@@ -278,6 +278,7 @@ getopts = "0.2"
 hyper-rustls = { version = "0.24.2", default-features = false }
 lipsum = "0.6.0"
 openat = "0.1.17"
+openssl = { version = "0.10.71", features = ["unstable_boringssl"] }
 pkcs1 = "0.7.5"
 rust_icu_common = { version = "5.0.0", default-features = false, features = ["renaming"] }
 rust_icu_sys = { version = "5.0.0", default-features = false, features = ["renaming", "icu_version_in_env", "icu_version_67_plus"] }
@@ -356,6 +357,7 @@ zip = { version = "0.5.5", default-features = false, features = ["deflate"] }
 
 ### In-tree Crates: crates which are on crates.io but which we build from our in-tree copy
 # keep-sorted start
+bssl-sys = { path = "intree/bssl-sys" }
 fuchsia-cprng = { path = "intree/fuchsia-cprng" }
 # keep-sorted end
 
@@ -390,6 +392,7 @@ output_vt100 = { path = "empty/output_vt100" }
 pkg-config = { path = "empty/pkg-config" }
 redox_syscall = { path = "empty/redox_syscall" }
 rustversion = { path = "empty/rustversion" }
+vcpkg = { path = "empty/vcpkg" }
 wasi-0_11_0_preview1 = { path = "empty/wasi-0.11.0-wasi-snapshot-preview1", package = "wasi" }
 wasm-bindgen = { path = "empty/wasm-bindgen" }
 winapi = { path = "empty/winapi" }
@@ -527,6 +530,9 @@ reviewed_features = ["default"]
 
 [gn.package.bitflags."2.8.0"]
 reviewed_features = ["serde"]
+
+[gn.package.bssl-sys."0.1.0"]
+existing_gn_target = "//third_party/boringssl/rust:bssl-sys"
 
 # The unicode feature is excluded so we don't need to spend time auditing it.
 [gn.package.bstr."1.5.0"]
@@ -769,6 +775,15 @@ rustflags = [
 
 [gn.package.once_cell."1.20.2"]
 group_visibility = { import = "//third_party/rust_crates/visibility.gni", variable = "once_cell_visibility" }
+
+[gn.package.openssl."0.10.71"]
+group_visibility = { import = "//third_party/rust_crates/visibility.gni", variable = "openssl_visibility" }
+rustflags = ["--cfg=boringssl"]
+configs = ["//third_party/boringssl/rust:osslconf"]
+
+[gn.package.openssl-sys."0.9.106"]
+# Has build script but no config needed.
+
 [gn.package.parking_lot."0.12.0"]
 # Funnel usage of parking_lot through fuchsia_sync.
 visibility = ["//src/lib/fuchsia-sync", "//third_party/rust_crates:*"]

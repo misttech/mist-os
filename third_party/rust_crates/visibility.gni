@@ -302,3 +302,19 @@ zeroize_visibility = [
   # At this time only Android KeyMint is allowed to use it.
   "//third_party/android/platform/system/keymint:*",
 ]
+
+openssl_visibility = [
+  #  ________  _________  ________  ________
+  # |\   ____\|\___   ___\\   __  \|\   __  \
+  # \ \  \___|\|___ \  \_\ \  \|\  \ \  \|\  \
+  #  \ \_____  \   \ \  \ \ \  \\\  \ \   ____\
+  #   \|____|\  \   \ \  \ \ \  \\\  \ \  \___|
+  #     ____\_\  \   \ \__\ \ \_______\ \__\
+  #    |\_________\   \|__|  \|_______|\|__|
+  #    \|_________|
+  #
+  # This is an allowlist of targets that use the `openssl` Rust crate.
+  #
+  # At this time only Android KeyMint is allowed to use it.
+  "//third_party/android/platform/system/keymint:*",
+]
