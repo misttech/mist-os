@@ -11,7 +11,8 @@ using zx;
 open protocol Device {
     /// Request to sent to nanohub to load the firmware.
     strict DownloadFirmware(resource struct {
-        firmware zx.Handle:<VMO, zx.Rights.MAP | zx.Rights.READ | zx.Rights.EXECUTE>;
+        firmware
+                zx.Handle:<VMO, zx.Rights.MAP | zx.Rights.READ | zx.Rights.GET_PROPERTY | zx.Rights.EXECUTE>;
         // Specify the location to jump to for reading the firmware.
         offset uint64;
     }) -> () error zx.Status;
