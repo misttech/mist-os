@@ -6,7 +6,6 @@ group("tools") {
   testonly = true
 
   public_deps = [
-    "//src/testing/pkgstats:host($host_toolchain)",
     "//tools/auto_owners($host_toolchain)",
     "//tools/bindc:host($host_toolchain)",
     "//tools/bootserver_old:host($host_toolchain)",
@@ -34,6 +33,7 @@ group("tools") {
     "//tools/netprotocol($host_toolchain)",
     "//tools/orchestrate($host_toolchain)",
     "//tools/pbtool($host_toolchain)",
+    "//tools/pkgstats:install($host_toolchain)",
     "//tools/power_config($host_toolchain)",
     "//tools/pretty_serial:install($host_toolchain)",
     "//tools/rfc:install($host_toolchain)",
@@ -130,6 +130,7 @@ group("tests_no_e2e") {
     "//tools/net:tests($host_toolchain)",
     "//tools/orchestrate:tests($host_toolchain)",
     "//tools/pbtool:tests($host_toolchain)",
+    "//tools/pkgstats:tests",
     "//tools/power_config:tests",
     "//tools/pretty_serial:tests",
     "//tools/qemu:tests($host_toolchain)",

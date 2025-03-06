@@ -41,7 +41,7 @@ if (is_host) {
     source_root = "src/main.rs"
     sources = [ "src/main.rs" ]
   }
-  install_host_tools("host") {
+  install_host_tools("install") {
     deps = [ ":bin" ]
     outputs = [ "pkgstats" ]
   }
