@@ -21,14 +21,18 @@ macro_rules! for_each_arch_syscall {
         $callback!{
             $($context;)*
             $($common_name,)*
+
+            // go/keep-sorted start
+
+            _sysctl,  // (deprecated)
             access,  // faccessat
             afs_syscall, // (deprecated)
             alarm,  // setitimer
             arch_prctl,  // (unused)
             chmod,  // fchmodat
             chown,  // fchownat
-            create_module, // (deprecated)
             creat,  // openat
+            create_module, // (deprecated)
             dup2,  // dup3
             epoll_create,  // epoll_create1
             epoll_ctl_old,  // (unused)
@@ -37,11 +41,11 @@ macro_rules! for_each_arch_syscall {
             eventfd,  // eventfd2
             fork,  // clone
             futimesat,  // (deprecated)
-            getdents,  // getdents64
             get_kernel_syms, // (deprecated)
+            get_thread_area,  // (unused)
+            getdents,  // getdents64
             getpgrp,  // getpgid
             getpmsg, // (unused)
-            get_thread_area,  // (unused)
             inotify_init,  // inotify_init1
             ioperm,  // (unused)
             iopl,  // (deprevated)
@@ -67,17 +71,18 @@ macro_rules! for_each_arch_syscall {
             signalfd,  // signalfd4
             stat,  // fstatat
             symlink,  // symlinkat
-            _sysctl,  // (deprecated)
             sysfs,  // (deprecated)
             time,  // gettimeofday
             tuxcall,  // (unused)
             unlink,  // unlinkat
             uselib,  // (deprecated)
             ustat,  // (deprecated)
-            utimes,  // utimesat
             utime,  // utimesat
+            utimes,  // utimesat
             vfork,  // clone
             vserver,  // (unused)
+
+            // go/keep-sorted end
         }
     }
 }
@@ -91,12 +96,16 @@ macro_rules! for_each_arch_arch32_syscall {
         $callback!{
             $($context;)*
             $($common_name,)*
-            renameat,  // renameat2
+
+            // go/keep-sorted start
+
             ARM_breakpoint,
             ARM_cacheflush,
             ARM_set_tls,
             ARM_usr26,
             ARM_usr32,
+            _llseek,
+            _newselect,
             arm_fadvise64_64,
             clock_gettime64,
             dup2,
@@ -114,19 +123,18 @@ macro_rules! for_each_arch_arch32_syscall {
             fstatfs64,
             ftruncate,
             ftruncate64,
+            get_robust_list,
             getdents,
             getitimer,
-            get_robust_list,
             getrusage,
             gettimeofday,
-            ioctl,
             io_pgetevents,
             io_pgetevents_time64,
             io_setup,
             io_submit,
+            ioctl,
             kexec_load,
             keyctl,
-            _llseek,
             lseek,
             lstat,
             mmap2,
@@ -136,10 +144,9 @@ macro_rules! for_each_arch_arch32_syscall {
             msgctl,
             msgrcv,
             msgsnd,
-            _newselect,
             open,
-            openat,
             open_by_handle_at,
+            openat,
             ppoll,
             ppoll_time64,
             pread64,
@@ -157,6 +164,7 @@ macro_rules! for_each_arch_arch32_syscall {
             recvmmsg,
             recvmmsg_time64,
             recvmsg,
+            renameat,  // renameat2
             rt_sigaction,
             rt_sigpending,
             rt_sigprocmask,
@@ -172,9 +180,9 @@ macro_rules! for_each_arch_arch32_syscall {
             sendfile,
             sendmmsg,
             sendmsg,
+            set_robust_list,
             setitimer,
             setrlimit,
-            set_robust_list,
             settimeofday,
             shmat,
             shmctl,
@@ -202,6 +210,8 @@ macro_rules! for_each_arch_arch32_syscall {
             vfork,
             wait4,
             waitid,
+
+            // go/keep-sorted end
         }
     }
 }
@@ -241,6 +251,9 @@ macro_rules! for_each_syscall {
             $callback;
             $($context;)*
             ;
+
+            // go/keep-sorted start
+
             accept,
             accept4,
             acct,
@@ -261,8 +274,8 @@ macro_rules! for_each_syscall {
             clock_settime,
             clone,
             clone3,
-            close_range,
             close,
+            close_range,
             connect,
             copy_file_range,
             delete_module,
@@ -275,8 +288,8 @@ macro_rules! for_each_syscall {
             eventfd2,
             execve,
             execveat,
-            exit_group,
             exit,
+            exit_group,
             faccessat,
             faccessat2,
             fadvise64,
@@ -304,8 +317,8 @@ macro_rules! for_each_syscall {
             fstatfs,
             fsync,
             ftruncate,
-            futex_waitv,
             futex,
+            futex_waitv,
             get_mempolicy,
             get_robust_list,
             getcpu,
@@ -379,8 +392,8 @@ macro_rules! for_each_syscall {
             mlock2,
             mlockall,
             mmap,
-            mount_setattr,
             mount,
+            mount_setattr,
             move_mount,
             move_pages,
             mprotect,
@@ -432,8 +445,8 @@ macro_rules! for_each_syscall {
             pwrite64,
             pwritev,
             pwritev2,
-            quotactl_fd,
             quotactl,
+            quotactl_fd,
             read,
             readahead,
             readlinkat,
@@ -477,8 +490,8 @@ macro_rules! for_each_syscall {
             sendmmsg,
             sendmsg,
             sendto,
-            set_mempolicy_home_node,
             set_mempolicy,
+            set_mempolicy_home_node,
             set_robust_list,
             set_tid_address,
             setdomainname,
@@ -516,8 +529,8 @@ macro_rules! for_each_syscall {
             swapoff,
             swapon,
             symlinkat,
-            sync_file_range,
             sync,
+            sync_file_range,
             syncfs,
             sysinfo,
             syslog,
@@ -547,6 +560,8 @@ macro_rules! for_each_syscall {
             waitid,
             write,
             writev,
+
+            // go/keep-sorted end
         }
     }
 }
@@ -575,6 +590,10 @@ macro_rules! for_each_arch32_syscall {
             $callback;
             $($context;)*
             ;
+
+            // go/keep-sorted start
+
+            // memfd_secret,  Not yet in our arm uapi
             _sysctl,
             accept,
             accept4,
@@ -597,8 +616,8 @@ macro_rules! for_each_arch32_syscall {
             clock_settime,
             clone,
             clone3,
-            close_range,
             close,
+            close_range,
             connect,
             copy_file_range,
             delete_module,
@@ -607,8 +626,8 @@ macro_rules! for_each_arch32_syscall {
             epoll_create1,
             epoll_ctl,
             eventfd2,
-            exit_group,
             exit,
+            exit_group,
             faccessat,
             faccessat2,
             fanotify_init,
@@ -629,8 +648,8 @@ macro_rules! for_each_arch32_syscall {
             fsopen,
             fspick,
             fsync,
-            futex_waitv,
             futex,
+            futex_waitv,
             get_mempolicy,
             getcpu,
             getcwd,
@@ -684,7 +703,6 @@ macro_rules! for_each_arch32_syscall {
             mbind,
             membarrier,
             memfd_create,
-            // memfd_secret,  Not yet in our arm uapi
             migrate_pages,
             mincore,
             mkdirat,
@@ -692,8 +710,8 @@ macro_rules! for_each_arch32_syscall {
             mlock,
             mlock2,
             mlockall,
-            mount_setattr,
             mount,
+            mount_setattr,
             move_mount,
             move_pages,
             mprotect,
@@ -727,8 +745,8 @@ macro_rules! for_each_arch32_syscall {
             process_mrelease,
             process_vm_readv,
             process_vm_writev,
-            quotactl_fd,
             quotactl,
+            quotactl_fd,
             read,
             readlinkat,
             readv,
@@ -754,8 +772,8 @@ macro_rules! for_each_arch32_syscall {
             semop,
             semtimedop,
             sendto,
-            set_mempolicy_home_node,
             set_mempolicy,
+            set_mempolicy_home_node,
             set_tid_address,
             setdomainname,
             setfsgid,
@@ -808,6 +826,8 @@ macro_rules! for_each_arch32_syscall {
             vmsplice,
             write,
             writev,
+
+            // go/keep-sorted end
         }
     }
 }
