@@ -160,15 +160,6 @@ config("compiler") {
     compiler_flags += [ "-mno-incremental-linker-compatible" ]
   }
 
-  # The toolchain-supplied headers come after include_dirs from targets and
-  # configs but before libc.
-  foreach(dir, zircon_toolchain.include_dirs_cc) {
-    cflags_cc += [
-      "-isystem",
-      rebase_path(dir, root_build_dir),
-    ]
-  }
-
   lib_dirs = zircon_toolchain.lib_dirs
 
   asmflags = compiler_flags

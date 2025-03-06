@@ -434,29 +434,47 @@ foreach(version, header_test_stdcxx) {
             "c",
             "gnu",
           ]) {
-    unittest_deps += [ ":header-tests.${prefix}xx$version" ]
-    libc_test("header-tests.${prefix}xx$version") {
-      sources = header_test_cxx_sources
-      deps = header_test_cxx_deps
+    # libc++ provides wrapper headers that interpose on various libc headers.
+    # Those will be found implicitly in preference to the libc headers, unless
+    # -nostdinc++ is used.  The libc headers should be usable and warning-clean
+    # when used in C++ language modes directly without the libc++ wrappers;
+    # they won't be standard C++ library compatible with `std::` namespace
+    # declarations and such, but they should not get compilation errors.
+    #
+    # The libc headers should also be usable (and warning-clean) when used via
+    # libc++'s wrapper headers.  So test both ways.
+    foreach(libcxx,
+            [
+              "",
+              "-libcxx",
+            ]) {
+      unittest_deps += [ ":header-tests.${prefix}xx$version$libcxx" ]
+      libc_test("header-tests.${prefix}xx$version$libcxx") {
+        sources = header_test_cxx_sources
+        deps = header_test_cxx_deps
 
-      # The <zircon/*.h> headers (and their transitive dependencies on syscall
-      # headers) don't need to support C++ < 17.
-      if (version != "03" && version >= 17) {
-        sources += header_test_zircon_cxx_sources
-        deps += header_test_zircon_cxx_deps
+        # The <zircon/*.h> headers (and their transitive dependencies on
+        # syscall headers) don't need to support C++ < 17.
+        if (version != "03" && version >= 17) {
+          sources += header_test_zircon_cxx_sources
+          deps += header_test_zircon_cxx_deps
+        }
+
+        deps += [ ":headers" ]
+        configs = [ ":test.$prefix++$version" ]
+        if (libcxx == "") {
+          # Don't use the libc++ headers.
+          configs += [ "//build/config:no-libc++-include" ]
+          remove_configs = [ "//build/config:libc++-include" ]
+
+          # The libc++ headers are not warning-clean, and instead rely on the
+          # system-headers exemption from warnings.  This is an unfortunate and
+          # counterproductive choice by the libc++ maintainers and it should be
+          # changed, but it is unlikely to change soon.  If it ever does
+          # change, then this should be added unconditionally.
+          configs += [ "//build/config:Wsystem-headers" ]
+        }
       }
-
-      deps += [ ":headers" ]
-      configs = [
-        ":test.$prefix++$version",
-        "//build/config:Wsystem-headers",
-
-        # libc++ headers are not warning-clean.
-        "//build/config:Wno-conversion",
-      ]
-
-      # TODO(https://fxbug.dev/400986232): Remove when this is resolved upstream
-      configs += [ "//build/config:Wno-nullability-completeness" ]
     }
 
     config("test.$prefix++$version") {

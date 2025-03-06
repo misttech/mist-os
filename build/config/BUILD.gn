@@ -153,6 +153,30 @@ config("compiler") {
   asmflags = cflags
 }
 
+# This is separate from :compiler so it can be removed from configs when also
+# adding :no-libc++-include.
+config("libc++-include") {
+  if (zircon_toolchain != false) {
+    cflags_cc = []
+
+    # The toolchain-supplied headers come after include_dirs from targets and
+    # configs but before libc.
+    foreach(dir, zircon_toolchain.include_dirs_cc) {
+      cflags_cc += [
+        "-isystem",
+        rebase_path(dir, root_build_dir),
+      ]
+    }
+  }
+}
+
+# Adding this must always be paired with removing :no-libc++-include.
+config("no-libc++-include") {
+  if (!is_gcc) {
+    cflags_cc = [ "-nostdinc++" ]
+  }
+}
+
 config("cpu_baseline") {
   if (current_cpu != "wasm32") {
     configs = [ "//build/config/$current_cpu" ]
