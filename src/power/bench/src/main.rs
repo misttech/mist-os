@@ -57,6 +57,17 @@ fn main() -> Result<()> {
         .warm_up_time(std::time::Duration::from_millis(10))
         .measurement_time(std::time::Duration::from_millis(100))
         .sample_size(100);
+
+    // TODO(https://fxbug.dev/401297480): Add a new bench test without an existing token.
+
+    let sag_arc = sag_work::obtain_sag_proxy();
+    let _event_pair = sag_arc
+        .take_wake_lease(
+            "benchmark",
+            zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(5)),
+        )
+        .unwrap();
+
     let _: &mut Criterion = c.bench("fuchsia.power.framework", get_sag_benches());
     let _: &mut Criterion = c.bench("fuchsia.power.framework", get_daemon_benches());
 

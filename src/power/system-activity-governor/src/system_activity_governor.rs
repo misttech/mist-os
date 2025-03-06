@@ -7,6 +7,7 @@ use crate::cpu_manager::{
 };
 use crate::events::{SagEvent, SagEventLogger};
 use anyhow::Result;
+use async_lock::{Semaphore, SemaphoreGuardArc};
 use async_trait::async_trait;
 use async_utils::hanging_get::server::{HangingGet, Publisher};
 use fidl::endpoints::{create_endpoints, Proxy};
@@ -27,6 +28,7 @@ use power_broker_client::{
 };
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
+use std::sync::Arc;
 use zx::{AsHandleRef, HandleBased};
 use {
     fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_observability as fobs,
@@ -252,7 +254,14 @@ impl LeaseManager {
         Ok(client_token)
     }
 
-    async fn create_wake_lease(&self, name: String) -> Result<fsystem::LeaseToken> {
+    async fn create_wake_lease<F>(
+        &self,
+        name: String,
+        once_closure: F,
+    ) -> Result<fsystem::LeaseToken>
+    where
+        F: FnOnce() + 'static,
+    {
         let suspend_blocker = match self.suspend_block_manager.try_get_blocker() {
             None => {
                 log::info!(
@@ -354,6 +363,7 @@ impl LeaseManager {
             // Keep wake lease alive for as long as the client keeps it alive.
             // The power element lease will be dropped once all references to lease have
             // been been dropped.
+            once_closure();
             let _ = fasync::OnSignals::new(server_token, zx::Signals::EVENTPAIR_PEER_CLOSED).await;
             log::debug!("Dropping wake lease for '{}'", name);
             sag_event_logger.log(SagEvent::WakeLeaseDropped { name: name.clone() });
@@ -690,6 +700,8 @@ impl SystemActivityGovernor {
     ) {
         // Before handling requests, ensure power elements are initialized and handlers are running.
         self.is_running_signal.wait().await;
+        // Semaphore to flow control the call from each client
+        let flow_control = Arc::new(Semaphore::new(1));
         while let Some(request) = stream.next().await {
             match request {
                 Ok(fsystem::ActivityGovernorRequest::GetPowerElements { responder }) => {
@@ -744,7 +756,15 @@ impl SystemActivityGovernor {
                     }
                 }
                 Ok(fsystem::ActivityGovernorRequest::TakeWakeLease { responder, name }) => {
-                    let client_token = match self.lease_manager.create_wake_lease(name).await {
+                    let guard: SemaphoreGuardArc = flow_control.acquire_arc().await;
+                    let once_closure = move || {
+                        drop(guard);
+                    };
+                    let client_token = match self
+                        .lease_manager
+                        .create_wake_lease(name, once_closure)
+                        .await
+                    {
                         Ok(client_token) => client_token,
                         Err(error) => {
                             log::warn!(error:?; "Encountered error while registering wake lease");
@@ -760,12 +780,16 @@ impl SystemActivityGovernor {
                     }
                 }
                 Ok(fsystem::ActivityGovernorRequest::AcquireWakeLease { responder, name }) => {
+                    let guard: SemaphoreGuardArc = flow_control.acquire_arc().await;
+                    let once_closure = move || {
+                        drop(guard);
+                    };
                     let client_token_res = if name.is_empty() {
                         log::warn!("Received invalid name while acquiring wake lease");
                         Err(fsystem::AcquireWakeLeaseError::InvalidName)
                     } else {
                         self.lease_manager
-                            .create_wake_lease(name)
+                            .create_wake_lease(name, once_closure)
                             .await
                             .and_then(|client_token| {
                                 client_token
