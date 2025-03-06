@@ -93,10 +93,6 @@ class PhysicalPageProvider : public PageProvider {
   // inspecting the loaned state, we force a serialization.
   mutable DECLARE_MUTEX(PhysicalPageProvider) loaned_state_lock_;
 
-  // Lock to ensure that only a single WaitOnEvent processing loop happens at a time. See comment
-  // in WaitOnEvent for more details.
-  mutable DECLARE_MUTEX(PhysicalPageProvider) wait_on_event_lock_;
-
   // To cease loaning pages all pages first become owned by the physical page provider and get
   // collected in |free_list_|, upon which they can be returned (i.e. freed) to the PMM.
   list_node_t free_list_ TA_GUARDED(mtx_) = LIST_INITIAL_VALUE(free_list_);

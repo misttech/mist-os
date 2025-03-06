@@ -286,18 +286,6 @@ void PhysicalPageProvider::UnloanRange(uint64_t range_offset, uint64_t length, l
 // TODO(https://fxbug.dev/42084841): Reason about the use of |suspendable|, ignored for now.
 zx_status_t PhysicalPageProvider::WaitOnEvent(Event* event,
                                               bool suspendable) TA_NO_THREAD_SAFETY_ANALYSIS {
-  // Use the wait_on_event_lock_ to serialize all attempts to wait on an event, and more
-  // specifically the processing of the requests. By holding this lock over the full processing of
-  // the requests we can guarantee that once all requests have been processed, that the request we
-  // are waiting on *must* be completed.
-  // Without this lock when we wait on the event below it might not be complete, since its request
-  // might be being processed by a different WaitOnEvent invocation. This is not a problem per se,
-  // but would require actually waiting, instead of using Deadline::infinite_past. As there is no
-  // benefit to having multiple requests being processed (since they will all hit the same VMO lock)
-  // the simplicity of being able to ASSERT that the event was signalled is considered preferable to
-  // enabling more concurrency here.
-  Guard<Mutex> wait_guard{&wait_on_event_lock_};
-
   // Before processing any events we synchronize with OnDetach and retrieve a RefPtr to the
   // cow_pages_. This ensures we can safely dereference the cow_pages_ later on, knowing we are not
   // racing with its destructor.
@@ -432,17 +420,23 @@ zx_status_t PhysicalPageProvider::WaitOnEvent(Event* event,
   }  // while have requests to process
 
   kcounter_add(physical_reclaim_total_requests, 1);
-  // Will immediately return, because we've already processed all the requests that were pending
-  // above (with success or failure), and we did so under the wait_on_event_lock_ so we know that
-  // there is no other processing loop that might still be working on our request.
-  zx_status_t wait_result = event->Wait(Deadline::infinite_past());
-  // TODO(https://fxbug.dev/400838270): There is a race where PageSource::Detach could be
-  // completing requests and already have done ClearAsyncRequest, but not yet called Signal on the
-  // event. If the request was cleared prior to us performing DequeueRequest then this leaves us in
-  // the position where the wait will have timed out. Once we can either differentiate or avoid this
-  // this case the ASSERT below should be uncommented. Note that in the event we are in this case
-  // failing to complete the wait is fine, since the source is ultimately getting detached.
-  // ASSERT(wait_result != ZX_ERR_TIMED_OUT);
+  // The event now should be in one of three states:
+  //  1. We processed the related request above in the loop, and the event got signaled as a
+  //     consequence of the pages we supplied.
+  //  2. A different thread dequeued the request and either processed it, or is still processing it.
+  //  3. The request is in the process of being cancelled and the underlying request packet got
+  //     dequeued, and the event has or will be signaled.
+  // In all cases it is a *kernel* thread under our control that should signal the thread, and so
+  // although we may need to wait, only a kernel bug should cause this to block indefinitely.
+  // To attempt to detect such bugs we wait with a generous timeout before making some noise.
+  constexpr zx_duration_t kReportWaitTime = ZX_SEC(60);
+  zx_status_t wait_result = ZX_OK;
+  uint32_t waited = 0;
+  while ((wait_result = event->Wait(Deadline::after_mono(kReportWaitTime))) == ZX_ERR_TIMED_OUT) {
+    waited++;
+    printf("WARNING: PhysicalPageProvider has waited %" PRIi64 " seconds on event.\n",
+           (kReportWaitTime * waited) / ZX_SEC(1));
+  }
   if (wait_result == ZX_OK) {
     kcounter_add(physical_reclaim_succeeded_requests, 1);
   } else {
