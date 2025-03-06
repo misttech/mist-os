@@ -160,6 +160,7 @@ impl ImageAssemblyConfigBuilder {
             packages_to_compile,
             shell_commands,
             developer_provided_files: _,
+            bootfs_files_package,
         } = developer_overrides;
 
         // Set the developer-only options for the buidler to use.
@@ -192,6 +193,10 @@ impl ImageAssemblyConfigBuilder {
             for binary in binaries {
                 self.add_pkg_shell_command_entry(&package, binary)?;
             }
+        }
+
+        if let Some(path) = bootfs_files_package {
+            self.add_bootfs_files_package(path, true)?;
         }
 
         Ok(())
@@ -246,7 +251,8 @@ impl ImageAssemblyConfigBuilder {
         self.add_bundle_packages(bundle_path, &packages)?;
 
         if let Some(path) = bootfs_files_package {
-            self.add_bootfs_files_from_path(bundle_path, path)?;
+            let path = bundle_path.join(path);
+            self.add_bootfs_files_package(path, false).context("Adding bootfs files package")?;
         }
 
         // Base drivers are added to the base packages
@@ -410,17 +416,6 @@ impl ImageAssemblyConfigBuilder {
         Ok(())
     }
 
-    /// Add all the product-provided bootfs file entries to the builder.
-    pub fn add_product_bootfs_files(&mut self, files: &Vec<FileEntry<String>>) -> Result<()> {
-        for entry in files {
-            self.bootfs_files.add_entry(FileEntry {
-                source: entry.source.to_owned(),
-                destination: BootfsDestination::FromProduct(entry.destination.to_owned()),
-            })?;
-        }
-        Ok(())
-    }
-
     /// Add kernel args to the builder
     pub fn add_kernel_args(&mut self, args: impl IntoIterator<Item = String>) -> Result<()> {
         self.kernel_args
@@ -440,14 +435,14 @@ impl ImageAssemblyConfigBuilder {
         Ok(())
     }
 
-    fn add_bootfs_files_from_path(
+    /// Add the blobs of a package as bootfs files
+    pub fn add_bootfs_files_package(
         &mut self,
-        bundle_path: impl AsRef<Utf8Path>,
         path: impl AsRef<Utf8Path>,
+        from_product: bool,
     ) -> Result<()> {
-        let path = bundle_path.as_ref().join(path);
         let manifest = PackageManifest::try_load_from(&path)
-            .with_context(|| format!("parsing {path} as a package manifest"))?;
+            .with_context(|| format!("parsing {} as a package manifest", path.as_ref()))?;
         for mut blob in manifest.into_blobs() {
             if blob.path.starts_with("meta/") {
                 continue;
@@ -455,9 +450,14 @@ impl ImageAssemblyConfigBuilder {
             if let Some(path) = blob.path.strip_prefix("bootfs/") {
                 blob.path = path.to_string();
             }
+            let destination = if from_product {
+                BootfsDestination::FromProduct(blob.path.clone())
+            } else {
+                BootfsDestination::FromAIB(blob.path.clone())
+            };
             self.bootfs_files
-                .add_blob_from_aib(blob)
-                .with_context(|| format!("adding bootfs file from {path}"))?;
+                .add_blob(destination, blob)
+                .with_context(|| format!("adding bootfs file from {}", path.as_ref()))?;
         }
         Ok(())
     }

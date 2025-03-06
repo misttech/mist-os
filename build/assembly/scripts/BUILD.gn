@@ -144,6 +144,14 @@ python_binary("developer_overrides") {
   ]
 }
 
+python_binary("product_assembly_config_file") {
+  main_source = "product_assembly_config_file.py"
+  deps = [
+    "//build/python/modules/assembly",
+    "//build/python/modules/serialization",
+  ]
+}
+
 group("tests") {
   testonly = true
   deps = [

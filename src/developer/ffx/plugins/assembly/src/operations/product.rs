@@ -19,6 +19,7 @@ use assembly_tool::SdkToolProvider;
 use assembly_util::read_config;
 use camino::Utf8PathBuf;
 use ffx_assembly_args::{PackageValidationHandling, ProductArgs};
+use fuchsia_pkg::PackageManifest;
 use tracing::info;
 
 mod assembly_builder;
@@ -264,7 +265,7 @@ Resulting product is not supported and may misbehave!
     builder.add_bootfs_files(&configuration.bootfs.files).context("Adding bootfs files")?;
 
     // Add product-specified packages and configuration
-    if !product.bootfs_files.is_empty() || !product.packages.bootfs.is_empty() {
+    if product.bootfs_files_package.is_some() || !product.packages.bootfs.is_empty() {
         match platform.feature_set_level {
             FeatureSupportLevel::Empty
             | FeatureSupportLevel::Embeddable
@@ -276,9 +277,15 @@ Resulting product is not supported and may misbehave!
             }
         }
     }
-    builder
-        .add_product_bootfs_files(&product.bootfs_files)
-        .context("Adding product-specified bootfs files")?;
+
+    // Add product-specified bootfs files, if present
+    if let Some(bootfs_files_package) = &product.bootfs_files_package {
+        builder
+            .add_bootfs_files_package(bootfs_files_package, true)
+            .context("Adding product-specified bootfs files")?;
+    }
+
+    // Add product-specified packages
     builder.add_product_packages(product.packages).context("Adding product-provided packages")?;
 
     // Add product-specified memory buckets.
@@ -475,6 +482,23 @@ fn print_developer_overrides_banner(
             }
         }
     }
+
+    if let Some(path) = &overrides.bootfs_files_package {
+        let manifest = PackageManifest::try_load_from(&path)
+            .with_context(|| format!("parsing {} as a package manifest", path))?;
+        let blobs = manifest.into_blobs();
+        if blobs.len() > 1 {
+            println!();
+            println!("  Additional bootfs files:");
+            for blob in blobs {
+                if blob.path.starts_with("meta/") {
+                    continue;
+                }
+                println!("    {}  (from: {})", blob.path, blob.source_path);
+            }
+        }
+    }
+
     println!();
     // And an additional empty line to make sure that any /r's don't attempt to overwrite the last
     // line of this warning.

@@ -4,6 +4,7 @@
 
 import("//build/assembly/product_assembly_config_file_impl.gni")
 import("//build/compiled_action.gni")
+import("//build/components/fuchsia_package.gni")
 import("//build/group_with_inputs.gni")
 
 # Create a product assembly config file from the lists of packages and config
@@ -114,6 +115,10 @@ template("product_assembly_configuration") {
     cache_package_config_data = "${target_name}.cache_packages.config_data"
     board_driver_package_set = "${target_name}.board_driver_packages"
     bootfs_package_set = "${target_name}.bootfs_packages"
+
+    if (defined(invoker.bootfs_files_labels)) {
+      bootfs_files_package = "${target_name}.bootfs_files_package"
+    }
 
     # Base packages specified by the invoker, used to create the list of
     # manifests and as the deps for the package set targets.
@@ -337,6 +342,17 @@ template("product_assembly_configuration") {
     }
   }
 
+  if (defined(labels.bootfs_files_package)) {
+    fuchsia_package(labels.bootfs_files_package) {
+      forward_variables_from(invoker, [ "testonly" ])
+      if (defined(invoker.bootfs_files_labels)) {
+        deps = invoker.bootfs_files_labels
+      }
+    }
+    bootfs_files_package_manifest =
+        "${target_out_dir}/${labels.bootfs_files_package}/package_manifest.json"
+  }
+
   _assembly_config = {
     # Create the platform configuration section from the caller's argument
     platform = invoker.platform
@@ -360,6 +376,11 @@ template("product_assembly_configuration") {
       }
 
       base_drivers = files.base_driver_packages
+
+      if (defined(labels.bootfs_files_package)) {
+        bootfs_files_package =
+            rebase_path(bootfs_files_package_manifest, root_build_dir)
+      }
     }
   }
 
@@ -496,6 +517,9 @@ template("product_assembly_configuration") {
     ]
     if (labels.bootfs_package_labels != []) {
       deps += [ ":${labels.bootfs_package_set}" ]
+    }
+    if (defined(labels.bootfs_files_package)) {
+      deps += [ ":${labels.bootfs_files_package}" ]
     }
 
     # Block all metadata walks for packages, distribution entries, etc.  These

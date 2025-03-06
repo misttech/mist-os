@@ -659,7 +659,7 @@ def main() -> int:
     )
     find_blob_parser.set_defaults(handler=find_blob)
 
-    args = parser.parse_args()
+    args: argparse.Namespace = parser.parse_args()
 
     if "handler" in args:
         # Dispatch to the handler fn.

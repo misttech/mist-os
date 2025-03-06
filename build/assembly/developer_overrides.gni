@@ -4,6 +4,7 @@
 
 import("//build/assembly/product_assembly_config_file_impl.gni")
 import("//build/bazel/bazel_inputs.gni")
+import("//build/components/fuchsia_package.gni")
 import("//build/python/python_action.gni")
 
 # Define developer overrides for product assembly
@@ -76,6 +77,10 @@ import("//build/python/python_action.gni")
 #    metadata. If the target isn't a bootfs_files_for_assembly target, it will
 #    cause an error like:
 #      "no dependency provides the input <package_name>/bootfs_files.json"
+#
+#   bootfs_files_labels [optional]
+#     [list, GN labels] A list of GN labels of bootfs_files_for_assembly()
+#     targets to include in bootfs_files provided by this AIB.
 #
 #  shell_commands (optional; default: empty)
 #    [list of scopes] A list of scopes that describe the shell commands for each
@@ -164,6 +169,10 @@ template("assembly_developer_overrides") {
     # template that lists all the files that were found in the intermediate
     assembly_overrides_intermediate_input_paths =
         "${assembly_overrides_intermediate}.input_file_paths"
+
+    if (defined(invoker.bootfs_files_labels)) {
+      bootfs_files_package = "${target_name}.bootfs_files_package"
+    }
   }
 
   files = {
@@ -278,6 +287,17 @@ template("assembly_developer_overrides") {
     }
   }
 
+  if (defined(invoker.bootfs_files_labels)) {
+    fuchsia_package(labels.bootfs_files_package) {
+      forward_variables_from(invoker, [ "testonly" ])
+      if (defined(invoker.bootfs_files_labels)) {
+        deps = invoker.bootfs_files_labels
+      }
+    }
+    bootfs_files_package_manifest =
+        "${target_out_dir}/${labels.bootfs_files_package}/package_manifest.json"
+  }
+
   _assembly_overrides = {
     target_name = get_label_info(":$target_name", "label_no_toolchain")
     forward_variables_from(invoker,
@@ -291,6 +311,11 @@ template("assembly_developer_overrides") {
     packages = _packages
     packages_to_compile = _compiled_packages
     shell_commands = _shell_commands
+
+    if (defined(labels.bootfs_files_package)) {
+      bootfs_files_package =
+          rebase_path(bootfs_files_package_manifest, files.outdir)
+    }
   }
 
   # Generate the overrides configuration file itself.
@@ -329,6 +354,10 @@ template("assembly_developer_overrides") {
       ":${labels.assembly_overrides_intermediate}",
     ]
     deps = [ ":${labels.assembly_overrides_intermediate_input_paths}" ]
+
+    if (defined(labels.bootfs_files_package)) {
+      deps += [ ":${labels.bootfs_files_package}" ]
+    }
 
     # The contents of these folders is dynamic, and managed entirely by this
     # action.  Further, this action will need to delete items from these

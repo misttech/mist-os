@@ -75,9 +75,7 @@ impl NamedFileMap<BootfsDestination> {
     /// duplicate but the merkle is the same, do nothing. If the
     /// `destination' path is a duplicate and the merkle is different,
     /// return an error. Otherwise add the entry.
-    pub fn add_blob_from_aib(&mut self, blob: BlobInfo) -> Result<()> {
-        let blob_path = blob.path.clone();
-        let destination = BootfsDestination::FromAIB(blob_path.clone());
+    pub fn add_blob(&mut self, destination: BootfsDestination, blob: BlobInfo) -> Result<()> {
         let result = self.map.entries.try_insert_unique(MapEntry(destination, blob.into()));
         match result {
             Ok(_) => Ok(()),
@@ -95,7 +93,7 @@ impl NamedFileMap<BootfsDestination> {
             destination     = {}
             previous_merkle = {:?}
             merkle          = {:?}"#,
-                    blob_path,
+                    existing_entry.key(),
                     previous_value.merkle,
                     new_value.merkle
                 ));
@@ -196,23 +194,29 @@ mod tests {
     #[test]
     fn blobs_diff_src_diff_dest() {
         let mut map = NamedFileMap::new("test");
-        map.add_blob_from_aib(BlobInfo {
-            source_path: "src1".into(),
-            path: "dest1".into(),
-            merkle: "0000000000000000000000000000000000000000000000000000000000000000"
-                .parse()
-                .unwrap(),
-            size: 0,
-        })
+        map.add_blob(
+            BootfsDestination::FromAIB("dest1".into()),
+            BlobInfo {
+                source_path: "src1".into(),
+                path: "dest1".into(),
+                merkle: "0000000000000000000000000000000000000000000000000000000000000000"
+                    .parse()
+                    .unwrap(),
+                size: 0,
+            },
+        )
         .unwrap();
-        map.add_blob_from_aib(BlobInfo {
-            source_path: "src2".into(),
-            path: "dest2".into(),
-            merkle: "0000000000000000000000000000000000000000000000000000000000000000"
-                .parse()
-                .unwrap(),
-            size: 0,
-        })
+        map.add_blob(
+            BootfsDestination::FromAIB("dest2".into()),
+            BlobInfo {
+                source_path: "src2".into(),
+                path: "dest2".into(),
+                merkle: "0000000000000000000000000000000000000000000000000000000000000000"
+                    .parse()
+                    .unwrap(),
+                size: 0,
+            },
+        )
         .unwrap();
 
         assert_eq!(
@@ -233,23 +237,29 @@ mod tests {
     #[test]
     fn blobs_same_src_diff_dest() {
         let mut map = NamedFileMap::new("test");
-        map.add_blob_from_aib(BlobInfo {
-            source_path: "src1".into(),
-            path: "dest1".into(),
-            merkle: "0000000000000000000000000000000000000000000000000000000000000000"
-                .parse()
-                .unwrap(),
-            size: 0,
-        })
+        map.add_blob(
+            BootfsDestination::FromAIB("dest1".into()),
+            BlobInfo {
+                source_path: "src1".into(),
+                path: "dest1".into(),
+                merkle: "0000000000000000000000000000000000000000000000000000000000000000"
+                    .parse()
+                    .unwrap(),
+                size: 0,
+            },
+        )
         .unwrap();
-        map.add_blob_from_aib(BlobInfo {
-            source_path: "src1".into(),
-            path: "dest2".into(),
-            merkle: "0000000000000000000000000000000000000000000000000000000000000000"
-                .parse()
-                .unwrap(),
-            size: 0,
-        })
+        map.add_blob(
+            BootfsDestination::FromAIB("dest2".into()),
+            BlobInfo {
+                source_path: "src1".into(),
+                path: "dest2".into(),
+                merkle: "0000000000000000000000000000000000000000000000000000000000000000"
+                    .parse()
+                    .unwrap(),
+                size: 0,
+            },
+        )
         .unwrap();
 
         assert_eq!(
@@ -270,23 +280,29 @@ mod tests {
     #[test]
     fn blobs_same_src_same_dest_same_merkle() {
         let mut map = NamedFileMap::new("test");
-        map.add_blob_from_aib(BlobInfo {
-            source_path: "src1".into(),
-            path: "dest1".into(),
-            merkle: "0000000000000000000000000000000000000000000000000000000000000000"
-                .parse()
-                .unwrap(),
-            size: 0,
-        })
+        map.add_blob(
+            BootfsDestination::FromAIB("dest1".into()),
+            BlobInfo {
+                source_path: "src1".into(),
+                path: "dest1".into(),
+                merkle: "0000000000000000000000000000000000000000000000000000000000000000"
+                    .parse()
+                    .unwrap(),
+                size: 0,
+            },
+        )
         .unwrap();
-        map.add_blob_from_aib(BlobInfo {
-            source_path: "src1".into(),
-            path: "dest1".into(),
-            merkle: "0000000000000000000000000000000000000000000000000000000000000000"
-                .parse()
-                .unwrap(),
-            size: 0,
-        })
+        map.add_blob(
+            BootfsDestination::FromAIB("dest1".into()),
+            BlobInfo {
+                source_path: "src1".into(),
+                path: "dest1".into(),
+                merkle: "0000000000000000000000000000000000000000000000000000000000000000"
+                    .parse()
+                    .unwrap(),
+                size: 0,
+            },
+        )
         .unwrap();
 
         assert_eq!(
@@ -301,23 +317,29 @@ mod tests {
     #[test]
     fn blobs_same_src_same_dest_diff_merkle() {
         let mut map = NamedFileMap::new("test");
-        map.add_blob_from_aib(BlobInfo {
-            source_path: "src1".into(),
-            path: "dest1".into(),
-            merkle: "0000000000000000000000000000000000000000000000000000000000000000"
-                .parse()
-                .unwrap(),
-            size: 0,
-        })
+        map.add_blob(
+            BootfsDestination::FromAIB("dest1".into()),
+            BlobInfo {
+                source_path: "src1".into(),
+                path: "dest1".into(),
+                merkle: "0000000000000000000000000000000000000000000000000000000000000000"
+                    .parse()
+                    .unwrap(),
+                size: 0,
+            },
+        )
         .unwrap();
-        let res = map.add_blob_from_aib(BlobInfo {
-            source_path: "src1".into(),
-            path: "dest1".into(),
-            merkle: "1111111111111111111111111111111111111111111111111111111111111111"
-                .parse()
-                .unwrap(),
-            size: 0,
-        });
+        let res = map.add_blob(
+            BootfsDestination::FromAIB("dest1".into()),
+            BlobInfo {
+                source_path: "src1".into(),
+                path: "dest1".into(),
+                merkle: "1111111111111111111111111111111111111111111111111111111111111111"
+                    .parse()
+                    .unwrap(),
+                size: 0,
+            },
+        );
         assert!(res.is_err());
 
         assert_eq!(
@@ -332,14 +354,17 @@ mod tests {
     #[test]
     fn blob_and_entry_diff_src_diff_dest() {
         let mut map = NamedFileMap::new("test");
-        map.add_blob_from_aib(BlobInfo {
-            source_path: "src1".into(),
-            path: "dest1".into(),
-            merkle: "0000000000000000000000000000000000000000000000000000000000000000"
-                .parse()
-                .unwrap(),
-            size: 0,
-        })
+        map.add_blob(
+            BootfsDestination::FromAIB("dest1".into()),
+            BlobInfo {
+                source_path: "src1".into(),
+                path: "dest1".into(),
+                merkle: "0000000000000000000000000000000000000000000000000000000000000000"
+                    .parse()
+                    .unwrap(),
+                size: 0,
+            },
+        )
         .unwrap();
         map.add_entry(FileEntry { source: "src2".into(), destination: BootfsDestination::ForTest })
             .unwrap();
@@ -359,14 +384,17 @@ mod tests {
     #[test]
     fn blob_and_entry_same_src_diff_dest() {
         let mut map = NamedFileMap::new("test");
-        map.add_blob_from_aib(BlobInfo {
-            source_path: "src1".into(),
-            path: "dest1".into(),
-            merkle: "0000000000000000000000000000000000000000000000000000000000000000"
-                .parse()
-                .unwrap(),
-            size: 0,
-        })
+        map.add_blob(
+            BootfsDestination::FromAIB("dest1".into()),
+            BlobInfo {
+                source_path: "src1".into(),
+                path: "dest1".into(),
+                merkle: "0000000000000000000000000000000000000000000000000000000000000000"
+                    .parse()
+                    .unwrap(),
+                size: 0,
+            },
+        )
         .unwrap();
         map.add_entry(FileEntry { source: "src1".into(), destination: BootfsDestination::ForTest })
             .unwrap();
@@ -386,14 +414,17 @@ mod tests {
     #[test]
     fn blob_and_entry_same_src_same_dest() {
         let mut map = NamedFileMap::new("test");
-        map.add_blob_from_aib(BlobInfo {
-            source_path: "src1".into(),
-            path: "dest1".into(),
-            merkle: "0000000000000000000000000000000000000000000000000000000000000000"
-                .parse()
-                .unwrap(),
-            size: 0,
-        })
+        map.add_blob(
+            BootfsDestination::FromAIB("dest1".into()),
+            BlobInfo {
+                source_path: "src1".into(),
+                path: "dest1".into(),
+                merkle: "0000000000000000000000000000000000000000000000000000000000000000"
+                    .parse()
+                    .unwrap(),
+                size: 0,
+            },
+        )
         .unwrap();
         let res = map.add_entry(FileEntry {
             source: "src1".into(),

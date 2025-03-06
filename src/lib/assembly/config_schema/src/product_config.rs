@@ -5,7 +5,6 @@
 use std::collections::BTreeMap;
 
 use anyhow::Result;
-use assembly_constants::FileEntry;
 use assembly_container::{FileType, WalkPaths, WalkPathsFn};
 use assembly_package_utils::{PackageInternalPathBuf, PackageManifestPathBuf};
 use camino::{Utf8Path, Utf8PathBuf};
@@ -57,12 +56,17 @@ pub struct ProductConfig {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub trusted_apps: Vec<TrustedApp>,
 
-    /// The set of files to be placed in BOOTFS in the ZBI.
+    /// A package that includes files to include in bootfs.
     ///
     /// This is only usable in the empty, embeddable, and bootstrap feature set levels.
     #[walk_paths]
+    #[schemars(schema_with = "crate::option_path_schema")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bootfs_files_package: Option<Utf8PathBuf>,
+
+    /// ignored, this is for a soft transition.
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub bootfs_files: Vec<FileEntry<String>>,
+    bootfs_files: Vec<String>,
 }
 
 /// Packages provided by the product, to add to the assembled images.

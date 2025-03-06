@@ -4,17 +4,12 @@
 
 assert(is_fuchsia, "These can only be defined in the default toolchain")
 
+# NOTE:  These have been relocated to //products/bringup:bootfs_test_files
+#        this file remains, emptied, to point people at that location.
+
 # WARNING: Known to infrastructure
 group("bringup") {
   testonly = true
-
-  deps = [
-    # This leads to all the individual bootfs_test() targets.
-    "//src/bringup/tests:bootfs-tests",
-
-    # Add the testrunner.
-    "//src/testing/runtests",
-  ]
 }
 
 # For use with the 'e2e_test_labels' GN build argument.
