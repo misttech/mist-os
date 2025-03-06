@@ -81,7 +81,6 @@ void Dwc3::CmdEpStartTransfer(const Endpoint& ep, zx_paddr_t trb_phys) {
     if (!DEPCMD::Get(ep_num).ReadFrom(mmio).CMDACT()) {
       break;
     }
-    usleep(1000);
   }
 }
 
@@ -107,7 +106,6 @@ void Dwc3::CmdEpEndTransfer(const Endpoint& ep) {
     if (!DEPCMD::Get(ep_num).ReadFrom(mmio).CMDACT()) {
       break;
     }
-    usleep(1000);
   }
 }
 
@@ -130,7 +128,6 @@ void Dwc3::CmdEpSetStall(const Endpoint& ep) {
     if (!DEPCMD::Get(ep_num).ReadFrom(mmio).CMDACT()) {
       break;
     }
-    usleep(1000);
   }
 }
 
@@ -153,7 +150,6 @@ void Dwc3::CmdEpClearStall(const Endpoint& ep) {
     if (!DEPCMD::Get(ep_num).ReadFrom(mmio).CMDACT()) {
       break;
     }
-    usleep(1000);
   }
 }
 
