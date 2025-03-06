@@ -2860,9 +2860,10 @@ mod tests {
         assert_eq!(message.payload.cmd, Nl80211Cmd::NewInterface);
         assert!(message.payload.attrs.iter().any(|attr| *attr
             == Nl80211Attr::IfaceIndex(ifaces::test_utils::FAKE_IFACE_RESPONSE.id.into())));
-        assert!(message.payload.attrs.iter().any(
-            |attr| *attr == Nl80211Attr::Mac(ifaces::test_utils::FAKE_IFACE_RESPONSE.sta_addr)
-        ));
+        assert!(message
+            .payload
+            .attrs
+            .contains(&Nl80211Attr::Mac(ifaces::test_utils::FAKE_IFACE_RESPONSE.sta_addr)));
         assert_eq!(responses[1].message_type, Some(fidl_wlanix::Nl80211MessageType::Done));
     }
 
@@ -3105,10 +3106,6 @@ mod tests {
         assert_eq!(responses.len(), 1);
         let message = expect_nl80211_message(&responses[0]);
         assert_eq!(message.payload.cmd, Nl80211Cmd::GetReg);
-        assert!(message
-            .payload
-            .attrs
-            .iter()
-            .any(|attr| *attr == Nl80211Attr::RegulatoryRegionAlpha2([b'W', b'W'])));
+        assert!(message.payload.attrs.contains(&Nl80211Attr::RegulatoryRegionAlpha2([b'W', b'W'])));
     }
 }

@@ -312,8 +312,8 @@ mod test {
             ),
             channel::Channel::new(11, channel::Cbw::Cbw20),
         );
-        assert!(roam_reasons.iter().any(|&r| r == RoamReason::SnrBelowThreshold));
-        assert!(roam_reasons.iter().any(|&r| r == RoamReason::RssiBelowThreshold));
+        assert!(roam_reasons.contains(&RoamReason::SnrBelowThreshold));
+        assert!(roam_reasons.contains(&RoamReason::RssiBelowThreshold));
 
         let roam_reasons = check_signal_thresholds(
             &EwmaSignalData::new(
@@ -336,8 +336,8 @@ mod test {
             ),
             channel::Channel::new(36, channel::Cbw::Cbw80),
         );
-        assert!(roam_reasons.iter().any(|&r| r == RoamReason::SnrBelowThreshold));
-        assert!(roam_reasons.iter().any(|&r| r == RoamReason::RssiBelowThreshold));
+        assert!(roam_reasons.contains(&RoamReason::SnrBelowThreshold));
+        assert!(roam_reasons.contains(&RoamReason::RssiBelowThreshold));
 
         let roam_reasons = check_signal_thresholds(
             &EwmaSignalData::new(
