@@ -33,10 +33,10 @@ async fn main() {
     let mut profiles_config: ProfilesConfig = serde_json5::from_str(&profiles_config).unwrap();
     profiles_config
         .profiles
-        .insert("first_custom_role".to_string(), ProfileConfig { priority: 16 });
+        .insert("first_custom_role".to_string(), ProfileConfig::Flexible { priority: 16 });
     profiles_config
         .profiles
-        .insert("second_custom_role".to_string(), ProfileConfig { priority: 16 });
+        .insert("second_custom_role".to_string(), ProfileConfig::Flexible { priority: 16 });
 
     let (fake_manager, mut requests) = FakeRoleManager::new(profiles_config);
 
@@ -201,7 +201,7 @@ async fn main() {
     requests
         .with_next(|koid, role| {
             assert_eq!(koid, puppet_thread_one_koid);
-            assert_eq!(role, "fuchsia.starnix.fair.29");
+            assert_eq!(role, "fuchsia.starnix.realtime");
         })
         .await;
 
@@ -232,9 +232,20 @@ struct ProfilesConfig {
 }
 
 #[derive(Clone, Debug, Deserialize)]
-struct ProfileConfig {
-    #[allow(unused)]
-    priority: u8,
+#[serde(untagged)]
+enum ProfileConfig {
+    Flexible {
+        #[allow(unused)]
+        priority: u8,
+    },
+    Constant {
+        #[allow(unused)]
+        capacity: String,
+        #[allow(unused)]
+        deadline: String,
+        #[allow(unused)]
+        period: String,
+    },
 }
 
 #[derive(Clone)]

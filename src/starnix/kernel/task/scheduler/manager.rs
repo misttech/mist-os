@@ -342,33 +342,27 @@ impl SchedulerPolicyKind {
     /// 3. 16 is used for the default priority SCHED_OTHER/SCHED_BATCH, the same as Zircon's
     ///    default for Fuchsia processes.
     /// 4. 17-26 (inclusive) is used for higher-than-default-priority SCHED_OTHER/SCHED_BATCH tasks.
-    /// 5. 28-31 (inclusive) is used to temporarily emulate aggressive preemption for SCHED_FIFO/SCHED_RR
-    ///    tasks, offering enough values to differentiate between the static priorities used in
-    ///    prioritized workloads at time of writing (1, 2, and 99).
-    fn zircon_fair_priority(&self) -> u8 {
+    /// 5. Realtime tasks receive their own profile name.
+    fn role_name(&self) -> &'static str {
         match self {
             // Configured with nice 0-40, mapped to 0-3.
-            Self::Idle { priority } => priority / 11,
+            Self::Idle { priority } => FAIR_PRIORITY_ROLE_NAMES[*priority as usize / 11],
 
             // Configured with nice 0-40 and mapped to 6-26. 20 is the default nice which we want to
             // map to 16.
-            Self::Normal { priority } => (priority / 2) + 6,
+            Self::Normal { priority } => FAIR_PRIORITY_ROLE_NAMES[(*priority as usize / 2) + 6],
             Self::Batch { priority } => {
                 track_stub!(TODO("https://fxbug.dev/308055542"), "SCHED_BATCH hinting");
-                (priority / 2) + 6
+                FAIR_PRIORITY_ROLE_NAMES[(*priority as usize / 2) + 6]
             }
 
-            // Configured with priority 1-99, mapped to 28-31.
-            Self::Fifo { priority } | Self::RoundRobin { priority } => match priority {
-                1 => 29,
-                2 => 30,
-                _ => 31,
-            },
+            // Configured with priority 1-99, mapped to a constant bandwidth profile. Priority
+            // between realtime tasks is ignored because we don't currently have a way to tell the
+            // scheduler that a given realtime task is more important than another without
+            // specifying an earlier deadline for the higher priority task. We can't specify
+            // deadlines at runtime, so we'll treat their priorities all the same.
+            Self::Fifo { .. } | Self::RoundRobin { .. } => REALTIME_ROLE_NAME,
         }
-    }
-
-    fn role_name(&self) -> &'static str {
-        FAIR_PRIORITY_ROLE_NAMES[self.zircon_fair_priority() as usize]
     }
 }
 
@@ -425,6 +419,7 @@ const FAIR_PRIORITY_ROLE_NAMES: [&str; 32] = [
     "fuchsia.starnix.fair.30",
     "fuchsia.starnix.fair.31",
 ];
+const REALTIME_ROLE_NAME: &str = "fuchsia.starnix.realtime";
 // LINT.ThenChange(src/starnix/config/starnix.profiles)
 
 #[cfg(test)]
@@ -454,15 +449,15 @@ mod tests {
     fn fifo_role_name() {
         assert_eq!(
             SchedulerPolicyKind::Fifo { priority: 1 }.role_name(),
-            "fuchsia.starnix.fair.29"
+            "fuchsia.starnix.realtime",
         );
         assert_eq!(
             SchedulerPolicyKind::Fifo { priority: 2 }.role_name(),
-            "fuchsia.starnix.fair.30"
+            "fuchsia.starnix.realtime",
         );
         assert_eq!(
             SchedulerPolicyKind::Fifo { priority: 99 }.role_name(),
-            "fuchsia.starnix.fair.31"
+            "fuchsia.starnix.realtime",
         );
     }
 

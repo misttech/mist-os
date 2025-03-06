@@ -35,6 +35,10 @@
     "fuchsia.starnix.fair.29": { "priority": 29 },
     "fuchsia.starnix.fair.30": { "priority": 30 },
     "fuchsia.starnix.fair.31": { "priority": 31 },
-    // LINT.ThenChange(src/starnix/kernel/task/scheduler.rs)
+
+    // When possible containers should specify the role overrides for tasks that are more
+    // conservative than this broad default.
+    "fuchsia.starnix.realtime": { "capacity": "1ms", "deadline": "1ms", "period": "1ms" },
+    // LINT.ThenChange(src/starnix/kernel/task/scheduler/manager.rs)
   },
 }
