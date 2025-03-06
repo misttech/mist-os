@@ -29,6 +29,7 @@
 #include <lib/trace-engine/context.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <zircon/availability.h>
 #include <zircon/compiler.h>
 
 __BEGIN_CDECLS
@@ -69,6 +70,21 @@ trace_state_t trace_state(void);
 //
 // This function is thread-safe.
 bool trace_is_category_enabled(const char* category_literal);
+
+// Returns true if tracing of the specified category has been enabled (which
+// implies that |trace_is_enabled()| is also true).
+//
+// Use |trace_acquire_context_for_category_bytestring()| if you intend to immediately
+// write a record into the trace buffer after checking the category.
+//
+// |bytes| is the category to check
+// |length | is the length of bytes
+//
+// This function is thread-safe.
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+bool trace_is_category_bytestring_enabled(const unsigned char* bytes, size_t length)
+    ZX_AVAILABLE_SINCE(NEXT);
+#endif
 
 // Acquires a reference to the trace engine's context.
 // Must be balanced by a call to |trace_release_context()| when the result is non-NULL.
@@ -119,6 +135,41 @@ trace_context_t* trace_acquire_context(void);
 trace_context_t* trace_acquire_context_for_category(const char* category_literal,
                                                     trace_string_ref_t* out_ref);
 
+// Acquires a reference to the trace engine's context, only if the specified
+// category is enabled.  Must be balanced by a call to |trace_release_context()|
+// when the result is non-NULL.
+//
+// This function is optimized to return quickly when tracing is not enabled.
+//
+// Trace engine shutdown is deferred until all references to the trace context
+// have been released, therefore it is important for clients to promptly
+// release their reference to the trace context once they have finished
+// writing records into the trace buffer.
+// It is also important to release the context promptly to maintain proper
+// operation in streaming mode: The buffer can't be saved until all writers
+// have released their context.
+//
+// This function is equivalent to calling |trace_acquire_context()| to acquire
+// the engine's context, then calling |trace_context_register_category_bytestring()|
+// to check whether the specified category is enabled and register it in the
+// string table.  It releases the context and returns NULL if the category
+// is not enabled.
+//
+// |bytes| the category to acquire for
+// |length| the number of bytes in the bytestring
+// |out_ref| points to where the registered string reference should be returned.
+//
+// Returns a valid trace context if tracing is enabled for the specified category.
+// Returns NULL otherwise.
+//
+// This function is thread-safe and lock-free.
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+trace_context_t* trace_acquire_context_for_category_bytestring(const unsigned char* bytes,
+                                                               size_t length,
+                                                               trace_string_ref_t* out_ref)
+    ZX_AVAILABLE_SINCE(NEXT);
+#endif
+
 // Releases a reference to the trace engine's context.
 // Must balance a prior successful call to |trace_acquire_context()|
 // or |trace_acquire_context_for_category()|.
@@ -168,6 +219,29 @@ typedef struct {
 trace_context_t* trace_acquire_context_for_category_cached(const char* category_literal,
                                                            trace_site_t* site_ptr,
                                                            trace_string_ref_t* out_ref);
+
+// Same as |trace_acquire_context_for_category_bytestring()| except includes an extra
+// parameter to allow for caching of the category lookup.
+//
+// |bytes| the category bytestring
+// |length| the length of the bytes
+// |site_ptr| must point to a variable of static storage duration initialized
+//   to zero. A static local variable at the call site of recording a trace
+//   event is the normal solution. The caller must not touch the memory pointed
+//   to by this value, it is for the sole use of the trace engine.
+// |out_ref| points to where the registered string reference should be returned.
+//
+// Returns a valid trace context if tracing is enabled for the specified category.
+// Returns NULL otherwise.
+//
+// This function is thread-safe and lock-free.
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+trace_context_t* trace_acquire_context_for_category_bytestring_cached(const unsigned char* bytes,
+                                                                      size_t length,
+                                                                      trace_site_t* site_ptr,
+                                                                      trace_string_ref_t* out_ref)
+    ZX_AVAILABLE_SINCE(NEXT);
+#endif
 
 // Flush the cache built up by calls to
 // |trace_acquire_context_for_category_cached()|.
