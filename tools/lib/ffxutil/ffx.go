@@ -774,7 +774,10 @@ func (f *FFXInstance) Test(
 
 // Snapshot takes a snapshot of the target's state and saves it to outDir/snapshotFilename.
 func (f *FFXInstance) Snapshot(ctx context.Context, outDir string, snapshotFilename string) error {
-	err := f.RunWithTarget(ctx, "target", "snapshot", "--dir", outDir)
+	if f.target == "" {
+		return fmt.Errorf("no target is set")
+	}
+	err := f.invoker([]string{"target", "snapshot", "--dir", outDir}).setStrict().setTarget(f.target).run(ctx)
 	if err != nil {
 		return err
 	}
