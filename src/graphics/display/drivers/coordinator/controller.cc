@@ -288,9 +288,11 @@ void Controller::DisplayEngineListenerOnCaptureComplete() {
 void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
                                                      zx_time_t banjo_timestamp,
                                                      const config_stamp_t* banjo_config_stamp_ptr) {
-  // Emit an event called "VSYNC", which is by convention the event
-  // that Trace Viewer looks for in its "Highlight VSync" feature.
-  TRACE_INSTANT("gfx", "VSYNC", TRACE_SCOPE_THREAD, "display_id", banjo_display_id);
+  // Emit a counter called "VSYNC" for visualization in the Trace Viewer. `vsync_edge_flag`
+  // switching between 0 and 1 counts represents one vsync period.
+  static bool vsync_edge_flag = false;
+  TRACE_COUNTER("gfx", "VSYNC", banjo_display_id, "",
+                TA_UINT32(vsync_edge_flag = !vsync_edge_flag));
   TRACE_DURATION("gfx", "Display::Controller::OnDisplayVsync", "display_id", banjo_display_id);
 
   const display::DisplayId display_id(banjo_display_id);
