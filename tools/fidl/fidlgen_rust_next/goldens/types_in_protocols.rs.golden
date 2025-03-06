@@ -5241,7 +5241,7 @@ pub trait ProtocolClientSender {
     fn one_way_basic<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -5271,7 +5271,7 @@ pub trait ProtocolClientSender {
     fn one_way_compound<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -5301,7 +5301,7 @@ pub trait ProtocolClientSender {
     fn one_way_array_basic<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -5331,7 +5331,7 @@ pub trait ProtocolClientSender {
     fn one_way_array_compound<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -5361,7 +5361,7 @@ pub trait ProtocolClientSender {
     fn one_way_vector_basic<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -5391,7 +5391,7 @@ pub trait ProtocolClientSender {
     fn one_way_vector_compound<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -5421,7 +5421,7 @@ pub trait ProtocolClientSender {
     fn one_way_vector_optional<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -5451,7 +5451,7 @@ pub trait ProtocolClientSender {
     fn one_way_array_vector_nested<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -5481,7 +5481,7 @@ pub trait ProtocolClientSender {
     fn one_way_resource<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -5518,7 +5518,7 @@ where
     fn one_way_basic<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -5560,7 +5560,7 @@ where
     fn one_way_compound<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -5602,7 +5602,7 @@ where
     fn one_way_array_basic<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -5644,7 +5644,7 @@ where
     fn one_way_array_compound<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -5686,7 +5686,7 @@ where
     fn one_way_vector_basic<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -5728,7 +5728,7 @@ where
     fn one_way_vector_compound<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -5770,7 +5770,7 @@ where
     fn one_way_vector_optional<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -5812,7 +5812,7 @@ where
     fn one_way_array_vector_nested<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -5854,7 +5854,7 @@ where
     fn one_way_resource<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -6096,7 +6096,7 @@ pub trait ProtocolServerSender {
     fn event_basic<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -6106,7 +6106,7 @@ pub trait ProtocolServerSender {
     fn event_compound<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -6116,7 +6116,7 @@ pub trait ProtocolServerSender {
     fn event_array_basic<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -6126,7 +6126,7 @@ pub trait ProtocolServerSender {
     fn event_array_compound<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -6136,7 +6136,7 @@ pub trait ProtocolServerSender {
     fn event_vector_basic<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -6146,7 +6146,7 @@ pub trait ProtocolServerSender {
     fn event_vector_compound<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -6156,7 +6156,7 @@ pub trait ProtocolServerSender {
     fn event_vector_optional<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -6166,7 +6166,7 @@ pub trait ProtocolServerSender {
     fn event_array_vector_nested<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -6176,7 +6176,7 @@ pub trait ProtocolServerSender {
     fn event_resource<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -6193,7 +6193,7 @@ where
     fn event_basic<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -6206,7 +6206,7 @@ where
     fn event_compound<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -6219,7 +6219,7 @@ where
     fn event_array_basic<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -6232,7 +6232,7 @@ where
     fn event_array_compound<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -6245,7 +6245,7 @@ where
     fn event_vector_basic<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -6258,7 +6258,7 @@ where
     fn event_vector_compound<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -6271,7 +6271,7 @@ where
     fn event_vector_optional<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -6284,7 +6284,7 @@ where
     fn event_array_vector_nested<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -6297,7 +6297,7 @@ where
     fn event_resource<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,

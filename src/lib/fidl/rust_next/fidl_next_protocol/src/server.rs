@@ -8,7 +8,7 @@ use core::num::NonZeroU32;
 
 use fidl_next_codec::{Encode, EncodeError, EncoderExt as _};
 
-use crate::{decode_header, encode_header, ProtocolError, Transport};
+use crate::{decode_header, encode_header, ProtocolError, SendFuture, Transport, TransportExt};
 
 /// A responder for a two-way message.
 #[must_use]
@@ -32,7 +32,7 @@ impl<T: Transport> ServerSender<T> {
         &self,
         ordinal: u64,
         event: &mut M,
-    ) -> Result<T::SendFuture<'_>, EncodeError>
+    ) -> Result<SendFuture<'_, T>, EncodeError>
     where
         M: Encode<T::SendBuffer>,
     {
@@ -48,7 +48,7 @@ impl<T: Transport> ServerSender<T> {
         responder: Responder,
         ordinal: u64,
         response: &mut M,
-    ) -> Result<T::SendFuture<'_>, EncodeError>
+    ) -> Result<SendFuture<'_, T>, EncodeError>
     where
         M: Encode<T::SendBuffer>,
     {

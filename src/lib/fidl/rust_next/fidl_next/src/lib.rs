@@ -23,7 +23,9 @@
 
 pub use ::fidl_next_bind::*;
 pub use ::fidl_next_codec::*;
-pub use ::fidl_next_protocol::{self as protocol, ProtocolError, Transport};
+pub use ::fidl_next_protocol::{
+    self as protocol, ProtocolError, RecvFuture, SendFuture, Transport,
+};
 
 /// Fuchsia-specific FIDL extensions.
 #[cfg(target_os = "fuchsia")]

@@ -1777,7 +1777,7 @@ pub trait MainProtocolClientSender {
     fn one_way_composed<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -1813,7 +1813,7 @@ pub trait MainProtocolClientSender {
     fn one_way_local<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -1849,7 +1849,7 @@ pub trait MainProtocolClientSender {
     fn one_way_import<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -1885,7 +1885,7 @@ pub trait MainProtocolClientSender {
     fn one_way_anon<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -1928,7 +1928,7 @@ where
     fn one_way_composed<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -1977,7 +1977,7 @@ where
     fn one_way_local<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -2026,7 +2026,7 @@ where
     fn one_way_import<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -2075,7 +2075,7 @@ where
     fn one_way_anon<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -2237,7 +2237,7 @@ pub trait MainProtocolServerSender {
     fn on_composed<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -2247,7 +2247,7 @@ pub trait MainProtocolServerSender {
     fn on_local<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -2257,7 +2257,7 @@ pub trait MainProtocolServerSender {
     fn on_import<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -2267,7 +2267,7 @@ pub trait MainProtocolServerSender {
     fn on_anon<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -2284,7 +2284,7 @@ where
     fn on_composed<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -2297,7 +2297,7 @@ where
     fn on_local<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -2310,7 +2310,7 @@ where
     fn on_import<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -2323,7 +2323,7 @@ where
     fn on_anon<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,

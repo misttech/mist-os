@@ -4,7 +4,6 @@
 
 //! A transport implementation which uses Zircon channels.
 
-use core::future::Future;
 use core::mem::replace;
 use core::pin::Pin;
 use core::ptr::NonNull;
@@ -123,40 +122,9 @@ impl HandleEncoder for Buffer {
     }
 }
 
-/// A channel send future.
-#[must_use = "futures do nothing unless polled"]
-pub struct SendFuture<'s> {
-    shared: &'s Shared,
+/// The state for a channel send future.
+pub struct SendFutureState {
     buffer: Buffer,
-}
-
-impl Future for SendFuture<'_> {
-    type Output = Result<(), Status>;
-
-    fn poll(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = Pin::into_inner(self);
-
-        let result = unsafe {
-            zx_channel_write(
-                this.shared.channel.get_ref().raw_handle(),
-                0,
-                this.buffer.chunks.as_ptr().cast::<u8>(),
-                (this.buffer.chunks.len() * CHUNK_SIZE) as u32,
-                this.buffer.handles.as_ptr().cast(),
-                this.buffer.handles.len() as u32,
-            )
-        };
-
-        if result == ZX_OK {
-            // Handles were written to the channel, so we must not drop them.
-            unsafe {
-                this.buffer.handles.set_len(0);
-            }
-            Poll::Ready(Ok(()))
-        } else {
-            Poll::Ready(Err(Status::from_raw(result)))
-        }
-    }
 }
 
 /// A channel receiver.
@@ -164,68 +132,9 @@ pub struct Receiver {
     shared: Arc<Shared>,
 }
 
-/// A channel receive future.
-#[must_use = "futures do nothing unless polled"]
-pub struct RecvFuture<'r> {
-    shared: &'r Shared,
+/// The state for a channel receive future.
+pub struct RecvFutureState {
     buffer: Option<Buffer>,
-}
-
-impl Future for RecvFuture<'_> {
-    type Output = Result<Option<RecvBuffer>, Status>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = Pin::into_inner(self);
-        let buffer = this.buffer.as_mut().unwrap();
-
-        let mut actual_bytes = 0;
-        let mut actual_handles = 0;
-
-        loop {
-            let result = unsafe {
-                zx_channel_read(
-                    this.shared.channel.get_ref().raw_handle(),
-                    0,
-                    buffer.chunks.as_mut_ptr().cast(),
-                    buffer.handles.as_mut_ptr().cast(),
-                    (buffer.chunks.capacity() * CHUNK_SIZE) as u32,
-                    buffer.handles.capacity() as u32,
-                    &mut actual_bytes,
-                    &mut actual_handles,
-                )
-            };
-
-            match result {
-                ZX_OK => {
-                    unsafe {
-                        buffer.chunks.set_len(actual_bytes as usize / CHUNK_SIZE);
-                        buffer.handles.set_len(actual_handles as usize);
-                    }
-                    return Poll::Ready(Ok(Some(RecvBuffer {
-                        buffer: this.buffer.take().unwrap(),
-                        chunks_taken: 0,
-                        handles_taken: 0,
-                    })));
-                }
-                ZX_ERR_PEER_CLOSED => return Poll::Ready(Ok(None)),
-                ZX_ERR_BUFFER_TOO_SMALL => {
-                    let min_chunks = (actual_bytes as usize).div_ceil(CHUNK_SIZE);
-                    buffer.chunks.reserve(min_chunks - buffer.chunks.capacity());
-                    buffer.handles.reserve(actual_handles as usize - buffer.handles.capacity());
-                }
-                ZX_ERR_SHOULD_WAIT => {
-                    if matches!(this.shared.channel.need_readable(cx)?, Poll::Pending) {
-                        this.shared.closed_waker.register(cx.waker());
-                        if this.shared.is_closed.load(Ordering::Relaxed) {
-                            return Poll::Ready(Ok(None));
-                        }
-                        return Poll::Pending;
-                    }
-                }
-                raw => return Poll::Ready(Err(Status::from_raw(raw))),
-            }
-        }
-    }
 }
 
 /// A channel receive buffer.
@@ -311,14 +220,41 @@ impl Transport for Channel {
 
     type Sender = Sender;
     type SendBuffer = Buffer;
-    type SendFuture<'s> = SendFuture<'s>;
+    type SendFutureState = SendFutureState;
 
     fn acquire(_: &Self::Sender) -> Self::SendBuffer {
         Buffer::new()
     }
 
-    fn send(sender: &Self::Sender, buffer: Self::SendBuffer) -> Self::SendFuture<'_> {
-        SendFuture { shared: &sender.shared, buffer }
+    fn begin_send(_: &Self::Sender, buffer: Self::SendBuffer) -> Self::SendFutureState {
+        SendFutureState { buffer }
+    }
+
+    fn poll_send(
+        mut future_state: Pin<&mut Self::SendFutureState>,
+        _: &mut Context<'_>,
+        sender: &Self::Sender,
+    ) -> Poll<Result<(), Self::Error>> {
+        let result = unsafe {
+            zx_channel_write(
+                sender.shared.channel.get_ref().raw_handle(),
+                0,
+                future_state.buffer.chunks.as_ptr().cast::<u8>(),
+                (future_state.buffer.chunks.len() * CHUNK_SIZE) as u32,
+                future_state.buffer.handles.as_ptr().cast(),
+                future_state.buffer.handles.len() as u32,
+            )
+        };
+
+        if result == ZX_OK {
+            // Handles were written to the channel, so we must not drop them.
+            unsafe {
+                future_state.buffer.handles.set_len(0);
+            }
+            Poll::Ready(Ok(()))
+        } else {
+            Poll::Ready(Err(Status::from_raw(result)))
+        }
     }
 
     fn close(sender: &Self::Sender) {
@@ -326,11 +262,67 @@ impl Transport for Channel {
     }
 
     type Receiver = Receiver;
-    type RecvFuture<'r> = RecvFuture<'r>;
+    type RecvFutureState = RecvFutureState;
     type RecvBuffer = RecvBuffer;
 
-    fn recv(receiver: &mut Self::Receiver) -> Self::RecvFuture<'_> {
-        RecvFuture { shared: &receiver.shared, buffer: Some(Buffer::new()) }
+    fn begin_recv(_: &mut Self::Receiver) -> Self::RecvFutureState {
+        RecvFutureState { buffer: Some(Buffer::new()) }
+    }
+
+    fn poll_recv(
+        mut future_state: Pin<&mut Self::RecvFutureState>,
+        cx: &mut Context<'_>,
+        receiver: &mut Self::Receiver,
+    ) -> Poll<Result<Option<Self::RecvBuffer>, Self::Error>> {
+        let buffer = future_state.buffer.as_mut().unwrap();
+
+        let mut actual_bytes = 0;
+        let mut actual_handles = 0;
+
+        loop {
+            let result = unsafe {
+                zx_channel_read(
+                    receiver.shared.channel.get_ref().raw_handle(),
+                    0,
+                    buffer.chunks.as_mut_ptr().cast(),
+                    buffer.handles.as_mut_ptr().cast(),
+                    (buffer.chunks.capacity() * CHUNK_SIZE) as u32,
+                    buffer.handles.capacity() as u32,
+                    &mut actual_bytes,
+                    &mut actual_handles,
+                )
+            };
+
+            match result {
+                ZX_OK => {
+                    unsafe {
+                        buffer.chunks.set_len(actual_bytes as usize / CHUNK_SIZE);
+                        buffer.handles.set_len(actual_handles as usize);
+                    }
+                    return Poll::Ready(Ok(Some(RecvBuffer {
+                        buffer: future_state.buffer.take().unwrap(),
+                        chunks_taken: 0,
+                        handles_taken: 0,
+                    })));
+                }
+                ZX_ERR_PEER_CLOSED => return Poll::Ready(Ok(None)),
+                ZX_ERR_BUFFER_TOO_SMALL => {
+                    let min_chunks = (actual_bytes as usize).div_ceil(CHUNK_SIZE);
+                    buffer.chunks.reserve(min_chunks - buffer.chunks.capacity());
+                    buffer.handles.reserve(actual_handles as usize - buffer.handles.capacity());
+                }
+                ZX_ERR_SHOULD_WAIT => {
+                    if matches!(receiver.shared.channel.need_readable(cx)?, Poll::Pending) {
+                        receiver.shared.closed_waker.register(cx.waker());
+                        if receiver.shared.is_closed.load(Ordering::Relaxed) {
+                            return Poll::Ready(Ok(None));
+                        }
+                        return Poll::Pending;
+                    }
+                }
+                raw => return Poll::Ready(Err(Status::from_raw(raw))),
+            }
+        }
     }
 }
 

@@ -48,7 +48,7 @@ pub trait FirstProtocolClientSender {
 
     fn method_on_first(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>;
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
 }
 
 impl<___T> FirstProtocolClientSender for ::fidl_next::ClientSender<___T, FirstProtocol>
@@ -59,8 +59,7 @@ where
 
     fn method_on_first(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
-    {
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
         self.as_untyped().send_one_way(6352548393671797041, &mut ())
     }
 }
@@ -306,7 +305,7 @@ pub trait SecondProtocolClientSender {
 
     fn method_on_second(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>;
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
 }
 
 impl<___T> SecondProtocolClientSender for ::fidl_next::ClientSender<___T, SecondProtocol>
@@ -317,8 +316,7 @@ where
 
     fn method_on_second(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
-    {
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
         self.as_untyped().send_one_way(8121179205110225988, &mut ())
     }
 }

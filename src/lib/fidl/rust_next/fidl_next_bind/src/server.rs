@@ -5,7 +5,7 @@
 use core::marker::PhantomData;
 
 use fidl_next_codec::{Encode, EncodeError};
-use fidl_next_protocol::{self as protocol, ProtocolError, Transport};
+use fidl_next_protocol::{self as protocol, ProtocolError, SendFuture, Transport};
 
 use super::{Method, ServerEnd};
 
@@ -167,7 +167,7 @@ impl<M> Responder<M> {
         self,
         server: &'s ServerSender<T, P>,
         response: &mut R,
-    ) -> Result<T::SendFuture<'s>, EncodeError>
+    ) -> Result<SendFuture<'s, T>, EncodeError>
     where
         T: Transport,
         M: Method<Protocol = P>,

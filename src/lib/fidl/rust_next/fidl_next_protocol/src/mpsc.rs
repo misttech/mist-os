@@ -5,7 +5,7 @@
 //! A basic [`Transport`] implementation based on MPSC channels.
 
 use core::fmt;
-use core::future::Future;
+use core::marker::PhantomData;
 use core::mem::take;
 use core::pin::Pin;
 use core::ptr::NonNull;
@@ -109,28 +109,8 @@ impl Drop for Sender {
 }
 
 /// The send future for a paired mpsc transport.
-pub struct SendFuture<'s> {
-    sender: &'s Sender,
+pub struct SendFutureState {
     buffer: Vec<Chunk>,
-}
-
-impl Future for SendFuture<'_> {
-    type Output = Result<(), Error>;
-
-    fn poll(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
-        if self.sender.shared.is_closed.load(Ordering::Relaxed) {
-            return Poll::Ready(Err(Error::Closed));
-        }
-
-        let chunks = take(&mut self.buffer);
-        match self.sender.sender.send(chunks) {
-            Ok(()) => {
-                self.sender.shared.ends[self.sender.end].send_waker.wake();
-                Poll::Ready(Ok(()))
-            }
-            Err(_) => Poll::Ready(Err(Error::Closed)),
-        }
-    }
 }
 
 /// The receive end of a paired mpsc transport.
@@ -141,25 +121,8 @@ pub struct Receiver {
 }
 
 /// The receive future for a paired mpsc transport.
-pub struct RecvFuture<'r> {
-    receiver: &'r mut Receiver,
-}
-
-impl Future for RecvFuture<'_> {
-    type Output = Result<Option<RecvBuffer>, Error>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if self.receiver.shared.is_closed.load(Ordering::Relaxed) {
-            return Poll::Ready(Ok(None));
-        }
-
-        self.receiver.shared.ends[1 - self.receiver.end].send_waker.register(cx.waker());
-        match self.receiver.receiver.try_recv() {
-            Ok(chunks) => Poll::Ready(Ok(Some(RecvBuffer { chunks, chunks_taken: 0 }))),
-            Err(mpsc::TryRecvError::Empty) => Poll::Pending,
-            Err(mpsc::TryRecvError::Disconnected) => Poll::Ready(Ok(None)),
-        }
-    }
+pub struct RecvFutureState {
+    _phantom: PhantomData<()>,
 }
 
 /// A received message buffer.
@@ -215,14 +178,33 @@ impl Transport for Mpsc {
 
     type Sender = Sender;
     type SendBuffer = Vec<Chunk>;
-    type SendFuture<'s> = SendFuture<'s>;
+    type SendFutureState = SendFutureState;
 
     fn acquire(_: &Self::Sender) -> Self::SendBuffer {
         Vec::new()
     }
 
-    fn send(sender: &Self::Sender, buffer: Self::SendBuffer) -> Self::SendFuture<'_> {
-        SendFuture { sender, buffer }
+    fn begin_send(_: &Self::Sender, buffer: Self::SendBuffer) -> Self::SendFutureState {
+        SendFutureState { buffer }
+    }
+
+    fn poll_send(
+        mut future_state: Pin<&mut SendFutureState>,
+        _: &mut Context<'_>,
+        sender: &Self::Sender,
+    ) -> Poll<Result<(), Error>> {
+        if sender.shared.is_closed.load(Ordering::Relaxed) {
+            return Poll::Ready(Err(Error::Closed));
+        }
+
+        let chunks = take(&mut future_state.buffer);
+        match sender.sender.send(chunks) {
+            Ok(()) => {
+                sender.shared.ends[sender.end].send_waker.wake();
+                Poll::Ready(Ok(()))
+            }
+            Err(_) => Poll::Ready(Err(Error::Closed)),
+        }
     }
 
     fn close(sender: &Self::Sender) {
@@ -230,11 +212,28 @@ impl Transport for Mpsc {
     }
 
     type Receiver = Receiver;
-    type RecvFuture<'r> = RecvFuture<'r>;
+    type RecvFutureState = RecvFutureState;
     type RecvBuffer = RecvBuffer;
 
-    fn recv(receiver: &mut Self::Receiver) -> Self::RecvFuture<'_> {
-        RecvFuture { receiver }
+    fn begin_recv(_: &mut Self::Receiver) -> Self::RecvFutureState {
+        RecvFutureState { _phantom: PhantomData }
+    }
+
+    fn poll_recv(
+        _: Pin<&mut Self::RecvFutureState>,
+        cx: &mut Context<'_>,
+        receiver: &mut Self::Receiver,
+    ) -> Poll<Result<Option<Self::RecvBuffer>, Self::Error>> {
+        if receiver.shared.is_closed.load(Ordering::Relaxed) {
+            return Poll::Ready(Ok(None));
+        }
+
+        receiver.shared.ends[1 - receiver.end].send_waker.register(cx.waker());
+        match receiver.receiver.try_recv() {
+            Ok(chunks) => Poll::Ready(Ok(Some(RecvBuffer { chunks, chunks_taken: 0 }))),
+            Err(mpsc::TryRecvError::Empty) => Poll::Pending,
+            Err(mpsc::TryRecvError::Disconnected) => Poll::Ready(Ok(None)),
+        }
     }
 }
 

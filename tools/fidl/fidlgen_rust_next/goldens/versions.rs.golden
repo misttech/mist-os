@@ -283,9 +283,8 @@ pub mod protocol {
 pub trait ProtocolClientSender {
     type Transport: ::fidl_next::Transport;
 
-    fn foo(
-        &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn foo(&self)
+        -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
 }
 
 impl<___T> ProtocolClientSender for ::fidl_next::ClientSender<___T, Protocol>
@@ -296,8 +295,7 @@ where
 
     fn foo(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
-    {
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
         self.as_untyped().send_one_way(6231434419097198905, &mut ())
     }
 }

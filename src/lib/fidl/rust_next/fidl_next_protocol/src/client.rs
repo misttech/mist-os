@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use fidl_next_codec::{Encode, EncodeError, EncoderExt};
 
 use crate::lockers::Lockers;
-use crate::{decode_header, encode_header, ProtocolError, Transport};
+use crate::{decode_header, encode_header, ProtocolError, SendFuture, Transport, TransportExt};
 
 use super::lockers::LockerError;
 
@@ -43,7 +43,7 @@ impl<T: Transport> ClientSender<T> {
         &self,
         ordinal: u64,
         request: &mut M,
-    ) -> Result<T::SendFuture<'_>, EncodeError>
+    ) -> Result<SendFuture<'_, T>, EncodeError>
     where
         M: Encode<T::SendBuffer>,
     {
@@ -80,7 +80,7 @@ impl<T: Transport> ClientSender<T> {
         txid: u32,
         ordinal: u64,
         message: &mut M,
-    ) -> Result<T::SendFuture<'_>, EncodeError>
+    ) -> Result<SendFuture<'_, T>, EncodeError>
     where
         M: Encode<T::SendBuffer>,
     {
@@ -97,8 +97,8 @@ impl<T: Transport> Clone for ClientSender<T> {
     }
 }
 
-enum ResponseFutureState<'a, T: 'a + Transport> {
-    Sending(T::SendFuture<'a>),
+enum ResponseFutureState<'a, T: Transport> {
+    Sending(SendFuture<'a, T>),
     Receiving,
     // We store the completion state locally so that we can free the locker during poll, instead of
     // waiting until the future is dropped.

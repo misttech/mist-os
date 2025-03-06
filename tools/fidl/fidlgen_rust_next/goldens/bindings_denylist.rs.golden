@@ -1643,7 +1643,7 @@ pub trait DeniedClientSender {
     fn should_never_appear_in_any_binding<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -1660,7 +1660,7 @@ where
     fn should_never_appear_in_any_binding<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -5752,7 +5752,7 @@ pub trait ImportsSameNameContextClientSender {
     fn always_denied<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -5761,11 +5761,11 @@ pub trait ImportsSameNameContextClientSender {
 
     fn unattributed(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>;
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
 
     fn always_appears_in_importing_library(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>;
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
 }
 
 impl<___T> ImportsSameNameContextClientSender
@@ -5778,7 +5778,7 @@ where
     fn always_denied<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -5790,15 +5790,13 @@ where
 
     fn unattributed(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
-    {
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
         self.as_untyped().send_one_way(475191379775102607, &mut ())
     }
 
     fn always_appears_in_importing_library(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
-    {
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
         self.as_untyped().send_one_way(2914965219653596920, &mut ())
     }
 }

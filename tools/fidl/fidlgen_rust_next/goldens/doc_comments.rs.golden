@@ -263,7 +263,7 @@ pub trait InterfaceClientSender {
     #[doc = " method comment #1\n\n method comment #3\n"]
     fn method(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>;
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
 }
 
 impl<___T> InterfaceClientSender for ::fidl_next::ClientSender<___T, Interface>
@@ -275,8 +275,7 @@ where
     #[doc = " method comment #1\n\n method comment #3\n"]
     fn method(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
-    {
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
         self.as_untyped().send_one_way(5017051197196532121, &mut ())
     }
 }
@@ -319,7 +318,7 @@ pub trait InterfaceServerSender {
     #[doc = " event comment #1\n\n event comment #3\n"]
     fn on_event(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>;
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
 }
 
 impl<___T> InterfaceServerSender for ::fidl_next::ServerSender<___T, Interface>
@@ -331,8 +330,7 @@ where
     #[doc = " event comment #1\n\n event comment #3\n"]
     fn on_event(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
-    {
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
         self.as_untyped().send_event(28780186509098736, &mut ())
     }
 }

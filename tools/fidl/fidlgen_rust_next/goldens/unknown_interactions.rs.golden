@@ -2278,11 +2278,11 @@ pub trait UnknownInteractionsAjarDriverProtocolClientSender {
 
     fn strict_one_way(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>;
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
 
     fn flexible_one_way(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>;
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
 
     fn strict_two_way(
         &self,
@@ -2382,15 +2382,13 @@ where
 
     fn strict_one_way(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
-    {
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
         self.as_untyped().send_one_way(200845620698173917, &mut ())
     }
 
     fn flexible_one_way(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
-    {
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
         self.as_untyped().send_one_way(3790953144423004126, &mut ())
     }
 
@@ -5995,11 +5993,11 @@ pub trait UnknownInteractionsAjarProtocolClientSender {
 
     fn strict_one_way(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>;
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
 
     fn flexible_one_way(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>;
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
 
     fn strict_two_way(
         &self,
@@ -6099,15 +6097,13 @@ where
 
     fn strict_one_way(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
-    {
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
         self.as_untyped().send_one_way(956561744635167883, &mut ())
     }
 
     fn flexible_one_way(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
-    {
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
         self.as_untyped().send_one_way(2483093178939638607, &mut ())
     }
 
@@ -6415,12 +6411,12 @@ pub trait UnknownInteractionsAjarProtocolServerSender {
 
     fn strict_event(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>;
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
 
     fn strict_event_fields<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -6430,7 +6426,7 @@ pub trait UnknownInteractionsAjarProtocolServerSender {
     fn strict_event_union<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -6440,7 +6436,7 @@ pub trait UnknownInteractionsAjarProtocolServerSender {
     fn strict_event_table<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -6449,12 +6445,12 @@ pub trait UnknownInteractionsAjarProtocolServerSender {
 
     fn flexible_event(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>;
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
 
     fn flexible_event_fields<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -6464,7 +6460,7 @@ pub trait UnknownInteractionsAjarProtocolServerSender {
     fn flexible_event_union<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -6474,7 +6470,7 @@ pub trait UnknownInteractionsAjarProtocolServerSender {
     fn flexible_event_table<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -6491,15 +6487,14 @@ where
 
     fn strict_event(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
-    {
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
         self.as_untyped().send_event(6927291151663612592, &mut ())
     }
 
     fn strict_event_fields<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -6512,7 +6507,7 @@ where
     fn strict_event_union<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -6525,7 +6520,7 @@ where
     fn strict_event_table<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -6537,15 +6532,14 @@ where
 
     fn flexible_event(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
-    {
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
         self.as_untyped().send_event(1281760452005010931, &mut ())
     }
 
     fn flexible_event_fields<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -6558,7 +6552,7 @@ where
     fn flexible_event_union<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -6571,7 +6565,7 @@ where
     fn flexible_event_table<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -9032,7 +9026,7 @@ pub trait UnknownInteractionsClosedDriverProtocolClientSender {
 
     fn strict_one_way(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>;
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
 
     fn strict_two_way(
         &self,
@@ -9132,8 +9126,7 @@ where
 
     fn strict_one_way(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
-    {
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
         self.as_untyped().send_one_way(9111839835597799810, &mut ())
     }
 
@@ -12215,7 +12208,7 @@ pub trait UnknownInteractionsClosedProtocolClientSender {
 
     fn strict_one_way(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>;
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
 
     fn strict_two_way(
         &self,
@@ -12315,8 +12308,7 @@ where
 
     fn strict_one_way(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
-    {
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
         self.as_untyped().send_one_way(401526495318825508, &mut ())
     }
 
@@ -12555,12 +12547,12 @@ pub trait UnknownInteractionsClosedProtocolServerSender {
 
     fn strict_event(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>;
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
 
     fn strict_event_fields<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -12570,7 +12562,7 @@ pub trait UnknownInteractionsClosedProtocolServerSender {
     fn strict_event_union<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -12580,7 +12572,7 @@ pub trait UnknownInteractionsClosedProtocolServerSender {
     fn strict_event_table<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -12597,15 +12589,14 @@ where
 
     fn strict_event(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
-    {
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
         self.as_untyped().send_event(760799297757210939, &mut ())
     }
 
     fn strict_event_fields<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -12618,7 +12609,7 @@ where
     fn strict_event_union<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -12631,7 +12622,7 @@ where
     fn strict_event_table<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -18550,11 +18541,11 @@ pub trait UnknownInteractionsDriverProtocolClientSender {
 
     fn strict_one_way(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>;
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
 
     fn flexible_one_way(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>;
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
 
     fn strict_two_way(
         &self,
@@ -18742,15 +18733,13 @@ where
 
     fn strict_one_way(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
-    {
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
         self.as_untyped().send_one_way(6982839851953080288, &mut ())
     }
 
     fn flexible_one_way(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
-    {
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
         self.as_untyped().send_one_way(1083620022582160398, &mut ())
     }
 
@@ -26001,11 +25990,11 @@ pub trait UnknownInteractionsProtocolClientSender {
 
     fn strict_one_way(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>;
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
 
     fn flexible_one_way(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>;
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
 
     fn strict_two_way(
         &self,
@@ -26193,15 +26182,13 @@ where
 
     fn strict_one_way(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
-    {
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
         self.as_untyped().send_one_way(5652707722400962470, &mut ())
     }
 
     fn flexible_one_way(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
-    {
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
         self.as_untyped().send_one_way(583422011583300678, &mut ())
     }
 
@@ -26647,12 +26634,12 @@ pub trait UnknownInteractionsProtocolServerSender {
 
     fn strict_event(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>;
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
 
     fn strict_event_fields<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -26662,7 +26649,7 @@ pub trait UnknownInteractionsProtocolServerSender {
     fn strict_event_union<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -26672,7 +26659,7 @@ pub trait UnknownInteractionsProtocolServerSender {
     fn strict_event_table<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -26681,12 +26668,12 @@ pub trait UnknownInteractionsProtocolServerSender {
 
     fn flexible_event(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>;
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
 
     fn flexible_event_fields<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -26696,7 +26683,7 @@ pub trait UnknownInteractionsProtocolServerSender {
     fn flexible_event_union<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -26706,7 +26693,7 @@ pub trait UnknownInteractionsProtocolServerSender {
     fn flexible_event_table<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -26723,15 +26710,14 @@ where
 
     fn strict_event(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
-    {
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
         self.as_untyped().send_event(685715276307386305, &mut ())
     }
 
     fn strict_event_fields<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -26744,7 +26730,7 @@ where
     fn strict_event_union<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -26757,7 +26743,7 @@ where
     fn strict_event_table<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -26769,15 +26755,14 @@ where
 
     fn flexible_event(
         &self,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
-    {
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
         self.as_untyped().send_event(7042257263728687206, &mut ())
     }
 
     fn flexible_event_fields<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -26790,7 +26775,7 @@ where
     fn flexible_event_union<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -26803,7 +26788,7 @@ where
     fn flexible_event_table<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,

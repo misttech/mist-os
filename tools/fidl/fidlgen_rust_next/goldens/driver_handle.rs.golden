@@ -509,7 +509,7 @@ pub trait HandlesInProtocolClientSender {
     fn send_handles<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
@@ -526,7 +526,7 @@ where
     fn send_handles<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
