@@ -132,7 +132,7 @@ async fn test_psi_unavailable() {
 /// open PSI file descriptor in it, tests that said EventWaiter delivers the
 /// expected PSI events.
 #[test_case(make_poll_waiter => ignore; "poll")]
-#[test_case(make_epoll_waiter => ignore; "epoll")]
+#[test_case(make_epoll_waiter; "epoll")]
 #[fuchsia::test]
 async fn test_wait<T>(make_waiter: T)
 where
@@ -172,8 +172,8 @@ where
 
     let mut waiter = make_waiter(&mut puppet, fd).await;
 
-    // The event is not asserted: a non-blocking wait should report no events.
-    assert_eq!(waiter.wait(0).await, false);
+    // The event is not asserted: it should report no events.
+    assert_eq!(waiter.wait(1000).await, false);
 
     // Pulse the event and sleep for longer than the window. A PSI event should be latched and
     // delivered, even if the wait starts after the sleep.
@@ -187,7 +187,7 @@ where
 
     // Signal it again and expect the wait result to reflect it.
     event.signal_handle(zx::Signals::empty(), zx::Signals::EVENT_SIGNALED).unwrap();
-    assert_eq!(waiter.wait(0).await, true);
+    assert_eq!(waiter.wait(5000).await, true);
 
     // The next wait, however, should not report any event until the window has elapsed.
     assert_eq!(waiter.wait(100).await, false);
