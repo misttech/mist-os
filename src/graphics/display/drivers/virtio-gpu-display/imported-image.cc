@@ -11,7 +11,6 @@
 #include <lib/zx/vmo.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
-#include <zircon/status.h>
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
 
@@ -41,7 +40,7 @@ zx::result<ImportedImage> ImportedImage::Create(const zx::bti& bti, zx::vmo& ima
                                    image_vmo_offset, pinned_memory_size, &image_physical_address,
                                    /*addrs_count=*/1, &pinned_memory_token);
   if (pin_status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to pin image VMO: %s", zx_status_get_string(pin_status));
+    fdf::error("Failed to pin image VMO: {}", zx::make_result(pin_status));
     return zx::error(pin_status);
   }
 
@@ -68,7 +67,7 @@ ImportedImage::~ImportedImage() {
   }
   zx_status_t unpin_status = pinned_memory_token_.unpin();
   if (unpin_status != ZX_OK) {
-    FDF_LOG(WARNING, "Failed to unpin image memory: %s", zx_status_get_string(unpin_status));
+    fdf::warn("Failed to unpin image memory: {}", zx::make_result(unpin_status));
   }
 }
 

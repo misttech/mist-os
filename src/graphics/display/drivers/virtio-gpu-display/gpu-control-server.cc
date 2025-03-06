@@ -24,7 +24,7 @@ fuchsia_gpu_virtio::Service::InstanceHandler GpuControlServer::GetInstanceHandle
 }
 
 void GpuControlServer::GetCapabilitySetLimit(GetCapabilitySetLimitCompleter::Sync& completer) {
-  FDF_LOG(TRACE, "GpuControlServer::GetCapabilitySetLimit returning %lu", capability_set_limit_);
+  fdf::trace("GpuControlServer::GetCapabilitySetLimit returning {}", capability_set_limit_);
 
   completer.Reply(capability_set_limit_);
 }
@@ -32,7 +32,7 @@ void GpuControlServer::GetCapabilitySetLimit(GetCapabilitySetLimitCompleter::Syn
 void GpuControlServer::SendHardwareCommand(
     fuchsia_gpu_virtio::wire::GpuControlSendHardwareCommandRequest* request,
     SendHardwareCommandCompleter::Sync& completer) {
-  FDF_LOG(TRACE, "GpuControlServer::SendHardwareCommand");
+  fdf::trace("GpuControlServer::SendHardwareCommand");
 
   auto callback = [&completer](cpp20::span<uint8_t> response) {
     completer.ReplySuccess(

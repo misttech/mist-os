@@ -41,8 +41,8 @@ zx::result<uint32_t> VirtioGpuDevice::UpdateCursor() {
   const auto& response =
       virtio_device_->ExchangeCursorqRequestResponse<virtio_abi::EmptyResponse>(command);
   if (response.header.type != virtio_abi::ControlType::kEmptyResponse) {
-    FDF_LOG(WARNING, "Unexpected response type: %s (0x%04" PRIx32 ")",
-            ControlTypeToString(response.header.type), static_cast<uint32_t>(response.header.type));
+    fdf::warn("Unexpected response type: {} (0x{:04x})", ControlTypeToString(response.header.type),
+              static_cast<uint32_t>(response.header.type));
     return zx::error(ZX_ERR_IO);
   }
 
@@ -64,8 +64,8 @@ zx::result<uint32_t> VirtioGpuDevice::SetCursorPosition(uint32_t scanout_id, uin
   const auto& response =
       virtio_device_->ExchangeCursorqRequestResponse<virtio_abi::EmptyResponse>(command);
   if (response.header.type != virtio_abi::ControlType::kEmptyResponse) {
-    FDF_LOG(WARNING, "Unexpected response type: %s (0x%04" PRIx32 ")",
-            ControlTypeToString(response.header.type), static_cast<uint32_t>(response.header.type));
+    fdf::warn("Unexpected response type: {} (0x{:04x})", ControlTypeToString(response.header.type),
+              static_cast<uint32_t>(response.header.type));
     return zx::error(ZX_ERR_IO);
   }
 
@@ -80,8 +80,8 @@ zx::result<fbl::Vector<DisplayInfo>> VirtioGpuDevice::GetDisplayInfo() {
   const auto& response =
       virtio_device_->ExchangeControlqRequestResponse<virtio_abi::DisplayInfoResponse>(command);
   if (response.header.type != virtio_abi::ControlType::kDisplayInfoResponse) {
-    FDF_LOG(ERROR, "Unexpected response type: %s (0x%04" PRIx32 ")",
-            ControlTypeToString(response.header.type), static_cast<uint32_t>(response.header.type));
+    fdf::error("Unexpected response type: {} (0x{:04x})", ControlTypeToString(response.header.type),
+               static_cast<uint32_t>(response.header.type));
     return zx::error(ZX_ERR_IO);
   }
 
@@ -96,7 +96,7 @@ zx::result<fbl::Vector<DisplayInfo>> VirtioGpuDevice::GetDisplayInfo() {
   fbl::Vector<DisplayInfo> display_infos;
   display_infos.reserve(enabled_scanout_count, &alloc_checker);
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for DisplayInfo vector");
+    fdf::error("Failed to allocate memory for DisplayInfo vector");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -106,11 +106,9 @@ zx::result<fbl::Vector<DisplayInfo>> VirtioGpuDevice::GetDisplayInfo() {
       continue;
     }
 
-    FDF_LOG(TRACE,
-            "Scanout %d: placement (%" PRIu32 ", %" PRIu32 "), resolution %" PRIu32 "x%" PRIu32
-            " flags 0x%08" PRIx32,
-            i, scanout.geometry.x, scanout.geometry.y, scanout.geometry.width,
-            scanout.geometry.height, scanout.flags);
+    fdf::trace("Scanout {}: placement ({}, {}), resolution {}x{} flags 0x{:08x}", i,
+               scanout.geometry.x, scanout.geometry.y, scanout.geometry.width,
+               scanout.geometry.height, scanout.flags);
 
     ZX_DEBUG_ASSERT(display_infos.size() < enabled_scanout_count);
     display_infos.push_back({.scanout_info = scanout, .scanout_id = i}, &alloc_checker);
@@ -122,7 +120,7 @@ zx::result<fbl::Vector<DisplayInfo>> VirtioGpuDevice::GetDisplayInfo() {
 zx::result<fbl::Vector<uint8_t>> VirtioGpuDevice::GetDisplayEdid(uint32_t scanout_id) {
   if ((pci_device().Features() & virtio_abi::GpuDeviceFeatures::kGpuEdid) == 0) {
     // EDID support is optional, and this driver can work without it.
-    FDF_LOG(TRACE, "virtio implementation does not support EDID");
+    fdf::trace("virtio implementation does not support EDID");
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
@@ -135,14 +133,14 @@ zx::result<fbl::Vector<uint8_t>> VirtioGpuDevice::GetDisplayEdid(uint32_t scanou
       virtio_device_->ExchangeControlqRequestResponse<virtio_abi::ExtendedDisplayIdResponse>(
           command);
   if (response.header.type != virtio_abi::ControlType::kExtendedDisplayIdResponse) {
-    FDF_LOG(ERROR, "Unexpected response type: %s (0x%04" PRIx32 ")",
-            ControlTypeToString(response.header.type), static_cast<uint32_t>(response.header.type));
+    fdf::error("Unexpected response type: {} (0x{:04x})", ControlTypeToString(response.header.type),
+               static_cast<uint32_t>(response.header.type));
     return zx::error(ZX_ERR_IO);
   }
 
   if (response.edid_size > virtio_abi::ExtendedDisplayIdResponse::kMaxEdidSize) {
-    FDF_LOG(ERROR, "Reported EDID size %" PRIu32 " exceeds maximum supported size %d",
-            response.edid_size, virtio_abi::ExtendedDisplayIdResponse::kMaxEdidSize);
+    fdf::error("Reported EDID size {} exceeds maximum supported size {}", response.edid_size,
+               virtio_abi::ExtendedDisplayIdResponse::kMaxEdidSize);
     return zx::error(ZX_ERR_IO);
   }
   const std::span<const uint8_t> response_edid_bytes(response.edid_bytes, response.edid_size);
@@ -151,7 +149,7 @@ zx::result<fbl::Vector<uint8_t>> VirtioGpuDevice::GetDisplayEdid(uint32_t scanou
   fbl::Vector<uint8_t> edid_bytes;
   edid_bytes.resize(response_edid_bytes.size(), &alloc_checker);
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for EDID bytes");
+    fdf::error("Failed to allocate memory for EDID bytes");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -177,7 +175,7 @@ std::optional<virtio_abi::ResourceFormat> To2DResourceFormat(display::PixelForma
 
 zx::result<uint32_t> VirtioGpuDevice::Create2DResource(uint32_t width, uint32_t height,
                                                        display::PixelFormat pixel_format) {
-  FDF_LOG(TRACE, "Allocate2DResource");
+  fdf::trace("Allocate2DResource");
 
   std::optional<virtio_abi::ResourceFormat> resource_format = To2DResourceFormat(pixel_format);
   if (!resource_format.has_value()) {
@@ -195,8 +193,8 @@ zx::result<uint32_t> VirtioGpuDevice::Create2DResource(uint32_t width, uint32_t 
   const auto& response =
       virtio_device_->ExchangeControlqRequestResponse<virtio_abi::EmptyResponse>(command);
   if (response.header.type != virtio_abi::ControlType::kEmptyResponse) {
-    FDF_LOG(ERROR, "Unexpected response type: %s (0x%04" PRIx32 ")",
-            ControlTypeToString(response.header.type), static_cast<uint32_t>(response.header.type));
+    fdf::error("Unexpected response type: {} (0x{:04x})", ControlTypeToString(response.header.type),
+               static_cast<uint32_t>(response.header.type));
     return zx::error(ZX_ERR_IO);
   }
   return zx::ok(command.resource_id);
@@ -206,9 +204,8 @@ zx::result<> VirtioGpuDevice::AttachResourceBacking(uint32_t resource_id, zx_pad
                                                     size_t buf_len) {
   ZX_ASSERT(ptr);
 
-  FDF_LOG(TRACE,
-          "AttachResourceBacking - resource ID %" PRIu32 ", address 0x%" PRIx64 ", length %zu",
-          resource_id, ptr, buf_len);
+  fdf::trace("AttachResourceBacking - resource ID {}, address 0x{:x}, length {}", resource_id, ptr,
+             buf_len);
 
   const virtio_abi::AttachResourceBackingCommand<1> command = {
       .header = {.type = virtio_abi::ControlType::kAttachResourceBackingCommand},
@@ -222,8 +219,8 @@ zx::result<> VirtioGpuDevice::AttachResourceBacking(uint32_t resource_id, zx_pad
   const auto& response =
       virtio_device_->ExchangeControlqRequestResponse<virtio_abi::EmptyResponse>(command);
   if (response.header.type != virtio_abi::ControlType::kEmptyResponse) {
-    FDF_LOG(ERROR, "Unexpected response type: %s (0x%04" PRIx32 ")",
-            ControlTypeToString(response.header.type), static_cast<uint32_t>(response.header.type));
+    fdf::error("Unexpected response type: {} (0x{:04x})", ControlTypeToString(response.header.type),
+               static_cast<uint32_t>(response.header.type));
     return zx::error(ZX_ERR_IO);
   }
   return zx::ok();
@@ -231,10 +228,8 @@ zx::result<> VirtioGpuDevice::AttachResourceBacking(uint32_t resource_id, zx_pad
 
 zx::result<> VirtioGpuDevice::SetScanoutProperties(uint32_t scanout_id, uint32_t resource_id,
                                                    uint32_t width, uint32_t height) {
-  FDF_LOG(TRACE,
-          "SetScanoutProperties - scanout ID %" PRIu32 ", resource ID %" PRIu32 ", size %" PRIu32
-          "x%" PRIu32,
-          scanout_id, resource_id, width, height);
+  fdf::trace("SetScanoutProperties - scanout ID {}, resource ID {}, size {}x{}", scanout_id,
+             resource_id, width, height);
 
   const virtio_abi::SetScanoutCommand command = {
       .header = {.type = virtio_abi::ControlType::kSetScanoutCommand},
@@ -246,16 +241,15 @@ zx::result<> VirtioGpuDevice::SetScanoutProperties(uint32_t scanout_id, uint32_t
   const auto& response =
       virtio_device_->ExchangeControlqRequestResponse<virtio_abi::EmptyResponse>(command);
   if (response.header.type != virtio_abi::ControlType::kEmptyResponse) {
-    FDF_LOG(ERROR, "Unexpected response type: %s (0x%04" PRIx32 ")",
-            ControlTypeToString(response.header.type), static_cast<uint32_t>(response.header.type));
+    fdf::error("Unexpected response type: {} (0x{:04x})", ControlTypeToString(response.header.type),
+               static_cast<uint32_t>(response.header.type));
     return zx::error(ZX_ERR_IO);
   }
   return zx::ok();
 }
 
 zx::result<> VirtioGpuDevice::FlushResource(uint32_t resource_id, uint32_t width, uint32_t height) {
-  FDF_LOG(TRACE, "FlushResource - resource ID %" PRIu32 ", size %" PRIu32 "x%" PRIu32, resource_id,
-          width, height);
+  fdf::trace("FlushResource - resource ID {}, size {}x{}", resource_id, width, height);
 
   virtio_abi::FlushResourceCommand command = {
       .header = {.type = virtio_abi::ControlType::kFlushResourceCommand},
@@ -266,8 +260,8 @@ zx::result<> VirtioGpuDevice::FlushResource(uint32_t resource_id, uint32_t width
   const auto& response =
       virtio_device_->ExchangeControlqRequestResponse<virtio_abi::EmptyResponse>(command);
   if (response.header.type != virtio_abi::ControlType::kEmptyResponse) {
-    FDF_LOG(ERROR, "Unexpected response type: %s (0x%04" PRIx32 ")",
-            ControlTypeToString(response.header.type), static_cast<uint32_t>(response.header.type));
+    fdf::error("Unexpected response type: {} (0x{:04x})", ControlTypeToString(response.header.type),
+               static_cast<uint32_t>(response.header.type));
     return zx::error(ZX_ERR_IO);
   }
   return zx::ok();
@@ -275,8 +269,7 @@ zx::result<> VirtioGpuDevice::FlushResource(uint32_t resource_id, uint32_t width
 
 zx::result<> VirtioGpuDevice::TransferToHost2D(uint32_t resource_id, uint32_t width,
                                                uint32_t height) {
-  FDF_LOG(TRACE, "Transfer2DResourceToHost - resource ID %" PRIu32 ", size %" PRIu32 "x%" PRIu32,
-          resource_id, width, height);
+  fdf::trace("Transfer2DResourceToHost - resource ID {}, size {}x{}", resource_id, width, height);
 
   virtio_abi::Transfer2DResourceToHostCommand command = {
       .header = {.type = virtio_abi::ControlType::kTransfer2DResourceToHostCommand},
@@ -288,8 +281,8 @@ zx::result<> VirtioGpuDevice::TransferToHost2D(uint32_t resource_id, uint32_t wi
   const auto& response =
       virtio_device_->ExchangeControlqRequestResponse<virtio_abi::EmptyResponse>(command);
   if (response.header.type != virtio_abi::ControlType::kEmptyResponse) {
-    FDF_LOG(ERROR, "Unexpected response type: %s (0x%04" PRIx32 ")",
-            ControlTypeToString(response.header.type), static_cast<uint32_t>(response.header.type));
+    fdf::error("Unexpected response type: {} (0x{:04x})", ControlTypeToString(response.header.type),
+               static_cast<uint32_t>(response.header.type));
     return zx::error(ZX_ERR_IO);
   }
   return zx::ok();

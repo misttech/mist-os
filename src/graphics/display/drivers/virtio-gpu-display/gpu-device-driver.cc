@@ -13,7 +13,6 @@
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
-#include <zircon/status.h>
 
 #include <cstring>
 #include <memory>
@@ -33,13 +32,13 @@ zx::result<> GpuDeviceDriver::InitResources() {
   fbl::AllocChecker alloc_checker;
   engine_events_ = fbl::make_unique_checked<display::DisplayEngineEventsBanjo>(&alloc_checker);
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for DisplayEngineEventsBanjo");
+    fdf::error("Failed to allocate memory for DisplayEngineEventsBanjo");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   zx::result sysmem_client_result = incoming()->Connect<fuchsia_sysmem2::Allocator>();
   if (sysmem_client_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to get sysmem protocol: %s", sysmem_client_result.status_string());
+    fdf::error("Failed to get sysmem protocol: {}", sysmem_client_result);
     return sysmem_client_result.take_error();
   }
   fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_client =
@@ -48,14 +47,14 @@ zx::result<> GpuDeviceDriver::InitResources() {
   zx::result<fidl::ClientEnd<fuchsia_hardware_pci::Device>> pci_client_result =
       incoming()->Connect<fuchsia_hardware_pci::Service::Device>();
   if (pci_client_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to get pci client: %s", pci_client_result.status_string());
+    fdf::error("Failed to get pci client: {}", pci_client_result);
     return pci_client_result.take_error();
   }
 
   zx::result<std::pair<zx::bti, std::unique_ptr<virtio::Backend>>> bti_and_backend_result =
       virtio::GetBtiAndBackend(ddk::Pci(std::move(pci_client_result).value()));
   if (!bti_and_backend_result.is_ok()) {
-    FDF_LOG(ERROR, "GetBtiAndBackend failed: %s", bti_and_backend_result.status_string());
+    fdf::error("GetBtiAndBackend failed: {}", bti_and_backend_result);
     return bti_and_backend_result.take_error();
   }
   auto [bti, backend] = std::move(bti_and_backend_result).value();
@@ -71,14 +70,14 @@ zx::result<> GpuDeviceDriver::InitResources() {
   engine_banjo_adapter_ = fbl::make_unique_checked<display::DisplayEngineBanjoAdapter>(
       &alloc_checker, display_engine_.get(), engine_events_.get());
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for DisplayEngineBanjoAdapter");
+    fdf::error("Failed to allocate memory for DisplayEngineBanjoAdapter");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   gpu_control_server_ = fbl::make_unique_checked<GpuControlServer>(
       &alloc_checker, this, display_engine_->pci_device().GetCapabilitySetLimit());
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for GpuControlServer");
+    fdf::error("Failed to allocate memory for GpuControlServer");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -94,8 +93,7 @@ zx::result<> GpuDeviceDriver::InitDisplayNode() {
                                         /*forward_metadata=*/compat::ForwardMetadata::None(),
                                         engine_banjo_adapter_->CreateBanjoConfig());
   if (compat_server_init_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to initialize the compatibility server: %s",
-            compat_server_init_result.status_string());
+    fdf::error("Failed to initialize the compatibility server: {}", compat_server_init_result);
     return compat_server_init_result.take_error();
   }
 
@@ -108,8 +106,7 @@ zx::result<> GpuDeviceDriver::InitDisplayNode() {
       display_node_controller_client_result =
           AddChild(kDisplayChildNodeName, node_properties, node_offers);
   if (display_node_controller_client_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to add child node: %s",
-            display_node_controller_client_result.status_string());
+    fdf::error("Failed to add child node: {}", display_node_controller_client_result);
     return display_node_controller_client_result.take_error();
   }
   display_node_controller_ =
@@ -124,8 +121,8 @@ zx::result<> GpuDeviceDriver::InitGpuControlNode() {
       gpu_control_server_->GetInstanceHandler(dispatcher),
       /*instance=*/component::kDefaultInstance);
   if (add_service_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to add fuchsia.gpu.virtio service to the outgoing directory: %s",
-            add_service_result.status_string());
+    fdf::error("Failed to add fuchsia.gpu.virtio service to the outgoing directory: {}",
+               add_service_result);
     return add_service_result.take_error();
   }
 
@@ -139,8 +136,7 @@ zx::result<> GpuDeviceDriver::InitGpuControlNode() {
           kGpuControlChildNodeName, cpp20::span<const fuchsia_driver_framework::NodeProperty>(),
           cpp20::span<const fuchsia_driver_framework::Offer>(node_offers, 1));
   if (gpu_control_node_controller_client_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to add child node: %s",
-            gpu_control_node_controller_client_result.status_string());
+    fdf::error("Failed to add child node: {}", gpu_control_node_controller_client_result);
     return gpu_control_node_controller_client_result.take_error();
   }
   gpu_control_node_controller_ =
@@ -158,23 +154,21 @@ GpuDeviceDriver::~GpuDeviceDriver() {}
 void GpuDeviceDriver::Start(fdf::StartCompleter completer) {
   zx::result<> init_resources_result = InitResources();
   if (init_resources_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to initialize the resources: %s", init_resources_result.status_string());
+    fdf::error("Failed to initialize the resources: {}", init_resources_result);
     completer(init_resources_result.take_error());
     return;
   }
 
   zx::result<> init_display_node_result = InitDisplayNode();
   if (init_display_node_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to initialize the display child node: %s",
-            init_display_node_result.status_string());
+    fdf::error("Failed to initialize the display child node: {}", init_display_node_result);
     completer(init_display_node_result.take_error());
     return;
   }
 
   zx::result<> init_gpu_control_node_result = InitGpuControlNode();
   if (init_gpu_control_node_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to initialize the gpu control child node: %s",
-            init_gpu_control_node_result.status_string());
+    fdf::error("Failed to initialize the gpu control child node: {}", init_gpu_control_node_result);
     completer(init_gpu_control_node_result.take_error());
     return;
   }

@@ -235,8 +235,7 @@ template <typename ResponseType, typename RequestType>
 const ResponseType& VirtioPciDevice::ExchangeCursorqRequestResponse(const RequestType& request) {
   static constexpr size_t request_size = sizeof(RequestType);
   static constexpr size_t response_size = sizeof(ResponseType);
-  FDF_LOG(TRACE, "Sending %zu-byte request, expecting %zu-byte response", request_size,
-          response_size);
+  fdf::trace("Sending {}-byte request, expecting {}-byte response", request_size, response_size);
 
   // Request/response exchanges are fully serialized.
   //
