@@ -558,9 +558,17 @@ func (t *Device) fastbootFlash(ctx context.Context, pbPath string, images []boot
 		return errors.New("fastboot not found")
 	}
 
+	dtbo, err := t.ffx.GetImageFromPB(ctx, pbPath, "a", "dtbo", "")
+	if err != nil {
+		return fmt.Errorf("GetImageFromPB dtbo: %w", err)
+	}
+	if dtbo == nil {
+		return fmt.Errorf("failed to find dtbo image from product bundle %s", pbPath)
+	}
+
 	zbi, err := t.ffx.GetImageFromPB(ctx, pbPath, "a", "zbi", "")
 	if err != nil {
-		return err
+		return fmt.Errorf("GetImageFromPB zbi: %w", err)
 	}
 	if zbi == nil {
 		return fmt.Errorf("failed to find zbi image from product bundle %s", pbPath)
@@ -568,17 +576,19 @@ func (t *Device) fastbootFlash(ctx context.Context, pbPath string, images []boot
 
 	fvmImage, err := t.ffx.GetImageFromPB(ctx, pbPath, "a", "fvm", "")
 	if err != nil {
-		return err
+		return fmt.Errorf("GetImageFromPB fvm: %w", err)
 	}
 	if fvmImage == nil {
 		fvmImage, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "fxfs", "")
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to find fvm image from product bundle %s", pbPath)
 		}
 	}
 	cmds := [][]string{
 		{"flash", "boot_a", zbi.Path},
 		{"flash", "boot_b", zbi.Path},
+		{"flash", "dtbo_a", dtbo.Path},
+		{"flash", "dtbo_b", dtbo.Path},
 	}
 	if fvmImage != nil {
 		cmds = append(cmds, []string{"flash", "super", fvmImage.Path})

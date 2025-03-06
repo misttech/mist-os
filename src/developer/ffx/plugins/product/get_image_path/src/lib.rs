@@ -150,9 +150,8 @@ impl PbGetImagePathTool {
                 | (Image::VBMeta(path), Some(ImageType::VBMeta))
                 | (Image::FVM(path), Some(ImageType::Fvm))
                 | (Image::Fxfs { path, .. }, Some(ImageType::Fxfs))
-                | (Image::QemuKernel(path), Some(ImageType::QemuKernel)) => {
-                    Some(self.compute_path(path))
-                }
+                | (Image::QemuKernel(path), Some(ImageType::QemuKernel))
+                | (Image::Dtbo(path), Some(ImageType::Dtbo)) => Some(self.compute_path(path)),
                 _ => None,
             })
             .transpose()
@@ -241,6 +240,7 @@ mod tests {
                 Image::ZBI { path: Utf8PathBuf::from("zbi/path"), signed: false },
                 Image::FVM(Utf8PathBuf::from(tempdir.join("system_a/fvm.blk"))),
                 Image::QemuKernel(Utf8PathBuf::from("qemu/path")),
+                Image::Dtbo(Utf8PathBuf::from("system_a/sorrel-dtbo.img")),
             ]),
             system_b: None,
             system_r: None,
@@ -278,6 +278,21 @@ mod tests {
             };
             let path = tool.extract_image_path(pb.clone()).unwrap().unwrap();
             let expected_path = Utf8PathBuf::from("qemu/path");
+            assert_eq!(expected_path, path);
+        }
+        {
+            let tool = PbGetImagePathTool {
+                cmd: GetImagePathCommand {
+                    product_bundle: None,
+                    slot: Some(Slot::A),
+                    image_type: Some(ImageType::Dtbo),
+                    relative_path: false,
+                    bootloader: None,
+                },
+                env: env.context.clone(),
+            };
+            let path = tool.extract_image_path(pb.clone()).unwrap().unwrap();
+            let expected_path = Utf8PathBuf::from("system_a/sorrel-dtbo.img");
             assert_eq!(expected_path, path);
         }
         {
