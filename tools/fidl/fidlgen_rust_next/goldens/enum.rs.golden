@@ -379,3 +379,6 @@ impl ::core::convert::From<MyStrictEnum> for WireMyStrictEnum {
         }
     }
 }
+
+/// Compatibility shims which mimic some API surfaces of the current Rust bindings.
+pub mod compat {}

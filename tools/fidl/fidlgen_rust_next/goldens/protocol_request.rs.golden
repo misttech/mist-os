@@ -866,3 +866,19 @@ where
         }
     }
 }
+
+/// Compatibility shims which mimic some API surfaces of the current Rust bindings.
+pub mod compat {
+
+    #[cfg(target_os = "fuchsia")]
+    /// An alias for a client sender over `zx::Channel` for the `Child`
+    /// protocol.
+    pub type ChildProxy =
+        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Child>;
+
+    #[cfg(target_os = "fuchsia")]
+    /// An alias for a client sender over `zx::Channel` for the `Parent`
+    /// protocol.
+    pub type ParentProxy =
+        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Parent>;
+}

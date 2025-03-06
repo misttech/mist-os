@@ -6898,3 +6898,49 @@ impl ::core::convert::From<OnlySyzkaller> for WireOnlySyzkaller {
         Self { value: ::fidl_next::u32_le::from(natural.bits()) }
     }
 }
+
+/// Compatibility shims which mimic some API surfaces of the current Rust bindings.
+pub mod compat {
+
+    #[cfg(target_os = "fuchsia")]
+    /// An alias for a client sender over `zx::Channel` for the `Allowed`
+    /// protocol.
+    pub type AllowedProxy =
+        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Allowed>;
+
+    #[cfg(target_os = "fuchsia")]
+    /// An alias for a client sender over `zx::Channel` for the `ContainsAllowed`
+    /// protocol.
+    pub type ContainsAllowedProxy =
+        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::ContainsAllowed>;
+
+    #[cfg(target_os = "fuchsia")]
+    /// An alias for a client sender over `zx::Channel` for the `Denied`
+    /// protocol.
+    pub type DeniedProxy =
+        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Denied>;
+
+    #[cfg(target_os = "fuchsia")]
+    /// An alias for a client sender over `zx::Channel` for the `DenyEachBinding`
+    /// protocol.
+    pub type DenyEachBindingProxy =
+        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::DenyEachBinding>;
+
+    #[cfg(target_os = "fuchsia")]
+    /// An alias for a client sender over `zx::Channel` for the `ImportsSameNameContext`
+    /// protocol.
+    pub type ImportsSameNameContextProxy =
+        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::ImportsSameNameContext>;
+
+    #[cfg(target_os = "fuchsia")]
+    /// An alias for a client sender over `zx::Channel` for the `OnlyCppAndDeps`
+    /// protocol.
+    pub type OnlyCppAndDepsProxy =
+        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::OnlyCppAndDeps>;
+
+    #[cfg(target_os = "fuchsia")]
+    /// An alias for a client sender over `zx::Channel` for the `OnlyLibfuzzerAndDeps`
+    /// protocol.
+    pub type OnlyLibfuzzerAndDepsProxy =
+        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::OnlyLibfuzzerAndDeps>;
+}

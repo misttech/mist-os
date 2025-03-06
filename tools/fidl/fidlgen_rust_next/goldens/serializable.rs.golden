@@ -385,3 +385,6 @@ impl ::core::fmt::Debug for WireOptionalSerializableUnion {
         self.as_ref().fmt(f)
     }
 }
+
+/// Compatibility shims which mimic some API surfaces of the current Rust bindings.
+pub mod compat {}

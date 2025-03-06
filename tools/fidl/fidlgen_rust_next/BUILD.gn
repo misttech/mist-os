@@ -53,6 +53,7 @@ if (is_host) {
       # Templates
       "templates/alias.askama",
       "templates/bits.askama",
+      "templates/compat.askama",
       "templates/const.askama",
       "templates/enum.askama",
       "templates/protocol.askama",

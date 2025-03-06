@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 pub struct Config {
+    pub emit_compat: bool,
     pub emit_debug_impls: bool,
     pub resource_bindings: ResourceBindings,
 }

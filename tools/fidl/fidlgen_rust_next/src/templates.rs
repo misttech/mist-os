@@ -46,10 +46,20 @@ impl Context {
     ) -> NaturalConstantTemplate<'a> {
         NaturalConstantTemplate { constant, ty, context: self }
     }
+
+    fn compat(&self) -> CompatTemplate<'_> {
+        CompatTemplate { context: self }
+    }
 }
 
 fn doc_string(attributes: &Attributes) -> DocStringTemplate<'_> {
     DocStringTemplate { attributes }
+}
+
+#[derive(Template)]
+#[template(path = "compat.askama")]
+struct CompatTemplate<'a> {
+    context: &'a Context,
 }
 
 #[derive(Template)]

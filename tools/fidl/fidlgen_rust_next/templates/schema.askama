@@ -33,3 +33,7 @@
             {{ self.service(schema.service_declarations[ident]) }}
     {% endmatch %}
 {% endfor %}
+
+{% if config.emit_compat %}
+    {{ self.compat() }}
+{% endif %}

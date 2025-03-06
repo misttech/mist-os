@@ -1211,3 +1211,13 @@ impl ::core::fmt::Debug for WireTable {
         f.debug_struct("Table").field("field", &self.field()).finish()
     }
 }
+
+/// Compatibility shims which mimic some API surfaces of the current Rust bindings.
+pub mod compat {
+
+    #[cfg(target_os = "fuchsia")]
+    /// An alias for a client sender over `zx::Channel` for the `Interface`
+    /// protocol.
+    pub type InterfaceProxy =
+        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Interface>;
+}

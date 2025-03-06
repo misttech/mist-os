@@ -27081,3 +27081,55 @@ where
         }
     }
 }
+
+/// Compatibility shims which mimic some API surfaces of the current Rust bindings.
+pub mod compat {
+
+    #[cfg(target_os = "fuchsia")]
+    /// An alias for a client sender over `zx::Channel` for the `UnknownInteractionsAjarDriverProtocol`
+    /// protocol.
+    pub type UnknownInteractionsAjarDriverProtocolProxy = ::fidl_next::ClientSender<
+        ::fidl_next::fuchsia::zx::Channel,
+        crate::UnknownInteractionsAjarDriverProtocol,
+    >;
+
+    #[cfg(target_os = "fuchsia")]
+    /// An alias for a client sender over `zx::Channel` for the `UnknownInteractionsAjarProtocol`
+    /// protocol.
+    pub type UnknownInteractionsAjarProtocolProxy = ::fidl_next::ClientSender<
+        ::fidl_next::fuchsia::zx::Channel,
+        crate::UnknownInteractionsAjarProtocol,
+    >;
+
+    #[cfg(target_os = "fuchsia")]
+    /// An alias for a client sender over `zx::Channel` for the `UnknownInteractionsClosedDriverProtocol`
+    /// protocol.
+    pub type UnknownInteractionsClosedDriverProtocolProxy = ::fidl_next::ClientSender<
+        ::fidl_next::fuchsia::zx::Channel,
+        crate::UnknownInteractionsClosedDriverProtocol,
+    >;
+
+    #[cfg(target_os = "fuchsia")]
+    /// An alias for a client sender over `zx::Channel` for the `UnknownInteractionsClosedProtocol`
+    /// protocol.
+    pub type UnknownInteractionsClosedProtocolProxy = ::fidl_next::ClientSender<
+        ::fidl_next::fuchsia::zx::Channel,
+        crate::UnknownInteractionsClosedProtocol,
+    >;
+
+    #[cfg(target_os = "fuchsia")]
+    /// An alias for a client sender over `zx::Channel` for the `UnknownInteractionsDriverProtocol`
+    /// protocol.
+    pub type UnknownInteractionsDriverProtocolProxy = ::fidl_next::ClientSender<
+        ::fidl_next::fuchsia::zx::Channel,
+        crate::UnknownInteractionsDriverProtocol,
+    >;
+
+    #[cfg(target_os = "fuchsia")]
+    /// An alias for a client sender over `zx::Channel` for the `UnknownInteractionsProtocol`
+    /// protocol.
+    pub type UnknownInteractionsProtocolProxy = ::fidl_next::ClientSender<
+        ::fidl_next::fuchsia::zx::Channel,
+        crate::UnknownInteractionsProtocol,
+    >;
+}

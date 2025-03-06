@@ -3200,3 +3200,6 @@ impl ::core::fmt::Debug for WireTableWithAttributes {
         f.debug_struct("TableWithAttributes").field("x", &self.x()).finish()
     }
 }
+
+/// Compatibility shims which mimic some API surfaces of the current Rust bindings.
+pub mod compat {}

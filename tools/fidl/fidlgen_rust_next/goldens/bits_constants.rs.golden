@@ -93,3 +93,6 @@ pub const CONST1: crate::BitsType = crate::BitsType::A;
 pub const CONST2: crate::BitsType = crate::BitsType::from_bits_retain(129);
 
 pub const CONST3: crate::BitsType = crate::BitsType::from_bits_retain(131);
+
+/// Compatibility shims which mimic some API surfaces of the current Rust bindings.
+pub mod compat {}

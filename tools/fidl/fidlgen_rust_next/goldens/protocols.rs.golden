@@ -7690,3 +7690,77 @@ where
         }
     }
 }
+
+/// Compatibility shims which mimic some API surfaces of the current Rust bindings.
+pub mod compat {
+
+    #[cfg(target_os = "fuchsia")]
+    /// An alias for a client sender over `zx::Channel` for the `AnotherDiscoverableProtocol`
+    /// protocol.
+    pub type AnotherDiscoverableProtocolProxy = ::fidl_next::ClientSender<
+        ::fidl_next::fuchsia::zx::Channel,
+        crate::AnotherDiscoverableProtocol,
+    >;
+
+    #[cfg(target_os = "fuchsia")]
+    /// An alias for a client sender over `zx::Channel` for the `ChannelProtocol`
+    /// protocol.
+    pub type ChannelProtocolProxy =
+        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::ChannelProtocol>;
+
+    #[cfg(target_os = "fuchsia")]
+    /// An alias for a client sender over `zx::Channel` for the `DiscoverableProtocol`
+    /// protocol.
+    pub type DiscoverableProtocolProxy =
+        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::DiscoverableProtocol>;
+
+    #[cfg(target_os = "fuchsia")]
+    /// An alias for a client sender over `zx::Channel` for the `HandleRightsProtocol`
+    /// protocol.
+    pub type HandleRightsProtocolProxy =
+        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::HandleRightsProtocol>;
+
+    #[cfg(target_os = "fuchsia")]
+    /// An alias for a client sender over `zx::Channel` for the `ManyParameters`
+    /// protocol.
+    pub type ManyParametersProxy =
+        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::ManyParameters>;
+
+    #[cfg(target_os = "fuchsia")]
+    /// An alias for a client sender over `zx::Channel` for the `MethodWithUnion`
+    /// protocol.
+    pub type MethodWithUnionProxy =
+        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::MethodWithUnion>;
+
+    #[cfg(target_os = "fuchsia")]
+    /// An alias for a client sender over `zx::Channel` for the `PlatformServer`
+    /// protocol.
+    pub type PlatformServerProxy =
+        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::PlatformServer>;
+
+    #[cfg(target_os = "fuchsia")]
+    /// An alias for a client sender over `zx::Channel` for the `SyscallProtocol`
+    /// protocol.
+    pub type SyscallProtocolProxy =
+        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::SyscallProtocol>;
+
+    #[cfg(target_os = "fuchsia")]
+    /// An alias for a client sender over `zx::Channel` for the `WithAndWithoutRequestResponse`
+    /// protocol.
+    pub type WithAndWithoutRequestResponseProxy = ::fidl_next::ClientSender<
+        ::fidl_next::fuchsia::zx::Channel,
+        crate::WithAndWithoutRequestResponse,
+    >;
+
+    #[cfg(target_os = "fuchsia")]
+    /// An alias for a client sender over `zx::Channel` for the `WithErrorSyntax`
+    /// protocol.
+    pub type WithErrorSyntaxProxy =
+        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::WithErrorSyntax>;
+
+    #[cfg(target_os = "fuchsia")]
+    /// An alias for a client sender over `zx::Channel` for the `WithProtocolEnds`
+    /// protocol.
+    pub type WithProtocolEndsProxy =
+        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::WithProtocolEnds>;
+}
