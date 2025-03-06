@@ -782,11 +782,6 @@ _build_fuchsia_product_bundle = rule(
             providers = [FuchsiaVirtualDeviceInfo],
             default = None,
         ),
-        "_rebase_flash_manifest": attr.label(
-            default = "//fuchsia/tools:rebase_flash_manifest",
-            executable = True,
-            cfg = "exec",
-        ),
         "_platform_user_scrutiny_config": attr.label(
             doc = "Scrutiny config listing platform content of user products",
             providers = [FuchsiaScrutinyConfigInfo],
