@@ -76,20 +76,21 @@ bool TestThread::Wait(ExpectStatus expect,
     zx_exception_report_t report;
     ZX_ASSERT(zx_object_get_info(zx_thread_.get(), ZX_INFO_THREAD_EXCEPTION_REPORT, &report,
                                  sizeof(report), NULL, NULL) == ZX_OK);
-    bool res = expect == ExpectStatus::Crash && report.header.type == ZX_EXCP_FATAL_PAGE_FAULT;
-    uintptr_t actual_crash_addr = 0;
-    if (res) {
+    bool res = expect == ExpectStatus::Crash;
+    if (auto info = crash_info) {
+      res &= report.header.type == ZX_EXCP_FATAL_PAGE_FAULT;
+      uintptr_t actual_crash_addr = 0;
+      if (res) {
 #if defined(__x86_64__)
-      actual_crash_addr = report.context.arch.u.x86_64.cr2;
+        actual_crash_addr = report.context.arch.u.x86_64.cr2;
 #elif defined(__aarch64__)
-      actual_crash_addr = report.context.arch.u.arm_64.far;
+        actual_crash_addr = report.context.arch.u.arm_64.far;
 #elif defined(__riscv)
-      actual_crash_addr = report.context.arch.u.riscv_64.tval;
+        actual_crash_addr = report.context.arch.u.riscv_64.tval;
 #else
 #error Unsupported architecture
 #endif
-    }
-    if (auto info = crash_info) {
+      }
       res &= info->first == actual_crash_addr;
       res &= info->second == static_cast<zx_status_t>(report.context.synth_code);
     }
