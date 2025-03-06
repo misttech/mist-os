@@ -18,7 +18,6 @@
 #include <threads.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
-#include <zircon/status.h>
 #include <zircon/syscalls.h>
 #include <zircon/threads.h>
 #include <zircon/types.h>
@@ -169,8 +168,8 @@ void FakeDisplay::InitializeSysmemClient() {
     // Errors here mean that the FIDL transport was not set up correctly, and
     // all future Sysmem client calls will fail. Crashing here exposes the
     // failure early.
-    FDF_LOG(FATAL, "SetDebugClientInfo() FIDL call failed: %s",
-            set_debug_status.error_value().status_string());
+    fdf::fatal("SetDebugClientInfo() FIDL call failed: {}",
+               set_debug_status.error_value().status_string());
   }
 }
 
@@ -199,7 +198,7 @@ void FakeDisplay::SendDisplayInformation() {
 
   std::lock_guard engine_listener_lock(engine_listener_mutex_);
   if (!engine_listener_client_.is_valid()) {
-    FDF_LOG(WARNING, "OnDisplayAdded() emitted with invalid event listener; event dropped");
+    fdf::warn("OnDisplayAdded() emitted with invalid event listener; event dropped");
     return;
   }
   engine_listener_client_.OnDisplayAdded(&banjo_display_info);
@@ -251,8 +250,7 @@ zx_status_t FakeDisplay::DisplayEngineImportBufferCollection(
   std::lock_guard lock(mutex_);
 
   if (buffer_collections_.find(driver_buffer_collection_id) != buffer_collections_.end()) {
-    FDF_LOG(ERROR, "Buffer Collection (id=%lu) already exists",
-            driver_buffer_collection_id.value());
+    fdf::error("Buffer Collection (id={}) already exists", driver_buffer_collection_id.value());
     return ZX_ERR_ALREADY_EXISTS;
   }
 
@@ -265,8 +263,8 @@ zx_status_t FakeDisplay::DisplayEngineImportBufferCollection(
   bind_request.buffer_collection_request() = std::move(collection_server_endpoint);
   auto bind_result = sysmem_->BindSharedCollection(std::move(bind_request));
   if (bind_result.is_error()) {
-    FDF_LOG(ERROR, "Cannot complete FIDL call BindSharedCollection: %s",
-            bind_result.error_value().status_string());
+    fdf::error("Cannot complete FIDL call BindSharedCollection: {}",
+               bind_result.error_value().status_string());
     return ZX_ERR_INTERNAL;
   }
 
@@ -283,8 +281,8 @@ zx_status_t FakeDisplay::DisplayEngineReleaseBufferCollection(
   std::lock_guard lock(mutex_);
 
   if (buffer_collections_.find(driver_buffer_collection_id) == buffer_collections_.end()) {
-    FDF_LOG(ERROR, "Cannot release buffer collection %lu: buffer collection doesn't exist",
-            driver_buffer_collection_id.value());
+    fdf::error("Cannot release buffer collection {}: buffer collection doesn't exist",
+               driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
   buffer_collections_.erase(driver_buffer_collection_id);
@@ -301,14 +299,14 @@ zx_status_t FakeDisplay::DisplayEngineImportImage(const image_metadata_t* image_
 
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
   if (it == buffer_collections_.end()) {
-    FDF_LOG(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)",
-            driver_buffer_collection_id.value());
+    fdf::error("ImportImage: Cannot find imported buffer collection (id={})",
+               driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
   const fidl::SyncClient<fuchsia_sysmem2::BufferCollection>& collection = it->second;
   if (!IsAcceptableImageTilingType(image_metadata->tiling_type)) {
-    FDF_LOG(INFO, "ImportImage() will fail due to invalid Image tiling type %" PRIu32,
-            image_metadata->tiling_type);
+    fdf::info("ImportImage() will fail due to invalid Image tiling type {}",
+              image_metadata->tiling_type);
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -389,12 +387,12 @@ void FakeDisplay::DisplayEngineReleaseImage(uint64_t image_handle) {
   std::lock_guard lock(mutex_);
 
   if (applied_image_id_ == driver_image_id) {
-    FDF_LOG(FATAL, "Cannot safely release an image used in currently applied configuration");
+    fdf::fatal("Cannot safely release an image used in currently applied configuration");
     return;
   }
 
   if (imported_images_.erase(driver_image_id) == nullptr) {
-    FDF_LOG(ERROR, "Image release request with unused handle: %" PRIu64, driver_image_id.value());
+    fdf::error("Image release request with unused handle: {}", driver_image_id.value());
   }
 }
 
@@ -612,8 +610,8 @@ zx_status_t FakeDisplay::DisplayEngineSetBufferCollectionConstraints(
 
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
   if (it == buffer_collections_.end()) {
-    FDF_LOG(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)",
-            driver_buffer_collection_id.value());
+    fdf::error("ImportImage: Cannot find imported buffer collection (id={})",
+               driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
   const fidl::SyncClient<fuchsia_sysmem2::BufferCollection>& collection = it->second;
@@ -626,8 +624,8 @@ zx_status_t FakeDisplay::DisplayEngineSetBufferCollectionConstraints(
   request.constraints() = CreateBufferCollectionConstraints(buffer_collection_usage);
   auto set_result = collection->SetConstraints(std::move(request));
   if (set_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to set constraints on a sysmem BufferCollection: %s",
-            set_result.error_value().status_string());
+    fdf::error("Failed to set constraints on a sysmem BufferCollection: {}",
+               set_result.error_value().status_string());
     return set_result.error_value().status();
   }
 
@@ -651,8 +649,8 @@ zx_status_t FakeDisplay::DisplayEngineImportImageForCapture(
 
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
   if (it == buffer_collections_.end()) {
-    FDF_LOG(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)",
-            driver_buffer_collection_id.value());
+    fdf::error("ImportImage: Cannot find imported buffer collection (id={})",
+               driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
   const fidl::SyncClient<fuchsia_sysmem2::BufferCollection>& collection = it->second;
@@ -724,7 +722,7 @@ zx_status_t FakeDisplay::DisplayEngineStartCapture(uint64_t capture_handle) {
   std::lock_guard lock(mutex_);
 
   if (started_capture_target_id_ != display::kInvalidDriverCaptureImageId) {
-    FDF_LOG(ERROR, "Capture start request declined while a capture is already in-progress");
+    fdf::error("Capture start request declined while a capture is already in-progress");
     return ZX_ERR_SHOULD_WAIT;
   }
 
@@ -733,8 +731,7 @@ zx_status_t FakeDisplay::DisplayEngineStartCapture(uint64_t capture_handle) {
       display::ToDriverCaptureImageId(capture_handle);
   auto it = imported_captures_.find(driver_capture_image_id);
   if (it == imported_captures_.end()) {
-    FDF_LOG(ERROR, "Capture start request with invalid handle: %" PRIu64,
-            driver_capture_image_id.value());
+    fdf::error("Capture start request with invalid handle: {}", driver_capture_image_id.value());
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -752,7 +749,7 @@ zx_status_t FakeDisplay::DisplayEngineReleaseCapture(uint64_t capture_handle) {
   std::lock_guard lock(mutex_);
 
   if (started_capture_target_id_ == driver_capture_image_id) {
-    FDF_LOG(FATAL, "Refusing to release the target of an in-progress capture");
+    fdf::fatal("Refusing to release the target of an in-progress capture");
 
     // TODO(https://fxrev.dev/394954078): The return code is not meaningful. It will be
     // removed when the ReleaseCapture() error code is eliminated.
@@ -760,8 +757,7 @@ zx_status_t FakeDisplay::DisplayEngineReleaseCapture(uint64_t capture_handle) {
   }
 
   if (imported_captures_.erase(driver_capture_image_id) == nullptr) {
-    FDF_LOG(ERROR, "Capture release request with unused handle: %" PRIu64,
-            driver_capture_image_id.value());
+    fdf::error("Capture release request with unused handle: {}", driver_capture_image_id.value());
 
     // TODO(https://fxrev.dev/394954078): The return code is not meaningful. It will be
     // removed when the ReleaseCapture() error code is eliminated.
@@ -830,45 +826,43 @@ zx::result<> FakeDisplay::ServiceAnyCaptureRequest() {
 zx::result<> FakeDisplay::DoImageCapture(DisplayImageInfo& source_info,
                                          CaptureImageInfo& destination_info) {
   if (source_info.metadata().pixel_format != destination_info.metadata().pixel_format) {
-    FDF_LOG(ERROR, "Capture will fail; trying to capture format=%u as format=%u\n",
-            static_cast<uint32_t>(source_info.metadata().pixel_format),
-            static_cast<uint32_t>(destination_info.metadata().pixel_format));
+    fdf::error("Capture will fail; trying to capture format={} as format={}\n",
+               static_cast<uint32_t>(source_info.metadata().pixel_format),
+               static_cast<uint32_t>(destination_info.metadata().pixel_format));
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   size_t source_vmo_size;
   zx_status_t status = source_info.vmo().get_size(&source_vmo_size);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to get the size of the displayed image VMO: %s",
-            zx_status_get_string(status));
+    fdf::error("Failed to get the size of the displayed image VMO: {}", zx::make_result(status));
     return zx::error(status);
   }
   if (source_vmo_size % sizeof(uint32_t) != 0) {
-    FDF_LOG(ERROR, "Capture will fail; the displayed image VMO size %zu is not a 32-bit multiple",
-            source_vmo_size);
+    fdf::error("Capture will fail; the displayed image VMO size {} is not a 32-bit multiple",
+               source_vmo_size);
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   size_t destination_vmo_size;
   status = destination_info.vmo().get_size(&destination_vmo_size);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to get the size of the VMO for the captured image: %s",
-            zx_status_get_string(status));
+    fdf::error("Failed to get the size of the VMO for the captured image: {}",
+               zx::make_result(status));
     return zx::error(status);
   }
   if (destination_vmo_size != source_vmo_size) {
-    FDF_LOG(ERROR,
-            "Capture will fail; the displayed image VMO size %zu does not match the "
-            "captured image VMO size %zu",
-            source_vmo_size, destination_vmo_size);
+    fdf::error(
+        "Capture will fail; the displayed image VMO size {} does not match the "
+        "captured image VMO size {}",
+        source_vmo_size, destination_vmo_size);
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   fzl::VmoMapper source_mapper;
   status = source_mapper.Map(source_info.vmo(), 0, source_vmo_size, ZX_VM_PERM_READ);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Capture will fail; failed to map displayed image VMO: %s",
-            zx_status_get_string(status));
+    fdf::error("Capture will fail; failed to map displayed image VMO: {}", zx::make_result(status));
     return zx::error(status);
   }
 
@@ -882,8 +876,7 @@ zx::result<> FakeDisplay::DoImageCapture(DisplayImageInfo& source_info,
   status = destination_mapper.Map(destination_info.vmo(), 0, destination_vmo_size,
                                   ZX_VM_PERM_READ | ZX_VM_PERM_WRITE);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Capture will fail; failed to map capture image VMO: %s",
-            zx_status_get_string(status));
+    fdf::error("Capture will fail; failed to map capture image VMO: {}", zx::make_result(status));
     return zx::error(status);
   }
 
@@ -914,9 +907,9 @@ zx::result<> FakeDisplay::DoColorFillCapture(display::Color fill_color,
   // which happens to be 32-bit BGRA. This rough edge will be removed when we
   // explicitly disallow starting a capture before a config is applied.
   if (fill_color.format().ToFidl() != destination_info.metadata().pixel_format) {
-    FDF_LOG(ERROR, "Capture will fail; trying to capture format=%u as format=%u\n",
-            fill_color.format().ValueForLogging(),
-            static_cast<uint32_t>(destination_info.metadata().pixel_format));
+    fdf::error("Capture will fail; trying to capture format={} as format={}\n",
+               fill_color.format().ValueForLogging(),
+               static_cast<uint32_t>(destination_info.metadata().pixel_format));
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
@@ -927,13 +920,13 @@ zx::result<> FakeDisplay::DoColorFillCapture(display::Color fill_color,
   size_t destination_vmo_size;
   zx_status_t status = destination_info.vmo().get_size(&destination_vmo_size);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to get the size of the VMO for the captured image: %s",
-            zx_status_get_string(status));
+    fdf::error("Failed to get the size of the VMO for the captured image: {}",
+               zx::make_result(status));
     return zx::error(status);
   }
   if (destination_vmo_size % sizeof(uint32_t) != 0) {
-    FDF_LOG(ERROR, "Capture will fail; the captured image VMO size %zu is not a 32-bit multiple",
-            destination_vmo_size);
+    fdf::error("Capture will fail; the captured image VMO size {} is not a 32-bit multiple",
+               destination_vmo_size);
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
@@ -941,8 +934,7 @@ zx::result<> FakeDisplay::DoColorFillCapture(display::Color fill_color,
   status = destination_mapper.Map(destination_info.vmo(), 0, destination_vmo_size,
                                   ZX_VM_PERM_READ | ZX_VM_PERM_WRITE);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Capture will fail; failed to map capture image VMO: %s",
-            zx_status_get_string(status));
+    fdf::error("Capture will fail; failed to map capture image VMO: {}", zx::make_result(status));
     return zx::error(status);
   }
 
