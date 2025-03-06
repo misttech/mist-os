@@ -17,17 +17,7 @@ fuchsia_cc_binary(
     srcs = [
         "hello_world.cc",
     ],
-    deps = select({
-        # This is an example of how to conditionally include a depenency based
-        # on the fuchsia API leve. This example is slightly convoluted because
-        # the api level should really be exposed in the library this is used
-        # to test that our packages pick up the correct deps when using different
-        # api levels.
-        "@fuchsia_sdk//fuchsia/constraints:api_level_17": [
-            "//build/bazel/examples/hello_cpp/lib:hello_printer_17",
-        ],
-        "//conditions:default": [],
-    }) + [
+    deps = [
         "@fuchsia_sdk//pkg/fdio",
         "@fuchsia_sdk//pkg/syslog",
         # the fidl libraries below are not effectively used in the hello world sample, they are here just to validate that
