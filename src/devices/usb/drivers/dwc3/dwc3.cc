@@ -621,6 +621,7 @@ void Dwc3::StopController(StopControllerCompleter::Sync& completer) {
     thrd_join(irq_thread_, nullptr);
     irq_thread_started_.store(false);
   }
+  irq_port_.cancel_key(0, 0);
 
   zx_status_t status;
   {
@@ -859,7 +860,7 @@ void Dwc3::EpServer::QueueRequests(QueueRequestsRequest& request,
     zx_status_t status{ZX_OK};
 
     if (!uep_->ep.enabled) {
-      status = ZX_ERR_BAD_STATE;
+      status = ZX_ERR_IO_NOT_PRESENT;
       FDF_LOG(ERROR, "Dwc3: ep(%u) not enabled!", uep_->ep.ep_num);
     }
 
