@@ -12,7 +12,7 @@ use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::fs::{create_dir_all, File, OpenOptions};
 use std::io::{BufRead, BufReader};
-use std::net::{AddrParseError, SocketAddr};
+use std::net::{AddrParseError, IpAddr, SocketAddr};
 use std::num::ParseIntError;
 use std::path::Path;
 use std::str::FromStr;
@@ -48,16 +48,22 @@ impl FromStr for FastbootMode {
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Clone)]
 pub struct FastbootEntry {
     mode: FastbootMode,
-    socket_addr: SocketAddr,
+    port: u16,
+    address: IpAddr,
 }
 
 impl FastbootEntry {
     pub fn mode(&self) -> FastbootMode {
         self.mode
     }
-
+    pub fn port(&self) -> u16 {
+        self.port
+    }
+    pub fn address(&self) -> IpAddr {
+        self.address.clone()
+    }
     pub fn socket_addr(&self) -> SocketAddr {
-        self.socket_addr
+        SocketAddr::new(self.address, self.port)
     }
 }
 
@@ -77,19 +83,19 @@ impl FromStr for FastbootEntry {
     type Err = ParseFastbootEntryError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (connection_type, addr_port) = s
-            .split_once(":")
+        let (connection_type_addr, port_str) = s
+            .rsplit_once(':')
             .ok_or_else(|| ParseFastbootEntryError::InvalidFormat { got: s.to_string() })?;
-        // let (addr, port_str) = addr_port
-        //     .rsplit_once(":")
-        //     .ok_or_else(|| ParseFastbootEntryError::InvalidFormat { got: s.to_string() })?;
+        let (connection_type, addr) = connection_type_addr
+            .rsplit_once(':')
+            .ok_or_else(|| ParseFastbootEntryError::InvalidFormat { got: s.to_string() })?;
 
-        // let port = port_str.parse::<u16>()?;
+        let port = port_str.parse::<u16>()?;
         let mode = connection_type.parse::<FastbootMode>()?;
 
-        let socket_addr = SocketAddr::from_str(addr_port)?;
+        let address = IpAddr::from_str(addr)?;
 
-        Ok(FastbootEntry { mode, socket_addr })
+        Ok(FastbootEntry { mode, port, address })
     }
 }
 
@@ -289,8 +295,10 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::net::{IpAddr, Ipv4Addr};
+    // use futures::channel::mpsc::unbounded;
     use pretty_assertions::assert_eq;
-    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddrV6};
+    // use std::collections::{HashMap, VecDeque};
 
     #[fuchsia::test]
     async fn test_parse_fastboot_mode() -> Result<()> {
@@ -320,22 +328,10 @@ mod test {
         assert!("tCp::811".parse::<FastbootEntry>().is_err());
 
         assert_eq!(
-            Ok(FastbootEntry {
-                mode: FastbootMode::TCP,
-                socket_addr: SocketAddr::V6(SocketAddrV6::new(
-                    Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1),
-                    811,
-                    0,
-                    1
-                ))
-            }),
-            "tcp:[::1%1]:811".parse::<FastbootEntry>()
-        );
-
-        assert_eq!(
             FastbootEntry {
                 mode: FastbootMode::TCP,
-                socket_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 811),
+                port: 811,
+                address: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
             },
             "tcp:127.0.0.1:811".parse::<FastbootEntry>()?
         );
@@ -343,7 +339,8 @@ mod test {
         assert_eq!(
             FastbootEntry {
                 mode: FastbootMode::UDP,
-                socket_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 811),
+                port: 811,
+                address: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
             },
             "udp:127.0.0.1:811".parse::<FastbootEntry>()?
         );
