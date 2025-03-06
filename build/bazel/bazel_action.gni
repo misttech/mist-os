@@ -821,6 +821,20 @@ template("bazel_action") {
             format = "json"
           },
         ]
+
+        # Used by //:bazel_build_actions target.
+        bazel_build_actions_barrier = []
+        bazel_build_actions = [
+          {
+            gn_target = get_label_info(":$target_name", "label_no_toolchain")
+            bazel_targets = _bazel_targets
+            no_sdk = _no_sdk
+            gn_targets_dir =
+                rebase_path(_gn_targets_repository_path, root_build_dir)
+            gn_targets_manifest =
+                rebase_path(_gn_targets_repository_manifest, root_build_dir)
+          },
+        ]
       }
     }
 

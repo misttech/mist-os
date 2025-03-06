@@ -120,3 +120,9 @@ common:no_sdk \
 
 # Link Go binaries with PIE to avoid relocation errors.
 build --@io_bazel_rules_go//go/config:linkmode=pie
+
+# Use --config=no_gn_targets to ensure that the @gn_targets repository is empty.
+# Bazel targets built with this option cannot depend on GN target outputs at all,
+# very intentionally.
+common:no_gn_targets \
+  --override_repository=gn_targets=build/bazel/local_repositories/empty

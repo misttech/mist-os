@@ -1839,6 +1839,48 @@ group("vnames_config.metadata") {
   }
 }
 
+# The bazel_build_actions_targets.json file maps GN bazel_action() targets reachable
+# from //:defaults, to the list of top-level bazel target labels they build. This is
+# used to implement `fx bazel-tool set_gn_targets <bazel_label>` as well as
+# `fx build @<bazel_target>`.
+#
+# LINT.IfChange
+#
+# Type: list(scope)
+#
+#   gn_label
+#     - Required: GN label of bazel_action() target.
+#     - Type: string
+#
+#   bazel_targets
+#     - Required: List of Bazel target labels built by gn_label. Labels begin with @ or //.
+#     - Type: string list
+#
+#   no_sdk
+#     - Required: flag indicating whether the IDK/SDK is required to build the target.
+#     - Type: boolean
+#
+#   gn_targets_dir
+#     - Required: Path to @gn_targets directory for gn_label, relative to Ninja build directory.
+#     - Type: string
+#
+#   gn_targets_manifest
+#     - Required: Path to manifest file describing the content of @gn_targets, relative
+#         to the Ninja build directory. Rebuilding this artifact with Ninja should ensure
+#         that all files exposed by the repository are up-to-date.
+#     - Type: string
+#
+generated_file("bazel_build_action_targets") {
+  testonly = true
+  deps = [ ":default" ]
+  data_keys = [ "bazel_build_actions" ]
+  walk_keys = [ "bazel_build_actions_barrier" ]
+  outputs = [ "$root_build_dir/$target_name.json" ]
+  output_conversion = "json"
+}
+
+# LINT.ThenChange(//build/bazel/scripts/gn_targets_utils.py)
+
 ###
 ### Top-level targets.
 ###
