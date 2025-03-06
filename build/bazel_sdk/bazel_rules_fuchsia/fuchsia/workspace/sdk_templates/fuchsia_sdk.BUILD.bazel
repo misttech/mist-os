@@ -38,6 +38,13 @@ TARGET_CPUS = [cpu for cpu in sdk_constants.target_cpus]
 # Export all files directly within this package as individual targets.
 exports_files(glob(["**/*"]))
 
+# An empty filegroup, which can be used in select() statements as a default fallback
+filegroup(
+    name = "empty",
+    srcs = [],
+    visibility = ["//visibility:public"],
+)
+
 # A single target that includes all files in the SDK.
 filegroup(
     name = "all_files",

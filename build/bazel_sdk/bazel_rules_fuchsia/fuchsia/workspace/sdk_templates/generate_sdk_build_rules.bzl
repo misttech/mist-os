@@ -1330,6 +1330,8 @@ def _generate_python_e2e_test_rules(
                     _fuchsia_api_level_constraint(api_level): "//%s/%s:%s" %
                                                               (relative_dir, api_level, name)
                     for api_level in files_for_api_level
+                } | {
+                    "//conditions:default": "//:empty",
                 },
             ),
         },
