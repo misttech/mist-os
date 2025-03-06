@@ -33,6 +33,7 @@ idk_category_marker_template("not-in-idk") {
 
 idk_category_marker_template("compat_test") {
   visibility = [
+    "//sdk/ctf/tests/fidl/*",
     "//sdk/fidl/*",
     "//src/*",
   ]

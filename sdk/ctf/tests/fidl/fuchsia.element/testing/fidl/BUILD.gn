@@ -6,7 +6,9 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.element.test") {
   testonly = true
-  versioned = "fuchsia"  # Override default behavior for `testonly`.
+  sdk_category = "compat_test"
+  stable = true
+  sdk_area = "Sessions"
   sources = [ "realm_factory.test.fidl" ]
   enable_hlcpp = true
   public_deps = [

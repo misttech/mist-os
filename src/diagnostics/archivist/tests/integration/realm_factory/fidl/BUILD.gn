@@ -6,7 +6,9 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.archivist.test") {
   testonly = true
-  versioned = "fuchsia"  # Override default behavior for `testonly`.
+  sdk_category = "compat_test"
+  stable = true
+  sdk_area = "Diagnostics"
 
   sources = [
     "puppet.test.fidl",
