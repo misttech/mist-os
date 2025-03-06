@@ -157,7 +157,7 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem2::Alloca
   }
 
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    FDF_LOG(ERROR, "%s not implemented", name.c_str());
+    fdf::error("{} not implemented", name);
     EXPECT_TRUE(false);
   }
 

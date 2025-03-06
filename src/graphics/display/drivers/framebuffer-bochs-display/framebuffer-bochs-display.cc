@@ -7,6 +7,7 @@
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/mmio/mmio-buffer.h>
+#include <lib/zx/result.h>
 #include <zircon/errors.h>
 #include <zircon/process.h>
 
@@ -47,9 +48,8 @@ zx::result<> SetUpBochsDisplayEngine(fdf::MmioView mmio_space, int width, int he
       bochs_vbe::DisplayEngineApiVersion::Get().ReadFrom(&mmio_space).version();
 
   if (hardware_supported_display_engine_api_version < kDriverRequiredDisplayEngineApiVersion) {
-    FDF_LOG(
-        ERROR,
-        "Hardware supported display engine API version (0x%04x) is too low. Driver requires API version 0x%04x",
+    fdf::error(
+        "Hardware supported display engine API version (0x{:04x}) is too low. Driver requires API version 0x{:04x}",
         hardware_supported_display_engine_api_version, kDriverRequiredDisplayEngineApiVersion);
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
@@ -79,39 +79,39 @@ zx::result<> SetUpBochsDisplayEngine(fdf::MmioView mmio_space, int width, int he
 }
 
 void LogBochsDisplayEngineRegisters(fdf::MmioView mmio_space) {
-  FDF_LOG(INFO, "Bochs display engine current state:");
-  FDF_LOG(INFO, "%30s: 0x%04x", "Hardware supported API version",
-          bochs_vbe::DisplayEngineApiVersion::Get().ReadFrom(&mmio_space).version());
-  FDF_LOG(INFO, "%30s: %d x %d", "Physical resolution (px)",
-          bochs_vbe::DisplayHorizontalResolution::Get().ReadFrom(&mmio_space).pixels(),
-          bochs_vbe::DisplayVerticalResolution::Get().ReadFrom(&mmio_space).pixels());
-  FDF_LOG(INFO, "%30s: %d", "Color depth",
-          bochs_vbe::DisplayBitsPerPixel::Get().ReadFrom(&mmio_space).bits_per_pixel());
+  fdf::info("Bochs display engine current state:");
+  fdf::info("{:30s}: 0x{:04x}", "Hardware supported API version",
+            bochs_vbe::DisplayEngineApiVersion::Get().ReadFrom(&mmio_space).version());
+  fdf::info("{:30s}: {} x {}", "Physical resolution (px)",
+            bochs_vbe::DisplayHorizontalResolution::Get().ReadFrom(&mmio_space).pixels(),
+            bochs_vbe::DisplayVerticalResolution::Get().ReadFrom(&mmio_space).pixels());
+  fdf::info("{:30s}: {}", "Color depth",
+            bochs_vbe::DisplayBitsPerPixel::Get().ReadFrom(&mmio_space).bits_per_pixel());
 
   bochs_vbe::DisplayFeatureControl display_feature_control =
       bochs_vbe::DisplayFeatureControl::Get().ReadFrom(&mmio_space);
-  FDF_LOG(INFO, "%30s: %s", "Video memory preserved on enable",
-          display_feature_control.video_memory_preserved_on_enable() ? "true" : "false");
-  FDF_LOG(INFO, "%30s: %s", "Linear frame buffer",
-          display_feature_control.linear_frame_buffer_enabled() ? "enabled" : "disabled");
-  FDF_LOG(INFO, "%30s: %s", "Pallete DAC mode",
-          display_feature_control.palette_dac_in_8bit_mode() ? "8-bit" : "6-bit");
-  FDF_LOG(INFO, "%30s: %s", "Read display capabilities",
-          display_feature_control.read_display_capabilities() ? "true" : "false");
-  FDF_LOG(INFO, "%30s: %s", "Display engine",
-          display_feature_control.display_engine_enabled() ? "enabled" : "disabled");
+  fdf::info("{:30s}: {}", "Video memory preserved on enable",
+            display_feature_control.video_memory_preserved_on_enable() ? "true" : "false");
+  fdf::info("{:30s}: {}", "Linear frame buffer",
+            display_feature_control.linear_frame_buffer_enabled() ? "enabled" : "disabled");
+  fdf::info("{:30s}: {}", "Pallete DAC mode",
+            display_feature_control.palette_dac_in_8bit_mode() ? "8-bit" : "6-bit");
+  fdf::info("{:30s}: {}", "Read display capabilities",
+            display_feature_control.read_display_capabilities() ? "true" : "false");
+  fdf::info("{:30s}: {}", "Display engine",
+            display_feature_control.display_engine_enabled() ? "enabled" : "disabled");
 
-  FDF_LOG(INFO, "%30s: %" PRIu16, "Video memory bank index",
-          bochs_vbe::VideoMemoryBankIndex::Get().ReadFrom(&mmio_space).bank_index());
-  FDF_LOG(INFO, "%30s: %d", "Virtual display width",
-          bochs_vbe::VirtualDisplayWidth::Get().ReadFrom(&mmio_space).pixels());
-  FDF_LOG(INFO, "%30s: %d", "Virtual display height",
-          bochs_vbe::VirtualDisplayHeight::Get().ReadFrom(&mmio_space).pixels());
-  FDF_LOG(INFO, "%30s: (%d, %d)", "Virtual display offset",
-          bochs_vbe::VirtualDisplayHorizontalOffset::Get().ReadFrom(&mmio_space).pixels(),
-          bochs_vbe::VirtualDisplayVerticalOffset::Get().ReadFrom(&mmio_space).pixels());
-  FDF_LOG(INFO, "%30s: %" PRId64, "Video memory size (bytes)",
-          bochs_vbe::VideoMemorySize::Get().ReadFrom(&mmio_space).GetVideoMemorySizeBytes());
+  fdf::info("{:30s}: {}", "Video memory bank index",
+            bochs_vbe::VideoMemoryBankIndex::Get().ReadFrom(&mmio_space).bank_index());
+  fdf::info("{:30s}: {}", "Virtual display width",
+            bochs_vbe::VirtualDisplayWidth::Get().ReadFrom(&mmio_space).pixels());
+  fdf::info("{:30s}: {}", "Virtual display height",
+            bochs_vbe::VirtualDisplayHeight::Get().ReadFrom(&mmio_space).pixels());
+  fdf::info("{:30s}: ({}, {})", "Virtual display offset",
+            bochs_vbe::VirtualDisplayHorizontalOffset::Get().ReadFrom(&mmio_space).pixels(),
+            bochs_vbe::VirtualDisplayVerticalOffset::Get().ReadFrom(&mmio_space).pixels());
+  fdf::info("{:30s}: {}", "Video memory size (bytes)",
+            bochs_vbe::VideoMemorySize::Get().ReadFrom(&mmio_space).GetVideoMemorySizeBytes());
 }
 
 // Driver for the QEMU Bochs-compatible display engine.
@@ -147,7 +147,7 @@ zx::result<ddk::Pci> FramebufferBochsDisplayDriver::GetPciClient() {
   zx::result<fidl::ClientEnd<fuchsia_hardware_pci::Device>> pci_result =
       incoming()->Connect<fuchsia_hardware_pci::Service::Device>("pci");
   if (pci_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to connect to PCI protocol: %s", pci_result.status_string());
+    fdf::error("Failed to connect to PCI protocol: {}", pci_result);
     return pci_result.take_error();
   }
   ddk::Pci pci(std::move(pci_result).value());
@@ -173,7 +173,7 @@ zx::result<> FramebufferBochsDisplayDriver::ConfigureHardware() {
   zx_status_t status =
       pci.MapMmio(kQemuBochsRegisterMmioPciBarIndex, ZX_CACHE_POLICY_UNCACHED_DEVICE, &mmio);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to map PCI config: %s", zx_status_get_string(status));
+    fdf::error("Failed to map PCI config: {}", zx::make_result(status));
     return zx::error(status);
   }
 
@@ -220,8 +220,7 @@ zx::result<fdf::MmioBuffer> FramebufferBochsDisplayDriver::GetFrameBufferMmioBuf
   zx_status_t status =
       pci.MapMmio(kFramebufferPciBarIndex, ZX_CACHE_POLICY_WRITE_COMBINING, &framebuffer_mmio);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to map PCI bar %" PRIu32 ": %s", kFramebufferPciBarIndex,
-            zx_status_get_string(status));
+    fdf::error("Failed to map PCI bar {}: {}", kFramebufferPciBarIndex, zx::make_result(status));
     return zx::error(status);
   }
 

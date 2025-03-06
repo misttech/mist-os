@@ -12,9 +12,9 @@
 #include <lib/image-format/image_format.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zbi-format/graphics.h>
+#include <lib/zx/result.h>
 #include <unistd.h>
 #include <zircon/process.h>
-#include <zircon/status.h>
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
 
@@ -84,16 +84,16 @@ void OnHeapServerClose(fidl::UnbindInfo info, zx::channel channel) {
   if (info.is_dispatcher_shutdown()) {
     // Pending wait is canceled because the display device that the heap belongs
     // to has been destroyed.
-    FDF_LOG(INFO, "Framebuffer display destroyed: status: %s", info.status_string());
+    fdf::info("Framebuffer display destroyed: status: {}", info.status_string());
     return;
   }
 
   if (info.is_peer_closed()) {
-    FDF_LOG(INFO, "Client closed heap connection");
+    fdf::info("Client closed heap connection");
     return;
   }
 
-  FDF_LOG(ERROR, "Channel internal error: status: %s", info.FormatDescription().c_str());
+  fdf::error("Channel internal error: status: {}", info.FormatDescription().c_str());
 }
 
 zx_koid_t GetCurrentProcessKoid() {
@@ -129,7 +129,7 @@ zx::result<> FramebufferDisplay::ImportBufferCollection(
     display::DriverBufferCollectionId buffer_collection_id,
     fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> buffer_collection_token) {
   if (buffer_collections_.find(buffer_collection_id) != buffer_collections_.end()) {
-    FDF_LOG(ERROR, "Buffer Collection (id=%lu) already exists", buffer_collection_id.value());
+    fdf::error("Buffer Collection (id={}) already exists", buffer_collection_id.value());
     return zx::error(ZX_ERR_ALREADY_EXISTS);
   }
 
@@ -146,8 +146,7 @@ zx::result<> FramebufferDisplay::ImportBufferCollection(
           .Build();
   auto bind_result = sysmem_client_->BindSharedCollection(std::move(bind_request));
   if (!bind_result.ok()) {
-    FDF_LOG(ERROR, "Cannot complete FIDL call BindSharedCollection: %s",
-            bind_result.status_string());
+    fdf::error("Cannot complete FIDL call BindSharedCollection: {}", bind_result.status_string());
     return zx::error(ZX_ERR_ALREADY_EXISTS);
   }
 
@@ -160,8 +159,8 @@ zx::result<> FramebufferDisplay::ImportBufferCollection(
 zx::result<> FramebufferDisplay::ReleaseBufferCollection(
     display::DriverBufferCollectionId buffer_collection_id) {
   if (buffer_collections_.find(buffer_collection_id) == buffer_collections_.end()) {
-    FDF_LOG(ERROR, "Cannot release buffer collection %lu: buffer collection doesn't exist",
-            buffer_collection_id.value());
+    fdf::error("Cannot release buffer collection {}: buffer collection doesn't exist",
+               buffer_collection_id.value());
     return zx::error(ZX_ERR_NOT_FOUND);
   }
   buffer_collections_.erase(buffer_collection_id);
@@ -173,8 +172,8 @@ zx::result<display::DriverImageId> FramebufferDisplay::ImportImage(
     display::DriverBufferCollectionId buffer_collection_id, uint32_t buffer_index) {
   const auto it = buffer_collections_.find(buffer_collection_id);
   if (it == buffer_collections_.end()) {
-    FDF_LOG(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)",
-            buffer_collection_id.value());
+    fdf::error("ImportImage: Cannot find imported buffer collection (id={})",
+               buffer_collection_id.value());
     return zx::error(ZX_ERR_NOT_FOUND);
   }
   const fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>& collection = it->second;
@@ -184,8 +183,7 @@ zx::result<display::DriverImageId> FramebufferDisplay::ImportImage(
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
   if (!check_result.ok()) {
-    FDF_LOG(ERROR, "failed to check buffers allocated, %s",
-            check_result.FormatDescription().c_str());
+    fdf::error("failed to check buffers allocated, {}", check_result.FormatDescription().c_str());
     return zx::error(check_result.status());
   }
   const auto& check_response = check_result.value();
@@ -201,8 +199,7 @@ zx::result<display::DriverImageId> FramebufferDisplay::ImportImage(
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
   if (!wait_result.ok()) {
-    FDF_LOG(ERROR, "failed to wait for buffers allocated, %s",
-            wait_result.FormatDescription().c_str());
+    fdf::error("failed to wait for buffers allocated, {}", wait_result.FormatDescription().c_str());
     return zx::error(wait_result.status());
   }
   auto& wait_response = wait_result.value();
@@ -213,22 +210,21 @@ zx::result<display::DriverImageId> FramebufferDisplay::ImportImage(
       wait_response->buffer_collection_info();
 
   if (!collection_info.settings().has_image_format_constraints()) {
-    FDF_LOG(ERROR, "no image format constraints");
+    fdf::error("no image format constraints");
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   if (buffer_index > 0) {
-    FDF_LOG(ERROR, "invalid index %d, greater than 0", buffer_index);
+    fdf::error("invalid index {}, greater than 0", buffer_index);
     return zx::error(ZX_ERR_OUT_OF_RANGE);
   }
 
   fuchsia_images2::wire::PixelFormat sysmem2_collection_format =
       collection_info.settings().image_format_constraints().pixel_format();
   if (sysmem2_collection_format != properties_.pixel_format.ToFidl()) {
-    FDF_LOG(ERROR,
-            "Image format from sysmem (%" PRIu32 ") doesn't match expected format (%" PRIu32 ")",
-            static_cast<uint32_t>(sysmem2_collection_format),
-            properties_.pixel_format.ValueForLogging());
+    fdf::error("Image format from sysmem ({}) doesn't match expected format ({})",
+               static_cast<uint32_t>(sysmem2_collection_format),
+               properties_.pixel_format.ValueForLogging());
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
@@ -344,9 +340,8 @@ zx::result<> FramebufferDisplay::SetBufferCollectionConstraints(
     display::DriverBufferCollectionId buffer_collection_id) {
   const auto it = buffer_collections_.find(buffer_collection_id);
   if (it == buffer_collections_.end()) {
-    FDF_LOG(ERROR,
-            "SetBufferCollectionConstraints: Cannot find imported buffer collection (id=%lu)",
-            buffer_collection_id.value());
+    fdf::error("SetBufferCollectionConstraints: Cannot find imported buffer collection (id={})",
+               buffer_collection_id.value());
     return zx::error(ZX_ERR_NOT_FOUND);
   }
   const fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>& collection = it->second;
@@ -389,7 +384,7 @@ zx::result<> FramebufferDisplay::SetBufferCollectionConstraints(
   auto result = collection->SetConstraints(set_request.Build());
 
   if (!result.ok()) {
-    FDF_LOG(ERROR, "failed to set constraints, %s", result.FormatDescription().c_str());
+    fdf::error("failed to set constraints, {}", result.FormatDescription().c_str());
     return zx::error(result.status());
   }
 
@@ -474,7 +469,7 @@ zx::result<> FramebufferDisplay::Initialize() {
   auto result = sysmem_hardware_client_->RegisterHeap(
       static_cast<uint64_t>(fuchsia_sysmem::wire::HeapType::kFramebuffer), std::move(heap_client));
   if (!result.ok()) {
-    FDF_LOG(ERROR, "Failed to register sysmem heap: %s", result.status_string());
+    fdf::error("Failed to register sysmem heap: {}", result.status_string());
     return zx::error(result.status());
   }
 
@@ -490,17 +485,16 @@ zx::result<> FramebufferDisplay::Initialize() {
                                     });
     auto result = fidl::WireSendEvent(binding)->OnRegister(std::move(heap_properties));
     if (!result.ok()) {
-      FDF_LOG(ERROR, "OnRegister() failed: %s", result.FormatDescription().c_str());
+      fdf::error("OnRegister() failed: {}", result.FormatDescription().c_str());
     }
   });
 
   // Start vsync loop.
   vsync_task_.Post(&dispatcher_);
 
-  FDF_LOG(INFO,
-          "Initialized display, %" PRId32 " x %" PRId32 " (stride=%" PRId32 " format=%" PRIu32 ")",
-          properties_.width_px, properties_.height_px, properties_.row_stride_px,
-          properties_.pixel_format.ValueForLogging());
+  fdf::info("Initialized display, {} x {} (stride={} format={})", properties_.width_px,
+            properties_.height_px, properties_.row_stride_px,
+            properties_.pixel_format.ValueForLogging());
 
   return zx::ok();
 }
@@ -532,8 +526,7 @@ FramebufferDisplay::FramebufferDisplay(
     set_debug_request.id(current_process_koid);
     auto set_debug_status = sysmem_client_->SetDebugClientInfo(set_debug_request.Build());
     if (!set_debug_status.ok()) {
-      FDF_LOG(ERROR, "Cannot set sysmem allocator debug info: %s",
-              set_debug_status.status_string());
+      fdf::error("Cannot set sysmem allocator debug info: {}", set_debug_status.status_string());
     }
   }
 }
@@ -542,9 +535,9 @@ void FramebufferDisplay::OnPeriodicVSync(async_dispatcher_t* dispatcher, async::
                                          zx_status_t status) {
   if (status != ZX_OK) {
     if (status == ZX_ERR_CANCELED) {
-      FDF_LOG(INFO, "Vsync task is canceled.");
+      fdf::info("Vsync task is canceled.");
     } else {
-      FDF_LOG(ERROR, "Failed to run Vsync task: %s", zx_status_get_string(status));
+      fdf::error("Failed to run Vsync task: {}", zx::make_result(status));
     }
     return;
   }
@@ -559,8 +552,7 @@ void FramebufferDisplay::OnPeriodicVSync(async_dispatcher_t* dispatcher, async::
   next_vsync_time_ += kVSyncInterval;
   zx_status_t post_status = vsync_task_.PostForTime(&dispatcher_, next_vsync_time_);
   if (post_status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to post Vsync task for the next Vsync: %s",
-            zx_status_get_string(status));
+    fdf::error("Failed to post Vsync task for the next Vsync: {}", zx::make_result(status));
   }
 }
 

@@ -13,7 +13,6 @@
 
 #include <fbl/alloc_checker.h>
 
-#include "lib/zbi-format/zbi.h"
 #include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 #include "src/graphics/display/lib/framebuffer-display/framebuffer-display-driver.h"
 #include "src/graphics/display/lib/framebuffer-display/framebuffer-display.h"
@@ -56,7 +55,7 @@ zx::result<fdf::MmioBuffer> FramebufferIntelDisplayDriver::GetFrameBufferMmioBuf
   zx::result<fidl::ClientEnd<fuchsia_hardware_pci::Device>> pci_result =
       incoming()->Connect<fuchsia_hardware_pci::Service::Device>("pci");
   if (pci_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to connect to PCI protocol: %s", pci_result.status_string());
+    fdf::error("Failed to connect to PCI protocol: {}", pci_result);
     return pci_result.take_error();
   }
   ddk::Pci pci(std::move(pci_result).value());
@@ -67,8 +66,8 @@ zx::result<fdf::MmioBuffer> FramebufferIntelDisplayDriver::GetFrameBufferMmioBuf
   zx_status_t status =
       pci.MapMmio(kIntelFramebufferPciBarIndex, ZX_CACHE_POLICY_WRITE_COMBINING, &framebuffer_mmio);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to map PCI bar %" PRIu32 ": %s", kIntelFramebufferPciBarIndex,
-            zx_status_get_string(status));
+    fdf::error("Failed to map PCI bar {}: {}", kIntelFramebufferPciBarIndex,
+               zx::make_result(status));
     return zx::error(status);
   }
 
@@ -79,18 +78,16 @@ zx::result<fdf::MmioBuffer> FramebufferIntelDisplayDriver::GetFrameBufferMmioBuf
 zx::result<zbi_swfb_t> FramebufferIntelDisplayDriver::GetFramebufferInfo() {
   zx::result boot_items_client = incoming()->Connect<fuchsia_boot::Items>();
   if (boot_items_client.is_error()) {
-    FDF_LOG(ERROR, "Failed to connect to fuchsia.boot/Items: %s",
-            boot_items_client.status_string());
+    fdf::error("Failed to connect to fuchsia.boot/Items: {}", boot_items_client);
     return boot_items_client.take_error();
   }
   fidl::WireResult result = fidl::WireCall(*boot_items_client)->Get2(ZBI_TYPE_FRAMEBUFFER, {});
   if (!result.ok()) {
-    FDF_LOG(ERROR, "Failed to call fuchsia.boot/Items.Get2: %s", result.status_string());
+    fdf::error("Failed to call fuchsia.boot/Items.Get2: {}", result.status_string());
     return zx::error(result.status());
   }
   if (result->is_error()) {
-    FDF_LOG(ERROR, "Failed to get framebuffer boot item: %s",
-            zx_status_get_string(result->error_value()));
+    fdf::error("Failed to get framebuffer boot item: {}", zx::make_result(result->error_value()));
     return zx::error(result->error_value());
   }
   fidl::VectorView items = result->value()->retrieved_items;
@@ -111,7 +108,7 @@ zx::result<zbi_swfb_t> FramebufferIntelDisplayDriver::GetFramebufferInfo() {
 zx::result<DisplayProperties> FramebufferIntelDisplayDriver::GetDisplayProperties() {
   zx::result framebuffer_info = GetFramebufferInfo();
   if (framebuffer_info.is_error()) {
-    FDF_LOG(ERROR, "Failed to get bootloader dimensions: %s", framebuffer_info.status_string());
+    fdf::error("Failed to get bootloader dimensions: {}", framebuffer_info);
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
   zbi_pixel_format_t format = framebuffer_info->format;
@@ -126,14 +123,13 @@ zx::result<DisplayProperties> FramebufferIntelDisplayDriver::GetDisplayPropertie
   fpromise::result<fuchsia_images2::wire::PixelFormat> sysmem2_format_type_result =
       ImageFormatConvertZbiToSysmemPixelFormat_v2(format);
   if (!sysmem2_format_type_result.is_ok()) {
-    FDF_LOG(ERROR, "Failed to convert framebuffer format: %" PRIu32, static_cast<uint32_t>(format));
+    fdf::error("Failed to convert framebuffer format: {}", static_cast<uint32_t>(format));
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
   fuchsia_images2::wire::PixelFormat sysmem2_format = sysmem2_format_type_result.take_value();
 
   if (!display::PixelFormat::IsSupported(sysmem2_format)) {
-    FDF_LOG(ERROR, "Unsupported framebuffer format: %" PRIu32,
-            static_cast<uint32_t>(sysmem2_format));
+    fdf::error("Unsupported framebuffer format: {}", static_cast<uint32_t>(sysmem2_format));
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
   display::PixelFormat pixel_format(sysmem2_format);
