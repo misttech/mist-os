@@ -1,6 +1,6 @@
 # Bazel migration guidelines
 
-Last update: [2025-02-21](#document-history)
+Last update: [2025-03-06](#document-history)
 
 This page provides important Bazel-related guidelines for Fuchsia developers
 working in-tree (i.e. with a fuchsia.git checkout). As the Bazel migration is
@@ -27,12 +27,19 @@ As of Q1 2025, the following guidelines apply:
 [bazel-driver-example]: https://cs.opensource.google/fuchsia/fuchsia/+/main:examples/drivers/simple/dfv2/BUILD.bazel;l=42
 
 - All new board development should happen in Bazel. If your board happens
-  to depend on an existing GN driver package, expose it to the Bazel graph
-  using the [bazel_driver_package()][bazel_driver_package]{:.external} template
-  ([example here][bazel_driver_package-example]{:.external}).
+  to depend on an existing GN driver package, first expose it to the Bazel graph
+  by setting the `export_to_bazel = true` argument in its GN
+  [`fuchsia_driver_package()`][fuchsia_driver_package_export_to_bazel]{:.external},
+  definition, then create a Bazel
+  [`fuchsia_prebuilt_package`()][fuchsia_prebuilt_package]{:.external}
+  companion target definition referencing the GN package artifact
+  ([example here][fuchsia_driver_package_export_example]{:.external} and
+  [here][fuchsia_prebuilt_package_example]{:.external}).
 
-[bazel_driver_package]: https://cs.opensource.google/fuchsia/fuchsia/+/main:build/bazel/drivers/bazel_driver_package.gni;drc=5bdaea639679d194a068c4fb8a99a382e1b44bfc;l=44
-[bazel_driver_package-example]: http://cs/h/turquoise-internal/fuchsia-internal-superproject/+/main:vendor/google/moonflower/serial/drivers/msm-uart/BUILD.gn?l=9
+[fuchsia_driver_package_export_to_bazel]: https://cs.opensource.google/fuchsia/fuchsia/+/main:build/drivers/fuchsia_driver_package.gni;drc=82da562a4ef932e58704b61093bf80d564ac042f;l=42
+[fuchsia_driver_package_export_example]: http://cs/h/fuchsia/fuchsia/+/main:src/connectivity/bluetooth/hci/transport/uart/BUILD.gn?l=67
+[fuchsia_prebuilt_package]: https://cs.opensource.google/fuchsia/fuchsia/+/main:build/bazel_sdk/bazel_rules_fuchsia/fuchsia/private/fuchsia_prebuilt_package.bzl;drc=f48ae8ee65b68615d40b684fa9779fff7d413f44;l=326
+[fuchsia_prebuilt_package_example]: http://cs/h/fuchsia/fuchsia/+/main:src/connectivity/bluetooth/hci/transport/uart/BUILD.bazel?l=9
 
 - Bazel-based driver packages *must only* depend on platform libraries that are
   exposed through the `@fuchsia_sdk` and `@internal_sdk` repositories.
@@ -219,4 +226,5 @@ target definitions that need to be tracked for the rest of the migration.
 
 ## Document History
 
+2025-03-06: Fix example on how to export Bazel package to GN.
 2025-02-21: Initial version
