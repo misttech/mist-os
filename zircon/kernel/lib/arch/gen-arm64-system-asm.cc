@@ -19,6 +19,7 @@ int main(int argc, char** argv) {
       .Macro("CPTR_EL2_RES1", "CPTR_EL2_UNKNOWN")
       .Register<arch::ArmCurrentEl>("CURRENT_EL_")
       .Register<arch::ArmHcrEl2>("HCR_EL2_")
+      .Register<arch::ArmHcrxEl2>("HCRX_EL2_")
       .Register<arch::ArmIccSreEl2>("ICC_SRE_EL2_")
       .Register<arch::ArmSctlrEl1>("SCTLR_EL1_")
       .Register<arch::ArmSctlrEl2>("SCTLR_EL2_")
