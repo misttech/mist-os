@@ -6,7 +6,6 @@ static_library("minfs") {
   friend = [
     "test:*",
     "allocator/test:*",
-    "inspector:*",
     "//src/storage/conformance/conformance_harness/minfs:bin",
   ]
   visibility = [ "//src/storage/*" ]
@@ -108,8 +107,8 @@ static_library("minfs") {
       # fsck.h includes block-client/cpp/block-device.h
       "//src/storage/lib/block_client/cpp",
 
-      # inspector/minfs_inspector.h includes journal/format.h
-      "//src/storage/lib/vfs/cpp/journal",
+      # Several headers include vfs headers
+      "//src/storage/lib/vfs/cpp",
 
       # Used by the MinfsInspectTree class
       "//sdk/lib/inspect/component/cpp:cpp",
@@ -134,6 +133,7 @@ static_library("minfs") {
       "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_cpp",
       "//src/storage/fvm",
       "//src/storage/lib/storage-metrics",
+      "//src/storage/lib/vfs/cpp/journal",
       "//zircon/system/ulib/fdio-caller",
       "//zircon/system/ulib/fzl",
       "//zircon/system/ulib/inspect",

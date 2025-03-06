@@ -6,7 +6,6 @@ bin/crasher
 bin/dd
 bin/debuglog
 bin/df
-bin/disk-inspect
 bin/dlog
 bin/fvm-check
 bin/handles
@@ -56,7 +55,6 @@ lib/libcrypto.so
 lib/libfdio.so
 lib/libinspector.so
 lib/libramdevice-client.so
-lib/libre2.so
 lib/libssl.so
 lib/libstd-*
 lib/libsvc.so

@@ -18,7 +18,6 @@ group("tests") {
     "block_client:tests",
     "block_server:tests",
     "delivery_blob:tests",
-    "disk_inspector:tests",
     "fs_management:tests",
     "fsverity-merkle:tests",
     "ftl:tests",

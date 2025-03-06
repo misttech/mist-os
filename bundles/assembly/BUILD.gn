@@ -418,7 +418,6 @@ assembly_input_bundle("bootstrap_userdebug") {
   bootfs_files_labels = [
     # tools
     "//src/connectivity/network/bin/ping:bootfs",
-    "//src/devices/block/bin/disk-inspect:bootfs",
     "//src/devices/block/bin/fvm-check:bootfs",
     "//src/devices/nand/bin/nand-loader:bootfs",
     "//src/devices/nand/bin/nand-util:bootfs",

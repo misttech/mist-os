@@ -366,7 +366,6 @@ group("deprecated_zx_wrapper_allowlist") {
     "//src/media/audio/drivers/lib/intel-hda:*",
     "//src/media/audio/lib/simple-codec:*",
     "//src/storage/gpt:*",
-    "//src/storage/lib/disk_inspector:*",
     "//third_party/android/platform/external/avb:*",
     "//zircon/kernel/arch/x86/phys:*",
     "//zircon/kernel/dev/coresight:*",
