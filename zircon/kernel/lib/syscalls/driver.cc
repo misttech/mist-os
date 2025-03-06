@@ -307,6 +307,44 @@ zx_status_t sys_bti_create(zx_handle_t iommu, uint32_t options, uint64_t bti_id,
   return up->MakeAndAddHandle(ktl::move(handle), rights, out);
 }
 
+// Helper for optimizing writing many small elements of user ptr array by allowing for a variable
+// amount of buffering.
+template <typename T, size_t Buf>
+class BufferedUserOutPtr {
+ public:
+  explicit BufferedUserOutPtr(user_out_ptr<T> out_ptr) : out_ptr_(out_ptr) {}
+  ~BufferedUserOutPtr() {
+    // Ensure Flush was called and everything got written out.
+    ASSERT(index_ == 0);
+  }
+  // Add a single element, either appending to the buffer and/or flushing the buffer if full.
+  zx_status_t Write(const T& item) {
+    buf_[index_] = item;
+    index_++;
+    if (index_ == Buf) {
+      return Flush();
+    }
+    return ZX_OK;
+  }
+  // Flush any remaining buffered items. Must be called prior to destruction.
+  zx_status_t Flush() {
+    zx_status_t status = out_ptr_.copy_array_to_user(buf_.data(), index_);
+    if (status != ZX_OK) {
+      return status;
+    }
+    out_ptr_ = out_ptr_.element_offset(index_);
+    index_ = 0;
+    return ZX_OK;
+  }
+
+ private:
+  size_t index_ = 0;
+  user_out_ptr<T> out_ptr_;
+  ktl::array<T, Buf> buf_;
+  // Expectation is this is going to be stack allocated, so ensure it's not too big.
+  static_assert(sizeof(buf_) < PAGE_SIZE);
+};
+
 // zx_status_t zx_bti_pin
 zx_status_t sys_bti_pin(zx_handle_t handle, uint32_t options, zx_handle_t vmo, uint64_t offset,
                         uint64_t size, user_out_ptr<zx_paddr_t> addrs, size_t addrs_count,
@@ -380,13 +418,6 @@ zx_status_t sys_bti_pin(zx_handle_t handle, uint32_t options, zx_handle_t vmo, u
     return ZX_ERR_INVALID_ARGS;
   }
 
-  constexpr size_t kAddrsLenLimitForStack = 4;
-  fbl::AllocChecker ac;
-  fbl::InlineArray<dev_vaddr_t, kAddrsLenLimitForStack> mapped_addrs(&ac, addrs_count);
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
-
   KernelHandle<PinnedMemoryTokenDispatcher> new_pmt_handle;
   zx_rights_t new_pmt_rights;
   status = bti_dispatcher->Pin(vmo_dispatcher->vmo(), offset, size, iommu_perms, &new_pmt_handle,
@@ -406,6 +437,9 @@ zx_status_t sys_bti_pin(zx_handle_t handle, uint32_t options, zx_handle_t vmo, u
   // will be moved in order to make a zx_handle_t.  |new_pmt_handle| will
   // not be valid after the move so we keep a RefPtr to the dispatcher instead.
   auto cleanup = fit::defer([disp = new_pmt_handle.dispatcher()]() { disp->Unpin(); });
+
+  static_assert(sizeof(dev_vaddr_t) == sizeof(zx_paddr_t), "mismatched types");
+  BufferedUserOutPtr<zx_paddr_t, 32> buffered_addrs(addrs);
 
   // Define a helper lambda with some state that can fetch potentially large ranges from the PMT,
   // but return them gradually. This just serves as an optimization around repeatedly querying the
@@ -464,13 +498,17 @@ zx_status_t sys_bti_pin(zx_handle_t handle, uint32_t options, zx_handle_t vmo, u
     if (result.is_error()) {
       return result.status_value();
     }
-    mapped_addrs[i] = *result;
+    status = buffered_addrs.Write(*result);
+    if (status != ZX_OK) {
+      return status;
+    }
   }
 
-  static_assert(sizeof(dev_vaddr_t) == sizeof(zx_paddr_t), "mismatched types");
-  if ((status = addrs.copy_array_to_user(mapped_addrs.get(), addrs_count)) != ZX_OK) {
+  status = buffered_addrs.Flush();
+  if (status != ZX_OK) {
     return status;
   }
+
   zx_status_t res = up->MakeAndAddHandle(ktl::move(new_pmt_handle), new_pmt_rights, pmt);
   if (res == ZX_OK) {
     cleanup.cancel();
