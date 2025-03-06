@@ -39,7 +39,7 @@ if (is_host) {
   go_library("coding_tables") {
     source_dir = "coding_tables"
     deps = [
-      "//third_party/golibs:golang.org/x/exp",
+      "//third_party/golibs:golang.org/x/exp/slices",
       "//tools/fidl/lib/fidlgen",
     ]
     sources = [ "ir.go" ]

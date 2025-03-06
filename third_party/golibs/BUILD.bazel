@@ -19,8 +19,6 @@ go_library(
         "//third_party/golibs/vendor/github.com/BurntSushi/toml",
         "//third_party/golibs/vendor/github.com/creack/pty",
         "//third_party/golibs/vendor/github.com/dustin/go-humanize",
-        "//third_party/golibs/vendor/github.com/dustin/go-humanize/english",
-        "//third_party/golibs/vendor/github.com/fsnotify/fsnotify",
         "//third_party/golibs/vendor/github.com/golang/glog",
         "//third_party/golibs/vendor/github.com/google/go-cmp/cmp",
         "//third_party/golibs/vendor/github.com/google/go-cmp/cmp/cmpopts",
