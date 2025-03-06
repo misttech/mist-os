@@ -9,12 +9,12 @@ use crate::{
     Client, ClientHandler, ClientSender, Responder, Server, ServerHandler, ServerSender, Transport,
 };
 
-pub async fn test_close_on_drop<T: Transport>(client_end: T, server_end: T) {
+pub async fn test_close_on_drop<T: Transport + 'static>(client_end: T, server_end: T) {
     struct TestServer {
         scope: Scope,
     }
 
-    impl<T: Transport> ServerHandler<T> for TestServer {
+    impl<T: Transport + 'static> ServerHandler<T> for TestServer {
         fn on_one_way(&mut self, _: &ServerSender<T>, _: u64, _: T::RecvBuffer) {
             panic!("unexpected event");
         }
@@ -63,7 +63,7 @@ pub async fn test_close_on_drop<T: Transport>(client_end: T, server_end: T) {
     server_task.await.expect("server encountered an error");
 }
 
-pub async fn test_one_way<T: Transport>(client_end: T, server_end: T) {
+pub async fn test_one_way<T: Transport + 'static>(client_end: T, server_end: T) {
     struct TestServer;
 
     impl<T: Transport> ServerHandler<T> for TestServer {
@@ -96,12 +96,12 @@ pub async fn test_one_way<T: Transport>(client_end: T, server_end: T) {
     server_task.await.expect("server encountered an error");
 }
 
-pub async fn test_two_way<T: Transport>(client_end: T, server_end: T) {
+pub async fn test_two_way<T: Transport + 'static>(client_end: T, server_end: T) {
     struct TestServer {
         scope: Scope,
     }
 
-    impl<T: Transport> ServerHandler<T> for TestServer {
+    impl<T: Transport + 'static> ServerHandler<T> for TestServer {
         fn on_one_way(&mut self, _: &ServerSender<T>, _: u64, _: T::RecvBuffer) {
             panic!("unexpected event");
         }
@@ -150,12 +150,12 @@ pub async fn test_two_way<T: Transport>(client_end: T, server_end: T) {
     server_task.await.expect("server encountered an error");
 }
 
-pub async fn test_multiple_two_way<T: Transport>(client_end: T, server_end: T) {
+pub async fn test_multiple_two_way<T: Transport + 'static>(client_end: T, server_end: T) {
     struct TestServer {
         scope: Scope,
     }
 
-    impl<T: Transport> ServerHandler<T> for TestServer {
+    impl<T: Transport + 'static> ServerHandler<T> for TestServer {
         fn on_one_way(&mut self, _: &ServerSender<T>, _: u64, _: T::RecvBuffer) {
             panic!("unexpected event");
         }
@@ -231,7 +231,7 @@ pub async fn test_multiple_two_way<T: Transport>(client_end: T, server_end: T) {
     server_task.await.expect("server encountered an error");
 }
 
-pub async fn test_event<T: Transport>(client_end: T, server_end: T) {
+pub async fn test_event<T: Transport + 'static>(client_end: T, server_end: T) {
     struct TestClient;
 
     impl<T: Transport> ClientHandler<T> for TestClient {

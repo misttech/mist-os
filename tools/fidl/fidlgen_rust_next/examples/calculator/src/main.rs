@@ -32,7 +32,7 @@ struct MyCalculatorServer {
     scope: Scope,
 }
 
-impl<T: Transport> CalculatorServerHandler<T> for MyCalculatorServer {
+impl<T: Transport + 'static> CalculatorServerHandler<T> for MyCalculatorServer {
     fn add(
         &mut self,
         sender: &ServerSender<T, Calculator>,

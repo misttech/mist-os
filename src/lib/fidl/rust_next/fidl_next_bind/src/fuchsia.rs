@@ -28,7 +28,7 @@ pub fn create_channel<P>() -> (ClientEnd<zx::Channel, P>, ServerEnd<zx::Channel,
 /// Returns a `ClientSender` for the spawned client.
 pub fn spawn_client_detached<T, P, H>(client_end: ClientEnd<T, P>, handler: H) -> ClientSender<T, P>
 where
-    T: Transport,
+    T: Transport + 'static,
     P: ClientProtocol<T, H> + 'static,
     H: Send + 'static,
 {
@@ -46,7 +46,7 @@ where
 /// Returns a `ClientSender` for the spawned client.
 pub fn spawn_client_sender_detached<T, P>(client_end: ClientEnd<T, P>) -> ClientSender<T, P>
 where
-    T: Transport,
+    T: Transport + 'static,
     P: 'static,
 {
     let mut client = Client::new(client_end);
@@ -63,7 +63,7 @@ where
 /// Returns a `ServerSender` for the spawned server.
 pub fn spawn_server_detached<T, P, H>(server_end: ServerEnd<T, P>, handler: H) -> ServerSender<T, P>
 where
-    T: Transport,
+    T: Transport + 'static,
     P: ServerProtocol<T, H> + 'static,
     H: Send + 'static,
 {

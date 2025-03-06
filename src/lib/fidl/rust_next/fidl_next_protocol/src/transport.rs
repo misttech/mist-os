@@ -28,7 +28,7 @@ use fidl_next_codec::{Decoder, Encoder};
 ///
 /// `SendFuture` should return an `Poll::Ready` with an error when polled after the transport is
 /// closed.
-pub trait Transport: 'static {
+pub trait Transport {
     /// The error type for the transport.
     type Error: Error + Send + Sync + 'static;
 
