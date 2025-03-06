@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use bt_rfcomm::{Role, DLCI};
+use bt_rfcomm::{Role, ServerChannel, DLCI};
 use fuchsia_async as fasync;
 use fuchsia_bluetooth::inspect::DataStreamInspect;
 use fuchsia_bluetooth::types::PeerId;
@@ -55,6 +55,8 @@ impl DuplexDataStreamInspect {
 /// An inspect node that represents information about the current state of a Session Channel.
 #[derive(Default, Debug, Inspect)]
 pub struct SessionChannelInspect {
+    /// Server channel number assigned to the RFCOMM channel.
+    server_channel: inspect::UintProperty,
     /// The DLCI of the channel.
     dlci: inspect::UintProperty,
     /// The initial local credit amount (if applicable).
@@ -71,6 +73,9 @@ impl SessionChannelInspect {
 
     pub fn set_dlci(&mut self, dlci: DLCI) {
         self.dlci.set(u8::from(dlci) as u64);
+        if let Ok(channel_number) = ServerChannel::try_from(dlci) {
+            self.server_channel.set(u8::from(channel_number) as u64);
+        }
     }
 
     pub fn set_flow_control(&mut self, flow_control: FlowControlMode) {
@@ -230,6 +235,7 @@ mod tests {
         assert_data_tree!(inspect, root: {
             channel: {
                 dlci: 0u64,
+                server_channel: 0u64,
             }
         });
 
@@ -238,6 +244,7 @@ mod tests {
         assert_data_tree!(inspect, root: {
             channel: {
                 dlci: 8u64,
+                server_channel: 4u64,
             }
         });
 
@@ -246,6 +253,7 @@ mod tests {
         assert_data_tree!(inspect, root: {
             channel: {
                 dlci: 8u64,
+                server_channel: 4u64,
             }
         });
 
@@ -254,6 +262,7 @@ mod tests {
         assert_data_tree!(inspect, root: {
             channel: {
                 dlci: 8u64,
+                server_channel: 4u64,
                 initial_local_credits: 10u64,
                 initial_remote_credits: 19u64,
             }

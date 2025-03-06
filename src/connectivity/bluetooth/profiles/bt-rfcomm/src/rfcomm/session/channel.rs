@@ -963,6 +963,7 @@ mod tests {
         assert_data_tree!(inspect, root: {
             channel_: {
                 dlci: 8u64,
+                server_channel: 4u64,
             },
         });
 
@@ -975,6 +976,7 @@ mod tests {
         assert_data_tree!(inspect, root: {
             channel_: {
                 dlci: 8u64,
+                server_channel: 4u64,
                 initial_local_credits: 12u64,
                 initial_remote_credits: 15u64,
             },
@@ -1025,6 +1027,7 @@ mod tests {
         assert_data_tree!(inspect, root: {
             channel_: {
                 dlci: 8u64,
+                server_channel: 4u64,
                 initial_local_credits: 12u64,
                 initial_remote_credits: 15u64,
             },
