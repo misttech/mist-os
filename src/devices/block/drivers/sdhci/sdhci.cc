@@ -13,9 +13,11 @@
 
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sdmmc/cpp/driver/fidl.h>
+#include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/metadata.h>
+#include <lib/driver/component/cpp/driver_base.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/pmt.h>
 #include <lib/zx/time.h>
@@ -26,6 +28,8 @@
 #include <fbl/alloc_checker.h>
 
 namespace {
+
+const std::string kIrqProfileName = "fuchsia.devices.sdhci.irq";
 
 constexpr uint32_t kSdFreqSetupHz = 400'000;
 
@@ -294,6 +298,7 @@ void Sdhci::CompleteRequest() {
 }
 
 int Sdhci::IrqThread() {
+  SetSchedulerRole(kIrqProfileName);
   while (true) {
     zx_status_t wait_res = WaitForInterrupt();
     if (wait_res != ZX_OK) {
@@ -1014,6 +1019,38 @@ void Sdhci::PrepareStop(fdf::PrepareStopCompleter completer) {
   }
 
   completer(zx::ok());
+}
+
+void Sdhci::SetSchedulerRole(const std::string& role) {
+  FDF_LOG(DEBUG, "Connecting to RoleManager");
+  auto client_end_res = incoming()->Connect<fuchsia_scheduler::RoleManager>();
+  if (client_end_res.is_error()) {
+    FDF_LOG(WARNING, "Failed to connect to RoleManager: %s", client_end_res.status_string());
+    return;
+  }
+  fidl::SyncClient<fuchsia_scheduler::RoleManager> role_manager(std::move(*client_end_res));
+
+  FDF_LOG(DEBUG, "Cloning self thread");
+  zx::thread thread_self;
+  zx_status_t status = zx::thread::self()->duplicate(ZX_RIGHT_SAME_RIGHTS, &thread_self);
+  if (status != ZX_OK) {
+    zx::result<> err = zx::error(status);
+    FDF_LOG(ERROR, "Couldn't clone self thread for profile: %s", err.status_string());
+    return;
+  }
+
+  FDF_LOG(DEBUG, "Setting thread role");
+  fuchsia_scheduler::RoleManagerSetRoleRequest request;
+  request.target(fuchsia_scheduler::RoleTarget::WithThread(std::move(thread_self)))
+      .role(fuchsia_scheduler::RoleName(role));
+  auto set_role_res = role_manager->SetRole(std::move(request));
+  if (!set_role_res.is_ok()) {
+    std::string err_str = set_role_res.error_value().FormatDescription();
+    FDF_LOG(WARNING, "Couldn't set thread role: %s", err_str.c_str());
+    return;
+  }
+
+  FDF_LOG(DEBUG, "Set thread role %s successfully.", role.c_str());
 }
 
 zx_status_t Sdhci::Init() {
