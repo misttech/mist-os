@@ -69,7 +69,8 @@ template <class Loader>
 struct StartupLoadModule : public StartupLoadModuleBase,
                            fbl::DoublyLinkedListable<StartupLoadModule<Loader>*> {
  public:
-  using List = fbl::DoublyLinkedList<StartupLoadModule*>;
+  using List =
+      fbl::DoublyLinkedList<StartupLoadModule*, fbl::DefaultObjectTag, fbl::SizeOrder::Constant>;
   using PreloadedModulesList = std::pair<List, std::span<const Dyn>>;
 
   using NeededCountObserver = elfldltl::DynamicTagCountObserver<Elf, elfldltl::ElfDynTag::kNeeded>;
@@ -357,6 +358,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     }
 
     ld::mutable_abi.loaded_modules = &modules.begin()->module();
+    ld::mutable_abi.loaded_modules_count = modules.size();
   }
 
   static void PopulateAbiRdebug(const List& modules) {

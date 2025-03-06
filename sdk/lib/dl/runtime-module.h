@@ -16,6 +16,7 @@
 #include <lib/elfldltl/soname.h>
 #include <lib/elfldltl/symbol.h>
 #include <lib/ld/abi.h>
+#include <lib/ld/dl-phdr-info.h>
 #include <lib/ld/load.h>  // For ld::AbiModule
 #include <lib/ld/tls.h>
 
@@ -199,7 +200,7 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   void Initialize();
 
   // Construct the `dl_phdr_info` for this module.
-  dl_phdr_info MakePhdrInfo(uint64_t global_loaded, uint64_t global_unloaded) const;
+  dl_phdr_info MakeDlPhdrInfo(ld::DlPhdrInfoCounts counts) const;
 
  private:
   // A RuntimeModule can only be created with Module::Create...).

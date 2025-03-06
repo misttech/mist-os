@@ -170,6 +170,10 @@ class RuntimeDynamicLinker {
   // passive ABI into the RuntimeDynamicLinker.
   void PopulateStartupModules(fbl::AllocChecker& ac, const ld::abi::Abi<>& abi);
 
+  ld::DlPhdrInfoCounts dl_phdr_info_counts() const {
+    return {.adds = loaded_, .subs = loaded_ - modules_.size()};
+  }
+
   // The RuntimeDynamicLinker owns the list of all 'live' modules that have been
   // loaded into the system image.
   ModuleList modules_;

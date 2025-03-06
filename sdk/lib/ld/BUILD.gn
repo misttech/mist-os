@@ -49,6 +49,7 @@ library_headers("headers") {
     "lib/ld/decoded-module-in-memory.h",
     "lib/ld/decoded-module.h",
     "lib/ld/diagnostics.h",
+    "lib/ld/dl-phdr-info.h",
     "lib/ld/load-module.h",
     "lib/ld/load.h",
     "lib/ld/log-posix.h",

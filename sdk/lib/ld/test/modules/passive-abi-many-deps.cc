@@ -4,9 +4,9 @@
 
 #include <lib/ld/abi.h>
 #include <lib/ld/module.h>
-#include <stdint.h>
 
-#include <iterator>
+#include <cstdint>
+#include <ranges>
 
 #include "test-start.h"
 
@@ -23,8 +23,9 @@ int64_t TestStart() {
   // f should return 3
   // We expect 9 total modules.
   // 13 + -8 + 3 + 9 = 17
-  auto view = ld::AbiLoadedModules(ld::abi::_ld_abi);
-  return a() + b() + f() + std::distance(view.begin(), view.end());
+  auto count = std::ranges::distance(ld::AbiLoadedModules(ld::abi::_ld_abi));
+  return a() + b() + f() + count +
+         (static_cast<int64_t>(ld::abi::_ld_abi.loaded_modules_count) - count);
 }
 
 }  // extern "C"

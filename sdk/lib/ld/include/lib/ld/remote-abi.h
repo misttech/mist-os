@@ -531,6 +531,7 @@ class RemoteAbi {
 
     // This is the head of the list, which is also the front of the array.
     abi.loaded_modules = abi_context.abi_modules.ptr();
+    abi.loaded_modules_count = abi_context.abi_modules.size();
 
     // These are used directly as flat arrays.
     abi.static_tls_modules = heap_->Remote(heap_vaddr, abi_tls_modules_);

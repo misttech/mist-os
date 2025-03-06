@@ -167,11 +167,15 @@ struct Abi<Elf, AbiTraits>::Module {
 
 }  // namespace abi
 
+// elfldltl::LinkMapList-compatible Traits type for abi::Abi<>::Module lists.
+template <class Elf = elfldltl::Elf<>>
+using AbiModuleListTraits =
+    elfldltl::LinkMapListInFirstMemberTraits<const typename abi::Abi<Elf>::Module>;
+
 // This provides a container-like view on the doubly-linked list of modules.
 template <class Elf = elfldltl::Elf<>>
-using AbiModuleList = elfldltl::LinkMapList<
-    const typename abi::Abi<Elf>::Module,
-    elfldltl::LinkMapListInFirstMemberTraits<const typename abi::Abi<Elf>::Module>>;
+using AbiModuleList =
+    elfldltl::LinkMapList<const typename abi::Abi<Elf>::Module, AbiModuleListTraits<Elf>>;
 
 // This returns the ld::AbiModuleList for an ld::Abi::Abi<>.
 template <class Elf = elfldltl::Elf<>>

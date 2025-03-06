@@ -44,7 +44,7 @@ extern "C" int64_t TestStart() {
     return 5;
   }
 
-  auto additional_modules = std::distance(it, modules.end());
+  size_t additional_modules = std::distance(it, modules.end());
   // There should be at most only 1 additional module. The vDSO may or may not
   // be present, but no additional modules should be found.
   if (additional_modules > 1) {
@@ -53,6 +53,10 @@ extern "C" int64_t TestStart() {
 
   if (!ld::abi::_ld_abi.static_tls_modules.empty()) {
     return 7;
+  }
+
+  if (ld::abi::_ld_abi.loaded_modules_count != 2 + additional_modules) {
+    return 8;
   }
 
   return 17;

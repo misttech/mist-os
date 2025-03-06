@@ -117,7 +117,7 @@ std::unique_ptr<RuntimeDynamicLinker> RuntimeDynamicLinker::Create(const ld::abi
 // of any locks.
 int RuntimeDynamicLinker::IteratePhdrInfo(DlIteratePhdrCallback* callback, void* data) const {
   for (const RuntimeModule& module : modules_) {
-    dl_phdr_info phdr_info = module.MakePhdrInfo(loaded_, loaded_ - modules_.size());
+    dl_phdr_info phdr_info = module.MakeDlPhdrInfo(dl_phdr_info_counts());
     // A non-zero return value ends the iteration.
     if (int result = callback(&phdr_info, sizeof(phdr_info), data); result != 0) {
       return result;
