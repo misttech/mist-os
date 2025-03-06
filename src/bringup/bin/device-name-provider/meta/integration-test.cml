@@ -11,5 +11,11 @@
     },
     use: [
         { protocol: "fuchsia.device.NameProvider" },
+        {
+            config: "use_zbi",
+            from: "parent",
+            type: "bool",
+            key: "use_zbi",
+        },
     ],
 }

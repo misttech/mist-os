@@ -28,6 +28,7 @@ test("integration-test") {
   sources = [ "integration-test.cc" ]
 
   deps = [
+    ":integration-test-config",
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//src/lib/fxl/test:gtest_main",
@@ -35,9 +36,20 @@ test("integration-test") {
   ]
 }
 
-fuchsia_component("integration-test-component") {
+fuchsia_component_manifest("integration-test-component-manifest") {
   testonly = true
   manifest = "../meta/integration-test.cml"
+  component_name = "integration-test-component"
+}
+
+fuchsia_structured_config_cpp_elf_lib("integration-test-config") {
+  testonly = true
+  cm_label = ":integration-test-component-manifest"
+}
+
+fuchsia_component("integration-test-component") {
+  testonly = true
+  cm_label = ":integration-test-component-manifest"
   deps = [ ":integration-test" ]
 }
 
@@ -46,8 +58,15 @@ fuchsia_component("integration-test-realm") {
   manifest = "../meta/integration-test-realm.cml"
 }
 
+fuchsia_component("integration-test-realm-no-zbi") {
+  testonly = true
+  manifest = "../meta/integration-test-realm-no-zbi.cml"
+}
+
 fuchsia_test_package("tests") {
   package_name = "device-name-provider-tests"
+  subpackages = [ "fake_zbi" ]
+  validate_structured_config = false
   deps = [
     ":integration-test-component",
     "//src/bringup/bin/device-name-provider",
@@ -61,5 +80,6 @@ fuchsia_test_package("tests") {
   test_components = [
     ":device-name-provider-test-component",
     ":integration-test-realm",
+    ":integration-test-realm-no-zbi",
   ]
 }

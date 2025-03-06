@@ -18,7 +18,10 @@
             path: "/dev/class/network",
         },
         {
-            protocol: [ "fuchsia.boot.Arguments" ],
+            protocol: [
+                "fuchsia.boot.Arguments",
+                "fuchsia.boot.Items",
+            ],
         },
         {
             config: "fuchsia.network.PrimaryInterface",

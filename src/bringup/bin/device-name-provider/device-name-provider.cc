@@ -3,13 +3,16 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <fidl/fuchsia.boot/cpp/wire.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdio/namespace.h>
 #include <lib/fit/defer.h>
+#include <lib/zbi-format/zbi.h>
 #include <limits.h>
 #include <stdio.h>
 #include <string.h>
@@ -93,6 +96,37 @@ class DeviceNameProviderServer final : public fidl::WireServer<fuchsia_device::N
   }
 };
 
+/// Get the MAC address of the primary interface from ZBI. This will work even
+/// if the device isn't configured to enable the interface.
+bool get_zbi_mac(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, unsigned char mac[6]) {
+  zx::result client_end = component::ConnectAt<fuchsia_boot::Items>(svc_root);
+  if (client_end.is_error()) {
+    printf("device-name-provider: Could not connect to fuchsia.boot.Items: %s\n",
+           client_end.status_string());
+    return false;
+  }
+
+  auto response = fidl::WireCall(client_end.value())->Get(ZBI_TYPE_DRV_MAC_ADDRESS, 0);
+  if (!response.ok()) {
+    printf("device-name-provider: Could not get MAC address from ZBI: %s\n",
+           response.status_string());
+    return false;
+  }
+
+  size_t len = std::min(response->length, 6u);
+  auto status = response->payload.read(mac, 0, len);
+
+  if (status != ZX_OK) {
+    printf("device-name-provider: Could not read MAC address from ZBI VMO: %s\n",
+           zx_status_get_string(status));
+    return false;
+  }
+
+  std::fill(mac + len, mac + 6, 0);
+
+  return true;
+}
+
 int main(int argc, char** argv) {
   // TODO(https://fxbug.dev/42073486): Remove this once the elf runner no longer
   // fools libc into block-buffering stdout.
@@ -127,8 +161,12 @@ int main(int argc, char** argv) {
   }
 
   char device_name[HOST_NAME_MAX];
+  std::array<unsigned char, 6> zbi_mac;
   if (!args.nodename.empty()) {
     strlcpy(device_name, args.nodename.c_str(), sizeof(device_name));
+  } else if (get_zbi_mac(svc_root, zbi_mac.data())) {
+    device_id_get(zbi_mac.data(), device_name, args.namegen);
+    printf("device-name-provider: generated device name from ZBI: %s\n", device_name);
   } else {
     zx::result status = netifc_discover(args.devdir, args.interface);
     if (status.is_error()) {
@@ -138,7 +176,8 @@ int main(int argc, char** argv) {
     } else {
       const NetdeviceInterface& interface = status.value();
       device_id_get(interface.mac.x, device_name, args.namegen);
-      printf("device-name-provider: generated device name: %s\n", device_name);
+      printf("device-name-provider: generated device name from discovered interface: %s\n",
+             device_name);
     }
   }
 

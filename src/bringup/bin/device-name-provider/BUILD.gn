@@ -34,12 +34,15 @@ executable("device-name-provider") {
   deps = [
     ":args",
     ":device_name_provider_config",
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/lib/async-default",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fdio",
+    "//sdk/lib/zbi-format",
     "//src/bringup/bin/netsvc:netifc-discover",
   ]
 }
