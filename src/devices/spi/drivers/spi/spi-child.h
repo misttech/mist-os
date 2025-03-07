@@ -13,7 +13,7 @@
 
 namespace spi {
 
-class SpiDevice;
+class SpiDriver;
 
 class SpiChild : public fidl::WireServer<fuchsia_hardware_spi::Device>,
                  public fidl::WireServer<fuchsia_hardware_spi::Controller> {
