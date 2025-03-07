@@ -627,8 +627,6 @@ template("assembled_system") {
       ffx_tool_output_name = "ffx-assembly"
 
       args = [
-        "--config",
-        "assembly_enabled=true",
         "assembly",
         "product",
         "--product",
@@ -753,8 +751,6 @@ template("assembled_system") {
       ffx_tool_output_name = "ffx-assembly"
 
       args = [
-        "--config",
-        "assembly_enabled=true",
         "assembly",
         "create-system",
         "--image-assembly-config",

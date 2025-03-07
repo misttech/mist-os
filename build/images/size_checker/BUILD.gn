@@ -32,8 +32,6 @@ if (!use_bazel_images_only) {
     ffx_tool = "//src/developer/ffx/plugins/assembly:ffx_assembly_tool"
     ffx_tool_output_name = "ffx-assembly"
     args = [
-      "--config",
-      "assembly_enabled=true",
       "assembly",
       "size-check",
       "product",
@@ -170,8 +168,6 @@ if (!use_bazel_images_only && blobfs_capacity != false &&
     ffx_tool = "//src/developer/ffx/plugins/assembly:ffx_assembly_tool"
     ffx_tool_output_name = "ffx-assembly"
     args = [
-      "--config",
-      "assembly_enabled=true",
       "assembly",
       "size-check",
       "package",

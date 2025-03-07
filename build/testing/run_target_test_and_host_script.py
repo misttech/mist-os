@@ -28,7 +28,6 @@ def run_target_test(
     # use the same configuration in //src/developer/ffx/build/ffx_action.gni
     base_config = [
         "analytics.disabled=true",
-        "assembly_enabled=true",
         "sdk.root=" + root_build_dir,
         "sdk.type=in-tree",
         "sdk.module=host_tools_used_by_ffx_action_during_build",

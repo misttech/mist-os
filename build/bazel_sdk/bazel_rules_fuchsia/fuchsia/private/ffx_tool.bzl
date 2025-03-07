@@ -84,7 +84,6 @@ def get_ffx_assembly_args(fuchsia_toolchain):
         fuchsia_toolchain.ffx_assembly.path,
         "--config",
         _to_quoted_comma_separated_list([
-            "assembly_enabled=true",
             "sdk.overrides.assembly=" + fuchsia_toolchain.ffx_assembly.path,
             "sdk.overrides.blobfs=" + fuchsia_toolchain.blobfs.path,
             "sdk.overrides.cmc=" + fuchsia_toolchain.cmc.path,
