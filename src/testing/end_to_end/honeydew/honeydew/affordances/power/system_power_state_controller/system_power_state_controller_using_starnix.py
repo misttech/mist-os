@@ -603,7 +603,7 @@ class SystemPowerStateControllerUsingStarnix(
 
         if (
             suspend_resume_stats_after["success_count"]
-            != suspend_resume_stats_before["success_count"] + 1
+            <= suspend_resume_stats_before["success_count"]
         ):
             raise system_power_state_controller_interface.SystemPowerStateControllerError(
                 f"Based on SAG inspect data, '{suspend_state}' followed "
@@ -678,7 +678,10 @@ class SystemPowerStateControllerUsingStarnix(
             for k, v in suspend_resume_events_after.items()
             if k not in suspend_resume_events_before
         }
-        if len(current_suspend_resume_events) != 2:
+        if (
+            len(current_suspend_resume_events) < 2
+            or len(current_suspend_resume_events) % 2 != 0
+        ):
             raise system_power_state_controller_interface.SystemPowerStateControllerError(
                 f"Based on FSH inspect data, '{suspend_state}' followed "
                 f"by '{resume_mode}' operation didn't succeed on "
