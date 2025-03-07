@@ -19,6 +19,9 @@ rustc_library("fuchsia") {
     "//third_party/rust_crates:libc",
     "//third_party/rust_crates:log",
   ]
+  if (is_fuchsia) {
+    deps += [ "//sdk/lib/scheduler/rust" ]
+  }
   sources = [ "src/lib.rs" ]
 }
 

@@ -13,6 +13,7 @@ use transformer::Transformer;
 ///
 /// Arguments:
 ///  - `threads` - integer worker thread count for the component. Must be >0. Default 1.
+///  - `thread_role` - name of a scheduler profile to apply to main thread and async worker threads.
 ///  - `logging` - boolean toggle for whether to initialize logging (or not). Default true.
 ///  - `logging_tags` - optional list of string to be used as tags for logs. Default: None.
 ///  - `logging_minimum_severity` - optional minimum severity to be set for logs. Default: None,

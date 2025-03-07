@@ -234,6 +234,39 @@ mod test {
         Ok(())
     }
 
+    // TODO(https://fxbug.dev/42161439): We combine #[fuchsia::main] and #[test] here as a kludge to
+    // enable testing of the fuchsia::main code in a unit test.
+    // Real users of the fuchsia library should not do this, and the ability to do so is not
+    // guaranteed to be present in the future.
+    #[fuchsia::main(thread_role = "role.for.test")]
+    #[test]
+    async fn async_component_with_thread_role() {}
+
+    // TODO(https://fxbug.dev/42161439): We combine #[fuchsia::main] and #[test] here as a kludge to
+    // enable testing of the fuchsia::main code in a unit test.
+    // Real users of the fuchsia library should not do this, and the ability to do so is not
+    // guaranteed to be present in the future.
+    #[fuchsia::main(threads = 2, thread_role = "role.for.test")]
+    #[test]
+    async fn async_multithreaded_component_with_thread_role() {}
+
+    // TODO(https://fxbug.dev/42161439): We combine #[fuchsia::main] and #[test] here as a kludge to
+    // enable testing of the fuchsia::main code in a unit test.
+    // Real users of the fuchsia library should not do this, and the ability to do so is not
+    // guaranteed to be present in the future.
+    #[fuchsia::main(thread_role = "role.for.test")]
+    #[test]
+    fn sync_component_with_thread_role() {}
+
+    // TODO(https://fxbug.dev/42161439): We combine #[fuchsia::main] and #[test] here as a kludge to
+    // enable testing of the fuchsia::main code in a unit test.
+    // Real users of the fuchsia library should not do this, and the ability to do so is not
+    // guaranteed to be present in the future.
+    #[fuchsia::main(thread_role = ROLE_NAME_FOR_TEST)]
+    #[test]
+    async fn component_with_const_thread_role() {}
+    const ROLE_NAME_FOR_TEST: &str = "role.for.test";
+
     // fuchsia::main with arguments can't be written as a test
     // (since argh will parse command line arguments and these will be arguments defining
     // the test execution environment)

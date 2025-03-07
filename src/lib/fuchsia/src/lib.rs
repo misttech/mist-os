@@ -138,6 +138,13 @@ fn init_logging_with_threads(logging: LoggingOptions<'_>) {
     diagnostics_log::initialize(logging.into()).expect("initialize_logging");
 }
 
+#[cfg(target_os = "fuchsia")]
+fn set_thread_role(role_name: &str) {
+    if let Err(e) = fuchsia_scheduler::set_role_for_this_thread(role_name) {
+        log::warn!(e:%, role_name:%; "Couldn't apply thread role.");
+    }
+}
+
 //
 // MAIN FUNCTION WRAPPERS
 //
@@ -151,6 +158,17 @@ where
     f()
 }
 
+/// Run a non-async main function, applying `role_name` as the thread role.
+#[doc(hidden)]
+pub fn main_not_async_with_role<F, R>(f: F, _role_name: &'static str) -> R
+where
+    F: FnOnce() -> R,
+{
+    #[cfg(target_os = "fuchsia")]
+    set_thread_role(_role_name);
+    f()
+}
+
 /// Run an async main function with a single threaded executor.
 #[doc(hidden)]
 pub fn main_singlethreaded<F, Fut, R>(f: F) -> R
@@ -158,6 +176,18 @@ where
     F: FnOnce() -> Fut,
     Fut: Future<Output = R> + 'static,
 {
+    fuchsia_async::LocalExecutor::new().run_singlethreaded(f())
+}
+
+/// Run an async main function with a single threaded executor, applying `role_name`.
+#[doc(hidden)]
+pub fn main_singlethreaded_with_role<F, Fut, R>(f: F, _role_name: &'static str) -> R
+where
+    F: FnOnce() -> Fut,
+    Fut: Future<Output = R> + 'static,
+{
+    #[cfg(target_os = "fuchsia")]
+    set_thread_role(_role_name);
     fuchsia_async::LocalExecutor::new().run_singlethreaded(f())
 }
 
@@ -170,6 +200,28 @@ where
     R: Send + 'static,
 {
     fuchsia_async::SendExecutor::new(num_threads).run(f())
+}
+
+/// Run an async main function with a multi threaded executor (containing `num_threads`) and apply
+/// `role_name` to all of the threads.
+#[doc(hidden)]
+pub fn main_multithreaded_with_role<F, Fut, R>(
+    f: F,
+    num_threads: usize,
+    _role_name: &'static str,
+) -> R
+where
+    F: FnOnce() -> Fut,
+    Fut: Future<Output = R> + Send + 'static,
+    R: Send + 'static,
+{
+    let mut exec = fuchsia_async::SendExecutor::new(num_threads);
+    #[cfg(target_os = "fuchsia")]
+    {
+        set_thread_role(_role_name);
+        exec.set_worker_init(move || set_thread_role(_role_name));
+    }
+    exec.run(f())
 }
 
 //
