@@ -491,6 +491,16 @@ impl<T: ProtocolMarker> From<Channel> for ClientEnd<T> {
     }
 }
 
+impl<T: ProtocolMarker> AsHandleRef for ClientEnd<T> {
+    fn as_handle_ref(&self) -> crate::HandleRef<'_> {
+        AsHandleRef::as_handle_ref(&self.inner)
+    }
+
+    fn object_type() -> fidl::ObjectType {
+        <Channel as AsHandleRef>::object_type()
+    }
+}
+
 /// The `Server` end of a FIDL connection.
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct ServerEnd<T: ProtocolMarker> {
@@ -551,5 +561,15 @@ impl<T: ProtocolMarker> From<Handle> for ServerEnd<T> {
 impl<T: ProtocolMarker> From<Channel> for ServerEnd<T> {
     fn from(chan: Channel) -> Self {
         ServerEnd { inner: chan, phantom: PhantomData }
+    }
+}
+
+impl<T: ProtocolMarker> AsHandleRef for ServerEnd<T> {
+    fn as_handle_ref(&self) -> crate::HandleRef<'_> {
+        AsHandleRef::as_handle_ref(&self.inner)
+    }
+
+    fn object_type() -> fidl::ObjectType {
+        <Channel as AsHandleRef>::object_type()
     }
 }
