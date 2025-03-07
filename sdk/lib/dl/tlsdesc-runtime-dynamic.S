@@ -136,11 +136,7 @@
 .macro prologue
   .tlsdesc.cfi
 
-  push {r1, r2}
-  .save {r1, r2}
-  .cfi_adjust_cfa_offset 8
-  .cfi_rel_offset r1, 0
-  .cfi_rel_offset r2, 4
+  push.spill r1, r2
 
   ldr r0, [r0, #4]
   .cfi_undefined r0  // Caller's value (argument pointer) no longer available.
@@ -176,10 +172,7 @@
   sub r0, r0, r2
 
   // Epilogue.
-  pop {r1, r2}
-  .cfi_adjust_cfa_offset -8
-  .cfi_same_value r1
-  .cfi_same_value r2
+  pop.reload r1, r2
   bx lr
 .end_function
 
