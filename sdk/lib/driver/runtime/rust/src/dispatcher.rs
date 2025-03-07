@@ -36,9 +36,9 @@ pub struct DispatcherBuilder {
 
 impl DispatcherBuilder {
     /// See `FDF_DISPATCHER_OPTION_UNSYNCHRONIZED` in the C API
-    const UNSYNCHRONIZED: u32 = 0b01;
+    pub(crate) const UNSYNCHRONIZED: u32 = 0b01;
     /// See `FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS` in the C API
-    const ALLOW_THREAD_BLOCKING: u32 = 0b10;
+    pub(crate) const ALLOW_THREAD_BLOCKING: u32 = 0b10;
 
     /// Creates a new [`DispatcherBuilder`] that can be used to configure a new dispatcher.
     /// For more information on the threading-related flags for the dispatcher, see
@@ -432,8 +432,15 @@ pub mod test {
             }
         });
     }
-
     pub fn with_raw_dispatcher<T>(name: &str, p: impl for<'a> FnOnce(&'a Dispatcher) -> T) -> T {
+        with_raw_dispatcher_flags(name, DispatcherBuilder::ALLOW_THREAD_BLOCKING, p)
+    }
+
+    pub(crate) fn with_raw_dispatcher_flags<T>(
+        name: &str,
+        flags: u32,
+        p: impl for<'a> FnOnce(&'a Dispatcher) -> T,
+    ) -> T {
         ensure_driver_env();
 
         let (shutdown_tx, shutdown_rx) = mpsc::channel();
@@ -452,7 +459,7 @@ pub mod test {
         let res = unsafe {
             fdf_env_dispatcher_create_with_owner(
                 &mut observer as *mut _ as *mut c_void,
-                DispatcherBuilder::ALLOW_THREAD_BLOCKING,
+                flags,
                 name.as_ptr() as *const c_char,
                 name.len(),
                 "".as_ptr() as *const c_char,

@@ -5,6 +5,7 @@
 //! Safe bindings for the driver runtime channel stable ABI
 
 use core::future::Future;
+use std::mem::ManuallyDrop;
 use zx::Status;
 
 use crate::{Arena, ArenaBox, DispatcherRef, DriverHandle, Message, MixedHandle};
@@ -131,82 +132,69 @@ impl<T: ?Sized + 'static> Channel<T> {
     {
         self.write(Message::new_with_data(arena, f))
     }
+}
 
-    /// Attempts to read from the channel, returning a [`Message`] object that can be used to
-    /// access or take the data received if there was any. This is the basic building block
-    /// on which the other `try_read_*` methods are built.
-    fn try_read_raw<'a>(&self) -> Result<Option<Message<[MaybeUninit<u8>]>>, Status> {
-        let mut out_arena = null_mut();
-        let mut out_data = null_mut();
-        let mut out_num_bytes = 0;
-        let mut out_handles = null_mut();
-        let mut out_num_handles = 0;
-        Status::ok(unsafe {
-            fdf_channel_read(
-                self.0.get_raw().get(),
-                0,
-                &mut out_arena,
-                &mut out_data,
-                &mut out_num_bytes,
-                &mut out_handles,
-                &mut out_num_handles,
-            )
-        })?;
-        // if no arena was returned, that means no data was returned.
-        if out_arena == null_mut() {
-            return Ok(None);
-        }
-        // SAFETY: we just checked that the `out_arena` is non-null
-        let arena = Arena(unsafe { NonNull::new_unchecked(out_arena) });
-        let data_ptr = if !out_data.is_null() {
-            let ptr = core::ptr::slice_from_raw_parts_mut(out_data.cast(), out_num_bytes as usize);
-            // SAFETY: we just checked that the pointer was non-null, the slice version of it should
-            // be too.
-            Some(unsafe { ArenaBox::new(NonNull::new_unchecked(ptr)) })
-        } else {
-            None
-        };
-        let handles_ptr = if !out_handles.is_null() {
-            let ptr =
-                core::ptr::slice_from_raw_parts_mut(out_handles.cast(), out_num_handles as usize);
-            // SAFETY: we just checked that the pointer was non-null, the slice version of it should
-            // be too.
-            Some(unsafe { ArenaBox::new(NonNull::new_unchecked(ptr)) })
-        } else {
-            None
-        };
-        Ok(Some(unsafe { Message::new_unchecked(arena, data_ptr, handles_ptr) }))
+/// Attempts to read from the channel, returning a [`Message`] object that can be used to
+/// access or take the data received if there was any. This is the basic building block
+/// on which the other `try_read_*` methods are built.
+fn try_read_raw(channel: &DriverHandle) -> Result<Option<Message<[MaybeUninit<u8>]>>, Status> {
+    let mut out_arena = null_mut();
+    let mut out_data = null_mut();
+    let mut out_num_bytes = 0;
+    let mut out_handles = null_mut();
+    let mut out_num_handles = 0;
+    Status::ok(unsafe {
+        fdf_channel_read(
+            channel.get_raw().get(),
+            0,
+            &mut out_arena,
+            &mut out_data,
+            &mut out_num_bytes,
+            &mut out_handles,
+            &mut out_num_handles,
+        )
+    })?;
+    // if no arena was returned, that means no data was returned.
+    if out_arena == null_mut() {
+        return Ok(None);
     }
+    // SAFETY: we just checked that the `out_arena` is non-null
+    let arena = Arena(unsafe { NonNull::new_unchecked(out_arena) });
+    let data_ptr = if !out_data.is_null() {
+        let ptr = core::ptr::slice_from_raw_parts_mut(out_data.cast(), out_num_bytes as usize);
+        // SAFETY: we just checked that the pointer was non-null, the slice version of it should
+        // be too.
+        Some(unsafe { ArenaBox::new(NonNull::new_unchecked(ptr)) })
+    } else {
+        None
+    };
+    let handles_ptr = if !out_handles.is_null() {
+        let ptr = core::ptr::slice_from_raw_parts_mut(out_handles.cast(), out_num_handles as usize);
+        // SAFETY: we just checked that the pointer was non-null, the slice version of it should
+        // be too.
+        Some(unsafe { ArenaBox::new(NonNull::new_unchecked(ptr)) })
+    } else {
+        None
+    };
+    Ok(Some(unsafe { Message::new_unchecked(arena, data_ptr, handles_ptr) }))
+}
 
-    /// Reads a message from the channel asynchronously
-    ///
-    /// # Panic
-    ///
-    /// Panics if this is not run from a driver framework dispatcher.
-    fn read_raw<'a>(&'a self, dispatcher: DispatcherRef<'a>) -> ReadMessageRawFut<'a, T> {
-        ReadMessageRawFut {
-            op: Arc::new(ReadMessageRawOp {
-                read_op: fdf_channel_read {
-                    // SAFETY: the lifetime of this future is constrained by the lifetime of the
-                    // channel through lifetime `'a`, and the read op will be cancelled if this
-                    // future is dropped before being fulfilled.
-                    channel: unsafe { self.0.get_raw() }.get(),
-                    handler: Some(ReadMessageRawOp::handler),
-                    ..Default::default()
-                },
-                waker: Mutex::new(None),
-            }),
-            channel: self,
-            dispatcher,
-        }
-    }
+/// Reads a message from the channel asynchronously
+///
+/// # Panic
+///
+/// Panics if this is not run from a driver framework dispatcher.
+fn read_raw<'a>(channel: &'a DriverHandle, dispatcher: DispatcherRef<'a>) -> ReadMessageRawFut<'a> {
+    // SAFETY: Since the future's lifetime is bound to the original driver handle and it
+    // holds the message state, the message state object can't outlive the handle.
+    ReadMessageRawFut { raw_fut: unsafe { ReadMessageState::new(channel) }, dispatcher }
 }
 
 impl<T> Channel<T> {
     /// Attempts to read an object of type `T` and a handle set from the channel
     pub fn try_read<'a>(&self) -> Result<Option<Message<T>>, Status> {
         // read a message from the channel
-        let Some(message) = self.try_read_raw()? else {
+        let Some(message) = try_read_raw(&self.0)? else {
             return Ok(None);
         };
         // SAFETY: It is an invariant of Channel<T> that messages sent or received are always of
@@ -216,7 +204,7 @@ impl<T> Channel<T> {
 
     /// Reads an object of type `T` and a handle set from the channel asynchronously
     pub async fn read(&self, dispatcher: DispatcherRef<'_>) -> Result<Option<Message<T>>, Status> {
-        let Some(message) = self.read_raw(dispatcher).await? else {
+        let Some(message) = read_raw(&self.0, dispatcher).await? else {
             return Ok(None);
         };
         // SAFETY: It is an invariant of Channel<T> that messages sent or received are always of
@@ -229,7 +217,7 @@ impl Channel<[u8]> {
     /// Attempts to read an object of type `T` and a handle set from the channel
     pub fn try_read_bytes<'a>(&self) -> Result<Option<Message<[u8]>>, Status> {
         // read a message from the channel
-        let Some(message) = self.try_read_raw()? else {
+        let Some(message) = try_read_raw(&self.0)? else {
             return Ok(None);
         };
         // SAFETY: It is an invariant of Channel<[u8]> that messages sent or received are always of
@@ -243,7 +231,7 @@ impl Channel<[u8]> {
         dispatcher: DispatcherRef<'_>,
     ) -> Result<Option<Message<[u8]>>, Status> {
         // read a message from the channel
-        let Some(message) = self.read_raw(dispatcher).await? else {
+        let Some(message) = read_raw(&self.0, dispatcher).await? else {
             return Ok(None);
         };
         // SAFETY: It is an invariant of Channel<[u8]> that messages sent or received are always of
@@ -272,13 +260,13 @@ impl<T> From<Channel<T>> for MixedHandle {
 /// If the dispatcher is synchronized, then the callback will *only* be called on fulfillment of the
 /// read wait.
 #[repr(C)]
-struct ReadMessageRawOp {
-    /// This must be at the start of the struct so that `ReadMessageRawOp` can be cast to and from `fdf_channel_read`.
+struct ReadMessageStateOp {
+    /// This must be at the start of the struct so that `ReadMessageStateOp` can be cast to and from `fdf_channel_read`.
     read_op: fdf_channel_read,
     waker: Mutex<Option<Waker>>,
 }
 
-impl ReadMessageRawOp {
+impl ReadMessageStateOp {
     unsafe extern "C" fn handler(
         _dispatcher: *mut fdf_dispatcher,
         read_op: *mut fdf_channel_read,
@@ -287,29 +275,63 @@ impl ReadMessageRawOp {
         // SAFETY: When setting up the read op, we incremented the refcount of the `Arc` to allow
         // for this handler to reconstitute it.
         let op: Arc<Self> = unsafe { Arc::from_raw(read_op.cast()) };
-        let waker = op
-            .waker
-            .lock()
-            .unwrap()
-            .take()
-            .expect("Channel read handler somehow called with no waker registered");
+        let Some(waker) = op.waker.lock().unwrap().take() else {
+            // the waker was already taken, presumably because the future was dropped.
+            return;
+        };
         waker.wake()
     }
 }
 
-struct ReadMessageRawFut<'a, T: ?Sized + 'static> {
-    op: Arc<ReadMessageRawOp>,
-    channel: &'a Channel<T>,
-    dispatcher: DispatcherRef<'a>,
+/// An object for managing the state of an async channel read message operation that can be used to
+/// implement futures.
+pub(crate) struct ReadMessageState {
+    op: Arc<ReadMessageStateOp>,
+    channel: ManuallyDrop<DriverHandle>,
+    callback_drops_arc: bool,
 }
 
-impl<'a, T: ?Sized + 'static> Future for ReadMessageRawFut<'a, T> {
-    type Output = Result<Option<Message<[MaybeUninit<u8>]>>, Status>;
+impl ReadMessageState {
+    /// Creates a new raw read message state that can be used to implement a [`Future`] that reads
+    /// data from a channel and then converts it to the appropriate type. It also allows for
+    /// different ways of storing and managing the dispatcher we wait on by deferring the
+    /// dispatcher used to poll time.
+    ///
+    /// # Safety
+    ///
+    /// The caller is responsible for ensuring that `channel` outlives this object.
+    pub(crate) unsafe fn new(channel: &DriverHandle) -> Self {
+        // SAFETY: The caller is responsible for ensuring that the handle is a correct channel handle
+        // and that the handle will outlive the created [`ReadMessageState`].
+        let channel = unsafe { channel.get_raw() };
+        Self {
+            op: Arc::new(ReadMessageStateOp {
+                read_op: fdf_channel_read {
+                    channel: channel.get(),
+                    handler: Some(ReadMessageStateOp::handler),
+                    ..Default::default()
+                },
+                waker: Mutex::new(None),
+            }),
+            // SAFETY: We know this is a valid driver handle by construction and we are
+            // storing this handle in a [`ManuallyDrop`] to prevent it from being double-dropped.
+            // The caller is responsible for ensuring that the handle outlives this object.
+            channel: ManuallyDrop::new(unsafe { DriverHandle::new_unchecked(channel) }),
+            // We haven't waited on it yet so we are responsible for dropping the arc for now,
+            // regardless of what kind of dispatcher it's intended to be used with.
+            callback_drops_arc: false,
+        }
+    }
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    /// Polls this channel read operation against the given dispatcher.
+    pub(crate) fn poll_with_dispatcher(
+        self: &mut Self,
+        cx: &mut Context<'_>,
+        dispatcher: DispatcherRef<'_>,
+    ) -> Poll<Result<Option<Message<[MaybeUninit<u8>]>>, Status>> {
         let mut waker_lock = self.op.waker.lock().unwrap();
 
-        match self.channel.try_read_raw() {
+        match try_read_raw(&self.channel) {
             Ok(res) => Poll::Ready(Ok(res)),
             Err(Status::SHOULD_WAIT) => {
                 // if we haven't yet set a waker, that means we haven't started the wait operation
@@ -318,13 +340,18 @@ impl<'a, T: ?Sized + 'static> Future for ReadMessageRawFut<'a, T> {
                     // increment the reference count of the read op to account for the copy that will be given to
                     // `fdf_channel_wait_async`.
                     let op = Arc::into_raw(self.op.clone());
-                    // SAFETY: the `ReadMessageRawOp` starts with an `fdf_channel_read` struct and
+                    // SAFETY: the `ReadMessageStateOp` starts with an `fdf_channel_read` struct and
                     // has `repr(C)` layout, so is safe to be cast to the latter.
                     let res = Status::ok(unsafe {
-                        fdf_channel_wait_async(self.dispatcher.0.as_ptr(), op.cast_mut().cast(), 0)
+                        fdf_channel_wait_async(dispatcher.0.as_ptr(), op.cast_mut().cast(), 0)
                     });
                     match res {
-                        Ok(()) => {}
+                        Ok(()) => {
+                            // if the dispatcher we're waiting on is unsynchronized, the callback
+                            // will drop the Arc and we need to indicate to our own Drop impl
+                            // that it should not.
+                            self.callback_drops_arc = dispatcher.is_unsynchronized();
+                        }
                         Err(e) => return Poll::Ready(Err(e)),
                     }
                 }
@@ -335,7 +362,7 @@ impl<'a, T: ?Sized + 'static> Future for ReadMessageRawFut<'a, T> {
     }
 }
 
-impl<'a, T: ?Sized + 'static> Drop for ReadMessageRawFut<'a, T> {
+impl Drop for ReadMessageState {
     fn drop(&mut self) {
         let mut waker_lock = self.op.waker.lock().unwrap();
         if waker_lock.is_none() {
@@ -346,7 +373,7 @@ impl<'a, T: ?Sized + 'static> Drop for ReadMessageRawFut<'a, T> {
 
         // SAFETY: since we hold a lifetimed-reference to the channel object here, the channel must
         // be valid.
-        let res = Status::ok(unsafe { fdf_channel_cancel_wait(self.channel.0.get_raw().get()) });
+        let res = Status::ok(unsafe { fdf_channel_cancel_wait(self.channel.get_raw().get()) });
         match res {
             Ok(_) => {}
             Err(Status::NOT_FOUND) => {
@@ -361,19 +388,34 @@ impl<'a, T: ?Sized + 'static> Drop for ReadMessageRawFut<'a, T> {
         // SAFETY: if the channel was waited on by a synchronized dispatcher, and the cancel was
         // successful, the callback will not be called and we will have to free the `Arc` that the
         // callback would have consumed.
-        if !self.dispatcher.is_unsynchronized() {
+        if !self.callback_drops_arc {
             unsafe { Arc::decrement_strong_count(Arc::as_ptr(&self.op)) };
         }
     }
 }
 
+struct ReadMessageRawFut<'a> {
+    raw_fut: ReadMessageState,
+    dispatcher: DispatcherRef<'a>,
+}
+
+impl<'a> Future for ReadMessageRawFut<'a> {
+    type Output = Result<Option<Message<[MaybeUninit<u8>]>>, Status>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let dispatcher = self.dispatcher.clone();
+        self.as_mut().raw_fut.poll_with_dispatcher(cx, dispatcher)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use std::sync::mpsc;
+    use std::pin::pin;
+    use std::sync::{mpsc, Weak};
 
-    use crate::test::with_raw_dispatcher;
+    use crate::test::{with_raw_dispatcher, with_raw_dispatcher_flags};
     use crate::tests::DropSender;
-    use crate::{Dispatcher, MixedHandleType};
+    use crate::{Dispatcher, DispatcherBuilder, MixedHandleType};
 
     use super::*;
 
@@ -528,6 +570,30 @@ mod tests {
         });
     }
 
+    /// assert that the strong count of an arc is correct
+    fn assert_strong_count<T>(arc: &Weak<T>, count: usize) {
+        assert_eq!(Weak::strong_count(arc), count, "unexpected strong count on arc");
+    }
+
+    /// create, poll, and then immediately drop a read future for a channel and verify
+    /// that the internal op arc has the right refcount at all steps. Returns a copy
+    /// of the op arc at the end so it can be verified that the count goes down
+    /// to zero correctly.
+    async fn read_and_drop<T: ?Sized + 'static>(
+        channel: &Channel<T>,
+        dispatcher: DispatcherRef<'_>,
+    ) -> Weak<ReadMessageStateOp> {
+        let fut = read_raw(&channel.0, dispatcher.as_ref());
+        let op_arc = Arc::downgrade(&fut.raw_fut.op);
+        assert_strong_count(&op_arc, 1);
+        let mut fut = pin!(fut);
+        let Poll::Pending = futures::poll!(fut.as_mut()) else {
+            panic!("expected pending state after polling channel read once");
+        };
+        assert_strong_count(&op_arc, 2);
+        op_arc
+    }
+
     #[test]
     fn early_cancel_future() {
         with_raw_dispatcher("early cancellation", |dispatcher| {
@@ -537,12 +603,7 @@ mod tests {
                 .spawn_task(async move {
                     // create, poll, and then immediately drop a read future for channel `a`
                     // so that it properly sets up the wait.
-                    let fut = a.read(dispatcher.as_ref());
-                    futures::pin_mut!(fut);
-                    let Poll::Pending = futures::poll!(fut.as_mut()) else {
-                        panic!("expected pending state after polling channel read once");
-                    };
-                    drop(fut);
+                    read_and_drop(&a, dispatcher.as_ref()).await;
                     b.write_with_data(Arena::new(), |arena| arena.insert(1)).unwrap();
                     assert_eq!(
                         a.read(dispatcher.as_ref()).await.unwrap().unwrap().data(),
@@ -553,5 +614,68 @@ mod tests {
                 .unwrap();
             fin_rx.recv().unwrap();
         })
+    }
+
+    #[test]
+    fn very_early_cancel_state_drops_correctly() {
+        with_raw_dispatcher("early cancellation drop correctness", |dispatcher| {
+            let (a, _b) = Channel::<[u8]>::create();
+            let (fin_tx, fin_rx) = mpsc::channel();
+
+            dispatcher
+                .spawn_task(async move {
+                    // drop before even polling it should drop the arc correctly
+                    let fut = read_raw(&a.0, dispatcher.as_ref());
+                    let op_arc = Arc::downgrade(&fut.raw_fut.op);
+                    assert_strong_count(&op_arc, 1);
+                    drop(fut);
+                    assert_strong_count(&op_arc, 0);
+                    fin_tx.send(()).unwrap();
+                })
+                .unwrap();
+            fin_rx.recv().unwrap()
+        })
+    }
+
+    #[test]
+    fn synchronized_early_cancel_state_drops_correctly() {
+        with_raw_dispatcher("early cancellation drop correctness", |dispatcher| {
+            let (a, _b) = Channel::<[u8]>::create();
+            let (fin_tx, fin_rx) = mpsc::channel();
+
+            dispatcher
+                .spawn_task(async move {
+                    assert_strong_count(&read_and_drop(&a, dispatcher.as_ref()).await, 0);
+                    fin_tx.send(()).unwrap();
+                })
+                .unwrap();
+            fin_rx.recv().unwrap()
+        });
+    }
+
+    #[test]
+    fn unsynchronized_early_cancel_state_drops_correctly() {
+        // the channel needs to outlive the dispatcher for this test because the channel shouldn't
+        // be closed before the read wait has been cancelled.
+        let (a, _b) = Channel::<[u8]>::create();
+        let unsync_op = with_raw_dispatcher_flags(
+            "early cancellation drop correctness",
+            DispatcherBuilder::UNSYNCHRONIZED,
+            |dispatcher| {
+                let (fin_tx, fin_rx) = mpsc::channel();
+
+                dispatcher
+                    .spawn_task(async {
+                        // we send the arc out to be checked after the dispatcher has shut down so
+                        // that we can be sure that the callback has had a chance to be called.
+                        fin_tx.send(read_and_drop(&a, dispatcher.as_ref()).await).unwrap();
+                    })
+                    .unwrap();
+                fin_rx.recv().unwrap()
+            },
+        );
+
+        // check that there are no more owners of the inner op for the unsynchronized dispatcher.
+        assert_strong_count(&unsync_op, 0);
     }
 }
