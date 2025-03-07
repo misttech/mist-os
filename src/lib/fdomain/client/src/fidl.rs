@@ -115,7 +115,7 @@ impl ::fidl::encoding::ProxyChannelBox<FDomainResourceDialect> for FDomainProxyC
                 handle.rights,
             ));
         }
-        let _ = self.1.write_etc(bytes, handle_ops);
+        let _ = self.1.fdomain_write_etc(bytes, handle_ops);
         Ok(())
     }
 
@@ -204,14 +204,14 @@ impl ::fidl::encoding::ProxyChannelFor<FDomainResourceDialect> for Channel {
                 handle.rights,
             ));
         }
-        let _ = self.write_etc(bytes, handle_ops);
+        let _ = self.fdomain_write_etc(bytes, handle_ops);
         Ok(())
     }
 }
 
 impl ::fidl::epitaph::ChannelLike for Channel {
     fn write_epitaph(&self, bytes: &[u8]) -> Result<(), ::fidl::TransportError> {
-        let _ = self.write_etc(bytes, vec![]);
+        let _ = self.write(bytes, vec![]);
         Ok(())
     }
 }

@@ -161,7 +161,15 @@ impl Channel {
     }
 
     /// Writes a message into the channel.
-    pub fn write(
+    pub fn write(&self, bytes: &[u8], handles: Vec<Handle>) -> Result<(), Error> {
+        let _ = self.fdomain_write(bytes, handles);
+        Ok(())
+    }
+
+    /// Writes a message into the channel. Returns a future that will allow you
+    /// to wait for the write to move across the FDomain connection and return
+    /// with the result of the actual write call on the target.
+    pub fn fdomain_write(
         &self,
         bytes: &[u8],
         handles: Vec<Handle>,
@@ -182,8 +190,10 @@ impl Channel {
         self.0.client.upgrade().is_none()
     }
 
-    /// Writes a message into the channel.
-    pub fn write_etc<'b>(
+    /// Writes a message into the channel. Optionally duplicates some of the
+    /// handles rather than consuming them, and can update the handle's rights
+    /// before sending.
+    pub fn fdomain_write_etc<'b>(
         &self,
         bytes: &[u8],
         handles: Vec<HandleOp<'b>>,
@@ -262,21 +272,28 @@ pub struct ChannelWriter(Arc<Channel>);
 
 impl ChannelWriter {
     /// Writes a message into the channel.
-    pub fn write(
+    pub fn write(&self, bytes: &[u8], handles: Vec<Handle>) -> Result<(), Error> {
+        self.0.write(bytes, handles)
+    }
+
+    /// Writes a message into the channel. Returns a future that will allow you
+    /// to wait for the write to move across the FDomain connection and return
+    /// with the result of the actual write call on the target.
+    pub fn fdomain_write(
         &self,
         bytes: &[u8],
         handles: Vec<Handle>,
     ) -> impl Future<Output = Result<(), Error>> + '_ {
-        self.0.write(bytes, handles)
+        self.0.fdomain_write(bytes, handles)
     }
 
     /// Writes a message into the channel.
-    pub fn write_etc<'b>(
+    pub fn fdomain_write_etc<'b>(
         &self,
         bytes: &[u8],
         handles: Vec<HandleOp<'b>>,
     ) -> impl Future<Output = Result<(), Error>> + 'b {
-        self.0.write_etc(bytes, handles)
+        self.0.fdomain_write_etc(bytes, handles)
     }
 
     /// Get a reference to the inner channel.

@@ -121,7 +121,7 @@ async fn channel() {
     const TEST_STR_1: &[u8] = b"Feral Cats Move In Mysterious Ways";
     const TEST_STR_2: &[u8] = b"Joyous Throbbing! Jubilant Pulsing!";
 
-    a.write(TEST_STR_1, vec![c.into()]).await.unwrap();
+    a.fdomain_write(TEST_STR_1, vec![c.into()]).await.unwrap();
     d.write_all(TEST_STR_2).await.unwrap();
 
     let mut msg = b.recv_msg().await.unwrap();
@@ -264,7 +264,7 @@ async fn channel_async() {
     let test_str_b = b"Almost all of our feelings were programmed in to us.";
 
     let (mut b_reader, b_writer) = b.stream().unwrap();
-    b_writer.write(test_str_a, Vec::new()).await.unwrap();
+    b_writer.fdomain_write(test_str_a, Vec::new()).await.unwrap();
 
     let write_side = async move {
         let msg = a.recv_msg().await.unwrap();
@@ -273,15 +273,15 @@ async fn channel_async() {
         assert!(msg.handles.is_empty());
 
         for _ in 0..5 {
-            a.write(test_str_a, Vec::new()).await.unwrap();
+            a.fdomain_write(test_str_a, Vec::new()).await.unwrap();
             fuchsia_async::Timer::new(std::time::Duration::from_millis(10)).await;
-            a.write(test_str_b, Vec::new()).await.unwrap();
+            a.fdomain_write(test_str_b, Vec::new()).await.unwrap();
             fuchsia_async::Timer::new(std::time::Duration::from_millis(10)).await;
         }
 
         fault_injector.inject(TestError("Connection failed".to_owned()));
 
-        let err = a.write(test_str_a, Vec::new()).await.unwrap_err();
+        let err = a.fdomain_write(test_str_a, Vec::new()).await.unwrap_err();
         let Error::Transport(err) = err else { panic!("Wrong error type!") };
 
         let TestError(err) = err.get_ref().unwrap().downcast_ref().unwrap();
@@ -323,7 +323,7 @@ async fn channel_async_shutdown() {
     let test_str_b = b"Almost all of our feelings were programmed in to us.";
 
     let (mut b_reader, b_writer) = b.stream().unwrap();
-    b_writer.write(test_str_a, Vec::new()).await.unwrap();
+    b_writer.fdomain_write(test_str_a, Vec::new()).await.unwrap();
 
     let write_side = async move {
         let msg = a.recv_msg().await.unwrap();
@@ -332,9 +332,9 @@ async fn channel_async_shutdown() {
         assert!(msg.handles.is_empty());
 
         for _ in 0..5 {
-            a.write(test_str_a, Vec::new()).await.unwrap();
+            a.fdomain_write(test_str_a, Vec::new()).await.unwrap();
             fuchsia_async::Timer::new(std::time::Duration::from_millis(10)).await;
-            a.write(test_str_b, Vec::new()).await.unwrap();
+            a.fdomain_write(test_str_b, Vec::new()).await.unwrap();
             fuchsia_async::Timer::new(std::time::Duration::from_millis(10)).await;
         }
 
@@ -377,7 +377,7 @@ async fn bad_tx() {
 
     let (a, b) = client.create_channel();
     let test_str_a = b"Feral Cats Move In Mysterious Ways";
-    a.write(test_str_a, Vec::new()).await.unwrap();
+    a.fdomain_write(test_str_a, Vec::new()).await.unwrap();
     fault_injector.send_garbage(b"*splot*");
     let err = b.recv_msg().await.unwrap_err();
     let err2 = b.recv_msg().await.unwrap_err();
@@ -396,10 +396,10 @@ async fn channel_read_stream_read() {
     let test_str_a = b"Feral Cats Move In Mysterious Ways";
     let test_str_b = b"Almost all of our feelings were programmed in to us.";
     let test_str_c = b"Joyous Throbbing! Jubilant Pulsing!";
-    a.write(test_str_a, Vec::new()).await.unwrap();
-    a.write(test_str_b, Vec::new()).await.unwrap();
-    a.write(test_str_c, Vec::new()).await.unwrap();
-    a.write(test_str_b, Vec::new()).await.unwrap();
+    a.fdomain_write(test_str_a, Vec::new()).await.unwrap();
+    a.fdomain_write(test_str_b, Vec::new()).await.unwrap();
+    a.fdomain_write(test_str_c, Vec::new()).await.unwrap();
+    a.fdomain_write(test_str_b, Vec::new()).await.unwrap();
 
     let (mut stream, writer) = b.stream().unwrap();
     let read_1 = read_1.await.unwrap();
