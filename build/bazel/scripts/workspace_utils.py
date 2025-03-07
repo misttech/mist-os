@@ -12,6 +12,10 @@ import sys
 import typing as T
 from pathlib import Path
 
+# Location of the @gn_targets redirection symlink, relative
+# to the Bazel workspace.
+GN_TARGETS_DIR_SYMLINK = "fuchsia_build_generated/gn_targets_dir"
+
 
 def get_host_platform() -> str:
     """Return host platform name, following Fuchsia conventions."""
@@ -711,7 +715,7 @@ common --enable_bzlmod=false
     # before each Bazel invocation to point to the @gn_targets content specific
     # to its parent bazel_action() target.
     generated.record_symlink(
-        "workspace/fuchsia_build_generated/gn_targets_dir",
+        f"workspace/{GN_TARGETS_DIR_SYMLINK}",
         fuchsia_dir / "build" / "bazel" / "local_repositories" / "empty",
     )
 

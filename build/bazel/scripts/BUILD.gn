@@ -18,6 +18,11 @@ python_build_time_tests("compute_content_hash_test") {
   ]
 }
 
+python_build_time_tests("gn_targets_utils_test") {
+  tests = [ "gn_targets_utils_test.py" ]
+  inputs = [ "gn_targets_utils.py" ]
+}
+
 python_build_time_tests("remote_services_utils_test") {
   tests = [ "remote_services_utils_test.py" ]
   inputs = [ "remote_services_utils_test.py" ]
@@ -60,6 +65,7 @@ group("tests") {
   testonly = true
   deps = [
     ":export_host_tests_test($host_toolchain)",
+    ":gn_targets_utils_test($host_toolchain)",
     ":minimal_workspace_test($host_toolchain)",
     ":remote_services_utils_test",
     ":runfiles_utils_test($host_toolchain)",
