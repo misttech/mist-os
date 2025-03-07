@@ -34,7 +34,9 @@ from fidl_codec import add_ir_path, encode_fidl_object
 from fuchsia_controller_py import Context
 
 from ._client import EventHandlerBase, FidlClient
+from ._construct import construct_response_object
 from ._fidl_common import (
+    FidlMeta,
     MethodInfo,
     camel_case_to_snake_case,
     internal_kind_to_type,
@@ -481,6 +483,7 @@ def bits_or_enum_root_type(ir, type_name: str) -> enum.EnumMeta:
     setattr(ty, "__doc__", docstring(ir))
     setattr(ty, "__members_for_aliasing__", members)
     setattr(ty, "__strict__", bool(ir["strict"]))
+    setattr(ty, "make_default", classmethod(lambda cls: cls(value=0)))
     return ty
 
 
@@ -494,6 +497,7 @@ def experimental_resource_type(ir, root_ir, recurse_guard=None) -> type:
             "__fidl_kind__": "experimental_resource",
             "__fidl_type__": ir.name(),
             "__fidl_raw_type__": ir.raw_name(),
+            "make_default": classmethod(lambda cls: 0),
         },
     )
     return ty
@@ -574,6 +578,7 @@ def union_type(ir, root_ir, recurse_guard=None) -> type:
             "__eq__": union_eq,
             "__fidl_type__": ir.name(),
             "__fidl_raw_type__": ir.raw_name(),
+            "make_default": classmethod(lambda cls: cls()),
         },
     )
     # TODO(https://fxbug.dev/42078357): Prevent unions from having more than one value set at the same time.
@@ -654,6 +659,11 @@ def struct_type(ir, root_ir, recurse_guard=None) -> type:
     setattr(ty, "__fidl_raw_type__", ir.raw_name())
     setattr(ty, "__doc__", docstring(ir))
     setattr(ty, "__getitem__", struct_and_table_subscript)
+    setattr(
+        ty,
+        "make_default",
+        classmethod(lambda cls: cls(**{member[0]: None for member in members})),
+    )
     return ty
 
 
@@ -676,6 +686,7 @@ def table_type(ir, root_ir, recurse_guard=None) -> type:
     setattr(ty, "__fidl_raw_type__", ir.raw_name())
     setattr(ty, "__doc__", docstring(ir))
     setattr(ty, "__getitem__", struct_and_table_subscript)
+    setattr(ty, "make_default", classmethod(lambda cls: cls()))
     return ty
 
 
@@ -762,8 +773,16 @@ def alias_declaration(ir, root_ir, recurse_guard=None) -> type:
         return type(name, (base_type,), base_params)
 
 
-class ProtocolBase:
-    pass
+class ProtocolBase(
+    metaclass=FidlMeta,
+    required_class_variables=[
+        ("Client", FidlMeta),
+        ("Server", FidlMeta),
+        ("EventHandler", FidlMeta),
+        ("MARKER", str),
+    ],
+):
+    ...
 
 
 def protocol_type(ir, root_ir, recurse_guard=None) -> type:
@@ -789,6 +808,7 @@ def protocol_event_handler_type(ir: IR, root_ir) -> type:
         "__fidl_kind__": "event_handler",
         "library": root_ir.name(),
         "method_map": {},
+        "construct_response_object": staticmethod(construct_response_object),
     }
     for method in ir.methods():
         # Methods without a request are event methods.
@@ -828,6 +848,7 @@ def protocol_server_type(ir: IR, root_ir) -> type:
         "__fidl_kind__": "server",
         "library": root_ir.name(),
         "method_map": {},
+        "construct_response_object": staticmethod(construct_response_object),
     }
     for method in ir.methods():
         method_snake_case = camel_case_to_snake_case(method.name())
@@ -864,6 +885,7 @@ def protocol_client_type(ir: IR, root_ir) -> type:
     properties = {
         "__doc__": docstring(ir),
         "__fidl_kind__": "client",
+        "construct_response_object": staticmethod(construct_response_object),
     }
     for method in ir.methods():
         if not method.has_request():
