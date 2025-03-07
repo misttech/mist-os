@@ -148,7 +148,8 @@ pub fn dispatch_syscall(
         };
         pub use crate::signals::syscalls::{
             sys_arch32_rt_sigaction, sys_arch32_rt_sigtimedwait, sys_arch32_sigaltstack,
-            sys_kill as sys_arch32_kill, sys_rt_sigpending as sys_arch32_rt_sigpending,
+            sys_kill as sys_arch32_kill, sys_restart_syscall as sys_arch32_restart_syscall,
+            sys_rt_sigpending as sys_arch32_rt_sigpending,
             sys_rt_sigprocmask as sys_arch32_rt_sigprocmask,
             sys_rt_sigqueueinfo as sys_arch32_rt_sigqueueinfo,
             sys_rt_sigreturn as sys_arch32_rt_sigreturn,
@@ -158,7 +159,7 @@ pub fn dispatch_syscall(
         };
         pub use crate::syscalls::misc::{
             sys_arch32_uname, sys_getrandom as sys_arch32_getrandom,
-            sys_personality as sys_arch32_personality,
+            sys_personality as sys_arch32_personality, sys_sched_yield as sys_arch32_sched_yield,
         };
         pub use crate::syscalls::time::{
             sys_arch32_clock_getres, sys_arch32_clock_gettime, sys_arch32_clock_gettime64,
@@ -284,6 +285,7 @@ pub fn dispatch_syscall(
             readlink[3],
             readlinkat[4],
             recvfrom[6],
+            restart_syscall[0],
             rmdir[1],
             rt_sigaction[4],
             rt_sigpending[2],
@@ -296,6 +298,7 @@ pub fn dispatch_syscall(
             sched_getaffinity[3],
             sched_getscheduler[1],
             sched_setaffinity[3],
+            sched_yield[0],
             sendfile[4],
             set_robust_list[2],
             set_tid_address[1],

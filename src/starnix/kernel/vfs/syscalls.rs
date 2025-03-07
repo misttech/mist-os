@@ -296,11 +296,12 @@ pub fn sys_fcntl(
             Ok(SUCCESS)
         }
         F_SETLK | F_SETLKW | F_GETLK | F_OFD_GETLK | F_OFD_SETLK | F_OFD_SETLKW => {
-            let flock_ref = UserRef::<uapi::flock>::new(arg.into());
-            let flock = current_task.read_object(flock_ref)?;
+            let flock_ref =
+                MultiArchUserRef::<uapi::flock, uapi::arch32::flock>::new(current_task, arg);
+            let flock = current_task.read_multi_arch_object(flock_ref)?;
             let cmd = RecordLockCommand::from_raw(cmd).ok_or_else(|| errno!(EINVAL))?;
             if let Some(flock) = file.record_lock(locked, current_task, cmd, flock)? {
-                current_task.write_object(flock_ref, &flock)?;
+                current_task.write_multi_arch_object(flock_ref, flock)?;
             }
             Ok(SUCCESS)
         }

@@ -198,3 +198,29 @@ impl TryFrom<crate::sigval> for crate::arch32::sigval {
         Ok(Self { _bindgen_opaque_blob: bindgen_opaque_blob.try_into().map_err(|_| ())? })
     }
 }
+
+impl From<crate::arch32::flock> for crate::flock {
+    fn from(flock: crate::arch32::flock) -> Self {
+        Self {
+            l_type: flock.l_type.into(),
+            l_whence: flock.l_whence.into(),
+            l_start: flock.l_start.into(),
+            l_len: flock.l_len.into(),
+            l_pid: flock.l_pid.into(),
+            ..Default::default()
+        }
+    }
+}
+
+impl TryFrom<crate::flock> for crate::arch32::flock {
+    type Error = ();
+    fn try_from(flock: crate::flock) -> Result<Self, ()> {
+        Ok(Self {
+            l_type: flock.l_type.try_into().map_err(|_| ())?,
+            l_whence: flock.l_whence.try_into().map_err(|_| ())?,
+            l_start: flock.l_start.try_into().map_err(|_| ())?,
+            l_len: flock.l_len.try_into().map_err(|_| ())?,
+            l_pid: flock.l_pid.try_into().map_err(|_| ())?,
+        })
+    }
+}
