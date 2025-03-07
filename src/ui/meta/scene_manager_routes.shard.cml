@@ -82,10 +82,7 @@
             ],
         },
         {
-            protocol: [
-                "fuchsia.metrics.MetricEventLoggerFactory",
-                "fuchsia.scheduler.RoleManager",
-            ],
+            protocol: "fuchsia.metrics.MetricEventLoggerFactory",
             from: "parent",
             to: [ "#scene_manager" ],
         },

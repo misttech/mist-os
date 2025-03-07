@@ -76,14 +76,9 @@ enum ExposedServices {
 }
 
 const LIGHT_SENSOR_CONFIGURATION: &'static str = "/sensor-config/config.json";
-const ROLE_NAME: &str = "fuchsia.ui.scene_manager";
 
-#[fuchsia::main(logging_tags = [ "scene_manager" ], thread_role = ROLE_NAME)]
+#[fuchsia::main(logging_tags = [ "scene_manager" ])]
 async fn main() -> Result<(), Error> {
-    if let Err(e) = fuchsia_scheduler::set_role_for_root_vmar(ROLE_NAME) {
-        warn!(e:%; "failed to set vmar role");
-    }
-
     let mut fs = ServiceFs::new_local();
 
     // Create an inspector that's large enough to store 10 seconds of touchpad

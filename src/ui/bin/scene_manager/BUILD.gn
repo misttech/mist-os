@@ -41,7 +41,6 @@ icu_rustc_binary("scene_manager_bin") {
     "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus_rust",
     "//sdk/fidl/fuchsia.ui.pointerinjector.configuration:fuchsia.ui.pointerinjector.configuration_rust",
     "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_rust",
-    "//sdk/lib/scheduler/rust",
     "//sdk/rust/zx",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",

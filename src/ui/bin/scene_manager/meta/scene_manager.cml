@@ -56,13 +56,12 @@
             ],
         },
         {
-            protocol: [
-                "fuchsia.media.sounds.Player",
-
-                // Used for power integration if configured.
-                "fuchsia.power.system.ActivityGovernor",
-                "fuchsia.scheduler.RoleManager",
-            ],
+            protocol: "fuchsia.media.sounds.Player",
+            availability: "optional",
+        },
+        {
+            // Used for power integration if configured.
+            protocol: [ "fuchsia.power.system.ActivityGovernor" ],
             availability: "optional",
         },
         {
