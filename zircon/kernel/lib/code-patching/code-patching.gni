@@ -158,7 +158,8 @@ template("code_patching_hermetic_alternative") {
     blob_entrypoint = target_name
   }
 
-  blob_path = rebase_path("$target_out_dir/$target_name.bin", root_build_dir)
+  blob_path =
+      rebase_path("$target_out_dir/$blob_entrypoint.bin", root_build_dir)
 
   hermetic_code_blob(target_name) {
     forward_variables_from(invoker,
@@ -181,7 +182,7 @@ template("code_patching_hermetic_alternative") {
       code_patching_hermetic_alternatives += [
         {
           label = target_label
-          name = target_name
+          name = blob_entrypoint
           path = blob_path
         },
       ]
@@ -191,7 +192,7 @@ template("code_patching_hermetic_alternative") {
       distribution_entries += [
         {
           source = blob_path
-          destination = "code-patches/$target_name"
+          destination = "code-patches/$entrypoint"
           label = target_label
         },
       ]

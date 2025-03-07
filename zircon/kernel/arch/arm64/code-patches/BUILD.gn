@@ -9,15 +9,14 @@ import("//build/toolchain/toolchain_environment.gni")
 
 if (toolchain_environment == "kernel.phys") {
   source_set("code-patches") {
-    public_deps = [ ":headers" ]
     sources = [ "code-patches.cc" ]
     deps = [
       "//zircon/kernel/arch/arm64/phys:arch-phys-info",
-      "//zircon/kernel/lib/arch",
       "//zircon/kernel/lib/code-patching",
       "//zircon/kernel/phys:handoff",
       "//zircon/kernel/phys:symbolize",
     ]
+    public_deps = [ ":headers" ]
   }
 }
 

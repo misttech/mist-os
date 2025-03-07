@@ -4,12 +4,6 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/MIT
 
-import("//build/toolchain/toolchain_environment.gni")
-import("//zircon/kernel/lib/code-patching/code-patching.gni")
-
-cortex_strings_dir = "//zircon/third_party/lib/cortex-strings"
-not_needed([ "cortex_strings_dir" ])
-
 source_set("arm64") {
   if (current_os == "win" || toolchain_variant.tags + [ "strict-align" ] -
                              [ "strict-align" ] != toolchain_variant.tags) {
@@ -20,48 +14,13 @@ source_set("arm64") {
       "//zircon/kernel/lib/libc/string/memset.c",
     ]
     deps = [ "//zircon/kernel/lib/libc:headers" ]
-  } else if (toolchain_environment == "kernel") {
-    # In the kernel proper, code-patching chooses the implementation.
-    deps = [
-      ":__unsanitized_memcpy",
-      ":__unsanitized_memset",
-    ]
   } else {
+    # These use '#include "third_party/lib/cortex-strings/src/aarch64/..."'.
+    # and '#include "third_party/lib/cortex-strings/no-neon/src/aarch64/..."'.
+    include_dirs = [ "//zircon/" ]
     sources = [
-      "$cortex_strings_dir/no-neon/src/aarch64/memset.S",
-      "$cortex_strings_dir/src/aarch64/memcpy.S",
+      "memcpy.S",
+      "memset.S",
     ]
-  }
-}
-
-if (toolchain_environment == "kernel") {
-  foreach(function,
-          [
-            "memcpy",
-            "memset",
-          ]) {
-    code_patching_hermetic_stub("__unsanitized_${function}") {
-      aliases = [ function ]
-      deps = [
-        ":${function}-cortex",
-        ":${function}-mops",
-      ]
-    }
-
-    code_patching_hermetic_alternative("${function}-mops") {
-      entrypoint = function
-      sources = [ "${function}-mops.S" ]
-      deps = [ "//zircon/kernel/lib/arch:headers" ]
-    }
-  }
-
-  code_patching_hermetic_alternative("memcpy-cortex") {
-    entrypoint = "memcpy"
-    sources = [ "$cortex_strings_dir/src/aarch64/memcpy.S" ]
-  }
-
-  code_patching_hermetic_alternative("memset-cortex") {
-    entrypoint = "memset"
-    sources = [ "$cortex_strings_dir/no-neon/src/aarch64/memset.S" ]
   }
 }
