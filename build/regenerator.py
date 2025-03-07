@@ -253,8 +253,11 @@ def main() -> int:
             sys.executable,
             "-S",
             f"{build_dir_to_source_dir}/build/regenerator.py",
-            f"--fuchsia-dir={shlex.quote(str(fuchsia_dir))}",
-            f"--fuchsia-build-dir={shlex.quote(str(build_dir))}",
+            # Ensure the Fuchsia checkout and build directories are relative to the
+            # current directory to avoid confusing Ninja when they are moved or
+            # copied to a different location. See https://fxbug.dev/401221699
+            f"--fuchsia-dir={build_dir_to_source_dir}",
+            "--fuchsia-build-dir=.",
             f"--host-tag={args.host_tag}",
         ]
         regenerator_command = " ".join(
