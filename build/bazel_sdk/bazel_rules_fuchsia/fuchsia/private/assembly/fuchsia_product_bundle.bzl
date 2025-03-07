@@ -56,7 +56,6 @@ def fuchsia_product_bundle(
     ```
     fuchsia_product_bundle(
         name = "product_bundle",
-        board_name = "<your_board>",
         product_bundle_name = "<your_product_name>",
         partitions_config = ":your_partitions_config",
         main = ":your_image",
@@ -569,7 +568,10 @@ def _build_fuchsia_product_bundle_impl(ctx):
     pb_out_dir = ctx.actions.declare_directory(ctx.label.name + "_out")
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
     size_report = ctx.actions.declare_file(ctx.label.name + "_size_report.json")
-    product_name = "{}.{}".format(ctx.attr.product_bundle_name, ctx.attr.board_name)
+    if ctx.attr.board_name:
+        product_bundle_name = "{}.{}".format(ctx.attr.product_bundle_name, ctx.attr.board_name)
+    else:
+        product_bundle_name = ctx.attr.product_bundle_name
     delivery_blob_type = ctx.attr.delivery_blob_type
 
     # In the future, the product bundles should be versioned independently of
@@ -584,7 +586,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
         "product",
         "create",
         "--product-name",
-        product_name,
+        product_bundle_name,
         "--product-version",
         product_version,
         "--partitions $PARTITIONS_PATH",
@@ -703,7 +705,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
         FuchsiaProductBundleInfo(
             is_remote = False,
             product_bundle = pb_out_dir,
-            product_name = product_name,
+            product_bundle_name = product_bundle_name,
             product_version = product_version,
             build_id_dirs = build_id_dirs,
         ),
@@ -722,12 +724,12 @@ _build_fuchsia_product_bundle = rule(
     toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     executable = True,
     attrs = {
+        # Deprecated. Please provide the entire name in `product_bundle_name`.
         "board_name": attr.string(
             doc = "Name of the board this PB runs on. E.g. x64.",
-            mandatory = True,
         ),
         "product_bundle_name": attr.string(
-            doc = "Name of the Fuchsia product. E.g. workstation_eng.",
+            doc = "Name of the Fuchsia product. E.g. workstation_eng.x64",
         ),
         "product_bundle_version": attr.string(
             doc = "Version of the Fuchsia product. E.g. 35.20221231.0.1.",

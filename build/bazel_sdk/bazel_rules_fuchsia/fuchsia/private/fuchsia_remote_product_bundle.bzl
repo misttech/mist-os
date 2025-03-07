@@ -16,7 +16,9 @@ def fuchsia_remote_product_bundle(
         name,
         transfer_url,
         product_version,
+        # Deprecated. Please use `product_bundle_name`.
         product_name = None,
+        product_bundle_name = None,
         **kwargs):
     """Describes a product bundle which is not built locally and tasks that can be performed with it.
 
@@ -29,15 +31,17 @@ def fuchsia_remote_product_bundle(
     Args:
         name: The target name.
         transfer_url: The transfer url to fetch the product bundle.
-        product_name: The name of the product bundle.
+        product_bundle_name: The name of the product bundle.
             Defaults to `name`.
         product_version: The sdk version associated with this product bundle.
         **kwargs: Extra attributes to pass along to the build rule.
     """
+    product_bundle_name = product_bundle_name or product_name or name
+
     _fuchsia_remote_product_bundle(
         name = name,
         transfer_url = transfer_url,
-        product_name = product_name or name,
+        product_bundle_name = product_bundle_name,
         product_version = product_version,
         **kwargs
     )
@@ -57,7 +61,7 @@ def _fuchsia_remote_product_bundle_impl(ctx):
         FuchsiaProductBundleInfo(
             is_remote = True,
             product_bundle = ctx.attr.transfer_url,
-            product_name = ctx.attr.product_name,
+            product_bundle_name = ctx.attr.product_bundle_name,
             product_version = ctx.attr.product_version,
         ),
     ]
@@ -70,7 +74,7 @@ _fuchsia_remote_product_bundle = rule(
             doc = "The transfer url to fetch the product bundle.",
             mandatory = True,
         ),
-        "product_name": attr.string(
+        "product_bundle_name": attr.string(
             doc = "The name of the product bundle.",
             mandatory = True,
         ),

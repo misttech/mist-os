@@ -12,7 +12,7 @@ load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION",
 def get_product_bundle_dir(ctx):
     pb = ctx.attr.product_bundle[FuchsiaProductBundleInfo]
     if pb.is_remote:
-        return "/tmp/%s-%s" % (pb.product_name, pb.product_version)
+        return "/tmp/%s-%s" % (pb.product_bundle_name, pb.product_version)
     else:
         return pb.product_bundle
 
