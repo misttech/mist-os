@@ -21,9 +21,6 @@
     ],
     use: [
         {
-            protocol: [ "fuchsia.scheduler.RoleManager" ],
-        },
-        {
             service: [ "fuchsia.hardware.platform.device.Service" ],
         },
     ],
