@@ -65,7 +65,7 @@ impl ContainerNamespace {
         let search_path = search_path.as_ref();
         if !search_path.is_absolute() {
             anyhow::bail!(
-                "Invalid parameter provided to find_closest_channel: {}",
+                "Non-absolute path provided to find_closest_channel: {}",
                 search_path.display()
             );
         }
