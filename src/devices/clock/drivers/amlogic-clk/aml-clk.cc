@@ -173,15 +173,14 @@ zx_status_t AmlClock::PopulateRegisterBlocks(uint32_t device_id, fdf::PDev& pdev
 
 zx::result<> AmlClock::Start() {
   // Get the platform device protocol and try to map all the MMIO regions.
-  fdf::PDev pdev;
-  {
-    zx::result result = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
-    if (result.is_error() || !result->is_valid()) {
-      FDF_LOG(ERROR, "Failed to connect to platform device: %s", result.status_string());
-      return result.take_error();
-    }
-    pdev = fdf::PDev{std::move(result.value())};
+  zx::result pdev_client_end =
+      incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
+  if (pdev_client_end.is_error()) {
+    FDF_LOG(ERROR, "Failed to connect to platform device: %s", pdev_client_end.status_string());
+    return pdev_client_end.take_error();
   }
+
+  fdf::PDev pdev{std::move(pdev_client_end.value())};
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   // Serve clock IDs metadata.

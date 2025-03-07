@@ -62,16 +62,15 @@ void AmlUartV2::OnDeviceServerInitialized(zx::result<> device_server_init_result
     return;
   }
 
-  fdf::PDev pdev;
-  {
-    auto result = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>(kPdevName);
-    if (result.is_error()) {
-      FDF_LOG(ERROR, "Failed to connect to platform device: %s", result.status_string());
-      CompleteStart(result.take_error());
-      return;
-    }
-    pdev = fdf::PDev{std::move(result.value())};
+  auto pdev_client_end =
+      incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>(kPdevName);
+  if (pdev_client_end.is_error()) {
+    FDF_LOG(ERROR, "Failed to connect to platform device: %s", pdev_client_end.status_string());
+    CompleteStart(pdev_client_end.take_error());
+    return;
   }
+
+  fdf::PDev pdev{std::move(pdev_client_end.value())};
 
   if (zx::result result = mac_address_metadata_server_.SetMetadataFromPDevIfExists(pdev);
       result.is_error()) {

@@ -102,17 +102,13 @@ zx::result<> Dwc3::Start() {
 }
 
 zx_status_t Dwc3::AcquirePDevResources() {
-  auto pdev = incoming()->Connect<fpdev::Service::Device>("pdev");
-  if (pdev.is_error()) {
-    FDF_LOG(ERROR, "fidl::CreateEndpoints<fpdev::Service>(): %s", pdev.status_string());
-    return pdev.error_value();
+  auto pdev_client_end = incoming()->Connect<fpdev::Service::Device>("pdev");
+  if (pdev_client_end.is_error()) {
+    FDF_LOG(ERROR, "fidl::CreateEndpoints<fpdev::Service>(): %s", pdev_client_end.status_string());
+    return pdev_client_end.error_value();
   }
-  pdev_ = fdf::PDev{std::move(*pdev)};
 
-  if (!pdev_.is_valid()) {
-    FDF_LOG(ERROR, "Could not get platform device protocol");
-    return ZX_ERR_NOT_SUPPORTED;
-  }
+  pdev_ = fdf::PDev{std::move(pdev_client_end.value())};
 
   // Initialize mac address metadata server.
   if (zx::result result = mac_address_metadata_server_.SetMetadataFromPDevIfExists(pdev_);

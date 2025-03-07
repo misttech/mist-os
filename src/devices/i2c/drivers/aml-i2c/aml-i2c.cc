@@ -365,15 +365,22 @@ zx::result<> AmlI2c::Start() {
   }
   auto compat_client = fidl::WireSyncClient(std::move(compat_result.value()));
 
-  fdf::PDev pdev;
-  {
-    zx::result result =
-        incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>("pdev");
-    if (result.is_error()) {
-      FDF_LOG(ERROR, "Failed to connect to pdev protocol: %s", result.status_string());
-      return result.take_error();
-    }
-    pdev = fdf::PDev{std::move(result.value())};
+  zx::result pdev_client_end =
+      incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>("pdev");
+  if (pdev_client_end.is_error()) {
+    FDF_LOG(ERROR, "Failed to connect to pdev protocol: %s", pdev_client_end.status_string());
+    return pdev_client_end.take_error();
+  }
+
+  fdf::PDev pdev{std::move(pdev_client_end.value())};
+
+  if (zx::result result = metadata_server_.SetMetadataFromPDevIfExists(pdev); result.is_error()) {
+    FDF_LOG(ERROR, "Failed to set metadata for metadata server: %s", result.status_string());
+    return result.take_error();
+  }
+  if (zx::result result = metadata_server_.Serve(*outgoing(), dispatcher()); result.is_error()) {
+    FDF_LOG(ERROR, "Failed to serve metadata: %s", result.status_string());
+    return result.take_error();
   }
 
   if (auto mmio = MapMmio(pdev); mmio.is_error()) {
@@ -401,15 +408,6 @@ zx::result<> AmlI2c::Start() {
       return interrupt.take_error();
     }
     irq_ = std::move(interrupt.value());
-  }
-
-  if (zx::result result = metadata_server_.SetMetadataFromPDevIfExists(pdev); result.is_error()) {
-    FDF_LOG(ERROR, "Failed to set metadata for metadata server: %s", result.status_string());
-    return result.take_error();
-  }
-  if (zx::result result = metadata_server_.Serve(*outgoing(), dispatcher()); result.is_error()) {
-    FDF_LOG(ERROR, "Failed to serve metadata: %s", result.status_string());
-    return result.take_error();
   }
 
   status = zx::event::create(0, &event_);

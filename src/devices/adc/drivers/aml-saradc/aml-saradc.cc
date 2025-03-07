@@ -174,12 +174,14 @@ zx::result<> AmlSaradc::Start() {
     return result.take_error();
   }
 
-  zx::result pdev_client = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
-  if (pdev_client.is_error()) {
-    FDF_SLOG(ERROR, "Failed to open pdev service.", KV("status", pdev_client.status_string()));
-    return pdev_client.take_error();
+  zx::result pdev_client_end =
+      incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
+  if (pdev_client_end.is_error()) {
+    FDF_SLOG(ERROR, "Failed to open pdev service.", KV("status", pdev_client_end.status_string()));
+    return pdev_client_end.take_error();
   }
-  fdf::PDev pdev{std::move(pdev_client.value())};
+
+  fdf::PDev pdev{std::move(pdev_client_end.value())};
   if (!pdev.is_valid()) {
     FDF_LOG(ERROR, "Failed to get pdev");
     return zx::error(ZX_ERR_NO_RESOURCES);

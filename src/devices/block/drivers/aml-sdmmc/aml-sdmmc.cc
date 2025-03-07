@@ -194,13 +194,16 @@ zx::result<> AmlSdmmc::Start() {
 }
 
 zx::result<> AmlSdmmc::InitResources(
-    fidl::ClientEnd<fuchsia_hardware_platform_device::Device> pdev_client) {
-  fdf::PDev pdev{std::move(pdev_client)};
+    fidl::ClientEnd<fuchsia_hardware_platform_device::Device> pdev_client_end) {
+  fdf::PDev pdev{std::move(pdev_client_end)};
 
-  if (zx_status_t status = InitMetadataServer(pdev); status != ZX_OK) {
-    FDF_LOGL(ERROR, logger(), "Failed to initialize metadata server: %s",
-             zx_status_get_string(status));
-    return zx::error(status);
+  if (zx::result result = metadata_server_.SetMetadataFromPDevIfExists(pdev); result.is_error()) {
+    FDF_LOGL(ERROR, logger(), "Failed to set metadata: %s", result.status_string());
+    return result.take_error();
+  }
+  if (zx::result result = metadata_server_.Serve(*outgoing(), dispatcher()); result.is_error()) {
+    FDF_LOGL(ERROR, logger(), "Failed to serve metadata: %s", result.status_string());
+    return result.take_error();
   }
 
   {
@@ -1819,19 +1822,6 @@ void AmlSdmmc::PrepareStop(fdf::PrepareStopCompleter completer) {
   }
 
   completer(zx::ok());
-}
-
-zx_status_t AmlSdmmc::InitMetadataServer(fdf::PDev& pdev) {
-  if (zx::result result = metadata_server_.SetMetadataFromPDevIfExists(pdev); result.is_error()) {
-    FDF_LOGL(ERROR, logger(), "Failed to set metadata: %s", result.status_string());
-    return result.status_value();
-  }
-  if (zx::result result = metadata_server_.Serve(*outgoing(), dispatcher()); result.is_error()) {
-    FDF_LOGL(ERROR, logger(), "Failed to serve metadata: %s", result.status_string());
-    return result.status_value();
-  }
-
-  return ZX_OK;
 }
 
 }  // namespace aml_sdmmc

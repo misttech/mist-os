@@ -90,7 +90,7 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
   // `|FidlType|::kSerializableName`. Assumes that the metadata from the platform device is a
   // persisted |FidlType|. Returns false if the metadata was not found. Returns true if otherwise.
   zx::result<bool> SetMetadataFromPDevIfExists(
-      fidl::ClientEnd<fuchsia_hardware_platform_device::Device>& pdev) {
+      fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> pdev) {
     fidl::WireResult result = fidl::WireCall(pdev)->GetMetadata(
         fidl::StringView::FromExternal(FidlType::kSerializableName));
     if (!result.ok()) {
@@ -111,23 +111,19 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
     return zx::ok(true);
   }
 
-  // Retrieves persisted metadata from |pdev| associated with the metadata ID
-  // `|FidlType|::kSerializableName`. Assumes that the metadata from the platform device is a
-  // persisted |FidlType|. Returns false if the metadata was not found. Returns true if otherwise.
+  // See
+  // `SetMetadataFromPDevIfExists(fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device>)`
+  // for more details.
+  zx::result<bool> SetMetadataFromPDevIfExists(
+      fidl::ClientEnd<fuchsia_hardware_platform_device::Device>& pdev) {
+    return SetMetadataFromPDevIfExists(pdev.borrow());
+  }
+
+  // See
+  // `SetMetadataFromPDevIfExists(fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device>)`
+  // for more details.
   zx::result<bool> SetMetadataFromPDevIfExists(fdf::PDev& pdev) {
-    zx::result metadata = pdev.GetFidlMetadata<FidlType>();
-    if (metadata.is_error()) {
-      if (metadata.status_value() == ZX_ERR_NOT_FOUND) {
-        return zx::ok(false);
-      }
-      FDF_LOG(ERROR, "Failed to get metadata: %s", metadata.status_string());
-      return metadata.take_error();
-    }
-    if (zx::result result = SetMetadata(metadata.value()); result.is_error()) {
-      FDF_LOG(ERROR, "Failed to set metadata: %s", result.status_string());
-      return result.take_error();
-    }
-    return zx::ok(true);
+    return SetMetadataFromPDevIfExists(pdev.borrow());
   }
 
   // Sets the metadata to be served to the metadata found in |incoming|.

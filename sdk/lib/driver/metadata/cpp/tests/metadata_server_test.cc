@@ -72,7 +72,7 @@ TEST_F(MetadataServerTest, GetPDevMetadata) {
 
   StartPlatformDevice();
   SetPlatformDeviceMetadata(kMetadata);
-  auto pdev_client = TakePDevClient();
+  fidl::ClientEnd pdev_client = TakePDevClient();
 
   // Verify that the metadata server can retrieve platform device metadata using a platform device
   // FIDL client.
@@ -100,7 +100,7 @@ TEST_F(MetadataServerTest, GetPDevMetadata) {
 // does not have metadata.
 TEST_F(MetadataServerTest, GetNonExistentPDevMetadata) {
   StartPlatformDevice();
-  auto pdev_client = TakePDevClient();
+  fidl::ClientEnd pdev_client = TakePDevClient();
 
   // Verify `MetadataServer::SetMetadataFromPDevIfExists()` returns false if the platform device
   // does not have metadata.
