@@ -17,10 +17,7 @@
     use: [
         { service: 'fuchsia.driver.compat.Service' },
         {
-            protocol: [
-                "fuchsia.kernel.InfoResource",
-                "fuchsia.scheduler.RoleManager",
-            ],
+            protocol: [ "fuchsia.kernel.InfoResource" ],
         },
     ],
 }
