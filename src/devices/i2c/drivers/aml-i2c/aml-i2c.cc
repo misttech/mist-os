@@ -160,7 +160,7 @@ zx_status_t AmlI2c::WaitTransferComplete() const {
   }
   event_.signal(observed, 0);
   if (observed & kErrorSignal) {
-    return ZX_ERR_TIMED_OUT;
+    return ZX_ERR_IO_REFUSED;
   }
   return ZX_OK;
 }
