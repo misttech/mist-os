@@ -84,8 +84,8 @@ void AtomHelper::SubmitCommandBuffer(How how, uint8_t atom_number, uint8_t atom_
   command_buffer.size = vaddr.size();
   command_buffer.semaphore_ids = nullptr;
   command_buffer.semaphore_count = 0;
-  EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_execute_immediate_commands(connection_, context_id_,
-                                                                         1, &command_buffer));
+  EXPECT_EQ(MAGMA_STATUS_OK,
+            magma_connection_execute_inline_commands(connection_, context_id_, 1, &command_buffer));
 
   magma_poll_item_t item = {.handle = magma_connection_get_notification_channel_handle(connection_),
                             .type = MAGMA_POLL_TYPE_HANDLE,

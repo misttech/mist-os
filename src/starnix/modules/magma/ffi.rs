@@ -10,7 +10,7 @@ use crate::image_file::{ImageFile, ImageInfo};
 use bstr::BString;
 use magma::{
     magma_buffer_export, magma_buffer_get_handle, magma_buffer_t, magma_command_descriptor,
-    magma_connection_execute_command, magma_connection_execute_immediate_commands,
+    magma_connection_execute_command, magma_connection_execute_inline_commands,
     magma_connection_flush, magma_connection_import_semaphore2,
     magma_connection_read_notification_channel, magma_connection_t, magma_device_create_connection,
     magma_device_import, magma_device_query, magma_device_t, magma_exec_command_buffer,
@@ -18,9 +18,8 @@ use magma::{
     virtio_magma_buffer_export_ctrl_t, virtio_magma_buffer_export_resp_t,
     virtio_magma_buffer_get_handle_ctrl_t, virtio_magma_buffer_get_handle_resp_t,
     virtio_magma_connection_execute_command_ctrl_t,
-    virtio_magma_connection_execute_immediate_commands_ctrl_t,
-    virtio_magma_connection_flush_ctrl_t, virtio_magma_connection_flush_resp_t,
-    virtio_magma_connection_read_notification_channel_ctrl_t,
+    virtio_magma_connection_execute_inline_commands_ctrl_t, virtio_magma_connection_flush_ctrl_t,
+    virtio_magma_connection_flush_resp_t, virtio_magma_connection_read_notification_channel_ctrl_t,
     virtio_magma_connection_read_notification_channel_resp_t,
     virtio_magma_connection_release_ctrl_t, virtio_magma_connection_release_resp_t,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_BUFFER_EXPORT,
@@ -367,10 +366,10 @@ where
 /// data into starnix in order to be able to pass pointers to the resources, command buffers, and
 /// semaphore ids to magma.
 ///
-/// SAFETY: Makes an FFI call to magma_execute_immediate_commands().
-pub fn execute_immediate_commands<F>(
+/// SAFETY: Makes an FFI call to magma_execute_inline_commands().
+pub fn execute_inline_commands<F>(
     current_task: &CurrentTask,
-    control: virtio_magma_connection_execute_immediate_commands_ctrl_t,
+    control: virtio_magma_connection_execute_inline_commands_ctrl_t,
     connection: &Arc<MagmaConnection>,
     get_semaphore: F,
 ) -> Result<magma_status_t, Errno>
@@ -441,7 +440,7 @@ where
                     &mut semaphore_ids_vec[i][0]
                 };
             }
-            magma_connection_execute_immediate_commands(
+            magma_connection_execute_inline_commands(
                 connection.handle,
                 control.context_id,
                 control.command_count,

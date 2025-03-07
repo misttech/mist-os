@@ -7,6 +7,16 @@
 
 #include <stdint.h>
 
+#ifdef __Fuchsia__
+#include <zircon/availability.h>
+#define MAGMA_AVAILABLE_SINCE(level_added) ZX_AVAILABLE_SINCE(level_added)
+#define MAGMA_DEPRECATED_SINCE(level_added, level_deprecated, msg) \
+  ZX_DEPRECATED_SINCE(level_added, level_deprecated, msg)
+#else
+#define MAGMA_AVAILABLE_SINCE(level_added)
+#define MAGMA_DEPRECATED_SINCE(level_added, level_deprecated, msg)
+#endif
+
 #if defined(__cplusplus)
 extern "C" {
 #endif
@@ -16,8 +26,8 @@ extern "C" {
 
 // LINT.IfChange(version)
 // This version should be incremented whenever the Magma API changes.
-#define MAGMA_API_VERSION 6
-// LINT.ThenChange()
+#define MAGMA_API_VERSION 7
+// LINT.ThenChange(magma_common_defs.h)
 
 // LINT.IfChange
 // The entrypoints should be exported from libmagma_client.a. ICDs should use a

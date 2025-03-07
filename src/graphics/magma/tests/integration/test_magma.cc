@@ -980,7 +980,7 @@ class TestConnection {
     magma_connection_release_semaphore(connection_, semaphore);
   }
 
-  void ImmediateCommands() {
+  void InlineCommands() {
     ASSERT_TRUE(connection_);
 
     uint32_t context_id;
@@ -996,8 +996,8 @@ class TestConnection {
         .semaphore_count = 1,
     };
 
-    magma_status_t status = magma_connection_execute_immediate_commands(connection_, context_id, 1,
-                                                                        &inline_command_buffer);
+    magma_status_t status = magma_connection_execute_inline_commands(connection_, context_id, 1,
+                                                                     &inline_command_buffer);
     if (status == MAGMA_STATUS_OK) {
       // Invalid semaphore ID prevents execution of pattern data
       EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_connection_flush(connection_));
@@ -1707,7 +1707,7 @@ TEST_F(Magma, SemaphoreExportImportOneShot) {
   test2.SemaphoreImport2(handle, /*one_shot=*/true);
 }
 
-TEST_F(Magma, ImmediateCommands) { TestConnection().ImmediateCommands(); }
+TEST_F(Magma, InlineCommands) { TestConnection().InlineCommands(); }
 
 class MagmaPoll : public testing::TestWithParam<uint32_t> {};
 

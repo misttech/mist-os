@@ -41,7 +41,7 @@ class TestConnection : public magma::TestDeviceBase {
     if (status != MAGMA_STATUS_OK)
       return DRET(status);
 
-    status = magma_connection_execute_immediate_commands(connection_, context_id, 0, nullptr);
+    status = magma_connection_execute_inline_commands(connection_, context_id, 0, nullptr);
     if (status != MAGMA_STATUS_OK)
       return DRET(status);
 

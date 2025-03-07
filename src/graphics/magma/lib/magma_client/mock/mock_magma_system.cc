@@ -97,10 +97,10 @@ magma_status_t magma_connection_execute_command(magma_connection_t connection, u
   return MAGMA_STATUS_OK;
 }
 
-magma_status_t magma_connection_execute_immediate_commands(
+magma_status_t magma_connection_execute_inline_commands(
     magma_connection_t connection, uint32_t context_id, uint64_t command_count,
     struct magma_inline_command_buffer* command_buffers) {
-  DLOG("magma_execute_immediate_commands2 - STUB");
+  DLOG("magma_connection_execute_inline_commands - STUB");
   return MAGMA_STATUS_OK;
 }
 

@@ -182,6 +182,46 @@ magma_status_t magma_connection_execute_immediate_commands(
   return static_cast<magma_status_t>(response.result_return);
 }
 
+magma_status_t magma_connection_execute_inline_commands(
+    magma_connection_t connection, uint32_t context_id, uint64_t command_count,
+    magma_inline_command_buffer_t* command_buffers) {
+#if VIRTMAGMA_DEBUG
+  printf("%s\n", __PRETTY_FUNCTION__);
+#endif
+
+  virtmagma_command_descriptor commands[command_count];
+  for (uint64_t i = 0; i < command_count; i++) {
+    commands[i] = {
+        .descriptor_size = 0,
+        .descriptor = 0,
+        .resource_size = 0,
+        .resources = 0,
+        .command_buffer_size = command_buffers[i].size,
+        .command_buffers = reinterpret_cast<uintptr_t>(command_buffers[i].data),
+        .semaphore_size = sizeof(uint64_t) * command_buffers[i].semaphore_count,
+        .semaphores = reinterpret_cast<uintptr_t>(command_buffers[i].semaphore_ids),
+    };
+  }
+
+  virtio_magma_connection_execute_inline_commands_ctrl request{
+      .hdr = {.type = VIRTIO_MAGMA_CMD_CONNECTION_EXECUTE_INLINE_COMMANDS}};
+  virtio_magma_connection_execute_inline_commands_resp response{};
+
+  auto connection_wrapped = virtmagma_connection_t::Get(connection);
+  request.connection = reinterpret_cast<uint64_t>(connection_wrapped->Object());
+  request.context_id = context_id;
+  request.command_count = command_count;
+  request.command_buffers = reinterpret_cast<uintptr_t>(commands);
+
+  int32_t file_descriptor = connection_wrapped->Parent().fd();
+
+  if (!virtmagma_send_command(file_descriptor, &request, sizeof(request), &response,
+                              sizeof(response))) {
+    assert(false);
+  }
+  return static_cast<magma_status_t>(response.result_return);
+}
+
 magma_status_t magma_buffer_get_info(magma_buffer_t buffer, magma_buffer_info_t* info_out) {
   auto buffer_wrapped = virtmagma_buffer_t::Get(buffer);
 
@@ -261,9 +301,9 @@ magma_status_t magma_virt_connection_create_image(magma_connection_t connection,
   // Ensure host compatibility with 32bit guest
   static_assert(sizeof(magma_image_create_info_t) % 8 == 0);
 
-  struct virtmagma_create_image_wrapper wrapper {
-    .create_info = reinterpret_cast<uintptr_t>(create_info),
-    .create_info_size = sizeof(magma_image_create_info_t),
+  struct virtmagma_create_image_wrapper wrapper{
+      .create_info = reinterpret_cast<uintptr_t>(create_info),
+      .create_info_size = sizeof(magma_image_create_info_t),
   };
 
   virtio_magma_virt_connection_create_image_ctrl_t request{
@@ -307,9 +347,9 @@ magma_status_t magma_virt_connection_get_image_info(magma_connection_t connectio
   // Ensure host compatibility with 32bit guest
   static_assert(sizeof(magma_image_info_t) % 8 == 0);
 
-  struct virtmagma_get_image_info_wrapper wrapper {
-    .image_info_out = reinterpret_cast<uintptr_t>(image_info_out),
-    .image_info_size = sizeof(magma_image_info_t),
+  struct virtmagma_get_image_info_wrapper wrapper{
+      .image_info_out = reinterpret_cast<uintptr_t>(image_info_out),
+      .image_info_size = sizeof(magma_image_info_t),
   };
 
   virtio_magma_virt_connection_get_image_info_ctrl_t request{

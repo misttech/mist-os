@@ -6,7 +6,7 @@
 
 use zerocopy::{FromBytes, Immutable, IntoBytes};
 
-pub const MAGMA_API_VERSION: u32 = 6;
+pub const MAGMA_API_VERSION: u32 = 7;
 pub const MAGMA_VENDOR_ID_MALI: u32 = 5045;
 pub const MAGMA_VENDOR_ID_INTEL: u32 = 32902;
 pub type magma_query_t = u64;
@@ -303,6 +303,15 @@ unsafe extern "C" {
     ) -> magma_status_t;
 }
 unsafe extern "C" {
+    #[doc = "\n \\brief Submits a series of commands for execution on the hardware without using a command\n        buffer.\n \\param connection An open connection.\n \\param context_id A valid context ID.\n \\param command_count The number of commands in the provided buffer.\n \\param command_buffers An array of command_count magma_inline_command_buffer structs.\n"]
+    pub fn magma_connection_execute_inline_commands(
+        connection: magma_connection_t,
+        context_id: u32,
+        command_count: u64,
+        command_buffers: *mut magma_inline_command_buffer_t,
+    ) -> magma_status_t;
+}
+unsafe extern "C" {
     #[doc = "\n \\brief Incurs a round-trip to the system driver, used to ensure all previous messages have been\n        observed, but not necessarily completed.  If a system driver error occurs, the connection\n        will be closed, and this interface will return the error.\n \\param connection An open connection.\n"]
     pub fn magma_connection_flush(connection: magma_connection_t) -> magma_status_t;
 }
@@ -580,6 +589,8 @@ pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_EXECUTE_COMMAND:
     virtio_magma_ctrl_type = 4176;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_EXECUTE_IMMEDIATE_COMMANDS:
     virtio_magma_ctrl_type = 4129;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_EXECUTE_INLINE_COMMANDS:
+    virtio_magma_ctrl_type = 4130;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_FLUSH: virtio_magma_ctrl_type = 4175;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_GET_NOTIFICATION_CHANNEL_HANDLE:
     virtio_magma_ctrl_type = 4138;
@@ -657,6 +668,8 @@ pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_EXECUTE_COMMAND:
     virtio_magma_ctrl_type = 8272;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_EXECUTE_IMMEDIATE_COMMANDS:
     virtio_magma_ctrl_type = 8225;
+pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_EXECUTE_INLINE_COMMANDS:
+    virtio_magma_ctrl_type = 8226;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_FLUSH: virtio_magma_ctrl_type = 8271;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_GET_NOTIFICATION_CHANNEL_HANDLE:
     virtio_magma_ctrl_type = 8234;
@@ -1037,6 +1050,25 @@ pub struct virtio_magma_connection_execute_immediate_commands_resp {
 }
 pub type virtio_magma_connection_execute_immediate_commands_resp_t =
     virtio_magma_connection_execute_immediate_commands_resp;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, Immutable)]
+pub struct virtio_magma_connection_execute_inline_commands_ctrl {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub connection: u64,
+    pub context_id: u32,
+    pub command_count: u64,
+    pub command_buffers: u64,
+}
+pub type virtio_magma_connection_execute_inline_commands_ctrl_t =
+    virtio_magma_connection_execute_inline_commands_ctrl;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, Immutable)]
+pub struct virtio_magma_connection_execute_inline_commands_resp {
+    pub hdr: virtio_magma_ctrl_hdr_t,
+    pub result_return: u64,
+}
+pub type virtio_magma_connection_execute_inline_commands_resp_t =
+    virtio_magma_connection_execute_inline_commands_resp;
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, Immutable)]
 pub struct virtio_magma_connection_flush_ctrl {
