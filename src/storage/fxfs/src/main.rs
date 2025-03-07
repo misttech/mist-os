@@ -3,16 +3,14 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use fuchsia_async as fasync;
 use fuchsia_component::server::MissingStartupHandle;
 use fuchsia_runtime::HandleType;
 use fxfs::log::*;
 use fxfs::serialized_types::LATEST_VERSION;
 use fxfs_platform::component::Component;
 
-#[fasync::run(6)]
+#[fuchsia::main(threads = 6)]
 async fn main() -> Result<(), Error> {
-    diagnostics_log::initialize(diagnostics_log::PublishOptions::default())?;
     let _inspect_server_task = inspect_runtime::publish(
         fuchsia_inspect::component::inspector(),
         inspect_runtime::PublishOptions::default().send_vmo_preference(
