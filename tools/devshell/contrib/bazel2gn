@@ -68,8 +68,8 @@ function main {
     build_gn="${FUCHSIA_DIR}/${dir}/BUILD.gn"
     "${BAZEL2GN_BIN}" \
       --bazel_input_path "${FUCHSIA_DIR}/${dir}/BUILD.bazel" \
-      --gn_output_path "${build_gn}"
-    "${PREBUILT_GN}" format "${build_gn}"
+      --gn_output_path "${build_gn}" \
+      --gn_bin "${PREBUILT_GN}"
   done
 }
 
