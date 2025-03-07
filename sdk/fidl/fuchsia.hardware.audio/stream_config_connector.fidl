@@ -30,3 +30,17 @@ closed protocol StreamConfigConnector {
 service StreamConfigConnectorService {
     stream_config_connector client_end:StreamConfigConnector;
 };
+
+// This service was added to allow conversion from devfs to services.
+// It should be considered just as deprecated as the StreamConfigConnector protocol
+@available(deprecated=20)
+service StreamConfigConnectorInputService {
+    stream_config_connector client_end:StreamConfigConnector;
+};
+
+// This service was added to allow conversion from devfs to services.
+// It should be considered just as deprecated as the StreamConfigConnector protocol
+@available(deprecated=20)
+service StreamConfigConnectorOutputService {
+    stream_config_connector client_end:StreamConfigConnector;
+};
