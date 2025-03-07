@@ -29,6 +29,8 @@ use {
     fidl_fuchsia_ui_policy as fuipolicy, fidl_fuchsia_ui_views as fuiviews, fuchsia_async as fasync,
 };
 
+const INPUT_RELAY_ROLE_NAME: &str = "fuchsia.starnix.kthread.input_relay";
+
 #[derive(Clone, Copy)]
 pub enum EventProxyMode {
     /// Don't proxy input events at all.
@@ -173,6 +175,9 @@ impl InputEventsRelay {
     ) {
         let slf = self.clone();
         kernel.kthreads.spawn(move |_lock_context, _current_task| {
+            if let Err(e) = fuchsia_scheduler::set_role_for_this_thread(INPUT_RELAY_ROLE_NAME) {
+                log_warn!(e:%; "Failed to set touch relay role.");
+            }
             fasync::LocalExecutor::new().run_singlethreaded(async {
             let mut default_touch_device = DeviceState {
                 device_type: InputDeviceType::Touch(
@@ -314,6 +319,9 @@ impl InputEventsRelay {
     ) {
         let slf = self.clone();
         kernel.kthreads.spawn(move |_lock_context, _current_task| {
+            if let Err(e) = fuchsia_scheduler::set_role_for_this_thread(INPUT_RELAY_ROLE_NAME) {
+                log_warn!(e:%; "Failed to set keyboard relay role.");
+            }
             fasync::LocalExecutor::new().run_singlethreaded(async {
                 let mut default_keyboard_device = DeviceState {
                     device_type: InputDeviceType::Keyboard,
@@ -377,6 +385,9 @@ impl InputEventsRelay {
     ) {
         let slf: Arc<InputEventsRelay> = self.clone();
         kernel.kthreads.spawn(move |_lock_context, _current_task| {
+            if let Err(e) = fuchsia_scheduler::set_role_for_this_thread(INPUT_RELAY_ROLE_NAME) {
+                log_warn!(e:%; "Failed to set button relay role.");
+            }
             fasync::LocalExecutor::new().run_singlethreaded(async {
                 let (remote_client, remote_server) =
                     fidl::endpoints::create_endpoints::<fuipolicy::MediaButtonsListenerMarker>();
@@ -531,6 +542,9 @@ impl InputEventsRelay {
     ) {
         let slf = self.clone();
         kernel.kthreads.spawn(move |_lock_context, _current_task| {
+            if let Err(e) = fuchsia_scheduler::set_role_for_this_thread(INPUT_RELAY_ROLE_NAME) {
+                log_warn!(e:%; "Failed to set mouse relay role.");
+            }
             fasync::LocalExecutor::new().run_singlethreaded(async {
                 slf.run_mouse_relay(
                     event_proxy_mode,

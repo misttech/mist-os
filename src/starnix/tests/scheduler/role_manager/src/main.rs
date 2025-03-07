@@ -254,6 +254,10 @@ struct FakeRoleManager {
     sender: UnboundedSender<SetRole>,
 }
 
+/// Profiles which are used by the kernel but are not in starnix.profiles because they should be
+/// defined by product integrators.
+const IGNORED_PROFILES: &[&str] = &["fuchsia.starnix.kthread.input_relay"];
+
 impl FakeRoleManager {
     fn new(config: ProfilesConfig) -> (Self, FakeProfileRequests) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
@@ -270,6 +274,10 @@ impl FakeRoleManager {
                 match request.unwrap() {
                     RoleManagerRequest::SetRole { payload, responder } => {
                         let role_name = payload.role.unwrap().role;
+                        if IGNORED_PROFILES.contains(&role_name.as_str()) {
+                            info!(role_name:%; "ignoring role request");
+                            continue;
+                        }
                         let thread = match payload.target.unwrap() {
                             RoleTarget::Thread(t) => t,
                             other => panic!("unexpected request {other:?} for role {role_name}"),
