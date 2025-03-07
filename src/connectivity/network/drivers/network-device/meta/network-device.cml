@@ -17,8 +17,5 @@
     },
     use: [
         { service: "fuchsia.hardware.network.driver.Service" },
-        {
-            protocol: [ "fuchsia.scheduler.RoleManager" ],
-        },
     ],
 }
