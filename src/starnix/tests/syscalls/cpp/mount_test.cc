@@ -59,6 +59,13 @@ static bool skip_mount_tests = false;
 class MountTest : public ::testing::Test {
  public:
   static void SetUpTestSuite() {
+    // The unshare() call will isolate the mount namespaces for the running
+    // test process. This allows the Linux-based tests to execute syscalls with
+    // root permissions, without fear of messing the environment up. While the
+    // Starnix tests don't strictly need to unshare, it's beneficial to run the
+    // same test binaries on Linux and on Starnix so we can be sure the semantics
+    // match. As a side effect, this means that the mounted directories will not
+    // be viewable in traditional ways, e.g. ffx component explore.
     // TODO(https://fxbug.dev/317285180) don't skip on baseline
     int rv = unshare(CLONE_NEWNS);
     if (rv == -1 && errno == EPERM) {
