@@ -37,7 +37,12 @@ class DisplayInfo : public IdMappable<std::unique_ptr<DisplayInfo>, display::Dis
   static zx::result<std::unique_ptr<DisplayInfo>> Create(AddedDisplayInfo added_display_info);
 
   // Exposed for testing. Prefer obtaining instances from the `Create()` factory method.
-  explicit DisplayInfo(display::DisplayId display_id);
+  explicit DisplayInfo(display::DisplayId display_id,
+                       fbl::Vector<display::PixelFormat> pixel_formats,
+                       display::DisplayTiming preferred_mode);
+
+  explicit DisplayInfo(display::DisplayId display_id,
+                       fbl::Vector<display::PixelFormat> pixel_formats, edid::Edid edid);
 
   DisplayInfo(const DisplayInfo&) = delete;
   DisplayInfo(DisplayInfo&&) = delete;
@@ -77,9 +82,9 @@ class DisplayInfo : public IdMappable<std::unique_ptr<DisplayInfo>, display::Dis
 
   // Exactly one of `edid` and `mode` can be non-nullopt.
   std::optional<Edid> edid;
-  std::optional<display::DisplayTiming> mode;
+  const std::optional<display::DisplayTiming> mode;
 
-  fbl::Vector<display::PixelFormat> pixel_formats;
+  const fbl::Vector<display::PixelFormat> pixel_formats;
 
   // A list of all images which have been sent to display driver.
   Image::DoublyLinkedList images;

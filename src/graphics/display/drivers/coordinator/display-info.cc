@@ -18,6 +18,7 @@
 #include <cinttypes>
 #include <cstddef>
 #include <cstring>
+#include <optional>
 #include <span>
 #include <utility>
 
@@ -31,8 +32,29 @@
 
 namespace display_coordinator {
 
-DisplayInfo::DisplayInfo(display::DisplayId display_id) : IdMappable(display_id) {
+// TODO(https://fxbug.dev/348695412): The two constructors below should be
+// unified. The unified constructor should take in both `preferred_modes` and
+// EDID bytes, and merge the modes.
+
+DisplayInfo::DisplayInfo(display::DisplayId display_id,
+                         fbl::Vector<display::PixelFormat> pixel_formats,
+                         display::DisplayTiming preferred_mode)
+    : IdMappable(display_id),
+      edid(std::nullopt),
+      mode(preferred_mode),
+      pixel_formats(std::move(pixel_formats)) {
   ZX_DEBUG_ASSERT(display_id != display::kInvalidDisplayId);
+}
+
+DisplayInfo::DisplayInfo(display::DisplayId display_id,
+                         fbl::Vector<display::PixelFormat> pixel_formats, edid::Edid edid)
+    : IdMappable(display_id),
+      edid(DisplayInfo::Edid{.base = std::move(edid)}),
+      mode(std::nullopt),
+      pixel_formats(std::move(pixel_formats)) {
+  ZX_DEBUG_ASSERT(display_id != display::kInvalidDisplayId);
+
+  // TODO(https://fxbug.dev/343872853): Parse audio information from EDID.
 }
 
 DisplayInfo::~DisplayInfo() = default;
@@ -75,19 +97,18 @@ zx::result<std::unique_ptr<DisplayInfo>> DisplayInfo::Create(AddedDisplayInfo ad
   ZX_DEBUG_ASSERT(added_display_info.display_id != display::kInvalidDisplayId);
   display::DisplayId display_id = added_display_info.display_id;
 
-  fbl::AllocChecker alloc_checker;
-  auto display_info = fbl::make_unique_checked<DisplayInfo>(&alloc_checker, display_id);
-  if (!alloc_checker.check()) {
-    fdf::error("Failed to allocate DisplayInfo for display ID: {}", display_id.value());
-    return zx::error(ZX_ERR_NO_MEMORY);
-  }
-
-  display_info->pixel_formats = std::move(added_display_info.pixel_formats);
-
   if (!added_display_info.banjo_preferred_modes.is_empty()) {
     ZX_DEBUG_ASSERT(added_display_info.banjo_preferred_modes.size() == 1);
+    display::DisplayTiming preferred_mode =
+        display::ToDisplayTiming(added_display_info.banjo_preferred_modes[0]);
 
-    display_info->mode = display::ToDisplayTiming(added_display_info.banjo_preferred_modes[0]);
+    fbl::AllocChecker alloc_checker;
+    auto display_info = fbl::make_unique_checked<DisplayInfo>(
+        &alloc_checker, display_id, std::move(added_display_info.pixel_formats), preferred_mode);
+    if (!alloc_checker.check()) {
+      fdf::error("Failed to allocate DisplayInfo for display ID: {}", display_id.value());
+      return zx::error(ZX_ERR_NO_MEMORY);
+    }
 
     // TODO(https://fxbug.dev/348695412): This should not be an early return.
     // `preferred_modes` should be merged and de-duplicated with the modes
@@ -106,14 +127,15 @@ zx::result<std::unique_ptr<DisplayInfo>> DisplayInfo::Create(AddedDisplayInfo ad
     fdf::error("Failed to initialize EDID: {}", edid_result.error_value());
     return zx::error(ZX_ERR_INTERNAL);
   }
-  display_info->edid = DisplayInfo::Edid{
-      .base = std::move(edid_result).value(),
-  };
 
-  // TODO(https://fxbug.dev/348695412): Merge and de-duplicate the modes in
-  // `preferred_modes` from the logic above.
-
-  // TODO(https://fxbug.dev/343872853): Parse audio information from EDID.
+  fbl::AllocChecker alloc_checker;
+  auto display_info = fbl::make_unique_checked<DisplayInfo>(
+      &alloc_checker, display_id, std::move(added_display_info.pixel_formats),
+      std::move(edid_result).value());
+  if (!alloc_checker.check()) {
+    fdf::error("Failed to allocate DisplayInfo for display ID: {}", display_id.value());
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
 
   if (fdf::Logger::GlobalInstance()->GetSeverity() <= FUCHSIA_LOG_DEBUG) {
     const auto& edid = display_info->edid->base;
