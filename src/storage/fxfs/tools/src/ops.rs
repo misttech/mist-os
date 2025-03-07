@@ -14,7 +14,7 @@ use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
 use fxfs::object_store::volume::root_volume;
 use fxfs::object_store::{
     Directory, HandleOptions, ObjectDescriptor, ObjectStore, SetExtendedAttributeMode,
-    StoreObjectHandle, StoreOwner,
+    StoreObjectHandle, StoreOwner, NO_OWNER,
 };
 use fxfs_crypto::Crypt;
 use std::io::Write;
@@ -84,7 +84,7 @@ pub async fn create_volume(
     crypt: Option<Arc<dyn Crypt>>,
 ) -> Result<Arc<ObjectStore>, Error> {
     let root_volume = root_volume(fs.deref().clone()).await?;
-    root_volume.new_volume(name, crypt).await
+    root_volume.new_volume(name, NO_OWNER, crypt).await
 }
 
 /// Opens a volume on a device and returns a Directory to it's root.

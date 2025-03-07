@@ -115,7 +115,7 @@ impl FuseFs {
         let fs = FxFilesystem::new_empty(device).await.expect("fxfs new_empty failed");
         let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
         root_volume
-            .new_volume(DEFAULT_VOLUME_NAME, crypt.clone())
+            .new_volume(DEFAULT_VOLUME_NAME, NO_OWNER, crypt.clone())
             .await
             .expect("new_volume failed");
         let default_store = root_volume

@@ -19,12 +19,12 @@ use crate::object_store::{
     MAX_ENCRYPTED_MUTATIONS_SIZE,
 };
 use crate::serialized_types::{Version, VersionedLatest, LATEST_VERSION};
-use anyhow::{Context, Error};
+use anyhow::{bail, Context, Error};
 use fxfs_crypto::KeyPurpose;
 use once_cell::sync::OnceCell;
 use std::sync::atomic::Ordering;
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Reason {
     /// Journal memory or space pressure.
     Journal,
@@ -33,13 +33,62 @@ pub enum Reason {
     Unlock,
 }
 
+/// If flushing an unlocked fails due to a Crypt error, we want to re-lock the store and flush it
+/// again, so we can make progress on flushing (and therefore journal compaction) without depending
+/// on Crypt.  This is necessary because Crypt is an external component that might crash or become
+/// unresponsive.
+#[derive(Debug)]
+enum FlushResult<T> {
+    Ok(T),
+    CryptError(Error),
+}
+
 #[fxfs_trace::trace]
 impl ObjectStore {
     #[trace("store_object_id" => self.store_object_id)]
     pub async fn flush_with_reason(&self, reason: Reason) -> Result<Version, Error> {
+        // Loop to deal with Crypt errors.  If flushing fails due to a Crypt error, we re-lock the
+        // store and try again.  However, another task might racily unlock the store after we lock
+        // but before we flush (since we dropped the lock taken in `try_flush_with_reason`).
+        // We set a limit on the number of times we'll permit a retry, to avoid looping forever if
+        // the race condition is continuously hit.  In practice it is very unlikely to ever occur
+        // at all, since that would require something else busily unlocking the volume and the Crypt
+        // instance dying repeatedly.
+        const MAX_RETRIES: usize = 10;
+        let mut retries = 0;
+        loop {
+            match self.try_flush_with_reason(reason).await? {
+                FlushResult::Ok(version) => return Ok(version),
+                FlushResult::CryptError(error) => {
+                    if reason == Reason::Unlock || retries >= MAX_RETRIES {
+                        // If flushing due to unlock fails due to Crypt issues, just fail, so we
+                        // don't return to `unlock` with a locked store.
+                        return Err(error);
+                    }
+                    log::warn!(
+                        error:?;
+                        "Flushing failed for store {}, re-locking and trying again.",
+                        self.store_object_id()
+                    );
+                    let owner = self.lock_state.lock().unwrap().owner();
+                    if let Some(owner) = owner {
+                        owner
+                            .force_lock(&self)
+                            .await
+                            .context("Failed to re-lock store during flush")?;
+                    } else {
+                        bail!("No store owner was registered!");
+                    }
+                }
+            }
+            retries += 1;
+        }
+    }
+
+    async fn try_flush_with_reason(&self, reason: Reason) -> Result<FlushResult<Version>, Error> {
         if self.parent_store.is_none() {
             // Early exit, but still return the earliest version used by a struct in the tree
-            return Ok(self.tree.get_earliest_version());
+            return Ok(FlushResult::Ok(self.tree.get_earliest_version()));
         }
         let filesystem = self.filesystem();
         let object_manager = filesystem.object_manager();
@@ -47,7 +96,7 @@ impl ObjectStore {
         // We must take the transaction guard *before* we take the flush lock.
         let txn_guard = filesystem.clone().txn_guard().await;
         let keys = lock_keys![LockKey::flush(self.store_object_id())];
-        let _guard = filesystem.lock_manager().write_lock(keys).await;
+        let _guard = Some(filesystem.lock_manager().write_lock(keys).await);
 
         match reason {
             Reason::Unlock => {
@@ -57,10 +106,11 @@ impl ObjectStore {
                 // Safe to unwrap store_info here because this was invoked from ObjectStore::unlock,
                 // so store_info is already accessible.
                 if self.store_info().unwrap().encrypted_mutations_object_id == INVALID_OBJECT_ID {
-                    // TODO(https://fxbug.dev/42179266): Add earliest_version support for encrypted mutations.
+                    // TODO(https://fxbug.dev/42179266): Add earliest_version support for encrypted
+                    // mutations.
                     // Early exit, but still return the earliest version used by a struct in the
                     // tree.
-                    return Ok(self.tree.get_earliest_version());
+                    return Ok(FlushResult::Ok(self.tree.get_earliest_version()));
                 }
             }
             Reason::Journal => {
@@ -72,7 +122,7 @@ impl ObjectStore {
                 {
                     // Early exit, but still return the earliest version used by a struct in the
                     // tree.
-                    return Ok(earliest_version);
+                    return Ok(FlushResult::Ok(earliest_version));
                 }
             }
         }
@@ -82,16 +132,20 @@ impl ObjectStore {
             info!(store_id = self.store_object_id(); "OS: begin flush");
         }
 
-        let layer_file_sizes = if matches!(&*self.lock_state.lock().unwrap(), LockState::Locked) {
-            self.flush_locked(txn_guard).await.with_context(|| {
-                format!("Failed to flush object store {}", self.store_object_id)
-            })?;
-            None
-        } else {
-            Some(self.flush_unlocked(txn_guard).await.with_context(|| {
-                format!("Failed to flush object store {}", self.store_object_id)
-            })?)
-        };
+        let layer_file_sizes =
+            if matches!(&*self.lock_state.lock().unwrap(), LockState::Locked) {
+                self.flush_locked(&txn_guard).await.with_context(|| {
+                    format!("Failed to flush object store {}", self.store_object_id)
+                })?;
+                None
+            } else {
+                match self.flush_unlocked(&txn_guard).await.with_context(|| {
+                    format!("Failed to flush object store {}", self.store_object_id)
+                })? {
+                    FlushResult::Ok(layer_file_sizes) => Some(layer_file_sizes),
+                    FlushResult::CryptError(error) => return Ok(FlushResult::CryptError(error)),
+                }
+            };
 
         if trace {
             info!(store_id = self.store_object_id(); "OS: end flush");
@@ -107,11 +161,14 @@ impl ObjectStore {
             counters.persistent_layer_file_sizes = layer_file_sizes;
         }
         // Return the earliest version used by a struct in the tree
-        Ok(self.tree.get_earliest_version())
+        Ok(FlushResult::Ok(self.tree.get_earliest_version()))
     }
 
     // Flushes an unlocked store. Returns the layer file sizes.
-    async fn flush_unlocked(&self, txn_guard: TxnGuard<'_>) -> Result<Vec<u64>, Error> {
+    async fn flush_unlocked(
+        &self,
+        txn_guard: &TxnGuard<'_>,
+    ) -> Result<FlushResult<Vec<u64>>, Error> {
         let roll_mutations_key = self
             .mutations_cipher
             .lock()
@@ -122,7 +179,11 @@ impl ObjectStore {
             })
             .unwrap_or(false);
         if roll_mutations_key {
-            self.roll_mutations_key(self.crypt().unwrap().as_ref()).await?;
+            if let Err(error) = self.roll_mutations_key(self.crypt().unwrap().as_ref()).await {
+                log::warn!(
+                    error:?; "Failed to roll mutations key for store {}", self.store_object_id());
+                return Ok(FlushResult::CryptError(error));
+            }
         }
 
         struct StoreInfoSnapshot<'a> {
@@ -161,7 +222,7 @@ impl ObjectStore {
             skip_journal_checks: true,
             borrow_metadata_space: true,
             allocator_reservation: Some(reservation),
-            txn_guard: Some(&txn_guard),
+            txn_guard: Some(txn_guard),
             ..Default::default()
         };
 
@@ -200,7 +261,17 @@ impl ObjectStore {
         let handle_options = HandleOptions { skip_journal_checks: true, ..Default::default() };
         let new_object_tree_layer = if let Some(crypt) = self.crypt().as_deref() {
             let object_id = parent_store.get_next_object_id(transaction.txn_guard()).await?;
-            let (key, unwrapped_key) = crypt.create_key(object_id, KeyPurpose::Data).await?;
+            let (key, unwrapped_key) = match crypt.create_key(object_id, KeyPurpose::Data).await {
+                Ok((key, unwrapped_key)) => (key, unwrapped_key),
+                Err(status) => {
+                    log::warn!(
+                        status:?;
+                        "Failed to create keys while flushing store {}",
+                        self.store_object_id(),
+                    );
+                    return Ok(FlushResult::CryptError(status.into()));
+                }
+            };
             ObjectStore::create_object_with_key(
                 parent_store,
                 &mut transaction,
@@ -297,11 +368,11 @@ impl ObjectStore {
             parent_store.tombstone_object(old_encrypted_mutations_object_id, txn_options).await?;
         }
 
-        Ok(layer_file_sizes)
+        Ok(FlushResult::Ok(layer_file_sizes))
     }
 
     // Flushes a locked store.
-    async fn flush_locked(&self, txn_guard: TxnGuard<'_>) -> Result<(), Error> {
+    async fn flush_locked(&self, txn_guard: &TxnGuard<'_>) -> Result<(), Error> {
         let filesystem = self.filesystem();
         let object_manager = filesystem.object_manager();
         let reservation = object_manager.metadata_reservation();
@@ -309,7 +380,7 @@ impl ObjectStore {
             skip_journal_checks: true,
             borrow_metadata_space: true,
             allocator_reservation: Some(reservation),
-            txn_guard: Some(&txn_guard),
+            txn_guard: Some(txn_guard),
             ..Default::default()
         };
 
@@ -386,8 +457,7 @@ impl ObjectStore {
         transaction.commit().await?;
 
         // Append the encrypted mutations, which need to be read from the journal.
-        // This assumes that the journal has no buffered mutations for this store (see
-        // Self::lock).
+        // This assumes that the journal has no buffered mutations for this store (see Self::lock).
         let journaled = filesystem
             .journal()
             .read_transactions_for_object(self.store_object_id)
@@ -459,7 +529,7 @@ mod tests {
         let store_id = {
             let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
             root_volume
-                .new_volume("test", Some(Arc::new(InsecureCrypt::new())))
+                .new_volume("test", NO_OWNER, Some(Arc::new(InsecureCrypt::new())))
                 .await
                 .expect("new_volume failed")
                 .store_object_id()
@@ -588,8 +658,10 @@ mod tests {
         let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
         let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
         let crypt = Arc::new(InsecureCrypt::new());
-        let store =
-            root_volume.new_volume("test", Some(crypt.clone())).await.expect("new_volume failed");
+        let store = root_volume
+            .new_volume("test", NO_OWNER, Some(crypt.clone()))
+            .await
+            .expect("new_volume failed");
         let root_dir =
             Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
         let mut transaction = fs

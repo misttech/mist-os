@@ -821,7 +821,7 @@ mod tests {
     use fxfs::object_store::directory::replace_child;
     use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
     use fxfs::object_store::volume::root_volume;
-    use fxfs::object_store::{HandleOptions, ObjectDescriptor, ObjectStore};
+    use fxfs::object_store::{HandleOptions, ObjectDescriptor, ObjectStore, NO_OWNER};
     use fxfs_insecure_crypto::InsecureCrypt;
     use std::sync::{Arc, Weak};
     use std::time::Duration;
@@ -1117,8 +1117,10 @@ mod tests {
         let filesystem = FxFilesystem::new_empty(device).await.unwrap();
         {
             let root_volume = root_volume(filesystem.clone()).await.unwrap();
-            let volume =
-                root_volume.new_volume("vol", Some(Arc::new(InsecureCrypt::new()))).await.unwrap();
+            let volume = root_volume
+                .new_volume("vol", NO_OWNER, Some(Arc::new(InsecureCrypt::new())))
+                .await
+                .unwrap();
             let mut transaction = filesystem
                 .clone()
                 .new_transaction(lock_keys![], Options::default())
@@ -1208,8 +1210,10 @@ mod tests {
         let filesystem = FxFilesystem::new_empty(device).await.unwrap();
         {
             let root_volume = root_volume(filesystem.clone()).await.unwrap();
-            let volume =
-                root_volume.new_volume("vol", Some(Arc::new(InsecureCrypt::new()))).await.unwrap();
+            let volume = root_volume
+                .new_volume("vol", NO_OWNER, Some(Arc::new(InsecureCrypt::new())))
+                .await
+                .unwrap();
             let mut transaction = filesystem
                 .clone()
                 .new_transaction(lock_keys![], Options::default())
@@ -1320,8 +1324,10 @@ mod tests {
         let filesystem = FxFilesystem::new_empty(device).await.unwrap();
         {
             let root_volume = root_volume(filesystem.clone()).await.unwrap();
-            let volume =
-                root_volume.new_volume("vol", Some(Arc::new(InsecureCrypt::new()))).await.unwrap();
+            let volume = root_volume
+                .new_volume("vol", NO_OWNER, Some(Arc::new(InsecureCrypt::new())))
+                .await
+                .unwrap();
             let mut transaction = filesystem
                 .clone()
                 .new_transaction(lock_keys![], Options::default())

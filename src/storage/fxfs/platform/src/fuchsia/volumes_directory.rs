@@ -11,6 +11,7 @@ use crate::fuchsia::profile::new_profile_state;
 use crate::fuchsia::volume::{FxVolume, FxVolumeAndRoot, MemoryPressureConfig, RootDir};
 use crate::fuchsia::RemoteCrypt;
 use anyhow::{anyhow, bail, ensure, Context, Error};
+use async_trait::async_trait;
 use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
 use fidl_fuchsia_fs::{AdminMarker, AdminRequest, AdminRequestStream};
 use fidl_fuchsia_fs_startup::{CheckOptions, MountOptions, VolumeRequest, VolumeRequestStream};
@@ -74,45 +75,40 @@ struct MountedVolume {
 }
 
 impl MountedVolumesGuard<'_> {
-    /// Creates and mounts a new volume. If |crypt| is set, the volume will be encrypted. The
-    /// volume is mounted according to |as_blob|.
-    async fn create_and_mount_volume(
+    /// Creates or mounts a volume. If |crypt| is set, the volume will be created or mounted as
+    /// encrypted. The volume is mounted according to |as_blob|.
+    async fn create_or_mount_volume(
         &mut self,
         name: &str,
         crypt: Option<Arc<dyn Crypt>>,
+        create: bool,
         as_blob: bool,
     ) -> Result<FxVolumeAndRoot, Error> {
-        self.volumes_directory
-            .root_volume
-            .new_volume(name, crypt)
-            .await
-            .context("failed to create new volume")?;
-        // The volume store is unlocked when created, so we don't pass `crypt` when mounting.
-        let volume =
-            self.mount_volume(name, None, as_blob).await.context("failed to mount volume")?;
-        let store_object_id = volume.volume().store().store_object_id();
-        self.volumes_directory.add_directory_entry(name, store_object_id);
-        Ok(volume)
-    }
-
-    /// Mounts an existing volume. `crypt` will be used to unlock the volume if provided.
-    /// If `as_blob` is `true`, the volume will be mounted as a blob filesystem, otherwise
-    /// it will be treated as a regular fxfs volume.
-    async fn mount_volume(
-        &mut self,
-        name: &str,
-        crypt: Option<Arc<dyn Crypt>>,
-        as_blob: bool,
-    ) -> Result<FxVolumeAndRoot, Error> {
-        let store = self
-            .volumes_directory
-            .root_volume
-            .volume(name, Arc::downgrade(&self.volumes_directory) as Weak<dyn StoreOwner>, crypt)
-            .await?;
+        let store = if create {
+            self.volumes_directory
+                .root_volume
+                .new_volume(
+                    name,
+                    Arc::downgrade(&self.volumes_directory) as Weak<dyn StoreOwner>,
+                    crypt,
+                )
+                .await
+                .context("failed to create new volume")?
+        } else {
+            self.volumes_directory
+                .root_volume
+                .volume(
+                    name,
+                    Arc::downgrade(&self.volumes_directory) as Weak<dyn StoreOwner>,
+                    crypt,
+                )
+                .await?
+        };
         ensure!(
             !self.mounted_volumes.contains_key(&store.store_object_id()),
             FxfsError::AlreadyBound
         );
+
         let volume = if as_blob {
             self.mount_store::<BlobDirectory>(name, store, MemoryPressureConfig::default()).await?
         } else {
@@ -130,6 +126,11 @@ impl MountedVolumesGuard<'_> {
                     profile_name, name, e
                 );
             }
+        }
+
+        if create {
+            let store_object_id = volume.volume().store().store_object_id();
+            self.volumes_directory.add_directory_entry(name, store_object_id);
         }
         Ok(volume)
     }
@@ -480,7 +481,7 @@ impl VolumesDirectory {
         crypt: Option<Arc<dyn Crypt>>,
         as_blob: bool,
     ) -> Result<FxVolumeAndRoot, Error> {
-        self.lock().await.create_and_mount_volume(name, crypt, as_blob).await
+        self.lock().await.create_or_mount_volume(name, crypt, true, as_blob).await
     }
 
     /// Mounts an existing volume. `crypt` will be used to unlock the volume if provided.
@@ -492,7 +493,7 @@ impl VolumesDirectory {
         crypt: Option<Arc<dyn Crypt>>,
         as_blob: bool,
     ) -> Result<FxVolumeAndRoot, Error> {
-        self.lock().await.mount_volume(name, crypt, as_blob).await
+        self.lock().await.create_or_mount_volume(name, crypt, false, as_blob).await
     }
 
     /// Removes a volume. The volume must exist but encrypted volume keys are not required.
@@ -595,14 +596,10 @@ impl VolumesDirectory {
         mount_options: MountOptions,
     ) -> Result<(), Error> {
         let mut guard = self.lock().await;
-        let MountOptions { crypt, as_blob, .. } = mount_options;
-        let crypt = if let Some(crypt) = crypt {
-            Some(Arc::new(RemoteCrypt::new(crypt)) as Arc<dyn Crypt>)
-        } else {
-            None
-        };
-        let as_blob = as_blob.unwrap_or(false);
-        let volume = guard.create_and_mount_volume(&name, crypt, as_blob).await?;
+        let crypt =
+            mount_options.crypt.map(|crypt| (Arc::new(RemoteCrypt::new(crypt)) as Arc<dyn Crypt>));
+        let as_blob = mount_options.as_blob.unwrap_or(false);
+        let volume = guard.create_or_mount_volume(&name, crypt, true, as_blob).await?;
         self.serve_volume(&volume, outgoing_directory, as_blob)
             .context("failed to serve volume")?;
         guard.auto_unmount(volume.volume().store().store_object_id());
@@ -760,15 +757,14 @@ impl VolumesDirectory {
         options: MountOptions,
     ) -> Result<(), Error> {
         info!(name:%, store_id:%, options:?; "Received mount request");
-        let crypt = if let Some(crypt) = options.crypt {
-            Some(Arc::new(RemoteCrypt::new(crypt)) as Arc<dyn Crypt>)
-        } else {
-            None
-        };
+        let crypt =
+            options.crypt.map(|crypt| (Arc::new(RemoteCrypt::new(crypt)) as Arc<dyn Crypt>));
         let as_blob = options.as_blob.unwrap_or(false);
         let mut guard = self.lock().await;
-        let volume =
-            guard.mount_volume(name, crypt, as_blob).await.context("failed to mount volume")?;
+        let volume = guard
+            .create_or_mount_volume(name, crypt, false, as_blob)
+            .await
+            .context("failed to mount volume")?;
         self.serve_volume(&volume, outgoing_directory, as_blob)
             .context("failed to serve volume")?;
         guard.auto_unmount(volume.volume().store().store_object_id());
@@ -827,7 +823,12 @@ impl VolumesDirectory {
     }
 }
 
-impl StoreOwner for VolumesDirectory {}
+#[async_trait]
+impl StoreOwner for VolumesDirectory {
+    async fn force_lock(self: Arc<Self>, store: &ObjectStore) -> Result<(), Error> {
+        self.lock().await.unmount(store.store_object_id()).await
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -842,7 +843,7 @@ mod tests {
     use futures::join;
     use fxfs::errors::FxfsError;
     use fxfs::filesystem::FxFilesystem;
-    use fxfs::fsck::fsck;
+    use fxfs::fsck::{fsck, fsck_volume_with_options, fsck_with_options, FsckOptions};
     use fxfs::lock_keys;
     use fxfs::object_store::allocator::Allocator;
     use fxfs::object_store::transaction::{LockKey, Options};
@@ -1466,7 +1467,10 @@ mod tests {
                 let wait_time = rand::thread_rng().gen_range(0..5);
                 fasync::Timer::new(Duration::from_millis(wait_time)).await;
                 let mut guard = volumes_directory.lock().await;
-                match guard.create_and_mount_volume("encrypted", Some(crypt.clone()), false).await {
+                match guard
+                    .create_or_mount_volume("encrypted", Some(crypt.clone()), true, false)
+                    .await
+                {
                     Ok(vol) => {
                         let store_id = vol.volume().store().store_object_id();
                         std::mem::drop(vol);
@@ -2130,5 +2134,99 @@ mod tests {
         volumes_directory.terminate().await;
         std::mem::drop(volumes_directory);
         filesystem.close().await.expect("Filesystem close");
+    }
+
+    #[fuchsia::test(threads = 10)]
+    async fn test_delete_crypt_for_volume() {
+        let device = DeviceHolder::new(FakeDevice::new(8192, 512));
+        let filesystem = FxFilesystem::new_empty(device).await.unwrap();
+        let store_id;
+        {
+            let volumes_directory = VolumesDirectory::new(
+                root_volume(filesystem.clone()).await.unwrap(),
+                Weak::new(),
+                None,
+            )
+            .await
+            .unwrap();
+            let name = "vol";
+            let crypt = Arc::new(InsecureCrypt::new());
+            let volume = volumes_directory
+                .create_and_mount_volume(name, Some(crypt.clone()), false)
+                .await
+                .unwrap();
+            store_id = volume.volume().store().store_object_id();
+            // Make sure the volume has some journaled mutations.
+            let mut transaction = filesystem
+                .clone()
+                .new_transaction(
+                    lock_keys![LockKey::object(
+                        volume.volume().store().store_object_id(),
+                        volume.root_dir().directory().object_id()
+                    )],
+                    Options::default(),
+                )
+                .await
+                .unwrap();
+            volume
+                .root_dir()
+                .directory()
+                .create_child_file(&mut transaction, "foo")
+                .await
+                .expect("create_child_file failed");
+            transaction.commit().await.expect("commit failed");
+
+            let (volume_dir_proxy, dir_server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+            volumes_directory
+                .serve_volume(&volume, dir_server_end, false)
+                .expect("serve_volume failed");
+            let (root_dir, root_server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+            volume_dir_proxy
+                .open(
+                    "root",
+                    fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                    &Default::default(),
+                    root_server_end.into_channel(),
+                )
+                .expect("Failed to open volume root");
+
+            let filesystem_clone = filesystem.clone();
+            join!(
+                async move {
+                    filesystem_clone.journal().compact().await.expect("Compact failed");
+                },
+                async move {
+                    let mut i = 0;
+                    while let Ok(_) = fuchsia_fs::directory::open_file(
+                        &root_dir,
+                        &format!("foo{i}"),
+                        fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_READABLE,
+                    )
+                    .await
+                    {
+                        i += 1;
+                    }
+                },
+                async move {
+                    crypt.shutdown();
+                },
+            );
+        }
+        filesystem.close().await.expect("Filesystem close");
+        let device = filesystem.take_device().await;
+        device.reopen(false);
+        let filesystem = FxFilesystem::open(device).await.expect("open failed");
+        let options = FsckOptions { fail_on_warning: true, ..Default::default() };
+        fsck_with_options(filesystem.clone(), &options).await.expect("fsck failed");
+        fsck_volume_with_options(
+            filesystem.as_ref(),
+            &options,
+            store_id,
+            Some(Arc::new(InsecureCrypt::new())),
+        )
+        .await
+        .expect("fsck_volume failed");
     }
 }

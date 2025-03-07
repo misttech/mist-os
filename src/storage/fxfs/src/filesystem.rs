@@ -16,7 +16,7 @@ use crate::object_store::transaction::{
     ReadGuard, Transaction, TRANSACTION_METADATA_MAX_AMOUNT,
 };
 use crate::object_store::volume::{root_volume, VOLUMES_DIRECTORY};
-use crate::object_store::ObjectStore;
+use crate::object_store::{ObjectStore, NO_OWNER};
 use crate::range::RangeExt;
 use crate::serialized_types::{Version, LATEST_VERSION};
 use crate::{debug_assert_not_too_long, metrics};
@@ -905,7 +905,7 @@ pub async fn mkfs_with_volume(
         // expect instead of propagating errors here, since otherwise we could drop |fs| before
         // close is called, which leads to confusing and unrelated error messages.
         let root_volume = root_volume(fs.clone()).await.expect("Open root_volume failed");
-        root_volume.new_volume(volume_name, crypt).await.expect("Create volume failed");
+        root_volume.new_volume(volume_name, NO_OWNER, crypt).await.expect("Create volume failed");
     }
     fs.close().await?;
     Ok(())
@@ -1270,7 +1270,7 @@ mod tests {
                     .expect("sync failed");
 
                 let store = root_volume
-                    .new_volume("test", Some(Arc::new(InsecureCrypt::new())))
+                    .new_volume("test", NO_OWNER, Some(Arc::new(InsecureCrypt::new())))
                     .await
                     .expect("new_volume failed");
                 let root_directory = Directory::open(&store, store.root_directory_object_id())

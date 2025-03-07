@@ -2839,7 +2839,7 @@ mod tests {
         root_volume(fs.clone())
             .await
             .expect("root_volume failed")
-            .new_volume("test", None)
+            .new_volume("test", NO_OWNER, None)
             .await
             .expect("volume failed");
         fs.close().await.expect("close failed");

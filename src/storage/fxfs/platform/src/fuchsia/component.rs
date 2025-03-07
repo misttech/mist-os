@@ -501,6 +501,7 @@ mod tests {
     use futures::{pin_mut, select};
     use fxfs::filesystem::FxFilesystem;
     use fxfs::object_store::volume::root_volume;
+    use fxfs::object_store::NO_OWNER;
     use ramdevice_client::RamdiskClientBuilder;
     use std::pin::Pin;
     use storage_device::block_device::BlockDevice;
@@ -533,7 +534,10 @@ mod tests {
             .expect("FxFilesystem::new_empty failed");
             {
                 let root_volume = root_volume(fs.clone()).await.expect("Open root_volume failed");
-                root_volume.new_volume("default", None).await.expect("Create volume failed");
+                root_volume
+                    .new_volume("default", NO_OWNER, None)
+                    .await
+                    .expect("Create volume failed");
             }
             fs.close().await.expect("close failed");
         }

@@ -2013,7 +2013,8 @@ mod tests {
             let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
             let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
 
-            let store = root_volume.new_volume("test", None).await.expect("new_volume failed");
+            let store =
+                root_volume.new_volume("test", NO_OWNER, None).await.expect("new_volume failed");
             let root_directory = Directory::open(&store, store.root_directory_object_id())
                 .await
                 .expect("open failed");

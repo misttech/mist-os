@@ -113,7 +113,11 @@ impl TestFixture {
             let filesystem = FxFilesystemBuilder::new().format(true).open(device).await.unwrap();
             let root_volume = root_volume(filesystem.clone()).await.unwrap();
             let store = root_volume
-                .new_volume("vol", if options.encrypted { Some(crypt.clone()) } else { None })
+                .new_volume(
+                    "vol",
+                    NO_OWNER,
+                    if options.encrypted { Some(crypt.clone()) } else { None },
+                )
                 .await
                 .unwrap();
             let store_object_id = store.store_object_id();

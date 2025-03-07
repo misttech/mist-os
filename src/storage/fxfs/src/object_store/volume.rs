@@ -38,6 +38,7 @@ impl RootVolume {
     pub async fn new_volume(
         &self,
         volume_name: &str,
+        owner: Weak<dyn StoreOwner>,
         crypt: Option<Arc<dyn Crypt>>,
     ) -> Result<Arc<ObjectStore>, Error> {
         let root_store = self.filesystem.root_store();
@@ -61,7 +62,7 @@ impl RootVolume {
         store = root_store
             .new_child_store(
                 &mut transaction,
-                NewChildStoreOptions { crypt, ..Default::default() },
+                NewChildStoreOptions { owner, crypt, ..Default::default() },
                 Box::new(TreeCache::new()),
             )
             .await?;
@@ -221,7 +222,7 @@ mod tests {
         {
             let root_volume = root_volume(filesystem.clone()).await.expect("root_volume failed");
             let store = root_volume
-                .new_volume("vol", Some(crypt.clone()))
+                .new_volume("vol", NO_OWNER, Some(crypt.clone()))
                 .await
                 .expect("new_volume failed");
             let mut transaction = filesystem
@@ -272,7 +273,7 @@ mod tests {
         {
             let root_volume = root_volume(filesystem.clone()).await.expect("root_volume failed");
             let store = root_volume
-                .new_volume("vol", Some(crypt.clone()))
+                .new_volume("vol", NO_OWNER, Some(crypt.clone()))
                 .await
                 .expect("new_volume failed");
             store_object_id = store.store_object_id();

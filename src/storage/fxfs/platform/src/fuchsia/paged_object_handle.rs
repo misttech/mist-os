@@ -1193,7 +1193,7 @@ mod tests {
     use futures::{join, StreamExt};
     use fxfs::filesystem::{FxFilesystemBuilder, OpenFxFilesystem};
     use fxfs::object_store::volume::root_volume;
-    use fxfs::object_store::Directory;
+    use fxfs::object_store::{Directory, NO_OWNER};
     use fxfs_macros::ToWeakNode;
     use std::collections::HashSet;
     use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
@@ -1286,7 +1286,7 @@ mod tests {
             .await
             .unwrap();
         let root_volume = root_volume(fs.clone()).await.unwrap();
-        let store = root_volume.new_volume("vol", None).await.unwrap();
+        let store = root_volume.new_volume("vol", NO_OWNER, None).await.unwrap();
         let store_object_id = store.store_object_id();
         let volume =
             FxVolumeAndRoot::new::<FxDirectory>(Weak::new(), store, store_object_id).await.unwrap();

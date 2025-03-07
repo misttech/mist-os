@@ -14,7 +14,9 @@ use fxfs::object_store::directory::Directory;
 use fxfs::object_store::journal::RESERVED_SPACE;
 use fxfs::object_store::transaction::{lock_keys, LockKey};
 use fxfs::object_store::volume::root_volume;
-use fxfs::object_store::{DirectWriter, HandleOptions, ObjectStore, BLOB_MERKLE_ATTRIBUTE_ID};
+use fxfs::object_store::{
+    DirectWriter, HandleOptions, ObjectStore, BLOB_MERKLE_ATTRIBUTE_ID, NO_OWNER,
+};
 use fxfs::round::round_up;
 use fxfs::serialized_types::BlobMetadata;
 use rayon::prelude::*;
@@ -208,7 +210,10 @@ async fn install_blobs(
     blobs: Vec<(Hash, PathBuf)>,
 ) -> Result<BlobsJsonOutput, Error> {
     let root_volume = root_volume(filesystem.clone()).await?;
-    let vol = root_volume.new_volume(volume_name, None).await.context("Failed to create volume")?;
+    let vol = root_volume
+        .new_volume(volume_name, NO_OWNER, None)
+        .await
+        .context("Failed to create volume")?;
     let directory = Directory::open(&vol, vol.root_directory_object_id())
         .await
         .context("Unable to open root directory")?;

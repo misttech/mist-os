@@ -1759,7 +1759,7 @@ mod tests {
         let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
         let crypt: Arc<InsecureCrypt> = Arc::new(InsecureCrypt::new());
         let store = root_volume
-            .new_volume("test", Some(crypt.clone() as Arc<dyn Crypt>))
+            .new_volume("test", NO_OWNER, Some(crypt.clone() as Arc<dyn Crypt>))
             .await
             .expect("new_volume failed");
 
@@ -1817,7 +1817,7 @@ mod tests {
         let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
         let crypt: Arc<InsecureCrypt> = Arc::new(InsecureCrypt::new());
         let store = root_volume
-            .new_volume("test", Some(crypt.clone() as Arc<dyn Crypt>))
+            .new_volume("test", NO_OWNER, Some(crypt.clone() as Arc<dyn Crypt>))
             .await
             .expect("new_volume failed");
 
@@ -1863,7 +1863,7 @@ mod tests {
         let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
         let crypt: Arc<InsecureCrypt> = Arc::new(InsecureCrypt::new());
         let store = root_volume
-            .new_volume("test", Some(crypt.clone() as Arc<dyn Crypt>))
+            .new_volume("test", NO_OWNER, Some(crypt.clone() as Arc<dyn Crypt>))
             .await
             .expect("new_volume failed");
 
@@ -1936,7 +1936,7 @@ mod tests {
         let (parent_oid, src_oid, dst_oid) = {
             let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
             let store = root_volume
-                .new_volume("test", Some(crypt.clone() as Arc<dyn Crypt>))
+                .new_volume("test", NO_OWNER, Some(crypt.clone() as Arc<dyn Crypt>))
                 .await
                 .expect("new_volume failed");
 
@@ -2064,7 +2064,7 @@ mod tests {
         let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
         let crypt: Arc<InsecureCrypt> = Arc::new(InsecureCrypt::new());
         let store = root_volume
-            .new_volume("test", Some(crypt.clone() as Arc<dyn Crypt>))
+            .new_volume("test", NO_OWNER, Some(crypt.clone() as Arc<dyn Crypt>))
             .await
             .expect("new_volume failed");
 
@@ -3129,7 +3129,7 @@ mod tests {
         {
             let root_volume = root_volume(filesystem.clone()).await.expect("root_volume failed");
             let store = root_volume
-                .new_volume("vol", Some(crypt.clone()))
+                .new_volume("vol", NO_OWNER, Some(crypt.clone()))
                 .await
                 .expect("new_volume failed");
             let mut transaction = filesystem
@@ -3201,8 +3201,10 @@ mod tests {
         let crypt = Arc::new(InsecureCrypt::new());
 
         let root_volume = root_volume(filesystem.clone()).await.expect("root_volume failed");
-        let store =
-            root_volume.new_volume("vol", Some(crypt.clone())).await.expect("new_volume failed");
+        let store = root_volume
+            .new_volume("vol", NO_OWNER, Some(crypt.clone()))
+            .await
+            .expect("new_volume failed");
         let directory =
             Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
 
@@ -3255,8 +3257,10 @@ mod tests {
         let crypt = Arc::new(InsecureCrypt::new());
 
         let root_volume = root_volume(filesystem.clone()).await.expect("root_volume failed");
-        let store =
-            root_volume.new_volume("vol", Some(crypt.clone())).await.expect("new_volume failed");
+        let store = root_volume
+            .new_volume("vol", NO_OWNER, Some(crypt.clone()))
+            .await
+            .expect("new_volume failed");
         let mut transaction = filesystem
             .clone()
             .new_transaction(
@@ -3339,8 +3343,10 @@ mod tests {
         let crypt = Arc::new(InsecureCrypt::new());
 
         let root_volume = root_volume(filesystem.clone()).await.expect("root_volume failed");
-        let store =
-            root_volume.new_volume("vol", Some(crypt.clone())).await.expect("new_volume failed");
+        let store = root_volume
+            .new_volume("vol", NO_OWNER, Some(crypt.clone()))
+            .await
+            .expect("new_volume failed");
         let mut transaction = filesystem
             .clone()
             .new_transaction(
@@ -3791,7 +3797,7 @@ mod tests {
         {
             let crypt: Arc<InsecureCrypt> = Arc::new(InsecureCrypt::new());
             let root_volume = root_volume(fs.clone()).await.unwrap();
-            let store = root_volume.new_volume("vol", Some(crypt.clone())).await.unwrap();
+            let store = root_volume.new_volume("vol", NO_OWNER, Some(crypt.clone())).await.unwrap();
 
             // Create a (very weak) key for our encrypted directory.
             let wrapping_key_id = 2;
@@ -3959,7 +3965,7 @@ mod tests {
         {
             let crypt: Arc<InsecureCrypt> = Arc::new(InsecureCrypt::new());
             let root_volume = root_volume(fs.clone()).await.unwrap();
-            let store = root_volume.new_volume("vol", Some(crypt.clone())).await.unwrap();
+            let store = root_volume.new_volume("vol", NO_OWNER, Some(crypt.clone())).await.unwrap();
 
             // Create a (very weak) key for our encrypted directory.
             let wrapping_key_id = 2;

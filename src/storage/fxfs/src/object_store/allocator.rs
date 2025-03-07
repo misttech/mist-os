@@ -2166,7 +2166,7 @@ mod tests {
     };
     use crate::object_store::transaction::{lock_keys, Options, TRANSACTION_METADATA_MAX_AMOUNT};
     use crate::object_store::volume::root_volume;
-    use crate::object_store::{Directory, LockKey, ObjectStore};
+    use crate::object_store::{Directory, LockKey, ObjectStore, NO_OWNER};
     use crate::range::RangeExt;
     use crate::round::round_up;
     use fuchsia_async as fasync;
@@ -2614,7 +2614,8 @@ mod tests {
 
         {
             let root_vol = root_volume(fs.clone()).await.expect("root_volume failed");
-            let store = root_vol.new_volume("vol", None).await.expect("new_volume failed");
+            let store =
+                root_vol.new_volume("vol", NO_OWNER, None).await.expect("new_volume failed");
 
             create_file(&store, FILE_SIZE).await;
         }
@@ -2649,7 +2650,8 @@ mod tests {
                     .await
                     .expect("delete_volume failed");
 
-                let store = root_vol.new_volume("vol", None).await.expect("new_volume failed");
+                let store =
+                    root_vol.new_volume("vol", NO_OWNER, None).await.expect("new_volume failed");
                 create_file(&store, FILE_SIZE).await;
             }
 
@@ -2671,7 +2673,8 @@ mod tests {
         for _ in 0..50 {
             {
                 let root_vol = root_volume(fs.clone()).await.expect("root_volume failed");
-                let store = root_vol.new_volume("vol", None).await.expect("new_volume failed");
+                let store =
+                    root_vol.new_volume("vol", NO_OWNER, None).await.expect("new_volume failed");
 
                 create_file(&store, 1_000_000).await;
 
