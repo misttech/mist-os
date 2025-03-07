@@ -1320,7 +1320,8 @@ class VmCowPages final : public VmHierarchyBase,
 
   // Helper struct which encapsulates a parent node along with a range and limit relative to it.
   struct ParentAndRange {
-    VmCowPages* parent;
+    LockedPtr parent;
+    LockedPtr grandparent;
     uint64_t parent_offset;
     uint64_t parent_limit;
     uint64_t size;
@@ -1328,7 +1329,7 @@ class VmCowPages final : public VmHierarchyBase,
 
   // Helper function for |CloneUnidirectionalLocked| and |CloneBidirectionalLocked|.
   //
-  // Walks the hierarchy from the `parent` node to the root and finds the most distant node which
+  // Walks the hierarchy from the |this| node to the root and finds the most distant node which
   // could correctly be the parent for a new clone of this node.
   //
   // Computes a range and limit for the clone, relative to the final parent, such that the clone
@@ -1342,16 +1343,19 @@ class VmCowPages final : public VmHierarchyBase,
   //  * The root.
   //
   // The caller provides:
-  //  * `parent`: Parent node to begin the search from. It must be a visible node.
+  //  * `this`: Initial candidate parent node to begin the search from. It must be a visible node.
   //             The new clone is logically a clone of it.
   //  * `offset`: Offset of the clone relative to the initial parent.
   //  * `size`: Size of the clone.
   //  * `parent_must_be_hidden`: true iff the final parent must satisfy this constraint.
   //
-  // Returns the parent node along with the clones' range and limit relative to that parent.
-  static ParentAndRange FindParentAndRangeForCloneLocked(VmCowPages* parent, uint64_t offset,
-                                                         uint64_t size, bool parent_must_be_hidden)
-      TA_REQ(parent->lock());
+  // Returns the actual node that should be used as the parent of the clone, and if that node has a
+  // parent also returns a locked reference to that node. By locking the parent of the target parent
+  // the caller ensures that any reasoning that made the target valid remains valid until the clone
+  // can be created. As a result it is only valid to create the clone if done so whilst continuously
+  // holding the returned locks.
+  ParentAndRange FindParentAndRangeForCloneLocked(uint64_t offset, uint64_t size,
+                                                  bool parent_must_be_hidden) TA_REQ(lock());
 
   // Helper function for |CloneBidirectionalLocked|.
   //

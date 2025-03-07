@@ -937,16 +937,19 @@ void VmCowPages::AddChildLocked(VmCowPages* child, uint64_t offset, uint64_t par
 }
 
 VmCowPages::ParentAndRange VmCowPages::FindParentAndRangeForCloneLocked(
-    VmCowPages* parent, uint64_t offset, uint64_t size, bool parent_must_be_hidden) {
-  DEBUG_ASSERT(!parent->is_hidden());
+    uint64_t offset, uint64_t size, bool parent_must_be_hidden) {
+  DEBUG_ASSERT(!is_hidden());
 
   // The clone's parent limit starts out equal to its size, but it can't exceed the parent's size.
   // This ensures that any clone pages beyond the parent's range get initialized from zeroes.
-  uint64_t parent_limit = ClampedLimit(offset, size, parent->size_);
+  uint64_t parent_limit = ClampedLimit(offset, size, size_);
+
+  LockedPtr parent;
+  LockedPtr grandparent;
 
   // Walk up the hierarchy until we find the last node which can correctly be the clone's parent.
-  while (VmCowPages* next_parent = parent->parent_.get()) {
-    AssertHeld(next_parent->lock_ref());
+  while (VmCowPages* next_parent = parent.locked_or(this).parent_.get()) {
+    grandparent = LockedPtr(next_parent, VmLockAcquireMode::Reentrant);
 
     // `parent` will always satisfy `parent_must_be_hidden` at this point.
     //
@@ -959,8 +962,8 @@ VmCowPages::ParentAndRange VmCowPages::FindParentAndRangeForCloneLocked(
     // If `parent` owns any pages in the clone's range then we muse use it as the clone's parent.
     // If we continued iterating, the clone couldn't snapshot all ancestor pages that it would be
     // able to if `this` had been the parent.
-    if (parent_limit > 0 &&
-        parent->page_list_.AnyPagesOrIntervalsInRange(offset, offset + parent_limit)) {
+    if (parent_limit > 0 && parent.locked_or(this).page_list_.AnyPagesOrIntervalsInRange(
+                                offset, offset + parent_limit)) {
       break;
     }
 
@@ -970,20 +973,21 @@ VmCowPages::ParentAndRange VmCowPages::FindParentAndRangeForCloneLocked(
     // Each iteration of this loop must leave the clone's ultimate `root_parent_offset_` unchanged.
     // We will increase the clone's `offset` by the current parent's `parent_offset_` but the new
     // parent's `root_parent_offset_` is smaller by the same amount.
-    DEBUG_ASSERT(CheckedAdd(next_parent->root_parent_offset_, parent->parent_offset_) ==
-                 parent->root_parent_offset_);
+    DEBUG_ASSERT(CheckedAdd(grandparent.locked().root_parent_offset_,
+                            parent.locked_or(this).parent_offset_) ==
+                 parent.locked_or(this).root_parent_offset_);
 
     // To move to `next_parent` we need to translate the clone's window to be relative to it.
     //
     // The clone's last visible offset into `next_parent` cannot exceed `parent`'s parent limit, as
     // it shouldn't be able to see more pages than it could see if `parent` had been the parent.
-    parent_limit = ClampedLimit(offset, parent_limit, parent->parent_limit_);
-    offset = CheckedAdd(parent->parent_offset_, offset);
+    parent_limit = ClampedLimit(offset, parent_limit, parent.locked_or(this).parent_limit_);
+    offset = CheckedAdd(parent.locked_or(this).parent_offset_, offset);
 
-    parent = next_parent;
+    parent = ktl::move(grandparent);
   }
 
-  return ParentAndRange{parent, offset, parent_limit, size};
+  return ParentAndRange{ktl::move(parent), ktl::move(grandparent), offset, parent_limit, size};
 }
 
 void VmCowPages::AddBidirectionallyClonedChildLocked(uint64_t offset, uint64_t limit,
@@ -1300,15 +1304,18 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CreateCloneLocked(SnapshotType 
   }
 
   ParentAndRange child_range =
-      FindParentAndRangeForCloneLocked(this, range.offset, range.len, !unidirectional);
-  AssertHeld(child_range.parent->lock_ref());
+      FindParentAndRangeForCloneLocked(range.offset, range.len, !unidirectional);
+  // TODO(https://fxbug.dev/338300943): We are supposed to hold any grandparent lock over the
+  // clone creation path. For now we continue to rely on the hierarchy lock encapsulating this lock
+  // allowing us to release it.
+  child_range.grandparent.release();
 
   if (unidirectional) {
-    return child_range.parent->CloneUnidirectionalLocked(
+    return child_range.parent.locked_or(this).CloneUnidirectionalLocked(
         child_range.parent_offset, child_range.parent_limit, child_range.size);
   }
-  return child_range.parent->CloneBidirectionalLocked(child_range.parent_offset,
-                                                      child_range.parent_limit, child_range.size);
+  return child_range.parent.locked_or(this).CloneBidirectionalLocked(
+      child_range.parent_offset, child_range.parent_limit, child_range.size);
 }
 
 void VmCowPages::RemoveChildLocked(VmCowPages* removed) {
