@@ -512,7 +512,7 @@ impl Sdk {
     pub fn get_host_tool_command(&self, name: &str) -> Result<Command> {
         let host_tool = self.get_host_tool(name)?;
         let mut command = Command::new(host_tool);
-        command.env("FUCHSIA_SDK_PATH", &self.path_prefix);
+        command.env("FUCHSIA_SDK_ROOT", &self.path_prefix);
         if let Some(module) = self.module.as_deref() {
             command.env("FUCHSIA_SDK_ENV", module);
         }
