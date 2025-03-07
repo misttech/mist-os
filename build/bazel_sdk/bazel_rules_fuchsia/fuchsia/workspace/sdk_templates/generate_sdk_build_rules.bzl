@@ -107,6 +107,7 @@ filegroup(
 
 _SDK_TEMPLATES = {
     "api_version": "//fuchsia/workspace/sdk_templates:api_version_template.bzl",
+    "api_level_constraint": "//fuchsia/workspace/sdk_templates:api_level_constraint.template",
     "bind_library": "//fuchsia/workspace/sdk_templates:bind_library.BUILD.template",
     "cc_library": "//fuchsia/workspace/sdk_templates:cc_library.BUILD.template",
     "cc_prebuilt_library": "//fuchsia/workspace/sdk_templates:cc_prebuilt_library.BUILD.template",
@@ -673,6 +674,18 @@ def _generate_api_version_rules(
         },
     )
 
+    constraint_build_file = _constraints_build_file(ctx)
+
+    # writes the api level constraints to the root build file
+    _merge_template(
+        ctx,
+        constraint_build_file,
+        _sdk_template_path(runtime, "api_level_constraint"),
+        {
+            "{{target_cpus}}": _get_starlark_list(runtime, process_context.constants.target_cpus),
+        },
+    )
+
 # buildifier: disable=unused-variable
 def _generate_fidl_library_build_rules(
         runtime,
@@ -893,11 +906,11 @@ def _to_fuchsia_cpu_name(cpu_name):
     return _TO_FUCHSIA_CPU_NAME_MAP.get(cpu_name, cpu_name)
 
 # Maps a Fuchsia cpu name to the corresponding config_setting() label in
-# @fuchsia_sdk//fuchsia/constraints
+# @rules_fuchsia//fuchsia/constraints
 _FUCHSIA_CPU_CONSTRAINT_MAP = {
-    "x64": "@fuchsia_sdk//fuchsia/constraints:cpu_x64",
-    "arm64": "@fuchsia_sdk//fuchsia/constraints:cpu_arm64",
-    "riscv64": "@fuchsia_sdk//fuchsia/constraints:cpu_riscv64",
+    "x64": "@rules_fuchsia//fuchsia/constraints:cpu_x64",
+    "arm64": "@rules_fuchsia//fuchsia/constraints:cpu_arm64",
+    "riscv64": "@rules_fuchsia//fuchsia/constraints:cpu_riscv64",
 }
 
 # Maps a variant name to the corresponding config_setting() label in
@@ -969,7 +982,7 @@ def _generate_cc_prebuilt_library_build_rules(
         # so that SDKs for different architectures can be composed by a simple directory merge.
         arch_list = process_context.constants.target_cpus
         for arch in arch_list:
-            constraint = "@fuchsia_sdk//fuchsia/constraints:is_%s_api_HEAD" % (arch)
+            constraint = "@fuchsia_sdk//constraints:is_%s_api_HEAD" % (arch)
             dist_select[constraint] = ["//%s/%s-HEAD:dist" % (relative_dir, arch)]
             prebuilt_select[constraint] = [
                 "//%s/%s-HEAD:prebuilts" % (relative_dir, arch),
@@ -1045,7 +1058,7 @@ def _generate_cc_prebuilt_library_build_rules(
                 runtime.make_struct(
                     name = "%s-api-%s" % (arch, api_level),
                     link_lib = values["link_lib"],
-                    constraint = "@fuchsia_sdk//fuchsia/constraints:is_%s_api_%s" %
+                    constraint = "@fuchsia_sdk//constraints:is_%s_api_%s" %
                                  (arch, api_level),
                     os = "@platforms//os:fuchsia",
                     arch = arch,
@@ -1059,7 +1072,7 @@ def _generate_cc_prebuilt_library_build_rules(
             )
 
     for variant in prebuilt_variants:
-        constraint = "@fuchsia_sdk//fuchsia/constraints:is_%s_api_%s" % (
+        constraint = "@fuchsia_sdk//constraints:is_%s_api_%s" % (
             variant.arch,
             variant.api_level,
         )
@@ -1182,7 +1195,7 @@ def _generate_package_build_rules(
                          (variant["arch"], _get_api_level(variant)),
             os = "@platforms//os:fuchsia",
             cpu = _FUCHSIA_CPU_CONSTRAINT_MAP[variant["arch"]].replace("@fuchsia_sdk", "@" + process_context.rules_fuchsia),
-            api_level = "//fuchsia/constraints:api_level_%s" % _get_api_level(variant),
+            api_level = "//constraints:api_level_%s" % _get_api_level(variant),
         )
         for variant in meta["variants"]
     ]
@@ -1213,8 +1226,6 @@ def _generate_package_build_rules(
             variant.files,
         )
 
-    rules_fuchsia = process_context.rules_fuchsia
-
     _merge_template(
         ctx,
         build_file,
@@ -1224,9 +1235,8 @@ def _generate_package_build_rules(
             "{{select_map}}": _get_starlark_dict(
                 runtime,
                 {
-                    "@%s//fuchsia/constraints:%s" %
-                    (rules_fuchsia, variant.constraint): ":%s" %
-                                                         variant.name
+                    "//constraints:%s" %
+                    variant.constraint: ":%s" % variant.name
                     for variant in package_variants
                 },
             ),
@@ -1270,7 +1280,7 @@ def _generate_python_e2e_test_rules(
     def _fuchsia_api_level_constraint(api_level, default = "//conditions:default"):
         if _is_undefined_api_level(api_level):
             return default
-        return "//fuchsia/constraints:api_level_%s" % api_level
+        return "//constraints:api_level_%s" % api_level
 
     def _api_level_deprecation_message(api_level):
         if _is_undefined_api_level(api_level):
@@ -1480,6 +1490,12 @@ def _write_cmc_includes(runtime, process_context):
 
 def _root_build_file(ctx):
     return ctx.path("BUILD.bazel")
+
+def _constraints_build_file(ctx):
+    build_file = _root_build_file(ctx).dirname.get_child("constraints").get_child("BUILD.bazel")
+    if not build_file.exists:
+        ctx.file(build_file, content = _header(), executable = False)
+    return build_file
 
 def _type_from_meta(runtime, meta):
     if "type" in meta:
@@ -1742,7 +1758,6 @@ def _merge_rules_fuchsia(runtime, use_rules_fuchsia):
         # these files simply re-exports symbols loaded from other source
         # packages.
         child_directories = [
-            "fuchsia/constraints",
             "fuchsia/toolchains",
             "fuchsia",
         ]

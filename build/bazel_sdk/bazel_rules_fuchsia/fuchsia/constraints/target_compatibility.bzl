@@ -90,7 +90,7 @@ COMPATIBILITY = struct(
     # Example usage:
     #
     #  ```
-    # load("@fuchsia_sdk//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
+    # load("@rules_fuchsia//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
     #
     #  cc_library(
     #     name = "foo",
@@ -107,7 +107,7 @@ COMPATIBILITY = struct(
     # Example usage:
     #
     # ```
-    # load("@fuchsia_sdk//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
+    # load("@rules_fuchsia//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
     #
     # def foo_macro(deps = [], **kwargs):
     #     cc_library(
@@ -123,7 +123,7 @@ COMPATIBILITY = struct(
     #
     # Example usage:
     # ```
-    # load("@fuchsia_sdk//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
+    # load("@rules_fuchsia//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
     #
     # foo = rule(
     #     ...
@@ -136,7 +136,7 @@ COMPATIBILITY = struct(
         "_host_compatibility": attr.label_list(
             doc = """
     Ensures that the current (and all dependent targets') target build configuration corresponds to a compatible host.
-    See `@fuchsia_sdk//fuchsia/constraints:target_compatibility.bzl` > `COMPATIBILITY` for more context.
+    See `@rules_fuchsia//fuchsia/constraints:target_compatibility.bzl` > `COMPATIBILITY` for more context.
     """,
             default = _HOST_DEPS,
         ),
@@ -151,7 +151,7 @@ COMPATIBILITY = struct(
         "_fuchsia_compatibility": attr.label_list(
             doc = """
     Ensures that the current (and all dependent targets') target build configuration corresponds to a compatible host and target.
-    See `@fuchsia_sdk//fuchsia/constraints:target_compatibility.bzl` > `COMPATIBILITY` for more context.
+    See `@rules_fuchsia//fuchsia/constraints:target_compatibility.bzl` > `COMPATIBILITY` for more context.
     """,
             default = _FUCHSIA_DEPS,
         ),

@@ -396,10 +396,10 @@ fuchsia_cc_binary(
     # Test that various constraints, including for a no longer supported API
     # level, are supported and do not cause analysis errors.
     srcs = select({
-        "@fuchsia_sdk//fuchsia/constraints:api_level_4": [],  # Oldest "known."
-        "@fuchsia_sdk//fuchsia/constraints:api_level_21": [],  # Retired.
-        "@fuchsia_sdk//fuchsia/constraints:api_level_NEXT": [],
-        "@fuchsia_sdk//fuchsia/constraints:api_level_HEAD": [":cc_main"],
+        "@fuchsia_sdk//constraints:api_level_4": [],  # Oldest "known."
+        "@fuchsia_sdk//constraints:api_level_21": [],  # Retired.
+        "@fuchsia_sdk//constraints:api_level_NEXT": [],
+        "@fuchsia_sdk//constraints:api_level_HEAD": [":cc_main"],
         "//conditions:default": [],
     }),
 )
