@@ -1928,7 +1928,7 @@ mod arch32 {
         sys_sched_setaffinity as sys_arch32_sched_setaffinity,
         sys_setgroups as sys_arch32_setgroups32, sys_setpriority as sys_arch32_setpriority,
         sys_setresgid as sys_arch32_setresgid32, sys_setresuid as sys_arch32_setresuid32,
-        sys_setrlimit as sys_arch32_setrlimit,
+        sys_setrlimit as sys_arch32_setrlimit, sys_syslog as sys_arch32_syslog,
     };
 }
 
