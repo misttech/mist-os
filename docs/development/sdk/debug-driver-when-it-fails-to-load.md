@@ -273,4 +273,4 @@ the Driver codelab.
 [fuchsia-pci-bind]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/devices/bind/fuchsia.pci/fuchsia.pci.bind
 [ffx-component-show]: /docs/development/tools/ffx/workflows/view-component-information.md
 [ffx-log]: /docs/development/tools/ffx/workflows/view-device-logs.md
-[implement-driver-hooks]: /docs/get-started/sdk/learn/driver/driver-binding.md#implement_driver_hooks
+[implement-driver-hooks]: /docs/development/drivers/tutorials/sdk_build_driver/driver-binding.md#implement_driver_hooks

@@ -31,17 +31,17 @@ automatically, follow the section below.
 * {SDK}
 
     Note: For more information about the Fuchsia SDK and how to configure your environment,
-    see [SDK fundamentals][sdk-fundamentals].
+    see [Fuchsia IDK][idk-download].
 
     1. Open your desired workspace. For example, open the
-       [getting-started repository][sdk-fundamentals] in your VS Code workspace.
+       [getting-started repository][idk-download] in your VS Code workspace.
     1. The extension should automatically detect the path to ffx. If the path
        is not detected, follow these steps:
         1. In VS Code navigate to the main menu, click **Code**, then **Preferences**, then **Settings**.
         1. Under **Extensions** navigate to **Fuchsia SDK** then **Ffx Path**.
         1. Enter the path to `ffx` directory (for example, `~/fuchsia/getting-started/tools/ffx`).
         1. Verify the extension is working via the button in the bottom right corner. Click said button, which lists a Fuchsia target device and ensure that your device is connected.
- 
+
     If there is no Fuchsia device that is running, including the emulator, you
     will see the following in the **Output** tab:
 
@@ -52,7 +52,7 @@ automatically, follow the section below.
 
 * {Source Tree}
 
-    Note: For more information about the Fuchsia source tree and how to configure your environment, 
+    Note: For more information about the Fuchsia source tree and how to configure your environment,
     see [source tree fundamentals][sourcetree-fundamentals].
 
     1. Open your desired workspace. For example, open the [sample repository][sourcetree-fundamentals]
@@ -75,6 +75,7 @@ information on how to use the Fuchsia extension, see
 [Using the Fuchsia extension for VS Code][using-fuchsia-ext].
 
 <!-- Reference links -->
+[idk-download]: /docs/development/idk/download.md
 [sdk-fundamentals]: /docs/get-started/sdk/learn
 [sourcetree-fundamentals]: /docs/get-started/learn
 [vscode-fuchsia]: /docs/reference/tools/editors/README.md#vs-code

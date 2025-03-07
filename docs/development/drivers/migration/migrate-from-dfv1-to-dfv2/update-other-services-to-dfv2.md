@@ -542,7 +542,7 @@ All the **documentation pages** mentioned in this section:
 [devfs]: /docs/concepts/drivers/driver_communication.md#service_discovery_using_devfs
 [connector]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/driver/devfs/cpp/connector.h;l=16
 [v2-parent-driver-cc]: https://cs.opensource.google/fuchsia/fuchsia/+/main:examples/drivers/transport/zircon/v2/parent-driver.cc;l=93
-[codelab-driver-service]: /docs/get-started/sdk/learn/driver/driver-service.md
+[codelab-driver-service]: /docs/development/drivers/tutorials/sdk_build_driver/driver-service.md
 [export-to-devfs]: https://fuchsia.googlesource.com/sdk-samples/drivers/+/refs/heads/main/src/qemu_edu/drivers/qemu_edu.cc#74
 [use-non-default-dispatchers]: /docs/development/drivers/migration/migrate-from-banjo-to-fidl/convert-banjo-protocols-to-fidl-protocols.md#update-the-dfv1-driver-to-use-non-default-dispatchers
 [aml-ethernet]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/connectivity/ethernet/drivers/aml-ethernet/aml-ethernet.cc;l=181
