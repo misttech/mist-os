@@ -54,5 +54,6 @@ macro_rules! invoke_for_handle_types {
         $x! {Stream, "Stream", STREAM, ZX_OBJ_TYPE_STREAM, FuchsiaOnly}
         $x! {Msi, "MSI", MSI, ZX_OBJ_TYPE_MSI, Stub}
         $x! {PciDevice, "PCI Device", PCI_DEVICE, ZX_OBJ_TYPE_PCI_DEVICE, Stub}
+        $x! {Counter, "Counter", COUNTER, ZX_OBJ_TYPE_COUNTER, FuchsiaOnly}
     };
 }
