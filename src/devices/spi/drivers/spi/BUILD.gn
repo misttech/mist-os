@@ -23,24 +23,33 @@ group("tests") {
   ]
 }
 
-group("common") {
-  public_deps = [
+source_set("common") {
+  sources = [
+    "spi-child.cc",
+    "spi-child.h",
+    "spi.cc",
+    "spi.h",
+  ]
+  deps = [
     ":spi_bind",
-    "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_bindlib_cpp",
-    "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_cpp",
-    "//sdk/fidl/fuchsia.hardware.spi.businfo:fuchsia.hardware.spi.businfo_cpp",
-    "//sdk/fidl/fuchsia.hardware.spiimpl:fuchsia.hardware.spiimpl_cpp",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
     "//sdk/lib/async",
     "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/driver/compat/cpp",
-    "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/fit",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/lib/ddk:ddk_metadata",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zx",
+  ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_bindlib_cpp",
+    "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_cpp",
+    "//sdk/fidl/fuchsia.hardware.spi.businfo:fuchsia.hardware.spi.businfo_cpp",
+    "//sdk/fidl/fuchsia.hardware.spiimpl:fuchsia.hardware.spiimpl_cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/devfs/cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
   ]
 }
 
@@ -49,10 +58,6 @@ fuchsia_cc_driver("spi-driver") {
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
-  ]
-  sources = [
-    "spi-child.cc",
-    "spi.cc",
   ]
   deps = [ ":common" ]
 }
@@ -76,14 +81,13 @@ fuchsia_driver_package("package") {
 
 test("spi-test-bin") {
   output_name = "spi-test"
-  sources = [
-    "spi-child.cc",
-    "spi-test.cc",
-    "spi.cc",
-  ]
+  sources = [ "spi-test.cc" ]
   deps = [
     ":common",
+    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
+    "//sdk/lib/driver/metadata/cpp",
     "//sdk/lib/driver/testing/cpp",
+    "//src/lib/ddk:ddk_metadata",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
     "//third_party/googletest:gtest",
