@@ -1739,11 +1739,6 @@ def _merge_rules_fuchsia(runtime, use_rules_fuchsia):
         # as a user-settable build attribute.
         content = content.replace("@rules_fuchsia//fuchsia:fuchsia_api_level", "@fuchsia_sdk//fuchsia:fuchsia_api_level")
 
-        # Another special case if @fuchsia_sdk//fuchsia:toolchain which is still referenced
-        # directly in @rules_fuchsia at the moment.
-        content = content.replace("@rules_fuchsia//fuchsia:toolchain", "@fuchsia_sdk//fuchsia:toolchain")
-        content = content.replace("@rules_fuchsia//fuchsia/toolchains:sdk", "@fuchsia_sdk//fuchsia/toolchains:sdk")
-
         return content
 
     if use_rules_fuchsia:
@@ -1758,7 +1753,6 @@ def _merge_rules_fuchsia(runtime, use_rules_fuchsia):
         # these files simply re-exports symbols loaded from other source
         # packages.
         child_directories = [
-            "fuchsia/toolchains",
             "fuchsia",
         ]
         for child_dir in child_directories:

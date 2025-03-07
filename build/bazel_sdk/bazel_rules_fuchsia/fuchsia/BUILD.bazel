@@ -105,13 +105,6 @@ fuchsia_assembly_developer_overrides_list(
     name = "empty_assembly_developer_overrides_list",
 )
 
-#TODO(386793401) remove this alias once all users have been migrated.
-alias(
-    name = "toolchain",
-    actual = "//fuchsia/toolchains:sdk",
-    deprecation = "Use //fuchsia/toolchains:sdk instead",
-)
-
 # Toolchain type for the Fuchsia devicetree toolchain.
 toolchain_type(
     name = "devicetree_toolchain_type",
