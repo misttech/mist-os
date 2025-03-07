@@ -9,12 +9,13 @@
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fake-i2c/fake-i2c.h>
 
-#include <zxtest/zxtest.h>
+#include "src/lib/testing/predicates/status.h"
 
 namespace gpio {
 
@@ -77,86 +78,64 @@ class FakeTiTca6408aDevice : public fake_i2c::FakeI2c {
   uint8_t configuration_ = 0b1111'1111;
 };
 
-struct IncomingNamespace {
-  fdf_testing::TestNode node_{std::string("root")};
-  fdf_testing::internal::TestEnvironment env_{fdf::Dispatcher::GetCurrent()->get()};
+class Environment : public fdf_testing::Environment {
+ public:
+  zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
+    device_server_.Initialize("pdev");
+
+    zx::result result = to_driver_vfs.AddService<fuchsia_hardware_i2c::Service>(
+        std::move(i2c_.GetInstanceHandler()), "i2c");
+    if (result.is_error()) {
+      return result.take_error();
+    }
+
+    return zx::ok();
+  }
+
+  FakeTiTca6408aDevice& i2c() { return i2c_; }
+
+ private:
   compat::DeviceServer device_server_;
-  FakeTiTca6408aDevice fake_i2c_;
+  FakeTiTca6408aDevice i2c_;
+};
+
+class TiTca6408aTestConfig {
+ public:
+  using DriverType = TiTca6408aDevice;
+  using EnvironmentType = Environment;
 };
 
 // WARNING: Don't use this test as a template for new tests as it uses the old driver testing
 // library.
-class TiTca6408aTest : public zxtest::Test {
+class TiTca6408aTest : public testing::Test {
  public:
-  TiTca6408aTest()
-      : env_dispatcher_(runtime_.StartBackgroundDispatcher()),
-        driver_dispatcher_(runtime_.StartBackgroundDispatcher()),
-        dut_(driver_dispatcher_->async_dispatcher(), std::in_place),
-        incoming_(env_dispatcher_->async_dispatcher(), std::in_place) {}
-
   void SetUp() override {
-    fuchsia_driver_framework::DriverStartArgs start_args;
-    fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory_client;
-    incoming_.SyncCall([&start_args, &outgoing_directory_client](IncomingNamespace* incoming) {
-      auto start_args_result = incoming->node_.CreateStartArgsAndServe();
-      ASSERT_TRUE(start_args_result.is_ok());
-      start_args = std::move(start_args_result->start_args);
-      outgoing_directory_client = std::move(start_args_result->outgoing_directory_client);
-
-      auto init_result =
-          incoming->env_.Initialize(std::move(start_args_result->incoming_directory_server));
-      ASSERT_TRUE(init_result.is_ok());
-
-      incoming->device_server_.Initialize("pdev");
-
-      // Serve fake_i2c_.
-      auto result = incoming->env_.incoming_directory().AddService<fuchsia_hardware_i2c::Service>(
-          std::move(incoming->fake_i2c_.GetInstanceHandler()), "i2c");
-      ASSERT_TRUE(result.is_ok());
-    });
-
-    // Start dut_.
-    auto result = runtime_.RunToCompletion(dut_.SyncCall(
-        &fdf_testing::internal::DriverUnderTest<TiTca6408aDevice>::Start, std::move(start_args)));
-    ASSERT_TRUE(result.is_ok());
-
-    // Connect to PinImpl.
-    auto svc_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
-
-    zx_status_t status =
-        fdio_open3_at(outgoing_directory_client.handle()->get(), "/svc",
-                      static_cast<uint64_t>(fuchsia_io::wire::Flags::kProtocolDirectory),
-                      svc_endpoints.server.TakeChannel().release());
-    EXPECT_EQ(ZX_OK, status);
-
-    auto connect_result =
-        fdf::internal::DriverTransportConnect<fuchsia_hardware_pinimpl::Service::Device>(
-            svc_endpoints.client, component::kDefaultInstance);
-    ASSERT_TRUE(connect_result.is_ok());
-    gpio_.Bind(std::move(connect_result.value()));
-    ASSERT_TRUE(gpio_.is_valid());
-
-    incoming_.SyncCall([](IncomingNamespace* incoming) {
-      EXPECT_EQ(incoming->fake_i2c_.polarity_inversion(), 0);
-    });
+    ASSERT_OK(driver_test_.StartDriver());
+    zx::result clock_impl = driver_test_.Connect<fuchsia_hardware_pinimpl::Service::Device>();
+    ASSERT_OK(clock_impl);
+    gpio_.Bind(std::move(clock_impl.value()));
   }
 
- private:
-  fdf_testing::DriverRuntime runtime_;
-  fdf::UnownedSynchronizedDispatcher env_dispatcher_;
-  fdf::UnownedSynchronizedDispatcher driver_dispatcher_;
-  async_patterns::TestDispatcherBound<fdf_testing::internal::DriverUnderTest<TiTca6408aDevice>>
-      dut_;
+  void TearDown() override { ASSERT_OK(driver_test_.StopDriver()); }
 
  protected:
-  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_;
+  void RunInI2cContext(fit::callback<void(FakeTiTca6408aDevice&)> callback) {
+    driver_test_.RunInEnvironmentTypeContext(
+        [callback = std::move(callback)](Environment& environment) mutable {
+          callback(environment.i2c());
+        });
+  }
+
   fdf::WireSyncClient<fuchsia_hardware_pinimpl::PinImpl> gpio_;
+
+ private:
+  fdf_testing::BackgroundDriverTest<TiTca6408aTestConfig> driver_test_;
 };
 
 TEST_F(TiTca6408aTest, SetBufferMode) {
-  incoming_.SyncCall([](IncomingNamespace* incoming) {
-    EXPECT_EQ(incoming->fake_i2c_.output_port(), 0b1111'1111);
-    EXPECT_EQ(incoming->fake_i2c_.configuration(), 0b1111'1111);
+  RunInI2cContext([](FakeTiTca6408aDevice& i2c) {
+    EXPECT_EQ(i2c.output_port(), 0b1111'1111);
+    EXPECT_EQ(i2c.configuration(), 0b1111'1111);
   });
 
   fdf::Arena arena('TEST');
@@ -166,9 +145,9 @@ TEST_F(TiTca6408aTest, SetBufferMode) {
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
   };
-  incoming_.SyncCall([](IncomingNamespace* incoming) {
-    EXPECT_EQ(incoming->fake_i2c_.output_port(), 0b1111'1110);
-    EXPECT_EQ(incoming->fake_i2c_.configuration(), 0b1111'1110);
+  RunInI2cContext([](FakeTiTca6408aDevice& i2c) {
+    EXPECT_EQ(i2c.output_port(), 0b1111'1110);
+    EXPECT_EQ(i2c.configuration(), 0b1111'1110);
   });
 
   {
@@ -176,9 +155,9 @@ TEST_F(TiTca6408aTest, SetBufferMode) {
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
   };
-  incoming_.SyncCall([](IncomingNamespace* incoming) {
-    EXPECT_EQ(incoming->fake_i2c_.output_port(), 0b1111'1110);
-    EXPECT_EQ(incoming->fake_i2c_.configuration(), 0b1111'1111);
+  RunInI2cContext([](FakeTiTca6408aDevice& i2c) {
+    EXPECT_EQ(i2c.output_port(), 0b1111'1110);
+    EXPECT_EQ(i2c.configuration(), 0b1111'1111);
   });
 
   {
@@ -187,9 +166,9 @@ TEST_F(TiTca6408aTest, SetBufferMode) {
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
   }
-  incoming_.SyncCall([](IncomingNamespace* incoming) {
-    EXPECT_EQ(incoming->fake_i2c_.output_port(), 0b1101'1110);
-    EXPECT_EQ(incoming->fake_i2c_.configuration(), 0b1101'1111);
+  RunInI2cContext([](FakeTiTca6408aDevice& i2c) {
+    EXPECT_EQ(i2c.output_port(), 0b1101'1110);
+    EXPECT_EQ(i2c.configuration(), 0b1101'1111);
   });
 
   {
@@ -197,9 +176,9 @@ TEST_F(TiTca6408aTest, SetBufferMode) {
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
   };
-  incoming_.SyncCall([](IncomingNamespace* incoming) {
-    EXPECT_EQ(incoming->fake_i2c_.output_port(), 0b1101'1110);
-    EXPECT_EQ(incoming->fake_i2c_.configuration(), 0b1111'1111);
+  RunInI2cContext([](FakeTiTca6408aDevice& i2c) {
+    EXPECT_EQ(i2c.output_port(), 0b1101'1110);
+    EXPECT_EQ(i2c.configuration(), 0b1111'1111);
   });
 
   {
@@ -208,9 +187,9 @@ TEST_F(TiTca6408aTest, SetBufferMode) {
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
   };
-  incoming_.SyncCall([](IncomingNamespace* incoming) {
-    EXPECT_EQ(incoming->fake_i2c_.output_port(), 0b1111'1110);
-    EXPECT_EQ(incoming->fake_i2c_.configuration(), 0b1101'1111);
+  RunInI2cContext([](FakeTiTca6408aDevice& i2c) {
+    EXPECT_EQ(i2c.output_port(), 0b1111'1110);
+    EXPECT_EQ(i2c.configuration(), 0b1101'1111);
   });
 
   {
@@ -222,7 +201,7 @@ TEST_F(TiTca6408aTest, SetBufferMode) {
 }
 
 TEST_F(TiTca6408aTest, Read) {
-  incoming_.SyncCall([](IncomingNamespace* incoming) { incoming->fake_i2c_.set_input_port(0x55); });
+  RunInI2cContext([](FakeTiTca6408aDevice& i2c) { i2c.set_input_port(0x55); });
 
   fdf::Arena arena('TEST');
   {

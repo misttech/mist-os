@@ -19,6 +19,10 @@ driver_bind_rules("ti-tca6408a-bind") {
 }
 
 source_set("common") {
+  sources = [
+    "ti-tca6408a.cc",
+    "ti-tca6408a.h",
+  ]
   public_deps = [
     ":ti-tca6408a-bind",
     "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
@@ -32,7 +36,6 @@ source_set("common") {
 
 fuchsia_cc_driver("ti-tca6408a-driver") {
   output_name = "ti-tca6408a"
-  sources = [ "ti-tca6408a.cc" ]
   deps = [
     ":common",
     "//src/devices/lib/driver:driver_runtime",
@@ -52,17 +55,15 @@ fuchsia_driver_package("package") {
 
 test("ti-tca6408a-test-bin") {
   output_name = "ti-tca6408a-test"
-  sources = [
-    "ti-tca6408a-test.cc",
-    "ti-tca6408a.cc",
-  ]
+  sources = [ "ti-tca6408a-test.cc" ]
   deps = [
     ":common",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/compat/cpp",
-    "//sdk/lib/driver/testing/cpp:cpp",
+    "//sdk/lib/driver/testing/cpp",
     "//src/devices/i2c/testing/fake-i2c",
-    "//zircon/system/ulib/zxtest",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
   ]
 }
 
