@@ -28,6 +28,7 @@ rustc_library("kernel_manager") {
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
     "//sdk/fidl/fuchsia.starnix.container:fuchsia.starnix.container_rust",
     "//sdk/fidl/fuchsia.starnix.runner:fuchsia.starnix.runner_rust",
+    "//sdk/lib/scheduler/rust",
     "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",

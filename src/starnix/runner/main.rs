@@ -20,8 +20,13 @@ enum Services {
     StarnixManager(fstarnixrunner::ManagerRequestStream),
 }
 
+const MEMORY_ROLE_NAME: &str = "fuchsia.starnix.runner";
+
 #[fuchsia::main(logging_tags = ["starnix_runner"])]
 async fn main() -> Result<(), Error> {
+    if let Err(e) = fuchsia_scheduler::set_role_for_root_vmar(MEMORY_ROLE_NAME) {
+        warn!(e:%; "failed to set memory role");
+    }
     fuchsia_trace_provider::trace_provider_create_with_fdio();
     let config = starnix_runner_config::Config::take_from_startup_handle();
     if config.enable_data_collection {

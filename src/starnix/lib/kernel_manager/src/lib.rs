@@ -437,11 +437,16 @@ pub struct ChannelProxy {
     name: String,
 }
 
+const PROXY_ROLE_NAME: &str = "fuchsia.starnix.runner.proxy";
+
 /// Starts a thread that listens for new proxies and runs `start_proxy` on each.
 pub fn run_proxy_thread(
     new_proxies: async_channel::Receiver<(ChannelProxy, Arc<Mutex<ResumeEvents>>)>,
 ) {
     let _ = std::thread::Builder::new().name("proxy_thread".to_string()).spawn(move || {
+        if let Err(e) = fuchsia_scheduler::set_role_for_this_thread(PROXY_ROLE_NAME) {
+            warn!(e:%; "failed to set thread role");
+        }
         let mut executor = fasync::LocalExecutor::new();
         executor.run_singlethreaded(async move {
             let mut tasks = fasync::TaskGroup::new();

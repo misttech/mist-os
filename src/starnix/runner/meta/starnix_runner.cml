@@ -45,6 +45,7 @@
             protocol: "fuchsia.component.Realm",
             from: "framework",
         },
+        { protocol: "fuchsia.scheduler.RoleManager" },
         {
             protocol: [
                 "fuchsia.power.system.ActivityGovernor",

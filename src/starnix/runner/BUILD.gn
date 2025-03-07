@@ -24,6 +24,7 @@ rustc_binary("starnix_runner_bin") {
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.settings:fuchsia.settings_rust",
     "//sdk/fidl/fuchsia.starnix.runner:fuchsia.starnix.runner_rust",
+    "//sdk/lib/scheduler/rust",
     "//sdk/rust/zx",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
