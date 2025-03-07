@@ -4,7 +4,7 @@
 #![deny(warnings)]
 
 use std::fs::{File, OpenOptions};
-use std::io::{Error, ErrorKind, Read, Seek, SeekFrom, Write};
+use std::io::{Error, Read, Seek, SeekFrom, Write};
 use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
 use structopt::StructOpt;

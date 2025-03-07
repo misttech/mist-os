@@ -5,7 +5,7 @@
 
 use std::collections::HashSet;
 use std::fs::File;
-use std::io::{Error, ErrorKind, Read};
+use std::io::{Error, Read};
 
 fn run_test() -> std::io::Result<()> {
     let mut set = HashSet::new();
