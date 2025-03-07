@@ -6,7 +6,7 @@
 # before making changes to this file, and add a member of the fuchsia.dev
 # team as reviewer.
 toc:
-- heading: "Platform fundamentals"
+- heading: "Get started with Fuchsia"
 - title: "Overview"
   path: /docs/get-started/learn/README.md
 - title: "Introduction to Fuchsia"
