@@ -11,6 +11,10 @@ namespace fdf {
 PDev::PDev(fidl::ClientEnd<fuchsia_hardware_platform_device::Device> client)
     : pdev_(std::move(client)) {}
 
+fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> PDev::borrow() {
+  return pdev_.client_end().borrow();
+}
+
 zx::result<fdf::MmioBuffer> PDev::MapMmio(uint32_t index, uint32_t cache_policy) const {
   zx::result pdev_mmio = GetMmio(index);
   if (pdev_mmio.is_error()) {

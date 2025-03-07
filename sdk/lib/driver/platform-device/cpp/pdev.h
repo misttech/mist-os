@@ -31,6 +31,8 @@ class PDev {
   PDev() = default;
   explicit PDev(fidl::ClientEnd<fuchsia_hardware_platform_device::Device> client);
 
+  fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> borrow();
+
   zx::result<fdf::MmioBuffer> MapMmio(
       uint32_t index, uint32_t cache_policy = ZX_CACHE_POLICY_UNCACHED_DEVICE) const;
   zx::result<fdf::MmioBuffer> MapMmio(
