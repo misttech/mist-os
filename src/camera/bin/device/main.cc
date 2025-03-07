@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.camera/cpp/wire.h>
 #include <fuchsia/camera2/hal/cpp/fidl.h>
 #include <fuchsia/hardware/camera/cpp/fidl.h>
 #include <fuchsia/ui/policy/cpp/fidl.h>
@@ -9,6 +10,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/async/cpp/wait.h>
+#include <lib/component/incoming/cpp/service_member_watcher.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fdio.h>
 #include <lib/sys/cpp/component_context.h>
@@ -25,18 +27,18 @@
 
 namespace camera {
 
-constexpr auto kCameraPath = "/dev/class/camera";
-
 using DeviceHandle = fuchsia::hardware::camera::DeviceHandle;
 
 static zx::result<DeviceHandle> GetCameraHandle() {
-  for (auto const& dir_entry : std::filesystem::directory_iterator{kCameraPath}) {
-    DeviceHandle camera;
-    zx_status_t status =
-        fdio_service_connect(dir_entry.path().c_str(), camera.NewRequest().TakeChannel().release());
-    return zx::make_result(status, std::move(camera));
+  component::SyncServiceMemberWatcher<fuchsia_hardware_camera::Service::Device> watcher;
+  auto client_end = watcher.GetNextInstance(true);
+  if (client_end.is_error()) {
+    if (client_end.error_value() == ZX_ERR_STOP) {
+      return zx::error(ZX_ERR_NOT_FOUND);
+    }
+    return client_end.take_error();
   }
-  return zx::error(ZX_ERR_NOT_FOUND);
+  return zx::ok(DeviceHandle(client_end.value().TakeChannel()));
 }
 
 }  // namespace camera
