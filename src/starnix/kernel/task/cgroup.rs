@@ -68,7 +68,6 @@ pub struct CgroupFreezerState {
 /// Common operations of all cgroups.
 pub trait CgroupOps: Send + Sync + 'static {
     /// Returns the unique ID of the cgroup. ID of root cgroup is 0.
-    #[allow(dead_code)]
     fn id(&self) -> u64;
 
     /// Add a process to a cgroup. Errors if the cgroup has been deleted.
