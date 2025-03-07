@@ -2,9 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")
-load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def _gen_android_starnix_container_impl(ctx):
     sdk = get_fuchsia_sdk_toolchain(ctx)
@@ -55,25 +55,22 @@ def _gen_android_starnix_container_impl(ctx):
         ]
 
     if ctx.file.vendor:
-        _package_inputs += [ctx.file.vendor]
+        _package_inputs.append(ctx.file.vendor)
         _args += [
             "--vendor",
             ctx.file.vendor.path,
         ]
-        _outputs += [
-            ctx.actions.declare_directory("vendor", sibling = _container_manifest),
-        ]
+        _outputs.append(ctx.actions.declare_directory("vendor", sibling = _container_manifest))
 
     if ctx.attr.skip_subpackages:
-        _args += [
-            "--skip-subpackages",
-        ]
+        _args.append("--skip-subpackages")
 
     ctx.actions.run(
         executable = sdk.gen_android_starnix_container,
         arguments = _args,
         inputs = _package_inputs,
         outputs = _outputs,
+        mnemonic = "GenAndroidStarnixContainer",
         **LOCAL_ONLY_ACTION_KWARGS
     )
 

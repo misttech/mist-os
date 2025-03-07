@@ -64,6 +64,7 @@ def _fuchsia_devicetree_impl(ctx):
         arguments = [pp_args],
         inputs = [dts_file] + headers + files.to_list(),
         outputs = [output_file],
+        mnemonic = "DtbCompile",
     )
 
     return [
@@ -120,6 +121,7 @@ def _fuchsia_devicetree_source_impl(ctx):
         arguments = [pp_args],
         inputs = [source],
         outputs = [output_file],
+        mnemonic = "DtbDecompile",
     )
 
     return [

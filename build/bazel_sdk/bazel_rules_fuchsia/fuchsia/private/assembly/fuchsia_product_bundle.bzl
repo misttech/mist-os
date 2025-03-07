@@ -11,6 +11,7 @@ load(
     "fuchsia_collect_all_debug_symbols_infos_aspect",
     "transform_collected_debug_symbols_infos",
 )
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 load(
     "//fuchsia/private/workflows:fuchsia_product_bundle_tasks.bzl",
     "fuchsia_product_bundle_tasks",
@@ -27,7 +28,6 @@ load(
     "FuchsiaVirtualDeviceInfo",
 )
 load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")
-load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 DELIVERY_BLOB_TYPE = struct(
     UNCOMPRESSED = "0",
@@ -110,6 +110,7 @@ def _build_zipped_product_bundle_impl(ctx):
             "PB_ZIP_PATH": pb_zip.path,
         },
         progress_message = "Creating zipped product bundle for %s" % ctx.label.name,
+        mnemonic = "CreatePBZip",
         **LOCAL_ONLY_ACTION_KWARGS
     )
 
@@ -256,6 +257,7 @@ def _verify_bootfs_filelist(
         env = {"FFX_ISOLATE_DIR": ffx_isolate_dir.path},
         command = "\n".join(script_lines),
         progress_message = "Verify Bootfs file list for %s" % label_name,
+        mnemonic = "VerifyBootfsFileList",
         **LOCAL_ONLY_ACTION_KWARGS
     )
     return stamp_file
@@ -292,6 +294,7 @@ def _verify_kernel_cmdline(
         env = {"FFX_ISOLATE_DIR": ffx_isolate_dir.path},
         command = "\n".join(script_lines),
         progress_message = "Verify Kernel Cmdline for %s" % label_name,
+        mnemonic = "VerifyKernelCmdline",
         **LOCAL_ONLY_ACTION_KWARGS
     )
     return stamp_file
@@ -327,6 +330,7 @@ def _verify_route_sources(
         env = {"FFX_ISOLATE_DIR": ffx_isolate_dir.path},
         command = "\n".join(script_lines),
         progress_message = "Verify Route sources for %s" % ctx.label.name,
+        mnemonic = "VerifyRouteSource",
         **LOCAL_ONLY_ACTION_KWARGS
     )
     return [stamp_file, tmp_dir]
@@ -362,6 +366,7 @@ def _verify_component_resolver_allowlist(
         env = {"FFX_ISOLATE_DIR": ffx_isolate_dir.path},
         command = "\n".join(script_lines),
         progress_message = "Verify Component Resolver for %s" % ctx.label.name,
+        mnemonic = "VerifyComponentResolver",
         **LOCAL_ONLY_ACTION_KWARGS
     )
     return [stamp_file, tmp_dir]
@@ -406,6 +411,7 @@ def _verify_routes(
         env = {"FFX_ISOLATE_DIR": ffx_isolate_dir.path},
         command = "\n".join(script_lines),
         progress_message = "Verify Routes for %s" % ctx.label.name,
+        mnemonic = "VerifyRoutes",
         **LOCAL_ONLY_ACTION_KWARGS
     )
     return [stamp_file, tmp_dir]
@@ -445,6 +451,7 @@ def _verify_base_packages(
         env = {"FFX_ISOLATE_DIR": ffx_isolate_dir.path},
         command = "\n".join(script_lines),
         progress_message = "Verify Static pkgs for %s" % label_name,
+        mnemonic = "VerifyStaticPkgs",
         **LOCAL_ONLY_ACTION_KWARGS
     )
     return [stamp_file, tmp_dir]
@@ -486,6 +493,7 @@ def _verify_pre_signing(
         env = {"FFX_ISOLATE_DIR": ffx_isolate_dir.path},
         command = "\n".join(script_lines),
         progress_message = "Verify pre-signing checks for %s" % label_name,
+        mnemonic = "VerifyPresigningChecks",
         **LOCAL_ONLY_ACTION_KWARGS
     )
     return stamp_file
@@ -521,6 +529,7 @@ def _verify_structured_config(
         env = {"FFX_ISOLATE_DIR": ffx_isolate_dir.path},
         command = "\n".join(script_lines),
         progress_message = "Verify structured config for %s" % ctx.label.name,
+        mnemonic = "VerifyStructedConfig",
         **LOCAL_ONLY_ACTION_KWARGS
     )
     return [stamp_file, tmp_dir]
@@ -556,6 +565,7 @@ def _extract_structured_config(ctx, ffx_invocation, ffx_scrutiny_inputs, pb_out_
         env = {"FFX_ISOLATE_DIR": ffx_isolate_dir.path},
         command = "\n".join(script_lines),
         progress_message = "Extract structured config for %s" % ctx.label.name,
+        mnemonic = "ExtractStructuredConfig",
         **LOCAL_ONLY_ACTION_KWARGS
     )
     return [structured_config, depfile]
@@ -664,6 +674,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
         command = script,
         env = env,
         progress_message = "Creating product bundle for %s" % ctx.label.name,
+        mnemonic = "CreatePB",
         **LOCAL_ONLY_ACTION_KWARGS
     )
     deps = [pb_out_dir, size_report] + partitions_configuration.files + ctx.files.main

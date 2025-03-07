@@ -573,5 +573,6 @@ def preprocess_file(ctx, source, includes, headers = [], files = depset()):
         arguments = [pp_args],
         inputs = [source] + headers + files.to_list(),
         outputs = [output_file],
+        mnemonic = "ClangPreprocessor",
     )
     return output_file

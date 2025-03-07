@@ -110,6 +110,7 @@ def _fuchsia_board_input_bundle_impl(ctx):
         inputs = creation_inputs,
         outputs = [board_input_bundle_dir],
         progress_message = "Creating board input bundle for %s" % ctx.label.name,
+        mnemonic = "CreateBIB",
         **LOCAL_ONLY_ACTION_KWARGS
     )
 

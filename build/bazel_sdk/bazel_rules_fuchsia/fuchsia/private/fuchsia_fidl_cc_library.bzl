@@ -163,9 +163,6 @@ def _codegen_impl(ctx):
 _codegen = rule(
     implementation = _codegen_impl,
     toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
-    # Files must be generated in genfiles in order for the header to be included
-    # anywhere.
-    output_to_genfiles = True,
     attrs = {
         "library": attr.label(
             doc = "The FIDL library to generate code for",
@@ -193,7 +190,6 @@ def _impl_wrapper_impl(ctx):
 # This allows the implementation file to be exposed as a source in its own rule.
 _impl_wrapper = rule(
     implementation = _impl_wrapper_impl,
-    output_to_genfiles = True,
     attrs = {
         "codegen": attr.label(
             doc = "The codegen rules generating the implementation file",

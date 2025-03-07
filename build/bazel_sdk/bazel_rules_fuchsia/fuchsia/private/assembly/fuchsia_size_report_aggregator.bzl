@@ -58,6 +58,7 @@ def _fuchsia_size_report_aggregator_impl(ctx):
         inputs = size_budgets + size_reports + verbose_outputs,
         executable = ctx.executable._size_report_merger,
         arguments = _merge_arguments,
+        mnemonic = "SizeAggregator",
         **LOCAL_ONLY_ACTION_KWARGS
     )
 

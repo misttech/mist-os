@@ -91,6 +91,7 @@ def _compile_component_manifest(ctx, manifest_in, component_name, includes_in):
                 coverage_shard.file,
             ],
             outputs = [manifest_merged],
+            mnemonic = "CmcMergeManifests",
         )
         manifest_in = manifest_merged
 
