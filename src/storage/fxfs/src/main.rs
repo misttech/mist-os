@@ -9,7 +9,7 @@ use fxfs::log::*;
 use fxfs::serialized_types::LATEST_VERSION;
 use fxfs_platform::component::Component;
 
-#[fuchsia::main(threads = 6)]
+#[fuchsia::main(threads = 6, thread_role = "fuchsia.fs.fxfs")]
 async fn main() -> Result<(), Error> {
     let _inspect_server_task = inspect_runtime::publish(
         fuchsia_inspect::component::inspector(),

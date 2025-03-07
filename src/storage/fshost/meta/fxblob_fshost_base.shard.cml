@@ -74,6 +74,11 @@
             availability: "optional",
         },
         {
+            protocol: "fuchsia.scheduler.RoleManager",
+            from: "parent",
+            to: "#fxfs",
+        },
+        {
             service: "fuchsia.fxfs.CryptService",
             from: "#fxfs-crypt",
             to: "#fxfs",
