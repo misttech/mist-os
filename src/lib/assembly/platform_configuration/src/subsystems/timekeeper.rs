@@ -65,8 +65,6 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
         if serve_fuchsia_time_alarms {
             // For all devices.
             builder.platform_bundle("timekeeper_wake_alarms");
-            // At the moment only the aml-hrtimer is supported. Stay tuned.
-            builder.platform_bundle("timekeeper_wake_alarms_aml_hrtimer");
         }
 
         // Always on counter is used instead of a persistent RTC on some platforms.
