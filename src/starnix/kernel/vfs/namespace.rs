@@ -1548,8 +1548,7 @@ impl NamespaceNode {
         if self.mount.flags().contains(MountFlags::NOSUID) {
             Ok(UserAndOrGroupId::default())
         } else {
-            let creds = current_task.creds();
-            self.entry.node.info().suid_and_sgid(&creds)
+            self.entry.node.info().suid_and_sgid(current_task)
         }
     }
 

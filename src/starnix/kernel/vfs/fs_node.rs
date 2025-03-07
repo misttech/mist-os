@@ -31,7 +31,7 @@ use starnix_types::ownership::Releasable;
 use starnix_types::time::{timespec_from_time, NANOS_PER_SECOND};
 use starnix_uapi::as_any::AsAny;
 use starnix_uapi::auth::{
-    Credentials, FsCred, UserAndOrGroupId, CAP_CHOWN, CAP_FOWNER, CAP_FSETID, CAP_MKNOD,
+    FsCred, UserAndOrGroupId, CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_FOWNER, CAP_FSETID, CAP_MKNOD,
     CAP_SYS_ADMIN, CAP_SYS_RESOURCE,
 };
 use starnix_uapi::device_type::DeviceType;
@@ -267,7 +267,7 @@ impl FsNodeInfo {
         FsCred { uid: self.uid, gid: self.gid }
     }
 
-    pub fn suid_and_sgid(&self, creds: &Credentials) -> Result<UserAndOrGroupId, Errno> {
+    pub fn suid_and_sgid(&self, current_task: &CurrentTask) -> Result<UserAndOrGroupId, Errno> {
         let uid = self.mode.contains(FileMode::ISUID).then_some(self.uid);
 
         // See <https://man7.org/linux/man-pages/man7/inode.7.html>:
@@ -283,7 +283,7 @@ impl FsNodeInfo {
         if maybe_set_id.is_some() {
             // Check that uid and gid actually have execute access before
             // returning them as the SUID or SGID.
-            creds.check_access(Access::EXEC, self.uid, self.gid, self.mode)?;
+            check_access(current_task, Access::EXEC, self.uid, self.gid, self.mode)?;
         }
         Ok(maybe_set_id)
     }
@@ -1997,7 +1997,7 @@ impl FsNode {
                 return Ok(());
             }
         }
-        current_task.creds().check_access(access, node_uid, node_gid, mode)
+        check_access(current_task, access, node_uid, node_gid, mode)
     }
 
     /// Check whether the node can be accessed in the current context with the specified access
@@ -2655,12 +2655,49 @@ impl Releasable for FsNode {
     }
 }
 
+fn check_access(
+    current_task: &CurrentTask,
+    access: Access,
+    node_uid: uid_t,
+    node_gid: gid_t,
+    mode: FileMode,
+) -> Result<(), Errno> {
+    let mode_bits = mode.bits();
+    let mode_rwx_bits = if current_task.creds().fsuid == node_uid {
+        (mode_bits & 0o700) >> 6
+    } else if current_task.creds().is_in_group(node_gid) {
+        (mode_bits & 0o070) >> 3
+    } else {
+        mode_bits & 0o007
+    };
+    if (access.rwx_bits() as u32 & mode_rwx_bits) == access.rwx_bits() as u32 {
+        return Ok(());
+    }
+    let capability_check_mode_rwx_bits = if mode.is_dir() {
+        0o7
+    } else {
+        // At least one of the EXEC bits must be set to execute files.
+        0o6 | (mode_bits & 0o100) >> 6 | (mode_bits & 0o010) >> 3 | mode_bits & 0o001
+    };
+    if (capability_check_mode_rwx_bits & access.rwx_bits() as u32) == access.rwx_bits() as u32 {
+        // TODO: https://fxbug.dev/401196505 - upgrade to security::check_task_capable.
+        if current_task.creds().has_capability(CAP_DAC_OVERRIDE) {
+            Ok(())
+        } else {
+            error!(EACCES)
+        }
+    } else {
+        error!(EACCES)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::device::mem::mem_device_init;
     use crate::testing::*;
     use crate::vfs::buffers::VecOutputBuffer;
+    use starnix_uapi::auth::Credentials;
 
     #[::fuchsia::test]
     async fn open_device_file() {
