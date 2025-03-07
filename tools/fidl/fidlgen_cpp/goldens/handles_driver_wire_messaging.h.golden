@@ -27,17 +27,8 @@ namespace test_handles {
 
 class DriverProtocol;
 
+#ifdef __Fuchsia__
 }  // namespace test_handles
-
-#ifdef __Fuchsia__
-
-template <>
-struct ::fidl::internal::ProtocolDetails<::test_handles::DriverProtocol> {
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_handles::DriverProtocol> final {
@@ -55,9 +46,11 @@ struct ::fidl::internal::WireServerDispatcher<::test_handles::DriverProtocol> fi
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
+namespace test_handles {
 
 #endif  // __Fuchsia__
 
+}  // namespace test_handles
 namespace fidl {
 
 #ifdef __Fuchsia__

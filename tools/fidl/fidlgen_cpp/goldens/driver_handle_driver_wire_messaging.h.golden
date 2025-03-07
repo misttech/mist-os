@@ -28,17 +28,8 @@ class DriverProtocol;
 
 class HandlesInProtocol;
 
+#ifdef __Fuchsia__
 }  // namespace test_driverhandle
-
-#ifdef __Fuchsia__
-
-template <>
-struct ::fidl::internal::ProtocolDetails<::test_driverhandle::DriverProtocol> {
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_driverhandle::DriverProtocol> final {
@@ -56,9 +47,11 @@ struct ::fidl::internal::WireServerDispatcher<::test_driverhandle::DriverProtoco
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
+namespace test_driverhandle {
 
 #endif  // __Fuchsia__
 
+}  // namespace test_driverhandle
 namespace fidl {
 
 #ifdef __Fuchsia__
@@ -131,14 +124,9 @@ namespace fidl {
 
 #endif  // __Fuchsia__
 
-}  // namespace fidl
-
-template <>
-struct ::fidl::internal::WireOrdinal<::test_driverhandle::HandlesInProtocol::SendHandles> final {
-  static constexpr uint64_t value = 8904504160365833729lu;
-};
-
 #ifdef __Fuchsia__
+
+}  // namespace fidl
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_driverhandle::HandlesInProtocol::SendHandles> {
@@ -148,21 +136,15 @@ struct ::fidl::internal::WireMethodTypes<::test_driverhandle::HandlesInProtocol:
   using Completer = fidl::Completer<>;
 };
 
+namespace fidl {
+
 #endif  // __Fuchsia__
 
+}  // namespace fidl
 namespace test_driverhandle {
 
+#ifdef __Fuchsia__
 }  // namespace test_driverhandle
-
-#ifdef __Fuchsia__
-
-template <>
-struct ::fidl::internal::ProtocolDetails<::test_driverhandle::HandlesInProtocol> {
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_driverhandle::HandlesInProtocol> final {
@@ -180,8 +162,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_driverhandle::HandlesInProt
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
+namespace test_driverhandle {
 
 #endif  // __Fuchsia__
+}  // namespace test_driverhandle
 
 #ifdef __Fuchsia__
 template <>

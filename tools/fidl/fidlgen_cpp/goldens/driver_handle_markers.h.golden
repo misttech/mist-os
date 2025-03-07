@@ -39,6 +39,8 @@ class HandlesInProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 8904504160365833729;
   };
 };
 

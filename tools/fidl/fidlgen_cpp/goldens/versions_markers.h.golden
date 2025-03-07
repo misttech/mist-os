@@ -39,6 +39,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 6231434419097198905;
   };
 };
 

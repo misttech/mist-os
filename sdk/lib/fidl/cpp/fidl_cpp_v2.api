@@ -7,7 +7,7 @@
   "pkg/fidl_cpp_v2/include/lib/fidl/cpp/internal/make_response_context.h": "89ac2750a91f194c83a1194c46d47c59",
   "pkg/fidl_cpp_v2/include/lib/fidl/cpp/internal/natural_client_base.h": "37dae0ef4e625a9762481f9f7f7574db",
   "pkg/fidl_cpp_v2/include/lib/fidl/cpp/internal/natural_message_encoder.h": "95e2b59c36d5cde98d8497ed78345b91",
-  "pkg/fidl_cpp_v2/include/lib/fidl/cpp/internal/thenable.h": "556e6478454e06ccfcf34b1ba0eea8c7",
-  "pkg/fidl_cpp_v2/include/lib/fidl/cpp/unified_messaging.h": "6725e16dcd4c719d223c8c7a21c7e0e7",
+  "pkg/fidl_cpp_v2/include/lib/fidl/cpp/internal/thenable.h": "5cbde8ce01bb0480023b854e480b68f3",
+  "pkg/fidl_cpp_v2/include/lib/fidl/cpp/unified_messaging.h": "25fbd7fb0daf1643b490c1e78ccc2520",
   "pkg/fidl_cpp_v2/include/lib/fidl/cpp/unified_messaging_declarations.h": "f97794ed5294c6f9cfa11862418e1b25"
 }

@@ -30,6 +30,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 8948968077914418681;
   };
   class TwoWayBasic final {
     TwoWayBasic() = delete;
@@ -44,6 +46,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 2331618702752598159;
   };
   class ErrorBasic final {
     ErrorBasic() = delete;
@@ -58,6 +62,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5016634351643393939;
   };
   class EventBasic final {
     EventBasic() = delete;
@@ -72,6 +78,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5892309624949902400;
   };
   class OneWayCompound final {
     OneWayCompound() = delete;
@@ -86,6 +94,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 3153289648860022476;
   };
   class TwoWayCompound final {
     TwoWayCompound() = delete;
@@ -100,6 +110,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 8787219719097524529;
   };
   class ErrorCompound final {
     ErrorCompound() = delete;
@@ -114,6 +126,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 2990809657626249085;
   };
   class EventCompound final {
     EventCompound() = delete;
@@ -128,6 +142,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 7024581948727571669;
   };
   class OneWayArrayBasic final {
     OneWayArrayBasic() = delete;
@@ -142,6 +158,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 7125516817014311449;
   };
   class TwoWayArrayBasic final {
     TwoWayArrayBasic() = delete;
@@ -156,6 +174,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5309034178175279380;
   };
   class ErrorArrayBasic final {
     ErrorArrayBasic() = delete;
@@ -170,6 +190,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 1084731895342694265;
   };
   class EventArrayBasic final {
     EventArrayBasic() = delete;
@@ -184,6 +206,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5888282827283820590;
   };
   class OneWayArrayCompound final {
     OneWayArrayCompound() = delete;
@@ -198,6 +222,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5064659223443251357;
   };
   class TwoWayArrayCompound final {
     TwoWayArrayCompound() = delete;
@@ -212,6 +238,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 849744466051983995;
   };
   class ErrorArrayCompound final {
     ErrorArrayCompound() = delete;
@@ -226,6 +254,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5919277476782807556;
   };
   class EventArrayCompound final {
     EventArrayCompound() = delete;
@@ -240,6 +270,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 2189769767733851157;
   };
   class OneWayVectorBasic final {
     OneWayVectorBasic() = delete;
@@ -254,6 +286,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5733220720079947351;
   };
   class TwoWayVectorBasic final {
     TwoWayVectorBasic() = delete;
@@ -268,6 +302,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 8674156353091415668;
   };
   class ErrorVectorBasic final {
     ErrorVectorBasic() = delete;
@@ -282,6 +318,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 875941614196965234;
   };
   class EventVectorBasic final {
     EventVectorBasic() = delete;
@@ -296,6 +334,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 4583890770109526006;
   };
   class OneWayVectorCompound final {
     OneWayVectorCompound() = delete;
@@ -310,6 +350,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 1853985797298830992;
   };
   class TwoWayVectorCompound final {
     TwoWayVectorCompound() = delete;
@@ -324,6 +366,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 3968024057912959924;
   };
   class ErrorVectorCompound final {
     ErrorVectorCompound() = delete;
@@ -338,6 +382,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 8506780203315865989;
   };
   class EventVectorCompound final {
     EventVectorCompound() = delete;
@@ -352,6 +398,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 6026375226599919603;
   };
   class OneWayVectorOptional final {
     OneWayVectorOptional() = delete;
@@ -366,6 +414,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 1530215841195476271;
   };
   class TwoWayVectorOptional final {
     TwoWayVectorOptional() = delete;
@@ -380,6 +430,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 1030024737742222323;
   };
   class ErrorVectorOptional final {
     ErrorVectorOptional() = delete;
@@ -394,6 +446,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 6406191217027936606;
   };
   class EventVectorOptional final {
     EventVectorOptional() = delete;
@@ -408,6 +462,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 1684763340073130077;
   };
   class OneWayArrayVectorNested final {
     OneWayArrayVectorNested() = delete;
@@ -422,6 +478,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5912603762133524183;
   };
   class TwoWayArrayVectorNested final {
     TwoWayArrayVectorNested() = delete;
@@ -436,6 +494,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5351275678438791132;
   };
   class ErrorArrayVectorNested final {
     ErrorArrayVectorNested() = delete;
@@ -450,6 +510,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 9085604921605802151;
   };
   class EventArrayVectorNested final {
     EventArrayVectorNested() = delete;
@@ -464,6 +526,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 1228201560727880574;
   };
   class OneWayResource final {
     OneWayResource() = delete;
@@ -478,6 +542,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 6553996787849601058;
   };
   class TwoWayResource final {
     TwoWayResource() = delete;
@@ -492,6 +558,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 1802709005492464987;
   };
   class ErrorResource final {
     ErrorResource() = delete;
@@ -506,6 +574,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 6568609240497354166;
   };
   class EventResource final {
     EventResource() = delete;
@@ -520,6 +590,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5745997765922613643;
   };
 };
 

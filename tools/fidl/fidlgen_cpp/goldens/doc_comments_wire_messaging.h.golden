@@ -28,19 +28,9 @@ class Interface;
 
 class Service;
 
-}  // namespace test_doccomments
-
-template <>
-struct ::fidl::internal::WireOrdinal<::test_doccomments::Interface::Method> final {
-  static constexpr uint64_t value = 5017051197196532121lu;
-};
-
-template <>
-struct ::fidl::internal::WireOrdinal<::test_doccomments::Interface::OnEvent> final {
-  static constexpr uint64_t value = 28780186509098736lu;
-};
-
 #ifdef __Fuchsia__
+
+}  // namespace test_doccomments
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_doccomments::Interface::Method> {
@@ -49,30 +39,25 @@ struct ::fidl::internal::WireMethodTypes<::test_doccomments::Interface::Method> 
   using Completer = fidl::Completer<>;
 };
 
+namespace test_doccomments {
+
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
+
+}  // namespace test_doccomments
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_doccomments::Interface::OnEvent> {
   static constexpr bool HasRequestPayload = false;
 };
 
-#endif  // __Fuchsia__
-
 namespace test_doccomments {
 
-}  // namespace test_doccomments
-
-#ifdef __Fuchsia__
-
-template <>
-struct ::fidl::internal::ProtocolDetails<::test_doccomments::Interface> {
-};
-
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
+}  // namespace test_doccomments
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_doccomments::Interface> final {
@@ -90,8 +75,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_doccomments::Interface> fin
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
+namespace test_doccomments {
 
 #endif  // __Fuchsia__
+}  // namespace test_doccomments
 
 #ifdef __Fuchsia__
 template <>

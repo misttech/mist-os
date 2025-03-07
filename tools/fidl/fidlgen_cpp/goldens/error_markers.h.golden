@@ -30,6 +30,8 @@ class Example final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 1107623248440401476;
   };
 };
 

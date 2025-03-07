@@ -96,8 +96,8 @@ TEST(SyncEventHandler, HandleEvent) {
 TEST(SyncEventHandler, UnknownEvent) {
   auto endpoints = fidl::Endpoints<test::TwoEvents>::Create();
   constexpr uint64_t kUnknownOrdinal = 0x1234abcd1234abcdULL;
-  static_assert(kUnknownOrdinal != fidl::internal::WireOrdinal<test::TwoEvents::EventA>::value);
-  static_assert(kUnknownOrdinal != fidl::internal::WireOrdinal<test::TwoEvents::EventB>::value);
+  static_assert(kUnknownOrdinal != test::TwoEvents::EventA::kOrdinal);
+  static_assert(kUnknownOrdinal != test::TwoEvents::EventB::kOrdinal);
   fidl_message_header_t unknown_message = {
       .txid = 1,
       .at_rest_flags = {0, 0},

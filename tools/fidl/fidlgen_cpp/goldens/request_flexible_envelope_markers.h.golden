@@ -30,6 +30,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 700529454616207123;
   };
   class RequestFlexibleResponseStrict final {
     RequestFlexibleResponseStrict() = delete;
@@ -44,6 +46,8 @@ class Protocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5191655763393883319;
   };
 };
 

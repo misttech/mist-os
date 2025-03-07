@@ -28,14 +28,9 @@ class Super;
 
 class Sub;
 
-}  // namespace test_inheritance
-
-template <>
-struct ::fidl::internal::WireOrdinal<::test_inheritance::Super::Foo> final {
-  static constexpr uint64_t value = 7540745593380780216lu;
-};
-
 #ifdef __Fuchsia__
+
+}  // namespace test_inheritance
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_inheritance::Super::Foo> {
@@ -55,21 +50,12 @@ struct ::fidl::internal::WireMethodTypes<::test_inheritance::Super::Foo> {
           ::fidl::internal::TransactionalRequest<::test_inheritance::Super::Foo>, ::fidl::internal::ChannelTransport>>;
 };
 
-#endif  // __Fuchsia__
-
 namespace test_inheritance {
 
-}  // namespace test_inheritance
-
-#ifdef __Fuchsia__
-
-template <>
-struct ::fidl::internal::ProtocolDetails<::test_inheritance::Super> {
-};
-
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
+}  // namespace test_inheritance
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_inheritance::Super> final {
@@ -87,8 +73,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_inheritance::Super> final {
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
+namespace test_inheritance {
 
 #endif  // __Fuchsia__
+}  // namespace test_inheritance
 
 #ifdef __Fuchsia__
 template <>
@@ -492,14 +480,9 @@ namespace fidl {
 
 #endif  // __Fuchsia__
 
-}  // namespace fidl
-
-template <>
-struct ::fidl::internal::WireOrdinal<::test_inheritance::Sub::Foo> final {
-  static constexpr uint64_t value = 7540745593380780216lu;
-};
-
 #ifdef __Fuchsia__
+
+}  // namespace fidl
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_inheritance::Sub::Foo> {
@@ -519,21 +502,15 @@ struct ::fidl::internal::WireMethodTypes<::test_inheritance::Sub::Foo> {
           ::fidl::internal::TransactionalRequest<::test_inheritance::Sub::Foo>, ::fidl::internal::ChannelTransport>>;
 };
 
+namespace fidl {
+
 #endif  // __Fuchsia__
 
+}  // namespace fidl
 namespace test_inheritance {
 
+#ifdef __Fuchsia__
 }  // namespace test_inheritance
-
-#ifdef __Fuchsia__
-
-template <>
-struct ::fidl::internal::ProtocolDetails<::test_inheritance::Sub> {
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_inheritance::Sub> final {
@@ -551,8 +528,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_inheritance::Sub> final {
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
+namespace test_inheritance {
 
 #endif  // __Fuchsia__
+}  // namespace test_inheritance
 
 #ifdef __Fuchsia__
 template <>

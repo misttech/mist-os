@@ -27,7 +27,7 @@ TEST(ServiceDirectoryTest, Control) {
 
   // TODO(https://fxbug.dev/377971588): This library uses `fdio_service_connect_at`, which still
   // uses io1's DeprecatedOpen function. This test will need to be updated when that is fixed.
-  ASSERT_EQ(fidl::internal::WireOrdinal<fio::Directory::DeprecatedOpen>::value, message.ordinal());
+  ASSERT_EQ(fio::Directory::DeprecatedOpen::kOrdinal, message.ordinal());
 }
 
 TEST(ServiceDirectoryTest, CreateWithRequest) {
@@ -44,7 +44,7 @@ TEST(ServiceDirectoryTest, CreateWithRequest) {
 
   // TODO(https://fxbug.dev/377971588): This library uses `fdio_service_connect_at`, which still
   // uses io1's DeprecatedOpen function. This test will need to be updated when that is fixed.
-  ASSERT_EQ(fidl::internal::WireOrdinal<fio::Directory::DeprecatedOpen>::value, message.ordinal());
+  ASSERT_EQ(fio::Directory::DeprecatedOpen::kOrdinal, message.ordinal());
 }
 
 TEST(ServiceDirectoryTest, Clone) {
@@ -59,7 +59,7 @@ TEST(ServiceDirectoryTest, Clone) {
   auto message = buffer.CreateEmptyIncomingMessage();
   message.Read(svc_server.get(), 0);
 
-  ASSERT_EQ(fidl::internal::WireOrdinal<fio::Directory::Clone>::value, message.ordinal());
+  ASSERT_EQ(fio::Directory::Clone::kOrdinal, message.ordinal());
 }
 
 TEST(ServiceDirectoryTest, Invalid) {

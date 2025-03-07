@@ -27,14 +27,9 @@ namespace test_placementofattributes {
 
 class ExampleProtocol;
 
-}  // namespace test_placementofattributes
-
-template <>
-struct ::fidl::internal::WireOrdinal<::test_placementofattributes::ExampleProtocol::Method> final {
-  static constexpr uint64_t value = 6023439637367187273lu;
-};
-
 #ifdef __Fuchsia__
+
+}  // namespace test_placementofattributes
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_placementofattributes::ExampleProtocol::Method> {
@@ -44,21 +39,12 @@ struct ::fidl::internal::WireMethodTypes<::test_placementofattributes::ExamplePr
   using Completer = fidl::Completer<>;
 };
 
-#endif  // __Fuchsia__
-
 namespace test_placementofattributes {
 
-}  // namespace test_placementofattributes
-
-#ifdef __Fuchsia__
-
-template <>
-struct ::fidl::internal::ProtocolDetails<::test_placementofattributes::ExampleProtocol> {
-};
-
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
+}  // namespace test_placementofattributes
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_placementofattributes::ExampleProtocol> final {
@@ -76,8 +62,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_placementofattributes::Exam
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
+namespace test_placementofattributes {
 
 #endif  // __Fuchsia__
+}  // namespace test_placementofattributes
 
 #ifdef __Fuchsia__
 template <>

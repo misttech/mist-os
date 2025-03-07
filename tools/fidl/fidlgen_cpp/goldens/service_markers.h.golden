@@ -30,6 +30,8 @@ class FirstProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 6352548393671797041;
   };
 };
 
@@ -54,6 +56,8 @@ class SecondProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 8121179205110225988;
   };
 };
 

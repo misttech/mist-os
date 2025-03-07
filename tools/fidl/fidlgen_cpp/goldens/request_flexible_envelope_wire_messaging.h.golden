@@ -26,19 +26,9 @@ namespace test_requestflexibleenvelope {
 
 class Protocol;
 
-}  // namespace test_requestflexibleenvelope
-
-template <>
-struct ::fidl::internal::WireOrdinal<::test_requestflexibleenvelope::Protocol::RequestStrictResponseFlexible> final {
-  static constexpr uint64_t value = 700529454616207123lu;
-};
-
-template <>
-struct ::fidl::internal::WireOrdinal<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict> final {
-  static constexpr uint64_t value = 5191655763393883319lu;
-};
-
 #ifdef __Fuchsia__
+
+}  // namespace test_requestflexibleenvelope
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_requestflexibleenvelope::Protocol::RequestStrictResponseFlexible> {
@@ -58,9 +48,13 @@ struct ::fidl::internal::WireMethodTypes<::test_requestflexibleenvelope::Protoco
           ::fidl::internal::TransactionalRequest<::test_requestflexibleenvelope::Protocol::RequestStrictResponseFlexible>, ::fidl::internal::ChannelTransport>>;
 };
 
+namespace test_requestflexibleenvelope {
+
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
+
+}  // namespace test_requestflexibleenvelope
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict> {
@@ -80,21 +74,12 @@ struct ::fidl::internal::WireMethodTypes<::test_requestflexibleenvelope::Protoco
           ::fidl::internal::TransactionalRequest<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict>, ::fidl::internal::ChannelTransport>>;
 };
 
-#endif  // __Fuchsia__
-
 namespace test_requestflexibleenvelope {
 
-}  // namespace test_requestflexibleenvelope
-
-#ifdef __Fuchsia__
-
-template <>
-struct ::fidl::internal::ProtocolDetails<::test_requestflexibleenvelope::Protocol> {
-};
-
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
+}  // namespace test_requestflexibleenvelope
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_requestflexibleenvelope::Protocol> final {
@@ -112,8 +97,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_requestflexibleenvelope::Pr
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
+namespace test_requestflexibleenvelope {
 
 #endif  // __Fuchsia__
+}  // namespace test_requestflexibleenvelope
 
 #ifdef __Fuchsia__
 template <>

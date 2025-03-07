@@ -39,6 +39,8 @@ class Parent final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 881818649151440699;
   };
   class GetChildRequest final {
     GetChildRequest() = delete;
@@ -53,6 +55,8 @@ class Parent final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 1096855814967598201;
   };
   class TakeChild final {
     TakeChild() = delete;
@@ -67,6 +71,8 @@ class Parent final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 4470101341872267920;
   };
   class TakeChildRequest final {
     TakeChildRequest() = delete;
@@ -81,6 +87,8 @@ class Parent final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 2333981071306416007;
   };
 };
 

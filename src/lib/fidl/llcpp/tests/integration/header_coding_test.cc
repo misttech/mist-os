@@ -51,7 +51,7 @@ TEST(HeaderCodingTest, OneWay) {
   ASSERT_EQ(kFidlWireFormatMagicNumberInitial, header->magic_number);
   ASSERT_EQ(FIDL_MESSAGE_HEADER_AT_REST_FLAGS_0_USE_VERSION_V2, header->at_rest_flags[0]);
   ASSERT_EQ(FIDL_MESSAGE_HEADER_DYNAMIC_FLAGS_STRICT_METHOD, header->dynamic_flags);
-  ASSERT_EQ(fidl::internal::WireOrdinal<Values::OneWay>::value, header->ordinal);
+  ASSERT_EQ(Values::OneWay::kOrdinal, header->ordinal);
 
   ASSERT_BYTES_EQ(
       buffer + sizeof(fidl_message_header_t) + sizeof(fidl::WireRequest<Values::OneWay>),
@@ -90,7 +90,7 @@ TEST(HeaderCodingTest, TwoWayAsync) {
   ASSERT_EQ(kFidlWireFormatMagicNumberInitial, header->magic_number);
   ASSERT_EQ(FIDL_MESSAGE_HEADER_AT_REST_FLAGS_0_USE_VERSION_V2, header->at_rest_flags[0]);
   ASSERT_EQ(FIDL_MESSAGE_HEADER_DYNAMIC_FLAGS_STRICT_METHOD, header->dynamic_flags);
-  ASSERT_EQ(fidl::internal::WireOrdinal<Values::Echo>::value, header->ordinal);
+  ASSERT_EQ(Values::Echo::kOrdinal, header->ordinal);
 
   ASSERT_BYTES_EQ(
       buffer + sizeof(fidl_message_header_t) + sizeof(fidl::WireRequest<Values::OneWay>),
@@ -124,7 +124,7 @@ TEST(HeaderCodingTest, TwoWaySync) {
     ASSERT_EQ(kFidlWireFormatMagicNumberInitial, header->magic_number);
     ASSERT_EQ(FIDL_MESSAGE_HEADER_AT_REST_FLAGS_0_USE_VERSION_V2, header->at_rest_flags[0]);
     ASSERT_EQ(FIDL_MESSAGE_HEADER_DYNAMIC_FLAGS_STRICT_METHOD, header->dynamic_flags);
-    ASSERT_EQ(fidl::internal::WireOrdinal<Values::Echo>::value, header->ordinal);
+    ASSERT_EQ(Values::Echo::kOrdinal, header->ordinal);
 
     ASSERT_BYTES_EQ(
         buffer + sizeof(fidl_message_header_t) + sizeof(fidl::WireRequest<Values::OneWay>),

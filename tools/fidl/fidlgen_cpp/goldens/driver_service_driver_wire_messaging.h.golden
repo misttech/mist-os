@@ -28,17 +28,8 @@ class SomeDriverProtocol;
 
 class DriverOnlyService;
 
+#ifdef __Fuchsia__
 }  // namespace test_driverservice
-
-#ifdef __Fuchsia__
-
-template <>
-struct ::fidl::internal::ProtocolDetails<::test_driverservice::SomeDriverProtocol> {
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_driverservice::SomeDriverProtocol> final {
@@ -56,9 +47,11 @@ struct ::fidl::internal::WireServerDispatcher<::test_driverservice::SomeDriverPr
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
+namespace test_driverservice {
 
 #endif  // __Fuchsia__
 
+}  // namespace test_driverservice
 namespace fidl {
 
 #ifdef __Fuchsia__

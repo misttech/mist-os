@@ -94,6 +94,10 @@ struct {{ .NaturalMethodTypes }} {
   using ResultCallback =
       ::fit::callback<void ({{ .NaturalResult }}&)>;
   {{- end }}
+
+  {{- if .HasDomainError }}
+  using DomainError = {{ .Result.ErrorDecl }};
+  {{- end }}
 };
 
 {{- end }}

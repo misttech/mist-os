@@ -30,6 +30,8 @@ class ExampleUseOfErrorSyntax final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 3565108794310607393;
   };
   class CallWhichMayFail final {
     CallWhichMayFail() = delete;
@@ -44,6 +46,8 @@ class ExampleUseOfErrorSyntax final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 3757408930698888354;
   };
 };
 

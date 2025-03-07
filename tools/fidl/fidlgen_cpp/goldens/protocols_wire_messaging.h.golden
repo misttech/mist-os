@@ -67,36 +67,10 @@
   class MethodWithUnion;
     
 
-}  // namespace test_protocols
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocols::WithAndWithoutRequestResponse::NoRequestNoResponse> final { static constexpr uint64_t value = 5413654872775949227lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocols::WithAndWithoutRequestResponse::NoRequestEmptyResponse> final { static constexpr uint64_t value = 1631193469798418024lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocols::WithAndWithoutRequestResponse::NoRequestWithResponse> final { static constexpr uint64_t value = 9037369643591427517lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocols::WithAndWithoutRequestResponse::WithRequestNoResponse> final { static constexpr uint64_t value = 7326057319832554103lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocols::WithAndWithoutRequestResponse::WithRequestEmptyResponse> final { static constexpr uint64_t value = 2877322062572412767lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocols::WithAndWithoutRequestResponse::WithRequestWithResponse> final { static constexpr uint64_t value = 6417226585456833969lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocols::WithAndWithoutRequestResponse::OnEmptyResponse> final { static constexpr uint64_t value = 5397663296507358806lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocols::WithAndWithoutRequestResponse::OnWithResponse> final { static constexpr uint64_t value = 5811598563493228968lu; };
-
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_protocols
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocols::WithAndWithoutRequestResponse::NoRequestNoResponse> {
@@ -105,7 +79,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::WithAndWithoutRequest
       using Completer = fidl::Completer<>;
 };
 
-
+namespace test_protocols {
 
 #endif  // __Fuchsia__
 
@@ -113,7 +87,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::WithAndWithoutRequest
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_protocols
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocols::WithAndWithoutRequestResponse::NoRequestEmptyResponse> {
@@ -135,7 +109,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::WithAndWithoutRequest
   >;
 };
 
-
+namespace test_protocols {
 
 #endif  // __Fuchsia__
 
@@ -143,7 +117,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::WithAndWithoutRequest
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_protocols
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocols::WithAndWithoutRequestResponse::NoRequestWithResponse> {
@@ -166,7 +140,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::WithAndWithoutRequest
   >;
 };
 
-
+namespace test_protocols {
 
 #endif  // __Fuchsia__
 
@@ -174,7 +148,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::WithAndWithoutRequest
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_protocols
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocols::WithAndWithoutRequestResponse::WithRequestNoResponse> {
@@ -184,7 +158,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::WithAndWithoutRequest
       using Completer = fidl::Completer<>;
 };
 
-
+namespace test_protocols {
 
 #endif  // __Fuchsia__
 
@@ -192,7 +166,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::WithAndWithoutRequest
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_protocols
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocols::WithAndWithoutRequestResponse::WithRequestEmptyResponse> {
@@ -215,7 +189,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::WithAndWithoutRequest
   >;
 };
 
-
+namespace test_protocols {
 
 #endif  // __Fuchsia__
 
@@ -223,7 +197,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::WithAndWithoutRequest
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_protocols
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocols::WithAndWithoutRequestResponse::WithRequestWithResponse> {
@@ -247,7 +221,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::WithAndWithoutRequest
   >;
 };
 
-
+namespace test_protocols {
 
 #endif  // __Fuchsia__
 
@@ -255,7 +229,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::WithAndWithoutRequest
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_protocols
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocols::WithAndWithoutRequestResponse::OnEmptyResponse> {
@@ -263,7 +237,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::WithAndWithoutRequest
     static constexpr bool HasRequestPayload = false;
 };
 
-
+namespace test_protocols {
 
 #endif  // __Fuchsia__
 
@@ -271,7 +245,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::WithAndWithoutRequest
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_protocols
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocols::WithAndWithoutRequestResponse::OnWithResponse> {
@@ -280,25 +254,15 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::WithAndWithoutRequest
       using Request = ::test_protocols::wire::WithAndWithoutRequestResponseOnWithResponseRequest;
 };
 
-
-
-#endif  // __Fuchsia__
-
-
 namespace test_protocols {
 
-}  // namespace test_protocols
-
-#ifdef __Fuchsia__
-
-template<>
-struct ::fidl::internal::ProtocolDetails<::test_protocols::WithAndWithoutRequestResponse> {
-};
-
 #endif  // __Fuchsia__
 
-#ifdef __Fuchsia__
 
+
+
+#ifdef __Fuchsia__
+}  // namespace test_protocols
 
 template<>
 struct ::fidl::internal::WireServerDispatcher<::test_protocols::WithAndWithoutRequestResponse> final {
@@ -315,10 +279,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_protocols::WithAndWithoutRe
   static const ::fidl::internal::MethodEntry* entries_end_;
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
-};
+};namespace test_protocols {
 
 #endif  // __Fuchsia__
-
+}  // namespace test_protocols
 
 #ifdef __Fuchsia__
 template<>
@@ -1880,24 +1844,10 @@ class ::fidl::WireServer<::test_protocols::WithAndWithoutRequestResponse> : publ
 
     
 
-}  // namespace fidl
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocols::WithErrorSyntax::ResponseAsStruct> final { static constexpr uint64_t value = 268248568430741139lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocols::WithErrorSyntax::ErrorAsPrimitive> final { static constexpr uint64_t value = 6930994461233198567lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocols::WithErrorSyntax::ErrorAsEnum> final { static constexpr uint64_t value = 5491891352371277635lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocols::WithErrorSyntax::HandleInResult> final { static constexpr uint64_t value = 1371676333068455103lu; };
-
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocols::WithErrorSyntax::ResponseAsStruct> {
@@ -1921,7 +1871,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::WithErrorSyntax::Resp
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -1929,7 +1879,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::WithErrorSyntax::Resp
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocols::WithErrorSyntax::ErrorAsPrimitive> {
@@ -1953,7 +1903,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::WithErrorSyntax::Erro
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -1961,7 +1911,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::WithErrorSyntax::Erro
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocols::WithErrorSyntax::ErrorAsEnum> {
@@ -1985,7 +1935,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::WithErrorSyntax::Erro
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -1993,7 +1943,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::WithErrorSyntax::Erro
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocols::WithErrorSyntax::HandleInResult> {
@@ -2017,25 +1967,16 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::WithErrorSyntax::Hand
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
 
+}  // namespace fidl
 namespace test_protocols {
 
+#ifdef __Fuchsia__
 }  // namespace test_protocols
-
-#ifdef __Fuchsia__
-
-template<>
-struct ::fidl::internal::ProtocolDetails<::test_protocols::WithErrorSyntax> {
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 
 template<>
 struct ::fidl::internal::WireServerDispatcher<::test_protocols::WithErrorSyntax> final {
@@ -2052,10 +1993,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_protocols::WithErrorSyntax>
   static const ::fidl::internal::MethodEntry* entries_end_;
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
-};
+};namespace test_protocols {
 
 #endif  // __Fuchsia__
-
+}  // namespace test_protocols
 
 #ifdef __Fuchsia__
 template<>
@@ -3368,27 +3309,10 @@ class ::fidl::WireServer<::test_protocols::WithErrorSyntax> : public ::fidl::int
 
     
 
-}  // namespace fidl
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocols::ChannelProtocol::MethodA> final { static constexpr uint64_t value = 3155008840945527714lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocols::ChannelProtocol::EventA> final { static constexpr uint64_t value = 2220452875311597006lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocols::ChannelProtocol::MethodB> final { static constexpr uint64_t value = 8903004957800778182lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocols::ChannelProtocol::TakeHandle> final { static constexpr uint64_t value = 591935489944717925lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocols::ChannelProtocol::MutateSocket> final { static constexpr uint64_t value = 7411742788430590287lu; };
-
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocols::ChannelProtocol::MethodA> {
@@ -3398,7 +3322,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::ChannelProtocol::Meth
       using Completer = fidl::Completer<>;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -3406,7 +3330,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::ChannelProtocol::Meth
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocols::ChannelProtocol::EventA> {
@@ -3415,7 +3339,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::ChannelProtocol::Even
       using Request = ::test_protocols::wire::ChannelProtocolEventARequest;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -3423,7 +3347,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::ChannelProtocol::Even
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocols::ChannelProtocol::MethodB> {
@@ -3447,7 +3371,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::ChannelProtocol::Meth
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -3455,7 +3379,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::ChannelProtocol::Meth
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocols::ChannelProtocol::TakeHandle> {
@@ -3478,7 +3402,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::ChannelProtocol::Take
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -3486,7 +3410,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::ChannelProtocol::Take
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocols::ChannelProtocol::MutateSocket> {
@@ -3510,25 +3434,16 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::ChannelProtocol::Muta
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
 
+}  // namespace fidl
 namespace test_protocols {
 
+#ifdef __Fuchsia__
 }  // namespace test_protocols
-
-#ifdef __Fuchsia__
-
-template<>
-struct ::fidl::internal::ProtocolDetails<::test_protocols::ChannelProtocol> {
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 
 template<>
 struct ::fidl::internal::WireServerDispatcher<::test_protocols::ChannelProtocol> final {
@@ -3545,10 +3460,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_protocols::ChannelProtocol>
   static const ::fidl::internal::MethodEntry* entries_end_;
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
-};
+};namespace test_protocols {
 
 #endif  // __Fuchsia__
-
+}  // namespace test_protocols
 
 #ifdef __Fuchsia__
 template<>
@@ -4757,15 +4672,10 @@ class ::fidl::WireServer<::test_protocols::ChannelProtocol> : public ::fidl::int
 
     
 
-}  // namespace fidl
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocols::DiscoverableProtocol::Method> final { static constexpr uint64_t value = 3455873048082739435lu; };
-
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocols::DiscoverableProtocol::Method> {
@@ -4774,26 +4684,16 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::DiscoverableProtocol:
       using Completer = fidl::Completer<>;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
 
+}  // namespace fidl
 namespace test_protocols {
 
+#ifdef __Fuchsia__
 }  // namespace test_protocols
-
-#ifdef __Fuchsia__
-
-template<>
-struct ::fidl::internal::ProtocolDetails<::test_protocols::DiscoverableProtocol> {
-    static constexpr char DiscoverableName[] = "test.protocols.DiscoverableProtocol";
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 
 template<>
 struct ::fidl::internal::WireServerDispatcher<::test_protocols::DiscoverableProtocol> final {
@@ -4810,10 +4710,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_protocols::DiscoverableProt
   static const ::fidl::internal::MethodEntry* entries_end_;
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
-};
+};namespace test_protocols {
 
 #endif  // __Fuchsia__
-
+}  // namespace test_protocols
 
 #ifdef __Fuchsia__
 template<>
@@ -5060,24 +4960,11 @@ class ::fidl::WireServer<::test_protocols::DiscoverableProtocol> : public ::fidl
 
     
 
-
-
 }  // namespace fidl
 namespace test_protocols {
 
+#ifdef __Fuchsia__
 }  // namespace test_protocols
-
-#ifdef __Fuchsia__
-
-template<>
-struct ::fidl::internal::ProtocolDetails<::test_protocols::AnotherDiscoverableProtocol> {
-    static constexpr char DiscoverableName[] = "fake.library.FakeProtocol";
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 
 template<>
 struct ::fidl::internal::WireServerDispatcher<::test_protocols::AnotherDiscoverableProtocol> final {
@@ -5094,11 +4981,12 @@ struct ::fidl::internal::WireServerDispatcher<::test_protocols::AnotherDiscovera
   static const ::fidl::internal::MethodEntry* entries_end_;
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
-};
+};namespace test_protocols {
 
 #endif  // __Fuchsia__
 
 
+}  // namespace test_protocols
 namespace fidl {
 
 
@@ -5230,24 +5118,11 @@ class ::fidl::WireServer<::test_protocols::AnotherDiscoverableProtocol> : public
 
     
 
-
-
 }  // namespace fidl
 namespace test_protocols {
 
+#ifdef __Fuchsia__
 }  // namespace test_protocols
-
-#ifdef __Fuchsia__
-
-template<>
-struct ::fidl::internal::ProtocolDetails<::test_protocols::PlatformServer> {
-    static constexpr char DiscoverableName[] = "test.protocols.PlatformServer";
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 
 template<>
 struct ::fidl::internal::WireServerDispatcher<::test_protocols::PlatformServer> final {
@@ -5264,11 +5139,12 @@ struct ::fidl::internal::WireServerDispatcher<::test_protocols::PlatformServer> 
   static const ::fidl::internal::MethodEntry* entries_end_;
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
-};
+};namespace test_protocols {
 
 #endif  // __Fuchsia__
 
 
+}  // namespace test_protocols
 namespace fidl {
 
 
@@ -5400,21 +5276,10 @@ class ::fidl::WireServer<::test_protocols::PlatformServer> : public ::fidl::inte
 
     
 
-}  // namespace fidl
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocols::HandleRightsProtocol::NoResponseMethod> final { static constexpr uint64_t value = 1155044649514904573lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocols::HandleRightsProtocol::ResponseMethod> final { static constexpr uint64_t value = 5956276128041940295lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocols::HandleRightsProtocol::AnEvent> final { static constexpr uint64_t value = 476727631355490611lu; };
-
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocols::HandleRightsProtocol::NoResponseMethod> {
@@ -5424,7 +5289,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::HandleRightsProtocol:
       using Completer = fidl::Completer<>;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -5432,7 +5297,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::HandleRightsProtocol:
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocols::HandleRightsProtocol::ResponseMethod> {
@@ -5456,7 +5321,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::HandleRightsProtocol:
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -5464,7 +5329,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::HandleRightsProtocol:
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocols::HandleRightsProtocol::AnEvent> {
@@ -5473,25 +5338,16 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::HandleRightsProtocol:
       using Request = ::test_protocols::wire::HandleRightsProtocolAnEventRequest;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
 
+}  // namespace fidl
 namespace test_protocols {
 
+#ifdef __Fuchsia__
 }  // namespace test_protocols
-
-#ifdef __Fuchsia__
-
-template<>
-struct ::fidl::internal::ProtocolDetails<::test_protocols::HandleRightsProtocol> {
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 
 template<>
 struct ::fidl::internal::WireServerDispatcher<::test_protocols::HandleRightsProtocol> final {
@@ -5508,10 +5364,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_protocols::HandleRightsProt
   static const ::fidl::internal::MethodEntry* entries_end_;
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
-};
+};namespace test_protocols {
 
 #endif  // __Fuchsia__
-
+}  // namespace test_protocols
 
 #ifdef __Fuchsia__
 template<>
@@ -6182,21 +6038,10 @@ class ::fidl::WireServer<::test_protocols::HandleRightsProtocol> : public ::fidl
 
     
 
-}  // namespace fidl
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocols::WithProtocolEnds::ClientEnds> final { static constexpr uint64_t value = 5870448041025163330lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocols::WithProtocolEnds::ServerEnds> final { static constexpr uint64_t value = 8115535094437022259lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocols::WithProtocolEnds::StructContainingEnds> final { static constexpr uint64_t value = 4076866772260025813lu; };
-
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocols::WithProtocolEnds::ClientEnds> {
@@ -6220,7 +6065,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::WithProtocolEnds::Cli
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -6228,7 +6073,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::WithProtocolEnds::Cli
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocols::WithProtocolEnds::ServerEnds> {
@@ -6252,7 +6097,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::WithProtocolEnds::Ser
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -6260,7 +6105,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::WithProtocolEnds::Ser
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocols::WithProtocolEnds::StructContainingEnds> {
@@ -6284,25 +6129,16 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::WithProtocolEnds::Str
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
 
+}  // namespace fidl
 namespace test_protocols {
 
+#ifdef __Fuchsia__
 }  // namespace test_protocols
-
-#ifdef __Fuchsia__
-
-template<>
-struct ::fidl::internal::ProtocolDetails<::test_protocols::WithProtocolEnds> {
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 
 template<>
 struct ::fidl::internal::WireServerDispatcher<::test_protocols::WithProtocolEnds> final {
@@ -6319,10 +6155,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_protocols::WithProtocolEnds
   static const ::fidl::internal::MethodEntry* entries_end_;
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
-};
+};namespace test_protocols {
 
 #endif  // __Fuchsia__
-
+}  // namespace test_protocols
 
 #ifdef __Fuchsia__
 template<>
@@ -7430,15 +7266,10 @@ class ::fidl::WireServer<::test_protocols::WithProtocolEnds> : public ::fidl::in
 
     
 
-}  // namespace fidl
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocols::ManyParameters::Fifteen> final { static constexpr uint64_t value = 6423043252952467815lu; };
-
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocols::ManyParameters::Fifteen> {
@@ -7448,25 +7279,16 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::ManyParameters::Fifte
       using Completer = fidl::Completer<>;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
 
+}  // namespace fidl
 namespace test_protocols {
 
+#ifdef __Fuchsia__
 }  // namespace test_protocols
-
-#ifdef __Fuchsia__
-
-template<>
-struct ::fidl::internal::ProtocolDetails<::test_protocols::ManyParameters> {
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 
 template<>
 struct ::fidl::internal::WireServerDispatcher<::test_protocols::ManyParameters> final {
@@ -7483,10 +7305,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_protocols::ManyParameters> 
   static const ::fidl::internal::MethodEntry* entries_end_;
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
-};
+};namespace test_protocols {
 
 #endif  // __Fuchsia__
-
+}  // namespace test_protocols
 
 #ifdef __Fuchsia__
 template<>
@@ -7762,15 +7584,10 @@ class ::fidl::WireServer<::test_protocols::ManyParameters> : public ::fidl::inte
 
     
 
-}  // namespace fidl
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocols::MethodWithUnion::UnionMethod> final { static constexpr uint64_t value = 4124874338266649112lu; };
-
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocols::MethodWithUnion::UnionMethod> {
@@ -7794,25 +7611,16 @@ struct ::fidl::internal::WireMethodTypes<::test_protocols::MethodWithUnion::Unio
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
 
+}  // namespace fidl
 namespace test_protocols {
 
+#ifdef __Fuchsia__
 }  // namespace test_protocols
-
-#ifdef __Fuchsia__
-
-template<>
-struct ::fidl::internal::ProtocolDetails<::test_protocols::MethodWithUnion> {
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 
 template<>
 struct ::fidl::internal::WireServerDispatcher<::test_protocols::MethodWithUnion> final {
@@ -7829,10 +7637,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_protocols::MethodWithUnion>
   static const ::fidl::internal::MethodEntry* entries_end_;
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
-};
+};namespace test_protocols {
 
 #endif  // __Fuchsia__
-
+}  // namespace test_protocols
 
 #ifdef __Fuchsia__
 template<>

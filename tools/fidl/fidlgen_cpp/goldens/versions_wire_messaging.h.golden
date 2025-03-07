@@ -30,17 +30,8 @@ class Protocol;
 
 class Service;
 
+#ifdef __Fuchsia__
 }  // namespace test_versions
-
-#ifdef __Fuchsia__
-
-template <>
-struct ::fidl::internal::ProtocolDetails<::test_versions::OtherProtocol> {
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_versions::OtherProtocol> final {
@@ -58,9 +49,11 @@ struct ::fidl::internal::WireServerDispatcher<::test_versions::OtherProtocol> fi
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
+namespace test_versions {
 
 #endif  // __Fuchsia__
 
+}  // namespace test_versions
 namespace fidl {
 
 #ifdef __Fuchsia__
@@ -175,14 +168,9 @@ namespace fidl {
 
 #endif  // __Fuchsia__
 
-}  // namespace fidl
-
-template <>
-struct ::fidl::internal::WireOrdinal<::test_versions::Protocol::Foo> final {
-  static constexpr uint64_t value = 6231434419097198905lu;
-};
-
 #ifdef __Fuchsia__
+
+}  // namespace fidl
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_versions::Protocol::Foo> {
@@ -191,21 +179,15 @@ struct ::fidl::internal::WireMethodTypes<::test_versions::Protocol::Foo> {
   using Completer = fidl::Completer<>;
 };
 
+namespace fidl {
+
 #endif  // __Fuchsia__
 
+}  // namespace fidl
 namespace test_versions {
 
+#ifdef __Fuchsia__
 }  // namespace test_versions
-
-#ifdef __Fuchsia__
-
-template <>
-struct ::fidl::internal::ProtocolDetails<::test_versions::Protocol> {
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_versions::Protocol> final {
@@ -222,8 +204,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_versions::Protocol> final {
   static const ::fidl::internal::MethodEntry* entries_end_;
   static const ::fidl::internal::UnknownMethodHandlerEntry unknown_method_handler_entry_;
 };
+namespace test_versions {
 
 #endif  // __Fuchsia__
+}  // namespace test_versions
 
 #ifdef __Fuchsia__
 template <>

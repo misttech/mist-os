@@ -82,7 +82,7 @@ class [[nodiscard]] NaturalThenable : private ThenableBase {
   void Then(Fn&& fn) && {
     using ResultType = typename FidlMethod::Protocol::Transport::template Result<FidlMethod>;
     std::move(*this).ThenExactlyOnce(MakeResponseContext<FidlMethod>(
-        internal::WireOrdinal<FidlMethod>::value,
+        FidlMethod::kOrdinal,
         WeakCallbackFactory<ResultType>{client_base()->client_object_lifetime()}.Then(
             std::forward<Fn>(fn))));
   }
@@ -108,8 +108,8 @@ class [[nodiscard]] NaturalThenable : private ThenableBase {
   //     event loop iteration when the client is destroyed.
   //
   void ThenExactlyOnce(::fidl::ClientCallback<FidlMethod> callback) && {
-    std::move(*this).ThenExactlyOnce(MakeResponseContext<FidlMethod>(
-        internal::WireOrdinal<FidlMethod>::value, std::move(callback)));
+    std::move(*this).ThenExactlyOnce(
+        MakeResponseContext<FidlMethod>(FidlMethod::kOrdinal, std::move(callback)));
   }
 
   NaturalThenable(NaturalThenable&& other) noexcept = delete;

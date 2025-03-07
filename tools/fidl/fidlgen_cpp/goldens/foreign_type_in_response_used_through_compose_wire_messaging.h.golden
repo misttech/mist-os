@@ -28,14 +28,9 @@ namespace test_foreigntypeinresponseusedthroughcompose {
 
 class Top;
 
-}  // namespace test_foreigntypeinresponseusedthroughcompose
-
-template <>
-struct ::fidl::internal::WireOrdinal<::test_foreigntypeinresponseusedthroughcompose::Top::GetFoo> final {
-  static constexpr uint64_t value = 4619180266423108403lu;
-};
-
 #ifdef __Fuchsia__
+
+}  // namespace test_foreigntypeinresponseusedthroughcompose
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_foreigntypeinresponseusedthroughcompose::Top::GetFoo> {
@@ -54,21 +49,12 @@ struct ::fidl::internal::WireMethodTypes<::test_foreigntypeinresponseusedthrough
           ::fidl::internal::TransactionalRequest<::test_foreigntypeinresponseusedthroughcompose::Top::GetFoo>, ::fidl::internal::ChannelTransport>>;
 };
 
-#endif  // __Fuchsia__
-
 namespace test_foreigntypeinresponseusedthroughcompose {
 
-}  // namespace test_foreigntypeinresponseusedthroughcompose
-
-#ifdef __Fuchsia__
-
-template <>
-struct ::fidl::internal::ProtocolDetails<::test_foreigntypeinresponseusedthroughcompose::Top> {
-};
-
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
+}  // namespace test_foreigntypeinresponseusedthroughcompose
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_foreigntypeinresponseusedthroughcompose::Top> final {
@@ -86,8 +72,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_foreigntypeinresponseusedth
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
+namespace test_foreigntypeinresponseusedthroughcompose {
 
 #endif  // __Fuchsia__
+}  // namespace test_foreigntypeinresponseusedthroughcompose
 
 #ifdef __Fuchsia__
 template <>

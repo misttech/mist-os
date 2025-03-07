@@ -26,14 +26,9 @@ namespace test_nullable {
 
 class SimpleProtocol;
 
-}  // namespace test_nullable
-
-template <>
-struct ::fidl::internal::WireOrdinal<::test_nullable::SimpleProtocol::Add> final {
-  static constexpr uint64_t value = 9142761280038437494lu;
-};
-
 #ifdef __Fuchsia__
+
+}  // namespace test_nullable
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_nullable::SimpleProtocol::Add> {
@@ -53,21 +48,12 @@ struct ::fidl::internal::WireMethodTypes<::test_nullable::SimpleProtocol::Add> {
           ::fidl::internal::TransactionalRequest<::test_nullable::SimpleProtocol::Add>, ::fidl::internal::ChannelTransport>>;
 };
 
-#endif  // __Fuchsia__
-
 namespace test_nullable {
 
-}  // namespace test_nullable
-
-#ifdef __Fuchsia__
-
-template <>
-struct ::fidl::internal::ProtocolDetails<::test_nullable::SimpleProtocol> {
-};
-
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
+}  // namespace test_nullable
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_nullable::SimpleProtocol> final {
@@ -85,8 +71,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_nullable::SimpleProtocol> f
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
+namespace test_nullable {
 
 #endif  // __Fuchsia__
+}  // namespace test_nullable
 
 #ifdef __Fuchsia__
 template <>

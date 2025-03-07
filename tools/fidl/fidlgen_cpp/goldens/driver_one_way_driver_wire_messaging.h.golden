@@ -26,14 +26,9 @@ namespace test_driveroneway {
 
 class OneWay;
 
-}  // namespace test_driveroneway
-
-template <>
-struct ::fidl::internal::WireOrdinal<::test_driveroneway::OneWay::Send> final {
-  static constexpr uint64_t value = 7942965975761529343lu;
-};
-
 #ifdef __Fuchsia__
+
+}  // namespace test_driveroneway
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_driveroneway::OneWay::Send> {
@@ -43,21 +38,12 @@ struct ::fidl::internal::WireMethodTypes<::test_driveroneway::OneWay::Send> {
   using Completer = fidl::Completer<>;
 };
 
-#endif  // __Fuchsia__
-
 namespace test_driveroneway {
 
-}  // namespace test_driveroneway
-
-#ifdef __Fuchsia__
-
-template <>
-struct ::fidl::internal::ProtocolDetails<::test_driveroneway::OneWay> {
-};
-
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
+}  // namespace test_driveroneway
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_driveroneway::OneWay> final {
@@ -75,8 +61,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_driveroneway::OneWay> final
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
+namespace test_driveroneway {
 
 #endif  // __Fuchsia__
+}  // namespace test_driveroneway
 
 #ifdef __Fuchsia__
 template <>

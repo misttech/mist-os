@@ -22,11 +22,6 @@ struct FakeUnknownMethod {
 };
 
 template <>
-struct ::fidl::internal::WireOrdinal<FakeUnknownMethod> {
-  static constexpr uint64_t value = FakeUnknownMethod::kOrdinal;
-};
-
-template <>
 struct ::fidl::TypeTraits<::fidl::WireResponse<FakeUnknownMethod>> {
   static constexpr uint32_t kPrimarySize = sizeof(fidl_union_t);
   static constexpr uint32_t kMaxOutOfLine = 0;
@@ -147,7 +142,9 @@ class UnknownInteractions : public ::zxtest::Test {
       async::PostTask(AsyncDispatcher(),
                       [&unbound, &unbind = unbind_.value(), &server = server_]() {
                         unbind();
-                        { auto s = std::move(server); }
+                        {
+                          auto s = std::move(server);
+                        }
                         unbound.Signal();
                       });
       unbound.Wait();
@@ -395,7 +392,7 @@ std::array<uint8_t, sizeof(fidl_message_header_t) + sizeof(fidl_union_t)> MakeMe
       .at_rest_flags = {FIDL_MESSAGE_HEADER_AT_REST_FLAGS_0_USE_VERSION_V2, 0},
       .dynamic_flags = dynamic_flags.value,
       .magic_number = kFidlWireFormatMagicNumberInitial,
-      .ordinal = fidl::internal::WireOrdinal<FidlMethod>::value,
+      .ordinal = FidlMethod::kOrdinal,
   };
   fidl_union_t body{
       .tag = static_cast<std::underlying_type_t<ResultUnionTag>>(result_union_tag),
@@ -431,7 +428,7 @@ std::array<uint8_t, sizeof(fidl_message_header_t)> MakeMessage(
       .at_rest_flags = {FIDL_MESSAGE_HEADER_AT_REST_FLAGS_0_USE_VERSION_V2, 0},
       .dynamic_flags = dynamic_flags.value,
       .magic_number = kFidlWireFormatMagicNumberInitial,
-      .ordinal = fidl::internal::WireOrdinal<FidlMethod>::value,
+      .ordinal = FidlMethod::kOrdinal,
   };
   std::array<uint8_t, sizeof(fidl_message_header_t)> result;
   std::memcpy(result.data(), &header, sizeof(fidl_message_header_t));

@@ -32,60 +32,10 @@
   class MainProtocol;
     
 
-}  // namespace test_protocolpayloads
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocolpayloads::MainProtocol::OneWayComposed> final { static constexpr uint64_t value = 2602591870026304272lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocolpayloads::MainProtocol::TwoWayComposed> final { static constexpr uint64_t value = 2542459230546612144lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocolpayloads::MainProtocol::TwoWayComposedWithError> final { static constexpr uint64_t value = 7681984876526769495lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocolpayloads::MainProtocol::OnComposed> final { static constexpr uint64_t value = 1872339328378152762lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocolpayloads::MainProtocol::OneWayLocal> final { static constexpr uint64_t value = 7755175439334311701lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocolpayloads::MainProtocol::TwoWayLocal> final { static constexpr uint64_t value = 8374292137648566031lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocolpayloads::MainProtocol::TwoWayLocalWithError> final { static constexpr uint64_t value = 2898559119954589948lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocolpayloads::MainProtocol::OnLocal> final { static constexpr uint64_t value = 5135782819583756313lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocolpayloads::MainProtocol::OneWayImport> final { static constexpr uint64_t value = 3344777159365288972lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocolpayloads::MainProtocol::TwoWayImport> final { static constexpr uint64_t value = 2374708679656510579lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocolpayloads::MainProtocol::TwoWayImportWithError> final { static constexpr uint64_t value = 4286143084949642173lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocolpayloads::MainProtocol::OnImport> final { static constexpr uint64_t value = 1996489653379631369lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocolpayloads::MainProtocol::OneWayAnon> final { static constexpr uint64_t value = 811587311021806764lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocolpayloads::MainProtocol::TwoWayAnon> final { static constexpr uint64_t value = 629880979996923737lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocolpayloads::MainProtocol::TwoWayAnonWithError> final { static constexpr uint64_t value = 6368863385719175734lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_protocolpayloads::MainProtocol::OnAnon> final { static constexpr uint64_t value = 4815229650203439104lu; };
-
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_protocolpayloads
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::OneWayComposed> {
@@ -95,7 +45,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
       using Completer = fidl::Completer<>;
 };
 
-
+namespace test_protocolpayloads {
 
 #endif  // __Fuchsia__
 
@@ -103,7 +53,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_protocolpayloads
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::TwoWayComposed> {
@@ -127,7 +77,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
   >;
 };
 
-
+namespace test_protocolpayloads {
 
 #endif  // __Fuchsia__
 
@@ -135,7 +85,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_protocolpayloads
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::TwoWayComposedWithError> {
@@ -160,7 +110,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
   >;
 };
 
-
+namespace test_protocolpayloads {
 
 #endif  // __Fuchsia__
 
@@ -168,7 +118,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_protocolpayloads
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::OnComposed> {
@@ -177,7 +127,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
       using Request = ::test_protocolpayloads_imported::wire::ImportStructPayload;
 };
 
-
+namespace test_protocolpayloads {
 
 #endif  // __Fuchsia__
 
@@ -185,7 +135,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_protocolpayloads
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::OneWayLocal> {
@@ -195,7 +145,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
       using Completer = fidl::Completer<>;
 };
 
-
+namespace test_protocolpayloads {
 
 #endif  // __Fuchsia__
 
@@ -203,7 +153,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_protocolpayloads
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::TwoWayLocal> {
@@ -227,7 +177,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
   >;
 };
 
-
+namespace test_protocolpayloads {
 
 #endif  // __Fuchsia__
 
@@ -235,7 +185,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_protocolpayloads
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::TwoWayLocalWithError> {
@@ -260,7 +210,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
   >;
 };
 
-
+namespace test_protocolpayloads {
 
 #endif  // __Fuchsia__
 
@@ -268,7 +218,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_protocolpayloads
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::OnLocal> {
@@ -277,7 +227,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
       using Request = ::test_protocolpayloads::wire::LocalStructPayload;
 };
 
-
+namespace test_protocolpayloads {
 
 #endif  // __Fuchsia__
 
@@ -285,7 +235,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_protocolpayloads
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::OneWayImport> {
@@ -295,7 +245,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
       using Completer = fidl::Completer<>;
 };
 
-
+namespace test_protocolpayloads {
 
 #endif  // __Fuchsia__
 
@@ -303,7 +253,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_protocolpayloads
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::TwoWayImport> {
@@ -327,7 +277,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
   >;
 };
 
-
+namespace test_protocolpayloads {
 
 #endif  // __Fuchsia__
 
@@ -335,7 +285,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_protocolpayloads
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::TwoWayImportWithError> {
@@ -360,7 +310,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
   >;
 };
 
-
+namespace test_protocolpayloads {
 
 #endif  // __Fuchsia__
 
@@ -368,7 +318,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_protocolpayloads
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::OnImport> {
@@ -377,7 +327,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
       using Request = ::test_protocolpayloads_imported::wire::ImportStructPayload;
 };
 
-
+namespace test_protocolpayloads {
 
 #endif  // __Fuchsia__
 
@@ -385,7 +335,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_protocolpayloads
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::OneWayAnon> {
@@ -395,7 +345,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
       using Completer = fidl::Completer<>;
 };
 
-
+namespace test_protocolpayloads {
 
 #endif  // __Fuchsia__
 
@@ -403,7 +353,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_protocolpayloads
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::TwoWayAnon> {
@@ -427,7 +377,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
   >;
 };
 
-
+namespace test_protocolpayloads {
 
 #endif  // __Fuchsia__
 
@@ -435,7 +385,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_protocolpayloads
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::TwoWayAnonWithError> {
@@ -460,7 +410,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
   >;
 };
 
-
+namespace test_protocolpayloads {
 
 #endif  // __Fuchsia__
 
@@ -468,7 +418,7 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_protocolpayloads
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::OnAnon> {
@@ -477,25 +427,15 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolpayloads::MainProtocol::
       using Request = ::test_protocolpayloads::wire::MainProtocolOnAnonRequest;
 };
 
-
-
-#endif  // __Fuchsia__
-
-
 namespace test_protocolpayloads {
 
-}  // namespace test_protocolpayloads
-
-#ifdef __Fuchsia__
-
-template<>
-struct ::fidl::internal::ProtocolDetails<::test_protocolpayloads::MainProtocol> {
-};
-
 #endif  // __Fuchsia__
 
-#ifdef __Fuchsia__
 
+
+
+#ifdef __Fuchsia__
+}  // namespace test_protocolpayloads
 
 template<>
 struct ::fidl::internal::WireServerDispatcher<::test_protocolpayloads::MainProtocol> final {
@@ -512,10 +452,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_protocolpayloads::MainProto
   static const ::fidl::internal::MethodEntry* entries_end_;
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
-};
+};namespace test_protocolpayloads {
 
 #endif  // __Fuchsia__
-
+}  // namespace test_protocolpayloads
 
 #ifdef __Fuchsia__
 template<>

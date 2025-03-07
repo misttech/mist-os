@@ -36,14 +36,9 @@ class MultiHeterogeneousMemberService;
 
 class MultiHomogeneousMemberService;
 
-}  // namespace test_service
-
-template <>
-struct ::fidl::internal::WireOrdinal<::test_service::FirstProtocol::MethodOnFirst> final {
-  static constexpr uint64_t value = 6352548393671797041lu;
-};
-
 #ifdef __Fuchsia__
+
+}  // namespace test_service
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_service::FirstProtocol::MethodOnFirst> {
@@ -52,21 +47,12 @@ struct ::fidl::internal::WireMethodTypes<::test_service::FirstProtocol::MethodOn
   using Completer = fidl::Completer<>;
 };
 
-#endif  // __Fuchsia__
-
 namespace test_service {
 
-}  // namespace test_service
-
-#ifdef __Fuchsia__
-
-template <>
-struct ::fidl::internal::ProtocolDetails<::test_service::FirstProtocol> {
-};
-
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
+}  // namespace test_service
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_service::FirstProtocol> final {
@@ -84,8 +70,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_service::FirstProtocol> fin
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
+namespace test_service {
 
 #endif  // __Fuchsia__
+}  // namespace test_service
 
 #ifdef __Fuchsia__
 template <>
@@ -303,14 +291,9 @@ namespace fidl {
 
 #endif  // __Fuchsia__
 
-}  // namespace fidl
-
-template <>
-struct ::fidl::internal::WireOrdinal<::test_service::SecondProtocol::MethodOnSecond> final {
-  static constexpr uint64_t value = 8121179205110225988lu;
-};
-
 #ifdef __Fuchsia__
+
+}  // namespace fidl
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_service::SecondProtocol::MethodOnSecond> {
@@ -319,21 +302,15 @@ struct ::fidl::internal::WireMethodTypes<::test_service::SecondProtocol::MethodO
   using Completer = fidl::Completer<>;
 };
 
+namespace fidl {
+
 #endif  // __Fuchsia__
 
+}  // namespace fidl
 namespace test_service {
 
+#ifdef __Fuchsia__
 }  // namespace test_service
-
-#ifdef __Fuchsia__
-
-template <>
-struct ::fidl::internal::ProtocolDetails<::test_service::SecondProtocol> {
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_service::SecondProtocol> final {
@@ -351,8 +328,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_service::SecondProtocol> fi
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
+namespace test_service {
 
 #endif  // __Fuchsia__
+}  // namespace test_service
 
 #ifdef __Fuchsia__
 template <>

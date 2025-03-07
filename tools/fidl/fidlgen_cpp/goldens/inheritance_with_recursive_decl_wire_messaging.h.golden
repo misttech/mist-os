@@ -28,14 +28,9 @@ class Parent;
 
 class Child;
 
-}  // namespace test_inheritancewithrecursivedecl
-
-template <>
-struct ::fidl::internal::WireOrdinal<::test_inheritancewithrecursivedecl::Parent::First> final {
-  static constexpr uint64_t value = 3973163707930985819lu;
-};
-
 #ifdef __Fuchsia__
+
+}  // namespace test_inheritancewithrecursivedecl
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_inheritancewithrecursivedecl::Parent::First> {
@@ -45,21 +40,12 @@ struct ::fidl::internal::WireMethodTypes<::test_inheritancewithrecursivedecl::Pa
   using Completer = fidl::Completer<>;
 };
 
-#endif  // __Fuchsia__
-
 namespace test_inheritancewithrecursivedecl {
 
-}  // namespace test_inheritancewithrecursivedecl
-
-#ifdef __Fuchsia__
-
-template <>
-struct ::fidl::internal::ProtocolDetails<::test_inheritancewithrecursivedecl::Parent> {
-};
-
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
+}  // namespace test_inheritancewithrecursivedecl
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_inheritancewithrecursivedecl::Parent> final {
@@ -77,8 +63,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_inheritancewithrecursivedec
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
+namespace test_inheritancewithrecursivedecl {
 
 #endif  // __Fuchsia__
+}  // namespace test_inheritancewithrecursivedecl
 
 #ifdef __Fuchsia__
 template <>
@@ -315,19 +303,9 @@ namespace fidl {
 
 #endif  // __Fuchsia__
 
-}  // namespace fidl
-
-template <>
-struct ::fidl::internal::WireOrdinal<::test_inheritancewithrecursivedecl::Child::First> final {
-  static constexpr uint64_t value = 3973163707930985819lu;
-};
-
-template <>
-struct ::fidl::internal::WireOrdinal<::test_inheritancewithrecursivedecl::Child::Second> final {
-  static constexpr uint64_t value = 2545123272820824165lu;
-};
-
 #ifdef __Fuchsia__
+
+}  // namespace fidl
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_inheritancewithrecursivedecl::Child::First> {
@@ -337,9 +315,13 @@ struct ::fidl::internal::WireMethodTypes<::test_inheritancewithrecursivedecl::Ch
   using Completer = fidl::Completer<>;
 };
 
+namespace fidl {
+
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
+
+}  // namespace fidl
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_inheritancewithrecursivedecl::Child::Second> {
@@ -349,21 +331,15 @@ struct ::fidl::internal::WireMethodTypes<::test_inheritancewithrecursivedecl::Ch
   using Completer = fidl::Completer<>;
 };
 
+namespace fidl {
+
 #endif  // __Fuchsia__
 
+}  // namespace fidl
 namespace test_inheritancewithrecursivedecl {
 
+#ifdef __Fuchsia__
 }  // namespace test_inheritancewithrecursivedecl
-
-#ifdef __Fuchsia__
-
-template <>
-struct ::fidl::internal::ProtocolDetails<::test_inheritancewithrecursivedecl::Child> {
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_inheritancewithrecursivedecl::Child> final {
@@ -381,8 +357,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_inheritancewithrecursivedec
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
+namespace test_inheritancewithrecursivedecl {
 
 #endif  // __Fuchsia__
+}  // namespace test_inheritancewithrecursivedecl
 
 #ifdef __Fuchsia__
 template <>

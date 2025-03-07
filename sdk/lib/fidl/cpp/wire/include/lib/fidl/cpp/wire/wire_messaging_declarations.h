@@ -104,9 +104,6 @@ class WireUnownedResult;
 
 namespace internal {
 
-template <typename FidlMethod>
-struct WireOrdinal;
-
 // |IncomingMessageStorage| allocates the necessary storage for receiving a
 // transactional message of type |FidlType| from its corresponding transport.
 // The allocation may be inline if reasonably small. It is useful for allocating

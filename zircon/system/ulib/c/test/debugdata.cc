@@ -118,7 +118,7 @@ TEST(DebugDataTests, PublishDataWithBadSvc) {
 // local copy matches the canonical definition here.
 // TODO(https://fxbug.dev/324111518): Migrate this to fuchsia.io/Directory.Open3.
 static_assert(fuchsia_io_DirectoryDeprecatedOpenOrdinal ==
-              fidl::internal::WireOrdinal<fuchsia_io::Directory::DeprecatedOpen>::value);
+              fuchsia_io::Directory::DeprecatedOpen::kOrdinal);
 static_assert(fidl::TypeTraits<fidl::internal::TransactionalRequest<
                   fuchsia_io::Directory::DeprecatedOpen>>::kPrimarySize ==
               sizeof(fuchsia_io_DirectoryDeprecatedOpenRequest));

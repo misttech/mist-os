@@ -28,14 +28,9 @@ namespace test_transitivedependenciescompose {
 
 class Top;
 
-}  // namespace test_transitivedependenciescompose
-
-template <>
-struct ::fidl::internal::WireOrdinal<::test_transitivedependenciescompose::Top::GetFoo> final {
-  static constexpr uint64_t value = 2618685789258237543lu;
-};
-
 #ifdef __Fuchsia__
+
+}  // namespace test_transitivedependenciescompose
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_transitivedependenciescompose::Top::GetFoo> {
@@ -54,21 +49,12 @@ struct ::fidl::internal::WireMethodTypes<::test_transitivedependenciescompose::T
           ::fidl::internal::TransactionalRequest<::test_transitivedependenciescompose::Top::GetFoo>, ::fidl::internal::ChannelTransport>>;
 };
 
-#endif  // __Fuchsia__
-
 namespace test_transitivedependenciescompose {
 
-}  // namespace test_transitivedependenciescompose
-
-#ifdef __Fuchsia__
-
-template <>
-struct ::fidl::internal::ProtocolDetails<::test_transitivedependenciescompose::Top> {
-};
-
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
+}  // namespace test_transitivedependenciescompose
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_transitivedependenciescompose::Top> final {
@@ -86,8 +72,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_transitivedependenciescompo
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
+namespace test_transitivedependenciescompose {
 
 #endif  // __Fuchsia__
+}  // namespace test_transitivedependenciescompose
 
 #ifdef __Fuchsia__
 template <>
