@@ -1245,6 +1245,7 @@ void Dispatcher::DispatchCallback(
   thread_context::PushDriver(owner_, this);
   auto pop_driver = fit::defer([]() { thread_context::PopDriver(); });
 
+  TRACE_DURATION("driver_dispatcher", name_.c_str());
   callback_request->Call(std::move(callback_request), ZX_OK);
 }
 
