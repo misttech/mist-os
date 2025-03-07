@@ -40,16 +40,16 @@ DisplayInfo::DisplayInfo(display::DisplayId display_id,
                          fbl::Vector<display::PixelFormat> pixel_formats,
                          display::DisplayTiming preferred_mode)
     : IdMappable(display_id),
-      edid(std::nullopt),
+      edid_info(std::nullopt),
       mode(preferred_mode),
       pixel_formats(std::move(pixel_formats)) {
   ZX_DEBUG_ASSERT(display_id != display::kInvalidDisplayId);
 }
 
 DisplayInfo::DisplayInfo(display::DisplayId display_id,
-                         fbl::Vector<display::PixelFormat> pixel_formats, edid::Edid edid)
+                         fbl::Vector<display::PixelFormat> pixel_formats, edid::Edid edid_info)
     : IdMappable(display_id),
-      edid(DisplayInfo::Edid{.base = std::move(edid)}),
+      edid_info(std::move(edid_info)),
       mode(std::nullopt),
       pixel_formats(std::move(pixel_formats)) {
   ZX_DEBUG_ASSERT(display_id != display::kInvalidDisplayId);
@@ -68,13 +68,13 @@ void DisplayInfo::InitializeInspect(inspect::Node* parent_node) {
     return;
   }
 
-  ZX_DEBUG_ASSERT(edid.has_value());
+  ZX_DEBUG_ASSERT(edid_info.has_value());
 
-  node.CreateByteVector("edid-bytes", std::span(edid->base.edid_bytes(), edid->base.edid_length()),
+  node.CreateByteVector("edid-bytes", std::span(edid_info->edid_bytes(), edid_info->edid_length()),
                         &properties);
 
   size_t i = 0;
-  for (const display::DisplayTiming& t : edid->timings) {
+  for (const display::DisplayTiming& t : edid_timings) {
     auto child = node.CreateChild(fbl::StringPrintf("timing-parameters-%lu", ++i).c_str());
     child.CreateDouble("vsync-hz",
                        static_cast<double>(t.vertical_field_refresh_rate_millihertz()) / 1000.0,
@@ -138,7 +138,7 @@ zx::result<std::unique_ptr<DisplayInfo>> DisplayInfo::Create(AddedDisplayInfo ad
   }
 
   if (fdf::Logger::GlobalInstance()->GetSeverity() <= FUCHSIA_LOG_DEBUG) {
-    const auto& edid = display_info->edid->base;
+    const edid::Edid& edid = display_info->edid_info.value();
     std::string manufacturer_id = edid.GetManufacturerId();
     const char* manufacturer_name = edid.GetManufacturerName();
     const char* manufacturer =
@@ -155,39 +155,39 @@ zx::result<std::unique_ptr<DisplayInfo>> DisplayInfo::Create(AddedDisplayInfo ad
 }
 
 int DisplayInfo::GetHorizontalSizeMm() const {
-  if (!edid.has_value()) {
+  if (!edid_info.has_value()) {
     return 0;
   }
-  return edid->base.horizontal_size_mm();
+  return edid_info->horizontal_size_mm();
 }
 
 int DisplayInfo::GetVerticalSizeMm() const {
-  if (!edid.has_value()) {
+  if (!edid_info.has_value()) {
     return 0;
   }
-  return edid->base.vertical_size_mm();
+  return edid_info->vertical_size_mm();
 }
 
 std::string_view DisplayInfo::GetManufacturerName() const {
-  if (!edid.has_value()) {
+  if (!edid_info.has_value()) {
     return std::string_view();
   }
-  const char* manufacturer_name = edid->base.GetManufacturerName();
+  const char* manufacturer_name = edid_info->GetManufacturerName();
   return std::string_view(manufacturer_name);
 }
 
 std::string DisplayInfo::GetMonitorName() const {
-  if (!edid.has_value()) {
+  if (!edid_info.has_value()) {
     return {};
   }
-  return edid->base.GetDisplayProductName();
+  return edid_info->GetDisplayProductName();
 }
 
 std::string DisplayInfo::GetMonitorSerial() const {
-  if (!edid.has_value()) {
+  if (!edid_info.has_value()) {
     return {};
   }
-  return edid->base.GetDisplayProductSerialNumber();
+  return edid_info->GetDisplayProductSerialNumber();
 }
 
 }  // namespace display_coordinator

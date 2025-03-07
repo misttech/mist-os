@@ -63,9 +63,10 @@ namespace fidl_display = fuchsia_hardware_display;
 namespace display_coordinator {
 
 void Controller::PopulateDisplayTimings(DisplayInfo& display_info) {
-  if (!display_info.edid.has_value()) {
+  if (!display_info.edid_info.has_value()) {
     return;
   }
+  const edid::Edid& edid_info = display_info.edid_info.value();
 
   // Go through all the display mode timings and record whether or not
   // a basic layer configuration is acceptable.
@@ -93,15 +94,15 @@ void Controller::PopulateDisplayTimings(DisplayInfo& display_info) {
       .layer_count = 1,
   };
 
-  for (auto edid_timing = edid::timing_iterator(&display_info.edid->base); edid_timing.is_valid();
-       ++edid_timing) {
-    const display::DisplayTiming& timing = *edid_timing;
-    int32_t width = timing.horizontal_active_px;
-    int32_t height = timing.vertical_active_lines;
+  for (auto edid_timing_it = edid::timing_iterator(&edid_info); edid_timing_it.is_valid();
+       ++edid_timing_it) {
+    const display::DisplayTiming& edid_timing = *edid_timing_it;
+    int32_t width = edid_timing.horizontal_active_px;
+    int32_t height = edid_timing.vertical_active_lines;
     bool duplicate = false;
-    for (const display::DisplayTiming& existing_timing : display_info.edid->timings) {
+    for (const display::DisplayTiming& existing_timing : display_info.edid_timings) {
       if (existing_timing.vertical_field_refresh_rate_millihertz() ==
-              timing.vertical_field_refresh_rate_millihertz() &&
+              edid_timing.vertical_field_refresh_rate_millihertz() &&
           existing_timing.horizontal_active_px == width &&
           existing_timing.vertical_active_lines == height) {
         duplicate = true;
@@ -123,7 +124,7 @@ void Controller::PopulateDisplayTimings(DisplayInfo& display_info) {
     test_layer.display_destination.width = width;
     test_layer.display_destination.height = height;
 
-    test_config.mode = display::ToBanjoDisplayMode(timing);
+    test_config.mode = display::ToBanjoDisplayMode(edid_timing);
 
     config_check_result_t display_cfg_result;
     layer_composition_operations_t layer_result = 0;
@@ -132,10 +133,10 @@ void Controller::PopulateDisplayTimings(DisplayInfo& display_info) {
         &test_config, &layer_result,
         /*layer_composition_operations_count=*/1, &display_layer_results_count);
     if (display_cfg_result == CONFIG_CHECK_RESULT_OK) {
-      fbl::AllocChecker ac;
-      display_info.edid->timings.push_back(timing, &ac);
-      if (!ac.check()) {
-        fdf::warn("Edid skip allocation failed");
+      fbl::AllocChecker alloc_checker;
+      display_info.edid_timings.push_back(edid_timing, &alloc_checker);
+      if (!alloc_checker.check()) {
+        fdf::warn("Failed to allocate memory for EDID timing. Skipping it.");
         break;
       }
     }
@@ -153,7 +154,7 @@ void Controller::AddDisplay(std::unique_ptr<AddedDisplayInfo> added_display_info
   }
   std::unique_ptr<DisplayInfo> display_info = std::move(display_info_result).value();
 
-  if (display_info->edid.has_value()) {
+  if (display_info->edid_info.has_value()) {
     PopulateDisplayTimings(*display_info);
   }
 
@@ -166,7 +167,7 @@ void Controller::AddDisplay(std::unique_ptr<AddedDisplayInfo> added_display_info
   //
   // Dropping some add events can result in spurious removes, but
   // those are filtered out in the clients.
-  if (!display_info->edid.has_value() || !display_info->edid->timings.is_empty()) {
+  if (!display_info->edid_info.has_value() || !display_info->edid_timings.is_empty()) {
     display_info->InitializeInspect(&root_);
   } else {
     fdf::warn("Ignoring display with no compatible edid timings");
@@ -666,8 +667,8 @@ zx::result<std::span<const display::DisplayTiming>> Controller::GetDisplayTiming
   }
   const DisplayInfo& display_info = *displays_it;
 
-  if (display_info.edid.has_value()) {
-    return zx::ok(std::span(display_info.edid->timings));
+  if (display_info.edid_info.has_value()) {
+    return zx::ok(std::span(display_info.edid_timings));
   }
 
   ZX_DEBUG_ASSERT(display_info.mode.has_value());

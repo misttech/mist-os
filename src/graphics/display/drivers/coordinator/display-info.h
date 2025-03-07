@@ -42,7 +42,7 @@ class DisplayInfo : public IdMappable<std::unique_ptr<DisplayInfo>, display::Dis
                        display::DisplayTiming preferred_mode);
 
   explicit DisplayInfo(display::DisplayId display_id,
-                       fbl::Vector<display::PixelFormat> pixel_formats, edid::Edid edid);
+                       fbl::Vector<display::PixelFormat> pixel_formats, edid::Edid edid_info);
 
   DisplayInfo(const DisplayInfo&) = delete;
   DisplayInfo(DisplayInfo&&) = delete;
@@ -75,13 +75,13 @@ class DisplayInfo : public IdMappable<std::unique_ptr<DisplayInfo>, display::Dis
   // Returns an empty string if the information is not available.
   std::string GetMonitorSerial() const;
 
-  struct Edid {
-    edid::Edid base;
-    fbl::Vector<display::DisplayTiming> timings;
-  };
+  // nullopt if the display does not support EDID.
+  const std::optional<edid::Edid> edid_info;
 
-  // Exactly one of `edid` and `mode` can be non-nullopt.
-  std::optional<Edid> edid;
+  // Only populated if `edid_info` is not nullopt.
+  fbl::Vector<display::DisplayTiming> edid_timings;
+
+  // Exactly one of `edid_info` and `mode` can be non-nullopt.
   const std::optional<display::DisplayTiming> mode;
 
   const fbl::Vector<display::PixelFormat> pixel_formats;

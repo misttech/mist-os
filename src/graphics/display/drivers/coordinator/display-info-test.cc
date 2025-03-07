@@ -54,13 +54,13 @@ TEST_F(DisplayInfoTest, InitializeWithEdidValueSingleBlock) {
   ASSERT_OK(display_info_result);
 
   std::unique_ptr<DisplayInfo> display_info = std::move(display_info_result).value();
-  ASSERT_TRUE(display_info->edid.has_value());
+  ASSERT_TRUE(display_info->edid_info.has_value());
 
-  const edid::Edid& edid_base = display_info->edid->base;
-  EXPECT_EQ(edid_base.edid_length(), edid::kHpZr30wEdid.size());
-  EXPECT_EQ(edid_base.GetManufacturerName(), std::string("HEWLETT PACKARD"));
-  EXPECT_EQ(edid_base.product_code(), 10348u);
-  EXPECT_EQ(edid_base.GetDisplayProductSerialNumber(), std::string("CN413010YH"));
+  const edid::Edid& edid_info = display_info->edid_info.value();
+  EXPECT_EQ(edid_info.edid_length(), edid::kHpZr30wEdid.size());
+  EXPECT_EQ(edid_info.GetManufacturerName(), std::string("HEWLETT PACKARD"));
+  EXPECT_EQ(edid_info.product_code(), 10348u);
+  EXPECT_EQ(edid_info.GetDisplayProductSerialNumber(), std::string("CN413010YH"));
 }
 
 TEST_F(DisplayInfoTest, InitializeWithEdidValueMultipleBlocks) {
@@ -88,13 +88,13 @@ TEST_F(DisplayInfoTest, InitializeWithEdidValueMultipleBlocks) {
   ASSERT_OK(display_info_result);
 
   std::unique_ptr<DisplayInfo> display_info = std::move(display_info_result).value();
-  ASSERT_TRUE(display_info->edid.has_value());
+  ASSERT_TRUE(display_info->edid_info.has_value());
 
-  const edid::Edid& edid_base = display_info->edid->base;
-  EXPECT_EQ(edid_base.edid_length(), edid::kSamsungCrg9Edid.size());
-  EXPECT_EQ(edid_base.GetManufacturerName(), std::string("SAMSUNG ELECTRIC COMPANY"));
-  EXPECT_EQ(edid_base.product_code(), 28754u);
-  EXPECT_EQ(edid_base.GetDisplayProductSerialNumber(), std::string("H4ZR701271"));
+  const edid::Edid& edid_info = display_info->edid_info.value();
+  EXPECT_EQ(edid_info.edid_length(), edid::kSamsungCrg9Edid.size());
+  EXPECT_EQ(edid_info.GetManufacturerName(), std::string("SAMSUNG ELECTRIC COMPANY"));
+  EXPECT_EQ(edid_info.product_code(), 28754u);
+  EXPECT_EQ(edid_info.GetDisplayProductSerialNumber(), std::string("H4ZR701271"));
 }
 
 TEST_F(DisplayInfoTest, InitializeWithEdidValueOfInvalidLength) {
