@@ -2,25 +2,38 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//src/bringup/bin/device-name-provider/meta/integration-test-realm-common.shard.cml" ],
+    include: [
+        "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
+    ],
     children: [
         {
-            name: "fake-zbi",
-            url: "fake_zbi#meta/fake_zbi.cm",
+            name: "device-name-provider",
+            url: "fuchsia-pkg://fuchsia.com/device-name-provider-tests#meta/device-name-provider.cm",
         },
-    ],
-    capabilities: [
         {
-            config: "use_zbi",
-            type: "bool",
-            value: true,
+            name: "integration-test",
+            url: "fuchsia-pkg://fuchsia.com/device-name-provider-tests#meta/integration-test-component.cm",
         },
     ],
     offer: [
         {
-            protocol: "fuchsia.boot.Items",
-            from: "#fake-zbi",
+            protocol: "fuchsia.device.NameProvider",
+            from: "#device-name-provider",
+            to: "#integration-test",
+        },
+        {
+            from: "void",
             to: "#device-name-provider",
+            availability: "optional",
+            config: [ "fuchsia.network.PrimaryInterface" ],
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.test.Suite",
+            from: "#integration-test",
+            to: "parent",
         },
     ],
 }

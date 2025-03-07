@@ -10,32 +10,20 @@
 
 #include <gtest/gtest.h>
 
-#include "src/bringup/bin/device-name-provider/tests/integration_test_config.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace {
 
-const char* kDeviceNameWithMAC = "fuchsia-4567-89ab-cdef";
-const bool kUseZbi = integration_test_config::Config::TakeFromStartupHandle().use_zbi();
-
 TEST(NameProviderTest, GetHostNameDefault) {
   char hostname[HOST_NAME_MAX];
   ASSERT_EQ(gethostname(hostname, sizeof(hostname)), 0) << strerror(errno);
-  if (kUseZbi) {
-    ASSERT_STREQ(hostname, kDeviceNameWithMAC);
-  } else {
-    ASSERT_STREQ(hostname, fuchsia_device::wire::kDefaultDeviceName);
-  }
+  ASSERT_STREQ(hostname, fuchsia_device::wire::kDefaultDeviceName);
 }
 
 TEST(NameProviderTest, UnameDefault) {
   utsname uts;
   ASSERT_EQ(uname(&uts), 0) << strerror(errno);
-  if (kUseZbi) {
-    ASSERT_STREQ(uts.nodename, kDeviceNameWithMAC);
-  } else {
-    ASSERT_STREQ(uts.nodename, fuchsia_device::wire::kDefaultDeviceName);
-  }
+  ASSERT_STREQ(uts.nodename, fuchsia_device::wire::kDefaultDeviceName);
 }
 
 TEST(NameProviderTest, GetDeviceName) {
@@ -51,13 +39,8 @@ TEST(NameProviderTest, GetDeviceName) {
 
   const fidl::StringView& name = res->value()->name;
   // regression test: ensure that no additional data is present past the last null byte
-  if (kUseZbi) {
-    EXPECT_EQ(name.size(), strlen(kDeviceNameWithMAC));
-    EXPECT_EQ(memcmp(name.data(), kDeviceNameWithMAC, name.size()), 0);
-  } else {
-    EXPECT_EQ(name.size(), strlen(fuchsia_device::wire::kDefaultDeviceName));
-    EXPECT_EQ(memcmp(name.data(), fuchsia_device::wire::kDefaultDeviceName, name.size()), 0);
-  }
+  EXPECT_EQ(name.size(), strlen(fuchsia_device::wire::kDefaultDeviceName));
+  EXPECT_EQ(memcmp(name.data(), fuchsia_device::wire::kDefaultDeviceName, name.size()), 0);
 }
 
 }  // namespace
