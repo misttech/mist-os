@@ -1769,36 +1769,6 @@ def _merge_rules_fuchsia(runtime, use_rules_fuchsia):
                     content = _adjust_content_for_rules_fuchsia(content)
                     ctx.file(child_dir + "/" + build_file.basename, content)
 
-        # @fuchsia_sdk//fuchsia/private:driver.ld,
-        # @fuchsia_sdk//fuchsia/private:driver_restricted_symbols.txt are
-        # accessed by the fuchsia_cc_driver() macro which is run in the
-        # context of project-specific BUILD.bazel files. Create two alias()
-        # targets to @rules_fuchsia//fuchsia/private:<name> for these
-        #
-        # Similarly, visitor.ld is used by fuchsia_devicetree_visitor().
-        ctx.file(
-            "fuchsia/private/BUILD.bazel",
-            """# AUTO-GENERATED - DO NOT EDIT
-alias(
-    name = "driver.ld",
-    actual = "@rules_fuchsia//fuchsia/private:driver.ld",
-    visibility = ["//visibility:public"],
-)
-
-alias(
-    name = "driver_restricted_symbols.txt",
-    actual = "@rules_fuchsia//fuchsia/private:driver_restricted_symbols.txt",
-    visibility = ["//visibility:public"],
-)
-
-alias(
-    name = "visitor.ld",
-    actual = "@rules_fuchsia//fuchsia/private:visitor.ld",
-    visibility = ["//visibility:public"],
-)
-""",
-        )
-
         # Needed by the SDK test suite.
         ctx.symlink(rules_fuchsia_root.get_child("fuchsia", "tools"), "fuchsia/tools")
     else:
