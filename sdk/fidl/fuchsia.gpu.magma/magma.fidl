@@ -560,6 +560,6 @@ open protocol PowerElementProvider {
 
 @available(added=HEAD)
 service Service {
-    device client_end:Device;
+    device client_end:CombinedDevice;
     power_element_provider client_end:PowerElementProvider;
 };
