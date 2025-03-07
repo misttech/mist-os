@@ -491,7 +491,33 @@ template("fidl") {
       # rust bindings are to be defined.
       import("//build/rust/fidl_rust.gni")
 
-      # Define the Rust bindings.
+      # Define the common portion of the rust bindings.
+      fidl_rust("${target_name}_rust_common") {
+        forward_variables_from(invoker,
+                               [
+                                 "applicable_licenses",
+                                 "testonly",
+                                 "visibility",
+                                 "public_deps",
+                                 "disable_rustdoc",
+                               ])
+        forward_variables_from(common_parameters, "*")
+        if (!is_host && enable_rust_drivers) {
+          forward_variables_from(invoker, [ "contains_drivers" ])
+        }
+        deps = []
+        common = true
+        if (is_host) {
+          deps = [ "//sdk/categories:marker-${marker_category}" ]
+        }
+        fidl_gen_dir += "/rust"
+      }
+
+      common_crate_name =
+          "fidl_" + string_replace(common_parameters.library_name, ".", "_") +
+          "_common"
+
+      # Define the standard FIDL Rust bindings.
       fidl_rust("${target_name}_rust") {
         forward_variables_from(invoker,
                                [
@@ -505,12 +531,14 @@ template("fidl") {
         if (!is_host && enable_rust_drivers) {
           forward_variables_from(invoker, [ "contains_drivers" ])
         }
-        deps = [ "//sdk/categories:marker-${marker_category}" ]
+        deps = [ ":${invoker.target_name}_rust_common" ]
+        use_common = common_crate_name
+        deps += [ "//sdk/categories:marker-${marker_category}" ]
         fidl_gen_dir += "/rust"
       }
 
       if (enable_fdomain) {
-        # Define the Rust bindings.
+        # Define the FDomain Rust bindings.
         fidl_rust("${target_name}_fdomain") {
           forward_variables_from(invoker,
                                  [
@@ -524,7 +552,11 @@ template("fidl") {
           fdomain = true
 
           forward_variables_from(common_parameters, "*")
-          deps = [ "//sdk/categories:marker-${marker_category}" ]
+          deps = [
+            ":${invoker.target_name}_rust_common",
+            "//sdk/categories:marker-${marker_category}",
+          ]
+          use_common = common_crate_name
           fidl_gen_dir += "/rust"
         }
       }

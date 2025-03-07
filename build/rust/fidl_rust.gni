@@ -46,6 +46,8 @@ template("fidl_rust") {
 
   generation_target = "${target_name}_generate"
   fdomain = defined(invoker.fdomain) && invoker.fdomain
+  common = defined(invoker.common) && invoker.common
+  assert(!fdomain || !common, "Only one of `fdomain` and `common` may be true")
 
   forward_variables_from(invoker,
                          [
@@ -57,6 +59,9 @@ template("fidl_rust") {
     crate_name = "fdomain_" + string_replace(library_name, ".", "_")
   } else {
     crate_name = "fidl_" + string_replace(library_name, ".", "_")
+  }
+  if (common) {
+    crate_name = crate_name + "_common"
   }
   file_stem = "$fidl_gen_dir/$crate_name"
 
@@ -102,6 +107,15 @@ template("fidl_rust") {
         args += [ "--fdomain=true" ]
       }
 
+      if (common) {
+        args += [ "--common=true" ]
+      }
+
+      if (defined(invoker.use_common)) {
+        assert(!common, "Common library should not set `use_common`")
+        args += [ "--use_common=${invoker.use_common}" ]
+      }
+
       if (defined(invoker.contains_drivers) && invoker.contains_drivers) {
         args += [ "--include-drivers" ]
       }
@@ -124,7 +138,9 @@ template("fidl_rust") {
                [
                  "fidl_ir_json",
                  "fidl_ir_target",
+                 "use_common",
                ])
+    not_needed([ "common" ])
 
     rustc_library(target_name) {
       forward_variables_from(invoker,

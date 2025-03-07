@@ -5,8 +5,10 @@
 */}}
 
 {{- define "AliasDeclaration" }}
+{{- if EmitType .Type.IsValueType }}
 {{- range .DocComments }}
 ///{{ . }}
 {{- end }}
 pub type {{ .Name }} = {{ .Type.Owned }};
+{{- end }}
 {{- end }}

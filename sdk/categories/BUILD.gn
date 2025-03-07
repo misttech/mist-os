@@ -66,6 +66,7 @@ if (is_host || is_fidl_toolchain) {
         "${target}_ir_root",
         "${target}_lint",
         "${target}_rust.actual",
+        "${target}_rust_common.actual",
       ]
     }
 

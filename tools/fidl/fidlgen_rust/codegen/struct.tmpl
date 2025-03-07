@@ -5,6 +5,7 @@
 */}}
 
 {{- define "StructDeclaration" }}
+{{- if EmitType .IsValueType }}
 {{- range .DocComments }}
 ///{{ . }}
 {{- end }}
@@ -24,8 +25,10 @@ pub struct {{ .Name }}{{ if not .Members }};{{ else }}{
 
 impl fidl::{{ if .IsValueType }}Persistable{{ else }}Standalone<{{ ResourceDialect }}>{{ end }} for {{ .Name }} {}
 {{- end }}
+{{- end }}
 
 {{- define "StructInternal" }}
+{{- if EmitType .IsValueType }}
 {{- $resourceDialectName := "D"}}
 {{- $resourceDialectGeneric := "<D: fidl::encoding::ResourceDialect>"}}
 {{- $resourceDialectGenericPart := "D: fidl::encoding::ResourceDialect, "}}
@@ -202,4 +205,5 @@ impl{{ $resourceDialectGeneric }} fidl::encoding::Decode<Self, {{ $resourceDiale
         {{- end }}
     }
 }
+{{- end }}
 {{- end }}
