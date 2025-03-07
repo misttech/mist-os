@@ -714,11 +714,6 @@ impl<I: Instant> RetransTimer<I> {
         *at = now.panicking_add(core::cmp::min(*rto, remaining));
     }
 
-    fn rearm(&mut self, now: I) {
-        let Self { at, rto, user_timeout_until: _, remaining_retries: _ } = self;
-        *at = now.panicking_add(*rto);
-    }
-
     fn timed_out(&self, now: I) -> bool {
         let RetransTimer { user_timeout_until, remaining_retries, at, rto: _ } = self;
         (remaining_retries.is_none() && now >= *at) || now >= *user_timeout_until
@@ -1499,7 +1494,15 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
         pure_ack: bool,
         rcv: R,
         now: I,
-        keep_alive: &KeepAlive,
+        SocketOptions {
+            keep_alive,
+            nagle_enabled: _,
+            user_timeout,
+            delayed_ack: _,
+            fin_wait2_timeout: _,
+            max_syn_retries: _,
+            ip_options: _,
+        }: &SocketOptions,
     ) -> (Option<Segment<()>>, DataAcked) {
         let Self {
             nxt: snd_nxt,
@@ -1534,7 +1537,13 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                 if seg_ack == *snd_max {
                     *timer = None;
                 } else if seg_ack.before(*snd_max) && seg_ack.after(*snd_una) {
-                    retrans_timer.rearm(now);
+                    let user_timeout = user_timeout.get_or_default(DEFAULT_USER_TIMEOUT);
+                    *retrans_timer = RetransTimer::new(
+                        now,
+                        rtt_estimator.rto(),
+                        user_timeout,
+                        DEFAULT_MAX_RETRIES,
+                    );
                 }
             }
             Some(SendTimer::ZeroWindowProbe(_)) | Some(SendTimer::SWSProbe { at: _ }) => {}
@@ -2019,8 +2028,8 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
         counters: &TcpCountersInner,
         incoming: Segment<P>,
         now: I,
-        SocketOptions {
-            keep_alive,
+        options @ SocketOptions {
+            keep_alive: _,
             nagle_enabled: _,
             user_timeout: _,
             delayed_ack,
@@ -2367,7 +2376,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                             pure_ack,
                             rcv.get_mut(),
                             now,
-                            keep_alive,
+                            options,
                         );
                         data_acked = segment_acked_data;
                         if let Some(ack) = ack {
@@ -2383,7 +2392,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                             pure_ack,
                             &*closed_rcv,
                             now,
-                            keep_alive,
+                            options,
                         );
                         data_acked = segment_acked_data;
                         if let Some(ack) = ack {
@@ -2401,7 +2410,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                             pure_ack,
                             &*closed_rcv,
                             now,
-                            keep_alive,
+                            options,
                         );
                         data_acked = segment_acked_data;
                         if let Some(ack) = ack {
@@ -2427,7 +2436,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                             pure_ack,
                             rcv.get_mut(),
                             now,
-                            keep_alive,
+                            options,
                         );
                         data_acked = segment_acked_data;
                         if let Some(ack) = ack {
@@ -2466,7 +2475,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                             pure_ack,
                             &*closed_rcv,
                             now,
-                            keep_alive,
+                            options,
                         );
                         data_acked = segment_acked_data;
                         if let Some(ack) = ack {
@@ -4897,10 +4906,10 @@ mod test {
             ),
             (None, None),
         );
-        // The timer is rearmed, and the current RTO after 2 retransmissions
-        // should be 4s (1s, 2s, 4s).
-        assert_eq!(state.poll_send_at(), Some(clock.now() + 4 * Estimator::RTO_INIT));
-        clock.sleep(4 * Estimator::RTO_INIT);
+        // The timer is rearmed with the the current RTO estimate, which still should
+        // be RTO_INIT.
+        assert_eq!(state.poll_send_at(), Some(clock.now() + Estimator::RTO_INIT));
+        clock.sleep(Estimator::RTO_INIT);
         assert_eq!(
             state.poll_send_with_default_options(1, clock.now(), &counters,),
             Some(Segment::data(
@@ -4924,10 +4933,11 @@ mod test {
             ),
             (None, None)
         );
-        // Since we retransmitted once more, the RTO is now 8s.
+        // Since we have received an ACK and we have no segments that can be used
+        // for RTT estimate, RTO is still the initial value.
         assert_eq!(counters.retransmits.get(), 3);
         assert_eq!(counters.timeouts.get(), 3);
-        assert_eq!(state.poll_send_at(), Some(clock.now() + 8 * Estimator::RTO_INIT));
+        assert_eq!(state.poll_send_at(), Some(clock.now() + Estimator::RTO_INIT));
         assert_eq!(
             state.poll_send_with_default_options(1, clock.now(), &counters),
             Some(Segment::data(
@@ -7174,7 +7184,7 @@ mod test {
                     wnd: WindowSize::DEFAULT,
                 },
                 clock.now(),
-                &KeepAlive::default(),
+                &SocketOptions::default(),
             ),
             (None, DataAcked::Yes)
         );
@@ -7244,7 +7254,7 @@ mod test {
                         wnd: WindowSize::DEFAULT,
                     },
                     clock.now(),
-                    &KeepAlive::default(),
+                    &SocketOptions::default(),
                 ),
                 (None, DataAcked::Yes)
             );
@@ -7263,7 +7273,7 @@ mod test {
                         wnd: WindowSize::DEFAULT,
                     },
                     clock.now(),
-                    &KeepAlive::default(),
+                    &SocketOptions::default(),
                 ),
                 (None, DataAcked::No)
             );
@@ -7283,7 +7293,7 @@ mod test {
                         wnd: WindowSize::DEFAULT,
                     },
                     clock.now(),
-                    &KeepAlive::default(),
+                    &SocketOptions::default(),
                 ),
                 (None, DataAcked::No)
             );
@@ -7408,7 +7418,7 @@ mod test {
                     wnd: WindowSize::DEFAULT,
                 },
                 clock.now(),
-                &KeepAlive::default(),
+                &SocketOptions::default(),
             ),
             (None, DataAcked::Yes)
         );
