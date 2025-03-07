@@ -17150,6 +17150,7 @@ pub struct remote_binder_wait_command {
 }
 pub const REMOTE_BINDER_START: __u32 = 2147766785;
 pub const REMOTE_BINDER_WAIT: __u32 = 1073828354;
+pub const FIBMAP: __u32 = 1;
 pub const FIGETBSZ: __u32 = 2;
 pub const FS_IOC_GETVERSION: __u32 = 2147776001;
 pub const FS_IOC_SETVERSION: __u32 = 1074034178;
