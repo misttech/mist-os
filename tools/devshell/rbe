@@ -175,7 +175,14 @@ function get_loas_cert_type_for_bazel() {
   echo "$loas_cert_type"
 }
 
+function ensure_adc_file_exists() {
+  # If this file doesn't already exist, generate it one time using gcloud auth.
+  local -r adc_file="$HOME/.config/gcloud/application_default_credentials.json"
+  [[ -f "$adc_file" ]] || gcloud_auth
+}
+
 function test_bazel_rbe() {
+  ensure_adc_file_exists
   setup_bazel_workspace
   # Test authentication to RBE and BES (both share the same gcloud auth).
   # Shutdown any bazel server each time to prevent it from caching
