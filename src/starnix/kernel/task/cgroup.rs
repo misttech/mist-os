@@ -649,8 +649,9 @@ mod test {
         let (kernel, _current_task) = create_kernel_and_task();
         let root = CgroupRoot::new(Arc::downgrade(&kernel));
 
-        let test_cgroup = root.new_child("test".into()).expect("");
-        let child_cgroup = test_cgroup.new_child("child".into()).expect("");
+        let test_cgroup = root.new_child("test".into()).expect("new_child on root cgroup succeeds");
+        let child_cgroup =
+            test_cgroup.new_child("child".into()).expect("new_child on non-root cgroup succeeds");
 
         assert_eq!(path_from_root(Some(Arc::downgrade(&test_cgroup))), Ok("/test".into()));
         assert_eq!(path_from_root(Some(Arc::downgrade(&child_cgroup))), Ok("/test/child".into()));
