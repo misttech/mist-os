@@ -417,6 +417,10 @@ nom-7_1_3 = { package = "nom", path = "forks/nom" }
 nom-language = { package = "nom-language", path = "forks/nom-language-0.1.0" }
 notify = { path = "forks/notify" }
 num-bigint-dig = { path = "forks/num-bigint-dig" }
+# rust-openssl carries 2 patches:
+# 1. https://github.com/sfackler/rust-openssl/pull/2372 already upstream waiting for the next quarterly release
+# 2. https://github.com/sfackler/rust-openssl/pull/2371 rejected upstream waiting to be inlined into KeyMint (https://fxbug.dev/398863191)
+openssl = { path = "forks/openssl-0.10.71" }
 # FIXME(118248): We can unfork once undefined behavior is resolved.
 prettytable-rs = { path = "forks/prettytable-rs" }
 #pulldown-cmark = { path = "forks/pulldown-cmark" }

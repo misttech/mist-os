@@ -10502,14 +10502,14 @@ rust_library("openat-v0_1_17") {
 license("openssl-v0_10_71.license") {
   public_package_name = "openssl"
   license_files = [
-    "//third_party/rust_crates/vendor/openssl-0.10.71/LICENSE",
-    "//third_party/rust_crates/vendor/openssl-0.10.71/LICENSE-APACHE",
+    "//third_party/rust_crates/forks/openssl-0.10.71/LICENSE",
+    "//third_party/rust_crates/forks/openssl-0.10.71/LICENSE-APACHE",
   ]
 }
 
 rust_library("openssl-v0_10_71") {
   crate_name = "openssl"
-  crate_root = "//third_party/rust_crates/vendor/openssl-0.10.71/src/lib.rs"
+  crate_root = "//third_party/rust_crates/forks/openssl-0.10.71/src/lib.rs"
   output_name = "openssl-edabd54f77d41c78"
   configs += [ "//third_party/boringssl/rust:osslconf" ]
   configs -= [ "//build/config/rust:2018_idioms" ]
