@@ -4,6 +4,7 @@
 
 use crate::mm::{MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
 use crate::security;
+use crate::syscalls::time::ITimerSpecPtr;
 use crate::task::{
     CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, Task, Timeline,
     TimerWakeup, Waiter,
@@ -58,22 +59,22 @@ use starnix_uapi::vfs::{EpollEvent, FdEvents, ResolveFlags};
 use starnix_uapi::{
     __kernel_fd_set, aio_context_t, errno, error, f_owner_ex, io_event, io_uring_params,
     io_uring_register_op_IORING_REGISTER_BUFFERS as IORING_REGISTER_BUFFERS,
-    io_uring_register_op_IORING_UNREGISTER_BUFFERS as IORING_UNREGISTER_BUFFERS, iocb, itimerspec,
-    off_t, pid_t, pollfd, pselect6_sigmask, sigset_t, statfs, statx, timespec, uapi, uid_t,
-    AT_EACCESS, AT_EMPTY_PATH, AT_NO_AUTOMOUNT, AT_REMOVEDIR, AT_SYMLINK_FOLLOW,
-    AT_SYMLINK_NOFOLLOW, CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_REALTIME,
-    CLOCK_REALTIME_ALARM, CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE, EFD_CLOEXEC, EFD_NONBLOCK,
-    EFD_SEMAPHORE, EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLL_CTL_DEL, EPOLL_CTL_MOD, FIOCLEX, FIONCLEX,
-    F_ADD_SEALS, F_DUPFD, F_DUPFD_CLOEXEC, F_GETFD, F_GETFL, F_GETLEASE, F_GETLK, F_GETOWN,
-    F_GETOWN_EX, F_GET_SEALS, F_OFD_GETLK, F_OFD_SETLK, F_OFD_SETLKW, F_OWNER_PGRP, F_OWNER_PID,
-    F_OWNER_TID, F_SETFD, F_SETFL, F_SETLEASE, F_SETLK, F_SETLKW, F_SETOWN, F_SETOWN_EX,
-    IN_CLOEXEC, IN_NONBLOCK, IORING_SETUP_CQSIZE, MFD_ALLOW_SEALING, MFD_CLOEXEC, MFD_HUGETLB,
-    MFD_HUGE_MASK, MFD_HUGE_SHIFT, MFD_NOEXEC_SEAL, NAME_MAX, O_CLOEXEC, O_CREAT, O_NOFOLLOW,
-    O_PATH, O_TMPFILE, PATH_MAX, PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI,
-    POLLRDBAND, POLLRDNORM, POLLWRBAND, POLLWRNORM, POSIX_FADV_DONTNEED, POSIX_FADV_NOREUSE,
-    POSIX_FADV_NORMAL, POSIX_FADV_RANDOM, POSIX_FADV_SEQUENTIAL, POSIX_FADV_WILLNEED,
-    RWF_SUPPORTED, TFD_CLOEXEC, TFD_NONBLOCK, TFD_TIMER_ABSTIME, TFD_TIMER_CANCEL_ON_SET,
-    XATTR_CREATE, XATTR_NAME_MAX, XATTR_REPLACE,
+    io_uring_register_op_IORING_UNREGISTER_BUFFERS as IORING_UNREGISTER_BUFFERS, iocb, off_t,
+    pid_t, pollfd, pselect6_sigmask, sigset_t, statfs, statx, timespec, uapi, uid_t, AT_EACCESS,
+    AT_EMPTY_PATH, AT_NO_AUTOMOUNT, AT_REMOVEDIR, AT_SYMLINK_FOLLOW, AT_SYMLINK_NOFOLLOW,
+    CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_REALTIME, CLOCK_REALTIME_ALARM,
+    CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE, EFD_CLOEXEC, EFD_NONBLOCK, EFD_SEMAPHORE,
+    EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLL_CTL_DEL, EPOLL_CTL_MOD, FIOCLEX, FIONCLEX, F_ADD_SEALS,
+    F_DUPFD, F_DUPFD_CLOEXEC, F_GETFD, F_GETFL, F_GETLEASE, F_GETLK, F_GETOWN, F_GETOWN_EX,
+    F_GET_SEALS, F_OFD_GETLK, F_OFD_SETLK, F_OFD_SETLKW, F_OWNER_PGRP, F_OWNER_PID, F_OWNER_TID,
+    F_SETFD, F_SETFL, F_SETLEASE, F_SETLK, F_SETLKW, F_SETOWN, F_SETOWN_EX, IN_CLOEXEC,
+    IN_NONBLOCK, IORING_SETUP_CQSIZE, MFD_ALLOW_SEALING, MFD_CLOEXEC, MFD_HUGETLB, MFD_HUGE_MASK,
+    MFD_HUGE_SHIFT, MFD_NOEXEC_SEAL, NAME_MAX, O_CLOEXEC, O_CREAT, O_NOFOLLOW, O_PATH, O_TMPFILE,
+    PATH_MAX, PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI, POLLRDBAND, POLLRDNORM,
+    POLLWRBAND, POLLWRNORM, POSIX_FADV_DONTNEED, POSIX_FADV_NOREUSE, POSIX_FADV_NORMAL,
+    POSIX_FADV_RANDOM, POSIX_FADV_SEQUENTIAL, POSIX_FADV_WILLNEED, RWF_SUPPORTED, TFD_CLOEXEC,
+    TFD_NONBLOCK, TFD_TIMER_ABSTIME, TFD_TIMER_CANCEL_ON_SET, XATTR_CREATE, XATTR_NAME_MAX,
+    XATTR_REPLACE,
 };
 use std::cmp::Ordering;
 use std::collections::VecDeque;
@@ -2017,13 +2018,13 @@ pub fn sys_timerfd_gettime(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
-    user_current_value: UserRef<itimerspec>,
+    user_current_value: ITimerSpecPtr,
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
     let timer_file = file.downcast_file::<TimerFile>().ok_or_else(|| errno!(EINVAL))?;
     let timer_info = timer_file.current_timer_spec();
     log_trace!("timerfd_gettime(fd={:?}, current_value={:?})", fd, timer_info);
-    current_task.write_object(user_current_value, &timer_info)?;
+    current_task.write_multi_arch_object(user_current_value, timer_info)?;
     Ok(())
 }
 
@@ -2032,8 +2033,8 @@ pub fn sys_timerfd_settime(
     current_task: &CurrentTask,
     fd: FdNumber,
     flags: u32,
-    user_new_value: UserRef<itimerspec>,
-    user_old_value: UserRef<itimerspec>,
+    user_new_value: ITimerSpecPtr,
+    user_old_value: ITimerSpecPtr,
 ) -> Result<(), Errno> {
     if flags & !(TFD_TIMER_ABSTIME | TFD_TIMER_CANCEL_ON_SET) != 0 {
         track_stub!(TODO("https://fxbug.dev/322874722"), "timerfd_settime unknown flags", flags);
@@ -2050,7 +2051,7 @@ pub fn sys_timerfd_settime(
     let file = current_task.files.get(fd)?;
     let timer_file = file.downcast_file::<TimerFile>().ok_or_else(|| errno!(EINVAL))?;
 
-    let new_timer_spec = current_task.read_object(user_new_value)?;
+    let new_timer_spec = current_task.read_multi_arch_object(user_new_value)?;
     let old_timer_spec = timer_file.set_timer_spec(current_task, &file, new_timer_spec, flags)?;
     log_trace!(
         "timerfd_settime(fd={:?}, flags={:#x}, new_value={:?}, current_value={:?})",
@@ -2060,7 +2061,7 @@ pub fn sys_timerfd_settime(
         old_timer_spec
     );
     if !user_old_value.is_null() {
-        current_task.write_object(user_old_value, &old_timer_spec)?;
+        current_task.write_multi_arch_object(user_old_value, old_timer_spec)?;
     }
     Ok(())
 }
@@ -3164,9 +3165,12 @@ mod arch32 {
     use linux_uapi::off_t;
     use starnix_sync::{Locked, Unlocked};
     use starnix_syscalls::SyscallArg;
+    use starnix_types::time::duration_from_poll_timeout;
     use starnix_uapi::errors::Errno;
     use starnix_uapi::file_mode::FileMode;
+    use starnix_uapi::signals::SigSet;
     use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
+    use starnix_uapi::vfs::EpollEvent;
     use starnix_uapi::{error, uapi, AT_REMOVEDIR};
 
     pub fn sys_arch32_open(
@@ -3341,7 +3345,55 @@ mod arch32 {
         super::sys_fchownat(locked, current_task, FdNumber::AT_FDCWD, user_path, owner, group, 0)
     }
 
-    pub use super::sys_fstatat64 as sys_arch32_fstatat64;
+    pub fn sys_arch32_poll(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &mut CurrentTask,
+        user_fds: UserRef<uapi::pollfd>,
+        num_fds: i32,
+        timeout: i32,
+    ) -> Result<usize, Errno> {
+        let deadline = zx::MonotonicInstant::after(duration_from_poll_timeout(timeout)?);
+        super::poll(locked, current_task, user_fds, num_fds, None, deadline)
+    }
+
+    pub fn sys_arch32_epoll_create(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        size: i32,
+    ) -> Result<FdNumber, Errno> {
+        if size < 1 {
+            // The man page for epoll_create says the size was used in a previous implementation as
+            // a hint but no longer does anything. But it's still required to be >= 1 to ensure
+            // programs are backwards-compatible.
+            return error!(EINVAL);
+        }
+        super::sys_epoll_create1(locked, current_task, 0)
+    }
+
+    pub fn sys_arch32_epoll_wait(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &mut CurrentTask,
+        epfd: FdNumber,
+        events: UserRef<EpollEvent>,
+        max_events: i32,
+        timeout: i32,
+    ) -> Result<usize, Errno> {
+        super::sys_epoll_pwait(
+            locked,
+            current_task,
+            epfd,
+            events,
+            max_events,
+            timeout,
+            UserRef::<SigSet>::default(),
+        )
+    }
+
+    pub use super::{
+        sys_epoll_ctl as sys_arch32_epoll_ctl, sys_fstatat64 as sys_arch32_fstatat64,
+        sys_timerfd_create as sys_arch32_timerfd_create,
+        sys_timerfd_settime as sys_arch32_timerfd_settime,
+    };
 }
 
 #[cfg(feature = "arch32")]

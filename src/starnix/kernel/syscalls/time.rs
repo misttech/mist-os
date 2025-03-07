@@ -22,17 +22,17 @@ use starnix_uapi::auth::CAP_WAKE_ALARM;
 use starnix_uapi::errors::{Errno, EINTR};
 use starnix_uapi::user_address::{MultiArchUserRef, UserRef};
 use starnix_uapi::{
-    errno, error, from_status_like_fdio, itimerspec, itimerval, pid_t, sigevent, timespec, timeval,
-    timezone, tms, uapi, CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC,
-    CLOCK_MONOTONIC_COARSE, CLOCK_MONOTONIC_RAW, CLOCK_PROCESS_CPUTIME_ID, CLOCK_REALTIME,
-    CLOCK_REALTIME_ALARM, CLOCK_REALTIME_COARSE, CLOCK_TAI, CLOCK_THREAD_CPUTIME_ID, MAX_CLOCKS,
-    TIMER_ABSTIME,
+    errno, error, from_status_like_fdio, itimerval, pid_t, sigevent, timespec, timeval, timezone,
+    tms, uapi, CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_MONOTONIC_COARSE,
+    CLOCK_MONOTONIC_RAW, CLOCK_PROCESS_CPUTIME_ID, CLOCK_REALTIME, CLOCK_REALTIME_ALARM,
+    CLOCK_REALTIME_COARSE, CLOCK_TAI, CLOCK_THREAD_CPUTIME_ID, MAX_CLOCKS, TIMER_ABSTIME,
 };
 use zx::{
     Task, {self as zx},
 };
 
 pub type TimeSpecPtr = MultiArchUserRef<uapi::timespec, uapi::arch32::timespec>;
+pub type ITimerSpecPtr = MultiArchUserRef<uapi::itimerspec, uapi::arch32::itimerspec>;
 type TimeValPtr = MultiArchUserRef<uapi::timeval, uapi::arch32::timeval>;
 type TimeZonePtr = MultiArchUserRef<uapi::timezone, uapi::arch32::timezone>;
 
@@ -475,10 +475,10 @@ pub fn sys_timer_gettime(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     id: uapi::__kernel_timer_t,
-    curr_value: UserRef<itimerspec>,
+    curr_value: ITimerSpecPtr,
 ) -> Result<(), Errno> {
     let timers = &current_task.thread_group.read().timers;
-    current_task.write_object(curr_value, &timers.get_time(id)?)?;
+    current_task.write_multi_arch_object(curr_value, timers.get_time(id)?)?;
     Ok(())
 }
 
@@ -496,25 +496,25 @@ pub fn sys_timer_settime(
     current_task: &CurrentTask,
     id: uapi::__kernel_timer_t,
     flags: i32,
-    user_new_value: UserRef<itimerspec>,
-    user_old_value: UserRef<itimerspec>,
+    user_new_value: ITimerSpecPtr,
+    user_old_value: ITimerSpecPtr,
 ) -> Result<(), Errno> {
     if user_new_value.is_null() {
         return error!(EINVAL);
     }
-    let new_value = current_task.read_object(user_new_value)?;
+    let new_value = current_task.read_multi_arch_object(user_new_value)?;
 
     // Return early if the user passes an obviously invalid pointer. This avoids changing the timer
     // settings for common pointer errors.
     if !user_old_value.is_null() {
-        current_task.write_object(user_old_value, &Default::default())?;
+        current_task.write_multi_arch_object(user_old_value, Default::default())?;
     }
 
     let timers = &current_task.thread_group.read().timers;
     let old_value = timers.set_time(current_task, id, flags, new_value)?;
 
     if !user_old_value.is_null() {
-        current_task.write_object(user_old_value, &old_value)?;
+        current_task.write_multi_arch_object(user_old_value, old_value)?;
     }
     Ok(())
 }

@@ -224,3 +224,19 @@ impl TryFrom<crate::flock> for crate::arch32::flock {
         })
     }
 }
+
+impl From<crate::arch32::itimerspec> for crate::itimerspec {
+    fn from(itimerspec: crate::arch32::itimerspec) -> Self {
+        Self { it_interval: itimerspec.it_interval.into(), it_value: itimerspec.it_value.into() }
+    }
+}
+
+impl TryFrom<crate::itimerspec> for crate::arch32::itimerspec {
+    type Error = ();
+    fn try_from(itimerspec: crate::itimerspec) -> Result<Self, ()> {
+        Ok(Self {
+            it_interval: itimerspec.it_interval.try_into().map_err(|_| ())?,
+            it_value: itimerspec.it_value.try_into().map_err(|_| ())?,
+        })
+    }
+}
