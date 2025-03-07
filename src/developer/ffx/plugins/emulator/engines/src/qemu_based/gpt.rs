@@ -9,7 +9,7 @@ use ffx_config::environment::ExecutableKind;
 use ffx_config::EnvironmentContext;
 use fho::{return_bug, user_error, Result};
 use make_fuchsia_vol::args::{
-    Arch, TopLevel as MakeFuchsiaVolCmd, ABR_SIZE, EFI_SIZE, VBMETA_SIZE,
+    Arch, TopLevel as MakeFuchsiaVolCmd, ABR_SIZE, EFI_SIZE, SYSTEM_PART_SIZE, VBMETA_SIZE,
 };
 use sdk_metadata::CpuArchitecture;
 use std::path::PathBuf;
@@ -20,7 +20,6 @@ bootloader.timeout=5"#;
 // By default, the image will be resized to 20G.
 // TODO(https://fxbug.dev/380879811): Calculate this dynamically.
 pub(crate) const DEFAULT_IMAGE_SIZE: u64 = 20 * 1024 * 1024 * 1024;
-const SYSTEM_PART_SIZE: u64 = 16 * 1024 * 1024 * 1024;
 
 /// Holds the args needed to construct a full GPT disk image
 #[derive(Debug, Default, PartialEq)]
