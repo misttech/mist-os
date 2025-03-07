@@ -15,6 +15,7 @@ use fxfs::filesystem::{FxFilesystem, FxFilesystemBuilder, OpenFxFilesystem};
 use fxfs::fsck::errors::FsckIssue;
 use fxfs::fsck::{fsck_volume_with_options, fsck_with_options, FsckOptions};
 use fxfs::object_store::volume::root_volume;
+use fxfs::object_store::NO_OWNER;
 use fxfs_crypto::Crypt;
 use fxfs_insecure_crypto::InsecureCrypt;
 use std::sync::{Arc, Weak};
@@ -132,7 +133,7 @@ impl TestFixture {
             let filesystem = FxFilesystemBuilder::new().open(device).await.unwrap();
             let root_volume = root_volume(filesystem.clone()).await.unwrap();
             let store = root_volume
-                .volume("vol", if options.encrypted { Some(crypt.clone()) } else { None })
+                .volume("vol", NO_OWNER, if options.encrypted { Some(crypt.clone()) } else { None })
                 .await
                 .unwrap();
             let store_object_id = store.store_object_id();

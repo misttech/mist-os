@@ -14,13 +14,13 @@ use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
 use fxfs::object_store::volume::root_volume;
 use fxfs::object_store::{
     Directory, HandleOptions, ObjectDescriptor, ObjectStore, SetExtendedAttributeMode,
-    StoreObjectHandle,
+    StoreObjectHandle, StoreOwner,
 };
 use fxfs_crypto::Crypt;
 use std::io::Write;
 use std::ops::Deref;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 pub async fn print_ls(dir: &Directory<ObjectStore>) -> Result<(), Error> {
     const DATE_FMT: &str = "%b %d %Y %T+00";
@@ -91,10 +91,11 @@ pub async fn create_volume(
 pub async fn open_volume(
     fs: &OpenFxFilesystem,
     name: &str,
+    owner: Weak<dyn StoreOwner>,
     crypt: Option<Arc<dyn Crypt>>,
 ) -> Result<Arc<ObjectStore>, Error> {
     let root_volume = root_volume(fs.deref().clone()).await?;
-    root_volume.volume(name, crypt).await.map(|v| v.into())
+    root_volume.volume(name, owner, crypt).await.map(|v| v.into())
 }
 
 /// Walks a directory path from a given root.

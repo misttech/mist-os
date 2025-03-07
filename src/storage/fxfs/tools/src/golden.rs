@@ -6,7 +6,7 @@ use crate::ops;
 use anyhow::{bail, ensure, Context, Error};
 use chrono::Local;
 use fxfs::filesystem::{mkfs_with_volume, FxFilesystem, OpenFxFilesystem, SyncOptions};
-use fxfs::object_store::ObjectStore;
+use fxfs::object_store::{ObjectStore, NO_OWNER};
 use fxfs::serialized_types::{Version, LATEST_VERSION};
 use fxfs_crypto::Crypt;
 use fxfs_insecure_crypto::InsecureCrypt;
@@ -117,7 +117,7 @@ pub async fn create_image() -> Result<(), Error> {
     let device_holder = DeviceHolder::new(load_device(&path)?);
     let device = device_holder.clone();
     let fs = FxFilesystem::open(device_holder).await?;
-    let default_vol = ops::open_volume(&fs, DEFAULT_VOLUME, Some(crypt.clone())).await?;
+    let default_vol = ops::open_volume(&fs, DEFAULT_VOLUME, NO_OWNER, Some(crypt.clone())).await?;
     let unencrypted_vol = ops::create_volume(&fs, UNENCRYPTED_VOLUME, None).await?;
     for (vol, msg) in [(&default_vol, "default volume"), (&unencrypted_vol, "unencrypted volume")] {
         activity_in_volume(&fs, vol).await.context(msg)?;
@@ -206,7 +206,7 @@ async fn check_image(path: &Path) -> Result<(), Error> {
         volumes.push((UNENCRYPTED_VOLUME, None));
     }
     for (vol_name, vol_crypt) in volumes.clone() {
-        let vol = ops::open_volume(&fs, vol_name, vol_crypt)
+        let vol = ops::open_volume(&fs, vol_name, NO_OWNER, vol_crypt)
             .await
             .context(format!("Opening {}", vol_name))?;
         check_volume(&fs, &vol, &version).await.context(format!("Checking {}", vol_name))?;
@@ -218,7 +218,7 @@ async fn check_image(path: &Path) -> Result<(), Error> {
     let fs = FxFilesystem::open(device).await?;
     ops::fsck(&fs, true).await.context("fsck failed")?;
     for (vol_name, vol_crypt) in volumes {
-        let vol = ops::open_volume(&fs, vol_name, vol_crypt).await.context(vol_name)?;
+        let vol = ops::open_volume(&fs, vol_name, NO_OWNER, vol_crypt).await.context(vol_name)?;
         if &ops::get(&vol, &Path::new(CHECK_FILE_PATH)).await?.as_slice()
             != &CHECK_FILE_CONTENT.as_slice()
         {

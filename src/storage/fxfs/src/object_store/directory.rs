@@ -1660,7 +1660,7 @@ mod tests {
     use crate::object_store::volume::root_volume;
     use crate::object_store::{
         HandleOptions, LockKey, ObjectDescriptor, ObjectStore, SetExtendedAttributeMode,
-        StoreObjectHandle,
+        StoreObjectHandle, NO_OWNER,
     };
     use assert_matches::assert_matches;
     use fidl_fuchsia_io as fio;
@@ -2006,7 +2006,7 @@ mod tests {
         let fs = FxFilesystem::open(device).await.expect("open failed");
         let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
         let store = root_volume
-            .volume("test", Some(crypt.clone() as Arc<dyn Crypt>))
+            .volume("test", NO_OWNER, Some(crypt.clone() as Arc<dyn Crypt>))
             .await
             .expect("volume failed");
 
@@ -3175,7 +3175,8 @@ mod tests {
 
         {
             let root_volume = root_volume(filesystem.clone()).await.expect("root_volume failed");
-            let volume = root_volume.volume("vol", Some(crypt)).await.expect("volume failed");
+            let volume =
+                root_volume.volume("vol", NO_OWNER, Some(crypt)).await.expect("volume failed");
             let root_directory = Directory::open(&volume, volume.root_directory_object_id())
                 .await
                 .expect("open failed");
@@ -3877,8 +3878,10 @@ mod tests {
         {
             let crypt: Arc<InsecureCrypt> = Arc::new(InsecureCrypt::new());
             let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
-            let store =
-                root_volume.volume("vol", Some(crypt.clone())).await.expect("volume failed");
+            let store = root_volume
+                .volume("vol", NO_OWNER, Some(crypt.clone()))
+                .await
+                .expect("volume failed");
             let dir = Directory::open(&store, object_id).await.expect("open failed");
             assert!(dir.casefold());
 
@@ -4039,8 +4042,10 @@ mod tests {
         {
             let crypt: Arc<InsecureCrypt> = Arc::new(InsecureCrypt::new());
             let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
-            let store =
-                root_volume.volume("vol", Some(crypt.clone())).await.expect("volume failed");
+            let store = root_volume
+                .volume("vol", NO_OWNER, Some(crypt.clone()))
+                .await
+                .expect("volume failed");
             let dir = Directory::open(&store, object_id).await.expect("open failed");
             assert!(dir.casefold());
 

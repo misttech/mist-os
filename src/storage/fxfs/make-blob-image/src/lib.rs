@@ -366,6 +366,7 @@ mod tests {
     use fxfs::filesystem::FxFilesystem;
     use fxfs::object_store::directory::Directory;
     use fxfs::object_store::volume::root_volume;
+    use fxfs::object_store::NO_OWNER;
     use sparse::reader::SparseReader;
     use std::fs::File;
     use std::io::{Seek as _, SeekFrom, Write as _};
@@ -490,7 +491,7 @@ mod tests {
             let device = DeviceHolder::new(FileBackedDevice::new(image, 4096));
             let filesystem = FxFilesystem::open(device).await.unwrap();
             let root_volume = root_volume(filesystem.clone()).await.expect("Opening root volume");
-            let vol = root_volume.volume("blob", None).await.expect("Opening volume");
+            let vol = root_volume.volume("blob", NO_OWNER, None).await.expect("Opening volume");
             let directory = Directory::open(&vol, vol.root_directory_object_id())
                 .await
                 .expect("Opening root dir");

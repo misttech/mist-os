@@ -1792,7 +1792,7 @@ mod tests {
     use crate::object_store::directory::Directory;
     use crate::object_store::transaction::Options;
     use crate::object_store::volume::root_volume;
-    use crate::object_store::{lock_keys, HandleOptions, LockKey, ObjectStore};
+    use crate::object_store::{lock_keys, HandleOptions, LockKey, ObjectStore, NO_OWNER};
     use fuchsia_async as fasync;
     use fuchsia_async::MonotonicDuration;
     use storage_device::fake_device::FakeDevice;
@@ -2082,7 +2082,7 @@ mod tests {
         {
             let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
 
-            let store = root_volume.volume("test", None).await.expect("volume failed");
+            let store = root_volume.volume("test", NO_OWNER, None).await.expect("volume failed");
 
             let root_directory = Directory::open(&store, store.root_directory_object_id())
                 .await

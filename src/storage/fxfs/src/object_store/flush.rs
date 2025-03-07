@@ -446,6 +446,7 @@ mod tests {
     use crate::object_store::volume::root_volume;
     use crate::object_store::{
         layer_size_from_encrypted_mutations_size, tree, HandleOptions, LockKey, ObjectStore,
+        NO_OWNER,
     };
     use fxfs_insecure_crypto::InsecureCrypt;
     use std::sync::Arc;
@@ -476,7 +477,7 @@ mod tests {
 
         let (first_filename, last_filename) = {
             let store = fs.object_manager().store(store_id).expect("store not found");
-            store.unlock(Arc::new(InsecureCrypt::new())).await.expect("unlock failed");
+            store.unlock(NO_OWNER, Arc::new(InsecureCrypt::new())).await.expect("unlock failed");
 
             // Keep writing until we notice the key has rolled.
             let root_dir = Directory::open(&store, store.root_directory_object_id())
@@ -550,7 +551,7 @@ mod tests {
 
         {
             let store = fs.object_manager().store(store_id).expect("store not found");
-            store.unlock(Arc::new(InsecureCrypt::new())).await.expect("unlock failed");
+            store.unlock(NO_OWNER, Arc::new(InsecureCrypt::new())).await.expect("unlock failed");
 
             // The key should get rolled when we unlock.
             assert_eq!(store.mutations_cipher.lock().unwrap().as_ref().unwrap().offset(), 0);
@@ -650,7 +651,7 @@ mod tests {
         );
 
         // Unlocking the store should replay that encrypted mutations file.
-        store.unlock(crypt).await.expect("unlock failed");
+        store.unlock(NO_OWNER, crypt).await.expect("unlock failed");
 
         ObjectStore::open_object(&store, foo.object_id(), HandleOptions::default(), None)
             .await

@@ -960,7 +960,7 @@ mod tests {
     use crate::object_store::journal::JournalOptions;
     use crate::object_store::transaction::{lock_keys, LockKey, Options};
     use crate::object_store::volume::root_volume;
-    use crate::object_store::{HandleOptions, ObjectDescriptor, ObjectStore};
+    use crate::object_store::{HandleOptions, ObjectDescriptor, ObjectStore, NO_OWNER};
     use crate::range::RangeExt;
     use fuchsia_async as fasync;
     use futures::future::join_all;
@@ -1380,7 +1380,7 @@ mod tests {
                 let store = root_volume(fs.clone())
                     .await
                     .expect("root_volume failed")
-                    .volume("test", Some(Arc::new(InsecureCrypt::new())))
+                    .volume("test", NO_OWNER, Some(Arc::new(InsecureCrypt::new())))
                     .await
                     .expect("volume failed");
 
@@ -1460,7 +1460,7 @@ mod tests {
                 let store = root_volume(fs.clone())
                     .await
                     .expect("root_volume failed")
-                    .volume("test", Some(Arc::new(InsecureCrypt::new())))
+                    .volume("test", NO_OWNER, Some(Arc::new(InsecureCrypt::new())))
                     .await
                     .expect("volume failed");
                 // We should be able to open the C object.

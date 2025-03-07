@@ -22,7 +22,7 @@ use fxfs::errors::FxfsError;
 use fxfs::log::*;
 use fxfs::object_store::transaction::{lock_keys, LockKey, LockKeys, Options, Transaction};
 use fxfs::object_store::volume::RootVolume;
-use fxfs::object_store::{Directory, ObjectDescriptor, ObjectStore};
+use fxfs::object_store::{Directory, ObjectDescriptor, ObjectStore, StoreOwner};
 use fxfs::{fsck, metrics};
 use fxfs_crypto::Crypt;
 use fxfs_trace::{trace_future_args, TraceFutureExt};
@@ -104,7 +104,11 @@ impl MountedVolumesGuard<'_> {
         crypt: Option<Arc<dyn Crypt>>,
         as_blob: bool,
     ) -> Result<FxVolumeAndRoot, Error> {
-        let store = self.volumes_directory.root_volume.volume(name, crypt).await?;
+        let store = self
+            .volumes_directory
+            .root_volume
+            .volume(name, Arc::downgrade(&self.volumes_directory) as Weak<dyn StoreOwner>, crypt)
+            .await?;
         ensure!(
             !self.mounted_volumes.contains_key(&store.store_object_id()),
             FxfsError::AlreadyBound
@@ -822,6 +826,8 @@ impl VolumesDirectory {
         self.on_volume_added.set(Box::new(callback)).ok().unwrap();
     }
 }
+
+impl StoreOwner for VolumesDirectory {}
 
 #[cfg(test)]
 mod tests {

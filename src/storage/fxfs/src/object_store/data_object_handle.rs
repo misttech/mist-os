@@ -1780,7 +1780,7 @@ mod tests {
     use crate::object_store::{
         AttributeKey, DataObjectHandle, Directory, ExtentKey, ExtentMode, ExtentValue,
         HandleOptions, LockKey, ObjectKeyData, ObjectStore, PosixAttributes,
-        FSVERITY_MERKLE_ATTRIBUTE_ID, TRANSACTION_MUTATION_THRESHOLD,
+        FSVERITY_MERKLE_ATTRIBUTE_ID, NO_OWNER, TRANSACTION_MUTATION_THRESHOLD,
     };
     use crate::range::RangeExt;
     use crate::round::{round_down, round_up};
@@ -2933,7 +2933,7 @@ mod tests {
 
                 // If the "foo" file exists check that allocated size matches content size.
                 let root_vol = root_volume(fs2.clone()).await.expect("root_volume failed");
-                let store = root_vol.volume("test", None).await.expect("volume failed");
+                let store = root_vol.volume("test", NO_OWNER, None).await.expect("volume failed");
 
                 if let Some(oid) = object_id {
                     // For the second pass, the object should get tombstoned.
@@ -2954,7 +2954,8 @@ mod tests {
                         .await
                         .expect("open failed");
                     let root_vol = root_volume(fs.clone()).await.expect("root_volume failed");
-                    let store = root_vol.volume("test", None).await.expect("volume failed");
+                    let store =
+                        root_vol.volume("test", NO_OWNER, None).await.expect("volume failed");
                     while needs_trim(&store).await.is_some() {
                         // The object has been truncated, but still has some data allocated to
                         // it.  The graveyard should trim the object eventually.
@@ -2988,7 +2989,7 @@ mod tests {
             .expect("open failed");
 
         let root_vol = root_volume(fs.clone()).await.expect("root_volume failed");
-        let store = root_vol.volume("test", None).await.expect("volume failed");
+        let store = root_vol.volume("test", NO_OWNER, None).await.expect("volume failed");
 
         shared_context.lock().unwrap().store = Some(store.clone());
 
