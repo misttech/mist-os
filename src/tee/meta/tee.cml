@@ -47,7 +47,7 @@
             to: [ "#binder-proxy" ],
         },
         {
-            service: [ "fuchsia.hardware.virtiopmem.Service" ],
+            service: [ "fuchsia.hardware.virtio.pmem.Service" ],
             from: "parent",
             to: "#binder-proxy",
         },

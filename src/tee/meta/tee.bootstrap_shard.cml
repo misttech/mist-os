@@ -20,5 +20,10 @@
             from: "#vsock",
             to: "#tee",
         },
+        {
+            service: [ "fuchsia.hardware.virtio.pmem.Service" ],
+            from: "#boot-drivers",
+            to: "#tee",
+        },
     ],
 }
