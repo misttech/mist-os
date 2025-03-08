@@ -15,7 +15,7 @@ import keyword
 import os
 import sys
 import typing
-from enum import EnumType, IntFlag
+from enum import EnumType, IntEnum, IntFlag
 from types import ModuleType
 from typing import (
     Any,
@@ -472,18 +472,25 @@ def bits_or_enum_root_type(ir, type_name: str) -> EnumType:
         member["name"]: int(member["value"]["value"])
         for member in ir["members"]
     }
-    # If there are no members, there must be at least one so that it can be
-    # decoded without error.
+    # Python enum types must include at least one member.
     if len(members) == 0:
-        members = {"__EMPTY__": 0}
-    ty = IntFlag(name, members)
+        members = {"EMPTY__": 0}
+    if type_name == "bits":
+        ty = IntFlag(name, members)
+        setattr(ty, "make_default", classmethod(lambda cls: cls(value=0)))
+    else:
+        # Decoding requires setting a default 0 value for enums, so
+        # give the IntEnum a 0 value if it doesn't have one.
+        if not 0 in members.values():
+            members["EMPTY__"] = 0
+        ty = IntEnum(name, members)
+        setattr(ty, "make_default", classmethod(lambda cls: cls(0)))
     setattr(ty, "__fidl_kind__", type_name)
     setattr(ty, "__fidl_type__", ir.name())
     setattr(ty, "__fidl_raw_type__", ir.raw_name())
     setattr(ty, "__doc__", docstring(ir))
     setattr(ty, "__members_for_aliasing__", members)
     setattr(ty, "__strict__", bool(ir["strict"]))
-    setattr(ty, "make_default", classmethod(lambda cls: cls(value=0)))
     return ty
 
 
