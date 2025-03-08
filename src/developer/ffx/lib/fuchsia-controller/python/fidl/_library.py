@@ -9,13 +9,13 @@
 from __future__ import annotations
 
 import dataclasses
-import enum
 import inspect
 import json
 import keyword
 import os
 import sys
 import typing
+from enum import EnumType, IntFlag
 from types import ModuleType
 from typing import (
     Any,
@@ -464,7 +464,7 @@ def docstring(decl, default: Optional[str] = None) -> Optional[str]:
     return doc_attr["arguments"][0]["value"]["value"].strip()
 
 
-def bits_or_enum_root_type(ir, type_name: str) -> enum.EnumMeta:
+def bits_or_enum_root_type(ir, type_name: str) -> EnumType:
     """Constructs a Python type from either bits or enums (they are quite similar so they bottom out
     on this function)."""
     name = fidl_ident_to_py_library_member(ir.name())
@@ -476,7 +476,7 @@ def bits_or_enum_root_type(ir, type_name: str) -> enum.EnumMeta:
     # decoded without error.
     if len(members) == 0:
         members = {"__EMPTY__": 0}
-    ty = enum.IntFlag(name, members)
+    ty = IntFlag(name, members)
     setattr(ty, "__fidl_kind__", type_name)
     setattr(ty, "__doc__", docstring(ir))
     setattr(ty, "__members_for_aliasing__", members)
@@ -501,12 +501,12 @@ def experimental_resource_type(ir, root_ir) -> type:
     return ty
 
 
-def bits_type(ir) -> enum.EnumMeta:
+def bits_type(ir) -> EnumType:
     """Constructs a Python type from a bits declaration in IR."""
     return bits_or_enum_root_type(ir, "bits")
 
 
-def enum_type(ir) -> enum.EnumMeta:
+def enum_type(ir) -> EnumType:
     """Constructs a Python type from a bits declaration in IR."""
     return bits_or_enum_root_type(ir, "enum")
 
@@ -716,7 +716,7 @@ def const_declaration(ir, root_ir) -> FIDLConstant:
         ty = get_type_by_identifier(ident, root_ir)
         if type(ty) is str:
             return FIDLConstant(name, ty(ir["value"]["value"]))
-        elif ty.__class__ == enum.EnumMeta:
+        elif ty.__class__ == EnumType:
             return FIDLConstant(name, ty(int(ir["value"]["value"])))
         raise TypeError(
             f"As yet unsupported identifier type in lib '{root_ir['name']}': {type(ty)}"
@@ -748,10 +748,10 @@ def alias_declaration(ir, root_ir) -> type:
                 base_type = list
             else:
                 base_type = get_type_by_identifier(ctor_type, root_ir)
-        if type(base_type) == enum.EnumType:
+        if type(base_type) == EnumType:
             # This is a bit of a special case. Enum cannot be used as a base type when using the
             # `type` operator.
-            ty = enum.IntFlag(name, base_type.__members_for_aliasing__)
+            ty = IntFlag(name, base_type.__members_for_aliasing__)
             setattr(ty, "__doc__", docstring(ir))
             setattr(ty, "__fidl_kind__", "alias")
             setattr(ty, "__fidl_type__", ir.name())
