@@ -10,11 +10,19 @@
     ],
     offer: [
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-display-coordinator",
             to: "#progress-ui",
             subdir: "display-coordinator",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.display.service",
+            from: "parent",
+            to: "#progress-ui",
         },
         {
             protocol: [

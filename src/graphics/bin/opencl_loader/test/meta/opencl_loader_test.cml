@@ -42,12 +42,28 @@
             to: [ "#opencl_loader" ],
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-gpu",
             from: "#test_lib_provider",
             to: [ "#opencl_loader" ],
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.gpu.magma.Service",
+            from: "#test_lib_provider",
+            to: [ "#opencl_loader" ],
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-gpu-dependency-injection",
+            from: "#test_lib_provider",
+            to: [ "#opencl_loader" ],
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.gpu.magma.DependencyInjectionService",
             from: "#test_lib_provider",
             to: [ "#opencl_loader" ],
         },

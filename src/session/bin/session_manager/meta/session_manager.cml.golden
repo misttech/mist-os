@@ -512,6 +512,8 @@
             to: "#session",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: [
                 "dev-backlight",
                 "dev-battery",
@@ -526,6 +528,8 @@
             to: "#session",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: [ "dev-bt-hci" ],
             from: "parent",
             to: "#session",
@@ -533,10 +537,9 @@
         },
         {
             service: [
+                "fuchsia.gpu.magma.Service", // replaces /dev/class/gpu
                 "fuchsia.hardware.backlight.Service", // replaces /dev/class/backlight
                 "fuchsia.hardware.bluetooth.Service", // replaces /dev/class/bt-hci
-
-                // TODO(http://fxbug.dev/400447707): add service to replace /dev/class/gpu
                 "fuchsia.hardware.hrtimer.Service", // replaces /dev/class/hrtimer
                 "fuchsia.hardware.light.LightService", // replaces /dev/class/light
                 "fuchsia.hardware.power.sensor.Service", // replaces /dev/class/power-sensor

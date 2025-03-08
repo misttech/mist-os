@@ -193,42 +193,90 @@
 
         // Some non-hermetic tests require access to the real display controller.
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-display-coordinator",
             from: "parent",
             to: [ "#system-tests" ],
             rights: [ "r*" ],
         },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.display.service",
+            from: "parent",
+            to: [ "#system-tests" ],
+        },
 
         // Some non-hermetic tests require access to the GPU and vulkan
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-goldfish-address-space",
             from: "parent",
             to: [ "#system-tests" ],
             rights: [ "r*" ],
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.goldfish.AddressSpaceService",
+            from: "parent",
+            to: [ "#system-tests" ],
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-goldfish-control",
             from: "parent",
             to: [ "#system-tests" ],
             rights: [ "r*" ],
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.goldfish.ControlService",
+            from: "parent",
+            to: [ "#system-tests" ],
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-goldfish-pipe",
             from: "parent",
             to: [ "#system-tests" ],
             rights: [ "r*" ],
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.goldfish.ControllerService",
+            from: "parent",
+            to: [ "#system-tests" ],
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-goldfish-sync",
             from: "parent",
             to: [ "#system-tests" ],
             rights: [ "r*" ],
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.goldfish.SyncService",
+            from: "parent",
+            to: [ "#system-tests" ],
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-gpu-performance-counters",
             from: "parent",
             to: [ "#system-tests" ],
             rights: [ "r*" ],
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.gpu.magma.PerformanceCounterService",
+            from: "parent",
+            to: [ "#system-tests" ],
         },
 
         // audio_driver_tests requires access to audio drivers.
@@ -267,10 +315,18 @@
         // Tests of the media system want to test against the real hardware
         // TODO(https://fxbug.dev/42164198): Remove when specialized test realms are ready.
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-mediacodec",
             from: "parent",
             to: [ "#system-tests" ],
             rights: [ "r*" ],
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.mediacodec.Service",
+            from: "parent",
+            to: [ "#system-tests" ],
         },
         {
             directory: "dev-sysmem",
@@ -373,10 +429,18 @@
             to: [ "#system-tests" ],
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-gpu",
             from: "parent",
             to: [ "#system-tests" ],
             rights: [ "r*" ],
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.gpu.magma.Service",
+            from: "parent",
+            to: [ "#system-tests" ],
         },
         {
             dictionary: "diagnostics",

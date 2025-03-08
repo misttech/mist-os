@@ -398,11 +398,19 @@
             to: [ "#agis" ],
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-display-coordinator",
             to: [ "#agis" ],
             subdir: "display-coordinator",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.display.service",
+            from: "parent",
+            to: [ "#agis" ],
         },
         {
             protocol: "fuchsia.memorypressure.Provider",
@@ -411,6 +419,8 @@
             source_availability: "unknown",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-gpu",
@@ -418,6 +428,14 @@
             subdir: "gpu",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.gpu.magma.Service",
+            from: "parent",
+            to: [ "#vulkan_loader" ],
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-gpu-dependency-injection",
@@ -425,6 +443,14 @@
             subdir: "gpu-dependency-injection",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.gpu.magma.DependencyInjectionService",
+            from: "parent",
+            to: "#vulkan_loader",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-goldfish-pipe",
@@ -432,6 +458,14 @@
             subdir: "goldfish-pipe",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.goldfish.ControllerService",
+            from: "parent",
+            to: "#vulkan_loader",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-goldfish-control",
@@ -439,6 +473,14 @@
             subdir: "goldfish-control",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.goldfish.ControlService",
+            from: "parent",
+            to: "#vulkan_loader",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-goldfish-address-space",
@@ -446,11 +488,25 @@
             subdir: "goldfish-address-space",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.goldfish.AddressSpaceService",
+            from: "parent",
+            to: "#vulkan_loader",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-goldfish-sync",
             to: "#vulkan_loader",
             subdir: "goldfish-sync",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.goldfish.SyncService",
+            from: "parent",
+            to: "#vulkan_loader",
         },
         {
             directory: "dev-class",

@@ -258,6 +258,8 @@
             to: "#test_manager",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-display-coordinator",
@@ -265,6 +267,14 @@
             subdir: "display-coordinator",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.display.service",
+            from: "parent",
+            to: "#test_manager",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-mediacodec",
@@ -272,6 +282,14 @@
             subdir: "media-codec",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.mediacodec.Service",
+            from: "parent",
+            to: "#test_manager",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-goldfish-address-space",
@@ -279,6 +297,14 @@
             subdir: "goldfish-address-space",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.goldfish.AddressSpaceService",
+            from: "parent",
+            to: "#test_manager",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-goldfish-control",
@@ -286,6 +312,14 @@
             subdir: "goldfish-control",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.goldfish.ControlService",
+            from: "parent",
+            to: "#test_manager",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-goldfish-pipe",
@@ -293,6 +327,14 @@
             subdir: "goldfish-pipe",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.goldfish.ControllerService",
+            from: "parent",
+            to: "#test_manager",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-goldfish-sync",
@@ -300,6 +342,14 @@
             subdir: "goldfish-sync",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.goldfish.SyncService",
+            from: "parent",
+            to: "#test_manager",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-gpu",
@@ -307,11 +357,25 @@
             subdir: "gpu",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.gpu.magma.Service",
+            from: "parent",
+            to: "#test_manager",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-gpu-performance-counters",
             to: "#test_manager",
             subdir: "gpu-performance-counters",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.gpu.magma.PerformanceCounterService",
+            from: "parent",
+            to: "#test_manager",
         },
         {
             // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have been migrated to services. The service capability has been added below.
@@ -401,11 +465,19 @@
         // Tests of the media system want to test against the real hardware
         // TODO(https://fxbug.dev/42164198): Remove when specialized test realms are ready.
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-mediacodec",
             to: "#test_manager",
             subdir: "media-codec",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.mediacodec.Service",
+            from: "parent",
+            to: "#test_manager",
         },
         {
             directory: "dev-class",

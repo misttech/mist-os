@@ -11,9 +11,15 @@
     },
     use: [
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-goldfish-pipe",
             rights: [ "r*" ],
             path: "/dev/class/goldfish-pipe",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.goldfish.ControllerService",
         },
         { protocol: "fuchsia.tracing.provider.Registry" },
     ],

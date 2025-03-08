@@ -33,16 +33,32 @@
             to: "#codec-factory",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-mediacodec",
             from: "parent",
             to: "#codec-factory",
             rights: [ "r*" ],
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.mediacodec.Service",
+            from: "parent",
+            to: "#codec-factory",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-gpu",
             from: "parent",
             to: "#codec-factory",
             rights: [ "r*" ],
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.gpu.magma.Service",
+            from: "parent",
+            to: "#codec-factory",
         },
     ],
 }

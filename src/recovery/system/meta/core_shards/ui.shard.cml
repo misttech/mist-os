@@ -9,11 +9,19 @@
             to: "#system_recovery",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-class-display-coordinator",
             to: "#system_recovery",
             subdir: "display-coordinator",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.display.service",
+            from: "parent",
+            to: "#system_recovery",
         },
         {
             directory: "dev-class",

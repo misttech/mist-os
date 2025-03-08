@@ -114,6 +114,8 @@
             to: [ "#sample-app" ],
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: [
                 "dev-display-coordinator",
                 "dev-goldfish-address-space",
@@ -127,6 +129,19 @@
             from: "parent",
             to: [ "#sample-app" ],
             rights: [ "r*" ],
+        },
+        {
+            // These services replace the directory capabilities above.
+            service: [
+                "fuchsia.gpu.magma.Service",
+                "fuchsia.hardware.display.service",
+                "fuchsia.hardware.goldfish.AddressSpaceService",
+                "fuchsia.hardware.goldfish.ControllerService",
+                "fuchsia.hardware.goldfish.ControlService",
+                "fuchsia.hardware.goldfish.SyncService",
+            ],
+            from: "parent",
+            to: [ "#sample-app" ],
         },
     ],
 }

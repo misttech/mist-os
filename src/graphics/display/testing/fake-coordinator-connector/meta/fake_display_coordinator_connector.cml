@@ -14,9 +14,15 @@
     capabilities: [
         { protocol: "fuchsia.hardware.display.Provider" },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-display-coordinator",
             rights: [ "r*" ],
             path: "/dev-display-coordinator",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.display.service",
         },
     ],
     use: [
@@ -31,7 +37,14 @@
             from: "self",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-display-coordinator",
+            from: "self",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.display.service",
             from: "self",
         },
     ],

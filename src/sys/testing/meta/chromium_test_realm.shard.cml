@@ -136,6 +136,8 @@
             scope: "#chromium-tests",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: [
                 "dev-goldfish-address-space",
                 "dev-goldfish-control",
@@ -151,6 +153,19 @@
             from: "parent",
             to: "#chromium-tests",
             rights: [ "r*" ],
+        },
+        {
+            // These services replace the directory capabilities above.
+            service: [
+                "fuchsia.gpu.magma.Service",
+                "fuchsia.hardware.goldfish.AddressSpaceService",
+                "fuchsia.hardware.goldfish.ControllerService",
+                "fuchsia.hardware.goldfish.ControlService",
+                "fuchsia.hardware.goldfish.SyncService",
+                "fuchsia.hardware.mediacodec.Service",
+            ],
+            from: "parent",
+            to: "#chromium-tests",
         },
         {
             directory: "root-ssl-certificates",
