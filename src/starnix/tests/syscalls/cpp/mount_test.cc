@@ -486,16 +486,18 @@ TEST_F(MountTest, RemotefsInvalidPath) {
               SyscallFailsWithErrno(ENOENT));
 }
 
-TEST_F(MountTest, RemotefsRelativePath) {
-  // Remotefs requires absolute paths, which correspond to a namespace entry.
+TEST_F(MountTest, RemotefsNoPathProvided) {
+  // TODO(b/379929394): Update this documentation after soft transition.
+  // When no root path is requested, the remotefs request should default to the data dir.
   if (!test_helper::IsStarnix()) {
     GTEST_SKIP() << "MountTest.RemotefsNoPathProvided cannot be run on Linux, skipping.";
   }
   ASSERT_SUCCESS(MakeDir("a"));
   auto dir = TestPath("a");
-  ASSERT_THAT(mount(".", dir.c_str(), "remotefs", MS_RDONLY, nullptr), SyscallFailsWithErrno(2));
-  ASSERT_THAT(mount("/", dir.c_str(), "remotefs", MS_RDONLY, nullptr), SyscallFailsWithErrno(2));
-  ASSERT_THAT(mount("", dir.c_str(), "remotefs", MS_RDONLY, nullptr), SyscallFailsWithErrno(2));
+  // TODO(b/379929394): After soft transition, these should be expected to fail.
+  ASSERT_THAT(mount(".", dir.c_str(), "remotefs", MS_RDONLY, nullptr), SyscallSucceeds());
+  ASSERT_THAT(mount("/", dir.c_str(), "remotefs", MS_RDONLY, nullptr), SyscallSucceeds());
+  ASSERT_THAT(mount("", dir.c_str(), "remotefs", MS_RDONLY, nullptr), SyscallSucceeds());
 }
 
 class ProcMountsTest : public ProcTestBase {

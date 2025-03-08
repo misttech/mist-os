@@ -65,6 +65,8 @@ pub fn new_remote_fs(
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
     let kernel = current_task.kernel();
+    // TODO(379929394): After soft transition of fstab is complete, we should
+    // validate the requested_path is a non-empty, non-root path.
     let requested_path = std::str::from_utf8(&options.source)
         .map_err(|_| errno!(EINVAL, "source path is not utf8"))?;
     let create_flags = fio::PERM_READABLE

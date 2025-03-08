@@ -775,7 +775,13 @@ impl Kernel {
         path: &str,
         open_flags: fio::Flags,
     ) -> Result<(fio::DirectorySynchronousProxy, String), Errno> {
-        let ns_path = PathBuf::from(path);
+        let ns_path = match path {
+            // TODO(379929394): This condition is specifically to soft
+            // transition the fstab file to the new format.
+            "" | "/" | "." => PathBuf::from("/data"),
+            _ => PathBuf::from(path),
+        };
+
         match self.container_namespace.find_closest_channel(&ns_path) {
             Ok((root_channel, remaining_subdir)) => {
                 let (_, server_end) = create_endpoints::<fio::DirectoryMarker>();
