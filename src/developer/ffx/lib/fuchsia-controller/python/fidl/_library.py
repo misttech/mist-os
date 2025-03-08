@@ -363,7 +363,7 @@ def fidl_import_to_library_path(name: str) -> str:
         )
 
 
-def type_annotation(type_ir, root_ir, recurse_guard=None) -> type:
+def type_annotation(type_ir, root_ir) -> type:
     """Attempts to turn a type's IR representation into a type annotation for class constructions."""
 
     def wrap_optional(annotation, module=None):
@@ -380,7 +380,7 @@ def type_annotation(type_ir, root_ir, recurse_guard=None) -> type:
     kind = type_ir["kind_v2"]
     if kind == "identifier":
         ident = type_ir.raw_identifier()
-        ty = get_type_by_identifier(ident, root_ir, recurse_guard)
+        ty = get_type_by_identifier(ident, root_ir)
         return wrap_optional(ty)
     elif kind == "primitive":
         return string_to_basetype(type_ir["subtype"])
@@ -390,16 +390,14 @@ def type_annotation(type_ir, root_ir, recurse_guard=None) -> type:
         return wrap_optional(str)
     elif kind == "vector" or kind == "array":
         element_type = type_ir["element_type"]
-        ty = type_annotation(element_type, root_ir, recurse_guard)
+        ty = type_annotation(element_type, root_ir)
         return wrap_optional(Sequence[ty])
     elif kind == "endpoint":
         # TODO(https://fxbug.dev/383175226): This inconsistency between client
         # and server may not be correct. Add test coverage for `client_end`.
         if type_ir["role"] == "client":
             return wrap_optional(
-                get_type_by_identifier(
-                    type_ir["protocol"], root_ir, recurse_guard
-                )
+                get_type_by_identifier(type_ir["protocol"], root_ir)
             )
         elif type_ir["role"] == "server":
             protocol = type_ir["protocol"]
@@ -487,7 +485,7 @@ def bits_or_enum_root_type(ir, type_name: str) -> enum.EnumMeta:
     return ty
 
 
-def experimental_resource_type(ir, root_ir, recurse_guard=None) -> type:
+def experimental_resource_type(ir, root_ir) -> type:
     name = fidl_ident_to_py_library_member(ir.name())
     ty = type(
         name,
@@ -564,7 +562,7 @@ def union_eq(self, other) -> bool:
     return False
 
 
-def union_type(ir, root_ir, recurse_guard=None) -> type:
+def union_type(ir, root_ir) -> type:
     """Constructs a Python type from a FIDL IR Union declaration."""
     name = fidl_ident_to_py_library_member(ir.name())
     base = type(
@@ -599,7 +597,7 @@ def union_type(ir, root_ir, recurse_guard=None) -> type:
         setattr(
             base,
             member_type_name,
-            type_annotation(member["type"], root_ir, recurse_guard),
+            type_annotation(member["type"], root_ir),
         )
         setattr(ctor, "__doc__", docstring(member))
         setattr(base, member_constructor_name, ctor)
@@ -643,13 +641,13 @@ def struct_and_table_subscript(self, item: str):
     return getattr(self, item)
 
 
-def struct_type(ir, root_ir, recurse_guard=None) -> type:
+def struct_type(ir, root_ir) -> type:
     """Constructs a Python type from a FIDL IR struct declaration."""
     name = fidl_ident_to_py_library_member(ir.name())
     members = [
         (
             normalize_member_name(member["name"]),
-            type_annotation(member["type"], root_ir, recurse_guard),
+            type_annotation(member["type"], root_ir),
         )
         for member in ir["members"]
     ]
@@ -667,12 +665,12 @@ def struct_type(ir, root_ir, recurse_guard=None) -> type:
     return ty
 
 
-def table_type(ir, root_ir, recurse_guard=None) -> type:
+def table_type(ir, root_ir) -> type:
     """Constructs a Python type from a FIDL IR table declaration."""
     name = fidl_ident_to_py_library_member(ir.name())
     members = []
     for member in ir["members"]:
-        optional_ty = type_annotation(member["type"], root_ir, recurse_guard)
+        optional_ty = type_annotation(member["type"], root_ir)
         new_member = (
             normalize_member_name(member["name"]),
             Optional[optional_ty],
@@ -706,7 +704,7 @@ def primitive_converter(subtype: str) -> type:
     raise TypeError(f"Unrecognized type: {subtype}")
 
 
-def const_declaration(ir, root_ir, recurse_guard=None) -> FIDLConstant:
+def const_declaration(ir, root_ir) -> FIDLConstant:
     """Constructs a Python type from a FIDL IR const declaration."""
     name = fidl_ident_to_py_library_member(ir.name())
     kind = ir["type"]["kind_v2"]
@@ -715,7 +713,7 @@ def const_declaration(ir, root_ir, recurse_guard=None) -> FIDLConstant:
         return FIDLConstant(name, converter(ir["value"]["value"]))
     elif kind == "identifier":
         ident = ir["type"].identifier()
-        ty = get_type_by_identifier(ident, root_ir, recurse_guard)
+        ty = get_type_by_identifier(ident, root_ir)
         if type(ty) is str:
             return FIDLConstant(name, ty(ir["value"]["value"]))
         elif ty.__class__ == enum.EnumMeta:
@@ -730,7 +728,7 @@ def const_declaration(ir, root_ir, recurse_guard=None) -> FIDLConstant:
     )
 
 
-def alias_declaration(ir, root_ir, recurse_guard=None) -> type:
+def alias_declaration(ir, root_ir) -> type:
     """Constructs a Python type from a FIDL IR alias declaration."""
     name = fidl_ident_to_py_library_member(ir.name())
     ctor = ir.get("partial_type_ctor")
@@ -785,7 +783,7 @@ class ProtocolBase(
     ...
 
 
-def protocol_type(ir, root_ir, recurse_guard=None) -> type:
+def protocol_type(ir, root_ir) -> type:
     """Constructs a Python type from a FIDL IR protocol declaration."""
     name = fidl_ident_to_py_library_member(ir.name())
     return type(
@@ -983,7 +981,6 @@ def event_method(
     method: Method,
     root_ir: IR,
     lambda_constructor: Callable,
-    recurse_guard=None,
 ) -> Callable:
     assert not method.has_request()
     if "maybe_response_payload" in method:
@@ -1000,12 +997,11 @@ def event_method(
         payload_kind,
         payload_ir,
         lambda_constructor,
-        recurse_guard,
     )
 
 
 def protocol_method(
-    method: Method, root_ir, lambda_constructor: Callable, recurse_guard=None
+    method: Method, root_ir, lambda_constructor: Callable
 ) -> Callable:
     assert method.has_request()
     if "maybe_request_payload" in method:
@@ -1022,7 +1018,6 @@ def protocol_method(
         payload_kind,
         payload_ir,
         lambda_constructor,
-        recurse_guard,
     )
 
 
@@ -1033,16 +1028,13 @@ def create_method(
     payload_kind: str,
     payload_ir: IR,
     lambda_constructor: Callable,
-    recurse_guard=None,
 ):
     if payload_kind == "struct":
         params = [
             inspect.Parameter(
                 normalize_member_name(member["name"]),
                 inspect.Parameter.KEYWORD_ONLY,
-                annotation=type_annotation(
-                    member["type"], root_ir, recurse_guard
-                ),
+                annotation=type_annotation(member["type"], root_ir),
             )
             for member in payload_ir["members"]
         ]
@@ -1055,9 +1047,7 @@ def create_method(
                 member["name"],
                 inspect.Parameter.KEYWORD_ONLY,
                 default=None,
-                annotation=type_annotation(
-                    member["type"], root_ir, recurse_guard
-                ),
+                annotation=type_annotation(member["type"], root_ir),
             )
             for member in payload_ir["members"]
         ]
@@ -1069,9 +1059,7 @@ def create_method(
             inspect.Parameter(
                 member["name"],
                 inspect.Parameter.POSITIONAL_ONLY,
-                annotation=type_annotation(
-                    member["type"], root_ir, recurse_guard
-                ),
+                annotation=type_annotation(member["type"], root_ir),
             )
             for member in payload_ir["members"]
         ]
@@ -1115,7 +1103,7 @@ def get_kind_by_identifier(ident: str, loader_ir) -> str:
     return get_type_by_identifier(ident, loader_ir).__fidl_kind__
 
 
-def get_type_by_identifier(ident: str, loader_ir, recurse_guard=None) -> type:
+def get_type_by_identifier(ident: str, loader_ir) -> type:
     """Takes a identifier, e.g. foo.bar.baz/Foo and returns its Python type."""
     member_name = fidl_ident_to_py_library_member(ident)
     mod = load_fidl_module(fidl_ident_to_py_import(ident))
