@@ -475,16 +475,32 @@
 
         // Some non-hermetic tests require access to real input.
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-input",
             from: "parent",
             to: [ "#system-tests" ],
             rights: [ "r*" ],
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.input.Service",
+            from: "parent",
+            to: [ "#system-tests" ],
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-input-report",
             from: "parent",
             to: [ "#system-tests" ],
             rights: [ "r*" ],
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.input.report.Service",
+            from: "parent",
+            to: [ "#system-tests" ],
         },
 
         // Some non-hermetic tests require access to the real display controller.
