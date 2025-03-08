@@ -20,7 +20,7 @@ use starnix_core::vfs::{
     fs_node_impl_dir_readonly, fs_node_impl_not_dir, parse_unsigned_file, unbounded_seek,
     BytesFile, BytesFileOps, CacheMode, DirEntry, DirectoryEntryType, DirentSink, FileObject,
     FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
-    FsNodeInfo, FsNodeOps, FsStr, FsString, MemoryFileNode, NamespaceNode, SeekTarget,
+    FsNodeInfo, FsNodeOps, FsStr, FsString, MemoryRegularNode, NamespaceNode, SeekTarget,
     SimpleFileNode, StaticDirectoryBuilder, VecDirectory, VecDirectoryEntry,
 };
 use starnix_uapi::auth::FsCred;
@@ -182,7 +182,7 @@ impl SeLinuxFs {
         dir.entry(
             current_task,
             "status",
-            MemoryFileNode::from_memory(Arc::new(MemoryObject::from(status_file))),
+            MemoryRegularNode::from_memory(Arc::new(MemoryObject::from(status_file))),
             mode!(IFREG, 0o444),
         );
         security_server.set_status_publisher(Box::new(status_holder));

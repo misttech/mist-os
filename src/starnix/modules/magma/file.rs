@@ -135,7 +135,7 @@ use starnix_core::mm::{MemoryAccessorExt, ProtectionFlags};
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
 use starnix_core::vfs::{
-    fileops_impl_noop_sync, Anon, FdFlags, FdNumber, FileObject, FileOps, FsNode, MemoryFileObject,
+    fileops_impl_noop_sync, Anon, FdFlags, FdNumber, FileObject, FileOps, FsNode, MemoryRegularFile,
 };
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{impossible_error, log_error, log_warn, set_zx_name, track_stub};
@@ -299,7 +299,7 @@ impl MagmaFile {
                 file.memory.duplicate_handle(zx::Rights::SAME_RIGHTS).map_err(impossible_error)?,
                 buffer,
             ))
-        } else if let Some(file) = file.downcast_file::<MemoryFileObject>() {
+        } else if let Some(file) = file.downcast_file::<MemoryRegularFile>() {
             let buffer = BufferInfo::Default;
             Ok((
                 file.memory.duplicate_handle(zx::Rights::SAME_RIGHTS).map_err(impossible_error)?,
@@ -312,7 +312,7 @@ impl MagmaFile {
             // used instead of ImageFile. Or if not needed, maybe we can remove ImageFile without
             // any replacement.
             //
-            // TODO: Consider if we can have binder related code in starnix use MemoryFileObject for
+            // TODO: Consider if we can have binder related code in starnix use MemoryRegularFile for
             // any FD wrapping a VMO, or if that's not workable, we may want to have magma related
             // code use RemoteFileObject.
             let buffer = BufferInfo::Default;

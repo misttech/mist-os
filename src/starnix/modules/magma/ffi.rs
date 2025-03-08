@@ -40,7 +40,7 @@ use magma::{
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::mm::{MemoryAccessor, MemoryAccessorExt};
 use starnix_core::task::CurrentTask;
-use starnix_core::vfs::{Anon, FdFlags, FsNodeInfo, MemoryFileObject};
+use starnix_core::vfs::{Anon, FdFlags, FsNodeInfo, MemoryRegularFile};
 use starnix_logging::track_stub;
 use starnix_types::user_buffer::UserBuffer;
 use starnix_uapi::errno;
@@ -503,7 +503,7 @@ pub fn export_buffer(
             } else {
                 Anon::new_file(
                     current_task,
-                    Box::new(MemoryFileObject::new(Arc::new(memory))),
+                    Box::new(MemoryRegularFile::new(Arc::new(memory))),
                     OpenFlags::RDWR,
                     "[fuchsia:magma_export_buffer]",
                 )
@@ -562,7 +562,7 @@ pub fn get_buffer_handle(
             MemoryObject::from(unsafe { zx::Vmo::from(zx::Handle::from_raw(buffer_handle_out)) });
         let file = Anon::new_file(
             current_task,
-            Box::new(MemoryFileObject::new(Arc::new(memory))),
+            Box::new(MemoryRegularFile::new(Arc::new(memory))),
             OpenFlags::RDWR,
             "[fuchsia:magma_buffer]",
         );
@@ -601,7 +601,7 @@ pub fn query(
         let memory_size = memory.get_size();
         let file = Anon::new_file_extended(
             current_task,
-            Box::new(MemoryFileObject::new(Arc::new(memory))),
+            Box::new(MemoryRegularFile::new(Arc::new(memory))),
             OpenFlags::RDWR,
             "[fuchsia:magma_vmo]",
             |id| {

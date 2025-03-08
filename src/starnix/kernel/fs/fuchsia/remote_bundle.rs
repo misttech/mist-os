@@ -239,12 +239,12 @@ impl FsNodeOps for File {
     }
 }
 
-// NB: This is different from MemoryFileObject, which is designed to wrap a VMO that is owned and
+// NB: This is different from MemoryRegularFile, which is designed to wrap a VMO that is owned and
 // managed by Starnix.  This struct is a wrapper around a pager-backed VMO received from the
 // filesystem backing the remote bundle.
-// MemoryFileObject does its own content size management, which is (a) incompatible with the content
+// MemoryRegularFile does its own content size management, which is (a) incompatible with the content
 // size management done for us by the remote filesystem, and (b) the content size is based on file
-// attributes in the case of MemoryFileObject, which we've intentionally avoided querying here for
+// attributes in the case of MemoryRegularFile, which we've intentionally avoided querying here for
 // performance.  Specifically, MemoryFile is designed to be opened as fast as possible, and requiring
 // that we stat the file whilst opening it is counter to that goal.
 // Note that MemoryFile assumes that the underlying file is read-only and not resizable (which is the

@@ -29,13 +29,13 @@ use starnix_uapi::signals::SIGXFSZ;
 use starnix_uapi::{errno, error};
 use std::sync::Arc;
 
-pub struct MemoryFileNode {
+pub struct MemoryRegularNode {
     /// The memory that backs this file.
     memory: Arc<MemoryObject>,
     xattrs: MemoryXattrStorage,
 }
 
-impl MemoryFileNode {
+impl MemoryRegularNode {
     /// Create a new writable file node based on a blank VMO.
     pub fn new() -> Result<Self, Errno> {
         let vmo =
@@ -54,7 +54,7 @@ impl MemoryFileNode {
     }
 }
 
-impl FsNodeOps for MemoryFileNode {
+impl FsNodeOps for MemoryRegularNode {
     fs_node_impl_not_dir!();
     fs_node_impl_xattr_delegate!(self, self.xattrs);
 
@@ -84,7 +84,7 @@ impl FsNodeOps for MemoryFileNode {
         }
         let scoped_memory =
             Arc::new(self.memory.duplicate_handle(desired_rights).map_err(|_e| errno!(EIO))?);
-        let file_object = MemoryFileObject::new(scoped_memory);
+        let file_object = MemoryRegularFile::new(scoped_memory);
 
         Ok(Box::new(file_object))
     }
@@ -195,18 +195,18 @@ impl FsNodeOps for MemoryFileNode {
     }
 }
 
-pub struct MemoryFileObject {
+pub struct MemoryRegularFile {
     pub memory: Arc<MemoryObject>,
 }
 
-impl MemoryFileObject {
+impl MemoryRegularFile {
     /// Create a file object based on a VMO.
     pub fn new(memory: Arc<MemoryObject>) -> Self {
-        MemoryFileObject { memory }
+        MemoryRegularFile { memory }
     }
 }
 
-impl MemoryFileObject {
+impl MemoryRegularFile {
     pub fn read(
         memory: &Arc<MemoryObject>,
         file: &FileObject,
@@ -359,7 +359,7 @@ macro_rules! fileops_impl_memory {
             offset: usize,
             data: &mut dyn $crate::vfs::buffers::OutputBuffer,
         ) -> Result<usize, starnix_uapi::errors::Errno> {
-            $crate::vfs::MemoryFileObject::read($memory, file, offset, data)
+            $crate::vfs::MemoryRegularFile::read($memory, file, offset, data)
         }
 
         fn write(
@@ -370,7 +370,7 @@ macro_rules! fileops_impl_memory {
             offset: usize,
             data: &mut dyn $crate::vfs::buffers::InputBuffer,
         ) -> Result<usize, starnix_uapi::errors::Errno> {
-            $crate::vfs::MemoryFileObject::write($memory, file, current_task, offset, data)
+            $crate::vfs::MemoryRegularFile::write($memory, file, current_task, offset, data)
         }
 
         fn get_memory(
@@ -381,13 +381,13 @@ macro_rules! fileops_impl_memory {
             _length: Option<usize>,
             prot: $crate::mm::ProtectionFlags,
         ) -> Result<Arc<$crate::mm::memory::MemoryObject>, starnix_uapi::errors::Errno> {
-            $crate::vfs::MemoryFileObject::get_memory($memory, file, current_task, prot)
+            $crate::vfs::MemoryRegularFile::get_memory($memory, file, current_task, prot)
         }
     }
 }
 pub(crate) use fileops_impl_memory;
 
-impl FileOps for MemoryFileObject {
+impl FileOps for MemoryRegularFile {
     fileops_impl_memory!(self, &self.memory);
     fileops_impl_noop_sync!();
 
