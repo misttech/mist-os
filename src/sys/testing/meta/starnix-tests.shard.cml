@@ -82,11 +82,19 @@
         {
             // TODO(https://fxbug.dev/304290346): In an ideal world, we would
             // mock bluetooth hardware in tests.
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-bt-hci",
             to: [ "#starnix-tests" ],
             subdir: "bt-hci",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.bluetooth.Service",
+            from: "parent",
+            to: [ "#starnix-tests" ],
         },
         {
             storage: "fxfs_tests_data",

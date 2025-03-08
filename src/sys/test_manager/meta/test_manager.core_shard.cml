@@ -314,6 +314,7 @@
             subdir: "gpu-performance-counters",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-audio-input",
@@ -321,6 +322,13 @@
             subdir: "audio-input",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.audio.StreamConfigConnectorInputService",
+            from: "parent",
+            to: "#test_manager",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-audio-output",
@@ -328,6 +336,13 @@
             subdir: "audio-output",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.audio.StreamConfigConnectorOutputService",
+            from: "parent",
+            to: "#test_manager",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-dai",
@@ -335,11 +350,24 @@
             subdir: "dai",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.audio.DaiConnectorService",
+            from: "parent",
+            to: "#test_manager",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-audio-composite",
             to: "#test_manager",
             subdir: "audio-composite",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.audio.CompositeConnectorService",
+            from: "parent",
+            to: "#test_manager",
         },
         {
             directory: "dev-class",

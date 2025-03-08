@@ -12,11 +12,18 @@
     ],
     offer: [
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-dai",
             to: "#bt-hfp-audio-gateway",
             subdir: "dai",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.audio.DaiConnectorService",
+            from: "parent",
+            to: "#bt-hfp-audio-gateway",
         },
         {
             protocol: [ "fuchsia.media.AudioDeviceEnumerator" ],

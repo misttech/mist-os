@@ -233,6 +233,7 @@
 
         // audio_driver_tests requires access to audio drivers.
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have been migrated to services. The service capability has been added below.
             directory: [
                 "dev-audio-composite",
                 "dev-audio-input",
@@ -242,6 +243,17 @@
             from: "parent",
             to: [ "#system-tests" ],
             rights: [ "r*" ],
+        },
+        {
+            // These services replace the directory capabilities above.
+            service: [
+                "fuchsia.hardware.audio.CompositeConnectorService",
+                "fuchsia.hardware.audio.DaiConnectorService",
+                "fuchsia.hardware.audio.StreamConfigConnectorInputService",
+                "fuchsia.hardware.audio.StreamConfigConnectorOutputService",
+            ],
+            from: "parent",
+            to: [ "#system-tests" ],
         },
 
         // optee_test requires access to /dev/class/tee.
