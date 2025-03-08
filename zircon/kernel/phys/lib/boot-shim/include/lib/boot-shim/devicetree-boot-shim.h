@@ -24,6 +24,16 @@
 
 namespace boot_shim {
 
+template <typename T, typename Shim>
+concept DevicetreeItem =
+    devicetree::Matcher<T> && std::is_base_of_v<ItemBase, T> && requires(T& t, Shim shim) {
+      //`Shim::Init` method will call each of these methods, before it attempts to match items in
+      // te devicetree.
+      //
+      // When successful must return true, otherwise must return false.
+      { t.Init(shim) };
+    };
+
 // Proxy for allocator. This allocator represents the following interface:
 //
 //   void* Allocator(size_t byte_count, size_t alignment);
@@ -77,7 +87,8 @@ class DevicetreeBootShim : public BootShim<Items...> {
       (items.Init(*this), ...);
       return devicetree::Match(dt_, items...);
     };
-    return this->template OnSelectItems<IsDevicetreeItem>(match_with);
+
+    return this->template OnSelectItems<DevicetreeShimItem>(match_with);
   }
 
   const devicetree::Devicetree& devicetree() const { return dt_; }
@@ -100,12 +111,10 @@ class DevicetreeBootShim : public BootShim<Items...> {
   }
 
  private:
-  DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(HasInit, Init, void (C::*)(const DevicetreeBootShim& shim));
-
-  // TODO(https://fxbug.dev/397467963): Replace with a proper concept.
+  // Alias capturing the `Shim` type for filtering items.
   template <typename T>
-  using IsDevicetreeItem = std::conditional_t<HasInit<T>::value && devicetree::Matcher<T>,
-                                              std::true_type, std::false_type>;
+  using DevicetreeShimItem = std::bool_constant<DevicetreeItem<T, DevicetreeBootShim>>;
+
   devicetree::Devicetree dt_;
   DevicetreeBootShimAllocator allocator_ = nullptr;
   DevicetreeBootShimMmioObserver mmio_observer_ = [](const DevicetreeMmioRange&) {};
