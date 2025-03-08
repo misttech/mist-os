@@ -67,6 +67,7 @@ const std::unordered_map<std::string_view, ServiceEntry> kClassNameToService = {
     {"bt-emulator",
      {ServiceEntry::kDevfsAndService, "fuchsia.hardware.bluetooth.EmulatorService", "device"}},
     {"bt-hci", {ServiceEntry::kDevfsAndService, "fuchsia.hardware.bluetooth.Service", "vendor"}},
+    {"camera", {ServiceEntry::kDevfsAndService, "fuchsia.hardware.camera.Service", "device"}},
     {"clock-impl",
      {ServiceEntry::kDevfsAndService, "fuchsia.hardware.clock.measure.Service", "measurer"}},
     {"codec",

@@ -19,7 +19,11 @@
         },
     ],
     use: [
-        { service: "fuchsia.hardware.camera.Service" },
+        {
+            directory: "dev-camera",
+            rights: [ "r*" ],
+            path: "/dev/class/camera",
+        },
         {
             protocol: [
                 "fuchsia.sysmem.Allocator",

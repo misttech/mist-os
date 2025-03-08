@@ -25,7 +25,7 @@
 
 namespace camera {
 
-constexpr auto kCameraPath = "/svc/fuchsia.hardware.camera.Service";
+constexpr auto kCameraPath = "/dev/class/camera";
 
 constexpr std::string_view kMipiCsiDeviceInstanceCollectionName{"csi_camera_devices"};
 constexpr std::string_view kMipiCsiDeviceInstanceNamePrefix{"csi_camera_device_"};

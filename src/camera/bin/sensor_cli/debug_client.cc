@@ -4,10 +4,8 @@
 
 #include "debug_client.h"
 
-#include <fidl/fuchsia.hardware.camera/cpp/wire.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
-#include <lib/component/incoming/cpp/service_member_watcher.h>
 #include <lib/fdio/directory.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/log_settings.h>
@@ -28,15 +26,22 @@ void DebugClient::Start(uint32_t mode) {
 
 bool DebugClient::ConnectToServer() {
   fuchsia::hardware::camera::DeviceHandle device_handle;
-  component::SyncServiceMemberWatcher<fuchsia_hardware_camera::Service::Device> watcher;
-  auto result = watcher.GetNextInstance(/*stop_at_idle=*/true);
-  if (result.is_error()) {
-    FX_PLOGS(ERROR, result.status_value()) << "Failed to connect to controller device";
+  for (auto const& dir_entry : std::filesystem::directory_iterator{"/dev/class/camera"}) {
+    if (zx_status_t status = fdio_service_connect(
+            dir_entry.path().c_str(), device_handle.NewRequest().TakeChannel().release());
+        status != ZX_OK) {
+      FX_PLOGS(ERROR, status) << "Failed to connect to controller device";
+      Quit();
+    }
+    break;
+  }
+  if (!device_handle.is_valid()) {
+    FX_LOGS(ERROR) << "Failed to discover controller device";
     Quit();
   }
 
   fuchsia::hardware::camera::DeviceSyncPtr device_sync_ptr;
-  device_sync_ptr.Bind(result.value().TakeChannel());
+  device_sync_ptr.Bind(std::move(device_handle));
 
   if (zx_status_t status =
           device_sync_ptr->GetDebugChannel(debug_ptr_.NewRequest(loop_.dispatcher()));

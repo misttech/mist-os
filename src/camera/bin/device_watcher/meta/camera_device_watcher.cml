@@ -30,7 +30,11 @@
         },
     ],
     use: [
-        { service: "fuchsia.hardware.camera.Service" },
+        {
+            directory: "dev-camera",
+            rights: [ "r*" ],
+            path: "/dev/class/camera",
+        },
         {
             protocol: [ "fuchsia.component.Realm" ],
             from: "framework",
@@ -60,7 +64,7 @@
             ],
         },
         {
-            service: "fuchsia.hardware.camera.Service",
+            directory: "dev-camera",
             from: "parent",
             to: [
                 "#csi_camera_devices",

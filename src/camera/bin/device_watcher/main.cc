@@ -94,7 +94,7 @@ int main(int argc, char* argv[]) {
   auto watcher = fsl::DeviceWatcher::CreateWithIdleCallback(
       camera::kCameraPath,
       [&](const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& path) {
-        server->AddDeviceByPath(path + "/device");
+        server->AddDeviceByPath(path);
       },
       [&]() { server->UpdateClients(); });
   if (!watcher) {

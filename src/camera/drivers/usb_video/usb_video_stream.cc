@@ -81,17 +81,8 @@ zx_status_t UsbVideoStream::Bind(void* ctx, zx_device_t* device) {
     return streams_or.error_value();
   }
   // Parsed all descriptors successfully.
-  auto dev = std::make_unique<UsbVideoStream>(device, usb, std::move(*streams_or));
 
-  fuchsia_hardware_camera::Service::InstanceHandler handler({
-      .device = dev->bindings_.CreateHandler(dev.get(), dev->fidl_dispatch_loop_->dispatcher(),
-                                             fidl::kIgnoreBindingClosure),
-  });
-  zx::result add_result = dev->DdkAddService<fuchsia_hardware_camera::Service>(std::move(handler));
-  if (add_result.is_error()) {
-    zxlogf(ERROR, "Failed to advertise camera service");
-    return add_result.error_value();
-  }
+  auto dev = std::make_unique<UsbVideoStream>(device, usb, std::move(*streams_or));
 
   zxlogf(INFO, "Adding UsbVideoStream");
   status = dev->DdkAdd("usb-video-source");

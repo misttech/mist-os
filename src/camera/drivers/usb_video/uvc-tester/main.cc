@@ -66,30 +66,34 @@ std::string FormatToString(Format f) {
 }
 
 zx::result<CamControl> OpenCamera() {
-  component::SyncServiceMemberWatcher<fuchsia_hardware_camera::Service::Device> watcher;
-  auto client_end = watcher.GetNextInstance(true);
-  if (client_end.is_error()) {
-    FX_PLOGS(ERROR, client_end.error_value()) << "Failed to open sensor ";
-    return client_end.take_error();
-  }
-  FX_LOGS(INFO) << "opened camera";
+  for (auto const& dir_entry : std::filesystem::directory_iterator{"/dev/class/camera"}) {
+    const char* path = dir_entry.path().c_str();
+    zx::result client_end = component::Connect<fuchsia_hardware_camera::Device>(path);
+    if (client_end.is_error()) {
+      FX_PLOGS(ERROR, client_end.error_value()) << "Failed to open sensor at " << path;
+      return client_end.take_error();
+    }
+    FX_LOGS(INFO) << "opened " << path;
 
-  fuchsia::camera::ControlSyncPtr ctrl;
-  const fidl::OneWayStatus status =
-      fidl::WireCall(client_end.value())->GetChannel(ctrl.NewRequest().TakeChannel());
-  if (!status.ok()) {
-    FX_PLOGS(INFO, status.status()) << "Couldn't GetChannel from camera";
-    return zx::error(status.status());
-  }
+    fuchsia::camera::ControlSyncPtr ctrl;
+    const fidl::OneWayStatus status =
+        fidl::WireCall(client_end.value())->GetChannel(ctrl.NewRequest().TakeChannel());
+    if (!status.ok()) {
+      FX_PLOGS(INFO, status.status()) << "Couldn't GetChannel from " << path;
+      return zx::error(status.status());
+    }
 
-  fuchsia::camera::DeviceInfo info_return;
-  if (zx_status_t status = ctrl->GetDeviceInfo(&info_return); status != ZX_OK) {
-    FX_PLOGS(ERROR, status) << "Could not get Device Info";
-    return zx::error(status);
+    fuchsia::camera::DeviceInfo info_return;
+    if (zx_status_t status = ctrl->GetDeviceInfo(&info_return); status != ZX_OK) {
+      FX_PLOGS(ERROR, status) << "Could not get Device Info";
+      return zx::error(status);
+    }
+    FX_LOGS(INFO) << "Got Device Info:\n"
+                  << "  Vendor: " << info_return.vendor_name << " (" << info_return.vendor_id
+                  << ")";
+    return zx::ok(std::move(ctrl));
   }
-  FX_LOGS(INFO) << "Got Device Info:\n"
-                << "  Vendor: " << info_return.vendor_name << " (" << info_return.vendor_id << ")";
-  return zx::ok(std::move(ctrl));
+  return zx::error(ZX_ERR_NOT_FOUND);
 }
 
 zx::result<std::vector<fuchsia::camera::VideoFormat>> GetFormats(CamControl& ctrl) {
