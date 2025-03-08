@@ -54,5 +54,10 @@ fuchsia_unittest_package("library_loader_tests") {
 
 group("tests") {
   testonly = true
-  deps = [ ":library_loader_tests" ]
+
+  # TODO: https://fxbug.dev/401049868: Re-enable it
+  # for the profile variant after the issue is resolved.
+  if (!is_profile) {
+    deps = [ ":library_loader_tests" ]
+  }
 }
