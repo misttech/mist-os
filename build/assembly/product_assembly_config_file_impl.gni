@@ -97,6 +97,11 @@ template("product_assembly_config_file") {
       fields = [ "product_index" ]
     },
     {
+      node_path = "platform.software_delivery"
+      fields = [ "tuf_config_paths" ]
+      is_list = true
+    },
+    {
       node_path = "platform.connectivity.network"
       fields = [ "netcfg_config_path" ]
     },
