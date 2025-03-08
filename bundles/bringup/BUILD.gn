@@ -4,13 +4,6 @@
 
 assert(is_fuchsia, "These can only be defined in the default toolchain")
 
-# WARNING: Known to infrastructure
-# DEPRECATED! DO NOT ADD TO THIS GROUP
-group("tests") {
-  testonly = true
-  deps = [ "//bundles/buildbot/bringup" ]
-}
-
 # TODO(https://fxbug.dev/42073789) Remove transitional labels
 group("manual_testing") {
 }

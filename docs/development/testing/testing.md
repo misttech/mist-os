@@ -6,14 +6,14 @@ To build Zircon and run unit tests, run one of the following commands:
 
 ```posix-terminal
 # Build and run x64.
-fx set bringup.x64 --with-base //bundles/buildbot/bringup
+fx set bringup_with_tests.x64
 
 fx build
 
 fx qemu
 
 # Build and run arm64.
-fx set bringup.arm64 --with-base //bundles/buildbot/bringup
+fx set bringup_with_tests.arm64 --with-base
 
 fx build
 

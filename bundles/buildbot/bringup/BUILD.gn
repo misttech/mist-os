@@ -2,19 +2,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-assert(is_fuchsia, "These can only be defined in the default toolchain")
-
 # NOTE:  These have been relocated to //products/bringup:bootfs_test_files
 #        this file remains, emptied, to point people at that location.
 
-# WARNING: Known to infrastructure
-group("bringup") {
-  testonly = true
-}
+import("//build/board.gni")
 
-# For use with the 'e2e_test_labels' GN build argument.
-# WARNING: Known to infrastructure
-group("e2e_tests") {
-  testonly = true
-  deps = []
-}
+print()
+print(
+    "ERROR:  //bundles/buildbot/bringup has been moved to the 'bringup_with_tests' product configuration, use that instead:")
+print("          fx set bringup_with_tests.${board_name}")
+print()
+assert(false)
