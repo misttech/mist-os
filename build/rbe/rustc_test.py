@@ -619,6 +619,37 @@ class RustActionTests(unittest.TestCase):
         )
         self.assertEqual(aux_rspfiles, [])
 
+    def test_dep_only_command_unwrapping_innermost(self) -> None:
+        new_depfile = "some/where/new-foo.rlib.d.other-2b"
+        r = rustc.RustAction(
+            [
+                "../rust-wrap-it.sh",
+                "--",
+                "wrap-some-more.py",
+                "--",
+                "../tools/rustc",
+                "../foo/lib.rs",
+                "-o",
+                "foo.rlib",
+            ]
+        )
+        dep_command, aux_rspfiles = r.dep_only_command_with_rspfiles(
+            new_depfile
+        )
+        self.assertEqual(
+            dep_command,  # should only use innermost command
+            [
+                "../tools/rustc",
+                "../foo/lib.rs",
+                "-o",
+                "foo.rlib",
+                f"--emit=dep-info={new_depfile}",
+                "-Z",
+                "binary-dep-depinfo",
+            ],
+        )
+        self.assertEqual(aux_rspfiles, [])
+
     def test_dep_only_command_with_metadata(self) -> None:
         new_depfile = "some/where/new-foo.rlib.d.other"
         rmeta_output = "foo34.rmeta"

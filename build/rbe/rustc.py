@@ -705,8 +705,15 @@ class RustAction(object):
           modified command
           rewritten response files (which appear in the modified command)
         """
+        # In case the original command contains additional levels of wrapping,
+        # interpret '--' as a wrapping separator, and take the innermost (last)
+        # subsequence as the relevant rustc command, for the purpose of
+        # dependency scanning.
+        innermost_command = list(
+            cl_utils.split_into_subsequences(self.original_command, "--")
+        )[-1]
         return rustc_dep_only_command(
-            command_tokens=self.original_command,
+            command_tokens=innermost_command,
             emit_metadata=self.emit_metadata,
             depfile_name=depfile_name,
         )
