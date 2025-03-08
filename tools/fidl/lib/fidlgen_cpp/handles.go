@@ -46,6 +46,7 @@ var handleSubtypeConsts = map[fidlgen.HandleSubtype]string{
 	fidlgen.HandleSubtypeBti:          "BTI",
 	fidlgen.HandleSubtypeChannel:      "CHANNEL",
 	fidlgen.HandleSubtypeClock:        "CLOCK",
+	fidlgen.HandleSubtypeCounter:      "COUNTER",
 	fidlgen.HandleSubtypeDebugLog:     "DEBUGLOG",
 	fidlgen.HandleSubtypeEvent:        "EVENT",
 	fidlgen.HandleSubtypeEventpair:    "EVENTPAIR",
