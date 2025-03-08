@@ -31,8 +31,10 @@ EOF
   exit 1
 }
 
+readonly PROTOBUF_WHEEL="prebuilt/third_party/protobuf-py3"
+
 env \
-  PYTHONPATH="$script_dir_abs":"$script_dir_abs"/proto:"$project_root"/third_party/protobuf/python \
+  PYTHONPATH="$script_dir_abs":"$script_dir_abs"/proto:"$project_root/$PROTOBUF_WHEEL" \
   "$python" \
   -S \
   "$script_dir"/"$stem".py \
