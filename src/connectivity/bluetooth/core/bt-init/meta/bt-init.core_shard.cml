@@ -32,11 +32,19 @@
             to: "#bluetooth-core",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-bt-hci",
             to: "#bluetooth-core",
             subdir: "bt-hci",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.bluetooth.Service",
+            from: "parent",
+            to: "#bluetooth-core",
         },
         {
             protocol: "fuchsia.metrics.MetricEventLoggerFactory",
