@@ -67,11 +67,7 @@ Thread* scanner_thread TA_GUARDED(scanner_disabled_lock::Get()) = nullptr;
 
 // Mutex used to ensure only a single access scan is happening at once.
 DECLARE_SINGLETON_MUTEX(accessed_scanner_lock);
-// To avoid redundant scanning we remember when the last accessed scan happened. As an accessed scan
-// might or might not harvest track the last time either kind of scan completed. Since harvesting is
-// a super set of scanning last_accessed_scan_complete >= last_harvest_accessed_scan_complete.
 ktl::atomic<zx_instant_mono_t> last_accessed_scan_complete = ZX_TIME_INFINITE_PAST;
-ktl::atomic<zx_instant_mono_t> last_harvest_accessed_scan_complete = ZX_TIME_INFINITE_PAST;
 
 // The accessed scan rate starts matched to the minimum aging period, since scanning more frequently
 // than that does not produce any fidelity of information.
@@ -174,7 +170,7 @@ int scanner_request_thread(void*) {
       // This is fine, and the goal of this is to ensure that we avoid triggering additional
       // accessed scans if we can avoid it, and that we additionally do not reclaim page tables too
       // often.
-      scanner_wait_for_accessed_scan(last_pt_evict, false);
+      scanner_wait_for_accessed_scan(last_pt_evict);
       // Trigger pt eviction to happen next time, which in the worst case will be once we timeout
       // and call scanner_wait_for_accessed_scan above. In essence this is introducing some slack to
       // the reclamation timeout to maximize the chance that the reclamation gets paired with a
@@ -188,7 +184,7 @@ int scanner_request_thread(void*) {
     // we were sleeping and we do not want to re-scan unless *no* scan happens for the period.
     next_harvest_deadline = zx_time_add_duration(last_accessed_scan_complete, accessed_scan_period);
     if (current >= next_harvest_deadline) {
-      scanner_wait_for_accessed_scan(next_harvest_deadline, false);
+      scanner_wait_for_accessed_scan(next_harvest_deadline);
       op |= kScannerOpUpdateHarvestTime;
     }
 
@@ -210,7 +206,7 @@ int scanner_request_thread(void*) {
       pmm_evictor()->EvictFromExternalTarget(target);
       // To ensure any page table eviction that was set earlier actually occurs, force an accessed
       // scan to happen right now.
-      scanner_wait_for_accessed_scan(current_mono_time(), true);
+      scanner_wait_for_accessed_scan(current_mono_time());
     }
     if (op & kScannerOpDump) {
       op &= ~kScannerOpDump;
@@ -263,16 +259,14 @@ void scanner_dump_info() {
 // The public definition of this method is abstract to allow for this to, in the future, not
 // necessarily perform a scan itself, but sync up with the scanner thread that might be slowly
 // scanning in the background.
-void scanner_wait_for_accessed_scan(zx_instant_mono_t update_time, bool clear_bits) {
-  if (update_time <=
-      (clear_bits ? last_harvest_accessed_scan_complete : last_accessed_scan_complete)) {
+void scanner_wait_for_accessed_scan(zx_instant_mono_t update_time) {
+  if (update_time <= last_accessed_scan_complete) {
     // scanning is sufficiently up to date.
     return;
   }
   Guard<Mutex> guard{accessed_scanner_lock::Get()};
   // Re-check now that we hold the lock in case a scan just finished and we were blocked on it.
-  if (update_time <=
-      (clear_bits ? last_harvest_accessed_scan_complete : last_accessed_scan_complete)) {
+  if (update_time <= last_accessed_scan_complete) {
     return;
   }
   bool reclaim_pt = reclaim_pt_next_accessed_scan.exchange(false);
@@ -284,15 +278,10 @@ void scanner_wait_for_accessed_scan(zx_instant_mono_t update_time, bool clear_bi
                                                    ? VmAspace::NonTerminalAction::FreeUnaccessed
                                                    : VmAspace::NonTerminalAction::Retain;
     pmm_page_queues()->BeginAccessScan();
-    VmAspace::HarvestAllUserAccessedBits(action, clear_bits
-                                                     ? VmAspace::TerminalAction::UpdateAgeAndHarvest
-                                                     : VmAspace::TerminalAction::UpdateAge);
+    VmAspace::HarvestAllUserAccessedBits(action, VmAspace::TerminalAction::UpdateAgeAndHarvest);
     pmm_page_queues()->EndAccessScan();
   }
   last_accessed_scan_complete = current_mono_time();
-  if (clear_bits) {
-    last_harvest_accessed_scan_complete = last_accessed_scan_complete.load();
-  }
 }
 
 PageQueues::ActiveInactiveCounts scanner_synchronized_active_inactive_counts() {
@@ -473,7 +462,7 @@ static int cmd_scanner(int argc, const cmd_args* argv, uint32_t flags) {
   } else if (!strcmp(argv[1].str, "rotate_queue")) {
     pmm_page_queues()->RotateReclaimQueues();
   } else if (!strcmp(argv[1].str, "harvest_accessed")) {
-    scanner_wait_for_accessed_scan(current_mono_time(), true);
+    scanner_wait_for_accessed_scan(current_mono_time());
   } else if (!strcmp(argv[1].str, "reclaim")) {
     if (argc < 3) {
       goto usage;

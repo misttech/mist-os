@@ -537,9 +537,6 @@ void PageQueues::Dump() {
 // This runs the aging thread. Aging, unlike lru processing, scanning or eviction, requires very
 // little work and is more about coordination. As such this thread is heavy on checks and signalling
 // but generally only needs to hold any locks for the briefest of times.
-// There is, currently, one exception to that, which is the calls to scanner_wait_for_accessed_scan.
-// The scanner will, eventually, be a separate thread that is synchronized with, but presently
-// a full scan may happen inline in that method call, and get attributed directly to this thread.
 void PageQueues::MruThread() {
   // Pretend that aging happens during startup to simplify the rest of the loop logic.
   last_age_time_ = current_mono_time();
@@ -607,14 +604,6 @@ void PageQueues::MruThread() {
     aging_token_.Wait();
     DeferPendingSignals dps{*this};
     dps.Pend(PendingSignal::AgingToken);
-
-    // Make sure the accessed information has been harvested since the last time we aged, otherwise
-    // we are deliberately making the age information coarser, by effectively not using one of the
-    // queues, at which point we might as well not have bothered rotating.
-    // Currently this is redundant since we will explicitly harvest just after aging, however once
-    // there are additional aging triggers and harvesting is more asynchronous, this will serve as
-    // a synchronization point.
-    scanner_wait_for_accessed_scan(last_age_time_, true);
 
     RotateReclaimQueues(age_reason);
 
