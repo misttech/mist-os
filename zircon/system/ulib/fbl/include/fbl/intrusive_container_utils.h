@@ -277,9 +277,9 @@ struct ContainableBaseClassEnumerator<Containable<PtrType, Options, TagType>, Re
   using ContainableTypes = decltype(std::tuple_cat(
       std::declval<std::tuple<Containable<PtrType, Options, TagType>>>(),
       std::declval<typename ContainableBaseClassEnumerator<Rest...>::ContainableTypes>()));
-  using TagTypes = decltype(
-      std::tuple_cat(std::declval<std::tuple<TagType>>(),
-                     std::declval<typename ContainableBaseClassEnumerator<Rest...>::TagTypes>()));
+  using TagTypes = decltype(std::tuple_cat(
+      std::declval<std::tuple<TagType>>(),
+      std::declval<typename ContainableBaseClassEnumerator<Rest...>::TagTypes>()));
 
   static constexpr size_t BaseClassCount =
       1 + ContainableBaseClassEnumerator<Rest...>::BaseClassCount;
@@ -432,8 +432,9 @@ struct KeyEraseUtils<ContainerType, KeyTraits,
   }
 };
 
-// Swaps two plain old data types with size no greater than 64 bits.
-template <typename T, typename = std::enable_if_t<std::is_pod_v<T> && (sizeof(T) <= 8)>>
+// Swaps two trivially copyable types with size no greater than 64 bits.
+template <typename T,
+          typename = std::enable_if_t<std::is_trivially_copyable_v<T> && (sizeof(T) <= 8)>>
 inline void Swap(T& a, T& b) noexcept {
   T tmp = a;
   a = b;

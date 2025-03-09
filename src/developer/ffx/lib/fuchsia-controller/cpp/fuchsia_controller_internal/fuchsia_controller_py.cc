@@ -313,8 +313,8 @@ using InternalHandle = struct {
   PythonObject *handle;
 };
 
-// Python C ABI requires that this is POD.
-static_assert(std::is_pod_v<InternalHandle>);
+// Python C ABI requires that this is trivially copyable.
+static_assert(std::is_trivially_copyable_v<InternalHandle>);
 
 PyObject *PythonObject::IntoPyObject() {
   if (converted_) {

@@ -5,15 +5,16 @@
 #ifndef FBL_VECTOR_H_
 #define FBL_VECTOR_H_
 
-#include <new>
 #include <string.h>
+#include <zircon/assert.h>
+
+#include <initializer_list>
+#include <new>
+#include <type_traits>
+#include <utility>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/macros.h>
-#include <initializer_list>
-#include <type_traits>
-#include <utility>
-#include <zircon/assert.h>
 
 namespace fbl {
 
@@ -309,7 +310,7 @@ class __OWNER(T) Vector {
   // leaving an 'empty' object at index.
   // Increases the size of the vector by one.
   template <typename U = T>
-  std::enable_if_t<std::is_pod_v<U>, void> shift_back(size_t index) {
+  std::enable_if_t<std::is_trivially_copyable_v<U>, void> shift_back(size_t index) {
     ZX_DEBUG_ASSERT(size_ < capacity_);
     ZX_DEBUG_ASSERT(size_ > 0);
     size_++;
@@ -317,7 +318,7 @@ class __OWNER(T) Vector {
   }
 
   template <typename U = T>
-  std::enable_if_t<!std::is_pod_v<U>, void> shift_back(size_t index) {
+  std::enable_if_t<!std::is_trivially_copyable_v<U>, void> shift_back(size_t index) {
     ZX_DEBUG_ASSERT(size_ < capacity_);
     ZX_DEBUG_ASSERT(size_ > 0);
     size_++;
@@ -330,14 +331,14 @@ class __OWNER(T) Vector {
   // Moves all objects in the internal storage (after index) forward by one.
   // Decreases the size of the vector by one.
   template <typename U = T>
-  std::enable_if_t<std::is_pod_v<U>, void> shift_forward(size_t index) {
+  std::enable_if_t<std::is_trivially_copyable_v<U>, void> shift_forward(size_t index) {
     ZX_DEBUG_ASSERT(size_ > 0);
     memmove(&ptr_[index], &ptr_[index + 1], sizeof(T) * (size_ - (index + 1)));
     size_--;
   }
 
   template <typename U = T>
-  std::enable_if_t<!std::is_pod_v<U>, void> shift_forward(size_t index) {
+  std::enable_if_t<!std::is_trivially_copyable_v<U>, void> shift_forward(size_t index) {
     ZX_DEBUG_ASSERT(size_ > 0);
     for (size_t i = index; (i + 1) < size_; i++) {
       ptr_[i] = std::move(ptr_[i + 1]);
@@ -346,7 +347,7 @@ class __OWNER(T) Vector {
   }
 
   template <typename U = T>
-  std::enable_if_t<std::is_pod_v<U>, void> transfer_to(T* newPtr, size_t elements) {
+  std::enable_if_t<std::is_trivially_copyable_v<U>, void> transfer_to(T* newPtr, size_t elements) {
     // We must avoid calling memcpy if ptr_ is nullptr -- it's UB to call mempcy
     // on nullptr, even if the size is 0.
     // When the vector's size is zero, ptr_ will be nullptr.
@@ -356,7 +357,7 @@ class __OWNER(T) Vector {
   }
 
   template <typename U = T>
-  std::enable_if_t<!std::is_pod_v<U>, void> transfer_to(T* newPtr, size_t elements) {
+  std::enable_if_t<!std::is_trivially_copyable_v<U>, void> transfer_to(T* newPtr, size_t elements) {
     for (size_t i = 0; i < elements; i++) {
       new (&newPtr[i]) T(std::move(ptr_[i]));
       ptr_[i].~T();
