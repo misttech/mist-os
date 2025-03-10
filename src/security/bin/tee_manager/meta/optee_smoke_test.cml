@@ -27,7 +27,7 @@
     ],
     offer: [
         {
-            service: "fuchsia.hardware.tee.Service",
+            directory: "dev-tee",
             from: "parent",
             to: "#tee_manager",
         },

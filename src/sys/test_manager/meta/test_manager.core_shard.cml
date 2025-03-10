@@ -464,9 +464,11 @@
             to: "#test_manager",
         },
         {
-            service: "fuchsia.hardware.tee.Service",
+            directory: "dev-class",
             from: "parent",
+            as: "dev-tee",
             to: "#test_manager",
+            subdir: "tee",
         },
         {
             directory: "dev-class",

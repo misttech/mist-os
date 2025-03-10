@@ -14,7 +14,11 @@
         { protocol: "fuchsia.tee.DeviceInfo" },
     ],
     use: [
-        { service: "fuchsia.hardware.tee.Service" },
+        {
+            directory: "dev-tee",
+            rights: [ "r*" ],
+            path: "/dev/class/tee",
+        },
         {
             directory: "config-data",
             rights: [ "r*" ],

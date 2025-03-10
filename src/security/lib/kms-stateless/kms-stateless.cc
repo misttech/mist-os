@@ -26,10 +26,9 @@ namespace kms_stateless {
 namespace {
 
 const size_t kDerivedKeySize = 16;
-const char kServicePath[] = "/svc/fuchsia.hardware.tee.Service";
-const char kServiceMemberName[] = "device_connector";
-
-const size_t kMaxPathLen = 264;
+const char kDeviceClass[] = "/dev/class/tee";
+// Path estimated to be "/dev/class/tee/XXX".
+const size_t kMaxPathLen = 64;
 
 // UUID of the keysafe TA.
 const TEEC_UUID kKeysafeTaUuid = TA_KEYSAFE_UUID;
@@ -184,11 +183,7 @@ zx_status_t WatchTee(int dirfd, int event, const char* filename, void* cookie) {
     return ZX_OK;
   }
   fbl::StringBuffer<kMaxPathLen> device_path;
-  device_path.Append(kServicePath)
-      .Append("/")
-      .Append(filename)
-      .Append("/")
-      .Append(kServiceMemberName);
+  device_path.Append(kDeviceClass).Append("/").Append(filename);
   // Hardware derived key is expected to be 128-bit AES key.
   std::unique_ptr<uint8_t[]> key_buffer(new uint8_t[kDerivedKeySize]);
   size_t key_size = 0;
@@ -215,7 +210,7 @@ zx_status_t WatchTee(int dirfd, int event, const char* filename, void* cookie) {
 
 zx_status_t GetHardwareDerivedKey(GetHardwareDerivedKeyCallback callback,
                                   uint8_t key_info[kExpectedKeyInfoSize]) {
-  zx::result channel = device_watcher::RecursiveWaitForFile(kServicePath, zx::sec(5));
+  zx::result channel = device_watcher::RecursiveWaitForFile(kDeviceClass, zx::sec(5));
   if (channel.is_error()) {
     fprintf(stderr, "Error waiting for tee device directory: %s\n", channel.status_string());
     return channel.error_value();

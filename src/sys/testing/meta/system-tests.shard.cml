@@ -322,9 +322,10 @@
 
         // optee_test requires access to /dev/class/tee.
         {
-            service: "fuchsia.hardware.tee.Service",
+            directory: "dev-tee",
             from: "parent",
             to: [ "#system-tests" ],
+            rights: [ "r*" ],
         },
 
         // Tests of the media system want to test against the real hardware

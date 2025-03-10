@@ -22,8 +22,7 @@ use futures::stream::FusedStream;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
-const DEV_TEE_PATH: &str = "/svc/fuchsia.hardware.tee.Service";
-const TEE_SERVICE_MEMBER: &str = "/device_connector";
+const DEV_TEE_PATH: &str = "/dev/class/tee";
 
 enum IncomingRequest {
     Application(ServerEnd<fuchsia_tee::ApplicationMarker>, fuchsia_tee::Uuid),
@@ -111,9 +110,7 @@ async fn enumerate_tee_devices() -> Result<Vec<PathBuf>, Error> {
                 if msg.filename == Path::new(".") {
                     continue;
                 }
-                device_list.push(
-                    PathBuf::new().join(DEV_TEE_PATH).join(msg.filename).join(TEE_SERVICE_MEMBER),
-                );
+                device_list.push(PathBuf::new().join(DEV_TEE_PATH).join(msg.filename));
             }
             vfs::WatchEvent::IDLE => {
                 break;
