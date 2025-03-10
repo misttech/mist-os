@@ -20,16 +20,22 @@
 namespace boot_shim {
 
 // A `Watchdog` Item must provide the following API:
-//
-//   * `Watchdog::kCompatibleDevices` as a collection of `std::string_view`.
-//     This represents the list of device nodes compatible string the items is matching against.
-//
-//   * `std::optional<zbi_dcfg_generic_32_watchog_t> Watchdog::MaybeCreate(const
-//          devicetree::PropertyDecoder& node_decoder);`
-//     This function is provided with a decoder (references a node) whose compatible string contain
-//     a device name in the `kCompatibleDevices` collection. If the node properties are enough to
-//     generate a valid configuration then a `zbi_dcfg_generic_32_watchdog_t` instance is returned.
-//     Otherwise, returns `std::nullopt`.
+template <typename T>
+concept Watchdog = requires(std::decay_t<T> t, const devicetree::PropertyDecoder& decoder,
+                            const DevicetreeBootShimMmioObserver* mmio_observer) {
+  // `Watchdog::kCompatibleDevices` as a collection of `std::string_view`.
+  //  This represents the list of device nodes compatible string the items is matching against.
+  { decltype(t)::kCompatibleDevices } -> std::ranges::range;
+  { *decltype(t)::kCompatibleDevices.begin() } -> std::convertible_to<std::string_view>;
+
+  //  This function is provided with a decoder (references a node) whose compatible string contain
+  //  a device name in the `kCompatibleDevices` collection. If the node properties are enough to
+  //  generate a valid configuration then a `zbi_dcfg_generic_32_watchdog_t` instance is returned.
+  //  Otherwise, returns `std::nullopt`.
+  {
+    decltype(t)::MaybeCreate(decoder, mmio_observer)
+  } -> std::convertible_to<std::optional<zbi_dcfg_generic32_watchdog_t>>;
+};
 
 struct QualcomMsmWatchdog {
   // List of devicetree compatible strings that this `Watchdog` item should be matched to.

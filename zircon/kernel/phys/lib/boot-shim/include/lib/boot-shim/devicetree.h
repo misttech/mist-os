@@ -992,7 +992,7 @@ using DevicetreeDtbItem = SingleItem<ZBI_TYPE_DEVICETREE>;
 // used to fill the payload.
 //
 // See '<lib/boot-shim/watchdog.h>' for Watchdog Item API contract.
-template <class... Watchdogs>
+template <Watchdog... Watchdogs>
 class GenericWatchdogItemBase
     : public DevicetreeItemBase<GenericWatchdogItemBase<Watchdogs...>, 1>,
       public SingleOptionalItem<zbi_dcfg_generic32_watchdog_t, ZBI_TYPE_KERNEL_DRIVER,
