@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.component.runner/cpp/natural_types.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
 
 namespace fdf_testing {

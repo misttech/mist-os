@@ -5,6 +5,7 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_HCI_VENDOR_INTEL_DEVICE_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_HCI_VENDOR_INTEL_DEVICE_H_
 
+#include <fidl/fuchsia.driver.framework/cpp/wire_messaging.h>
 #include <fidl/fuchsia.hardware.bluetooth/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.bluetooth/cpp/wire.h>
 #include <lib/driver/component/cpp/driver_base.h>
@@ -45,15 +46,15 @@ class Device : public fdf::DriverBase,
 
  private:
   // fuchsia_hardware_bluetooth::Vendor protocol interface implementations
-  void GetFeatures(GetFeaturesCompleter::Sync& completer) override;
+  void GetFeatures(GetFeaturesCompleter::Sync &completer) override;
   void EncodeCommand(EncodeCommandRequestView request,
-                     EncodeCommandCompleter::Sync& completer) override;
-  void OpenHci(OpenHciCompleter::Sync& completer) override;
-  void OpenHciTransport(OpenHciTransportCompleter::Sync& completer) override;
-  void OpenSnoop(OpenSnoopCompleter::Sync& completer) override;
+                     EncodeCommandCompleter::Sync &completer) override;
+  void OpenHci(OpenHciCompleter::Sync &completer) override;
+  void OpenHciTransport(OpenHciTransportCompleter::Sync &completer) override;
+  void OpenSnoop(OpenSnoopCompleter::Sync &completer) override;
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
-      fidl::UnknownMethodCompleter::Sync& completer) override;
+      fidl::UnknownMethodCompleter::Sync &completer) override;
 
   void Connect(fidl::ServerEnd<fuchsia_hardware_bluetooth::Vendor> request);
 
@@ -64,7 +65,7 @@ class Device : public fdf::DriverBase,
   // which will unbind the device, and leaves an error on the kernel log
   // prepended with |note|.
   // Returns |status|.
-  zx_status_t InitFailed(zx_status_t status, const char* note);
+  zx_status_t InitFailed(zx_status_t status, const char *note);
 
   // Maps the firmware refrenced by |name| into memory.
   // Returns the vmo that the firmware is loaded into or ZX_HANDLE_INVALID if it
@@ -72,7 +73,7 @@ class Device : public fdf::DriverBase,
   // Closing this handle will invalidate |fw_addr|, which
   // receives a pointer to the memory.
   // |fw_size| receives the size of the firmware if valid.
-  zx_handle_t MapFirmware(const char* name, uintptr_t* fw_addr, size_t* fw_size);
+  zx_handle_t MapFirmware(const char *name, uintptr_t *fw_addr, size_t *fw_size);
 
   driver_devfs::Connector<fuchsia_hardware_bluetooth::Vendor> devfs_connector_;
 

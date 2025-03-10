@@ -5,7 +5,7 @@
 #ifndef LIB_INSPECT_COMPONENT_CPP_COMPONENT_H_
 #define LIB_INSPECT_COMPONENT_CPP_COMPONENT_H_
 
-#include <fidl/fuchsia.inspect/cpp/fidl.h>
+#include <fidl/fuchsia.inspect/cpp/markers.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/inspect/component/cpp/tree_handler_settings.h>

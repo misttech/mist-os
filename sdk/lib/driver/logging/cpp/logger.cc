@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.logger/cpp/wire_messaging.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/fdio/directory.h>
+#include <zircon/process.h>
 
 #include <cstdarg>
 

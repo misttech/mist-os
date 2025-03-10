@@ -5,7 +5,8 @@
 #ifndef LIB_DRIVER_LOGGING_CPP_LOGGER_H_
 #define LIB_DRIVER_LOGGING_CPP_LOGGER_H_
 
-#include <fidl/fuchsia.logger/cpp/wire.h>
+#include <fidl/fuchsia.logger/cpp/markers.h>
+#include <fidl/fuchsia.logger/cpp/wire_types.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/syslog/structured_backend/cpp/fuchsia_syslog.h>
 #include <lib/zx/socket.h>

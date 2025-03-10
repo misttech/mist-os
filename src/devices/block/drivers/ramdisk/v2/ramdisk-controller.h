@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_RAMDISK_V2_RAMDISK_CONTROLLER_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_RAMDISK_V2_RAMDISK_CONTROLLER_H_
 
+#include <fidl/fuchsia.driver.framework/cpp/natural_messaging.h>
 #include <fidl/fuchsia.hardware.ramdisk/cpp/wire.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/driver/component/cpp/driver_base.h>

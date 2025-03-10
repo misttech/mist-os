@@ -5,7 +5,7 @@
 #ifndef LIB_DRIVER_COMPONENT_CPP_COMPOSITE_NODE_SPEC_H_
 #define LIB_DRIVER_COMPONENT_CPP_COMPOSITE_NODE_SPEC_H_
 
-#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
+#include <fidl/fuchsia.driver.framework/cpp/natural_types.h>
 
 #include <string_view>
 

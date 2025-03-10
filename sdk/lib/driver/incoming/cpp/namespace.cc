@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.component.runner/cpp/natural_types.h>
+#include <fidl/fuchsia.component.runner/cpp/wire_types.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <zircon/availability.h>
 

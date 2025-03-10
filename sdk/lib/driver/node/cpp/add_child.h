@@ -9,7 +9,7 @@
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(18)
 
-#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
+#include <fidl/fuchsia.driver.framework/cpp/markers.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/stdcompat/span.h>
 

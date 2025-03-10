@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.component.decl/cpp/type_conversions.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
 #include <gtest/gtest.h>

@@ -5,8 +5,7 @@
 #ifndef LIB_DRIVER_INCOMING_CPP_NAMESPACE_H_
 #define LIB_DRIVER_INCOMING_CPP_NAMESPACE_H_
 
-#include <fidl/fuchsia.component.runner/cpp/fidl.h>
-#include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/markers.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/incoming/cpp/service.h>
 #include <lib/driver/incoming/cpp/service_validator.h>
@@ -15,6 +14,14 @@
 #include <lib/fdio/namespace.h>
 #include <lib/fidl_driver/cpp/transport.h>
 #include <zircon/availability.h>
+
+// Forward declare to avoid pulling in unneeded generated bindings
+namespace fuchsia_component_runner {
+class ComponentNamespaceEntry;
+namespace wire {
+class ComponentNamespaceEntry;
+}
+}  // namespace fuchsia_component_runner
 
 namespace fdf {
 
