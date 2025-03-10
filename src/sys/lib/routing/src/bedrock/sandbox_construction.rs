@@ -7,6 +7,7 @@ use crate::bedrock::structured_dict::{
     ComponentEnvironment, ComponentInput, ComponentOutput, StructuredDictMap,
 };
 use crate::bedrock::with_porcelain_type::WithPorcelainType as _;
+use crate::bedrock::with_service_renames_and_filter::WithServiceRenamesAndFilter;
 use crate::capability_source::{CapabilitySource, InternalCapability, VoidSource};
 use crate::component_instance::{ComponentInstanceInterface, WeakComponentInstanceInterface};
 use crate::error::{ErrorReporter, RouteRequestErrorInfo, RoutingError};
@@ -842,7 +843,7 @@ fn extend_dict_with_offer<T, C: ComponentInstanceInterface + 'static>(
     error_reporter: impl ErrorReporter,
 ) where
     T: CapabilityBound + Clone,
-    Router<T>: TryFrom<Capability> + Into<Capability>,
+    Router<T>: TryFrom<Capability> + Into<Capability> + WithServiceRenamesAndFilter,
 {
     assert!(is_supported_offer(offer), "{offer:?}");
 
@@ -959,14 +960,12 @@ fn extend_dict_with_offer<T, C: ComponentInstanceInterface + 'static>(
     // general. However, supporting the general case simplifies the logic and establishes a nice
     // symmetry between program_input_dict, component_output_dict, and {child,collection}_inputs.
     let default_request = Request { metadata, target: component.as_weak().into() };
-    match target_dict.insert_capability(
-        target_name,
-        router
-            .with_availability(component.moniker().clone(), *offer.availability())
-            .with_default(default_request)
-            .with_error_reporter(RouteRequestErrorInfo::from(offer), error_reporter)
-            .into(),
-    ) {
+    let router = router
+        .with_availability(component.moniker().clone(), *offer.availability())
+        .with_default(default_request)
+        .with_error_reporter(RouteRequestErrorInfo::from(offer), error_reporter)
+        .with_service_renames_and_filter(offer.clone());
+    match target_dict.insert_capability(target_name, router.into()) {
         Ok(()) => (),
         Err(e) => warn!("failed to insert {target_name} into target dict: {e:?}"),
     }

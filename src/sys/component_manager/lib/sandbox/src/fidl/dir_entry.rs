@@ -7,7 +7,7 @@ use crate::fidl::registry;
 use crate::{Connector, ConversionError, DirEntry, RemotableCapability};
 use fidl::handle::{Channel, Status};
 use std::sync::Arc;
-use vfs::directory::entry::{DirectoryEntry, OpenRequest};
+use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
 use vfs::execution_scope::ExecutionScope;
 use vfs::ToObjectRequest;
 use {fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio};
@@ -42,6 +42,18 @@ impl Connectable for DirEntry {
             message.channel,
         );
         Ok(())
+    }
+}
+
+impl GetEntryInfo for DirEntry {
+    fn entry_info(&self) -> EntryInfo {
+        self.entry.entry_info()
+    }
+}
+
+impl DirectoryEntry for DirEntry {
+    fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
+        self.entry.clone().open_entry(request)
     }
 }
 

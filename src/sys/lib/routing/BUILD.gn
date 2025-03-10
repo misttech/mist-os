@@ -77,6 +77,7 @@ rustc_library("routing") {
     "src/bedrock/with_policy_check.rs",
     "src/bedrock/with_porcelain_type.rs",
     "src/bedrock/with_rights.rs",
+    "src/bedrock/with_service_renames_and_filter.rs",
     "src/capability_source.rs",
     "src/collection.rs",
     "src/component_instance.rs",
@@ -114,6 +115,7 @@ rustc_library("routing") {
   if (is_fuchsia) {
     deps += [
       "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust",
+      "//src/storage/lib/vfs/rust:vfs",
       "//src/sys/lib/cm_fidl_validator",
       "//src/sys/lib/mem_util",
     ]
