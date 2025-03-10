@@ -20,7 +20,7 @@ std::string RemoveTailNull(std::string in) {
   return in;
 }
 
-void RunTest() {
+TEST(PolicyLoadTest, TasksUseKernelSid) {
   LoadPolicy("minimal_policy.pp");
 
   std::string s = ReadFile("/proc/thread-self/attr/current");

@@ -12,7 +12,7 @@
 
 #include "src/starnix/tests/selinux/userspace/util.h"
 
-void RunTest() {
+TEST(PolicyLoadTest, MemFdsRetrospectivelyLabeledOnPolicyLoad) {
   int before_policy_fd;
   EXPECT_THAT((before_policy_fd = memfd_create("test", 0)), SyscallSucceeds());
 

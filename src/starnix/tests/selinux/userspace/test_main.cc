@@ -8,8 +8,6 @@
 
 #include "src/starnix/tests/selinux/userspace/util.h"
 
-extern void RunTest();
-
 void PrepareTestEnvironment() {
   EXPECT_THAT(mkdir("/sys", 0755), SyscallSucceeds());
   EXPECT_THAT(mkdir("/proc", 0755), SyscallSucceeds());
@@ -21,14 +19,10 @@ void PrepareTestEnvironment() {
               SyscallSucceeds());
 }
 
-// Wrap running the test function in a gtest test to get access to the nice EXPECT/ASSERT magic.
-TEST(StarnixUserspaceTest, TestWrapper) {
-  PrepareTestEnvironment();
-  RunTest();
-}
-
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
+
+  PrepareTestEnvironment();
 
   return RUN_ALL_TESTS();
 }

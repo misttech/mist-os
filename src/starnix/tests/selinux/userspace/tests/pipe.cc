@@ -12,7 +12,7 @@
 #include "src/starnix/tests/selinux/userspace/util.h"
 
 // Under the default policy, a pipe is labeled with the label of its creating process.
-void RunTest() {
+TEST(PolicyLoadTest, Pipes) {
   int pipe_before_policy[2];
   EXPECT_THAT(pipe(pipe_before_policy), SyscallSucceeds());
   LoadPolicy("minimal_policy.pp");
