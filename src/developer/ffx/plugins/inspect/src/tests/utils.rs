@@ -132,24 +132,6 @@ pub fn setup_fake_rcs(components: Vec<&str>) -> RemoteControlProxy {
                         .detach();
                     responder.send(Ok(())).unwrap();
                 }
-                // TODO(https://fxbug.dev/384054758): Remove when all clients call ConnectCapability
-                // first.
-                RemoteControlRequest::DeprecatedOpenCapability {
-                    moniker,
-                    capability_set,
-                    capability_name,
-                    server_channel,
-                    flags: _,
-                    responder,
-                } => {
-                    assert_eq!(moniker, "toolbox");
-                    assert_eq!(capability_set, rcs::OpenDirType::NamespaceDir);
-                    assert_eq!(capability_name, "svc/fuchsia.sys2.RealmQuery.root");
-                    let querier = Rc::clone(&querier);
-                    fuchsia_async::Task::local(querier.serve(ServerEnd::new(server_channel)))
-                        .detach();
-                    responder.send(Ok(())).unwrap();
-                }
                 _ => unreachable!("Not implemented"),
             }
         }

@@ -541,26 +541,6 @@ mod test {
                             server_channels.push(server_channel);
                             responder.send(Ok(())).expect("error sending EchoString response");
                         }
-                        // TODO(https://fxbug.dev/384054758): Remove when all clients call
-                        // ConnectCapability first.
-                        fremotecontrol::RemoteControlRequest::DeprecatedOpenCapability {
-                            moniker,
-                            capability_set,
-                            capability_name,
-                            server_channel,
-                            flags: _,
-                            responder,
-                        } => {
-                            assert_eq!(moniker, "toolbox");
-                            assert_eq!(capability_set, fsys::OpenDirType::NamespaceDir);
-                            assert!(
-                                capability_name == "svc/fuchsia.sys2.RealmQuery.root"
-                                    || capability_name
-                                        == "svc/fuchsia.sys2.LifecycleController.root"
-                            );
-                            server_channels.push(server_channel);
-                            responder.send(Ok(())).expect("error sending EchoString response");
-                        }
                         other => {
                             unreachable!("Got unexpected request: {other:?}");
                         }
@@ -999,40 +979,6 @@ mod test {
                         capability_set,
                         capability_name,
                         server_channel,
-                        responder,
-                    } => {
-                        assert!(!once);
-                        once = true;
-                        assert_eq!(moniker, "/core/test_manager");
-                        assert_eq!(capability_set, fsys::OpenDirType::ExposedDir);
-                        assert!(capability_name == EarlyBootProfileMarker::DEBUG_NAME);
-                        responder.send(Ok(())).expect("error sending EchoString response");
-
-                        let mut stream = EarlyBootProfileRequestStream::from_channel(
-                            fidl::AsyncChannel::from_channel(server_channel),
-                        );
-                        while let Some(request) = stream.try_next().await.unwrap() {
-                            match request {
-                                ftest_manager::EarlyBootProfileRequest::RegisterWatcher {
-                                    iterator,
-                                    control_handle: _,
-                                } => {
-                                    fake_debug_data_iterator(iterator).await;
-                                }
-                                other => {
-                                    unreachable!("Got unexpected request: {other:?}");
-                                }
-                            }
-                        }
-                    }
-                    // TODO(https://fxbug.dev/384054758): Remove when all clients call
-                    // ConnectCapability first.
-                    fremotecontrol::RemoteControlRequest::DeprecatedOpenCapability {
-                        moniker,
-                        capability_set,
-                        capability_name,
-                        server_channel,
-                        flags: _,
                         responder,
                     } => {
                         assert!(!once);

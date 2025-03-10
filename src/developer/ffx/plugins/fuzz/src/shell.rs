@@ -844,24 +844,6 @@ mod test_fixtures {
                     task =
                         Some(create_task(serve_manager(server_end, test.clone()), test.writer()));
                 }
-                // TODO(https://fxbug.dev/384054758): Remove when all clients call ConnectCapability
-                // first.
-                Ok(rcs::RemoteControlRequest::DeprecatedOpenCapability {
-                    moniker,
-                    capability_set,
-                    capability_name,
-                    flags: _,
-                    server_channel,
-                    responder,
-                }) => {
-                    assert_eq!(moniker, "/core/fuzz-manager");
-                    assert_eq!(capability_set, fsys::OpenDirType::ExposedDir);
-                    assert_eq!(capability_name, fuzz::ManagerMarker::PROTOCOL_NAME);
-                    let server_end = ServerEnd::<fuzz::ManagerMarker>::new(server_channel);
-                    responder.send(Ok(()))?;
-                    task =
-                        Some(create_task(serve_manager(server_end, test.clone()), test.writer()));
-                }
                 Err(e) => return Err(anyhow!(e)),
                 _ => todo!("not yet implemented"),
             }

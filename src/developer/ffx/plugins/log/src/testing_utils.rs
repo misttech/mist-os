@@ -295,29 +295,6 @@ fn setup_fake_rcs(state: Rc<State>) -> RemoteControlProxy {
                     });
                     responder.send(Ok(())).unwrap();
                 }
-                // TODO(https://fxbug.dev/384054758): Remove when all clients call ConnectCapability
-                // first.
-                RemoteControlRequest::DeprecatedOpenCapability {
-                    moniker,
-                    capability_set,
-                    capability_name,
-                    server_channel,
-                    flags: _,
-                    responder,
-                } => {
-                    assert_eq!(capability_set, rcs::OpenDirType::NamespaceDir);
-                    let state_clone = state.clone();
-                    task_group.local(async move {
-                        handle_open_capability(
-                            &moniker,
-                            &capability_name,
-                            server_channel,
-                            state_clone,
-                        )
-                        .await
-                    });
-                    responder.send(Ok(())).unwrap();
-                }
                 RemoteControlRequest::IdentifyHost { responder } => {
                     responder
                         .send(Ok(&IdentifyHostResponse {

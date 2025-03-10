@@ -398,22 +398,6 @@ mod tests {
                                 .detach();
                             responder.send(Ok(())).unwrap();
                         }
-                        // TODO(https://fxbug.dev/384054758): Remove when all clients call
-                        // ConnectCapability first.
-                        rcs::RemoteControlRequest::DeprecatedOpenCapability {
-                            moniker: _,
-                            capability_set,
-                            capability_name,
-                            server_channel,
-                            flags: _,
-                            responder,
-                        } => {
-                            assert_eq!(sys2::OpenDirType::NamespaceDir, capability_set);
-                            assert_eq!("svc/fuchsia.posix.socket.Provider", capability_name);
-                            fuchsia_async::Task::spawn(test_socket_provider(server_channel))
-                                .detach();
-                            responder.send(Ok(())).unwrap();
-                        }
                         other => panic!("Unexpected request: {:?}", other),
                     }
                 }

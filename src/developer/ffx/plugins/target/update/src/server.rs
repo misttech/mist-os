@@ -677,36 +677,6 @@ mod tests {
                     }
                 };
             }
-            // TODO(https://fxbug.dev/384054758): Remove when all clients call ConnectCapability
-            // first.
-            RemoteControlRequest::DeprecatedOpenCapability {
-                capability_name,
-                server_channel,
-                responder,
-                ..
-            } => {
-                match capability_name.as_str() {
-                    RepositoryManagerMarker::PROTOCOL_NAME => {
-                        repo_manager.spawn(
-                            fidl::endpoints::ServerEnd::<RepositoryManagerMarker>::new(
-                                server_channel,
-                            )
-                            .into_stream(),
-                        );
-                        responder.send(Ok(())).expect("Could not send response")
-                    }
-                    EngineMarker::PROTOCOL_NAME => {
-                        engine.spawn(
-                            fidl::endpoints::ServerEnd::<EngineMarker>::new(server_channel)
-                                .into_stream(),
-                        );
-                        responder.send(Ok(())).expect("Could not send response")
-                    }
-                    _ => {
-                        responder.send(Err(ConnectCapabilityError::NoMatchingCapabilities)).unwrap()
-                    }
-                };
-            }
             _ => panic!("Unexpected request: {:?}", req),
         }
     }

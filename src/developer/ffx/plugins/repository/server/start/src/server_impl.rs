@@ -695,33 +695,6 @@ mod test {
                     }
                     responder.send(Ok(())).unwrap();
                 }
-                // TODO(https://fxbug.dev/384054758): Remove when all clients call ConnectCapability
-                // first.
-                frcs::RemoteControlRequest::DeprecatedOpenCapability {
-                    moniker: _,
-                    capability_set: _,
-                    capability_name,
-                    server_channel,
-                    flags: _,
-                    responder,
-                } => {
-                    match capability_name.as_str() {
-                        RepositoryManagerMarker::PROTOCOL_NAME => repo_manager.spawn(
-                            fidl::endpoints::ServerEnd::<RepositoryManagerMarker>::new(
-                                server_channel,
-                            )
-                            .into_stream(),
-                        ),
-                        EngineMarker::PROTOCOL_NAME => engine.spawn(
-                            fidl::endpoints::ServerEnd::<EngineMarker>::new(server_channel)
-                                .into_stream(),
-                        ),
-                        _ => {
-                            unreachable!();
-                        }
-                    }
-                    responder.send(Ok(())).unwrap();
-                }
                 _ => panic!("unexpected request: {:?}", req),
             });
 
@@ -768,46 +741,6 @@ mod test {
                                     capability_set: _,
                                     capability_name,
                                     server_channel,
-                                    responder,
-                                } => {
-                                    match capability_name.as_str() {
-                                        RemoteControlMarker::PROTOCOL_NAME => {
-                                            // Serve the periodic knock whether the fake target is alive
-                                            // By knock_rcs_impl() in
-                                            // src/developer/ffx/lib/rcs/src/lib.rs
-                                            // a knock is considered unsuccessful if there is no
-                                            // channel connection available within the timeout.
-                                            knock_counter += 1;
-                                            if knock_skip.contains(&knock_counter) { // Do not respond
-                                            } else {
-                                                let mut stream = fidl::endpoints::ServerEnd::<
-                                                    RemoteControlMarker,
-                                                >::new(
-                                                    server_channel
-                                                )
-                                                .into_stream();
-                                                fasync::Task::local(async move {
-                                                    while let Some(Ok(_)) = stream.next().await {
-                                                        // Do nada, just await the request, this is required for target knocking
-                                                    }
-                                                })
-                                                .detach();
-                                                let _ = responder.send(Ok(())).unwrap();
-                                            }
-                                        }
-                                        e => {
-                                            panic!("Requested capability not implemented: {}", e);
-                                        }
-                                    };
-                                }
-                                // TODO(https://fxbug.dev/384054758): Remove when all clients call
-                                // ConnectCapability first.
-                                frcs::RemoteControlRequest::DeprecatedOpenCapability {
-                                    moniker: _,
-                                    capability_set: _,
-                                    capability_name,
-                                    server_channel,
-                                    flags: _,
                                     responder,
                                 } => {
                                     match capability_name.as_str() {

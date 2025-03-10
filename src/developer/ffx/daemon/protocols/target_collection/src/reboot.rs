@@ -435,16 +435,6 @@ mod tests {
                         setup_admin(server_channel).unwrap();
                         responder.send(Ok(())).unwrap();
                     }
-                    // TODO(https://fxbug.dev/384054758): Remove when all clients call
-                    // ConnectCapability first.
-                    RemoteControlRequest::DeprecatedOpenCapability {
-                        server_channel,
-                        responder,
-                        ..
-                    } => {
-                        setup_admin(server_channel).unwrap();
-                        responder.send(Ok(())).unwrap();
-                    }
                     _ => panic!("Unhandled request: {req:?}"),
                 }
             }
