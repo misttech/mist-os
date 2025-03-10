@@ -997,7 +997,15 @@ class GenericWatchdogItemBase
     : public DevicetreeItemBase<GenericWatchdogItemBase<Watchdogs...>, 1>,
       public SingleOptionalItem<zbi_dcfg_generic32_watchdog_t, ZBI_TYPE_KERNEL_DRIVER,
                                 ZBI_KERNEL_DRIVER_GENERIC32_WATCHDOG> {
+  using Base = DevicetreeItemBase<GenericWatchdogItemBase<Watchdogs...>, 1>;
+
  public:
+  template <typename Shim>
+  void Init(const Shim& shim) {
+    Base::Init(shim);
+    mmio_observer_ = &shim.mmio_observer();
+  }
+
   devicetree::ScanState OnNode(const devicetree::NodePath& path,
                                const devicetree::PropertyDecoder& decoder) {
     auto compatibles =
@@ -1024,7 +1032,7 @@ class GenericWatchdogItemBase
   bool Match(std::string_view compatible, const devicetree::PropertyDecoder& decoder) {
     for (std::string_view device_compatible : Watchdog::kCompatibleDevices) {
       if (device_compatible == compatible) {
-        if (auto payload = Watchdog::MaybeCreate(decoder); payload) {
+        if (auto payload = Watchdog::MaybeCreate(decoder, mmio_observer_); payload) {
           set_payload(*payload);
         }
         return true;
@@ -1032,6 +1040,8 @@ class GenericWatchdogItemBase
     }
     return false;
   }
+
+  const DevicetreeBootShimMmioObserver* mmio_observer_ = nullptr;
 };
 
 using GenericWatchdogItem = WithAllWatchdogs<GenericWatchdogItemBase>;

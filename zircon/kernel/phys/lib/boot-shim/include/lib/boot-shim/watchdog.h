@@ -4,6 +4,7 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <lib/boot-shim/devicetree-boot-shim.h>
 #include <lib/devicetree/devicetree.h>
 #include <lib/stdcompat/array.h>
 #include <lib/zbi-format/driver-config.h>
@@ -41,7 +42,8 @@ struct QualcomMsmWatchdog {
   // Returns true if decoder references a valid device node describing the watchdog device node and
   // `payload` is properly filled. Otherwise, returns false.
   static std::optional<zbi_dcfg_generic32_watchdog_t> MaybeCreate(
-      const devicetree::PropertyDecoder& decoder) {
+      const devicetree::PropertyDecoder& decoder,
+      const DevicetreeBootShimMmioObserver* mmio_observer) {
     auto [reg_names_prop, reg_prop, pet_time_prop] =
         decoder.FindProperties("reg-names", "reg", "qcom,pet-time");
 
@@ -64,7 +66,6 @@ struct QualcomMsmWatchdog {
       }
       base_index++;
     }
-
     // Index refers to the reg property array.
     if (base_index >= reg->size()) {
       return std::nullopt;
@@ -73,9 +74,13 @@ struct QualcomMsmWatchdog {
     auto base_reg = (*reg)[base_index];
     auto base_addr = base_reg.address();
     auto base_size = base_reg.size();
+
     if (!base_addr || !base_size) {
       return std::nullopt;
     }
+
+    (*mmio_observer)(
+        DevicetreeMmioRange{.address = *base_addr, .size = static_cast<size_t>(*base_size)});
 
     return zbi_dcfg_generic32_watchdog_t{
         .pet_action =
