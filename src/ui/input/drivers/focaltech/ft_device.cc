@@ -328,17 +328,6 @@ zx_status_t FtDevice::Create(void* ctx, zx_device_t* device) {
 
   auto cleanup = fit::defer([&]() { ft_dev->ShutDown(); });
 
-  // Set scheduler role for device thread.
-  {
-    const char* role_name = "fuchsia.ui.input.drivers.focaltech.device";
-    status = device_set_profile_by_role(ft_dev->parent(), zx_thread_self(), role_name,
-                                        strlen(role_name));
-    if (status != ZX_OK) {
-      zxlogf(WARNING, "focaltouch: Failed to apply scheduler role: %s",
-             zx_status_get_string(status));
-    }
-  }
-
   status = ft_dev->DdkAdd(ddk::DeviceAddArgs("focaltouch-HidDevice")
                               .set_inspect_vmo(ft_dev->inspector_.DuplicateVmo()));
   if (status != ZX_OK) {
