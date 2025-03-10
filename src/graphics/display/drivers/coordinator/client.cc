@@ -1170,11 +1170,20 @@ void Client::ApplyConfig() {
   ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher());
   TRACE_DURATION("gfx", "Display::Client::ApplyConfig");
 
+  if (layers_.is_empty()) {
+    FDF_LOG(ERROR, "ApplyConfig() called before SetDisplayLayers()");
+    TearDown(ZX_ERR_BAD_STATE);
+    return;
+  }
+
   bool config_missing_image = false;
 
   // The total number of registered layers is an upper bound on the number of
   // layers assigned to display configurations.
-  layer_t layers[layers_.size() + 1];
+  //
+  // This VLA (Variable-Length Array) is guaranteed not to be empty,
+  // because SetDisplayLayers() requires a non-empty layer list.
+  layer_t layers[layers_.size()];
   int layers_index = 0;
 
   // Layers may have pending images, and it is possible that a layer still
