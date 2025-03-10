@@ -447,7 +447,9 @@ mod tests {
 
             dispatcher
                 .spawn_task(async move {
-                    fin_tx.send(first.read_bytes(dispatcher.as_ref()).await.unwrap()).unwrap();
+                    fin_tx
+                        .send(first.read_bytes(dispatcher.as_dispatcher_ref()).await.unwrap())
+                        .unwrap();
                 })
                 .unwrap();
             second.write_with_data(arena, |arena| arena.insert_slice(&[1, 2, 3, 4])).unwrap();
@@ -509,7 +511,7 @@ mod tests {
     async fn ping(dispatcher: &Dispatcher, chan: Channel<u8>) {
         println!("starting ping!");
         chan.write_with_data(Arena::new(), |arena| arena.insert(0)).unwrap();
-        while let Ok(Some(msg)) = chan.read(dispatcher.as_ref()).await {
+        while let Ok(Some(msg)) = chan.read(dispatcher.as_dispatcher_ref()).await {
             let next = *msg.data().unwrap();
             println!("ping! {next}");
             chan.write_with_data(msg.take_arena(), |arena| arena.insert(next + 1)).unwrap();
@@ -518,7 +520,7 @@ mod tests {
 
     async fn pong(dispatcher: &Dispatcher, fin_tx: std::sync::mpsc::Sender<()>, chan: Channel<u8>) {
         println!("starting pong!");
-        while let Some(msg) = chan.read(dispatcher.as_ref()).await.unwrap() {
+        while let Some(msg) = chan.read(dispatcher.as_dispatcher_ref()).await.unwrap() {
             let next = *msg.data().unwrap();
             println!("pong! {next}");
             if next > 10 {
@@ -583,7 +585,7 @@ mod tests {
         channel: &Channel<T>,
         dispatcher: DispatcherRef<'_>,
     ) -> Weak<ReadMessageStateOp> {
-        let fut = read_raw(&channel.0, dispatcher.as_ref());
+        let fut = read_raw(&channel.0, dispatcher.as_dispatcher_ref());
         let op_arc = Arc::downgrade(&fut.raw_fut.op);
         assert_strong_count(&op_arc, 1);
         let mut fut = pin!(fut);
@@ -603,10 +605,10 @@ mod tests {
                 .spawn_task(async move {
                     // create, poll, and then immediately drop a read future for channel `a`
                     // so that it properly sets up the wait.
-                    read_and_drop(&a, dispatcher.as_ref()).await;
+                    read_and_drop(&a, dispatcher.as_dispatcher_ref()).await;
                     b.write_with_data(Arena::new(), |arena| arena.insert(1)).unwrap();
                     assert_eq!(
-                        a.read(dispatcher.as_ref()).await.unwrap().unwrap().data(),
+                        a.read(dispatcher.as_dispatcher_ref()).await.unwrap().unwrap().data(),
                         Some(&1)
                     );
                     fin_tx.send(()).unwrap();
@@ -625,7 +627,7 @@ mod tests {
             dispatcher
                 .spawn_task(async move {
                     // drop before even polling it should drop the arc correctly
-                    let fut = read_raw(&a.0, dispatcher.as_ref());
+                    let fut = read_raw(&a.0, dispatcher.as_dispatcher_ref());
                     let op_arc = Arc::downgrade(&fut.raw_fut.op);
                     assert_strong_count(&op_arc, 1);
                     drop(fut);
@@ -645,7 +647,10 @@ mod tests {
 
             dispatcher
                 .spawn_task(async move {
-                    assert_strong_count(&read_and_drop(&a, dispatcher.as_ref()).await, 0);
+                    assert_strong_count(
+                        &read_and_drop(&a, dispatcher.as_dispatcher_ref()).await,
+                        0,
+                    );
                     fin_tx.send(()).unwrap();
                 })
                 .unwrap();
@@ -668,7 +673,9 @@ mod tests {
                     .spawn_task(async {
                         // we send the arc out to be checked after the dispatcher has shut down so
                         // that we can be sure that the callback has had a chance to be called.
-                        fin_tx.send(read_and_drop(&a, dispatcher.as_ref()).await).unwrap();
+                        fin_tx
+                            .send(read_and_drop(&a, dispatcher.as_dispatcher_ref()).await)
+                            .unwrap();
                     })
                     .unwrap();
                 fin_rx.recv().unwrap()

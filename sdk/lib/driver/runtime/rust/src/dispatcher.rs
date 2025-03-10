@@ -231,7 +231,7 @@ impl Dispatcher {
 
     /// Returns a [`DispatcherRef`] that references this dispatcher with a lifetime constrained by
     /// `self`.
-    pub fn as_ref(&self) -> DispatcherRef<'_> {
+    pub fn as_dispatcher_ref(&self) -> DispatcherRef<'_> {
         DispatcherRef(ManuallyDrop::new(Dispatcher(self.0)), PhantomData)
     }
 }
