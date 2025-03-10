@@ -58,7 +58,7 @@ async fn run_virtio_console(
     Ok(())
 }
 
-#[fuchsia::main(logging = true, threads = 1)]
+#[fuchsia::main(logging = true)]
 async fn main() -> Result<(), Error> {
     let mut fs = server::ServiceFs::new();
     fs.dir("svc").add_fidl_service(|stream: VirtioConsoleRequestStream| stream);

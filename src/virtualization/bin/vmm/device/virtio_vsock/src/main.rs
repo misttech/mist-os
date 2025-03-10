@@ -107,7 +107,7 @@ async fn handle_host_vsock_endpoint(
         .map_err(|err| anyhow!(err))
 }
 
-#[fuchsia::main(logging = true, logging_minimum_severity = "debug", threads = 1)]
+#[fuchsia::main(logging = true, logging_minimum_severity = "debug")]
 async fn main() -> Result<(), Error> {
     let vsock_device = VsockDevice::new();
 

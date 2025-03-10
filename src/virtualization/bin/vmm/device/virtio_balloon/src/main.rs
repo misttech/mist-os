@@ -126,7 +126,7 @@ async fn run_virtio_balloon(
     Ok(())
 }
 
-#[fuchsia::main(logging = true, threads = 1)]
+#[fuchsia::main(logging = true)]
 async fn main() -> Result<(), anyhow::Error> {
     let mut fs = server::ServiceFs::new();
     let _inspect_server_task = inspect_runtime::publish(

@@ -250,7 +250,7 @@ async fn run_virtio_sound(
     return Ok(());
 }
 
-#[fuchsia::main(logging = true, threads = 1)]
+#[fuchsia::main(logging = true)]
 async fn main() -> Result<(), Error> {
     let audio = fuchsia_component::client::connect_to_protocol::<fidl_fuchsia_media::AudioMarker>()
         .context("Failed to connect to fuchsia.media.Audio")?;

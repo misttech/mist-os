@@ -81,7 +81,7 @@ async fn run_virtio_gpu(mut virtio_gpu_fidl: VirtioGpuRequestStream) -> Result<(
     Ok(())
 }
 
-#[fuchsia::main(logging = true, threads = 1)]
+#[fuchsia::main(logging = true)]
 async fn main() -> Result<(), anyhow::Error> {
     let mut fs = server::ServiceFs::new();
     fs.dir("svc").add_fidl_service(|stream: VirtioGpuRequestStream| stream);

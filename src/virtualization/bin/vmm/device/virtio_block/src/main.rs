@@ -107,7 +107,7 @@ async fn run_virtio_block(
     Ok(())
 }
 
-#[fuchsia::main(logging = true, threads = 1)]
+#[fuchsia::main(logging = true)]
 async fn main() -> Result<(), anyhow::Error> {
     trace_provider_create_with_fdio();
     let mut fs = server::ServiceFs::new();

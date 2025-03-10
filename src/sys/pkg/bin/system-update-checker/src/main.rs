@@ -34,7 +34,7 @@ use std::sync::Arc;
 const MAX_CONCURRENT_CONNECTIONS: usize = 200;
 const DEFAULT_UPDATE_PACKAGE_URL: &str = "fuchsia-pkg://fuchsia.com/update";
 
-#[fuchsia::main(threads = 1, logging_tags = ["system-update-checker"])]
+#[fuchsia::main(logging_tags = ["system-update-checker"])]
 async fn main() -> Result<(), Error> {
     main_inner().await.map_err(|err| {
         // anyhow with alternate formatting prints the Display impl of each error in the chain.

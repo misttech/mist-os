@@ -73,7 +73,7 @@ enum IncomingService {
     VirtioInput(VirtioInputRequestStream),
 }
 
-#[fuchsia::main(logging = true, threads = 1)]
+#[fuchsia::main(logging = true)]
 async fn main() -> Result<(), anyhow::Error> {
     let mut fs = server::ServiceFs::new();
     fs.dir("svc").add_fidl_service(IncomingService::VirtioInput);
