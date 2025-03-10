@@ -27,7 +27,7 @@ declare_args() {
 
   # Skip generating a UEFI disk for a product whose board defines
   # `build_uefi_disk`
-  product_skip_uefi_disk = false
+  product_skip_uefi_disk = true
 
   # Generate installer disk image (ISO) to be flashed to a USB drive.
   # Will be located at obj/build/images/installer relative to the build directory.

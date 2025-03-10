@@ -25,3 +25,4 @@
 
 fuchsia_product_assembly_config_label = "//products/core"
 zedboot_product_assembly_config_label = "//products/zedboot"
+product_skip_uefi_disk = false
