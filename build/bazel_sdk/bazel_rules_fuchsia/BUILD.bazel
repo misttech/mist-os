@@ -8,20 +8,6 @@
 # The above allows this fragment to be merged from `bazel_rules_fuchsia` into
 # `@fuchsia_sdk//:BUILD.bazel`.
 
-# buildifier: disable=bzl-visibility
-load("//fuchsia/private:debug_info.bzl", "print_debug_info")
-
-# A target that will dump debug information about the Fuchsia
-# Bazel SDK and tools that it is using.
-#
-# Note: this command relies on the existence of a fuchsia_clang repository being
-# registered in your WORKSPACE file.
-#
-# bazel run @fuchsia_sdk//:debug_info
-print_debug_info(
-    name = "debug_info",
-)
-
 # All of the starlark files that are exported for documentation.
 filegroup(
     name = "bzl_srcs",
