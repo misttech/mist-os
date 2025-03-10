@@ -157,7 +157,15 @@
             to: [ "#reachability" ],
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class-network",
+            from: "parent",
+            to: [ "#netcfg" ],
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.network.Service",
             from: "parent",
             to: [ "#netcfg" ],
         },

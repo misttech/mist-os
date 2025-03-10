@@ -92,11 +92,19 @@
             to: [ "#lowpan-ot-driver" ],
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-class-ot-radio",
             to: "#lowpan-ot-driver",
             subdir: "ot-radio",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.lowpan.spinel.Service",
+            from: "parent",
+            to: "#lowpan-ot-driver",
         },
         {
             protocol: [ "fuchsia.net.masquerade.Factory" ],
