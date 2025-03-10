@@ -221,6 +221,8 @@ struct MemoryMappingExt : public MemoryMapping {
   }
 };
 
+#define MY_NLMSG_OK(nlh, len) NLMSG_OK((nlh), static_cast<decltype((nlh)->nlmsg_len)>(len))
+
 // Encoder for serializing netlink messages
 class NetlinkEncoder {
  public:

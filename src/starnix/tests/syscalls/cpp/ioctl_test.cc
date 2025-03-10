@@ -188,7 +188,7 @@ void DumpIpv4AddressesOnInterface(uint32_t if_index,
   while (true) {
     ssize_t len = recv(nlsock.get(), &buf, kBufSize, 0);
     ASSERT_GT(len, 0) << strerror(errno);
-    for (nlmsghdr* hdr = reinterpret_cast<nlmsghdr*>(buf); NLMSG_OK(hdr, len);
+    for (nlmsghdr* hdr = reinterpret_cast<nlmsghdr*>(buf); MY_NLMSG_OK(hdr, len);
          hdr = NLMSG_NEXT(hdr, len)) {
       if (hdr->nlmsg_type == NLMSG_DONE) {
         return;
@@ -248,7 +248,7 @@ void InstallIpv4AddressOnInterface(const char* if_name, in_addr_t addr, uint8_t 
   ASSERT_GT(len, 0) << strerror(errno);
 
   nlmsghdr* response_hdr = reinterpret_cast<nlmsghdr*>(buf);
-  ASSERT_TRUE(NLMSG_OK(response_hdr, len)) << "Invalid netlink response";
+  ASSERT_TRUE(MY_NLMSG_OK(response_hdr, len)) << "Invalid netlink response";
   ASSERT_EQ(response_hdr->nlmsg_type, NLMSG_ERROR) << "Unexpected netlink response type";
 
   nlmsgerr* err = reinterpret_cast<nlmsgerr*>(NLMSG_DATA(response_hdr));

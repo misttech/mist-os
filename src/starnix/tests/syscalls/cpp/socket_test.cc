@@ -299,14 +299,14 @@ TEST(RouteNetlinkSocket, AddDropMulticastGroup) {
 
   nlmsghdr* nlmsg = reinterpret_cast<nlmsghdr*>(buf);
 
-  ASSERT_TRUE(NLMSG_OK(nlmsg, len));
+  ASSERT_TRUE(MY_NLMSG_OK(nlmsg, len));
   ASSERT_EQ(nlmsg->nlmsg_type, RTM_DELADDR);
   rtmsg* rtm = reinterpret_cast<rtmsg*>(NLMSG_DATA(nlmsg));
   ASSERT_EQ(rtm->rtm_family, AF_INET);
 
   nlmsg = NLMSG_NEXT(nlmsg, len);
 
-  if (NLMSG_OK(nlmsg, len)) {
+  if (MY_NLMSG_OK(nlmsg, len)) {
     // The next message is already in the buffer, so we don't need to do
     // anything here.
   } else {
@@ -314,7 +314,7 @@ TEST(RouteNetlinkSocket, AddDropMulticastGroup) {
     len = recv(nlsock.get(), buf, sizeof(buf), 0);
     ASSERT_GT(len, 0) << strerror(errno);
     nlmsg = reinterpret_cast<nlmsghdr*>(buf);
-    ASSERT_TRUE(NLMSG_OK(nlmsg, len));
+    ASSERT_TRUE(MY_NLMSG_OK(nlmsg, len));
   }
 
   // Assert that the content of the second message indicates the new loopback
@@ -325,7 +325,7 @@ TEST(RouteNetlinkSocket, AddDropMulticastGroup) {
 
   // Now we should have run out of messages.
   nlmsg = NLMSG_NEXT(nlmsg, len);
-  ASSERT_FALSE(NLMSG_OK(nlmsg, len));
+  ASSERT_FALSE(MY_NLMSG_OK(nlmsg, len));
 
   // Drop the multicast group membership so that we won't get notified about
   // further address changes.

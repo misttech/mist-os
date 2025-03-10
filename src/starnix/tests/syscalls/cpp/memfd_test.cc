@@ -23,6 +23,10 @@
 #define __NR_memfd_create 319
 #elif defined(__aarch64__) || defined(__riscv)
 #define __NR_memfd_create 279
+#elif defined(__arm__)
+#define __NR_memfd_create 385
+#else
+#error Add support for this architecture
 #endif
 #endif  // !defined(__NR_memfd_create)
 

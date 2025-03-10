@@ -1566,7 +1566,7 @@ uint64_t ExpectedGetAttrsValue(ExpectedGetAttrBehaviour behaviour, uint64_t acce
     case ExpectedGetAttrBehaviour::kNone:
       return 0;
     case ExpectedGetAttrBehaviour::kOncePerFile:
-      return std::min(access_count, 1ul);
+      return std::min(access_count, static_cast<uint64_t>(1));
     case ExpectedGetAttrBehaviour::kOncePerAccess:
       return access_count;
   }
