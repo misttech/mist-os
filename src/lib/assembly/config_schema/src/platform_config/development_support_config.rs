@@ -64,6 +64,12 @@ pub struct DevelopmentSupportConfig {
     /// bringup-like environment using the run-test-suite command line tool.
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub include_bootstrap_testing_framework: bool,
+
+    /// Enable userboot.next for running a boot-time test.
+    ///
+    /// Only valid on eng builds.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub enable_userboot_next_component_manager: bool,
 }
 
 /// Platform-provided tools for development and debugging.

@@ -113,6 +113,9 @@ pub enum KernelArg {
 
     /// Enable the netboot functionality of the netsvc.
     NetsvcNetboot(bool),
+
+    /// Enable userboot.next
+    UserbootNext(String),
 }
 
 /// Options for zero page scanner configuration.
@@ -222,6 +225,7 @@ impl KernelArg {
                 ("kernel.page-scanner.zero-page-scans-per-second", z.to_string())
             }
             Self::NetsvcNetboot(b) => ("netsvc.netboot", b.to_string()),
+            Self::UserbootNext(s) => ("userboot.next", s.to_string()),
         };
         (key.to_string(), value)
     }
@@ -260,6 +264,7 @@ impl KernelArg {
 
             // These kernel args are eng-only, and therefore should never be in an allowlist.
             Self::NetsvcNetboot(_) => vec![],
+            Self::UserbootNext(_) => vec![],
         }
     }
 }

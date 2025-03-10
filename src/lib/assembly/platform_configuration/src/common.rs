@@ -148,6 +148,22 @@ impl ConfigurationContext<'_> {
         feature_set_levels: &[FeatureSupportLevel],
         item_name: &str,
     ) -> anyhow::Result<()> {
+        self.ensure_build_type(build_types, item_name)?;
+        self.ensure_feature_set_level(feature_set_levels, item_name)
+    }
+
+    /// Ensure that the configuration context matches the given set of
+    /// build-types.
+    ///
+    /// Note that this is not a mechanism to enforce policy; they simply make configuration errors
+    /// more obvious to users by providing a clear error message.
+    ///
+    /// Returns an error if they do not, and Ok(()) if they do.
+    pub fn ensure_build_type(
+        &self,
+        build_types: &[BuildType],
+        item_name: &str,
+    ) -> anyhow::Result<()> {
         if !build_types.contains(self.build_type) {
             bail!(
                 "{} can only be enabled on the following build types, not '{}': [{}]",
@@ -156,8 +172,7 @@ impl ConfigurationContext<'_> {
                 build_types.iter().map(|b| b.to_string()).collect::<Vec<String>>().join(", ")
             );
         }
-
-        self.ensure_feature_set_level(feature_set_levels, item_name)
+        Ok(())
     }
 
     /// Ensure that the configuration context matches the give set of

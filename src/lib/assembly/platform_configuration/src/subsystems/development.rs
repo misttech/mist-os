@@ -188,6 +188,11 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
             builder.platform_bundle("testing_support_bootstrap");
         }
 
+        if config.enable_userboot_next_component_manager {
+            context.ensure_build_type(&[BuildType::Eng], "userboot.next")?;
+            builder.kernel_arg(KernelArg::UserbootNext("bin/component_manager+--boot".to_string()));
+        }
+
         Ok(())
     }
 }
