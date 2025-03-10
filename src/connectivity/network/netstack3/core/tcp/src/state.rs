@@ -266,6 +266,7 @@ impl Listen {
             return ListenOnSegmentDisposition::SendRst(Segment::rst(ack));
         }
         if control == Some(Control::SYN) {
+            let sack_permitted = options.sack_permitted();
             // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-65):
             //   third check for a SYN
             //   Set RCV.NXT to SEG.SEQ+1, IRS is set to SEG.SEQ and any other
@@ -316,6 +317,7 @@ impl Listen {
                     smss,
                     rcv_wnd_scale,
                     snd_wnd_scale: options.window_scale(),
+                    sack_permitted,
                 },
             );
         }
@@ -429,6 +431,7 @@ impl<I: Instant + 'static, ActiveOpen> SynSent<I, ActiveOpen> {
             }
             Some(Control::SYN) => {
                 let smss = options.mss().unwrap_or(default_mss).min(device_mss);
+                let sack_permitted = options.sack_permitted();
                 // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-67):
                 //   fourth check the SYN bit
                 //   This step should be reached only if the ACK is ok, or there
@@ -494,6 +497,7 @@ impl<I: Instant + 'static, ActiveOpen> SynSent<I, ActiveOpen> {
                                     mss: smss,
                                     wnd_scale: rcv_wnd_scale,
                                     last_window_update: (irs + 1, buffer_sizes.rwnd()),
+                                    sack_permitted,
                                 }
                                 .into(),
                             };
@@ -545,6 +549,7 @@ impl<I: Instant + 'static, ActiveOpen> SynSent<I, ActiveOpen> {
                                     smss,
                                     rcv_wnd_scale,
                                     snd_wnd_scale: options.window_scale(),
+                                    sack_permitted,
                                 },
                             )
                         } else {
@@ -596,6 +601,7 @@ pub struct SynRcvd<I, ActiveOpen> {
     smss: Mss,
     rcv_wnd_scale: WindowScale,
     snd_wnd_scale: Option<WindowScale>,
+    sack_permitted: bool,
 }
 
 impl<I: Instant, R: ReceiveBuffer, S: SendBuffer, ActiveOpen> From<SynRcvd<I, Infallible>>
@@ -612,6 +618,7 @@ impl<I: Instant, R: ReceiveBuffer, S: SendBuffer, ActiveOpen> From<SynRcvd<I, In
             smss,
             rcv_wnd_scale,
             snd_wnd_scale,
+            sack_permitted,
         }: SynRcvd<I, Infallible>,
     ) -> Self {
         match simultaneous_open {
@@ -625,6 +632,7 @@ impl<I: Instant, R: ReceiveBuffer, S: SendBuffer, ActiveOpen> From<SynRcvd<I, In
                 smss,
                 rcv_wnd_scale,
                 snd_wnd_scale,
+                sack_permitted,
             }),
         }
     }
@@ -884,6 +892,9 @@ pub(crate) struct Recv<I, R> {
     last_window_update: (SeqNum, WindowSize),
     remaining_quickacks: usize,
     last_segment_at: Option<I>,
+    /// True iff the SYN segment from the peer allowed for us to generate
+    /// selective acks.
+    sack_permitted: bool,
 
     // Buffer may be closed once receive is shutdown (e.g. with `shutdown(SHUT_RD)`).
     buffer: RecvBufferState<R>,
@@ -899,6 +910,7 @@ impl<I> Recv<I, ()> {
             buffer: old_buffer,
             remaining_quickacks,
             last_segment_at,
+            sack_permitted,
         } = self;
         let nxt = match old_buffer {
             RecvBufferState::Open { assembler, .. } => assembler.nxt(),
@@ -912,6 +924,7 @@ impl<I> Recv<I, ()> {
             remaining_quickacks,
             last_segment_at,
             buffer: RecvBufferState::Open { buffer, assembler: Assembler::new(nxt) },
+            sack_permitted,
         }
     }
 }
@@ -943,6 +956,7 @@ impl<I: Instant, R: ReceiveBuffer> Recv<I, R> {
             last_window_update: (rcv_wup, last_wnd),
             remaining_quickacks: _,
             last_segment_at: _,
+            sack_permitted: _,
         } = self;
 
         // Per RFC 9293 Section 3.8.6.2.2:
@@ -1063,6 +1077,7 @@ impl<I: Instant, R: ReceiveBuffer> Recv<I, R> {
             remaining_quickacks,
             buffer,
             last_segment_at: _,
+            sack_permitted: _,
         } = self;
         let new_remaining = quickack_counter(buffer.limits(), *mss);
         // Update if we increased the number of quick acks.
@@ -2076,6 +2091,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                                     smss,
                                     rcv_wnd_scale,
                                     snd_wnd_scale,
+                                    sack_permitted,
                                 },
                             ) => {
                                 match simultaneous_open {
@@ -2093,6 +2109,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                                                     smss,
                                                     rcv_wnd_scale,
                                                     snd_wnd_scale,
+                                                    sack_permitted,
                                                 }),
                                             ),
                                             NewlyClosed::No
@@ -2165,6 +2182,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                     smss: _,
                     rcv_wnd_scale: _,
                     snd_wnd_scale: _,
+                    sack_permitted: _,
                 }) => {
                     // RFC 7323 Section 2.2:
                     //  The window field in a segment where the SYN bit is set
@@ -2305,6 +2323,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                         smss,
                         rcv_wnd_scale,
                         snd_wnd_scale,
+                        sack_permitted,
                     }) => {
                         // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-72):
                         //    if the ACK bit is on
@@ -2368,6 +2387,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                                         *smss,
                                     ),
                                     last_window_update: (*irs + 1, buffer_sizes.rwnd()),
+                                    sack_permitted: *sack_permitted,
                                 }
                                 .into(),
                             };
@@ -2822,6 +2842,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                 smss,
                 rcv_wnd_scale,
                 snd_wnd_scale,
+                sack_permitted: _,
             }) => (retrans_timer.at <= now).then(|| {
                 *timestamp = None;
                 retrans_timer.backoff(now);
@@ -2901,6 +2922,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                 smss: _,
                 rcv_wnd_scale: _,
                 snd_wnd_scale: _,
+                sack_permitted: _,
             }) => retrans_timer.timed_out(now),
 
             State::Closed(_) | State::Listen(_) | State::TimeWait(_) => false,
@@ -2998,6 +3020,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                 smss,
                 rcv_wnd_scale,
                 snd_wnd_scale,
+                sack_permitted,
             }) => {
                 // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-60):
                 //   SYN-RECEIVED STATE
@@ -3059,6 +3082,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                         last_segment_at: None,
                         wnd_scale: rcv_wnd_scale,
                         last_window_update: (*irs + 1, buffer_sizes.rwnd()),
+                        sack_permitted: *sack_permitted,
                     }
                     .into(),
                 };
@@ -3167,6 +3191,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                 smss: _,
                 rcv_wnd_scale: _,
                 snd_wnd_scale: _,
+                sack_permitted: _,
             }) => {
                 // When we're in SynRcvd we already sent out SYN-ACK with iss,
                 // so a RST must have iss+1.
@@ -3273,6 +3298,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                 smss: _,
                 rcv_wnd_scale: _,
                 snd_wnd_scale: _,
+                sack_permitted: _,
             })
             | State::SynSent(SynSent {
                 iss,
@@ -3540,6 +3566,7 @@ mod test {
                 smss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 rcv_wnd_scale: WindowScale::default(),
                 snd_wnd_scale: Some(WindowScale::default()),
+                sack_permitted: SACK_PERMITTED,
             })
         }
     }
@@ -3610,6 +3637,7 @@ mod test {
             smss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             rcv_wnd_scale: WindowScale::default(),
             snd_wnd_scale: Some(WindowScale::default()),
+            sack_permitted: SACK_PERMITTED,
         }
     ); "SYN only")]
     #[test_case(
@@ -3680,8 +3708,9 @@ mod test {
                 simultaneous_open: None,
                 buffer_sizes: BufferSizes::default(),
                 smss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-            rcv_wnd_scale: WindowScale::default(),
-            snd_wnd_scale: Some(WindowScale::default()),
+                sack_permitted: SACK_PERMITTED,
+                rcv_wnd_scale: WindowScale::default(),
+                snd_wnd_scale: Some(WindowScale::default()),
             }); "accept syn")]
     fn segment_arrives_when_listen(
         incoming: Segment<()>,
@@ -3759,6 +3788,7 @@ mod test {
                     mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                     wnd_scale: WindowScale::default(),
                     last_window_update: (ISS_1 + 1, WindowSize::DEFAULT),
+                    sack_permitted: SACK_PERMITTED,
                 }.into(),
             }
         ))
@@ -3961,6 +3991,7 @@ mod test {
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
                 last_window_update: (ISS_2 + 1, WindowSize::new(2).unwrap()),
+                sack_permitted: SACK_PERMITTED,
             }
             .into(),
         });
@@ -4011,6 +4042,7 @@ mod test {
             mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             wnd_scale: WindowScale::default(),
             last_window_update: (ISS_2 + 1, WindowSize::new(TEST_BYTES.len()).unwrap()),
+            sack_permitted: SACK_PERMITTED,
         };
         for mut state in [
             State::Established(Established { snd: new_snd().into(), rcv: new_rcv().into() }),
@@ -4080,6 +4112,7 @@ mod test {
             mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             wnd_scale: WindowScale::default(),
             last_window_update: (ISS_2 + 1, WindowSize::ZERO),
+            sack_permitted: SACK_PERMITTED,
         };
         for mut state in [
             State::Established(Established { snd: new_snd().into(), rcv: new_rcv().into() }),
@@ -4225,11 +4258,12 @@ mod test {
         seg
     }
 
-    #[test]
-    fn active_passive_open() {
+    #[test_case(true; "sack")]
+    #[test_case(false; "no sack")]
+    fn active_passive_open(sack_permitted: bool) {
         let mut clock = FakeInstantCtx::default();
         let counters = TcpCountersInner::default();
-        let (syn_sent, syn_seg) = Closed::<Initial>::connect(
+        let (syn_sent, mut syn_seg) = Closed::<Initial>::connect(
             ISS_1,
             clock.now(),
             (),
@@ -4246,6 +4280,7 @@ mod test {
                 HandshakeOptions {
                     mss: Some(DEVICE_MAXIMUM_SEGMENT_SIZE),
                     window_scale: Some(WindowScale::default()),
+                    // Matches the stack-wide constant.
                     sack_permitted: SACK_PERMITTED,
                 }
                 .into(),
@@ -4278,13 +4313,20 @@ mod test {
             None,
         ));
         clock.sleep(RTT / 2);
+
+        // Update the SYN segment to match what the test wants.
+        {
+            let opt = assert_matches!(&mut syn_seg.header.options, Options::Handshake(o) => o);
+            opt.sack_permitted = sack_permitted;
+        }
+
         let (seg, passive_open) = passive
             .on_segment_with_default_options::<_, ClientlessBufferProvider>(
                 syn_seg,
                 clock.now(),
                 &counters,
             );
-        let syn_ack = seg.expect("failed to generate a syn-ack segment");
+        let mut syn_ack = seg.expect("failed to generate a syn-ack segment");
         assert_eq!(passive_open, None);
         assert_eq!(
             syn_ack,
@@ -4295,6 +4337,7 @@ mod test {
                 HandshakeOptions {
                     mss: Some(DEVICE_MAXIMUM_SEGMENT_SIZE),
                     window_scale: Some(WindowScale::default()),
+                    // Matches the stack-wide constant.
                     sack_permitted: SACK_PERMITTED,
                 }
                 .into(),
@@ -4315,8 +4358,16 @@ mod test {
             smss: DEVICE_MAXIMUM_SEGMENT_SIZE,
             rcv_wnd_scale: WindowScale::default(),
             snd_wnd_scale: Some(WindowScale::default()),
+            sack_permitted,
         });
         clock.sleep(RTT / 2);
+
+        // Update the SYN ACK segment to match what the test wants.
+        {
+            let opt = assert_matches!(&mut syn_ack.header.options, Options::Handshake(o) => o);
+            opt.sack_permitted = sack_permitted;
+        }
+
         let (seg, passive_open) = active
             .on_segment_with_default_options::<_, ClientlessBufferProvider>(
                 syn_ack,
@@ -4359,6 +4410,7 @@ mod test {
                     mss: DEVICE_MAXIMUM_SEGMENT_SIZE,
                     wnd_scale: WindowScale::default(),
                     last_window_update: (ISS_2 + 1, WindowSize::DEFAULT),
+                    sack_permitted,
                 }
                 .into()
             }
@@ -4405,6 +4457,7 @@ mod test {
                     mss: DEVICE_MAXIMUM_SEGMENT_SIZE,
                     wnd_scale: WindowScale::default(),
                     last_window_update: (ISS_1 + 1, WindowSize::DEFAULT),
+                    sack_permitted,
                 }
                 .into()
             }
@@ -4528,6 +4581,7 @@ mod test {
             smss: DEVICE_MAXIMUM_SEGMENT_SIZE,
             rcv_wnd_scale: WindowScale::default(),
             snd_wnd_scale: Some(WindowScale::default()),
+            sack_permitted: SACK_PERMITTED,
         });
         assert_matches!(state2, State::SynRcvd(ref syn_rcvd) if syn_rcvd == &SynRcvd {
             iss: ISS_2,
@@ -4544,6 +4598,7 @@ mod test {
             smss: DEVICE_MAXIMUM_SEGMENT_SIZE,
             rcv_wnd_scale: WindowScale::default(),
             snd_wnd_scale: Some(WindowScale::default()),
+            sack_permitted: SACK_PERMITTED,
         });
 
         clock.sleep(RTT);
@@ -4596,7 +4651,8 @@ mod test {
                     last_segment_at: Some(clock.now()),
                     mss: DEVICE_MAXIMUM_SEGMENT_SIZE,
                     wnd_scale: WindowScale::default(),
-                    last_window_update: (ISS_2 + 1, WindowSize::DEFAULT)
+                    last_window_update: (ISS_2 + 1, WindowSize::DEFAULT),
+                    sack_permitted: SACK_PERMITTED,
                 }
                 .into()
             }
@@ -4634,7 +4690,8 @@ mod test {
                     last_segment_at: Some(clock.now()),
                     mss: DEVICE_MAXIMUM_SEGMENT_SIZE,
                     wnd_scale: WindowScale::default(),
-                    last_window_update: (ISS_1 + 1, WindowSize::DEFAULT)
+                    last_window_update: (ISS_1 + 1, WindowSize::DEFAULT),
+                    sack_permitted: SACK_PERMITTED,
                 }
                 .into()
             }
@@ -4678,6 +4735,7 @@ mod test {
                 mss: Mss(NonZeroU16::new(5).unwrap()),
                 wnd_scale: WindowScale::default(),
                 last_window_update: (ISS_2 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
+                sack_permitted: SACK_PERMITTED,
             }
             .into(),
         });
@@ -4802,6 +4860,7 @@ mod test {
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
                 last_window_update: (ISS_2 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
+                sack_permitted: SACK_PERMITTED,
             }
             .into(),
         });
@@ -5060,6 +5119,7 @@ mod test {
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
                 last_window_update: (ISS_2 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
+                sack_permitted: SACK_PERMITTED,
             }
             .into(),
         });
@@ -5197,6 +5257,7 @@ mod test {
             smss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             rcv_wnd_scale: WindowScale::default(),
             snd_wnd_scale: Some(WindowScale::default()),
+            sack_permitted: SACK_PERMITTED,
         });
         assert_eq!(
             state.close(
@@ -5250,6 +5311,7 @@ mod test {
                 mss: Mss(NonZeroU16::new(5).unwrap()),
                 wnd_scale: WindowScale::default(),
                 last_window_update: (ISS_2 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
+                sack_permitted: SACK_PERMITTED,
             }
             .into(),
         });
@@ -5458,6 +5520,7 @@ mod test {
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
                 last_window_update: (ISS_2 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
+                sack_permitted: SACK_PERMITTED,
             }
             .into(),
         });
@@ -5516,6 +5579,7 @@ mod test {
                 last_window_update: (ISS_1 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
                 remaining_quickacks: 0,
                 last_segment_at: None,
+                sack_permitted: SACK_PERMITTED,
             }
             .into(),
         });
@@ -5658,6 +5722,7 @@ mod test {
                 last_window_update: (ISS_2 + 5, WindowSize::DEFAULT),
                 remaining_quickacks: 0,
                 last_segment_at: None,
+                sack_permitted: SACK_PERMITTED,
             }.into(),
         }),
         Segment::data(ISS_2, ISS_1, UnscaledWindowSize::from(u16::MAX), TEST_BYTES) =>
@@ -5679,6 +5744,7 @@ mod test {
             smss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             rcv_wnd_scale: WindowScale::default(),
             snd_wnd_scale: Some(WindowScale::default()),
+            sack_permitted: SACK_PERMITTED,
         }),
         Segment::syn_ack(ISS_2, ISS_1 + 1, UnscaledWindowSize::from(u16::MAX),
         HandshakeOptions { window_scale: Some(WindowScale::default()), ..Default::default() }.into()) =>
@@ -5740,6 +5806,7 @@ mod test {
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
                 last_window_update: (ISS_2, WindowSize::DEFAULT),
+                sack_permitted: SACK_PERMITTED,
             }
             .into(),
         });
@@ -5863,6 +5930,7 @@ mod test {
                 last_window_update: (ISS_2, WindowSize::DEFAULT),
                 remaining_quickacks: 0,
                 last_segment_at: None,
+                sack_permitted: SACK_PERMITTED,
             }
             .into(),
         });
@@ -6098,6 +6166,7 @@ mod test {
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
                 last_window_update: (ISS_2 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
+                sack_permitted: SACK_PERMITTED,
             }
             .into(),
         });
@@ -6203,6 +6272,7 @@ mod test {
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
                 last_window_update: (ISS_2 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
+                sack_permitted: SACK_PERMITTED,
             }
             .into(),
         });
@@ -6340,6 +6410,7 @@ mod test {
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
                 last_window_update: (ISS_2 + 1, WindowSize::DEFAULT),
+                sack_permitted: SACK_PERMITTED,
             }
             .into(),
         });
@@ -6469,6 +6540,7 @@ mod test {
                     ISS_2 + 1,
                     WindowSize::new(TEST_BYTES.len() + 2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE) as usize).unwrap()
                 ),
+                sack_permitted: SACK_PERMITTED,
             }.into(),
         }); "established")]
     #[test_case(
@@ -6509,6 +6581,7 @@ mod test {
                     ISS_2 + 1,
                     WindowSize::new(TEST_BYTES.len() + 2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE) as usize).unwrap()
                 ),
+                sack_permitted: SACK_PERMITTED,
             }.into(),
         }); "fin_wait_1")]
     #[test_case(
@@ -6530,6 +6603,7 @@ mod test {
                     ISS_2 + 1,
                     WindowSize::new(TEST_BYTES.len() + 2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE) as usize).unwrap()
                 ),
+                sack_permitted: SACK_PERMITTED,
             },
             timeout_at: None,
         }); "fin_wait_2")]
@@ -6669,6 +6743,7 @@ mod test {
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
                 last_window_update: (ISS_2 + 1, WindowSize::new(TEST_BYTES.len() + 1).unwrap()),
+                sack_permitted: SACK_PERMITTED,
             }
             .into(),
         });
@@ -6770,6 +6845,7 @@ mod test {
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 wnd_scale: WindowScale::default(),
                 last_window_update: (ISS_2, WindowSize::DEFAULT),
+                sack_permitted: SACK_PERMITTED,
             },
             timeout_at: None,
         });
@@ -6854,6 +6930,7 @@ mod test {
             smss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             rcv_wnd_scale: WindowScale::default(),
             snd_wnd_scale: Some(WindowScale::default()),
+            sack_permitted: SACK_PERMITTED,
         })
     => DEFAULT_MAX_SYNACK_RETRIES.get(); "syn_rcvd")]
     fn handshake_timeout(mut state: State<FakeInstant, RingBuffer, RingBuffer, ()>) -> u8 {
@@ -7000,6 +7077,7 @@ mod test {
             smss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             rcv_wnd_scale,
             snd_wnd_scale: WindowScale::new(1),
+            sack_permitted: SACK_PERMITTED,
         });
 
         assert_eq!(
@@ -7076,6 +7154,7 @@ mod test {
             mss: Mss(NonZeroU16::new(TEST_BYTES.len() as u16).unwrap()),
             wnd_scale: WindowScale::default(),
             last_window_update: (ISS_1, WindowSize::new(CAP).unwrap()),
+            sack_permitted: SACK_PERMITTED,
         };
 
         fn get_buffer(rcv: &mut Recv<FakeInstant, RingBuffer>) -> &mut RingBuffer {
@@ -7149,6 +7228,7 @@ mod test {
             mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             wnd_scale: rcv_wnd_scale,
             last_window_update: (ISS_2 + 1, WindowSize::ZERO),
+            sack_permitted: SACK_PERMITTED,
         };
         for mut state in [
             State::Established(Established { snd: new_snd().into(), rcv: new_rcv().into() }),
@@ -7546,6 +7626,7 @@ mod test {
                 remaining_quickacks: 0,
                 last_segment_at: None,
                 last_window_update: (ISS_1 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
+                sack_permitted: SACK_PERMITTED,
             }
             .into(),
         });
@@ -7660,6 +7741,7 @@ mod test {
             smss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             rcv_wnd_scale: WindowScale::new(0).unwrap(),
             snd_wnd_scale: WindowScale::new(0),
+            sack_permitted: SACK_PERMITTED,
         }) => NewlyClosed::No; "non-closed to non-closed")]
     fn transition_to_state(
         mut old_state: State<FakeInstant, RingBuffer, RingBuffer, ()>,
@@ -7705,6 +7787,7 @@ mod test {
             last_segment_at: None,
             wnd_scale: WindowScale::default(),
             last_window_update: (ISS_2 + 1, WindowSize::new(BUFFER_SIZE).unwrap()),
+            sack_permitted: SACK_PERMITTED,
         };
 
         let clock = FakeInstantCtx::default();
@@ -7808,6 +7891,7 @@ mod test {
             last_segment_at: None,
             wnd_scale: WindowScale::default(),
             last_window_update: (ISS_2 + 1, WindowSize::from_u32(1).unwrap()),
+            sack_permitted: SACK_PERMITTED,
         };
         let seg = recv.poll_receive_data_dequeued(ISS_1).expect("generates segment");
         assert_eq!(seg.header.ack, Some(recv.nxt()));
@@ -7845,6 +7929,7 @@ mod test {
                 last_segment_at: None,
                 wnd_scale: WindowScale::default(),
                 last_window_update: (ISS_2 + 1, WindowSize::DEFAULT),
+                sack_permitted: SACK_PERMITTED,
             }
             .into(),
         });
@@ -7928,6 +8013,7 @@ mod test {
                 last_segment_at: None,
                 wnd_scale: WindowScale::default(),
                 last_window_update: (ISS_2 + 1, WindowSize::DEFAULT),
+                sack_permitted: SACK_PERMITTED,
             }
             .into(),
         });
@@ -7988,6 +8074,7 @@ mod test {
                 last_segment_at: Some(clock.now()),
                 wnd_scale: WindowScale::default(),
                 last_window_update: (ISS_2 + 1, WindowSize::DEFAULT),
+                sack_permitted: SACK_PERMITTED,
             }
             .into(),
         });

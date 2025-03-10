@@ -175,6 +175,12 @@ impl Options {
     pub fn mss(&self) -> Option<Mss> {
         self.as_handshake().and_then(|h| h.mss)
     }
+
+    /// Returns true IFF this is an [`Options::Handshake`] and its
+    /// [`HandShakeOptions::sack_permitted`] is set.
+    pub fn sack_permitted(&self) -> bool {
+        self.as_handshake().is_some_and(|o| o.sack_permitted)
+    }
 }
 
 /// Segment options only set on handshake.
