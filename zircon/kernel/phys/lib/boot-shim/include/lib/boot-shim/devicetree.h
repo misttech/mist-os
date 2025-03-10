@@ -1037,6 +1037,29 @@ class GenericWatchdogItemBase
 using GenericWatchdogItem = WithAllWatchdogs<GenericWatchdogItemBase>;
 using NvramItem = SingleOptionalItem<zbi_nvram_t, ZBI_TYPE_NVRAM>;
 
+// Serial number can be provided as "serial-number" property in the root node, or as a boot argument
+// in some cases. This matcher will prefer the root-node property if available, or fallback to
+// chosen node's `bootargs` property providing the right item.
+class DevicetreeSerialNumberItem : public DevicetreeItemBase<DevicetreeSerialNumberItem, 1>,
+                                   public SingleItem<ZBI_TYPE_SERIAL_NUMBER> {
+  using Base = DevicetreeItemBase<DevicetreeSerialNumberItem, 1>;
+
+ public:
+  devicetree::ScanState OnNode(const devicetree::NodePath& path,
+                               const devicetree::PropertyDecoder& decoder);
+
+  void InitCmdline(std::string_view cmdline) { cmdline_ = cmdline; }
+
+  template <typename Shim>
+  void Init(const Shim& shim) {
+    Base::Init(shim);
+    cmdline_ = shim.legacy_cmdline();
+  }
+
+ private:
+  std::string_view cmdline_;
+};
+
 }  // namespace boot_shim
 
 #endif  // ZIRCON_KERNEL_PHYS_LIB_BOOT_SHIM_INCLUDE_LIB_BOOT_SHIM_DEVICETREE_H_

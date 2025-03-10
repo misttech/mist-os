@@ -51,6 +51,8 @@ dts_synthetic = [
   "synthetic/cpus_no_cpu_map_riscv.dts",
   "synthetic/empty.dts",
   "synthetic/memory_complex.dts",
+  "synthetic/serial_number.dts",
+  "synthetic/serial_number_bootargs.dts",
   "synthetic/memory.dts",
   "synthetic/memory_reservations.dts",
   "synthetic/plic_riscv.dts",

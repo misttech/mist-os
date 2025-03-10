@@ -64,7 +64,8 @@ void PhysMain(void* fdt, arch::EarlyTicks ticks) {
   // Memory has been initialized, we can finish up parsing the rest of the items from the boot shim.
   boot_shim::DevicetreeBootShim<
       boot_shim::UartItem<>, boot_shim::PoolMemConfigItem, boot_shim::NvramItem,
-      boot_shim::RiscvDevicetreePlicItem, boot_shim::RiscvDevicetreeTimerItem,
+      boot_shim::DevicetreeSerialNumberItem, boot_shim::RiscvDevicetreePlicItem,
+      boot_shim::RiscvDevicetreeTimerItem,
       boot_shim::RiscvDevicetreeCpuTopologyItem<BootHartIdGetter>, boot_shim::DevicetreeDtbItem>
       shim(kShimName, gDevicetreeBoot.fdt);
   shim.set_allocator([](size_t size, size_t align, fbl::AllocChecker& ac) -> void* {
