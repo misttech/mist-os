@@ -613,7 +613,7 @@ func TestExecute(t *testing.T) {
 					{Name: "boot-test_product_bundle", Path: "boot-test_product_bundle"},
 				},
 			}
-			if err := execute(ctx, tc.flags, tc.params, m); err != nil {
+			if err := execute(ctx, tc.flags, tc.params, checkoutRoot, m); err != nil {
 				t.Fatal(err)
 			}
 

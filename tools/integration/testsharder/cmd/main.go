@@ -37,6 +37,7 @@ Shards tests produced by a build.
 
 type testsharderFlags struct {
 	buildDir                 string
+	checkoutDir              string
 	outputFile               string
 	modifiersPath            string
 	affectedTestsPath        string
@@ -50,6 +51,7 @@ type testsharderFlags struct {
 func parseFlags() testsharderFlags {
 	var flags testsharderFlags
 	flag.StringVar(&flags.buildDir, "build-dir", "", "path to the fuchsia build directory root (required)")
+	flag.StringVar(&flags.checkoutDir, "checkout-dir", "", "path to the fuchsia checkout directory root")
 	flag.StringVar(&flags.outputFile, "output-file", "", "path to a file which will contain the shards as JSON, default is stdout")
 	flag.StringVar(&flags.modifiersPath, "modifiers", "", "path to the json manifest containing tests to modify")
 	flag.StringVar(&flags.affectedTestsPath, "affected-tests", "", "path to a file containing names of tests affected by the change being tested. One test name per line.")
@@ -115,7 +117,7 @@ func mainImpl(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return execute(ctx, flags, params, m)
+	return execute(ctx, flags, params, flags.checkoutDir, m)
 }
 
 type buildModules interface {
@@ -138,7 +140,7 @@ var getHostPlatform = func() (string, error) {
 	return hostplatform.Name()
 }
 
-func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, m buildModules) error {
+func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, checkoutDir string, m buildModules) error {
 	if flags.depsFile != "" && flags.outputFile == "" {
 		return fmt.Errorf("output-file needs to be set if deps-file is set")
 	}
