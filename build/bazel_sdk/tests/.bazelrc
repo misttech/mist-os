@@ -36,8 +36,8 @@ build --incompatible_strict_action_env=true
 # Bzlmod is not supported yet.
 common --enable_bzlmod=false
 
-build --flag_alias=override_fuchsia_api_level=@fuchsia_sdk//fuchsia:fuchsia_api_level
-build --flag_alias=default_fuchsia_api_level=@fuchsia_sdk//fuchsia:repository_default_fuchsia_api_level
+build --flag_alias=override_fuchsia_api_level=@fuchsia_sdk//flags:fuchsia_api_level
+build --flag_alias=default_fuchsia_api_level=@fuchsia_sdk//flags:repository_default_fuchsia_api_level
 
 # This value determines what API level we compile our packages against when they
 # do not specify it themselves.

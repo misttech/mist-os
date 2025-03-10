@@ -208,29 +208,29 @@ def _noop_success_test_impl(ctx):
 _no_repo_default_api_level_test = analysistest.make(
     _noop_success_test_impl,
     config_settings = {
-        "@fuchsia_sdk//fuchsia:repository_default_fuchsia_api_level": "",
+        "@fuchsia_sdk//flags:repository_default_fuchsia_api_level": "",
     },
 )
 
 _repo_default_unknown_api_level_test = analysistest.make(
     _noop_success_test_impl,
     config_settings = {
-        "@fuchsia_sdk//fuchsia:repository_default_fuchsia_api_level": "98765",
+        "@fuchsia_sdk//flags:repository_default_fuchsia_api_level": "98765",
     },
 )
 
 _repo_default_api_level_next_test = analysistest.make(
     _noop_success_test_impl,
     config_settings = {
-        "@fuchsia_sdk//fuchsia:repository_default_fuchsia_api_level": "NEXT",
+        "@fuchsia_sdk//flags:repository_default_fuchsia_api_level": "NEXT",
     },
 )
 
 _repo_default_unknown_and_override_next_api_level_test = analysistest.make(
     _noop_success_test_impl,
     config_settings = {
-        "@fuchsia_sdk//fuchsia:repository_default_fuchsia_api_level": "98765",
-        "@fuchsia_sdk//fuchsia:fuchsia_api_level": "NEXT",
+        "@fuchsia_sdk//flags:repository_default_fuchsia_api_level": "98765",
+        "@fuchsia_sdk//flags:fuchsia_api_level": "NEXT",
     },
 )
 

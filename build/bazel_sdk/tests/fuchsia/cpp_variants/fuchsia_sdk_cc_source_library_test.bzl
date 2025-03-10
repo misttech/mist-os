@@ -51,7 +51,7 @@ def _cc_std_version_transition_impl(settings, attr):
         "//command_line_option:cxxopt": cxxopts,
         "//command_line_option:copt": copts,
         "//command_line_option:platforms": fuchsia_platform,
-        "@fuchsia_sdk//fuchsia:fuchsia_api_level": _TARGET_API_LEVEL,
+        "@fuchsia_sdk//flags:fuchsia_api_level": _TARGET_API_LEVEL,
     }
 
 # This transition replicates some of the functionality of `fuchsia_transition`,
@@ -68,7 +68,7 @@ cc_std_version_transition = transition(
         "//command_line_option:cxxopt",
         "//command_line_option:platforms",
         "//command_line_option:copt",
-        "@fuchsia_sdk//fuchsia:fuchsia_api_level",  # "@fuchsia_sdk%s" % FUCHSIA_API_LEVEL_TARGET_NAME,
+        "@fuchsia_sdk//flags:fuchsia_api_level",  # "@fuchsia_sdk%s" % FUCHSIA_API_LEVEL_TARGET_NAME,
     ],
 )
 

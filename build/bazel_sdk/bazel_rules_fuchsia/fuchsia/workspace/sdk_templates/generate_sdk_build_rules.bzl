@@ -108,6 +108,7 @@ filegroup(
 _SDK_TEMPLATES = {
     "api_version": "//fuchsia/workspace/sdk_templates:api_version_template.bzl",
     "api_level_constraint": "//fuchsia/workspace/sdk_templates:api_level_constraint.template",
+    "api_level_flag": "//fuchsia/workspace/sdk_templates:api_level_flags.template",
     "bind_library": "//fuchsia/workspace/sdk_templates:bind_library.BUILD.template",
     "cc_library": "//fuchsia/workspace/sdk_templates:cc_library.BUILD.template",
     "cc_prebuilt_library": "//fuchsia/workspace/sdk_templates:cc_prebuilt_library.BUILD.template",
@@ -676,7 +677,7 @@ def _generate_api_version_rules(
 
     constraint_build_file = _constraints_build_file(ctx)
 
-    # writes the api level constraints to the root build file
+    # writes the api level constraints to the constraints build file
     _merge_template(
         ctx,
         constraint_build_file,
@@ -684,6 +685,17 @@ def _generate_api_version_rules(
         {
             "{{target_cpus}}": _get_starlark_list(runtime, process_context.constants.target_cpus),
         },
+    )
+
+    # write the api level flags
+    flags_build_file = _flags_build_file(ctx)
+
+    # writes the api level constraints to the constraints build file
+    _merge_template(
+        ctx,
+        flags_build_file,
+        _sdk_template_path(runtime, "api_level_flag"),
+        {},
     )
 
 # buildifier: disable=unused-variable
@@ -1497,6 +1509,12 @@ def _constraints_build_file(ctx):
         ctx.file(build_file, content = _header(), executable = False)
     return build_file
 
+def _flags_build_file(ctx):
+    build_file = _root_build_file(ctx).dirname.get_child("flags").get_child("BUILD.bazel")
+    if not build_file.exists:
+        ctx.file(build_file, content = _header(), executable = False)
+    return build_file
+
 def _type_from_meta(runtime, meta):
     if "type" in meta:
         return meta["type"]
@@ -1727,49 +1745,9 @@ def _generate_sdk_build_rules(
     }
     runtime.file_copier(files_to_copy)
 
-def _merge_rules_fuchsia(runtime, use_rules_fuchsia):
+def _merge_rules_fuchsia(runtime):
     ctx = runtime.ctx
     rules_fuchsia_root = runtime.label_to_path("//:BUILD.bazel").dirname
-
-    def _adjust_content_for_rules_fuchsia(content):
-        # Adjust "//fuchsia//<foo> into "@fuchsia//fuchsia
-        content = content.replace("\"//fuchsia", "\"@rules_fuchsia//fuchsia")
-
-        # As a special case, continue to use @fuchsia_sdk//fuchsia:fuchsia_api_level
-        # as a user-settable build attribute.
-        content = content.replace("@rules_fuchsia//fuchsia:fuchsia_api_level", "@fuchsia_sdk//fuchsia:fuchsia_api_level")
-
-        return content
-
-    if use_rules_fuchsia:
-        # For backwards compatibility, ensure that a statement like
-        # load("@fuchsia_sdk//fuchsia:defs.bzl", "foo") is equivalent
-        # to load("@rules_fuchsia//fuchsia:defs.bzl", "foo").
-        #
-        # This is done by copying the .bzl files from @rules_fuchsia//fuchsia/
-        # into @fuchsia_sdk//fuchsia/ after changing the load() label references
-        # in them from "//fuchsia<something>" to
-        # "@rules_fuchsia//fuchsia<something>" instead. This works because all
-        # these files simply re-exports symbols loaded from other source
-        # packages.
-        child_directories = [
-            "fuchsia",
-        ]
-        for child_dir in child_directories:
-            source_dir = rules_fuchsia_root.get_child(child_dir)
-            for build_file in source_dir.readdir():
-                if not build_file.is_dir:
-                    content = ctx.read(build_file)
-                    content = _adjust_content_for_rules_fuchsia(content)
-                    ctx.file(child_dir + "/" + build_file.basename, content)
-
-        # Needed by the SDK test suite.
-        ctx.symlink(rules_fuchsia_root.get_child("fuchsia", "tools"), "fuchsia/tools")
-    else:
-        # Simply symlink the content of @rules_fuchsia into the current
-        # repository instead.
-        ctx.symlink(rules_fuchsia_root.get_child("common"), "common")
-        ctx.symlink(rules_fuchsia_root.get_child("fuchsia"), "fuchsia")
 
     rules_fuchsia_build = ctx.read(
         rules_fuchsia_root.get_child("BUILD.bazel"),
@@ -1792,16 +1770,29 @@ def _merge_rules_fuchsia(runtime, use_rules_fuchsia):
         executable = False,
     )
 
+    # Allow for a soft transition of the api level flag.
+    #TODO(b/402169646) remove this alias when OOT users are migrated
+    ctx.file("fuchsia/BUILD.bazel", content = """
+package(default_visibility = ["//visibility:public"])
+
+alias(
+    name = "fuchsia_api_level",
+    actual = "//flags:fuchsia_api_level",
+    deprecation = "Use @fuchsia_sdk//flags:fuchsia_api_level instead",
+)
+
+alias(
+    name = "repository_default_fuchsia_api_level",
+    actual = "//flags:repository_default_fuchsia_api_level",
+    deprecation = "Use @fuchsia_sdk//flags:repository_default_fuchsia_api_level instead",
+)
+    """, executable = False)
+
     # BUILD.bazel references //:.build-id in a fuchsia_debug_symbol()
     # target declaration. This directory may not exist when the input
     # IDK is an external repository, so create an empty one if needed.
     if not ctx.path(".build-id").exists:
         ctx.file(".build-id/.empty-on-purpose")
-
-    if use_rules_fuchsia:
-        content = ctx.read("BUILD.bazel")
-        content = _adjust_content_for_rules_fuchsia(content)
-        ctx.file("BUILD.bazel", content)
 
 def _export_all_files(runtime):
     ctx = runtime.ctx
@@ -1866,7 +1857,7 @@ def generate_sdk_repository(runtime, manifests, use_rules_fuchsia):
     # substitutions directly to the call to ctx.template above.
     _generate_sdk_build_rules(runtime, manifests, constants, rules_fuchsia_name)
 
-    _merge_rules_fuchsia(runtime, use_rules_fuchsia)
+    _merge_rules_fuchsia(runtime)
 
     # Should only be called after all BUILD.bazel files have been added.
     _export_all_files(runtime)

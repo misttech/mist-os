@@ -68,12 +68,6 @@ common:exec_log --experimental_enable_execution_graph_log
 common --experimental_downloader_config=build/bazel/config/no_downloads_allowed.config
 
 # Pass local developer overrides for assembly to Bazel
-# For now, this needs to set the label_flag() in both @rules_fuchsia
-# and @fuchsia_sdk to ensure that all fuchsia_product() definitions
-# correctly support this feature. The @fuchsia_sdk one may be
-# removed when the fuchsia.git and vendor/*.git repositories no
-# longer include rules from @fuchsia_sdk.
-common --@fuchsia_sdk//fuchsia:assembly_developer_overrides_list=@assembly_developer_overrides//:in-tree_developer_overrides_list
 common --@rules_fuchsia//fuchsia:assembly_developer_overrides_list=@assembly_developer_overrides//:in-tree_developer_overrides_list
 
 # Disable verbose Bazel output with --config=quiet

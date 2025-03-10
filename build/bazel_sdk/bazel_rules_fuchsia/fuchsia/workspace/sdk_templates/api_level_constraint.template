@@ -6,7 +6,7 @@ load("//:api_version.bzl", "INTERNAL_ONLY_ALL_KNOWN_API_LEVELS", "INTERNAL_ONLY_
     config_setting(
         name = "api_level_%s" % api_level.api_level,
         flag_values = {
-            "@fuchsia_sdk//fuchsia:fuchsia_api_level": api_level.api_level,
+            "@fuchsia_sdk//flags:fuchsia_api_level": api_level.api_level,
         },
     )
     for api_level in INTERNAL_ONLY_ALL_KNOWN_API_LEVELS

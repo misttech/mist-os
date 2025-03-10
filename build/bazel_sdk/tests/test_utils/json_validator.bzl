@@ -14,7 +14,7 @@ load("//test_utils:py_test_utils.bzl", "PY_TOOLCHAIN_DEPS", "create_python3_shel
 # interpreter.
 CREATE_VALIDATION_SCRIPT_ATTRS = {
     "_json_comparator": attr.label(
-        default = "@fuchsia_sdk//fuchsia/tools:json_comparator",
+        default = "@rules_fuchsia//fuchsia/tools:json_comparator",
         executable = True,
         cfg = "exec",
     ),
