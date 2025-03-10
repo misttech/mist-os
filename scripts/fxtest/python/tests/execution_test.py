@@ -598,7 +598,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
                             )
                         )
                     ],
-                    product_bundle="some_product",
+                    is_boot_test=True,
                 ),
                 test_list_file.TestListEntry("foo", [], execution=None),
             ),

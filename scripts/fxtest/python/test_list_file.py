@@ -221,12 +221,12 @@ class Test:
     def is_boot_test(self) -> bool:
         """Determine if this test is a boot test.
 
-        Boot tests specify a product_bundle entry and reboot the device.
+        Boot tests specify is_boot_test and reboot the device.
 
         Returns:
             bool: True only if this test is a boot test.
         """
-        return self.build.product_bundle is not None
+        return self.build.is_boot_test is not None and self.build.is_boot_test
 
     def package_name(self) -> str | None:
         """Get the package name for this test if applicable.

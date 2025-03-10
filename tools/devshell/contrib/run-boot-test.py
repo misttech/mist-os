@@ -141,7 +141,7 @@ class BootTest(object):
 
     @staticmethod
     def is_boot_test(test_json):
-        return "product_bundle" in test_json
+        return bool(test_json.get("is_boot_test"))
 
     def is_uefi_boot(self):
         if self.efi_disk:
