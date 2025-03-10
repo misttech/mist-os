@@ -254,7 +254,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
                             core_ctx,
                             bindings_ctx,
                             conn_id,
-                            incoming,
+                            incoming.clone(),
                         )
                     }
                     EitherStack::OtherStack(conn_id) => {
@@ -262,7 +262,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
                             core_ctx,
                             bindings_ctx,
                             conn_id,
-                            incoming,
+                            incoming.clone(),
                         )
                     }
                 };
@@ -294,7 +294,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
                                             &listener_id,
                                             isn,
                                             socket_state,
-                                            incoming,
+                                            incoming.clone(),
                                             conn_addr,
                                             incoming_device,
                                             &mut tw_reuse,
@@ -310,7 +310,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
                                             &listener_id,
                                             isn,
                                             socket_state,
-                                            incoming,
+                                            incoming.clone(),
                                             conn_addr,
                                             incoming_device,
                                             &mut tw_reuse,
@@ -358,7 +358,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
                                             &listener_id,
                                             isn,
                                             socket_state,
-                                            incoming,
+                                            incoming.clone(),
                                             conn_addr,
                                             incoming_device,
                                             &mut tw_reuse,
@@ -1088,24 +1088,25 @@ where
     result
 }
 
-pub(super) fn tcp_serialize_segment<I, P>(
-    segment: Segment<P>,
+pub(super) fn tcp_serialize_segment<'a, I, P>(
+    header: &'a SegmentHeader,
+    data: P,
     conn_addr: ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>,
-) -> impl TransportPacketSerializer<I, Buffer = EmptyBuf> + Debug
+) -> impl TransportPacketSerializer<I, Buffer = EmptyBuf> + Debug + 'a
 where
     I: IpExt,
-    P: InnerPacketBuilder + Debug + Payload,
+    P: InnerPacketBuilder + Debug + Payload + 'a,
 {
-    let Segment { header: SegmentHeader { seq, ack, wnd, control, options, .. }, data } = segment;
+    let SegmentHeader { seq, ack, wnd, control, options, .. } = header;
     let ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) } = conn_addr;
     let mut builder = TcpSegmentBuilder::new(
         local_ip.addr(),
         remote_ip.addr(),
         local_port,
         remote_port,
-        seq.into(),
+        (*seq).into(),
         ack.map(Into::into),
-        u16::from(wnd),
+        u16::from(*wnd),
     );
     match control {
         None => {}
@@ -1126,7 +1127,7 @@ where
 mod test {
     use ip_test_macro::ip_test;
     use netstack3_base::testutil::TestIpExt;
-    use netstack3_base::{Options, UnscaledWindowSize};
+    use netstack3_base::{HandshakeOptions, UnscaledWindowSize};
     use packet::ParseBuffer as _;
     use test_case::test_case;
 
@@ -1137,17 +1138,26 @@ mod test {
     const FAKE_DATA: &'static [u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
 
     #[ip_test(I)]
-    #[test_case(Segment::syn(SEQ, UnscaledWindowSize::from(u16::MAX), Options { mss: None, window_scale: None }), &[]; "syn")]
-    #[test_case(Segment::syn(SEQ, UnscaledWindowSize::from(u16::MAX), Options { mss: Some(Mss(NonZeroU16::new(1440 as u16).unwrap())), window_scale: None }), &[]; "syn with mss")]
+    #[test_case(
+        Segment::syn(SEQ, UnscaledWindowSize::from(u16::MAX),
+        HandshakeOptions::default().into()), &[]
+        ; "syn")]
+    #[test_case(
+        Segment::syn(SEQ, UnscaledWindowSize::from(u16::MAX),
+        HandshakeOptions {
+            mss: Some(Mss(NonZeroU16::new(1440 as u16).unwrap())),
+            ..Default::default() }.into()), &[]
+            ; "syn with mss")]
     #[test_case(Segment::ack(SEQ, ACK, UnscaledWindowSize::from(u16::MAX)), &[]; "ack")]
     #[test_case(Segment::with_fake_data(SEQ, ACK, FAKE_DATA), FAKE_DATA; "data")]
     fn tcp_serialize_segment<I: TestIpExt>(segment: Segment<&[u8]>, expected_body: &[u8]) {
         const SOURCE_PORT: NonZeroU16 = NonZeroU16::new(1111).unwrap();
         const DEST_PORT: NonZeroU16 = NonZeroU16::new(2222).unwrap();
 
-        let options = segment.header.options;
+        let Segment { header, data } = segment;
         let serializer = super::tcp_serialize_segment::<I, _>(
-            segment,
+            &header,
+            data,
             ConnIpAddr {
                 local: (SocketIpAddr::try_from(I::TEST_ADDRS.local_ip).unwrap(), SOURCE_PORT),
                 remote: (SocketIpAddr::try_from(I::TEST_ADDRS.remote_ip).unwrap(), DEST_PORT),
@@ -1169,6 +1179,7 @@ mod test {
             UnscaledWindowSize::from(parsed_segment.window_size()),
             UnscaledWindowSize::from(u16::MAX)
         );
+        let options = header.options;
         assert_eq!(options.iter().count(), parsed_segment.iter_options().count());
         for (orig, parsed) in options.iter().zip(parsed_segment.iter_options()) {
             assert_eq!(orig, parsed);

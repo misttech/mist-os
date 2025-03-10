@@ -5414,9 +5414,10 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
     // acknowledged by the peer. That lives entirely in the TCP module and we
     // don't need to track segments sitting in device queues.
     let tx_metadata: BC::TxMetadata = Default::default();
+    let Segment { header, data } = segment;
     let result = match ip_sock {
         Some(ip_sock) => {
-            let body = tcp_serialize_segment(segment, conn_addr);
+            let body = tcp_serialize_segment(&header, data, conn_addr);
             core_ctx
                 .send_ip_packet(bindings_ctx, ip_sock, body, ip_sock_options, tx_metadata)
                 .map_err(|err| IpSockCreateAndSendError::Send(err))
@@ -5431,7 +5432,7 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
                 IpProto::Tcp.into(),
                 ip_sock_options,
                 tx_metadata,
-                |_addr| tcp_serialize_segment(segment, conn_addr),
+                |_addr| tcp_serialize_segment(&header, data, conn_addr),
             )
         }
     };

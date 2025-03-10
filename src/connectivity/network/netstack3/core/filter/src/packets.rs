@@ -1216,7 +1216,7 @@ fn parse_tcp_header<B: ParseBuffer, I: IpExt>(
     let packet = body.parse::<TcpSegmentRaw<_>>().ok()?;
 
     let (builder, options, body) = packet.into_builder_options(src_ip, dst_ip)?;
-    let options = Options::from_iter(options.iter());
+    let options = Options::from_iter(builder.syn_set(), options.iter());
 
     let segment = SegmentHeader::from_builder_options(&builder, options).ok()?;
 
@@ -1618,7 +1618,7 @@ pub mod testutil {
                 Some(TransportPacketData::Tcp {
                     src_port: self.src_port,
                     dst_port: self.dst_port,
-                    segment: self.segment,
+                    segment: self.segment.clone(),
                     payload_len: self.payload_len,
                 })
             }

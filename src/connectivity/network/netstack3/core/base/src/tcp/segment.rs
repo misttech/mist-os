@@ -12,11 +12,12 @@ use core::mem::MaybeUninit;
 use core::num::{NonZeroU16, TryFromIntError};
 use core::ops::Range;
 
+use arrayvec::ArrayVec;
 use log::info;
 use net_types::ip::IpAddress;
 use packet::records::options::OptionSequenceBuilder;
 use packet::InnerSerializer;
-use packet_formats::tcp::options::TcpOption;
+use packet_formats::tcp::options::{TcpOption, TcpSackBlock};
 use packet_formats::tcp::{TcpSegment, TcpSegmentBuilder, TcpSegmentBuilderWithOptions};
 use thiserror::Error;
 
@@ -24,7 +25,7 @@ use super::base::{Control, Mss};
 use super::seqnum::{SeqNum, UnscaledWindowSize, WindowScale, WindowSize};
 
 /// A TCP segment.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Segment<P> {
     /// The non-payload information of the segment.
     pub header: SegmentHeader,
@@ -36,7 +37,7 @@ pub struct Segment<P> {
 }
 
 /// All non-data portions of a TCP segment.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct SegmentHeader {
     /// The sequence number of the segment.
     pub seq: SeqNum,
@@ -51,55 +52,227 @@ pub struct SegmentHeader {
 }
 
 /// Contains all supported TCP options.
-#[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
-pub struct Options {
-    /// The MSS option (only set on handshake).
-    pub mss: Option<Mss>,
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Options {
+    /// Options present in a handshake segment.
+    Handshake(HandshakeOptions),
+    /// Options present in a regular segment.
+    Segment(SegmentOptions),
+}
 
-    /// The WS option (only set on handshake).
-    pub window_scale: Option<WindowScale>,
+impl Default for Options {
+    fn default() -> Self {
+        // Default to a non handshake options value, since those are more
+        // common.
+        Self::Segment(SegmentOptions::default())
+    }
+}
+
+impl From<HandshakeOptions> for Options {
+    fn from(value: HandshakeOptions) -> Self {
+        Self::Handshake(value)
+    }
+}
+
+impl From<SegmentOptions> for Options {
+    fn from(value: SegmentOptions) -> Self {
+        Self::Segment(value)
+    }
 }
 
 impl Options {
     /// Returns an iterator over the contained options.
-    pub fn iter(&self) -> impl Iterator<Item = TcpOption<'static>> + core::fmt::Debug + Clone {
-        self.mss
-            .map(|mss| TcpOption::Mss(mss.get().get()))
-            .into_iter()
-            .chain(self.window_scale.map(|ws| TcpOption::WindowScale(ws.get())))
+    pub fn iter(&self) -> impl Iterator<Item = TcpOption<'_>> + Debug + Clone {
+        match self {
+            Options::Handshake(o) => either::Either::Left(o.iter()),
+            Options::Segment(o) => either::Either::Right(o.iter()),
+        }
+    }
+
+    fn as_handshake(&self) -> Option<&HandshakeOptions> {
+        match self {
+            Self::Handshake(h) => Some(h),
+            Self::Segment(_) => None,
+        }
+    }
+
+    fn as_handshake_mut(&mut self) -> Option<&mut HandshakeOptions> {
+        match self {
+            Self::Handshake(h) => Some(h),
+            Self::Segment(_) => None,
+        }
+    }
+
+    fn as_segment_mut(&mut self) -> Option<&mut SegmentOptions> {
+        match self {
+            Self::Handshake(_) => None,
+            Self::Segment(s) => Some(s),
+        }
+    }
+
+    /// Returns a new empty [`Options`] with the variant dictated by
+    /// `handshake`.
+    pub fn new_with_handshake(handshake: bool) -> Self {
+        if handshake {
+            Self::Handshake(Default::default())
+        } else {
+            Self::Segment(Default::default())
+        }
     }
 
     /// Creates a new [`Options`] from an iterator of TcpOption.
-    pub fn from_iter<'a>(iter: impl IntoIterator<Item = TcpOption<'a>>) -> Self {
-        let mut options = Options::default();
+    ///
+    /// If `handshake` is `true`, only the handshake options will be parsed.
+    /// Otherwise only the non-handshake options are parsed.
+    pub fn from_iter<'a>(handshake: bool, iter: impl IntoIterator<Item = TcpOption<'a>>) -> Self {
+        let mut options = Self::new_with_handshake(handshake);
         for option in iter {
             match option {
                 TcpOption::Mss(mss) => {
-                    options.mss = NonZeroU16::new(mss).map(Mss);
+                    if let Some(h) = options.as_handshake_mut() {
+                        h.mss = NonZeroU16::new(mss).map(Mss);
+                    }
                 }
                 TcpOption::WindowScale(ws) => {
-                    // Per RFC 7323 Section 2.3:
-                    //   If a Window Scale option is received with a shift.cnt
-                    //   value larger than 14, the TCP SHOULD log the error but
-                    //   MUST use 14 instead of the specified value.
-                    if ws > WindowScale::MAX.get() {
-                        info!(
-                            "received an out-of-range window scale: {}, want < {}",
-                            ws,
-                            WindowScale::MAX.get()
-                        );
+                    if let Some(h) = options.as_handshake_mut() {
+                        // Per RFC 7323 Section 2.3:
+                        //   If a Window Scale option is received with a shift.cnt
+                        //   value larger than 14, the TCP SHOULD log the error but
+                        //   MUST use 14 instead of the specified value.
+                        if ws > WindowScale::MAX.get() {
+                            info!(
+                                "received an out-of-range window scale: {}, want < {}",
+                                ws,
+                                WindowScale::MAX.get()
+                            );
+                        }
+                        h.window_scale = Some(WindowScale::new(ws).unwrap_or(WindowScale::MAX));
                     }
-                    options.window_scale = Some(WindowScale::new(ws).unwrap_or(WindowScale::MAX));
+                }
+                TcpOption::SackPermitted => {
+                    if let Some(h) = options.as_handshake_mut() {
+                        h.sack_permitted = true;
+                    }
+                }
+                TcpOption::Sack(sack) => {
+                    if let Some(seg) = options.as_segment_mut() {
+                        seg.sack_blocks = SackBlocks::from_option(sack);
+                    }
                 }
                 // TODO(https://fxbug.dev/42072902): We don't support these yet.
-                TcpOption::SackPermitted
-                | TcpOption::Sack(_)
-                | TcpOption::Timestamp { ts_val: _, ts_echo_reply: _ } => {}
+                TcpOption::Timestamp { ts_val: _, ts_echo_reply: _ } => {}
             }
         }
         options
     }
+
+    /// Reads the window scale if this is an [`Options::Handshake`].
+    pub fn window_scale(&self) -> Option<WindowScale> {
+        self.as_handshake().and_then(|h| h.window_scale)
+    }
+
+    /// Reads the mss option if this is an [`Options::Handshake`].
+    pub fn mss(&self) -> Option<Mss> {
+        self.as_handshake().and_then(|h| h.mss)
+    }
 }
+
+/// Segment options only set on handshake.
+#[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
+pub struct HandshakeOptions {
+    /// The MSS option.
+    pub mss: Option<Mss>,
+
+    /// The WS option.
+    pub window_scale: Option<WindowScale>,
+
+    /// The SACK permitted option.
+    pub sack_permitted: bool,
+}
+
+impl HandshakeOptions {
+    /// Returns an iterator over the contained options.
+    pub fn iter(&self) -> impl Iterator<Item = TcpOption<'_>> + Debug + Clone {
+        let Self { mss, window_scale, sack_permitted } = self;
+        mss.map(|mss| TcpOption::Mss(mss.get().get()))
+            .into_iter()
+            .chain(window_scale.map(|ws| TcpOption::WindowScale(ws.get())))
+            .chain((*sack_permitted).then_some(TcpOption::SackPermitted))
+    }
+}
+
+/// Segment options set on non-handshake segments.
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
+pub struct SegmentOptions {
+    /// The SACK option.
+    pub sack_blocks: SackBlocks,
+}
+
+impl SegmentOptions {
+    /// Returns an iterator over the contained options.
+    pub fn iter(&self) -> impl Iterator<Item = TcpOption<'_>> + Debug + Clone {
+        let Self { sack_blocks } = self;
+        sack_blocks.as_option().into_iter()
+    }
+}
+
+const MAX_SACK_BLOCKS: usize = 4;
+/// Blocks of selective ACKs.
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
+pub struct SackBlocks(ArrayVec<TcpSackBlock, MAX_SACK_BLOCKS>);
+
+impl SackBlocks {
+    /// The maximum number of selective ack blocks that can be in a TCP segment.
+    ///
+    /// See [RFC 2018 section 3].
+    ///
+    /// [RFC 2018 section 3] https://www.rfc-editor.org/rfc/rfc2018#section-3
+    pub const MAX_BLOCKS: usize = MAX_SACK_BLOCKS;
+
+    /// Returns the contained selective ACKs as a TCP option.
+    ///
+    /// Returns `None` if this [`SackBlocks`] is empty.
+    pub fn as_option(&self) -> Option<TcpOption<'_>> {
+        let Self(inner) = self;
+        if inner.is_empty() {
+            return None;
+        }
+
+        Some(TcpOption::Sack(inner.as_slice()))
+    }
+
+    /// Returns an iterator over the [`SackBlock`]s contained in this option.
+    pub fn iter(&self) -> impl Iterator<Item = SackBlock> + '_ {
+        let Self(inner) = self;
+        inner.iter().map(|block| SackBlock(block.left_edge().into(), block.right_edge().into()))
+    }
+
+    /// Creates a new [`SackBlocks`] option from a slice of blocks seen in a TCP
+    /// segment.
+    ///
+    /// Ignores any blocks past [`SackBlocks::MAX_BLOCKS`].
+    pub fn from_option(blocks: &[TcpSackBlock]) -> Self {
+        Self(blocks.iter().take(Self::MAX_BLOCKS).copied().collect())
+    }
+
+    /// Creates a new [`SackBlocks`] option from an iterator of [`SackBlock`].
+    ///
+    /// Ignores any blocks past [`SackBlocks::MAX_BLOCKS`].
+    pub fn from_iter(iter: impl IntoIterator<Item = SackBlock>) -> Self {
+        Self(
+            iter.into_iter()
+                .take(Self::MAX_BLOCKS)
+                .map(|SackBlock(left, right)| TcpSackBlock::new(left.into(), right.into()))
+                .collect(),
+        )
+    }
+}
+
+/// A selective ACK block.
+///
+/// Contains the left and right markers for a received data segment.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub struct SackBlock(pub SeqNum, pub SeqNum);
 
 /// The maximum length that the sequence number doesn't wrap around.
 pub const MAX_PAYLOAD_AND_CONTROL_LEN: usize = 1 << 31;
@@ -338,7 +511,7 @@ impl SegmentHeader {
     pub fn from_builder<A: IpAddress>(
         builder: &TcpSegmentBuilder<A>,
     ) -> Result<Self, MalformedFlags> {
-        Self::from_builder_options(builder, Options::default())
+        Self::from_builder_options(builder, Options::new_with_handshake(builder.syn_set()))
     }
 
     /// Create a `SegmentHeader` from the provided builder, options, and data length.
@@ -516,11 +689,12 @@ impl<'a> TryFrom<TcpSegment<&'a [u8]>> for Segment<&'a [u8]> {
     type Error = MalformedFlags;
 
     fn try_from(from: TcpSegment<&'a [u8]>) -> Result<Self, Self::Error> {
-        let options = Options::from_iter(from.iter_options());
+        let syn = from.syn();
+        let options = Options::from_iter(syn, from.iter_options());
         let (to, discarded) = Segment::with_data_options(
             from.seq_num().into(),
             from.ack_num().map(Into::into),
-            Flags { syn: from.syn(), fin: from.fin(), rst: from.rst() }.control()?,
+            Flags { syn, fin: from.fin(), rst: from.rst() }.control()?,
             UnscaledWindowSize::from(from.window_size()),
             from.into_body(),
             options,
@@ -553,9 +727,14 @@ where
     fn try_from(
         from: &TcpSegmentBuilderWithOptions<A, OptionSequenceBuilder<TcpOption<'a>, I>>,
     ) -> Result<Self, Self::Error> {
+        let prefix_builder = from.prefix_builder();
+        let handshake = prefix_builder.syn_set();
         Self::from_builder_options(
-            from.prefix_builder(),
-            Options::from_iter(from.iter_options().map(|option| option.borrow().to_owned())),
+            prefix_builder,
+            Options::from_iter(
+                handshake,
+                from.iter_options().map(|option| option.borrow().to_owned()),
+            ),
         )
     }
 }
@@ -957,7 +1136,7 @@ mod test {
             ack: Some(SeqNum::new(2)),
             wnd: UnscaledWindowSize::from(3u16),
             control: Some(Control::SYN),
-            options: Options { mss: None, window_scale: None },
+            options: HandshakeOptions::default().into(),
         };
 
         assert_eq!(converted_header, expected_header);
@@ -977,14 +1156,14 @@ mod test {
     }
 
     #[ip_test(I)]
-    fn from_segment_builder_with_options<I: TestIpExt>() {
+    fn from_segment_builder_with_options_handshake<I: TestIpExt>() {
         let mut builder =
             TcpSegmentBuilder::new(I::SRC_IP, I::DST_IP, SRC_PORT, DST_PORT, 1, Some(2), 3);
         builder.syn(true);
 
         let builder = TcpSegmentBuilderWithOptions::new(
             builder,
-            [TcpOption::Mss(1024), TcpOption::WindowScale(10)],
+            [TcpOption::Mss(1024), TcpOption::WindowScale(10), TcpOption::SackPermitted],
         )
         .expect("failed to create tcp segment builder");
 
@@ -996,10 +1175,42 @@ mod test {
             ack: Some(SeqNum::new(2)),
             wnd: UnscaledWindowSize::from(3u16),
             control: Some(Control::SYN),
-            options: Options {
+            options: HandshakeOptions {
                 mss: Some(Mss(NonZeroU16::new(1024).unwrap())),
                 window_scale: Some(WindowScale::new(10).unwrap()),
-            },
+                sack_permitted: true,
+            }
+            .into(),
+        };
+
+        assert_eq!(converted_header, expected_header);
+    }
+
+    #[ip_test(I)]
+    fn from_segment_builder_with_options_segment<I: TestIpExt>() {
+        let builder =
+            TcpSegmentBuilder::new(I::SRC_IP, I::DST_IP, SRC_PORT, DST_PORT, 1, Some(2), 3);
+
+        let sack_blocks = [TcpSackBlock::new(1, 2), TcpSackBlock::new(4, 6)];
+        let builder =
+            TcpSegmentBuilderWithOptions::new(builder, [TcpOption::Sack(&sack_blocks[..])])
+                .expect("failed to create tcp segment builder");
+
+        let converted_header =
+            SegmentHeader::try_from(&builder).expect("failed to convert serializer");
+
+        let expected_header = SegmentHeader {
+            seq: SeqNum::new(1),
+            ack: Some(SeqNum::new(2)),
+            wnd: UnscaledWindowSize::from(3u16),
+            control: None,
+            options: SegmentOptions {
+                sack_blocks: SackBlocks::from_iter([
+                    SackBlock(SeqNum::new(1), SeqNum::new(2)),
+                    SackBlock(SeqNum::new(4), SeqNum::new(6)),
+                ]),
+            }
+            .into(),
         };
 
         assert_eq!(converted_header, expected_header);

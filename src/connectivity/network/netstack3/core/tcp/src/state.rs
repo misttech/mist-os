@@ -17,7 +17,7 @@ use assert_matches::assert_matches;
 use derivative::Derivative;
 use explicit::ResultExt as _;
 use netstack3_base::{
-    Control, IcmpErrorCode, Instant, Mss, Options, Payload, PayloadLen as _, Segment,
+    Control, HandshakeOptions, IcmpErrorCode, Instant, Mss, Payload, PayloadLen as _, Segment,
     SegmentHeader, SeqNum, UnscaledWindowSize, WindowScale, WindowSize,
 };
 use packet_formats::utils::NonZeroDuration;
@@ -65,6 +65,10 @@ const SWS_PROBE_TIMEOUT: Duration = Duration::from_millis(100);
 ///   where Fr is a fraction whose recommended value is 1/2,
 /// Note that we use the inverse since we want to avoid floating point.
 const SWS_BUFFER_FACTOR: u32 = 2;
+
+/// Whether netstack3 senders support receiving selective acks.
+// TODO(https://fxbug.dev/42078221): Tell the peer we can do SACK.
+const SACK_PERMITTED: bool = false;
 
 /// A helper trait for duration socket options that use 0 to indicate default.
 trait NonZeroDurationOptionExt {
@@ -148,7 +152,12 @@ impl Closed<Initial> {
             Segment::syn(
                 iss,
                 rwnd,
-                Options { mss: Some(device_mss), window_scale: Some(rcv_wnd_scale) },
+                HandshakeOptions {
+                    mss: Some(device_mss),
+                    window_scale: Some(rcv_wnd_scale),
+                    sack_permitted: SACK_PERMITTED,
+                }
+                .into(),
             ),
         )
     }
@@ -238,7 +247,7 @@ impl Listen {
         now: I,
     ) -> ListenOnSegmentDisposition<I> {
         let Listen { iss, buffer_sizes, device_mss, default_mss, user_timeout } = *self;
-        let smss = options.mss.unwrap_or(default_mss).min(device_mss);
+        let smss = options.mss().unwrap_or(default_mss).min(device_mss);
         // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-65):
         //   first check for an RST
         //   An incoming RST should be ignored.  Return.
@@ -281,14 +290,16 @@ impl Listen {
                     iss,
                     seq + 1,
                     rwnd,
-                    Options {
+                    HandshakeOptions {
                         mss: Some(smss),
                         // Per RFC 7323 Section 2.3:
                         //   If a TCP receives a <SYN> segment containing a
                         //   Window Scale option, it SHOULD send its own Window
                         //   Scale option in the <SYN,ACK> segment.
-                        window_scale: options.window_scale.map(|_| rcv_wnd_scale),
-                    },
+                        window_scale: options.window_scale().map(|_| rcv_wnd_scale),
+                        sack_permitted: SACK_PERMITTED,
+                    }
+                    .into(),
                 ),
                 SynRcvd {
                     iss,
@@ -304,7 +315,7 @@ impl Listen {
                     buffer_sizes,
                     smss,
                     rcv_wnd_scale,
-                    snd_wnd_scale: options.window_scale,
+                    snd_wnd_scale: options.window_scale(),
                 },
             );
         }
@@ -417,7 +428,7 @@ impl<I: Instant + 'static, ActiveOpen> SynSent<I, ActiveOpen> {
                 }
             }
             Some(Control::SYN) => {
-                let smss = options.mss.unwrap_or(default_mss).min(device_mss);
+                let smss = options.mss().unwrap_or(default_mss).min(device_mss);
                 // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-67):
                 //   fourth check the SYN bit
                 //   This step should be reached only if the ACK is ok, or there
@@ -448,7 +459,7 @@ impl<I: Instant + 'static, ActiveOpen> SynSent<I, ActiveOpen> {
                                 rtt_estimator.sample(now.saturating_duration_since(syn_sent_ts));
                             }
                             let (rcv_wnd_scale, snd_wnd_scale) = options
-                                .window_scale
+                                .window_scale()
                                 .map(|snd_wnd_scale| (rcv_wnd_scale, snd_wnd_scale))
                                 .unwrap_or_default();
                             let established = Established {
@@ -511,10 +522,12 @@ impl<I: Instant + 'static, ActiveOpen> SynSent<I, ActiveOpen> {
                                     iss,
                                     seg_seq + 1,
                                     rwnd,
-                                    Options {
+                                    HandshakeOptions {
                                         mss: Some(smss),
-                                        window_scale: options.window_scale.map(|_| rcv_wnd_scale),
-                                    },
+                                        window_scale: options.window_scale().map(|_| rcv_wnd_scale),
+                                        sack_permitted: SACK_PERMITTED,
+                                    }
+                                    .into(),
                                 ),
                                 SynRcvd {
                                     iss,
@@ -531,7 +544,7 @@ impl<I: Instant + 'static, ActiveOpen> SynSent<I, ActiveOpen> {
                                     buffer_sizes,
                                     smss,
                                     rcv_wnd_scale,
-                                    snd_wnd_scale: options.window_scale,
+                                    snd_wnd_scale: options.window_scale(),
                                 },
                             )
                         } else {
@@ -2791,7 +2804,12 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                 Segment::syn(
                     *iss,
                     UnscaledWindowSize::from(u16::MAX),
-                    Options { mss: Some(*device_mss), window_scale: Some(*rcv_wnd_scale) },
+                    HandshakeOptions {
+                        mss: Some(*device_mss),
+                        window_scale: Some(*rcv_wnd_scale),
+                        sack_permitted: SACK_PERMITTED,
+                    }
+                    .into(),
                 )
             }),
             State::SynRcvd(SynRcvd {
@@ -2811,10 +2829,12 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                     *iss,
                     *irs + 1,
                     UnscaledWindowSize::from(u16::MAX),
-                    Options {
+                    HandshakeOptions {
                         mss: Some(*smss),
                         window_scale: snd_wnd_scale.map(|_| *rcv_wnd_scale),
-                    },
+                        sack_permitted: SACK_PERMITTED,
+                    }
+                    .into(),
                 )
             }),
             State::Established(Established { snd, rcv }) => {
@@ -3312,7 +3332,7 @@ mod test {
     use assert_matches::assert_matches;
     use net_types::ip::Ipv4;
     use netstack3_base::testutil::{FakeInstant, FakeInstantCtx};
-    use netstack3_base::{FragmentedPayload, InstantContext as _};
+    use netstack3_base::{FragmentedPayload, InstantContext as _, Options};
     use test_case::test_case;
 
     use super::*;
@@ -3526,8 +3546,8 @@ mod test {
 
     #[test_case(Segment::rst(ISS_1) => None; "drop RST")]
     #[test_case(Segment::rst_ack(ISS_1, ISS_2) => None; "drop RST|ACK")]
-    #[test_case(Segment::syn(ISS_1, UnscaledWindowSize::from(0), Options { mss: None, window_scale: None }) => Some(Segment::rst_ack(SeqNum::new(0), ISS_1 + 1)); "reset SYN")]
-    #[test_case(Segment::syn_ack(ISS_1, ISS_2, UnscaledWindowSize::from(0), Options { mss: None, window_scale: None }) => Some(Segment::rst(ISS_2)); "reset SYN|ACK")]
+    #[test_case(Segment::syn(ISS_1, UnscaledWindowSize::from(0), HandshakeOptions::default().into()) => Some(Segment::rst_ack(SeqNum::new(0), ISS_1 + 1)); "reset SYN")]
+    #[test_case(Segment::syn_ack(ISS_1, ISS_2, UnscaledWindowSize::from(0), HandshakeOptions::default().into()) => Some(Segment::rst(ISS_2)); "reset SYN|ACK")]
     #[test_case(Segment::data(ISS_1, ISS_2, UnscaledWindowSize::from(0), &[0, 1, 2][..]) => Some(Segment::rst(ISS_2)); "reset data segment")]
     fn segment_arrives_when_closed(
         incoming: impl Into<Segment<&'static [u8]>>,
@@ -3558,9 +3578,23 @@ mod test {
         Segment::rst(ISS_2), RTT
     => SynSentOnSegmentDisposition::Ignore; "RST without ack")]
     #[test_case(
-        Segment::syn(ISS_2, UnscaledWindowSize::from(u16::MAX), Options { mss: None, window_scale: Some(WindowScale::default()) }), RTT
+        Segment::syn(
+            ISS_2,
+            UnscaledWindowSize::from(u16::MAX),
+            HandshakeOptions {
+                window_scale: Some(WindowScale::default()),
+                ..Default::default() }.into()
+        ), RTT
     => SynSentOnSegmentDisposition::SendSynAckAndEnterSynRcvd(
-        Segment::syn_ack(ISS_1, ISS_2 + 1, UnscaledWindowSize::from(u16::MAX), Options { mss: Some(Mss::default::<Ipv4>()), window_scale: Some(WindowScale::default()) }),
+        Segment::syn_ack(
+            ISS_1,
+            ISS_2 + 1,
+            UnscaledWindowSize::from(u16::MAX),
+            HandshakeOptions {
+                mss: Some(Mss::default::<Ipv4>()),
+                window_scale: Some(WindowScale::default()),
+                ..Default::default()
+            }.into()),
         SynRcvd {
             iss: ISS_1,
             irs: ISS_2,
@@ -3588,7 +3622,7 @@ mod test {
         Segment::ack(ISS_2, ISS_1, UnscaledWindowSize::from(u16::MAX)), RTT
     => SynSentOnSegmentDisposition::Ignore; "acceptable ACK(ISS) without RST")]
     #[test_case(
-        Segment::syn(ISS_2, UnscaledWindowSize::from(u16::MAX), Options { mss: None, window_scale: None }),
+        Segment::syn(ISS_2, UnscaledWindowSize::from(u16::MAX), HandshakeOptions::default().into()),
         DEFAULT_USER_TIMEOUT
     => SynSentOnSegmentDisposition::EnterClosed(Closed {
         reason: None
@@ -3618,9 +3652,21 @@ mod test {
     #[test_case(Segment::rst(ISS_2) => ListenOnSegmentDisposition::Ignore; "ignore RST")]
     #[test_case(Segment::ack(ISS_2, ISS_1, UnscaledWindowSize::from(u16::MAX)) =>
         ListenOnSegmentDisposition::SendRst(Segment::rst(ISS_1)); "reject ACK")]
-    #[test_case(Segment::syn(ISS_2, UnscaledWindowSize::from(u16::MAX), Options { mss: None, window_scale: Some(WindowScale::default()) }) =>
+    #[test_case(Segment::syn(ISS_2, UnscaledWindowSize::from(u16::MAX),
+        HandshakeOptions {
+            window_scale: Some(WindowScale::default()),
+            ..Default::default()
+        }.into()) =>
         ListenOnSegmentDisposition::SendSynAckAndEnterSynRcvd(
-            Segment::syn_ack(ISS_1, ISS_2 + 1, UnscaledWindowSize::from(u16::MAX), Options { mss: Some(Mss::default::<Ipv4>()), window_scale: Some(WindowScale::default()) }),
+            Segment::syn_ack(
+                ISS_1,
+                ISS_2 + 1,
+                UnscaledWindowSize::from(u16::MAX),
+                HandshakeOptions {
+                    mss: Some(Mss::default::<Ipv4>()),
+                    window_scale: Some(WindowScale::default()),
+                    ..Default::default()
+                }.into()),
             SynRcvd {
                 iss: ISS_1,
                 irs: ISS_2,
@@ -3665,7 +3711,8 @@ mod test {
         Some(State::Closed(Closed { reason: Some(ConnectionError::ConnectionReset) }))
     => None; "acceptable RST")]
     #[test_case(
-        Segment::syn(ISS_1 + 1, UnscaledWindowSize::from(u16::MAX), Options { mss: None, window_scale: Some(WindowScale::default()) }),
+        Segment::syn(ISS_1 + 1, UnscaledWindowSize::from(u16::MAX),
+        HandshakeOptions { window_scale: Some(WindowScale::default()), ..Default::default() }.into()),
         Some(State::Closed(Closed { reason: Some(ConnectionError::ConnectionReset) }))
     => Some(
         Segment::rst(ISS_2 + 1)
@@ -3798,7 +3845,7 @@ mod test {
     }
 
     #[test_case(
-        Segment::syn(ISS_2 + 1, UnscaledWindowSize::from(u16::MAX), Options { mss: None, window_scale: None }),
+        Segment::syn(ISS_2 + 1, UnscaledWindowSize::from(u16::MAX), HandshakeOptions::default().into()),
         Some(State::Closed (
             Closed { reason: Some(ConnectionError::ConnectionReset) },
         ))
@@ -4110,7 +4157,7 @@ mod test {
 
     #[test_case(
         Segment::syn(ISS_2 + 2, UnscaledWindowSize::from(u16::MAX),
-                     Options { mss: None, window_scale: None }),
+            HandshakeOptions::default().into()),
         Some(State::Closed (
             Closed { reason: Some(ConnectionError::ConnectionReset) },
         ))
@@ -4196,10 +4243,12 @@ mod test {
             Segment::syn(
                 ISS_1,
                 UnscaledWindowSize::from(u16::MAX),
-                Options {
+                HandshakeOptions {
                     mss: Some(DEVICE_MAXIMUM_SEGMENT_SIZE),
-                    window_scale: Some(WindowScale::default())
+                    window_scale: Some(WindowScale::default()),
+                    sack_permitted: SACK_PERMITTED,
                 }
+                .into(),
             )
         );
         assert_eq!(
@@ -4243,10 +4292,12 @@ mod test {
                 ISS_2,
                 ISS_1 + 1,
                 UnscaledWindowSize::from(u16::MAX),
-                Options {
+                HandshakeOptions {
                     mss: Some(DEVICE_MAXIMUM_SEGMENT_SIZE),
-                    window_scale: Some(WindowScale::default())
+                    window_scale: Some(WindowScale::default()),
+                    sack_permitted: SACK_PERMITTED,
                 }
+                .into(),
             )
         );
         assert_matches!(passive, State::SynRcvd(ref syn_rcvd) if syn_rcvd == &SynRcvd {
@@ -4389,10 +4440,12 @@ mod test {
             Segment::syn(
                 ISS_1,
                 UnscaledWindowSize::from(u16::MAX),
-                Options {
+                HandshakeOptions {
                     mss: Some(DEVICE_MAXIMUM_SEGMENT_SIZE),
-                    window_scale: Some(WindowScale::default())
+                    window_scale: Some(WindowScale::default()),
+                    sack_permitted: SACK_PERMITTED,
                 }
+                .into(),
             )
         );
         assert_eq!(
@@ -4400,10 +4453,12 @@ mod test {
             Segment::syn(
                 ISS_2,
                 UnscaledWindowSize::from(u16::MAX),
-                Options {
+                HandshakeOptions {
                     mss: Some(DEVICE_MAXIMUM_SEGMENT_SIZE),
-                    window_scale: Some(WindowScale::default())
+                    window_scale: Some(WindowScale::default()),
+                    sack_permitted: SACK_PERMITTED,
                 }
+                .into(),
             )
         );
 
@@ -4434,10 +4489,12 @@ mod test {
                 ISS_1,
                 ISS_2 + 1,
                 UnscaledWindowSize::from(u16::MAX),
-                Options {
+                HandshakeOptions {
                     mss: Some(DEVICE_MAXIMUM_SEGMENT_SIZE),
-                    window_scale: Some(WindowScale::default())
+                    window_scale: Some(WindowScale::default()),
+                    sack_permitted: SACK_PERMITTED,
                 }
+                .into()
             )
         );
         assert_eq!(
@@ -4446,10 +4503,12 @@ mod test {
                 ISS_2,
                 ISS_1 + 1,
                 UnscaledWindowSize::from(u16::MAX),
-                Options {
+                HandshakeOptions {
                     mss: Some(DEVICE_MAXIMUM_SEGMENT_SIZE),
-                    window_scale: Some(WindowScale::default())
+                    window_scale: Some(WindowScale::default()),
+                    sack_permitted: SACK_PERMITTED,
                 }
+                .into()
             )
         );
 
@@ -4828,7 +4887,7 @@ mod test {
         // The SYN segment should be retransmitted.
         assert_eq!(
             state.poll_send_with_default_options(u32::MAX, clock.now(), &counters),
-            Some(syn.into_empty())
+            Some(syn.clone().into_empty())
         );
 
         // Bring the state to SYNRCVD.
@@ -4846,7 +4905,7 @@ mod test {
         // The SYN-ACK segment should be retransmitted.
         assert_eq!(
             state.poll_send_with_default_options(u32::MAX, clock.now(), &counters),
-            Some(syn_ack.into_empty())
+            Some(syn_ack.clone().into_empty())
         );
 
         // Bring the state to ESTABLISHED and write some data.
@@ -5621,7 +5680,8 @@ mod test {
             rcv_wnd_scale: WindowScale::default(),
             snd_wnd_scale: Some(WindowScale::default()),
         }),
-        Segment::syn_ack(ISS_2, ISS_1 + 1, UnscaledWindowSize::from(u16::MAX), Options { mss: None, window_scale: Some(WindowScale::default()) }) =>
+        Segment::syn_ack(ISS_2, ISS_1 + 1, UnscaledWindowSize::from(u16::MAX),
+        HandshakeOptions { window_scale: Some(WindowScale::default()), ..Default::default() }.into()) =>
         Some(Segment::ack(ISS_1 + 1, ISS_2 + 1, UnscaledWindowSize::from(u16::MAX))); "retransmit syn_ack"
     )]
     // Regression test for https://fxbug.dev/42058963
@@ -6848,10 +6908,12 @@ mod test {
             Segment::syn(
                 ISS_1,
                 UnscaledWindowSize::from(u16::try_from(buffer_size).unwrap_or(u16::MAX)),
-                Options {
+                HandshakeOptions {
                     mss: Some(DEVICE_MAXIMUM_SEGMENT_SIZE),
-                    window_scale: Some(syn_window_scale)
-                },
+                    window_scale: Some(syn_window_scale),
+                    sack_permitted: SACK_PERMITTED,
+                }
+                .into(),
             )
         );
         let mut active = State::SynSent(syn_sent);
@@ -6862,10 +6924,12 @@ mod test {
                     ISS_2,
                     ISS_1 + 1,
                     UnscaledWindowSize::from(u16::MAX),
-                    Options {
+                    HandshakeOptions {
                         mss: Some(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
                         window_scale: syn_ack_window_scale,
-                    },
+                        sack_permitted: SACK_PERMITTED,
+                    }
+                    .into(),
                 ),
                 clock.now(),
                 &counters,

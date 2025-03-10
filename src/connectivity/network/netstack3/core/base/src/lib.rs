@@ -70,7 +70,10 @@ pub use resource_references::{
 };
 pub use rng::RngContext;
 pub use tcp::base::{Control, FragmentedPayload, Mss};
-pub use tcp::segment::{Options, Payload, PayloadLen, Segment, SegmentHeader};
+pub use tcp::segment::{
+    HandshakeOptions, Options, Payload, PayloadLen, SackBlock, SackBlocks, Segment, SegmentHeader,
+    SegmentOptions,
+};
 pub use tcp::seqnum::{SeqNum, UnscaledWindowSize, WindowScale, WindowSize};
 pub use time::local_timer_heap::LocalTimerHeap;
 pub use time::{
