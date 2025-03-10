@@ -474,6 +474,7 @@ TEST(UnixSocket, SendZeroFds) {
   ASSERT_EQ(recvmsg(fds[1], &msg, 0), 1);
   EXPECT_EQ(data[0], 'a');
   EXPECT_EQ(msg.msg_controllen, 0u);
+  EXPECT_EQ(msg.msg_flags, 0);
 }
 
 #if defined(__NR_memfd_create)
@@ -511,6 +512,7 @@ TEST(UnixSocket, SendMemFd) {
   ASSERT_EQ(recvmsg(fds[1], &msg, 0), 1);
   EXPECT_EQ(data[0], '\0');
   EXPECT_GT(msg.msg_controllen, 0u);
+  EXPECT_EQ(msg.msg_flags, 0);
 }
 #endif  // defined(__NR_memfd_create)
 
