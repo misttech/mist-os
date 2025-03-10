@@ -10,6 +10,7 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/zx/clock.h>
+#include <lib/zx/result.h>
 #include <lib/zx/time.h>
 #include <zircon/status.h>
 #include <zircon/syscalls.h>
@@ -71,6 +72,15 @@ void Pl031::Get(GetCompleter::Sync& completer) {
 
 void Pl031::Set(SetRequestView request, SetCompleter::Sync& completer) {
   completer.Reply(SetRtc(request->rtc));
+}
+
+void Pl031::Set2(Set2RequestView request, Set2Completer::Sync& completer) {
+  zx_status_t status{SetRtc(request->rtc)};
+  if (status != ZX_OK) {
+    completer.ReplyError(status);
+  } else {
+    completer.ReplySuccess();
+  }
 }
 
 void Pl031::DdkRelease() { delete this; }

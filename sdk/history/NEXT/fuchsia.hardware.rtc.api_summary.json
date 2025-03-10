@@ -10,12 +10,13 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.hardware.rtc/Device.Set",
+        "name": "fuchsia.hardware.rtc/Device.Set2",
         "strictness": "flexible",
-        "ordinal": "6913514335775086624",
+        "ordinal": "1614978035535395557",
         "direction": "two_way",
-        "request": "fuchsia.hardware.rtc/DeviceSetRequest",
-        "response": "fuchsia.hardware.rtc/Device_Set_Response"
+        "request": "fuchsia.hardware.rtc/DeviceSet2Request",
+        "response": "fuchsia.hardware.rtc/Device_Set2_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol",
@@ -25,13 +26,13 @@
     },
     {
         "kind": "struct/member",
-        "name": "fuchsia.hardware.rtc/DeviceSetRequest.rtc",
+        "name": "fuchsia.hardware.rtc/DeviceSet2Request.rtc",
         "ordinal": "1",
         "type": "fuchsia.hardware.rtc/Time"
     },
     {
         "kind": "struct",
-        "name": "fuchsia.hardware.rtc/DeviceSetRequest"
+        "name": "fuchsia.hardware.rtc/DeviceSet2Request"
     },
     {
         "kind": "struct/member",
@@ -42,16 +43,6 @@
     {
         "kind": "struct",
         "name": "fuchsia.hardware.rtc/Device_Get_Response"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.hardware.rtc/Device_Set_Response.status",
-        "ordinal": "1",
-        "type": "int32"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.hardware.rtc/Device_Set_Response"
     },
     {
         "kind": "struct/member",

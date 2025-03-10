@@ -629,6 +629,11 @@ async fn serve_fake_rtc(
                 rtc_updates.0.lock().push(rtc);
                 responder.send(zx::Status::OK.into_raw()).unwrap();
             }
+            DeviceRequest::Set2 { rtc, responder } => {
+                log::debug!("serve_fake_rtc: DeviceRequest::Set2");
+                rtc_updates.0.lock().push(rtc);
+                responder.send(Ok(())).unwrap();
+            }
             DeviceRequest::_UnknownMethod { .. } => {}
         }
     }

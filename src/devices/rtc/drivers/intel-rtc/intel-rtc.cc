@@ -164,6 +164,11 @@ void RtcDevice::Set(SetRequestView request, SetCompleter::Sync& completer) {
   completer.Reply(ZX_OK);
 }
 
+void RtcDevice::Set2(Set2RequestView request, Set2Completer::Sync& completer) {
+  WriteTime(request->rtc);
+  completer.ReplySuccess();
+}
+
 zx_status_t Bind(void* ctx, zx_device_t* parent) {
   auto client = acpi::Client::Create(parent);
   if (client.is_error()) {
