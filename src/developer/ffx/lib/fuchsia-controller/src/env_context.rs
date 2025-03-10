@@ -14,6 +14,7 @@ use ffx_target::connection::Connection;
 use ffx_target::ssh_connector::SshConnector;
 use fidl::endpoints::Proxy;
 use fidl::AsHandleRef;
+use fidl_fuchsia_device::ControllerMarker;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{Arc, OnceLock, Weak};
@@ -173,15 +174,14 @@ impl EnvContext {
     ) -> Result<zx_types::zx_handle_t> {
         self.invariant_check().await?;
         let rcs_proxy = self.device_connection.lock().await.as_ref().unwrap().rcs_proxy().await?;
-        let (hdl, server) = fidl::Channel::create();
-        rcs::connect_with_timeout_at(
+        let proxy = rcs::connect_with_timeout_at::<ControllerMarker>(
             Duration::from_secs(15),
             &moniker,
             &capability_name,
             &rcs_proxy,
-            server,
         )
         .await?;
+        let hdl = proxy.into_channel().map_err(fxe)?.into_zx_channel();
         let res = hdl.raw_handle();
         std::mem::forget(hdl);
         Ok(res)

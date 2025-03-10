@@ -81,20 +81,17 @@ where
     P: FProxy + 'static,
     P::Protocol: FDiscoverableProtocolMarker,
 {
-    let (proxy, server_end) = rcs.domain().create_proxy::<P::Protocol>();
     rcs_fdomain::open_with_timeout::<P::Protocol>(
         timeout,
         moniker,
         capability_set,
         rcs,
-        server_end.into_channel(),
     )
     .await
     .with_user_message(|| {
         let protocol_name = P::Protocol::PROTOCOL_NAME;
         format!("Failed to connect to protocol '{protocol_name}' at moniker '{moniker}' within {} seconds", timeout.as_secs_f64())
-    })?;
-    Ok(proxy)
+    })
 }
 
 /// Sets up a fake FDomain proxy of type `T` handing requests to the given

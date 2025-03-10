@@ -15,56 +15,66 @@ use {
 
 #[cfg(not(feature = "fdomain"))]
 use {
-    fidl::endpoints::{DiscoverableProtocolMarker, ProxyHasDomain},
-    fidl_fuchsia_developer_remotecontrol::RemoteControlProxy,
-    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as sys2,
-    fidl_fuchsia_sys2::OpenDirType,
+    fidl::endpoints::DiscoverableProtocolMarker,
+    fidl_fuchsia_developer_remotecontrol::RemoteControlProxy, fidl_fuchsia_io as fio,
+    fidl_fuchsia_sys2 as sys2, fidl_fuchsia_sys2::OpenDirType,
 };
 
-pub const LEGACY_MONIKER: &str = "core/toolbox";
 pub const MONIKER: &str = "toolbox";
+const LEGACY_MONIKER: &str = "core/toolbox";
 
-/// Open the service directory of the toolbox.
-// TODO(https://fxbug.dev/384054758): Transition this to ConnectCapability.
 #[cfg(not(feature = "fdomain"))]
-pub async fn open_toolbox(rcs: &RemoteControlProxy) -> Result<fio::DirectoryProxy> {
+async fn connect_realm_query(
+    rcs: &RemoteControlProxy,
+    moniker: &str,
+) -> Result<sys2::RealmQueryProxy> {
+    // Try to connect via fuchsia.developer.remotecontrol/RemoteControl.ConnectCapability.
     let (query, server) = fidl::endpoints::create_proxy::<sys2::RealmQueryMarker>();
-    let e = rcs
-        .deprecated_open_capability(
-            MONIKER,
+    let result = rcs
+        .connect_capability(
+            moniker,
             sys2::OpenDirType::NamespaceDir,
             &format!("svc/{}.root", sys2::RealmQueryMarker::PROTOCOL_NAME),
             server.into_channel(),
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .await?;
-
-    let (query, moniker) = if let Err(_) = e {
-        let (query, server) = fidl::endpoints::create_proxy::<sys2::RealmQueryMarker>();
-        rcs.deprecated_open_capability(
-            LEGACY_MONIKER,
-            sys2::OpenDirType::NamespaceDir,
-            &format!("svc/{}.root", sys2::RealmQueryMarker::PROTOCOL_NAME),
-            server.into_channel(),
-            fio::OpenFlags::RIGHT_READABLE,
         )
         .await?
-        .map_err(|e| anyhow::anyhow!("{e:?}"))?;
+        .map_err(|e| anyhow::anyhow!("{e:?}"));
+    if result.is_ok() {
+        return Ok(query);
+    }
+    // Fallback to fuchsia.developer.remotecontrol/RemoteControl.DeprecatedOpenCapability.
+    // This can be removed once we drop support for API level 27.
+    let (query, server) = fidl::endpoints::create_proxy::<sys2::RealmQueryMarker>();
+    rcs.deprecated_open_capability(
+        moniker,
+        sys2::OpenDirType::NamespaceDir,
+        &format!("svc/{}.root", sys2::RealmQueryMarker::PROTOCOL_NAME),
+        server.into_channel(),
+        Default::default(),
+    )
+    .await?
+    .map_err(|e| anyhow::anyhow!("{e:?}"))?;
+    Ok(query)
+}
 
-        (query, LEGACY_MONIKER)
-    } else {
-        (query, MONIKER)
+/// Open the service directory of the toolbox.
+#[cfg(not(feature = "fdomain"))]
+pub async fn open_toolbox(rcs: &RemoteControlProxy) -> Result<fio::DirectoryProxy> {
+    let (query, moniker) = {
+        if let Ok(query) = connect_realm_query(rcs, MONIKER).await {
+            (query, MONIKER)
+        } else {
+            let query = connect_realm_query(rcs, LEGACY_MONIKER).await?;
+            (query, LEGACY_MONIKER)
+        }
     };
-
     let moniker = moniker::Moniker::try_from(moniker)?;
-
     let namespace_dir = component_debug::dirs::open_instance_dir_root_readable(
         &moniker,
         sys2::OpenDirType::NamespaceDir.into(),
         &query,
     )
     .await?;
-
     let (ret, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     namespace_dir.open(
         "svc",
@@ -95,39 +105,33 @@ where
     P: DiscoverableProtocolMarker,
 {
     let protocol_name = P::PROTOCOL_NAME;
-    let (proxy, server_end) = rcs_proxy.domain().create_proxy::<P>();
     // time this so that we can use an appropriately shorter timeout for the attempt
     // to connect by the backup (if there is one)
     let start_time = Instant::now();
-    let toolbox_res = crate::open_with_timeout_at(
+    let toolbox_res = crate::open_with_timeout_at::<P>(
         dur,
         MONIKER,
         OpenDirType::NamespaceDir,
         &format!("svc/{protocol_name}"),
         rcs_proxy,
-        server_end.into_channel(),
     )
     .await;
 
     // Fallback to legacy toolbox moniker if toolbox is not available.
-    let (toolbox_res, proxy) = if toolbox_res.is_ok() {
-        (toolbox_res, proxy)
-    } else {
-        let (proxy, server_end) = rcs_proxy.domain().create_proxy::<P>();
-        let toolbox_took = Instant::now() - start_time;
-        let timeout = dur.saturating_sub(toolbox_took);
-        (
-            crate::open_with_timeout_at(
+    let toolbox_res = match toolbox_res {
+        Ok(toolbox) => Ok(toolbox),
+        Err(_) => {
+            let toolbox_took = Instant::now() - start_time;
+            let timeout = dur.saturating_sub(toolbox_took);
+            crate::open_with_timeout_at::<P>(
                 timeout,
                 LEGACY_MONIKER,
                 OpenDirType::NamespaceDir,
                 &format!("svc/{protocol_name}"),
                 rcs_proxy,
-                server_end.into_channel(),
             )
-            .await,
-            proxy,
-        )
+            .await
+        }
     };
 
     let toolbox_took = Instant::now() - start_time;
@@ -137,31 +141,22 @@ where
     // message. This just avoids an indentation or having to break this out
     // into another single-use function. It's kind of a reverse `?`.
     let Some(backup) = backup_moniker.as_ref().map(|s| s.as_ref()) else {
-        toolbox_res.context(toolbox_error_message(protocol_name))?;
-        return Ok(proxy);
+        return toolbox_res.context(toolbox_error_message(protocol_name));
     };
-    let Err(_toolbox_err) = toolbox_res else {
-        return Ok(proxy);
-    };
+    if let Ok(toolbox) = toolbox_res {
+        return Ok(toolbox);
+    }
 
     // try to connect to the moniker given instead, but don't double
     // up the timeout.
     let timeout = dur.saturating_sub(toolbox_took);
-    let (proxy, server_end) = rcs_proxy.domain().create_proxy::<P>();
-    let moniker_res = crate::open_with_timeout::<P>(
-        timeout,
-        &backup,
-        OpenDirType::ExposedDir,
-        &rcs_proxy,
-        server_end.into_channel(),
-    )
-    .await;
+    let moniker_res =
+        crate::open_with_timeout::<P>(timeout, &backup, OpenDirType::ExposedDir, &rcs_proxy).await;
 
     // stack the errors together so we can see both of them in the log if
     // we want to and then provide an error message that indicates we tried
     // both and could find it at neither.
-    moniker_res.context(backup_error_message(protocol_name, &backup))?;
-    Ok(proxy)
+    moniker_res.context(backup_error_message(protocol_name, &backup))
 }
 
 fn toolbox_error_message(protocol_name: &str) -> String {

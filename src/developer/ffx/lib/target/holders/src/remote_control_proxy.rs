@@ -83,20 +83,17 @@ where
     P: Proxy + 'static,
     P::Protocol: DiscoverableProtocolMarker,
 {
-    let (proxy, server_end) = fidl::endpoints::create_proxy::<P::Protocol>();
     rcs::open_with_timeout::<P::Protocol>(
         timeout,
         moniker,
         capability_set,
         rcs,
-        server_end.into_channel(),
     )
     .await
     .with_user_message(|| {
         let protocol_name = P::Protocol::PROTOCOL_NAME;
         format!("Failed to connect to protocol '{protocol_name}' at moniker '{moniker}' within {} seconds", timeout.as_secs_f64())
-    })?;
-    Ok(proxy)
+    })
 }
 
 /// Sets up a fake proxy of type `T` handing requests to the given callback and returning
