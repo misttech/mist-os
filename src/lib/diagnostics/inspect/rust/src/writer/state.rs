@@ -1242,19 +1242,11 @@ impl InnerState {
     ) -> Result<(), Error> {
         let old_string_ref_idx =
             self.heap.container.block_at_unchecked::<Buffer>(block_index).extent_index();
-        let new_string_ref_idx = match self.get_or_create_string_reference(value.into()) {
-            Ok(b_index) => {
-                self.heap
-                    .container
-                    .block_at_unchecked_mut::<StringRef>(b_index)
-                    .increment_ref_count()?;
-                b_index
-            }
-            Err(err) => {
-                self.heap.free_block(block_index)?;
-                return Err(err);
-            }
-        };
+        let new_string_ref_idx = self.get_or_create_string_reference(value.into())?;
+        self.heap
+            .container
+            .block_at_unchecked_mut::<StringRef>(new_string_ref_idx)
+            .increment_ref_count()?;
 
         self.heap
             .container
@@ -1340,6 +1332,30 @@ mod tests {
     use diagnostics_assertions::assert_data_tree;
     use futures::prelude::*;
     use inspect_format::Header;
+
+    #[track_caller]
+    fn assert_all_free_or_reserved<'a>(
+        blocks: impl Iterator<Item = Block<&'a BackingBuffer, Unknown>>,
+    ) {
+        let mut errors = vec![];
+        for block in blocks {
+            if block.block_type() != Some(BlockType::Free)
+                && block.block_type() != Some(BlockType::Reserved)
+            {
+                errors.push(format!(
+                    "block at {} is {:?}, expected {} or {}",
+                    block.index(),
+                    block.block_type(),
+                    BlockType::Free,
+                    BlockType::Reserved,
+                ));
+            }
+        }
+
+        if !errors.is_empty() {
+            panic!("{errors:#?}");
+        }
+    }
 
     #[track_caller]
     fn assert_all_free<'a>(blocks: impl Iterator<Item = Block<&'a BackingBuffer, Unknown>>) {
@@ -2705,8 +2721,7 @@ mod tests {
         assert_eq!(blocks[0].block_type(), Some(BlockType::Header));
         assert_eq!(blocks[1].block_type(), Some(BlockType::BufferValue));
         assert_eq!(blocks[2].block_type(), Some(BlockType::StringReference));
-        assert!(blocks[3..].iter().all(|b| b.block_type() == Some(BlockType::Reserved)
-            || b.block_type() == Some(BlockType::Free)));
+        assert_all_free_or_reserved(blocks.into_iter().skip(3));
 
         {
             let mut state = core_state.try_lock().expect("lock state");
@@ -2715,7 +2730,53 @@ mod tests {
         }
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
         let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
-        assert!(blocks[1..].iter().all(|b| b.block_type() == Some(BlockType::Reserved)
-            || b.block_type() == Some(BlockType::Free)));
+        assert_all_free_or_reserved(blocks.into_iter().skip(1));
+    }
+
+    #[fuchsia::test]
+    fn test_string_property_on_overflow_set() {
+        let core_state = get_state(4096);
+        {
+            let mut state = core_state.try_lock().expect("lock state");
+
+            // Create string property with value.
+            let block_index = state.create_string("test", "test-property", 0.into()).unwrap();
+
+            // Fill the vmo.
+            for _ in 10..(4096 / constants::MIN_ORDER_SIZE).try_into().unwrap() {
+                state.inner_lock.heap.allocate_block(constants::MIN_ORDER_SIZE).unwrap();
+            }
+
+            // make a value too large to fit in the VMO, then attempt to set it into the property
+            // in order to trigger error conditions and make sure the old value isn't deallocated
+            let values = ["a"].into_iter().cycle().take(5000).collect::<String>();
+            assert!(state.set_string_property(block_index, values).is_err());
+            let block = state.get_block::<Buffer>(block_index);
+            assert_eq!(*block.index(), 2);
+            assert_eq!(*block.parent_index(), 0);
+            assert_eq!(*block.name_index(), 3);
+
+            // expect the old value to be there
+            assert_eq!(
+                state.load_string(BlockIndex::from(*block.extent_index())).unwrap(),
+                "test-property"
+            );
+
+            // make sure state can still create some new values
+            assert!(state.create_int_metric("foo", 1, 0.into()).is_ok());
+            assert!(state.create_int_metric("bar", 1, 0.into()).is_ok());
+        };
+
+        let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
+        let blocks: Vec<ScannedBlock<'_, Unknown>> = snapshot.scan().collect();
+        assert_eq!(blocks[0].block_type(), Some(BlockType::Header));
+        assert_eq!(blocks[1].block_type(), Some(BlockType::BufferValue));
+        assert_eq!(blocks[2].block_type(), Some(BlockType::StringReference));
+        assert_eq!(blocks[3].block_type(), Some(BlockType::StringReference));
+        assert_eq!(blocks[250].block_type(), Some(BlockType::IntValue));
+        assert_eq!(blocks[251].block_type(), Some(BlockType::StringReference));
+        assert_eq!(blocks[252].block_type(), Some(BlockType::IntValue));
+        assert_eq!(blocks[253].block_type(), Some(BlockType::StringReference));
+        assert_all_free_or_reserved(blocks.into_iter().skip(4).rev().skip(4));
     }
 }
