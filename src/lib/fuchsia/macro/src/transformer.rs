@@ -179,44 +179,22 @@ impl quote::ToTokens for Interest {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         tokens.extend(match self.min_severity {
             None => quote! { ::fuchsia::Interest::default() },
-            Some(severity) => match severity {
-                Severity::Trace => quote! {
+            Some(severity) => {
+                let severity_tok = match severity {
+                    Severity::Trace => quote!(::fuchsia::Severity::Trace),
+                    Severity::Debug => quote!(::fuchsia::Severity::Debug),
+                    Severity::Info => quote!(::fuchsia::Severity::Info),
+                    Severity::Warn => quote!(::fuchsia::Severity::Warn),
+                    Severity::Error => quote!(::fuchsia::Severity::Error),
+                    Severity::Fatal => quote!(::fuchsia::Severity::Fatal),
+                };
+                quote! {
                     ::fuchsia::Interest {
-                        min_severity: Some(::fuchsia::Severity::Trace),
+                        min_severity: Some(#severity_tok),
                         ..Default::default()
                     }
-                },
-                Severity::Debug => quote! {
-                    ::fuchsia::Interest {
-                        min_severity: Some(::fuchsia::Severity::Debug),
-                        ..Default::default()
-                    }
-                },
-                Severity::Info => quote! {
-                    ::fuchsia::Interest {
-                        min_severity: Some(::fuchsia::Severity::Info),
-                        ..Default::default()
-                    }
-                },
-                Severity::Warn => quote! {
-                    ::fuchsia::Interest {
-                        min_severity: Some(::fuchsia::Severity::Warn),
-                        ..Default::default()
-                    }
-                },
-                Severity::Error => quote! {
-                    ::fuchsia::Interest {
-                        min_severity: Some(::fuchsia::Severity::Error),
-                        ..Default::default()
-                    }
-                },
-                Severity::Fatal => quote! {
-                    ::fuchsia::Interest {
-                        min_severity: Some(::fuchsia::Severity::Fatal),
-                        ..Default::default()
-                    }
-                },
-            },
+                }
+            }
         });
     }
 }
