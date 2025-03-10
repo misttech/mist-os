@@ -21,7 +21,7 @@ const size_t kExpectedKeyInfoSize = 32;
 using GetHardwareDerivedKeyCallback =
     fit::function<zx_status_t(std::unique_ptr<uint8_t[]>, size_t)>;
 
-// Get a hardware derived key using the device /dev/class/tee/000 .
+// Get a hardware derived key using the service path.
 // This is useful in early boot when other services may not be up.
 zx_status_t GetHardwareDerivedKey(GetHardwareDerivedKeyCallback callback,
                                   uint8_t key_info[kExpectedKeyInfoSize]);

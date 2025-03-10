@@ -39,7 +39,7 @@
             to: "#system_update_configurator",
         },
         {
-            directory: "dev-tee",
+            service: "fuchsia.hardware.tee.Service",
             from: "parent",
             to: "#tee_manager",
         },

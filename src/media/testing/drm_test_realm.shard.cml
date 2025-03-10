@@ -60,10 +60,9 @@
             rights: [ "r*" ],
         },
         {
-            directory: "dev-tee",
+            service: "fuchsia.hardware.tee.Service",
             from: "parent",
             to: "#drm-tests",
-            rights: [ "r*" ],
         },
         {
             directory: "boot",

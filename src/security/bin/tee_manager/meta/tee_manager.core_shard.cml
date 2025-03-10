@@ -16,11 +16,9 @@
     ],
     offer: [
         {
-            directory: "dev-class",
+            service: "fuchsia.hardware.tee.Service",
             from: "parent",
-            as: "dev-tee",
             to: "#tee_manager",
-            subdir: "tee",
         },
         {
             storage: "data",

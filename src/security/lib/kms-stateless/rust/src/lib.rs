@@ -120,12 +120,13 @@ fn rotate_key_from_tee_device(device: Option<&CStr>, info: KeyInfo) -> Result<()
     call_command(device, &mut op, TaKeysafeCommand::RotateHardwareDerivedKey)
 }
 
-/// Gets a hardware derived key using the first device found in /dev/class/tee.
+/// Gets a hardware derived key using the first device found in /svc/fuchsia.hardware.tee.Service.
 /// This is useful in early boot when other services may not be up.
 pub async fn get_hardware_derived_key(info: KeyInfo) -> Result<Vec<u8>, Error> {
-    const DEV_CLASS_TEE: &str = "/dev/class/tee";
+    const TEE_SERVICE: &str = "/svc/fuchsia.hardware.tee.Service";
+    const TEE_SERVICE_MEMBER: &str = "device_connector";
 
-    let dir = fuchsia_fs::directory::open_in_namespace(DEV_CLASS_TEE, fuchsia_fs::Flags::empty())?;
+    let dir = fuchsia_fs::directory::open_in_namespace(TEE_SERVICE, fuchsia_fs::Flags::empty())?;
     let mut stream = device_watcher::watch_for_files(&dir).await?;
     let first = stream
         .try_next()
@@ -133,13 +134,11 @@ pub async fn get_hardware_derived_key(info: KeyInfo) -> Result<Vec<u8>, Error> {
         .on_timeout(std::time::Duration::from_secs(5), || Err(Error::TeeDeviceWaitTimeout))
         .await?;
     let first = first.ok_or_else(|| {
-        Error::TeeDeviceWaitFailure(anyhow::anyhow!(
-            "'{DEV_CLASS_TEE}' watcher closed unexpectedly"
-        ))
+        Error::TeeDeviceWaitFailure(anyhow::anyhow!("'{TEE_SERVICE}' watcher closed unexpectedly"))
     })?;
     let first = first.to_str().expect("paths are utf-8");
 
-    let dev = format!("{DEV_CLASS_TEE}/{first}");
+    let dev = format!("{TEE_SERVICE}/{first}/{TEE_SERVICE_MEMBER}");
     let dev = CString::new(dev).expect("paths do not contain nul bytes");
     get_key_from_tee_device(Some(&dev), info)
 }
@@ -150,12 +149,13 @@ pub async fn get_hardware_derived_key_from_service(info: KeyInfo) -> Result<Vec<
     get_key_from_tee_device(None, info)
 }
 
-/// Rotates the hardware derived key from a tee device at the /dev/class/tee.
+/// Rotates the hardware derived key from a tee device at /svc/fuchsia.hardware.tee.Service.
 /// This is useful in early boot when other services may not be up.
 pub async fn rotate_hardware_derived_key(info: KeyInfo) -> Result<(), Error> {
-    const DEV_CLASS_TEE: &str = "/dev/class/tee";
+    const TEE_SERVICE: &str = "/svc/fuchsia.hardware.tee.Service";
+    const TEE_SERVICE_MEMBER: &str = "device_connector";
 
-    let dir = fuchsia_fs::directory::open_in_namespace(DEV_CLASS_TEE, fuchsia_fs::Flags::empty())?;
+    let dir = fuchsia_fs::directory::open_in_namespace(TEE_SERVICE, fuchsia_fs::Flags::empty())?;
     let mut stream = device_watcher::watch_for_files(&dir).await?;
     let first = stream
         .try_next()
@@ -163,13 +163,11 @@ pub async fn rotate_hardware_derived_key(info: KeyInfo) -> Result<(), Error> {
         .on_timeout(std::time::Duration::from_secs(5), || Err(Error::TeeDeviceWaitTimeout))
         .await?;
     let first = first.ok_or_else(|| {
-        Error::TeeDeviceWaitFailure(anyhow::anyhow!(
-            "'{DEV_CLASS_TEE}' watcher closed unexpectedly"
-        ))
+        Error::TeeDeviceWaitFailure(anyhow::anyhow!("'{TEE_SERVICE}' watcher closed unexpectedly"))
     })?;
     let first = first.to_str().expect("paths are utf-8");
 
-    let dev = format!("{DEV_CLASS_TEE}/{first}");
+    let dev = format!("{TEE_SERVICE}/{first}/{TEE_SERVICE_MEMBER}");
     let dev = CString::new(dev).expect("paths do not contain nul bytes");
     rotate_key_from_tee_device(Some(&dev), info)
 }

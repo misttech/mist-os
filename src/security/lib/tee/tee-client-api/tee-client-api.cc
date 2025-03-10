@@ -55,7 +55,7 @@ constexpr std::string_view kServiceDirectoryPath("/svc/");
 
 // Presently only used by clients that need to connect before the service is available / don't need
 // the TEE to be able to use file services.
-constexpr std::string_view kTeeDevClass("/dev/class/tee/");
+constexpr std::string_view kTeeServicePath("/svc/fuchsia.hardware.tee.Service");
 
 std::string GetApplicationServicePath(const fuchsia_tee::wire::Uuid& app_uuid) {
   constexpr std::string_view kApplicationServicePathPrefix = "/svc/fuchsia.tee.Application.";
@@ -791,7 +791,7 @@ TEEC_Result TEEC_InitializeContext(const char* name, TEEC_Context* context) {
   auto name_view = std::string_view(name != nullptr ? name : "");
   fidl::ClientEnd<fuchsia_hardware_tee::DeviceConnector> maybe_device_connector;
 
-  if (starts_with(name_view, kTeeDevClass)) {
+  if (starts_with(name_view, kTeeServicePath)) {
     if (zx_status_t status = ConnectToDeviceConnector(name, &maybe_device_connector);
         status != ZX_OK) {
       return TEEC_ERROR_COMMUNICATION;
