@@ -16,7 +16,7 @@ use cm_rust::{
     UseSource, UseStorageDecl,
 };
 use cm_rust_derive::FidlDecl;
-use cm_types::{Name, Path};
+use cm_types::{LongName, Name, Path};
 use derivative::Derivative;
 use fidl::{persist, unpersist};
 use from_enum::FromEnum;
@@ -25,7 +25,10 @@ use moniker::{ChildName, ExtendedMoniker, Moniker};
 use sandbox::{Capability, Data};
 use std::fmt;
 use thiserror::Error;
-use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_internal as finternal};
+use {
+    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_internal as finternal,
+    fidl_fuchsia_sys2 as fsys,
+};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -180,6 +183,15 @@ pub struct AnonymizedAggregateSource {
     pub moniker: Moniker,
     pub members: Vec<AggregateMember>,
     pub sources: Sources,
+    pub instances: Vec<ServiceInstance>,
+}
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[derive(FidlDecl, Debug, PartialEq, Clone)]
+#[fidl_decl(fidl_table = "fsys::ServiceInstance")]
+pub struct ServiceInstance {
+    instance_name: Name,
+    child_name: LongName,
+    child_instance_name: Name,
 }
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, Debug, PartialEq, Clone)]

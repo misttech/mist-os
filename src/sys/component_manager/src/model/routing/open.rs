@@ -52,11 +52,11 @@ impl<'a> CapabilityOpenRequest<'a> {
         route_source: RouteSource,
         target: &'a Arc<ComponentInstance>,
         mut open_request: OpenRequest<'a>,
-    ) -> Result<Self, ModelError> {
+    ) -> Result<Self, OpenError> {
         let RouteSource { source, relative_path } = route_source;
         if !relative_path.is_dot() {
             open_request.prepend_path(
-                &relative_path.to_string().try_into().map_err(|_| ModelError::BadPath)?,
+                &relative_path.to_string().try_into().map_err(|_| OpenError::BadPath)?,
             );
         }
         Ok(Self::OutgoingDirectory { open_request, source, target })
@@ -189,6 +189,7 @@ impl<'a> CapabilityOpenRequest<'a> {
                 moniker,
                 members,
                 sources: _,
+                instances: _,
             }) => {
                 let source_component_instance = target.upgrade()?.find_absolute(moniker).await?;
 

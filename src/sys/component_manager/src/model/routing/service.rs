@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::capability::CapabilityProvider;
-use crate::model::component::{ComponentInstance, WeakComponentInstance, WeakExtendedInstance};
+use crate::model::component::{ComponentInstance, WeakComponentInstance};
 use crate::model::mutable_directory::MutableDirectory;
 use crate::model::routing::{CapabilityOpenRequest, RouteSource};
 use async_trait::async_trait;
@@ -14,14 +14,15 @@ use errors::{CapabilityProviderError, ModelError, OpenError};
 use fidl_fuchsia_io as fio;
 use flyweights::FlyStr;
 use fuchsia_async::{DurationExt, TimeoutExt};
+use fuchsia_fs::directory::WatcherCreateError;
 use futures::channel::oneshot;
 use futures::future::{join_all, BoxFuture};
 use futures::lock::Mutex;
 use futures::stream::TryStreamExt;
+use futures::FutureExt;
 use hooks::{Event, EventPayload, EventType, Hook, HooksRegistration};
 use log::{error, warn};
 use moniker::{ExtendedMoniker, Moniker};
-use router_error::Explain;
 use routing::capability_source::{
     AggregateInstance, AggregateMember, CapabilitySource, ComponentSource,
     FilteredAggregateCapabilityProvider,
@@ -32,6 +33,7 @@ use routing::collection::{
 use routing::component_instance::ComponentInstanceInterface;
 use routing::error::RoutingError;
 use routing::legacy_router::NoopVisitor;
+use sandbox::{DirEntry, Router, RouterResponse};
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, Weak};
@@ -133,38 +135,49 @@ impl FilteredAggregateServiceDir {
                         return vec![];
                     }
                 };
-                let capability_source = Arc::new(route_data.capability_source);
-                let source_instance = match capability_source.source_moniker() {
-                    ExtendedMoniker::ComponentInstance(moniker) => {
-                        let Ok(parent) = parent.upgrade() else {
-                            return vec![];
-                        };
-                        let Ok(source_instance) = parent.find_absolute(&moniker).await else {
-                            return vec![];
-                        };
-                        WeakExtendedInstance::Component(source_instance.as_weak())
-                    }
-                    ExtendedMoniker::ComponentManager => {
-                        let Ok(parent) = parent.upgrade() else {
-                            return vec![];
-                        };
-                        let Ok(above_root) = parent.find_above_root() else {
-                            return vec![];
-                        };
-                        WeakExtendedInstance::AboveRoot(Arc::downgrade(&above_root))
-                    }
+                let capability_source = route_data.capability_source;
+                let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+                let flags = fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE;
+                let mut object_request = flags.to_object_request(server);
+                let Ok(target) = target.upgrade() else {
+                    return vec![];
                 };
+                let Ok(open_request) = CapabilityOpenRequest::new_from_route_source(
+                    RouteSource { source: capability_source, relative_path: Default::default() },
+                    &target,
+                    OpenRequest::new(
+                        target.execution_scope.clone(),
+                        flags,
+                        Path::dot(),
+                        &mut object_request,
+                    ),
+                ) else {
+                    return vec![];
+                };
+                if let Err(_e) = open_request
+                    .open()
+                    .on_timeout(OPEN_SERVICE_TIMEOUT.after_now(), || Err(OpenError::Timeout))
+                    .await
+                {
+                    return vec![];
+                }
                 let entries: Vec<_> = route_data
                     .instance_filter
                     .into_iter()
-                    .map(|mapping| {
-                        Arc::new(ServiceInstanceDirectoryEntry::<FlyStr> {
+                    .filter_map(|mapping| {
+                        let Ok(directory_proxy) = fuchsia_fs::directory::open_directory_async(
+                            &proxy,
+                            mapping.source_name.as_str(),
+                            fio::PERM_READABLE,
+                        ) else {
+                            return None;
+                        };
+                        Some(Arc::new(ServiceInstanceDirectoryEntry::<FlyStr> {
                             name: mapping.target_name.into(),
-                            capability_source: capability_source.clone(),
-                            source_instance: source_instance.clone(),
+                            directory_proxy,
                             source_id: mapping.source_name.clone().into(),
                             service_instance: mapping.source_name.into(),
-                        })
+                        }))
                     })
                     .collect();
                 entries
@@ -172,7 +185,7 @@ impl FilteredAggregateServiceDir {
             .collect();
         let dir = simple_immutable_dir();
         for entry in join_all(futs).await.into_iter().flatten() {
-            dir.add_node(&entry.name, entry.clone()).map_err(|err| {
+            dir.add_node(entry.name.as_str(), entry.clone()).map_err(|err| {
                 ModelError::ServiceDirError { moniker: target.moniker.clone(), err }
             })?;
         }
@@ -279,7 +292,7 @@ pub trait AnonymizedAggregateCapabilityProvider: Send + Sync {
     async fn route_instance(
         &self,
         instance: &AggregateInstance,
-    ) -> Result<CapabilitySource, RoutingError>;
+    ) -> Result<(Router<DirEntry>, CapabilitySource), RoutingError>;
 }
 
 #[async_trait]
@@ -292,9 +305,44 @@ impl AnonymizedAggregateCapabilityProvider
     async fn route_instance(
         &self,
         instance: &AggregateInstance,
-    ) -> Result<CapabilitySource, RoutingError> {
-        AnonymizedAggregateServiceProvider::route_instance(&self, instance, &mut NoopVisitor {})
-            .await
+    ) -> Result<(Router<DirEntry>, CapabilitySource), RoutingError> {
+        let capability_source = AnonymizedAggregateServiceProvider::route_instance(
+            &self,
+            instance,
+            &mut NoopVisitor {},
+        )
+        .await?;
+        let source_clone = capability_source.clone();
+        let target = self.containing_component.clone();
+        let router = Router::<DirEntry>::new(move |_request, debug: bool| {
+            assert!(!debug);
+            let source = source_clone.clone();
+            let target = target.clone();
+            async move {
+                let target = target.upgrade().map_err(RoutingError::from)?;
+                let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+                let flags = fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE;
+                let mut object_request = flags.to_object_request(server);
+                CapabilityOpenRequest::new_from_route_source(
+                    RouteSource { source: source.clone(), relative_path: Default::default() },
+                    &target,
+                    OpenRequest::new(
+                        target.execution_scope.clone(),
+                        flags,
+                        Path::dot(),
+                        &mut object_request,
+                    ),
+                )
+                .map_err(|err| router_error::RouterError::NotFound(Arc::new(err)))?
+                .open()
+                .on_timeout(OPEN_SERVICE_TIMEOUT.after_now(), || Err(OpenError::Timeout))
+                .await
+                .map_err(|err| router_error::RouterError::NotFound(Arc::new(err)))?;
+                Ok(RouterResponse::Capability(DirEntry::new(vfs::remote::remote_dir(proxy))))
+            }
+            .boxed()
+        });
+        Ok((router, capability_source))
     }
 }
 
@@ -360,7 +408,7 @@ impl AnonymizedAggregateServiceDir {
             self.parent.upgrade().map_err(|err| ModelError::ComponentInstanceError { err })?;
         let service_name = self.route.service_name.as_str();
         match self.aggregate_capability_provider.route_instance(instance).await {
-            Ok(source) => {
+            Ok((router, source)) => {
                 // Add entries for the component `name`, from its `source`,
                 // the service exposed by the component.
                 // We will use this oneshot channel to know when we have reached the idle state
@@ -404,7 +452,11 @@ impl AnonymizedAggregateServiceDir {
                             instance.clone(),
                             WatcherEntry::WaitingForIdle(Some(idle_sender)),
                         );
-                        self.spawn_instance_watcher_task(instance.clone(), source.clone())?;
+                        self.spawn_instance_watcher_task(
+                            instance.clone(),
+                            router.clone(),
+                            source.clone(),
+                        )?;
 
                         // Since we put in our idle_sender, we will want to do a wait.
                         true
@@ -451,6 +503,7 @@ impl AnonymizedAggregateServiceDir {
     fn spawn_instance_watcher_task(
         self: &Arc<Self>,
         instance: AggregateInstance,
+        router: Router<DirEntry>,
         source: CapabilitySource,
     ) -> Result<(), ModelError> {
         let task_group = self.parent.upgrade()?.nonblocking_task_group();
@@ -479,23 +532,23 @@ impl AnonymizedAggregateServiceDir {
                 return;
             }
 
-            let watcher = self_clone.create_instance_watcher(&instance, &source).await;
+            let (proxy, watcher) =
+                match self_clone.create_instance_watcher(&instance, &router).await {
+                    Ok(val) => val,
+                    Err(err) => {
+                        error!(
+                            component:% = instance,
+                            service_name:% = service_name,
+                            error:% = err;
+                            "Failed to create_instance_watcher.",
+                        );
+                        return;
+                    }
+                };
 
-            match watcher {
-                Ok(watcher) => {
-                    // This is a long running watcher that is alive until the source component
-                    // removes the service directory.
-                    self_clone.run_instance_watcher(watcher, &instance, source).await;
-                }
-                Err(err) => {
-                    error!(
-                        component:% = instance,
-                        service_name:% = service_name,
-                        error:% = err;
-                        "Failed to create_instance_watcher.",
-                    );
-                }
-            }
+            // This is a long running watcher that is alive until the source component
+            // removes the service directory.
+            self_clone.run_instance_watcher(watcher, &proxy, &instance).await;
         };
 
         task_group.spawn(instance_watcher_task);
@@ -642,44 +695,53 @@ impl AnonymizedAggregateServiceDir {
         Ok(())
     }
 
-    /// Opens the service capability at `source` and creates a directory_watcher on it.
+    /// Opens the service capability using the `router` and creates a directory_watcher on it.
     ///
     /// # Errors
     /// Returns an error if `source` is not a service capability, or could not be opened.
     async fn create_instance_watcher(
         &self,
         instance: &AggregateInstance,
-        source: &CapabilitySource,
-    ) -> Result<fuchsia_fs::directory::Watcher, ModelError> {
+        router: &Router<DirEntry>,
+    ) -> Result<(fio::DirectoryProxy, fuchsia_fs::directory::Watcher), ModelError> {
         let target =
             self.parent.upgrade().map_err(|err| ModelError::ComponentInstanceError { err })?;
 
         let scope = ExecutionScope::new();
-        let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        let mut object_request = fio::OpenFlags::DIRECTORY.to_object_request(server);
-        CapabilityOpenRequest::new_from_route_source(
-            RouteSource { source: source.clone(), relative_path: Default::default() },
-            &target,
-            OpenRequest::new(
-                scope.clone(),
-                fio::OpenFlags::DIRECTORY,
-                Path::dot(),
-                &mut object_request,
-            ),
-        )?
-        .open()
-        .on_timeout(OPEN_SERVICE_TIMEOUT.after_now(), || Err(OpenError::Timeout))
-        .await?;
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+        let dir_entry = match router.route(None, false).await? {
+            RouterResponse::Capability(dir_entry) => dir_entry,
+            RouterResponse::Unavailable => {
+                return Err(RoutingError::RouteUnexpectedUnavailable {
+                    type_name: CapabilityTypeName::Service,
+                    moniker: target.moniker.clone().into(),
+                }
+                .into())
+            }
+            RouterResponse::Debug(_) => panic!("we didn't ask for a debug route"),
+        };
+        dir_entry.open(
+            scope.clone(),
+            fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
+            vfs::path::Path::dot(),
+            server_end.into_channel(),
+        );
 
-        fuchsia_fs::directory::Watcher::new(&proxy).await.map_err(|err| {
-            error!(
-                component:% = instance,
-                service_name:% = self.route.service_name,
-                error:% = err;
-                "Failed to create service instance directory watcher.",
-            );
-            ModelError::open_directory_error(target.moniker.clone(), instance.to_string())
-        })
+        let watcher = fuchsia_fs::directory::Watcher::new(&proxy)
+            .on_timeout(OPEN_SERVICE_TIMEOUT.after_now(), || {
+                Err(WatcherCreateError::WatchError(zx::Status::TIMED_OUT))
+            })
+            .await
+            .map_err(|err| {
+                error!(
+                    component:% = instance,
+                    service_name:% = self.route.service_name,
+                    error:% = err;
+                    "Failed to create service instance directory watcher.",
+                );
+                ModelError::open_directory_error(target.moniker.clone(), instance.to_string())
+            })?;
+        Ok((proxy, watcher))
     }
 
     /// Runs the directory watcher on the service directory. This will discover additions and
@@ -688,11 +750,9 @@ impl AnonymizedAggregateServiceDir {
     async fn run_instance_watcher(
         &self,
         watcher: fuchsia_fs::directory::Watcher,
+        proxy: &fio::DirectoryProxy,
         instance: &AggregateInstance,
-        source: CapabilitySource,
     ) -> () {
-        let source_arc = Arc::new(source.clone());
-        let source_borrow = &source_arc;
         let result = watcher
             .map_err(|e| Some(e))
             .try_for_each(|message| async move {
@@ -719,7 +779,7 @@ impl AnonymizedAggregateServiceDir {
                     | fuchsia_fs::directory::WatchEvent::EXISTING => {
                         let instance_key = ServiceInstanceDirectoryKey::<AggregateInstance> {
                             source_id: instance.clone(),
-                            service_instance: FlyStr::new(&filename),
+                            service_instance: Name::new(&filename).unwrap(),
                         };
 
                         // Check for duplicate entries.
@@ -727,22 +787,22 @@ impl AnonymizedAggregateServiceDir {
                             return Ok(());
                         }
                         let name = Self::generate_instance_id(&mut rand::thread_rng());
-                        let source_instance = (&self
-                            .parent
-                            .upgrade()
-                            .map_err(|_| None)?
-                            .find_extended_instance(&source_borrow.source_moniker())
-                            .await
-                            .map_err(|_| None)?)
-                            .into();
+
+                        let Ok(child_proxy) = fuchsia_fs::directory::open_directory_async(
+                            proxy,
+                            &filename,
+                            fio::PERM_READABLE,
+                        ) else {
+                            // Our connection to the directory has been broken, so we can exit.
+                            return Err(None);
+                        };
                         let entry = Arc::new(ServiceInstanceDirectoryEntry::<AggregateInstance> {
-                            name: name.clone().into(),
-                            capability_source: source_borrow.clone(),
-                            source_instance,
+                            name: name.clone(),
+                            directory_proxy: child_proxy,
                             source_id: instance_key.source_id.clone(),
-                            service_instance: instance_key.service_instance.clone(),
+                            service_instance: instance_key.service_instance.clone().into(),
                         });
-                        let result = inner.dir.add_node(&name, entry.clone());
+                        let result = inner.dir.add_node(&name.as_str(), entry.clone());
                         if let Err(err) = result {
                             error!(
                                 component:% = instance,
@@ -757,13 +817,13 @@ impl AnonymizedAggregateServiceDir {
                     fuchsia_fs::directory::WatchEvent::REMOVE_FILE => {
                         let instance_key = ServiceInstanceDirectoryKey::<AggregateInstance> {
                             source_id: instance.clone(),
-                            service_instance: FlyStr::new(&filename),
+                            service_instance: Name::new(&filename).unwrap(),
                         };
 
                         let removed_entry = inner.entries.remove(&instance_key);
                         match removed_entry {
                             Some(removed_entry) => {
-                                let result = inner.dir.remove_node(&removed_entry.name);
+                                let result = inner.dir.remove_node(removed_entry.name.as_str());
                                 if let Err(err) = result {
                                     error!(
                                         component:% = instance,
@@ -836,10 +896,11 @@ impl AnonymizedAggregateServiceDir {
     }
 
     /// Generates a 128-bit uuid as a hex string.
-    fn generate_instance_id(rng: &mut impl rand::Rng) -> String {
+    fn generate_instance_id(rng: &mut impl rand::Rng) -> Name {
         let mut num: [u8; 16] = [0; 16];
         rng.fill_bytes(&mut num);
-        num.iter().map(|byte| format!("{:02x}", byte)).collect::<Vec<String>>().join("")
+        Name::new(num.iter().map(|byte| format!("{:02x}", byte)).collect::<Vec<String>>().join(""))
+            .unwrap()
     }
 
     async fn on_started_async(
@@ -854,7 +915,7 @@ impl AnonymizedAggregateServiceDir {
         {
             let child_moniker = component_moniker.leaf().unwrap(); // checked in `matches_child_component`
             let instance = AggregateInstance::Child(child_moniker.clone());
-            let capability_source =
+            let (router, capability_source) =
                 self.aggregate_capability_provider.route_instance(&instance).await?;
 
             // If we have not already spawned a watcher task we want to do that here.
@@ -866,7 +927,7 @@ impl AnonymizedAggregateServiceDir {
                 inner.watchers_spawned.insert(instance.clone(), WatcherEntry::WaitingForIdle(None));
 
                 // Spawn the watcher.
-                self.spawn_instance_watcher_task(instance, capability_source)?;
+                self.spawn_instance_watcher_task(instance, router, capability_source)?;
             }
         }
         Ok(())
@@ -881,7 +942,7 @@ impl AnonymizedAggregateServiceDir {
             for entry in inner.entries.values() {
                 if matches!(&entry.source_id, AggregateInstance::Child(n) if n == target_child_moniker)
                 {
-                    inner.dir.remove_node(&entry.name).map_err(|err| {
+                    inner.dir.remove_node(entry.name.as_str()).map_err(|err| {
                         ModelError::ServiceDirError { moniker: target_moniker.clone(), err }
                     })?;
                 }
@@ -918,17 +979,10 @@ impl Hook for AnonymizedAggregateServiceDir {
 /// A directory entry representing an instance of a service.
 /// Upon opening, performs capability routing and opens the instance at its source.
 pub struct ServiceInstanceDirectoryEntry<T> {
-    /// The name of the entry in its parent directory.
-    ///
-    /// This is not a [Name] because, in the case of aggregated service instances, the instance
-    /// name can be any valid [fuchsia.io] filename.
-    pub name: FlyStr,
+    /// The name of this directory entry, when added as a node into another directory.
+    pub name: Name,
 
-    /// The source of the service capability instance to route.
-    capability_source: Arc<CapabilitySource>,
-
-    /// The source instance referred to in `capability_source`
-    source_instance: WeakExtendedInstance,
+    directory_proxy: fio::DirectoryProxy,
 
     /// An identifier that can be used to find the child component that serves the service
     /// instance.
@@ -956,7 +1010,7 @@ struct ServiceInstanceDirectoryKey<T: Send + Sync + 'static + fmt::Display> {
     pub source_id: T,
 
     /// The name of the service instance directory to open at the source.
-    pub service_instance: FlyStr,
+    pub service_instance: Name,
 }
 
 impl<T: Send + Sync + 'static> DirectoryEntry for ServiceInstanceDirectoryEntry<T> {
@@ -973,47 +1027,8 @@ impl<T: Send + Sync + 'static> GetEntryInfo for ServiceInstanceDirectoryEntry<T>
 }
 
 impl<T: Send + Sync + 'static> DirectoryEntryAsync for ServiceInstanceDirectoryEntry<T> {
-    async fn open_entry_async(
-        self: Arc<Self>,
-        mut request: OpenRequest<'_>,
-    ) -> Result<(), zx::Status> {
-        let source_component = match &self.source_instance {
-            WeakExtendedInstance::Component(c) => c,
-            WeakExtendedInstance::AboveRoot(_) => {
-                unreachable!(
-                    "aggregate service directory has a capability source above root, but this is \
-                     impossible"
-                );
-            }
-        };
-        let Ok(source_component) = source_component.upgrade() else {
-            warn!(
-                moniker:% = source_component.moniker;
-                "source_component of aggregated service directory is gone"
-            );
-            return Err(zx::Status::NOT_FOUND);
-        };
-        request.prepend_path(&self.service_instance.as_str().try_into().unwrap());
-        let route_source = RouteSource::new((*self.capability_source).clone());
-        let cap_open_request =
-            CapabilityOpenRequest::new_from_route_source(route_source, &source_component, request)
-                .map_err(|e| e.as_zx_status())?;
-        if let Err(err) = cap_open_request.open().await {
-            source_component
-                .log(
-                    log::Level::Error,
-                    "Failed to open service instance from component",
-                    &[
-                        &("service_instance", self.service_instance.as_str()),
-                        &("source_instance", format!("{}", source_component.moniker).as_str()),
-                        &("error", format!("{err}").as_str()),
-                    ],
-                )
-                .await;
-            Err(err.as_zx_status())
-        } else {
-            Ok(())
-        }
+    async fn open_entry_async(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
+        request.open_remote(vfs::remote::remote_dir(Clone::clone(&self.directory_proxy)))
     }
 }
 
@@ -1051,36 +1066,67 @@ mod tests {
         async fn route_instance(
             &self,
             instance: &AggregateInstance,
-        ) -> Result<CapabilitySource, RoutingError> {
-            Ok(CapabilitySource::Component(ComponentSource {
+        ) -> Result<(Router<DirEntry>, CapabilitySource), RoutingError> {
+            let instances_guard = self.instances.lock().await;
+            let Some(component_instance) = instances_guard.get(instance) else {
+                let err = match instance {
+                    AggregateInstance::Parent => RoutingError::OfferFromParentNotFound {
+                        capability_id: "my.service.Service".to_string(),
+                        moniker: Moniker::root(),
+                    },
+                    AggregateInstance::Child(instance) => {
+                        RoutingError::OfferFromChildInstanceNotFound {
+                            capability_id: "my.service.Service".to_string(),
+                            child_moniker: instance.clone(),
+                            moniker: Moniker::root(),
+                        }
+                    }
+                    AggregateInstance::Self_ => {
+                        panic!("not expected");
+                    }
+                };
+                return Err(err.into());
+            };
+            let source = CapabilitySource::Component(ComponentSource {
                 capability: ComponentCapability::Service(ServiceDecl {
                     name: "my.service.Service".parse().unwrap(),
                     source_path: Some("/svc/my.service.Service".parse().unwrap()),
                 }),
-                moniker: self
-                    .instances
-                    .lock()
+                moniker: component_instance.moniker.clone(),
+            });
+            let source_clone = source.clone();
+            let weak_component = component_instance.clone();
+            let router = Router::new(move |_request, debug: bool| {
+                assert!(!debug);
+                let source = source_clone.clone();
+                let weak_component = weak_component.clone();
+                async move {
+                    let component = weak_component.upgrade().map_err(RoutingError::from)?;
+                    let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+                    let flags = fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE;
+                    let mut object_request = flags.to_object_request(server);
+                    CapabilityOpenRequest::new_from_route_source(
+                        RouteSource { source: source.clone(), relative_path: Default::default() },
+                        &component,
+                        OpenRequest::new(
+                            component.execution_scope.clone(),
+                            flags,
+                            Path::dot(),
+                            &mut object_request,
+                        ),
+                    )
+                    // TODO: better error
+                    .map_err(|_| OpenError::Timeout)?
+                    .open()
+                    .on_timeout(OPEN_SERVICE_TIMEOUT.after_now(), || Err(OpenError::Timeout))
                     .await
-                    .get(instance)
-                    .ok_or_else(|| match instance {
-                        AggregateInstance::Parent => RoutingError::OfferFromParentNotFound {
-                            capability_id: "my.service.Service".to_string(),
-                            moniker: Moniker::root(),
-                        },
-                        AggregateInstance::Child(instance) => {
-                            RoutingError::OfferFromChildInstanceNotFound {
-                                capability_id: "my.service.Service".to_string(),
-                                child_moniker: instance.clone(),
-                                moniker: Moniker::root(),
-                            }
-                        }
-                        AggregateInstance::Self_ => {
-                            panic!("not expected");
-                        }
-                    })?
-                    .moniker
-                    .clone(),
-            }))
+                    // TODO: better error
+                    .map_err(|_| router_error::RouterError::Internal)?;
+                    Ok(RouterResponse::Capability(DirEntry::new(vfs::remote::remote_dir(proxy))))
+                }
+                .boxed()
+            });
+            Ok((router, source))
         }
 
         async fn list_instances(&self) -> Result<Vec<AggregateInstance>, RoutingError> {
@@ -1357,14 +1403,14 @@ mod tests {
                 .entries()
                 .await
                 .into_iter()
-                .map(|e| (e.name.clone(), e.source_id.clone(), e.service_instance.clone()))
+                .map(|e| (e.name.clone(), e.source_id.clone()))
                 .collect();
             dir_arc.add_entries_from_children().await.unwrap();
             let entries: HashSet<_> = dir_arc
                 .entries()
                 .await
                 .into_iter()
-                .map(|e| (e.name.clone(), e.source_id.clone(), e.service_instance.clone()))
+                .map(|e| (e.name.clone(), e.source_id.clone()))
                 .collect();
             assert_eq!(entries, previous_entries);
             let dir_contents = fuchsia_fs::directory::readdir(&dir_proxy)
@@ -1972,14 +2018,14 @@ mod tests {
                 .entries()
                 .await
                 .into_iter()
-                .map(|e| (e.name.clone(), e.source_id.clone(), e.service_instance.clone()))
+                .map(|e| (e.name.clone(), e.source_id.clone()))
                 .collect();
             dir.add_entries_from_children().await.unwrap();
             let entries: HashSet<_> = dir
                 .entries()
                 .await
                 .into_iter()
-                .map(|e| (e.name.clone(), e.source_id.clone(), e.service_instance.clone()))
+                .map(|e| (e.name.clone(), e.source_id.clone()))
                 .collect();
             assert_eq!(entries, previous_entries);
             let dir_contents = fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap();
@@ -2215,11 +2261,11 @@ mod tests {
         fn service_instance_id(seed in 0..u64::MAX) {
             let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
             let instance = AnonymizedAggregateServiceDir::generate_instance_id(&mut rng);
-            assert!(is_instance_id(&instance), "{}", instance);
+            assert!(is_instance_id(instance.as_str()), "{}", instance);
 
             // Verify it's random
             let instance2 = AnonymizedAggregateServiceDir::generate_instance_id(&mut rng);
-            assert!(is_instance_id(&instance2), "{}", instance2);
+            assert!(is_instance_id(instance2.as_str()), "{}", instance2);
             assert_ne!(instance, instance2);
         }
     }

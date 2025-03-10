@@ -753,6 +753,8 @@ pub enum OpenError {
     },
     #[error("timed out opening capability")]
     Timeout,
+    #[error("invalid path found")]
+    BadPath,
     #[error("capability does not support opening: {0}")]
     DoesNotSupportOpen(ConversionError),
 }
@@ -765,6 +767,7 @@ impl Explain for OpenError {
             Self::CapabilityProviderError { err } => err.as_zx_status(),
             Self::CapabilityProviderNotFound => zx::Status::NOT_FOUND,
             Self::Timeout => zx::Status::TIMED_OUT,
+            Self::BadPath => zx::Status::BAD_PATH,
             Self::DoesNotSupportOpen(_) => zx::Status::NOT_SUPPORTED,
         }
     }

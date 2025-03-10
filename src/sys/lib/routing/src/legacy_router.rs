@@ -222,6 +222,7 @@ where
                 moniker: aggregation_component.moniker().clone(),
                 sources: sources.clone(),
                 members,
+                instances: vec![],
             }))
         }
         OfferResult::OfferFromFilteredAggregate(offers, aggregation_component) => {
@@ -338,6 +339,7 @@ where
                 moniker: aggregation_component.moniker().clone(),
                 sources: sources.clone(),
                 members,
+                instances: vec![],
             }))
         }
     }
@@ -716,6 +718,7 @@ impl Use {
                     moniker: target.moniker().clone(),
                     sources: sources.clone(),
                     members: vec![AggregateMember::Collection(name.clone())],
+                    instances: vec![],
                 }),
             )),
             UseSource::Debug => {

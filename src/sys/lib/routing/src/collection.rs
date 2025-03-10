@@ -66,6 +66,7 @@ where
             moniker,
             members,
             sources,
+            instances: _,
         }) = source
         else {
             return None;
