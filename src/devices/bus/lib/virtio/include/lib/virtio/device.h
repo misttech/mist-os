@@ -12,8 +12,8 @@
 
 #include <atomic>
 #include <memory>
+#include <mutex>
 
-#include <fbl/mutex.h>
 #include <virtio/virtio.h>
 
 // Virtio devices are represented by a derived class specific to their type (eg
@@ -96,7 +96,7 @@ class Device {
 
   // This lock exists for devices to synchronize themselves, it should not be used by the base
   // device class.
-  fbl::Mutex lock_;
+  std::mutex lock_;
 
   std::atomic<bool> irq_thread_should_exit_ = false;
 };

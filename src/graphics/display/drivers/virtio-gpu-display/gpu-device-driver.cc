@@ -52,7 +52,7 @@ zx::result<> GpuDeviceDriver::InitResources() {
   }
 
   zx::result<std::pair<zx::bti, std::unique_ptr<virtio::Backend>>> bti_and_backend_result =
-      virtio::GetBtiAndBackend(ddk::Pci(std::move(pci_client_result).value()));
+      virtio::GetBtiAndBackend(std::move(pci_client_result).value());
   if (!bti_and_backend_result.is_ok()) {
     fdf::error("GetBtiAndBackend failed: {}", bti_and_backend_result);
     return bti_and_backend_result.take_error();
