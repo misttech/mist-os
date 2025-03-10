@@ -17,8 +17,9 @@ use assert_matches::assert_matches;
 use derivative::Derivative;
 use explicit::ResultExt as _;
 use netstack3_base::{
-    Control, HandshakeOptions, IcmpErrorCode, Instant, Mss, Payload, PayloadLen as _, Segment,
-    SegmentHeader, SeqNum, UnscaledWindowSize, WindowScale, WindowSize,
+    Control, HandshakeOptions, IcmpErrorCode, Instant, Mss, Options, Payload, PayloadLen as _,
+    SackBlocks, Segment, SegmentHeader, SegmentOptions, SeqNum, UnscaledWindowSize, WindowScale,
+    WindowSize,
 };
 use packet_formats::utils::NonZeroDuration;
 use replace_with::{replace_with, replace_with_and};
@@ -929,6 +930,20 @@ impl<I> Recv<I, ()> {
     }
 }
 
+impl<I, R> Recv<I, R> {
+    fn sack_blocks(&self) -> SackBlocks {
+        if self.sack_permitted {
+            match &self.buffer {
+                RecvBufferState::Open { buffer: _, assembler } => assembler.sack_blocks(),
+                RecvBufferState::Closed { buffer_size: _, nxt: _ } => SackBlocks::default(),
+            }
+        } else {
+            // Peer can't process selective acks.
+            SackBlocks::default()
+        }
+    }
+}
+
 /// The calculation returned from [`Recv::calculate_window_size`].
 struct WindowSizeCalculation {
     /// THe sequence number of the next octet that we expect to receive from the
@@ -1086,11 +1101,11 @@ impl<I: Instant, R: ReceiveBuffer> Recv<I, R> {
 }
 
 impl<'a, I: Instant, R: ReceiveBuffer> RecvSegmentArgumentsProvider for &'a mut Recv<I, R> {
-    fn take_rcv_segment_args(self) -> (SeqNum, UnscaledWindowSize) {
+    fn take_rcv_segment_args(self) -> (SeqNum, UnscaledWindowSize, SackBlocks) {
         let WindowSizeCalculation { rcv_nxt, window_size, threshold: _ } =
             self.calculate_window_size();
         self.last_window_update = (rcv_nxt, window_size);
-        (rcv_nxt, window_size >> self.wnd_scale)
+        (rcv_nxt, window_size >> self.wnd_scale, self.sack_blocks())
     }
 }
 
@@ -1105,8 +1120,8 @@ pub(super) struct RecvParams {
 }
 
 impl<'a> RecvSegmentArgumentsProvider for &'a RecvParams {
-    fn take_rcv_segment_args(self) -> (SeqNum, UnscaledWindowSize) {
-        (self.ack, self.wnd >> self.wnd_scale)
+    fn take_rcv_segment_args(self) -> (SeqNum, UnscaledWindowSize, SackBlocks) {
+        (self.ack, self.wnd >> self.wnd_scale, SackBlocks::default())
     }
 }
 
@@ -1136,14 +1151,17 @@ impl<'a, I, R> CalculatedRecvParams<'a, I, R> {
 }
 
 impl<'a, I, R> RecvSegmentArgumentsProvider for CalculatedRecvParams<'a, I, R> {
-    fn take_rcv_segment_args(self) -> (SeqNum, UnscaledWindowSize) {
+    fn take_rcv_segment_args(self) -> (SeqNum, UnscaledWindowSize, SackBlocks) {
         let Self { params, recv } = self;
         let RecvParams { ack, wnd_scale, wnd } = params;
-        if let Some(recv) = recv {
+        let sack_blocks = if let Some(recv) = recv {
             // A segment was produced, update the receiver with last info.
             recv.last_window_update = (ack, wnd);
-        }
-        (ack, wnd >> wnd_scale)
+            recv.sack_blocks()
+        } else {
+            SackBlocks::default()
+        };
+        (ack, wnd >> wnd_scale, sack_blocks)
     }
 }
 
@@ -1157,28 +1175,28 @@ impl<'a, I: Instant, R: ReceiveBuffer> CalculatedRecvParams<'a, I, R> {
 }
 
 trait RecvSegmentArgumentsProvider: Sized {
-    /// Consumes this provider returning the ACK and WND to be placed in a
-    /// segment.
+    /// Consumes this provider returning the ACK, WND, and selective ack blocks
+    /// to be placed in a segment.
     ///
     /// The implementer assumes that the parameters *will be sent to a peer* and
     /// may cache the yielded values as the last sent receiver information.
-    fn take_rcv_segment_args(self) -> (SeqNum, UnscaledWindowSize);
+    fn take_rcv_segment_args(self) -> (SeqNum, UnscaledWindowSize, SackBlocks);
 
     /// Consumes this provider and calls `f` with the ACK and window size
     /// arguments that should be put in the segment to be returned by `f`.
-    fn make_segment<P, F: FnOnce(SeqNum, UnscaledWindowSize) -> Segment<P>>(
+    fn make_segment<P, F: FnOnce(SeqNum, UnscaledWindowSize, SackBlocks) -> Segment<P>>(
         self,
         f: F,
     ) -> Segment<P> {
-        let (ack, wnd) = self.take_rcv_segment_args();
-        f(ack, wnd)
+        let (ack, wnd, sack) = self.take_rcv_segment_args();
+        f(ack, wnd, sack)
     }
 
     /// Makes an ACK segment with the provided `seq` and `self`'s receiver
     /// state.
     fn make_ack<P: Payload>(self, seq: SeqNum) -> Segment<P> {
-        let (ack, wnd) = self.take_rcv_segment_args();
-        Segment::ack(seq, ack, wnd)
+        let (ack, wnd, sack_blocks) = self.take_rcv_segment_args();
+        Segment::ack_with_options(seq, ack, wnd, Options::Segment(SegmentOptions { sack_blocks }))
     }
 }
 
@@ -1458,13 +1476,41 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                 }
             }
 
-            let seg = rcv.make_segment(|ack, wnd| {
-                let (seg, discarded) = Segment::with_data(
+            let seg = rcv.make_segment(|ack, wnd, mut sack_blocks| {
+                let bytes_to_send = match sack_blocks.as_option() {
+                    // We may have to trim bytes_to_send.
+                    Some(option) => {
+                        // Unwrap here is okay, we're building this option from
+                        // `SackBlocks` which encodes the SACK block option
+                        // limit within it.
+                        let options_len = u32::try_from(
+                            packet_formats::tcp::aligned_options_length(core::iter::once(option)),
+                        )
+                        .unwrap();
+                        if options_len < mss {
+                            bytes_to_send.min(mss - options_len)
+                        } else {
+                            // NB: we don't encode a minimum Mss in types. To
+                            // prevent the state machine from possibly blocking
+                            // completely here just drop sack blocks.
+                            //
+                            // TODO(https://fxbug.dev/383355972): We might be
+                            // able to get around this if we have guarantees
+                            // over minimum MTU and, hence, Mss.
+                            sack_blocks.clear();
+                            bytes_to_send
+                        }
+                    }
+                    // No further trimming necessary.
+                    None => bytes_to_send,
+                };
+                let (seg, discarded) = Segment::with_data_options(
                     next_seg,
                     Some(ack),
                     has_fin.then_some(Control::FIN),
                     wnd,
                     readable.slice(0..bytes_to_send),
+                    Options::Segment(SegmentOptions { sack_blocks }),
                 );
                 debug_assert_eq!(discarded, 0);
                 seg
@@ -3358,7 +3404,7 @@ mod test {
     use assert_matches::assert_matches;
     use net_types::ip::Ipv4;
     use netstack3_base::testutil::{FakeInstant, FakeInstantCtx};
-    use netstack3_base::{FragmentedPayload, InstantContext as _, Options};
+    use netstack3_base::{FragmentedPayload, InstantContext as _, Options, SackBlock};
     use test_case::test_case;
 
     use super::*;
@@ -8103,5 +8149,118 @@ mod test {
         // counter's value.
         assert_eq!(recv.remaining_quickacks, default_quickack_counter() - 1);
         assert_eq!(recv.last_segment_at, Some(clock.now()));
+    }
+
+    #[test_case(true; "sack permitted")]
+    #[test_case(false; "sack not permitted")]
+    fn receiver_selective_acks(sack_permitted: bool) {
+        let mut state = State::Established(Established::<FakeInstant, _, _> {
+            snd: Send {
+                nxt: ISS_1 + 1,
+                max: ISS_1 + 1,
+                una: ISS_1 + 1,
+                wnd: WindowSize::DEFAULT,
+                wnd_max: WindowSize::DEFAULT,
+                buffer: RingBuffer::default(),
+                wl1: ISS_2 + 1,
+                wl2: ISS_1 + 1,
+                rtt_estimator: Estimator::default(),
+                last_seq_ts: None,
+                timer: None,
+                congestion_control: CongestionControl::cubic_with_mss(DEVICE_MAXIMUM_SEGMENT_SIZE),
+                wnd_scale: WindowScale::default(),
+            }
+            .into(),
+            rcv: Recv {
+                buffer: RecvBufferState::Open {
+                    buffer: RingBuffer::default(),
+                    assembler: Assembler::new(ISS_2 + 1),
+                },
+                timer: None,
+                mss: DEVICE_MAXIMUM_SEGMENT_SIZE,
+                // quickacks start at zero.
+                remaining_quickacks: 0,
+                last_segment_at: None,
+                wnd_scale: WindowScale::default(),
+                last_window_update: (ISS_2 + 1, WindowSize::DEFAULT),
+                sack_permitted,
+            }
+            .into(),
+        });
+        let clock = FakeInstantCtx::default();
+        let counters = TcpCountersInner::default();
+        let data = vec![0u8; usize::from(DEVICE_MAXIMUM_SEGMENT_SIZE)];
+        let mss = u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE);
+        // Send an out of order segment.
+        let seg_start = ISS_2 + 1 + mss;
+        let (segment, _) = Segment::with_data(
+            seg_start,
+            Some(ISS_1 + 1),
+            None,
+            WindowSize::DEFAULT >> WindowScale::default(),
+            &data[..],
+        );
+        let (seg, passive_open) = state
+            .on_segment_with_default_options::<_, ClientlessBufferProvider>(
+                segment,
+                clock.now(),
+                &counters,
+            );
+        assert_eq!(passive_open, None);
+        let seg = seg.expect("expected segment");
+        assert_eq!(seg.header.ack, Some(ISS_2 + 1));
+        let expect = if sack_permitted {
+            SackBlocks::from_iter([SackBlock(seg_start, seg_start + mss)])
+        } else {
+            SackBlocks::default()
+        };
+        let sack_blocks = assert_matches!(seg.header.options, Options::Segment(o) => o.sack_blocks);
+        assert_eq!(sack_blocks, expect);
+
+        // If we need to send data now, sack blocks should be present.
+        assert_eq!(
+            state.buffers_mut().into_send_buffer().unwrap().enqueue_data(&data[..]),
+            data.len()
+        );
+        let seg = state
+            .poll_send_with_default_options(mss, clock.now(), &counters)
+            .expect("generates segment");
+        assert_eq!(seg.header.ack, Some(ISS_2 + 1));
+
+        // The exact same sack blocks are present there.
+        let sack_blocks =
+            assert_matches!(&seg.header.options, Options::Segment(o) => &o.sack_blocks);
+        assert_eq!(sack_blocks, &expect);
+        // If there are sack blocks, the segment length should have been
+        // restricted.
+        let expect_len = if sack_permitted {
+            // Single SACK block (8 + 2) plus padding (2).
+            mss - 12
+        } else {
+            mss
+        };
+        assert_eq!(seg.len(), expect_len);
+
+        // Now receive the out of order block, no SACK should be present
+        // anymore.
+        let (segment, _) = Segment::with_data(
+            ISS_2 + 1,
+            Some(ISS_1 + 1),
+            None,
+            WindowSize::DEFAULT >> WindowScale::default(),
+            &data[..],
+        );
+        let (seg, passive_open) = state
+            .on_segment_with_default_options::<_, ClientlessBufferProvider>(
+                segment,
+                clock.now(),
+                &counters,
+            );
+        assert_eq!(passive_open, None);
+        let seg = seg.expect("expected segment");
+        assert_eq!(seg.header.ack, Some(ISS_2 + (2 * mss) + 1));
+        let sack_blocks =
+            assert_matches!(&seg.header.options, Options::Segment(o) => &o.sack_blocks);
+        assert_eq!(sack_blocks, &SackBlocks::default());
     }
 }

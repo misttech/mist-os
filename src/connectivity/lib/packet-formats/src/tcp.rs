@@ -836,6 +836,14 @@ impl<A: IpAddress, O> TcpSegmentBuilderWithOptions<A, O> {
     }
 }
 
+/// Calculates the total aligned length of a collection of options in a TCP
+/// header.
+pub fn aligned_options_length<'a>(
+    opt: impl Iterator<Item: Borrow<TcpOption<'a>>> + Clone,
+) -> usize {
+    crate::utils::round_to_next_multiple_of_four(OptionSequenceBuilder::new(opt).serialized_len())
+}
+
 impl<A: IpAddress, O: InnerPacketBuilder> TcpSegmentBuilderWithOptions<A, O> {
     fn aligned_options_len(&self) -> usize {
         // Round up to the next 4-byte boundary.

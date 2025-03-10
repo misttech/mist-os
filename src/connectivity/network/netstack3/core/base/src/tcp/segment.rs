@@ -272,6 +272,12 @@ impl SackBlocks {
                 .collect(),
         )
     }
+
+    /// Drops all blocks.
+    pub fn clear(&mut self) {
+        let Self(inner) = self;
+        inner.clear()
+    }
 }
 
 /// A selective ACK block.
@@ -466,7 +472,17 @@ impl<P: Payload> Segment<P> {
 
     /// Creates an ACK segment.
     pub fn ack(seq: SeqNum, ack: SeqNum, wnd: UnscaledWindowSize) -> Self {
-        Segment::new(seq, Some(ack), None, wnd)
+        Self::ack_with_options(seq, ack, wnd, Options::default())
+    }
+
+    /// Creates an ACK segment with options.
+    pub fn ack_with_options(
+        seq: SeqNum,
+        ack: SeqNum,
+        wnd: UnscaledWindowSize,
+        options: Options,
+    ) -> Self {
+        Segment::with_options(seq, Some(ack), None, wnd, options)
     }
 
     /// Creates a SYN segment.

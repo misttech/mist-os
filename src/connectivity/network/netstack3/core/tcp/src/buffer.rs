@@ -279,7 +279,6 @@ impl Assembler {
     ///
     /// [RFC 2018 section 4]:
     ///     https://datatracker.ietf.org/doc/html/rfc2018#section-4
-    #[todo_unused::todo_unused("https://fxbug.dev/42078221")]
     pub(crate) fn sack_blocks(&self) -> SackBlocks {
         let Self { nxt: _, generation: _, outstanding } = self;
         // Fast exit, no outstanding blocks.
