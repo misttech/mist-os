@@ -17,8 +17,10 @@ use digest::DynDigest as Digest;
 use ecb::{Decryptor as EcbDecryptor, Encryptor as EcbEncryptor};
 use hmac::Hmac;
 use rand_core::{CryptoRng, RngCore};
-use rsa::traits::{PaddingScheme as RsaPaddingScheme, PublicKeyParts as _};
-use rsa::{Oaep, RsaPrivateKey};
+use rsa::traits::{
+    PaddingScheme as RsaPaddingScheme, PublicKeyParts as _, SignatureScheme as RsaSignatureScheme,
+};
+use rsa::{Oaep, Pss, RsaPrivateKey};
 use sha1::Sha1;
 use sha2::{Sha224, Sha256, Sha384, Sha512};
 use tee_internal::{
@@ -474,6 +476,81 @@ enum AsymmetricEncryptionKeyType {
     RsaOaepSha1,
 }
 
+trait AsymmetricSigningKey {
+    fn sign(
+        &self,
+        params: &[Attribute],
+        input: &[u8],
+        output: &mut [u8],
+    ) -> Result<usize, ErrorWithSize>;
+}
+
+trait RsaSignature<D>: RsaSignatureScheme
+where
+    D: 'static + Digest + digest::Digest + Send + Sync,
+{
+    fn new() -> Self;
+}
+
+impl<D> RsaSignature<D> for Pss
+where
+    D: 'static + Digest + digest::Digest + Send + Sync,
+{
+    fn new() -> Self {
+        Pss::new::<D>()
+    }
+}
+
+struct RsaSigningKey<D, Signature>
+where
+    D: 'static + Digest + digest::Digest + Send + Sync,
+    Signature: RsaSignature<D>,
+{
+    private: Rc<RsaPrivateKey>,
+    phantom: PhantomData<(D, Signature)>,
+}
+
+impl<D, Signature> RsaSigningKey<D, Signature>
+where
+    D: 'static + Digest + digest::Digest + Send + Sync,
+    Signature: RsaSignature<D>,
+{
+    fn new(private: Rc<RsaPrivateKey>) -> Self {
+        Self { private, phantom: PhantomData::default() }
+    }
+}
+
+impl<D, Signature> AsymmetricSigningKey for RsaSigningKey<D, Signature>
+where
+    D: 'static + Digest + digest::Digest + Send + Sync,
+    Signature: RsaSignature<D>,
+{
+    fn sign(
+        &self,
+        params: &[Attribute],
+        input: &[u8],
+        output: &mut [u8],
+    ) -> Result<usize, ErrorWithSize> {
+        assert!(params.is_empty());
+        let output_size = self.private.size() as usize;
+        if output.len() < output_size {
+            return Err(ErrorWithSize::short_buffer(output_size));
+        }
+
+        let signed = self
+            .private
+            .sign_with_rng(&mut Rng {}, Signature::new(), input)
+            .expect("Failed to sign");
+        let written = &mut output[..signed.len()];
+        written.copy_from_slice(&signed);
+        Ok(written.len())
+    }
+}
+
+enum AsymmetricSigningKeyType {
+    RsaPssSha1,
+}
+
 // Encapsulated an abstracted helper classes particular to supported
 // algorithms.
 enum Helper {
@@ -481,6 +558,7 @@ enum Helper {
     Cipher(Option<Box<dyn Cipher>>, CipherType),
     Mac(Option<Box<dyn Mac>>, MacType),
     AsymmetricEncryptionKey(Option<Box<dyn AsymmetricEncryptionKey>>, AsymmetricEncryptionKeyType),
+    AsymmetricSigningKey(Option<Box<dyn AsymmetricSigningKey>>, AsymmetricSigningKeyType),
 }
 
 impl Helper {
@@ -501,6 +579,9 @@ impl Helper {
             Algorithm::HmacSha512 => Ok(Helper::Mac(None, MacType::HmacSha512)),
             Algorithm::RsaesPkcs1OaepMgf1Sha1 => {
                 Ok(Helper::AsymmetricEncryptionKey(None, AsymmetricEncryptionKeyType::RsaOaepSha1))
+            }
+            Algorithm::RsassaPkcs1PssMgf1Sha1 => {
+                Ok(Helper::AsymmetricSigningKey(None, AsymmetricSigningKeyType::RsaPssSha1))
             }
             _ => Err(Error::NotSupported),
         }
@@ -591,6 +672,14 @@ impl Helper {
                     *aenc = Some(Box::new(RsaEncryptionKey::<Sha1, Oaep>::new(rsa.private_key())));
                 }
             },
+            Helper::AsymmetricSigningKey(asign, asign_type) => match asign_type {
+                AsymmetricSigningKeyType::RsaPssSha1 => {
+                    let Key::RsaKeypair(rsa) = key else {
+                        panic!("Wrong key type ({:?}) - expected RSA keypair", key.get_type());
+                    };
+                    *asign = Some(Box::new(RsaSigningKey::<Sha1, Pss>::new(rsa.private_key())));
+                }
+            },
         }
     }
 
@@ -608,6 +697,7 @@ impl Helper {
                 }
             }
             Helper::AsymmetricEncryptionKey(_, _) => {}
+            Helper::AsymmetricSigningKey(_, _) => {}
         }
     }
 }
@@ -671,6 +761,14 @@ impl Operation {
             aenc.as_mut().expect("TEE_OperationSetKey() has not yet been called")
         } else {
             panic!("{:?} is not a asymmetric encryption key algorithm", self.algorithm)
+        }
+    }
+
+    fn as_asymmetric_signing_key(&mut self) -> &mut Box<dyn AsymmetricSigningKey> {
+        if let Helper::AsymmetricSigningKey(aenc, _) = &mut self.helper {
+            aenc.as_mut().expect("TEE_OperationSetKey() has not yet been called")
+        } else {
+            panic!("{:?} is not a asymmetric signing key algorithm", self.algorithm)
         }
     }
 
@@ -740,6 +838,7 @@ impl Operation {
             | Algorithm::HmacSha384
             | Algorithm::HmacSha512 => {}
             Algorithm::RsaesPkcs1OaepMgf1Sha1 => {}
+            Algorithm::RsassaPkcs1PssMgf1Sha1 => {}
             _ => return Err(Error::NotImplemented),
         };
         self.key = key.clone();
@@ -979,6 +1078,17 @@ impl Operation {
         assert_eq!(self.mode, Mode::Decrypt);
         self.as_asymmetric_encryption_key().decrypt(params, src, dest)
     }
+
+    // See TEE_AsymmetricSignDigest().
+    fn asymmetric_sign_digest(
+        &mut self,
+        params: &[Attribute],
+        digest: &[u8],
+        signature: &mut [u8],
+    ) -> Result<usize, ErrorWithSize> {
+        assert_eq!(self.mode, Mode::Sign);
+        self.as_asymmetric_signing_key().sign(params, digest, signature)
+    }
 }
 
 pub struct Operations {
@@ -1070,6 +1180,12 @@ impl Operations {
             }
             Algorithm::RsaesPkcs1OaepMgf1Sha1 => {
                 if mode != Mode::Encrypt && mode != Mode::Decrypt {
+                    return Err(Error::NotSupported);
+                }
+                RsaKeypair::is_valid_size
+            }
+            Algorithm::RsassaPkcs1PssMgf1Sha1 => {
+                if mode != Mode::Sign && mode != Mode::Verify {
                     return Err(Error::NotSupported);
                 }
                 RsaKeypair::is_valid_size
@@ -1206,6 +1322,16 @@ impl Operations {
         dest: &mut [u8],
     ) -> Result<usize, ErrorWithSize> {
         self.get_mut(operation).asymmetric_decrypt(params, src, dest)
+    }
+
+    pub fn asymmetric_sign_digest(
+        &mut self,
+        operation: OperationHandle,
+        params: &[Attribute],
+        digest: &[u8],
+        signature: &mut [u8],
+    ) -> Result<usize, ErrorWithSize> {
+        self.get_mut(operation).asymmetric_sign_digest(params, digest, signature)
     }
 }
 

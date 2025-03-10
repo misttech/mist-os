@@ -1661,7 +1661,37 @@ extern "C" fn TEE_AsymmetricSignDigest(
     signature: *mut ::std::os::raw::c_void,
     signatureLen: *mut usize,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(!signatureLen.is_null());
+
+    to_tee_result(|| -> TeeResult {
+        // SAFETY: signatureLen checked as non-null above.
+        let initialSignatureLen = unsafe { *signatureLen };
+
+        // This is a precondition to being anble to reinterpret `signature` as
+        // a mutable slice.
+        assert!(!buffers_overlap(digest, digestLen, signature, initialSignatureLen));
+
+        let params = slice_from_raw_parts(params, paramCount as usize);
+        let digest = slice_from_raw_parts(digest, digestLen);
+        let signature = slice_from_raw_parts_mut(signature, initialSignatureLen);
+        let operation = *OperationHandle::from_binding(&operation);
+
+        context::with_current_mut(|context| {
+            let (output_size, result) = match context
+                .operations
+                .asymmetric_sign_digest(operation, params, digest, signature)
+            {
+                Ok(written) => {
+                    debug_assert!(written <= signature.len());
+                    (written, Ok(()))
+                }
+                Err(err) => (err.size, Err(err.error)),
+            };
+            // SAFETY: signatureLen checked as non-null above.
+            unsafe { *signatureLen = output_size };
+            result
+        })
+    }())
 }
 
 #[unsafe(no_mangle)]

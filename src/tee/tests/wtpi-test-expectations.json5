@@ -45,6 +45,7 @@
                 "CryptoTest.RandomBytesFailsForBadInputs",
                 "CryptoTest.RSADecrypt",
                 "CryptoTest.RSADecryptFailsForBadInput",
+                "CryptoTest.RSASign",
                 "CryptoTest.RSASignFailsWithBadInput",
                 "CryptoTest.SHA256Basic",
                 "CryptoTest.SHA256FailsWithBadInput",
@@ -84,12 +85,6 @@
                 "Prov4Test.UseBootCertificateChainToValidateCoseSign1",
                 "Prov4Test.WTPI_BccKeyCoseSign1FailsForBadInput",
                 "Prov4Test.WTPI_BccKeyCoseSign1Success",
-            ],
-        },
-        {
-            type: "expect_failure",
-            matchers: [
-                "CryptoTest.RSASign",
             ],
         },
         {
