@@ -36,13 +36,8 @@ group("bench") {
   deps = [
     ":rust-inspect-reader-benchmark",
     ":rust-inspect-snapshot-filter-benchmark",
+    ":rust-inspect-writer-benchmark",
   ]
-
-  # TODO: https://fxbug.dev/401055400: Re-enable it
-  # for the profile variant after the issue is resolved.
-  if (!is_profile) {
-    deps += [ ":rust-inspect-writer-benchmark" ]
-  }
 }
 
 group("build-only") {
