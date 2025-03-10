@@ -100,7 +100,7 @@ void Controller::PopulateDisplayTimings(DisplayInfo& display_info) {
     int32_t width = edid_timing.horizontal_active_px;
     int32_t height = edid_timing.vertical_active_lines;
     bool duplicate = false;
-    for (const display::DisplayTiming& existing_timing : display_info.edid_timings) {
+    for (const display::DisplayTiming& existing_timing : display_info.timings) {
       if (existing_timing.vertical_field_refresh_rate_millihertz() ==
               edid_timing.vertical_field_refresh_rate_millihertz() &&
           existing_timing.horizontal_active_px == width &&
@@ -134,7 +134,7 @@ void Controller::PopulateDisplayTimings(DisplayInfo& display_info) {
         /*layer_composition_operations_count=*/1, &display_layer_results_count);
     if (display_cfg_result == CONFIG_CHECK_RESULT_OK) {
       fbl::AllocChecker alloc_checker;
-      display_info.edid_timings.push_back(edid_timing, &alloc_checker);
+      display_info.timings.push_back(edid_timing, &alloc_checker);
       if (!alloc_checker.check()) {
         fdf::warn("Failed to allocate memory for EDID timing. Skipping it.");
         break;
@@ -167,10 +167,10 @@ void Controller::AddDisplay(std::unique_ptr<AddedDisplayInfo> added_display_info
   //
   // Dropping some add events can result in spurious removes, but
   // those are filtered out in the clients.
-  if (!display_info->edid_info.has_value() || !display_info->edid_timings.is_empty()) {
+  if (!display_info->timings.is_empty()) {
     display_info->InitializeInspect(&root_);
   } else {
-    fdf::warn("Ignoring display with no compatible edid timings");
+    fdf::warn("Ignoring display with no usable display timings");
     added_ids = {};
   }
 
@@ -666,13 +666,7 @@ zx::result<std::span<const display::DisplayTiming>> Controller::GetDisplayTiming
     return zx::error(ZX_ERR_NOT_FOUND);
   }
   const DisplayInfo& display_info = *displays_it;
-
-  if (display_info.edid_info.has_value()) {
-    return zx::ok(std::span(display_info.edid_timings));
-  }
-
-  ZX_DEBUG_ASSERT(display_info.mode.has_value());
-  return zx::ok(std::span(&display_info.mode.value(), 1));
+  return zx::ok(std::span(display_info.timings));
 }
 
 zx::result<fbl::Vector<display::PixelFormat>> Controller::GetSupportedPixelFormats(

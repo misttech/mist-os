@@ -39,10 +39,8 @@ class DisplayInfo : public IdMappable<std::unique_ptr<DisplayInfo>, display::Dis
   // Exposed for testing. Prefer obtaining instances from the `Create()` factory method.
   explicit DisplayInfo(display::DisplayId display_id,
                        fbl::Vector<display::PixelFormat> pixel_formats,
-                       display::DisplayTiming preferred_mode);
-
-  explicit DisplayInfo(display::DisplayId display_id,
-                       fbl::Vector<display::PixelFormat> pixel_formats, edid::Edid edid_info);
+                       fbl::Vector<display::DisplayTiming> preferred_modes,
+                       std::optional<edid::Edid> edid_info);
 
   DisplayInfo(const DisplayInfo&) = delete;
   DisplayInfo(DisplayInfo&&) = delete;
@@ -78,11 +76,8 @@ class DisplayInfo : public IdMappable<std::unique_ptr<DisplayInfo>, display::Dis
   // nullopt if the display does not support EDID.
   const std::optional<edid::Edid> edid_info;
 
-  // Only populated if `edid_info` is not nullopt.
-  fbl::Vector<display::DisplayTiming> edid_timings;
-
-  // Exactly one of `edid_info` and `mode` can be non-nullopt.
-  const std::optional<display::DisplayTiming> mode;
+  // Modified after construction if `edid_info` is not nullopt.
+  fbl::Vector<display::DisplayTiming> timings;
 
   const fbl::Vector<display::PixelFormat> pixel_formats;
 

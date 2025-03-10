@@ -32,25 +32,13 @@
 
 namespace display_coordinator {
 
-// TODO(https://fxbug.dev/348695412): The two constructors below should be
-// unified. The unified constructor should take in both `preferred_modes` and
-// EDID bytes, and merge the modes.
-
 DisplayInfo::DisplayInfo(display::DisplayId display_id,
                          fbl::Vector<display::PixelFormat> pixel_formats,
-                         display::DisplayTiming preferred_mode)
-    : IdMappable(display_id),
-      edid_info(std::nullopt),
-      mode(preferred_mode),
-      pixel_formats(std::move(pixel_formats)) {
-  ZX_DEBUG_ASSERT(display_id != display::kInvalidDisplayId);
-}
-
-DisplayInfo::DisplayInfo(display::DisplayId display_id,
-                         fbl::Vector<display::PixelFormat> pixel_formats, edid::Edid edid_info)
+                         fbl::Vector<display::DisplayTiming> preferred_modes,
+                         std::optional<edid::Edid> edid_info)
     : IdMappable(display_id),
       edid_info(std::move(edid_info)),
-      mode(std::nullopt),
+      timings(std::move(preferred_modes)),
       pixel_formats(std::move(pixel_formats)) {
   ZX_DEBUG_ASSERT(display_id != display::kInvalidDisplayId);
 
@@ -62,19 +50,8 @@ DisplayInfo::~DisplayInfo() = default;
 void DisplayInfo::InitializeInspect(inspect::Node* parent_node) {
   node = parent_node->CreateChild(fbl::StringPrintf("display-%" PRIu64, id().value()).c_str());
 
-  if (mode.has_value()) {
-    node.CreateUint("width", mode->horizontal_active_px, &properties);
-    node.CreateUint("height", mode->vertical_active_lines, &properties);
-    return;
-  }
-
-  ZX_DEBUG_ASSERT(edid_info.has_value());
-
-  node.CreateByteVector("edid-bytes", std::span(edid_info->edid_bytes(), edid_info->edid_length()),
-                        &properties);
-
   size_t i = 0;
-  for (const display::DisplayTiming& t : edid_timings) {
+  for (const display::DisplayTiming& t : timings) {
     auto child = node.CreateChild(fbl::StringPrintf("timing-parameters-%lu", ++i).c_str());
     child.CreateDouble("vsync-hz",
                        static_cast<double>(t.vertical_field_refresh_rate_millihertz()) / 1000.0,
@@ -90,6 +67,13 @@ void DisplayInfo::InitializeInspect(inspect::Node* parent_node) {
     child.CreateInt("vertical-sync-pulse", t.vertical_sync_width_lines, &properties);
     properties.emplace(std::move(child));
   }
+
+  if (!edid_info.has_value()) {
+    return;
+  }
+
+  node.CreateByteVector("edid-bytes", std::span(edid_info->edid_bytes(), edid_info->edid_length()),
+                        &properties);
 }
 
 // static
@@ -97,47 +81,47 @@ zx::result<std::unique_ptr<DisplayInfo>> DisplayInfo::Create(AddedDisplayInfo ad
   ZX_DEBUG_ASSERT(added_display_info.display_id != display::kInvalidDisplayId);
   display::DisplayId display_id = added_display_info.display_id;
 
+  fbl::Vector<display::DisplayTiming> preferred_modes;
   if (!added_display_info.banjo_preferred_modes.is_empty()) {
-    ZX_DEBUG_ASSERT(added_display_info.banjo_preferred_modes.size() == 1);
-    display::DisplayTiming preferred_mode =
-        display::ToDisplayTiming(added_display_info.banjo_preferred_modes[0]);
-
     fbl::AllocChecker alloc_checker;
-    auto display_info = fbl::make_unique_checked<DisplayInfo>(
-        &alloc_checker, display_id, std::move(added_display_info.pixel_formats), preferred_mode);
+    preferred_modes.reserve(added_display_info.banjo_preferred_modes.size(), &alloc_checker);
     if (!alloc_checker.check()) {
-      fdf::error("Failed to allocate DisplayInfo for display ID: {}", display_id.value());
+      fdf::error("Failed to allocate DisplayTiming list for display ID: {}", display_id.value());
       return zx::error(ZX_ERR_NO_MEMORY);
     }
-
-    // TODO(https://fxbug.dev/348695412): This should not be an early return.
-    // `preferred_modes` should be merged and de-duplicated with the modes
-    // decoded from the display's EDID, by the logic below.
-    return zx::ok(std::move(display_info));
+    for (const display_mode_t& banjo_preferred_mode : added_display_info.banjo_preferred_modes) {
+      ZX_DEBUG_ASSERT_MSG(
+          preferred_modes.size() < added_display_info.banjo_preferred_modes.size(),
+          "The push_back() below was not supposed to allocate memory, but it might");
+      preferred_modes.push_back(display::ToDisplayTiming(banjo_preferred_mode), &alloc_checker);
+      ZX_DEBUG_ASSERT_MSG(alloc_checker.check(),
+                          "The push_back() above failed to allocate memory; "
+                          "it was not supposed to allocate at all");
+    }
   }
 
-  if (added_display_info.edid_bytes.is_empty()) {
-    fdf::error("Missing display timing information for display ID: {}", display_id.value());
-    return zx::error(ZX_ERR_INVALID_ARGS);
-  }
-
-  fit::result<const char*, edid::Edid> edid_result =
-      edid::Edid::Create(added_display_info.edid_bytes);
-  if (edid_result.is_error()) {
-    fdf::error("Failed to initialize EDID: {}", edid_result.error_value());
-    return zx::error(ZX_ERR_INTERNAL);
+  std::optional<edid::Edid> edid_info;
+  if (!added_display_info.edid_bytes.is_empty()) {
+    fit::result<const char*, edid::Edid> edid_result =
+        edid::Edid::Create(added_display_info.edid_bytes);
+    if (edid_result.is_error()) {
+      fdf::error("Failed to initialize EDID: {}", edid_result.error_value());
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+    edid_info.emplace(std::move(edid_result).value());
   }
 
   fbl::AllocChecker alloc_checker;
   auto display_info = fbl::make_unique_checked<DisplayInfo>(
       &alloc_checker, display_id, std::move(added_display_info.pixel_formats),
-      std::move(edid_result).value());
+      std::move(preferred_modes), std::move(edid_info));
   if (!alloc_checker.check()) {
     fdf::error("Failed to allocate DisplayInfo for display ID: {}", display_id.value());
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  if (fdf::Logger::GlobalInstance()->GetSeverity() <= FUCHSIA_LOG_DEBUG) {
+  if (fdf::Logger::GlobalInstance()->GetSeverity() <= FUCHSIA_LOG_DEBUG &&
+      display_info->edid_info.has_value()) {
     const edid::Edid& edid = display_info->edid_info.value();
     std::string manufacturer_id = edid.GetManufacturerId();
     const char* manufacturer_name = edid.GetManufacturerName();
