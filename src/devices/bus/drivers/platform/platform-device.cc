@@ -32,6 +32,7 @@
 #include "src/devices/bus/drivers/platform/node-util.h"
 #include "src/devices/bus/drivers/platform/platform-bus.h"
 #include "src/devices/bus/drivers/platform/platform-interrupt.h"
+#include "zircon/system/public/zircon/syscalls-next.h"
 
 namespace fdf {
 using namespace fuchsia_driver_framework;
@@ -295,6 +296,13 @@ zx_status_t PlatformDevice::PDevGetInterrupt(uint32_t index, uint32_t flags,
   }
   if (flags == 0) {
     flags = static_cast<uint32_t>(irq.mode().value());
+  }
+  if (flags & ZX_INTERRUPT_WAKE_VECTOR) {
+    zxlogf(WARNING,
+           "Client passing in ZX_INTERRUPT_WAKE_VECTOR. This will be an error in the future.");
+  }
+  if (bus_->suspend_enabled() && irq.wake_vector().has_value() && irq.wake_vector().value()) {
+    flags &= ZX_INTERRUPT_WAKE_VECTOR;
   }
   auto vector = irq.irq().value();
   zxlogf(INFO, "Creating interrupt with vector %u for platform device \"%s\"", vector, name_);

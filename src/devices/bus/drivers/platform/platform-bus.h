@@ -131,6 +131,8 @@ class PlatformBus : public PlatformBusType,
     return sysinfo_bindings_;
   }
 
+  bool suspend_enabled() const { return suspend_enabled_; }
+
  private:
   fidl::WireClient<fuchsia_hardware_platform_bus::SysSuspend> suspend_cb_;
 
@@ -173,6 +175,8 @@ class PlatformBus : public PlatformBusType,
   fidl::ServerBindingGroup<fuchsia_sysinfo::SysInfo> sysinfo_bindings_;
   fdf::UnownedDispatcher dispatcher_;
   std::optional<inspect::ComponentInspector> inspector_;
+
+  bool suspend_enabled_ = false;
 };
 
 }  // namespace platform_bus

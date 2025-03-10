@@ -66,6 +66,13 @@
             default: [],
         },
         {
+            config: "fuchsia.power.SuspendEnabled",
+            key: "suspend_enabled",
+            type: "bool",
+            availability: "optional",
+            default: false,
+        },
+        {
             protocol: [
                 "fuchsia.boot.Items",
                 "fuchsia.driver.framework.CompositeNodeManager",

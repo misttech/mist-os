@@ -893,6 +893,8 @@ void PlatformBus::DdkInit(ddk::InitTxn txn) {
     }
   }
 
+  suspend_enabled_ = config.suspend_enabled();
+
   return txn.Reply(ZX_OK);  // This will make the device visible and able to be unbound.
 }
 
