@@ -432,14 +432,14 @@ pub mod test {
             }
         });
     }
-    pub fn with_raw_dispatcher<T>(name: &str, p: impl for<'a> FnOnce(&'a Dispatcher) -> T) -> T {
+    pub fn with_raw_dispatcher<T>(name: &str, p: impl for<'a> FnOnce(&Arc<Dispatcher>) -> T) -> T {
         with_raw_dispatcher_flags(name, DispatcherBuilder::ALLOW_THREAD_BLOCKING, p)
     }
 
     pub(crate) fn with_raw_dispatcher_flags<T>(
         name: &str,
         flags: u32,
-        p: impl for<'a> FnOnce(&'a Dispatcher) -> T,
+        p: impl for<'a> FnOnce(&Arc<Dispatcher>) -> T,
     ) -> T {
         ensure_driver_env();
 
@@ -452,13 +452,14 @@ pub mod test {
             shutdown_tx.send(()).unwrap();
         })
         .into_ptr();
+        let driver_ptr = &mut observer as *mut _ as *mut c_void;
         // SAFETY: The pointers we pass to this function are all stable for the
         // duration of this function, and are not available to copy or clone to
         // client code (only through a ref to the non-`Clone`` `Dispatcher`
         // wrapper).
         let res = unsafe {
             fdf_env_dispatcher_create_with_owner(
-                &mut observer as *mut _ as *mut c_void,
+                driver_ptr,
                 flags,
                 name.as_ptr() as *const c_char,
                 name.len(),
@@ -469,15 +470,21 @@ pub mod test {
             )
         };
         assert_eq!(res, ZX_OK);
-        let dispatcher = Dispatcher(NonNull::new(dispatcher).unwrap());
+        let dispatcher = Arc::new(Dispatcher(NonNull::new(dispatcher).unwrap()));
 
         let res = p(&dispatcher);
 
         // this initiates the dispatcher shutdown on a driver runtime
         // thread. When all tasks on the dispatcher have completed, the wait
         // on the shutdown_rx below will end and we can tear it down.
+        let weak_dispatcher = Arc::downgrade(&dispatcher);
         drop(dispatcher);
         shutdown_rx.recv().unwrap();
+        assert_eq!(
+            0,
+            weak_dispatcher.strong_count(),
+            "a dispatcher reference escaped the test body"
+        );
 
         res
     }

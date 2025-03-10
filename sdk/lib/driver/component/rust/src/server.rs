@@ -236,7 +236,7 @@ mod tests {
         let (server_chan, client_chan) = fdf::Channel::<[u8]>::create();
         with_raw_dispatcher("driver registration", move |dispatcher| {
             dispatcher
-                .spawn_task(async move {
+                .spawn_task(async {
                     let channel_handle = server_chan.into_driver_handle().into_raw().get();
                     let driver_server = unsafe { initialize_func(channel_handle) } as usize;
                     assert_ne!(driver_server, 0);

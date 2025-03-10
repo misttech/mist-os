@@ -446,7 +446,7 @@ mod tests {
             let (first, second) = Channel::create();
 
             dispatcher
-                .spawn_task(async move {
+                .spawn_task(async {
                     fin_tx
                         .send(first.read_bytes(dispatcher.as_dispatcher_ref()).await.unwrap())
                         .unwrap();
@@ -663,19 +663,21 @@ mod tests {
         // the channel needs to outlive the dispatcher for this test because the channel shouldn't
         // be closed before the read wait has been cancelled.
         let (a, _b) = Channel::<[u8]>::create();
-        let unsync_op = with_raw_dispatcher_flags(
+        let (unsync_op, _a) = with_raw_dispatcher_flags(
             "early cancellation drop correctness",
             DispatcherBuilder::UNSYNCHRONIZED,
             |dispatcher| {
                 let (fin_tx, fin_rx) = mpsc::channel();
 
+                let inner_dispatcher = dispatcher.clone();
                 dispatcher
-                    .spawn_task(async {
-                        // we send the arc out to be checked after the dispatcher has shut down so
+                    .spawn_task(async move {
+                        // We send the arc out to be checked after the dispatcher has shut down so
                         // that we can be sure that the callback has had a chance to be called.
-                        fin_tx
-                            .send(read_and_drop(&a, dispatcher.as_dispatcher_ref()).await)
-                            .unwrap();
+                        // We send the channel back out so that it lives long enough for the
+                        // cancellation to be called on it.
+                        let res = read_and_drop(&a, inner_dispatcher.as_dispatcher_ref()).await;
+                        fin_tx.send((res, a)).unwrap();
                     })
                     .unwrap();
                 fin_rx.recv().unwrap()
