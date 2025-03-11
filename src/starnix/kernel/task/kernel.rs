@@ -56,7 +56,7 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::from_status_like_fdio;
 use starnix_uapi::open_flags::OpenFlags;
 use std::borrow::Cow;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU8, Ordering};
 use std::sync::{Arc, OnceLock, Weak};
@@ -100,6 +100,12 @@ pub struct KernelFeatures {
     ///
     /// Components can override this by setting the `fsseclabel` field in their program block.
     pub default_fsseclabel: Option<String>,
+
+    /// The default mount options to use when mounting directories from a component's namespace.
+    ///
+    /// The key is the path in the component's namespace, and the value is the mount options
+    /// string.
+    pub default_ns_mount_options: Option<HashMap<String, String>>,
 
     /// The default uid that is applied to components that are run in this kernel.
     ///

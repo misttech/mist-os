@@ -103,6 +103,7 @@ impl Features {
                         default_uid,
                         default_seclabel,
                         default_fsseclabel,
+                        default_ns_mount_options,
                     },
                 selinux,
                 ashmem,
@@ -175,6 +176,10 @@ impl Features {
                     kernel_node.record_string(
                         "default_fsseclabel",
                         default_fsseclabel.as_ref().map_or("", |s| s),
+                    );
+                    inspect_node.record_string(
+                        "default_ns_mount_options",
+                        format!("{:?}", default_ns_mount_options),
                     );
                 });
             }
@@ -261,6 +266,21 @@ pub fn parse_features(
 
     features.kernel.default_uid = config.program.default_uid.0;
     features.kernel.default_seclabel = config.program.default_seclabel.clone();
+    features.kernel.default_ns_mount_options =
+        if let Some(mount_options) = &config.program.default_ns_mount_options {
+            let options = mount_options
+                .iter()
+                .map(|item| {
+                    let mut splitter = item.splitn(2, ":");
+                    let key = splitter.next().expect("Failed to parse mount options");
+                    let value = splitter.next().expect("Failed to parse mount options");
+                    (key.to_string(), value.to_string())
+                })
+                .collect();
+            Some(options)
+        } else {
+            None
+        };
 
     Ok(features)
 }

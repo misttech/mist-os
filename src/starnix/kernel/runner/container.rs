@@ -204,6 +204,12 @@ pub struct ContainerProgram {
     #[serde(default = "default_uid")]
     pub default_uid: runner::serde::StoreAsString<u32>,
 
+    /// The default mount options to use when mounting directories from a component's namespace.
+    ///
+    /// The string is expected to follow the format: "<namespace_path>:<mount_options".
+    /// string.
+    pub default_ns_mount_options: Option<Vec<String>>,
+
     /// Specifies role names to use for "realtime" tasks based on their process & thread names.
     ///
     /// Zircon's scheduler doesn't support configuring tasks to always preempt non-"realtime"

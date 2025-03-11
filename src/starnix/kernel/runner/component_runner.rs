@@ -152,12 +152,21 @@ pub async fn start_component(
         .fsseclabel
         .as_deref()
         .or_else(|| system_task.kernel().features.default_fsseclabel.as_deref());
-
+    let ns_mount_options = system_task.kernel().features.default_ns_mount_options.as_ref();
     let mut maybe_pkg = None;
     let mut maybe_svc = None;
     for entry in ns {
         if let (Some(dir_path), Some(dir_handle)) = (entry.path, entry.directory) {
-            match dir_path.as_str() {
+            let dir_path_str = dir_path.as_str();
+            let mount_options = match (
+                ns_mount_options.and_then(|mount_options| mount_options.get(dir_path_str).cloned()),
+                mount_seclabel,
+            ) {
+                (None, Some(mount_seclabel)) => Some(format!("context={}", mount_seclabel)),
+                (mount_options, _) => mount_options,
+            };
+
+            match dir_path_str {
                 "/svc" => {
                     maybe_svc = Some(fio::DirectoryProxy::new(AsyncChannel::from_channel(
                         dir_handle.into_channel(),
@@ -174,7 +183,7 @@ pub async fn start_component(
                             system_task,
                             &dir_proxy,
                             &dir_path,
-                            mount_seclabel,
+                            mount_options.as_ref(),
                         )
                         .with_context(|| format!("failed to mount_remote on path {}", &dir_path))?;
                 }
@@ -187,7 +196,7 @@ pub async fn start_component(
                             system_task,
                             &dir_proxy,
                             &format!("{component_path}/{dir_path}"),
-                            mount_seclabel,
+                            mount_options.as_ref(),
                         )
                         .with_context(|| {
                             format!("failed to mount_remote on path {component_path}/{dir_path}")
@@ -473,7 +482,7 @@ impl MountRecord {
         system_task: &CurrentTask,
         directory: &fio::DirectorySynchronousProxy,
         path: &str,
-        mount_seclabel: Option<&str>,
+        mount_options: Option<&String>,
     ) -> Result<(), Error>
     where
         L: LockBefore<FileOpsCore>,
@@ -518,8 +527,9 @@ impl MountRecord {
 
         // If a filesystem security label argument was provided then apply it to all files via
         // mountpoint-labeling, with a "context=..." mount option.
-        let params = if let Some(security_context) = mount_seclabel {
-            MountParams::parse(format!("context={}", security_context).as_str().into()).unwrap()
+        let params = if let Some(mount_options) = mount_options {
+            MountParams::parse(mount_options.as_str().into())
+                .expect("failed to parse default_ns_mount_options")
         } else {
             MountParams::default()
         };
