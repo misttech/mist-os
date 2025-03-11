@@ -1290,8 +1290,8 @@ mod tests {
     impl<I: IpExt> IcmpEchoContextMarker for FakeIcmpCoreCtx<I> {}
 
     impl<I: IpExt> CounterContext<IcmpRxCounters<I>> for FakeIcmpCoreCtxState<I> {
-        fn with_counters<O, F: FnOnce(&IcmpRxCounters<I>) -> O>(&self, cb: F) -> O {
-            cb(&self.rx_counters)
+        fn counters(&self) -> &IcmpRxCounters<I> {
+            &self.rx_counters
         }
     }
 

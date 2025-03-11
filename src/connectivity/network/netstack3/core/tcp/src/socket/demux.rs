@@ -627,9 +627,13 @@ where
             }
         }
     }
-    let (reply, passive_open, data_acked, newly_closed) = core_ctx.with_counters(|counters| {
-        state.on_segment::<_, BC>(counters, incoming, bindings_ctx.now(), socket_options, *defunct)
-    });
+    let (reply, passive_open, data_acked, newly_closed) = state.on_segment::<_, BC>(
+        core_ctx.counters(),
+        incoming,
+        bindings_ctx.now(),
+        socket_options,
+        *defunct,
+    );
 
     match data_acked {
         DataAcked::Yes => {
@@ -954,15 +958,13 @@ where
     //
     // We might end up discarding the reply in case we can't instantiate this
     // new connection.
-    let result = core_ctx.with_counters(|counters| {
-        state.on_segment::<_, BC>(
-            counters,
-            incoming,
-            bindings_ctx.now(),
-            &SocketOptions::default(),
-            false, /* defunct */
-        )
-    });
+    let result = state.on_segment::<_, BC>(
+        core_ctx.counters(),
+        incoming,
+        bindings_ctx.now(),
+        &SocketOptions::default(),
+        false, /* defunct */
+    );
     let reply = assert_matches!(
         result,
         (reply, None, /* data_acked */ _, NewlyClosed::No /* can't become closed */) => reply

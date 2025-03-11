@@ -870,14 +870,14 @@ mod tests {
     }
 
     impl CounterContext<ArpCounters> for FakeArpCtx {
-        fn with_counters<O, F: FnOnce(&ArpCounters) -> O>(&self, cb: F) -> O {
-            cb(&self.counters)
+        fn counters(&self) -> &ArpCounters {
+            &self.counters
         }
     }
 
     impl CounterContext<NudCounters<Ipv4>> for FakeArpCtx {
-        fn with_counters<O, F: FnOnce(&NudCounters<Ipv4>) -> O>(&self, cb: F) -> O {
-            cb(&self.nud_counters)
+        fn counters(&self) -> &NudCounters<Ipv4> {
+            &self.nud_counters
         }
     }
 

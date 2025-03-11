@@ -39,8 +39,8 @@ impl<C, S, Meta, DeviceId> CounterContext<C> for FakeCoreCtx<S, Meta, DeviceId>
 where
     S: CounterContext<C>,
 {
-    fn with_counters<O, F: FnOnce(&C) -> O>(&self, cb: F) -> O {
-        CounterContext::<C>::with_counters(&self.state, cb)
+    fn counters(&self) -> &C {
+        CounterContext::<C>::counters(&self.state)
     }
 }
 
@@ -48,8 +48,8 @@ impl<C, S, R, Meta, DeviceId> ResourceCounterContext<R, C> for FakeCoreCtx<S, Me
 where
     S: ResourceCounterContext<R, C>,
 {
-    fn with_per_resource_counters<O, F: FnOnce(&C) -> O>(&self, resource: &R, cb: F) -> O {
-        ResourceCounterContext::<R, C>::with_per_resource_counters(&self.state, resource, cb)
+    fn per_resource_counters<'a>(&'a self, resource: &'a R) -> &'a C {
+        ResourceCounterContext::<R, C>::per_resource_counters(&self.state, resource)
     }
 }
 

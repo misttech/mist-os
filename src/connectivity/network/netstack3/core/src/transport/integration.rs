@@ -582,19 +582,13 @@ impl<I: datagram::IpExt, BT: BindingsTypes>
 }
 
 impl<BC: BindingsContext, I: Ip, L> CounterContext<TcpCounters<I>> for CoreCtx<'_, BC, L> {
-    fn with_counters<O, F: FnOnce(&TcpCounters<I>) -> O>(&self, cb: F) -> O {
-        cb(self
-            .unlocked_access::<crate::lock_ordering::UnlockedState>()
-            .transport
-            .tcp_counters::<I>())
+    fn counters(&self) -> &TcpCounters<I> {
+        self.unlocked_access::<crate::lock_ordering::UnlockedState>().transport.tcp_counters::<I>()
     }
 }
 
 impl<BC: BindingsContext, I: Ip, L> CounterContext<UdpCounters<I>> for CoreCtx<'_, BC, L> {
-    fn with_counters<O, F: FnOnce(&UdpCounters<I>) -> O>(&self, cb: F) -> O {
-        cb(self
-            .unlocked_access::<crate::lock_ordering::UnlockedState>()
-            .transport
-            .udp_counters::<I>())
+    fn counters(&self) -> &UdpCounters<I> {
+        self.unlocked_access::<crate::lock_ordering::UnlockedState>().transport.udp_counters::<I>()
     }
 }

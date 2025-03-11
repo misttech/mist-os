@@ -625,17 +625,13 @@ mod tests {
         assert_eq!(bindings_ctx.take_events(), expected_events);
 
         // Verify that counters are updated.
-        api.core_ctx().with_counters(|counters: &MulticastForwardingCounters<I>| {
-            assert_eq!(counters.pending_packet_tx.get(), if expect_sent_packet { 1 } else { 0 });
-            assert_eq!(
-                counters.pending_packet_drops_disabled_dev.get(),
-                if forwarding_enabled_for_dev { 0 } else { 1 }
-            );
-            assert_eq!(
-                counters.pending_packet_drops_wrong_dev.get(),
-                if right_dev { 0 } else { 1 }
-            );
-        });
+        let counters: &MulticastForwardingCounters<I> = api.core_ctx().counters();
+        assert_eq!(counters.pending_packet_tx.get(), if expect_sent_packet { 1 } else { 0 });
+        assert_eq!(
+            counters.pending_packet_drops_disabled_dev.get(),
+            if forwarding_enabled_for_dev { 0 } else { 1 }
+        );
+        assert_eq!(counters.pending_packet_drops_wrong_dev.get(), if right_dev { 0 } else { 1 });
     }
 
     #[ip_test(I)]

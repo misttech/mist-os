@@ -1765,8 +1765,7 @@ impl<
         error: IcmpErrorCode,
     ) -> NewlyClosed {
         let Connection { soft_error, state, .. } = self;
-        let (new_soft_error, newly_closed) =
-            core_ctx.with_counters(|counters| state.on_icmp_error(counters, error, seq));
+        let (new_soft_error, newly_closed) = state.on_icmp_error(core_ctx.counters(), error, seq);
         *soft_error = soft_error.or(new_soft_error);
         newly_closed
     }
@@ -2975,13 +2974,11 @@ where
                             let _: Result<(), CloseError> = conn.state.shutdown_recv();
 
                             conn.defunct = true;
-                            let newly_closed = match core_ctx.with_counters(|counters| {
-                                conn.state.close(
-                                    counters,
-                                    CloseReason::Close { now: bindings_ctx.now() },
-                                    &conn.socket_options,
-                                )
-                            }) {
+                            let newly_closed = match conn.state.close(
+                                core_ctx.counters(),
+                                CloseReason::Close { now: bindings_ctx.now() },
+                                &conn.socket_options,
+                            ) {
                                 Err(CloseError::NoConnection) => NewlyClosed::No,
                                 Err(CloseError::Closing) | Ok(NewlyClosed::No) => {
                                     do_send_inner(&id, conn, &addr, timer, core_ctx, bindings_ctx)
@@ -3131,13 +3128,11 @@ where
                                 return Ok(());
                             }
 
-                            match core_ctx.with_counters(|counters| {
-                                conn.state.close(
-                                    counters,
-                                    CloseReason::Shutdown,
-                                    &conn.socket_options,
-                                )
-                            }) {
+                            match conn.state.close(
+                                core_ctx.counters(),
+                                CloseReason::Shutdown,
+                                &conn.socket_options,
+                            ) {
                                 Ok(newly_closed) => {
                                     let newly_closed = match newly_closed {
                                         NewlyClosed::Yes => NewlyClosed::Yes,
@@ -4640,7 +4635,7 @@ fn close_pending_socket<WireI, SockI, DC, BC>(
     BC: TcpBindingsContext,
 {
     debug!("aborting pending socket {sock_id:?}");
-    let (maybe_reset, newly_closed) = core_ctx.with_counters(|counters| conn.state.abort(counters));
+    let (maybe_reset, newly_closed) = conn.state.abort(core_ctx.counters());
     handle_newly_closed(core_ctx, bindings_ctx, newly_closed, demux_id, conn_addr, timer);
     if let Some(reset) = maybe_reset {
         let ConnAddr { ip, device: _ } = conn_addr;
@@ -4714,9 +4709,12 @@ where
     CC: TransportIpContext<WireI, BC> + CounterContext<TcpCounters<SockI>>,
 {
     let newly_closed = loop {
-        match core_ctx.with_counters(|counters| {
-            conn.state.poll_send(counters, u32::MAX, bindings_ctx.now(), &conn.socket_options)
-        }) {
+        match conn.state.poll_send(
+            core_ctx.counters(),
+            u32::MAX,
+            bindings_ctx.now(),
+            &conn.socket_options,
+        ) {
             Ok(seg) => {
                 send_tcp_segment(
                     core_ctx,
@@ -6149,9 +6147,8 @@ mod tests {
     impl<I: Ip, D: FakeStrongDeviceId, BT: TcpTestBindingsTypes<D>> CounterContext<TcpCounters<I>>
         for TcpCoreCtx<D, BT>
     {
-        fn with_counters<O, F: FnOnce(&TcpCounters<I>) -> O>(&self, cb: F) -> O {
-            let counters = I::map_ip((), |()| &self.tcp.v4.counters, |()| &self.tcp.v6.counters);
-            cb(counters)
+        fn counters(&self) -> &TcpCounters<I> {
+            I::map_ip((), |()| &self.tcp.v4.counters, |()| &self.tcp.v6.counters)
         }
     }
 
@@ -6593,31 +6590,24 @@ mod tests {
         let mut assert_counters =
             |context_name: &'static str, ExpectedCounters { tx, rx, passive_open, active_open }| {
                 net.with_context(context_name, |ctx| {
-                    ctx.core_ctx.with_counters(|counters: &TcpCounters<I>| {
-                        let c = counters.as_ref();
-                        assert_eq!(c.segment_send_errors.get(), 0, "{}", context_name);
-                        assert_eq!(c.segments_sent.get(), tx, "{}", context_name);
-                        assert_eq!(c.invalid_segments_received.get(), 0, "{}", context_name);
-                        assert_eq!(c.valid_segments_received.get(), rx, "{}", context_name);
-                        assert_eq!(c.received_segments_dispatched.get(), rx, "{}", context_name);
-                        assert_eq!(
-                            c.active_connection_openings.get(),
-                            active_open,
-                            "{}",
-                            context_name
-                        );
-                        assert_eq!(
-                            c.passive_connection_openings.get(),
-                            passive_open,
-                            "{}",
-                            context_name
-                        );
-                        assert_eq!(c.failed_connection_attempts.get(), 0, "{}", context_name);
-                        // Each side of the connection sends and receives a,
-                        // SYN, regardless of it initiated the connection.
-                        assert_eq!(c.syns_sent.get(), 1);
-                        assert_eq!(c.syns_received.get(), 1);
-                    })
+                    let c: &TcpCounters<I> = ctx.core_ctx.counters();
+                    assert_eq!(c.segment_send_errors.get(), 0, "{}", context_name);
+                    assert_eq!(c.segments_sent.get(), tx, "{}", context_name);
+                    assert_eq!(c.invalid_segments_received.get(), 0, "{}", context_name);
+                    assert_eq!(c.valid_segments_received.get(), rx, "{}", context_name);
+                    assert_eq!(c.received_segments_dispatched.get(), rx, "{}", context_name);
+                    assert_eq!(c.active_connection_openings.get(), active_open, "{}", context_name);
+                    assert_eq!(
+                        c.passive_connection_openings.get(),
+                        passive_open,
+                        "{}",
+                        context_name
+                    );
+                    assert_eq!(c.failed_connection_attempts.get(), 0, "{}", context_name);
+                    // Each side of the connection sends and receives a,
+                    // SYN, regardless of it initiated the connection.
+                    assert_eq!(c.syns_sent.get(), 1);
+                    assert_eq!(c.syns_received.get(), 1);
                 })
             };
         // Communication done by `bind_listen_connect_accept_inner`:

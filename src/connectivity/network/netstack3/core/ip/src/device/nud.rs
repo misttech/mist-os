@@ -2963,8 +2963,8 @@ mod tests {
     }
 
     impl<I: Ip> CounterContext<NudCounters<I>> for FakeCoreCtxImpl<I> {
-        fn with_counters<O, F: FnOnce(&NudCounters<I>) -> O>(&self, cb: F) -> O {
-            cb(&self.nud.counters)
+        fn counters(&self) -> &NudCounters<I> {
+            &self.nud.counters
         }
     }
 
@@ -4569,9 +4569,7 @@ mod tests {
         // will be dropped because the packets pending address resolution in this test
         // is not a valid IP packet.
         assert_eq!(core_ctx.inner.take_frames(), []);
-        core_ctx.with_counters(|counters| {
-            assert_eq!(counters.as_ref().icmp_dest_unreachable_dropped.get(), 1)
-        });
+        assert_eq!(core_ctx.counters().as_ref().icmp_dest_unreachable_dropped.get(), 1);
     }
 
     #[ip_test(I)]

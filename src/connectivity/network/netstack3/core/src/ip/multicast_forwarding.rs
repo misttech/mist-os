@@ -140,10 +140,9 @@ where
     I: IpExt,
     BC: BindingsContext,
 {
-    fn with_counters<O, F: FnOnce(&MulticastForwardingCounters<I>) -> O>(&self, cb: F) -> O {
-        cb(self
-            .unlocked_access::<crate::lock_ordering::UnlockedState>()
+    fn counters(&self) -> &MulticastForwardingCounters<I> {
+        self.unlocked_access::<crate::lock_ordering::UnlockedState>()
             .inner_ip_state()
-            .multicast_forwarding_counters())
+            .multicast_forwarding_counters()
     }
 }

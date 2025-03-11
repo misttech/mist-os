@@ -3247,8 +3247,8 @@ mod tests {
     }
 
     impl<I: Ip, D: FakeStrongDeviceId> CounterContext<UdpCounters<I>> for FakeUdpCoreCtx<D> {
-        fn with_counters<O, F: FnOnce(&UdpCounters<I>) -> O>(&self, cb: F) -> O {
-            cb(&self.all_sockets.udp_counters())
+        fn counters(&self) -> &UdpCounters<I> {
+            &self.all_sockets.udp_counters()
         }
     }
 

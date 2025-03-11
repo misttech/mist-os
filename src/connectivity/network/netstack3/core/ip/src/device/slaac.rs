@@ -2141,8 +2141,8 @@ mod tests {
     }
 
     impl<'a> CounterContext<SlaacCounters> for &'a mut FakeSlaacAddrs {
-        fn with_counters<O, F: FnOnce(&SlaacCounters) -> O>(&self, cb: F) -> O {
-            cb(&self.counters)
+        fn counters(&self) -> &SlaacCounters {
+            &self.counters
         }
     }
 

@@ -130,46 +130,42 @@ where
 impl<BT: BindingsTypes, I: datagram::DualStackIpExt, L> CounterContext<IcmpTxCounters<I>>
     for CoreCtx<'_, BT, L>
 {
-    fn with_counters<O, F: FnOnce(&IcmpTxCounters<I>) -> O>(&self, cb: F) -> O {
-        cb(&self
+    fn counters(&self) -> &IcmpTxCounters<I> {
+        &self
             .unlocked_access::<crate::lock_ordering::UnlockedState>()
             .inner_icmp_state::<I>()
-            .tx_counters)
+            .tx_counters
     }
 }
 
 impl<BT: BindingsTypes, I: datagram::DualStackIpExt, L> CounterContext<IcmpRxCounters<I>>
     for CoreCtx<'_, BT, L>
 {
-    fn with_counters<O, F: FnOnce(&IcmpRxCounters<I>) -> O>(&self, cb: F) -> O {
-        cb(&self
+    fn counters(&self) -> &IcmpRxCounters<I> {
+        &self
             .unlocked_access::<crate::lock_ordering::UnlockedState>()
             .inner_icmp_state::<I>()
-            .rx_counters)
+            .rx_counters
     }
 }
 
 impl<BT: BindingsTypes, L> CounterContext<IgmpCounters> for CoreCtx<'_, BT, L> {
-    fn with_counters<O, F: FnOnce(&IgmpCounters) -> O>(&self, cb: F) -> O {
-        cb(&self
+    fn counters(&self) -> &IgmpCounters {
+        &self
             .unlocked_access::<crate::lock_ordering::UnlockedState>()
             .inner_ip_state::<Ipv4>()
-            .igmp_counters())
+            .igmp_counters()
     }
 }
 
 impl<BT: BindingsTypes, L> ResourceCounterContext<DeviceId<BT>, IgmpCounters>
     for CoreCtx<'_, BT, L>
 {
-    fn with_per_resource_counters<O, F: FnOnce(&IgmpCounters) -> O>(
-        &self,
-        device_id: &DeviceId<BT>,
-        cb: F,
-    ) -> O {
+    fn per_resource_counters<'a>(&'a self, device_id: &'a DeviceId<BT>) -> &'a IgmpCounters {
         for_any_device_id!(
             DeviceId,
             device_id,
-            id => self.with_per_resource_counters(id, cb)
+            id => self.per_resource_counters(id)
         )
     }
 }
@@ -177,41 +173,33 @@ impl<BT: BindingsTypes, L> ResourceCounterContext<DeviceId<BT>, IgmpCounters>
 impl<BT: BindingsTypes, D: DeviceStateSpec, L>
     ResourceCounterContext<BaseDeviceId<D, BT>, IgmpCounters> for CoreCtx<'_, BT, L>
 {
-    fn with_per_resource_counters<O, F: FnOnce(&IgmpCounters) -> O>(
-        &self,
-        device_id: &BaseDeviceId<D, BT>,
-        cb: F,
-    ) -> O {
-        cb(device_id
+    fn per_resource_counters<'a>(&'a self, device_id: &'a BaseDeviceId<D, BT>) -> &'a IgmpCounters {
+        device_id
             .device_state(
                 &self.unlocked_access::<crate::lock_ordering::UnlockedState>().device.origin,
             )
             .as_ref()
-            .igmp_counters())
+            .igmp_counters()
     }
 }
 
 impl<BT: BindingsTypes, L> CounterContext<MldCounters> for CoreCtx<'_, BT, L> {
-    fn with_counters<O, F: FnOnce(&MldCounters) -> O>(&self, cb: F) -> O {
-        cb(&self
+    fn counters(&self) -> &MldCounters {
+        &self
             .unlocked_access::<crate::lock_ordering::UnlockedState>()
             .inner_ip_state::<Ipv4>()
-            .mld_counters())
+            .mld_counters()
     }
 }
 
 impl<BT: BindingsTypes, L> ResourceCounterContext<DeviceId<BT>, MldCounters>
     for CoreCtx<'_, BT, L>
 {
-    fn with_per_resource_counters<O, F: FnOnce(&MldCounters) -> O>(
-        &self,
-        device_id: &DeviceId<BT>,
-        cb: F,
-    ) -> O {
+    fn per_resource_counters<'a>(&'a self, device_id: &'a DeviceId<BT>) -> &'a MldCounters {
         for_any_device_id!(
             DeviceId,
             device_id,
-            id => self.with_per_resource_counters(id, cb)
+            id => self.per_resource_counters(id)
         )
     }
 }
@@ -219,23 +207,19 @@ impl<BT: BindingsTypes, L> ResourceCounterContext<DeviceId<BT>, MldCounters>
 impl<BT: BindingsTypes, D: DeviceStateSpec, L>
     ResourceCounterContext<BaseDeviceId<D, BT>, MldCounters> for CoreCtx<'_, BT, L>
 {
-    fn with_per_resource_counters<O, F: FnOnce(&MldCounters) -> O>(
-        &self,
-        device_id: &BaseDeviceId<D, BT>,
-        cb: F,
-    ) -> O {
-        cb(device_id
+    fn per_resource_counters<'a>(&'a self, device_id: &'a BaseDeviceId<D, BT>) -> &'a MldCounters {
+        device_id
             .device_state(
                 &self.unlocked_access::<crate::lock_ordering::UnlockedState>().device.origin,
             )
             .as_ref()
-            .mld_counters())
+            .mld_counters()
     }
 }
 
 impl<BT: BindingsTypes, L> CounterContext<NdpCounters> for CoreCtx<'_, BT, L> {
-    fn with_counters<O, F: FnOnce(&NdpCounters) -> O>(&self, cb: F) -> O {
-        cb(&self.unlocked_access::<crate::lock_ordering::UnlockedState>().ipv6.icmp.ndp_counters)
+    fn counters(&self) -> &NdpCounters {
+        &self.unlocked_access::<crate::lock_ordering::UnlockedState>().ipv6.icmp.ndp_counters
     }
 }
 
@@ -252,11 +236,8 @@ impl<
 }
 
 impl<BT: BindingsTypes, I: IpLayerIpExt, L> CounterContext<IpCounters<I>> for CoreCtx<'_, BT, L> {
-    fn with_counters<O, F: FnOnce(&IpCounters<I>) -> O>(&self, cb: F) -> O {
-        cb(&self
-            .unlocked_access::<crate::lock_ordering::UnlockedState>()
-            .inner_ip_state()
-            .counters())
+    fn counters(&self) -> &IpCounters<I> {
+        &self.unlocked_access::<crate::lock_ordering::UnlockedState>().inner_ip_state().counters()
     }
 }
 

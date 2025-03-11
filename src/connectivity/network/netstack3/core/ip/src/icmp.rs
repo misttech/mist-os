@@ -2004,9 +2004,7 @@ pub fn send_icmpv4_host_unreachable<
     fragment_type: Ipv4FragmentType,
     marks: &Marks,
 ) {
-    core_ctx.with_counters(|counters| {
-        counters.address_unreachable.increment();
-    });
+    core_ctx.counters().address_unreachable.increment();
 
     send_icmpv4_dest_unreachable(
         core_ctx,
@@ -2047,9 +2045,7 @@ pub fn send_icmpv6_address_unreachable<
     original_packet: B,
     marks: &Marks,
 ) {
-    core_ctx.with_counters(|counters| {
-        counters.address_unreachable.increment();
-    });
+    core_ctx.counters().address_unreachable.increment();
 
     send_icmpv6_dest_unreachable(
         core_ctx,
@@ -3089,20 +3085,20 @@ mod tests {
     impl<I: IpExt> IcmpStateContext for InnerIpSocketCtx<I> {}
 
     impl<I: IpExt> CounterContext<IcmpRxCounters<I>> for FakeIcmpCoreCtx<I> {
-        fn with_counters<O, F: FnOnce(&IcmpRxCounters<I>) -> O>(&self, cb: F) -> O {
-            cb(&self.icmp.rx_counters)
+        fn counters(&self) -> &IcmpRxCounters<I> {
+            &self.icmp.rx_counters
         }
     }
 
     impl<I: IpExt> CounterContext<IcmpTxCounters<I>> for FakeIcmpCoreCtx<I> {
-        fn with_counters<O, F: FnOnce(&IcmpTxCounters<I>) -> O>(&self, cb: F) -> O {
-            cb(&self.icmp.tx_counters)
+        fn counters(&self) -> &IcmpTxCounters<I> {
+            &self.icmp.tx_counters
         }
     }
 
     impl<I: IpExt> CounterContext<NdpCounters> for FakeIcmpCoreCtx<I> {
-        fn with_counters<O, F: FnOnce(&NdpCounters) -> O>(&self, cb: F) -> O {
-            cb(&self.icmp.ndp_counters)
+        fn counters(&self) -> &NdpCounters {
+            &self.icmp.ndp_counters
         }
     }
 

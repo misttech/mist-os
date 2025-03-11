@@ -110,13 +110,13 @@ where
 }
 
 impl<'a, BC: BindingsContext> CounterContext<SlaacCounters> for SlaacAddrs<'a, BC> {
-    fn with_counters<O, F: FnOnce(&SlaacCounters) -> O>(&self, cb: F) -> O {
-        cb(&self
+    fn counters(&self) -> &SlaacCounters {
+        &self
             .core_ctx
             .core_ctx
             .unlocked_access::<crate::lock_ordering::UnlockedState>()
             .ipv6
-            .slaac_counters)
+            .slaac_counters
     }
 }
 
@@ -529,8 +529,8 @@ impl<'a, Config, L, BC: BindingsContext, T> CounterContext<T>
 where
     CoreCtx<'a, BC, L>: CounterContext<T>,
 {
-    fn with_counters<O, F: FnOnce(&T) -> O>(&self, cb: F) -> O {
-        self.core_ctx.with_counters(cb)
+    fn counters(&self) -> &T {
+        self.core_ctx.counters()
     }
 }
 
@@ -539,8 +539,8 @@ impl<'a, Config, L, BC: BindingsContext, R, T> ResourceCounterContext<R, T>
 where
     CoreCtx<'a, BC, L>: ResourceCounterContext<R, T>,
 {
-    fn with_per_resource_counters<O, F: FnOnce(&T) -> O>(&self, resource: &R, cb: F) -> O {
-        self.core_ctx.with_per_resource_counters(resource, cb)
+    fn per_resource_counters<'b>(&'b self, resource: &'b R) -> &'b T {
+        self.core_ctx.per_resource_counters(resource)
     }
 }
 
@@ -1437,8 +1437,8 @@ impl<
 }
 
 impl<BC: BindingsContext, I: Ip, L> CounterContext<NudCounters<I>> for CoreCtx<'_, BC, L> {
-    fn with_counters<O, F: FnOnce(&NudCounters<I>) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::UnlockedState>().device.nud_counters::<I>())
+    fn counters(&self) -> &NudCounters<I> {
+        self.unlocked_access::<crate::lock_ordering::UnlockedState>().device.nud_counters::<I>()
     }
 }
 
@@ -1576,7 +1576,7 @@ impl<BT: IpDeviceStateBindingsTypes> LockLevelFor<Ipv6AddressEntry<BT>>
 }
 
 impl<BT: BindingsTypes, L> CounterContext<SlaacCounters> for CoreCtx<'_, BT, L> {
-    fn with_counters<O, F: FnOnce(&SlaacCounters) -> O>(&self, cb: F) -> O {
-        cb(&self.unlocked_access::<crate::lock_ordering::UnlockedState>().ipv6.slaac_counters)
+    fn counters(&self) -> &SlaacCounters {
+        &self.unlocked_access::<crate::lock_ordering::UnlockedState>().ipv6.slaac_counters
     }
 }

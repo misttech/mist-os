@@ -96,11 +96,10 @@ impl<I: IpExt, BT: BindingsTypes> LockLevelFor<RawIpSocketState<I, WeakDeviceId<
 impl<I: IpExt, BC: BindingsContext, L> CounterContext<RawIpSocketCounters<I>>
     for CoreCtx<'_, BC, L>
 {
-    fn with_counters<O, F: FnOnce(&RawIpSocketCounters<I>) -> O>(&self, cb: F) -> O {
-        cb(self
-            .unlocked_access::<crate::lock_ordering::UnlockedState>()
+    fn counters(&self) -> &RawIpSocketCounters<I> {
+        self.unlocked_access::<crate::lock_ordering::UnlockedState>()
             .inner_ip_state()
-            .raw_ip_socket_counters())
+            .raw_ip_socket_counters()
     }
 }
 
@@ -109,15 +108,14 @@ impl<I: IpExt, BC: BindingsContext, L> CounterContext<RawIpSocketCounters<I>>
 impl<I: IpExt, BC: BindingsContext, L, D: WeakDeviceIdentifier>
     ResourceCounterContext<RawIpSocketId<I, D, BC>, RawIpSocketCounters<I>> for CoreCtx<'_, BC, L>
 {
-    fn with_per_resource_counters<O, F: FnOnce(&RawIpSocketCounters<I>) -> O>(
-        &self,
-        id: &RawIpSocketId<I, D, BC>,
-        cb: F,
-    ) -> O {
+    fn per_resource_counters<'a>(
+        &'a self,
+        id: &'a RawIpSocketId<I, D, BC>,
+    ) -> &'a RawIpSocketCounters<I> {
         // NB: circumvent the lock ordering to access the counters, because it
         // spares jumping through some hoops, and
         // `crate::lock_ordering::RawIpSocketCounters<I>>` exists for unlocked
         // access.
-        cb(id.state().counters())
+        id.state().counters()
     }
 }

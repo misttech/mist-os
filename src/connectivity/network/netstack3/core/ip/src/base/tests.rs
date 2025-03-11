@@ -53,8 +53,8 @@ impl<I: IpLayerIpExt> Default for IpFakeCoreCtx<I> {
 }
 
 impl<I: IpLayerIpExt> CounterContext<IpCounters<I>> for IpFakeCoreCtx<I> {
-    fn with_counters<O, F: FnOnce(&IpCounters<I>) -> O>(&self, cb: F) -> O {
-        cb(&self.counters)
+    fn counters(&self) -> &IpCounters<I> {
+        &self.counters
     }
 }
 

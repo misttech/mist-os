@@ -950,46 +950,44 @@ mod tests {
     }
 
     impl CounterContext<DeviceCounters> for FakeCoreCtx {
-        fn with_counters<O, F: FnOnce(&DeviceCounters) -> O>(&self, cb: F) -> O {
-            cb(&self.inner.state.counters)
+        fn counters(&self) -> &DeviceCounters {
+            &self.inner.state.counters
         }
     }
 
     impl CounterContext<DeviceCounters> for FakeInnerCtx {
-        fn with_counters<O, F: FnOnce(&DeviceCounters) -> O>(&self, cb: F) -> O {
-            cb(&self.state.counters)
+        fn counters(&self) -> &DeviceCounters {
+            &self.state.counters
         }
     }
 
     impl ResourceCounterContext<FakeDeviceId, DeviceCounters> for FakeCoreCtx {
-        fn with_per_resource_counters<O, F: FnOnce(&DeviceCounters) -> O>(
-            &self,
-            &FakeDeviceId: &FakeDeviceId,
-            cb: F,
-        ) -> O {
-            cb(&self.inner.state.per_device_counters)
+        fn per_resource_counters<'a>(
+            &'a self,
+            &FakeDeviceId: &'a FakeDeviceId,
+        ) -> &'a DeviceCounters {
+            &self.inner.state.per_device_counters
         }
     }
 
     impl ResourceCounterContext<FakeDeviceId, DeviceCounters> for FakeInnerCtx {
-        fn with_per_resource_counters<O, F: FnOnce(&DeviceCounters) -> O>(
-            &self,
-            &FakeDeviceId: &FakeDeviceId,
-            cb: F,
-        ) -> O {
-            cb(&self.state.per_device_counters)
+        fn per_resource_counters<'a>(
+            &'a self,
+            &FakeDeviceId: &'a FakeDeviceId,
+        ) -> &'a DeviceCounters {
+            &self.state.per_device_counters
         }
     }
 
     impl CounterContext<EthernetDeviceCounters> for FakeCoreCtx {
-        fn with_counters<O, F: FnOnce(&EthernetDeviceCounters) -> O>(&self, cb: F) -> O {
-            cb(&self.inner.state.ethernet_counters)
+        fn counters(&self) -> &EthernetDeviceCounters {
+            &self.inner.state.ethernet_counters
         }
     }
 
     impl CounterContext<EthernetDeviceCounters> for FakeInnerCtx {
-        fn with_counters<O, F: FnOnce(&EthernetDeviceCounters) -> O>(&self, cb: F) -> O {
-            cb(&self.state.ethernet_counters)
+        fn counters(&self) -> &EthernetDeviceCounters {
+            &self.state.ethernet_counters
         }
     }
 
@@ -1344,8 +1342,8 @@ mod tests {
     }
 
     impl CounterContext<ArpCounters> for FakeCoreCtx {
-        fn with_counters<O, F: FnOnce(&ArpCounters) -> O>(&self, cb: F) -> O {
-            cb(&self.inner.state.arp_counters)
+        fn counters(&self) -> &ArpCounters {
+            &self.inner.state.arp_counters
         }
     }
 

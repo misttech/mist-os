@@ -1391,8 +1391,8 @@ mod tests {
     }
 
     impl<D: FakeStrongDeviceId> CounterContext<DeviceSocketCounters> for FakeCoreCtx<D> {
-        fn with_counters<O, F: FnOnce(&DeviceSocketCounters) -> O>(&self, cb: F) -> O {
-            cb(&self.state.counters)
+        fn counters(&self) -> &DeviceSocketCounters {
+            &self.state.counters
         }
     }
 
@@ -1400,19 +1400,18 @@ mod tests {
         ResourceCounterContext<DeviceSocketId<D::Weak, FakeBindingsCtx>, DeviceSocketCounters>
         for FakeCoreCtx<D>
     {
-        fn with_per_resource_counters<O, F: FnOnce(&DeviceSocketCounters) -> O>(
-            &self,
-            socket: &DeviceSocketId<D::Weak, FakeBindingsCtx>,
-            cb: F,
-        ) -> O {
-            cb(socket.counters())
+        fn per_resource_counters<'a>(
+            &'a self,
+            socket: &'a DeviceSocketId<D::Weak, FakeBindingsCtx>,
+        ) -> &'a DeviceSocketCounters {
+            socket.counters()
         }
     }
 
     impl<'m, X, Y, Z, D> CounterContext<DeviceSocketCounters> for FakeSocketsMutRefs<'m, X, Y, Z, D> {
-        fn with_counters<O, F: FnOnce(&DeviceSocketCounters) -> O>(&self, cb: F) -> O {
+        fn counters(&self) -> &DeviceSocketCounters {
             let FakeSocketsMutRefs(_, _, _, _, counters) = self;
-            cb(counters)
+            counters
         }
     }
 
@@ -1420,12 +1419,11 @@ mod tests {
         ResourceCounterContext<DeviceSocketId<D::Weak, FakeBindingsCtx>, DeviceSocketCounters>
         for FakeSocketsMutRefs<'m, X, Y, Z, D>
     {
-        fn with_per_resource_counters<O, F: FnOnce(&DeviceSocketCounters) -> O>(
-            &self,
-            socket: &DeviceSocketId<D::Weak, FakeBindingsCtx>,
-            cb: F,
-        ) -> O {
-            cb(socket.counters())
+        fn per_resource_counters<'a>(
+            &'a self,
+            socket: &'a DeviceSocketId<D::Weak, FakeBindingsCtx>,
+        ) -> &'a DeviceSocketCounters {
+            socket.counters()
         }
     }
 

@@ -285,17 +285,33 @@ where
         inspector: &mut N,
     ) {
         inspector.record_child("Counters", |inspector| {
-            self.core_ctx().with_per_resource_counters(device, |counters: &DeviceCounters| {
-                inspector.delegate_inspectable(counters)
+            inspector.delegate_inspectable(
+                ResourceCounterContext::<_, DeviceCounters>::per_resource_counters(
+                    self.core_ctx(),
+                    device,
+                ),
+            );
+            inspector.delegate_inspectable(
+                ResourceCounterContext::<_, D::Counters>::per_resource_counters(
+                    self.core_ctx(),
+                    device,
+                ),
+            );
+            inspector.record_child("IGMP", |inspector| {
+                inspector.delegate_inspectable(
+                    ResourceCounterContext::<_, IgmpCounters>::per_resource_counters(
+                        self.core_ctx(),
+                        device,
+                    ),
+                );
             });
-            self.core_ctx().with_per_resource_counters(device, |counters: &D::Counters| {
-                inspector.delegate_inspectable(counters)
-            });
-            self.core_ctx().with_per_resource_counters(device, |counters: &IgmpCounters| {
-                inspector.record_child("IGMP", |inspector| inspector.delegate_inspectable(counters))
-            });
-            self.core_ctx().with_per_resource_counters(device, |counters: &MldCounters| {
-                inspector.record_child("MLD", |inspector| inspector.delegate_inspectable(counters))
+            inspector.record_child("MLD", |inspector| {
+                inspector.delegate_inspectable(
+                    ResourceCounterContext::<_, MldCounters>::per_resource_counters(
+                        self.core_ctx(),
+                        device,
+                    ),
+                );
             });
         });
     }

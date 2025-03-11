@@ -973,8 +973,8 @@ mod test {
     }
 
     impl<I: IpExt, D: FakeStrongDeviceId> CounterContext<RawIpSocketCounters<I>> for FakeCoreCtx<I, D> {
-        fn with_counters<O, F: FnOnce(&RawIpSocketCounters<I>) -> O>(&self, cb: F) -> O {
-            cb(&self.state.counters)
+        fn counters(&self) -> &RawIpSocketCounters<I> {
+            &self.state.counters
         }
     }
 
@@ -984,12 +984,11 @@ mod test {
             RawIpSocketCounters<I>,
         > for FakeCoreCtx<I, D>
     {
-        fn with_per_resource_counters<O, F: FnOnce(&RawIpSocketCounters<I>) -> O>(
-            &self,
-            socket: &RawIpSocketId<I, D::Weak, FakeBindingsCtx<D>>,
-            cb: F,
-        ) -> O {
-            cb(socket.state().counters())
+        fn per_resource_counters<'a>(
+            &'a self,
+            socket: &'a RawIpSocketId<I, D::Weak, FakeBindingsCtx<D>>,
+        ) -> &'a RawIpSocketCounters<I> {
+            socket.state().counters()
         }
     }
 

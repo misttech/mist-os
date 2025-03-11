@@ -385,16 +385,16 @@ mod testutil {
     impl<I: IpLayerIpExt, D: FakeStrongDeviceId> CounterContext<IpCounters<I>>
         for FakeCoreCtxState<I, D>
     {
-        fn with_counters<O, F: FnOnce(&IpCounters<I>) -> O>(&self, cb: F) -> O {
-            cb(&self.counters)
+        fn counters(&self) -> &IpCounters<I> {
+            &self.counters
         }
     }
 
     impl<I: IpLayerIpExt, D: FakeStrongDeviceId> CounterContext<MulticastForwardingCounters<I>>
         for FakeCoreCtxState<I, D>
     {
-        fn with_counters<O, F: FnOnce(&MulticastForwardingCounters<I>) -> O>(&self, cb: F) -> O {
-            cb(&self.multicast_forwarding_counters)
+        fn counters(&self) -> &MulticastForwardingCounters<I> {
+            &self.multicast_forwarding_counters
         }
     }
 
@@ -716,14 +716,13 @@ mod tests {
         }
 
         // Verify that counters are updated.
-        api.core_ctx().with_counters(|counters: &MulticastForwardingCounters<I>| {
-            assert_eq!(counters.rx.get(), 1);
-            assert_eq!(counters.tx.get(), if lookup_succeeded { 1 } else { 0 });
-            assert_eq!(counters.no_tx_disabled_dev.get(), if dev_enabled { 0 } else { 1 });
-            assert_eq!(counters.no_tx_disabled_stack_wide.get(), if enabled { 0 } else { 1 });
-            assert_eq!(counters.no_tx_wrong_dev.get(), if right_dev { 0 } else { 1 });
-            assert_eq!(counters.pending_packets.get(), if right_key { 0 } else { 1 });
-        });
+        let counters: &MulticastForwardingCounters<I> = api.core_ctx().counters();
+        assert_eq!(counters.rx.get(), 1);
+        assert_eq!(counters.tx.get(), if lookup_succeeded { 1 } else { 0 });
+        assert_eq!(counters.no_tx_disabled_dev.get(), if dev_enabled { 0 } else { 1 });
+        assert_eq!(counters.no_tx_disabled_stack_wide.get(), if enabled { 0 } else { 1 });
+        assert_eq!(counters.no_tx_wrong_dev.get(), if right_dev { 0 } else { 1 });
+        assert_eq!(counters.pending_packets.get(), if right_key { 0 } else { 1 });
 
         lookup_succeeded
     }

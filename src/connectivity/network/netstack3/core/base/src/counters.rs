@@ -43,30 +43,30 @@ impl Counter {
 ///
 /// `CounterContext` exposes access to counters for observation and debugging.
 pub trait CounterContext<T> {
-    /// Call the function with an immutable reference to counter type T.
-    fn with_counters<O, F: FnOnce(&T) -> O>(&self, cb: F) -> O;
+    /// Returns a reference to the counters.
+    fn counters(&self) -> &T;
 
     /// Increments the counter returned by the callback.
     fn increment<F: FnOnce(&T) -> &Counter>(&self, cb: F) {
-        self.with_counters(|counters| cb(counters).increment());
+        cb(self.counters()).increment()
     }
 
     /// Adds the provided value to the counter returned by the callback.
     fn add<F: FnOnce(&T) -> &Counter>(&self, n: u64, cb: F) {
-        self.with_counters(|counters| cb(counters).add(n))
+        cb(self.counters()).add(n)
     }
 }
 
 /// A context that provides access to per-resource counters for observation and
 /// debugging.
 pub trait ResourceCounterContext<R, T>: CounterContext<T> {
-    /// Call `cb` with an immutable reference to the set of counters on `resource`.
-    fn with_per_resource_counters<O, F: FnOnce(&T) -> O>(&self, resource: &R, cb: F) -> O;
+    /// Returns a reference to the set of counters on `resource`.
+    fn per_resource_counters<'a>(&'a self, resource: &'a R) -> &'a T;
 
     /// Increments both the per-resource and stackwide versions of
     /// the counter returned by the callback.
     fn increment_both<F: Fn(&T) -> &Counter>(&self, resource: &R, cb: F) {
-        self.with_per_resource_counters(resource, |counters| cb(counters).increment());
-        self.with_counters(|counters| cb(counters).increment());
+        cb(self.per_resource_counters(resource)).increment();
+        cb(self.counters()).increment();
     }
 }

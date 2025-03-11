@@ -1104,18 +1104,14 @@ mod tests {
     }
 
     impl CounterContext<IgmpCounters> for FakeIgmpCtx {
-        fn with_counters<O, F: FnOnce(&IgmpCounters) -> O>(&self, cb: F) -> O {
-            cb(&self.stack_wide_counters)
+        fn counters(&self) -> &IgmpCounters {
+            &self.stack_wide_counters
         }
     }
 
     impl ResourceCounterContext<FakeDeviceId, IgmpCounters> for FakeIgmpCtx {
-        fn with_per_resource_counters<O, F: FnOnce(&IgmpCounters) -> O>(
-            &self,
-            _device_id: &FakeDeviceId,
-            cb: F,
-        ) -> O {
-            cb(&self.device_specific_counters)
+        fn per_resource_counters<'a>(&'a self, _device_id: &'a FakeDeviceId) -> &'a IgmpCounters {
+            &self.device_specific_counters
         }
     }
 
@@ -1230,20 +1226,16 @@ mod tests {
     }
 
     impl CounterContext<IgmpCounters> for &mut FakeCoreCtx {
-        fn with_counters<O, F: FnOnce(&IgmpCounters) -> O>(&self, cb: F) -> O {
-            <FakeCoreCtx as CounterContext<IgmpCounters>>::with_counters(self, cb)
+        fn counters(&self) -> &IgmpCounters {
+            <FakeCoreCtx as CounterContext<IgmpCounters>>::counters(self)
         }
     }
 
     impl ResourceCounterContext<FakeDeviceId, IgmpCounters> for &mut FakeCoreCtx {
-        fn with_per_resource_counters<O, F: FnOnce(&IgmpCounters) -> O>(
-            &self,
-            device_id: &FakeDeviceId,
-            cb: F,
-        ) -> O {
+        fn per_resource_counters<'a>(&'a self, device_id: &'a FakeDeviceId) -> &'a IgmpCounters {
             <
                 FakeCoreCtx as ResourceCounterContext<FakeDeviceId, IgmpCounters>
-            >::with_per_resource_counters(self, device_id, cb)
+            >::per_resource_counters(self, device_id)
         }
     }
 
@@ -1276,13 +1268,12 @@ mod tests {
         ) {
             assert_eq!(
                 self,
-                &core_ctx.with_counters(|c| CounterExpectations::from(c)),
+                &CounterExpectations::from(core_ctx.counters()),
                 "stack-wide counter mismatch"
             );
             assert_eq!(
                 self,
-                &core_ctx
-                    .with_per_resource_counters(&FakeDeviceId, |c| CounterExpectations::from(c)),
+                &CounterExpectations::from(core_ctx.per_resource_counters(&FakeDeviceId)),
                 "device-specific counter mismatch"
             );
         }
