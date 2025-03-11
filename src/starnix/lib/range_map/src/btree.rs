@@ -18,9 +18,6 @@ const B: usize = 6;
 /// The capacity of nodes in the btree.
 const NODE_CAPACITY: usize = 2 * B;
 
-/// The type of key stored in a RangeMap.
-pub type Key = u64;
-
 /// A location inside the btree.
 #[derive(Debug, Default, Clone, Copy)]
 struct Cursor {
@@ -152,18 +149,17 @@ enum CursorPosition {
 /// If the array contains a range that contains the key, returns the index of that range.
 /// Otherwise, returns the index at which the given key could be inserted into the array to
 /// maintain the ordering.
-fn binary_search(key: &Key, keys: &ArrayVec<Range<Key>, NODE_CAPACITY>) -> usize {
-    let key = *key;
+fn binary_search<K: Ord>(key: &K, keys: &ArrayVec<Range<K>, NODE_CAPACITY>) -> usize {
     let mut left = 0usize;
     let mut right = keys.len();
     while left < right {
         let mid = left + (right - left) / 2;
         // TODO: Consider `get_unchecked`.
         let range = &keys[mid];
-        if key < range.start {
+        if key < &range.start {
             // This range is too large.
             right = mid;
-        } else if key < range.end {
+        } else if key < &range.end {
             // We found the range that contains this key.
             return mid;
         } else {
@@ -182,21 +178,22 @@ fn binary_search(key: &Key, keys: &ArrayVec<Range<Key>, NODE_CAPACITY>) -> usize
 /// the `i`th entry in the values array. The balancing rules of the btree ensure that every
 /// non-root leaf has between N and N/2 entries populated.
 #[derive(Clone)]
-struct NodeLeaf<V: Clone> {
+struct NodeLeaf<K: Ord + Copy, V: Clone> {
     /// The keys stored in this leaf node.
     ///
     /// We store the key in a dense array to improve cache performance during lookups. We often
     /// need to binary-search the keys in a given leaf node, which means having those keys close
     /// together improves cache performance.
-    keys: ArrayVec<Range<Key>, NODE_CAPACITY>,
+    keys: ArrayVec<Range<K>, NODE_CAPACITY>,
 
     /// The value stored in this leaf node.
     values: ArrayVec<V, NODE_CAPACITY>,
 }
 
 /// Shows the map structure of the leaf node.
-impl<V> Debug for NodeLeaf<V>
+impl<K, V> Debug for NodeLeaf<K, V>
 where
+    K: Debug + Ord + Copy,
     V: Debug + Clone,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -205,7 +202,7 @@ where
 }
 
 /// The result of performing an insertion into a btree node.
-enum InsertResult<V: Clone> {
+enum InsertResult<K: Ord + Copy, V: Clone> {
     /// The value was successfully inserted into an empty slot.
     Inserted,
 
@@ -213,13 +210,13 @@ enum InsertResult<V: Clone> {
     /// leaf node to exceed its capacity and split into two leaf nodes. The existing leaf node
     /// now holds the entries to the left of the split and the entries to the right of the split
     /// are returned. The split occurred at the returned key.
-    SplitLeaf(Key, Arc<NodeLeaf<V>>),
+    SplitLeaf(K, Arc<NodeLeaf<K, V>>),
 
     /// The value was inserted into an empty slot in a subtree but that insertion caused the
     /// internal node to exceed its capacity and split into two internal nodes. The internal node
     /// now holds the entries to the left of the split and the entries to the right of the split
     /// are returned. The split occurred at the returned key.
-    SplitInternal(Key, Arc<NodeInternal<V>>),
+    SplitInternal(K, Arc<NodeInternal<K, V>>),
 }
 
 /// The intermediate result of a remove operation.
@@ -248,8 +245,9 @@ enum RemoveResult<V: Clone> {
     Underflow(V),
 }
 
-impl<V> NodeLeaf<V>
+impl<K, V> NodeLeaf<K, V>
 where
+    K: Ord + Copy,
     V: Clone,
 {
     /// Create an empty leaf node.
@@ -274,7 +272,7 @@ where
     }
 
     /// Search this leaf for the given key and return both the key and the value found.
-    fn get_key_value(&self, cursor: Cursor) -> Option<(&Range<Key>, &V)> {
+    fn get_key_value(&self, cursor: Cursor) -> Option<(&Range<K>, &V)> {
         if let Some(index) = self.get_index(cursor) {
             let key = &self.keys[index];
             let value = &self.values[index];
@@ -285,7 +283,7 @@ where
     }
 
     /// The last key/value pair stored in this leaf.
-    fn last_key_value(&self) -> Option<(&Range<Key>, &V)> {
+    fn last_key_value(&self) -> Option<(&Range<K>, &V)> {
         let key = self.keys.last()?;
         let value = self.values.last()?;
         Some((key, value))
@@ -294,7 +292,7 @@ where
     /// Find the given key in this node.
     ///
     /// Updates `cursor` to point to the position indicated by `position`.
-    fn find(&self, key: &Key, position: CursorPosition, cursor: &mut Cursor) {
+    fn find(&self, key: &K, position: CursorPosition, cursor: &mut Cursor) {
         let index = binary_search(key, &self.keys);
         match position {
             CursorPosition::Left => {
@@ -315,7 +313,7 @@ where
     /// Insert the given entry at the location indicated by `cursor`.
     ///
     /// Inserting a value into a leaf node might cause this node to split into two leaf nodes.
-    fn insert(&mut self, mut cursor: Cursor, range: Range<Key>, value: V) -> InsertResult<V> {
+    fn insert(&mut self, mut cursor: Cursor, range: Range<K>, value: V) -> InsertResult<K, V> {
         let index = cursor.pop().expect("valid cursor");
         if self.keys.len() == NODE_CAPACITY {
             if index == NODE_CAPACITY {
@@ -365,16 +363,17 @@ where
 
 /// The children of an internal node in the btree.
 #[derive(Clone, Debug)]
-enum ChildList<V: Clone> {
+enum ChildList<K: Ord + Copy, V: Clone> {
     /// Used when an internal node has leaf nodes as children.
-    Leaf(ArrayVec<Arc<NodeLeaf<V>>, NODE_CAPACITY>),
+    Leaf(ArrayVec<Arc<NodeLeaf<K, V>>, NODE_CAPACITY>),
 
     /// Used when an internal node has other internal nodes as children.
-    Internal(ArrayVec<Arc<NodeInternal<V>>, NODE_CAPACITY>),
+    Internal(ArrayVec<Arc<NodeInternal<K, V>>, NODE_CAPACITY>),
 }
 
-impl<V> ChildList<V>
+impl<K, V> ChildList<K, V>
 where
+    K: Ord + Copy,
     V: Clone,
 {
     /// Create a child list that has no children.
@@ -402,7 +401,7 @@ where
     }
 
     /// Obtain the child located at the given index.
-    fn get(&self, i: usize) -> Node<V> {
+    fn get(&self, i: usize) -> Node<K, V> {
         match self {
             ChildList::Leaf(children) => Node::Leaf(children[i].clone()),
             ChildList::Internal(children) => Node::Internal(children[i].clone()),
@@ -410,7 +409,7 @@ where
     }
 
     /// Get a reference to the child located at the given index.
-    fn get_ref(&self, i: usize) -> NodeRef<'_, V> {
+    fn get_ref(&self, i: usize) -> NodeRef<'_, K, V> {
         match self {
             ChildList::Leaf(children) => NodeRef::Leaf(&children[i]),
             ChildList::Internal(children) => NodeRef::Internal(&children[i]),
@@ -440,7 +439,7 @@ where
     /// Insert a child into the child list.
     ///
     /// The type of child node must match the type of the child list.
-    fn insert(&mut self, index: usize, child: Node<V>) {
+    fn insert(&mut self, index: usize, child: Node<K, V>) {
         match self {
             ChildList::Leaf(children) => {
                 let Node::Leaf(leaf) = child else {
@@ -487,16 +486,16 @@ where
 
 /// An internal node in the btree.
 #[derive(Clone, Debug)]
-struct NodeInternal<V: Clone> {
+struct NodeInternal<K: Ord + Copy, V: Clone> {
     /// A cache of the keys that partition the keys in the children.
     /// The key at index `i` is the smallest key stored in the subtree
     /// of the `i`+1 child.
     ///
     /// We only ever store CAPACITY - 1 keys in this array.
-    keys: ArrayVec<Key, NODE_CAPACITY>,
+    keys: ArrayVec<K, NODE_CAPACITY>,
 
     /// The children of this node.
-    children: ChildList<V>,
+    children: ChildList<K, V>,
 }
 
 /// Get mutable references to two entries in a slice.
@@ -518,15 +517,16 @@ fn get_two_mut<T>(slice: &mut [T], i: usize, j: usize) -> (&mut T, &mut T) {
     }
 }
 
-impl<V> NodeInternal<V>
+impl<K, V> NodeInternal<K, V>
 where
+    K: Ord + Copy,
     V: Clone,
 {
     /// The index of the child that might contain the given key.
     ///
     /// Searches the cached keys at this node to determine which child node might contain the given
     /// key.
-    fn get_child_index(&self, key: &Key) -> usize {
+    fn get_child_index(&self, key: &K) -> usize {
         let p = self.keys.partition_point(|k| k < key);
         if self.keys.get(p) == Some(key) {
             // If the query key exactly matches the split key, then we need to look for this key to
@@ -539,7 +539,7 @@ where
     }
 
     /// Search this subtree for the given key and return both the key and the value found.
-    fn get_key_value(&self, mut cursor: Cursor) -> Option<(&Range<Key>, &V)> {
+    fn get_key_value(&self, mut cursor: Cursor) -> Option<(&Range<K>, &V)> {
         let index = cursor.pop().expect("valid cursor");
         match &self.children {
             ChildList::Leaf(children) => children[index].get_key_value(cursor),
@@ -550,7 +550,7 @@ where
     /// Returns a reference to the node that contains the entry indicated by the cursor.
     ///
     /// Assumes the cursor points a descendant of this node.
-    fn get_containing_node(&self, mut cursor: Cursor) -> NodeRef<'_, V> {
+    fn get_containing_node(&self, mut cursor: Cursor) -> NodeRef<'_, K, V> {
         debug_assert!(cursor.depth >= 2);
         let index = cursor.pop().expect("valid cursor");
         if cursor.depth == 1 {
@@ -563,7 +563,7 @@ where
     }
 
     /// The last key/value pair stored in this subtree.
-    fn last_key_value(&self) -> Option<(&Range<Key>, &V)> {
+    fn last_key_value(&self) -> Option<(&Range<K>, &V)> {
         match &self.children {
             ChildList::Leaf(children) => {
                 children.last().expect("child lists are always non-empty").last_key_value()
@@ -577,7 +577,7 @@ where
     /// Find the given key in this node.
     ///
     /// Updates `cursor` to point to the position indicated by `position`.
-    fn find(&self, key: &Key, position: CursorPosition, cursor: &mut Cursor) {
+    fn find(&self, key: &K, position: CursorPosition, cursor: &mut Cursor) {
         let index = self.get_child_index(&key);
         match &self.children {
             ChildList::Leaf(children) => children[index].find(key, position, cursor),
@@ -591,7 +591,7 @@ where
     /// `key` must be the smallest key that occurs in the `child` subtree.
     ///
     /// The caller must ensure that the child is inserted in the correct location.
-    fn insert_child(&mut self, index: usize, key: Key, child: Node<V>) -> InsertResult<V> {
+    fn insert_child(&mut self, index: usize, key: K, child: Node<K, V>) -> InsertResult<K, V> {
         let n = self.children.len();
         if n == NODE_CAPACITY {
             if index == NODE_CAPACITY {
@@ -629,7 +629,7 @@ where
     ///
     /// Inserting a value into an internal node might cause this node to split into two internal
     /// nodes.
-    fn insert(&mut self, mut cursor: Cursor, range: Range<Key>, value: V) -> InsertResult<V> {
+    fn insert(&mut self, mut cursor: Cursor, range: Range<K>, value: V) -> InsertResult<K, V> {
         let index = cursor.pop().expect("valid cursor");
         let result = match &mut self.children {
             ChildList::Leaf(children) => {
@@ -793,16 +793,17 @@ where
 
 /// A node in the btree.
 #[derive(Clone, Debug)]
-enum Node<V: Clone> {
+enum Node<K: Ord + Copy, V: Clone> {
     /// An internal node.
-    Internal(Arc<NodeInternal<V>>),
+    Internal(Arc<NodeInternal<K, V>>),
 
     /// A leaf node.
-    Leaf(Arc<NodeLeaf<V>>),
+    Leaf(Arc<NodeLeaf<K, V>>),
 }
 
-impl<V> Node<V>
+impl<K, V> Node<K, V>
 where
+    K: Ord + Copy,
     V: Clone,
 {
     /// The number of children stored at this node.
@@ -814,7 +815,7 @@ where
     }
 
     /// Search this node for the given key and return both the key and the value found.
-    fn get_key_value(&self, cursor: Cursor) -> Option<(&Range<Key>, &V)> {
+    fn get_key_value(&self, cursor: Cursor) -> Option<(&Range<K>, &V)> {
         match self {
             Node::Leaf(node) => node.get_key_value(cursor),
             Node::Internal(node) => node.get_key_value(cursor),
@@ -822,7 +823,7 @@ where
     }
 
     /// The last key/value pair stored in this node.
-    fn last_key_value(&self) -> Option<(&Range<Key>, &V)> {
+    fn last_key_value(&self) -> Option<(&Range<K>, &V)> {
         match self {
             Node::Leaf(node) => node.last_key_value(),
             Node::Internal(node) => node.last_key_value(),
@@ -830,7 +831,7 @@ where
     }
 
     /// Converts a reference into a Node into a NodeRef.
-    fn as_ref(&self) -> NodeRef<'_, V> {
+    fn as_ref(&self) -> NodeRef<'_, K, V> {
         match self {
             Node::Internal(node) => NodeRef::Internal(node),
             Node::Leaf(node) => NodeRef::Leaf(node),
@@ -840,7 +841,7 @@ where
     /// Returns a reference to the node that contains the entry indicated by the cursor.
     ///
     /// Assumes the cursor is non-empty.
-    fn get_containing_node(&self, cursor: Cursor) -> NodeRef<'_, V> {
+    fn get_containing_node(&self, cursor: Cursor) -> NodeRef<'_, K, V> {
         assert!(cursor.depth > 0);
         if cursor.depth == 1 {
             return self.as_ref();
@@ -855,7 +856,7 @@ where
     ///
     /// If the insertion causes this node to split, the node will always split into two instances
     /// of the same type of node.
-    fn insert(&mut self, cursor: Cursor, range: Range<Key>, value: V) -> InsertResult<V> {
+    fn insert(&mut self, cursor: Cursor, range: Range<K>, value: V) -> InsertResult<K, V> {
         match self {
             Node::Internal(node) => Arc::make_mut(node).insert(cursor, range, value),
             Node::Leaf(node) => Arc::make_mut(node).insert(cursor, range, value),
@@ -873,7 +874,7 @@ where
     /// Find the given key in this node.
     ///
     /// Updates `cursor` to point to the position indicated by `position`.
-    fn find(&self, key: &Key, position: CursorPosition, cursor: &mut Cursor) {
+    fn find(&self, key: &K, position: CursorPosition, cursor: &mut Cursor) {
         match self {
             Node::Internal(node) => node.find(key, position, cursor),
             Node::Leaf(node) => node.find(key, position, cursor),
@@ -883,16 +884,17 @@ where
 
 /// A node in the btree.
 #[derive(Clone, Debug)]
-enum NodeRef<'a, V: Clone> {
+enum NodeRef<'a, K: Ord + Copy, V: Clone> {
     /// An internal node.
-    Internal(&'a Arc<NodeInternal<V>>),
+    Internal(&'a Arc<NodeInternal<K, V>>),
 
     /// A leaf node.
-    Leaf(&'a Arc<NodeLeaf<V>>),
+    Leaf(&'a Arc<NodeLeaf<K, V>>),
 }
 
-impl<'a, V> NodeRef<'a, V>
+impl<'a, K, V> NodeRef<'a, K, V>
 where
+    K: Ord + Copy,
     V: Clone,
 {
     /// The number of children stored at this node.
@@ -906,7 +908,7 @@ where
 
 /// An iterator over the key-value pairs stored in a RangeMap2.
 #[derive(Debug)]
-pub struct Iter<'a, V: Clone> {
+pub struct Iter<'a, K: Ord + Copy, V: Clone> {
     /// The state of the forward iteration.
     ///
     /// The cursor points to the next entry to enumerate.
@@ -919,11 +921,12 @@ pub struct Iter<'a, V: Clone> {
     backward: Cursor,
 
     /// The root node of the tree.
-    root: &'a Node<V>,
+    root: &'a Node<K, V>,
 }
 
-impl<'a, V> Iter<'a, V>
+impl<'a, K, V> Iter<'a, K, V>
 where
+    K: Ord + Copy,
     V: Clone,
 {
     /// Whether the iterator is complete.
@@ -934,11 +937,12 @@ where
     }
 }
 
-impl<'a, V> Iterator for Iter<'a, V>
+impl<'a, K, V> Iterator for Iter<'a, K, V>
 where
+    K: Ord + Copy,
     V: Clone,
 {
-    type Item = (&'a Range<Key>, &'a V);
+    type Item = (&'a Range<K>, &'a V);
 
     fn next(&mut self) -> Option<Self::Item> {
         while !self.is_done() {
@@ -970,8 +974,9 @@ where
     }
 }
 
-impl<'a, V> DoubleEndedIterator for Iter<'a, V>
+impl<'a, K, V> DoubleEndedIterator for Iter<'a, K, V>
 where
+    K: Ord + Copy,
     V: Clone,
 {
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -1009,16 +1014,17 @@ where
 /// This map can be cloned efficiently. If the map is modified after being cloned, the relevant
 /// parts of the map's internal structure will be copied lazily.
 #[derive(Clone, Debug)]
-pub struct RangeMap2<V: Clone + Eq> {
+pub struct RangeMap2<K: Ord + Copy, V: Clone + Eq> {
     /// The root node of the tree.
     ///
     /// The root node is either a leaf of an internal node, depending on the number of entries in
     /// the map.
-    node: Node<V>,
+    node: Node<K, V>,
 }
 
-impl<V> Default for RangeMap2<V>
+impl<K, V> Default for RangeMap2<K, V>
 where
+    K: Ord + Copy,
     V: Clone + Eq,
 {
     fn default() -> Self {
@@ -1026,8 +1032,9 @@ where
     }
 }
 
-impl<V> RangeMap2<V>
+impl<K, V> RangeMap2<K, V>
 where
+    K: Ord + Copy,
     V: Clone + Eq,
 {
     /// Whether this map contains any entries.
@@ -1041,7 +1048,7 @@ where
     /// Find the given key in this node.
     ///
     /// Returns a Cursor that points to the position indicated by `position`.
-    fn find(&self, key: &Key, position: CursorPosition) -> Cursor {
+    fn find(&self, key: &K, position: CursorPosition) -> Cursor {
         let mut cursor = Cursor::default();
         self.node.find(key, position, &mut cursor);
         cursor
@@ -1049,7 +1056,7 @@ where
 
     /// If the entry indicated by the cursor contains `key`, returns the range and value stored at
     /// that entry.
-    fn get_if_contains_key(&self, key: &Key, cursor: Cursor) -> Option<(&Range<Key>, &V)> {
+    fn get_if_contains_key(&self, key: &K, cursor: Cursor) -> Option<(&Range<K>, &V)> {
         if let Some((range, value)) = self.node.get_key_value(cursor) {
             if range.contains(key) {
                 return Some((range, value));
@@ -1061,19 +1068,19 @@ where
     /// Searches the map for a range that contains the given key.
     ///
     /// Returns the range and value if such a range is found.
-    pub fn get(&self, key: Key) -> Option<(&Range<Key>, &V)> {
+    pub fn get(&self, key: K) -> Option<(&Range<K>, &V)> {
         self.get_if_contains_key(&key, self.find(&key, CursorPosition::Left))
     }
 
     /// The last range stored in this map.
-    pub fn last_range(&self) -> Option<&Range<Key>> {
+    pub fn last_range(&self) -> Option<&Range<K>> {
         self.node.last_key_value().map(|(key, _)| key)
     }
 
     /// Searches the map for a range that contains the given key.
     ///
     /// If such a range is found, returns a cursor to that entry, the range, and the value.
-    fn get_cursor_key_value(&mut self, key: &Key) -> Option<(Cursor, Range<Key>, V)> {
+    fn get_cursor_key_value(&mut self, key: &K) -> Option<(Cursor, Range<K>, V)> {
         let cursor = self.find(key, CursorPosition::Left);
         self.get_if_contains_key(key, cursor)
             .map(|(range, value)| (cursor, range.clone(), value.clone()))
@@ -1082,7 +1089,7 @@ where
     /// Remove the entry with the given key from the map.
     ///
     /// If the key was present in the map, returns the value previously stored at the given key.
-    pub fn remove(&mut self, range: Range<Key>) -> Vec<V> {
+    pub fn remove(&mut self, range: Range<K>) -> Vec<V> {
         let mut removed_values = vec![];
 
         if range.is_empty() {
@@ -1142,7 +1149,7 @@ where
     }
 
     /// Insert the given range and value at the location indicated by the cursor.
-    fn insert_at(&mut self, cursor: Cursor, range: Range<Key>, value: V) -> Option<V> {
+    fn insert_at(&mut self, cursor: Cursor, range: Range<K>, value: V) -> Option<V> {
         let result = self.node.insert(cursor, range, value);
         match result {
             InsertResult::Inserted => None,
@@ -1191,22 +1198,19 @@ where
     ///
     /// If the inserted range is directly adjacent to another range with an equal value, the
     /// inserted range will be merged with the adjacent ranges.
-    pub fn insert(&mut self, mut range: Range<Key>, value: V) {
+    pub fn insert(&mut self, mut range: Range<K>, value: V) {
         if range.is_empty() {
             return;
         }
         self.remove(range.clone());
 
-        if range.start > 0 {
-            // Check for a range directly before this one. If it exists, it will be the last range with
-            // start < range.start.
-            let before_start = range.start - 1;
-            if let Some((cursor, prev_range, prev_value)) = self.get_cursor_key_value(&before_start)
-            {
-                if prev_range.end == range.start && value == prev_value {
-                    range.start = prev_range.start;
-                    self.remove_at(cursor);
-                }
+        // Check for a range directly before this one. If it exists, it will be the last range with
+        // start < range.start.
+        if let Some((prev_range, prev_value)) = self.range(..range.start).next_back() {
+            if prev_range.end == range.start && value == *prev_value {
+                let cursor = self.find(&prev_range.start, CursorPosition::Left);
+                range.start = prev_range.start;
+                self.remove_at(cursor);
             }
         }
 
@@ -1247,7 +1251,7 @@ where
     }
 
     /// Iterate through the keys and values stored in the map.
-    pub fn iter(&self) -> Iter<'_, V> {
+    pub fn iter(&self) -> Iter<'_, K, V> {
         Iter {
             forward: Cursor::with_index(0),
             backward: Cursor::with_index(self.node.len()),
@@ -1256,7 +1260,7 @@ where
     }
 
     /// Create the cursor stack for the start bound of the given range.
-    fn find_start_bound(&self, bounds: &impl RangeBounds<Key>) -> Cursor {
+    fn find_start_bound(&self, bounds: &impl RangeBounds<K>) -> Cursor {
         let key = match bounds.start_bound() {
             Bound::Included(key) => key,
             Bound::Excluded(key) => key,
@@ -1268,7 +1272,7 @@ where
     }
 
     /// Create the cursor stack for the end bound of the given range.
-    fn find_end_bound(&self, bounds: &impl RangeBounds<Key>) -> Cursor {
+    fn find_end_bound(&self, bounds: &impl RangeBounds<K>) -> Cursor {
         let key = match bounds.end_bound() {
             Bound::Included(key) => key,
             Bound::Excluded(key) => key,
@@ -1280,23 +1284,23 @@ where
     }
 
     /// Iterate through the keys and values stored in the given range in the map.
-    pub fn range(&self, bounds: impl RangeBounds<Key>) -> Iter<'_, V> {
+    pub fn range(&self, bounds: impl RangeBounds<K>) -> Iter<'_, K, V> {
         let forward = self.find_start_bound(&bounds);
         let backward = self.find_end_bound(&bounds);
         Iter { forward, backward, root: &self.node }
     }
 
     /// Iterate over the ranges in the map, starting at the first range starting after or at the given point.
-    pub fn iter_starting_at(&self, key: Key) -> impl Iterator<Item = (&Range<Key>, &V)> {
+    pub fn iter_starting_at(&self, key: K) -> impl Iterator<Item = (&Range<K>, &V)> {
         self.range(key..).filter(move |(range, _)| key <= range.start)
     }
 
     /// Iterate over the ranges in the map, starting at the last range starting before or at the given point.
-    pub fn iter_ending_at(&self, key: Key) -> impl DoubleEndedIterator<Item = (&Range<Key>, &V)> {
+    pub fn iter_ending_at(&self, key: K) -> impl DoubleEndedIterator<Item = (&Range<K>, &V)> {
         self.range(..key)
     }
 
-    pub fn intersection(&self, range: impl Borrow<Range<Key>>) -> Iter<'_, V> {
+    pub fn intersection(&self, range: impl Borrow<Range<K>>) -> Iter<'_, K, V> {
         let range = range.borrow();
         self.range(range.start..range.end)
     }
@@ -1308,7 +1312,7 @@ mod test {
 
     #[::fuchsia::test]
     fn test_empty() {
-        let mut map = RangeMap2::<i32>::default();
+        let mut map = RangeMap2::<u32, i32>::default();
 
         assert!(map.get(12).is_none());
         map.remove(10..34);
@@ -1319,7 +1323,7 @@ mod test {
 
     #[::fuchsia::test]
     fn test_insert_into_empty() {
-        let mut map = RangeMap2::<i32>::default();
+        let mut map = RangeMap2::<u32, i32>::default();
 
         map.insert(10..34, -14);
 
@@ -1332,7 +1336,7 @@ mod test {
 
     #[::fuchsia::test]
     fn test_iter() {
-        let mut map = RangeMap2::<i32>::default();
+        let mut map = RangeMap2::<u32, i32>::default();
 
         map.insert(10..34, -14);
         map.insert(74..92, -12);
@@ -1372,7 +1376,7 @@ mod test {
 
     #[::fuchsia::test]
     fn test_remove_overlapping_edge() {
-        let mut map = RangeMap2::<i32>::default();
+        let mut map = RangeMap2::<u32, i32>::default();
 
         map.insert(10..34, -14);
 
@@ -1385,7 +1389,7 @@ mod test {
 
     #[::fuchsia::test]
     fn test_remove_middle_splits_range() {
-        let mut map = RangeMap2::<i32>::default();
+        let mut map = RangeMap2::<u32, i32>::default();
 
         map.insert(10..34, -14);
         map.remove(15..18);
@@ -1396,7 +1400,7 @@ mod test {
 
     #[::fuchsia::test]
     fn test_remove_upper_half_of_split_range_leaves_lower_range() {
-        let mut map = RangeMap2::<i32>::default();
+        let mut map = RangeMap2::<u32, i32>::default();
 
         map.insert(10..34, -14);
         map.remove(15..18);
@@ -1409,7 +1413,7 @@ mod test {
 
     #[::fuchsia::test]
     fn test_range_map_overlapping_insert() {
-        let mut map = RangeMap2::<i32>::default();
+        let mut map = RangeMap2::<u32, i32>::default();
 
         map.insert(2..7, -21);
         map.insert(5..9, -42);
@@ -1424,7 +1428,7 @@ mod test {
 
     #[::fuchsia::test]
     fn test_intersect_single() {
-        let mut map = RangeMap2::<i32>::default();
+        let mut map = RangeMap2::<u32, i32>::default();
 
         map.insert(2..7, -10);
 
@@ -1450,7 +1454,7 @@ mod test {
 
     #[::fuchsia::test]
     fn test_intersect_multiple() {
-        let mut map = RangeMap2::<i32>::default();
+        let mut map = RangeMap2::<u32, i32>::default();
 
         map.insert(2..7, -10);
         map.insert(7..9, -20);
@@ -1470,7 +1474,7 @@ mod test {
 
     #[::fuchsia::test]
     fn test_intersect_no_gaps() {
-        let mut map = RangeMap2::<i32>::default();
+        let mut map = RangeMap2::<u32, i32>::default();
 
         map.insert(0..1, -10);
         map.insert(1..2, -20);
@@ -1485,7 +1489,7 @@ mod test {
 
     #[test]
     fn test_merging() {
-        let mut map = RangeMap2::<i32>::default();
+        let mut map = RangeMap2::<u32, i32>::default();
 
         map.insert(1..2, -10);
         assert_eq!(map.iter().collect::<Vec<_>>(), vec![(&(1..2), &-10)]);

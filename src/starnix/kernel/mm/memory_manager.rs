@@ -1189,7 +1189,7 @@ impl MemoryManagerState {
         // the mappings in the middle are fully covered by the target mapping and
         // won't be split.
         check_if_mapping_has_unauthorized_split(intersection.next())
-            || check_if_mapping_has_unauthorized_split(intersection.last())
+            || check_if_mapping_has_unauthorized_split(intersection.next_back())
     }
 
     /// Unmaps the specified range. Unmapped mappings are placed in `released_mappings`.

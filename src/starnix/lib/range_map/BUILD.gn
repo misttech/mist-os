@@ -23,8 +23,6 @@ rustc_library("range_map") {
 
   if (starnix_use_cowmap) {
     features = [ "use_cowmap" ]
-
-    deps += [ "//src/starnix/lib/cowmap" ]
   }
 }
 

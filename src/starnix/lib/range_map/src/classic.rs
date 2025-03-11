@@ -75,7 +75,6 @@ impl<T: Ord> Ord for RangeStart<T> {
 /// but also the range that value occupies in the map.
 #[derive(Debug)]
 pub struct RangeMap<K: Ord + Clone, V: Clone + Eq> {
-    #[cfg(not(feature = "use_cowmap"))]
     map: BTreeMap<RangeStart<K>, V>,
 }
 
@@ -272,7 +271,7 @@ where
     }
 
     /// Iterate over the ranges in the map that intersect the requested range.
-    pub fn intersection<R>(&self, range: R) -> impl Iterator<Item = (&Range<K>, &V)>
+    pub fn intersection<R>(&self, range: R) -> impl DoubleEndedIterator<Item = (&Range<K>, &V)>
     where
         R: Borrow<Range<K>>,
     {
