@@ -6,10 +6,10 @@ use crate::error::RoutingError;
 use crate::legacy_router::Sources;
 use cm_rust::{
     CapabilityDecl, CapabilityTypeName, ChildRef, ConfigurationDecl, DictionaryDecl, DirectoryDecl,
-    EventStreamDecl, ExposeConfigurationDecl, ExposeDecl, ExposeDictionaryDecl,
+    EventStreamDecl, ExposeConfigurationDecl, ExposeDecl, ExposeDeclCommon, ExposeDictionaryDecl,
     ExposeDirectoryDecl, ExposeProtocolDecl, ExposeResolverDecl, ExposeRunnerDecl,
     ExposeServiceDecl, ExposeSource, FidlIntoNative, NameMapping, NativeIntoFidl,
-    OfferConfigurationDecl, OfferDecl, OfferDictionaryDecl, OfferDirectoryDecl,
+    OfferConfigurationDecl, OfferDecl, OfferDeclCommon, OfferDictionaryDecl, OfferDirectoryDecl,
     OfferEventStreamDecl, OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl, OfferServiceDecl,
     OfferSource, OfferStorageDecl, ProtocolDecl, RegistrationSource, ResolverDecl, RunnerDecl,
     ServiceDecl, StorageDecl, UseDecl, UseDirectoryDecl, UseProtocolDecl, UseServiceDecl,
@@ -48,6 +48,44 @@ pub enum AggregateMember {
     Collection(Name),
     Parent,
     Self_,
+}
+
+impl TryFrom<&cm_rust::OfferDecl> for AggregateMember {
+    type Error = ();
+
+    fn try_from(offer: &cm_rust::OfferDecl) -> Result<AggregateMember, ()> {
+        match offer.source() {
+            // TODO: should we panic instead of filtering when we find something we don't expect?
+            cm_rust::OfferSource::Framework => Err(()),
+            cm_rust::OfferSource::Parent => Ok(AggregateMember::Parent),
+            cm_rust::OfferSource::Child(child) => Ok(AggregateMember::Child(child.clone())),
+            cm_rust::OfferSource::Collection(name) => Ok(AggregateMember::Collection(name.clone())),
+            cm_rust::OfferSource::Self_ => Ok(AggregateMember::Self_),
+            cm_rust::OfferSource::Capability(_name) => Err(()),
+            cm_rust::OfferSource::Void => Err(()),
+        }
+    }
+}
+
+impl TryFrom<&cm_rust::ExposeDecl> for AggregateMember {
+    type Error = ();
+
+    fn try_from(expose: &cm_rust::ExposeDecl) -> Result<AggregateMember, ()> {
+        match expose.source() {
+            // TODO: should we panic instead of filtering when we find something we don't expect?
+            cm_rust::ExposeSource::Framework => Err(()),
+            cm_rust::ExposeSource::Child(child) => Ok(AggregateMember::Child(cm_rust::ChildRef {
+                name: child.clone().into(),
+                collection: None,
+            })),
+            cm_rust::ExposeSource::Collection(name) => {
+                Ok(AggregateMember::Collection(name.clone()))
+            }
+            cm_rust::ExposeSource::Self_ => Ok(AggregateMember::Self_),
+            cm_rust::ExposeSource::Capability(_name) => Err(()),
+            cm_rust::ExposeSource::Void => Err(()),
+        }
+    }
 }
 
 impl fmt::Display for AggregateMember {

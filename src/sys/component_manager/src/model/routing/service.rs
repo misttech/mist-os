@@ -1046,7 +1046,6 @@ mod tests {
     use cm_rust::*;
     use cm_rust_testing::*;
     use fidl::endpoints::ServerEnd;
-    use fuchsia_async as fasync;
     use maplit::hashmap;
     use proptest::prelude::*;
     use rand::SeedableRng;
@@ -1243,7 +1242,6 @@ mod tests {
             if original_entries.len() != updated_entries.len() {
                 return updated_entries;
             }
-            fasync::Timer::new(std::time::Duration::from_millis(100)).await;
         }
     }
 

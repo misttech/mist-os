@@ -13,6 +13,7 @@ use crate::model::context::ModelContext;
 use crate::model::environment::Environment;
 use crate::model::escrow::{self, EscrowedState};
 use crate::model::namespace::create_namespace;
+use crate::model::routing::aggregate_router::AggregateRouter;
 use crate::model::routing::legacy::RouteRequestExt;
 use crate::model::routing::service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute};
 use crate::model::routing::{self, RoutingFailureErrorReporter};
@@ -482,6 +483,7 @@ impl ResolvedInstanceState {
             build_storage_admin_dictionary(component, &decl),
             declared_dictionaries,
             RoutingFailureErrorReporter::new(component.as_weak()),
+            &AggregateRouter::new,
         );
         Self::extend_program_input_namespace_with_legacy(
             &component,
@@ -927,6 +929,7 @@ impl ResolvedInstanceState {
         if !dynamic_offers.is_empty() {
             extend_dict_with_offers(
                 &component,
+                &self.decl().offers,
                 &child_component_output_dictionary_routers,
                 &self.sandbox.component_input,
                 &dynamic_offers,
@@ -935,6 +938,7 @@ impl ResolvedInstanceState {
                 &self.sandbox.capability_sourced_capabilities_dict,
                 &child_input,
                 RoutingFailureErrorReporter::new(component.as_weak()),
+                &AggregateRouter::new,
             );
         }
 

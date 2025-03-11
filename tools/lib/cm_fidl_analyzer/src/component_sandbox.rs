@@ -4,6 +4,7 @@
 
 use crate::component_instance::ComponentInstanceForAnalyzer;
 use crate::component_model::DynamicDictionaryConfig;
+use ::routing::bedrock::aggregate_router::AggregateSource;
 use ::routing::bedrock::program_output_dict;
 use ::routing::bedrock::structured_dict::ComponentInput;
 use ::routing::bedrock::with_policy_check::WithPolicyCheck;
@@ -325,4 +326,12 @@ pub(crate) fn static_children_component_output_dictionary_routers(
         );
     }
     output
+}
+
+pub fn new_aggregate_router(
+    _component: Arc<ComponentInstanceForAnalyzer>,
+    _sources: Vec<AggregateSource>,
+    capability_source: CapabilitySource,
+) -> Router<DirEntry> {
+    new_debug_only_specific_router(capability_source)
 }

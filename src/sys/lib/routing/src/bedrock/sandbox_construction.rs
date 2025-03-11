@@ -2,16 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::bedrock::request_metadata::{Metadata, METADATA_KEY_TYPE};
+use crate::bedrock::aggregate_router::{AggregateRouterFn, AggregateSource};
+use crate::bedrock::request_metadata::{service_metadata, Metadata, METADATA_KEY_TYPE};
 use crate::bedrock::structured_dict::{
     ComponentEnvironment, ComponentInput, ComponentOutput, StructuredDictMap,
 };
 use crate::bedrock::with_porcelain_type::WithPorcelainType as _;
 use crate::bedrock::with_service_renames_and_filter::WithServiceRenamesAndFilter;
-use crate::capability_source::{CapabilitySource, InternalCapability, VoidSource};
+use crate::capability_source::{
+    AggregateCapability, AggregateInstance, AggregateMember, AnonymizedAggregateSource,
+    CapabilitySource, FilteredAggregateProviderSource, InternalCapability, VoidSource,
+};
 use crate::component_instance::{ComponentInstanceInterface, WeakComponentInstanceInterface};
 use crate::error::{ErrorReporter, RouteRequestErrorInfo, RoutingError};
-use crate::{DictExt, LazyGet, WithAvailability, WithDefault, WithErrorReporter};
+use crate::{DictExt, LazyGet, Sources, WithAvailability, WithDefault, WithErrorReporter};
 use async_trait::async_trait;
 use cm_rust::{
     CapabilityTypeName, ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDeclCommon,
@@ -24,7 +28,8 @@ use log::warn;
 use moniker::{ChildName, Moniker};
 use router_error::RouterError;
 use sandbox::{
-    Capability, CapabilityBound, Connector, Data, Dict, Request, Routable, Router, RouterResponse,
+    Capability, CapabilityBound, Connector, Data, Dict, DirEntry, Request, Routable, Router,
+    RouterResponse,
 };
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -200,6 +205,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
     capability_sourced_capabilities_dict: Dict,
     declared_dictionaries: Dict,
     error_reporter: impl ErrorReporter,
+    aggregate_router_fn: &AggregateRouterFn<C>,
 ) -> ComponentSandbox {
     let component_output = ComponentOutput::new();
     let program_input = ProgramInput::default();
@@ -288,8 +294,9 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
         }
     }
 
-    for offer in &decl.offers {
-        let get_target_dict = || match offer.target() {
+    for offer_bundle in group_offer_aggregates(&decl.offers).into_iter() {
+        let first_offer = offer_bundle.first().unwrap();
+        let get_target_dict = || match first_offer.target() {
             cm_rust::OfferTarget::Child(child_ref) => {
                 assert!(child_ref.collection.is_none(), "unexpected dynamic offer target");
                 let child_name = Name::new(child_ref.name.as_str())
@@ -303,32 +310,66 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                     .capabilities()
             }
             cm_rust::OfferTarget::Collection(name) => {
-                if collection_inputs.get(name).is_none() {
+                if collection_inputs.get(&name).is_none() {
                     collection_inputs.insert(name.clone(), Default::default()).ok();
                 }
-                collection_inputs.get(name).expect("collection input was just added").capabilities()
+                collection_inputs
+                    .get(&name)
+                    .expect("collection input was just added")
+                    .capabilities()
             }
             cm_rust::OfferTarget::Capability(name) => {
-                let dict = match declared_dictionaries
-                    .get(name)
-                    .expect("dictionaries must be cloneable")
-                {
-                    Some(dict) => dict,
-                    None => {
-                        let dict = Dict::new();
-                        declared_dictionaries
-                            .insert(name.clone(), Capability::Dictionary(dict.clone()))
-                            .ok();
-                        Capability::Dictionary(dict)
-                    }
-                };
+                let dict =
+                    match declared_dictionaries.get(&name).expect("dictionaries must be cloneable")
+                    {
+                        Some(dict) => dict,
+                        None => {
+                            let dict = Dict::new();
+                            declared_dictionaries
+                                .insert(name.clone(), Capability::Dictionary(dict.clone()))
+                                .ok();
+                            Capability::Dictionary(dict)
+                        }
+                    };
                 let Capability::Dictionary(dict) = dict else {
                     panic!("wrong type in dict");
                 };
                 dict
             }
         };
-        match offer {
+        match first_offer {
+            cm_rust::OfferDecl::Service(_)
+                if offer_bundle.len() == 1
+                    && !matches!(first_offer.source(), cm_rust::OfferSource::Collection(_)) =>
+            {
+                extend_dict_with_offer::<DirEntry, _>(
+                    component,
+                    &child_component_output_dictionary_routers,
+                    &component_input,
+                    &program_output_dict,
+                    &framework_dict,
+                    &capability_sourced_capabilities_dict,
+                    first_offer,
+                    &(get_target_dict)(),
+                    error_reporter.clone(),
+                );
+            }
+            cm_rust::OfferDecl::Service(_) => {
+                let aggregate_router = new_aggregate_router_from_service_offers(
+                    &offer_bundle,
+                    component,
+                    &child_component_output_dictionary_routers,
+                    &component_input,
+                    &program_output_dict,
+                    &framework_dict,
+                    &capability_sourced_capabilities_dict,
+                    error_reporter.clone(),
+                    aggregate_router_fn,
+                );
+                (get_target_dict)()
+                    .insert(first_offer.target_name().clone(), aggregate_router.into())
+                    .expect("failed to insert capability into target dict")
+            }
             cm_rust::OfferDecl::Config(_) => extend_dict_with_offer::<Data, _>(
                 component,
                 &child_component_output_dictionary_routers,
@@ -336,7 +377,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                 &program_output_dict,
                 &framework_dict,
                 &capability_sourced_capabilities_dict,
-                offer,
+                first_offer,
                 &(get_target_dict)(),
                 error_reporter.clone(),
             ),
@@ -347,7 +388,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                 &program_output_dict,
                 &framework_dict,
                 &capability_sourced_capabilities_dict,
-                offer,
+                first_offer,
                 &(get_target_dict)(),
                 error_reporter.clone(),
             ),
@@ -360,7 +401,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                 &program_output_dict,
                 &framework_dict,
                 &capability_sourced_capabilities_dict,
-                offer,
+                first_offer,
                 &(get_target_dict)(),
                 error_reporter.clone(),
             ),
@@ -417,6 +458,134 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
         child_inputs,
         collection_inputs,
     }
+}
+
+fn new_aggregate_router_from_service_offers<C: ComponentInstanceInterface + 'static>(
+    offer_bundle: &Vec<&cm_rust::OfferDecl>,
+    component: &Arc<C>,
+    child_component_output_dictionary_routers: &HashMap<ChildName, Router<Dict>>,
+    component_input: &ComponentInput,
+    program_output_dict: &Dict,
+    framework_dict: &Dict,
+    capability_sourced_capabilities_dict: &Dict,
+    error_reporter: impl ErrorReporter,
+    aggregate_router_fn: &AggregateRouterFn<C>,
+) -> Router<DirEntry> {
+    let mut aggregate_sources = vec![];
+    let dict_for_source_router = Dict::new();
+    let source = new_aggregate_capability_source(component.moniker().clone(), offer_bundle.clone());
+    for offer in offer_bundle.iter() {
+        if matches!(&source, &CapabilitySource::FilteredAggregateProvider(_)) {
+            if let cm_rust::OfferDecl::Service(offer_service_decl) = offer {
+                if offer_service_decl
+                    .source_instance_filter
+                    .as_ref()
+                    .and_then(|v| v.first())
+                    .is_none()
+                    && offer_service_decl
+                        .renamed_instances
+                        .as_ref()
+                        .and_then(|v| v.first())
+                        .is_none()
+                {
+                    // If we're a filtering aggregate and no filter or renames have been
+                    // set, then all instances here are ignored, and there's no point in
+                    // including the router in the aggregate.
+                    continue;
+                }
+            }
+        }
+        extend_dict_with_offer::<DirEntry, _>(
+            component,
+            &child_component_output_dictionary_routers,
+            &component_input,
+            &program_output_dict,
+            &framework_dict,
+            &capability_sourced_capabilities_dict,
+            offer,
+            &dict_for_source_router,
+            error_reporter.clone(),
+        );
+        match dict_for_source_router.remove(offer.target_name()) {
+            Some(Capability::DirEntryRouter(router)) => {
+                let source_instance = match offer.source() {
+                    cm_rust::OfferSource::Self_ => AggregateInstance::Self_,
+                    cm_rust::OfferSource::Parent => AggregateInstance::Parent,
+                    cm_rust::OfferSource::Child(child_ref) => {
+                        AggregateInstance::Child(moniker::ChildName::new(
+                            child_ref.name.clone(),
+                            child_ref.collection.clone(),
+                        ))
+                    }
+                    other_source => {
+                        warn!("unsupported source found in offer aggregate: {:?}", other_source);
+                        continue;
+                    }
+                };
+                aggregate_sources.push(AggregateSource::DirectoryRouter { source_instance, router })
+            }
+            None => match offer.source() {
+                // `extend_dict_with_offer` doesn't insert a capability for offers with a source of
+                // `OfferSource::Collection`. This is because at this stage there's nothing in the
+                // collection, and thus no routers to things in the collection.
+                cm_rust::OfferSource::Collection(collection_name) => {
+                    aggregate_sources.push(AggregateSource::Collection {
+                        collection_name: collection_name.clone(),
+                    });
+                }
+                _ => continue,
+            },
+            other => warn!("found unexpected entry in dictionary: {:?}", other),
+        }
+    }
+    (aggregate_router_fn)(component.clone(), aggregate_sources, source).with_default(Request {
+        metadata: service_metadata(*offer_bundle.first().unwrap().availability()),
+        target: component.as_weak().into(),
+    })
+}
+
+fn new_aggregate_capability_source(
+    moniker: Moniker,
+    offers: Vec<&cm_rust::OfferDecl>,
+) -> CapabilitySource {
+    let offer_service_decls = offers
+        .iter()
+        .map(|o| match o {
+            cm_rust::OfferDecl::Service(o) => o,
+            _ => panic!("cannot aggregate non-service capabilities, manifest validation should prevent this"),
+        }).collect::<Vec<_>>();
+    // This is a filtered offer if any of the offers set a filter or rename mapping.
+    let is_filtered_offer = offer_service_decls.iter().any(|o| {
+        o.source_instance_filter.as_ref().map(|v| !v.is_empty()).unwrap_or(false)
+            || o.renamed_instances.as_ref().map(|v| !v.is_empty()).unwrap_or(false)
+    });
+    let capability =
+        AggregateCapability::Service(offer_service_decls.first().unwrap().target_name.clone());
+    if is_filtered_offer {
+        CapabilitySource::FilteredAggregateProvider(FilteredAggregateProviderSource {
+            capability,
+            moniker,
+            offer_service_decls: offer_service_decls.into_iter().cloned().collect(),
+            sources: Sources::new(cm_rust::CapabilityTypeName::Service).component().collection(),
+        })
+    } else {
+        let members = offers.iter().filter_map(|o| AggregateMember::try_from(*o).ok()).collect();
+        CapabilitySource::AnonymizedAggregate(AnonymizedAggregateSource {
+            capability,
+            moniker,
+            members,
+            sources: Sources::new(cm_rust::CapabilityTypeName::Service).component().collection(),
+            instances: vec![],
+        })
+    }
+}
+
+fn group_offer_aggregates(offers: &Vec<cm_rust::OfferDecl>) -> Vec<Vec<&cm_rust::OfferDecl>> {
+    let mut groupings = HashMap::new();
+    for offer in offers.iter() {
+        groupings.entry((offer.target(), offer.target_name())).or_insert(vec![]).push(offer);
+    }
+    groupings.into_iter().map(|(_key, grouping)| grouping.into()).collect()
 }
 
 fn build_environment(
@@ -507,10 +676,10 @@ fn build_environment(
     environment
 }
 
-/// Extends the given dict based on offer declarations. All offer declarations in `offers` are
-/// assumed to target `target_dict`.
+/// Extends the given `target_input` to contain the capabilities described in `dynamic_offers`.
 pub fn extend_dict_with_offers<C: ComponentInstanceInterface + 'static>(
     component: &Arc<C>,
+    static_offers: &Vec<cm_rust::OfferDecl>,
     child_component_output_dictionary_routers: &HashMap<ChildName, Router<Dict>>,
     component_input: &ComponentInput,
     dynamic_offers: &Vec<cm_rust::OfferDecl>,
@@ -519,9 +688,57 @@ pub fn extend_dict_with_offers<C: ComponentInstanceInterface + 'static>(
     capability_sourced_capabilities_dict: &Dict,
     target_input: &ComponentInput,
     error_reporter: impl ErrorReporter,
+    aggregate_router_fn: &AggregateRouterFn<C>,
 ) {
-    for offer in dynamic_offers {
-        match offer {
+    for offer_bundle in group_offer_aggregates(dynamic_offers).into_iter() {
+        let first_offer = offer_bundle.first().unwrap();
+        match first_offer {
+            cm_rust::OfferDecl::Service(_) => {
+                let static_offer_bundles = group_offer_aggregates(static_offers);
+                let maybe_static_offer_bundle = static_offer_bundles.into_iter().find(|bundle| {
+                    bundle.first().unwrap().target_name() == first_offer.target_name()
+                });
+                let mut combined_offer_bundle = offer_bundle.clone();
+                if let Some(mut static_offer_bundle) = maybe_static_offer_bundle {
+                    // We are aggregating together dynamic and static offers, as there are static
+                    // offers with the same target name as our current dynamic offers. We already
+                    // populated a router for the static bundle in the target input, let's toss
+                    // that and generate a new one with the expanded set of offers.
+                    let _ = target_input.capabilities().remove(first_offer.target_name());
+                    combined_offer_bundle.append(&mut static_offer_bundle);
+                }
+                if combined_offer_bundle.len() == 1
+                    && !matches!(first_offer.source(), cm_rust::OfferSource::Collection(_))
+                {
+                    extend_dict_with_offer::<DirEntry, _>(
+                        component,
+                        &child_component_output_dictionary_routers,
+                        &component_input,
+                        &program_output_dict,
+                        &framework_dict,
+                        &capability_sourced_capabilities_dict,
+                        first_offer,
+                        &target_input.capabilities(),
+                        error_reporter.clone(),
+                    );
+                } else {
+                    let aggregate_router = new_aggregate_router_from_service_offers(
+                        &combined_offer_bundle,
+                        component,
+                        &child_component_output_dictionary_routers,
+                        &component_input,
+                        &program_output_dict,
+                        &framework_dict,
+                        &capability_sourced_capabilities_dict,
+                        error_reporter.clone(),
+                        aggregate_router_fn,
+                    );
+                    target_input
+                        .capabilities()
+                        .insert(first_offer.target_name().clone(), aggregate_router.into())
+                        .expect("failed to insert capability into target dict");
+                }
+            }
             cm_rust::OfferDecl::Config(_) => extend_dict_with_offer::<Data, _>(
                 component,
                 &child_component_output_dictionary_routers,
@@ -529,7 +746,7 @@ pub fn extend_dict_with_offers<C: ComponentInstanceInterface + 'static>(
                 program_output_dict,
                 framework_dict,
                 capability_sourced_capabilities_dict,
-                offer,
+                first_offer,
                 &target_input.capabilities(),
                 error_reporter.clone(),
             ),
@@ -540,7 +757,7 @@ pub fn extend_dict_with_offers<C: ComponentInstanceInterface + 'static>(
                 program_output_dict,
                 framework_dict,
                 capability_sourced_capabilities_dict,
-                offer,
+                first_offer,
                 &target_input.capabilities(),
                 error_reporter.clone(),
             ),
@@ -553,7 +770,7 @@ pub fn extend_dict_with_offers<C: ComponentInstanceInterface + 'static>(
                 program_output_dict,
                 framework_dict,
                 capability_sourced_capabilities_dict,
-                offer,
+                first_offer,
                 &target_input.capabilities(),
                 error_reporter.clone(),
             ),
@@ -828,6 +1045,7 @@ fn is_supported_offer(offer: &cm_rust::OfferDecl) -> bool {
             | cm_rust::OfferDecl::Dictionary(_)
             | cm_rust::OfferDecl::Runner(_)
             | cm_rust::OfferDecl::Resolver(_)
+            | cm_rust::OfferDecl::Service(_)
     )
 }
 
@@ -849,13 +1067,13 @@ fn extend_dict_with_offer<T, C: ComponentInstanceInterface + 'static>(
 
     let source_path = offer.source_path();
     let target_name = offer.target_name();
-    if target_dict.get_capability(&source_path).is_some() {
-        warn!(
-            "duplicate sources for protocol {} in a dict, unable to populate dict entry",
+    if target_dict.get_capability(&target_name).is_some() {
+        panic!(
+            "duplicate sources for {} {} in a dict, unable to populate dict entry, manifest \
+                validation should prevent this",
+            cm_rust::CapabilityTypeName::from(offer),
             target_name
         );
-        target_dict.remove_capability(target_name);
-        return;
     }
     let porcelain_type = CapabilityTypeName::from(offer);
     let router: Router<T> = match offer.source() {
@@ -940,8 +1158,13 @@ fn extend_dict_with_offer<T, C: ComponentInstanceInterface + 'static>(
             InternalCapability::Protocol(offer.source_name().clone()),
             component,
         ),
-        // This is only relevant for services, so this arm is never reached.
-        cm_rust::OfferSource::Collection(_name) => return,
+        cm_rust::OfferSource::Collection(_collection_name) => {
+            // There's nothing in a collection at this stage, and thus we can't get any routers to
+            // things in the collection. What's more: the contents of the collection can change
+            // over time, so it must be monitored. We don't handle collections here, they're
+            // handled in a different way by whoever called `extend_dict_with_offer`.
+            return;
+        }
     };
     let metadata = Dict::new();
     metadata
