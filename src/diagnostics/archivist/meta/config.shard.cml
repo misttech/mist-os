@@ -19,7 +19,7 @@
         maximum_concurrent_snapshots_per_reader: { type: "uint64" },
 
         // Number of threads that the archivist will use for its multithreaded executor.
-        num_threads: { type: "uint64" },
+        num_threads: { type: "uint8" },
 
         // Path to the archivist pipeline configuration.
         pipelines_path: {

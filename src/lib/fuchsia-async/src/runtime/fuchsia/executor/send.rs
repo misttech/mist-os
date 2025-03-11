@@ -12,7 +12,7 @@ use std::future::Future;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
-use std::{fmt, thread, usize};
+use std::{fmt, thread};
 
 /// A multi-threaded port-based executor for Fuchsia. Requires that tasks scheduled on it
 /// implement `Send` so they can be load balanced between worker threads.
@@ -45,7 +45,7 @@ impl fmt::Debug for SendExecutor {
 impl SendExecutor {
     /// Create a new multi-threaded executor.
     #[allow(deprecated)]
-    pub fn new(num_threads: usize) -> Self {
+    pub fn new(num_threads: u8) -> Self {
         Self::new_inner(num_threads, None)
     }
 
@@ -64,14 +64,11 @@ impl SendExecutor {
     }
 
     fn new_inner(
-        num_threads: usize,
+        num_threads: u8,
         worker_init: Option<Arc<dyn Fn() + Send + Sync + 'static>>,
     ) -> Self {
-        let inner = Arc::new(Executor::new(
-            ExecutorTime::RealTime,
-            /* is_local */ false,
-            num_threads.try_into().expect("no more than 256 threads are supported"),
-        ));
+        let inner =
+            Arc::new(Executor::new(ExecutorTime::RealTime, /* is_local */ false, num_threads));
         let root_scope = ScopeHandle::root(inner.clone());
         Executor::set_local(root_scope.clone());
         Self { inner, root_scope, threads: Vec::default(), worker_init }

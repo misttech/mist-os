@@ -818,7 +818,7 @@ pub struct BuiltinEnvironment {
     pub trace_provider: TraceProvider,
     // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
     #[allow(dead_code)]
-    pub num_threads: usize,
+    pub num_threads: u8,
     // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
     #[allow(dead_code)]
     pub realm_builder_resolver: Option<RealmBuilderResolver>,

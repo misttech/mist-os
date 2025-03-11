@@ -193,7 +193,7 @@ where
 
 /// Run an async main function with a multi threaded executor (containing `num_threads`).
 #[doc(hidden)]
-pub fn main_multithreaded<F, Fut, R>(f: F, num_threads: usize) -> R
+pub fn main_multithreaded<F, Fut, R>(f: F, num_threads: u8) -> R
 where
     F: FnOnce() -> Fut,
     Fut: Future<Output = R> + Send + 'static,
@@ -205,11 +205,7 @@ where
 /// Run an async main function with a multi threaded executor (containing `num_threads`) and apply
 /// `role_name` to all of the threads.
 #[doc(hidden)]
-pub fn main_multithreaded_with_role<F, Fut, R>(
-    f: F,
-    num_threads: usize,
-    _role_name: &'static str,
-) -> R
+pub fn main_multithreaded_with_role<F, Fut, R>(f: F, num_threads: u8, _role_name: &'static str) -> R
 where
     F: FnOnce() -> Fut,
     Fut: Future<Output = R> + Send + 'static,
@@ -259,7 +255,7 @@ where
 
 /// Run an async test function with a multi threaded executor (containing `num_threads`).
 #[doc(hidden)]
-pub fn test_multithreaded<F, Fut, R>(f: F, num_threads: usize) -> R
+pub fn test_multithreaded<F, Fut, R>(f: F, num_threads: u8) -> R
 where
     F: Fn(usize) -> Fut + Sync + 'static,
     Fut: Future<Output = R> + Send + 'static,
