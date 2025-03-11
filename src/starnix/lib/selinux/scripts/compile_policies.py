@@ -79,6 +79,13 @@ _COMPOSITE_POLICY_PATHS = [
     (
         [
             "base_policy.conf",
+            "new_file/selinuxfs_policy.conf",
+        ],
+        "selinuxfs_policy.pp",
+    ),
+    (
+        [
+            "base_policy.conf",
             "new_file/memfd_transition.conf",
         ],
         "memfd_transition.pp",

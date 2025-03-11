@@ -111,6 +111,7 @@ resource("policies") {
   sources = [
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/memfd_transition.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/minimal_policy.pp",
+    "//src/starnix/lib/selinux/testdata/composite_policies/compiled/selinuxfs_policy.pp",
   ]
   outputs = "data/policies/{{source_file_part}}"
 }
