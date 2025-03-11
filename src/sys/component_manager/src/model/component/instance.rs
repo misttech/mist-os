@@ -15,7 +15,6 @@ use crate::model::escrow::{self, EscrowedState};
 use crate::model::namespace::create_namespace;
 use crate::model::routing::aggregate_router::AggregateRouter;
 use crate::model::routing::legacy::RouteRequestExt;
-use crate::model::routing::service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute};
 use crate::model::routing::{self, RoutingFailureErrorReporter};
 use crate::model::start::Start;
 use crate::model::storage::build_storage_admin_dictionary;
@@ -344,9 +343,6 @@ pub struct ResolvedInstanceState {
     /// URL, or (with a package context) a relative path URL.
     address: ComponentAddress,
 
-    /// Anonymized service directories aggregated from collections and children.
-    pub anonymized_services: HashMap<AnonymizedServiceRoute, Arc<AnonymizedAggregateServiceDir>>,
-
     /// The sandbox holds all dictionaries involved in capability routing.
     pub sandbox: ComponentSandbox,
 
@@ -429,7 +425,6 @@ impl ResolvedInstanceState {
             exposed_dir: Once::default(),
             dynamic_offers: vec![],
             address,
-            anonymized_services: HashMap::new(),
             sandbox: Default::default(),
             program_escrow,
         };

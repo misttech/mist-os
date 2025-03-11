@@ -7,7 +7,6 @@ pub mod component;
 pub mod escrow;
 pub mod event_logger;
 pub mod model;
-pub mod mutable_directory;
 pub mod start;
 
 pub(crate) mod context;

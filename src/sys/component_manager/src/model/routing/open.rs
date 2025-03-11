@@ -3,17 +3,10 @@
 // found in the LICENSE file.
 
 use crate::capability::CapabilityProvider;
-use crate::model::component::{
-    ComponentInstance, ExtendedInstance, StartReason, WeakComponentInstance,
-};
+use crate::model::component::{ComponentInstance, ExtendedInstance, WeakComponentInstance};
 use crate::model::routing::providers::{
-    DefaultComponentCapabilityProvider, DirectoryEntryCapabilityProvider,
-    NamespaceCapabilityProvider,
+    DefaultComponentCapabilityProvider, NamespaceCapabilityProvider,
 };
-use crate::model::routing::service::{
-    AnonymizedAggregateServiceDir, AnonymizedServiceRoute, FilteredAggregateServiceProvider,
-};
-use crate::model::start::Start;
 use crate::model::storage::{self, BackingDirectoryInfo};
 use ::routing::capability_source::{
     AnonymizedAggregateSource, CapabilitySource, ComponentSource, NamespaceSource,
@@ -23,7 +16,6 @@ use ::routing::RouteSource;
 use errors::{CapabilityProviderError, ModelError, OpenError};
 use fidl_fuchsia_io as fio;
 use moniker::ExtendedMoniker;
-use routing::collection::AnonymizedAggregateServiceProvider;
 use std::sync::Arc;
 use vfs::directory::entry::OpenRequest;
 use vfs::remote::remote_dir;
@@ -177,79 +169,11 @@ impl<'a> CapabilityOpenRequest<'a> {
                 }
             }
             CapabilitySource::FilteredProvider(_)
-            | CapabilitySource::FilteredAggregateProvider(_) => Ok(Some(Box::new(
-                FilteredAggregateServiceProvider::new_from_capability_source(
-                    source.clone(),
-                    target,
-                )
-                .await?,
-            ))),
-            CapabilitySource::AnonymizedAggregate(AnonymizedAggregateSource {
-                capability,
-                moniker,
-                members,
-                sources: _,
-                instances: _,
-            }) => {
-                let source_component_instance = target.upgrade()?.find_absolute(moniker).await?;
-
-                let route = AnonymizedServiceRoute {
-                    source_moniker: source_component_instance.moniker.clone(),
-                    members: members.clone(),
-                    service_name: capability.source_name().clone(),
-                };
-
-                source_component_instance
-                    .ensure_started(&StartReason::AccessCapability {
-                        target: target.moniker.clone(),
-                        name: capability.source_name().clone(),
-                    })
-                    .await?;
-
-                // These are defined in the lock, but used after it, so forward
-                // declare them.
-                let provider;
-                let service_dir;
-                // Lock while we set up the service collection, and drop the lock
-                // before adding children.
-                {
-                    let mut state = source_component_instance.lock_resolved_state().await?;
-
-                    // If there is an existing collection service directory, provide it instead
-                    if let Some(service_dir) = state.anonymized_services.get(&route) {
-                        let provider = DirectoryEntryCapabilityProvider {
-                            entry: service_dir.dir_entry().await,
-                        };
-                        return Ok(Some(Box::new(provider)));
-                    }
-
-                    let aggregate_capability_provider =
-                        AnonymizedAggregateServiceProvider::new_from_capability_source(
-                            source,
-                            &source_component_instance,
-                        )
-                        .await
-                        .expect("failed to create AnonymizedAggregateServiceProvider");
-
-                    service_dir = Arc::new(AnonymizedAggregateServiceDir::new(
-                        source_component_instance.as_weak(),
-                        route.clone(),
-                        Box::new(aggregate_capability_provider),
-                    ));
-
-                    let entry = service_dir.dir_entry().await;
-                    source_component_instance.hooks.install(service_dir.hooks()).await;
-
-                    state.anonymized_services.insert(route, service_dir.clone());
-
-                    provider = DirectoryEntryCapabilityProvider { entry };
-                };
-
-                // Populate the service dir with service entries from children that may have been started before the service
-                // capability had been routed from the collection.
-                service_dir.add_entries_from_children().await?;
-
-                Ok(Some(Box::new(provider)))
+            | CapabilitySource::FilteredAggregateProvider(_)
+            | CapabilitySource::AnonymizedAggregate(AnonymizedAggregateSource { .. }) => {
+                // This function should only be used for legacy routing, and these capability
+                // sources have been fully moved to bedrock routing.
+                panic!("this code should never be reached");
             }
             // These capabilities do not have a default provider.
             CapabilitySource::Framework(_)

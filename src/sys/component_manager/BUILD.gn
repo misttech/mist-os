@@ -213,7 +213,6 @@ _component_manager_bin = {
     "src/model/events/synthesizer.rs",
     "src/model/mod.rs",
     "src/model/model.rs",
-    "src/model/mutable_directory.rs",
     "src/model/namespace.rs",
     "src/model/resolver.rs",
     "src/model/routing/aggregate_router.rs",

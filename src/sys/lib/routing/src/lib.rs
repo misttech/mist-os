@@ -5,7 +5,6 @@
 pub mod availability;
 pub mod bedrock;
 pub mod capability_source;
-pub mod collection;
 pub mod component_instance;
 pub mod config;
 pub mod environment;

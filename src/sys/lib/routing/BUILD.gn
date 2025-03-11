@@ -80,7 +80,6 @@ rustc_library("routing") {
     "src/bedrock/with_rights.rs",
     "src/bedrock/with_service_renames_and_filter.rs",
     "src/capability_source.rs",
-    "src/collection.rs",
     "src/component_instance.rs",
     "src/config.rs",
     "src/environment.rs",

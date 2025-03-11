@@ -24,10 +24,9 @@ use fidl::endpoints::ProtocolMarker;
 use moniker::{ExtendedMoniker, Moniker};
 use routing::capability_source::{
     AggregateCapability, AggregateMember, AnonymizedAggregateSource, BuiltinSource,
-    CapabilitySource, ComponentCapability, ComponentSource, FilteredAggregateCapabilityRouteData,
-    FilteredAggregateProviderSource, InternalCapability,
+    CapabilitySource, ComponentCapability, ComponentSource, FilteredAggregateProviderSource,
+    InternalCapability,
 };
-use routing::collection::new_filtered_aggregate_from_capability_source;
 use routing::component_instance::ComponentInstanceInterface;
 use routing::error::RoutingError;
 use routing::mapper::NoopRouteMapper;
@@ -3345,8 +3344,6 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         let b_component =
             model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
-        let c_component =
-            model.look_up_instance(&vec!["c"].try_into().unwrap()).await.expect("c instance");
         let UseDecl::Service(use_decl) = use_decl else { unreachable!() };
         let source = route_capability(
             RouteRequest::UseService(use_decl),
@@ -3363,32 +3360,6 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         assert_eq!(
             source.source_moniker(),
             ExtendedMoniker::ComponentInstance("c".parse().unwrap())
-        );
-        let capability_provider =
-            new_filtered_aggregate_from_capability_source(source, c_component.as_weak());
-        let mut data = capability_provider.route_instances();
-        assert_eq!(data.len(), 1);
-        let data = data.remove(0).await.unwrap();
-        assert_matches!(
-            data,
-            FilteredAggregateCapabilityRouteData {
-                capability_source: CapabilitySource::Component(ComponentSource {
-                    moniker,
-                    capability,
-                }),
-                instance_filter,
-            }
-            if moniker == "c".parse().unwrap() &&
-                capability == ComponentCapability::Service(ServiceDecl {
-                    name: "foo".parse().unwrap(),
-                    source_path: Some("/svc/foo".parse().unwrap()),
-                }) &&
-                instance_filter == vec![
-                    NameMapping {
-                        source_name: "service_instance_0".parse().unwrap(),
-                        target_name: "service_instance_0".parse().unwrap(),
-                    }
-                ]
         );
     }
 
@@ -3428,8 +3399,6 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         let b_component =
             model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
-        let c_component =
-            model.look_up_instance(&vec!["c"].try_into().unwrap()).await.expect("c instance");
         let UseDecl::Service(use_decl) = use_decl else { unreachable!() };
         let source = route_capability(
             RouteRequest::UseService(use_decl),
@@ -3446,32 +3415,6 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         assert_eq!(
             source.source_moniker(),
             ExtendedMoniker::ComponentInstance("c".parse().unwrap())
-        );
-        let capability_provider =
-            new_filtered_aggregate_from_capability_source(source, c_component.as_weak());
-        let mut data = capability_provider.route_instances();
-        assert_eq!(data.len(), 1);
-        let data = data.remove(0).await.unwrap();
-        assert_matches!(
-            data,
-            FilteredAggregateCapabilityRouteData {
-                capability_source: CapabilitySource::Component(ComponentSource {
-                    moniker,
-                    capability,
-                }),
-                instance_filter,
-            }
-            if moniker == "c".parse().unwrap() &&
-                capability == ComponentCapability::Service(ServiceDecl {
-                    name: "foo".parse().unwrap(),
-                    source_path: Some("/svc/foo".parse().unwrap()),
-                }) &&
-                instance_filter == vec![
-                    NameMapping {
-                        source_name: "instance_0".parse().unwrap(),
-                        target_name: "renamed_instance_0".parse().unwrap(),
-                    }
-                ]
         );
     }
 
