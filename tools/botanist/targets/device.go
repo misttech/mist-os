@@ -579,7 +579,7 @@ func (t *Device) fastbootFlash(ctx context.Context, pbPath string, images []boot
 		return fmt.Errorf("GetImageFromPB fvm: %w", err)
 	}
 	if fvmImage == nil {
-		fvmImage, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "fxfs", "")
+		fvmImage, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "fxfs.fastboot", "")
 		if err != nil {
 			return fmt.Errorf("failed to find fvm image from product bundle %s", pbPath)
 		}
