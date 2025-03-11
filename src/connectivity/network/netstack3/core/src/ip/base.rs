@@ -508,9 +508,7 @@ impl<
         original_body: &[u8],
         err: Icmpv4ErrorCode,
     ) {
-        CounterContext::<IpCounters<Ipv4>>::increment(self, |counters: &IpCounters<Ipv4>| {
-            &counters.receive_icmp_error
-        });
+        CounterContext::<IpCounters<Ipv4>>::counters(self).receive_icmp_error.increment();
         trace!("InnerIcmpContext<Ipv4>::receive_icmp_error({:?})", err);
 
         match original_proto {
@@ -588,9 +586,7 @@ impl<
         original_body: &[u8],
         err: Icmpv6ErrorCode,
     ) {
-        CounterContext::<IpCounters<Ipv6>>::increment(self, |counters: &IpCounters<Ipv6>| {
-            &counters.receive_icmp_error
-        });
+        CounterContext::<IpCounters<Ipv6>>::counters(self).receive_icmp_error.increment();
         trace!("InnerIcmpContext<Ipv6>::receive_icmp_error({:?})", err);
 
         match original_next_header {

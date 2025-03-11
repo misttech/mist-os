@@ -2003,7 +2003,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
 
                 // Try the next address, as long as we have not reached the maximum number of
                 // attempts.
-                slaac_addrs.increment(|counters| &counters.generated_slaac_addr_exists);
+                slaac_addrs.counters().generated_slaac_addr_exists.increment();
                 local_regen_attempts += 1;
                 if local_regen_attempts > MAX_LOCAL_REGEN_ATTEMPTS {
                     debug!(

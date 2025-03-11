@@ -2426,7 +2426,7 @@ where
         });
         match &result {
             Err(BindError::LocalAddressError(LocalAddressError::FailedToAllocateLocalPort)) => {
-                core_ctx.increment(|counters| &counters.failed_port_reservations);
+                core_ctx.counters().failed_port_reservations.increment();
             }
             Err(_) | Ok(_) => {}
         }
@@ -2799,13 +2799,13 @@ where
         match &result {
             Ok(()) => {}
             Err(err) => {
-                core_ctx.increment(|counters| &counters.failed_connection_attempts);
+                core_ctx.counters().failed_connection_attempts.increment();
                 match err {
                     ConnectError::NoRoute => {
-                        core_ctx.increment(|counters| &counters.active_open_no_route_errors)
+                        core_ctx.counters().active_open_no_route_errors.increment()
                     }
                     ConnectError::NoPort => {
-                        core_ctx.increment(|counters| &counters.failed_port_reservations)
+                        core_ctx.counters().failed_port_reservations.increment()
                     }
                     _ => {}
                 }
@@ -5266,7 +5266,7 @@ where
             },
             conn_addr,
         );
-        core_ctx.increment(|counters| &counters.active_connection_openings);
+        core_ctx.counters().active_connection_openings.increment();
         TcpSocketStateInner::Bound(BoundSocketState::Connected { conn, sharing, timer })
     })())
 }
@@ -5436,16 +5436,16 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
     };
     match result {
         Ok(()) => {
-            core_ctx.increment(|counters| &counters.segments_sent);
+            core_ctx.counters().segments_sent.increment();
             match control {
                 None => {}
-                Some(Control::RST) => core_ctx.increment(|counters| &counters.resets_sent),
-                Some(Control::SYN) => core_ctx.increment(|counters| &counters.syns_sent),
-                Some(Control::FIN) => core_ctx.increment(|counters| &counters.fins_sent),
+                Some(Control::RST) => core_ctx.counters().resets_sent.increment(),
+                Some(Control::SYN) => core_ctx.counters().syns_sent.increment(),
+                Some(Control::FIN) => core_ctx.counters().fins_sent.increment(),
             }
         }
         Err(err) => {
-            core_ctx.increment(|counters| &counters.segment_send_errors);
+            core_ctx.counters().segment_send_errors.increment();
             match socket_id {
                 Some(socket_id) => debug!("{:?}: failed to send segment: {:?}", socket_id, err),
                 None => debug!("TCP: failed to send segment: {:?}", err),

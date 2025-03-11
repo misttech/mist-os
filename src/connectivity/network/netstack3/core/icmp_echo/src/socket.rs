@@ -1076,8 +1076,9 @@ impl<
                     "ICMP received ICMP error {:?} from {:?}, to {:?} on socket {:?}",
                     err, original_dst_ip, original_src_ip, conn
                 );
-                core_ctx
-                    .increment(|counters: &IcmpRxCounters<I>| &counters.error_delivered_to_socket)
+                CounterContext::<IcmpRxCounters<I>>::counters(core_ctx)
+                    .error_delivered_to_socket
+                    .increment()
             } else {
                 trace!(
                     "IcmpIpTransportContext::receive_icmp_error: Got ICMP error message for \

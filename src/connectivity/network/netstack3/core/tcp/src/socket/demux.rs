@@ -127,14 +127,18 @@ where
         }
 
         if broadcast.is_some() {
-            core_ctx.increment(|counters: &TcpCounters<I>| &counters.invalid_ip_addrs_received);
+            CounterContext::<TcpCounters<I>>::counters(core_ctx)
+                .invalid_ip_addrs_received
+                .increment();
             debug!("tcp: dropping broadcast TCP packet");
             return Ok(());
         }
 
         let remote_ip = match SpecifiedAddr::new(remote_ip.into()) {
             None => {
-                core_ctx.increment(|counters: &TcpCounters<I>| &counters.invalid_ip_addrs_received);
+                CounterContext::<TcpCounters<I>>::counters(core_ctx)
+                    .invalid_ip_addrs_received
+                    .increment();
                 debug!("tcp: source address unspecified, dropping the packet");
                 return Ok(());
             }
@@ -143,7 +147,9 @@ where
         let remote_ip: SocketIpAddr<_> = match remote_ip.try_into() {
             Ok(remote_ip) => remote_ip,
             Err(AddrIsMappedError {}) => {
-                core_ctx.increment(|counters: &TcpCounters<I>| &counters.invalid_ip_addrs_received);
+                CounterContext::<TcpCounters<I>>::counters(core_ctx)
+                    .invalid_ip_addrs_received
+                    .increment();
                 debug!("tcp: source address is mapped (ipv4-mapped-ipv6), dropping the packet");
                 return Ok(());
             }
@@ -151,7 +157,9 @@ where
         let local_ip: SocketIpAddr<_> = match local_ip.try_into() {
             Ok(local_ip) => local_ip,
             Err(AddrIsMappedError {}) => {
-                core_ctx.increment(|counters: &TcpCounters<I>| &counters.invalid_ip_addrs_received);
+                CounterContext::<TcpCounters<I>>::counters(core_ctx)
+                    .invalid_ip_addrs_received
+                    .increment();
                 debug!("tcp: local address is mapped (ipv4-mapped-ipv6), dropping the packet");
                 return Ok(());
             }
@@ -161,11 +169,15 @@ where
         {
             Ok(packet) => packet,
             Err(err) => {
-                core_ctx.increment(|counters: &TcpCounters<I>| &counters.invalid_segments_received);
+                CounterContext::<TcpCounters<I>>::counters(core_ctx)
+                    .invalid_segments_received
+                    .increment();
                 debug!("tcp: failed parsing incoming packet {:?}", err);
                 match err {
                     ParseError::Checksum => {
-                        core_ctx.increment(|counters: &TcpCounters<I>| &counters.checksum_errors);
+                        CounterContext::<TcpCounters<I>>::counters(core_ctx)
+                            .checksum_errors
+                            .increment();
                     }
                     ParseError::NotSupported | ParseError::NotExpected | ParseError::Format => {}
                 }
@@ -177,7 +189,9 @@ where
         let incoming = match Segment::try_from(packet) {
             Ok(segment) => segment,
             Err(err) => {
-                core_ctx.increment(|counters: &TcpCounters<I>| &counters.invalid_segments_received);
+                CounterContext::<TcpCounters<I>>::counters(core_ctx)
+                    .invalid_segments_received
+                    .increment();
                 debug!("tcp: malformed segment {:?}", err);
                 return Ok(());
             }
@@ -185,17 +199,17 @@ where
         let conn_addr =
             ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) };
 
-        core_ctx.increment(|counters: &TcpCounters<I>| &counters.valid_segments_received);
+        CounterContext::<TcpCounters<I>>::counters(core_ctx).valid_segments_received.increment();
         match incoming.header.control {
             None => {}
             Some(Control::RST) => {
-                core_ctx.increment(|counters: &TcpCounters<I>| &counters.resets_received)
+                CounterContext::<TcpCounters<I>>::counters(core_ctx).resets_received.increment()
             }
             Some(Control::SYN) => {
-                core_ctx.increment(|counters: &TcpCounters<I>| &counters.syns_received)
+                CounterContext::<TcpCounters<I>>::counters(core_ctx).syns_received.increment()
             }
             Some(Control::FIN) => {
-                core_ctx.increment(|counters: &TcpCounters<I>| &counters.fins_received)
+                CounterContext::<TcpCounters<I>>::counters(core_ctx).fins_received.increment()
             }
         }
         handle_incoming_packet::<I, _, _>(
@@ -392,7 +406,9 @@ fn handle_incoming_packet<WireI, BC, CC>(
     };
 
     if !found_socket {
-        core_ctx.increment(|counters: &TcpCounters<WireI>| &counters.received_segments_no_dispatch);
+        CounterContext::<TcpCounters<WireI>>::counters(core_ctx)
+            .received_segments_no_dispatch
+            .increment();
 
         // There is no existing TCP state, pretend it is closed
         // and generate a RST if needed.
@@ -413,7 +429,9 @@ fn handle_incoming_packet<WireI, BC, CC>(
             );
         }
     } else {
-        core_ctx.increment(|counters: &TcpCounters<WireI>| &counters.received_segments_dispatched);
+        CounterContext::<TcpCounters<WireI>>::counters(core_ctx)
+            .received_segments_dispatched
+            .increment();
     }
 }
 
@@ -818,7 +836,7 @@ where
             if let Some(to_destroy) = to_destroy {
                 socket::destroy_socket(core_ctx, bindings_ctx, to_destroy);
             }
-            core_ctx.increment(|counters| &counters.passive_connection_openings);
+            core_ctx.counters().passive_connection_openings.increment();
             true
         }
     }
@@ -886,8 +904,8 @@ where
     // reuse the connection in TIME-WAIT, this is because we need to store the
     // reused connection in the accept queue so we have to respect its limit.
     if accept_queue.len() == backlog.get() {
-        core_ctx.increment(|counters| &counters.listener_queue_overflow);
-        core_ctx.increment(|counters| &counters.failed_connection_attempts);
+        core_ctx.counters().listener_queue_overflow.increment();
+        core_ctx.counters().failed_connection_attempts.increment();
         debug!("incoming SYN dropped because of the full backlog of the listener");
         return ListenerIncomingSegmentDisposition::FoundSocket;
     }
@@ -915,8 +933,8 @@ where
     ) {
         Ok(ip_sock) => ip_sock,
         err @ Err(IpSockCreationError::Route(_)) => {
-            core_ctx.increment(|counters| &counters.passive_open_no_route_errors);
-            core_ctx.increment(|counters| &counters.failed_connection_attempts);
+            core_ctx.counters().passive_open_no_route_errors.increment();
+            core_ctx.counters().failed_connection_attempts.increment();
             debug!("cannot construct an ip socket to the SYN originator: {:?}, ignoring", err);
             return ListenerIncomingSegmentDisposition::NoMatchingSocket;
         }
@@ -934,7 +952,7 @@ where
             // there isn't much we can do here since sending a RST back is
             // impossible, we just need to silent drop the segment.
             error!("Cannot find a device with large enough MTU for the connection");
-            core_ctx.increment(|counters| &counters.failed_connection_attempts);
+            core_ctx.counters().failed_connection_attempts.increment();
             match err {
                 MmsError::NoDevice(_) | MmsError::MTUTooSmall(_) => {
                     return ListenerIncomingSegmentDisposition::FoundSocket;
@@ -1064,7 +1082,7 @@ where
             None => {
                 // We didn't create a new connection, short circuit early and
                 // don't send out the pending segment.
-                core_ctx.increment(|counters| &counters.failed_connection_attempts);
+                core_ctx.counters().failed_connection_attempts.increment();
                 return ListenerIncomingSegmentDisposition::ConflictingConnection;
             }
         }

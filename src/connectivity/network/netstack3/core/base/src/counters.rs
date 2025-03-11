@@ -45,16 +45,6 @@ impl Counter {
 pub trait CounterContext<T> {
     /// Returns a reference to the counters.
     fn counters(&self) -> &T;
-
-    /// Increments the counter returned by the callback.
-    fn increment<F: FnOnce(&T) -> &Counter>(&self, cb: F) {
-        cb(self.counters()).increment()
-    }
-
-    /// Adds the provided value to the counter returned by the callback.
-    fn add<F: FnOnce(&T) -> &Counter>(&self, n: u64, cb: F) {
-        cb(self.counters()).add(n)
-    }
 }
 
 /// A context that provides access to per-resource counters for observation and

@@ -2340,7 +2340,7 @@ fn handle_neighbor_timer<I, D, CC, BC>(
                         Some((packet, original_src_ip, original_dst_ip))
                     })
                     .or_else(|| {
-                        core_ctx.increment(|counters| &counters.icmp_dest_unreachable_dropped);
+                        core_ctx.counters().icmp_dest_unreachable_dropped.increment();
                         None
                     })
                 else {

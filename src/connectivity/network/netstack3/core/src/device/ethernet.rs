@@ -199,9 +199,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<Ipv6>>
 
         let mac = ethernet::get_mac(self, device_id);
 
-        <Self as CounterContext<NdpCounters>>::increment(self, |counters| {
-            &counters.tx.neighbor_solicitation
-        });
+        CounterContext::<NdpCounters>::counters(self).tx.neighbor_solicitation.increment();
         debug!("sending NDP solicitation for {lookup_addr} to {dst_ip}");
         // TODO(https://fxbug.dev/42165912): Either panic or guarantee that this error
         // can't happen statically.

@@ -1040,7 +1040,7 @@ impl<
         }) {
             DadAddressStateLookupResult::Assigned => IpAddressState::Assigned,
             DadAddressStateLookupResult::Tentative { matched_nonce: true } => {
-                self.increment(|counters| &counters.version_rx.drop_looped_back_dad_probe);
+                self.counters().version_rx.drop_looped_back_dad_probe.increment();
 
                 // Per RFC 7527 section 4.2, "the receiver compares the nonce
                 // included in the message, with any stored nonce on the
