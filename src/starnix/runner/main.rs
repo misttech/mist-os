@@ -7,7 +7,8 @@ use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_component::server::ServiceFs;
 use futures::StreamExt;
 use kernel_manager::kernels::Kernels;
-use kernel_manager::{serve_starnix_manager, SuspendContext};
+use kernel_manager::serve_starnix_manager;
+use kernel_manager::suspend::SuspendContext;
 use log::{error, info, warn};
 use std::sync::Arc;
 use {
