@@ -16,11 +16,25 @@ _OPT_PATTERN = re.compile("[\W]+")
 
 _SHOULD_LOG = False
 
-_CPU_MAP = {"aarch64": "arm64", "x86_64": "x64"}
+_FUCHSIA_CPU_MAP = {"aarch64": "arm64", "x86_64": "x64"}
+
+_BAZEL_CPU_ALIASES = {
+    "k8": "x86_64",
+    "x86_64": "x86_64",
+    "aarch64": "aarch64",
+    "arm64": "aarch64",
+    "riscv64": "riscv64",
+}
 
 
-def _map_cpu(cpu):
-    return _CPU_MAP.get(cpu, cpu)
+def _map_fuchsia_cpu(cpu):
+    """Converts a bazel cpu to a fuchsia cpu"""
+    return _FUCHSIA_CPU_MAP.get(cpu, cpu)
+
+
+def _map_bazel_cpu(cpu):
+    """Converts a cpu to one that bazel recognizes"""
+    return _BAZEL_CPU_ALIASES.get(cpu, cpu)
 
 
 # These regex patterns are a tuple of compiled regex's to lambdas that will be
@@ -50,9 +64,8 @@ _REGEX_PATH_PATTERNS = [
         re.compile(
             ".*bazel-out.*\/(?P<arch>[a-zA-Z0-9]+)-.*\/bin\/src\/devices\/bind\/(?P<name>.*)\/_virtual_includes.*"
         ),
-        # _map_cpu
         lambda m: "-I{cpu}-shared/gen/src/devices/bind/{name}/{name}/bind_cpp".format(
-            cpu=_map_cpu(m["arch"]),
+            cpu=_map_fuchsia_cpu(m["arch"]),
             name=m["name"],
         ),
     ),
@@ -211,7 +224,7 @@ def collect_actions(action_graph: Sequence[Dict]) -> Sequence[Action]:
 
 
 def get_action_graph_from_labels(
-    bazel_exe: str, compilation_mode, labels: Sequence[str]
+    bazel_exe: str, compilation_mode: str, cpu: str, labels: Sequence[str]
 ) -> Sequence[Dict]:
     labels_set = "set({})".format(" ".join(labels))
     info("Getting action graph for {}".format(labels_set))
@@ -221,6 +234,7 @@ def get_action_graph_from_labels(
             "aquery",
             "mnemonic('CppCompile',deps({}))".format(labels_set),
             compilation_mode,
+            "--cpu={}".format(_map_bazel_cpu(cpu)),
             "--output=jsonproto",
             "--ui_event_filters=-info,-warning",
             "--noshow_loading_progress",
@@ -331,6 +345,9 @@ def main(argv: Sequence[str]):
         "--optimization", required=True, help="The build level optimization"
     )
     parser.add_argument(
+        "--target-cpu", required=True, help="The cpu we are targeting"
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         required=False,
@@ -375,6 +392,7 @@ def main(argv: Sequence[str]):
     actions = get_action_graph_from_labels(
         args.bazel,
         compilation_mode(args),
+        args.target_cpu,
         labels,
     )
 
