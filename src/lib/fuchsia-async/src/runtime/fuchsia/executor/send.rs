@@ -170,13 +170,17 @@ impl SendExecutor {
             let inner = self.inner.clone();
             let root_scope = self.root_scope.clone();
             let worker_init = self.worker_init.clone();
-            self.threads.push(thread::spawn(move || {
-                Executor::set_local(root_scope);
-                if let Some(init) = worker_init.as_ref() {
-                    init();
-                }
-                inner.worker_lifecycle::</* UNTIL_STALLED: */ false>();
-            }));
+            let thread = thread::Builder::new()
+                .name("executor_worker".to_string())
+                .spawn(move || {
+                    Executor::set_local(root_scope);
+                    if let Some(init) = worker_init.as_ref() {
+                        init();
+                    }
+                    inner.worker_lifecycle::</* UNTIL_STALLED: */ false>();
+                })
+                .expect("must be able to spawn threads");
+            self.threads.push(thread);
         }
     }
 
