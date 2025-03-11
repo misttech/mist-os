@@ -870,7 +870,10 @@ pub fn sys_shutdown(
 // Syscalls for arch32 usage
 #[cfg(feature = "arch32")]
 mod arch32 {
-    pub use super::{sys_recvfrom as sys_arch32_recvfrom, sys_socketpair as sys_arch32_socketpair};
+    pub use super::{
+        sys_recvfrom as sys_arch32_recvfrom, sys_setsockopt as sys_arch32_setsockopt,
+        sys_socketpair as sys_arch32_socketpair,
+    };
 }
 
 #[cfg(feature = "arch32")]

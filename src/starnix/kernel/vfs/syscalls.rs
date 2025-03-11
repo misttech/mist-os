@@ -3339,6 +3339,17 @@ mod arch32 {
         )
     }
 
+    pub fn sys_arch32_ftruncate64(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        fd: FdNumber,
+        _: SyscallArg,
+        length_low: off_t,
+        length_high: off_t,
+    ) -> Result<(), Errno> {
+        super::sys_ftruncate(locked, current_task, fd, length_low | (length_high << 32))
+    }
+
     pub fn sys_arch32_chmod(
         locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
