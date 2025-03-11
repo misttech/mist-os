@@ -1923,6 +1923,7 @@ pub fn sys_vhangup(
 mod arch32 {
     pub use super::{
         sys_execve as sys_arch32_execve, sys_geteuid as sys_arch32_geteuid32,
+        sys_getresgid as sys_arch32_getresgid32, sys_getresuid as sys_arch32_getresuid32,
         sys_getrlimit as sys_arch32_ugetrlimit, sys_getuid as sys_arch32_getuid32,
         sys_sched_getaffinity as sys_arch32_sched_getaffinity,
         sys_sched_setaffinity as sys_arch32_sched_setaffinity,

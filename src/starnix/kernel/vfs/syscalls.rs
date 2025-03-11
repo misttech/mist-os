@@ -3443,10 +3443,11 @@ mod arch32 {
     }
 
     pub use super::{
-        sys_epoll_ctl as sys_arch32_epoll_ctl, sys_fstatat64 as sys_arch32_fstatat64,
-        sys_ftruncate as sys_arch32_ftruncate, sys_renameat2 as sys_arch32_renameat2,
-        sys_timerfd_create as sys_arch32_timerfd_create,
-        sys_timerfd_settime as sys_arch32_timerfd_settime,
+        sys_epoll_ctl as sys_arch32_epoll_ctl, sys_fchmod as sys_arch32_fchmod,
+        sys_fchown as sys_arch32_fchown32, sys_fchown as sys_arch32_fchown,
+        sys_fstatat64 as sys_arch32_fstatat64, sys_ftruncate as sys_arch32_ftruncate,
+        sys_renameat2 as sys_arch32_renameat2, sys_timerfd_create as sys_arch32_timerfd_create,
+        sys_timerfd_settime as sys_arch32_timerfd_settime, sys_truncate as sys_arch32_truncate,
     };
 }
 
