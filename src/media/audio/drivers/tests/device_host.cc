@@ -127,15 +127,16 @@ void DeviceHost::DetectDevices(bool devfs_only, bool no_virtual_audio) {
   // Then, if enabled, enable virtual_audio instances and wait for their detection.
   // By reusing the watchers we've already configured, we detect each preexisting device only once.
   if (!no_virtual_audio) {
-    auto device_count = device_entries().size();
+    auto real_device_count = device_entries().size();
     dev_type = DeviceType::Virtual;
     AddVirtualDevices();
 
     // If we hang indefinitely here, the test execution environment will eventually timeout.
-    while (device_entries().size() < device_count + kNumVirtualAudioDevicesToAdd) {
+    auto device_count = real_device_count + virtual_audio_devices_.size();
+    while (device_entries().size() < device_count) {
       device_loop_.RunUntilIdle();
     }
-    ASSERT_GE(device_entries().size(), device_count + kNumVirtualAudioDevicesToAdd)
+    ASSERT_GE(device_entries().size(), device_count)
         << "DeviceWatcher timed out, for " << dev_type << " devices";
   }
 
@@ -152,34 +153,62 @@ void DeviceHost::DetectDevices(bool devfs_only, bool no_virtual_audio) {
 // Optionally called during DetectDevices. Create virtual_audio instances (all four types) using the
 // default configuration settings (which should pass all tests).
 void DeviceHost::AddVirtualDevices() {
-  const std::string kControlNodePath =
-      fxl::Concatenate({"/dev/", fuchsia::virtualaudio::LEGACY_CONTROL_NODE_NAME});
-  zx_status_t status = fdio_service_connect(kControlNodePath.c_str(),
-                                            controller_.NewRequest().TakeChannel().release());
-  ASSERT_EQ(status, ZX_OK) << "fdio_service_connect failed";
+  // Add virtual audio devices using non-legacy controller.
+  {
+    const std::string kControlNodePath =
+        fxl::Concatenate({"/dev/", fuchsia::virtualaudio::CONTROL_NODE_NAME});
+    zx_status_t status = fdio_service_connect(kControlNodePath.c_str(),
+                                              controller_.NewRequest().TakeChannel().release());
+    ASSERT_EQ(status, ZX_OK) << "fdio_service_connect failed";
 
-  uint32_t num_inputs = -1, num_outputs = -1, num_unspecified_direction = -1;
-  status = controller_->GetNumDevices(&num_inputs, &num_outputs, &num_unspecified_direction);
-  ASSERT_EQ(status, ZX_OK) << "GetNumDevices failed";
-  ASSERT_TRUE(controller_.is_bound()) << "virtualaudio::Control did not stay bound";
-  ASSERT_EQ(num_inputs, 0u) << num_inputs << " virtual_audio inputs already exist (should be 0)";
-  ASSERT_EQ(num_outputs, 0u) << num_outputs << " virtual_audio outputs already exist (should be 0)";
-  ASSERT_EQ(num_unspecified_direction, 0u)
-      << num_unspecified_direction
-      << " virtual_audio devices with unspecified direction already exist (should be 0)";
+    uint32_t num_inputs = -1, num_outputs = -1, num_unspecified_direction = -1;
+    status = controller_->GetNumDevices(&num_inputs, &num_outputs, &num_unspecified_direction);
+    ASSERT_EQ(status, ZX_OK) << "GetNumDevices failed";
+    ASSERT_TRUE(controller_.is_bound()) << "virtualaudio::Control did not stay bound";
+    ASSERT_EQ(num_inputs, 0u) << num_inputs << " virtual-audio inputs already exist (should be 0)";
+    ASSERT_EQ(num_outputs, 0u) << num_outputs
+                               << " virtual-audio outputs already exist (should be 0)";
+    ASSERT_EQ(num_unspecified_direction, 0u)
+        << num_unspecified_direction
+        << " virtual-audio devices with unspecified direction already exist (should be 0)";
 
-  // Codec directionality is not applicable.
-  AddVirtualDevice(fuchsia::virtualaudio::DeviceType::CODEC, codec_);
+    // Composite has no directionality; for this testing.
+    AddVirtualDevice(controller_, fuchsia::virtualaudio::DeviceType::COMPOSITE);
+  }
 
-  AddVirtualDevice(fuchsia::virtualaudio::DeviceType::DAI, dai_input_, true);
-  AddVirtualDevice(fuchsia::virtualaudio::DeviceType::DAI, dai_output_, false);
+  // Add virtual audio devices using legacy controller.
+  {
+    const std::string kLegacyControlNodePath =
+        fxl::Concatenate({"/dev/", fuchsia::virtualaudio::LEGACY_CONTROL_NODE_NAME});
+    zx_status_t status = fdio_service_connect(
+        kLegacyControlNodePath.c_str(), legacy_controller_.NewRequest().TakeChannel().release());
+    ASSERT_EQ(status, ZX_OK) << "fdio_service_connect failed";
 
-  AddVirtualDevice(fuchsia::virtualaudio::DeviceType::STREAM_CONFIG, stream_config_input_, true);
-  AddVirtualDevice(fuchsia::virtualaudio::DeviceType::STREAM_CONFIG, stream_config_output_, false);
+    uint32_t num_inputs = -1, num_outputs = -1, num_unspecified_direction = -1;
+    status =
+        legacy_controller_->GetNumDevices(&num_inputs, &num_outputs, &num_unspecified_direction);
+    ASSERT_EQ(status, ZX_OK) << "GetNumDevices failed";
+    ASSERT_TRUE(legacy_controller_.is_bound()) << "virtualaudio::Control did not stay bound";
+    ASSERT_EQ(num_inputs, 0u) << num_inputs
+                              << " virtual-audio-legacy inputs already exist (should be 0)";
+    ASSERT_EQ(num_outputs, 0u) << num_outputs
+                               << " virtual-audio-legacy outputs already exist (should be 0)";
+    ASSERT_EQ(num_unspecified_direction, 0u)
+        << num_unspecified_direction
+        << " virtual-audio-legacy devices with unspecified direction already exist (should be 0)";
+
+    // Codec directionality is not applicable.
+    AddVirtualDevice(legacy_controller_, fuchsia::virtualaudio::DeviceType::CODEC);
+
+    AddVirtualDevice(legacy_controller_, fuchsia::virtualaudio::DeviceType::DAI, true);
+    AddVirtualDevice(legacy_controller_, fuchsia::virtualaudio::DeviceType::DAI, false);
+    AddVirtualDevice(legacy_controller_, fuchsia::virtualaudio::DeviceType::STREAM_CONFIG, true);
+    AddVirtualDevice(legacy_controller_, fuchsia::virtualaudio::DeviceType::STREAM_CONFIG, false);
+  }
 }
 
-void DeviceHost::AddVirtualDevice(const fuchsia::virtualaudio::DeviceType device_type,
-                                  fuchsia::virtualaudio::DevicePtr& device_ptr,
+void DeviceHost::AddVirtualDevice(fuchsia::virtualaudio::ControlSyncPtr& controller,
+                                  const fuchsia::virtualaudio::DeviceType device_type,
                                   std::optional<bool> is_input) {
   const char* direction = is_input ? (*is_input ? "input" : "output") : "NONE";
   const char* type;
@@ -207,19 +236,20 @@ void DeviceHost::AddVirtualDevice(const fuchsia::virtualaudio::DeviceType device
   }
 
   fuchsia::virtualaudio::Control_GetDefaultConfiguration_Result config_result;
-  zx_status_t status = controller_->GetDefaultConfiguration(
+  zx_status_t status = controller->GetDefaultConfiguration(
       device_type, std::move(configuration_direction), &config_result);
-  ASSERT_EQ(status, ZX_OK) << "virtualaudio::Control::GetDefaultConfiguration (" << type << " "
+  EXPECT_EQ(status, ZX_OK) << "virtualaudio::Control::GetDefaultConfiguration (" << type << " "
                            << direction << ") failed";
   ASSERT_FALSE(config_result.is_err()) << "Failed to GetDefaultConfiguration for (" << type << " "
                                        << direction << ") device: " << config_result.err();
 
   fuchsia::virtualaudio::Configuration config = std::move(config_result.response().config);
   fuchsia::virtualaudio::Control_AddDevice_Result result;
-  status = controller_->AddDevice(std::move(config),
-                                  device_ptr.NewRequest(device_loop_.dispatcher()), &result);
+  auto& device_ptr = virtual_audio_devices_.emplace_back(nullptr);
+  status = controller->AddDevice(std::move(config),
+                                 device_ptr.NewRequest(device_loop_.dispatcher()), &result);
 
-  ASSERT_EQ(status, ZX_OK) << "virtualaudio::Control::AddDevice (" << type << " " << direction
+  EXPECT_EQ(status, ZX_OK) << "virtualaudio::Control::AddDevice (" << type << " " << direction
                            << ") failed";
   ASSERT_FALSE(result.is_err()) << "Failed to add " << type << " " << direction
                                 << " device: " << result.err();
@@ -251,11 +281,9 @@ zx_status_t DeviceHost::QuitDeviceLoop() {
 
   libsync::Completion done;
   async::PostTask(device_loop_.dispatcher(), [this, &done]() {
-    codec_.set_error_handler(nullptr);
-    dai_input_.set_error_handler(nullptr);
-    dai_output_.set_error_handler(nullptr);
-    stream_config_input_.set_error_handler(nullptr);
-    stream_config_output_.set_error_handler(nullptr);
+    for (auto& device : virtual_audio_devices_) {
+      device.set_error_handler(nullptr);
+    }
 
     if (controller_.is_bound()) {
       zx_status_t status = controller_->RemoveAll();
@@ -265,7 +293,19 @@ zx_status_t DeviceHost::QuitDeviceLoop() {
       do {
         status =
             controller_->GetNumDevices(&input_count, &output_count, &unspecified_direction_count);
-        ASSERT_EQ(status, ZX_OK) << "After final RemoveAll, GetNumDevices failed";
+        ASSERT_EQ(status, ZX_OK) << "After final RemoveAll, GetNumDevices (non-legacy) failed";
+      } while (input_count != 0 || output_count != 0 || unspecified_direction_count != 0);
+    }
+
+    if (legacy_controller_.is_bound()) {
+      zx_status_t status = legacy_controller_->RemoveAll();
+      ASSERT_EQ(status, ZX_OK) << "Final RemoveAll failed";
+
+      uint32_t input_count = -1, output_count = -1, unspecified_direction_count = -1;
+      do {
+        status = legacy_controller_->GetNumDevices(&input_count, &output_count,
+                                                   &unspecified_direction_count);
+        ASSERT_EQ(status, ZX_OK) << "After final RemoveAll, GetNumDevices (legacy) failed";
       } while (input_count != 0 || output_count != 0 || unspecified_direction_count != 0);
     }
 

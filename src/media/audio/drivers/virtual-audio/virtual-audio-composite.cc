@@ -106,11 +106,11 @@ fuchsia_virtualaudio::Configuration VirtualAudioComposite::GetDefaultConfig() {
 }
 
 zx::result<std::unique_ptr<VirtualAudioComposite>> VirtualAudioComposite::Create(
-    InstanceId instance_id, async_dispatcher_t* dispatcher,
-    fidl::ServerEnd<fuchsia_virtualaudio::Device> server, OnDeviceBindingClosed on_binding_closed,
-    AddOwnedChild add_owned_child) {
-  auto device = std::make_unique<VirtualAudioComposite>(instance_id, dispatcher, std::move(server),
-                                                        std::move(on_binding_closed));
+    InstanceId instance_id, fuchsia_virtualaudio::Configuration config,
+    async_dispatcher_t* dispatcher, fidl::ServerEnd<fuchsia_virtualaudio::Device> server,
+    OnDeviceBindingClosed on_binding_closed, AddOwnedChild add_owned_child) {
+  auto device = std::make_unique<VirtualAudioComposite>(
+      instance_id, std::move(config), dispatcher, std::move(server), std::move(on_binding_closed));
   if (zx::result result = device->Init(std::move(add_owned_child)); result.is_error()) {
     FDF_LOG(ERROR, "Failed to initialize virtual audio composite device: %s",
             result.status_string());

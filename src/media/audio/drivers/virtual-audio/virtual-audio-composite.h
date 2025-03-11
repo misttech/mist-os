@@ -29,14 +29,16 @@ class VirtualAudioComposite
   static fuchsia_virtualaudio::Configuration GetDefaultConfig();
 
   static zx::result<std::unique_ptr<VirtualAudioComposite>> Create(
-      InstanceId instance_id, async_dispatcher_t* dispatcher,
-      fidl::ServerEnd<fuchsia_virtualaudio::Device> server, OnDeviceBindingClosed on_binding_closed,
-      AddOwnedChild add_owned_child);
+      InstanceId instance_id, fuchsia_virtualaudio::Configuration config,
+      async_dispatcher_t* dispatcher, fidl::ServerEnd<fuchsia_virtualaudio::Device> server,
+      OnDeviceBindingClosed on_binding_closed, AddOwnedChild add_owned_child);
 
-  VirtualAudioComposite(InstanceId instance_id, async_dispatcher_t* dispatcher,
+  VirtualAudioComposite(InstanceId instance_id, fuchsia_virtualaudio::Configuration config,
+                        async_dispatcher_t* dispatcher,
                         fidl::ServerEnd<fuchsia_virtualaudio::Device> server,
                         OnDeviceBindingClosed on_device_binding_closed)
-      : dispatcher_(dispatcher),
+      : config_(std::move(config)),
+        dispatcher_(dispatcher),
         device_binding_(dispatcher_, std::move(server), this, std::move(on_device_binding_closed)),
         instance_id_(instance_id) {}
 

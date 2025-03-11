@@ -37,8 +37,8 @@ class DeviceHost {
   // Optionally called during DetectDevices. Create virtual_audio instances for each device type
   // using the default configurations settings (which should always pass all tests).
   void AddVirtualDevices();
-  void AddVirtualDevice(fuchsia::virtualaudio::DeviceType device_type,
-                        fuchsia::virtualaudio::DevicePtr& device_ptr,
+  void AddVirtualDevice(fuchsia::virtualaudio::ControlSyncPtr& controller,
+                        fuchsia::virtualaudio::DeviceType device_type,
                         std::optional<bool> is_input = std::nullopt);
 
   std::set<DeviceEntry>& device_entries() { return device_entries_; }
@@ -51,11 +51,8 @@ class DeviceHost {
   // While the test suite is running, we spawn a number of virtual_audio driver instances.
   static constexpr size_t kNumVirtualAudioDevicesToAdd = 5;
   fuchsia::virtualaudio::ControlSyncPtr controller_ = nullptr;
-  fuchsia::virtualaudio::DevicePtr codec_ = nullptr;
-  fuchsia::virtualaudio::DevicePtr dai_input_ = nullptr;
-  fuchsia::virtualaudio::DevicePtr dai_output_ = nullptr;
-  fuchsia::virtualaudio::DevicePtr stream_config_input_ = nullptr;
-  fuchsia::virtualaudio::DevicePtr stream_config_output_ = nullptr;
+  fuchsia::virtualaudio::ControlSyncPtr legacy_controller_ = nullptr;
+  std::vector<fuchsia::virtualaudio::DevicePtr> virtual_audio_devices_;
 
   bool shutting_down_ = false;
   std::atomic_bool device_enumeration_complete_ = false;

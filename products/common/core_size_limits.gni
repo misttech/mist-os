@@ -261,7 +261,7 @@ size_checker_input = {
         "wav_player",
         "wav_recorder",
       ]
-      limit = 5025792  # 4.973 MiB
+      limit = 5138000  # 4.900 MiB
       creep_limit = 24576  # 24.0 KiB
     },
     {

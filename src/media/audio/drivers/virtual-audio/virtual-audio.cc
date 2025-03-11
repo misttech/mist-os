@@ -63,7 +63,7 @@ void VirtualAudio::AddDevice(AddDeviceRequestView request, AddDeviceCompleter::S
 
   auto device_instance_id = next_device_instance_id_++;
   zx::result device = VirtualAudioComposite::Create(
-      device_instance_id, dispatcher(), std::move(request->server),
+      device_instance_id, std::move(config), dispatcher(), std::move(request->server),
       [this, device_instance_id](auto _) {
         FDF_LOG(INFO, "Removing device %lu: Device's binding closed", device_instance_id);
         devices_.erase(device_instance_id);
@@ -77,7 +77,7 @@ void VirtualAudio::AddDevice(AddDeviceRequestView request, AddDeviceCompleter::S
     return;
   }
   devices_[device_instance_id] = std::move(device.value());
-  FDF_LOG(INFO, "Create virtual audio composite device %lu", device_instance_id);
+  FDF_LOG(INFO, "Created virtual audio composite device %lu", device_instance_id);
 
   completer.ReplySuccess();
 }
