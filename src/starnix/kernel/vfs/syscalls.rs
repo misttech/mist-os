@@ -3159,7 +3159,7 @@ mod arch32 {
     use crate::mm::MemoryAccessorExt;
     use crate::vfs::syscalls::{
         lookup_at, sys_dup3, sys_faccessat, sys_lseek, sys_mkdirat, sys_openat, sys_readlinkat,
-        sys_unlinkat, LookupFlags, StatFsPtr,
+        sys_unlinkat, LookupFlags, OpenFlags, StatFsPtr,
     };
     use crate::vfs::{CurrentTask, FdNumber, FsNode};
     use linux_uapi::off_t;
@@ -3326,6 +3326,26 @@ mod arch32 {
         )
     }
 
+    pub fn sys_arch32_pwrite64(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        fd: FdNumber,
+        address: UserAddress,
+        length: usize,
+        _: SyscallArg,
+        offset_low: off_t,
+        offset_high: off_t,
+    ) -> Result<usize, Errno> {
+        super::sys_pwrite64(
+            locked,
+            current_task,
+            fd,
+            address,
+            length,
+            offset_low | (offset_high << 32),
+        )
+    }
+
     pub fn sys_arch32_chmod(
         locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
@@ -3406,9 +3426,26 @@ mod arch32 {
         )
     }
 
+    pub fn sys_arch32_creat(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        user_path: UserCString,
+        mode: FileMode,
+    ) -> Result<FdNumber, Errno> {
+        super::sys_openat(
+            locked,
+            current_task,
+            FdNumber::AT_FDCWD,
+            user_path,
+            (OpenFlags::WRONLY | OpenFlags::CREAT | OpenFlags::TRUNC).bits(),
+            mode,
+        )
+    }
+
     pub use super::{
         sys_epoll_ctl as sys_arch32_epoll_ctl, sys_fstatat64 as sys_arch32_fstatat64,
-        sys_renameat2 as sys_arch32_renameat2, sys_timerfd_create as sys_arch32_timerfd_create,
+        sys_ftruncate as sys_arch32_ftruncate, sys_renameat2 as sys_arch32_renameat2,
+        sys_timerfd_create as sys_arch32_timerfd_create,
         sys_timerfd_settime as sys_arch32_timerfd_settime,
     };
 }

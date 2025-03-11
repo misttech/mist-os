@@ -12,6 +12,9 @@
                 // TODO(b/307959737): Crash in glibc on Arm.
                 "TimeTest.GetTimeOfDayNullTvSomeTz",
                 "TimeTest.GetTimeOfDayNullTvNullTz",
+
+                // TODO(b/402077314): Fix the address selection
+                "Mmap.HintRoundedDownIfMisaligned",
             ],
         },
         {
