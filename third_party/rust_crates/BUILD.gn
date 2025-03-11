@@ -136,7 +136,7 @@ group("bumpalo") {
 }
 
 group("byteorder") {
-  public_deps = [ ":byteorder-v1_4_3" ]
+  public_deps = [ ":byteorder-v1_5_0" ]
 }
 
 group("bytes") {
@@ -3031,16 +3031,16 @@ rust_library("bytecount-v0_6_0") {
   applicable_licenses = [ ":bytecount-v0_6_0.license" ]
 }
 
-license("byteorder-v1_4_3.license") {
+license("byteorder-v1_5_0.license") {
   public_package_name = "byteorder"
   license_files =
       [ "//third_party/rust_crates/ask2patch/byteorder/LICENSE-MIT" ]
 }
 
-rust_library("byteorder-v1_4_3") {
+rust_library("byteorder-v1_5_0") {
   crate_name = "byteorder"
   crate_root = "//third_party/rust_crates/ask2patch/byteorder/src/lib.rs"
-  output_name = "byteorder-eb0270683cf7e0fd"
+  output_name = "byteorder-73ae1ac5d4f8be7b"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -3049,17 +3049,16 @@ rust_library("byteorder-v1_4_3") {
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=eb0270683cf7e0fd",
-    "-Cextra-filename=-eb0270683cf7e0fd",
+    "--edition=2021",
+    "-Cmetadata=73ae1ac5d4f8be7b",
+    "-Cextra-filename=-73ae1ac5d4f8be7b",
     "--cfg=feature=\"default\"",
-    "--cfg=feature=\"i128\"",
     "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":byteorder-v1_4_3.license" ]
+  applicable_licenses = [ ":byteorder-v1_5_0.license" ]
 }
 
 license("bytes-v1_10_0.license") {
@@ -4836,7 +4835,7 @@ rust_library("deflate-v0_7_19") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":byteorder-v1_4_3" ]
+  deps += [ ":byteorder-v1_5_0" ]
   deps += [ ":adler32-v1_0_4" ]
 
   rustenv = []
@@ -5909,7 +5908,7 @@ rust_library("fatfs-v0_3_6") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":byteorder-v1_4_3" ]
+  deps += [ ":byteorder-v1_5_0" ]
   deps += [ ":bitflags-v1_3_2" ]
   deps += [ ":chrono-v0_4_34" ]
   deps += [ ":log-v0_4_22" ]
@@ -10035,7 +10034,7 @@ rust_library("num-bigint-dig-v0_8_4") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":byteorder-v1_4_3" ]
+  deps += [ ":byteorder-v1_5_0" ]
   deps += [ ":libm-v0_2_1" ]
   deps += [ ":zeroize-v1_8_1" ]
   deps += [ ":lazy_static-v1_4_0" ]
@@ -13073,7 +13072,7 @@ rust_library("rand_xoshiro-v0_1_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":byteorder-v1_4_3" ]
+  deps += [ ":byteorder-v1_5_0" ]
   deps += [ ":rand_core-v0_3_1" ]
 
   rustenv = []
@@ -13370,7 +13369,7 @@ rust_library("regex-automata-v0_1_9") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":byteorder-v1_4_3" ]
+  deps += [ ":byteorder-v1_5_0" ]
   deps += [ ":regex-syntax-v0_6_29" ]
 
   rustenv = []
@@ -14123,7 +14122,7 @@ rust_library("rustc-hash-v1_0_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":byteorder-v1_4_3" ]
+  deps += [ ":byteorder-v1_5_0" ]
 
   rustenv = []
 
@@ -16603,7 +16602,7 @@ rust_library("term-v0_5_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":byteorder-v1_4_3" ]
+  deps += [ ":byteorder-v1_5_0" ]
   if (false) {
     deps += [ ":winapi-v0_3_9" ]
   }
@@ -19669,7 +19668,7 @@ rust_library("zerocopy-v0_7_35") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":byteorder-v1_4_3" ]
+  deps += [ ":byteorder-v1_5_0" ]
   deps += [ ":zerocopy-derive-v0_7_35($host_toolchain)" ]
   if (true) {
     deps += [ ":zerocopy-derive-v0_7_35($host_toolchain)" ]
