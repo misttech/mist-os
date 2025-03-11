@@ -275,29 +275,8 @@ async fn main() -> Result<(), Error> {
         fasync::Task::local(input_pipeline.handle_input_events()).detach();
     };
 
-    // Create and register a ColorTransformManager.
-    let color_converter = connect_to_protocol::<color::ConverterMarker>()?;
     let color_transform_manager =
-        ColorTransformManager::new(color_converter, Arc::clone(&scene_manager));
-
-    let (color_transform_handler_client, color_transform_handler_server) =
-        fidl::endpoints::create_request_stream::<ColorTransformHandlerMarker>();
-    match connect_to_protocol::<ColorTransformMarker>() {
-        Err(e) => {
-            error!("Failed to connect to fuchsia.accessibility.color_transform: {:?}", e);
-        }
-        Ok(proxy) => match proxy.register_color_transform_handler(color_transform_handler_client) {
-            Err(e) => {
-                error!("Failed to call RegisterColorTransformHandler: {:?}", e);
-            }
-            Ok(()) => {
-                ColorTransformManager::handle_color_transform_request_stream(
-                    Arc::clone(&color_transform_manager),
-                    color_transform_handler_server,
-                );
-            }
-        },
-    }
+        create_color_transform_manager(attach_a11y_view, Arc::clone(&scene_manager)).await?;
 
     fs.take_and_serve_directory_handle()?;
 
@@ -306,22 +285,34 @@ async fn main() -> Result<(), Error> {
     while let Some(service_request) = fs.next().await {
         match service_request {
             ExposedServices::ColorAdjustmentHandler(request_stream) => {
-                ColorTransformManager::handle_color_adjustment_handler_request_stream(
-                    Arc::clone(&color_transform_manager),
-                    request_stream,
-                );
+                if attach_a11y_view {
+                    ColorTransformManager::handle_color_adjustment_handler_request_stream(
+                        Arc::clone(color_transform_manager.as_ref().unwrap()),
+                        request_stream,
+                    );
+                } else {
+                    warn!("failed to forward as A11y protocols are disabled");
+                }
             }
             ExposedServices::ColorAdjustment(request_stream) => {
-                ColorTransformManager::handle_color_adjustment_request_stream(
-                    Arc::clone(&color_transform_manager),
-                    request_stream,
-                );
+                if attach_a11y_view {
+                    ColorTransformManager::handle_color_adjustment_request_stream(
+                        Arc::clone(color_transform_manager.as_ref().unwrap()),
+                        request_stream,
+                    );
+                } else {
+                    warn!("failed to forward as A11y protocols are disabled");
+                }
             }
             ExposedServices::DisplayBacklight(request_stream) => {
-                ColorTransformManager::handle_display_backlight_request_stream(
-                    Arc::clone(&color_transform_manager),
-                    request_stream,
-                );
+                if attach_a11y_view {
+                    ColorTransformManager::handle_display_backlight_request_stream(
+                        Arc::clone(color_transform_manager.as_ref().unwrap()),
+                        request_stream,
+                    );
+                } else {
+                    warn!("failed to forward as A11y protocols are disabled");
+                }
             }
             ExposedServices::FocusChainProvider(request_stream) => {
                 focus_chain_stream_handler.handle_request_stream(request_stream).detach();
@@ -456,6 +447,42 @@ async fn main() -> Result<(), Error> {
 
     info!("Finished service handler loop; exiting main.");
     Ok(())
+}
+
+pub async fn create_color_transform_manager(
+    attach_a11y_view: bool,
+    scene_manager: Arc<Mutex<dyn SceneManagerTrait>>,
+) -> Result<Option<Arc<Mutex<ColorTransformManager>>>, Error> {
+    // Create and register a ColorTransformManager if we are attaching A11y View.
+    if !attach_a11y_view {
+        return Ok(None);
+    }
+
+    let color_converter = connect_to_protocol::<color::ConverterMarker>()?;
+    let color_transform_manager =
+        ColorTransformManager::new(color_converter, Arc::clone(&scene_manager));
+
+    let (color_transform_handler_client, color_transform_handler_server) =
+        fidl::endpoints::create_request_stream::<ColorTransformHandlerMarker>();
+    match connect_to_protocol::<ColorTransformMarker>() {
+        Err(e) => {
+            error!("Failed to connect to fuchsia.accessibility.color_transform: {:?}", e);
+            Err(e.into())
+        }
+        Ok(proxy) => match proxy.register_color_transform_handler(color_transform_handler_client) {
+            Err(e) => {
+                error!("Failed to call RegisterColorTransformHandler: {:?}", e);
+                Err(e.into())
+            }
+            Ok(()) => {
+                ColorTransformManager::handle_color_transform_request_stream(
+                    Arc::clone(&color_transform_manager),
+                    color_transform_handler_server,
+                );
+                Ok(Some(color_transform_manager))
+            }
+        },
+    }
 }
 
 pub async fn handle_scene_manager_request_stream(
@@ -629,6 +656,15 @@ mod tests {
 
         assert_eq!(recorded_view_ref, None);
 
+        Ok(())
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_create_color_transform_manager_attach_a11y_view_false() -> Result<(), Error> {
+        let scene_manager: Arc<Mutex<dyn SceneManagerTrait>> =
+            Arc::new(Mutex::new(MockSceneManager::new()));
+        let result = create_color_transform_manager(false, scene_manager).await?;
+        assert!(result.is_none());
         Ok(())
     }
 }
