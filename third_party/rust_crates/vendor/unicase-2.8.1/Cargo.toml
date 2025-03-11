@@ -10,11 +10,17 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
+edition = "2018"
 name = "unicase"
-version = "2.7.0"
+version = "2.8.1"
 authors = ["Sean McArthur <sean@seanmonstar.com>"]
-build = "build.rs"
+build = false
 exclude = ["scripts/*"]
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "A case-insensitive wrapper around strings."
 documentation = "https://docs.rs/unicase"
 readme = "README.md"
@@ -30,11 +36,12 @@ categories = [
     "text-processing",
     "no-std",
 ]
-license = "MIT/Apache-2.0"
+license = "MIT OR Apache-2.0"
 repository = "https://github.com/seanmonstar/unicase"
-
-[build-dependencies.version_check]
-version = "0.9"
 
 [features]
 nightly = []
+
+[lib]
+name = "unicase"
+path = "src/lib.rs"

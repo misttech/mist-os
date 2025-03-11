@@ -1,4 +1,4 @@
-#[cfg(__unicase__iter_cmp)]
+use alloc::string::String;
 use core::cmp::Ordering;
 use core::hash::{Hash, Hasher};
 
@@ -7,6 +7,12 @@ mod map;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Unicode<S>(pub S);
+
+impl<S: AsRef<str>> Unicode<S> {
+    pub fn to_folded_case(&self) -> String {
+        self.0.as_ref().chars().flat_map(lookup).collect()
+    }
+}
 
 impl<S1: AsRef<str>, S2: AsRef<str>> PartialEq<Unicode<S2>> for Unicode<S1> {
     #[inline]
@@ -35,7 +41,6 @@ impl<S1: AsRef<str>, S2: AsRef<str>> PartialEq<Unicode<S2>> for Unicode<S1> {
 
 impl<S: AsRef<str>> Eq for Unicode<S> {}
 
-#[cfg(__unicase__iter_cmp)]
 impl<T: AsRef<str>> PartialOrd for Unicode<T> {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
@@ -43,7 +48,6 @@ impl<T: AsRef<str>> PartialOrd for Unicode<T> {
     }
 }
 
-#[cfg(__unicase__iter_cmp)]
 impl<T: AsRef<str>> Ord for Unicode<T> {
     #[inline]
     fn cmp(&self, other: &Self) -> Ordering {
@@ -59,8 +63,15 @@ impl<S: AsRef<str>> Hash for Unicode<S> {
         let mut buf = [0; 4];
         for c in self.0.as_ref().chars().flat_map(|c| lookup(c)) {
             let len = char_to_utf8(c, &mut buf);
-            hasher.write(&buf[..len])
+            // we can't use `write(buf)` because the ASCII variant uses
+            // `write_u8`. The docs for Hash say that's technically different.
+            // ¯\_(ツ)_/¯
+            for &b in &buf[..len] {
+                hasher.write_u8(b);
+            }
         }
+        // prefix-freedom
+        hasher.write_u8(0xFF);
     }
 }
 
@@ -182,6 +193,11 @@ mod tests {
         eq!("ﬂour", "flour");
         eq!("Maße", "MASSE");
         eq!("ᾲ στο διάολο", "ὰι στο διάολο");
+    }
+
+    #[test]
+    fn test_to_folded_case() {
+        assert_eq!(Unicode("Maße").to_folded_case(), "masse");
     }
 
     #[cfg(feature = "nightly")]

@@ -1185,7 +1185,7 @@ group("unic-ucd-block") {
 }
 
 group("unicase") {
-  public_deps = [ ":unicase-v2_7_0" ]
+  public_deps = [ ":unicase-v2_8_1" ]
 }
 
 if (current_os == "fuchsia") {
@@ -9132,7 +9132,7 @@ rust_library("mime_guess-v2_0_5") {
 
   deps = []
   deps += [ ":mime-v0_3_17" ]
-  deps += [ ":unicase-v2_7_0" ]
+  deps += [ ":unicase-v2_8_1" ]
 
   rustenv = [ "MIME_TYPES_GENERATED_PATH=../../../compat/mime_guess/mime_types_generated.rs" ]
 
@@ -12437,7 +12437,7 @@ rust_library("pulldown-cmark-v0_9_3") {
   deps += [ ":bitflags-v1_3_2" ]
   deps += [ ":getopts-v0_2_18" ]
   deps += [ ":serde-v1_0_204" ]
-  deps += [ ":unicase-v2_7_0" ]
+  deps += [ ":unicase-v2_8_1" ]
 
   rustenv = []
 
@@ -18226,18 +18226,18 @@ rust_library("unic-ucd-version-v0_9_0") {
   applicable_licenses = [ ":unic-ucd-version-v0_9_0.license" ]
 }
 
-license("unicase-v2_7_0.license") {
+license("unicase-v2_8_1.license") {
   public_package_name = "unicase"
   license_files = [
-    "//third_party/rust_crates/vendor/unicase-2.7.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/unicase-2.7.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/unicase-2.8.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/unicase-2.8.1/LICENSE-MIT",
   ]
 }
 
-rust_library("unicase-v2_7_0") {
+rust_library("unicase-v2_8_1") {
   crate_name = "unicase"
-  crate_root = "//third_party/rust_crates/vendor/unicase-2.7.0/src/lib.rs"
-  output_name = "unicase-f34d8ad6d458e4d2"
+  crate_root = "//third_party/rust_crates/vendor/unicase-2.8.1/src/lib.rs"
+  output_name = "unicase-e2759e64b1e2cf7b"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -18246,18 +18246,14 @@ rust_library("unicase-v2_7_0") {
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=f34d8ad6d458e4d2",
-    "-Cextra-filename=-f34d8ad6d458e4d2",
-    "--cfg=__unicase__iter_cmp",
-    "--cfg=__unicase__default_hasher",
-    "--cfg=__unicase__const_fns",
-    "--cfg=__unicase__core_and_alloc",
+    "--edition=2018",
+    "-Cmetadata=e2759e64b1e2cf7b",
+    "-Cextra-filename=-e2759e64b1e2cf7b",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":unicase-v2_7_0.license" ]
+  applicable_licenses = [ ":unicase-v2_8_1.license" ]
 }
 
 license("unicode-bidi-v0_3_4.license") {

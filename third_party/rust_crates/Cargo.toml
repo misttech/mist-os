@@ -241,7 +241,7 @@ tuf = { version = "=0.3.0-beta13", default-features = false, features = ["hyper"
 typed-builder = "0.10.0"
 unic-char-range = "0.9"
 unic-ucd-block = "0.9"
-unicase = "2.7.0"
+unicase = "2.8.1"
 unicode-segmentation = "1.10"
 unicode-width = "0.2.0"
 unicode-xid = "0.2.0"
@@ -1113,14 +1113,6 @@ env_vars = [ "CARGO_PKG_VERSION=\\\"0.9.0\\\"", "CARGO_PKG_NAME=\\\"unic-char-ra
 env_vars = [ "CARGO_PKG_VERSION=\\\"0.9.0\\\"", "CARGO_PKG_NAME=\\\"unic-char-property\\\"",  "CARGO_PKG_DESCRIPTION=\\\"\\\"", ]
 [gn.package.unic-ucd-block."0.9.0"]
 env_vars = [ "CARGO_PKG_VERSION=\\\"0.9.0\\\"", "CARGO_PKG_NAME=\\\"unic-ucd-block\\\"",  "CARGO_PKG_DESCRIPTION=\\\"\\\"", ]
-
-[gn.package.unicase."2.7.0"]
-rustflags = [
-  "--cfg=__unicase__iter_cmp",
-  "--cfg=__unicase__default_hasher",
-  "--cfg=__unicase__const_fns",
-  "--cfg=__unicase__core_and_alloc",
-]
 
 [gn.package.unicode-bidi."0.3.4"]
 license_files = ["LICENSE-APACHE"]
