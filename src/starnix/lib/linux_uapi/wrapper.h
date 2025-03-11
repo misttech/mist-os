@@ -116,6 +116,9 @@
 
 #endif  // #ifndef __arm__
 
+// Android kgsl header
+#include "src/starnix/lib/linux_uapi/stub/kgsl/msm_kgsl.h"
+
 // Data shared between Starnix and a vDSO implementation.
 #include "src/starnix/kernel/vdso/vvar_data.h"
 
