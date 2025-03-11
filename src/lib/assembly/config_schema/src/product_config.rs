@@ -63,10 +63,6 @@ pub struct ProductConfig {
     #[schemars(schema_with = "crate::option_path_schema")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bootfs_files_package: Option<Utf8PathBuf>,
-
-    /// ignored, this is for a soft transition.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    bootfs_files: Vec<String>,
 }
 
 /// Packages provided by the product, to add to the assembled images.
