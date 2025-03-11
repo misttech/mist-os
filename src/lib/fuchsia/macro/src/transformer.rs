@@ -5,10 +5,8 @@
 use fidl_fuchsia_diagnostics::Severity;
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned, TokenStreamExt};
-use syn::parse::{Parse, ParseStream};
-use syn::{
-    Attribute, Block, Error, Expr, Ident, ItemFn, LitBool, LitStr, Signature, Token, Visibility,
-};
+use syn::parse::{Parse, ParseStream, Parser};
+use syn::{Attribute, Block, Error, Expr, ItemFn, LitBool, LitStr, Signature, Token, Visibility};
 
 #[derive(Clone, Copy)]
 enum FunctionType {
@@ -227,8 +225,8 @@ fn get_interest_arg(input: &ParseStream<'_>) -> syn::Result<Interest> {
     input.parse::<Interest>()
 }
 
-impl Parse for Args {
-    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+impl Args {
+    fn parse(input: TokenStream) -> syn::Result<Self> {
         let mut args = Self {
             threads: None,
             thread_role: None,
@@ -242,33 +240,29 @@ impl Parse for Args {
             add_test_attr: true,
         };
 
-        loop {
-            if input.is_empty() {
-                break;
-            }
-            let ident: Ident = input.parse()?;
-            let err = |message| Err(Error::new(ident.span(), message));
+        let arg_parser = syn::meta::parser(|meta| {
+            let ident =
+                meta.path.get_ident().ok_or_else(|| meta.error("arguments must have a key"))?;
             match ident.to_string().as_ref() {
-                "threads" => args.threads = Some(get_arg::<Expr>(&input)?),
-                "thread_role" => args.thread_role = Some(get_arg::<Expr>(&input)?),
-                "allow_stalls" => args.allow_stalls = Some(get_bool_arg(&input, true)?),
-                "logging" => args.logging = get_bool_arg(&input, true)?,
-                "logging_blocking" => args.logging_blocking = get_bool_arg(&input, true)?,
-                "logging_tags" => args.logging_tags = get_logging_tags(&input)?,
+                "threads" => args.threads = Some(get_arg::<Expr>(&meta.input)?),
+                "thread_role" => args.thread_role = Some(get_arg::<Expr>(&meta.input)?),
+                "allow_stalls" => args.allow_stalls = Some(get_bool_arg(&meta.input, true)?),
+                "logging" => args.logging = get_bool_arg(&meta.input, true)?,
+                "logging_blocking" => args.logging_blocking = get_bool_arg(&meta.input, true)?,
+                "logging_tags" => args.logging_tags = get_logging_tags(&meta.input)?,
                 "always_log_file_line" => {
-                    args.logging_include_file_line = get_bool_arg(&input, true)?
+                    args.logging_include_file_line = get_bool_arg(&meta.input, true)?
                 }
-                "logging_minimum_severity" => args.interest = get_interest_arg(&input)?,
-                "logging_panic_prefix" => args.panic_prefix = Some(get_arg(&input)?),
-                "add_test_attr" => args.add_test_attr = get_bool_arg(&input, true)?,
-                x => return err(format!("unknown argument: {}", x)),
+                "logging_minimum_severity" => args.interest = get_interest_arg(&meta.input)?,
+                "logging_panic_prefix" => args.panic_prefix = Some(get_arg(&meta.input)?),
+                "add_test_attr" => args.add_test_attr = get_bool_arg(&meta.input, true)?,
+                _ => return Err(meta.error("unrecognized argument")),
             }
-            if input.is_empty() {
-                break;
-            }
-            input.parse::<Token![,]>()?;
-        }
 
+            Ok(())
+        });
+
+        arg_parser.parse2(input)?;
         Ok(args)
     }
 }
@@ -292,7 +286,7 @@ impl Transformer {
         args: TokenStream,
         input: TokenStream,
     ) -> Result<Transformer, Error> {
-        let args: Args = syn::parse2(args)?;
+        let args = Args::parse(args)?;
         let ItemFn { attrs, vis, sig, block } = syn::parse2(input)?;
         let is_async = sig.asyncness.is_some();
 
