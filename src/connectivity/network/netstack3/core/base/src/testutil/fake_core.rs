@@ -48,8 +48,8 @@ impl<C, S, R, Meta, DeviceId> ResourceCounterContext<R, C> for FakeCoreCtx<S, Me
 where
     S: ResourceCounterContext<R, C>,
 {
-    fn with_per_resource_counters<O, F: FnOnce(&C) -> O>(&mut self, resource: &R, cb: F) -> O {
-        ResourceCounterContext::<R, C>::with_per_resource_counters(&mut self.state, resource, cb)
+    fn with_per_resource_counters<O, F: FnOnce(&C) -> O>(&self, resource: &R, cb: F) -> O {
+        ResourceCounterContext::<R, C>::with_per_resource_counters(&self.state, resource, cb)
     }
 }
 

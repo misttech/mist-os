@@ -555,14 +555,17 @@ where
         let (core_ctx, bindings_ctx) = self.contexts();
         let result = core_ctx.send_frame(bindings_ctx, metadata, body).map_err(|e| e.into_err());
         match &result {
-            Ok(()) => core_ctx.increment(id, |counters: &DeviceSocketCounters| &counters.tx_frames),
-            Err(SendFrameErrorReason::QueueFull) => core_ctx
-                .increment(id, |counters: &DeviceSocketCounters| &counters.tx_err_queue_full),
-            Err(SendFrameErrorReason::Alloc) => {
-                core_ctx.increment(id, |counters: &DeviceSocketCounters| &counters.tx_err_alloc)
+            Ok(()) => {
+                core_ctx.increment_both(id, |counters: &DeviceSocketCounters| &counters.tx_frames)
             }
+            Err(SendFrameErrorReason::QueueFull) => core_ctx
+                .increment_both(id, |counters: &DeviceSocketCounters| &counters.tx_err_queue_full),
+            Err(SendFrameErrorReason::Alloc) => core_ctx
+                .increment_both(id, |counters: &DeviceSocketCounters| &counters.tx_err_alloc),
             Err(SendFrameErrorReason::SizeConstraintsViolation) => core_ctx
-                .increment(id, |counters: &DeviceSocketCounters| &counters.tx_err_size_constraint),
+                .increment_both(id, |counters: &DeviceSocketCounters| {
+                    &counters.tx_err_size_constraint
+                }),
         }
         result
     }
@@ -869,7 +872,7 @@ where
                         },
                     );
                     if delivered {
-                        core_ctx.increment(socket, |counters: &DeviceSocketCounters| {
+                        core_ctx.increment_both(socket, |counters: &DeviceSocketCounters| {
                             &counters.rx_frames
                         });
                     }
@@ -1398,7 +1401,7 @@ mod tests {
         for FakeCoreCtx<D>
     {
         fn with_per_resource_counters<O, F: FnOnce(&DeviceSocketCounters) -> O>(
-            &mut self,
+            &self,
             socket: &DeviceSocketId<D::Weak, FakeBindingsCtx>,
             cb: F,
         ) -> O {
@@ -1418,7 +1421,7 @@ mod tests {
         for FakeSocketsMutRefs<'m, X, Y, Z, D>
     {
         fn with_per_resource_counters<O, F: FnOnce(&DeviceSocketCounters) -> O>(
-            &mut self,
+            &self,
             socket: &DeviceSocketId<D::Weak, FakeBindingsCtx>,
             cb: F,
         ) -> O {

@@ -428,7 +428,7 @@ mod tests {
 
     impl ResourceCounterContext<FakeLinkDeviceId, DeviceCounters> for FakeCoreCtxImpl {
         fn with_per_resource_counters<O, F: FnOnce(&DeviceCounters) -> O>(
-            &mut self,
+            &self,
             _resource: &FakeLinkDeviceId,
             cb: F,
         ) -> O {

@@ -220,11 +220,12 @@ where
                 })
         });
         match &result {
-            Ok(()) => {
-                core_ctx.increment(&id, |counters: &RawIpSocketCounters<I>| &counters.tx_packets)
-            }
+            Ok(()) => core_ctx
+                .increment_both(&id, |counters: &RawIpSocketCounters<I>| &counters.tx_packets),
             Err(RawIpSocketSendToError::InvalidBody) => core_ctx
-                .increment(&id, |counters: &RawIpSocketCounters<I>| &counters.tx_checksum_errors),
+                .increment_both(&id, |counters: &RawIpSocketCounters<I>| {
+                    &counters.tx_checksum_errors
+                }),
             Err(_) => {}
         }
         result
@@ -700,18 +701,18 @@ where
                     check_packet_for_delivery(packet, device, state)
                 }) {
                     DeliveryOutcome::Deliver => {
-                        core_ctx.increment(&socket, |counters: &RawIpSocketCounters<I>| {
+                        core_ctx.increment_both(&socket, |counters: &RawIpSocketCounters<I>| {
                             &counters.rx_packets
                         });
                         bindings_ctx.receive_packet(socket, packet, device);
                     }
                     DeliveryOutcome::WrongChecksum => {
-                        core_ctx.increment(&socket, |counters: &RawIpSocketCounters<I>| {
+                        core_ctx.increment_both(&socket, |counters: &RawIpSocketCounters<I>| {
                             &counters.rx_checksum_errors
                         });
                     }
                     DeliveryOutcome::WrongIcmpMessageType => {
-                        core_ctx.increment(&socket, |counters: &RawIpSocketCounters<I>| {
+                        core_ctx.increment_both(&socket, |counters: &RawIpSocketCounters<I>| {
                             &counters.rx_icmp_filtered
                         });
                     }
@@ -984,7 +985,7 @@ mod test {
         > for FakeCoreCtx<I, D>
     {
         fn with_per_resource_counters<O, F: FnOnce(&RawIpSocketCounters<I>) -> O>(
-            &mut self,
+            &self,
             socket: &RawIpSocketId<I, D::Weak, FakeBindingsCtx<D>>,
             cb: F,
         ) -> O {

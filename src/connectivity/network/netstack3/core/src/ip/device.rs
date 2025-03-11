@@ -539,7 +539,7 @@ impl<'a, Config, L, BC: BindingsContext, R, T> ResourceCounterContext<R, T>
 where
     CoreCtx<'a, BC, L>: ResourceCounterContext<R, T>,
 {
-    fn with_per_resource_counters<O, F: FnOnce(&T) -> O>(&mut self, resource: &R, cb: F) -> O {
+    fn with_per_resource_counters<O, F: FnOnce(&T) -> O>(&self, resource: &R, cb: F) -> O {
         self.core_ctx.with_per_resource_counters(resource, cb)
     }
 }

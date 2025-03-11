@@ -184,14 +184,14 @@ fn receive_igmp_packet<
     //
     // See RFC 1112 APPENDIX I, RFC 2236 section 2, and RFC 3376 section 4.
     if ttl != IGMP_IP_TTL {
-        core_ctx.increment(device, |counters: &IgmpCounters| &counters.rx_err_bad_ttl);
+        core_ctx.increment_both(device, |counters: &IgmpCounters| &counters.rx_err_bad_ttl);
         return Err(IgmpError::BadTtl(ttl));
     }
 
     let packet = match buffer.parse_with::<_, IgmpPacket<&[u8]>>(()) {
         Ok(packet) => packet,
         Err(e) => {
-            core_ctx.increment(device, |counters: &IgmpCounters| &counters.rx_err_parse);
+            core_ctx.increment_both(device, |counters: &IgmpCounters| &counters.rx_err_parse);
             return Err(IgmpError::Parse(e));
         }
     };
@@ -199,9 +199,11 @@ fn receive_igmp_packet<
     match packet {
         IgmpPacket::MembershipQueryV2(msg) => {
             if msg.is_igmpv1_query() {
-                core_ctx.increment(device, |counters: &IgmpCounters| &counters.rx_igmpv1_query);
+                core_ctx
+                    .increment_both(device, |counters: &IgmpCounters| &counters.rx_igmpv1_query);
             } else {
-                core_ctx.increment(device, |counters: &IgmpCounters| &counters.rx_igmpv2_query);
+                core_ctx
+                    .increment_both(device, |counters: &IgmpCounters| &counters.rx_igmpv2_query);
             }
             // From RFC 3376 section 9.1:
             //
@@ -211,7 +213,7 @@ fn receive_igmp_packet<
                 && dst_ip.is_multicast()
                 && dst_ip != *Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS.as_ref()
             {
-                core_ctx.increment(device, |counters: &IgmpCounters| {
+                core_ctx.increment_both(device, |counters: &IgmpCounters| {
                     &counters.rx_err_rejected_general_query
                 });
                 return Err(IgmpError::RejectedGeneralQuery { dst_ip });
@@ -221,7 +223,7 @@ fn receive_igmp_packet<
             // Hosts SHOULD ignore v2 or v3 Queries without the Router-Alert
             // option.
             if !msg.is_igmpv1_query() && !header_info.router_alert() {
-                core_ctx.increment(device, |counters: &IgmpCounters| {
+                core_ctx.increment_both(device, |counters: &IgmpCounters| {
                     &counters.rx_err_missing_router_alert_in_query
                 });
                 return Err(IgmpError::MissingRouterAlertInQuery);
@@ -229,7 +231,7 @@ fn receive_igmp_packet<
             gmp::v1::handle_query_message(core_ctx, bindings_ctx, device, &msg).map_err(Into::into)
         }
         IgmpPacket::MembershipQueryV3(msg) => {
-            core_ctx.increment(device, |counters: &IgmpCounters| &counters.rx_igmpv3_query);
+            core_ctx.increment_both(device, |counters: &IgmpCounters| &counters.rx_igmpv3_query);
             // From RFC 3376 section 9.1:
             //
             // Hosts SHOULD ignore v1, v2 or v3 General Queries sent to a
@@ -238,7 +240,7 @@ fn receive_igmp_packet<
                 && dst_ip.is_multicast()
                 && dst_ip != *Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS.as_ref()
             {
-                core_ctx.increment(device, |counters: &IgmpCounters| {
+                core_ctx.increment_both(device, |counters: &IgmpCounters| {
                     &counters.rx_err_rejected_general_query
                 });
                 return Err(IgmpError::RejectedGeneralQuery { dst_ip });
@@ -248,7 +250,7 @@ fn receive_igmp_packet<
             // Hosts SHOULD ignore v2 or v3 Queries without the Router-Alert
             // option.
             if !header_info.router_alert() {
-                core_ctx.increment(device, |counters: &IgmpCounters| {
+                core_ctx.increment_both(device, |counters: &IgmpCounters| {
                     &counters.rx_err_missing_router_alert_in_query
                 });
                 return Err(IgmpError::MissingRouterAlertInQuery);
@@ -257,7 +259,7 @@ fn receive_igmp_packet<
             gmp::v2::handle_query_message(core_ctx, bindings_ctx, device, &msg).map_err(Into::into)
         }
         IgmpPacket::MembershipReportV1(msg) => {
-            core_ctx.increment(device, |counters: &IgmpCounters| &counters.rx_igmpv1_report);
+            core_ctx.increment_both(device, |counters: &IgmpCounters| &counters.rx_igmpv1_report);
             let addr = msg.group_addr();
             MulticastAddr::new(addr).map_or(Err(IgmpError::NotAMember { addr }), |group_addr| {
                 gmp::v1::handle_report_message(core_ctx, bindings_ctx, device, group_addr)
@@ -265,7 +267,7 @@ fn receive_igmp_packet<
             })
         }
         IgmpPacket::MembershipReportV2(msg) => {
-            core_ctx.increment(device, |counters: &IgmpCounters| &counters.rx_igmpv2_report);
+            core_ctx.increment_both(device, |counters: &IgmpCounters| &counters.rx_igmpv2_report);
             let addr = msg.group_addr();
             MulticastAddr::new(addr).map_or(Err(IgmpError::NotAMember { addr }), |group_addr| {
                 gmp::v1::handle_report_message(core_ctx, bindings_ctx, device, group_addr)
@@ -273,12 +275,12 @@ fn receive_igmp_packet<
             })
         }
         IgmpPacket::LeaveGroup(_) => {
-            core_ctx.increment(device, |counters: &IgmpCounters| &counters.rx_leave_group);
+            core_ctx.increment_both(device, |counters: &IgmpCounters| &counters.rx_leave_group);
             debug!("Hosts are not interested in Leave Group messages");
             return Ok(());
         }
         IgmpPacket::MembershipReportV3(_) => {
-            core_ctx.increment(device, |counters: &IgmpCounters| &counters.rx_igmpv3_report);
+            core_ctx.increment_both(device, |counters: &IgmpCounters| &counters.rx_igmpv3_report);
             debug!("Hosts are not interested in IGMPv3 report messages");
             return Ok(());
         }
@@ -479,7 +481,9 @@ where
         let result = match msg_type {
             gmp::v1::GmpMessageType::Report => {
                 if cur_mode.should_send_v1(bindings_ctx) {
-                    self.increment(device, |counters: &IgmpCounters| &counters.tx_igmpv1_report);
+                    self.increment_both(device, |counters: &IgmpCounters| {
+                        &counters.tx_igmpv1_report
+                    });
                     send_igmp_v2_message::<_, _, IgmpMembershipReportV1>(
                         self,
                         bindings_ctx,
@@ -489,7 +493,9 @@ where
                         (),
                     )
                 } else {
-                    self.increment(device, |counters: &IgmpCounters| &counters.tx_igmpv2_report);
+                    self.increment_both(device, |counters: &IgmpCounters| {
+                        &counters.tx_igmpv2_report
+                    });
                     send_igmp_v2_message::<_, _, IgmpMembershipReportV2>(
                         self,
                         bindings_ctx,
@@ -501,7 +507,7 @@ where
                 }
             }
             gmp::v1::GmpMessageType::Leave => {
-                self.increment(device, |counters: &IgmpCounters| &counters.tx_leave_group);
+                self.increment_both(device, |counters: &IgmpCounters| &counters.tx_leave_group);
                 send_igmp_v2_message::<_, _, IgmpLeaveGroup>(
                     self,
                     bindings_ctx,
@@ -516,7 +522,7 @@ where
         match result {
             Ok(()) => {}
             Err(err) => {
-                self.increment(device, |counters: &IgmpCounters| &counters.tx_err);
+                self.increment_both(device, |counters: &IgmpCounters| &counters.tx_err);
                 debug!(
                     "error sending IGMP message ({msg_type:?}) on device {device:?} for group \
                 {group_addr}: {err}",
@@ -546,17 +552,17 @@ where
                 // TODO(https://fxbug.dev/383355972): Consider an assertion here
                 // instead.
                 error!("MTU too small to send IGMP reports: {e:?}");
-                self.increment(device, |counters: &IgmpCounters| &counters.tx_err);
+                self.increment_both(device, |counters: &IgmpCounters| &counters.tx_err);
                 return;
             }
         };
         for report in reports {
-            self.increment(device, |counters: &IgmpCounters| &counters.tx_igmpv3_report);
+            self.increment_both(device, |counters: &IgmpCounters| &counters.tx_igmpv3_report);
             let destination = IpPacketDestination::Multicast(dst_ip);
             let ip_frame = report.into_serializer().encapsulate(header.clone());
             IpLayerHandler::send_ip_frame(self, bindings_ctx, device, destination, ip_frame)
                 .unwrap_or_else(|ErrorAndSerializer { error, .. }| {
-                    self.increment(device, |counters: &IgmpCounters| &counters.tx_err);
+                    self.increment_both(device, |counters: &IgmpCounters| &counters.tx_err);
                     debug!("failed to send IGMPv3 report over {device:?}: {error:?}")
                 });
         }
@@ -1105,7 +1111,7 @@ mod tests {
 
     impl ResourceCounterContext<FakeDeviceId, IgmpCounters> for FakeIgmpCtx {
         fn with_per_resource_counters<O, F: FnOnce(&IgmpCounters) -> O>(
-            &mut self,
+            &self,
             _device_id: &FakeDeviceId,
             cb: F,
         ) -> O {
@@ -1231,7 +1237,7 @@ mod tests {
 
     impl ResourceCounterContext<FakeDeviceId, IgmpCounters> for &mut FakeCoreCtx {
         fn with_per_resource_counters<O, F: FnOnce(&IgmpCounters) -> O>(
-            &mut self,
+            &self,
             device_id: &FakeDeviceId,
             cb: F,
         ) -> O {

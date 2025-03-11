@@ -61,11 +61,11 @@ pub trait CounterContext<T> {
 /// debugging.
 pub trait ResourceCounterContext<R, T>: CounterContext<T> {
     /// Call `cb` with an immutable reference to the set of counters on `resource`.
-    fn with_per_resource_counters<O, F: FnOnce(&T) -> O>(&mut self, resource: &R, cb: F) -> O;
+    fn with_per_resource_counters<O, F: FnOnce(&T) -> O>(&self, resource: &R, cb: F) -> O;
 
     /// Increments both the per-resource and stackwide versions of
     /// the counter returned by the callback.
-    fn increment<F: Fn(&T) -> &Counter>(&mut self, resource: &R, cb: F) {
+    fn increment_both<F: Fn(&T) -> &Counter>(&self, resource: &R, cb: F) {
         self.with_per_resource_counters(resource, |counters| cb(counters).increment());
         self.with_counters(|counters| cb(counters).increment());
     }

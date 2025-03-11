@@ -162,7 +162,7 @@ impl<BT: BindingsTypes, L> ResourceCounterContext<DeviceId<BT>, IgmpCounters>
     for CoreCtx<'_, BT, L>
 {
     fn with_per_resource_counters<O, F: FnOnce(&IgmpCounters) -> O>(
-        &mut self,
+        &self,
         device_id: &DeviceId<BT>,
         cb: F,
     ) -> O {
@@ -178,7 +178,7 @@ impl<BT: BindingsTypes, D: DeviceStateSpec, L>
     ResourceCounterContext<BaseDeviceId<D, BT>, IgmpCounters> for CoreCtx<'_, BT, L>
 {
     fn with_per_resource_counters<O, F: FnOnce(&IgmpCounters) -> O>(
-        &mut self,
+        &self,
         device_id: &BaseDeviceId<D, BT>,
         cb: F,
     ) -> O {
@@ -204,7 +204,7 @@ impl<BT: BindingsTypes, L> ResourceCounterContext<DeviceId<BT>, MldCounters>
     for CoreCtx<'_, BT, L>
 {
     fn with_per_resource_counters<O, F: FnOnce(&MldCounters) -> O>(
-        &mut self,
+        &self,
         device_id: &DeviceId<BT>,
         cb: F,
     ) -> O {
@@ -220,7 +220,7 @@ impl<BT: BindingsTypes, D: DeviceStateSpec, L>
     ResourceCounterContext<BaseDeviceId<D, BT>, MldCounters> for CoreCtx<'_, BT, L>
 {
     fn with_per_resource_counters<O, F: FnOnce(&MldCounters) -> O>(
-        &mut self,
+        &self,
         device_id: &BaseDeviceId<D, BT>,
         cb: F,
     ) -> O {

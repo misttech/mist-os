@@ -173,7 +173,7 @@ where
         buffer: B,
     ) {
         let Self { device_id, ip_version } = self;
-        core_ctx.increment(&device_id, |counters: &DeviceCounters| &counters.recv_frame);
+        core_ctx.increment_both(&device_id, |counters: &DeviceCounters| &counters.recv_frame);
 
         // NB: For conformance with Linux, don't verify that the contents of
         // of the buffer are a valid IPv4/IPv6 packet. Device sockets are
@@ -187,7 +187,7 @@ where
 
         match ip_version {
             IpVersion::V4 => {
-                core_ctx.increment(&device_id, |counters: &DeviceCounters| {
+                core_ctx.increment_both(&device_id, |counters: &DeviceCounters| {
                     &counters.recv_ipv4_delivered
                 });
                 core_ctx.receive_frame(
@@ -201,7 +201,7 @@ where
                 )
             }
             IpVersion::V6 => {
-                core_ctx.increment(&device_id, |counters: &DeviceCounters| {
+                core_ctx.increment_both(&device_id, |counters: &DeviceCounters| {
                     &counters.recv_ipv6_delivered
                 });
                 core_ctx.receive_frame(
@@ -263,8 +263,8 @@ where
     S: Serializer,
     S::Buffer: BufferMut,
 {
-    core_ctx.increment(device_id, |counters| &counters.send_total_frames);
-    core_ctx.increment(device_id, DeviceCounters::send_frame::<I>);
+    core_ctx.increment_both(device_id, |counters| &counters.send_total_frames);
+    core_ctx.increment_both(device_id, DeviceCounters::send_frame::<I>);
 
     match destination {
         IpPacketDestination::Broadcast(_)
@@ -302,20 +302,20 @@ where
     );
     match result {
         Ok(()) => {
-            core_ctx.increment(device_id, |counters| &counters.send_frame);
+            core_ctx.increment_both(device_id, |counters| &counters.send_frame);
             Ok(())
         }
         Err(TransmitQueueFrameError::NoQueue(err)) => {
-            core_ctx.increment(device_id, |counters| &counters.send_dropped_no_queue);
+            core_ctx.increment_both(device_id, |counters| &counters.send_dropped_no_queue);
             debug!("device {device_id:?} failed to send frame: {err:?}.");
             Ok(())
         }
         Err(TransmitQueueFrameError::QueueFull(serializer)) => {
-            core_ctx.increment(device_id, |counters| &counters.send_queue_full);
+            core_ctx.increment_both(device_id, |counters| &counters.send_queue_full);
             Err(SendFrameError { serializer, error: SendFrameErrorReason::QueueFull })
         }
         Err(TransmitQueueFrameError::SerializeError(err)) => {
-            core_ctx.increment(device_id, |counters| &counters.send_serialize_error);
+            core_ctx.increment_both(device_id, |counters| &counters.send_serialize_error);
             Err(err.err_into())
         }
     }

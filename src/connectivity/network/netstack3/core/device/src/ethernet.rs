@@ -147,7 +147,7 @@ where
         + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = BC::TxMetadata>
         + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
 {
-    core_ctx.increment(device_id, |counters| &counters.send_total_frames);
+    core_ctx.increment_both(device_id, |counters| &counters.send_total_frames);
     match TransmitQueueHandler::<EthernetLinkDevice, _>::queue_tx_frame(
         core_ctx,
         bindings_ctx,
@@ -156,20 +156,20 @@ where
         frame,
     ) {
         Ok(()) => {
-            core_ctx.increment(device_id, |counters| &counters.send_frame);
+            core_ctx.increment_both(device_id, |counters| &counters.send_frame);
             Ok(())
         }
         Err(TransmitQueueFrameError::NoQueue(err)) => {
-            core_ctx.increment(device_id, |counters| &counters.send_dropped_no_queue);
+            core_ctx.increment_both(device_id, |counters| &counters.send_dropped_no_queue);
             debug!("device {device_id:?} failed to send frame: {err:?}.");
             Ok(())
         }
         Err(TransmitQueueFrameError::QueueFull(serializer)) => {
-            core_ctx.increment(device_id, |counters| &counters.send_queue_full);
+            core_ctx.increment_both(device_id, |counters| &counters.send_queue_full);
             Err(SendFrameError { serializer, error: SendFrameErrorReason::QueueFull })
         }
         Err(TransmitQueueFrameError::SerializeError(err)) => {
-            core_ctx.increment(device_id, |counters| &counters.send_serialize_error);
+            core_ctx.increment_both(device_id, |counters| &counters.send_serialize_error);
             Err(err.err_into())
         }
     }
@@ -398,7 +398,7 @@ where
     S: Serializer,
     S::Buffer: BufferMut,
 {
-    core_ctx.increment(device_id, DeviceCounters::send_frame::<I>);
+    core_ctx.increment_both(device_id, DeviceCounters::send_frame::<I>);
 
     trace!("ethernet::send_ip_frame: destination = {:?}; device = {:?}", destination, device_id);
 
@@ -472,7 +472,7 @@ where
         trace_duration!(bindings_ctx, c"device::ethernet::receive_frame");
         let Self { device_id } = self;
         trace!("ethernet::receive_frame: device_id = {:?}", device_id);
-        core_ctx.increment(&device_id, |counters: &DeviceCounters| &counters.recv_frame);
+        core_ctx.increment_both(&device_id, |counters: &DeviceCounters| &counters.recv_frame);
         // NOTE(joshlf): We do not currently validate that the Ethernet frame
         // satisfies the minimum length requirement. We expect that if this
         // requirement is necessary (due to requirements of the physical medium),
@@ -486,7 +486,8 @@ where
         {
             frame
         } else {
-            core_ctx.increment(&device_id, |counters: &DeviceCounters| &counters.recv_parse_error);
+            core_ctx
+                .increment_both(&device_id, |counters: &DeviceCounters| &counters.recv_parse_error);
             trace!("ethernet::receive_frame: failed to parse ethernet frame");
             return;
         };
@@ -526,7 +527,7 @@ where
                 }
             }
             Some(EtherType::Ipv4) => {
-                core_ctx.increment(&device_id, |counters: &DeviceCounters| {
+                core_ctx.increment_both(&device_id, |counters: &DeviceCounters| {
                     &counters.recv_ipv4_delivered
                 });
                 core_ctx.receive_frame(
@@ -540,7 +541,7 @@ where
                 )
             }
             Some(EtherType::Ipv6) => {
-                core_ctx.increment(&device_id, |counters: &DeviceCounters| {
+                core_ctx.increment_both(&device_id, |counters: &DeviceCounters| {
                     &counters.recv_ipv6_delivered
                 });
                 core_ctx.receive_frame(
@@ -554,12 +555,12 @@ where
                 )
             }
             Some(EtherType::Other(_)) => {
-                core_ctx.increment(&device_id, |counters: &EthernetDeviceCounters| {
+                core_ctx.increment_both(&device_id, |counters: &EthernetDeviceCounters| {
                     &counters.recv_unsupported_ethertype
                 });
             }
             None => {
-                core_ctx.increment(&device_id, |counters: &EthernetDeviceCounters| {
+                core_ctx.increment_both(&device_id, |counters: &EthernetDeviceCounters| {
                     &counters.recv_no_ethertype
                 });
             }
@@ -962,7 +963,7 @@ mod tests {
 
     impl ResourceCounterContext<FakeDeviceId, DeviceCounters> for FakeCoreCtx {
         fn with_per_resource_counters<O, F: FnOnce(&DeviceCounters) -> O>(
-            &mut self,
+            &self,
             &FakeDeviceId: &FakeDeviceId,
             cb: F,
         ) -> O {
@@ -972,7 +973,7 @@ mod tests {
 
     impl ResourceCounterContext<FakeDeviceId, DeviceCounters> for FakeInnerCtx {
         fn with_per_resource_counters<O, F: FnOnce(&DeviceCounters) -> O>(
-            &mut self,
+            &self,
             &FakeDeviceId: &FakeDeviceId,
             cb: F,
         ) -> O {

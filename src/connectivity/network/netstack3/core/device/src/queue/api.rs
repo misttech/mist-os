@@ -101,7 +101,7 @@ where
                     ) {
                         Ok(()) => {}
                         Err(e) => {
-                            tx_queue_ctx.increment(device_id, |c| &c.send_dropped_dequeue);
+                            tx_queue_ctx.increment_both(device_id, |c| &c.send_dropped_dequeue);
                             // We failed to send the frame so requeue the rest
                             // and try again later. The failed packet is lost.
                             // We shouldn't requeue it because it's already been

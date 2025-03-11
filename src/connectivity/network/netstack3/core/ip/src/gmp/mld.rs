@@ -164,26 +164,27 @@ fn receive_mld_packet<
     // to be malicious than a poor implementation. Note that the same rationale
     // is applied to IGMP.
     if header_info.hop_limit() != MLD_IP_HOP_LIMIT {
-        core_ctx.increment(device, |counters: &MldCounters| &counters.rx_err_bad_hop_limit);
+        core_ctx.increment_both(device, |counters: &MldCounters| &counters.rx_err_bad_hop_limit);
         return Err(MldError::BadHopLimit { hop_limit: header_info.hop_limit() });
     }
 
     match packet {
         MldPacket::MulticastListenerQuery(msg) => {
-            core_ctx.increment(device, |counters: &MldCounters| &counters.rx_mldv1_query);
+            core_ctx.increment_both(device, |counters: &MldCounters| &counters.rx_mldv1_query);
             // From RFC 2710 section 5:
             //
             //  - To be valid, the Query message MUST come from a link-
             //  local IPv6 Source Address [...]
             if !src_ip.is_link_local() {
-                core_ctx.increment(device, |counters: &MldCounters| &counters.rx_err_bad_src_addr);
+                core_ctx
+                    .increment_both(device, |counters: &MldCounters| &counters.rx_err_bad_src_addr);
                 return Err(MldError::BadSourceAddress { addr: src_ip.into_addr() });
             }
             gmp::v1::handle_query_message(core_ctx, bindings_ctx, device, msg.body())
                 .map_err(Into::into)
         }
         MldPacket::MulticastListenerQueryV2(msg) => {
-            core_ctx.increment(device, |counters: &MldCounters| &counters.rx_mldv2_query);
+            core_ctx.increment_both(device, |counters: &MldCounters| &counters.rx_mldv2_query);
             // From RFC 3810 section 5.1.14:
             //
             // If a node (router or host) receives a Query message with
@@ -191,7 +192,8 @@ fn receive_mld_packet<
             // other address that is not a valid IPv6 link-local address, it MUST
             // silently discard the message.
             if !src_ip.is_link_local() {
-                core_ctx.increment(device, |counters: &MldCounters| &counters.rx_err_bad_src_addr);
+                core_ctx
+                    .increment_both(device, |counters: &MldCounters| &counters.rx_err_bad_src_addr);
                 return Err(MldError::BadSourceAddress { addr: src_ip.into_addr() });
             }
 
@@ -202,7 +204,7 @@ fn receive_mld_packet<
             // Hop-By-Hop Options header of the IPv6 packet. If any of these
             // checks fails, the packet is dropped.
             if !header_info.router_alert() {
-                core_ctx.increment(device, |counters: &MldCounters| {
+                core_ctx.increment_both(device, |counters: &MldCounters| {
                     &counters.rx_err_missing_router_alert
                 });
                 return Err(MldError::MissingRouterAlert);
@@ -212,7 +214,7 @@ fn receive_mld_packet<
                 .map_err(Into::into)
         }
         MldPacket::MulticastListenerReport(msg) => {
-            core_ctx.increment(device, |counters: &MldCounters| &counters.rx_mldv1_report);
+            core_ctx.increment_both(device, |counters: &MldCounters| &counters.rx_mldv1_report);
             // From RFC 2710 section 5:
             //
             //  - To be valid, the Report message MUST come from a link-
@@ -225,7 +227,7 @@ fn receive_mld_packet<
                 Ipv6SourceAddr::Unspecified => {}
                 Ipv6SourceAddr::Unicast(src_ip) => {
                     if !src_ip.is_link_local() {
-                        core_ctx.increment(device, |counters: &MldCounters| {
+                        core_ctx.increment_both(device, |counters: &MldCounters| {
                             &counters.rx_err_bad_src_addr
                         });
                         return Err(MldError::BadSourceAddress { addr: src_ip.into_addr() });
@@ -242,12 +244,12 @@ fn receive_mld_packet<
             )
         }
         MldPacket::MulticastListenerReportV2(_) => {
-            core_ctx.increment(device, |counters: &MldCounters| &counters.rx_mldv2_report);
+            core_ctx.increment_both(device, |counters: &MldCounters| &counters.rx_mldv2_report);
             debug!("Hosts are not interested in MLDv2 report messages");
             Ok(())
         }
         MldPacket::MulticastListenerDone(_) => {
-            core_ctx.increment(device, |counters: &MldCounters| &counters.rx_leave_group);
+            core_ctx.increment_both(device, |counters: &MldCounters| &counters.rx_leave_group);
             debug!("Hosts are not interested in Done messages");
             Ok(())
         }
@@ -420,7 +422,7 @@ impl<BC: MldBindingsContext, CC: MldSendContext<BC>> GmpContextInner<Ipv6, BC> f
         let group_addr = group_addr.into_multicast_addr();
         let result = match msg_type {
             gmp::v1::GmpMessageType::Report => {
-                self.increment(device, |counters: &MldCounters| &counters.tx_mldv1_report);
+                self.increment_both(device, |counters: &MldCounters| &counters.tx_mldv1_report);
                 send_mld_v1_packet::<_, _, _>(
                     self,
                     bindings_ctx,
@@ -432,7 +434,7 @@ impl<BC: MldBindingsContext, CC: MldSendContext<BC>> GmpContextInner<Ipv6, BC> f
                 )
             }
             gmp::v1::GmpMessageType::Leave => {
-                self.increment(device, |counters: &MldCounters| &counters.tx_leave_group);
+                self.increment_both(device, |counters: &MldCounters| &counters.tx_leave_group);
                 send_mld_v1_packet::<_, _, _>(
                     self,
                     bindings_ctx,
@@ -448,7 +450,7 @@ impl<BC: MldBindingsContext, CC: MldSendContext<BC>> GmpContextInner<Ipv6, BC> f
         match result {
             Ok(()) => {}
             Err(err) => {
-                self.increment(device, |counters: &MldCounters| &counters.tx_err);
+                self.increment_both(device, |counters: &MldCounters| &counters.tx_err);
                 debug!(
                     "error sending MLD message ({msg_type:?}) on device {device:?} for group \
                 {group_addr}: {err}",
@@ -471,7 +473,7 @@ impl<BC: MldBindingsContext, CC: MldSendContext<BC>> GmpContextInner<Ipv6, BC> f
         let reports = match Mldv2ReportMessageBuilder::new(groups).with_len_limits(avail_len) {
             Ok(msg) => msg,
             Err(e) => {
-                self.increment(device, |counters: &MldCounters| &counters.tx_err);
+                self.increment_both(device, |counters: &MldCounters| &counters.tx_err);
                 // Warn here, we don't quite have a good global guarantee of
                 // minimal acceptable MTUs across both IPv4 and IPv6. This
                 // should effectively not happen though.
@@ -483,13 +485,13 @@ impl<BC: MldBindingsContext, CC: MldSendContext<BC>> GmpContextInner<Ipv6, BC> f
             }
         };
         for report in reports {
-            self.increment(device, |counters: &MldCounters| &counters.tx_mldv2_report);
+            self.increment_both(device, |counters: &MldCounters| &counters.tx_mldv2_report);
             let destination = IpPacketDestination::Multicast(dst_ip);
             let ip_frame =
                 report.into_serializer().encapsulate(icmp.clone()).encapsulate(ipv6.clone());
             IpLayerHandler::send_ip_frame(self, bindings_ctx, device, destination, ip_frame)
                 .unwrap_or_else(|ErrorAndSerializer { error, .. }| {
-                    self.increment(device, |counters: &MldCounters| &counters.tx_err);
+                    self.increment_both(device, |counters: &MldCounters| &counters.tx_err);
                     debug!("failed to send MLDv2 report over {device:?}: {error:?}")
                 });
         }
@@ -893,7 +895,7 @@ mod tests {
 
     impl ResourceCounterContext<FakeDeviceId, MldCounters> for FakeMldCtx {
         fn with_per_resource_counters<O, F: FnOnce(&MldCounters) -> O>(
-            &mut self,
+            &self,
             _device_id: &FakeDeviceId,
             cb: F,
         ) -> O {
@@ -1051,7 +1053,7 @@ mod tests {
 
     impl ResourceCounterContext<FakeDeviceId, MldCounters> for &mut FakeCoreCtxImpl {
         fn with_per_resource_counters<O, F: FnOnce(&MldCounters) -> O>(
-            &mut self,
+            &self,
             device_id: &FakeDeviceId,
             cb: F,
         ) -> O {

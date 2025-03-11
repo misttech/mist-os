@@ -986,7 +986,7 @@ where
         DeviceId::Blackhole(id) => {
             // Just drop the frame.
             debug!("dropping frame in send_ip_frame on blackhole device {id:?}");
-            core_ctx.increment(id, DeviceCounters::send_frame::<I>);
+            core_ctx.increment_both(id, DeviceCounters::send_frame::<I>);
             Ok(())
         }
     }
@@ -1127,14 +1127,15 @@ impl<'a, BC: BindingsContext, L> ResourceCounterContext<DeviceId<BC>, DeviceCoun
     for CoreCtx<'a, BC, L>
 {
     fn with_per_resource_counters<O, F: FnOnce(&DeviceCounters) -> O>(
-        &mut self,
+        &self,
         device_id: &DeviceId<BC>,
         cb: F,
     ) -> O {
         for_any_device_id!(DeviceId, device_id, id => {
-            cb(&device_state(self, id)
-                .unlocked_access::<crate::lock_ordering::UnlockedState>()
-                .counters)
+            let state = id.device_state(
+                &self.unlocked_access::<crate::lock_ordering::UnlockedState>().device.origin,
+            );
+            cb(&state.counters)
         })
     }
 }
@@ -1143,13 +1144,14 @@ impl<'a, BC: BindingsContext, D: DeviceStateSpec, L>
     ResourceCounterContext<BaseDeviceId<D, BC>, DeviceCounters> for CoreCtx<'a, BC, L>
 {
     fn with_per_resource_counters<O, F: FnOnce(&DeviceCounters) -> O>(
-        &mut self,
+        &self,
         device_id: &BaseDeviceId<D, BC>,
         cb: F,
     ) -> O {
-        cb(&device_state(self, device_id)
-            .unlocked_access::<crate::lock_ordering::UnlockedState>()
-            .counters)
+        let state = device_id.device_state(
+            &self.unlocked_access::<crate::lock_ordering::UnlockedState>().device.origin,
+        );
+        cb(&state.counters)
     }
 }
 
@@ -1157,7 +1159,7 @@ impl<'a, BC: BindingsContext, L, D: WeakDeviceIdentifier>
     ResourceCounterContext<DeviceSocketId<D, BC>, DeviceSocketCounters> for CoreCtx<'a, BC, L>
 {
     fn with_per_resource_counters<O, F: FnOnce(&DeviceSocketCounters) -> O>(
-        &mut self,
+        &self,
         socket_id: &DeviceSocketId<D, BC>,
         cb: F,
     ) -> O {
@@ -1169,14 +1171,14 @@ impl<'a, BC: BindingsContext, L>
     ResourceCounterContext<EthernetDeviceId<BC>, EthernetDeviceCounters> for CoreCtx<'a, BC, L>
 {
     fn with_per_resource_counters<O, F: FnOnce(&EthernetDeviceCounters) -> O>(
-        &mut self,
+        &self,
         device_id: &EthernetDeviceId<BC>,
         cb: F,
     ) -> O {
-        cb(&device_state(self, device_id)
-            .unlocked_access::<crate::lock_ordering::UnlockedState>()
-            .link
-            .counters)
+        let state = device_id.device_state(
+            &self.unlocked_access::<crate::lock_ordering::UnlockedState>().device.origin,
+        );
+        cb(&state.link.counters)
     }
 }
 
@@ -1184,14 +1186,14 @@ impl<'a, BC: BindingsContext, L>
     ResourceCounterContext<LoopbackDeviceId<BC>, EthernetDeviceCounters> for CoreCtx<'a, BC, L>
 {
     fn with_per_resource_counters<O, F: FnOnce(&EthernetDeviceCounters) -> O>(
-        &mut self,
+        &self,
         device_id: &LoopbackDeviceId<BC>,
         cb: F,
     ) -> O {
-        cb(&device_state(self, device_id)
-            .unlocked_access::<crate::lock_ordering::UnlockedState>()
-            .link
-            .counters)
+        let state = device_id.device_state(
+            &self.unlocked_access::<crate::lock_ordering::UnlockedState>().device.origin,
+        );
+        cb(&state.link.counters)
     }
 }
 
@@ -1199,14 +1201,14 @@ impl<'a, BC: BindingsContext, L> ResourceCounterContext<PureIpDeviceId<BC>, Pure
     for CoreCtx<'a, BC, L>
 {
     fn with_per_resource_counters<O, F: FnOnce(&PureIpDeviceCounters) -> O>(
-        &mut self,
+        &self,
         device_id: &PureIpDeviceId<BC>,
         cb: F,
     ) -> O {
-        cb(&device_state(self, device_id)
-            .unlocked_access::<crate::lock_ordering::UnlockedState>()
-            .link
-            .counters)
+        let state = device_id.device_state(
+            &self.unlocked_access::<crate::lock_ordering::UnlockedState>().device.origin,
+        );
+        cb(&state.link.counters)
     }
 }
 
@@ -1221,7 +1223,7 @@ impl<'a, BC: BindingsContext, L>
     ResourceCounterContext<BlackholeDeviceId<BC>, BlackholeDeviceCounters> for CoreCtx<'a, BC, L>
 {
     fn with_per_resource_counters<O, F: FnOnce(&BlackholeDeviceCounters) -> O>(
-        &mut self,
+        &self,
         _device_id: &BlackholeDeviceId<BC>,
         cb: F,
     ) -> O {

@@ -110,7 +110,7 @@ impl<I: IpExt, BC: BindingsContext, L, D: WeakDeviceIdentifier>
     ResourceCounterContext<RawIpSocketId<I, D, BC>, RawIpSocketCounters<I>> for CoreCtx<'_, BC, L>
 {
     fn with_per_resource_counters<O, F: FnOnce(&RawIpSocketCounters<I>) -> O>(
-        &mut self,
+        &self,
         id: &RawIpSocketId<I, D, BC>,
         cb: F,
     ) -> O {
