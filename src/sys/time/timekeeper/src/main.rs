@@ -744,6 +744,8 @@ mod tests {
             serve_fuchsia_time_alarms: false,
             has_always_on_counter: false,
             serve_fuchsia_time_external_adjust: false,
+            utc_max_allowed_delta_future_sec: 0,
+            utc_max_allowed_delta_past_sec: 0,
         }))
     }
 

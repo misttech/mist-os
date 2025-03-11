@@ -39,6 +39,18 @@ pub struct TimekeeperConfig {
     /// This is a security sensitive protocol, and very few assemblies are
     /// expected to have it turned on.
     pub serve_fuchsia_time_external_adjust: bool,
+    /// Maximum absolute difference between proposed UTC reference and actual UTC
+    /// reference, expressed in seconds, when the proposed UTC reference is
+    /// in the "past" with respect of actual UTC reference.
+    ///
+    /// This is always expressed as a non-negative value.
+    pub utc_max_allowed_delta_past_sec: u64,
+    /// Maximum absolute difference between proposed UTC reference and actual UTC
+    /// reference, expressed in seconds, when the proposed UTC reference is
+    /// in the "future" with respect of actual UTC reference.
+    ///
+    /// This is always expressed as a non-negative value.
+    pub utc_max_allowed_delta_future_sec: u64,
 }
 
 impl Default for TimekeeperConfig {
@@ -54,6 +66,8 @@ impl Default for TimekeeperConfig {
             always_on_counter: false,
             use_persistent_storage: false,
             serve_fuchsia_time_external_adjust: false,
+            utc_max_allowed_delta_past_sec: 0,
+            utc_max_allowed_delta_future_sec: 0,
         }
     }
 }

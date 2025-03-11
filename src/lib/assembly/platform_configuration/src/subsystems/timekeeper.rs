@@ -91,6 +91,8 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
             .component("meta/timekeeper.cm")
             .context("while finding the timekeeper component")?;
 
+        // Refer to //src/sys/time/timekeeper/config.shard.cml
+        // for details.
         config_builder
             .field("disable_delays", false)?
             .field("oscillator_error_std_dev_ppm", 15)?
@@ -116,6 +118,8 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
             .field("has_real_time_clock", has_real_time_clock)?
             .field("has_always_on_counter", use_always_on_counter)?
             .field("utc_start_at_startup_when_invalid_rtc", config.utc_start_at_startup_when_invalid_rtc)?
+            .field("utc_max_allowed_delta_past_sec", config.utc_max_allowed_delta_past_sec)?
+            .field("utc_max_allowed_delta_future_sec", config.utc_max_allowed_delta_future_sec)?
             .field("serve_fuchsia_time_alarms", serve_fuchsia_time_alarms)?;
 
         let mut time_source_config_builder = builder
