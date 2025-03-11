@@ -63,6 +63,7 @@ rustc_library("routing") {
 
   sources = [
     "src/availability.rs",
+    "src/bedrock/aggregate_router.rs",
     "src/bedrock/dict_ext.rs",
     "src/bedrock/lazy_get.rs",
     "src/bedrock/mod.rs",

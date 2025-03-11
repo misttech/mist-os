@@ -216,6 +216,7 @@ _component_manager_bin = {
     "src/model/mutable_directory.rs",
     "src/model/namespace.rs",
     "src/model/resolver.rs",
+    "src/model/routing/aggregate_router.rs",
     "src/model/routing/bedrock.rs",
     "src/model/routing/legacy.rs",
     "src/model/routing/mod.rs",

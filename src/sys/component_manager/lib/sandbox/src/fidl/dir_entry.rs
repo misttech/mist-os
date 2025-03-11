@@ -17,7 +17,7 @@ impl RemotableCapability for DirEntry {
         self,
         _scope: ExecutionScope,
     ) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
-        Ok(self.entry)
+        Ok(self.to_directory_entry())
     }
 }
 
@@ -61,6 +61,10 @@ impl DirEntry {
     /// Creates a [DirEntry] capability from a [vfs::directory::entry::DirectoryEntry].
     pub fn new(entry: Arc<dyn DirectoryEntry>) -> Self {
         Self { entry }
+    }
+
+    pub fn to_directory_entry(self) -> Arc<dyn DirectoryEntry> {
+        self.entry
     }
 
     /// Opens the corresponding entry.

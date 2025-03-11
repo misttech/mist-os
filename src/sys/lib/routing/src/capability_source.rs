@@ -16,7 +16,7 @@ use cm_rust::{
     UseSource, UseStorageDecl,
 };
 use cm_rust_derive::FidlDecl;
-use cm_types::{LongName, Name, Path};
+use cm_types::{Name, Path};
 use derivative::Derivative;
 use fidl::{persist, unpersist};
 use from_enum::FromEnum;
@@ -189,9 +189,9 @@ pub struct AnonymizedAggregateSource {
 #[derive(FidlDecl, Debug, PartialEq, Clone)]
 #[fidl_decl(fidl_table = "fsys::ServiceInstance")]
 pub struct ServiceInstance {
-    instance_name: Name,
-    child_name: LongName,
-    child_instance_name: Name,
+    pub instance_name: Name,
+    pub child_name: String,
+    pub child_instance_name: Name,
 }
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, Debug, PartialEq, Clone)]
