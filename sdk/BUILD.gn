@@ -726,6 +726,13 @@ if (!is_host) {
       # The ffx tests also depend on these tools.
       "//src/developer/ffx/plugins/emulator:uefi_internal_x64($host_toolchain)",
       "//src/developer/ffx/plugins/profile:sdk($host_toolchain)",
+
+      # `ffx emu start --engine qemu` requires `qemu_internal` in the manifest.
+      "//src/developer/ffx/plugins/emulator:qemu_internal($host_toolchain)",
+
+      # For completeness.
+      "//src/developer/ffx/plugins/emulator:crosvm_internal($host_toolchain)",
+      "//src/developer/ffx/plugins/emulator:uefi_internal_arm64($host_toolchain)",
     ]
   }
 
