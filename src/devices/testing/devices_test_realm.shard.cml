@@ -91,6 +91,7 @@
         {
             // These services replace the directory capabilities above.
             service: [
+                "fuchsia.gpu.magma.Service",
                 "fuchsia.hardware.audio.CodecConnectorService",
                 "fuchsia.hardware.audio.CompositeConnectorService",
                 "fuchsia.hardware.audio.DaiConnectorService",
