@@ -20,6 +20,35 @@ fn saturating_i64_to_i32(v: i64) -> i32 {
     }
 }
 
+macro_rules! translate_data {
+    ($type_name:ident; $( $field :ident ),+) => {
+      translate_data!(FROM32; $type_name; $( $field ),*);
+      translate_data!(TRYFROM64; $type_name; $( $field ),*);
+    };
+    (FROM32; $type_name:ident; $( $field :ident ),+) => {
+        impl From<crate::arch32::$type_name> for crate::$type_name {
+            fn from($type_name: crate::arch32::$type_name) -> Self {
+                Self {
+                    $( $field: $type_name.$field.into(),  )*
+                    ..Default::default()
+                }
+            }
+        }
+
+    };
+    (TRYFROM64; $type_name:ident; $( $field :ident ),+) => {
+        impl TryFrom<crate::$type_name> for crate::arch32::$type_name {
+            type Error = ();
+            fn try_from($type_name: crate::$type_name) -> Result<Self, ()> {
+                Ok(Self {
+                    $( $field: $type_name.$field.try_into().map_err(|_| ())?,  )*
+                    ..Default::default()
+                })
+            }
+        }
+    };
+}
+
 impl From<crate::stat> for crate::arch32::stat64 {
     fn from(stat: crate::stat) -> Self {
         let mut result = Self::default();
@@ -45,6 +74,7 @@ impl From<crate::stat> for crate::arch32::stat64 {
     }
 }
 
+translate_data!(FROM32; timespec; tv_sec, tv_nsec);
 impl From<crate::timespec> for crate::arch32::timespec {
     fn from(tv: crate::timespec) -> Self {
         Self {
@@ -54,12 +84,7 @@ impl From<crate::timespec> for crate::arch32::timespec {
     }
 }
 
-impl From<crate::arch32::timespec> for crate::timespec {
-    fn from(tv: crate::arch32::timespec) -> Self {
-        Self { tv_sec: tv.tv_sec.into(), tv_nsec: tv.tv_nsec.into() }
-    }
-}
-
+translate_data!(FROM32; timeval; tv_sec, tv_usec);
 impl From<crate::timeval> for crate::arch32::timeval {
     fn from(tv: crate::timeval) -> Self {
         Self {
@@ -69,12 +94,7 @@ impl From<crate::timeval> for crate::arch32::timeval {
     }
 }
 
-impl From<crate::arch32::rlimit> for crate::rlimit {
-    fn from(rlimit: crate::arch32::rlimit) -> Self {
-        Self { rlim_cur: rlimit.rlim_cur.into(), rlim_max: rlimit.rlim_max.into() }
-    }
-}
-
+translate_data!(FROM32; rlimit; rlim_cur, rlim_max);
 impl From<crate::rlimit> for crate::arch32::rlimit {
     fn from(rlimit: crate::rlimit) -> Self {
         Self {
@@ -84,27 +104,7 @@ impl From<crate::rlimit> for crate::arch32::rlimit {
     }
 }
 
-impl From<crate::arch32::sigaltstack> for crate::sigaltstack {
-    fn from(sigaltstack: crate::arch32::sigaltstack) -> Self {
-        Self {
-            ss_sp: sigaltstack.ss_sp.into(),
-            ss_flags: sigaltstack.ss_flags.into(),
-            ss_size: sigaltstack.ss_size.into(),
-            __bindgen_padding_0: Default::default(),
-        }
-    }
-}
-
-impl TryFrom<crate::sigaltstack> for crate::arch32::sigaltstack {
-    type Error = ();
-    fn try_from(sigaltstack: crate::sigaltstack) -> Result<Self, ()> {
-        Ok(Self {
-            ss_sp: sigaltstack.ss_sp.try_into().map_err(|_| ())?,
-            ss_flags: sigaltstack.ss_flags.try_into().map_err(|_| ())?,
-            ss_size: sigaltstack.ss_size.try_into().map_err(|_| ())?,
-        })
-    }
-}
+translate_data!(sigaltstack; ss_sp, ss_flags ,ss_size);
 
 impl From<crate::__kernel_fsid_t> for crate::arch32::__kernel_fsid_t {
     fn from(fsid: crate::__kernel_fsid_t) -> Self {
@@ -199,44 +199,6 @@ impl TryFrom<crate::sigval> for crate::arch32::sigval {
     }
 }
 
-impl From<crate::arch32::flock> for crate::flock {
-    fn from(flock: crate::arch32::flock) -> Self {
-        Self {
-            l_type: flock.l_type.into(),
-            l_whence: flock.l_whence.into(),
-            l_start: flock.l_start.into(),
-            l_len: flock.l_len.into(),
-            l_pid: flock.l_pid.into(),
-            ..Default::default()
-        }
-    }
-}
-
-impl TryFrom<crate::flock> for crate::arch32::flock {
-    type Error = ();
-    fn try_from(flock: crate::flock) -> Result<Self, ()> {
-        Ok(Self {
-            l_type: flock.l_type.try_into().map_err(|_| ())?,
-            l_whence: flock.l_whence.try_into().map_err(|_| ())?,
-            l_start: flock.l_start.try_into().map_err(|_| ())?,
-            l_len: flock.l_len.try_into().map_err(|_| ())?,
-            l_pid: flock.l_pid.try_into().map_err(|_| ())?,
-        })
-    }
-}
-
-impl From<crate::arch32::itimerspec> for crate::itimerspec {
-    fn from(itimerspec: crate::arch32::itimerspec) -> Self {
-        Self { it_interval: itimerspec.it_interval.into(), it_value: itimerspec.it_value.into() }
-    }
-}
-
-impl TryFrom<crate::itimerspec> for crate::arch32::itimerspec {
-    type Error = ();
-    fn try_from(itimerspec: crate::itimerspec) -> Result<Self, ()> {
-        Ok(Self {
-            it_interval: itimerspec.it_interval.try_into().map_err(|_| ())?,
-            it_value: itimerspec.it_value.try_into().map_err(|_| ())?,
-        })
-    }
-}
+translate_data!(flock; l_type, l_whence, l_start, l_len, l_pid);
+translate_data!(itimerspec; it_interval, it_value);
+translate_data!(itimerval; it_interval, it_value);

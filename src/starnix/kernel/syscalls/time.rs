@@ -22,8 +22,8 @@ use starnix_uapi::auth::CAP_WAKE_ALARM;
 use starnix_uapi::errors::{Errno, EINTR};
 use starnix_uapi::user_address::{MultiArchUserRef, UserRef};
 use starnix_uapi::{
-    errno, error, from_status_like_fdio, itimerval, pid_t, sigevent, timespec, timeval, timezone,
-    tms, uapi, CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_MONOTONIC_COARSE,
+    errno, error, from_status_like_fdio, pid_t, sigevent, timespec, timeval, timezone, tms, uapi,
+    CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_MONOTONIC_COARSE,
     CLOCK_MONOTONIC_RAW, CLOCK_PROCESS_CPUTIME_ID, CLOCK_REALTIME, CLOCK_REALTIME_ALARM,
     CLOCK_REALTIME_COARSE, CLOCK_TAI, CLOCK_THREAD_CPUTIME_ID, MAX_CLOCKS, TIMER_ABSTIME,
 };
@@ -33,6 +33,7 @@ use zx::{
 
 pub type TimeSpecPtr = MultiArchUserRef<uapi::timespec, uapi::arch32::timespec>;
 pub type ITimerSpecPtr = MultiArchUserRef<uapi::itimerspec, uapi::arch32::itimerspec>;
+pub type ITimerValPtr = MultiArchUserRef<uapi::itimerval, uapi::arch32::itimerval>;
 type TimeValPtr = MultiArchUserRef<uapi::timeval, uapi::arch32::timeval>;
 type TimeZonePtr = MultiArchUserRef<uapi::timezone, uapi::arch32::timezone>;
 
@@ -523,10 +524,10 @@ pub fn sys_getitimer(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     which: u32,
-    user_curr_value: UserRef<itimerval>,
+    user_curr_value: ITimerValPtr,
 ) -> Result<(), Errno> {
     let remaining = current_task.thread_group.get_itimer(which)?;
-    current_task.write_object(user_curr_value, &remaining)?;
+    current_task.write_multi_arch_object(user_curr_value, remaining)?;
     Ok(())
 }
 
@@ -534,15 +535,15 @@ pub fn sys_setitimer(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     which: u32,
-    user_new_value: UserRef<itimerval>,
-    user_old_value: UserRef<itimerval>,
+    user_new_value: ITimerValPtr,
+    user_old_value: ITimerValPtr,
 ) -> Result<(), Errno> {
-    let new_value = current_task.read_object(user_new_value)?;
+    let new_value = current_task.read_multi_arch_object(user_new_value)?;
 
     let old_value = current_task.thread_group.set_itimer(current_task, which, new_value)?;
 
     if !user_old_value.is_null() {
-        current_task.write_object(user_old_value, &old_value)?;
+        current_task.write_multi_arch_object(user_old_value, old_value)?;
     }
 
     Ok(())
@@ -608,6 +609,7 @@ mod arch32 {
     pub use super::{
         sys_clock_getres as sys_arch32_clock_getres, sys_clock_gettime as sys_arch32_clock_gettime,
         sys_gettimeofday as sys_arch32_gettimeofday, sys_nanosleep as sys_arch32_nanosleep,
+        sys_setitimer as sys_arch32_setitimer,
     };
 }
 
