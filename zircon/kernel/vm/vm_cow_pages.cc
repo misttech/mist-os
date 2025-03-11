@@ -569,47 +569,16 @@ fbl::RefPtr<VmCowPages> VmCowPages::DeadTransitionLocked(Guard<VmoLockType>& gua
 
       // We removed a child from the parent, and so it may also need to be cleaned.
       // Avoid recursing destructors and dead transitions when we delete our parent by using the
-      // deferred deletion method. See common in parent else branch for why we can avoid this on a
-      // hidden parent.
-      if (!parent_->is_hidden()) {
-        deferred = ktl::move(parent_);
-      } else {
-        deferred = parent_->MaybeDeadTransitionLocked(parent_guard);
-      }
+      // deferred deletion method, i.e. return the parent_ and have the caller call dead transition
+      // on it.
+      deferred = ktl::move(parent_);
     }
   } else {
     // Most of the hidden vmo's state should have already been cleaned up when it merged
     // itself into its child in ::RemoveChildLocked.
     DEBUG_ASSERT(children_list_len_ == 0);
     DEBUG_ASSERT(page_list_.HasNoPageOrRef());
-    // Even though we are hidden we might have a parent. Unlike in the other branch of this if we
-    // do not need to perform any deferred deletion. The reason for this is that the deferred
-    // deletion mechanism is intended to resolve the scenario where there is a chain of 'one ref'
-    // parent pointers that will chain delete. However, with hidden parents we *know* that a
-    // hidden parent has two children (and hence at least one other ref to it) and so we cannot be
-    // in a one ref chain. Even if N threads all tried to remove children from the hierarchy at
-    // once, this would ultimately get serialized through the lock and the hierarchy would go from
-    //
-    //          [..]
-    //           /
-    //          A                             [..]
-    //         / \                             /
-    //        B   E           TO         B    A
-    //       / \                        /    / \.
-    //      C   D                      C    D   E
-    //
-    // And so each serialized deletion breaks of a discrete two VMO chain that can be safely
-    // finalized with one recursive step.
-    if (parent_) {
-      Guard<VmoLockType> parent_guard{AssertOrderedLock, parent_->lock(), parent_->lock_order(),
-                                      VmLockAcquireMode::Reentrant};
-      DEBUG_ASSERT(!parent_->parent_);
-      // We explicitly call DeadTransition on our parent (even though we are still a child of it) as
-      // otherwise its destructor will run without this transition happening, which is an error.
-      // This otherwise does not cause any actual cleanup to happen, since our parent is hidden and
-      // will have had all its pages removed already.
-      deferred = parent_->DeadTransitionLocked(parent_guard);
-    }
+    DEBUG_ASSERT(!parent_);
   }
 
   DEBUG_ASSERT(page_list_.IsEmpty());
