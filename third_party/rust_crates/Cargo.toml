@@ -31,7 +31,7 @@ ansi_term = "0.12.0"
 anyhow = "1.0.95"
 arbitrary = { version = "1.0.3", features = ["derive"] }
 argh = "0.1.12"
-arrayref = "0.3.5"
+arrayref = "0.3.9"
 arrayvec = "0.7.4"
 ash = { version = "0.37.0", features = ["linked"], default-features = false }
 assert_matches = "1.5.0"

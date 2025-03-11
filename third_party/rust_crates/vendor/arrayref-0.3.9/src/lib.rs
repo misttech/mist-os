@@ -58,17 +58,17 @@ macro_rules! array_ref {
     ($arr:expr, $offset:expr, $len:expr) => {{
         {
             #[inline]
-            unsafe fn as_array<T>(slice: &[T]) -> &[T; $len] {
+            const unsafe fn as_array<T>(slice: &[T]) -> &[T; $len] {
                 &*(slice.as_ptr() as *const [_; $len])
             }
             let offset = $offset;
-            let slice = & $arr[offset..offset + $len];
+            let slice = &$arr[offset..offset + $len];
             #[allow(unused_unsafe)]
             unsafe {
                 as_array(slice)
             }
         }
-    }}
+    }};
 }
 
 /// You can use `array_refs` to generate a series of array references
@@ -105,27 +105,29 @@ macro_rules! array_ref {
 macro_rules! array_refs {
     ( $arr:expr, $( $pre:expr ),* ; .. ;  $( $post:expr ),* ) => {{
         {
-            use std::slice;
+            use core::slice;
             #[inline]
             #[allow(unused_assignments)]
-            unsafe fn as_arrays<T>(a: &[T]) -> ( $( &[T; $pre], )* &[T],  $( &[T; $post], )*) {
-                let min_len = $( $pre + )* $( $post + )* 0;
-                let var_len = a.len() - min_len;
-                assert!(a.len() >= min_len);
+            #[allow(clippy::eval_order_dependence)]
+            const unsafe fn as_arrays<T>(a: &[T]) -> ( $( &[T; $pre], )* &[T],  $( &[T; $post], )*) {
+                const MIN_LEN: usize = 0usize $( .saturating_add($pre) )* $( .saturating_add($post) )*;
+                assert!(MIN_LEN < usize::MAX, "Your arrays are too big, are you trying to hack yourself?!");
+                let var_len = a.len() - MIN_LEN;
+                assert!(a.len() >= MIN_LEN);
                 let mut p = a.as_ptr();
                 ( $( {
                     let aref = & *(p as *const [T; $pre]);
-                    p = p.offset($pre as isize);
+                    p = p.add($pre);
                     aref
-                } ),* , {
+                }, )* {
                     let sl = slice::from_raw_parts(p as *const T, var_len);
-                    p = p.offset(var_len as isize);
+                    p = p.add(var_len);
                     sl
                 }, $( {
                     let aref = & *(p as *const [T; $post]);
-                    p = p.offset($post as isize);
+                    p = p.add($post);
                     aref
-                } ),*)
+                }, )*)
             }
             let input = $arr;
             #[allow(unused_unsafe)]
@@ -138,13 +140,14 @@ macro_rules! array_refs {
         {
             #[inline]
             #[allow(unused_assignments)]
-            unsafe fn as_arrays<T>(a: &[T; $( $len + )* 0 ]) -> ( $( &[T; $len], )* ) {
+            #[allow(clippy::eval_order_dependence)]
+            const unsafe fn as_arrays<T>(a: &[T; $( $len + )* 0 ]) -> ( $( &[T; $len], )* ) {
                 let mut p = a.as_ptr();
                 ( $( {
                     let aref = &*(p as *const [T; $len]);
                     p = p.offset($len as isize);
                     aref
-                } ),* )
+                }, )* )
             }
             let input = $arr;
             #[allow(unused_unsafe)]
@@ -154,7 +157,6 @@ macro_rules! array_refs {
         }
     }}
 }
-
 
 /// You can use `mut_array_refs` to generate a series of mutable array
 /// references to an input mutable array reference.  The idea is if
@@ -200,27 +202,29 @@ macro_rules! array_refs {
 macro_rules! mut_array_refs {
     ( $arr:expr, $( $pre:expr ),* ; .. ;  $( $post:expr ),* ) => {{
         {
-            use std::slice;
+            use core::slice;
             #[inline]
             #[allow(unused_assignments)]
+            #[allow(clippy::eval_order_dependence)]
             unsafe fn as_arrays<T>(a: &mut [T]) -> ( $( &mut [T; $pre], )* &mut [T],  $( &mut [T; $post], )*) {
-                let min_len = $( $pre + )* $( $post + )* 0;
-                let var_len = a.len() - min_len;
-                assert!(a.len() >= min_len);
+                const MIN_LEN: usize = 0usize $( .saturating_add($pre) )* $( .saturating_add($post) )*;
+                assert!(MIN_LEN < usize::MAX, "Your arrays are too big, are you trying to hack yourself?!");
+                let var_len = a.len() - MIN_LEN;
+                assert!(a.len() >= MIN_LEN);
                 let mut p = a.as_mut_ptr();
                 ( $( {
                     let aref = &mut *(p as *mut [T; $pre]);
-                    p = p.offset($pre as isize);
+                    p = p.add($pre);
                     aref
-                } ),* , {
+                }, )* {
                     let sl = slice::from_raw_parts_mut(p as *mut T, var_len);
-                    p = p.offset(var_len as isize);
+                    p = p.add(var_len);
                     sl
                 }, $( {
                     let aref = &mut *(p as *mut [T; $post]);
-                    p = p.offset($post as isize);
+                    p = p.add($post);
                     aref
-                } ),*)
+                }, )*)
             }
             let input = $arr;
             #[allow(unused_unsafe)]
@@ -233,13 +237,14 @@ macro_rules! mut_array_refs {
         {
             #[inline]
             #[allow(unused_assignments)]
+            #[allow(clippy::eval_order_dependence)]
             unsafe fn as_arrays<T>(a: &mut [T; $( $len + )* 0 ]) -> ( $( &mut [T; $len], )* ) {
                 let mut p = a.as_mut_ptr();
                 ( $( {
                     let aref = &mut *(p as *mut [T; $len]);
-                    p = p.offset($len as isize);
+                    p = p.add($len);
                     aref
-                } ),* )
+                }, )* )
             }
             let input = $arr;
             #[allow(unused_unsafe)]
@@ -289,184 +294,211 @@ macro_rules! array_mut_ref {
                 as_array(slice)
             }
         }
-    }}
+    }};
 }
 
-
+#[allow(clippy::all)]
 #[cfg(test)]
 mod test {
 
-extern crate quickcheck;
+    extern crate quickcheck;
 
-use std::vec::Vec;
+    use std::vec::Vec;
 
-// use super::*;
+    // use super::*;
 
-#[test]
-#[should_panic]
-fn checks_bounds() {
-    let foo: [u8; 11] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-    let bar = array_ref!(foo, 1, 11);
-    println!("I am checking that I can dereference bar[0] = {}", bar[0]);
-}
+    #[test]
+    #[should_panic]
+    fn checks_bounds() {
+        let foo: [u8; 11] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        let bar = array_ref!(foo, 1, 11);
+        println!("I am checking that I can dereference bar[0] = {}", bar[0]);
+    }
 
-#[test]
-fn simple_case_works() {
-    fn check(expected: [u8; 3], actual: &[u8; 3]) {
-        for (e, a) in (&expected).iter().zip(actual.iter()) {
-            assert_eq!(e, a)
+    #[test]
+    fn simple_case_works() {
+        fn check(expected: [u8; 3], actual: &[u8; 3]) {
+            for (e, a) in (&expected).iter().zip(actual.iter()) {
+                assert_eq!(e, a)
+            }
         }
-    }
-    let mut foo: [u8; 11] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-    {
-        let bar = array_ref!(foo, 2, 3);
-        check([2, 3, 4], bar);
-    }
-    check([0, 1, 2], array_ref!(foo, 0, 3));
-    fn zero2(x: &mut [u8; 2]) {
-        x[0] = 0;
-        x[1] = 0;
-    }
-    zero2(array_mut_ref!(foo, 8, 2));
-    check([0, 0, 10], array_ref!(foo, 8, 3));
-}
-
-
-#[test]
-fn check_array_ref_5() {
-    fn f(data: Vec<u8>, offset: usize) -> quickcheck::TestResult {
-        if data.len() < offset + 5 {
-            return quickcheck::TestResult::discard();
+        let mut foo: [u8; 11] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        {
+            let bar = array_ref!(foo, 2, 3);
+            check([2, 3, 4], bar);
         }
-        let out = array_ref!(data, offset, 5);
-        quickcheck::TestResult::from_bool(out.len() == 5)
-    }
-    quickcheck::quickcheck(f as fn(Vec<u8>, usize) -> quickcheck::TestResult);
-}
-
-#[test]
-fn check_array_ref_out_of_bounds_5() {
-    fn f(data: Vec<u8>, offset: usize) -> quickcheck::TestResult {
-        if data.len() >= offset + 5 {
-            return quickcheck::TestResult::discard();
+        check([0, 1, 2], array_ref!(foo, 0, 3));
+        fn zero2(x: &mut [u8; 2]) {
+            x[0] = 0;
+            x[1] = 0;
         }
-        quickcheck::TestResult::must_fail(move || {
-            array_ref!(data, offset, 5);
-        })
+        zero2(array_mut_ref!(foo, 8, 2));
+        check([0, 0, 10], array_ref!(foo, 8, 3));
     }
-    quickcheck::quickcheck(f as fn(Vec<u8>, usize) -> quickcheck::TestResult);
-}
 
-#[test]
-fn check_array_mut_ref_7() {
-    fn f(mut data: Vec<u8>, offset: usize) -> quickcheck::TestResult {
-        if data.len() < offset + 7 {
-            return quickcheck::TestResult::discard();
+    #[test]
+    fn check_array_ref_5() {
+        fn f(data: Vec<u8>, offset: usize) -> quickcheck::TestResult {
+            // Compute the following, with correct results even if the sum would overflow:
+            //   if data.len() < offset + 5
+            if data.len() < 5 || data.len() - 5 < offset {
+                return quickcheck::TestResult::discard();
+            }
+            let out = array_ref!(data, offset, 5);
+            quickcheck::TestResult::from_bool(out.len() == 5)
         }
-        let out = array_mut_ref!(data, offset, 7);
-        out[6] = 3;
-        quickcheck::TestResult::from_bool(out.len() == 7)
+        quickcheck::quickcheck(f as fn(Vec<u8>, usize) -> quickcheck::TestResult);
     }
-    quickcheck::quickcheck(f as fn(Vec<u8>, usize) -> quickcheck::TestResult);
-}
 
-
-#[test]
-fn check_array_mut_ref_out_of_bounds_32() {
-    fn f(mut data: Vec<u8>, offset: usize) -> quickcheck::TestResult {
-        if data.len() >= offset + 32 {
-            return quickcheck::TestResult::discard();
+    #[test]
+    fn check_array_ref_out_of_bounds_5() {
+        fn f(data: Vec<u8>, offset: usize) -> quickcheck::TestResult {
+            // Compute the following, with correct results even if the sum would overflow:
+            //   if data.len() >= offset + 5
+            if data.len() >= 5 && data.len() - 5 >= offset {
+                return quickcheck::TestResult::discard();
+            }
+            quickcheck::TestResult::must_fail(move || {
+                array_ref!(data, offset, 5);
+            })
         }
-        quickcheck::TestResult::must_fail(move || {
-            array_mut_ref!(data, offset, 32);
-        })
+        quickcheck::quickcheck(f as fn(Vec<u8>, usize) -> quickcheck::TestResult);
     }
-    quickcheck::quickcheck(f as fn(Vec<u8>, usize) -> quickcheck::TestResult);
-}
 
-
-#[test]
-fn test_5_array_refs() {
-    let mut data: [usize; 128] = [0; 128];
-    for i in 0..128 {
-        data[i] = i;
+    #[test]
+    fn check_array_mut_ref_7() {
+        fn f(mut data: Vec<u8>, offset: usize) -> quickcheck::TestResult {
+            // Compute the following, with correct results even if the sum would overflow:
+            //   if data.len() < offset + 7
+            if data.len() < 7 || data.len() - 7 < offset {
+                return quickcheck::TestResult::discard();
+            }
+            let out = array_mut_ref!(data, offset, 7);
+            out[6] = 3;
+            quickcheck::TestResult::from_bool(out.len() == 7)
+        }
+        quickcheck::quickcheck(f as fn(Vec<u8>, usize) -> quickcheck::TestResult);
     }
-    let data = data;
-    let (a,b,c,d,e) = array_refs!(&data, 1, 14, 3, 100, 10);
-    assert_eq!(a.len(), 1 as usize);
-    assert_eq!(b.len(), 14 as usize);
-    assert_eq!(c.len(), 3 as usize);
-    assert_eq!(d.len(), 100 as usize);
-    assert_eq!(e.len(), 10 as usize);
-    assert_eq!(a, array_ref![data, 0, 1]);
-    assert_eq!(b, array_ref![data, 1, 14]);
-    assert_eq!(c, array_ref![data, 15, 3]);
-    assert_eq!(e, array_ref![data, 118, 10]);
-}
 
-#[test]
-fn test_5_array_refs_dotdot() {
-    let mut data: [usize; 128] = [0; 128];
-    for i in 0..128 {
-        data[i] = i;
+    #[test]
+    fn check_array_mut_ref_out_of_bounds_32() {
+        fn f(mut data: Vec<u8>, offset: usize) -> quickcheck::TestResult {
+            // Compute the following, with correct results even if the sum would overflow:
+            //   if data.len() >= offset + 32
+            if data.len() >= 32 && data.len() - 32 >= offset {
+                return quickcheck::TestResult::discard();
+            }
+            quickcheck::TestResult::must_fail(move || {
+                array_mut_ref!(data, offset, 32);
+            })
+        }
+        quickcheck::quickcheck(f as fn(Vec<u8>, usize) -> quickcheck::TestResult);
     }
-    let data = data;
-    let (a,b,c,d,e) = array_refs!(&data, 1, 14, 3; ..; 10);
-    assert_eq!(a.len(), 1 as usize);
-    assert_eq!(b.len(), 14 as usize);
-    assert_eq!(c.len(), 3 as usize);
-    assert_eq!(d.len(), 100 as usize);
-    assert_eq!(e.len(), 10 as usize);
-    assert_eq!(a, array_ref![data, 0, 1]);
-    assert_eq!(b, array_ref![data, 1, 14]);
-    assert_eq!(c, array_ref![data, 15, 3]);
-    assert_eq!(e, array_ref![data, 118, 10]);
-}
 
-
-#[test]
-fn test_5_mut_xarray_refs() {
-    let mut data: [usize; 128] = [0; 128];
-    {
-        // temporarily borrow the data to modify it.
-        let (a,b,c,d,e) = mut_array_refs!(&mut data, 1, 14, 3, 100, 10);
+    #[test]
+    fn test_5_array_refs() {
+        let mut data: [usize; 128] = [0; 128];
+        for i in 0..128 {
+            data[i] = i;
+        }
+        let data = data;
+        let (a, b, c, d, e) = array_refs!(&data, 1, 14, 3, 100, 10);
         assert_eq!(a.len(), 1 as usize);
         assert_eq!(b.len(), 14 as usize);
         assert_eq!(c.len(), 3 as usize);
         assert_eq!(d.len(), 100 as usize);
         assert_eq!(e.len(), 10 as usize);
-        *a = [1; 1];
-        *b = [14; 14];
-        *c = [3; 3];
-        *d = [100; 100];
-        *e = [10; 10];
+        assert_eq!(a, array_ref![data, 0, 1]);
+        assert_eq!(b, array_ref![data, 1, 14]);
+        assert_eq!(c, array_ref![data, 15, 3]);
+        assert_eq!(e, array_ref![data, 118, 10]);
     }
-    assert_eq!(&[1;1], array_ref![data, 0, 1]);
-    assert_eq!(&[14;14], array_ref![data, 1, 14]);
-    assert_eq!(&[3;3], array_ref![data, 15, 3]);
-    assert_eq!(&[10;10], array_ref![data, 118, 10]);
-}
 
-#[test]
-fn test_5_mut_xarray_refs_with_dotdot() {
-    let mut data: [usize; 128] = [0; 128];
-    {
-        // temporarily borrow the data to modify it.
-        let (a,b,c,d,e) = mut_array_refs!(&mut data, 1, 14, 3; ..; 10);
+    #[test]
+    fn test_5_array_refs_dotdot() {
+        let mut data: [usize; 128] = [0; 128];
+        for i in 0..128 {
+            data[i] = i;
+        }
+        let data = data;
+        let (a, b, c, d, e) = array_refs!(&data, 1, 14, 3; ..; 10);
         assert_eq!(a.len(), 1 as usize);
         assert_eq!(b.len(), 14 as usize);
         assert_eq!(c.len(), 3 as usize);
         assert_eq!(d.len(), 100 as usize);
         assert_eq!(e.len(), 10 as usize);
-        *a = [1; 1];
-        *b = [14; 14];
-        *c = [3; 3];
-        *e = [10; 10];
+        assert_eq!(a, array_ref![data, 0, 1]);
+        assert_eq!(b, array_ref![data, 1, 14]);
+        assert_eq!(c, array_ref![data, 15, 3]);
+        assert_eq!(e, array_ref![data, 118, 10]);
     }
-    assert_eq!(&[1;1], array_ref![data, 0, 1]);
-    assert_eq!(&[14;14], array_ref![data, 1, 14]);
-    assert_eq!(&[3;3], array_ref![data, 15, 3]);
-    assert_eq!(&[10;10], array_ref![data, 118, 10]);
-}
 
+    #[test]
+    fn test_5_mut_xarray_refs() {
+        let mut data: [usize; 128] = [0; 128];
+        {
+            // temporarily borrow the data to modify it.
+            let (a, b, c, d, e) = mut_array_refs!(&mut data, 1, 14, 3, 100, 10);
+            assert_eq!(a.len(), 1 as usize);
+            assert_eq!(b.len(), 14 as usize);
+            assert_eq!(c.len(), 3 as usize);
+            assert_eq!(d.len(), 100 as usize);
+            assert_eq!(e.len(), 10 as usize);
+            *a = [1; 1];
+            *b = [14; 14];
+            *c = [3; 3];
+            *d = [100; 100];
+            *e = [10; 10];
+        }
+        assert_eq!(&[1; 1], array_ref![data, 0, 1]);
+        assert_eq!(&[14; 14], array_ref![data, 1, 14]);
+        assert_eq!(&[3; 3], array_ref![data, 15, 3]);
+        assert_eq!(&[10; 10], array_ref![data, 118, 10]);
+    }
+
+    #[test]
+    fn test_5_mut_xarray_refs_with_dotdot() {
+        let mut data: [usize; 128] = [0; 128];
+        {
+            // temporarily borrow the data to modify it.
+            let (a, b, c, d, e) = mut_array_refs!(&mut data, 1, 14, 3; ..; 10);
+            assert_eq!(a.len(), 1 as usize);
+            assert_eq!(b.len(), 14 as usize);
+            assert_eq!(c.len(), 3 as usize);
+            assert_eq!(d.len(), 100 as usize);
+            assert_eq!(e.len(), 10 as usize);
+            *a = [1; 1];
+            *b = [14; 14];
+            *c = [3; 3];
+            *e = [10; 10];
+        }
+        assert_eq!(&[1; 1], array_ref![data, 0, 1]);
+        assert_eq!(&[14; 14], array_ref![data, 1, 14]);
+        assert_eq!(&[3; 3], array_ref![data, 15, 3]);
+        assert_eq!(&[10; 10], array_ref![data, 118, 10]);
+    }
+
+    #[forbid(clippy::ptr_offset_with_cast)]
+    #[test]
+    fn forbidden_clippy_lints_do_not_fire() {
+        let mut data = [0u8; 32];
+        let _ = array_refs![&data, 8; .. ;];
+        let _ = mut_array_refs![&mut data, 8; .. ; 10];
+    }
+
+    #[test]
+    fn single_arg_refs() {
+        let mut data = [0u8; 8];
+        let (_,) = array_refs![&data, 8];
+        let (_,) = mut_array_refs![&mut data, 8];
+
+        let (_, _) = array_refs![&data, 4; ..;];
+        let (_, _) = mut_array_refs![&mut data, 4; ..;];
+
+        let (_, _) = array_refs![&data,; ..; 4];
+        let (_, _) = mut_array_refs![&mut data,; ..; 4];
+
+        let (_,) = array_refs![&data,; ..;];
+        let (_,) = mut_array_refs![&mut data,; ..;];
+    }
 } // mod test

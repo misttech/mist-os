@@ -42,7 +42,7 @@ group("argh") {
 }
 
 group("arrayref") {
-  public_deps = [ ":arrayref-v0_3_5" ]
+  public_deps = [ ":arrayref-v0_3_9" ]
 }
 
 group("arrayvec") {
@@ -1766,15 +1766,15 @@ rust_library("argh_shared-v0_1_12") {
   applicable_licenses = [ ":argh_shared-v0_1_12.license" ]
 }
 
-license("arrayref-v0_3_5.license") {
+license("arrayref-v0_3_9.license") {
   public_package_name = "arrayref"
-  license_files = [ "//third_party/rust_crates/vendor/arrayref-0.3.5/LICENSE" ]
+  license_files = [ "//third_party/rust_crates/vendor/arrayref-0.3.9/LICENSE" ]
 }
 
-rust_library("arrayref-v0_3_5") {
+rust_library("arrayref-v0_3_9") {
   crate_name = "arrayref"
-  crate_root = "//third_party/rust_crates/vendor/arrayref-0.3.5/src/lib.rs"
-  output_name = "arrayref-1f394a4894f5a098"
+  crate_root = "//third_party/rust_crates/vendor/arrayref-0.3.9/src/lib.rs"
+  output_name = "arrayref-efc1042da10928c9"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -1784,13 +1784,13 @@ rust_library("arrayref-v0_3_5") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2015",
-    "-Cmetadata=1f394a4894f5a098",
-    "-Cextra-filename=-1f394a4894f5a098",
+    "-Cmetadata=efc1042da10928c9",
+    "-Cextra-filename=-efc1042da10928c9",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":arrayref-v0_3_5.license" ]
+  applicable_licenses = [ ":arrayref-v0_3_9.license" ]
 }
 
 license("arrayvec-v0_7_4.license") {
