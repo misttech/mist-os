@@ -108,6 +108,55 @@ fn has_file_permissions(
     Ok(())
 }
 
+/// Checks that `current_task` has permission to "use" the specified `file`, and the specified
+/// `permissions` to the underlying [`crate::vfs::FsNode`], with "todo_deny" on denial.
+fn todo_has_file_permissions(
+    bug: BugRef,
+    permission_check: &PermissionCheck<'_>,
+    subject_sid: SecurityId,
+    file: &FileObject,
+    permissions: &[Permission],
+    audit_context: Auditable<'_>,
+) -> Result<(), Errno> {
+    // Validate that the `subject` has the "fd { use }" permission to the `file`.
+    // If the file and task security domains are identical then `fd { use }` is implicitly granted.
+    let file_sid = file.security_state.state.sid;
+    if subject_sid == SecurityId::initial(InitialSid::Kernel)
+        || file_sid == SecurityId::initial(InitialSid::Kernel)
+    {
+        track_stub!(
+            TODO("https://fxbug.dev/385121365"),
+            "Enforce fs:use where source or target is the kernel SID?"
+        );
+    } else if subject_sid != file_sid {
+        let node = file.node().as_ref().as_ref();
+        let audit_context = [audit_context, file.into(), node.into()];
+        todo_check_permission(
+            bug.clone(),
+            permission_check,
+            subject_sid,
+            file_sid,
+            FdPermission::Use,
+            (&audit_context).into(),
+        )?;
+    }
+
+    // Validate that the `subject` has the desired `permissions`, if any, to the underlying node.
+    if !permissions.is_empty() {
+        let audit_context = [audit_context, file.into()];
+        todo_has_fs_node_permissions(
+            bug.clone(),
+            permission_check,
+            subject_sid,
+            file.node(),
+            permissions,
+            (&audit_context).into(),
+        )?;
+    }
+
+    Ok(())
+}
+
 /// Checks that `current_task` has the specified `permissions` to the `node`.
 fn has_fs_node_permissions(
     permission_check: &PermissionCheck<'_>,

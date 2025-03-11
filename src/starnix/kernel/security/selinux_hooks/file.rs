@@ -9,6 +9,7 @@ use super::{
     fs_node_effective_sid_and_class, has_file_permissions, permissions_from_flags,
     todo_has_fs_node_permissions, FileObjectState, FsNodeSidAndClass, PermissionFlags,
 };
+use crate::security::selinux_hooks::todo_has_file_permissions;
 use crate::task::CurrentTask;
 use crate::vfs::FileObject;
 use crate::TODO_DENY;
@@ -54,6 +55,26 @@ pub fn file_permission(
         current_sid,
         &file.name.entry.node,
         &permissions_from_flags(permission_flags, file_class),
+        current_task.into(),
+    )
+}
+
+/// Returns whether the `current_task` can receive `file` via a socket IPC.
+pub fn file_receive(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    file: &FileObject,
+) -> Result<(), Errno> {
+    let permission_check = security_server.as_permission_check();
+    let subject_sid = current_task.security_state.lock().current_sid;
+    let fs_node_class = file.node().security_state.lock().class;
+    let permission_flags = file.flags().into();
+    todo_has_file_permissions(
+        TODO_DENY!("https://fxbug.dev/399894966", "Check file receive permission."),
+        &permission_check,
+        subject_sid,
+        file,
+        &permissions_from_flags(permission_flags, fs_node_class),
         current_task.into(),
     )
 }
