@@ -293,13 +293,28 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
 
   uint64_t CreateDispensableOrdinal();
 
-  void VLogClient(bool is_error, Location location, const NodeProperties* node_properties,
-                  const char* format, va_list args) const;
+  enum class LogSeverity : fuchsia_logging::RawLogSeverity {
+    Trace = 0x10,
+    Debug = 0x20,
+    InfoOrDebug = 0x28,
+    Info = 0x30,
+    Warn = 0x40,
+    Error = 0x50,
+    Fatal = 0x60,
+  };
+  fuchsia_logging::LogSeverity LogSeverityToFuchsiaLogSeverity(
+      LogicalBufferCollection::LogSeverity log_severity) const;
+  void VLogClient(LogSeverity log_severity, Location location,
+                  const NodeProperties* node_properties, const char* format, va_list args) const;
   void LogClientInfo(Location location, const NodeProperties* node_properties, const char* format,
+                     ...) const __PRINTFLIKE(4, 5);
+  void LogClientWarn(Location location, const NodeProperties* node_properties, const char* format,
                      ...) const __PRINTFLIKE(4, 5);
   void LogClientError(Location location, const NodeProperties* node_properties, const char* format,
                       ...) const __PRINTFLIKE(4, 5);
   void VLogClientInfo(Location location, const NodeProperties* node_properties, const char* format,
+                      va_list args) const;
+  void VLogClientWarn(Location location, const NodeProperties* node_properties, const char* format,
                       va_list args) const;
   void VLogClientError(Location location, const NodeProperties* node_properties, const char* format,
                        va_list args) const;
@@ -434,7 +449,9 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   static void LogErrorStatic(Location location, const ClientDebugInfo* client_debug_info,
                              const char* format, ...) __PRINTFLIKE(3, 4);
 
+  void LogWarn(Location location, const char* format, ...) const __PRINTFLIKE(3, 4);
   void LogError(Location location, const char* format, ...) const __PRINTFLIKE(3, 4);
+  void VLogWarn(Location location, const char* format, va_list args) const;
   void VLogError(Location location, const char* format, va_list args) const;
 
   void ResetGroupChildSelection(std::vector<NodeProperties*>& groups_by_priority);
