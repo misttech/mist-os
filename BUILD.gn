@@ -1778,6 +1778,15 @@ action("product_bundles.check") {
     rebase_path(outputs[0], root_build_dir),
   ]
 
+  if (!is_multi_product_build) {
+    args += [
+      # Fuchsia infrastructure expects this product bundle to exist.
+      # TODO(https://fxbug.dev/402187053): Remove this check.
+      "--expect-product-bundle-name",
+      "${build_info_product}.${build_info_board}",
+    ]
+  }
+
   deps = [ ":product_bundles" ]
 }
 

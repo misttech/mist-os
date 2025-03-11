@@ -230,6 +230,15 @@ if (main_pb_label != "") {
   bazel_product_bundle_target = ""
 }
 
+declare_args() {
+  # The build is configured as a multi-product build.
+  # This is any product.gni that is bazel-only, but doesn't specify a default PB.
+  # If this is bazel-only, and a main_pb_label is provided, we are also multi-product.
+  is_multi_product_build =
+      use_bazel_images_only &&
+      (bazel_product_bundle_target == "" || main_pb_label != "")
+}
+
 assert(
     !enable_netboot,
     "The 'enable_netboot' GN arg has been deprecated, use developer overrides for assembly instead, see the 'netboot_mode' section of the documentation at go/fuchsia-assembly-overrides#bookmark=id.ddsy0djempid for details.")
