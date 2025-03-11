@@ -409,15 +409,99 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
         }
     }
 
-    for expose in &decl.exposes {
-        match expose {
+    for expose_bundle in group_expose_aggregates(&decl.exposes).into_iter() {
+        let first_expose = expose_bundle.first().unwrap();
+        match first_expose {
+            cm_rust::ExposeDecl::Service(_)
+                if expose_bundle.len() == 1
+                    && !matches!(first_expose.source(), cm_rust::ExposeSource::Collection(_)) =>
+            {
+                extend_dict_with_expose::<DirEntry, _>(
+                    component,
+                    &child_component_output_dictionary_routers,
+                    &program_output_dict,
+                    &framework_dict,
+                    &capability_sourced_capabilities_dict,
+                    first_expose,
+                    &component_output,
+                    error_reporter.clone(),
+                );
+            }
+            cm_rust::ExposeDecl::Service(_) => {
+                let mut aggregate_sources = vec![];
+                let temp_component_output = ComponentOutput::new();
+                for expose in expose_bundle.iter() {
+                    extend_dict_with_expose::<DirEntry, _>(
+                        component,
+                        &child_component_output_dictionary_routers,
+                        &program_output_dict,
+                        &framework_dict,
+                        &capability_sourced_capabilities_dict,
+                        expose,
+                        &temp_component_output,
+                        error_reporter.clone(),
+                    );
+                    match temp_component_output.capabilities().remove(first_expose.target_name()) {
+                        Some(Capability::DirEntryRouter(router)) => {
+                            let source_instance = match expose.source() {
+                                cm_rust::ExposeSource::Self_ => AggregateInstance::Self_,
+                                cm_rust::ExposeSource::Child(name) => AggregateInstance::Child(
+                                    moniker::ChildName::new(name.clone().to_long(), None),
+                                ),
+                                other_source => {
+                                    warn!(
+                                        "unsupported source found in expose aggregate: {:?}",
+                                        other_source
+                                    );
+                                    continue;
+                                }
+                            };
+                            aggregate_sources
+                                .push(AggregateSource::DirectoryRouter { source_instance, router })
+                        }
+                        None => match expose.source() {
+                            cm_rust::ExposeSource::Collection(collection_name) => {
+                                aggregate_sources.push(AggregateSource::Collection {
+                                    collection_name: collection_name.clone(),
+                                });
+                            }
+                            _ => continue,
+                        },
+                        other_value => panic!("unexpected dictionary entry: {:?}", other_value),
+                    }
+                }
+                let aggregate = (aggregate_router_fn)(
+                    component.clone(),
+                    aggregate_sources,
+                    CapabilitySource::AnonymizedAggregate(AnonymizedAggregateSource {
+                        capability: AggregateCapability::Service(
+                            first_expose.target_name().clone(),
+                        ),
+                        moniker: component.moniker().clone(),
+                        members: expose_bundle
+                            .iter()
+                            .filter_map(|e| AggregateMember::try_from(*e).ok())
+                            .collect(),
+                        sources: Sources::new(cm_rust::CapabilityTypeName::Service),
+                        instances: vec![],
+                    }),
+                )
+                .with_default(Request {
+                    metadata: service_metadata(*first_expose.availability()),
+                    target: component.as_weak().into(),
+                });
+                component_output
+                    .capabilities()
+                    .insert(first_expose.target_name().clone(), aggregate.into())
+                    .expect("failed to insert capability into target dict")
+            }
             cm_rust::ExposeDecl::Config(_) => extend_dict_with_expose::<Data, _>(
                 component,
                 &child_component_output_dictionary_routers,
                 &program_output_dict,
                 &framework_dict,
                 &capability_sourced_capabilities_dict,
-                expose,
+                first_expose,
                 &component_output,
                 error_reporter.clone(),
             ),
@@ -427,7 +511,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                 &program_output_dict,
                 &framework_dict,
                 &capability_sourced_capabilities_dict,
-                expose,
+                first_expose,
                 &component_output,
                 error_reporter.clone(),
             ),
@@ -439,7 +523,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                 &program_output_dict,
                 &framework_dict,
                 &capability_sourced_capabilities_dict,
-                expose,
+                first_expose,
                 &component_output,
                 error_reporter.clone(),
             ),
@@ -580,12 +664,24 @@ fn new_aggregate_capability_source(
     }
 }
 
+/// Groups together a set of offers into sub-sets of those that have the same target and target
+/// name. This is useful for identifying which offers are part of an aggregation of capabilities,
+/// and which are for standalone routes.
 fn group_offer_aggregates(offers: &Vec<cm_rust::OfferDecl>) -> Vec<Vec<&cm_rust::OfferDecl>> {
     let mut groupings = HashMap::new();
     for offer in offers.iter() {
         groupings.entry((offer.target(), offer.target_name())).or_insert(vec![]).push(offer);
     }
-    groupings.into_iter().map(|(_key, grouping)| grouping.into()).collect()
+    groupings.into_iter().map(|(_key, grouping)| grouping).collect()
+}
+
+/// Identical to `group_offer_aggregates`, but for exposes.
+fn group_expose_aggregates(exposes: &Vec<cm_rust::ExposeDecl>) -> Vec<Vec<&cm_rust::ExposeDecl>> {
+    let mut groupings = HashMap::new();
+    for expose in exposes.iter() {
+        groupings.entry((expose.target(), expose.target_name())).or_insert(vec![]).push(expose);
+    }
+    groupings.into_iter().map(|(_key, grouping)| grouping).collect()
 }
 
 fn build_environment(
@@ -1202,6 +1298,7 @@ pub fn is_supported_expose(expose: &cm_rust::ExposeDecl) -> bool {
             | cm_rust::ExposeDecl::Dictionary(_)
             | cm_rust::ExposeDecl::Runner(_)
             | cm_rust::ExposeDecl::Resolver(_)
+            | cm_rust::ExposeDecl::Service(_)
     )
 }
 
@@ -1300,7 +1397,10 @@ fn extend_dict_with_expose<T, C: ComponentInstanceInterface + 'static>(
             InternalCapability::Protocol(expose.source_name().clone()),
             component,
         ),
-        // This is only relevant for services, so this arm is never reached.
+        // There's nothing in a collection at this stage, and thus we can't get any routers to
+        // things in the collection. What's more: the contents of the collection can change over
+        // time, so it must be monitored. We don't handle collections here, they're handled in a
+        // different way by whoever called `extend_dict_with_expose`.
         cm_rust::ExposeSource::Collection(_name) => return,
     };
     let metadata = Dict::new();

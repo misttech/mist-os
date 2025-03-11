@@ -159,7 +159,7 @@ pub fn resolver_metadata(availability: cm_types::Availability) -> sandbox::Dict 
     metadata
 }
 
-/// Returns a `Dict` Containing Router Service metadata specifying a Service porcelain type.
+/// Returns a `Dict` Containing Router Request metadata specifying a Service porcelain type.
 pub fn service_metadata(availability: cm_types::Availability) -> sandbox::Dict {
     let metadata = sandbox::Dict::new();
     metadata
