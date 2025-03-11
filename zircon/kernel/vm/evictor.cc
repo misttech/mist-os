@@ -217,23 +217,42 @@ Evictor::EvictedPageCounts Evictor::EvictFromTargetInternal(Evictor::EvictionTar
     return total_evicted_counts;
   }
 
-  uint64_t free_pages_before = CountFreePages();
-
+  const uint64_t free_pages_before = CountFreePages();
   total_evicted_counts =
       EvictUntilTargetsMet(target.min_pages_to_free, target.free_pages_target, target.level);
+  const uint64_t free_pages_after = CountFreePages();
 
   if (target.print_counts) {
-    printf("[EVICT]: Free memory before eviction was %zuMB and after eviction is %zuMB\n",
-           free_pages_before * PAGE_SIZE / MB, CountFreePages() * PAGE_SIZE / MB);
+    // Helper lambdas to print the counts as values in KB or MB.
+    auto format_val = [](uint64_t count) {
+      return count < MB / PAGE_SIZE ? count * PAGE_SIZE / KB : count * PAGE_SIZE / MB;
+    };
+    auto format_unit = [](uint64_t count) { return count < MB / PAGE_SIZE ? "K" : "M"; };
+
+    // This should be large enough to hold the formatted string.
+    constexpr size_t kBufSize = 56;
+    char buf[kBufSize] __UNINITIALIZED = "\0";
+    size_t buf_len = 0;
     if (total_evicted_counts.pager_backed > 0) {
-      printf("[EVICT]: Evicted %lu user pager backed pages\n", total_evicted_counts.pager_backed);
+      buf_len += snprintf(buf + buf_len, kBufSize - buf_len, " pager:%zu%s",
+                          format_val(total_evicted_counts.pager_backed),
+                          format_unit(total_evicted_counts.pager_backed));
     }
     if (total_evicted_counts.discardable > 0) {
-      printf("[EVICT]: Evicted %lu pages from discardable vmos\n",
-             total_evicted_counts.discardable);
+      ASSERT(buf_len < kBufSize);
+      buf_len += snprintf(buf + buf_len, kBufSize - buf_len, " discardable:%zu%s",
+                          format_val(total_evicted_counts.discardable),
+                          format_unit(total_evicted_counts.discardable));
     }
     if (total_evicted_counts.compressed > 0) {
-      printf("[EVICT]: Evicted %lu pages by compression\n", total_evicted_counts.compressed);
+      ASSERT(buf_len < kBufSize);
+      buf_len += snprintf(buf + buf_len, kBufSize - buf_len, " compressed:%zu%s",
+                          format_val(total_evicted_counts.compressed),
+                          format_unit(total_evicted_counts.compressed));
+    }
+    if (buf_len > 0) {
+      printf("[EVICT]:%s free:%zuM->%zuM\n", buf, free_pages_before * PAGE_SIZE / MB,
+             free_pages_after * PAGE_SIZE / MB);
     }
   }
 
