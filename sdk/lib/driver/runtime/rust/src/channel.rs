@@ -445,8 +445,10 @@ mod tests {
             let (fin_tx, fin_rx) = mpsc::channel();
             let (first, second) = Channel::create();
 
+            let dispatcher = dispatcher.clone();
             dispatcher
-                .spawn_task(async {
+                .clone()
+                .spawn_task(async move {
                     fin_tx
                         .send(first.read_bytes(dispatcher.as_dispatcher_ref()).await.unwrap())
                         .unwrap();
@@ -508,7 +510,7 @@ mod tests {
         assert_eq!(inner_second.try_read().unwrap().unwrap().data().unwrap(), &"boom".to_string());
     }
 
-    async fn ping(dispatcher: &Dispatcher, chan: Channel<u8>) {
+    async fn ping(dispatcher: Arc<Dispatcher>, chan: Channel<u8>) {
         println!("starting ping!");
         chan.write_with_data(Arena::new(), |arena| arena.insert(0)).unwrap();
         while let Ok(Some(msg)) = chan.read(dispatcher.as_dispatcher_ref()).await {
@@ -518,7 +520,11 @@ mod tests {
         }
     }
 
-    async fn pong(dispatcher: &Dispatcher, fin_tx: std::sync::mpsc::Sender<()>, chan: Channel<u8>) {
+    async fn pong(
+        dispatcher: Arc<Dispatcher>,
+        fin_tx: std::sync::mpsc::Sender<()>,
+        chan: Channel<u8>,
+    ) {
         println!("starting pong!");
         while let Some(msg) = chan.read(dispatcher.as_dispatcher_ref()).await.unwrap() {
             let next = *msg.data().unwrap();
@@ -537,8 +543,8 @@ mod tests {
         with_raw_dispatcher("async ping pong", |dispatcher| {
             let (fin_tx, fin_rx) = mpsc::channel();
             let (ping_chan, pong_chan) = Channel::create();
-            dispatcher.spawn_task(ping(&dispatcher, ping_chan)).unwrap();
-            dispatcher.spawn_task(pong(&dispatcher, fin_tx, pong_chan)).unwrap();
+            dispatcher.spawn_task(ping(dispatcher.clone(), ping_chan)).unwrap();
+            dispatcher.spawn_task(pong(dispatcher.clone(), fin_tx, pong_chan)).unwrap();
 
             fin_rx.recv().expect("to receive final value");
         });
@@ -550,25 +556,31 @@ mod tests {
             let (fin_tx, fin_rx) = mpsc::channel();
             let (ping_chan, pong_chan) = Channel::create();
 
+            let dispatcher = dispatcher.clone();
             dispatcher
-                .post_task_sync(|_status| {
+                .clone()
+                .post_task_sync(move |_status| {
+                    let rust_async_dispatcher_fin_tx = fin_tx.clone();
                     let rust_async_dispatcher = crate::DispatcherBuilder::new()
                         .name("fuchsia-async")
                         .allow_thread_blocking()
+                        .shutdown_observer(move |_| rust_async_dispatcher_fin_tx.send(()).unwrap())
                         .create()
                         .expect("failure creating blocking dispatcher for rust async");
 
-                    dispatcher.spawn_task(pong(&dispatcher, fin_tx, pong_chan)).unwrap();
+                    dispatcher.spawn_task(pong(dispatcher.clone(), fin_tx, pong_chan)).unwrap();
+                    let dispatcher = dispatcher.clone();
                     rust_async_dispatcher
-                        .post_task_sync(|_| {
+                        .post_task_sync(move |_| {
                             let mut executor = fuchsia_async::LocalExecutor::new();
-                            executor.run_singlethreaded(ping(&dispatcher, ping_chan));
+                            executor.run_singlethreaded(ping(dispatcher, ping_chan));
                         })
                         .unwrap();
                 })
                 .unwrap();
 
-            fin_rx.recv().expect("to receive final value");
+            // wait for everything to shut down.
+            while fin_rx.recv().is_ok() {}
         });
     }
 
@@ -601,7 +613,9 @@ mod tests {
         with_raw_dispatcher("early cancellation", |dispatcher| {
             let (fin_tx, fin_rx) = mpsc::channel();
             let (a, b) = Channel::create();
+            let dispatcher = dispatcher.clone();
             dispatcher
+                .clone()
                 .spawn_task(async move {
                     // create, poll, and then immediately drop a read future for channel `a`
                     // so that it properly sets up the wait.
@@ -624,7 +638,9 @@ mod tests {
             let (a, _b) = Channel::<[u8]>::create();
             let (fin_tx, fin_rx) = mpsc::channel();
 
+            let dispatcher = dispatcher.clone();
             dispatcher
+                .clone()
                 .spawn_task(async move {
                     // drop before even polling it should drop the arc correctly
                     let fut = read_raw(&a.0, dispatcher.as_dispatcher_ref());
@@ -645,7 +661,9 @@ mod tests {
             let (a, _b) = Channel::<[u8]>::create();
             let (fin_tx, fin_rx) = mpsc::channel();
 
+            let dispatcher = dispatcher.clone();
             dispatcher
+                .clone()
                 .spawn_task(async move {
                     assert_strong_count(
                         &read_and_drop(&a, dispatcher.as_dispatcher_ref()).await,
