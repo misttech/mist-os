@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::{MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
+use crate::mm::{IOVecPtr, MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
 use crate::security;
 use crate::syscalls::time::ITimerSpecPtr;
 use crate::task::{
@@ -51,9 +51,7 @@ use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::seal_flags::SealFlags;
 use starnix_uapi::signals::SigSet;
 use starnix_uapi::unmount_flags::UnmountFlags;
-use starnix_uapi::user_address::{
-    ArchSpecific, MultiArchUserRef, UserAddress, UserCString, UserRef,
-};
+use starnix_uapi::user_address::{MultiArchUserRef, UserAddress, UserCString, UserRef};
 use starnix_uapi::user_value::UserValue;
 use starnix_uapi::vfs::{EpollEvent, FdEvents, ResolveFlags};
 use starnix_uapi::{
@@ -376,7 +374,7 @@ fn do_readv(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
-    iovec_addr: UserAddress,
+    iovec_addr: IOVecPtr,
     iovec_count: UserValue<i32>,
     offset: Option<off_t>,
     flags: u32,
@@ -406,7 +404,7 @@ pub fn sys_readv(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
-    iovec_addr: UserAddress,
+    iovec_addr: IOVecPtr,
     iovec_count: UserValue<i32>,
 ) -> Result<usize, Errno> {
     do_readv(locked, current_task, fd, iovec_addr, iovec_count, None, 0)
@@ -416,7 +414,7 @@ pub fn sys_preadv(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
-    iovec_addr: UserAddress,
+    iovec_addr: IOVecPtr,
     iovec_count: UserValue<i32>,
     offset: off_t,
 ) -> Result<usize, Errno> {
@@ -427,7 +425,7 @@ pub fn sys_preadv2(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
-    iovec_addr: UserAddress,
+    iovec_addr: IOVecPtr,
     iovec_count: UserValue<i32>,
     offset: off_t,
     _unused: SyscallArg, // On 32-bit systems, holds the upper 32 bits of offset.
@@ -441,7 +439,7 @@ fn do_writev(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
-    iovec_addr: UserAddress,
+    iovec_addr: IOVecPtr,
     iovec_count: UserValue<i32>,
     offset: Option<off_t>,
     flags: u32,
@@ -454,12 +452,7 @@ fn do_writev(
     }
 
     let file = current_task.files.get(fd)?;
-    // Try to minimize how far arch32 impacts the system
-    let iovec = if current_task.is_arch32() {
-        current_task.read_iovec32(iovec_addr, iovec_count)?
-    } else {
-        current_task.read_iovec(iovec_addr, iovec_count)?
-    };
+    let iovec = current_task.read_iovec(iovec_addr, iovec_count)?;
     let mut data = UserBuffersInputBuffer::unified_new(current_task, iovec)?;
     let res = if let Some(offset) = offset {
         file.write_at(
@@ -486,7 +479,7 @@ pub fn sys_writev(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
-    iovec_addr: UserAddress,
+    iovec_addr: IOVecPtr,
     iovec_count: UserValue<i32>,
 ) -> Result<usize, Errno> {
     do_writev(locked, current_task, fd, iovec_addr, iovec_count, None, 0)
@@ -496,7 +489,7 @@ pub fn sys_pwritev(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
-    iovec_addr: UserAddress,
+    iovec_addr: IOVecPtr,
     iovec_count: UserValue<i32>,
     offset: off_t,
 ) -> Result<usize, Errno> {
@@ -507,7 +500,7 @@ pub fn sys_pwritev2(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
-    iovec_addr: UserAddress,
+    iovec_addr: IOVecPtr,
     iovec_count: UserValue<i32>,
     offset: off_t,
     _unused: SyscallArg, // On 32-bit systems, holds the upper 32 bits of offset.
@@ -2878,7 +2871,7 @@ pub fn sys_vmsplice(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
-    iovec_addr: UserAddress,
+    iovec_addr: IOVecPtr,
     iovec_count: UserValue<i32>,
     flags: u32,
 ) -> Result<usize, Errno> {
@@ -3127,7 +3120,7 @@ pub fn sys_io_uring_register(
     current_task: &CurrentTask,
     fd: FdNumber,
     opcode: u32,
-    arg: UserAddress,
+    arg: IOVecPtr,
     nr_args: UserValue<i32>,
 ) -> Result<SyscallResult, Errno> {
     if !current_task.kernel().features.io_uring {
@@ -3450,6 +3443,7 @@ mod arch32 {
         sys_splice as sys_arch32_splice, sys_tee as sys_arch32_tee,
         sys_timerfd_create as sys_arch32_timerfd_create,
         sys_timerfd_settime as sys_arch32_timerfd_settime, sys_truncate as sys_arch32_truncate,
+        sys_vmsplice as sys_arch32_vmsplice,
     };
 }
 

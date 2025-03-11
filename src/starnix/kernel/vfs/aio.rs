@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::mm::{
-    DesiredAddress, MappingName, MappingOptions, MemoryAccessorExt, ProtectionFlags,
+    DesiredAddress, IOVecPtr, MappingName, MappingOptions, MemoryAccessorExt, ProtectionFlags,
     RemoteMemoryManager, TaskMemoryAccessor,
 };
 use crate::task::{CurrentTask, KernelThreads, SimpleWaiter, WaitQueue};
@@ -274,8 +274,9 @@ impl IoOperation {
                 length: control_block.aio_nbytes as usize,
             }],
             OpType::PReadV | OpType::PWriteV => {
+                let iovec_addr = IOVecPtr::new(current_task, control_block.aio_buf);
                 let count: i32 = control_block.aio_nbytes.try_into().map_err(|_| errno!(EINVAL))?;
-                current_task.read_iovec(control_block.aio_buf.into(), count.into())?
+                current_task.read_iovec(iovec_addr, count.into())?
             }
         };
 

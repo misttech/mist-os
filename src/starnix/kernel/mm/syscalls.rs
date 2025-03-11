@@ -4,8 +4,8 @@
 
 use crate::execution::notify_debugger_of_module_list;
 use crate::mm::{
-    DesiredAddress, FutexKey, MappingName, MappingOptions, MemoryAccessorExt, MremapFlags,
-    PrivateFutexKey, ProtectionFlags, SharedFutexKey, PAGE_SIZE,
+    DesiredAddress, FutexKey, IOVecPtr, MappingName, MappingOptions, MemoryAccessorExt,
+    MremapFlags, PrivateFutexKey, ProtectionFlags, SharedFutexKey, PAGE_SIZE,
 };
 use crate::security;
 use crate::syscalls::time::TimeSpecPtr;
@@ -263,9 +263,9 @@ pub fn sys_process_vm_readv(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
-    local_iov_addr: UserAddress,
+    local_iov_addr: IOVecPtr,
     local_iov_count: UserValue<i32>,
-    remote_iov_addr: UserAddress,
+    remote_iov_addr: IOVecPtr,
     remote_iov_count: UserValue<i32>,
     flags: usize,
 ) -> Result<usize, Errno> {
@@ -314,9 +314,9 @@ pub fn sys_process_vm_writev(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
-    local_iov_addr: UserAddress,
+    local_iov_addr: IOVecPtr,
     local_iov_count: UserValue<i32>,
-    remote_iov_addr: UserAddress,
+    remote_iov_addr: IOVecPtr,
     remote_iov_count: UserValue<i32>,
     flags: usize,
 ) -> Result<usize, Errno> {

@@ -44,9 +44,9 @@ use starnix_uapi::user_address::{
 };
 use starnix_uapi::user_value::UserValue;
 use starnix_uapi::{
-    errno, error, MADV_DOFORK, MADV_DONTFORK, MADV_DONTNEED, MADV_KEEPONFORK, MADV_NOHUGEPAGE,
-    MADV_NORMAL, MADV_WILLNEED, MADV_WIPEONFORK, MREMAP_DONTUNMAP, MREMAP_FIXED, MREMAP_MAYMOVE,
-    PROT_EXEC, PROT_GROWSDOWN, PROT_READ, PROT_WRITE, SI_KERNEL, UIO_MAXIOV,
+    errno, error, uapi, MADV_DOFORK, MADV_DONTFORK, MADV_DONTNEED, MADV_KEEPONFORK,
+    MADV_NOHUGEPAGE, MADV_NORMAL, MADV_WILLNEED, MADV_WIPEONFORK, MREMAP_DONTUNMAP, MREMAP_FIXED,
+    MREMAP_MAYMOVE, PROT_EXEC, PROT_GROWSDOWN, PROT_READ, PROT_WRITE, SI_KERNEL, UIO_MAXIOV,
 };
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
@@ -58,6 +58,8 @@ use syncio::zxio::zxio_default_maybe_faultable_copy;
 use usercopy::slice_to_maybe_uninit_mut;
 use zerocopy::{FromBytes, Immutable, IntoBytes};
 use zx::VmarInfo;
+
+pub type IOVecPtr = MultiArchUserRef<uapi::iovec, uapi::arch32::iovec>;
 
 pub const ZX_VM_SPECIFIC_OVERWRITE: zx::VmarFlags =
     zx::VmarFlags::from_bits_retain(zx::VmarFlagsExtended::SPECIFIC_OVERWRITE.bits());
@@ -2444,7 +2446,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
     /// Fails if `iovec_count` is greater than `UIO_MAXIOV`.
     fn read_iovec(
         &self,
-        iovec_addr: UserAddress,
+        iovec_addr: IOVecPtr,
         iovec_count: UserValue<i32>,
     ) -> Result<UserBuffers, Errno> {
         let iovec_count: usize = iovec_count.try_into().map_err(|_| errno!(EINVAL))?;
@@ -2452,25 +2454,13 @@ pub trait MemoryAccessorExt: MemoryAccessor {
             return error!(EINVAL);
         }
 
-        self.read_objects_to_smallvec(iovec_addr.into(), iovec_count)
-    }
-
-    /// Read exactly `iovec_count` `UserBuffer`s from `iovec_addr`.
-    ///
-    /// Fails if `iovec_count` is greater than `UIO_MAXIOV`.
-    // TODO(https://fxbug.dev/380427162) Should this be rolled into the
-    // above call with just a 32bit flag?
-    fn read_iovec32(
-        &self,
-        iovec_addr: UserAddress,
-        iovec_count: UserValue<i32>,
-    ) -> Result<UserBuffers, Errno> {
-        let iovec_count: usize = iovec_count.try_into().map_err(|_| errno!(EINVAL))?;
-        if iovec_count > UIO_MAXIOV as usize {
-            return error!(EINVAL);
+        if iovec_addr.is_arch32() {
+            let ub32s: UserBuffers32 =
+                self.read_objects_to_smallvec(iovec_addr.addr().into(), iovec_count)?;
+            Ok(ub32s.iter().map(|&ub32| ub32.into()).collect())
+        } else {
+            self.read_objects_to_smallvec(iovec_addr.addr().into(), iovec_count)
         }
-        let ub32s: UserBuffers32 = self.read_objects_to_smallvec(iovec_addr.into(), iovec_count)?;
-        Ok(ub32s.iter().map(|&ub32| ub32.into()).collect())
     }
 
     /// Read up to `max_size` bytes from `string`, stopping at the first discovered null byte and

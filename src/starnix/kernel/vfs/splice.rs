@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::{MemoryAccessorExt, PAGE_SIZE};
+use crate::mm::{IOVecPtr, MemoryAccessorExt, PAGE_SIZE};
 use crate::task::CurrentTask;
 use crate::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
 use crate::vfs::pipe::{Pipe, PipeFileObject, PipeOperands};
@@ -13,7 +13,6 @@ use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_types::user_buffer::MAX_RW_COUNT;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::user_value::UserValue;
 use starnix_uapi::{errno, error, off_t, uapi};
 use std::sync::Arc;
@@ -253,7 +252,7 @@ pub fn vmsplice(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
-    iovec_addr: UserAddress,
+    iovec_addr: IOVecPtr,
     iovec_count: UserValue<i32>,
     flags: u32,
 ) -> Result<usize, Errno> {

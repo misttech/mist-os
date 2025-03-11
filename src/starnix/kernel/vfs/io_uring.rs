@@ -6,7 +6,7 @@
 
 use crate::mm::memory::MemoryObject;
 use crate::mm::{
-    read_to_object_as_bytes, DesiredAddress, MappingName, MappingOptions, ProtectionFlags,
+    read_to_object_as_bytes, DesiredAddress, IOVecPtr, MappingName, MappingOptions, ProtectionFlags,
 };
 use crate::task::CurrentTask;
 use crate::vfs::socket::syscalls::{sys_recvfrom, sys_recvmsg, sys_sendmsg, sys_sendto};
@@ -24,7 +24,7 @@ use starnix_types::user_buffer::UserBuffers;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::Access;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::user_address::{UserAddress, UserRef};
+use starnix_uapi::user_address::{ArchSpecific, UserAddress, UserRef};
 use starnix_uapi::user_value::UserValue;
 use starnix_uapi::{
     errno, error, io_cqring_offsets, io_sqring_offsets, io_uring_cqe, io_uring_op,
@@ -39,8 +39,8 @@ use starnix_uapi::{
     io_uring_op_IORING_OP_STATX, io_uring_op_IORING_OP_SYNC_FILE_RANGE,
     io_uring_op_IORING_OP_TIMEOUT, io_uring_op_IORING_OP_TIMEOUT_REMOVE,
     io_uring_op_IORING_OP_WRITE, io_uring_op_IORING_OP_WRITEV, io_uring_op_IORING_OP_WRITE_FIXED,
-    io_uring_params, io_uring_sqe, off_t, socklen_t, IORING_FEAT_SINGLE_MMAP, IORING_OFF_CQ_RING,
-    IORING_OFF_SQES, IORING_OFF_SQ_RING, IORING_SETUP_CQSIZE,
+    io_uring_params, io_uring_sqe, off_t, socklen_t, uapi, IORING_FEAT_SINGLE_MMAP,
+    IORING_OFF_CQ_RING, IORING_OFF_SQES, IORING_OFF_SQ_RING, IORING_SETUP_CQSIZE,
 };
 use std::sync::Arc;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
@@ -142,7 +142,8 @@ struct SqEntry {
     field3: [u64; 2usize],
 }
 
-static_assertions::assert_eq_size!(SqEntry, io_uring_sqe);
+static_assertions::assert_eq_size!(SqEntry, uapi::io_uring_sqe);
+static_assertions::assert_eq_size!(SqEntry, uapi::arch32::io_uring_sqe);
 static_assertions::const_assert_eq!(
     std::mem::offset_of!(SqEntry, opcode),
     std::mem::offset_of!(io_uring_sqe, opcode)
@@ -209,8 +210,8 @@ impl SqEntry {
         FdNumber::from_raw(self.raw_fd)
     }
 
-    fn iovec_addr(&self) -> UserAddress {
-        self.field1.into()
+    fn iovec_addr<Arch: ArchSpecific>(&self, arch: &Arch) -> IOVecPtr {
+        IOVecPtr::new(arch, self.field1)
     }
 
     fn iovec_count(&self) -> UserValue<i32> {
@@ -689,7 +690,7 @@ impl IoUringFileObject {
                     locked,
                     current_task,
                     entry.fd(),
-                    entry.iovec_addr(),
+                    entry.iovec_addr(current_task),
                     entry.iovec_count(),
                     entry.offset(),
                     SyscallArg::default(),
@@ -705,7 +706,7 @@ impl IoUringFileObject {
                     locked,
                     current_task,
                     entry.fd(),
-                    entry.iovec_addr(),
+                    entry.iovec_addr(current_task),
                     entry.iovec_count(),
                     entry.offset(),
                     SyscallArg::default(),

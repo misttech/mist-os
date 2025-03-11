@@ -54,6 +54,7 @@ syscall_tests = [
   "tmpfs_test",
   "touch_standby_test",
   "trivial_test",
+  "vmsplice_test",
   "waitpid_exit_signal_test",
 
   # go/keep-sorted end
@@ -91,7 +92,6 @@ arch64_syscall_tests = [
   "uio_test",
   "userfaultfd_test",
   "vdso_test",
-  "vmsplice_test",
   "waitpid_flags_test",
 
   # go/keep-sorted end
