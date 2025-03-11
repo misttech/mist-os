@@ -158,24 +158,10 @@ if (labels.images == "//build/images/bringup") {
   # The guest image itself.
   assembled_system("guest") {
     testonly = true
-
-    include_legacy_bundle = true
     generate_fvm = true
-
     namespace = "guest"
     image_name = "fuchsia"
     product_assembly_config_label = ":product_assembly_config"
     board_config_label = ":board"
-
-    base_packages = [
-      # This is config data for cobalt.
-      "//src/cobalt/bin/app:cobalt_registry",
-    ]
-
-    bootfs_labels = [
-      "//src/storage/minfs/bin:minfs-component",
-      "//src/storage/bin/mount",
-      "//src/storage/bin/umount",
-    ]
   }
 }
