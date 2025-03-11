@@ -35,6 +35,11 @@ int main(int argc, char** argv) {
   escher::RenderFrameFn render_frame = [&debug_font](const escher::ImagePtr& output_image,
                                                      const vk::Extent2D image_extent,
                                                      const escher::FramePtr& frame) {
+    frame->cmds()->vk().clearColorImage(
+        output_image->vk(), vk::ImageLayout::eTransferDstOptimal,
+        vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f}),
+        {vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1)});
+
     static int32_t dir_x = 3;
     static int32_t dir_y = 1;
     static int32_t pos_x = 0;

@@ -175,10 +175,6 @@ void escher::EscherFlatland::RenderFrame(RenderFrameFn render_frame) {
     // clearing the whole image anyway.
     frame->cmds()->TransitionImageLayout(output_image, vk::ImageLayout::eUndefined,
                                          vk::ImageLayout::eTransferDstOptimal);
-    frame->cmds()->vk().clearColorImage(
-        output_image->vk(), vk::ImageLayout::eTransferDstOptimal,
-        vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f}),
-        {vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1)});
 
     render_frame(output_image, image_extent_, frame);
 
