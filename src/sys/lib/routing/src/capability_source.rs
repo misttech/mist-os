@@ -12,8 +12,8 @@ use cm_rust::{
     OfferConfigurationDecl, OfferDecl, OfferDeclCommon, OfferDictionaryDecl, OfferDirectoryDecl,
     OfferEventStreamDecl, OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl, OfferServiceDecl,
     OfferSource, OfferStorageDecl, ProtocolDecl, RegistrationSource, ResolverDecl, RunnerDecl,
-    ServiceDecl, StorageDecl, UseDecl, UseDirectoryDecl, UseProtocolDecl, UseServiceDecl,
-    UseSource, UseStorageDecl,
+    ServiceDecl, StorageDecl, UseDecl, UseDeclCommon, UseDirectoryDecl, UseProtocolDecl,
+    UseServiceDecl, UseSource, UseStorageDecl,
 };
 use cm_rust_derive::FidlDecl;
 use cm_types::{Name, Path};
@@ -84,6 +84,25 @@ impl TryFrom<&cm_rust::ExposeDecl> for AggregateMember {
             cm_rust::ExposeSource::Self_ => Ok(AggregateMember::Self_),
             cm_rust::ExposeSource::Capability(_name) => Err(()),
             cm_rust::ExposeSource::Void => Err(()),
+        }
+    }
+}
+
+impl TryFrom<&cm_rust::UseDecl> for AggregateMember {
+    type Error = ();
+
+    fn try_from(use_: &cm_rust::UseDecl) -> Result<AggregateMember, ()> {
+        match use_.source() {
+            cm_rust::UseSource::Parent => Ok(AggregateMember::Parent),
+            cm_rust::UseSource::Framework => Err(()),
+            cm_rust::UseSource::Debug => Err(()),
+            cm_rust::UseSource::Self_ => Ok(AggregateMember::Self_),
+            cm_rust::UseSource::Capability(_) => Err(()),
+            cm_rust::UseSource::Child(name) => {
+                Ok(AggregateMember::Child(ChildRef { name: name.clone().into(), collection: None }))
+            }
+            cm_rust::UseSource::Collection(name) => Ok(AggregateMember::Collection(name.clone())),
+            cm_rust::UseSource::Environment => Err(()),
         }
     }
 }

@@ -6,15 +6,12 @@ use crate::capability::{CapabilityProvider, FrameworkCapability, InternalCapabil
 use crate::model::component::instance::ResolvedInstanceState;
 use crate::model::component::{ComponentInstance, WeakComponentInstance};
 use crate::model::model::Model;
-use crate::model::routing::service::AnonymizedServiceRoute;
 use crate::model::routing::{self, BedrockRouteRequest, Route, RoutingError};
-use ::routing::capability_source::{
-    AnonymizedAggregateSource, CapabilitySource, InternalCapability,
-};
+use ::routing::capability_source::{CapabilitySource, InternalCapability};
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::RouteRequest as LegacyRouteRequest;
 use async_trait::async_trait;
-use cm_rust::{ExposeDecl, SourceName, UseDecl};
+use cm_rust::{ExposeDecl, NativeIntoFidl, SourceName, UseDecl};
 use cm_types::{Name, RelativePath};
 use errors::{ActionError, StartActionError};
 use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
@@ -25,7 +22,6 @@ use log::warn;
 use moniker::{ExtendedMoniker, Moniker};
 use router_error::{Explain, RouterError};
 use sandbox::{Capability, RouterResponse};
-use std::cmp::Ordering;
 use std::sync::{Arc, Weak};
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
@@ -364,47 +360,15 @@ impl RouteRequest {
             CapabilitySource::Void(_) => fsys::RouteOutcome::Void,
             _ => fsys::RouteOutcome::Success,
         };
-        let service_info = match source {
-            CapabilitySource::AnonymizedAggregate(AnonymizedAggregateSource {
-                capability,
-                moniker,
-                members,
-                ..
-            }) => {
-                let component = instance.find_absolute(&moniker).await?;
-                let route = AnonymizedServiceRoute {
-                    source_moniker: component.moniker.clone(),
-                    members: members.clone(),
-                    service_name: capability.source_name().clone(),
-                };
-                let state = component.lock_state().await;
-                if let Some(service_dir) = state
-                    .get_resolved_state()
-                    .and_then(|r| r.anonymized_services.get(&route).cloned())
-                {
-                    let mut service_info = service_dir.entries().await;
-                    // Sort the entries (they can show up in any order)
-                    service_info.sort_by(|a, b| match a.source_id.cmp(&b.source_id) {
-                        Ordering::Equal => a.service_instance.cmp(&b.service_instance),
-                        o => o,
-                    });
-                    let service_info = service_info
-                        .into_iter()
-                        .map(|e| {
-                            let child_name = format!("{}", e.source_id);
-                            fsys::ServiceInstance {
-                                instance_name: Some(e.name.clone().into()),
-                                child_name: Some(child_name),
-                                child_instance_name: Some(e.service_instance.clone().into()),
-                                ..Default::default()
-                            }
-                        })
-                        .collect();
-                    Some(service_info)
-                } else {
-                    None
-                }
-            }
+        let service_info = match &source {
+            CapabilitySource::AnonymizedAggregate(anonymized_aggregate_source) => Some(
+                anonymized_aggregate_source
+                    .instances
+                    .clone()
+                    .into_iter()
+                    .map(NativeIntoFidl::native_into_fidl)
+                    .collect(),
+            ),
             _ => None,
         };
         Ok((outcome, source_moniker, service_info))
@@ -478,7 +442,18 @@ impl RouteRequest {
                 CapabilitySource::Void(_) => fsys::RouteOutcome::Void,
                 _ => fsys::RouteOutcome::Success,
             };
-            (outcome, capability_source.source_moniker(), None)
+            let service_info = match &capability_source {
+                CapabilitySource::AnonymizedAggregate(anonymized_aggregate_source) => Some(
+                    anonymized_aggregate_source
+                        .instances
+                        .clone()
+                        .into_iter()
+                        .map(NativeIntoFidl::native_into_fidl)
+                        .collect(),
+                ),
+                _ => None,
+            };
+            (outcome, capability_source.source_moniker(), service_info)
         })
     }
 

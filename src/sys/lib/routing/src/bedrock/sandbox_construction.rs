@@ -88,8 +88,8 @@ impl ProgramInput {
         }
     }
 
-    fn set_runner(&self, router: Router<Connector>) {
-        self.inner.insert(RUNNER.clone(), router.into()).unwrap()
+    fn set_runner(&self, capability: Capability) {
+        self.inner.insert(RUNNER.clone(), capability).unwrap()
     }
 
     /// All of the config capabilities that a program will use.
@@ -182,7 +182,7 @@ impl ComponentSandbox {
             }
         }
         if let Some(runner_router) = program_input.runner() {
-            self.program_input.set_runner(runner_router);
+            self.program_input.set_runner(runner_router.into());
         }
         for (key, component_input) in child_inputs.enumerate() {
             self.child_inputs.insert(key, component_input).unwrap();
@@ -258,17 +258,71 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
     }
 
     for use_ in &decl.uses {
-        extend_dict_with_use(
-            component,
-            &child_component_output_dictionary_routers,
-            &component_input,
-            &program_input,
-            &program_output_dict,
-            &framework_dict,
-            &capability_sourced_capabilities_dict,
-            use_,
-            error_reporter.clone(),
-        );
+        match use_ {
+            cm_rust::UseDecl::Service(_)
+                if matches!(use_.source(), cm_rust::UseSource::Collection(_)) =>
+            {
+                let cm_rust::UseSource::Collection(collection_name) = use_.source() else {
+                    unreachable!();
+                };
+                let aggregate = (aggregate_router_fn)(
+                    component.clone(),
+                    vec![AggregateSource::Collection { collection_name: collection_name.clone() }],
+                    CapabilitySource::AnonymizedAggregate(AnonymizedAggregateSource {
+                        capability: AggregateCapability::Service(use_.source_name().clone()),
+                        moniker: component.moniker().clone(),
+                        members: vec![AggregateMember::try_from(use_).unwrap()],
+                        sources: Sources::new(cm_rust::CapabilityTypeName::Service),
+                        instances: vec![],
+                    }),
+                )
+                .with_default(Request {
+                    metadata: service_metadata(*use_.availability()),
+                    target: component.as_weak().into(),
+                })
+                .with_error_reporter(RouteRequestErrorInfo::from(use_), error_reporter.clone());
+                if let Err(e) = program_input
+                    .namespace()
+                    .insert_capability(use_.path().unwrap(), aggregate.into())
+                {
+                    warn!("failed to insert {} in program input dict: {e:?}", use_.path().unwrap())
+                }
+            }
+            cm_rust::UseDecl::Service(_) => extend_dict_with_use::<DirEntry, _>(
+                component,
+                &child_component_output_dictionary_routers,
+                &component_input,
+                &program_input,
+                &program_output_dict,
+                &framework_dict,
+                &capability_sourced_capabilities_dict,
+                use_,
+                error_reporter.clone(),
+            ),
+            cm_rust::UseDecl::Protocol(_) | cm_rust::UseDecl::Runner(_) => {
+                extend_dict_with_use::<Connector, _>(
+                    component,
+                    &child_component_output_dictionary_routers,
+                    &component_input,
+                    &program_input,
+                    &program_output_dict,
+                    &framework_dict,
+                    &capability_sourced_capabilities_dict,
+                    use_,
+                    error_reporter.clone(),
+                )
+            }
+            cm_rust::UseDecl::Config(config) => extend_dict_with_config_use(
+                component,
+                &child_component_output_dictionary_routers,
+                &component_input,
+                &program_input,
+                &program_output_dict,
+                config,
+                error_reporter.clone(),
+            ),
+            _ => (),
+        }
     }
 
     // The runner may be specified by either use declaration or in the program section of the
@@ -276,7 +330,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
     // section, then let's synthesize a use decl for it and add it to the sandbox.
     if !decl.uses.iter().any(|u| matches!(u, cm_rust::UseDecl::Runner(_))) {
         if let Some(runner_name) = decl.program.as_ref().and_then(|p| p.runner.as_ref()) {
-            extend_dict_with_use(
+            extend_dict_with_use::<Connector, _>(
                 component,
                 &child_component_output_dictionary_routers,
                 &component_input,
@@ -878,7 +932,10 @@ pub fn extend_dict_with_offers<C: ComponentInstanceInterface + 'static>(
 pub fn is_supported_use(use_: &cm_rust::UseDecl) -> bool {
     matches!(
         use_,
-        cm_rust::UseDecl::Config(_) | cm_rust::UseDecl::Protocol(_) | cm_rust::UseDecl::Runner(_)
+        cm_rust::UseDecl::Config(_)
+            | cm_rust::UseDecl::Protocol(_)
+            | cm_rust::UseDecl::Runner(_)
+            | cm_rust::UseDecl::Service(_)
     )
 }
 
@@ -959,7 +1016,7 @@ fn extend_dict_with_config_use<C: ComponentInstanceInterface + 'static>(
     }
 }
 
-fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
+fn extend_dict_with_use<T, C: ComponentInstanceInterface + 'static>(
     component: &Arc<C>,
     child_component_output_dictionary_routers: &HashMap<ChildName, Router<Dict>>,
     component_input: &ComponentInput,
@@ -969,7 +1026,10 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
     capability_sourced_capabilities_dict: &Dict,
     use_: &cm_rust::UseDecl,
     error_reporter: impl ErrorReporter,
-) {
+) where
+    T: CapabilityBound + Clone,
+    Router<T>: TryFrom<Capability> + Into<Capability>,
+{
     if !is_supported_use(use_) {
         return;
     }
@@ -988,13 +1048,13 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
 
     let source_path = use_.source_path();
     let porcelain_type = CapabilityTypeName::from(use_);
-    let router: Router<Connector> = match use_.source() {
+    let router: Router<T> = match use_.source() {
         cm_rust::UseSource::Parent => {
-            use_from_parent_router::<Connector>(component_input, source_path.to_owned(), moniker)
+            use_from_parent_router::<T>(component_input, source_path.to_owned(), moniker)
                 .with_porcelain_type(porcelain_type, moniker.clone())
         }
         cm_rust::UseSource::Self_ => program_output_dict
-            .get_router_or_not_found::<Connector>(
+            .get_router_or_not_found::<T>(
                 &source_path,
                 RoutingError::use_from_self_not_found(
                     moniker,
@@ -1009,7 +1069,7 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
             else {
                 panic!("use declaration in manifest for component {} has a source of a nonexistent child {}, this should be prevented by manifest validation", moniker, child_name);
             };
-            let r: Router<Connector> = child_component_output.clone().lazy_get(
+            let r: Router<T> = child_component_output.clone().lazy_get(
                 source_path.to_owned(),
                 RoutingError::use_from_child_expose_not_found(
                     &child_name,
@@ -1020,13 +1080,13 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
             r.with_porcelain_type(porcelain_type, moniker.clone())
         }
         cm_rust::UseSource::Framework if use_.is_from_dictionary() => {
-            Router::<Connector>::new_error(RoutingError::capability_from_framework_not_found(
+            Router::<T>::new_error(RoutingError::capability_from_framework_not_found(
                 moniker,
                 source_path.iter_segments().join("/"),
             ))
         }
         cm_rust::UseSource::Framework => framework_dict
-            .get_router_or_not_found::<Connector>(
+            .get_router_or_not_found::<T>(
                 &source_path,
                 RoutingError::capability_from_framework_not_found(
                     moniker,
@@ -1042,7 +1102,7 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
             if source_path.iter_segments().join("/") == fsys::StorageAdminMarker::PROTOCOL_NAME {
                 capability_sourced_capabilities_dict.get_router_or_not_found(&capability_name, err)
             } else {
-                Router::<Connector>::new_error(err)
+                Router::<T>::new_error(err)
             }
         }
         cm_rust::UseSource::Debug => {
@@ -1052,7 +1112,7 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
             component_input
                 .environment()
                 .debug()
-                .get_router_or_not_found::<Connector>(
+                .get_router_or_not_found::<T>(
                     &use_protocol.source_name,
                     RoutingError::use_from_environment_not_found(
                         moniker,
@@ -1069,7 +1129,7 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
             component_input
                 .environment()
                 .runners()
-                .get_router_or_not_found::<Connector>(
+                .get_router_or_not_found::<T>(
                     &use_runner.source_name,
                     RoutingError::use_from_environment_not_found(
                         moniker,
@@ -1080,8 +1140,8 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
                 .with_porcelain_type(porcelain_type, moniker.clone())
         }
         cm_rust::UseSource::Collection(_) => {
-            // This arm is used for service capabilities, which are not yet supported here.
-            unimplemented!();
+            // Collection sources are handled separately, in `build_component_sandbox`
+            return;
         }
     };
     let metadata = Dict::new();
@@ -1106,7 +1166,7 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
         match use_ {
             cm_rust::UseDecl::Runner(_) => {
                 assert!(program_input.runner().is_none(), "component can't use multiple runners");
-                program_input.set_runner(router);
+                program_input.set_runner(router.into());
             }
             _ => panic!("unexpected capability type: {:?}", use_),
         }

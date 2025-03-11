@@ -6,8 +6,8 @@ use crate::model::component::WeakComponentInstance;
 use ::routing::bedrock::sandbox_construction::{ComponentSandbox, ProgramInput};
 use ::routing::DictExt;
 use cm_rust::{
-    ExposeDecl, ExposeDictionaryDecl, ExposeProtocolDecl, ExposeRunnerDecl, UseDecl,
-    UseProtocolDecl, UseRunnerDecl,
+    ExposeDecl, ExposeDictionaryDecl, ExposeProtocolDecl, ExposeRunnerDecl, ExposeServiceDecl,
+    UseDecl, UseProtocolDecl, UseRunnerDecl, UseServiceDecl,
 };
 use sandbox::Capability;
 
@@ -18,6 +18,8 @@ pub enum UseRouteRequest {
     // decl is never used outside Debug, but include it for consistency
     #[allow(dead_code)]
     UseRunner(UseRunnerDecl),
+
+    UseService(UseServiceDecl),
 }
 
 impl TryFrom<UseDecl> for UseRouteRequest {
@@ -27,6 +29,7 @@ impl TryFrom<UseDecl> for UseRouteRequest {
         match decl {
             UseDecl::Protocol(decl) => Ok(Self::UseProtocol(decl)),
             UseDecl::Runner(decl) => Ok(Self::UseRunner(decl)),
+            UseDecl::Service(decl) => Ok(Self::UseService(decl)),
             decl => Err(decl),
         }
     }
@@ -64,6 +67,24 @@ impl UseRouteRequest {
                     .expect("component has `use runner` but no runner in program input?");
                 router.into()
             }
+            Self::UseService(decl) => {
+                let Some(capability) = program_input.namespace().get_capability(&decl.target_path)
+                else {
+                    panic!(
+                        "router for capability {:?} is missing from program input dictionary for \
+                         component {}",
+                        decl.target_path, target.moniker
+                    );
+                };
+                let Capability::DirEntryRouter(_) = &capability else {
+                    panic!(
+                        "program input dictionary for component {} had an entry with an unexpected \
+                         type: {:?}",
+                        target.moniker, capability
+                    );
+                };
+                capability
+            }
         }
     }
 
@@ -71,6 +92,7 @@ impl UseRouteRequest {
         match self {
             Self::UseProtocol(p) => p.availability,
             Self::UseRunner(_) => cm_rust::Availability::Required,
+            Self::UseService(s) => s.availability,
         }
     }
 }
@@ -81,6 +103,7 @@ pub enum ExposeRouteRequest {
     ExposeProtocol(ExposeProtocolDecl),
     ExposeDictionary(ExposeDictionaryDecl),
     ExposeRunner(ExposeRunnerDecl),
+    ExposeService(ExposeServiceDecl),
 }
 
 impl TryFrom<&Vec<&ExposeDecl>> for ExposeRouteRequest {
@@ -92,6 +115,7 @@ impl TryFrom<&Vec<&ExposeDecl>> for ExposeRouteRequest {
                 ExposeDecl::Protocol(decl) => Ok(Self::ExposeProtocol(decl.clone())),
                 ExposeDecl::Dictionary(decl) => Ok(Self::ExposeDictionary(decl.clone())),
                 ExposeDecl::Runner(decl) => Ok(Self::ExposeRunner(decl.clone())),
+                ExposeDecl::Service(decl) => Ok(Self::ExposeService(decl.clone())),
                 _ => Err(()),
             }
         } else {
@@ -145,6 +169,25 @@ impl ExposeRouteRequest {
                 };
                 capability
             }
+            Self::ExposeService(decl) => {
+                let Some(capability) =
+                    sandbox.component_output.capabilities().get_capability(&decl.target_name)
+                else {
+                    panic!(
+                        "router for capability {:?} is missing from component output dictionary for \
+                         component {}",
+                        decl.target_name, target.moniker
+                    );
+                };
+                let Capability::DictionaryRouter(_) = &capability else {
+                    panic!(
+                        "program input dictionary for component {} had an entry with an unexpected \
+                                 type: {:?}",
+                        target.moniker, capability
+                    );
+                };
+                capability
+            }
             Self::ExposeRunner(decl) => {
                 let Some(capability) =
                     sandbox.component_output.capabilities().get_capability(&decl.target_name)
@@ -172,6 +215,7 @@ impl ExposeRouteRequest {
             Self::ExposeProtocol(p) => p.availability,
             Self::ExposeDictionary(d) => d.availability,
             Self::ExposeRunner(_) => cm_rust::Availability::Required,
+            Self::ExposeService(s) => s.availability,
         }
     }
 }

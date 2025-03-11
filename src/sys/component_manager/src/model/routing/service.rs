@@ -172,10 +172,12 @@ impl FilteredAggregateServiceDir {
                         ) else {
                             return None;
                         };
-                        Some(Arc::new(ServiceInstanceDirectoryEntry::<FlyStr> {
+                        Some(Arc::new(ServiceInstanceDirectoryEntry {
                             name: mapping.target_name.into(),
                             directory_proxy,
-                            source_id: mapping.source_name.clone().into(),
+                            // This is silly and inaccurate, but we're deleting this block in a
+                            // following CL.
+                            source_id: AggregateInstance::Parent,
                             service_instance: mapping.source_name.into(),
                         }))
                     })
@@ -266,10 +268,8 @@ struct AnonymizedAggregateServiceDirInner {
     ///
     /// This is used to find directory entries after they have been inserted into `dir`,
     /// as `dir` does not directly expose its entries.
-    entries: HashMap<
-        ServiceInstanceDirectoryKey<AggregateInstance>,
-        Arc<ServiceInstanceDirectoryEntry<AggregateInstance>>,
-    >,
+    entries:
+        HashMap<ServiceInstanceDirectoryKey<AggregateInstance>, Arc<ServiceInstanceDirectoryEntry>>,
 
     /// This contains entries for directory watchers that are listening for service instances.
     /// The value is an enum to indicate the various states that the watcher can be in.
@@ -395,7 +395,7 @@ impl AnonymizedAggregateServiceDir {
 
     /// Returns metadata about all the service instances in their original representation,
     /// useful for exposing debug info. The results are returned in no particular order.
-    pub async fn entries(&self) -> Vec<Arc<ServiceInstanceDirectoryEntry<AggregateInstance>>> {
+    pub async fn entries(&self) -> Vec<Arc<ServiceInstanceDirectoryEntry>> {
         self.inner.lock().await.entries.values().cloned().collect()
     }
 
@@ -796,10 +796,10 @@ impl AnonymizedAggregateServiceDir {
                             // Our connection to the directory has been broken, so we can exit.
                             return Err(None);
                         };
-                        let entry = Arc::new(ServiceInstanceDirectoryEntry::<AggregateInstance> {
+                        let entry = Arc::new(ServiceInstanceDirectoryEntry {
                             name: name.clone(),
                             directory_proxy: child_proxy,
-                            source_id: instance_key.source_id.clone(),
+                            source_id: instance.clone(),
                             service_instance: instance_key.service_instance.clone().into(),
                         });
                         let result = inner.dir.add_node(&name.as_str(), entry.clone());
@@ -978,7 +978,7 @@ impl Hook for AnonymizedAggregateServiceDir {
 
 /// A directory entry representing an instance of a service.
 /// Upon opening, performs capability routing and opens the instance at its source.
-pub struct ServiceInstanceDirectoryEntry<T> {
+pub struct ServiceInstanceDirectoryEntry {
     /// The name of this directory entry, when added as a node into another directory.
     pub name: Name,
 
@@ -993,7 +993,7 @@ pub struct ServiceInstanceDirectoryEntry<T> {
     // FilteredAggregateServiceDir only uses this for debug info. We could probably have
     // AnonymizedAggregateServiceDir use ServiceInstanceDirectoryKey.source_id instead, and either
     // delete this or make it debug-only.
-    pub source_id: T,
+    pub source_id: AggregateInstance,
 
     /// The name of the service instance directory to open at the source.
     pub service_instance: FlyStr,
@@ -1013,20 +1013,20 @@ struct ServiceInstanceDirectoryKey<T: Send + Sync + 'static + fmt::Display> {
     pub service_instance: Name,
 }
 
-impl<T: Send + Sync + 'static> DirectoryEntry for ServiceInstanceDirectoryEntry<T> {
+impl DirectoryEntry for ServiceInstanceDirectoryEntry {
     fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
         request.spawn(self);
         Ok(())
     }
 }
 
-impl<T: Send + Sync + 'static> GetEntryInfo for ServiceInstanceDirectoryEntry<T> {
+impl GetEntryInfo for ServiceInstanceDirectoryEntry {
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
     }
 }
 
-impl<T: Send + Sync + 'static> DirectoryEntryAsync for ServiceInstanceDirectoryEntry<T> {
+impl DirectoryEntryAsync for ServiceInstanceDirectoryEntry {
     async fn open_entry_async(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
         request.open_remote(vfs::remote::remote_dir(Clone::clone(&self.directory_proxy)))
     }
