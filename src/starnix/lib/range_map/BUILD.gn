@@ -14,6 +14,7 @@ rustc_library("range_map") {
   edition = "2021"
   sources = [
     "src/btree.rs",
+    "src/classic.rs",
     "src/lib.rs",
   ]
   deps = [ "//third_party/rust_crates:arrayvec" ]
@@ -32,6 +33,7 @@ rustc_test("starnix_range_map_test") {
   edition = "2021"
   sources = [
     "src/btree.rs",
+    "src/classic.rs",
     "src/lib.rs",
   ]
   deps = [
