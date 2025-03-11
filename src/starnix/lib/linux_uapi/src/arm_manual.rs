@@ -49,6 +49,12 @@ macro_rules! translate_data {
     };
 }
 
+translate_data!(flock; l_type, l_whence, l_start, l_len, l_pid);
+translate_data!(itimerspec; it_interval, it_value);
+translate_data!(itimerval; it_interval, it_value);
+translate_data!(__kernel_fsid_t; val);
+translate_data!(sigaltstack; ss_sp, ss_flags, ss_size);
+
 impl From<crate::stat> for crate::arch32::stat64 {
     fn from(stat: crate::stat) -> Self {
         let mut result = Self::default();
@@ -104,14 +110,6 @@ impl From<crate::rlimit> for crate::arch32::rlimit {
     }
 }
 
-translate_data!(sigaltstack; ss_sp, ss_flags ,ss_size);
-
-impl From<crate::__kernel_fsid_t> for crate::arch32::__kernel_fsid_t {
-    fn from(fsid: crate::__kernel_fsid_t) -> Self {
-        Self { val: fsid.val }
-    }
-}
-
 impl TryFrom<crate::statfs> for crate::arch32::statfs64 {
     type Error = ();
     fn try_from(statfs: crate::statfs) -> Result<Self, ()> {
@@ -123,7 +121,7 @@ impl TryFrom<crate::statfs> for crate::arch32::statfs64 {
             f_bavail: statfs.f_bavail.try_into().map_err(|_| ())?,
             f_files: statfs.f_files.try_into().map_err(|_| ())?,
             f_ffree: statfs.f_ffree.try_into().map_err(|_| ())?,
-            f_fsid: statfs.f_fsid.into(),
+            f_fsid: statfs.f_fsid.try_into().map_err(|_| ())?,
             f_namelen: statfs.f_namelen.try_into().map_err(|_| ())?,
             f_frsize: statfs.f_frsize.try_into().map_err(|_| ())?,
             f_flags: statfs.f_flags.try_into().map_err(|_| ())?,
@@ -190,6 +188,14 @@ impl From<crate::sigset_t> for crate::arch32::sigset64_t {
     }
 }
 
+impl From<crate::arch32::sigval> for crate::sigval {
+    fn from(sigval: crate::arch32::sigval) -> Self {
+        // SAFETY: This is safe because the union has a single field.
+        let bindgen_opaque_blob = unsafe { sigval._bindgen_opaque_blob };
+        Self { _bindgen_opaque_blob: bindgen_opaque_blob.into() }
+    }
+}
+
 impl TryFrom<crate::sigval> for crate::arch32::sigval {
     type Error = ();
     fn try_from(sigval: crate::sigval) -> Result<Self, ()> {
@@ -199,6 +205,63 @@ impl TryFrom<crate::sigval> for crate::arch32::sigval {
     }
 }
 
-translate_data!(flock; l_type, l_whence, l_start, l_len, l_pid);
-translate_data!(itimerspec; it_interval, it_value);
-translate_data!(itimerval; it_interval, it_value);
+impl From<crate::arch32::sigevent> for crate::sigevent {
+    fn from(sigevent: crate::arch32::sigevent) -> Self {
+        let mut _sigev_un = crate::sigevent__bindgen_ty_1::default();
+        // SAFETY: This is safe because the union has all bytes defined.
+        match sigevent.sigev_notify as u32 {
+            crate::SIGEV_THREAD_ID => unsafe {
+                _sigev_un._tid = sigevent._sigev_un._tid.into();
+            },
+            crate::SIGEV_THREAD => unsafe {
+                _sigev_un._sigev_thread = crate::sigevent__bindgen_ty_1__bindgen_ty_1 {
+                    _function: sigevent._sigev_un._sigev_thread._function.into(),
+                    _attribute: sigevent._sigev_un._sigev_thread._attribute.into(),
+                };
+            },
+            _ => {}
+        }
+        Self {
+            sigev_value: sigevent.sigev_value.into(),
+            sigev_signo: sigevent.sigev_signo.into(),
+            sigev_notify: sigevent.sigev_notify.into(),
+            _sigev_un,
+        }
+    }
+}
+
+impl TryFrom<crate::sigevent> for crate::arch32::sigevent {
+    type Error = ();
+    fn try_from(sigevent: crate::sigevent) -> Result<Self, ()> {
+        let mut _sigev_un = crate::arch32::sigevent__bindgen_ty_1::default();
+        // SAFETY: This is safe because the union has all bytes defined.
+        match sigevent.sigev_notify as u32 {
+            crate::SIGEV_THREAD_ID => unsafe {
+                _sigev_un._tid = sigevent._sigev_un._tid.try_into().map_err(|_| ())?;
+            },
+            crate::SIGEV_THREAD => unsafe {
+                _sigev_un._sigev_thread = crate::arch32::sigevent__bindgen_ty_1__bindgen_ty_1 {
+                    _function: sigevent
+                        ._sigev_un
+                        ._sigev_thread
+                        ._function
+                        .try_into()
+                        .map_err(|_| ())?,
+                    _attribute: sigevent
+                        ._sigev_un
+                        ._sigev_thread
+                        ._attribute
+                        .try_into()
+                        .map_err(|_| ())?,
+                };
+            },
+            _ => {}
+        }
+        Ok(Self {
+            sigev_value: sigevent.sigev_value.try_into().map_err(|_| ())?,
+            sigev_signo: sigevent.sigev_signo.try_into().map_err(|_| ())?,
+            sigev_notify: sigevent.sigev_notify.try_into().map_err(|_| ())?,
+            _sigev_un,
+        })
+    }
+}

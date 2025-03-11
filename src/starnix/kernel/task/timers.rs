@@ -8,8 +8,20 @@ use crate::task::{CurrentTask, Timeline, TimerWakeup};
 use starnix_sync::Mutex;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::SIGALRM;
-use starnix_uapi::{__kernel_timer_t, error, itimerspec, uapi, TIMER_ABSTIME};
+use starnix_uapi::{error, itimerspec, uapi, TIMER_ABSTIME};
 use std::collections::HashMap;
+
+static_assertions::const_assert!(
+    std::mem::size_of::<uapi::__kernel_timer_t>()
+        == std::mem::size_of::<uapi::arch32::__kernel_timer_t>()
+);
+pub type TimerId = uapi::__kernel_timer_t;
+
+static_assertions::const_assert!(
+    std::mem::size_of::<uapi::__kernel_clockid_t>()
+        == std::mem::size_of::<uapi::arch32::__kernel_clockid_t>()
+);
+pub type ClockId = uapi::__kernel_clockid_t;
 
 // Table for POSIX timers from timer_create() that deliver timers via signals (not new-style
 // timerfd's).
@@ -40,9 +52,6 @@ impl Default for TimerTableMutableState {
         }
     }
 }
-
-pub type TimerId = __kernel_timer_t;
-pub type ClockId = uapi::__kernel_clockid_t;
 
 impl TimerTable {
     /// Creates a new per-process interval timer.

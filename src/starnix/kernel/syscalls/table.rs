@@ -164,7 +164,9 @@ pub fn dispatch_syscall(
         pub use crate::syscalls::time::{
             sys_arch32_clock_getres, sys_arch32_clock_gettime, sys_arch32_clock_gettime64,
             sys_arch32_gettimeofday, sys_arch32_nanosleep, sys_arch32_setitimer,
-            sys_arch32_timer_gettime64, sys_clock_nanosleep as sys_arch32_clock_nanosleep,
+            sys_arch32_timer_create, sys_arch32_timer_delete, sys_arch32_timer_getoverrun,
+            sys_arch32_timer_gettime, sys_arch32_timer_gettime64, sys_arch32_timer_settime,
+            sys_clock_nanosleep as sys_arch32_clock_nanosleep,
         };
         pub use crate::task::syscalls::{
             sys_arch32_execve, sys_arch32_geteuid32, sys_arch32_getresgid32,
@@ -343,7 +345,12 @@ pub fn dispatch_syscall(
             syslog[3],
             tee[4],
             tgkill[3],
+            timer_create[3],
+            timer_delete[1],
+            timer_getoverrun[1],
             timer_gettime64[2],
+            timer_gettime[2],
+            timer_settime[4],
             timerfd_create[2],
             timerfd_settime[4],
             truncate[2],

@@ -22,7 +22,7 @@ use starnix_uapi::auth::CAP_WAKE_ALARM;
 use starnix_uapi::errors::{Errno, EINTR};
 use starnix_uapi::user_address::{MultiArchUserRef, UserRef};
 use starnix_uapi::{
-    errno, error, from_status_like_fdio, pid_t, sigevent, timespec, timeval, timezone, tms, uapi,
+    errno, error, from_status_like_fdio, pid_t, timespec, timeval, timezone, tms, uapi,
     CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_MONOTONIC_COARSE,
     CLOCK_MONOTONIC_RAW, CLOCK_PROCESS_CPUTIME_ID, CLOCK_REALTIME, CLOCK_REALTIME_ALARM,
     CLOCK_REALTIME_COARSE, CLOCK_TAI, CLOCK_THREAD_CPUTIME_ID, MAX_CLOCKS, TIMER_ABSTIME,
@@ -409,14 +409,17 @@ pub fn sys_timer_create(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     clock_id: ClockId,
-    event: UserRef<sigevent>,
+    event: MultiArchUserRef<uapi::sigevent, uapi::arch32::sigevent>,
     timerid: UserRef<TimerId>,
 ) -> Result<(), Errno> {
     if clock_id >= MAX_CLOCKS as TimerId {
         return error!(EINVAL);
     }
-    let user_event =
-        if event.addr().is_null() { None } else { Some(current_task.read_object(event)?) };
+    let user_event = if event.addr().is_null() {
+        None
+    } else {
+        Some(current_task.read_multi_arch_object(event)?)
+    };
 
     let mut checked_signal_event: Option<SignalEvent> = None;
     let thread_group = current_task.thread_group.read();
@@ -466,7 +469,7 @@ pub fn sys_timer_create(
 pub fn sys_timer_delete(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
-    id: uapi::__kernel_timer_t,
+    id: TimerId,
 ) -> Result<(), Errno> {
     let timers = &current_task.thread_group.read().timers;
     timers.delete(current_task, id)
@@ -475,7 +478,7 @@ pub fn sys_timer_delete(
 pub fn sys_timer_gettime(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
-    id: uapi::__kernel_timer_t,
+    id: TimerId,
     curr_value: ITimerSpecPtr,
 ) -> Result<(), Errno> {
     let timers = &current_task.thread_group.read().timers;
@@ -486,7 +489,7 @@ pub fn sys_timer_gettime(
 pub fn sys_timer_getoverrun(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
-    id: uapi::__kernel_timer_t,
+    id: TimerId,
 ) -> Result<i32, Errno> {
     let timers = &current_task.thread_group.read().timers;
     timers.get_overrun(id)
@@ -495,7 +498,7 @@ pub fn sys_timer_getoverrun(
 pub fn sys_timer_settime(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
-    id: uapi::__kernel_timer_t,
+    id: TimerId,
     flags: i32,
     user_new_value: ITimerSpecPtr,
     user_old_value: ITimerSpecPtr,
@@ -573,7 +576,7 @@ pub fn sys_times(
 // Syscalls for arch32 usage
 #[cfg(feature = "arch32")]
 mod arch32 {
-    use crate::task::CurrentTask;
+    use crate::task::{CurrentTask, TimerId};
     use starnix_sync::{Locked, Unlocked};
     use starnix_uapi::errors::Errno;
     use starnix_uapi::uapi;
@@ -596,7 +599,7 @@ mod arch32 {
     pub fn sys_arch32_timer_gettime64(
         locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
-        id: uapi::arch32::__kernel_timer_t,
+        id: TimerId,
         curr_value: UserRef<uapi::itimerspec>,
     ) -> Result<(), Errno> {
         const_assert!(
@@ -609,7 +612,11 @@ mod arch32 {
     pub use super::{
         sys_clock_getres as sys_arch32_clock_getres, sys_clock_gettime as sys_arch32_clock_gettime,
         sys_gettimeofday as sys_arch32_gettimeofday, sys_nanosleep as sys_arch32_nanosleep,
-        sys_setitimer as sys_arch32_setitimer,
+        sys_setitimer as sys_arch32_setitimer, sys_timer_create as sys_arch32_timer_create,
+        sys_timer_delete as sys_arch32_timer_delete,
+        sys_timer_getoverrun as sys_arch32_timer_getoverrun,
+        sys_timer_gettime as sys_arch32_timer_gettime,
+        sys_timer_settime as sys_arch32_timer_settime,
     };
 }
 
