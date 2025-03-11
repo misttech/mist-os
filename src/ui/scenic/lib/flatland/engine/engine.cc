@@ -76,6 +76,9 @@ void Engine::InitializeInspectObjects() {
 void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_time,
                                   const FlatlandDisplay& display,
                                   scheduling::FramePresentedCallback callback) {
+  // Emit a counter called "ScenicRender" for visualization in the Trace Viewer.
+  static bool render_edge_flag = false;
+  TRACE_COUNTER("gfx", "ScenicRender", 0, "", TA_UINT32(render_edge_flag = !render_edge_flag));
   // NOTE: this name is important for benchmarking.  Do not remove or modify it
   // without also updating the "process_gfx_trace.go" script.
   TRACE_DURATION("gfx", "RenderFrame", "frame_number", frame_number, "time",
