@@ -17,16 +17,20 @@ import tempfile
 SUCCESS_RE = re.compile("^TEST SUCCESS$", re.MULTILINE)
 
 
-def parse_manifest(path, output_dir):
+def parse_manifest(
+    path: pathlib.Path, output_dir: pathlib.Path
+) -> dict[str, pathlib.Path]:
     """Returns a mapping of package file to file path from the package manifest at path."""
     files = {}
-    for l in path.read_text().splitlines():
-        dest, origin = l.strip().split("=", 1)
+    for line in path.read_text().splitlines():
+        dest, origin = line.strip().split("=", 1)
         files[dest] = output_dir / origin
     return files
 
 
-def build_initrd(work_dir, fuchsia_dir):
+def build_initrd(
+    work_dir: pathlib.Path, fuchsia_dir: pathlib.Path
+) -> tuple[pathlib.Path, list[str]]:
     """Builds an initrd containing the tests and associated files.
 
     Args:
@@ -80,7 +84,12 @@ def build_initrd(work_dir, fuchsia_dir):
     return (work_dir / "initrd.img"), tests
 
 
-def run_test(work_dir, test_name, kernel_path, initrd_path):
+def run_test(
+    work_dir: pathlib.Path,
+    test_name: str,
+    kernel_path: pathlib.Path,
+    initrd_path: pathlib.Path,
+) -> bool:
     """Runs a test, returns success or failure."""
 
     print(f"Running {test_name}")
@@ -113,13 +122,27 @@ def run_test(work_dir, test_name, kernel_path, initrd_path):
         return True
     else:
         print("... FAILED")
-        print("Output tail:")
-        print(*result.stdout.splitlines()[-30:], sep="\n")
+        print("Failure output:")
+        result_lines: list[str] = []
+        record_lines: bool = False
+        for line in result.stdout.splitlines():
+            if "[ RUN      ]" in line:
+                record_lines = True
+            if not record_lines:
+                continue
+            result_lines.append(line)
+            if "[       OK ]" in line:
+                print(line)
+                result_lines = []
+            elif "[  FAILED  ]" in line:
+                print(*result_lines, sep="\n")
+                result_lines = []
+
         print(f"End of output ({test_name})")
         return False
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         "run_on_linux.py",
     )
@@ -143,7 +166,9 @@ def main():
             shutil.rmtree(work_dir)
 
 
-def build_and_run_tests(work_dir, args):
+def build_and_run_tests(
+    work_dir: pathlib.Path, args: argparse.Namespace
+) -> None:
     if "FUCHSIA_DIR" not in os.environ:
         print("FUCHSIA_DIR is not set", file=sys.stderr)
         sys.exit(1)
