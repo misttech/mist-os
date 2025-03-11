@@ -3389,9 +3389,26 @@ mod arch32 {
         )
     }
 
+    pub fn sys_arch32_rename(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        old_user_path: UserCString,
+        new_user_path: UserCString,
+    ) -> Result<(), Errno> {
+        super::sys_renameat2(
+            locked,
+            current_task,
+            FdNumber::AT_FDCWD,
+            old_user_path,
+            FdNumber::AT_FDCWD,
+            new_user_path,
+            0,
+        )
+    }
+
     pub use super::{
         sys_epoll_ctl as sys_arch32_epoll_ctl, sys_fstatat64 as sys_arch32_fstatat64,
-        sys_timerfd_create as sys_arch32_timerfd_create,
+        sys_renameat2 as sys_arch32_renameat2, sys_timerfd_create as sys_arch32_timerfd_create,
         sys_timerfd_settime as sys_arch32_timerfd_settime,
     };
 }
