@@ -257,7 +257,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
         collection_inputs.insert(collection.name.clone(), input).ok();
     }
 
-    for use_ in &decl.uses {
+    for use_ in decl.uses.iter() {
         match use_ {
             cm_rust::UseDecl::Service(_)
                 if matches!(use_.source(), cm_rust::UseSource::Collection(_)) =>

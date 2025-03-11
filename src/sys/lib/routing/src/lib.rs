@@ -20,7 +20,7 @@ pub mod rights;
 pub mod walk_state;
 
 use crate::bedrock::request_metadata::{
-    dictionary_metadata, protocol_metadata, resolver_metadata, runner_metadata,
+    dictionary_metadata, protocol_metadata, resolver_metadata, runner_metadata, service_metadata,
 };
 use crate::capability_source::{
     CapabilitySource, ComponentCapability, ComponentSource, InternalCapability, VoidSource,
@@ -54,7 +54,8 @@ use itertools::Itertools;
 use moniker::{ChildName, ExtendedMoniker, Moniker, MonikerError};
 use router_error::Explain;
 use sandbox::{
-    Capability, CapabilityBound, Connector, Data, Dict, Request, Routable, Router, RouterResponse,
+    Capability, CapabilityBound, Connector, Data, Dict, DirEntry, Request, Routable, Router,
+    RouterResponse,
 };
 use std::sync::Arc;
 use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, zx_status as zx};
@@ -348,7 +349,14 @@ where
             .await
         }
         RouteRequest::ExposeService(expose_bundle) => {
-            route_service_from_expose(expose_bundle, target, mapper).await
+            let first_expose = expose_bundle.iter().next().expect("can't route empty bundle");
+            route_capability_inner::<DirEntry, _>(
+                &target.component_sandbox().await?.component_output.capabilities(),
+                first_expose.target_name(),
+                service_metadata(*first_expose.availability()),
+                target,
+            )
+            .await
         }
         RouteRequest::ExposeRunner(expose_runner_decl) => {
             let sandbox = target.component_sandbox().await?;
@@ -427,7 +435,13 @@ where
             .await
         }
         RouteRequest::UseService(use_service_decl) => {
-            route_service(use_service_decl, target, mapper).await
+            route_capability_inner::<DirEntry, _>(
+                &target.component_sandbox().await?.program_input.namespace(),
+                &use_service_decl.target_path,
+                service_metadata(use_service_decl.availability),
+                target,
+            )
+            .await
         }
         RouteRequest::UseStorage(use_storage_decl) => {
             route_storage(use_storage_decl, target, mapper).await
@@ -485,8 +499,23 @@ where
         RouteRequest::OfferStorage(offer_storage_decl) => {
             route_storage_from_offer(offer_storage_decl, target, mapper).await
         }
-        RouteRequest::OfferService(offer_service_decl) => {
-            route_service_from_offer(offer_service_decl, target, mapper).await
+        RouteRequest::OfferService(offer_service_bundle) => {
+            let first_offer = offer_service_bundle.iter().next().expect("can't route empty bundle");
+            let target_dictionary = get_dictionary_for_offer_target(target, first_offer).await?;
+            let metadata = service_metadata(first_offer.availability);
+            metadata
+                .insert(
+                    Name::new(crate::bedrock::with_policy_check::SKIP_POLICY_CHECKS).unwrap(),
+                    Capability::Data(Data::Uint64(1)),
+                )
+                .unwrap();
+            route_capability_inner::<DirEntry, _>(
+                &target_dictionary,
+                &first_offer.target_name,
+                metadata,
+                target,
+            )
+            .await
         }
         RouteRequest::OfferEventStream(offer_event_stream_decl) => {
             route_event_stream_from_offer(offer_event_stream_decl, target, mapper).await
@@ -680,30 +709,6 @@ where
     Ok(RouteSource::new_with_relative_path(source, state.subdir))
 }
 
-async fn route_service_from_offer<C>(
-    offer_bundle: RouteBundle<OfferServiceDecl>,
-    target: &Arc<C>,
-    mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource, RoutingError>
-where
-    C: ComponentInstanceInterface + 'static,
-{
-    // TODO(https://fxbug.dev/42124541): Figure out how to set the availability when `offer_bundle` contains
-    // multiple routes with different availabilities. It's possible that manifest validation should
-    // disallow this. For now, just pick the first.
-    let mut availability_visitor = offer_bundle.iter().next().unwrap().availability;
-    let allowed_sources = Sources::new(CapabilityTypeName::Service).component().collection();
-    let source = legacy_router::route_from_offer(
-        offer_bundle.map(Into::into),
-        target.clone(),
-        allowed_sources,
-        &mut availability_visitor,
-        mapper,
-    )
-    .await?;
-    Ok(RouteSource::new(source))
-}
-
 /// Routes an EventStream capability from `target` to its source, starting from `offer_decl`.
 async fn route_event_stream_from_offer<C>(
     offer_decl: OfferEventStreamDecl,
@@ -782,70 +787,6 @@ where
         target.clone(),
         allowed_sources,
         &mut NoopVisitor::new(),
-        mapper,
-    )
-    .await?;
-
-    target.policy_checker().can_route_capability(&source, target.moniker())?;
-    Ok(RouteSource::new(source))
-}
-
-async fn route_service<C>(
-    use_decl: UseServiceDecl,
-    target: &Arc<C>,
-    mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource, RoutingError>
-where
-    C: ComponentInstanceInterface + 'static,
-{
-    match use_decl.source {
-        UseSource::Self_ => {
-            let mut availability_visitor = use_decl.availability;
-            let allowed_sources = Sources::new(CapabilityTypeName::Service).component();
-            let source = legacy_router::route_from_self(
-                use_decl.into(),
-                target.clone(),
-                allowed_sources,
-                &mut availability_visitor,
-                mapper,
-            )
-            .await?;
-            Ok(RouteSource::new(source))
-        }
-        _ => {
-            let mut availability_visitor = use_decl.availability;
-            let allowed_sources =
-                Sources::new(CapabilityTypeName::Service).component().collection();
-            let source = legacy_router::route_from_use(
-                use_decl.into(),
-                target.clone(),
-                allowed_sources,
-                &mut availability_visitor,
-                mapper,
-            )
-            .await?;
-
-            target.policy_checker().can_route_capability(&source, target.moniker())?;
-            Ok(RouteSource::new(source))
-        }
-    }
-}
-
-async fn route_service_from_expose<C>(
-    expose_bundle: RouteBundle<ExposeServiceDecl>,
-    target: &Arc<C>,
-    mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource, RoutingError>
-where
-    C: ComponentInstanceInterface + 'static,
-{
-    let mut availability_visitor = expose_bundle.availability().clone();
-    let allowed_sources = Sources::new(CapabilityTypeName::Service).component().collection();
-    let source = legacy_router::route_from_expose(
-        expose_bundle.map(Into::into),
-        target.clone(),
-        allowed_sources,
-        &mut availability_visitor,
         mapper,
     )
     .await?;
