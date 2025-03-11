@@ -877,6 +877,7 @@ class VmCowPages final : public VmHierarchyBase,
       TA_REQ(lock());
 
   friend class fbl::RefPtr<VmCowPages>;
+  friend class LockedParentWalker;
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(VmCowPages);
 
@@ -1029,20 +1030,21 @@ class VmCowPages final : public VmHierarchyBase,
   // See |ForEveryOwnedHierarchyPageInRange|. Each entry given to `T` is constant and may not be
   // modified in any way.
   template <typename T>
-  zx_status_t ForEveryOwnedHierarchyPageInRangeLocked(T func, uint64_t offset, uint64_t size) const
-      TA_REQ(lock());
+  zx_status_t ForEveryOwnedHierarchyPageInRangeLocked(T func, uint64_t offset, uint64_t size,
+                                                      const LockedPtr& parent) const TA_REQ(lock());
 
   // See |ForEveryOwnedHierarchyPageInRange|. Each entry given to `T` is a VmPageOrMarkerRef, which
   // supports limited mutation.
   template <typename T>
-  zx_status_t ForEveryOwnedMutableHierarchyPageInRangeLocked(T func, uint64_t offset, uint64_t size)
+  zx_status_t ForEveryOwnedMutableHierarchyPageInRangeLocked(T func, uint64_t offset, uint64_t size,
+                                                             const LockedPtr& parent)
       TA_REQ(lock());
 
   // See |ForEveryOwnedHierarchyPageInRange|. Each entry given to `T` is mutable and `T` may modify
   // it or replace it with an empty entry.
   template <typename T>
-  zx_status_t RemoveOwnedHierarchyPagesInRangeLocked(T func, uint64_t offset, uint64_t size)
-      TA_REQ(lock());
+  zx_status_t RemoveOwnedHierarchyPagesInRangeLocked(T func, uint64_t offset, uint64_t size,
+                                                     const LockedPtr& parent) TA_REQ(lock());
 
   // Iterates a range within a visible node, invoking a callback for every `VmPageListEntry` the
   // node owns (fully or partially) in that range.
@@ -1063,6 +1065,8 @@ class VmCowPages final : public VmHierarchyBase,
   //  * `func`: Callback function invoked for each non-empty entry.
   //  * `offset`: Offset relative to `self` to begin iterating at.
   //  * `size`: Size of the range to iterate.
+  //  * `parent`: If the caller has locked the immediate parent, then it can pass it in here to
+  //              avoid double locking, otherwise if no parent or not locked a nullptr can be given.
   //
   // The type `S` must be implicitly convertible to a `VmCowPages` or a `const VmCowPages`.
   // The type `P` is `const VmPageOrMarker` if `S` is const, otherwise it is `VmPageOrMarker`.
@@ -1077,7 +1081,8 @@ class VmCowPages final : public VmHierarchyBase,
   // from the failing `func` invocation.
   template <typename P, typename S, typename T>
   static zx_status_t ForEveryOwnedHierarchyPageInRange(S* self, T func, uint64_t offset,
-                                                       uint64_t size) TA_REQ(self->lock());
+                                                       uint64_t size, const LockedPtr& parent)
+      TA_REQ(self->lock());
 
   // Changes a Reference in the provided VmPageOrMarker into a real vm_page_t. The allocated page
   // is assumed to be for this VmCowPages, and so uses the pmm_alloc_flags_, but it is not assumed

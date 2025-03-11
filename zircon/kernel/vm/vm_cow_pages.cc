@@ -166,6 +166,63 @@ VmObjectPaged* paged_backlink_locked(VmCowPages* cow) TA_REQ(cow->lock())
 
 }  // namespace
 
+// Helper for walking up a VmCowPages hierarchy where the start node is locked, and the immediate
+// parent may or may not be locked.
+class LockedParentWalker {
+ public:
+  // Construct the parent walker with a reference to a LockedPtr of any locked parent. The
+  // referenced LockedPtr can be empty if the immediate parent is either not locked, or does not
+  // exist. It is the callers responsibility to ensure the LockedPtr lives long enough.
+  explicit LockedParentWalker(const VmCowPages::LockedPtr& maybe_locked_parent)
+      : pre_locked_parent_(maybe_locked_parent) {}
+
+  // Returns a locked reference to the current node in the walk. The TA_ASSERT is deemed correct as
+  // all code paths return a `LockedPtr::locked*` method, that themselves have a TA_ASSERT.
+  VmCowPages& current(VmCowPages* self) const TA_REQ(self->lock()) TA_ASSERT(current(self).lock()) {
+    if (current_is_pre_locked_parent_) {
+      return pre_locked_parent_.locked();
+    }
+    return current_.locked_or(self);
+  }
+  const VmCowPages& current(const VmCowPages* self) const TA_REQ(self->lock())
+      TA_ASSERT(current(self).lock()) {
+    if (current_is_pre_locked_parent_) {
+      return pre_locked_parent_.locked();
+    }
+    return current_.locked_or(self);
+  }
+
+  // Resets the walker to its initial state, allowing for a new walk.
+  void reset() {
+    current_.release();
+    current_is_pre_locked_parent_ = false;
+  }
+
+  // Walk up the hierarchy, changing the current node to the current nodes parent. It is an error to
+  // call this if current has no parent.
+  void WalkUp(const VmCowPages* self) TA_REQ(self->lock()) {
+    VmCowPages* next = current(self).parent_.get();
+    DEBUG_ASSERT(next);
+    // If the next node in the chain matches the pre locked parent, then use that, otherwise move
+    // current_ up and acquire the lock.
+    if (next == pre_locked_parent_.get()) {
+      // Double check that the pre_locked_parent_ is actually the immediate parent.
+      DEBUG_ASSERT(self->parent_.get() == next);
+      current_is_pre_locked_parent_ = true;
+    } else {
+      current_is_pre_locked_parent_ = false;
+      current_ = VmCowPages::LockedPtr(next, next->lock_order(), VmLockAcquireMode::Reentrant);
+    }
+  }
+
+ private:
+  // Tracks whether a call to |current| should return the |pre_locked_locked_parent_|, or the normal
+  // |current_| tracker.
+  bool current_is_pre_locked_parent_ = false;
+  const VmCowPages::LockedPtr& pre_locked_parent_;
+  VmCowPages::LockedPtr current_;
+};
+
 // Helper class for collecting pages to performed batched Removes from the page queue to not incur
 // its spinlock overhead for every single page. Pages that it removes from the page queue get placed
 // into a provided list. Note that pages are not moved into the list until *after* Flush has been
@@ -611,25 +668,29 @@ VmCowPages::~VmCowPages() {
 
 template <typename T>
 zx_status_t VmCowPages::ForEveryOwnedHierarchyPageInRangeLocked(T func, uint64_t offset,
-                                                                uint64_t size) const {
-  return ForEveryOwnedHierarchyPageInRange<const VmPageOrMarker*>(this, func, offset, size);
+                                                                uint64_t size,
+                                                                const LockedPtr& parent) const {
+  return ForEveryOwnedHierarchyPageInRange<const VmPageOrMarker*>(const_cast<VmCowPages*>(this),
+                                                                  func, offset, size, parent);
 }
 
 template <typename T>
 zx_status_t VmCowPages::ForEveryOwnedMutableHierarchyPageInRangeLocked(T func, uint64_t offset,
-                                                                       uint64_t size) {
-  return ForEveryOwnedHierarchyPageInRange<VmPageOrMarkerRef>(this, func, offset, size);
+                                                                       uint64_t size,
+                                                                       const LockedPtr& parent) {
+  return ForEveryOwnedHierarchyPageInRange<VmPageOrMarkerRef>(this, func, offset, size, parent);
 }
 
 template <typename T>
 zx_status_t VmCowPages::RemoveOwnedHierarchyPagesInRangeLocked(T func, uint64_t offset,
-                                                               uint64_t size) {
-  return ForEveryOwnedHierarchyPageInRange<VmPageOrMarker*>(this, func, offset, size);
+                                                               uint64_t size,
+                                                               const LockedPtr& parent) {
+  return ForEveryOwnedHierarchyPageInRange<VmPageOrMarker*>(this, func, offset, size, parent);
 }
 
 template <typename P, typename S, typename T>
 zx_status_t VmCowPages::ForEveryOwnedHierarchyPageInRange(S* self, T func, uint64_t offset,
-                                                          uint64_t size) {
+                                                          uint64_t size, const LockedPtr& parent) {
   DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
   DEBUG_ASSERT(IS_PAGE_ALIGNED(size));
 
@@ -637,23 +698,24 @@ zx_status_t VmCowPages::ForEveryOwnedHierarchyPageInRange(S* self, T func, uint6
   uint64_t end_in_self = CheckedAdd(offset, size);
   uint64_t start_in_cur = start_in_self;
   uint64_t end_in_cur = end_in_self;
-  S* cur = self;
+
+  LockedParentWalker walker(parent);
 
   while (start_in_self < end_in_self) {
-    AssertHeld(cur->lock_ref());
-
     // Early out if the current node is empty.
     // TODO(https://fxbug.dev/338300943): This early out shouldn't be necessary as long as the
     // VmPageList iterator functions like `ForEveryPageInRange` early out instead. Microbenchmarks
     // slightly regressed when we attempted this though. Investigate adding the `IsEmpty` early-out
     // to the VMPageList methods and removing this block.
-    if (cur->page_list_.IsEmpty()) {
-      if (cur->is_parent_hidden_locked() && start_in_cur < cur->parent_limit_) {
+    if (walker.current(self).page_list_.IsEmpty()) {
+      if (walker.current(self).is_parent_hidden_locked() &&
+          start_in_cur < walker.current(self).parent_limit_) {
         // Some of this range within the parent node is still owned by `self`, so walk up and
         // process the range from within the parent instead.
-        start_in_cur = start_in_cur + cur->parent_offset_;
-        end_in_cur = ktl::min(end_in_cur, cur->parent_limit_) + cur->parent_offset_;
-        cur = cur->parent_.get();
+        start_in_cur = start_in_cur + walker.current(self).parent_offset_;
+        end_in_cur = ktl::min(end_in_cur, walker.current(self).parent_limit_) +
+                     walker.current(self).parent_offset_;
+        walker.WalkUp(self);
       } else {
         // The range within the current node is owned by `self`, but the same range is not owned by
         // `self` within the parent node. Either:
@@ -664,7 +726,7 @@ zx_status_t VmCowPages::ForEveryOwnedHierarchyPageInRange(S* self, T func, uint6
         start_in_self += end_in_cur - start_in_cur;
         start_in_cur = start_in_self;
         end_in_cur = end_in_self;
-        cur = self;
+        walker.reset();
       }
 
       continue;
@@ -674,25 +736,25 @@ zx_status_t VmCowPages::ForEveryOwnedHierarchyPageInRange(S* self, T func, uint6
     // impact on code size.
     bool stopped_early = false;
     bool walk_up = false;
-    auto page_callback = [func, cur, cur_to_self = start_in_cur - start_in_self, &stopped_early](
-                             auto p, uint64_t page_offset) __ALWAYS_INLINE {
-      zx_status_t status = func(p, cur, page_offset - cur_to_self, page_offset);
+    auto page_callback = [func, &walker, self, cur_to_self = start_in_cur - start_in_self,
+                          &stopped_early](auto p, uint64_t page_offset) __ALWAYS_INLINE {
+      AssertHeld(self->lock_ref());
+      zx_status_t status = func(p, &walker.current(self), page_offset - cur_to_self, page_offset);
       if (status == ZX_ERR_STOP) {
         stopped_early = true;
       }
       return status;
     };
-    auto gap_callback = [&cur, &start_in_self, &start_in_cur, &end_in_cur, &walk_up](
-                            uint64_t gap_start_offset, uint64_t gap_end_offset) __ALWAYS_INLINE {
-      AssertHeld(cur->lock_ref());
-
+    auto gap_callback = [&](uint64_t gap_start_offset, uint64_t gap_end_offset) __ALWAYS_INLINE {
       // The gap is empty, so walk up if the parent is accessible from any part of it.
       // Mark the range immediately preceding the gap as processed.
-      if (gap_start_offset < cur->parent_limit_) {
+      AssertHeld(self->lock_ref());
+      if (gap_start_offset < walker.current(self).parent_limit_) {
         start_in_self += gap_start_offset - start_in_cur;
-        start_in_cur = gap_start_offset + cur->parent_offset_;
-        end_in_cur = ktl::min(gap_end_offset, cur->parent_limit_) + cur->parent_offset_;
-        cur = cur->parent_.get();
+        start_in_cur = gap_start_offset + walker.current(self).parent_offset_;
+        end_in_cur = ktl::min(gap_end_offset, walker.current(self).parent_limit_) +
+                     walker.current(self).parent_offset_;
+        walker.WalkUp(self);
         walk_up = true;
         return ZX_ERR_STOP;
       }
@@ -701,20 +763,21 @@ zx_status_t VmCowPages::ForEveryOwnedHierarchyPageInRange(S* self, T func, uint6
     };
 
     zx_status_t status = ZX_OK;
-    if (cur->is_parent_hidden_locked() && start_in_cur < cur->parent_limit_) {
+    if (walker.current(self).is_parent_hidden_locked() &&
+        start_in_cur < walker.current(self).parent_limit_) {
       // We know the parent is hidden here, so we may need to walk up into it if it's accessible
       // from any empty offset within the range.
       //
       // Otherwise process pages within the range directly owned by `cur`.
       if constexpr (ktl::is_same_v<P, VmPageOrMarker*>) {
-        status = cur->page_list_.RemovePagesAndIterateGaps(page_callback, gap_callback,
-                                                           start_in_cur, end_in_cur);
+        status = walker.current(self).page_list_.RemovePagesAndIterateGaps(
+            page_callback, gap_callback, start_in_cur, end_in_cur);
       } else if constexpr (ktl::is_same_v<P, VmPageOrMarkerRef>) {
-        status = cur->page_list_.ForEveryPageAndGapInRangeMutable(page_callback, gap_callback,
-                                                                  start_in_cur, end_in_cur);
+        status = walker.current(self).page_list_.ForEveryPageAndGapInRangeMutable(
+            page_callback, gap_callback, start_in_cur, end_in_cur);
       } else {
-        status = cur->page_list_.ForEveryPageAndGapInRange(page_callback, gap_callback,
-                                                           start_in_cur, end_in_cur);
+        status = walker.current(self).page_list_.ForEveryPageAndGapInRange(
+            page_callback, gap_callback, start_in_cur, end_in_cur);
       }
     } else {
       // There is either no parent here, or the parent is visible.
@@ -726,12 +789,14 @@ zx_status_t VmCowPages::ForEveryOwnedHierarchyPageInRange(S* self, T func, uint6
       // gaps and intervals, so save time by avoiding that and only processing pages directly owned
       // by `cur`.
       if constexpr (ktl::is_same_v<P, VmPageOrMarker*>) {
-        status = cur->page_list_.RemovePages(page_callback, start_in_cur, end_in_cur);
-      } else if constexpr (ktl::is_same_v<P, VmPageOrMarkerRef>) {
         status =
-            cur->page_list_.ForEveryPageInRangeMutable(page_callback, start_in_cur, end_in_cur);
+            walker.current(self).page_list_.RemovePages(page_callback, start_in_cur, end_in_cur);
+      } else if constexpr (ktl::is_same_v<P, VmPageOrMarkerRef>) {
+        status = walker.current(self).page_list_.ForEveryPageInRangeMutable(
+            page_callback, start_in_cur, end_in_cur);
       } else {
-        status = cur->page_list_.ForEveryPageInRange(page_callback, start_in_cur, end_in_cur);
+        status = walker.current(self).page_list_.ForEveryPageInRange(page_callback, start_in_cur,
+                                                                     end_in_cur);
       }
     }
     if (status != ZX_OK) {
@@ -749,7 +814,7 @@ zx_status_t VmCowPages::ForEveryOwnedHierarchyPageInRange(S* self, T func, uint6
       start_in_self += end_in_cur - start_in_cur;
       start_in_cur = start_in_self;
       end_in_cur = end_in_self;
-      cur = self;
+      walker.reset();
     }
   }
 
@@ -979,7 +1044,7 @@ void VmCowPages::AddBidirectionallyClonedChildLocked(uint64_t offset, uint64_t l
 
         return ZX_ERR_NEXT;
       },
-      offset, limit);
+      offset, limit, LockedPtr());
   DEBUG_ASSERT(status == ZX_OK);
 
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
@@ -1542,7 +1607,7 @@ VmCowPages::AttributionCounts VmCowPages::GetAttributedMemoryInRangeLocked(VmCow
         }
         return ZX_ERR_NEXT;
       },
-      range.offset, range.len);
+      range.offset, range.len, LockedPtr());
   DEBUG_ASSERT(status == ZX_OK);
 
   return counts;
@@ -1993,7 +2058,7 @@ void VmCowPages::ReleaseOwnedPagesLocked(uint64_t start, ScopedPageFreedList* fr
         }
         return ZX_ERR_NEXT;
       },
-      start, size_ - start);
+      start, size_ - start, LockedPtr());
   DEBUG_ASSERT(status == ZX_OK);
 
   // This node can no longer see into its parent in the range we just released.
@@ -4055,7 +4120,7 @@ zx_status_t VmCowPages::DecompressInRangeLocked(VmCowRange range, Guard<VmoLockT
           }
           return status;
         },
-        cur_offset, end_offset - cur_offset);
+        cur_offset, end_offset - cur_offset, LockedPtr());
     if (status == ZX_OK) {
       return ZX_OK;
     }
@@ -6415,7 +6480,7 @@ bool VmCowPages::DebugValidatePageSharingLocked() const {
 
               return ZX_ERR_NEXT;
             },
-            offset_in_parent - cur->parent_offset_, PAGE_SIZE);
+            offset_in_parent - cur->parent_offset_, PAGE_SIZE, LockedPtr());
       }
 
       // Our next node should be the next available child in some `children_list_`. We will walk up
