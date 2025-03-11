@@ -6,7 +6,7 @@
 
 use ::fidl::endpoints::RequestStream as _;
 use anyhow::{anyhow, Context as _, Error};
-use fidl_fuchsia_update_verify::{BlobfsVerifierMarker, NetstackVerifierMarker};
+use fidl_fuchsia_update_verify::HealthVerificationMarker;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::health::Reporter as _;
@@ -122,10 +122,9 @@ async fn fresh_run() -> Result<(), Error> {
     let reboot_proxy =
         connect_to_protocol::<fidl_fuchsia_hardware_power_statecontrol::AdminMarker>()
             .context("while connecting to power state control")?;
-    let blobfs_verifier = connect_to_protocol::<BlobfsVerifierMarker>()
-        .context("while connecting to blobfs verifier")?;
-    let netstack_verifier = connect_to_protocol::<NetstackVerifierMarker>()
-        .context("while connecting to netstack verifier")?;
+
+    let health_verification = connect_to_protocol::<HealthVerificationMarker>()
+        .context("while connecting to health verification")?;
 
     let (p_internal, p_external) = zx::EventPair::create();
     let p_internal_clone =
@@ -140,7 +139,7 @@ async fn fresh_run() -> Result<(), Error> {
             &boot_manager,
             &p_internal,
             unblocker,
-            &[&blobfs_verifier, &netstack_verifier],
+            &health_verification,
             verification_node_ref,
             commit_node_ref,
         )

@@ -22,8 +22,7 @@
             protocol: [
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.paver.Paver",
-                "fuchsia.update.verify.BlobfsVerifier",
-                "fuchsia.update.verify.NetstackVerifier",
+                "fuchsia.update.verify.HealthVerification",
             ],
         },
         {

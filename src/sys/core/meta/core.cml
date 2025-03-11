@@ -290,6 +290,7 @@
                 "fuchsia.power.CollaborativeRebootInitiator",
                 "fuchsia.power.internal.CollaborativeRebootScheduler",
                 "fuchsia.update.verify.BlobfsVerifier",
+                "fuchsia.update.verify.HealthVerification",
             ],
             from: "parent",
             to: "#system-update",

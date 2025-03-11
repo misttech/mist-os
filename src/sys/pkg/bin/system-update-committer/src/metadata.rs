@@ -4,12 +4,13 @@
 
 //! Handles interfacing with the boot metadata (e.g. verifying a slot, committing a slot, etc).
 
-use crate::metadata::verify::VerifierProxy;
 use commit::do_commit;
 use errors::MetadataError;
+use fidl_fuchsia_update_verify::HealthVerificationProxy;
 use futures::channel::oneshot;
+use inspect::write_to_inspect;
 use policy::PolicyEngine;
-use verify::do_health_verification;
+use std::time::Instant;
 use zx::{self as zx, EventPair, Peered};
 use {fidl_fuchsia_paver as paver, fuchsia_inspect as finspect};
 
@@ -18,7 +19,6 @@ mod configuration_without_recovery;
 mod errors;
 mod inspect;
 mod policy;
-mod verify;
 
 /// Puts BootManager metadata into a happy state, provided we believe the system can OTA.
 ///
@@ -36,7 +36,7 @@ pub async fn put_metadata_in_happy_state(
     boot_manager: &paver::BootManagerProxy,
     p_internal: &EventPair,
     unblocker: oneshot::Sender<()>,
-    verifiers: &[&dyn VerifierProxy],
+    health_verification: &HealthVerificationProxy,
     node: &finspect::Node,
     commit_inspect: &CommitInspect,
 ) -> Result<CommitResult, MetadataError> {
@@ -47,8 +47,16 @@ pub async fn put_metadata_in_happy_state(
             // At this point, the FIDL server should start responding to requests so that clients
             // can find out that the health verification is underway.
             unblocker = unblock_fidl_server(unblocker)?;
-            let () =
-                do_health_verification(verifiers, node).await.map_err(MetadataError::Verify)?;
+            let start_time = Instant::now();
+            let res_status =
+                health_verification.query_health_checks().await.map(zx::Status::from_raw);
+            let () = write_to_inspect(node, &res_status, start_time.elapsed());
+            let status = res_status.map_err(|e| {
+                MetadataError::HealthVerification(errors::HealthVerificationError::Fidl(e))
+            })?;
+            let () = Result::from(status).map_err(|e| {
+                MetadataError::HealthVerification(errors::HealthVerificationError::Unhealthy(e))
+            })?;
 
             let () =
                 do_commit(boot_manager, current_config).await.map_err(MetadataError::Commit)?;
@@ -114,41 +122,32 @@ fn unblock_fidl_server(
 // test the functionality at different layers.
 #[cfg(test)]
 mod tests {
-    use super::errors::{VerifyError, VerifyErrors, VerifyFailureReason, VerifySource};
+    use super::errors::HealthVerificationError;
     use super::*;
     use assert_matches::assert_matches;
     use configuration_without_recovery::ConfigurationWithoutRecovery;
     use fasync::OnSignals;
-    use fidl_fuchsia_update_verify::BlobfsVerifierProxy;
+    use fuchsia_async as fasync;
+    use mock_health_verification::MockHealthVerificationService;
     use mock_paver::{hooks as mphooks, MockPaverServiceBuilder, PaverEvent};
-    use mock_verifier::MockVerifierService;
     use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::Arc;
     use zx::{AsHandleRef, Status};
-    use {fidl_fuchsia_update_verify as fidl, fuchsia_async as fasync};
 
-    fn blobfs_verifier_and_call_count(
-        res: Result<(), fidl::VerifyError>,
-    ) -> (BlobfsVerifierProxy, Arc<AtomicU32>) {
+    fn health_verification_and_call_count(
+        status: zx::Status,
+    ) -> (HealthVerificationProxy, Arc<AtomicU32>) {
         let call_count = Arc::new(AtomicU32::new(0));
         let call_count_clone = Arc::clone(&call_count);
-        let verifier = Arc::new(MockVerifierService::new(move |_| {
+        let verification = Arc::new(MockHealthVerificationService::new(move || {
             call_count_clone.fetch_add(1, Ordering::SeqCst);
-            res
+            status
         }));
 
-        let (blobfs_verifier, server) = verifier.spawn_blobfs_verifier_service();
+        let (health_verification, server) = verification.spawn_health_verification_service();
         let () = server.detach();
 
-        (blobfs_verifier, call_count)
-    }
-
-    fn success_blobfs_verifier_and_call_count() -> (BlobfsVerifierProxy, Arc<AtomicU32>) {
-        blobfs_verifier_and_call_count(Ok(()))
-    }
-
-    fn failing_blobfs_verifier_and_call_count() -> (BlobfsVerifierProxy, Arc<AtomicU32>) {
-        blobfs_verifier_and_call_count(Err(fidl::VerifyError::Internal))
+        (health_verification, call_count)
     }
 
     /// When we don't support ABR, we should not update metadata.
@@ -162,14 +161,14 @@ mod tests {
         );
         let (p_internal, p_external) = EventPair::create();
         let (unblocker, unblocker_recv) = oneshot::channel();
-        let (blobfs_verifier, blobfs_verifier_call_count) =
-            success_blobfs_verifier_and_call_count();
+        let (health_verification, health_verification_call_count) =
+            health_verification_and_call_count(zx::Status::OK);
 
         put_metadata_in_happy_state(
             &paver.spawn_boot_manager_service(),
             &p_internal,
             unblocker,
-            &[&blobfs_verifier],
+            &health_verification,
             &finspect::Node::default(),
             &CommitInspect::new(finspect::Node::default()),
         )
@@ -182,7 +181,7 @@ mod tests {
             Ok(zx::Signals::USER_0)
         );
         assert_eq!(unblocker_recv.await, Ok(()));
-        assert_eq!(blobfs_verifier_call_count.load(Ordering::SeqCst), 0);
+        assert_eq!(health_verification_call_count.load(Ordering::SeqCst), 0);
     }
 
     /// When we're in recovery, we should not update metadata.
@@ -197,14 +196,14 @@ mod tests {
         );
         let (p_internal, p_external) = EventPair::create();
         let (unblocker, unblocker_recv) = oneshot::channel();
-        let (blobfs_verifier, blobfs_verifier_call_count) =
-            success_blobfs_verifier_and_call_count();
+        let (health_verification, health_verification_call_count) =
+            health_verification_and_call_count(zx::Status::OK);
 
         put_metadata_in_happy_state(
             &paver.spawn_boot_manager_service(),
             &p_internal,
             unblocker,
-            &[&blobfs_verifier],
+            &health_verification,
             &finspect::Node::default(),
             &CommitInspect::new(finspect::Node::default()),
         )
@@ -217,7 +216,7 @@ mod tests {
             Ok(zx::Signals::USER_0)
         );
         assert_eq!(unblocker_recv.await, Ok(()));
-        assert_eq!(blobfs_verifier_call_count.load(Ordering::SeqCst), 0);
+        assert_eq!(health_verification_call_count.load(Ordering::SeqCst), 0);
     }
 
     /// When the current slot is healthy, we should not update metadata.
@@ -235,14 +234,14 @@ mod tests {
         );
         let (p_internal, p_external) = EventPair::create();
         let (unblocker, unblocker_recv) = oneshot::channel();
-        let (blobfs_verifier, blobfs_verifier_call_count) =
-            success_blobfs_verifier_and_call_count();
+        let (health_verification, health_verification_call_count) =
+            health_verification_and_call_count(zx::Status::OK);
 
         put_metadata_in_happy_state(
             &paver.spawn_boot_manager_service(),
             &p_internal,
             unblocker,
-            &[&blobfs_verifier],
+            &health_verification,
             &finspect::Node::default(),
             &CommitInspect::new(finspect::Node::default()),
         )
@@ -263,7 +262,7 @@ mod tests {
             Ok(zx::Signals::USER_0)
         );
         assert_eq!(unblocker_recv.await, Ok(()));
-        assert_eq!(blobfs_verifier_call_count.load(Ordering::SeqCst), 0);
+        assert_eq!(health_verification_call_count.load(Ordering::SeqCst), 0);
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -292,14 +291,14 @@ mod tests {
         );
         let (p_internal, p_external) = EventPair::create();
         let (unblocker, unblocker_recv) = oneshot::channel();
-        let (blobfs_verifier, blobfs_verifier_call_count) =
-            success_blobfs_verifier_and_call_count();
+        let (health_verification, health_verification_call_count) =
+            health_verification_and_call_count(zx::Status::OK);
 
         put_metadata_in_happy_state(
             &paver.spawn_boot_manager_service(),
             &p_internal,
             unblocker,
-            &[&blobfs_verifier],
+            &health_verification,
             &finspect::Node::default(),
             &CommitInspect::new(finspect::Node::default()),
         )
@@ -322,7 +321,7 @@ mod tests {
         );
         assert_eq!(OnSignals::new(&p_external, zx::Signals::USER_0).await, Ok(zx::Signals::USER_0));
         assert_eq!(unblocker_recv.await, Ok(()));
-        assert_eq!(blobfs_verifier_call_count.load(Ordering::SeqCst), 1);
+        assert_eq!(health_verification_call_count.load(Ordering::SeqCst), 1);
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -348,14 +347,14 @@ mod tests {
         );
         let (p_internal, p_external) = EventPair::create();
         let (unblocker, unblocker_recv) = oneshot::channel();
-        let (blobfs_verifier, blobfs_verifier_call_count) =
-            failing_blobfs_verifier_and_call_count();
+        let (health_verification, health_verification_call_count) =
+            health_verification_and_call_count(zx::Status::INTERNAL);
 
         put_metadata_in_happy_state(
             &paver.spawn_boot_manager_service(),
             &p_internal,
             unblocker,
-            &[&blobfs_verifier],
+            &health_verification,
             &finspect::Node::default(),
             &CommitInspect::new(finspect::Node::default()),
         )
@@ -365,7 +364,7 @@ mod tests {
         assert_eq!(paver.take_events(), vec![PaverEvent::QueryCurrentConfiguration,]);
         assert_eq!(OnSignals::new(&p_external, zx::Signals::USER_0).await, Ok(zx::Signals::USER_0));
         assert_eq!(unblocker_recv.await, Ok(()));
-        assert_eq!(blobfs_verifier_call_count.load(Ordering::SeqCst), 0);
+        assert_eq!(health_verification_call_count.load(Ordering::SeqCst), 0);
     }
 
     /// When we fail to verify and the config says to not ignore, we should report an error.
@@ -382,26 +381,26 @@ mod tests {
         );
         let (p_internal, p_external) = EventPair::create();
         let (unblocker, unblocker_recv) = oneshot::channel();
-        let (blobfs_verifier, blobfs_verifier_call_count) =
-            failing_blobfs_verifier_and_call_count();
+        let (health_verification, health_verification_call_count) =
+            health_verification_and_call_count(zx::Status::INTERNAL);
 
-        let res = put_metadata_in_happy_state(
+        let result = put_metadata_in_happy_state(
             &paver.spawn_boot_manager_service(),
             &p_internal,
             unblocker,
-            &[&blobfs_verifier],
+            &health_verification,
             &finspect::Node::default(),
             &CommitInspect::new(finspect::Node::default()),
         )
         .await;
 
-        let errors = assert_matches!(
-            res,
-            Err(MetadataError::Verify(VerifyErrors::VerifyErrors(s))) => s);
         assert_matches!(
-            errors[..],
-            [VerifyError::VerifyError(VerifySource::Blobfs, VerifyFailureReason::Verify(_), _)]
+            result,
+            Err(MetadataError::HealthVerification(HealthVerificationError::Unhealthy(
+                Status::INTERNAL
+            )))
         );
+
         assert_eq!(
             paver.take_events(),
             vec![
@@ -416,7 +415,7 @@ mod tests {
             Err(zx::Status::TIMED_OUT)
         );
         assert_eq!(unblocker_recv.await, Ok(()));
-        assert_eq!(blobfs_verifier_call_count.load(Ordering::SeqCst), 1);
+        assert_eq!(health_verification_call_count.load(Ordering::SeqCst), 1);
     }
 
     #[fasync::run_singlethreaded(test)]
