@@ -22,6 +22,7 @@ use fuchsia_async::{self as fasync, DurationExt, TimeoutExt as _};
 use futures::future::{self, LocalBoxFuture};
 use futures::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use futures::{Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
+use heck::ToSnakeCase as _;
 use net_declare::{
     fidl_ip_v4, fidl_ip_v6, fidl_mac, fidl_socket_addr, fidl_subnet, net_addr_subnet, net_ip_v4,
     net_ip_v6, net_subnet_v4, net_subnet_v6, std_ip, std_ip_v4, std_socket_addr,
@@ -3686,7 +3687,7 @@ async fn tcp_connect_icmp_error<N: Netstack, I: TestIpExt, M: IcmpMessage<I> + D
     let fake_ep = &fake_ep;
 
     let client = sandbox
-        .create_netstack_realm::<N, _>(format!("{}_client", name))
+        .create_netstack_realm::<N, _>(format!("{name}_{}", format!("{code:?}").to_snake_case()))
         .expect("failed to create client realm");
     let client_interface =
         client.join_network(&net, "client-ep").await.expect("failed to join network in realm");
@@ -3941,7 +3942,7 @@ async fn tcp_established_icmp_error<N: Netstack, I: TestIpExt, M: IcmpMessage<I>
     let fake_ep = net.create_fake_endpoint().expect("failed to create fake endpoint");
 
     let client = sandbox
-        .create_netstack_realm::<N, _>(format!("{}_client", name))
+        .create_netstack_realm::<N, _>(format!("{name}_{}", format!("{code:?}").to_snake_case()))
         .expect("failed to create client realm");
     let client_interface =
         client.join_network(&net, "client-ep").await.expect("failed to join network in realm");
