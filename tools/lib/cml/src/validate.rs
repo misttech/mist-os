@@ -731,17 +731,6 @@ which is almost certainly a mistake: {}",
             checker.validate("exposed")?;
         }
 
-        // Ensure that if the expose target is framework, the source target is self always.
-        if expose.to == Some(ExposeToRef::Framework) {
-            match &expose.from {
-                OneOrMany::One(ExposeFromRef::Self_) => {}
-                OneOrMany::Many(vec) if vec.iter().all(|from| *from == ExposeFromRef::Self_) => {}
-                _ => {
-                    return Err(Error::validate("Expose to framework can only be done from self."))
-                }
-            }
-        }
-
         // Ensure directory rights are valid.
         if let Some(_) = expose.directory.as_ref() {
             if expose.from.iter().any(|r| *r == ExposeFromRef::Self_) || expose.rights.is_some() {
@@ -4169,25 +4158,6 @@ mod tests {
             }),
             Ok(())
         ),
-        test_cml_expose_to_framework_invalid(
-            json!({
-                "expose": [
-                    {
-                        "directory": "foo",
-                        "from": "#logger",
-                        "to": "framework"
-                    }
-                ],
-                "children": [
-                    {
-                        "name": "logger",
-                        "url": "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm"
-                    }
-                ]
-            }),
-            Err(Error::Validate { err, .. }) if &err == "Expose to framework can only be done from self."
-        ),
-
         // offer
         test_cml_offer(
             json!({
