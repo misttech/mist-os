@@ -34,6 +34,8 @@ rustc_library("libkmr_crypto_boring") {
   ]
   configs += [ ":with_boringssl_config" ]
   configs += [ "//src/lib/android:android_rust_config" ]
+
+  disable_clippy = true
 }
 
 config("with_boringssl_config") {
@@ -77,6 +79,8 @@ rustc_library("libkmr_common") {
     "//third_party/rust_crates:zeroize",
   ]
   configs += [ "//src/lib/android:android_rust_config" ]
+
+  disable_clippy = true
 }
 
 rustc_macro("libkmr_derive") {
@@ -89,6 +93,8 @@ rustc_macro("libkmr_derive") {
     "//third_party/rust_crates:quote",
     "//third_party/rust_crates:syn",
   ]
+
+  disable_clippy = true
 }
 
 rustc_library("libkmr_hal") {
@@ -117,6 +123,8 @@ rustc_library("libkmr_hal") {
   ]
   features = [ "hal_v2" ]
   configs += [ "//src/lib/android:android_rust_config" ]
+
+  disable_clippy = true
 }
 
 rustc_library("libkmr_ta") {
@@ -143,6 +151,8 @@ rustc_library("libkmr_ta") {
     "//third_party/rust_crates:x509-cert",
   ]
   configs += [ "//src/lib/android:android_rust_config" ]
+
+  disable_clippy = true
 }
 
 rustc_library("libkmr_wire_v2") {
@@ -166,6 +176,8 @@ rustc_library("libkmr_wire_v2") {
     "//third_party/rust_crates:zeroize",
   ]
   features = [ "hal_v2" ]
+
+  disable_clippy = true
 }
 
 rustc_library("libkmr_wire_v4") {
@@ -193,4 +205,6 @@ rustc_library("libkmr_wire_v4") {
     "hal_v3",
     "hal_v4",
   ]
+
+  disable_clippy = true
 }
