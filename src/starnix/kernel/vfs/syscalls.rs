@@ -3435,6 +3435,15 @@ mod arch32 {
         )
     }
 
+    pub fn sys_arch32_symlink(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        user_target: UserCString,
+        user_path: UserCString,
+    ) -> Result<(), Errno> {
+        super::sys_symlinkat(locked, current_task, user_target, FdNumber::AT_FDCWD, user_path)
+    }
+
     pub use super::{
         sys_epoll_ctl as sys_arch32_epoll_ctl, sys_fchmod as sys_arch32_fchmod,
         sys_fchown as sys_arch32_fchown32, sys_fchown as sys_arch32_fchown,
