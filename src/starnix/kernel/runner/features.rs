@@ -102,7 +102,6 @@ impl Features {
                         enable_visual_debugging,
                         default_uid,
                         default_seclabel,
-                        default_fsseclabel,
                         default_ns_mount_options,
                     },
                 selinux,
@@ -172,10 +171,6 @@ impl Features {
                     kernel_node.record_string(
                         "default_seclabel",
                         default_seclabel.as_deref().unwrap_or_default(),
-                    );
-                    kernel_node.record_string(
-                        "default_fsseclabel",
-                        default_fsseclabel.as_ref().map_or("", |s| s),
                     );
                     inspect_node.record_string(
                         "default_ns_mount_options",

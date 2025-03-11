@@ -82,9 +82,6 @@ struct ComponentProgram {
 
     #[serde(default)]
     seclabel: Option<CString>,
-
-    #[serde(default)]
-    fsseclabel: Option<String>,
 }
 
 impl ComponentProgram {
@@ -146,25 +143,14 @@ pub async fn start_component(
     program.resolve_templates(&component_path, &pkg_path);
     log_info!("start_component: {}\n{:#?}", url, program);
 
-    // If the component specifies a filesystem security label then it will be applied to all files
-    // in all directories mounted from the component's namespace.
-    let mount_seclabel = program
-        .fsseclabel
-        .as_deref()
-        .or_else(|| system_task.kernel().features.default_fsseclabel.as_deref());
     let ns_mount_options = system_task.kernel().features.default_ns_mount_options.as_ref();
     let mut maybe_pkg = None;
     let mut maybe_svc = None;
     for entry in ns {
         if let (Some(dir_path), Some(dir_handle)) = (entry.path, entry.directory) {
             let dir_path_str = dir_path.as_str();
-            let mount_options = match (
-                ns_mount_options.and_then(|mount_options| mount_options.get(dir_path_str).cloned()),
-                mount_seclabel,
-            ) {
-                (None, Some(mount_seclabel)) => Some(format!("context={}", mount_seclabel)),
-                (mount_options, _) => mount_options,
-            };
+            let mount_options =
+                ns_mount_options.and_then(|mount_options| mount_options.get(dir_path_str).cloned());
 
             match dir_path_str {
                 "/svc" => {

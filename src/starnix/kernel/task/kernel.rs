@@ -96,11 +96,6 @@ pub struct KernelFeatures {
     /// Components can override this by setting the `seclabel` field in their program block.
     pub default_seclabel: Option<String>,
 
-    /// The default fsseclabel that is applied to components that are run in this kernel.
-    ///
-    /// Components can override this by setting the `fsseclabel` field in their program block.
-    pub default_fsseclabel: Option<String>,
-
     /// The default mount options to use when mounting directories from a component's namespace.
     ///
     /// The key is the path in the component's namespace, and the value is the mount options

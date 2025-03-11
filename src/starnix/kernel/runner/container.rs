@@ -192,12 +192,6 @@ pub struct ContainerProgram {
     #[serde(default)]
     pub default_seclabel: Option<String>,
 
-    /// The default fsseclabel that is applied to components that are instantiated in this container.
-    ///
-    /// Components can override this by setting the `fsseclabel` field in their program block.
-    #[serde(default)]
-    pub default_fsseclabel: Option<String>,
-
     /// The default uid that is applied to components that are instantiated in this container.
     ///
     /// Components can override this by setting the `uid` field in their program block.
