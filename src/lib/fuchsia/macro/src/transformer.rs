@@ -7,8 +7,7 @@ use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned, TokenStreamExt};
 use syn::parse::{Parse, ParseStream};
 use syn::{
-    Attribute, Block, Error, Expr, Ident, ItemFn, LitBool, LitInt, LitStr, Signature, Token,
-    Visibility,
+    Attribute, Block, Error, Expr, Ident, ItemFn, LitBool, LitStr, Signature, Token, Visibility,
 };
 
 #[derive(Clone, Copy)]
@@ -19,19 +18,20 @@ enum FunctionType {
 
 // How should code be executed?
 #[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
 enum Executor {
     // Directly by calling it
     None { thread_role: Option<Expr> },
     // fasync::run_singlethreaded
     Singlethreaded { thread_role: Option<Expr> },
     // fasync::run
-    Multithreaded { threads: usize, thread_role: Option<Expr> },
+    Multithreaded { threads: Expr, thread_role: Option<Expr> },
     // #[test]
     Test,
     // fasync::run_singlethreaded(test)
     SinglethreadedTest,
     // fasync::run(test)
-    MultithreadedTest { threads: usize },
+    MultithreadedTest { threads: Expr },
     // fasync::run_until_stalled
     UntilStalledTest,
 }
@@ -111,7 +111,7 @@ pub struct Transformer {
 }
 
 struct Args {
-    threads: usize,
+    threads: Option<Expr>,
     thread_role: Option<Expr>,
     allow_stalls: Option<bool>,
     logging: bool,
@@ -206,14 +206,6 @@ fn get_arg<T: Parse>(p: &ParseStream<'_>) -> syn::Result<T> {
     p.parse()
 }
 
-fn get_base10_arg<T>(p: &ParseStream<'_>) -> syn::Result<T>
-where
-    T: std::str::FromStr,
-    T::Err: std::fmt::Display,
-{
-    get_arg::<LitInt>(p)?.base10_parse()
-}
-
 fn get_bool_arg(p: &ParseStream<'_>, if_present: bool) -> syn::Result<bool> {
     if p.peek(Token![=]) {
         Ok(get_arg::<LitBool>(p)?.value)
@@ -238,7 +230,7 @@ fn get_interest_arg(input: &ParseStream<'_>) -> syn::Result<Interest> {
 impl Parse for Args {
     fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
         let mut args = Self {
-            threads: 1,
+            threads: None,
             thread_role: None,
             allow_stalls: None,
             logging: true,
@@ -257,7 +249,7 @@ impl Parse for Args {
             let ident: Ident = input.parse()?;
             let err = |message| Err(Error::new(ident.span(), message));
             match ident.to_string().as_ref() {
-                "threads" => args.threads = get_base10_arg(&input)?,
+                "threads" => args.threads = Some(get_arg::<Expr>(&input)?),
                 "thread_role" => args.thread_role = Some(get_arg::<Expr>(&input)?),
                 "allow_stalls" => args.allow_stalls = Some(get_bool_arg(&input, true)?),
                 "logging" => args.logging = get_bool_arg(&input, true)?,
@@ -308,31 +300,32 @@ impl Transformer {
 
         let executor =
             match (args.threads, args.allow_stalls, args.thread_role, is_async, function_type) {
-                (0, _, _, _, _) => return err("need at least one thread"),
                 (_, _, Some(_), _, FunctionType::Test) => {
                     return err("thread_role cannot be applied to tests")
                 }
                 (_, Some(_), _, _, FunctionType::Component) => {
                     return err("allow_stalls only applies to tests")
                 }
-                (1, _, thread_role, false, FunctionType::Component) => {
+                (None, _, thread_role, false, FunctionType::Component) => {
                     Executor::None { thread_role }
                 }
-                (1, None, thread_role, true, FunctionType::Component) => {
+                (None, None, thread_role, true, FunctionType::Component) => {
                     Executor::Singlethreaded { thread_role }
                 }
-                (threads, None, thread_role, true, FunctionType::Component) => {
+                (Some(threads), None, thread_role, true, FunctionType::Component) => {
                     Executor::Multithreaded { threads, thread_role }
                 }
-                (1, Some(_), _, false, FunctionType::Test) => {
+                (None, Some(_), _, false, FunctionType::Test) => {
                     return err("allow_stalls only applies to async tests")
                 }
-                (1, None, _, false, FunctionType::Test) => Executor::Test,
-                (1, Some(true) | None, _, true, FunctionType::Test) => Executor::SinglethreadedTest,
-                (threads, Some(true) | None, _, true, FunctionType::Test) => {
+                (None, None, _, false, FunctionType::Test) => Executor::Test,
+                (None, Some(true) | None, _, true, FunctionType::Test) => {
+                    Executor::SinglethreadedTest
+                }
+                (Some(threads), Some(true) | None, _, true, FunctionType::Test) => {
                     Executor::MultithreadedTest { threads }
                 }
-                (1, Some(false), _, true, FunctionType::Test) => Executor::UntilStalledTest,
+                (None, Some(false), _, true, FunctionType::Test) => Executor::UntilStalledTest,
                 (_, Some(false), _, _, FunctionType::Test) => {
                     return err("allow_stalls=false tests must be single threaded")
                 }
