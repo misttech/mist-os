@@ -10,7 +10,7 @@ use super::typeface::{
 use super::AssetId;
 use fidl_fuchsia_fonts::GenericFontFamily;
 use fuchsia_inspect as finspect;
-use heck::KebabCase;
+use heck::ToKebabCase;
 use itertools::Itertools;
 use manifest::serde_ext::StyleOptions;
 use manifest::v2;

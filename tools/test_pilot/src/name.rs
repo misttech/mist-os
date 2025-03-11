@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::schema::Schema;
-use heck::{ShoutySnakeCase, SnakeCase};
+use heck::{ToShoutySnakeCase, ToSnakeCase};
 use serde::Deserialize;
 
 const VAR_PREFIX: &str = "FUCHSIA_";

@@ -121,7 +121,7 @@ glob = "0.3.2"
 gpt = "3.0.0"
 half = "2.4.1"
 handlebars = "4.3.5"
-heck = "0.3.1"
+heck = "0.4.1"
 hex = { version = "0.4.3", features = ["serde"] }
 hkdf = "0.12.3"
 hmac = "0.12.1"
@@ -632,6 +632,10 @@ license_files = ["LICENSE-APACHE"]
 [gn.package.handlebars."4.3.5"]
 # pest relies on this being set to find the grammar file
 env_vars = [ "CARGO_MANIFEST_DIR=${gn_source_root}/third_party/rust_crates/vendor/handlebars-4.3.5" ]
+
+[gn.package.heck."0.3.1"]
+# TODO(https://fxbug.dev/402302539) starnix tests rely on the older semantics of to_camel_case()
+visibility = [ "//src/sys/test_runners/starnix:*", "//third_party/rust_crates:*" ]
 
 [gn.package.httparse."1.9.4"]
 rustflags = [

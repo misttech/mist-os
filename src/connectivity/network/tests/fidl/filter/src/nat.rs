@@ -13,7 +13,7 @@ use fidl_fuchsia_net_filter_ext::{
     Action, AddressMatcher, AddressMatcherType, InterfaceMatcher, Matchers, NatHook, PortRange,
 };
 use fidl_fuchsia_net_routes as fnet_routes;
-use heck::SnakeCase as _;
+use heck::ToSnakeCase as _;
 use net_types::ip::IpAddress as _;
 use net_types::Witness as _;
 use netstack_testing_macros::netstack_test;

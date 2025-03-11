@@ -4,7 +4,7 @@
 
 use anyhow::{anyhow, Error};
 use fidl_ir_lib::fidl::{self, *};
-use heck::SnakeCase;
+use heck::ToSnakeCase;
 use std::iter;
 
 static ATTR_NAME_DERIVE_DEBUG: &'static str = "derive_debug";

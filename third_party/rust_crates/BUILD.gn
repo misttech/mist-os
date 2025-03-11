@@ -406,7 +406,7 @@ group("handlebars") {
 }
 
 group("heck") {
-  public_deps = [ ":heck-v0_3_1" ]
+  public_deps = [ ":heck-v0_4_1" ]
 }
 
 group("hex") {
@@ -7222,7 +7222,9 @@ rust_library("heck-v0_3_1") {
     "-Cextra-filename=-e3dad0497ab5b0fe",
   ]
 
-  visibility = [ ":*" ]
+  visibility = []
+  visibility += [ "//src/sys/test_runners/starnix:*" ]
+  visibility += [ "//third_party/rust_crates:*" ]
 
   applicable_licenses = [ ":heck-v0_3_1.license" ]
 }

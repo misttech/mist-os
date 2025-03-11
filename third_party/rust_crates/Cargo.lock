@@ -1533,7 +1533,7 @@ dependencies = [
  "gpt",
  "half",
  "handlebars",
- "heck 0.3.1",
+ "heck 0.4.1",
  "hex 0.4.3",
  "hkdf",
  "hmac",

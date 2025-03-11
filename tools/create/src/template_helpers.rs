@@ -3,10 +3,9 @@
 // found in the LICENSE file.
 
 use handlebars::{handlebars_helper, Handlebars};
-use heck::{CamelCase, ShoutySnakeCase, SnekCase};
+use heck::{ToPascalCase, ToShoutySnakeCase, ToSnekCase};
 
-// heck::CamelCase is actually PascalCase.
-handlebars_helper!(pascal_case: |arg: str| arg.to_camel_case());
+handlebars_helper!(pascal_case: |arg: str| arg.to_pascal_case());
 
 handlebars_helper!(snake_case: |arg: str| arg.to_snek_case());
 

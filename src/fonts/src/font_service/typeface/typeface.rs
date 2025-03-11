@@ -9,7 +9,7 @@ use fidl_fuchsia_fonts::{FamilyName, GenericFontFamily, Slant, Style2, TypefaceR
 use fidl_fuchsia_fonts_experimental::TypefaceInfo;
 use fidl_fuchsia_intl::LocaleId;
 use fuchsia_inspect as finspect;
-use heck::KebabCase;
+use heck::ToKebabCase;
 use itertools::Itertools;
 use manifest::v2;
 use std::collections::BTreeSet;

@@ -18,7 +18,7 @@ use fuchsia_async::{self as fasync, DurationExt as _, TimeoutExt as _};
 use futures::future::LocalBoxFuture;
 use futures::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryFutureExt as _};
-use heck::SnakeCase as _;
+use heck::ToSnakeCase as _;
 use log::info;
 use net_declare::fidl_subnet;
 use net_types::ip::{GenericOverIp, Ip, IpVersion, IpVersionMarker, Ipv4, Ipv6};

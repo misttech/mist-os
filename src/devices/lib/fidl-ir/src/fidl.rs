@@ -5,7 +5,7 @@
 // Based on https://fuchsia.googlesource.com/fuchsia/+/HEAD/tools/fidl/fidlc/schema.json
 
 use anyhow::{anyhow, Error};
-use heck::SnakeCase;
+use heck::ToSnakeCase;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize};
