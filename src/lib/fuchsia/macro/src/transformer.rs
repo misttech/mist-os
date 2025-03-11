@@ -31,7 +31,7 @@ enum Executor {
     // fasync::run_singlethreaded(test)
     SinglethreadedTest,
     // fasync::run(test)
-    MultithreadedTest(usize),
+    MultithreadedTest { threads: usize },
     // fasync::run_until_stalled
     UntilStalledTest,
 }
@@ -41,7 +41,7 @@ impl Executor {
         match self {
             Executor::Test
             | Executor::SinglethreadedTest
-            | Executor::MultithreadedTest(_)
+            | Executor::MultithreadedTest { .. }
             | Executor::UntilStalledTest => true,
             Executor::None { .. }
             | Executor::Singlethreaded { .. }
@@ -80,7 +80,9 @@ impl quote::ToTokens for Executor {
                 }
             }
             Executor::SinglethreadedTest => quote! { ::fuchsia::test_singlethreaded(func) },
-            Executor::MultithreadedTest(n) => quote! { ::fuchsia::test_multithreaded(func, #n) },
+            Executor::MultithreadedTest { threads } => {
+                quote! { ::fuchsia::test_multithreaded(func, #threads) }
+            }
             Executor::UntilStalledTest => quote! { ::fuchsia::test_until_stalled(func) },
         })
     }
@@ -327,8 +329,8 @@ impl Transformer {
                 }
                 (1, None, _, false, FunctionType::Test) => Executor::Test,
                 (1, Some(true) | None, _, true, FunctionType::Test) => Executor::SinglethreadedTest,
-                (n, Some(true) | None, _, true, FunctionType::Test) => {
-                    Executor::MultithreadedTest(n)
+                (threads, Some(true) | None, _, true, FunctionType::Test) => {
+                    Executor::MultithreadedTest { threads }
                 }
                 (1, Some(false), _, true, FunctionType::Test) => Executor::UntilStalledTest,
                 (_, Some(false), _, _, FunctionType::Test) => {
