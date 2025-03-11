@@ -295,8 +295,8 @@ enum StrictCheckErrorEnum {
     MustHaveMachineSpecified,
     #[error("ffx strict requires that the target be explicitly specified")]
     MustHaveTarget,
-    #[error("ffx strict requires that the Target be specified by address. Actually passed: \"{}\"", .0)]
-    TargetMustBeAddress(String),
+    #[error("ffx strict requires that the Target be specified by address or serial. Actually passed: \"{}\"", .0)]
+    TargetMustBeAddressOrSerial(String),
     #[error("ffx strict requires that the Target be a valid IP address. Invalid ID: \"{}\"", .0)]
     TargetAddressMustHaveValidScopeId(String),
     #[error("When running in strict mode, config flags must be list of Key Value Pairs or valid JSON. Passed: \"{}\"", .0)]
@@ -347,7 +347,12 @@ pub fn check_strict_constraints(ffx: &Ffx, requires_target: bool) -> Result<()> 
         match &ffx.target {
             None => errors.push(StrictCheckErrorEnum::MustHaveTarget),
             Some(t) => match netext::parse_address_parts(t.as_str()) {
-                Err(_) => errors.push(StrictCheckErrorEnum::TargetMustBeAddress(t.clone())),
+                Err(_) => {
+                    let re = regex::Regex::new(r"^\w{14}$").unwrap();
+                    if !re.is_match(t) {
+                        errors.push(StrictCheckErrorEnum::TargetMustBeAddressOrSerial(t.clone()));
+                    }
+                }
                 Ok((_, scope, _)) => {
                     if let Some(scope) = scope {
                         match netext::get_verified_scope_id(scope) {
@@ -672,7 +677,7 @@ mod test {
                     "echo",
                 ],
                 name: "Target must be SocketAddr".into(),
-                expected_errors: vec![StrictCheckErrorEnum::TargetMustBeAddress(
+                expected_errors: vec![StrictCheckErrorEnum::TargetMustBeAddressOrSerial(
                     "no waaaaaayyy".into(),
                 )],
             },
