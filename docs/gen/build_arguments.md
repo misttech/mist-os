@@ -722,7 +722,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8720783958784521617"`
+**Current value for `target_cpu = "arm64"`:** `"8720738653060496193"`
 
 From //out/not-default/args.gn:10
 
@@ -730,7 +730,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8720783958784521617"`
+**Current value for `target_cpu = "riscv64"`:** `"8720738653060496193"`
 
 From //out/not-default/args.gn:10
 
@@ -738,7 +738,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8720783958784521617"`
+**Current value for `target_cpu = "x64"`:** `"8720738653060496193"`
 
 From //out/not-default/args.gn:10
 
@@ -1213,7 +1213,7 @@ This should never be set as a build argument.
 }
   tsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
@@ -2359,7 +2359,7 @@ TODO(https://fxbug.dev/320511796): Cleanup when no longer necessary.
 
 **Current value (from the default):** `false`
 
-From //build/testing/boot_tests/kernel_zbi_test.gni:21
+From //build/testing/boot_tests/kernel_zbi_test.gni:22
 
 ### disable_elf_checks
 
@@ -3038,7 +3038,7 @@ which is a full system image generated for exfiltrating instrumentation data fro
 
 **Current value (from the default):** `false`
 
-From //build/testing/boot_tests/kernel_zbi_test.gni:17
+From //build/testing/boot_tests/kernel_zbi_test.gni:18
 
 ### generate_licenses_spdx_stubs
 
@@ -5027,7 +5027,15 @@ From //build/product.gni:11
 Skip generating a UEFI disk for a product whose board defines
 `build_uefi_disk`
 
-**Current value (from the default):** `false`
+**Current value for `target_cpu = "arm64"`:** `false`
+
+From //products/core.gni:28
+
+**Overridden from the default:** `true`
+
+From //build/images/args.gni:30
+
+**Current value (from the default):** `true`
 
 From //build/images/args.gni:30
 
@@ -5394,7 +5402,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"CjlIdo98pmS01_NpIXpOBEUQneRiJoJ6dH451H-Cp8oC"`
+**Current value (from the default):** `"8mnLlRMzmf2kuuAMl7YmrCJUSdEB_3_8eb0aZq6ON8cC"`
 
 From //build/rust/config.gni:42
 
