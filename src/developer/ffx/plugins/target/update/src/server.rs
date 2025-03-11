@@ -4,11 +4,9 @@
 
 use ffx_config::EnvironmentContext;
 use ffx_writer::VerifiedMachineWriter;
-use fho::{bug, return_bug, return_user_error, user_error, Deferred, FfxMain, Result};
+use fho::{bug, return_bug, return_user_error, user_error, FfxMain, Result};
 use fidl::endpoints::DiscoverableProtocolMarker;
-use fidl_fuchsia_developer_ffx::{
-    RepositoryRegistrationAliasConflictMode, RepositoryRegistryProxy,
-};
+use fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode;
 use fidl_fuchsia_pkg::RepositoryManagerMarker;
 use fidl_fuchsia_pkg_rewrite::{EngineMarker, EngineProxy};
 use fidl_fuchsia_pkg_rewrite_ext::{do_transaction, Rule};
@@ -60,7 +58,6 @@ pub(crate) struct PackageServerTask {
 pub(crate) async fn package_server_task(
     target_proxy_connector: Connector<TargetProxyHolder>,
     rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
-    repos: Deferred<RepositoryRegistryProxy>,
     context: EnvironmentContext,
     product_bundle: PathBuf,
     repo_port: u16,
@@ -118,7 +115,6 @@ pub(crate) async fn package_server_task(
     let task = fuchsia_async::Task::local(async move {
         let tool = ffx_repository_server_start::ServerStartTool {
             cmd,
-            repos,
             context,
             target_proxy_connector: target_proxy_connector.clone(),
             rcs_proxy_connector: connector.clone(),
@@ -473,7 +469,6 @@ mod tests {
         pub context: EnvironmentContext,
         pub rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
         pub target_proxy_connector: Connector<TargetProxyHolder>,
-        pub repo_proxy: Deferred<RepositoryRegistryProxy>,
     }
 
     impl FakeTestEnv {
@@ -482,9 +477,6 @@ mod tests {
                 fake_proxy(move |req| handle_rcs_proxy_request(req));
             let fake_target_proxy: TargetProxy =
                 fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
-            let fake_repo_proxy = Deferred::from_output(Ok(fake_proxy(move |req| {
-                panic!("Unexpected request: {:?}", req)
-            })));
             let fake_injector = FakeInjector {
                 remote_factory_closure: Box::new(move || {
                     let value = fake_rcs_proxy.clone();
@@ -506,12 +498,7 @@ mod tests {
                 .expect("Could not make target proxy test connector");
             let rcs_proxy_connector =
                 Connector::try_from_env(&fho_env).await.expect("Could not make RCS test connector");
-            Self {
-                context: test_env.context.clone(),
-                rcs_proxy_connector,
-                target_proxy_connector,
-                repo_proxy: fake_repo_proxy,
-            }
+            Self { context: test_env.context.clone(), rcs_proxy_connector, target_proxy_connector }
         }
     }
 
@@ -691,7 +678,6 @@ mod tests {
         let result = package_server_task(
             fake_env.target_proxy_connector,
             fake_env.rcs_proxy_connector,
-            fake_env.repo_proxy,
             fake_env.context,
             product_bundle,
             0,

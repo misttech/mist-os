@@ -20,11 +20,8 @@ use futures::{pin_mut, select, TryStreamExt};
 use std::path::PathBuf;
 use std::time::Duration;
 use target_connector::Connector;
-use target_holders::{daemon_protocol, moniker, RemoteControlProxyHolder, TargetProxyHolder};
-use {
-    ffx_update_args as args, fidl_fuchsia_developer_ffx as ffx,
-    fidl_fuchsia_update_installer_ext as installer,
-};
+use target_holders::{moniker, RemoteControlProxyHolder, TargetProxyHolder};
+use {ffx_update_args as args, fidl_fuchsia_update_installer_ext as installer};
 
 mod server;
 
@@ -41,8 +38,6 @@ pub struct UpdateTool {
     installer_proxy: Deferred<InstallerProxy>,
     target_proxy_connector: Connector<TargetProxyHolder>,
     rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
-    #[with(deferred(daemon_protocol()))]
-    repos: Deferred<ffx::RepositoryRegistryProxy>,
 }
 
 fho::embedded_plugin!(UpdateTool);
@@ -85,7 +80,6 @@ impl UpdateTool {
             server::package_server_task(
                 self.target_proxy_connector.clone(),
                 self.rcs_proxy_connector.clone(),
-                self.repos,
                 self.context.clone(),
                 product_path,
                 repo_port,
@@ -196,7 +190,6 @@ impl UpdateTool {
             server::package_server_task(
                 self.target_proxy_connector.clone(),
                 self.rcs_proxy_connector.clone(),
-                self.repos,
                 self.context.clone(),
                 product_path,
                 repo_port,
@@ -651,9 +644,6 @@ mod tests {
             fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
         let fake_rcs_proxy: RemoteControlProxy =
             fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
-        let fake_repo_proxy = Deferred::from_output(Ok(fake_proxy(move |req| {
-            panic!("Unexpected request: {:?}", req)
-        })));
         let fake_update_manager_proxy = fake_proxy(move |req| {
             match req {
                 ManagerRequest::CheckNow { responder, .. } => {
@@ -698,7 +688,6 @@ mod tests {
             rcs_proxy_connector: Connector::try_from_env(&fho_env)
                 .await
                 .expect("Could not make RCS test connector"),
-            repos: fake_repo_proxy,
         };
         let buffers = TestBuffers::default();
         let writer = SimpleWriter::new_test(&buffers);
@@ -752,9 +741,6 @@ mod tests {
             fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
         let fake_rcs_proxy: RemoteControlProxy =
             fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
-        let fake_repo_proxy = Deferred::from_output(Ok(fake_proxy(move |req| {
-            panic!("Unexpected request: {:?}", req)
-        })));
 
         let fake_injector = FakeInjector {
             remote_factory_closure: Box::new(move || {
@@ -783,7 +769,6 @@ mod tests {
             rcs_proxy_connector: Connector::try_from_env(&fho_env)
                 .await
                 .expect("Could not make RCS test connector"),
-            repos: fake_repo_proxy,
         };
 
         let buffers = TestBuffers::default();

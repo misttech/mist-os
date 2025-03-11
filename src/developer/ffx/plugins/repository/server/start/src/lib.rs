@@ -7,8 +7,7 @@ use daemonize::daemonize;
 use ffx_config::EnvironmentContext;
 use ffx_repository_server_start_args::StartCommand;
 use ffx_writer::VerifiedMachineWriter;
-use fho::{bug, deferred, user_error, Deferred, FfxMain, FfxTool, Result};
-use fidl_fuchsia_developer_ffx as ffx;
+use fho::{bug, user_error, FfxMain, FfxTool, Result};
 use pkg::config::DEFAULT_REPO_NAME;
 use pkg::ServerMode;
 use schemars::JsonSchema;
@@ -17,7 +16,7 @@ use std::io::Write as _;
 use std::net::SocketAddr;
 use std::time::Duration;
 use target_connector::Connector;
-use target_holders::{daemon_protocol, RemoteControlProxyHolder, TargetProxyHolder};
+use target_holders::{RemoteControlProxyHolder, TargetProxyHolder};
 
 mod server;
 mod server_impl;
@@ -47,8 +46,6 @@ pub enum CommandStatus {
 pub struct ServerStartTool {
     #[command]
     pub cmd: StartCommand,
-    #[with(deferred(daemon_protocol()))]
-    pub repos: Deferred<ffx::RepositoryRegistryProxy>,
     pub context: EnvironmentContext,
     pub target_proxy_connector: Connector<TargetProxyHolder>,
     pub rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
@@ -76,7 +73,6 @@ impl FfxMain for ServerStartTool {
                         self.context,
                         self.target_proxy_connector,
                         self.rcs_proxy_connector,
-                        self.repos,
                         writer,
                         mode,
                     ))
@@ -90,7 +86,6 @@ impl FfxMain for ServerStartTool {
                     if let Some(running) = serve_impl_validate_args(
                         &self.cmd,
                         &self.rcs_proxy_connector,
-                        self.repos,
                         &self.context,
                     )
                     .await?

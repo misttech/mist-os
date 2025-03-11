@@ -9,15 +9,10 @@ use ffx_config::api::ConfigError;
 use ffx_config::EnvironmentContext;
 use ffx_repository_server_stop_args::StopCommand;
 use ffx_writer::VerifiedMachineWriter;
-use fho::{
-    bug, deferred, return_bug, return_user_error, Deferred, Error, FfxMain, FfxTool, Result,
-};
-use fidl_fuchsia_developer_ffx as ffx;
-use fidl_fuchsia_developer_ffx_ext::RepositoryError;
-use pkg::{PkgServerInfo, PkgServerInstanceInfo as _, PkgServerInstances, ServerMode};
+use fho::{bug, return_bug, return_user_error, Error, FfxMain, FfxTool, Result};
+use pkg::{PkgServerInfo, PkgServerInstanceInfo as _, PkgServerInstances};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use target_holders::daemon_protocol;
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -33,8 +28,6 @@ pub enum CommandStatus {
 pub struct RepoStopTool {
     #[command]
     cmd: StopCommand,
-    #[with(deferred(daemon_protocol()))]
-    repos: Deferred<ffx::RepositoryRegistryProxy>,
     context: EnvironmentContext,
 }
 
@@ -74,27 +67,15 @@ impl RepoStopTool {
         let repo_port = self.cmd.port;
 
         if self.cmd.all {
-            // Resolve the daemon proxy if there are daemon instances, otherwise don't.
-            let repos = if instances.iter().any(|s| s.server_mode == ServerMode::Daemon) {
-                Some(self.repos.await?)
-            } else {
-                None
-            };
-
             for instance in instances {
-                Self::stop_instance(&instance, &repos).await?;
+                Self::stop_instance(&instance).await?;
             }
             return Ok(None);
         } else if let Some(repo_name) = &self.cmd.name {
             if let Some(instance) = instances.iter().find(|s| {
                 &s.name == repo_name && (repo_port.is_none() || repo_port.unwrap() == s.port())
             }) {
-                let repos = if instance.server_mode == ServerMode::Daemon {
-                    Some(self.repos.await?)
-                } else {
-                    None
-                };
-                return Self::stop_instance(instance, &repos).await;
+                return Self::stop_instance(instance).await;
             } else {
                 return_user_error!("no running server named {repo_name} is found.");
             }
@@ -103,7 +84,7 @@ impl RepoStopTool {
                 s.repo_path_display() == *product_bundle
                     && (repo_port.is_none() || repo_port.unwrap() == s.port())
             }) {
-                return Self::stop_instance(instance, &None).await;
+                return Self::stop_instance(instance).await;
             } else {
                 return_user_error!(
                     "no running server serving a product bundle {product_bundle} is found."
@@ -114,53 +95,17 @@ impl RepoStopTool {
             0 => return Ok(Some("no running servers".into())),
             1 => return {
                 let instance = instances.get(0).unwrap();
-                let repos = if instance.server_mode == ServerMode::Daemon {
-                    Some(self.repos.await?)
-                } else {
-                    None
-                };
-                Self::stop_instance(instance, &repos).await
+                Self::stop_instance(instance).await
             },
             _ => return_user_error!("more than 1 server running. Use --all or specify the name and port (if needed) of the server to stop.")
         }
         }
     }
 
-    async fn stop_instance(
-        instance: &PkgServerInfo,
-        repos: &Option<ffx::RepositoryRegistryProxy>,
-    ) -> Result<Option<String>> {
-        match instance.server_mode {
-            pkg::ServerMode::Background | ServerMode::Foreground => {
-                match instance.terminate(Duration::from_secs(3)).await {
-                    Ok(_) => Ok(None),
-                    Err(e) => return_bug!("Could not terminate server: {e}"),
-                }
-            }
-            pkg::ServerMode::Daemon => {
-                let repos_proxy: ffx::RepositoryRegistryProxy =
-                    repos.clone().expect("repository proxy");
-                match repos_proxy.server_stop().await {
-                    Ok(Ok(())) => Ok(None),
-                    Ok(Err(err)) => {
-                        let err = RepositoryError::from(err);
-                        match err {
-                            RepositoryError::ServerNotRunning => {
-                                Ok(Some("No repository server is running".into()))
-                            }
-                            err => {
-                                return_bug!(
-                                    "Failed to stop the server: {}",
-                                    RepositoryError::from(err)
-                                )
-                            }
-                        }
-                    }
-                    Err(err) => {
-                        return_bug!("Failed to communicate with the daemon: {}", err)
-                    }
-                }
-            }
+    async fn stop_instance(instance: &PkgServerInfo) -> Result<Option<String>> {
+        match instance.terminate(Duration::from_secs(3)).await {
+            Ok(_) => Ok(None),
+            Err(e) => return_bug!("Could not terminate server: {e}"),
         }
     }
 }
@@ -170,20 +115,16 @@ mod tests {
     use super::*;
     use camino::Utf8PathBuf;
     use ffx_config::{ConfigLevel, TestEnv};
-    use ffx_writer::Format;
-    use fidl_fuchsia_developer_ffx::RepositoryRegistryRequest;
     use fidl_fuchsia_developer_ffx_ext::RepositorySpec;
     use fidl_fuchsia_pkg_ext::{
         RepositoryConfigBuilder, RepositoryRegistrationAliasConflictMode, RepositoryStorageType,
     };
-    use futures::channel::oneshot::channel;
-    use serde_json::Value;
+    use pkg::ServerMode;
     use std::collections::BTreeSet;
+    use std::fs;
     use std::net::Ipv4Addr;
     use std::os::unix::fs::PermissionsExt as _;
     use std::process::{Child, Command};
-    use std::{fs, process};
-    use target_holders::fake_proxy;
 
     const FAKE_SERVER_CONTENTS: &str = r#"#!/bin/bash
        while sleep 1s
@@ -234,71 +175,6 @@ mod tests {
         Ok((mgr, child))
     }
 
-    fn make_daemon_instance(name: String, context: &EnvironmentContext) -> Result<()> {
-        let instance_root = context.get("repository.process_dir").expect("instance dir");
-        let mgr = PkgServerInstances::new(instance_root);
-
-        let address = (Ipv4Addr::LOCALHOST, 1234).into();
-
-        let repo_config =
-            RepositoryConfigBuilder::new(format!("fuchsia-pkg://{name}").parse().unwrap()).build();
-
-        mgr.write_instance(&PkgServerInfo {
-            name,
-            address,
-            repo_spec: RepositorySpec::Pm {
-                path: Utf8PathBuf::from("/somewhere"),
-                aliases: BTreeSet::new(),
-            }
-            .into(),
-            registration_storage_type: RepositoryStorageType::Ephemeral,
-            registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
-            server_mode: ServerMode::Daemon,
-            pid: process::id(),
-            repo_config,
-        })
-        .map_err(Into::into)
-    }
-
-    #[fuchsia::test]
-    async fn test_daemon_stop() {
-        let env = ffx_config::test_init().await.unwrap();
-        env.context
-            .query("repository.process_dir")
-            .level(Some(ConfigLevel::User))
-            .set(env.isolate_root.path().join("repo_servers").to_string_lossy().into())
-            .await
-            .expect("setting isolated process dir");
-
-        make_daemon_instance("default".into(), &env.context).expect("test daemon instance");
-
-        let (sender, receiver) = channel();
-        let mut sender = Some(sender);
-        let fake_proxy = fake_proxy(move |req| match req {
-            RepositoryRegistryRequest::ServerStop { responder } => {
-                sender.take().unwrap().send(()).unwrap();
-                responder.send(Ok(())).unwrap()
-            }
-            other => panic!("Unexpected request: {:?}", other),
-        });
-        let repos = Deferred::from_output(Ok(fake_proxy));
-
-        let tool = RepoStopTool {
-            context: env.context.clone(),
-            cmd: StopCommand { all: true, name: None, port: None, product_bundle: None },
-            repos,
-        };
-        let buffers = ffx_writer::TestBuffers::default();
-        let writer = <RepoStopTool as FfxMain>::Writer::new_test(None, &buffers);
-        let res = tool.main(writer).await;
-
-        let (stdout, stderr) = buffers.into_strings();
-        assert_eq!(stdout, "Stopped the repository server\n");
-        assert_eq!(stderr, "");
-        assert!(res.is_ok());
-        assert!(receiver.await.is_ok());
-    }
-
     #[fuchsia::test]
     async fn test_standalone_stop() {
         let env = ffx_config::test_init().await.unwrap();
@@ -313,14 +189,9 @@ mod tests {
             make_standalone_instance("default".into(), None, &env.context, &env)
                 .expect("test daemon instance");
 
-        let fake_proxy = fake_proxy(move |req| panic!("Unexpected request: {req:?}"));
-
-        let repos = Deferred::from_output(Ok(fake_proxy));
-
         let tool = RepoStopTool {
             context: env.context.clone(),
             cmd: StopCommand { all: true, name: None, port: None, product_bundle: None },
-            repos,
         };
         let buffers = ffx_writer::TestBuffers::default();
         let writer = <RepoStopTool as FfxMain>::Writer::new_test(None, &buffers);
@@ -353,10 +224,6 @@ mod tests {
         )
         .expect("test daemon instance");
 
-        let fake_proxy = fake_proxy(move |req| panic!("Unexpected request: {req:?}"));
-
-        let repos = Deferred::from_output(Ok(fake_proxy));
-
         let tool = RepoStopTool {
             context: env.context.clone(),
             cmd: StopCommand {
@@ -365,7 +232,6 @@ mod tests {
                 port: None,
                 product_bundle: Some(product_bundle_path),
             },
-            repos,
         };
         let buffers = ffx_writer::TestBuffers::default();
         let writer = <RepoStopTool as FfxMain>::Writer::new_test(None, &buffers);
@@ -378,242 +244,5 @@ mod tests {
         assert_eq!(stdout, "Stopped the repository server\n", "stderr: {stderr}");
         assert_eq!(stderr, "");
         assert!(res.is_ok());
-    }
-
-    #[fuchsia::test]
-    async fn test_stop_daemon_machine() {
-        let env = ffx_config::test_init().await.unwrap();
-        env.context
-            .query("repository.process_dir")
-            .level(Some(ConfigLevel::User))
-            .set(env.isolate_root.path().join("repo_servers").to_string_lossy().into())
-            .await
-            .expect("setting isolated process dir");
-        make_daemon_instance("default".into(), &env.context).expect("test daemon instance");
-
-        let (sender, receiver) = channel();
-        let mut sender = Some(sender);
-        let fake_proxy = fake_proxy(move |req| match req {
-            RepositoryRegistryRequest::ServerStop { responder } => {
-                sender.take().unwrap().send(()).unwrap();
-                responder.send(Ok(())).unwrap()
-            }
-            other => panic!("Unexpected request: {:?}", other),
-        });
-        let repos = Deferred::from_output(Ok(fake_proxy));
-
-        let tool = RepoStopTool {
-            context: env.context.clone(),
-            cmd: StopCommand { all: true, name: None, port: None, product_bundle: None },
-            repos,
-        };
-        let buffers = ffx_writer::TestBuffers::default();
-        let writer = <RepoStopTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
-        let res = tool.main(writer).await;
-
-        assert!(res.is_ok());
-        assert!(receiver.await.is_ok());
-
-        let (stdout, stderr) = buffers.into_strings();
-        assert!(res.is_ok(), "expected ok: {stdout} {stderr}");
-        let err = format!("schema not valid {stdout}");
-        let json = serde_json::from_str(&stdout).expect(&err);
-        let err = format!("json must adhere to schema: {json}");
-        <RepoStopTool as FfxMain>::Writer::verify_schema(&json).expect(&err);
-        assert_eq!(json, serde_json::json!({"ok": { "message": "Stopped the repository server"}}));
-        assert_eq!(stderr, "");
-    }
-
-    #[fuchsia::test]
-    async fn test_stop_daemon_error_machine() {
-        let env = ffx_config::test_init().await.unwrap();
-        env.context
-            .query("repository.process_dir")
-            .level(Some(ConfigLevel::User))
-            .set(env.isolate_root.path().join("repo_servers").to_string_lossy().into())
-            .await
-            .expect("setting isolated process dir");
-        make_daemon_instance("default".into(), &env.context).expect("test daemon instance");
-
-        let (sender, receiver) = channel();
-        let mut sender = Some(sender);
-        let fake_proxy = fake_proxy(move |req| match req {
-            RepositoryRegistryRequest::ServerStop { responder } => {
-                sender.take().unwrap().send(()).unwrap();
-                responder.send(Err(RepositoryError::InternalError.into())).unwrap()
-            }
-            other => panic!("Unexpected request: {:?}", other),
-        });
-        let repos = Deferred::from_output(Ok(fake_proxy));
-
-        let tool = RepoStopTool {
-            context: env.context.clone(),
-            cmd: StopCommand { all: true, name: None, port: None, product_bundle: None },
-            repos,
-        };
-        let buffers = ffx_writer::TestBuffers::default();
-        let writer = <RepoStopTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
-        let res = tool.main(writer).await;
-
-        let (stdout, stderr) = buffers.into_strings();
-        assert!(res.is_err(), "expected error: {stdout} {stderr}");
-        let err = format!("schema not valid {stdout}");
-        let json = serde_json::from_str(&stdout).expect(&err);
-        let err = format!("json must adhere to schema: {json}");
-        <RepoStopTool as FfxMain>::Writer::verify_schema(&json).expect(&err);
-        assert_eq!(
-            json,
-            serde_json::json!({"unexpected_error": {
-             "message": "BUG: An internal command error occurred.\nError: Failed to stop the server: some unspecified internal error"}})
-        );
-        assert_eq!(stderr, "");
-        assert!(receiver.await.is_ok());
-    }
-
-    #[fuchsia::test]
-    async fn test_stop_multiple_servers_error() {
-        let env = ffx_config::test_init().await.unwrap();
-        env.context
-            .query("repository.process_dir")
-            .level(Some(ConfigLevel::User))
-            .set(env.isolate_root.path().join("repo_servers").to_string_lossy().into())
-            .await
-            .expect("setting isolated process dir");
-
-        make_daemon_instance("default".into(), &env.context).expect("test daemon instance");
-        make_daemon_instance("default2".into(), &env.context).expect("test daemon instance");
-
-        let fake_proxy = fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
-        let repos = Deferred::from_output(Ok(fake_proxy));
-
-        let tool = RepoStopTool {
-            context: env.context.clone(),
-            cmd: StopCommand { all: false, name: None, port: None, product_bundle: None },
-            repos,
-        };
-        let buffers = ffx_writer::TestBuffers::default();
-        let writer = <RepoStopTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
-        let res = tool.main(writer).await;
-
-        let (stdout, stderr) = buffers.into_strings();
-        let err = format!("schema not valid {stdout}");
-        let json: Value = serde_json::from_str(&stdout).expect(&err);
-        let err = format!("json must adhere to schema: {json}");
-        <RepoStopTool as FfxMain>::Writer::verify_schema(&json).expect(&err);
-        assert_eq!(stderr, "");
-        let expected = CommandStatus::UserError {
-            message:
-                "more than 1 server running. Use --all or specify the name and port (if needed) of the server to stop."
-                    .into(),
-        };
-        assert_eq!(
-            serde_json::from_value::<CommandStatus>(json).expect("CommandStatus from Value"),
-            expected
-        );
-        assert!(res.is_err(), "expected error: {stdout} {stderr}");
-    }
-    #[fuchsia::test]
-    async fn test_stop_multiple_servers_ok() {
-        let env = ffx_config::test_init().await.unwrap();
-        env.context
-            .query("repository.process_dir")
-            .level(Some(ConfigLevel::User))
-            .set(env.isolate_root.path().join("repo_servers").to_string_lossy().into())
-            .await
-            .expect("setting isolated process dir");
-
-        make_daemon_instance("default".into(), &env.context).expect("test daemon instance");
-        make_daemon_instance("default2".into(), &env.context).expect("test daemon instance");
-
-        let (sender, _receiver) = channel();
-        let mut sender = Some(sender);
-        let fake_proxy = fake_proxy(move |req| match req {
-            RepositoryRegistryRequest::ServerStop { responder } => {
-                sender.take().unwrap().send(()).unwrap();
-                responder.send(Ok(())).unwrap()
-            }
-            other => panic!("Unexpected request: {:?}", other),
-        });
-        let repos = Deferred::from_output(Ok(fake_proxy));
-
-        let tool = RepoStopTool {
-            context: env.context.clone(),
-            cmd: StopCommand {
-                all: false,
-                name: Some("default2".into()),
-                port: None,
-                product_bundle: None,
-            },
-            repos,
-        };
-        let buffers = ffx_writer::TestBuffers::default();
-        let writer = <RepoStopTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
-        let res = tool.main(writer).await;
-
-        let (stdout, stderr) = buffers.into_strings();
-        let err = format!("schema not valid {stdout}");
-        let json: Value = serde_json::from_str(&stdout).expect(&err);
-        let err = format!("json must adhere to schema: {json}");
-        <RepoStopTool as FfxMain>::Writer::verify_schema(&json).expect(&err);
-        assert_eq!(stderr, "");
-        let expected = CommandStatus::Ok { message: "Stopped the repository server".into() };
-        assert_eq!(
-            serde_json::from_value::<CommandStatus>(json).expect("CommandStatus from Value"),
-            expected
-        );
-        assert!(res.is_ok(), "unexpected error: {stdout} {stderr}");
-    }
-
-    #[fuchsia::test]
-    async fn test_stop_servers_not_found() {
-        let env = ffx_config::test_init().await.unwrap();
-        env.context
-            .query("repository.process_dir")
-            .level(Some(ConfigLevel::User))
-            .set(env.isolate_root.path().join("repo_servers").to_string_lossy().into())
-            .await
-            .expect("setting isolated process dir");
-
-        make_daemon_instance("default".into(), &env.context).expect("test daemon instance");
-
-        let (sender, _receiver) = channel();
-        let mut sender = Some(sender);
-        let fake_proxy = fake_proxy(move |req| match req {
-            RepositoryRegistryRequest::ServerStop { responder } => {
-                sender.take().unwrap().send(()).unwrap();
-                responder.send(Ok(())).unwrap()
-            }
-            other => panic!("Unexpected request: {:?}", other),
-        });
-        let repos = Deferred::from_output(Ok(fake_proxy));
-
-        let tool = RepoStopTool {
-            context: env.context.clone(),
-            cmd: StopCommand {
-                all: false,
-                name: Some("default2".into()),
-                port: None,
-                product_bundle: None,
-            },
-            repos,
-        };
-        let buffers = ffx_writer::TestBuffers::default();
-        let writer = <RepoStopTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
-        let res = tool.main(writer).await;
-
-        let (stdout, stderr) = buffers.into_strings();
-        let err = format!("schema not valid {stdout}");
-        let json: Value = serde_json::from_str(&stdout).expect(&err);
-        let err = format!("json must adhere to schema: {json}");
-        <RepoStopTool as FfxMain>::Writer::verify_schema(&json).expect(&err);
-        assert_eq!(stderr, "");
-        let expected = CommandStatus::UserError {
-            message: "no running server named default2 is found.".into(),
-        };
-        assert_eq!(
-            serde_json::from_value::<CommandStatus>(json).expect("CommandStatus from Value"),
-            expected
-        );
-        assert!(res.is_err(), "unexpected error: {stdout} {stderr}");
     }
 }

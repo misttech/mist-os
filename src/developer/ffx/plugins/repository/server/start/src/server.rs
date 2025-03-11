@@ -7,7 +7,7 @@ use crate::ServerStartTool;
 use ffx_command_error::{bug, return_user_error, user_error, FfxContext as _, Result};
 use ffx_config::EnvironmentContext;
 use ffx_repository_server_start_args::StartCommand;
-use fho::{Deferred, FfxMain};
+use fho::FfxMain;
 use fidl_fuchsia_developer_ffx as ffx;
 use pkg::{PkgServerInstanceInfo, PkgServerInstances, ServerMode};
 use std::net::SocketAddr;
@@ -68,7 +68,6 @@ pub async fn run_foreground_server(
     context: EnvironmentContext,
     target_proxy_connector: Connector<TargetProxyHolder>,
     rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
-    repos: Deferred<ffx::RepositoryRegistryProxy>,
     w: <ServerStartTool as FfxMain>::Writer,
     mode: ServerMode,
 ) -> Result<()> {
@@ -91,7 +90,6 @@ pub async fn run_foreground_server(
     serve_impl(
         target_proxy_connector,
         rcs_proxy_connector,
-        repos,
         start_cmd,
         context,
         w.simple_writer(),
