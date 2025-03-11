@@ -1444,7 +1444,7 @@ class VmCowPages final : public VmHierarchyBase,
   // Replaces this node in its parent's child list with a hidden node and makes this node a child
   // of the newly created hidden node. Moves the pages that were stored at this node into the
   // newly created hidden node.
-  zx_status_t ReplaceWithHiddenNodeLocked(fbl::RefPtr<VmCowPages>* replacement_node) TA_REQ(lock());
+  zx::result<LockedRefPtr> ReplaceWithHiddenNodeLocked() TA_REQ(lock());
 
   // Removes the specified child from this objects |children_list_| and performs any hierarchy
   // updates that need to happen as a result. This does not modify the |parent_| member of the

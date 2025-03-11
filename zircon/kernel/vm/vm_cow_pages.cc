@@ -1031,7 +1031,7 @@ void VmCowPages::MovePagesIntoLocked(VmCowPages& other) {
   DEBUG_ASSERT(page_list_.IsEmpty());
 }
 
-zx_status_t VmCowPages::ReplaceWithHiddenNodeLocked(fbl::RefPtr<VmCowPages>* replacement_node) {
+zx::result<VmCowPages::LockedRefPtr> VmCowPages::ReplaceWithHiddenNodeLocked() {
   canary_.Assert();
 
   fbl::RefPtr<VmHierarchyState> state;
@@ -1051,23 +1051,26 @@ zx_status_t VmCowPages::ReplaceWithHiddenNodeLocked(fbl::RefPtr<VmCowPages>* rep
                               RangeChangeChildren::AssumeNone);
 
   VmCowPagesOptions options = inheritable_options();
-  fbl::AllocChecker ac;
-  // Lock order for a new hidden parent is either derived from its parent, or if no parent starts at
-  // kLockOrderRoot. Cow creation rules state that our parent is either hidden, or a page root node,
-  // ensuring that our derived lock order will still be in the hidden range.
-  DEBUG_ASSERT(!parent_ || parent_->is_hidden() || parent_->page_source_);
-  const uint64_t hidden_lock_order =
-      parent_ ? parent_->lock_order() - kLockOrderDelta : kLockOrderRoot;
-  auto hidden_parent = fbl::AdoptRef<VmCowPages>(
-      new (&ac) VmCowPages(ktl::move(state), options | VmCowPagesOptions::kHidden, pmm_alloc_flags_,
-                           size_, nullptr, nullptr, hidden_lock_order));
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
+  LockedRefPtr hidden_parent;
+  // Use a sub-scope to limit visibility of hidden_parent_ref as it's just a temporary.
+  {
+    fbl::AllocChecker ac;
+    // Lock order for a new hidden parent is either derived from its parent, or if no parent starts
+    // kLockOrderRoot. Cow creation rules state that our parent is either hidden, or a page root
+    // node ensuring that our derived lock order will still be in the hidden range.
+    DEBUG_ASSERT(!parent_ || parent_->is_hidden() || parent_->page_source_);
+    const uint64_t hidden_lock_order =
+        parent_ ? parent_->lock_order() - kLockOrderDelta : kLockOrderRoot;
+    auto hidden_parent_ref = fbl::AdoptRef<VmCowPages>(
+        new (&ac) VmCowPages(ktl::move(state), options | VmCowPagesOptions::kHidden,
+                             pmm_alloc_flags_, size_, nullptr, nullptr, hidden_lock_order));
+    if (!ac.check()) {
+      return zx::error(ZX_ERR_NO_MEMORY);
+    }
+    hidden_parent = LockedRefPtr(ktl::move(hidden_parent_ref), VmLockAcquireMode::Reentrant);
   }
-  Guard<VmoLockType> child_guard{AssertOrderedLock, hidden_parent->lock(),
-                                 hidden_parent->lock_order(), VmLockAcquireMode::Reentrant};
-  hidden_parent->page_list_.InitializeSkew(page_list_.GetSkew(), 0);
-  hidden_parent->TransitionToAliveLocked();
+  hidden_parent.locked().page_list_.InitializeSkew(page_list_.GetSkew(), 0);
+  hidden_parent.locked().TransitionToAliveLocked();
 
   // If the current object is not the root of the tree, then we need to replace ourselves in our
   // parent's child list with the new hidden node before we can becomes its child.
@@ -1075,15 +1078,15 @@ zx_status_t VmCowPages::ReplaceWithHiddenNodeLocked(fbl::RefPtr<VmCowPages>* rep
     // Copy the offsets and limits from the current node to the newly created parent.
     // This logic is similar to AddChildLocked, except that we don't need to recompute these
     // values.
-    hidden_parent->root_parent_offset_ = root_parent_offset_;
-    hidden_parent->parent_offset_ = parent_offset_;
-    hidden_parent->parent_limit_ = parent_limit_;
+    hidden_parent.locked().root_parent_offset_ = root_parent_offset_;
+    hidden_parent.locked().parent_offset_ = parent_offset_;
+    hidden_parent.locked().parent_limit_ = parent_limit_;
 
     // We do not need to set high_priority_count_ because the called to AddChildLocked below
     // will initialize high_priority_count_ for hidden_parent.
 
     parent_locked().ReplaceChildLocked(this, hidden_parent.get());
-    hidden_parent->parent_ = ktl::move(parent_);
+    hidden_parent.locked().parent_ = ktl::move(parent_);
 
     // We have lost our parent, which means we could now be violating the invariant that
     // parent_limit_ being non-zoer implies we have a parent. In practice this assignment
@@ -1093,14 +1096,13 @@ zx_status_t VmCowPages::ReplaceWithHiddenNodeLocked(fbl::RefPtr<VmCowPages>* rep
 
   // We need to move all our pages into the new parent before adding ourselves as its child
   // because we cannot be added as a child unless we have no pages.
-  MovePagesIntoLocked(*hidden_parent);
+  MovePagesIntoLocked(hidden_parent.locked());
   DEBUG_ASSERT(page_list_.GetSkew() == 0);
 
-  hidden_parent->AddChildLocked(this, 0, size_);
+  hidden_parent.locked().AddChildLocked(this, 0, size_);
 
   // Return the hidden parent as the replacement node.
-  *replacement_node = ktl::move(hidden_parent);
-  return ZX_OK;
+  return zx::ok(ktl::move(hidden_parent));
 }
 
 zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneBidirectionalLocked(uint64_t offset,
@@ -1129,23 +1131,21 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneBidirectionalLocked(uint64
         LockedRefPtr(ktl::move(cow_clone_ref), lock_order() + 1, VmLockAcquireMode::Reentrant);
   }
 
-  VmCowPages* parent = this;
-
   // If `parent` is to be the new child's parent then it must become hidden first.
   // That requires creating a new hidden node and rotating `parent` to be its child.
   if (!is_hidden()) {
-    fbl::RefPtr<VmCowPages> replacement_node;
-    zx_status_t status = ReplaceWithHiddenNodeLocked(&replacement_node);
-    if (status != ZX_OK) {
-      return zx::error(status);
+    auto result = ReplaceWithHiddenNodeLocked();
+    if (result.is_error()) {
+      return result.take_error();
     }
-    parent = replacement_node.get();
+    DEBUG_ASSERT((*result)->is_hidden());
+    (*result).locked().AddBidirectionallyClonedChildLocked(offset, limit, &cow_clone.locked());
+  } else {
+    // The COW clone's parent must be hidden because the clone must not see any future parent
+    // writes.
+    DEBUG_ASSERT(is_hidden());
+    AddBidirectionallyClonedChildLocked(offset, limit, &cow_clone.locked());
   }
-  AssertHeld(parent->lock_ref());
-
-  // The COW clone's parent must be hidden because the clone must not see any future parent writes.
-  DEBUG_ASSERT(parent->is_hidden());
-  parent->AddBidirectionallyClonedChildLocked(offset, limit, &cow_clone.locked());
 
   // Checking this node's hierarchy will also check the parent's hierarchy.
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
