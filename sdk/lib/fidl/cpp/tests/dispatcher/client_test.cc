@@ -46,9 +46,9 @@ class WireWeakAsyncClientImpl<TestProtocol> : public fidl::internal::ClientImplB
           // The input to this call has no handles.
           ZX_ASSERT(msg.message().handle_actual() == 0);
           auto copied_bytes = msg.message().CopyBytes();
-          zx_status_t status =
-              zx_channel_write_etc(transport->get<fidl::internal::ChannelTransport>()->get(), 0,
-                                   copied_bytes.data(), copied_bytes.size(), nullptr, 0);
+          zx_status_t status = zx_channel_write_etc(
+              transport->get<fidl::internal::ChannelTransport>()->get(), 0, copied_bytes.data(),
+              static_cast<uint32_t>(copied_bytes.size()), nullptr, 0);
           EXPECT_OK(status);
           return fidl::Status::Ok();
         });
@@ -105,7 +105,8 @@ class ClientFixture : public zxtest::Test {
     return fidl::MessageRead(
         endpoints_.server.channel(),
         fidl::ChannelMessageStorageView{
-            .bytes = fidl::BufferSpan(read_buffer_.data(), read_buffer_.size()),
+            .bytes =
+                fidl::BufferSpan(read_buffer_.data(), static_cast<uint32_t>(read_buffer_.size())),
             .handles = nullptr,
             .handle_metadata = nullptr,
             .handle_capacity = 0,

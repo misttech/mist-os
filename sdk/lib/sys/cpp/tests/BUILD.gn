@@ -30,9 +30,6 @@ test("component_cpp_unittests_bin") {
     "//src/testing/fidl:placeholders_hlcpp",
   ]
 
-  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
-
   # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,
   # rather than builders.
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]

@@ -16,7 +16,4 @@ source_set("cpp") {
   ]
 
   public_deps = [ "//sdk/fidl/fuchsia.media:fuchsia.media_hlcpp" ]
-
-  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
 }

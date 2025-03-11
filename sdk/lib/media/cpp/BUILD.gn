@@ -58,9 +58,6 @@ cc_test_executable("test_bin") {
     ":cpp",
     "//src/lib/fxl/test:gtest_main",
   ]
-
-  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
 }
 
 fuchsia_unittest_package("media_lib_timeline_tests") {

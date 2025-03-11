@@ -27,9 +27,6 @@ test("fidl_cpp_dispatcher_tests_bin") {
     "//src/lib/fidl/llcpp/tests/dispatcher:client_test_helpers",
     "//zircon/system/ulib/zxtest",
   ]
-
-  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
 }
 
 fuchsia_unittest_package("fidl_cpp_dispatcher_tests") {
