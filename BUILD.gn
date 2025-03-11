@@ -210,6 +210,7 @@ build_api_module("api") {
     ":build_info",
     ":checkout_artifacts",
     ":cipd_assembly_artifacts",
+    ":ctf_fidl_method_summary",
     ":delivery_blob_config",
     ":detailed_size_checker_data",
     ":exported_files",
@@ -1485,6 +1486,19 @@ build_api_module("triage_sources") {
     "//build/images/updates:packages",
     "//src/diagnostics/config/triage",
   ]
+}
+
+# The "ctf_fidl_method_summary.json" build API file contains a path to
+# the `ctf_sdk_fidl_methods.json` API summary file that is used by the
+# CTF FIDL coverage recipe. This path is relative to the $root_build_dir.
+# in file: "$root_build_dir/ctf_fidl_method_summary.json".
+#
+# Type: list(string)
+#
+build_api_module("ctf_fidl_method_summary") {
+  testonly = true
+  data_keys = [ "ctf_fidl_method_summary" ]
+  deps = [ "//sdk/ctf:summarize_ctf_fidl_methods" ]
 }
 
 # Describes the path to a list of all the package manifests, the same
