@@ -1,63 +1,70 @@
 -
- name: Inspect
- team: Diagnostics
- links:
-  Home: /docs/development/diagnostics/inspect
- description: |
-   Expose structured state about a component. Monitor the state of a component at an
-   instant in time.
+  name: Inspect
+  team: Diagnostics
+  links:
+    Overview: /docs/development/diagnostics/inspect/README.md
+    Quickstart: /docs/development/diagnostics/inspect/quickstart.md
+    Health check: /docs/development/diagnostics/inspect/health.md
+    Rust libraries: /docs/development/diagnostics/inspect/rust.md
+    Codelab - Using Inspect: /docs/development/diagnostics/inspect/codelab.md
+  description: |
+    Expose structured diagnositcs information about the state of a component.
+    This helps to monitor the state of a component at an given point in time.
 
-   The Inspect tool allows a component to expose an arbitrary hierarchy of typed key/value pairs
-   and update it over the course of its execution. This data can be snapshotted and inspected
-   while the component is still running.
+    The Inspect tool allows a component to expose an arbitrary hierarchy of typed
+    key/value pairs and update it over the course of its execution. This data can
+    be snapshotted and inspected while the component is still running.
 
-   Inspect is commonly used to represent information about the working set and recent history
-   of a component to help during debugging.
+    Inspect is commonly used to represent information about the working set and
+    recent history of a component to help during debugging.
 
-   Component authors use Inspect by depending on a library in their language of choice (Rust, C++,
-   and Dart are currently supported), and calling the appropriate methods to mutate their
-   recorded state.
+    A component developer can use Inspect by depending on a library in their
+    language of choice (Rust, C++), and calling the appropriate methods to mutate
+    their recorded state.
 
-   Inspect data may be read using the <code>ffx component inspect</code>
-   tool or <code>ffx target snapshot</code>.
- related:
+    Inspect data may be read using the <code>ffx inspect</code>
+    tool or <code>ffx target snapshot</code>.
+  related:
   - Triage
 
 -
- name: Logs
- team: Diagnostics
- links:
-  Writing Logs: /docs/development/diagnostics/logs/recording
-  Viewing Logs: /docs/development/diagnostics/logs/viewing
- description: |
-   Print string logs during the execution of a component.
+  name: Logs
+  team: Diagnostics
+  links:
+    Overview: /docs/development/diagnostics/logs/README.md
+    Recording logs: /docs/development/diagnostics/logs/recording.md
+    Log record severity: /docs/development/diagnostics/logs/severity.md
+    Viewing logs: /docs/development/diagnostics/logs/viewing.md
+    Additional logging workflows: /docs/development/diagnostics/test_and_logs.md
+  description: |
+    Print string logs during the execution of a component.
 
-   Fuchsia, like many systems, supports basic logging of strings to record some information
-   when particular lines of source code are executed.
+    Fuchsia, like many systems, supports basic logging of strings to record some information
+    when particular lines of source code are executed.
 
-   Logs are aggregated by the Archivist component. They may be read using `ffx log`.
- related:
+    Logs are aggregated by the Archivist component. They may be read using `ffx log`.
+  related:
   - Structured Logs
 
 -
   name: Structured Logs
   team: Diagnostics
   links:
-   Structured log encoding reference: /docs/reference/platform-spec/diagnostics/logs-encoding
+    Structured log encoding reference: /docs/reference/platform-spec/diagnostics/logs-encoding
   description: |
-   Store structured key/value pairs in log messages.
+    Store structured key/value pairs in log messages.
 
-   In addition to text-based logs, Fuchsia supports fully structured
-   log records encoded as typed key/value hierarchies.
+    In addition to text-based logs, Fuchsia supports fully structured
+    log records encoded as typed key/value hierarchies.
 
-   Developers may write structured logs using the <code>tracing</code> crate macros in Rust
-   or the <code>FX_SLOG</code> macro in C++.
+    Developers may write structured logs using the <code>tracing</code> crate macros in Rust
+    or the <code>FX_SLOG</code> macro in C++.
 
 -
   name: Persistence
   team: Diagnostics
   links:
-   Persistence documentation: /docs/reference/diagnostics/persistence
+    Persistence documentation: /docs/reference/diagnostics/persistence
   description: |
     Persistence stores Inspect data and publishes it on the subsequent boot.
 
@@ -66,13 +73,13 @@
     writes selected Inspect data to disk and then publishes it back to Inspect
     on the next boot.
   related:
-   - Inspect
+  - Inspect
 
 -
   name: Sampler
   team: Diagnostics
   links:
-   Sampler documentation: /docs/reference/diagnostics/sampler
+    Sampler documentation: /docs/reference/diagnostics/sampler
   description: |
     Sampler reads data from Inspect and forwards it to Cobalt.
 
@@ -81,13 +88,33 @@
     your data in Inspect and write a simple config file entry to tell Sampler
     to fetch your data and send it to Cobalt.
   related:
-   - Inspect
+  - Inspect
+
+-
+  name: Tracing
+  team: Tracing
+  links:
+    Tracing documentation: /docs/concepts/kernel/tracing-system.md
+    Tracing guides: /docs/development/tracing/guides.md
+    Use trace events: /docs/development/tracing/events.md
+    Tutorial on Fuchsia tracing: /docs/development/tracing/tutorial/index.md
+    Fuchsia trace format: /docs/reference/tracing/trace-format
+  description: |
+    Fuchsia's tracing system offers a comprehensive way to collect,
+    aggregate, and visualize diagnostic tracing information from the
+    Fuchsia user space processes and the Zircon kernel. Traces, like
+    logs, represent events from a Fuchsia system, but are fine grained,
+    higher frequency and are meant for machine consumption to compute
+    other insights and visualizations.
+  related:
+  - Inspect
+  - Logs
 
 -
   name: Triage
   team: Diagnostics
   links:
-   Triage documentation: /docs/reference/diagnostics/triage
+    Triage documentation: /docs/reference/diagnostics/triage
   description: |
     Triage selects and processes values from Diagnostics data, producing
     useful actions and insights on-device and off-device.
@@ -96,19 +123,43 @@
     on-device as the engine of Detect); and print warnings about
     off-nominal values.
   related:
-   - Inspect
-   - Detect
+  - Inspect
+  - Detect
+
+-
+  name: Cobalt
+  team: Cobalt
+  links:
+    Detect documentation: https://fuchsia.googlesource.com/cobalt/+/main/README.md
+  description: |
+    Cobalt is a pipeline for collecting metrics data from user-owned devices in
+    the field and producing aggregated reports.
+
+    Cobalt includes a suite of features for preserving user privacy and
+    anonymity while giving product owners the data they need to improve their
+    products.
+  related: []
 
 -
   name: Detect
   team: Diagnostics
   links:
-   Detect documentation: /docs/reference/diagnostics/consumers/detect
+    Cobalt - Telemetry with built-in privacy: /docs/reference/diagnostics/consumers/detect
   description: |
     Detect scans Inspect data on-device to decide when to file crash reports.
 
     Detect scans are configured using the Triage language and run every
     few minutes.
   related:
-   - Inspect
-   - Triage
+  - Inspect
+  - Triage
+
+-
+  name: zxdb
+  team: zxdb
+  links:
+    zxdb documentation: /docs/development/debugger/README.md
+    Tutorial - Debug tests using zxdb: /docs/development/debugger/tutorial-tests.md
+    Tutorial - Debug minidumps using zxdb: /docs/development/debugger/tutorial-minidumps.md
+  description: |
+    zxdb is a console-mode debugger for native code running on Fuchsia.
