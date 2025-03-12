@@ -169,13 +169,14 @@ impl StationaryMonitor {
             self.connection_data.previous_roam_scan_data.roam_reasons_prev_scan =
                 roam_reasons.clone();
             self.connection_data.previous_roam_scan_data.rssi_prev_roam_scan = rssi;
-            info!("Initiating roam search for roam reasons: {:?}", roam_reasons);
+            info!("Initiating roam search for roam reasons: {:?}", &roam_reasons);
             // Stationary monitor uses active roam scans to prioritize shorter scan times over power
             // consumption.
             return RoamTriggerDataOutcome::RoamSearch {
                 scan_type: fidl_common::ScanType::Active,
                 network_identifier: self.connection_data.network_identifier.clone(),
                 credential: self.connection_data.credential.clone(),
+                reasons: roam_reasons,
             };
         }
         RoamTriggerDataOutcome::Noop
