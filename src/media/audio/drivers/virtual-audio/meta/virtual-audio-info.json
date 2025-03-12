@@ -1,5 +1,5 @@
 {
-    "short_description": "Virtual audio DFv2 driver used for integration testing",
+    "short_description": "Driver that can create virtual audio composite devices",
     "manufacturer": "",
     "families": [],
     "models": [],

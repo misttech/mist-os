@@ -5,37 +5,26 @@ Fuchsia systems (even in the absence of audio hardware) for end-to-end testing o
 subsystem.
 
 The Virtual Audio Device and its drivers are provided by virtual_audio_driver.so and are only
-included in Fuchsia as part of the "media/tests" component group.
-
-## Legacy Version
-
-This driver is the legacy version of the virtual-audio driver. It only supports the creation of
-legacy virtual audio the creation of legacy virtual audio Codec, Dai, and StreamConfig devices. The
-non-legacy virtual-audio driver supports the creation of virtual audio Composite
+included in "eng" builds as part of the "Audio Development Support" assembly input bundle.
 
 ## Driver Entities
 
-When virtual_audio_driver.so is installed (as part of the Audio Development Support assembly input
-bundle), the VirtualAudioBus driver attaches to the /dev/test device node, automatically adding a
-device for controlling virtual audio devices. This device node is exposed at
-/dev/sys/platform/virtual-audio-legacy/virtual-audio-legacy and is backed by a controller driver,
-implemented by a singleton of the VirtualAudioControlImpl class. Virtual audio devices are created
-by interacting with this virtual audio controller, via FIDL (more on the FIDL connection and
+When virtual_audio_driver.so is installed, the VirtualAudioBus driver attaches to the /dev/test
+device node, automatically adding a device for controlling virtual audio devices. This device node
+is exposed at /dev/sys/platform/virtual-audio/virtual-audio and is backed by a controller driver,
+implemented by a singleton of the VirtualAudio class. Virtual audio devices are created by
+interacting with this virtual audio controller, via FIDL (more on the FIDL connection and
 interfafces below).
 
 The controller can be instructed to create a device configuration, and to create a virtual audio
-device using this configuration. For example, when instructed to add a virtual StreamConfig
-instance, it creates a VirtualAudioStreamIn or VirtualAudioStreamOut object, which inherits
-significant functionality from parent class SimpleAudioStream - this parent class is located in
-Zircon and is used by other audio drivers as well. VirtualAudioStream methods provide very basic
-support for gain, position notification, and supported formats.
+device using this configuration.
 
 ## Debugging the Virtual Audio Device Drivers
 
 TRACE and DEBUG levels of logging are disabled by default. To enable them, use an 'fx set' command\
 like the following:
 
-    fx set x64 --args=dev_bootfs_labels=[\"//src/media/audio/drivers/virtual-audio-legacy:kernel_logging\"]
+    fx set x64 --args=dev_bootfs_labels=[\"//src/media/audio/drivers/virtual-audio:kernel_logging\"]
 
 ## FIDL Interfaces
 
@@ -43,15 +32,17 @@ The driver implements the virtualaudio.Device FIDL interfaces.
 
 ### virtualaudio.Control
 
-The virtualaudio.Control interface is used for top-level activation of virtual audio devices and to
-fetch the default configuration of each DeviceType (which the client can customize before
-activating that device instance).
+The virtualaudio.Control interface is used for top-level activation or deactivation of virtual audio
+devices. The Disable function deactivates/removes any active virtual audio devices and disallows any
+subsequent virtual device activations. Conversely, the Enable function once again allows virtual
+audio devices to be activated/added (although it does not automatically re-activate any previously
+active devices).
 
-### virtualaudio.Device
+### virtualaudio.Input and virtualaudio.Output
 
-This FIDL interface is used to interact with virtual audio device instances that have been added.
-
-The virtualaudio.Configuration, used when previously adding the device, specifies
+These FIDL interfaces are used to configure and add virtual audio input and output devices.
+virtualaudio.Configuration is a subset of the top-level input and output interfaces, and includes
+methods to statically configure these virtual devices before they are created, specifically to set
 the following properties:
 * Device name
 * Manufacturer name
