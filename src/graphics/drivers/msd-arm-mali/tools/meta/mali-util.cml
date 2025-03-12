@@ -10,11 +10,6 @@
         binary: "bin/mali-util",
     },
     use: [
-        {
-            directory: "dev-class",
-            rights: [ "r*" ],
-            path: "/dev/class",
-        },
-        {service : "fuchsia.hardware.gpu.mali.UtilsService"},
+        { service: "fuchsia.hardware.gpu.mali.UtilsService" },
     ],
 }

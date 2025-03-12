@@ -4,32 +4,21 @@
 
 #include <fidl/fuchsia.hardware.gpu.mali/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/component/incoming/cpp/service_member_watcher.h>
 
 #include <filesystem>
 
 #include "src/lib/fxl/command_line.h"
-
-const char* kUtilClassPath = "/dev/class/mali-util";
 
 int main(int argc, char** argv) {
   auto command_line = fxl::CommandLineFromArgcArgv(argc, argv);
 
   static const char kPowerStateFlag[] = "power-state";
 
-  std::string gpu_device_value;
-  for (auto& p : std::filesystem::directory_iterator(kUtilClassPath)) {
-    gpu_device_value = p.path();
-  }
-  if (gpu_device_value.empty()) {
-    fprintf(stderr, "No magma device found\n");
-    return -1;
-  }
-  printf("Opening magma device: %s\n", gpu_device_value.c_str());
-  zx::result client_end =
-      component::Connect<fuchsia_hardware_gpu_mali::MaliUtils>(gpu_device_value);
+  component::SyncServiceMemberWatcher<fuchsia_hardware_gpu_mali::UtilsService::Device> watcher;
+  zx::result client_end = watcher.GetNextInstance(true);
   if (client_end.is_error()) {
-    printf("Failed to open magma device %s: %s\n", gpu_device_value.c_str(),
-           client_end.status_string());
+    printf("Failed to open magma device: %s\n", client_end.status_string());
     return -1;
   }
 
