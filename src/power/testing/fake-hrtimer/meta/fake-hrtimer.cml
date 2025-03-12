@@ -12,9 +12,15 @@
     },
     capabilities: [
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-hrtimer",
             rights: [ "r*" ],
             path: "/hrtimer",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.hrtimer.Service",
         },
     ],
     use: [
@@ -24,7 +30,14 @@
     ],
     expose: [
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-hrtimer",
+            from: "self",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.hrtimer.Service",
             from: "self",
         },
     ],

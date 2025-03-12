@@ -26,9 +26,15 @@
             service: "fuchsia.hardware.mediacodec.Service",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-securemem",
             rights: [ "r*" ],
             path: "/dev/class/securemem",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.securemem.Service",
         },
         {
             directory: "dev-sysmem",

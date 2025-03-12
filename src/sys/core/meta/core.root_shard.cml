@@ -310,7 +310,7 @@
                 "fuchsia.hardware.goldfish.ControllerService",
                 "fuchsia.hardware.goldfish.ControlService",
                 "fuchsia.hardware.goldfish.SyncService",
-                "fuchsia.hardware.gpu.mali.Service",
+                "fuchsia.hardware.gpu.mali.UtilsService",
                 "fuchsia.hardware.hrtimer.Service",
                 "fuchsia.hardware.i2c.Service",
                 "fuchsia.hardware.input.Service",

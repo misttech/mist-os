@@ -495,6 +495,8 @@
             subdir: "tee",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-securemem",
@@ -502,11 +504,25 @@
             subdir: "securemem",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.securemem.Service",
+            from: "parent",
+            to: "#testing",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-hrtimer",
             to: "#testing",
             subdir: "hrtimer",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.hrtimer.Service",
+            from: "parent",
+            to: "#testing",
         },
 
         // Tests of the media system want to test against the real hardware

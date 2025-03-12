@@ -13,9 +13,15 @@
     ],
     use: [
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-radar",
             rights: [ "r*" ],
             path: "/dev/class/radar",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.radar.Service",
         },
     ],
     expose: [

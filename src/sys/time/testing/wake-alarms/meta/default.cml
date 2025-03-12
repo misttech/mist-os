@@ -19,9 +19,15 @@
     use: [
         {
             // Hrtimer is the hardware wake alarm driver API.
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-hrtimer",
             rights: [ "r*" ],
             path: "/dev/class/hrtimer",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.hrtimer.Service",
         },
     ],
     expose: [

@@ -65,9 +65,15 @@
             service: "fuchsia.input.report.Service",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-light",
             rights: [ "r*" ],
             path: "/dev/class/light",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.light.LightService",
         },
 
         // Features: config-data.

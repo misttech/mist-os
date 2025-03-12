@@ -67,17 +67,30 @@
             availability: "optional",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-rtc",
             rights: [ "r*" ],
             path: "/dev/class/rtc",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.rtc.Service",
+        },
+        {
             // Used for handling wake alarms.
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-hrtimer",
             rights: [ "r*" ],
             path: "/dev/class/hrtimer",
 
             // Optional during development.
+            availability: "optional",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.hrtimer.Service",
             availability: "optional",
         },
     ],
