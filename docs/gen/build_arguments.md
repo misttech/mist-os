@@ -722,7 +722,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8720693347680310817"`
+**Current value for `target_cpu = "arm64"`:** `"8720648036170342049"`
 
 From //out/not-default/args.gn:10
 
@@ -730,7 +730,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8720693347680310817"`
+**Current value for `target_cpu = "riscv64"`:** `"8720648036170342049"`
 
 From //out/not-default/args.gn:10
 
@@ -738,7 +738,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8720693347680310817"`
+**Current value for `target_cpu = "x64"`:** `"8720648036170342049"`
 
 From //out/not-default/args.gn:10
 
@@ -3485,6 +3485,12 @@ Debug build.
 **Current value (from the default):** `""`
 
 From //build/config/compilation_modes.gni:54
+
+### is_multi_product_build
+
+**Current value (from the default):** `false`
+
+From //build/images/args.gni:238
 
 ### is_perfetto_build_generator
 
