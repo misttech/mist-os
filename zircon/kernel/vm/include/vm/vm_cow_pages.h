@@ -1365,9 +1365,11 @@ class VmCowPages final : public VmHierarchyBase,
   // Helper function for |CloneBidirectionalLocked|.
   //
   // Adds the newly created bidirectionally cloned |child| as a child of this node. Also, updates
-  // the appropriate share counts for the pages that are now shared by the new child.
-  void AddBidirectionallyClonedChildLocked(uint64_t offset, uint64_t limit, VmCowPages* child)
-      TA_REQ(lock()) TA_REQ(child->lock());
+  // the appropriate share counts for the pages that are now shared by the new child. If there is a
+  // parent_ then the passed in |parent| is a locked ptr to it.
+  void AddBidirectionallyClonedChildLocked(uint64_t offset, uint64_t limit, VmCowPages* child,
+                                           const LockedPtr& parent) TA_REQ(lock())
+      TA_REQ(child->lock());
 
   // Helper function for |CreateCloneLocked|.
   //
@@ -1381,8 +1383,10 @@ class VmCowPages final : public VmHierarchyBase,
   // Unlike a unidirectional clone, the snapshot taken by the child is guaranteed to never contain
   // any writes or newly committed pages made by ancestor nodes after the clone operation is
   // performed.
-  zx::result<LockedRefPtr> CloneBidirectionalLocked(uint64_t offset, uint64_t limit, uint64_t size)
-      TA_REQ(lock());
+  //
+  // If there is a parent_ then the passed in |parent| is a locked ptr to it.
+  zx::result<LockedRefPtr> CloneBidirectionalLocked(uint64_t offset, uint64_t limit, uint64_t size,
+                                                    const LockedPtr& parent) TA_REQ(lock());
 
   // Helper function for |CreateCloneLocked|.
   //
@@ -1397,8 +1401,10 @@ class VmCowPages final : public VmHierarchyBase,
   // clone operation is performed, but this is not guaranteed. This includes pages which ancestors
   // have newly committed since this clone operation was performed - the clone may see these pages
   // to snapshot them but it is not guaranteed.
-  zx::result<LockedRefPtr> CloneUnidirectionalLocked(uint64_t offset, uint64_t limit, uint64_t size)
-      TA_REQ(lock());
+  //
+  // If there is a parent_ then the passed in |parent| is a locked ptr to it.
+  zx::result<LockedRefPtr> CloneUnidirectionalLocked(uint64_t offset, uint64_t limit, uint64_t size,
+                                                     const LockedPtr& parent) TA_REQ(lock());
 
   // Release any pages this VMO can reference from the provided start offset till the end of the
   // VMO. This releases both directly owned pages, as well as pages in hidden parents that may be
@@ -1449,7 +1455,7 @@ class VmCowPages final : public VmHierarchyBase,
   // Replaces this node in its parent's child list with a hidden node and makes this node a child
   // of the newly created hidden node. Moves the pages that were stored at this node into the
   // newly created hidden node.
-  zx::result<LockedRefPtr> ReplaceWithHiddenNodeLocked() TA_REQ(lock());
+  zx::result<LockedRefPtr> ReplaceWithHiddenNodeLocked(const LockedPtr& parent) TA_REQ(lock());
 
   // Removes the specified child from this objects |children_list_| and performs any hierarchy
   // updates that need to happen as a result. This does not modify the |parent_| member of the

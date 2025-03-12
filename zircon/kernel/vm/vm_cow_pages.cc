@@ -1025,7 +1025,7 @@ VmCowPages::ParentAndRange VmCowPages::FindParentAndRangeForCloneLocked(
 }
 
 void VmCowPages::AddBidirectionallyClonedChildLocked(uint64_t offset, uint64_t limit,
-                                                     VmCowPages* child) {
+                                                     VmCowPages* child, const LockedPtr& parent) {
   AddChildLocked(child, offset, limit);
 
   VmCompression* compression = Pmm::Node().GetPageCompression();
@@ -1044,7 +1044,7 @@ void VmCowPages::AddBidirectionallyClonedChildLocked(uint64_t offset, uint64_t l
 
         return ZX_ERR_NEXT;
       },
-      offset, limit, LockedPtr());
+      offset, limit, parent);
   DEBUG_ASSERT(status == ZX_OK);
 
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
@@ -1096,7 +1096,8 @@ void VmCowPages::MovePagesIntoLocked(VmCowPages& other) {
   DEBUG_ASSERT(page_list_.IsEmpty());
 }
 
-zx::result<VmCowPages::LockedRefPtr> VmCowPages::ReplaceWithHiddenNodeLocked() {
+zx::result<VmCowPages::LockedRefPtr> VmCowPages::ReplaceWithHiddenNodeLocked(
+    const LockedPtr& parent) {
   canary_.Assert();
 
   fbl::RefPtr<VmHierarchyState> state;
@@ -1132,7 +1133,13 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::ReplaceWithHiddenNodeLocked() {
     if (!ac.check()) {
       return zx::error(ZX_ERR_NO_MEMORY);
     }
-    hidden_parent = LockedRefPtr(ktl::move(hidden_parent_ref), VmLockAcquireMode::Reentrant);
+    // If we have a parent (which will become the parent of the new hidden node) then since its
+    // lock is already acquired we cannot acquire the new hidden parent using its normal lock order.
+    // As we just created this node we know that no one else can be acquiring it, so we use the gap
+    // in the regular lock orders, taking into account that the new leaf node was already acquired
+    // into the same gap.
+    const uint64_t order = parent ? parent->lock_order() + 2 : hidden_parent_ref->lock_order();
+    hidden_parent = LockedRefPtr(ktl::move(hidden_parent_ref), order, VmLockAcquireMode::Reentrant);
   }
   hidden_parent.locked().page_list_.InitializeSkew(page_list_.GetSkew(), 0);
   hidden_parent.locked().TransitionToAliveLocked();
@@ -1140,6 +1147,7 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::ReplaceWithHiddenNodeLocked() {
   // If the current object is not the root of the tree, then we need to replace ourselves in our
   // parent's child list with the new hidden node before we can becomes its child.
   if (parent_) {
+    DEBUG_ASSERT(parent && parent.get() == parent_.get());
     // Copy the offsets and limits from the current node to the newly created parent.
     // This logic is similar to AddChildLocked, except that we don't need to recompute these
     // values.
@@ -1150,7 +1158,7 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::ReplaceWithHiddenNodeLocked() {
     // We do not need to set high_priority_count_ because the called to AddChildLocked below
     // will initialize high_priority_count_ for hidden_parent.
 
-    parent_locked().ReplaceChildLocked(this, hidden_parent.get());
+    parent.locked().ReplaceChildLocked(this, hidden_parent.get());
     hidden_parent.locked().parent_ = ktl::move(parent_);
 
     // We have lost our parent, which means we could now be violating the invariant that
@@ -1172,7 +1180,8 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::ReplaceWithHiddenNodeLocked() {
 
 zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneBidirectionalLocked(uint64_t offset,
                                                                           uint64_t limit,
-                                                                          uint64_t size) {
+                                                                          uint64_t size,
+                                                                          const LockedPtr& parent) {
   canary_.Assert();
 
   VmCowPagesOptions options = inheritable_options();
@@ -1191,25 +1200,28 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneBidirectionalLocked(uint64
       return zx::error(ZX_ERR_NO_MEMORY);
     }
     // As this node was just constructed we know the lock is free, use one of the lock order gap
-    // values to acquire without a lockdep violation.
-    cow_clone =
-        LockedRefPtr(ktl::move(cow_clone_ref), lock_order() + 1, VmLockAcquireMode::Reentrant);
+    // values to acquire without a lockdep violation. If we have a parent, and hence hold its lock,
+    // then we must set the lock order after it.
+    DEBUG_ASSERT(parent_.get() == parent.get());
+    const uint64_t order = (parent ? parent->lock_order() : lock_order()) + 1;
+    cow_clone = LockedRefPtr(ktl::move(cow_clone_ref), order, VmLockAcquireMode::Reentrant);
   }
 
   // If `parent` is to be the new child's parent then it must become hidden first.
   // That requires creating a new hidden node and rotating `parent` to be its child.
   if (!is_hidden()) {
-    auto result = ReplaceWithHiddenNodeLocked();
+    auto result = ReplaceWithHiddenNodeLocked(parent);
     if (result.is_error()) {
       return result.take_error();
     }
     DEBUG_ASSERT((*result)->is_hidden());
-    (*result).locked().AddBidirectionallyClonedChildLocked(offset, limit, &cow_clone.locked());
+    (*result).locked().AddBidirectionallyClonedChildLocked(offset, limit, &cow_clone.locked(),
+                                                           parent);
   } else {
     // The COW clone's parent must be hidden because the clone must not see any future parent
     // writes.
     DEBUG_ASSERT(is_hidden());
-    AddBidirectionallyClonedChildLocked(offset, limit, &cow_clone.locked());
+    AddBidirectionallyClonedChildLocked(offset, limit, &cow_clone.locked(), parent);
   }
 
   // Checking this node's hierarchy will also check the parent's hierarchy.
@@ -1218,9 +1230,8 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneBidirectionalLocked(uint64
   return zx::ok(ktl::move(cow_clone));
 }
 
-zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneUnidirectionalLocked(uint64_t offset,
-                                                                           uint64_t limit,
-                                                                           uint64_t size) {
+zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneUnidirectionalLocked(
+    uint64_t offset, uint64_t limit, uint64_t size, const LockedPtr& parent) {
   canary_.Assert();
 
   VmCowPagesOptions options = inheritable_options();
@@ -1244,9 +1255,12 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneUnidirectionalLocked(uint6
       return zx::error(ZX_ERR_NO_MEMORY);
     }
     // As this node was just constructed we know the lock is free, use one of the lock order gap
-    // values to acquire without a lockdep violation.
+    // values to acquire without a lockdep violation. If we have a parent, and hence hold its lock,
+    // then we must set the lock order after it.
+    DEBUG_ASSERT(parent_.get() == parent.get());
     cow_clone =
-        LockedRefPtr(ktl::move(cow_clone_ref), lock_order() + 1, VmLockAcquireMode::Reentrant);
+        LockedRefPtr(ktl::move(cow_clone_ref), (parent ? parent->lock_order() : lock_order()) + 1,
+                     VmLockAcquireMode::Reentrant);
   }
 
   // The COW clone's parent must not be hidden because the clone may see future parent writes.
@@ -1339,17 +1353,15 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CreateCloneLocked(SnapshotType 
 
   ParentAndRange child_range =
       FindParentAndRangeForCloneLocked(range.offset, range.len, !unidirectional);
-  // TODO(https://fxbug.dev/338300943): We are supposed to hold any grandparent lock over the
-  // clone creation path. For now we continue to rely on the hierarchy lock encapsulating this lock
-  // allowing us to release it.
-  child_range.grandparent.release();
 
   if (unidirectional) {
     return child_range.parent.locked_or(this).CloneUnidirectionalLocked(
-        child_range.parent_offset, child_range.parent_limit, child_range.size);
+        child_range.parent_offset, child_range.parent_limit, child_range.size,
+        child_range.grandparent);
   }
   return child_range.parent.locked_or(this).CloneBidirectionalLocked(
-      child_range.parent_offset, child_range.parent_limit, child_range.size);
+      child_range.parent_offset, child_range.parent_limit, child_range.size,
+      child_range.grandparent);
 }
 
 void VmCowPages::RemoveChildLocked(VmCowPages* removed) {
