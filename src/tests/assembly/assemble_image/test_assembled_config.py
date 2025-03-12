@@ -40,7 +40,7 @@ def main() -> int:
     parser.add_argument(
         "--legacy-bundle",
         type=pathlib.Path,
-        required=True,
+        required=False,
         help="Path to the legacy input bundle manifest.",
     )
     parser.add_argument(
