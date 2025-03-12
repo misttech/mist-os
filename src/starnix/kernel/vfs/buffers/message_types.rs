@@ -84,7 +84,7 @@ pub struct ControlMsg {
 impl ControlMsg {
     pub fn new(cmsg_level: u32, cmsg_type: u32, data: Vec<u8>) -> ControlMsg {
         let cmsg_len = std::mem::size_of::<cmsghdr>() + data.len();
-        let header = cmsghdr { cmsg_len, cmsg_level, cmsg_type };
+        let header = cmsghdr { cmsg_len: cmsg_len as u64, cmsg_level, cmsg_type };
         ControlMsg { header, data }
     }
 }
@@ -237,7 +237,7 @@ impl AncillaryData {
         let cmsg = self.into_controlmsg(current_task, flags)?;
         if let Some(mut cmsg) = cmsg {
             let cmsg_len = std::cmp::min(header_size + cmsg.data.len(), space_available);
-            cmsg.header.cmsg_len = cmsg_len;
+            cmsg.header.cmsg_len = cmsg_len as u64;
             let mut bytes = cmsg.header.as_bytes().to_owned();
             bytes.extend_from_slice(&cmsg.data[..cmsg_len - header_size]);
             return Ok(bytes);

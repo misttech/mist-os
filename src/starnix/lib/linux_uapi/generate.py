@@ -229,6 +229,28 @@ AUTO_DERIVE_TRAITS = [
     ),
     (r"xt_counters_info", ["KnownLayout", "FromBytes", "Immutable"]),
     (r"xt_tproxy_target_info_v1", ["KnownLayout", "FromBytes", "Immutable"]),
+    (
+        r"ucred",
+        [
+            "KnownLayout",
+            "IntoBytes",
+            "FromBytes",
+            "Immutable",
+            "Eq",
+            "PartialEq",
+        ],
+    ),
+    (
+        r"cmsghdr",
+        [
+            "KnownLayout",
+            "IntoBytes",
+            "FromBytes",
+            "Immutable",
+            "Eq",
+            "PartialEq",
+        ],
+    ),
 ]
 
 # General replacements to apply to the contents of the file. These are tuples of
@@ -370,6 +392,7 @@ bindgen.type_blocklist = TYPE_BLOCKLIST
 bindgen.no_debug_types = NO_DEBUG_TYPES
 bindgen.no_copy_types = NO_COPY_TYPES
 bindgen.enable_stdlib_include_dirs = False
+bindgen.size_t_is_usize = False
 
 for arch in ARCH_INFO:
     bindgen.raw_lines = RAW_LINES

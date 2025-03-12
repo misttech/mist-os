@@ -435,16 +435,16 @@ fn read_iovec_from_msghdr(
     current_task: &CurrentTask,
     message_header: &msghdr,
 ) -> Result<UserBuffers, Errno> {
-    let iovec_count = message_header.msg_iovlen as usize;
+    let iovec_count = message_header.msg_iovlen;
 
     // In `CurrentTask::read_iovec()` the same check fails with `EINVAL`. This works for all
     // syscalls that use `iovec`, except `sendmsg()` and `recvmsg()`, which need to fail with
     // EMSGSIZE.
-    if iovec_count > UIO_MAXIOV as usize {
+    if iovec_count > UIO_MAXIOV as u64 {
         return error!(EMSGSIZE);
     }
 
-    current_task.read_objects_to_smallvec(message_header.msg_iov.into(), iovec_count)
+    current_task.read_iovec(message_header.msg_iov.into(), (iovec_count as i32).into())
 }
 
 fn recvmsg_internal<L>(
@@ -474,7 +474,7 @@ where
 
     message_header.msg_flags = 0;
 
-    let cmsg_buffer_size = message_header.msg_controllen;
+    let cmsg_buffer_size = message_header.msg_controllen as usize;
     let mut cmsg_bytes_written = 0;
     let header_size = size_of::<cmsghdr>();
 
@@ -497,7 +497,7 @@ where
         // some of the message is missing.
         let truncated = message_bytes.len() < expected_size;
         if truncated {
-            message_header.msg_flags |= MSG_CTRUNC as u64;
+            message_header.msg_flags |= MSG_CTRUNC;
         }
 
         if message_bytes.len() < header_size {
@@ -506,8 +506,10 @@ where
         }
 
         if !message_bytes.is_empty() {
-            current_task
-                .write_memory(message_header.msg_control + cmsg_bytes_written, &message_bytes)?;
+            current_task.write_memory(
+                UserAddress::from(message_header.msg_control) + cmsg_bytes_written,
+                &message_bytes,
+            )?;
             cmsg_bytes_written += message_bytes.len();
             if !truncated {
                 cmsg_bytes_written = round_up_to_increment(cmsg_bytes_written, size_of::<usize>())?;
@@ -515,9 +517,10 @@ where
         }
     }
 
-    message_header.msg_controllen = cmsg_bytes_written;
+    message_header.msg_controllen = cmsg_bytes_written as u64;
 
-    if !message_header.msg_name.is_null() {
+    let msg_name = UserAddress::from(message_header.msg_name);
+    if !msg_name.is_null() {
         if message_header.msg_namelen > i32::MAX as u32 {
             return error!(EINVAL);
         }
@@ -525,12 +528,12 @@ where
         let num_bytes = std::cmp::min(message_header.msg_namelen as usize, bytes.len());
         message_header.msg_namelen = bytes.len() as u32;
         if num_bytes > 0 {
-            current_task.write_memory(message_header.msg_name, &bytes[..num_bytes])?;
+            current_task.write_memory(msg_name, &bytes[..num_bytes])?;
         }
     }
 
     if info.bytes_read != info.message_length {
-        message_header.msg_flags |= MSG_TRUNC as u64;
+        message_header.msg_flags |= MSG_TRUNC;
     }
 
     current_task.write_object(user_message_header, &message_header)?;
@@ -661,30 +664,32 @@ where
     }
     let dest_address = maybe_parse_socket_address(
         current_task,
-        message_header.msg_name,
+        UserAddress::from(message_header.msg_name),
         message_header.msg_namelen as usize,
     )?;
     let iovec = read_iovec_from_msghdr(current_task, &message_header)?;
 
-    let mut next_message_offset = 0;
+    let mut next_message_offset: usize = 0;
     let mut ancillary_data = Vec::new();
     let header_size = size_of::<cmsghdr>();
     loop {
-        let space = message_header.msg_controllen.saturating_sub(next_message_offset);
+        let space = (message_header.msg_controllen as usize).saturating_sub(next_message_offset);
         if space < header_size {
             break;
         }
-        let cmsg_ref = UserRef::<cmsghdr>::from(message_header.msg_control + next_message_offset);
+        let cmsg_ref = UserRef::<cmsghdr>::from(
+            UserAddress::from(message_header.msg_control) + next_message_offset,
+        );
         let cmsg = current_task.read_object(cmsg_ref)?;
         // If the message header is not long enough to fit the required fields of the
         // control data, return EINVAL.
-        if cmsg.cmsg_len < header_size {
+        if (cmsg.cmsg_len as usize) < header_size {
             return error!(EINVAL);
         }
 
-        let data_size = std::cmp::min(cmsg.cmsg_len - header_size, space);
+        let data_size = std::cmp::min(cmsg.cmsg_len as usize - header_size, space);
         let data = current_task.read_memory_to_vec(
-            message_header.msg_control + next_message_offset + header_size,
+            UserAddress::from(message_header.msg_control) + next_message_offset + header_size,
             data_size,
         )?;
         next_message_offset += round_up_to_increment(header_size + data.len(), size_of::<usize>())?;

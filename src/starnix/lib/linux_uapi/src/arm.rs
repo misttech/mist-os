@@ -225,10 +225,10 @@ impl<T> ::std::cmp::PartialEq for __BindgenUnionField<T> {
     }
 }
 impl<T> ::std::cmp::Eq for __BindgenUnionField<T> {}
+pub const __BITS_PER_LONG_LONG: u32 = 64;
 pub const AF_UNSPEC: u32 = 0;
 pub const AF_INET: u32 = 2;
 pub const AF_INET6: u32 = 10;
-pub const __BITS_PER_LONG_LONG: u32 = 64;
 pub const __FD_SETSIZE: u32 = 1024;
 pub const _KERNEL_NSIG: u32 = 32;
 pub const SIGHUP: u32 = 1;
@@ -6184,6 +6184,7 @@ pub const SPLICE_F_MOVE: u32 = 1;
 pub const SPLICE_F_NONBLOCK: u32 = 2;
 pub const SPLICE_F_MORE: u32 = 4;
 pub const SPLICE_F_GIFT: u32 = 8;
+pub type size_t = crate::types::arch32::c_uint;
 pub type wchar_t = crate::types::arch32::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
@@ -6191,22 +6192,24 @@ pub struct max_align_t {
     pub __clang_max_align_nonce1: crate::types::arch32::c_longlong,
     pub __clang_max_align_nonce2: f64,
 }
-pub type __s8 = crate::types::arch32::c_schar;
-pub type __u8 = crate::types::arch32::c_uchar;
-pub type __s16 = crate::types::arch32::c_short;
-pub type __u16 = crate::types::arch32::c_ushort;
-pub type __s32 = crate::types::arch32::c_int;
-pub type __u32 = crate::types::arch32::c_uint;
-pub type __s64 = crate::types::arch32::c_longlong;
-pub type __u64 = crate::types::arch32::c_ulonglong;
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
-pub struct __kernel_fd_set {
-    pub fds_bits: [crate::types::arch32::c_ulong; 32usize],
-}
-pub type __kernel_sighandler_t = crate::uaddr32;
-pub type __kernel_key_t = crate::types::arch32::c_int;
-pub type __kernel_mqd_t = crate::types::arch32::c_int;
+pub type int_least64_t = i64;
+pub type uint_least64_t = u64;
+pub type int_fast64_t = i64;
+pub type uint_fast64_t = u64;
+pub type int_least32_t = i32;
+pub type uint_least32_t = u32;
+pub type int_fast32_t = i32;
+pub type uint_fast32_t = u32;
+pub type int_least16_t = i16;
+pub type uint_least16_t = u16;
+pub type int_fast16_t = i16;
+pub type uint_fast16_t = u16;
+pub type int_least8_t = i8;
+pub type uint_least8_t = u8;
+pub type int_fast8_t = i8;
+pub type uint_fast8_t = u8;
+pub type intmax_t = crate::types::arch32::c_longlong;
+pub type uintmax_t = crate::types::arch32::c_ulonglong;
 pub type __kernel_mode_t = crate::types::arch32::c_ushort;
 pub type __kernel_ipc_pid_t = crate::types::arch32::c_ushort;
 pub type __kernel_uid_t = crate::types::arch32::c_ushort;
@@ -6241,6 +6244,82 @@ pub type __kernel_clockid_t = crate::types::arch32::c_int;
 pub type __kernel_caddr_t = crate::uref32<crate::types::arch32::c_char>;
 pub type __kernel_uid16_t = crate::types::arch32::c_ushort;
 pub type __kernel_gid16_t = crate::types::arch32::c_ushort;
+pub type socklen_t = u32;
+#[repr(C)]
+#[derive(
+    Debug, Default, Copy, Clone, KnownLayout, IntoBytes, FromBytes, Immutable, Eq, PartialEq,
+)]
+pub struct ucred {
+    pub pid: __kernel_pid_t,
+    pub uid: __kernel_uid_t,
+    pub gid: __kernel_gid_t,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct msghdr {
+    pub msg_name: crate::uaddr32,
+    pub msg_namelen: socklen_t,
+    pub msg_iov: crate::uref32<iovec>,
+    pub msg_iovlen: size_t,
+    pub msg_control: crate::uaddr32,
+    pub msg_controllen: size_t,
+    pub msg_flags: crate::types::arch32::c_uint,
+}
+impl Default for msghdr {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(
+    Debug, Default, Copy, Clone, KnownLayout, IntoBytes, FromBytes, Immutable, Eq, PartialEq,
+)]
+pub struct cmsghdr {
+    pub cmsg_len: size_t,
+    pub cmsg_level: crate::types::arch32::c_uint,
+    pub cmsg_type: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct mmsghdr {
+    pub msg_hdr: msghdr,
+    pub msg_len: crate::types::arch32::c_uint,
+}
+impl Default for mmsghdr {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct linger {
+    pub l_onoff: crate::types::arch32::c_int,
+    pub l_linger: crate::types::arch32::c_int,
+}
+pub type __s8 = crate::types::arch32::c_schar;
+pub type __u8 = crate::types::arch32::c_uchar;
+pub type __s16 = crate::types::arch32::c_short;
+pub type __u16 = crate::types::arch32::c_ushort;
+pub type __s32 = crate::types::arch32::c_int;
+pub type __u32 = crate::types::arch32::c_uint;
+pub type __s64 = crate::types::arch32::c_longlong;
+pub type __u64 = crate::types::arch32::c_ulonglong;
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct __kernel_fd_set {
+    pub fds_bits: [crate::types::arch32::c_ulong; 32usize],
+}
+pub type __kernel_sighandler_t = crate::uaddr32;
+pub type __kernel_key_t = crate::types::arch32::c_int;
+pub type __kernel_mqd_t = crate::types::arch32::c_int;
 pub type __le16 = __u16;
 pub type __be16 = __u16;
 pub type __le32 = __u32;
@@ -7430,24 +7509,6 @@ pub const DM_DEV_SET_GEOMETRY_CMD: _bindgen_ty_6 = 15;
 pub const DM_DEV_ARM_POLL_CMD: _bindgen_ty_6 = 16;
 pub const DM_GET_TARGET_VERSION_CMD: _bindgen_ty_6 = 17;
 pub type _bindgen_ty_6 = crate::types::arch32::c_uint;
-pub type int_least64_t = i64;
-pub type uint_least64_t = u64;
-pub type int_fast64_t = i64;
-pub type uint_fast64_t = u64;
-pub type int_least32_t = i32;
-pub type uint_least32_t = u32;
-pub type int_fast32_t = i32;
-pub type uint_fast32_t = u32;
-pub type int_least16_t = i16;
-pub type uint_least16_t = u16;
-pub type int_fast16_t = i16;
-pub type uint_fast16_t = u16;
-pub type int_least8_t = i8;
-pub type uint_least8_t = u8;
-pub type int_fast8_t = i8;
-pub type uint_fast8_t = u8;
-pub type intmax_t = crate::types::arch32::c_longlong;
-pub type uintmax_t = crate::types::arch32::c_ulonglong;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
 pub struct epoll_event {

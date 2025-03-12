@@ -86,54 +86,6 @@ pub const MNT_DETACH: u32 = 2;
 pub const MNT_EXPIRE: u32 = 4;
 pub const UMOUNT_NOFOLLOW: u32 = 8;
 
-pub type socklen_t = u32;
-
-#[derive(Clone, Debug, Default, Eq, PartialEq, IntoBytes, KnownLayout, FromBytes, Immutable)]
-#[repr(C)]
-pub struct ucred {
-    pub pid: pid_t,
-    pub uid: uid_t,
-    pub gid: gid_t,
-}
-
-#[derive(Debug, Default, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
-#[repr(C)]
-pub struct msghdr {
-    pub msg_name: UserAddress,
-    pub msg_namelen: u32,
-    pub _pad0: u32,
-    pub msg_iov: UserAddress,
-    pub msg_iovlen: u64,
-    pub msg_control: UserAddress,
-    pub msg_controllen: usize,
-    pub msg_flags: u64,
-}
-
-#[derive(
-    Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable, Eq, PartialEq,
-)]
-#[repr(packed)]
-pub struct cmsghdr {
-    pub cmsg_len: usize,
-    pub cmsg_level: u32,
-    pub cmsg_type: u32,
-}
-
-#[derive(Debug, Default, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
-#[repr(C)]
-pub struct mmsghdr {
-    pub msg_hdr: msghdr,
-    pub msg_len: u32,
-    pub __reserved: [u8; 4usize],
-}
-
-#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
-#[repr(C)]
-pub struct linger {
-    pub l_onoff: i32,
-    pub l_linger: i32,
-}
-
 pub const EFD_CLOEXEC: u32 = O_CLOEXEC;
 pub const EFD_NONBLOCK: u32 = O_NONBLOCK;
 pub const EFD_SEMAPHORE: u32 = 1;
