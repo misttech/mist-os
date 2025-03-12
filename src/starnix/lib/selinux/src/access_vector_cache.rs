@@ -4,7 +4,7 @@
 
 use crate::policy::AccessDecision;
 use crate::sync::Mutex;
-use crate::{AbstractObjectClass, FileClass, NullessByteStr, ObjectClass, SecurityId};
+use crate::{AbstractObjectClass, FsNodeClass, NullessByteStr, ObjectClass, SecurityId};
 use indexmap::IndexMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
@@ -25,27 +25,27 @@ pub(super) trait Query {
         target_class: AbstractObjectClass,
     ) -> AccessDecision;
 
-    /// Returns the security identifier (SID) with which to label a new `file_class` instance
+    /// Returns the security identifier (SID) with which to label a new `fs_node_class` instance
     /// created by `source_sid` in a parent directory labeled `target_sid` should be labeled,
-    /// if no more specific SID was specified by `compute_new_file_sid_with_name()`, based on
+    /// if no more specific SID was specified by `compute_new_fs_node_sid_with_name()`, based on
     /// the file's name.
-    fn compute_new_file_sid(
+    fn compute_new_fs_node_sid(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        file_class: FileClass,
+        fs_node_class: FsNodeClass,
     ) -> Result<SecurityId, anyhow::Error>;
 
-    /// Returns the security identifier (SID) with which to label a new `file_class` instance of
-    /// name `file_name`, created by `source_sid` in a parent directory labeled `target_sid`.
-    /// If no filename-transition rules exist for the specified `file_name` then `None` is
+    /// Returns the security identifier (SID) with which to label a new `fs_node_class` instance of
+    /// name `fs_node_name`, created by `source_sid` in a parent directory labeled `target_sid`.
+    /// If no filename-transition rules exist for the specified `fs_node_name` then `None` is
     /// returned.
-    fn compute_new_file_sid_with_name(
+    fn compute_new_fs_node_sid_with_name(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        file_class: FileClass,
-        file_name: NullessByteStr<'_>,
+        fs_node_class: FsNodeClass,
+        fs_node_name: NullessByteStr<'_>,
     ) -> Option<SecurityId>;
 }
 
@@ -67,27 +67,27 @@ pub trait QueryMut {
         target_class: AbstractObjectClass,
     ) -> AccessDecision;
 
-    /// Returns the security identifier (SID) with which to label a new `file_class` instance
+    /// Returns the security identifier (SID) with which to label a new `fs_node_class` instance
     /// created by `source_sid` in a parent directory labeled `target_sid` should be labeled,
-    /// if no more specific SID was specified by `compute_new_file_sid_with_name()`, based on
+    /// if no more specific SID was specified by `compute_new_fs_node_sid_with_name()`, based on
     /// the file's name.
-    fn compute_new_file_sid(
+    fn compute_new_fs_node_sid(
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        file_class: FileClass,
+        fs_node_class: FsNodeClass,
     ) -> Result<SecurityId, anyhow::Error>;
 
-    /// Returns the security identifier (SID) with which to label a new `file_class` instance of
-    /// name `file_name`, created by `source_sid` in a parent directory labeled `target_sid`.
-    /// If no filename-transition rules exist for the specified `file_name` then `None` is
+    /// Returns the security identifier (SID) with which to label a new `fs_node_class` instance of
+    /// name `fs_node_name`, created by `source_sid` in a parent directory labeled `target_sid`.
+    /// If no filename-transition rules exist for the specified `fs_node_name` then `None` is
     /// returned.
-    fn compute_new_file_sid_with_name(
+    fn compute_new_fs_node_sid_with_name(
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        file_class: FileClass,
-        file_name: NullessByteStr<'_>,
+        fs_node_class: FsNodeClass,
+        fs_node_name: NullessByteStr<'_>,
     ) -> Option<SecurityId>;
 }
 
@@ -101,24 +101,28 @@ impl<Q: Query> QueryMut for Q {
         (self as &dyn Query).query(source_sid, target_sid, target_class)
     }
 
-    fn compute_new_file_sid(
+    fn compute_new_fs_node_sid(
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        file_class: FileClass,
+        fs_node_class: FsNodeClass,
     ) -> Result<SecurityId, anyhow::Error> {
-        (self as &dyn Query).compute_new_file_sid(source_sid, target_sid, file_class)
+        (self as &dyn Query).compute_new_fs_node_sid(source_sid, target_sid, fs_node_class)
     }
 
-    fn compute_new_file_sid_with_name(
+    fn compute_new_fs_node_sid_with_name(
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        file_class: FileClass,
-        file_name: NullessByteStr<'_>,
+        fs_node_class: FsNodeClass,
+        fs_node_name: NullessByteStr<'_>,
     ) -> Option<SecurityId> {
-        (self as &dyn Query)
-            .compute_new_file_sid_with_name(source_sid, target_sid, file_class, file_name)
+        (self as &dyn Query).compute_new_fs_node_sid_with_name(
+            source_sid,
+            target_sid,
+            fs_node_class,
+            fs_node_name,
+        )
     }
 }
 
@@ -161,21 +165,21 @@ impl Query for DenyAll {
         AccessDecision::default()
     }
 
-    fn compute_new_file_sid(
+    fn compute_new_fs_node_sid(
         &self,
         _source_sid: SecurityId,
         _target_sid: SecurityId,
-        _file_class: FileClass,
+        _fs_node_class: FsNodeClass,
     ) -> Result<SecurityId, anyhow::Error> {
         unreachable!()
     }
 
-    fn compute_new_file_sid_with_name(
+    fn compute_new_fs_node_sid_with_name(
         &self,
         _source_sid: SecurityId,
         _target_sid: SecurityId,
-        _file_class: FileClass,
-        _file_name: NullessByteStr<'_>,
+        _fs_node_class: FsNodeClass,
+        _fs_node_name: NullessByteStr<'_>,
     ) -> Option<SecurityId> {
         unreachable!()
     }
@@ -228,21 +232,21 @@ impl<D: QueryMut> QueryMut for Empty<D> {
         self.delegate.query(source_sid, target_sid, target_class)
     }
 
-    fn compute_new_file_sid(
+    fn compute_new_fs_node_sid(
         &mut self,
         _source_sid: SecurityId,
         _target_sid: SecurityId,
-        _file_class: FileClass,
+        _fs_node_class: FsNodeClass,
     ) -> Result<SecurityId, anyhow::Error> {
         unreachable!()
     }
 
-    fn compute_new_file_sid_with_name(
+    fn compute_new_fs_node_sid_with_name(
         &mut self,
         _source_sid: SecurityId,
         _target_sid: SecurityId,
-        _file_class: FileClass,
-        _file_name: NullessByteStr<'_>,
+        _fs_node_class: FsNodeClass,
+        _fs_node_name: NullessByteStr<'_>,
     ) -> Option<SecurityId> {
         unreachable!()
     }
@@ -373,13 +377,13 @@ impl<D: QueryMut> QueryMut for FifoCache<D> {
         access_decision
     }
 
-    fn compute_new_file_sid(
+    fn compute_new_fs_node_sid(
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        file_class: FileClass,
+        fs_node_class: FsNodeClass,
     ) -> Result<SecurityId, anyhow::Error> {
-        let target_class = AbstractObjectClass::System(ObjectClass::from(file_class));
+        let target_class = AbstractObjectClass::System(ObjectClass::from(fs_node_class));
 
         let index = if let Some(index) = self.search(source_sid, target_sid, target_class.clone()) {
             index
@@ -396,7 +400,7 @@ impl<D: QueryMut> QueryMut for FifoCache<D> {
             Ok(new_file_sid)
         } else {
             let new_file_sid =
-                self.delegate.compute_new_file_sid(source_sid, target_sid, file_class);
+                self.delegate.compute_new_fs_node_sid(source_sid, target_sid, fs_node_class);
             if let Ok(new_file_sid) = new_file_sid {
                 query_result.new_file_sid = Some(new_file_sid);
             }
@@ -404,14 +408,19 @@ impl<D: QueryMut> QueryMut for FifoCache<D> {
         }
     }
 
-    fn compute_new_file_sid_with_name(
+    fn compute_new_fs_node_sid_with_name(
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        file_class: FileClass,
-        file_name: NullessByteStr<'_>,
+        fs_node_class: FsNodeClass,
+        fs_node_name: NullessByteStr<'_>,
     ) -> Option<SecurityId> {
-        self.delegate.compute_new_file_sid_with_name(source_sid, target_sid, file_class, file_name)
+        self.delegate.compute_new_fs_node_sid_with_name(
+            source_sid,
+            target_sid,
+            fs_node_class,
+            fs_node_name,
+        )
     }
 }
 
@@ -465,25 +474,28 @@ impl<D: QueryMut> Query for Locked<D> {
         self.delegate.lock().query(source_sid, target_sid, target_class)
     }
 
-    fn compute_new_file_sid(
+    fn compute_new_fs_node_sid(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        file_class: FileClass,
+        fs_node_class: FsNodeClass,
     ) -> Result<SecurityId, anyhow::Error> {
-        self.delegate.lock().compute_new_file_sid(source_sid, target_sid, file_class)
+        self.delegate.lock().compute_new_fs_node_sid(source_sid, target_sid, fs_node_class)
     }
 
-    fn compute_new_file_sid_with_name(
+    fn compute_new_fs_node_sid_with_name(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        file_class: FileClass,
-        file_name: NullessByteStr<'_>,
+        fs_node_class: FsNodeClass,
+        fs_node_name: NullessByteStr<'_>,
     ) -> Option<SecurityId> {
-        self.delegate
-            .lock()
-            .compute_new_file_sid_with_name(source_sid, target_sid, file_class, file_name)
+        self.delegate.lock().compute_new_fs_node_sid_with_name(
+            source_sid,
+            target_sid,
+            fs_node_class,
+            fs_node_name,
+        )
     }
 }
 
@@ -542,23 +554,28 @@ impl<Q: Query> Query for Arc<Q> {
         self.as_ref().query(source_sid, target_sid, target_class)
     }
 
-    fn compute_new_file_sid(
+    fn compute_new_fs_node_sid(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        file_class: FileClass,
+        fs_node_class: FsNodeClass,
     ) -> Result<SecurityId, anyhow::Error> {
-        self.as_ref().compute_new_file_sid(source_sid, target_sid, file_class)
+        self.as_ref().compute_new_fs_node_sid(source_sid, target_sid, fs_node_class)
     }
 
-    fn compute_new_file_sid_with_name(
+    fn compute_new_fs_node_sid_with_name(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        file_class: FileClass,
-        file_name: NullessByteStr<'_>,
+        fs_node_class: FsNodeClass,
+        fs_node_name: NullessByteStr<'_>,
     ) -> Option<SecurityId> {
-        self.as_ref().compute_new_file_sid_with_name(source_sid, target_sid, file_class, file_name)
+        self.as_ref().compute_new_fs_node_sid_with_name(
+            source_sid,
+            target_sid,
+            fs_node_class,
+            fs_node_name,
+        )
     }
 }
 
@@ -578,26 +595,31 @@ impl<Q: Query> Query for Weak<Q> {
         self.upgrade().map(|q| q.query(source_sid, target_sid, target_class)).unwrap_or_default()
     }
 
-    fn compute_new_file_sid(
+    fn compute_new_fs_node_sid(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        file_class: FileClass,
+        fs_node_class: FsNodeClass,
     ) -> Result<SecurityId, anyhow::Error> {
         self.upgrade()
-            .map(|q| q.compute_new_file_sid(source_sid, target_sid, file_class))
+            .map(|q| q.compute_new_fs_node_sid(source_sid, target_sid, fs_node_class))
             .unwrap_or(Err(anyhow::anyhow!("weak reference failed to resolve")))
     }
 
-    fn compute_new_file_sid_with_name(
+    fn compute_new_fs_node_sid_with_name(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        file_class: FileClass,
-        file_name: NullessByteStr<'_>,
+        fs_node_class: FsNodeClass,
+        fs_node_name: NullessByteStr<'_>,
     ) -> Option<SecurityId> {
         let delegate = self.upgrade()?;
-        delegate.compute_new_file_sid_with_name(source_sid, target_sid, file_class, file_name)
+        delegate.compute_new_fs_node_sid_with_name(
+            source_sid,
+            target_sid,
+            fs_node_class,
+            fs_node_name,
+        )
     }
 }
 
@@ -645,11 +667,11 @@ impl<D: QueryMut + ResetMut> QueryMut for ThreadLocalQuery<D> {
         self.delegate.query(source_sid, target_sid, target_class)
     }
 
-    fn compute_new_file_sid(
+    fn compute_new_fs_node_sid(
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        file_class: FileClass,
+        fs_node_class: FsNodeClass,
     ) -> Result<SecurityId, anyhow::Error> {
         let version = self.active_version.as_ref().version();
         if self.current_version != version {
@@ -658,18 +680,23 @@ impl<D: QueryMut + ResetMut> QueryMut for ThreadLocalQuery<D> {
         }
 
         // Allow `self.delegate` to implement caching strategy and prepare response.
-        self.delegate.compute_new_file_sid(source_sid, target_sid, file_class)
+        self.delegate.compute_new_fs_node_sid(source_sid, target_sid, fs_node_class)
     }
 
-    fn compute_new_file_sid_with_name(
+    fn compute_new_fs_node_sid_with_name(
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        file_class: FileClass,
-        file_name: NullessByteStr<'_>,
+        fs_node_class: FsNodeClass,
+        fs_node_name: NullessByteStr<'_>,
     ) -> Option<SecurityId> {
         // Allow `self.delegate` to implement caching strategy and prepare response.
-        self.delegate.compute_new_file_sid_with_name(source_sid, target_sid, file_class, file_name)
+        self.delegate.compute_new_fs_node_sid_with_name(
+            source_sid,
+            target_sid,
+            fs_node_class,
+            fs_node_name,
+        )
     }
 }
 
@@ -820,21 +847,21 @@ mod tests {
             self.delegate.query(source_sid, target_sid, target_class)
         }
 
-        fn compute_new_file_sid(
+        fn compute_new_fs_node_sid(
             &self,
             _source_sid: SecurityId,
             _target_sid: SecurityId,
-            _file_class: FileClass,
+            _fs_node_class: FsNodeClass,
         ) -> Result<SecurityId, anyhow::Error> {
             unreachable!()
         }
 
-        fn compute_new_file_sid_with_name(
+        fn compute_new_fs_node_sid_with_name(
             &self,
             _source_sid: SecurityId,
             _target_sid: SecurityId,
-            _file_class: FileClass,
-            _file_name: NullessByteStr<'_>,
+            _fs_node_class: FsNodeClass,
+            _fs_node_name: NullessByteStr<'_>,
         ) -> Option<SecurityId> {
             unreachable!()
         }
@@ -1025,21 +1052,21 @@ mod starnix_tests {
             }
         }
 
-        fn compute_new_file_sid(
+        fn compute_new_fs_node_sid(
             &self,
             _source_sid: SecurityId,
             _target_sid: SecurityId,
-            _file_class: FileClass,
+            _fs_node_class: FsNodeClass,
         ) -> Result<SecurityId, anyhow::Error> {
             unreachable!()
         }
 
-        fn compute_new_file_sid_with_name(
+        fn compute_new_fs_node_sid_with_name(
             &self,
             _source_sid: SecurityId,
             _target_sid: SecurityId,
-            _file_class: FileClass,
-            _file_name: NullessByteStr<'_>,
+            _fs_node_class: FsNodeClass,
+            _fs_node_name: NullessByteStr<'_>,
         ) -> Option<SecurityId> {
             unreachable!()
         }
@@ -1352,21 +1379,21 @@ mod starnix_tests {
             }
         }
 
-        fn compute_new_file_sid(
+        fn compute_new_fs_node_sid(
             &self,
             _source_sid: SecurityId,
             _target_sid: SecurityId,
-            _file_class: FileClass,
+            _fs_node_class: FsNodeClass,
         ) -> Result<SecurityId, anyhow::Error> {
             unreachable!()
         }
 
-        fn compute_new_file_sid_with_name(
+        fn compute_new_fs_node_sid_with_name(
             &self,
             _source_sid: SecurityId,
             _target_sid: SecurityId,
-            _file_class: FileClass,
-            _file_name: NullessByteStr<'_>,
+            _fs_node_class: FsNodeClass,
+            _fs_node_name: NullessByteStr<'_>,
         ) -> Option<SecurityId> {
             unreachable!()
         }

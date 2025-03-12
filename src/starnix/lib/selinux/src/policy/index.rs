@@ -135,7 +135,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         &self,
         source: &SecurityContext,
         target: &SecurityContext,
-        class: &crate::FileClass,
+        class: &crate::FsNodeClass,
     ) -> SecurityContext {
         let object_class = crate::ObjectClass::from(class.clone());
         self.new_security_context(
@@ -163,7 +163,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         &self,
         source: &SecurityContext,
         target: &SecurityContext,
-        class: &crate::FileClass,
+        class: &crate::FsNodeClass,
         name: NullessByteStr<'_>,
     ) -> Option<SecurityContext> {
         let object_class = crate::ObjectClass::from(class.clone());

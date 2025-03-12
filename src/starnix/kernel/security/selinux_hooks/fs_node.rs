@@ -340,13 +340,15 @@ fn compute_new_fs_node_sid(
                     label.sid
                 };
                 let permission_check = security_server.as_permission_check();
-                let FsNodeClass::File(new_node_class) = new_node_class else {
-                    panic!("compute_new_fs_node_sid on non-file-like class")
-                };
                 let sid = permission_check
-                    .compute_new_file_sid(current_task_sid, parent_sid, new_node_class, name.into())
+                    .compute_new_fs_node_sid(
+                        current_task_sid,
+                        parent_sid,
+                        new_node_class,
+                        name.into(),
+                    )
                     // TODO: https://fxbug.dev/377915452 - is EPERM right here? What does it mean
-                    // for compute_new_file_sid to have failed?
+                    // for compute_new_fs_node_sid to have failed?
                     .map_err(|_| errno!(EPERM))?;
                 Ok(Some((sid, label)))
             }
@@ -409,7 +411,7 @@ pub fn fs_node_init_on_create(
     }
 }
 
-/// Called to label file nodes not linked in any filesystem's directory structure, e.g. sockets,
+/// Called to label file nodes not linked in any filesystem's directory structure, e.g.
 /// usereventfds, etc.
 pub fn fs_node_init_anon(
     security_server: &SecurityServer,
@@ -418,12 +420,13 @@ pub fn fs_node_init_anon(
     node_type: &str,
 ) {
     let task_sid = current_task.security_state.lock().current_sid;
+    let fs_node_class = FileClass::AnonFsNode.into();
     let sid = security_server
         .as_permission_check()
-        .compute_new_file_sid(task_sid, task_sid, FileClass::AnonFsNode, node_type.into())
+        .compute_new_fs_node_sid(task_sid, task_sid, fs_node_class, node_type.into())
         .expect("Compute label for anon_inode");
     let mut state = new_node.security_state.lock();
-    state.class = FileClass::AnonFsNode.into();
+    state.class = fs_node_class;
     state.label = FsNodeLabel::SecurityId { sid };
 }
 
