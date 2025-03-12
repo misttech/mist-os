@@ -18,8 +18,11 @@ use ffx_writer::VerifiedMachineWriter;
 use fho::{FfxMain, FfxTool};
 use fidl::endpoints::create_proxy;
 use futures::FutureExt;
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use run_test_suite_lib::output::Reporter;
+use schemars::JsonSchema;
+use serde::Serialize;
 use signal_hook::consts::signal::{SIGINT, SIGTERM};
 use signal_hook::iterator::Signals;
 use std::fmt::Debug;
@@ -59,7 +62,7 @@ fho::embedded_plugin!(TestTool);
 
 #[async_trait(?Send)]
 impl FfxMain for TestTool {
-    type Writer = VerifiedMachineWriter<()>;
+    type Writer = VerifiedMachineWriter<TestToolMessage>;
 
     // TODO(https://fxbug.dev/42078544): use Writer when it becomes possible.
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
@@ -71,14 +74,38 @@ impl FfxMain for TestTool {
                 run_test(remote_control.deref().clone(), writer, run).await?
             }
             TestSubCommand::List(list) => {
-                get_tests(&remote_control, writer, list).await?;
+                get_tests(&remote_control, _writer, list).await?;
             }
             TestSubCommand::EarlyBootProfile(cmd) => {
-                early_boot_profile(remote_control.deref().clone(), writer, cmd).await?;
+                early_boot_profile(remote_control.deref().clone(), _writer, cmd).await?;
             }
         }
         Ok(())
     }
+}
+
+#[derive(Debug, Clone, Serialize, JsonSchema, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum TestName {
+    Test { name: String },
+    NoNameGiven,
+}
+
+impl std::fmt::Display for TestName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let message = match self {
+            Self::Test { name } => name,
+            Self::NoNameGiven => &"<No name>".to_string(),
+        };
+        write!(f, "{}", message)
+    }
+}
+
+#[derive(Debug, Serialize, JsonSchema, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum TestToolMessage {
+    CannotCreateDirectory { err: String },
+    ListTests { tests: Vec<TestName> },
 }
 
 struct Experiment {
@@ -111,9 +138,9 @@ impl Experiments {
     }
 }
 
-async fn early_boot_profile<W: 'static + Write + Send + Sync>(
+async fn early_boot_profile(
     remote_control: fremotecontrol::RemoteControlProxy,
-    mut writer: W,
+    mut writer: VerifiedMachineWriter<TestToolMessage>,
     cmd: EarlyBootProfileCommand,
 ) -> Result<()> {
     let early_boot_profile_proxy = testing_lib::connect_to_early_boot_profile(&remote_control)
@@ -137,7 +164,11 @@ async fn early_boot_profile<W: 'static + Write + Send + Sync>(
     ) {
         Ok(o) => run_test_suite_lib::copy_debug_data(client.into_proxy(), o).await,
         Err(e) => {
-            writeln!(writer, "Cannot create output directory: {}", e)?;
+            writer.machine_or(
+                &TestToolMessage::CannotCreateDirectory { err: e.to_string() },
+                format!("Cannot create output directory: {}", e),
+            )?;
+            // writeln!(writer, "Cannot create output directory: {}", e)?;
             return Err(e.into());
         }
     };
@@ -375,15 +406,14 @@ async fn test_params_from_args(
     }
 }
 
-async fn get_tests<W: Write>(
+async fn get_tests(
     remote_control: &fremotecontrol::RemoteControlProxy,
-    mut write: W,
+    mut writer: VerifiedMachineWriter<TestToolMessage>,
     cmd: ListCommand,
 ) -> Result<()> {
     let query_proxy = testing_lib::connect_to_query(&remote_control)
         .await
         .map_err(|e| ffx_error_with_code!(*SETUP_FAILED_CODE, "{:?}", e))?;
-    let writer = &mut write;
     let (iterator_proxy, iterator) = create_proxy();
 
     tracing::info!("launching test suite {}", cmd.test_url);
@@ -431,23 +461,30 @@ async fn get_tests<W: Write>(
         .context("enumeration failed")?
         .map_err(|e| format_err!("error launching test: {:?}", e))?;
 
+    let mut machine_cases = vec![];
     loop {
         let cases = iterator_proxy.get_next().await?;
         if cases.is_empty() {
-            return Ok(());
+            break;
         }
-        for case in cases {
-            match case.name {
-                Some(n) => writeln!(writer, "{}", n)?,
-                None => writeln!(writer, "<No name>")?,
-            }
-        }
+        let mut m_cases: Vec<_> = cases
+            .iter()
+            .map(|c| match &c.name {
+                Some(n) => TestName::Test { name: n.to_string() },
+                None => TestName::NoNameGiven,
+            })
+            .collect();
+        machine_cases.append(&mut m_cases);
     }
+    let cases_str = machine_cases.clone().into_iter().map(|c| format!("{}", c)).join("\n");
+    writer.machine_or(&TestToolMessage::ListTests { tests: machine_cases }, cases_str)?;
+    Ok(())
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use ffx_writer::{Format, TestBuffers};
     use fidl::endpoints::{create_proxy_and_stream, ProtocolMarker, RequestStream, ServerEnd};
     use fidl_fuchsia_sys2 as fsys;
     use ftest_manager::{
@@ -1014,14 +1051,18 @@ mod test {
         // Create a temporary directory
         let temp_dir = tempfile::tempdir().expect("Failed to create temporary directory");
         let temp_dir_path = temp_dir.path();
+        let test_buffers = TestBuffers::default();
+        let writer = VerifiedMachineWriter::new_test(Some(Format::Json), &test_buffers);
         early_boot_profile(
             remote_control,
-            std::io::sink(),
+            writer,
             EarlyBootProfileCommand { output_directory: temp_dir_path.to_path_buf() },
         )
         .await
         .unwrap();
         task.await;
+
+        assert!(test_buffers.into_stdout_str().is_empty());
 
         let mut found_test_file = false;
         for entry in walkdir::WalkDir::new(temp_dir_path).follow_links(false) {
