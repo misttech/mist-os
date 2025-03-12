@@ -3,6 +3,12 @@
 {% let protocol_name = filters::ident(protocol_base_name)? %}
 {% let module_name = filters::ident(protocol.name.decl_name().snake())? %}
 
+{% let client_sender_name = format!("{protocol_base_name}ClientSender") %}
+{% let client_handler_name = format!("{protocol_base_name}ClientHandler") %}
+
+{% let server_sender_name = format!("{protocol_base_name}ServerSender") %}
+{% let server_handler_name = format!("{protocol_base_name}ServerHandler") %}
+
 /// The type corresponding to the {{ non_canonical_name }} protocol.
 {{ self::doc_string(protocol.attributes) -}}
 {% if context.config.emit_debug_impls -%}
@@ -17,6 +23,20 @@ pub struct {{ protocol_name }};
 {% endif %}
 
 pub mod {{ module_name }} {
+    pub mod prelude {
+        pub use crate::{
+            {{ protocol_name }},
+            {{ client_sender_name }},
+            {{ client_handler_name }},
+            {{ server_sender_name }},
+            {{ server_handler_name }},
+            {{ module_name }},
+        };
+        {% for ident in self.prelude_method_type_idents() %}
+            pub use {{ context.natural_id(ident) }};
+        {% endfor %}
+    }
+
     {% for method in protocol.methods %}
         {% let method_name = filters::ident(method.name.camel())? %}
         pub struct {{ method_name }};
@@ -48,9 +68,6 @@ pub mod {{ module_name }} {
         }
     {% endfor %}
 }
-
-{% let client_sender_name = format!("{protocol_base_name}ClientSender") %}
-{% let client_handler_name = format!("{protocol_base_name}ClientHandler") %}
 
 /// A helper trait for the `{{ non_canonical_name }}` client sender.
 pub trait {{ client_sender_name }} {
@@ -256,9 +273,6 @@ where
         }
     }
 }
-
-{% let server_sender_name = format!("{protocol_base_name}ServerSender") %}
-{% let server_handler_name = format!("{protocol_base_name}ServerHandler") %}
 
 /// A helper trait for the `{{ non_canonical_name }}` server sender.
 pub trait {{ server_sender_name }} {

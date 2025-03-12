@@ -341,6 +341,16 @@ where
 pub struct SimpleProtocol;
 
 pub mod simple_protocol {
+    pub mod prelude {
+        pub use crate::{
+            simple_protocol, SimpleProtocol, SimpleProtocolClientHandler,
+            SimpleProtocolClientSender, SimpleProtocolServerHandler, SimpleProtocolServerSender,
+        };
+
+        pub use crate::SimpleProtocolAddRequest;
+
+        pub use crate::SimpleProtocolAddResponse;
+    }
 
     pub struct Add;
 
@@ -1488,11 +1498,6 @@ where
 
         Ok(())
     }
-}
-
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{SimpleProtocolClientSender, SimpleProtocolServerSender};
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.

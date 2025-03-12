@@ -426,6 +426,16 @@ impl ::core::fmt::Debug for WireOptionalExampleFooResult {
 pub struct Example;
 
 pub mod example {
+    pub mod prelude {
+        pub use crate::{
+            example, Example, ExampleClientHandler, ExampleClientSender, ExampleServerHandler,
+            ExampleServerSender,
+        };
+
+        pub use crate::ExampleFooRequest;
+
+        pub use crate::ExampleFooResponse;
+    }
 
     pub struct Foo;
 
@@ -575,11 +585,6 @@ where
             }
         }
     }
-}
-
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{ExampleClientSender, ExampleServerSender};
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.

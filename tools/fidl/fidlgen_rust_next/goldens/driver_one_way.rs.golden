@@ -219,6 +219,14 @@ where
 pub struct OneWay;
 
 pub mod one_way {
+    pub mod prelude {
+        pub use crate::{
+            one_way, OneWay, OneWayClientHandler, OneWayClientSender, OneWayServerHandler,
+            OneWayServerSender,
+        };
+
+        pub use crate::OneWaySendRequest;
+    }
 
     pub struct Send;
 
@@ -354,11 +362,6 @@ where
             }
         }
     }
-}
-
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{OneWayClientSender, OneWayServerSender};
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.

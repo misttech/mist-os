@@ -833,6 +833,20 @@ where
 pub struct Protocol;
 
 pub mod protocol {
+    pub mod prelude {
+        pub use crate::{
+            protocol, Protocol, ProtocolClientHandler, ProtocolClientSender, ProtocolServerHandler,
+            ProtocolServerSender,
+        };
+
+        pub use crate::ProtocolRequestFlexibleResponseStrictRequest;
+
+        pub use crate::ProtocolRequestFlexibleResponseStrictResponse;
+
+        pub use crate::ProtocolRequestStrictResponseFlexibleRequest;
+
+        pub use crate::ProtocolRequestStrictResponseFlexibleResponse;
+    }
 
     pub struct RequestStrictResponseFlexible;
 
@@ -1049,11 +1063,6 @@ where
             }
         }
     }
-}
-
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{ProtocolClientSender, ProtocolServerSender};
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.

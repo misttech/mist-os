@@ -230,6 +230,12 @@ impl ::core::fmt::Debug for WireOptionalFlexibleUnion {
 pub struct Interface;
 
 pub mod interface {
+    pub mod prelude {
+        pub use crate::{
+            interface, Interface, InterfaceClientHandler, InterfaceClientSender,
+            InterfaceServerHandler, InterfaceServerSender,
+        };
+    }
 
     pub struct Method;
 
@@ -1204,11 +1210,6 @@ impl ::core::fmt::Debug for WireTable {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> Result<(), ::core::fmt::Error> {
         f.debug_struct("Table").field("field", &self.field()).finish()
     }
-}
-
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{InterfaceClientSender, InterfaceServerSender, ServiceInstance};
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.

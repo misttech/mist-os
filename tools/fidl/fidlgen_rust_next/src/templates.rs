@@ -5,6 +5,8 @@
 // Templates generate a lot of code which have tendencies to trip lints.
 #![expect(clippy::diverging_sub_expression, dead_code, unreachable_code)]
 
+use std::collections::BTreeSet;
+
 use askama::Template;
 
 use crate::config::Config;
@@ -134,6 +136,42 @@ impl BitsTemplate<'_> {
             panic!("invalid non-integral primitive subtype for bits");
         };
         *subtype
+    }
+}
+
+impl ProtocolTemplate<'_> {
+    fn prelude_method_type_idents(&self) -> BTreeSet<CompIdent> {
+        let mut result = BTreeSet::new();
+
+        fn get_identifier(ty: &Type) -> Option<CompIdent> {
+            if let Type { kind: TypeKind::Identifier { identifier, .. }, .. } = ty {
+                Some(identifier.clone())
+            } else {
+                None
+            }
+        }
+
+        for method in self.protocol.methods.iter() {
+            // We always include the request payload in the prelude if there is one
+            if let Some(request) = method.maybe_request_payload.as_deref() {
+                result.extend(get_identifier(request));
+            }
+
+            if let Some(success) = method.maybe_response_success_type.as_deref() {
+                // The response type is a result, so we only want to include the success and error
+                // types in the prelude
+                result.extend(get_identifier(success));
+                if let Some(error) = method.maybe_response_err_type.as_deref() {
+                    result.extend(get_identifier(error));
+                }
+            } else if let Some(response) = method.maybe_response_payload.as_deref() {
+                // The response type is not a result, so we want to include the response payload
+                // type in the prelude
+                result.extend(get_identifier(response));
+            }
+        }
+
+        result
     }
 }
 

@@ -6,7 +6,14 @@
 #[derive(Debug)]
 pub struct Child;
 
-pub mod child {}
+pub mod child {
+    pub mod prelude {
+        pub use crate::{
+            child, Child, ChildClientHandler, ChildClientSender, ChildServerHandler,
+            ChildServerSender,
+        };
+    }
+}
 
 /// A helper trait for the `Child` client sender.
 pub trait ChildClientSender {
@@ -587,6 +594,20 @@ where
 pub struct Parent;
 
 pub mod parent {
+    pub mod prelude {
+        pub use crate::{
+            parent, Parent, ParentClientHandler, ParentClientSender, ParentServerHandler,
+            ParentServerSender,
+        };
+
+        pub use crate::ParentGetChildRequestResponse;
+
+        pub use crate::ParentGetChildResponse;
+
+        pub use crate::ParentTakeChildRequest;
+
+        pub use crate::ParentTakeChildRequestRequest;
+    }
 
     pub struct GetChild;
 
@@ -865,11 +886,6 @@ where
             }
         }
     }
-}
-
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{ChildClientSender, ChildServerSender, ParentClientSender, ParentServerSender};
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.

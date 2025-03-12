@@ -525,6 +525,20 @@ where
 pub struct EmptyProtocol;
 
 pub mod empty_protocol {
+    pub mod prelude {
+        pub use crate::{
+            empty_protocol, EmptyProtocol, EmptyProtocolClientHandler, EmptyProtocolClientSender,
+            EmptyProtocolServerHandler, EmptyProtocolServerSender,
+        };
+
+        pub use crate::EmptyProtocolReceiveRequest;
+
+        pub use crate::EmptyProtocolSendAndReceiveRequest;
+
+        pub use crate::EmptyProtocolSendAndReceiveResponse;
+
+        pub use crate::EmptyProtocolSendRequest;
+    }
 
     pub struct Send;
 
@@ -776,11 +790,6 @@ where
             }
         }
     }
-}
-
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{EmptyProtocolClientSender, EmptyProtocolServerSender};
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.

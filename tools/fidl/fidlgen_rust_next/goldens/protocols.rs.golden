@@ -10,7 +10,15 @@ impl ::fidl_next::Discoverable for AnotherDiscoverableProtocol {
     const PROTOCOL_NAME: &'static str = "another_discoverable_protocol";
 }
 
-pub mod another_discoverable_protocol {}
+pub mod another_discoverable_protocol {
+    pub mod prelude {
+        pub use crate::{
+            another_discoverable_protocol, AnotherDiscoverableProtocol,
+            AnotherDiscoverableProtocolClientHandler, AnotherDiscoverableProtocolClientSender,
+            AnotherDiscoverableProtocolServerHandler, AnotherDiscoverableProtocolServerSender,
+        };
+    }
+}
 
 /// A helper trait for the `AnotherDiscoverableProtocol` client sender.
 pub trait AnotherDiscoverableProtocolClientSender {
@@ -919,6 +927,26 @@ where
 pub struct ChannelProtocol;
 
 pub mod channel_protocol {
+    pub mod prelude {
+        pub use crate::{
+            channel_protocol, ChannelProtocol, ChannelProtocolClientHandler,
+            ChannelProtocolClientSender, ChannelProtocolServerHandler, ChannelProtocolServerSender,
+        };
+
+        pub use crate::ChannelProtocolEventARequest;
+
+        pub use crate::ChannelProtocolMethodARequest;
+
+        pub use crate::ChannelProtocolMethodBRequest;
+
+        pub use crate::ChannelProtocolMethodBResponse;
+
+        pub use crate::ChannelProtocolMutateSocketRequest;
+
+        pub use crate::ChannelProtocolMutateSocketResponse;
+
+        pub use crate::ChannelProtocolTakeHandleRequest;
+    }
 
     pub struct MethodA;
 
@@ -1308,6 +1336,13 @@ impl ::fidl_next::Discoverable for DiscoverableProtocol {
 }
 
 pub mod discoverable_protocol {
+    pub mod prelude {
+        pub use crate::{
+            discoverable_protocol, DiscoverableProtocol, DiscoverableProtocolClientHandler,
+            DiscoverableProtocolClientSender, DiscoverableProtocolServerHandler,
+            DiscoverableProtocolServerSender,
+        };
+    }
 
     pub struct Method;
 
@@ -1980,6 +2015,21 @@ where
 pub struct HandleRightsProtocol;
 
 pub mod handle_rights_protocol {
+    pub mod prelude {
+        pub use crate::{
+            handle_rights_protocol, HandleRightsProtocol, HandleRightsProtocolClientHandler,
+            HandleRightsProtocolClientSender, HandleRightsProtocolServerHandler,
+            HandleRightsProtocolServerSender,
+        };
+
+        pub use crate::HandleRightsProtocolAnEventRequest;
+
+        pub use crate::HandleRightsProtocolNoResponseMethodRequest;
+
+        pub use crate::HandleRightsProtocolResponseMethodRequest;
+
+        pub use crate::HandleRightsProtocolResponseMethodResponse;
+    }
 
     pub struct NoResponseMethod;
 
@@ -2544,6 +2594,14 @@ where
 pub struct ManyParameters;
 
 pub mod many_parameters {
+    pub mod prelude {
+        pub use crate::{
+            many_parameters, ManyParameters, ManyParametersClientHandler,
+            ManyParametersClientSender, ManyParametersServerHandler, ManyParametersServerSender,
+        };
+
+        pub use crate::ManyParametersFifteenRequest;
+    }
 
     pub struct Fifteen;
 
@@ -3123,6 +3181,16 @@ where
 pub struct MethodWithUnion;
 
 pub mod method_with_union {
+    pub mod prelude {
+        pub use crate::{
+            method_with_union, MethodWithUnion, MethodWithUnionClientHandler,
+            MethodWithUnionClientSender, MethodWithUnionServerHandler, MethodWithUnionServerSender,
+        };
+
+        pub use crate::MethodWithUnionUnionMethodRequest;
+
+        pub use crate::MethodWithUnionUnionMethodResponse;
+    }
 
     pub struct UnionMethod;
 
@@ -3284,7 +3352,14 @@ impl ::fidl_next::Discoverable for PlatformServer {
     const PROTOCOL_NAME: &'static str = "platform_server";
 }
 
-pub mod platform_server {}
+pub mod platform_server {
+    pub mod prelude {
+        pub use crate::{
+            platform_server, PlatformServer, PlatformServerClientHandler,
+            PlatformServerClientSender, PlatformServerServerHandler, PlatformServerServerSender,
+        };
+    }
+}
 
 /// A helper trait for the `PlatformServer` client sender.
 pub trait PlatformServerClientSender {
@@ -3701,6 +3776,14 @@ where
 pub struct SyscallProtocol;
 
 pub mod syscall_protocol {
+    pub mod prelude {
+        pub use crate::{
+            syscall_protocol, SyscallProtocol, SyscallProtocolClientHandler,
+            SyscallProtocolClientSender, SyscallProtocolServerHandler, SyscallProtocolServerSender,
+        };
+
+        pub use crate::SyscallProtocolMethodCRequest;
+    }
 
     pub struct MethodC;
 
@@ -4468,6 +4551,25 @@ where
 pub struct WithAndWithoutRequestResponse;
 
 pub mod with_and_without_request_response {
+    pub mod prelude {
+        pub use crate::{
+            with_and_without_request_response, WithAndWithoutRequestResponse,
+            WithAndWithoutRequestResponseClientHandler, WithAndWithoutRequestResponseClientSender,
+            WithAndWithoutRequestResponseServerHandler, WithAndWithoutRequestResponseServerSender,
+        };
+
+        pub use crate::WithAndWithoutRequestResponseNoRequestWithResponseResponse;
+
+        pub use crate::WithAndWithoutRequestResponseOnWithResponseRequest;
+
+        pub use crate::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest;
+
+        pub use crate::WithAndWithoutRequestResponseWithRequestNoResponseRequest;
+
+        pub use crate::WithAndWithoutRequestResponseWithRequestWithResponseRequest;
+
+        pub use crate::WithAndWithoutRequestResponseWithRequestWithResponseResponse;
+    }
 
     pub struct NoRequestNoResponse;
 
@@ -6412,6 +6514,22 @@ impl ::core::fmt::Debug for WireOptionalWithErrorSyntaxHandleInResultResult {
 pub struct WithErrorSyntax;
 
 pub mod with_error_syntax {
+    pub mod prelude {
+        pub use crate::{
+            with_error_syntax, WithErrorSyntax, WithErrorSyntaxClientHandler,
+            WithErrorSyntaxClientSender, WithErrorSyntaxServerHandler, WithErrorSyntaxServerSender,
+        };
+
+        pub use crate::ErrorEnum;
+
+        pub use crate::WithErrorSyntaxErrorAsEnumResponse;
+
+        pub use crate::WithErrorSyntaxErrorAsPrimitiveResponse;
+
+        pub use crate::WithErrorSyntaxHandleInResultResponse;
+
+        pub use crate::WithErrorSyntaxResponseAsStructResponse;
+    }
 
     pub struct ResponseAsStruct;
 
@@ -7405,6 +7523,25 @@ where
 pub struct WithProtocolEnds;
 
 pub mod with_protocol_ends {
+    pub mod prelude {
+        pub use crate::{
+            with_protocol_ends, WithProtocolEnds, WithProtocolEndsClientHandler,
+            WithProtocolEndsClientSender, WithProtocolEndsServerHandler,
+            WithProtocolEndsServerSender,
+        };
+
+        pub use crate::WithProtocolEndsClientEndsRequest;
+
+        pub use crate::WithProtocolEndsClientEndsResponse;
+
+        pub use crate::WithProtocolEndsServerEndsRequest;
+
+        pub use crate::WithProtocolEndsServerEndsResponse;
+
+        pub use crate::WithProtocolEndsStructContainingEndsRequest;
+
+        pub use crate::WithProtocolEndsStructContainingEndsResponse;
+    }
 
     pub struct ClientEnds;
 
@@ -7686,21 +7823,6 @@ where
             }
         }
     }
-}
-
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{
-        AnotherDiscoverableProtocolClientSender, AnotherDiscoverableProtocolServerSender,
-        ChannelProtocolClientSender, ChannelProtocolServerSender, DiscoverableProtocolClientSender,
-        DiscoverableProtocolServerSender, HandleRightsProtocolClientSender,
-        HandleRightsProtocolServerSender, ManyParametersClientSender, ManyParametersServerSender,
-        MethodWithUnionClientSender, MethodWithUnionServerSender, PlatformServerClientSender,
-        PlatformServerServerSender, SyscallProtocolClientSender, SyscallProtocolServerSender,
-        WithAndWithoutRequestResponseClientSender, WithAndWithoutRequestResponseServerSender,
-        WithErrorSyntaxClientSender, WithErrorSyntaxServerSender, WithProtocolEndsClientSender,
-        WithProtocolEndsServerSender,
-    };
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.

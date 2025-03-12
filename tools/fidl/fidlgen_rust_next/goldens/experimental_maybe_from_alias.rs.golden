@@ -43,7 +43,14 @@ pub type WireAliasOfVectorContainingAliasOfVector = ::fidl_next::WireVector<::fi
 #[derive(Debug)]
 pub struct MyProtocol;
 
-pub mod my_protocol {}
+pub mod my_protocol {
+    pub mod prelude {
+        pub use crate::{
+            my_protocol, MyProtocol, MyProtocolClientHandler, MyProtocolClientSender,
+            MyProtocolServerHandler, MyProtocolServerSender,
+        };
+    }
+}
 
 /// A helper trait for the `MyProtocol` client sender.
 pub trait MyProtocolClientSender {
@@ -602,11 +609,6 @@ where
 
         Ok(())
     }
-}
-
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{MyProtocolClientSender, MyProtocolServerSender};
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.

@@ -34,26 +34,6 @@
     {% endmatch %}
 {% endfor %}
 
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    {%- for ident in schema.declaration_order -%}
-        {%- match schema.declarations[ident] -%}
-            {%- when DeclType::Protocol -%}
-                {%- let protocol = schema.protocol_declarations[ident] -%}
-                {%- let protocol_base_name = protocol.name.decl_name().camel() -%}
-                pub use super::{
-                    {{ format!("{protocol_base_name}ClientSender") }},
-                    {{ format!("{protocol_base_name}ServerSender") }},
-                };
-            {%- when DeclType::Service -%}
-                {%- let service = schema.service_declarations[ident] -%}
-                {%- let service_base_name = service.name.decl_name().camel() -%}
-                pub use super::{{ format!("{service_base_name}Instance") }};
-            {%- else -%}
-        {%- endmatch -%}
-    {%- endfor -%}
-}
-
 {% if config.emit_compat %}
     {{ self.compat() }}
 {% endif %}

@@ -129,6 +129,14 @@ where
 pub struct Parent;
 
 pub mod parent {
+    pub mod prelude {
+        pub use crate::{
+            parent, Parent, ParentClientHandler, ParentClientSender, ParentServerHandler,
+            ParentServerSender,
+        };
+
+        pub use crate::ParentFirstRequest;
+    }
 
     pub struct First;
 
@@ -394,6 +402,16 @@ where
 pub struct Child;
 
 pub mod child {
+    pub mod prelude {
+        pub use crate::{
+            child, Child, ChildClientHandler, ChildClientSender, ChildServerHandler,
+            ChildServerSender,
+        };
+
+        pub use crate::ChildSecondRequest;
+
+        pub use crate::ParentFirstRequest;
+    }
 
     pub struct First;
 
@@ -580,11 +598,6 @@ where
             }
         }
     }
-}
-
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{ChildClientSender, ChildServerSender, ParentClientSender, ParentServerSender};
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.

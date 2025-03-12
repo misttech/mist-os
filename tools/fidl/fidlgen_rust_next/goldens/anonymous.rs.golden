@@ -1873,6 +1873,18 @@ impl ::core::fmt::Debug for WireOptionalSomeProtocolSomeMethodResult {
 pub struct SomeProtocol;
 
 pub mod some_protocol {
+    pub mod prelude {
+        pub use crate::{
+            some_protocol, SomeProtocol, SomeProtocolClientHandler, SomeProtocolClientSender,
+            SomeProtocolServerHandler, SomeProtocolServerSender,
+        };
+
+        pub use crate::SomeProtocolSomeMethodRequest;
+
+        pub use crate::SomeProtocolSomeMethodError;
+
+        pub use crate::SomeProtocolSomeMethodResponse;
+    }
 
     pub struct SomeMethod;
 
@@ -2024,11 +2036,6 @@ where
             }
         }
     }
-}
-
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{SomeProtocolClientSender, SomeProtocolServerSender};
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.

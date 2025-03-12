@@ -50,10 +50,8 @@ pub struct ProtocolMethod {
     pub kind: ProtocolMethodKind,
     pub maybe_request_payload: Option<Box<Type>>,
     pub maybe_response_payload: Option<Box<Type>>,
-    #[expect(dead_code)]
     pub maybe_response_success_type: Option<Box<Type>>,
-    #[expect(dead_code)]
-    pub maybe_response_error_type: Option<Box<Type>>,
+    pub maybe_response_err_type: Option<Box<Type>>,
     pub name: Ident,
     pub ordinal: u64,
     #[expect(dead_code)]

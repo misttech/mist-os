@@ -28,6 +28,12 @@ where
 pub struct FirstProtocol;
 
 pub mod first_protocol {
+    pub mod prelude {
+        pub use crate::{
+            first_protocol, FirstProtocol, FirstProtocolClientHandler, FirstProtocolClientSender,
+            FirstProtocolServerHandler, FirstProtocolServerSender,
+        };
+    }
 
     pub struct MethodOnFirst;
 
@@ -285,6 +291,12 @@ where
 pub struct SecondProtocol;
 
 pub mod second_protocol {
+    pub mod prelude {
+        pub use crate::{
+            second_protocol, SecondProtocol, SecondProtocolClientHandler,
+            SecondProtocolClientSender, SecondProtocolServerHandler, SecondProtocolServerSender,
+        };
+    }
 
     pub struct MethodOnSecond;
 
@@ -443,15 +455,6 @@ where
     > {
         self.as_untyped_mut().connect("single_member").map(::fidl_next::ClientEnd::from_untyped)
     }
-}
-
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{
-        EmptyServiceInstance, FirstProtocolClientSender, FirstProtocolServerSender,
-        MultiHeterogeneousMemberServiceInstance, MultiHomogeneousMemberServiceInstance,
-        SecondProtocolClientSender, SecondProtocolServerSender, SingleMemberServiceInstance,
-    };
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.

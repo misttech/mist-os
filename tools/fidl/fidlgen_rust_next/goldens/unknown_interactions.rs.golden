@@ -2150,6 +2150,29 @@ impl ::core::fmt::Debug
 pub struct UnknownInteractionsAjarDriverProtocol;
 
 pub mod unknown_interactions_ajar_driver_protocol {
+    pub mod prelude {
+        pub use crate::{
+            unknown_interactions_ajar_driver_protocol, UnknownInteractionsAjarDriverProtocol,
+            UnknownInteractionsAjarDriverProtocolClientHandler,
+            UnknownInteractionsAjarDriverProtocolClientSender,
+            UnknownInteractionsAjarDriverProtocolServerHandler,
+            UnknownInteractionsAjarDriverProtocolServerSender,
+        };
+
+        pub use crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse;
+
+        pub use crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse;
+
+        pub use crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse;
+
+        pub use crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse;
+
+        pub use crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse;
+
+        pub use crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse;
+
+        pub use crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse;
+    }
 
     pub struct StrictOneWay;
 
@@ -5769,6 +5792,41 @@ impl ::core::fmt::Debug for WireUnknownInteractionsAjarProtocolFlexibleEventTabl
 pub struct UnknownInteractionsAjarProtocol;
 
 pub mod unknown_interactions_ajar_protocol {
+    pub mod prelude {
+        pub use crate::{
+            unknown_interactions_ajar_protocol, UnknownInteractionsAjarProtocol,
+            UnknownInteractionsAjarProtocolClientHandler,
+            UnknownInteractionsAjarProtocolClientSender,
+            UnknownInteractionsAjarProtocolServerHandler,
+            UnknownInteractionsAjarProtocolServerSender,
+        };
+
+        pub use crate::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest;
+
+        pub use crate::UnknownInteractionsAjarProtocolFlexibleEventTableRequest;
+
+        pub use crate::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest;
+
+        pub use crate::UnknownInteractionsAjarProtocolStrictEventFieldsRequest;
+
+        pub use crate::UnknownInteractionsAjarProtocolStrictEventTableRequest;
+
+        pub use crate::UnknownInteractionsAjarProtocolStrictEventUnionRequest;
+
+        pub use crate::UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse;
+
+        pub use crate::UnknownInteractionsAjarProtocolStrictTwoWayTableResponse;
+
+        pub use crate::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse;
+
+        pub use crate::UnknownInteractionsAjarProtocolStrictTwoWayErrResponse;
+
+        pub use crate::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse;
+
+        pub use crate::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse;
+
+        pub use crate::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse;
+    }
 
     pub struct StrictOneWay;
 
@@ -8906,6 +8964,29 @@ impl ::core::fmt::Debug
 pub struct UnknownInteractionsClosedDriverProtocol;
 
 pub mod unknown_interactions_closed_driver_protocol {
+    pub mod prelude {
+        pub use crate::{
+            unknown_interactions_closed_driver_protocol, UnknownInteractionsClosedDriverProtocol,
+            UnknownInteractionsClosedDriverProtocolClientHandler,
+            UnknownInteractionsClosedDriverProtocolClientSender,
+            UnknownInteractionsClosedDriverProtocolServerHandler,
+            UnknownInteractionsClosedDriverProtocolServerSender,
+        };
+
+        pub use crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse;
+
+        pub use crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse;
+
+        pub use crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse;
+
+        pub use crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse;
+
+        pub use crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse;
+
+        pub use crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse;
+
+        pub use crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse;
+    }
 
     pub struct StrictOneWay;
 
@@ -12044,6 +12125,35 @@ impl ::core::fmt::Debug for WireUnknownInteractionsClosedProtocolStrictEventTabl
 pub struct UnknownInteractionsClosedProtocol;
 
 pub mod unknown_interactions_closed_protocol {
+    pub mod prelude {
+        pub use crate::{
+            unknown_interactions_closed_protocol, UnknownInteractionsClosedProtocol,
+            UnknownInteractionsClosedProtocolClientHandler,
+            UnknownInteractionsClosedProtocolClientSender,
+            UnknownInteractionsClosedProtocolServerHandler,
+            UnknownInteractionsClosedProtocolServerSender,
+        };
+
+        pub use crate::UnknownInteractionsClosedProtocolStrictEventFieldsRequest;
+
+        pub use crate::UnknownInteractionsClosedProtocolStrictEventTableRequest;
+
+        pub use crate::UnknownInteractionsClosedProtocolStrictEventUnionRequest;
+
+        pub use crate::UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse;
+
+        pub use crate::UnknownInteractionsClosedProtocolStrictTwoWayTableResponse;
+
+        pub use crate::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse;
+
+        pub use crate::UnknownInteractionsClosedProtocolStrictTwoWayErrResponse;
+
+        pub use crate::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse;
+
+        pub use crate::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse;
+
+        pub use crate::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse;
+    }
 
     pub struct StrictOneWay;
 
@@ -18293,6 +18403,45 @@ impl ::core::fmt::Debug
 pub struct UnknownInteractionsDriverProtocol;
 
 pub mod unknown_interactions_driver_protocol {
+    pub mod prelude {
+        pub use crate::{
+            unknown_interactions_driver_protocol, UnknownInteractionsDriverProtocol,
+            UnknownInteractionsDriverProtocolClientHandler,
+            UnknownInteractionsDriverProtocolClientSender,
+            UnknownInteractionsDriverProtocolServerHandler,
+            UnknownInteractionsDriverProtocolServerSender,
+        };
+
+        pub use crate::UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse;
+
+        pub use crate::UnknownInteractionsDriverProtocolStrictTwoWayTableResponse;
+
+        pub use crate::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse;
+
+        pub use crate::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse;
+
+        pub use crate::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse;
+
+        pub use crate::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse;
+
+        pub use crate::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse;
+
+        pub use crate::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse;
+
+        pub use crate::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse;
+
+        pub use crate::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse;
+
+        pub use crate::UnknownInteractionsDriverProtocolFlexibleTwoWayResponse;
+
+        pub use crate::UnknownInteractionsDriverProtocolStrictTwoWayErrResponse;
+
+        pub use crate::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse;
+
+        pub use crate::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse;
+
+        pub use crate::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse;
+    }
 
     pub struct StrictOneWay;
 
@@ -25622,6 +25771,55 @@ impl ::core::fmt::Debug for WireUnknownInteractionsProtocolFlexibleEventTableReq
 pub struct UnknownInteractionsProtocol;
 
 pub mod unknown_interactions_protocol {
+    pub mod prelude {
+        pub use crate::{
+            unknown_interactions_protocol, UnknownInteractionsProtocol,
+            UnknownInteractionsProtocolClientHandler, UnknownInteractionsProtocolClientSender,
+            UnknownInteractionsProtocolServerHandler, UnknownInteractionsProtocolServerSender,
+        };
+
+        pub use crate::UnknownInteractionsProtocolFlexibleEventFieldsRequest;
+
+        pub use crate::UnknownInteractionsProtocolFlexibleEventTableRequest;
+
+        pub use crate::UnknownInteractionsProtocolFlexibleEventUnionRequest;
+
+        pub use crate::UnknownInteractionsProtocolStrictEventFieldsRequest;
+
+        pub use crate::UnknownInteractionsProtocolStrictEventTableRequest;
+
+        pub use crate::UnknownInteractionsProtocolStrictEventUnionRequest;
+
+        pub use crate::UnknownInteractionsProtocolStrictTwoWayFieldsResponse;
+
+        pub use crate::UnknownInteractionsProtocolStrictTwoWayTableResponse;
+
+        pub use crate::UnknownInteractionsProtocolStrictTwoWayUnionResponse;
+
+        pub use crate::UnknownInteractionsProtocolFlexibleTwoWayErrResponse;
+
+        pub use crate::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse;
+
+        pub use crate::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse;
+
+        pub use crate::UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse;
+
+        pub use crate::UnknownInteractionsProtocolFlexibleTwoWayTableResponse;
+
+        pub use crate::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse;
+
+        pub use crate::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse;
+
+        pub use crate::UnknownInteractionsProtocolFlexibleTwoWayResponse;
+
+        pub use crate::UnknownInteractionsProtocolStrictTwoWayErrResponse;
+
+        pub use crate::UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse;
+
+        pub use crate::UnknownInteractionsProtocolStrictTwoWayTableErrResponse;
+
+        pub use crate::UnknownInteractionsProtocolStrictTwoWayUnionErrResponse;
+    }
 
     pub struct StrictOneWay;
 
@@ -27017,22 +27215,6 @@ where
             ordinal => handler.on_unknown_interaction(sender, ordinal),
         }
     }
-}
-
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{
-        UnknownInteractionsAjarDriverProtocolClientSender,
-        UnknownInteractionsAjarDriverProtocolServerSender,
-        UnknownInteractionsAjarProtocolClientSender, UnknownInteractionsAjarProtocolServerSender,
-        UnknownInteractionsClosedDriverProtocolClientSender,
-        UnknownInteractionsClosedDriverProtocolServerSender,
-        UnknownInteractionsClosedProtocolClientSender,
-        UnknownInteractionsClosedProtocolServerSender,
-        UnknownInteractionsDriverProtocolClientSender,
-        UnknownInteractionsDriverProtocolServerSender, UnknownInteractionsProtocolClientSender,
-        UnknownInteractionsProtocolServerSender,
-    };
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.

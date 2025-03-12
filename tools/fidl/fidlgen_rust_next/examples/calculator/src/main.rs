@@ -6,10 +6,7 @@ use fidl_next::{
     Client, ClientEnd, ClientSender, RequestBuffer, Responder, ResponseBuffer, Server, ServerEnd,
     ServerSender, Transport,
 };
-use fidl_next_examples_calculator::prelude::*;
-use fidl_next_examples_calculator::{
-    calculator, Calculator, CalculatorClientHandler, CalculatorServerHandler,
-};
+use fidl_next_examples_calculator::calculator::prelude::*;
 use fuchsia_async::{Scope, Task};
 
 struct MyCalculatorClient;
@@ -43,7 +40,7 @@ impl<T: Transport + 'static> CalculatorServerHandler<T> for MyCalculatorServer {
         self.scope.spawn(async move {
             let Ok(request) = request.decode() else { return sender.close() };
 
-            use fidl_next_examples_calculator::{CalculatorAddResponse, CalculatorAddResult};
+            use fidl_next_examples_calculator::CalculatorAddResult;
 
             println!("{} + {} = {}", request.a, request.b, request.a + request.b);
             let mut response =
@@ -64,9 +61,7 @@ impl<T: Transport + 'static> CalculatorServerHandler<T> for MyCalculatorServer {
         self.scope.spawn(async move {
             let Ok(request) = request.decode() else { return sender.close() };
 
-            use fidl_next_examples_calculator::{
-                CalculatorDivideResponse, CalculatorDivideResult, DivisionError,
-            };
+            use fidl_next_examples_calculator::CalculatorDivideResult;
 
             let mut response = if request.divisor != 0 {
                 println!(
@@ -95,7 +90,6 @@ impl<T: Transport + 'static> CalculatorServerHandler<T> for MyCalculatorServer {
         self.scope.spawn(async move {
             println!("Cleared, sending an error back to close the connection");
 
-            use fidl_next_examples_calculator::CalculatorOnErrorRequest;
             sender
                 .on_error(&mut CalculatorOnErrorRequest { status_code: 100 })
                 .unwrap()
@@ -148,7 +142,7 @@ async fn create_endpoints(
 }
 
 async fn add(client_sender: &ClientSender<Endpoint, Calculator>) {
-    use fidl_next_examples_calculator::{calculator_add_result, CalculatorAddRequest};
+    use fidl_next_examples_calculator::calculator_add_result;
 
     let mut buffer =
         client_sender.add(&mut CalculatorAddRequest { a: 16, b: 26 }).unwrap().await.unwrap();
@@ -160,9 +154,7 @@ async fn add(client_sender: &ClientSender<Endpoint, Calculator>) {
 }
 
 async fn divide(client_sender: &ClientSender<Endpoint, Calculator>) {
-    use fidl_next_examples_calculator::{
-        calculator_divide_result, CalculatorDivideRequest, DivisionError,
-    };
+    use fidl_next_examples_calculator::calculator_divide_result;
 
     // Normal division
     let mut buffer = client_sender

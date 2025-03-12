@@ -235,6 +235,16 @@ where
 pub struct TwoWay;
 
 pub mod two_way {
+    pub mod prelude {
+        pub use crate::{
+            two_way, TwoWay, TwoWayClientHandler, TwoWayClientSender, TwoWayServerHandler,
+            TwoWayServerSender,
+        };
+
+        pub use crate::TwoWayAddRequest;
+
+        pub use crate::TwoWayAddResponse;
+    }
 
     pub struct Add;
 
@@ -384,11 +394,6 @@ where
             }
         }
     }
-}
-
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{TwoWayClientSender, TwoWayServerSender};
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.

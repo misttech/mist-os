@@ -296,6 +296,14 @@ where
 pub struct ExampleProtocol;
 
 pub mod example_protocol {
+    pub mod prelude {
+        pub use crate::{
+            example_protocol, ExampleProtocol, ExampleProtocolClientHandler,
+            ExampleProtocolClientSender, ExampleProtocolServerHandler, ExampleProtocolServerSender,
+        };
+
+        pub use crate::ExampleProtocolMethodRequest;
+    }
 
     pub struct Method;
 
@@ -865,11 +873,6 @@ impl ::core::fmt::Debug for WireOptionalExampleUnion {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         self.as_ref().fmt(f)
     }
-}
-
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{ExampleProtocolClientSender, ExampleProtocolServerSender};
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.

@@ -4878,6 +4878,16 @@ where
 pub struct TestProtocol;
 
 pub mod test_protocol {
+    pub mod prelude {
+        pub use crate::{
+            test_protocol, TestProtocol, TestProtocolClientHandler, TestProtocolClientSender,
+            TestProtocolServerHandler, TestProtocolServerSender,
+        };
+
+        pub use crate::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse;
+
+        pub use crate::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse;
+    }
 
     pub struct StrictUnionHenceResponseMayBeStackAllocated;
 
@@ -5867,11 +5877,6 @@ impl ::core::fmt::Debug for WireOptionalUnionWithAttributes {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         self.as_ref().fmt(f)
     }
-}
-
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{TestProtocolClientSender, TestProtocolServerSender};
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.

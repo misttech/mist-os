@@ -442,6 +442,21 @@ impl ::core::fmt::Debug for WireOptionalExampleUseOfErrorSyntaxCallWhichMayFailR
 pub struct ExampleUseOfErrorSyntax;
 
 pub mod example_use_of_error_syntax {
+    pub mod prelude {
+        pub use crate::{
+            example_use_of_error_syntax, ExampleUseOfErrorSyntax,
+            ExampleUseOfErrorSyntaxClientHandler, ExampleUseOfErrorSyntaxClientSender,
+            ExampleUseOfErrorSyntaxServerHandler, ExampleUseOfErrorSyntaxServerSender,
+        };
+
+        pub use ::fidl_next_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailRequest;
+
+        pub use ::fidl_next_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailResponse;
+
+        pub use crate::ExampleUseOfErrorSyntaxCallWhichMayFailRequest;
+
+        pub use crate::ExampleUseOfErrorSyntaxCallWhichMayFailResponse;
+    }
 
     pub struct ComposedCallWhichMayFail;
 
@@ -681,11 +696,6 @@ where
             }
         }
     }
-}
-
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{ExampleUseOfErrorSyntaxClientSender, ExampleUseOfErrorSyntaxServerSender};
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.

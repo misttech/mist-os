@@ -172,7 +172,14 @@ impl ::core::convert::From<Enum> for WireEnum {
 #[derive(Debug)]
 pub struct OtherProtocol;
 
-pub mod other_protocol {}
+pub mod other_protocol {
+    pub mod prelude {
+        pub use crate::{
+            other_protocol, OtherProtocol, OtherProtocolClientHandler, OtherProtocolClientSender,
+            OtherProtocolServerHandler, OtherProtocolServerSender,
+        };
+    }
+}
 
 /// A helper trait for the `OtherProtocol` client sender.
 pub trait OtherProtocolClientSender {
@@ -265,6 +272,12 @@ where
 pub struct Protocol;
 
 pub mod protocol {
+    pub mod prelude {
+        pub use crate::{
+            protocol, Protocol, ProtocolClientHandler, ProtocolClientSender, ProtocolServerHandler,
+            ProtocolServerSender,
+        };
+    }
 
     pub struct Foo;
 
@@ -863,14 +876,6 @@ impl ::core::fmt::Debug for WireOptionalUnion {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         self.as_ref().fmt(f)
     }
-}
-
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{
-        OtherProtocolClientSender, OtherProtocolServerSender, ProtocolClientSender,
-        ProtocolServerSender, ServiceInstance,
-    };
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.

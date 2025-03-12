@@ -2028,6 +2028,44 @@ impl ::core::fmt::Debug for WireOptionalMainProtocolOnAnonRequest {
 pub struct MainProtocol;
 
 pub mod main_protocol {
+    pub mod prelude {
+        pub use crate::{
+            main_protocol, MainProtocol, MainProtocolClientHandler, MainProtocolClientSender,
+            MainProtocolServerHandler, MainProtocolServerSender,
+        };
+
+        pub use ::fidl_next_test_protocollayouts_imported::ComposedProtocolOnAnonComposedRequest;
+
+        pub use ::fidl_next_test_protocollayouts_imported::ComposedProtocolOneWayAnonComposedRequest;
+
+        pub use ::fidl_next_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedRequest;
+
+        pub use ::fidl_next_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedResponse;
+
+        pub use ::fidl_next_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorRequest;
+
+        pub use ::fidl_next_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorResponse;
+
+        pub use ::fidl_next_test_protocollayouts_imported::ImportTablePayload;
+
+        pub use ::fidl_next_test_protocollayouts_imported::ImportUnionPayload;
+
+        pub use crate::LocalTablePayload;
+
+        pub use crate::LocalUnionPayload;
+
+        pub use crate::MainProtocolOnAnonRequest;
+
+        pub use crate::MainProtocolOneWayAnonRequest;
+
+        pub use crate::MainProtocolTwoWayAnonRequest;
+
+        pub use crate::MainProtocolTwoWayAnonResponse;
+
+        pub use crate::MainProtocolTwoWayAnonWithErrorRequest;
+
+        pub use crate::MainProtocolTwoWayAnonWithErrorResponse;
+    }
 
     pub struct OneWayAnonComposed;
 
@@ -3639,6 +3677,38 @@ where
 pub struct OpenProtocol;
 
 pub mod open_protocol {
+    pub mod prelude {
+        pub use crate::{
+            open_protocol, OpenProtocol, OpenProtocolClientHandler, OpenProtocolClientSender,
+            OpenProtocolServerHandler, OpenProtocolServerSender,
+        };
+
+        pub use ::fidl_next_test_protocollayouts_imported::ComposedOpenProtocolFlexibleEventRequest;
+
+        pub use ::fidl_next_test_protocollayouts_imported::ComposedOpenProtocolFlexibleOneWayRequest;
+
+        pub use ::fidl_next_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayNoErrorRequest;
+
+        pub use ::fidl_next_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayWithErrorRequest;
+
+        pub use ::fidl_next_test_protocollayouts_imported::ComposedOpenProtocolStrictEventRequest;
+
+        pub use ::fidl_next_test_protocollayouts_imported::ComposedOpenProtocolStrictOneWayRequest;
+
+        pub use ::fidl_next_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayNoErrorRequest;
+
+        pub use ::fidl_next_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayNoErrorResponse;
+
+        pub use ::fidl_next_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayWithErrorRequest;
+
+        pub use ::fidl_next_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayNoErrorResponse;
+
+        pub use ::fidl_next_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayWithErrorResponse;
+
+        pub use ::fidl_next_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayWithErrorResponse;
+
+        pub use ::fidl_next_test_protocollayouts_imported::ImportStructPayload;
+    }
 
     pub struct FlexibleOneWay;
 
@@ -4492,14 +4562,6 @@ where
 
         }
     }
-}
-
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{
-        MainProtocolClientSender, MainProtocolServerSender, OpenProtocolClientSender,
-        OpenProtocolServerSender,
-    };
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.

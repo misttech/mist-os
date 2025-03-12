@@ -808,6 +808,14 @@ impl ::core::fmt::Debug for WireOptionalAllowedDeniedResult {
 pub struct Allowed;
 
 pub mod allowed {
+    pub mod prelude {
+        pub use crate::{
+            allowed, Allowed, AllowedClientHandler, AllowedClientSender, AllowedServerHandler,
+            AllowedServerSender,
+        };
+
+        pub use crate::AllowedDeniedResponse;
+    }
 
     pub struct Denied;
 
@@ -946,7 +954,14 @@ where
 #[derive(Debug)]
 pub struct ContainsAllowed;
 
-pub mod contains_allowed {}
+pub mod contains_allowed {
+    pub mod prelude {
+        pub use crate::{
+            contains_allowed, ContainsAllowed, ContainsAllowedClientHandler,
+            ContainsAllowedClientSender, ContainsAllowedServerHandler, ContainsAllowedServerSender,
+        };
+    }
+}
 
 /// A helper trait for the `ContainsAllowed` client sender.
 pub trait ContainsAllowedClientSender {
@@ -1622,6 +1637,14 @@ where
 pub struct Denied;
 
 pub mod denied {
+    pub mod prelude {
+        pub use crate::{
+            denied, Denied, DeniedClientHandler, DeniedClientSender, DeniedServerHandler,
+            DeniedServerSender,
+        };
+
+        pub use crate::DeniedShouldNeverAppearInAnyBindingRequest;
+    }
 
     pub struct ShouldNeverAppearInAnyBinding;
 
@@ -5224,6 +5247,36 @@ impl ::core::fmt::Debug for WireOptionalDenyEachBindingOnlyDenySyzkallerResult {
 pub struct DenyEachBinding;
 
 pub mod deny_each_binding {
+    pub mod prelude {
+        pub use crate::{
+            deny_each_binding, DenyEachBinding, DenyEachBindingClientHandler,
+            DenyEachBindingClientSender, DenyEachBindingServerHandler, DenyEachBindingServerSender,
+        };
+
+        pub use crate::DenyEachBindingOnlyDenyCppRequest;
+
+        pub use crate::DenyEachBindingOnlyDenyDartRequest;
+
+        pub use crate::DenyEachBindingOnlyDenyGoRequest;
+
+        pub use crate::DenyEachBindingOnlyDenyLibfuzzerRequest;
+
+        pub use crate::DenyEachBindingOnlyDenyRustRequest;
+
+        pub use crate::DenyEachBindingOnlyDenySyzkallerRequest;
+
+        pub use crate::DenyEachBindingOnlyDenyCppResponse;
+
+        pub use crate::DenyEachBindingOnlyDenyDartResponse;
+
+        pub use crate::DenyEachBindingOnlyDenyGoResponse;
+
+        pub use crate::DenyEachBindingOnlyDenyLibfuzzerResponse;
+
+        pub use crate::DenyEachBindingOnlyDenyRustResponse;
+
+        pub use crate::DenyEachBindingOnlyDenySyzkallerResponse;
+    }
 
     pub struct OnlyDenyCpp;
 
@@ -5707,6 +5760,15 @@ where
 pub struct ImportsSameNameContext;
 
 pub mod imports_same_name_context {
+    pub mod prelude {
+        pub use crate::{
+            imports_same_name_context, ImportsSameNameContext, ImportsSameNameContextClientHandler,
+            ImportsSameNameContextClientSender, ImportsSameNameContextServerHandler,
+            ImportsSameNameContextServerSender,
+        };
+
+        pub use ::fidl_next_test_dependent::ContainsDeniedAlwaysDeniedRequest;
+    }
 
     pub struct AlwaysDenied;
 
@@ -6142,7 +6204,14 @@ where
 #[derive(Debug)]
 pub struct OnlyCppAndDeps;
 
-pub mod only_cpp_and_deps {}
+pub mod only_cpp_and_deps {
+    pub mod prelude {
+        pub use crate::{
+            only_cpp_and_deps, OnlyCppAndDeps, OnlyCppAndDepsClientHandler,
+            OnlyCppAndDepsClientSender, OnlyCppAndDepsServerHandler, OnlyCppAndDepsServerSender,
+        };
+    }
+}
 
 /// A helper trait for the `OnlyCppAndDeps` client sender.
 pub trait OnlyCppAndDepsClientSender {
@@ -6429,7 +6498,15 @@ where
 #[derive(Debug)]
 pub struct OnlyLibfuzzerAndDeps;
 
-pub mod only_libfuzzer_and_deps {}
+pub mod only_libfuzzer_and_deps {
+    pub mod prelude {
+        pub use crate::{
+            only_libfuzzer_and_deps, OnlyLibfuzzerAndDeps, OnlyLibfuzzerAndDepsClientHandler,
+            OnlyLibfuzzerAndDepsClientSender, OnlyLibfuzzerAndDepsServerHandler,
+            OnlyLibfuzzerAndDepsServerSender,
+        };
+    }
+}
 
 /// A helper trait for the `OnlyLibfuzzerAndDeps` client sender.
 pub trait OnlyLibfuzzerAndDepsClientSender {
@@ -6895,18 +6972,6 @@ impl ::core::convert::From<OnlySyzkaller> for WireOnlySyzkaller {
     fn from(natural: OnlySyzkaller) -> Self {
         Self { value: ::fidl_next::WireU32::from(natural.bits()) }
     }
-}
-
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{
-        AllowedClientSender, AllowedServerSender, ContainsAllowedClientSender,
-        ContainsAllowedServerSender, DeniedClientSender, DeniedServerSender,
-        DenyEachBindingClientSender, DenyEachBindingServerSender,
-        ImportsSameNameContextClientSender, ImportsSameNameContextServerSender,
-        OnlyCppAndDepsClientSender, OnlyCppAndDepsServerSender, OnlyHlcppInstance,
-        OnlyLibfuzzerAndDepsClientSender, OnlyLibfuzzerAndDepsServerSender,
-    };
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.

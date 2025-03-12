@@ -50,7 +50,15 @@ where
 #[derive(Debug)]
 pub struct SomeDriverProtocol;
 
-pub mod some_driver_protocol {}
+pub mod some_driver_protocol {
+    pub mod prelude {
+        pub use crate::{
+            some_driver_protocol, SomeDriverProtocol, SomeDriverProtocolClientHandler,
+            SomeDriverProtocolClientSender, SomeDriverProtocolServerHandler,
+            SomeDriverProtocolServerSender,
+        };
+    }
+}
 
 /// A helper trait for the `SomeDriverProtocol` client sender.
 pub trait SomeDriverProtocolClientSender {
@@ -136,13 +144,6 @@ where
             }
         }
     }
-}
-
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{
-        DriverOnlyServiceInstance, SomeDriverProtocolClientSender, SomeDriverProtocolServerSender,
-    };
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.

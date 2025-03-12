@@ -1798,6 +1798,29 @@ impl ::core::fmt::Debug for WireOptionalComposedProtocolTwoWayNamedComposedWithE
 pub struct ComposedProtocol;
 
 pub mod composed_protocol {
+    pub mod prelude {
+        pub use crate::{
+            composed_protocol, ComposedProtocol, ComposedProtocolClientHandler,
+            ComposedProtocolClientSender, ComposedProtocolServerHandler,
+            ComposedProtocolServerSender,
+        };
+
+        pub use crate::ComposedProtocolOnAnonComposedRequest;
+
+        pub use crate::ComposedProtocolOneWayAnonComposedRequest;
+
+        pub use crate::ComposedProtocolTwoWayAnonComposedRequest;
+
+        pub use crate::ComposedProtocolTwoWayAnonComposedResponse;
+
+        pub use crate::ComposedProtocolTwoWayAnonComposedWithErrorRequest;
+
+        pub use crate::ComposedProtocolTwoWayAnonComposedWithErrorResponse;
+
+        pub use crate::TablePayload;
+
+        pub use crate::UnionPayload;
+    }
 
     pub struct OneWayAnonComposed;
 
@@ -3826,6 +3849,40 @@ impl ::core::fmt::Debug for WireOptionalMainProtocolOnAnonRequest {
 pub struct MainProtocol;
 
 pub mod main_protocol {
+    pub mod prelude {
+        pub use crate::{
+            main_protocol, MainProtocol, MainProtocolClientHandler, MainProtocolClientSender,
+            MainProtocolServerHandler, MainProtocolServerSender,
+        };
+
+        pub use crate::ComposedProtocolOnAnonComposedRequest;
+
+        pub use crate::ComposedProtocolOneWayAnonComposedRequest;
+
+        pub use crate::ComposedProtocolTwoWayAnonComposedRequest;
+
+        pub use crate::ComposedProtocolTwoWayAnonComposedResponse;
+
+        pub use crate::ComposedProtocolTwoWayAnonComposedWithErrorRequest;
+
+        pub use crate::ComposedProtocolTwoWayAnonComposedWithErrorResponse;
+
+        pub use crate::MainProtocolOnAnonRequest;
+
+        pub use crate::MainProtocolOneWayAnonRequest;
+
+        pub use crate::MainProtocolTwoWayAnonRequest;
+
+        pub use crate::MainProtocolTwoWayAnonResponse;
+
+        pub use crate::MainProtocolTwoWayAnonWithErrorRequest;
+
+        pub use crate::MainProtocolTwoWayAnonWithErrorResponse;
+
+        pub use crate::TablePayload;
+
+        pub use crate::UnionPayload;
+    }
 
     pub struct OneWayAnonComposed;
 
@@ -4838,14 +4895,6 @@ where
             }
         }
     }
-}
-
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{
-        ComposedProtocolClientSender, ComposedProtocolServerSender, MainProtocolClientSender,
-        MainProtocolServerSender,
-    };
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.

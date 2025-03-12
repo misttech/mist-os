@@ -528,8 +528,5 @@ pub const OR_RESULT: crate::BitsType = crate::BitsType::from_bits_retain(7);
 
 pub const OR_RESULT_PRIMITIVE_VAL: u32 = 5;
 
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {}
-
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {}

@@ -126,7 +126,14 @@ where
 #[derive(Debug)]
 pub struct DriverProtocol;
 
-pub mod driver_protocol {}
+pub mod driver_protocol {
+    pub mod prelude {
+        pub use crate::{
+            driver_protocol, DriverProtocol, DriverProtocolClientHandler,
+            DriverProtocolClientSender, DriverProtocolServerHandler, DriverProtocolServerSender,
+        };
+    }
+}
 
 /// A helper trait for the `DriverProtocol` client sender.
 pub trait DriverProtocolClientSender {
@@ -488,6 +495,15 @@ where
 pub struct HandlesInProtocol;
 
 pub mod handles_in_protocol {
+    pub mod prelude {
+        pub use crate::{
+            handles_in_protocol, HandlesInProtocol, HandlesInProtocolClientHandler,
+            HandlesInProtocolClientSender, HandlesInProtocolServerHandler,
+            HandlesInProtocolServerSender,
+        };
+
+        pub use crate::HandlesInProtocolSendHandlesRequest;
+    }
 
     pub struct SendHandles;
 
@@ -744,14 +760,6 @@ where
 
         Ok(())
     }
-}
-
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{
-        DriverProtocolClientSender, DriverProtocolServerSender, HandlesInProtocolClientSender,
-        HandlesInProtocolServerSender,
-    };
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.

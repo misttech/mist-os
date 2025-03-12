@@ -4800,6 +4800,30 @@ impl ::core::fmt::Debug for WireOptionalProtocolErrorResourceResult {
 pub struct Protocol;
 
 pub mod protocol {
+    pub mod prelude {
+        pub use crate::{
+            protocol, Protocol, ProtocolClientHandler, ProtocolClientSender, ProtocolServerHandler,
+            ProtocolServerSender,
+        };
+
+        pub use crate::ArrayBasic;
+
+        pub use crate::ArrayCompound;
+
+        pub use crate::ArrayVectorNested;
+
+        pub use crate::Basic;
+
+        pub use crate::Compound;
+
+        pub use crate::Resource;
+
+        pub use crate::VectorBasic;
+
+        pub use crate::VectorCompound;
+
+        pub use crate::VectorOptional;
+    }
 
     pub struct OneWayBasic;
 
@@ -6749,11 +6773,6 @@ where
             }
         }
     }
-}
-
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{ProtocolClientSender, ProtocolServerSender};
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.

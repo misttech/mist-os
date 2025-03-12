@@ -210,6 +210,16 @@ where
 pub struct Super;
 
 pub mod super_ {
+    pub mod prelude {
+        pub use crate::{
+            super_, Super, SuperClientHandler, SuperClientSender, SuperServerHandler,
+            SuperServerSender,
+        };
+
+        pub use crate::SuperFooRequest;
+
+        pub use crate::SuperFooResponse;
+    }
 
     pub struct Foo;
 
@@ -366,6 +376,15 @@ where
 pub struct Sub;
 
 pub mod sub {
+    pub mod prelude {
+        pub use crate::{
+            sub, Sub, SubClientHandler, SubClientSender, SubServerHandler, SubServerSender,
+        };
+
+        pub use crate::SuperFooRequest;
+
+        pub use crate::SuperFooResponse;
+    }
 
     pub struct Foo;
 
@@ -509,11 +528,6 @@ where
             }
         }
     }
-}
-
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{SubClientSender, SubServerSender, SuperClientSender, SuperServerSender};
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
