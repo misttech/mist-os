@@ -276,6 +276,7 @@ void VideoInputUnit::SetColorCorrection(uint32_t rdma_table_idx, const display_c
 
 void VideoInputUnit::FlipOnVsync(const display_config_t& config,
                                  display::DriverConfigStamp config_stamp) {
+  // TODO(https://fxbug.dev/401286733): color layers not yet supported.
   ZX_DEBUG_ASSERT_MSG(config.layer_list[0].image_source.width != 0,
                       "Solid color fill layers not supported");
   ZX_DEBUG_ASSERT_MSG(config.layer_list[0].image_source.height != 0,

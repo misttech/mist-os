@@ -524,6 +524,10 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
     if (memcmp(&layer.display_destination, &display_area, sizeof(rect_u_t)) != 0) {
       return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
+    if (layer.image_source.width == 0 || layer.image_source.height == 0) {
+      // TODO(https://fxbug.dev/401286733): color layers not yet supported.
+      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+    }
     if (memcmp(&layer.image_source, &display_area, sizeof(rect_u_t)) != 0) {
       return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }

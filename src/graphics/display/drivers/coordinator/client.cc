@@ -1066,17 +1066,14 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
   }
 
   if (banjo_display_config.layer_count == 0) {
-    // The client does not have a non-empty configuration for an existing
-    // display.
+    // `SetDisplayLayers()` prevents the client from directly specifying an empty layer list
+    // for a display. However, we can still end up here if the client specified a non-empty
+    // configuration for a display that was removed before the client called `CheckConfig()`.
     //
-    // This can happen if the client put together a configuration for a
-    // display, the display was removed, and the client called CheckConfig()
-    // before it received the display change event.
-    //
-    // Passing the check is acceptable, because ApplyConfig() will skip the
-    // configuration for the missing display. On the other hand, the client
-    // may be using CheckConfig() to probe the display engine's capabilities,
-    // and may get confused by this result.
+    // It is OK to pass the check, because `ApplyConfig()` will skip the configuration for the
+    // missing display. Conversely, we don't want to fail the check, because the client may be
+    // using `CheckConfig()` to probe the display engine's capabilities, and would likely be
+    // confused by a transient failure they have no control over.
     return true;
   }
 
