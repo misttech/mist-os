@@ -730,9 +730,17 @@ if (!is_host) {
       # `ffx emu start --engine qemu` requires `qemu_internal` in the manifest.
       "//src/developer/ffx/plugins/emulator:qemu_internal($host_toolchain)",
 
-      # For completeness.
+      # Other emulators for completeness.
       "//src/developer/ffx/plugins/emulator:crosvm_internal($host_toolchain)",
       "//src/developer/ffx/plugins/emulator:uefi_internal_arm64($host_toolchain)",
+
+      # `ffx debug connect` requires `zxdb`, `fidlcat`, and `symbolizer` (already
+      # included).
+      "//src/developer/debug/zxdb:zxdb_sdk($host_toolchain)",
+      "//tools/fidlcat:fidlcat_sdk($host_toolchain)",
+
+      # Include all tools not in the in-tree collection to avoid regressions.
+      ":non_build_host_tools($host_toolchain)",
     ]
   }
 
