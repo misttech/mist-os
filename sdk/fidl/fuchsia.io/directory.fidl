@@ -170,7 +170,7 @@ const PERM_EXECUTABLE Flags
 /// "must create" in other contexts is due to the assumption that some POSIX flags are compatible
 /// with the members in `Flags`. In particular the POSIX `O_EXCL` has the same value as
 /// `Flags.FLAG_MUST_CREATE`. We are not able to define different bit members of the same value,
-/// hence it is defined seperately outside of `Flags`.
+/// hence it is defined separately outside of `Flags`.
 @available(added=HEAD)
 const FLAG_TEMPORARY_AS_NOT_LINKABLE Flags = Flags.FLAG_MUST_CREATE;
 

@@ -148,10 +148,10 @@ type MutableNodeAttributes = table {
     /// implementations. The value can only be set or returned if it is
     /// [`MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN`] characters or less to constrain the size of the
     /// response. If the value is not currently found on the node the response the field will not
-    /// be included in the repsonse. If the value is found on the node but the server is not
+    /// be included in the response. If the value is found on the node but the server is not
     /// returning it here due to size or implementation, then it will return
     /// `use_extended_attributes` to indicate using the ['fuchsia.io/Node.GetExtendedAttribute`]
-    /// to retreive it.
+    /// to retrieve it.
     ///
     /// ZX_ERR_INVALID_ARGS will be returned if there is an attempt set this attribute with the
     /// `use_extended_attributes` member.
@@ -539,7 +539,7 @@ open protocol Node {
         ///
         /// It supports connecting to arbitrary protocols exported by the
         /// filesystem server at a path, including ones that do not compose
-        /// [`Node2`].
+        /// [`Node`].
         ///
         /// See [`NodeProtocolKinds.CONNECTOR`].
         1: connector @generated_name("ConnectorInfo") table {
