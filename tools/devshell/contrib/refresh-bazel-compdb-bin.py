@@ -16,10 +16,13 @@ _OPT_PATTERN = re.compile("[\W]+")
 
 _SHOULD_LOG = False
 
+_FUCHSIA_PACKAGE_SUFFIX = "_fuchsia_package"
+
 _FUCHSIA_CPU_MAP = {"aarch64": "arm64", "x86_64": "x64"}
 
 _BAZEL_CPU_ALIASES = {
     "k8": "x86_64",
+    "x64": "x86_64",
     "x86_64": "x86_64",
     "aarch64": "aarch64",
     "arm64": "aarch64",
@@ -256,12 +259,22 @@ def compilation_mode(args: Sequence[str]) -> str:
         return "--compilation_mode=fastbuild"
 
 
-def assert_arg_label_is_fuchsia_package(args: argparse.Namespace):
-    results = collect_labels_from_scope(args.bazel, args.label)
+def canonicalize_label_from_arg(label: str) -> str:
+    # fuchsia_package targets append a suffix to them which is not obvious.
+    # We check the label to see if the user has appended it or not and fix
+    # it for them here.
+    if label.endswith(_FUCHSIA_PACKAGE_SUFFIX):
+        return label
+    else:
+        return label + _FUCHSIA_PACKAGE_SUFFIX
+
+
+def assert_arg_label_is_fuchsia_package(bazel_exe: str, label: str):
+    results = collect_labels_from_scope(bazel_exe, label)
     if len(results) == 0:
         fail(
             "Provided label '{}' is not a valid fuchsia_package label. Please provide a label that points to a valid fuchsia package or use --dir instead.".format(
-                args.label
+                label
             )
         )
 
@@ -381,9 +394,10 @@ def main(argv: Sequence[str]):
 
     labels = []
     if args.label:
-        info("Verifying label '{}' is valid".format(args.label))
-        assert_arg_label_is_fuchsia_package(args)
-        labels.append(args.label)
+        label = canonicalize_label_from_arg(args.label)
+        info("Verifying label '{}' is valid".format(label))
+        assert_arg_label_is_fuchsia_package(args.bazel, label)
+        labels.append(label)
 
     if args.dir:
         info("Finding all labels in dir '{}'".format(args.dir))
