@@ -32,7 +32,7 @@ pub trait JsonGetter<K: Clone + AsRef<str>>: DiagnosticsHierarchyGetter<K> {
     fn get_json(&self) -> String {
         let mut tree = self.get_diagnostics_hierarchy();
         tree.to_mut().sort();
-        serde_json::to_string(&tree).expect("pretty json string")
+        serde_json::to_string(&tree).expect("json string")
     }
 }
 
@@ -271,24 +271,24 @@ macro_rules! assert_json_diff {
         let actual = actual_hierarchy.get_pretty_json();
 
         if actual != expected {
-            panic!("{}", $crate::line_diff(&expected, &actual));
+            panic!("{}", $crate::Diff::from_text(&expected, &actual));
         }
     }}
 }
 
-#[doc(hidden)]
-pub fn line_diff(expected: &str, actual: &str) -> Changeset {
-    Changeset::new(expected, actual, "\n")
-}
-
 /// A difference between expected and actual output.
-struct Diff(Changeset);
+pub struct Diff(Changeset);
 
 impl Diff {
     fn new(expected: &dyn Debug, actual: &dyn Debug) -> Self {
         let expected = format!("{:#?}", expected);
         let actual = format!("{:#?}", actual);
-        Diff(Changeset::new(&expected, &actual, "\n"))
+        Self::from_text(&expected, &actual)
+    }
+
+    #[doc(hidden)]
+    pub fn from_text(expected: &str, actual: &str) -> Self {
+        Diff(Changeset::new(expected, actual, "\n"))
     }
 }
 
@@ -1626,13 +1626,13 @@ mod tests {
     }
 
     #[test]
-    fn test_line_diff() {
+    fn test_diff_from_text() {
         let original = "foo\nbar\nbaz";
         let update = "foo\nbaz\nqux";
 
-        let changeset = line_diff(original, update);
+        let changeset = Diff::from_text(original, update);
         assert_eq!(
-            changeset.diffs,
+            changeset.0.diffs,
             vec![
                 Same("foo".to_string()),
                 Rem("bar".to_string()),
