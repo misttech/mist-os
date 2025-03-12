@@ -8,7 +8,6 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/device_server.h>
-#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
@@ -84,20 +83,10 @@ class Environment : public fdf_testing::Environment {
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
     device_server_.Initialize("pdev");
 
-    {
-      zx::result result = to_driver_vfs.AddService<fuchsia_hardware_platform_device::Service>(
-          pdev_.GetInstanceHandler(fdf::Dispatcher::GetCurrent()->async_dispatcher()), "pdev");
-      if (result.is_error()) {
-        return result.take_error();
-      }
-    }
-
-    {
-      zx::result result = to_driver_vfs.AddService<fuchsia_hardware_i2c::Service>(
-          std::move(i2c_.GetInstanceHandler()), "i2c");
-      if (result.is_error()) {
-        return result.take_error();
-      }
+    zx::result result = to_driver_vfs.AddService<fuchsia_hardware_i2c::Service>(
+        std::move(i2c_.GetInstanceHandler()), "i2c");
+    if (result.is_error()) {
+      return result.take_error();
     }
 
     return zx::ok();
@@ -108,7 +97,6 @@ class Environment : public fdf_testing::Environment {
  private:
   compat::DeviceServer device_server_;
   FakeTiTca6408aDevice i2c_;
-  fdf_fake::FakePDev pdev_;
 };
 
 class TiTca6408aTestConfig {

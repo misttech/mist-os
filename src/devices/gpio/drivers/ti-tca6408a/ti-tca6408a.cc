@@ -38,13 +38,7 @@ zx::result<> TiTca6408aDevice::Start() {
 
   ZX_ASSERT(compat_server_
                 .Initialize(incoming(), outgoing(), node_name(), kDeviceName,
-                            compat::ForwardMetadata::Some(
-                                {// TODO(b/395140408): Don't forward
-                                 // DEVICE_METADATA_SCHEDULER_ROLE_NAME once no longer retrieved.
-                                 DEVICE_METADATA_SCHEDULER_ROLE_NAME,
-                                 // TODO(b/388305889): Don't forward DEVICE_METADATA_GPIO_CONTROLLER
-                                 // once no longer retrieved.
-                                 DEVICE_METADATA_GPIO_CONTROLLER}))
+                            compat::ForwardMetadata::All())
                 .is_ok());
 
   device_ = std::make_unique<TiTca6408a>(std::move(i2c));
@@ -59,36 +53,6 @@ zx::result<> TiTca6408aDevice::Start() {
     return result.take_error();
   }
 
-  zx::result pdev = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>("pdev");
-  if (pdev.is_error()) {
-    FDF_LOG(ERROR, "Failed to connect to platform device: %s", pdev.status_string());
-    return pdev.take_error();
-  }
-
-  if (zx::result result = pin_metadata_server_.SetMetadataFromPDevIfExists(pdev.value());
-      result.is_error()) {
-    FDF_LOG(ERROR, "Failed to set pin metadata from platform device: %s", result.status_string());
-    return result.take_error();
-  }
-  if (zx::result result = pin_metadata_server_.Serve(*outgoing(), dispatcher());
-      result.is_error()) {
-    FDF_LOG(ERROR, "Failed to serve pin metadata: %s", result.status_string());
-    return result.take_error();
-  }
-
-  if (zx::result result =
-          scheduler_role_name_metadata_server_.SetMetadataFromPDevIfExists(pdev.value());
-      result.is_error()) {
-    FDF_LOG(ERROR, "Failed to set scheduler role name metadata from platform device: %s",
-            result.status_string());
-    return result.take_error();
-  }
-  if (zx::result result = scheduler_role_name_metadata_server_.Serve(*outgoing(), dispatcher());
-      result.is_error()) {
-    FDF_LOG(ERROR, "Failed to serve scheduler role name metadata: %s", result.status_string());
-    return result.take_error();
-  }
-
   return CreateNode();
 }
 
@@ -100,18 +64,25 @@ void TiTca6408aDevice::Stop() {
 }
 
 zx::result<> TiTca6408aDevice::CreateNode() {
-  std::vector offers = compat_server_.CreateOffers2();
-  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_pinimpl::Service>());
-  offers.push_back(pin_metadata_server_.MakeOffer());
-  offers.push_back(scheduler_role_name_metadata_server_.MakeOffer());
+  fidl::Arena arena;
+  auto offers = compat_server_.CreateOffers2(arena);
+  offers.push_back(
+      fdf::MakeOffer2<fuchsia_hardware_pinimpl::Service>(arena, component::kDefaultInstance));
 
-  zx::result child =
-      AddChild(kDeviceName, std::vector<fuchsia_driver_framework::NodeProperty>{}, offers);
-  if (child.is_error()) {
-    FDF_LOG(ERROR, "Failed to add child: %s", child.status_string());
-    return child.take_error();
+  auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
+                  .name(arena, kDeviceName)
+                  .offers2(arena, std::move(offers))
+                  .Build();
+
+  auto controller_endpoints = fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
+
+  fidl::WireResult result =
+      fidl::WireCall(node())->AddChild(args, std::move(controller_endpoints.server), {});
+  if (!result.ok()) {
+    FDF_LOG(ERROR, "Failed to add child %s", result.status_string());
+    return zx::error(result.status());
   }
-  controller_.Bind(std::move(child.value()));
+  controller_.Bind(std::move(controller_endpoints.client));
 
   return zx::ok();
 }

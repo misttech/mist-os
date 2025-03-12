@@ -23,15 +23,12 @@ source_set("common") {
     "ti-tca6408a.cc",
     "ti-tca6408a.h",
   ]
-  deps = [ "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp" ]
   public_deps = [
     ":ti-tca6408a-bind",
     "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
     "//sdk/fidl/fuchsia.hardware.pinimpl:fuchsia.hardware.pinimpl_cpp",
-    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp:cpp",
-    "//sdk/lib/driver/metadata/cpp",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//zircon/system/ulib/zx",
   ]
@@ -63,7 +60,6 @@ test("ti-tca6408a-test-bin") {
     ":common",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/compat/cpp",
-    "//sdk/lib/driver/fake-platform-device/cpp",
     "//sdk/lib/driver/testing/cpp",
     "//src/devices/i2c/testing/fake-i2c",
     "//src/lib/fxl/test:gtest_main",
