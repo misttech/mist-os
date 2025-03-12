@@ -37,7 +37,7 @@ def get_run_commands(mock_run: mock.MagicMock) -> list[list[str]]:
 class GitTests(unittest.TestCase):
     @mock.patch.object(subprocess, "run", autospec=True)
     def test_git_command(self, mock_run: mock.MagicMock) -> None:
-        git = cipd_utils.Git("path/to/repo/")
+        git = cipd_utils.Git("path/to/repo/", "")
 
         git.git(["foo", "bar"])
 
@@ -50,7 +50,7 @@ class GitTests(unittest.TestCase):
 
     @mock.patch.object(subprocess, "run", autospec=True)
     def test_changelog(self, mock_run: mock.MagicMock) -> None:
-        git = cipd_utils.Git("path/")
+        git = cipd_utils.Git("path/", "")
         mock_run.return_value = subprocess.CompletedProcess("", 0, "fake log")
 
         result = git.changelog("start_revision", "end_revision")
@@ -72,7 +72,7 @@ class GitTests(unittest.TestCase):
 
     @mock.patch.object(subprocess, "run", autospec=True)
     def test_changelog_no_start(self, mock_run: mock.MagicMock) -> None:
-        git = cipd_utils.Git("path/")
+        git = cipd_utils.Git("path/", "")
         mock_run.return_value = subprocess.CompletedProcess("", 0, "fake log")
 
         result = git.changelog(None, "end_revision")
@@ -168,6 +168,44 @@ class RepoTests(unittest.TestCase):
             cipd_utils.Repo(
                 "/repo/root", spec={"foo": "same_alias", "baz": "same_alias"}
             )
+
+    @mock.patch.object(subprocess, "run", autospec=True)
+    def test_repo_manifest(self, mock_run: mock.MagicMock) -> None:
+        # First call should be `repo info`, then `repo status`.
+        mock_run.side_effect = [
+            subprocess.CompletedProcess([], 0, _FAKE_REPO_INFO),
+            subprocess.CompletedProcess([], 0, ""),
+        ]
+
+        repo = cipd_utils.Repo("/repo/root")
+        self.assertEqual(
+            repo.manifest(),
+            {
+                "foo": "foo_revision",
+                "bar/baz": "baz_revision",
+            },
+        )
+
+        # Verify we made the calls that we expected.
+        self.assertEqual(
+            get_run_commands(mock_run),
+            [
+                ["repo", "info", "--local-only"],
+                ["repo", "status", "--quiet"],
+            ],
+        )
+
+    @mock.patch.object(subprocess, "run", autospec=True)
+    def test_repo_manifest_dirty(self, mock_run: mock.MagicMock) -> None:
+        mock_run.side_effect = [
+            subprocess.CompletedProcess([], 0, _FAKE_REPO_INFO),
+            # Any output from `repo status --quiet` means dirty repo.
+            subprocess.CompletedProcess([], 0, "--dirty--"),
+        ]
+
+        repo = cipd_utils.Repo("/repo/root")
+        with self.assertRaises(ValueError):
+            repo.manifest()
 
 
 class CipdTests(unittest.TestCase):
