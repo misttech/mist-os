@@ -14,10 +14,10 @@ some common target-agnostic utilities for working with these CIPD packages.
 
 import argparse
 import json
+import logging
 import os
 import re
 import subprocess
-import sys
 import tempfile
 
 _MY_DIR = os.path.dirname(__file__)
@@ -27,8 +27,11 @@ _FUCHSIA_ROOT = os.path.normpath(os.path.join(_MY_DIR, "..", "..", ".."))
 _GIT_TOOL = "git"
 _REPO_TOOL = "repo"
 
-# `cipd` is available as a prebuilt in the Fuchsia checkout.
+# `cipd` is available as a prebuilt in the Fuchsia checkout, but fall back to $PATH
+# in case this is being run out-of-tree.
 CIPD_TOOL = os.path.join(_FUCHSIA_ROOT, ".jiri_root", "bin", "cipd")
+if not os.path.isfile(CIPD_TOOL):
+    CIPD_TOOL = "cipd"
 
 
 class Git:
@@ -119,30 +122,34 @@ class Repo:
         self.root = os.path.realpath(root)
         self.git_repos = self._list_git_repos(spec)
 
-    def manifest(self) -> dict[str, str]:
+    def manifest(self, allow_dirty: bool) -> dict[str, str]:
         """Returns a {name: version} manifest of this repo.
 
-        This requires a clean repo, because the git revisions aren't stable if they
-        are only local to this machine. A clean repo means they actually exist upstream
-        and can be used to point to a specific version.
+        Normally this requires a clean repo, because the git revisions aren't stable if
+        they are only local to this machine. A clean repo means they actually exist
+        upstream and can be used to point to a specific version.
+
+        Args:
+            allow_dirty: allow generating a manifest on a dirty repo.
 
         Raises:
             ValueError if the repo is not clean.
         """
-        # `repo status --quiet` doesn't print anything if the repo is clean,
-        # otherwise it prints the dirty repo path(s).
-        repo_status = subprocess.run(
-            [_REPO_TOOL, "status", "--quiet"],
-            cwd=self.root,
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-        ).stdout.strip()
-        if repo_status:
-            raise ValueError(
-                f"Repo at '{self.root}' is dirty, cannot create stable manifest"
-            )
+        if not allow_dirty:
+            # `repo status --quiet` doesn't print anything if the repo is clean,
+            # otherwise it prints the dirty repo path(s).
+            repo_status = subprocess.run(
+                [_REPO_TOOL, "status", "--quiet"],
+                cwd=self.root,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+            ).stdout.strip()
+            if repo_status:
+                raise ValueError(
+                    f"Repo at '{self.root}' is dirty, cannot create stable manifest"
+                )
 
         return {name: git.revision for name, git in self.git_repos.items()}
 
@@ -453,16 +460,20 @@ def _parse_args() -> argparse.Namespace:
         " use with this script",
     )
     _add_common_repo_args(manifest_parser)
+    manifest_parser.add_argument(
+        "--allow-dirty",
+        action="store_true",
+        help="Allow dirty repos. Note that the resulting manifest is not stable since"
+        " the revisions only apply to the local checkout, so should only be used for"
+        " local testing and verification",
+    )
 
     return parser.parse_args()
 
 
-def main() -> int:
-    """Script entry point.
-
-    Returns:
-        0 on success, non-zero on failure.
-    """
+def main() -> None:
+    """Script entry point."""
+    logging.basicConfig()
     args = _parse_args()
 
     if args.action == "changelog":
@@ -507,13 +518,24 @@ def main() -> int:
             spec = None
 
         repo = Repo(args.repo, spec=spec)
-        print(json.dumps(repo.manifest(), indent=2, sort_keys=True))
+        print(
+            json.dumps(
+                repo.manifest(args.allow_dirty), indent=2, sort_keys=True
+            )
+        )
 
     else:
         raise NotImplementedError(f"Unimplemented command: {args.action}")
 
-    return 0
-
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        main()
+    except subprocess.CalledProcessError as e:
+        # Dump stdout/stderr for failed subprocesses so the caller knows what failed.
+        logging.error("Failed command: `%s`", " ".join([str(c) for c in e.cmd]))
+        if e.stdout:
+            logging.error("\n-- stdout --\n%s------------", e.stdout)
+        if e.stderr:
+            logging.error("\n-- stderr --\n%s------------", e.stderr)
+        raise

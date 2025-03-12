@@ -179,7 +179,7 @@ class RepoTests(unittest.TestCase):
 
         repo = cipd_utils.Repo("/repo/root")
         self.assertEqual(
-            repo.manifest(),
+            repo.manifest(allow_dirty=False),
             {
                 "foo": "foo_revision",
                 "bar/baz": "baz_revision",
@@ -205,7 +205,27 @@ class RepoTests(unittest.TestCase):
 
         repo = cipd_utils.Repo("/repo/root")
         with self.assertRaises(ValueError):
-            repo.manifest()
+            repo.manifest(allow_dirty=False)
+
+    @mock.patch.object(subprocess, "run", autospec=True)
+    def test_repo_manifest_allow_dirty(self, mock_run: mock.MagicMock) -> None:
+        # First call should be `repo info`, then `repo status`.
+        mock_run.side_effect = [
+            subprocess.CompletedProcess([], 0, _FAKE_REPO_INFO),
+            # Any output from `repo status --quiet` means dirty repo.
+            subprocess.CompletedProcess([], 0, "--dirty--"),
+        ]
+
+        repo = cipd_utils.Repo("/repo/root")
+
+        # With allow_dirty, we should be able to produce a manifest on a dirty repo.
+        self.assertEqual(
+            repo.manifest(allow_dirty=True),
+            {
+                "foo": "foo_revision",
+                "bar/baz": "baz_revision",
+            },
+        )
 
 
 class CipdTests(unittest.TestCase):
