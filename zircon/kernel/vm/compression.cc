@@ -15,6 +15,7 @@
 #include <vm/physmap.h>
 #include <vm/pmm.h>
 #include <vm/tri_page_storage.h>
+#include <vm/vm.h>
 
 namespace {
 
@@ -68,6 +69,7 @@ VmCompression::~VmCompression() {
 
 VmCompression::CompressResult VmCompression::Compress(const void* page_src,
                                                       zx_instant_mono_ticks_t now) {
+  VM_KTRACE_DURATION(2, "compress_page");
   // Take the compression lock so we can use the buffer_page_.
   Guard<Mutex> guard{&compression_lock_};
 
@@ -132,6 +134,7 @@ VmCompression::CompressResult VmCompression::Compress(const void* page_src,
 
 void VmCompression::Decompress(CompressedRef ref, void* page_dest, uint32_t* metadata_dest,
                                zx_instant_mono_ticks_t now) {
+  VM_KTRACE_DURATION_BEGIN(2, "decompress_page");
   ScopedMemoryStall memory_stall;
 
   if (unlikely(IsTempReference(ref))) {
@@ -162,6 +165,8 @@ void VmCompression::Decompress(CompressedRef ref, void* page_dest, uint32_t* met
 
   // Now that decompression is finished, free the backing memory.
   storage_->Free(ref);
+  VM_KTRACE_DURATION_END(2, "decompress_page",
+                         ("compressed_time_s", (now - compressed_ticks) / ticks_per_second()));
 }
 
 void VmCompression::Free(CompressedRef ref) {
