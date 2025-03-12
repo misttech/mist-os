@@ -215,31 +215,6 @@ func runGen(
 	return stdoutBuf.String(), nil
 }
 
-// findGNIFile returns the relative path to a board or product file in a
-// checkout, given a basename. It checks the root of the checkout as well as
-// each vendor/* directory for a file matching "<dirname>/<basename>.gni", e.g.
-// "boards/core.gni".
-func findGNIFile(checkoutDir, dirname, basename string) (string, error) {
-	dirs, err := filepath.Glob(filepath.Join(checkoutDir, "vendor", "*", dirname))
-	if err != nil {
-		return "", err
-	}
-	dirs = append(dirs, filepath.Join(checkoutDir, dirname))
-
-	for _, dir := range dirs {
-		path := filepath.Join(dir, fmt.Sprintf("%s.gni", basename))
-		exists, err := osmisc.FileExists(path)
-		if err != nil {
-			return "", err
-		}
-		if exists {
-			return filepath.Rel(checkoutDir, path)
-		}
-	}
-
-	return "", nil
-}
-
 func genArgs(
 	ctx context.Context,
 	staticSpec *fintpb.Static,
