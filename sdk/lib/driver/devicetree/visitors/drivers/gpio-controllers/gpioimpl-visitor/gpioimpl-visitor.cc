@@ -538,19 +538,30 @@ zx::result<> GpioImplVisitor::FinalizeNode(fdf_devicetree::Node& node) {
       metadata.pins() = *std::move(controller->second.metadata.pins());
     }
 
-    const fit::result persisted_pin_metadata = fidl::Persist(metadata);
-    if (!persisted_pin_metadata.is_ok()) {
-      FDF_LOG(ERROR, "Failed to encode pin metadata for node %s: %s", node.name().c_str(),
-              persisted_pin_metadata.error_value().FormatDescription().c_str());
-      return zx::error(persisted_pin_metadata.error_value().status());
+    const fit::result encoded_controller_metadata = fidl::Persist(metadata);
+    if (!encoded_controller_metadata.is_ok()) {
+      FDF_LOG(ERROR, "Failed to encode GPIO controller metadata for node %s: %s",
+              node.name().c_str(),
+              encoded_controller_metadata.error_value().FormatDescription().c_str());
+      return zx::error(encoded_controller_metadata.error_value().status());
     }
 
-    fuchsia_hardware_platform_bus::Metadata pin_metadata = {{
-        .id = fuchsia_hardware_pinimpl::Metadata::kSerializableName,
-        .data = std::move(persisted_pin_metadata.value()),
-    }};
-    node.AddMetadata(std::move(pin_metadata));
+    // TODO(b/388305889): Remove once no longer retrieved.
+    {
+      fuchsia_hardware_platform_bus::Metadata controller_metadata = {{
+          .id = std::to_string(DEVICE_METADATA_GPIO_CONTROLLER),
+          .data = encoded_controller_metadata.value(),
+      }};
+      node.AddMetadata(std::move(controller_metadata));
+    }
 
+    {
+      fuchsia_hardware_platform_bus::Metadata controller_metadata = {{
+          .id = fuchsia_hardware_pinimpl::Metadata::kSerializableName,
+          .data = std::move(encoded_controller_metadata.value()),
+      }};
+      node.AddMetadata(std::move(controller_metadata));
+    }
     FDF_LOG(DEBUG, "Gpio metadata added to node '%s'", node.name().c_str());
   }
 

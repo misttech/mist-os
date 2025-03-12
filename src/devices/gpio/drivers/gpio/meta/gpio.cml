@@ -21,7 +21,6 @@
     ],
     use: [
         { service: 'fuchsia.hardware.pinimpl.Service' },
-        { service: 'fuchsia.hardware.pinimpl.Metadata' },
     ],
     expose: [
         {

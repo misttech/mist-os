@@ -15,40 +15,30 @@ driver_bind_rules("gpio_bind") {
       [ "//sdk/fidl/fuchsia.hardware.pinimpl:fuchsia.hardware.pinimpl_bindlib" ]
 }
 
-source_set("common") {
-  sources = [
-    "gpio.cc",
-    "gpio.h",
-  ]
-  deps = [
-    ":gpio_bind",
-    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
-    "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/driver/metadata/cpp",
-    "//sdk/lib/driver/node/cpp",
-    "//src/devices/bind/fuchsia:fuchsia_cpp",
-    "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
-    "//src/lib/ddk:ddk_metadata",
-    "//zircon/system/ulib/zx",
-  ]
-  public_deps = [
-    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
-    "//sdk/fidl/fuchsia.hardware.pin:fuchsia.hardware.pin_cpp",
-    "//sdk/fidl/fuchsia.hardware.pinimpl:fuchsia.hardware.pinimpl_cpp",
-    "//sdk/lib/driver/compat/cpp",
-    "//sdk/lib/driver/component/cpp",
-    "//sdk/lib/driver/devfs/cpp",
-    "//zircon/system/ulib/fbl",
-  ]
-}
-
 fuchsia_cc_driver("gpio-driver") {
   output_name = "gpio"
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  deps = [ ":common" ]
+  sources = [ "gpio.cc" ]
+  deps = [
+    ":gpio_bind",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
+    "//sdk/fidl/fuchsia.hardware.pin:fuchsia.hardware.pin_cpp",
+    "//sdk/fidl/fuchsia.hardware.pinimpl:fuchsia.hardware.pinimpl_cpp",
+    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/node/cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
+    "//src/lib/ddk:ddk-metadata-headers",
+    "//src/lib/ddk:ddk_metadata",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/zx",
+  ]
 }
 
 fuchsia_driver_component("gpio") {
@@ -70,17 +60,30 @@ fuchsia_driver_package("package") {
 
 test("gpio-test-bin") {
   output_name = "gpio-test"
-  sources = [ "gpio-test.cc" ]
+  sources = [
+    "gpio-test.cc",
+    "gpio.cc",
+  ]
   deps = [
-    ":common",
+    ":gpio_bind",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
+    "//sdk/fidl/fuchsia.hardware.pin:fuchsia.hardware.pin_cpp",
     "//sdk/fidl/fuchsia.hardware.pinimpl:fuchsia.hardware.pinimpl_cpp",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
     "//sdk/lib/async_patterns/testing/cpp",
-    "//sdk/lib/driver/metadata/cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/node/cpp",
+    "//sdk/lib/driver/outgoing/cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/driver/testing/cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
+    "//src/lib/ddk:ddk-metadata-headers",
     "//src/lib/ddk:ddk_metadata",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/zx",
   ]
 }
 

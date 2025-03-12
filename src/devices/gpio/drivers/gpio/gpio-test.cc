@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/device_server.h>
-#include <lib/driver/metadata/cpp/metadata_server.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 
 #include <optional>
@@ -178,13 +177,7 @@ class GpioTestEnvironment : public fdf_testing::Environment {
     compat_.Init(component::kDefaultInstance, "root");
     EXPECT_OK(compat_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs));
     EXPECT_OK(pinimpl_.Serve(to_driver_vfs));
-    EXPECT_OK(pin_metadata_server_.Serve(to_driver_vfs,
-                                         fdf::Dispatcher::GetCurrent()->async_dispatcher()));
     return zx::ok();
-  }
-
-  zx::result<> SetPinMetadata(const fuchsia_hardware_pinimpl::Metadata& metadata) {
-    return pin_metadata_server_.SetMetadata(metadata);
   }
 
   compat::DeviceServer& compat() { return compat_; }
@@ -193,7 +186,6 @@ class GpioTestEnvironment : public fdf_testing::Environment {
  private:
   compat::DeviceServer compat_;
   MockPinImpl pinimpl_;
-  fdf_metadata::MetadataServer<fuchsia_hardware_pinimpl::Metadata> pin_metadata_server_;
 };
 
 class FixtureConfig final {
@@ -217,9 +209,13 @@ class GpioTest : public ::testing::Test {
   fdf_testing::ForegroundDriverTest<FixtureConfig>& driver_test() { return driver_test_; }
 
  protected:
-  void SetPinMetadata(const fuchsia_hardware_pinimpl::Metadata& metadata) {
-    driver_test().RunInEnvironmentTypeContext(
-        [&](GpioTestEnvironment& env) { EXPECT_OK(env.SetPinMetadata(metadata)); });
+  void SetGpioMetadata(const fuchsia_hardware_pinimpl::Metadata& metadata) {
+    fit::result encoded_metadata = fidl::Persist(metadata);
+    ASSERT_TRUE(encoded_metadata.is_ok());
+    driver_test().RunInEnvironmentTypeContext([&](GpioTestEnvironment& env) {
+      EXPECT_OK(env.compat().AddMetadata(DEVICE_METADATA_GPIO_CONTROLLER, encoded_metadata->data(),
+                                         encoded_metadata->size()));
+    });
   }
 
  private:
@@ -227,11 +223,11 @@ class GpioTest : public ::testing::Test {
 };
 
 TEST_F(GpioTest, TestGpioAll) {
-  SetPinMetadata({{.pins = {{
-                       DECL_GPIO_PIN(1),
-                       DECL_GPIO_PIN(2),
-                       DECL_GPIO_PIN(3),
-                   }}}});
+  SetGpioMetadata({{.pins = {{
+                        DECL_GPIO_PIN(1),
+                        DECL_GPIO_PIN(2),
+                        DECL_GPIO_PIN(3),
+                    }}}});
 
   EXPECT_TRUE(driver_test().StartDriver().is_ok());
 
@@ -367,11 +363,11 @@ TEST_F(GpioTest, TestGpioAll) {
 }
 
 TEST_F(GpioTest, TestPinAll) {
-  SetPinMetadata({{.pins = {{
-                       DECL_GPIO_PIN(1),
-                       DECL_GPIO_PIN(2),
-                       DECL_GPIO_PIN(3),
-                   }}}});
+  SetGpioMetadata({{.pins = {{
+                        DECL_GPIO_PIN(1),
+                        DECL_GPIO_PIN(2),
+                        DECL_GPIO_PIN(3),
+                    }}}});
 
   EXPECT_TRUE(driver_test().StartDriver().is_ok());
 
@@ -425,11 +421,11 @@ TEST_F(GpioTest, TestPinAll) {
 }
 
 TEST_F(GpioTest, ValidateMetadataOk) {
-  SetPinMetadata({{.pins = {{
-                       DECL_GPIO_PIN(1),
-                       DECL_GPIO_PIN(2),
-                       DECL_GPIO_PIN(3),
-                   }}}});
+  SetGpioMetadata({{.pins = {{
+                        DECL_GPIO_PIN(1),
+                        DECL_GPIO_PIN(2),
+                        DECL_GPIO_PIN(3),
+                    }}}});
 
   EXPECT_TRUE(driver_test().StartDriver().is_ok());
 
@@ -444,12 +440,12 @@ TEST_F(GpioTest, ValidateMetadataOk) {
 }
 
 TEST_F(GpioTest, ValidateMetadataRejectDuplicates) {
-  SetPinMetadata({{.pins = {{
-                       DECL_GPIO_PIN(2),
-                       DECL_GPIO_PIN(1),
-                       DECL_GPIO_PIN(2),
-                       DECL_GPIO_PIN(0),
-                   }}}});
+  SetGpioMetadata({{.pins = {{
+                        DECL_GPIO_PIN(2),
+                        DECL_GPIO_PIN(1),
+                        DECL_GPIO_PIN(2),
+                        DECL_GPIO_PIN(0),
+                    }}}});
 
   ASSERT_FALSE(driver_test().StartDriver().is_ok());
 }
@@ -537,7 +533,7 @@ TEST_F(GpioTest, Init) {
   steps.push_back(config(3, fhpin::Configuration{{.function = 3}}));
   steps.push_back(config(3, fhpin::Configuration{{.drive_strength_ua = 2000}}));
 
-  SetPinMetadata({{
+  SetGpioMetadata({{
       .init_steps = std::move(steps),
       .pins = {{
           DECL_GPIO_PIN(1),
@@ -578,7 +574,7 @@ TEST_F(GpioTest, InitWithoutPins) {
   steps.push_back(fhpinimpl::InitStep::WithCall(
       {{1, fhpinimpl::InitCall::WithPinConfig({{.pull = fhpin::Pull::kDown}})}}));
 
-  SetPinMetadata({{.init_steps = std::move(steps)}});
+  SetGpioMetadata({{.init_steps = std::move(steps)}});
 
   EXPECT_TRUE(driver_test().StartDriver().is_ok());
 
@@ -623,7 +619,7 @@ TEST_F(GpioTest, InitErrorHandling) {
   steps.push_back(config(2, fhpin::Configuration{{.function = 0}}));
   steps.push_back(config(2, fhpin::Configuration{{.drive_strength_ua = 1000}}));
 
-  SetPinMetadata({{
+  SetGpioMetadata({{
       .init_steps = std::move(steps),
       .pins = {{
           DECL_GPIO_PIN(1),
@@ -662,7 +658,7 @@ TEST_F(GpioTest, ControllerId) {
       DECL_GPIO_PIN(2),
   };
 
-  SetPinMetadata({{
+  SetGpioMetadata({{
       .controller_id = kController,
       .pins = kPins,
   }});
@@ -713,7 +709,7 @@ TEST_F(GpioTest, SchedulerRole) {
       DECL_GPIO_PIN(1),
       DECL_GPIO_PIN(2),
   };
-  SetPinMetadata({{.pins = kPins}});
+  SetGpioMetadata({{.pins = kPins}});
 
   driver_test().RunInEnvironmentTypeContext([&](GpioTestEnvironment& env) {
     // Add scheduler role metadata that will cause the core driver to create a new driver
@@ -760,7 +756,7 @@ TEST_F(GpioTest, MultipleClients) {
       DECL_GPIO_PIN(2),
   };
 
-  SetPinMetadata({{.pins = kPins}});
+  SetGpioMetadata({{.pins = kPins}});
 
   EXPECT_TRUE(driver_test().StartDriver().is_ok());
 
@@ -786,11 +782,11 @@ TEST_F(GpioTest, MultipleClients) {
 }
 
 TEST_F(GpioTest, DebugDevfs) {
-  SetPinMetadata({{.pins = {{
-                       DECL_GPIO_PIN(1),
-                       DECL_GPIO_PIN(2),
-                       DECL_GPIO_PIN(3),
-                   }}}});
+  SetGpioMetadata({{.pins = {{
+                        DECL_GPIO_PIN(1),
+                        DECL_GPIO_PIN(2),
+                        DECL_GPIO_PIN(3),
+                    }}}});
 
   EXPECT_TRUE(driver_test().StartDriver().is_ok());
 
@@ -889,10 +885,10 @@ TEST_F(GpioTest, DebugDevfs) {
 }
 
 TEST_F(GpioTest, MultipleClientsGetInterrupts) {
-  SetPinMetadata({{.pins = {{
-                       DECL_GPIO_PIN(1),
-                       DECL_GPIO_PIN(2),
-                   }}}});
+  SetGpioMetadata({{.pins = {{
+                        DECL_GPIO_PIN(1),
+                        DECL_GPIO_PIN(2),
+                    }}}});
 
   EXPECT_TRUE(driver_test().StartDriver().is_ok());
 
@@ -967,9 +963,9 @@ TEST_F(GpioTest, MultipleClientsGetInterrupts) {
 }
 
 TEST_F(GpioTest, UnbindingClientReleasesInterrupt) {
-  SetPinMetadata({{.pins = {{
-                       DECL_GPIO_PIN(1),
-                   }}}});
+  SetGpioMetadata({{.pins = {{
+                        DECL_GPIO_PIN(1),
+                    }}}});
 
   EXPECT_TRUE(driver_test().StartDriver().is_ok());
 
@@ -1032,9 +1028,9 @@ TEST_F(GpioTest, UnbindingClientReleasesInterrupt) {
 }
 
 TEST_F(GpioTest, OnlyClientWithInterruptCanConfigure) {
-  SetPinMetadata({{.pins = {{
-                       DECL_GPIO_PIN(1),
-                   }}}});
+  SetGpioMetadata({{.pins = {{
+                        DECL_GPIO_PIN(1),
+                    }}}});
 
   EXPECT_TRUE(driver_test().StartDriver().is_ok());
 
@@ -1146,9 +1142,9 @@ TEST_F(GpioTest, OnlyClientWithInterruptCanConfigure) {
 }
 
 TEST_F(GpioTest, DoubleGetInterruptAndRelease) {
-  SetPinMetadata({{.pins = {{
-                       DECL_GPIO_PIN(1),
-                   }}}});
+  SetGpioMetadata({{.pins = {{
+                        DECL_GPIO_PIN(1),
+                    }}}});
 
   EXPECT_TRUE(driver_test().StartDriver().is_ok());
 
