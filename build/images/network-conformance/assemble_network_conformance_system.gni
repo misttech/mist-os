@@ -103,8 +103,6 @@ template("assemble_network_conformance_system") {
 
   assembled_system(target_name) {
     testonly = true
-    include_legacy_bundle = true
-    legacy_bundle_must_be_empty = true
 
     if (!fxfs_blob) {
       generate_fvm = true
