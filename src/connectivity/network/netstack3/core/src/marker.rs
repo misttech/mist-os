@@ -10,7 +10,7 @@
 use net_types::ip::{Ipv4, Ipv6};
 use netstack3_base::{
     AnyDevice, CounterContext, DeviceIdContext, InstantBindingsTypes, ReferenceNotifiers,
-    RngContext, TimerBindingsTypes, TracingContext, TxMetadataBindingsTypes,
+    RngContext, TimerBindingsTypes, TxMetadataBindingsTypes,
 };
 use netstack3_datagram as datagram;
 use netstack3_device::ethernet::{EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId};
@@ -175,7 +175,6 @@ pub trait IpBindingsContext<I: IpExt>:
     + device::DeviceLayerEventDispatcher
     + device::socket::DeviceSocketBindingsContext<DeviceId<Self>>
     + ReferenceNotifiers
-    + TracingContext
     + 'static
 {
 }
@@ -198,7 +197,6 @@ where
         + device::DeviceLayerEventDispatcher
         + device::socket::DeviceSocketBindingsContext<DeviceId<Self>>
         + ReferenceNotifiers
-        + TracingContext
         + 'static,
 {
 }

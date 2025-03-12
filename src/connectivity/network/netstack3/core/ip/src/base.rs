@@ -35,8 +35,7 @@ use netstack3_base::{
     HandleableTimer, Inspectable, Inspector, InspectorExt as _, InstantContext, IpAddressId,
     IpDeviceAddr, IpDeviceAddressIdContext, IpExt, Matcher as _, NestedIntoCoreTimerCtx,
     NotFoundError, RngContext, SendFrameErrorReason, StrongDeviceIdentifier, TimerBindingsTypes,
-    TimerContext, TimerHandler, TracingContext, TxMetadataBindingsTypes, WeakIpAddressId,
-    WrapBroadcastMarker,
+    TimerContext, TimerHandler, TxMetadataBindingsTypes, WeakIpAddressId, WrapBroadcastMarker,
 };
 use netstack3_filter::{
     self as filter, ConnectionDirection, ConntrackConnection, FilterBindingsContext,
@@ -1069,7 +1068,6 @@ impl<DeviceId, BC: EventContext<RouterAdvertisementEvent<DeviceId>>> NdpBindings
 pub trait IpLayerBindingsContext<I: IpLayerIpExt, DeviceId>:
     InstantContext
     + EventContext<IpLayerEvent<DeviceId, I>>
-    + TracingContext
     + FilterBindingsContext
     + TxMetadataBindingsTypes
 {
@@ -1079,7 +1077,6 @@ impl<
         DeviceId,
         BC: InstantContext
             + EventContext<IpLayerEvent<DeviceId, I>>
-            + TracingContext
             + FilterBindingsContext
             + TxMetadataBindingsTypes,
     > IpLayerBindingsContext<I, DeviceId> for BC

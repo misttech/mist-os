@@ -62,7 +62,6 @@ common_deps = [
   "//src/lib/network/fidl_fuchsia_net_routes_ext",
   "//src/lib/network/packet",
   "//src/lib/replace-with",
-  "//src/lib/trace/rust:trace",
   "//src/lib/trace/rust:trace-provider",
   "//src/starnix/lib/ebpf",
   "//src/starnix/lib/ebpf_api",

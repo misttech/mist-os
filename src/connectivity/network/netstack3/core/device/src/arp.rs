@@ -13,7 +13,7 @@ use net_types::{SpecifiedAddr, UnicastAddr, Witness as _};
 use netstack3_base::{
     CoreTimerContext, Counter, CounterContext, DeviceIdContext, EventContext, FrameDestination,
     InstantBindingsTypes, LinkDevice, SendFrameContext, SendFrameError, TimerContext,
-    TracingContext, TxMetadataBindingsTypes, WeakDeviceIdentifier,
+    TxMetadataBindingsTypes, WeakDeviceIdentifier,
 };
 use netstack3_ip::nud::{
     self, ConfirmationFlags, DynamicNeighborUpdateSource, LinkResolutionContext, NudBindingsTypes,
@@ -107,7 +107,6 @@ pub trait ArpSenderContext<D: ArpDevice, BC: ArpBindingsContext<D, Self::DeviceI
 /// The execution context for the ARP protocol provided by bindings.
 pub trait ArpBindingsContext<D: ArpDevice, DeviceId>:
     TimerContext
-    + TracingContext
     + LinkResolutionContext<D>
     + EventContext<nud::Event<D::Address, DeviceId, Ipv4, <Self as InstantBindingsTypes>::Instant>>
     + TxMetadataBindingsTypes
@@ -118,7 +117,6 @@ impl<
         DeviceId,
         D: ArpDevice,
         BC: TimerContext
-            + TracingContext
             + LinkResolutionContext<D>
             + EventContext<
                 nud::Event<D::Address, DeviceId, Ipv4, <Self as InstantBindingsTypes>::Instant>,

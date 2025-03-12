@@ -13,7 +13,6 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use core::borrow::Borrow;
-use core::ffi::CStr;
 use core::fmt::Debug;
 use core::hash::Hash;
 use core::ops::{Deref, DerefMut};
@@ -36,7 +35,7 @@ use netstack3_base::{
     AddressResolutionFailed, CtxPair, DeferredResourceRemovalContext, EventContext,
     FrameDestination, InstantBindingsTypes, InstantContext, IpDeviceAddr, LinkDevice,
     NotFoundError, ReferenceNotifiers, RemoveResourceResult, RngContext, TimerBindingsTypes,
-    TimerContext, TimerHandler, TracingContext, TxMetadataBindingsTypes, WorkQueueReport,
+    TimerContext, TimerHandler, TxMetadataBindingsTypes, WorkQueueReport,
 };
 use netstack3_device::ethernet::{
     EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId,
@@ -850,12 +849,6 @@ impl<T: Into<DispatchedEvent>> EventContext<T> for FakeBindingsCtx {
     fn on_event(&mut self, event: T) {
         self.with_inner_mut(|ctx| ctx.events.on_event(event.into()))
     }
-}
-
-impl TracingContext for FakeBindingsCtx {
-    type DurationScope = ();
-
-    fn duration(&self, _: &'static CStr) {}
 }
 
 impl TcpBindingsTypes for FakeBindingsCtx {

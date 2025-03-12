@@ -53,7 +53,6 @@ rustc_library_with_features("netstack3-base") {
     "src/time.rs",
     "src/time/local_timer_heap.rs",
     "src/time/testutil.rs",
-    "src/trace.rs",
     "src/uninstantiable.rs",
     "src/work_queue.rs",
   ]

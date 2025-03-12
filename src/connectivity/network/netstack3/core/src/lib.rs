@@ -217,6 +217,12 @@ pub mod tcp {
     };
 }
 
+/// Tracing utilities.
+pub mod trace {
+    // Re-export all of the trace crate to match how the rest of core works.
+    pub use netstack3_trace::*;
+}
+
 /// Miscellaneous and common types.
 pub mod types {
     pub use netstack3_base::{Counter, WorkQueueReport};
@@ -236,8 +242,7 @@ pub use inspect::Inspector;
 pub use marker::{BindingsContext, BindingsTypes, CoreContext, IpBindingsContext, IpExt};
 pub use netstack3_base::{
     CtxPair, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes, InstantContext,
-    ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext, TracingContext,
-    TxMetadataBindingsTypes,
+    ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext, TxMetadataBindingsTypes,
 };
 pub use state::{StackState, StackStateBuilder};
 pub use time::{AtomicInstant, Instant, TimerId};

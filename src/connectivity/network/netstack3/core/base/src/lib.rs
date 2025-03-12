@@ -29,7 +29,6 @@ mod resource_references;
 mod rng;
 mod tcp;
 mod time;
-mod trace;
 mod uninstantiable;
 mod work_queue;
 
@@ -81,7 +80,6 @@ pub use time::{
     InstantContext, IntoCoreTimerCtx, NestedIntoCoreTimerCtx, TimerBindingsTypes, TimerContext,
     TimerHandler,
 };
-pub use trace::TracingContext;
 pub use uninstantiable::{Uninstantiable, UninstantiableWrapper};
 pub use work_queue::WorkQueueReport;
 
@@ -163,7 +161,6 @@ pub mod testutil {
         FakeAtomicInstant, FakeInstant, FakeInstantCtx, FakeTimerCtx, FakeTimerCtxExt, FakeTimerId,
         InstantAndData, WithFakeTimerContext,
     };
-    pub use crate::trace::testutil::FakeTracingCtx;
     pub use addr::{TestAddrs, TestDualStackIpExt, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6};
     pub use benchmarks::{Bencher, RealBencher, TestBencher};
     pub use fake_bindings::FakeBindingsCtx;

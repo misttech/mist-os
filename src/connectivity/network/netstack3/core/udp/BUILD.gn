@@ -19,6 +19,7 @@ rustc_library_with_features("netstack3-udp") {
     "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/packet-formats",
     "//src/connectivity/network/netstack3/core/lock-order",
+    "//src/connectivity/network/netstack3/core/trace:netstack3-trace",
     "//src/lib/fakealloc",
     "//src/lib/network/packet",
     "//third_party/rust_crates:derivative",

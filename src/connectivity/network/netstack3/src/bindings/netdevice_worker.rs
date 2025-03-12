@@ -26,6 +26,7 @@ use netstack3_core::ip::{
 };
 use netstack3_core::routes::RawMetric;
 use netstack3_core::sync::RwLock as CoreRwLock;
+use netstack3_core::trace::trace_duration;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
     fuchsia_async as fasync,
@@ -34,7 +35,7 @@ use {
 use crate::bindings::devices::TxTask;
 use crate::bindings::util::NeedsDataNotifier;
 use crate::bindings::{
-    devices, interfaces_admin, routes, trace_duration, BindingId, BindingsCtx, Ctx, DeviceId,
+    devices, interfaces_admin, routes, BindingId, BindingsCtx, Ctx, DeviceId,
     Ipv6DeviceConfiguration, Netstack, DEFAULT_INTERFACE_METRIC,
 };
 

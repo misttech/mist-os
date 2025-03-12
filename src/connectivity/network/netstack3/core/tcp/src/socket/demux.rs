@@ -17,9 +17,9 @@ use netstack3_base::socket::{
     ListenerIpAddr, SocketIpAddr, SocketIpAddrExt as _,
 };
 use netstack3_base::{
-    trace_duration, BidirectionalConverter as _, Control, CounterContext, CtxPair, EitherDeviceId,
-    IpDeviceAddr, Mss, NotFoundError, Payload, Segment, SegmentHeader, SeqNum,
-    StrongDeviceIdentifier as _, WeakDeviceIdentifier,
+    BidirectionalConverter as _, Control, CounterContext, CtxPair, EitherDeviceId, IpDeviceAddr,
+    Mss, NotFoundError, Payload, Segment, SegmentHeader, SeqNum, StrongDeviceIdentifier as _,
+    WeakDeviceIdentifier,
 };
 use netstack3_filter::TransportPacketSerializer;
 use netstack3_ip::socket::{IpSockCreationError, MmsError};
@@ -27,6 +27,7 @@ use netstack3_ip::{
     IpHeaderInfo, IpTransportContext, LocalDeliveryPacketInfo, Marks, ReceiveIpPacketMeta,
     TransportIpContext, TransportReceiveError,
 };
+use netstack3_trace::trace_duration;
 use packet::{BufferMut, BufferView as _, EmptyBuf, InnerPacketBuilder, Serializer as _};
 use packet_formats::error::ParseError;
 use packet_formats::ip::{IpExt, IpProto};
@@ -245,7 +246,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
         + CounterContext<TcpCounters<WireI>>
         + CounterContext<TcpCounters<WireI::OtherVersion>>,
 {
-    trace_duration!(bindings_ctx, c"tcp::handle_incoming_packet");
+    trace_duration!(c"tcp::handle_incoming_packet");
     let mut tw_reuse = None;
 
     let mut addrs_to_search = AddrVecIter::<WireI, CC::WeakDeviceId, TcpPortSpec>::with_device(

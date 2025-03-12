@@ -50,20 +50,21 @@ use netstack3_base::socket::{
 use netstack3_base::socketmap::{IterShadows as _, SocketMap};
 use netstack3_base::sync::RwLock;
 use netstack3_base::{
-    trace_duration, AnyDevice, BidirectionalConverter as _, ContextPair, Control, CoreTimerContext,
-    CounterContext, CtxPair, DeferredResourceRemovalContext, DeviceIdContext, EitherDeviceId,
-    ExistsError, HandleableTimer, IcmpErrorCode, Inspector, InspectorDeviceExt, InspectorExt,
+    AnyDevice, BidirectionalConverter as _, ContextPair, Control, CoreTimerContext, CounterContext,
+    CtxPair, DeferredResourceRemovalContext, DeviceIdContext, EitherDeviceId, ExistsError,
+    HandleableTimer, IcmpErrorCode, Inspector, InspectorDeviceExt, InspectorExt,
     InstantBindingsTypes, IpDeviceAddr, IpExt, LocalAddressError, Mark, MarkDomain, Mss,
     OwnedOrRefsBidirectionalConverter, PortAllocImpl, ReferenceNotifiersExt as _,
     RemoveResourceResult, RngContext, Segment, SeqNum, StrongDeviceIdentifier as _,
-    TimerBindingsTypes, TimerContext, TracingContext, TxMetadataBindingsTypes,
-    WeakDeviceIdentifier, ZonedAddressError,
+    TimerBindingsTypes, TimerContext, TxMetadataBindingsTypes, WeakDeviceIdentifier,
+    ZonedAddressError,
 };
 use netstack3_filter::Tuple;
 use netstack3_ip::socket::{
     DeviceIpSocketHandler, IpSock, IpSockCreateAndSendError, IpSockCreationError, IpSocketHandler,
 };
 use netstack3_ip::{self as ip, BaseTransportIpContext, TransportIpContext};
+use netstack3_trace::trace_duration;
 use packet_formats::ip::IpProto;
 use smallvec::{smallvec, SmallVec};
 use thiserror::Error;
@@ -484,22 +485,12 @@ pub trait TcpBindingsTypes:
 ///
 /// TCP timers are scoped by weak device IDs.
 pub trait TcpBindingsContext:
-    Sized
-    + DeferredResourceRemovalContext
-    + TimerContext
-    + TracingContext
-    + RngContext
-    + TcpBindingsTypes
+    Sized + DeferredResourceRemovalContext + TimerContext + RngContext + TcpBindingsTypes
 {
 }
 
 impl<BC> TcpBindingsContext for BC where
-    BC: Sized
-        + DeferredResourceRemovalContext
-        + TimerContext
-        + TracingContext
-        + RngContext
-        + TcpBindingsTypes
+    BC: Sized + DeferredResourceRemovalContext + TimerContext + RngContext + TcpBindingsTypes
 {
 }
 
@@ -3681,7 +3672,7 @@ where
         };
         let (core_ctx, bindings_ctx) = self.contexts();
         debug!("handle_timer on {id:?}");
-        trace_duration!(bindings_ctx, c"tcp::handle_timer");
+        trace_duration!(c"tcp::handle_timer");
         // Alias refs so we can move weak_id to the closure.
         let id_alias = &id;
         let bindings_ctx_alias = &mut *bindings_ctx;
@@ -5462,7 +5453,6 @@ mod tests {
     use alloc::vec::Vec;
     use alloc::{format, vec};
     use core::cell::RefCell;
-    use core::ffi::CStr;
     use core::num::NonZeroU16;
     use core::time::Duration;
 
@@ -5761,12 +5751,6 @@ mod tests {
         fn unique_timer_id(&self, timer: &Self::Timer) -> Self::UniqueTimerId {
             self.timers.unique_timer_id(timer)
         }
-    }
-
-    impl<D: FakeStrongDeviceId> TracingContext for TcpBindingsCtx<D> {
-        type DurationScope = ();
-
-        fn duration(&self, _: &'static CStr) {}
     }
 
     impl<D: FakeStrongDeviceId> ReferenceNotifiers for TcpBindingsCtx<D> {

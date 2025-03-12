@@ -32,11 +32,10 @@ use netstack3_base::socket::{
 use netstack3_base::socketmap::{IterShadows as _, SocketMap, Tagged};
 use netstack3_base::sync::{RwLock, StrongRc};
 use netstack3_base::{
-    trace_duration, AnyDevice, BidirectionalConverter, ContextPair, CoreTxMetadataContext, Counter,
-    CounterContext, DeviceIdContext, Inspector, InspectorDeviceExt, InstantContext,
-    LocalAddressError, Mark, MarkDomain, PortAllocImpl, ReferenceNotifiers,
-    RemoveResourceResultWithContext, RngContext, SocketError, StrongDeviceIdentifier,
-    TracingContext, WeakDeviceIdentifier, ZonedAddressError,
+    AnyDevice, BidirectionalConverter, ContextPair, CoreTxMetadataContext, Counter, CounterContext,
+    DeviceIdContext, Inspector, InspectorDeviceExt, InstantContext, LocalAddressError, Mark,
+    MarkDomain, PortAllocImpl, ReferenceNotifiers, RemoveResourceResultWithContext, RngContext,
+    SocketError, StrongDeviceIdentifier, WeakDeviceIdentifier, ZonedAddressError,
 };
 use netstack3_datagram::{
     self as datagram, BoundSocketState as DatagramBoundSocketState,
@@ -60,6 +59,7 @@ use netstack3_ip::{
     MulticastMembershipHandler, ReceiveIpPacketMeta, TransparentLocalDelivery, TransportIpContext,
     TransportReceiveError,
 };
+use netstack3_trace::trace_duration;
 use packet::{BufferMut, Nested, ParsablePacket, Serializer};
 use packet_formats::ip::{DscpAndEcn, IpProto, IpProtoExt};
 use packet_formats::udp::{UdpPacket, UdpPacketBuilder, UdpParseArgs};
@@ -1167,7 +1167,6 @@ pub trait UdpBindingsTypes: DatagramBindingsTypes + Sized + 'static {
 pub trait UdpBindingsContext<I: IpExt, D: StrongDeviceIdentifier>:
     InstantContext
     + RngContext
-    + TracingContext
     + UdpReceiveBindingsContext<I, D>
     + ReferenceNotifiers
     + UdpBindingsTypes
@@ -1177,7 +1176,6 @@ impl<
         I: IpExt,
         BC: InstantContext
             + RngContext
-            + TracingContext
             + UdpReceiveBindingsContext<I, D>
             + ReferenceNotifiers
             + UdpBindingsTypes,
@@ -1391,7 +1389,7 @@ fn receive_ip_packet<
     let LocalDeliveryPacketInfo { meta, header_info, marks: _ } = info;
     let ReceiveIpPacketMeta { broadcast, transparent_override } = meta;
 
-    trace_duration!(bindings_ctx, c"udp::receive_ip_packet");
+    trace_duration!(c"udp::receive_ip_packet");
     core_ctx.counters().rx.increment();
     trace!("received UDP packet: {:x?}", buffer.as_mut());
     let src_ip: I::Addr = src_ip.into();
