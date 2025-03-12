@@ -221,6 +221,10 @@ impl FileSystemOps for RemoteFs {
             .rename(get_name_str(old_name)?, &new_parent.zxio, get_name_str(new_name)?)
             .map_err(|status| from_status_like_fdio!(status))
     }
+
+    fn manages_timestamps(&self) -> bool {
+        true
+    }
 }
 
 impl RemoteFs {
@@ -856,10 +860,6 @@ impl FsNodeOps for RemoteNode {
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
         fetch_and_refresh_info_impl(&self.zxio, info)
-    }
-
-    fn filesystem_manages_timestamps(&self, _node: &FsNode) -> bool {
-        true
     }
 
     fn update_attributes(
@@ -1593,10 +1593,6 @@ impl FsNodeOps for RemoteSymlink {
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
         fetch_and_refresh_info_impl(&self.zxio, info)
-    }
-
-    fn filesystem_manages_timestamps(&self, _node: &FsNode) -> bool {
-        true
     }
 }
 

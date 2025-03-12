@@ -454,6 +454,10 @@ impl FileSystem {
     pub fn name(&self) -> &'static FsStr {
         self.ops.name()
     }
+
+    pub fn manages_timestamps(&self) -> bool {
+        self.ops.manages_timestamps()
+    }
 }
 
 /// The filesystem-implementation-specific data for FileSystem.
@@ -530,6 +534,15 @@ pub trait FileSystemOps: AsAny + Send + Sync + 'static {
 
     /// Called when the filesystem is unmounted.
     fn unmount(&self) {}
+
+    /// Indicates if the filesystem can manage the timestamps (i.e. ctime and mtime).
+    ///
+    /// Starnix updates the timestamps in FsNode's `info` directly. However, if the filesystem can
+    /// manage the timestamps, then Starnix does not need to do so. `info` will be refreshed with
+    /// the timestamps from the filesystem by calling `fetch_and_refresh_info(..)` on the FsNode.
+    fn manages_timestamps(&self) -> bool {
+        false
+    }
 }
 
 impl Drop for FileSystem {

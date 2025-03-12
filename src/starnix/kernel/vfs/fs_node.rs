@@ -769,15 +769,6 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
         Ok(info.read())
     }
 
-    /// Indicates if the filesystem can manage the timestamps (i.e. atime, ctime, and mtime).
-    ///
-    /// Starnix updates the timestamps in node.info directly. However, if the filesystem can manage
-    /// the timestamps, then Starnix does not need to do so. `node.info`` will be refreshed with the
-    /// timestamps from the filesystem by calling `fetch_and_refresh_info(..)`.
-    fn filesystem_manages_timestamps(&self, _node: &FsNode) -> bool {
-        false
-    }
-
     /// Update node attributes persistently.
     fn update_attributes(
         &self,
@@ -2535,7 +2526,7 @@ impl FsNode {
 
     /// Update the ctime and mtime of a file to now.
     pub fn update_ctime_mtime(&self) {
-        if self.ops().filesystem_manages_timestamps(self) {
+        if self.fs().manages_timestamps() {
             return;
         }
         self.update_info(|info| {
@@ -2547,7 +2538,7 @@ impl FsNode {
 
     /// Update the ctime of a file to now.
     pub fn update_ctime(&self) {
-        if self.ops().filesystem_manages_timestamps(self) {
+        if self.fs().manages_timestamps() {
             return;
         }
         self.update_info(|info| {
