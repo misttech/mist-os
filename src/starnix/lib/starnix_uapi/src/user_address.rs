@@ -226,7 +226,7 @@ impl From<UserAddress32> for UserAddress {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[derive(Debug, Default, Eq, PartialEq, Hash, Ord, PartialOrd)]
 #[repr(transparent)]
 pub struct UserRef<T> {
     addr: UserAddress,
@@ -254,6 +254,14 @@ impl<T> UserRef<T> {
         UserRef::<S>::new(self.addr)
     }
 }
+
+impl<T> Clone for UserRef<T> {
+    fn clone(&self) -> Self {
+        Self { addr: self.addr, phantom: Default::default() }
+    }
+}
+
+impl<T> Copy for UserRef<T> {}
 
 impl<T> From<UserAddress> for UserRef<T> {
     fn from(user_address: UserAddress) -> Self {
@@ -331,18 +339,20 @@ impl<T, U: MultiArchFrom<T>> Into32<U> for T {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub enum MultiArchUserRef<T64, T32> {
-    Arch64(UserRef<T64>),
+#[derive(Debug)]
+pub enum MappingMultiArchUserRef<T, T64, T32> {
+    Arch64(UserRef<T64>, core::marker::PhantomData<T>),
     Arch32(UserRef<T32>),
 }
 
-impl<T64, T32> MultiArchUserRef<T64, T32> {
+pub type MultiArchUserRef<T64, T32> = MappingMultiArchUserRef<T64, T64, T32>;
+
+impl<T, T64, T32> MappingMultiArchUserRef<T, T64, T32> {
     pub fn new<Arch: ArchSpecific, Addr: Into<UserAddress>>(arch: &Arch, address: Addr) -> Self {
         if arch.is_arch32() {
             Self::Arch32(address.into().into())
         } else {
-            Self::Arch64(address.into().into())
+            Self::Arch64(address.into().into(), Default::default())
         }
     }
 
@@ -360,13 +370,13 @@ impl<T64, T32> MultiArchUserRef<T64, T32> {
 
     pub fn addr(&self) -> UserAddress {
         match self {
-            Self::Arch64(addr) => addr.addr(),
+            Self::Arch64(addr, _) => addr.addr(),
             Self::Arch32(addr) => addr.addr(),
         }
     }
 }
 
-impl<T64: IntoBytes, T32: IntoBytes> MultiArchUserRef<T64, T32> {
+impl<T, T64: IntoBytes, T32: IntoBytes> MappingMultiArchUserRef<T, T64, T32> {
     pub fn next(&self) -> Self {
         let offset =
             if self.is_arch32() { std::mem::size_of::<T32>() } else { std::mem::size_of::<T64>() };
@@ -374,7 +384,13 @@ impl<T64: IntoBytes, T32: IntoBytes> MultiArchUserRef<T64, T32> {
     }
 }
 
-impl<T64, T32> MultiArchUserRef<MultiArchUserRef<T64, T32>, MultiArchUserRef<T64, T32>> {
+impl<T, T64, T32>
+    MappingMultiArchUserRef<
+        MappingMultiArchUserRef<T, T64, T32>,
+        MappingMultiArchUserRef<T, T64, T32>,
+        MappingMultiArchUserRef<T, T64, T32>,
+    >
+{
     pub fn next(&self) -> Self {
         let offset = if self.is_arch32() {
             std::mem::size_of::<UserAddress32>()
@@ -385,36 +401,47 @@ impl<T64, T32> MultiArchUserRef<MultiArchUserRef<T64, T32>, MultiArchUserRef<T64
     }
 }
 
-impl<T64, T32> ArchSpecific for MultiArchUserRef<T64, T32> {
+impl<T, T64, T32> Clone for MappingMultiArchUserRef<T, T64, T32> {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Arch64(ur, _) => Self::Arch64(*ur, Default::default()),
+            Self::Arch32(ur) => Self::Arch32(*ur),
+        }
+    }
+}
+
+impl<T, T64, T32> Copy for MappingMultiArchUserRef<T, T64, T32> {}
+
+impl<T, T64, T32> ArchSpecific for MappingMultiArchUserRef<T, T64, T32> {
     fn is_arch32(&self) -> bool {
         matches!(self, Self::Arch32(_))
     }
 }
 
-impl<T64, T32> ops::Deref for MultiArchUserRef<T64, T32> {
+impl<T, T64, T32> ops::Deref for MappingMultiArchUserRef<T, T64, T32> {
     type Target = UserAddress;
 
     fn deref(&self) -> &UserAddress {
         match self {
-            Self::Arch64(addr) => addr.deref(),
+            Self::Arch64(addr, _) => addr.deref(),
             Self::Arch32(addr) => addr.deref(),
         }
     }
 }
 
-impl<T64, T32> From<UserRef<T64>> for MultiArchUserRef<T64, T32> {
+impl<T, T64, T32> From<UserRef<T64>> for MappingMultiArchUserRef<T, T64, T32> {
     fn from(addr: UserRef<T64>) -> Self {
-        Self::Arch64(addr)
+        Self::Arch64(addr, Default::default())
     }
 }
 
-impl<T64, T32> From<uref<T64>> for MultiArchUserRef<T64, T32> {
+impl<T, T64, T32> From<uref<T64>> for MappingMultiArchUserRef<T, T64, T32> {
     fn from(addr: uref<T64>) -> Self {
-        Self::Arch64(addr.into())
+        Self::Arch64(addr.into(), Default::default())
     }
 }
 
-impl<T64, T32> From<crate::uref32<T32>> for MultiArchUserRef<T64, T32> {
+impl<T, T64, T32> From<crate::uref32<T32>> for MappingMultiArchUserRef<T, T64, T32> {
     fn from(addr: crate::uref32<T32>) -> Self {
         Self::Arch32(uref::from(addr).into())
     }

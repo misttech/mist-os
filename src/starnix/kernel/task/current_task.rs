@@ -14,9 +14,9 @@ use crate::signals::{
 };
 use crate::task::{
     ExitStatus, Kernel, PidTable, ProcessGroup, PtraceCoreState, PtraceEvent, PtraceEventData,
-    PtraceOptions, RobustList, RobustListHead, RobustListHeadPtr, SeccompFilter,
-    SeccompFilterContainer, SeccompNotifierHandle, SeccompState, SeccompStateValue, StopState,
-    Task, TaskFlags, ThreadGroup, ThreadGroupParent, Waiter,
+    PtraceOptions, RobustListHeadPtr, SeccompFilter, SeccompFilterContainer, SeccompNotifierHandle,
+    SeccompState, SeccompStateValue, StopState, Task, TaskFlags, ThreadGroup, ThreadGroupParent,
+    Waiter,
 };
 use crate::vfs::{
     CheckAccessReason, FdNumber, FdTable, FileHandle, FsContext, FsStr, LookupContext,
@@ -1171,7 +1171,7 @@ impl CurrentTask {
             // No one has called set_robust_list.
             return;
         }
-        let robust_list_res = RobustListHead::read(self, task_state.robust_list_head);
+        let robust_list_res = self.read_multi_arch_object(task_state.robust_list_head);
 
         let head = if let Ok(head) = robust_list_res {
             head
@@ -1184,7 +1184,7 @@ impl CurrentTask {
         let mut entries_count = 0;
         let mut curr_ptr = head.list.next;
         while curr_ptr.addr() != robust_list_addr.into() && entries_count < ROBUST_LIST_LIMIT {
-            let curr_ref = RobustList::read(self, curr_ptr);
+            let curr_ref = self.read_multi_arch_object(curr_ptr);
 
             let curr = if let Ok(curr) = curr_ref {
                 curr

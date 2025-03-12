@@ -40,7 +40,8 @@ use starnix_uapi::restricted_aspace::{
 };
 use starnix_uapi::signals::{SIGBUS, SIGSEGV};
 use starnix_uapi::user_address::{
-    ArchSpecific, MultiArchUserRef, UserAddress, UserAddress32, UserCString, UserRef,
+    ArchSpecific, MappingMultiArchUserRef, MultiArchUserRef, UserAddress, UserAddress32,
+    UserCString, UserRef,
 };
 use starnix_uapi::user_value::UserValue;
 use starnix_uapi::{
@@ -2315,13 +2316,17 @@ pub trait MemoryAccessorExt: MemoryAccessor {
 
     /// Read an instance of T64 from `user` where the object has a different representation in 32
     /// and 64 bits.
-    fn read_multi_arch_object<T64: FromBytes, T32: FromBytes + Into<T64>>(
+    fn read_multi_arch_object<T, T64: FromBytes + Into<T>, T32: FromBytes + Into<T>>(
         &self,
-        user: MultiArchUserRef<T64, T32>,
-    ) -> Result<T64, Errno> {
+        user: MappingMultiArchUserRef<T, T64, T32>,
+    ) -> Result<T, Errno> {
         match user {
-            MultiArchUserRef::<T64, T32>::Arch64(user) => self.read_object(user),
-            MultiArchUserRef::<T64, T32>::Arch32(user) => self.read_object(user).map(T32::into),
+            MappingMultiArchUserRef::<T, T64, T32>::Arch64(user, _) => {
+                self.read_object(user).map(T64::into)
+            }
+            MappingMultiArchUserRef::<T, T64, T32>::Arch32(user) => {
+                self.read_object(user).map(T32::into)
+            }
         }
     }
 
@@ -2607,16 +2612,19 @@ pub trait MemoryAccessorExt: MemoryAccessor {
     }
 
     fn write_multi_arch_object<
-        T64: IntoBytes + Immutable,
-        T32: IntoBytes + Immutable + TryFrom<T64>,
+        T,
+        T64: IntoBytes + Immutable + TryFrom<T>,
+        T32: IntoBytes + Immutable + TryFrom<T>,
     >(
         &self,
-        user: MultiArchUserRef<T64, T32>,
-        object: T64,
+        user: MappingMultiArchUserRef<T, T64, T32>,
+        object: T,
     ) -> Result<usize, Errno> {
         match user {
-            MultiArchUserRef::<T64, T32>::Arch64(user) => self.write_object(user, &object),
-            MultiArchUserRef::<T64, T32>::Arch32(user) => {
+            MappingMultiArchUserRef::<T, T64, T32>::Arch64(user, _) => {
+                self.write_object(user, &T64::try_from(object).map_err(|_| errno!(EINVAL))?)
+            }
+            MappingMultiArchUserRef::<T, T64, T32>::Arch32(user) => {
                 self.write_object(user, &T32::try_from(object).map_err(|_| errno!(EINVAL))?)
             }
         }
