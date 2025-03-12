@@ -16,7 +16,7 @@ pub(super) mod testing;
 
 use super::{FsNodeSecurityXattr, PermissionFlags};
 use crate::task::{CurrentTask, Task};
-use crate::vfs::{DirEntry, FileHandle, FileObject, FileSystem, FsNode, FsStr};
+use crate::vfs::{DirEntry, FileHandle, FileObject, FileSystem, FsNode, FsStr, OutputBuffer};
 use crate::TODO_DENY;
 use audit::{audit_decision, audit_todo_decision, Auditable};
 use selinux::permission_check::PermissionCheck;
@@ -480,6 +480,54 @@ impl FileSystemState {
                     other_mount_options,
                     fs_name.into(),
                 ) == *label
+            }
+        }
+    }
+
+    /// Writes the Security mount options for the `FileSystemState` into `buf`.
+    /// This is used where the mount options need to be stringified to expose to userspace, as
+    /// is the case for `/proc/mounts`
+    ///
+    /// This function always writes a leading comma because it is only ever called to append to a
+    /// non-empty list of comma-separated values.
+    ///
+    /// Example output:
+    ///     ",context=foo,root_context=bar"
+    /// TODO(357876133): Write "seclabel" when relevant.
+    fn write_mount_options(&self, security_server: &SecurityServer, buf: &mut impl OutputBuffer) {
+        let security_state = self.0.lock();
+
+        let mut write_options = |mount_options: &FileSystemMountOptions| {
+            let mut write_option = |prefix: &[u8], option: &Option<Vec<u8>>| {
+                if let Some(value) = option {
+                    let _ = buf.write_all(prefix);
+                    let _ = buf.write_all(value);
+                }
+            };
+            write_option(b",context=", &mount_options.context);
+            write_option(b",fscontext=", &mount_options.fs_context);
+            write_option(b",defcontext=", &mount_options.def_context);
+            write_option(b",rootcontext=", &mount_options.root_context);
+        };
+
+        match &*security_state {
+            FileSystemLabelState::Unlabeled { mount_options, name: _, pending_entries: _ } => {
+                write_options(mount_options);
+            }
+            FileSystemLabelState::Labeled { label } => {
+                let get_option = |sid_opt: Option<_>| -> Option<Vec<u8>> {
+                    if let Some(sid) = sid_opt {
+                        return security_server.sid_to_security_context(sid);
+                    }
+                    Option::None
+                };
+                let mount_options = FileSystemMountOptions {
+                    context: get_option(label.mount_sids.context),
+                    fs_context: get_option(label.mount_sids.fs_context),
+                    def_context: get_option(label.mount_sids.def_context),
+                    root_context: get_option(label.mount_sids.root_context),
+                };
+                write_options(&mount_options);
             }
         }
     }

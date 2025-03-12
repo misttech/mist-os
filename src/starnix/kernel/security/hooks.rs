@@ -8,7 +8,7 @@ use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
     DirEntryHandle, FileHandle, FileObject, FileSystem, FileSystemHandle, FsNode, FsStr, FsString,
-    Mount, NamespaceNode, ValueOrSize, XattrOp,
+    Mount, NamespaceNode, OutputBuffer, ValueOrSize, XattrOp,
 };
 use fuchsia_inspect_contrib::profile_duration;
 use selinux::{FileSystemMountOptions, SecurityPermission, SecurityServer};
@@ -989,6 +989,17 @@ pub fn sb_remount(
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::superblock::sb_remount(security_server, mount, new_mount_options)
     })
+}
+
+/// Writes the LSM mount options of `mount` into `buf`.
+/// Corresponds to the `sb_show_options` LSM hook.
+pub fn sb_show_options(kernel: &Kernel, buf: &mut impl OutputBuffer, mount: &Mount) {
+    profile_duration!("security.hooks.sb_show_options");
+    if let Some(state) = &kernel.security_state.state {
+        if state.server.has_policy() {
+            selinux_hooks::superblock::sb_show_options(&state.server, buf, mount);
+        }
+    }
 }
 
 /// Checks if `current_task` has the permission to get the filesystem statistics of `fs`.

@@ -450,7 +450,7 @@ impl Mount {
         }
     }
 
-    fn flags(self: &MountHandle) -> MountFlags {
+    fn flags(&self) -> MountFlags {
         *self.flags.lock()
     }
 
@@ -722,6 +722,13 @@ impl CurrentTask {
     }
 }
 
+// Writes to `sink` the mount flags and LSM mount options for the given `mount`.
+fn write_mount_info(task: &Task, sink: &mut DynamicFileBuf, mount: &Mount) -> Result<(), Errno> {
+    write!(sink, "{}", mount.flags())?;
+    security::sb_show_options(&task.kernel(), sink, &mount);
+    Ok(())
+}
+
 struct ProcMountsFileSource(WeakRef<Task>);
 
 impl DynamicFileSource for ProcMountsFileSource {
@@ -738,14 +745,15 @@ impl DynamicFileSource for ProcMountsFileSource {
             if !mountpoint.is_descendant_of(&root) {
                 return Ok(());
             }
-            writeln!(
+            write!(
                 sink,
-                "{} {} {} {} 0 0",
+                "{} {} {} ",
                 mount.fs.options.source_for_display(),
                 mountpoint.path(&task),
                 mount.fs.name(),
-                mount.flags(),
             )?;
+            write_mount_info(&task, sink, mount)?;
+            writeln!(sink, " 0 0")?;
             Ok(())
         })?;
         Ok(())
@@ -843,14 +851,14 @@ impl DynamicFileSource for ProcMountinfoFile {
             let parent = mountpoint.mount.as_ref().unwrap();
             write!(
                 sink,
-                "{} {} {} {} {} {}",
+                "{} {} {} {} {} ",
                 mount.id,
                 parent.id,
                 mount.root.node.fs().dev_id,
                 path_from_fs_root(&mount.root),
                 mountpoint.path(&task),
-                mount.flags(),
             )?;
+            write_mount_info(&task, sink, mount)?;
             if let Some(peer_group) = mount.read().peer_group() {
                 write!(sink, " shared:{}", peer_group.id)?;
             }

@@ -10,7 +10,7 @@ use super::{
 
 use crate::task::CurrentTask;
 use crate::vfs::fs_args::MountParams;
-use crate::vfs::{FileSystem, FileSystemHandle, FsStr, Mount, NamespaceNode};
+use crate::vfs::{FileSystem, FileSystemHandle, FsStr, Mount, NamespaceNode, OutputBuffer};
 use crate::TODO_DENY;
 use selinux::permission_check::PermissionCheck;
 use selinux::{
@@ -219,6 +219,15 @@ pub fn sb_remount(
         return error!(EACCES);
     }
     Ok(())
+}
+
+/// Writes the LSM mount options of `mount` to `buf`.
+pub fn sb_show_options(
+    security_server: &SecurityServer,
+    buf: &mut impl OutputBuffer,
+    mount: &Mount,
+) {
+    mount.security_state().state.write_mount_options(security_server, buf)
 }
 
 /// Checks if `current_task` has the permission to get information on `fs`.
