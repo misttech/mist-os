@@ -85,7 +85,6 @@ pub fn main() {
         .add_fidl_service(Service::NdpWatcher)
         .add_fidl_service(Service::Neighbor)
         .add_fidl_service(Service::NeighborController)
-        .add_fidl_service(Service::Verifier)
         .add_fidl_service(Service::HealthCheck);
 
     let seed = NetstackSeed::new(GlobalConfig {

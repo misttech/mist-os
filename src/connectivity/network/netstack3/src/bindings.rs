@@ -36,7 +36,6 @@ mod health_check_worker;
 mod time;
 mod timers;
 mod util;
-mod verifier_worker;
 
 use std::convert::Infallible as Never;
 use std::ffi::CStr;
@@ -1250,7 +1249,6 @@ pub(crate) enum Service {
     RuleTableV6(fnet_routes_admin::RuleTableV6RequestStream),
     Socket(fidl_fuchsia_posix_socket::ProviderRequestStream),
     Stack(fidl_fuchsia_net_stack::StackRequestStream),
-    Verifier(fidl_fuchsia_update_verify::NetstackVerifierRequestStream),
 }
 
 trait RequestStreamExt: RequestStream {
@@ -1760,9 +1758,6 @@ impl NetstackSeed {
                                     neighbor_worker::serve_controller(netstack.ctx.clone(), rs)
                                 })
                                 .await
-                        }
-                        Service::Verifier(verifier) => {
-                            verifier.serve_with(|rs| verifier_worker::serve(rs)).await
                         }
                         Service::HealthCheck(health_check) => {
                             health_check.serve_with(|rs| health_check_worker::serve(rs)).await

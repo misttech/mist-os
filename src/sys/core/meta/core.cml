@@ -296,11 +296,6 @@
             to: "#system-update",
         },
         {
-            protocol: [ "fuchsia.update.verify.NetstackVerifier" ],
-            from: "#network",
-            to: "#system-update",
-        },
-        {
             protocol: [
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",

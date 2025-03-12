@@ -127,7 +127,6 @@ impl_service_marker!(fidl_fuchsia_net_routes::StateMarker, RoutesState);
 impl_service_marker!(fidl_fuchsia_net_routes::StateV4Marker, RoutesStateV4);
 impl_service_marker!(fidl_fuchsia_net_routes::StateV6Marker, RoutesStateV6);
 impl_service_marker!(fidl_fuchsia_posix_socket::ProviderMarker, Socket);
-impl_service_marker!(fidl_fuchsia_update_verify::NetstackVerifierMarker, Verifier);
 impl_service_marker!(fidl_fuchsia_update_verify::ComponentOtaHealthCheckMarker, HealthCheck);
 
 impl TestStack {

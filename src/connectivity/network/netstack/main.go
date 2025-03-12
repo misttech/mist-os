@@ -647,21 +647,6 @@ func Main() {
 	startPersistClient(ctx, componentCtx, stk.Clock())
 
 	{
-		stub := verify.NetstackVerifierWithCtxStub{Impl: &verifier{}}
-		componentCtx.OutgoingService.AddService(
-			verify.NetstackVerifierName,
-			func(ctx context.Context, c zx.Channel) error {
-				go component.Serve(ctx, &stub, c, component.ServeOptions{
-					OnError: func(err error) {
-						_ = syslog.WarnTf(verify.NetstackVerifierName, "%s", err)
-					},
-				})
-
-				return nil
-			},
-		)
-	}
-	{
 		stub := verify.ComponentOtaHealthCheckWithCtxStub{Impl: &healthCheck{}}
 		componentCtx.OutgoingService.AddService(
 			verify.ComponentOtaHealthCheckName,
@@ -1169,16 +1154,6 @@ func getSecretKeyForOpaqueIID(componentCtx *component.Context) ([]byte, error) {
 	default:
 		panic(fmt.Sprintf("unexpected store accessor flush result type: %d", w))
 	}
-}
-
-var _ verify.NetstackVerifierWithCtx = (*verifier)(nil)
-
-type verifier struct{}
-
-func (*verifier) Verify(fidl.Context, verify.VerifyOptions) (verify.VerifierVerifyResult, error) {
-	// Wait an arbitrary amount of time; if we didn't crash, we're probably healthy.
-	<-time.After(15 * time.Second)
-	return verify.VerifierVerifyResultWithResponse(verify.VerifierVerifyResponse{}), nil
 }
 
 var _ verify.ComponentOtaHealthCheckWithCtx = (*healthCheck)(nil)
