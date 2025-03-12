@@ -100,6 +100,25 @@ creating the driver's [default dispatcher][driver-dispatcher], for example:
 
 Make sure that the scheduler roles that you specify match what a component would send through the `fuchsia.scheduler/RoleManager.SetRole` FIDL API.
 
+### Allowed scheduler roles
+
+The `allowed_scheduler_roles` field dictates what is allowed to be passed in as a
+scheduler_role when creating new dispatchers, for example:
+
+```json5 {:.devsite-disable-click-to-copy}
+{
+    program: {
+        runner: "driver",
+        binary: "driver/example.so",
+        bind: "meta/bind/example.bindbc",
+        {{ '<strong>' }}allowed_scheduler_roles: "fuchsia.graphics.display.driver"{{ '</strong>' }}
+    }
+}
+```
+
+This would allow the driver to create a new dispatcher at runtime and specify the
+`"fuchsia.graphics.display.driver"` scheduler_role.
+
 ### Fallback
 
 If the `fallback` field is set to the string `true`, this fallback driver will

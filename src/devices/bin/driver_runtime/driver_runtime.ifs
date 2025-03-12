@@ -22,6 +22,7 @@ Symbols:
   - { Name: fdf_dispatcher_get_options, Type: Func }
   - { Name: fdf_dispatcher_seal, Type: Func }
   - { Name: fdf_dispatcher_shutdown_async, Type: Func }
+  - { Name: fdf_env_add_allowed_scheduler_role_for_driver, Type: Func }
   - { Name: fdf_env_destroy_all_dispatchers, Type: Func }
   - { Name: fdf_env_dispatcher_create_with_owner, Type: Func }
   - { Name: fdf_env_dispatcher_dump, Type: Func }

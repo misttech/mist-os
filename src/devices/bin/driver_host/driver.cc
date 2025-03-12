@@ -11,6 +11,7 @@
 #include <lib/driver/component/cpp/internal/start_args.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fdf/cpp/env.h>
+#include <lib/fdf/env.h>
 #include <lib/fdio/directory.h>
 #include <lib/fit/defer.h>
 #include <lib/sync/cpp/completion.h>
@@ -530,6 +531,20 @@ void LoadDriver(fuchsia_driver_framework::DriverStartArgs start_args,
                driver.status_string());
           callback(driver.take_error());
           return;
+        }
+
+        zx::result allowed_scheduler_roles =
+            fdf_internal::ProgramValueAsVector(*start_args.program(), "allowed_scheduler_roles");
+        if (allowed_scheduler_roles.is_ok()) {
+          for (const auto& role : *allowed_scheduler_roles) {
+            fdf_env_add_allowed_scheduler_role_for_driver(driver.value().get(), role.data(),
+                                                          role.length());
+          }
+        }
+        if (!default_dispatcher_scheduler_role.empty()) {
+          fdf_env_add_allowed_scheduler_role_for_driver(driver.value().get(),
+                                                        default_dispatcher_scheduler_role.data(),
+                                                        default_dispatcher_scheduler_role.length());
         }
 
         zx::result<fdf::Dispatcher> driver_dispatcher =

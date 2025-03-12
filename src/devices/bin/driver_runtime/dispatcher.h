@@ -19,6 +19,7 @@
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -814,6 +815,25 @@ class Dispatcher : public async_dispatcher_t,
   std::unordered_set<fdf_token_t*> registered_tokens_;
 
   fbl::Canary<fbl::magic("FDFD")> canary_;
+};
+
+// Singleton to keep track of allowed scheduler roles.
+class AllowedSchedulerRoles {
+ public:
+  static AllowedSchedulerRoles* Get();
+
+  AllowedSchedulerRoles(const AllowedSchedulerRoles&) = delete;
+  AllowedSchedulerRoles& operator=(const AllowedSchedulerRoles&) = delete;
+
+  void AddForDriver(const void* driver, std::string_view role);
+  bool IsAllowed(std::string_view role);
+
+ private:
+  AllowedSchedulerRoles() = default;
+
+  fbl::Mutex lock_;
+  std::unordered_map<const void*, std::unordered_set<std::string>> allowed_roles_
+      __TA_GUARDED(&lock_);
 };
 
 // Coordinator for all dispatchers in a process.

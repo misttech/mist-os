@@ -6,6 +6,7 @@
 #define LIB_FDF_ENV_H_
 
 #include <lib/fdf/dispatcher.h>
+#include <zircon/availability.h>
 #include <zircon/types.h>
 
 __BEGIN_CDECLS
@@ -127,6 +128,9 @@ uint32_t fdf_env_get_thread_limit(const char* scheduler_role, size_t scheduler_r
 zx_status_t fdf_env_set_thread_limit(const char* scheduler_role, size_t scheduler_role_len,
                                      uint32_t max_threads);
 
+// Adds an allowed scheduler role for the given driver.
+void fdf_env_add_allowed_scheduler_role_for_driver(const void* driver, const char* role,
+                                                   size_t role_length) ZX_AVAILABLE_SINCE(NEXT);
 __END_CDECLS
 
 #endif  // LIB_FDF_ENV_H_

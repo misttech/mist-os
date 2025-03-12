@@ -246,6 +246,14 @@ __EXPORT bool fdf_env_dispatcher_has_queued_tasks(fdf_dispatcher_t* dispatcher) 
   return dispatcher->HasQueuedTasks();
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+__EXPORT void fdf_env_add_allowed_scheduler_role_for_driver(const void* driver, const char* role,
+                                                            size_t role_length) {
+  driver_runtime::AllowedSchedulerRoles::Get()->AddForDriver(driver,
+                                                             std::string_view(role, role_length));
+}
+#endif
+
 __EXPORT void fdf_internal_wait_until_all_dispatchers_idle() {
   return driver_runtime::DispatcherCoordinator::WaitUntilDispatchersIdle();
 }
