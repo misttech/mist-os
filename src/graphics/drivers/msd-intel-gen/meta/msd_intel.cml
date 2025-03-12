@@ -2,22 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [
-        "inspect/client.shard.cml",
-        "syslog/client.shard.cml",
-    ],
+    include: [ "//src/graphics/drivers/msd-intel-gen/meta/msd_intel.shard.cml" ],
     program: {
-        runner: "driver",
         binary: "driver/libmsd_intel.so",
         bind: "meta/bind/msd_intel_bind.bindbc",
-        colocate: "true",
-        default_dispatcher_opts: [ "allow_sync_calls" ],
-        fallback: "false",
     },
-    use: [
-        { service: 'fuchsia.driver.compat.Service' },
-        {
-            protocol: [ "fuchsia.kernel.InfoResource" ],
-        },
-    ],
 }

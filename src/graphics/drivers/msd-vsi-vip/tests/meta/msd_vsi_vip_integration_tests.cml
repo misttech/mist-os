@@ -16,6 +16,13 @@
             path: "/dev/class",
         },
         {
+            // This service replaces the directory capability above.
+            service: [
+                "fuchsia.gpu.magma.PerformanceCounterService",
+                "fuchsia.gpu.magma.Service",
+            ],
+        },
+        {
             protocol: [
                 "fuchsia.driver.development.Manager",
                 "fuchsia.driver.registrar.DriverRegistrar",
