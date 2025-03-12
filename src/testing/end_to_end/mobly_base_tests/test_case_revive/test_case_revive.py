@@ -22,7 +22,7 @@ _DMC_MODULE: str = (
 _DMC_CLASS: str = "PowerSwitchUsingDmc"
 
 
-# pylint: disable=protected-access
+# pylint: disable=protected-access, unused-argument
 
 
 class FuchsiaDeviceOperation(enum.StrEnum):
@@ -59,12 +59,20 @@ class _TestArgTuple:
     test_case_method: str
     fuchsia_device_operation: FuchsiaDeviceOperation
     test_method_execution_frequency: TestMethodExecutionFrequency
+    pre_test_execution_fn: Callable[[], None] | None = None
+    pre_test_execution_fn_kwargs: dict[str, Any] | None = None
+    post_test_execution_fn: Callable[[], None] | None = None
+    post_test_execution_fn_kwargs: dict[str, Any] | None = None
 
     def __str__(self) -> str:
         return (
             f"TestCaseMethod:{self.test_case_method}, "
             f"FuchsiaDeviceOperation:{self.fuchsia_device_operation}, "
-            f"TestMethodExecutionFrequency:{self.test_method_execution_frequency}"
+            f"TestMethodExecutionFrequency:{self.test_method_execution_frequency}, "
+            f"PreTestExecutionFunction:{self.pre_test_execution_fn}, "
+            f"PreTestExecutionFunctionKeywordArgs:{self.pre_test_execution_fn_kwargs}, "
+            f"PostTestExecutionFunction:{self.post_test_execution_fn}, "
+            f"PostTestExecutionFunctionKeywordArgs:{self.post_test_execution_fn_kwargs}, "
         )
 
 
@@ -72,6 +80,10 @@ def tag_test(
     tag_name: str = "revive_test_case",
     fuchsia_device_operation: FuchsiaDeviceOperation | None = None,
     test_method_execution_frequency: TestMethodExecutionFrequency | None = None,
+    pre_test_execution_fn: Callable[..., None] | None = None,
+    pre_test_execution_fn_kwargs: dict[str, Any] | None = None,
+    post_test_execution_fn: Callable[..., None] | None = None,
+    post_test_execution_fn_kwargs: dict[str, Any] | None = None,
 ) -> Callable[..., Any]:
     """Decorator that can be used to tag a test with a label"""
 
@@ -85,6 +97,12 @@ def tag_test(
             func._test_method_execution_frequency = (  # type: ignore[attr-defined]
                 TestMethodExecutionFrequency(test_method_execution_frequency)
             )
+        if pre_test_execution_fn is not None:
+            func._pre_test_execution_fn = pre_test_execution_fn  # type: ignore[attr-defined]
+            func._pre_test_execution_fn_kwargs = pre_test_execution_fn_kwargs  # type: ignore[attr-defined]
+        if post_test_execution_fn is not None:
+            func._post_test_execution_fn = post_test_execution_fn  # type: ignore[attr-defined]
+            func._post_test_execution_fn_kwargs = post_test_execution_fn_kwargs  # type: ignore[attr-defined]
         return func
 
     return tags_decorator
@@ -94,9 +112,11 @@ class TestCaseRevive(fuchsia_base_test.FuchsiaBaseTest):
     """Test case revive is a lacewing test class that takes any Lacewing test
     case and modifies it to run in below sequence:
 
-    1. Run the test case (optional, if specified by user)
-    2. Perform an operation requested by user (from list of supported operations)
-    3. Rerun the test case (optional, if specified by user)
+    1. Run custom method before running the test case (optional, if `pre_test_execution_fn` arg is set)
+    2. Run the test case (optional, if `test_method_execution_frequency` is PRE_ONLY or PRE_AND_POST)
+    3. Perform an operation requested by user (from any of the `FuchsiaDeviceOperation`)
+    4. Rerun the test case (optional, if `test_method_execution_frequency` is POST_ONLY or PRE_AND_POST)
+    5. Run custom method before running the test case (optional, if `post_test_execution_fn` arg is set)
     """
 
     def pre_run(self) -> None:
@@ -191,6 +211,10 @@ class TestCaseRevive(fuchsia_base_test.FuchsiaBaseTest):
         test_case: str,
         fuchsia_device_operation: FuchsiaDeviceOperation,
         test_method_execution_frequency: TestMethodExecutionFrequency,
+        pre_test_execution_fn: Callable[[], None] | None,
+        pre_test_execution_fn_kwargs: dict[str, Any] | None,
+        post_test_execution_fn: Callable[[], None] | None,
+        post_test_execution_fn_kwargs: dict[str, Any] | None,
     ) -> None:
         """TestCaseRevive logic"""
 
@@ -209,7 +233,26 @@ class TestCaseRevive(fuchsia_base_test.FuchsiaBaseTest):
             sequence = f"{test_case} -> {fuchsia_device_operation}"
         else:  # TestMethodExecutionFrequency.POST_ONLY
             sequence = f"{fuchsia_device_operation} -> {test_case}"
+        if pre_test_execution_fn:
+            sequence = f"{pre_test_execution_fn.__qualname__} -> {sequence}"
+        if post_test_execution_fn:
+            sequence = f"{sequence} -> {post_test_execution_fn.__qualname__}"
         _LOGGER.info("[TestCaseRevive] - Revived test logic: %s", sequence)
+
+        if pre_test_execution_fn:
+            if pre_test_execution_fn_kwargs:
+                _LOGGER.info(
+                    "[TestCaseRevive] - Calling %s with args:%s which is the first step in the revived test sequence...",
+                    pre_test_execution_fn.__qualname__,
+                    pre_test_execution_fn_kwargs,
+                )
+                pre_test_execution_fn(**pre_test_execution_fn_kwargs)
+            else:
+                _LOGGER.info(
+                    "[TestCaseRevive] - Calling %s which is the first step in the revived test sequence...",
+                    pre_test_execution_fn.__qualname__,
+                )
+                pre_test_execution_fn()
 
         if test_method_execution_frequency in [
             TestMethodExecutionFrequency.PRE_AND_POST,
@@ -240,11 +283,30 @@ class TestCaseRevive(fuchsia_base_test.FuchsiaBaseTest):
             )
             getattr(self, test_case)()
 
+        if post_test_execution_fn:
+            if post_test_execution_fn_kwargs:
+                _LOGGER.info(
+                    "[TestCaseRevive] - Calling %s with args:%s which is the last step in the revived test sequence...",
+                    post_test_execution_fn.__qualname__,
+                    post_test_execution_fn_kwargs,
+                )
+                post_test_execution_fn(**post_test_execution_fn_kwargs)
+            else:
+                _LOGGER.info(
+                    "[TestCaseRevive] - Calling %s which is the last step in the revived test sequence...",
+                    post_test_execution_fn.__qualname__,
+                )
+                post_test_execution_fn()
+
     def _revived_test_case_name_func(
         self,
         test_case: str,
         fuchsia_device_operation: FuchsiaDeviceOperation,
-        _: TestMethodExecutionFrequency,
+        test_method_execution_frequency: TestMethodExecutionFrequency,
+        pre_test_execution_fn: Callable[[], None] | None,
+        pre_test_execution_fn_kwargs: dict[str, Any] | None,
+        post_test_execution_fn: Callable[[], None] | None,
+        post_test_execution_fn_kwargs: dict[str, Any] | None,
     ) -> str:
         """Revived test case name function"""
         test_case = test_case.lstrip("_")
@@ -349,10 +411,46 @@ class TestCaseRevive(fuchsia_base_test.FuchsiaBaseTest):
                     self, revived_test_case
                 )._test_method_execution_frequency
 
+            pre_test_execution_fn: Callable[[], None] | None = None
+            if "_pre_test_execution_fn" in dir(
+                getattr(self, revived_test_case)
+            ):
+                pre_test_execution_fn = getattr(
+                    self, revived_test_case
+                )._pre_test_execution_fn
+
+            pre_test_execution_fn_kwargs: dict[str, Any] | None = None
+            if "_pre_test_execution_fn_kwargs" in dir(
+                getattr(self, revived_test_case)
+            ):
+                pre_test_execution_fn_kwargs = getattr(
+                    self, revived_test_case
+                )._pre_test_execution_fn_kwargs
+
+            post_test_execution_fn: Callable[[], None] | None = None
+            if "_post_test_execution_fn" in dir(
+                getattr(self, revived_test_case)
+            ):
+                post_test_execution_fn = getattr(
+                    self, revived_test_case
+                )._post_test_execution_fn
+
+            post_test_execution_fn_kwargs: dict[str, Any] | None = None
+            if "_post_test_execution_fn_kwargs" in dir(
+                getattr(self, revived_test_case)
+            ):
+                post_test_execution_fn_kwargs = getattr(
+                    self, revived_test_case
+                )._post_test_execution_fn_kwargs
+
             test_arg_tuple: _TestArgTuple = _TestArgTuple(
                 test_case_method=revived_test_case,
                 fuchsia_device_operation=fuchsia_device_operation,
                 test_method_execution_frequency=test_method_execution_frequency,
+                pre_test_execution_fn=pre_test_execution_fn,
+                pre_test_execution_fn_kwargs=pre_test_execution_fn_kwargs,
+                post_test_execution_fn=post_test_execution_fn,
+                post_test_execution_fn_kwargs=post_test_execution_fn_kwargs,
             )
 
             test_arg_tuple_list.append(test_arg_tuple)
