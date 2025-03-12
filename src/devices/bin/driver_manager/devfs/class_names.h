@@ -102,7 +102,7 @@ const std::unordered_map<std::string_view, ServiceEntry> kClassNameToService = {
     {"input", {ServiceEntry::kDevfsAndService, "fuchsia.hardware.input.Service", "controller"}},
     {"light", {ServiceEntry::kDevfsAndService, "fuchsia.hardware.light.LightService", "light"}},
     {"mali-util",
-     {ServiceEntry::kDevfsAndService, "fuchsia.hardware.gpu.mali.Service", "arm_mali"}},
+     {ServiceEntry::kDevfsAndService, "fuchsia.hardware.gpu.mali.UtilsService", "device"}},
     {"media-codec",
      {ServiceEntry::kDevfsAndService, "fuchsia.hardware.mediacodec.Service", "device"}},
     {"midi", {ServiceEntry::kDevfsAndService, "fuchsia.hardware.midi.Service", "controller"}},

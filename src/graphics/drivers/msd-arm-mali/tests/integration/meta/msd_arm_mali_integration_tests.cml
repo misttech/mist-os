@@ -26,6 +26,7 @@
                 "fuchsia.gpu.magma.Service",
             ],
         },
+        { service: "fuchsia.hardware.gpu.mali.UtilsService" },
         { protocol: "fuchsia.tracing.provider.Registry" },
         {
             protocol: [
