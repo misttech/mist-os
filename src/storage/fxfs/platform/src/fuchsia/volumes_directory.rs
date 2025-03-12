@@ -15,7 +15,7 @@ use async_trait::async_trait;
 use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
 use fidl_fuchsia_fs::{AdminMarker, AdminRequest, AdminRequestStream};
 use fidl_fuchsia_fs_startup::{CheckOptions, MountOptions, VolumeRequest, VolumeRequestStream};
-use fidl_fuchsia_fxfs::{BlobCreatorMarker, BlobReaderMarker, ProjectIdMarker};
+use fidl_fuchsia_fxfs::ProjectIdMarker;
 use fs_inspect::{FsInspectTree, FsInspectVolume};
 use futures::stream::FuturesUnordered;
 use futures::{StreamExt, TryStreamExt};
@@ -546,18 +546,7 @@ impl VolumesDirectory {
                 }
             }),
         )?;
-        if as_blob {
-            let root = volume.root().clone();
-            svc_dir.add_entry(
-                BlobCreatorMarker::PROTOCOL_NAME,
-                vfs::service::host(move |r| root.clone().handle_blob_creator_requests(r)),
-            )?;
-            let root = volume.root().clone();
-            svc_dir.add_entry(
-                BlobReaderMarker::PROTOCOL_NAME,
-                vfs::service::host(move |r| root.clone().handle_blob_reader_requests(r)),
-            )?;
-        }
+        volume.root().clone().register_additional_volume_services(&svc_dir)?;
 
         // Use the volume's scope here which should be OK for now.  In theory the scope represents a
         // filesystem instance and the pseudo filesystem we are using is arguably a different
