@@ -5,6 +5,7 @@
 // TODO(https://github.com/rust-lang/rust/issues/39371): remove
 #![allow(non_upper_case_globals)]
 
+use super::BpfMap;
 use crate::bpf::attachments::{bpf_prog_attach, bpf_prog_detach, BpfAttachAttr};
 use crate::bpf::fs::{get_bpf_object, BpfFsDir, BpfFsObject, BpfHandle};
 use crate::bpf::program::{Program, ProgramInfo};
@@ -167,7 +168,11 @@ pub fn sys_bpf(
             {
                 flags |= BPF_F_RDONLY_PROG;
             }
-            let map = Map::new(schema, flags).map_err(map_error_to_errno)?;
+
+            let map = BpfMap::new(
+                Map::new(schema, flags).map_err(map_error_to_errno)?,
+                security::bpf_map_alloc(current_task),
+            );
             install_bpf_fd(current_task, map)
         }
 

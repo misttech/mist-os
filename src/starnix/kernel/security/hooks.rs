@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{selinux_hooks, FileObjectState, FileSystemState, ResolvedElfState, TaskState};
+use super::{
+    selinux_hooks, BpfMapState, FileObjectState, FileSystemState, ResolvedElfState, TaskState,
+};
 use crate::security::KernelState;
 use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::fs_args::MountParams;
@@ -574,6 +576,14 @@ pub fn file_receive(current_task: &CurrentTask, file: &FileObject) -> Result<(),
 pub fn file_alloc_security(current_task: &CurrentTask) -> FileObjectState {
     track_hook_duration!(c"security.hooks.file_alloc_security");
     FileObjectState { state: selinux_hooks::file::file_alloc_security(current_task) }
+}
+
+/// Returns the security context to be assigned to a BPM map object, based on the task that
+/// creates it.
+/// Corresponds to the `bpf_map_alloc_security()` LSM hook.
+pub fn bpf_map_alloc(current_task: &CurrentTask) -> BpfMapState {
+    track_hook_duration!(c"security.hooks.bpf_map_alloc");
+    BpfMapState { _state: selinux_hooks::bpf::bpf_map_alloc(current_task) }
 }
 
 /// Returns whether `current_task` can issue an ioctl to `file`.

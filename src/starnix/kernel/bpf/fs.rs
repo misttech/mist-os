@@ -5,6 +5,7 @@
 // TODO(https://github.com/rust-lang/rust/issues/39371): remove
 #![allow(non_upper_case_globals)]
 
+use super::BpfMap;
 use crate::bpf::program::Program;
 use crate::bpf::syscalls::BpfTypeFormat;
 use crate::mm::memory::MemoryObject;
@@ -20,7 +21,7 @@ use crate::vfs::{
     FsNodeOps, FsStr, MemoryDirectoryFile, MemoryXattrStorage, NamespaceNode, XattrStorage as _,
 };
 use ebpf::MapSchema;
-use ebpf_api::{compute_map_storage_size, PinnedMap, RINGBUF_SIGNAL};
+use ebpf_api::{compute_map_storage_size, RINGBUF_SIGNAL};
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_types::vfs::default_statfs;
@@ -47,12 +48,12 @@ pub enum BpfHandle {
     // Stub used to fake loading of programs of unknown types.
     ProgramStub(u32),
 
-    Map(PinnedMap),
+    Map(Arc<BpfMap>),
     BpfTypeFormat(Arc<BpfTypeFormat>),
 }
 
 impl BpfHandle {
-    pub fn as_map(&self) -> Result<&PinnedMap, Errno> {
+    pub fn as_map(&self) -> Result<&BpfMap, Errno> {
         match self {
             Self::Map(ref map) => Ok(map),
             _ => error!(EINVAL),
@@ -68,7 +69,7 @@ impl BpfHandle {
     // Returns VMO and schema if this handle references a map.
     fn get_map_vmo(&self) -> Result<(Arc<zx::Vmo>, MapSchema), Errno> {
         match self {
-            Self::Map(map) => {
+            Self::Map(ref map) => {
                 let vmo = map.vmo().ok_or_else(|| errno!(ENODEV))?;
                 Ok((vmo, map.schema))
             }
@@ -91,9 +92,9 @@ impl From<Program> for BpfHandle {
     }
 }
 
-impl From<PinnedMap> for BpfHandle {
-    fn from(map: PinnedMap) -> Self {
-        Self::Map(map)
+impl From<BpfMap> for BpfHandle {
+    fn from(map: BpfMap) -> Self {
+        Self::Map(Arc::new(map))
     }
 }
 

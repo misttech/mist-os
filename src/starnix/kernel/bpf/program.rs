@@ -118,7 +118,7 @@ fn link_maps_fds(
 
                     let fd = FdNumber::from_raw(instruction.imm);
                     let object = get_bpf_object(current_task, fd)?;
-                    let map = object.as_map()?;
+                    let map: &PinnedMap = object.as_map()?;
 
                     // Find the map in `maps` or insert it otherwise.
                     let maybe_index =

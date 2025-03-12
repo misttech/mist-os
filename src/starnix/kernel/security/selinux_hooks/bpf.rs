@@ -5,13 +5,19 @@
 // TODO(https://github.com/rust-lang/rust/issues/39371): remove
 #![allow(non_upper_case_globals)]
 
-use super::check_self_permission;
+use super::{check_self_permission, BpfMapState};
 
 use crate::task::CurrentTask;
 use selinux::{BpfPermission, SecurityId, SecurityServer};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{bpf_cmd, bpf_cmd_BPF_MAP_CREATE, bpf_cmd_BPF_PROG_LOAD, bpf_cmd_BPF_PROG_RUN};
 use zerocopy::FromBytes;
+
+/// Returns the security state to be assigned to a BPF map. This is defined as the security
+/// context of the creating task.
+pub fn bpf_map_alloc(current_task: &CurrentTask) -> BpfMapState {
+    BpfMapState { sid: current_task.security_state.lock().current_sid }
+}
 
 /// Returns whether `current_task` can perform the bpf `cmd`.
 pub fn check_bpf_access<Attr: FromBytes>(
