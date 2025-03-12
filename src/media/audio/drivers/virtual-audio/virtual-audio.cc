@@ -39,7 +39,8 @@ void VirtualAudio::GetDefaultConfiguration(GetDefaultConfigurationRequestView re
       completer.ReplySuccess(fidl::ToWire(arena, VirtualAudioComposite::GetDefaultConfig()));
       return;
     default:
-      FDF_LOG(ERROR, "Failed to get default configuration: Device type not supported");
+      FDF_LOG(ERROR, "Failed to get default configuration: Device type %u not supported",
+              static_cast<uint32_t>(request->type));
       completer.ReplyError(fuchsia_virtualaudio::Error::kNotSupported);
       return;
   }
