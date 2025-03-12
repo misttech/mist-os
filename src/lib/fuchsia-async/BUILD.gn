@@ -25,7 +25,6 @@ rustc_library("fuchsia-async") {
     "//third_party/rust_crates:pin-project-lite",
   ]
   sources = [
-    "src/atomic_future.rs",
     "src/condition.rs",
     "src/handle/mod.rs",
     "src/lib.rs",
@@ -58,6 +57,7 @@ rustc_library("fuchsia-async") {
       "src/net/fuchsia/mod.rs",
       "src/net/fuchsia/tcp.rs",
       "src/net/fuchsia/udp.rs",
+      "src/runtime/fuchsia/executor/atomic_future.rs",
       "src/runtime/fuchsia/executor/common.rs",
       "src/runtime/fuchsia/executor/local.rs",
       "src/runtime/fuchsia/executor/mod.rs",

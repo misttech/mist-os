@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use super::super::task::JoinHandle;
+use super::atomic_future::{AtomicFuture, CancelAndDetachResult};
 use super::common::{Executor, Task};
-use crate::atomic_future::{AtomicFuture, CancelAndDetachResult};
 use crate::condition::{Condition, ConditionGuard, WakerEntry};
 use crate::EHandle;
 use pin_project_lite::pin_project;

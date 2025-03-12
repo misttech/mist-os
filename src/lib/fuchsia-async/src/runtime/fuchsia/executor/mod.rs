@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+/// A future which can be used by multiple threads at once.
+mod atomic_future;
 mod common;
 mod local;
 mod packets;

@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use super::atomic_future::AtomicFuture;
 use super::common::{Executor, ExecutorTime, MAIN_TASK_ID};
 use super::scope::ScopeHandle;
-use crate::atomic_future::AtomicFuture;
 use fuchsia_sync::{Condvar, Mutex};
 
 use futures::FutureExt;

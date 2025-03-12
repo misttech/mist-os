@@ -119,9 +119,6 @@ const RESULT_TAKEN: usize = 1 << 5;
 /// This indicates the result of attempting to `poll` the future.
 #[derive(Debug)]
 pub enum AttemptPollResult {
-    /// The future was being polled by another thread, but it was notified
-    /// to poll at least once more before yielding.
-    Busy,
     /// The future was polled, but did not complete.
     Pending,
     /// The future was polled and finished by this thread.
