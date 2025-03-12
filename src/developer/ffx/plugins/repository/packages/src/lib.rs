@@ -488,12 +488,17 @@ async fn extract_archive_impl(
 #[cfg(test)]
 mod test {
     use super::*;
+    use camino::Utf8PathBuf;
     use ffx_config::ConfigLevel;
     use ffx_package_archive_utils::{read_file_entries, ArchiveEntry, FarArchiveReader};
     use ffx_writer::TestBuffers;
-    use fuchsia_async as fasync;
+    use fidl_fuchsia_pkg_ext::{
+        RepositoryConfigBuilder, RepositoryRegistrationAliasConflictMode, RepositoryStorageType,
+    };
     use fuchsia_repo::test_utils;
+    use pkg::PkgServerInfo;
     use pretty_assertions::assert_eq;
+    use std::net::SocketAddr;
     use std::path::Path;
 
     const PKG1_HASH: &str = "2881455493b5870aaea36537d70a2adc635f516ac2092598f4b6056dabc6b25d";
@@ -502,23 +507,41 @@ mod test {
     const PKG1_BIN_HASH: &str = "72e1e7a504f32edf4f23e7e8a3542c1d77d12541142261cfe272decfa75f542d";
     const PKG1_LIB_HASH: &str = "8a8a5f07f935a4e8e1fd1a1eda39da09bb2438ec0adfb149679ddd6e7e1fbb4f";
 
-    async fn setup_repo(path: &Path) -> ffx_config::TestEnv {
+    async fn setup_repo(instance_name: &str, path: &Path) -> ffx_config::TestEnv {
         test_utils::make_pm_repo_dir(path).await;
 
         let env = ffx_config::test_init().await.unwrap();
+        let repo_process_dir = env.isolate_root.path().join("repo_data");
+
+        // Override the default location for the process dir so it is test specific.
         env.context
-            .query("repository.repositories.devhost.path")
+            .query("repository.process_dir")
             .level(Some(ConfigLevel::User))
-            .set(path.to_str().unwrap().into())
+            .set(repo_process_dir.to_string_lossy().into())
             .await
             .unwrap();
 
-        env.context
-            .query("repository.repositories.devhost.type")
-            .level(Some(ConfigLevel::User))
-            .set("pm".into())
-            .await
-            .unwrap();
+        // Create a test repo
+        let repo_config =
+            RepositoryConfigBuilder::new(format!("fuchsia-pkg://{instance_name}").parse().unwrap())
+                .build();
+
+        let addr = SocketAddr::new(std::net::IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED), 8000);
+        let s1 = PkgServerInfo {
+            name: instance_name.into(),
+            address: addr,
+            repo_spec: fuchsia_repo::repository::RepositorySpec::Pm {
+                path: Utf8PathBuf::from_path_buf(path.into()).expect("utf-8 path"),
+                aliases: BTreeSet::new(),
+            },
+            registration_storage_type: RepositoryStorageType::Ephemeral,
+            registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
+            server_mode: pkg::ServerMode::Foreground,
+            pid: std::process::id(),
+            repo_config,
+        };
+        let mgr = PkgServerInstances::new(repo_process_dir.into());
+        mgr.write_instance(&s1).expect("writing s1");
 
         env
     }
@@ -554,18 +577,10 @@ mod test {
         test_buffers
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_package_list_repo_path() {
         let tmp = tempfile::tempdir().unwrap();
-        let env = setup_repo(tmp.path()).await;
-
-        // This test is only testing with daemon based repo.
-        env.context
-            .query("repository.process_dir")
-            .level(Some(ConfigLevel::User))
-            .set(env.isolate_root.path().join("repo_data").to_string_lossy().into())
-            .await
-            .unwrap();
+        let env = setup_repo("test-repo1", tmp.path()).await;
 
         let test_buffers = run_impl(
             ListSubCommand {
@@ -604,22 +619,14 @@ package2/0 {pkg2_hash} {pkg2_modified} \n",
         assert_eq!(stderr, "");
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_package_list_truncated_hash() {
         let tmp = tempfile::tempdir().unwrap();
-        let env = setup_repo(tmp.path()).await;
-
-        // This test is only testing with daemon based repo.
-        env.context
-            .query("repository.process_dir")
-            .level(Some(ConfigLevel::User))
-            .set(env.isolate_root.path().join("repo_data").to_string_lossy().into())
-            .await
-            .unwrap();
+        let env = setup_repo("test-repo2", tmp.path()).await;
 
         let test_buffers = run_impl(
             ListSubCommand {
-                repository: Some("devhost".to_string()),
+                repository: Some("test-repo2".to_string()),
                 port: None,
                 full_hash: false,
                 include_components: false,
@@ -654,22 +661,14 @@ package2/0 {pkg2_hash} {pkg2_modified} \n",
         assert_eq!(stderr, "");
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_package_list_full_hash() {
         let tmp = tempfile::tempdir().unwrap();
-        let env = setup_repo(tmp.path()).await;
-
-        // This test is only testing with daemon based repo.
-        env.context
-            .query("repository.process_dir")
-            .level(Some(ConfigLevel::User))
-            .set(env.isolate_root.path().join("repo_data").to_string_lossy().into())
-            .await
-            .unwrap();
+        let env = setup_repo("test-repo3", tmp.path()).await;
 
         let test_buffers = run_impl(
             ListSubCommand {
-                repository: Some("devhost".to_string()),
+                repository: Some("test-repo3".to_string()),
                 port: None,
                 full_hash: true,
                 include_components: false,
@@ -704,22 +703,14 @@ package2/0 {pkg2_hash} {pkg2_modified} \n",
         assert_eq!(stderr, "");
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_package_list_including_components() {
         let tmp = tempfile::tempdir().unwrap();
-        let env = setup_repo(tmp.path()).await;
-
-        // This test is only testing with daemon based repo.
-        env.context
-            .query("repository.process_dir")
-            .level(Some(ConfigLevel::User))
-            .set(env.isolate_root.path().join("repo_data").to_string_lossy().into())
-            .await
-            .unwrap();
+        let env = setup_repo("test-repo4", tmp.path()).await;
 
         let test_buffers = run_impl(
             ListSubCommand {
-                repository: Some("devhost".to_string()),
+                repository: Some("test-repo4".to_string()),
                 port: None,
                 full_hash: false,
                 include_components: true,
@@ -756,22 +747,14 @@ package2/0 {pkg2_hash} {pkg2_modified} meta/package2.cm \n",
         assert_eq!(stderr, "");
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_package_list_including_size() {
         let tmp = tempfile::tempdir().unwrap();
-        let env = setup_repo(tmp.path()).await;
-
-        // This test is only testing with daemon based repo.
-        env.context
-            .query("repository.process_dir")
-            .level(Some(ConfigLevel::User))
-            .set(env.isolate_root.path().join("repo_data").to_string_lossy().into())
-            .await
-            .unwrap();
+        let env = setup_repo("test-repo5", tmp.path()).await;
 
         let test_buffers = run_impl(
             ListSubCommand {
-                repository: Some("devhost".to_string()),
+                repository: Some("test-repo5".to_string()),
                 port: None,
                 full_hash: false,
                 include_components: false,
@@ -808,22 +791,14 @@ package2/0 {pkg2_hash} {pkg2_modified} 24.03 KB \n",
         assert_eq!(stderr, "");
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_show_package_truncated_hash() {
         let tmp = tempfile::tempdir().unwrap();
-        let env = setup_repo(tmp.path()).await;
-
-        // This test is only testing with daemon based repo.
-        env.context
-            .query("repository.process_dir")
-            .level(Some(ConfigLevel::User))
-            .set(env.isolate_root.path().join("repo_data").to_string_lossy().into())
-            .await
-            .unwrap();
+        let env = setup_repo("test-repo6", tmp.path()).await;
 
         let test_buffers = run_impl_for_show_command(
             ShowSubCommand {
-                repository: Some("devhost".to_string()),
+                repository: Some("test-repo6".to_string()),
                 port: None,
                 repo_path: None,
                 full_hash: false,
@@ -870,22 +845,14 @@ meta/package1.cmx             12 B  <unknown>   {pkg1_modified} \n"
         assert_eq!(stderr, "");
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_show_package_full_hash() {
         let tmp = tempfile::tempdir().unwrap();
-        let env = setup_repo(tmp.path()).await;
-
-        // This test is only testing with daemon based repo.
-        env.context
-            .query("repository.process_dir")
-            .level(Some(ConfigLevel::User))
-            .set(env.isolate_root.path().join("repo_data").to_string_lossy().into())
-            .await
-            .unwrap();
+        let env = setup_repo("test-repo7", tmp.path()).await;
 
         let test_buffers = run_impl_for_show_command(
             ShowSubCommand {
-                repository: Some("devhost".to_string()),
+                repository: Some("test-repo7".to_string()),
                 port: None,
                 repo_path: None,
                 full_hash: true,
@@ -930,22 +897,14 @@ meta/package1.cmx             12 B  <unknown>                                   
         assert_eq!(stderr, "");
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_show_package_with_subpackages() {
         let tmp = tempfile::tempdir().unwrap();
-        let env = setup_repo(tmp.path()).await;
-
-        // This test is only testing with daemon based repo.
-        env.context
-            .query("repository.process_dir")
-            .level(Some(ConfigLevel::User))
-            .set(env.isolate_root.path().join("repo_data").to_string_lossy().into())
-            .await
-            .unwrap();
+        let env = setup_repo("test-repo8", tmp.path()).await;
 
         let test_buffers = run_impl_for_show_command(
             ShowSubCommand {
-                repository: Some("devhost".to_string()),
+                repository: Some("test-repo8".to_string()),
                 port: None,
                 repo_path: None,
                 full_hash: false,
@@ -992,24 +951,16 @@ meta/package1.cmx             <root>     12 B  <unknown>   {pkg1_modified} \n"
         assert_eq!(stderr, "");
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_extract_archive() {
         let tmp = tempfile::tempdir().unwrap();
-        let env = setup_repo(&tmp.path().join("repo")).await;
-
-        // This test is only testing with daemon based repo.
-        env.context
-            .query("repository.process_dir")
-            .level(Some(ConfigLevel::User))
-            .set(env.isolate_root.path().join("repo_data").to_string_lossy().into())
-            .await
-            .unwrap();
+        let env = setup_repo("test-repo9", &tmp.path().join("repo")).await;
 
         let archive_path = tmp.path().join("archive.far");
         extract_archive_impl(
             ExtractArchiveSubCommand {
                 out: archive_path.clone(),
-                repository: Some("devhost".to_string()),
+                repository: Some("test-repo9".to_string()),
                 port: None,
                 repo_path: None,
                 package: "package1/0".to_string(),
