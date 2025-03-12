@@ -220,9 +220,7 @@ class VmCowPages final : public VmHierarchyBase,
     return !!(options_ & VmCowPagesOptions::kPreservingPageContentRoot);
   }
 
-  bool is_parent_hidden_locked() const TA_REQ(lock()) {
-    return parent_ && parent_locked().is_hidden();
-  }
+  bool is_parent_hidden_locked() const TA_REQ(lock()) { return parent_ && parent_->is_hidden(); }
 
   bool is_discardable() const { return !!discardable_tracker_; }
 
@@ -978,8 +976,9 @@ class VmCowPages final : public VmHierarchyBase,
 
   // Returns whether or not performing a bidirectional clone would result in a valid tree structure.
   // This does not perform checks on whether there are pinned pages, or if a bidirectional clone
-  // would semantically make sense.
-  bool can_bidirectional_clone_locked() const TA_REQ(lock()) {
+  // would semantically make sense. Additionally the target |parent| for the new node should be
+  // passed in, which may or may not be the same as |parent_|.
+  bool can_bidirectional_clone_locked(const LockedPtr& parent) const TA_REQ(lock()) {
     // If the immediate node has a page source of any kind then bidirectional cloning is not
     // possible. A page source is otherwise permitted in the tree.
     if (page_source_) {
@@ -995,7 +994,7 @@ class VmCowPages final : public VmHierarchyBase,
     // If there is a parent then either that parent is hidden, or the parent is the root of the
     // tree. This forbids creating a bi-directional clone at the end of chain of unidirectional
     // clones.
-    if (parent_ && parent_locked().parent_ && !is_parent_hidden_locked()) {
+    if (parent && parent.locked().parent_ && !parent->is_hidden()) {
       return false;
     }
 
@@ -1468,17 +1467,6 @@ class VmCowPages final : public VmHierarchyBase,
   // is a child. This updates the parent_ field in child to hold a refptr to |this|.
   void AddChildLocked(VmCowPages* child, uint64_t offset, uint64_t parent_limit) TA_REQ(lock())
       TA_REQ(child->lock());
-
-  // Helpers to give convenience locked access to the parent_. Only valid to be called if there is a
-  // parent.
-  VmCowPages& parent_locked() TA_REQ(lock()) TA_ASSERT(parent_locked().lock()) {
-    DEBUG_ASSERT(parent_);
-    return *parent_;
-  }
-  const VmCowPages& parent_locked() const TA_REQ(lock()) TA_ASSERT(parent_locked().lock()) {
-    DEBUG_ASSERT(parent_);
-    return *parent_;
-  }
 
   void ReplaceChildLocked(VmCowPages* old, VmCowPages* new_child) TA_REQ(lock());
 

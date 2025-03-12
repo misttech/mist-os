@@ -1336,13 +1336,22 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CreateCloneLocked(SnapshotType 
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
   const bool unidirectional = !require_bidirectional && can_unidirectional_clone_locked();
+
+  // Now that we know whether it will be a unidirectional clone or not, determine where this clone
+  // will hang.
+  ParentAndRange child_range =
+      FindParentAndRangeForCloneLocked(range.offset, range.len, !unidirectional);
+
   if (!unidirectional) {
     if (require_unidirectional) {
       return zx::error(ZX_ERR_NOT_SUPPORTED);
     }
-    if (!can_bidirectional_clone_locked()) {
+    // The bidirectional clone check requires looking at the parent of where we want to hang the
+    // node, which is represented by |child_range.grandparent|.
+    if (!can_bidirectional_clone_locked(child_range.grandparent)) {
       return zx::error(ZX_ERR_NOT_SUPPORTED);
     }
+
     // If this is non-zero, that means that there are pages which hardware can
     // touch, so the vmo can't be safely cloned.
     // TODO: consider immediately forking these pages.
@@ -1350,9 +1359,6 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CreateCloneLocked(SnapshotType 
       return zx::error(ZX_ERR_BAD_STATE);
     }
   }
-
-  ParentAndRange child_range =
-      FindParentAndRangeForCloneLocked(range.offset, range.len, !unidirectional);
 
   if (unidirectional) {
     return child_range.parent.locked_or(this).CloneUnidirectionalLocked(
@@ -1399,8 +1405,12 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed) {
                (high_priority_count_ == 1 && child->high_priority_count_ > 0));
   // Similarly if we have a priority count, and we have a parent, then our parent must have a
   // non-zero count.
+  LockedPtr locked_parent;
   if (parent_) {
-    DEBUG_ASSERT(high_priority_count_ == 0 || parent_locked().high_priority_count_ != 0);
+    locked_parent = LockedPtr(parent_.get(), VmLockAcquireMode::Reentrant);
+  }
+  if (locked_parent) {
+    DEBUG_ASSERT(high_priority_count_ == 0 || locked_parent.locked().high_priority_count_ != 0);
   }
   // If our child has a non-zero count, then it is propagating a +1 count to us, and we in turn are
   // propagating a +1 count to our parent. In the final arrangement after ReplaceChildLocked then
@@ -1413,8 +1423,8 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed) {
   // Drop the child from our list, but don't recurse back into this function. Then
   // remove ourselves from the clone tree.
   DropChildLocked(child);
-  if (parent_) {
-    parent_locked().ReplaceChildLocked(this, child);
+  if (locked_parent) {
+    locked_parent.locked().ReplaceChildLocked(this, child);
   }
   child->parent_ = ktl::move(parent_);
   // We have lost our parent which, if we had a parent, could lead us to now be violating the
@@ -2125,7 +2135,9 @@ void VmCowPages::FindPageContentLocked(uint64_t offset, uint64_t max_owner_lengt
 
 void VmCowPages::FindInitialPageContentLocked(uint64_t offset, PageLookup* out) {
   if (parent_ && offset < parent_limit_) {
-    parent_locked().FindPageContentLocked(offset + parent_offset_, PAGE_SIZE, out);
+    Guard<VmoLockType> parent_guard{AssertOrderedLock, parent_->lock(), parent_->lock_order(),
+                                    VmLockAcquireMode::Reentrant};
+    parent_->FindPageContentLocked(offset + parent_offset_, PAGE_SIZE, out);
   } else {
     *out = {VMPLCursor(), this, offset, offset + PAGE_SIZE};
   }
@@ -3554,7 +3566,7 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
     // when https://bugs.llvm.org/show_bug.cgi?id=35450 gets fixed.
     (void)can_see_parent;  // used only in DEBUG_ASSERT
     DEBUG_ASSERT(can_see_parent(offset));
-    return parent_locked().is_hidden();
+    return parent_->is_hidden();
   };
 
   // Finding the initial page content is expensive, but we only need to call it under certain
