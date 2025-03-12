@@ -109,6 +109,12 @@ bootstrap_userdebug_platform_aib_names = [
   # Trusted application support.
   "trusted_execution_environment",
 
+  # Timekeeper
+  # Gives timekeeper some mutable persistent storage. This is optionally
+  # used (1) in tests; and (2) on specific platforms that need
+  # persistence for RTC functionality.
+  "timekeeper_persistence",
+
   # Wake alarms support: generic and then hardware-specific.
   "timekeeper_wake_alarms",
 ]
@@ -404,9 +410,6 @@ eng_only_platform_aib_names =
       # Example AIB
       "example_assembly_bundle",
 
-      # Gives timekeeper some mutable persistent storage.
-      "timekeeper_persistence",
-
       # Topology test support
       "topology_test_daemon",
 
@@ -462,6 +465,12 @@ experimental_aib_names = [
   "power_framework_broker",
   "power_framework_sag",
   "power_framework_development_support",
+
+  # Timekeeper
+  # Gives timekeeper some mutable persistent storage. This is optionally
+  # used (1) in tests; and (2) on specific platforms that need
+  # persistence for RTC functionality.
+  "timekeeper_persistence",
 
   # Wake alarms support: generic and then hardware-specific.
   "timekeeper_wake_alarms",
