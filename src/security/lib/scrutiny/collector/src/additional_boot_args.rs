@@ -147,8 +147,13 @@ impl AdditionalBootConfigCollector {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_additional_boot_args_contents;
+    use crate::zbi::ZbiCollector;
+
+    use super::*;
     use maplit::hashmap;
+    use scrutiny_collection::model_config::ModelConfig;
+
+    const PRODUCT_BUNDLE_PATH: &str = env!("PRODUCT_BUNDLE_PATH");
 
     #[test]
     fn test_empty() {
@@ -298,5 +303,24 @@ a=a
                 ]
             }
         );
+    }
+
+    #[fuchsia::test]
+    fn from_product_bundle() {
+        let model = ModelConfig::from_product_bundle(PRODUCT_BUNDLE_PATH).unwrap();
+        let data_model = Arc::new(DataModel::new(model).unwrap());
+
+        let zbi_collector = ZbiCollector {};
+        zbi_collector.collect(data_model.clone()).unwrap();
+
+        let collector = AdditionalBootConfigCollector {};
+        collector.collect(data_model.clone()).unwrap();
+
+        let collection = data_model.get::<AdditionalBootConfigCollection>().unwrap();
+        assert!(collection
+            .additional_boot_args
+            .as_ref()
+            .unwrap()
+            .contains_key("zircon.system.pkgfs.cmd"));
     }
 }

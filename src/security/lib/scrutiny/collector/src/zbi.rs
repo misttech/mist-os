@@ -202,16 +202,28 @@ mod tests {
         let collector = ZbiCollector {};
         collector.collect(data_model.clone()).unwrap();
         let collection = data_model.get::<Zbi>().unwrap();
-        assert!(collection.bootfs_files.bootfs_files.contains_key(&"path/to/version".to_string()));
+        assert!(collection
+            .bootfs_files
+            .bootfs_files
+            .contains_key(&"bin/component_manager".to_string()));
     }
 
-    #[test]
+    #[fuchsia::test]
     fn cmdline() {
         let model = ModelConfig::from_product_bundle(PRODUCT_BUNDLE_PATH).unwrap();
         let data_model = Arc::new(DataModel::new(model).unwrap());
         let collector = ZbiCollector {};
         collector.collect(data_model.clone()).unwrap();
         let collection = data_model.get::<Zbi>().unwrap();
-        assert_eq!(collection.cmdline, vec!["abc".to_string(), "def".to_string(),]);
+        assert_eq!(
+            collection.cmdline,
+            vec![
+                "console.shell=true".to_string(),
+                "kernel.enable-debugging-syscalls=true".to_string(),
+                "kernel.enable-serial-syscalls=true".to_string(),
+                "netsvc.all-features=true".to_string(),
+                "netsvc.disable=false".to_string()
+            ]
+        );
     }
 }
