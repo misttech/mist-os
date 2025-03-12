@@ -537,28 +537,9 @@ group("core_realm_shards_allowlist") {
 group("legacy_bundle_allowlist") {
   visibility = []
 
-  # Owned closely by the assembly team.
   visibility += [
-    "//build/images/*",
-    "//src/tests/assembly/assemble_image/*",
-    "//vendor/google/*",
-  ]
-
-  # These are all tests that should ideally not be using a legacy bundle.
-  visibility += [
-    "//build/testing/boot_tests:*",
-    "//src/security/lib/scrutiny/collector:*",
-    "//src/security/lib/scrutiny/tests/structured_config:*",
-    "//src/security/tests/pkg_test/tests:*",
-    "//src/sys/component_manager/tests/bootfs_launching_benchmark:*",
-    "//src/sys/component_manager/tests/fuchsia_boot_resolver:*",
-    "//src/tests/early-boot-coverage/*",
-    "//src/tests/limited_netsvc/image:*",
-    "//third_party/network-conformance/images:*",
-    "//zircon/kernel/lib/userabi/userboot/tests:*",
-    "//zircon/kernel/phys/test/debugdata-propagation:*",
-    "//zircon/system/ulib/c/test:*",
-    "//zircon/system/ulib/uart/test/interrupt-test:*",
-    "//zircon/system/utest/core:*",
+    # Owned closely by the assembly team.
+    "//build/images/bringup:*",
+    "//build/images/fuchsia:*",
   ]
 }
