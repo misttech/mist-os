@@ -41,10 +41,7 @@ zx::result<> TiTca6408aDevice::Start() {
                             compat::ForwardMetadata::Some(
                                 {// TODO(b/395140408): Don't forward
                                  // DEVICE_METADATA_SCHEDULER_ROLE_NAME once no longer retrieved.
-                                 DEVICE_METADATA_SCHEDULER_ROLE_NAME,
-                                 // TODO(b/388305889): Don't forward DEVICE_METADATA_GPIO_CONTROLLER
-                                 // once no longer retrieved.
-                                 DEVICE_METADATA_GPIO_CONTROLLER}))
+                                 DEVICE_METADATA_SCHEDULER_ROLE_NAME}))
                 .is_ok());
 
   device_ = std::make_unique<TiTca6408a>(std::move(i2c));

@@ -100,7 +100,7 @@ fuchsia_cc_driver("test-gpio-driver") {
     "//sdk/fidl/fuchsia.hardware.pinimpl:fuchsia.hardware.pinimpl_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
-    "//src/lib/ddk:ddk_metadata",
+    "//sdk/lib/driver/metadata/cpp",
     "//zircon/system/ulib/zx",
   ]
 }

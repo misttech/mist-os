@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.pinimpl/cpp/driver/fidl.h>
-#include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/driver/metadata/cpp/metadata_server.h>
 
 #include <array>
 #include <memory>
@@ -54,18 +54,28 @@ class TestGpioDriver : public fdf::DriverBase,
   fdf::ServerBindingGroup<fuchsia_hardware_pinimpl::PinImpl> bindings_;
   compat::SyncInitializedDeviceServer compat_server_;
   fidl::ClientEnd<fuchsia_driver_framework::NodeController> child_;
+  fdf_metadata::MetadataServer<fuchsia_hardware_pinimpl::Metadata> pin_metadata_server_;
 };
 
 zx::result<> TestGpioDriver::Start() {
   {
-    zx::result<> result =
-        compat_server_.Initialize(incoming(), outgoing(), node_name(), kChildNodeName,
-                                  // TODO(b/388305889): Don't forward
-                                  // DEVICE_METADATA_GPIO_CONTROLLER once no longer retrieved.
-                                  compat::ForwardMetadata::Some({DEVICE_METADATA_GPIO_CONTROLLER}));
+    zx::result<> result = compat_server_.Initialize(
+        incoming(), outgoing(), node_name(), kChildNodeName, compat::ForwardMetadata::None());
     if (result.is_error()) {
       return result.take_error();
     }
+  }
+
+  zx::result pdev = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
+  if (zx::result result = pin_metadata_server_.SetMetadataFromPDevIfExists(pdev.value());
+      result.is_error()) {
+    FDF_LOG(ERROR, "Failed to set SPI metadata from platform device: %s", result.status_string());
+    return result.take_error();
+  }
+  if (zx::result result = pin_metadata_server_.Serve(*outgoing(), dispatcher());
+      result.is_error()) {
+    FDF_LOG(ERROR, "Failed to serve SPI metadata: %s", result.status_string());
+    return result.take_error();
   }
 
   {
@@ -82,6 +92,7 @@ zx::result<> TestGpioDriver::Start() {
 
   std::vector offers = compat_server_.CreateOffers2();
   offers.push_back(fdf::MakeOffer2<fuchsia_hardware_pinimpl::Service>());
+  offers.push_back(pin_metadata_server_.MakeOffer());
   zx::result child =
       AddChild(kChildNodeName, std::vector<fuchsia_driver_framework::NodeProperty2>{}, offers);
   if (child.is_error()) {

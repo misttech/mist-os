@@ -8,6 +8,7 @@
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/metadata/cpp/metadata.h>
 #include <lib/driver/node/cpp/add_child.h>
 #include <lib/fit/defer.h>
 #include <zircon/types.h>
@@ -327,23 +328,19 @@ void GpioDevice::DevfsConnect(fidl::ServerEnd<fuchsia_hardware_pin::Debug> serve
 void GpioRootDevice::Start(fdf::StartCompleter completer) {
   uint32_t controller_id = 0;
 
-  fidl::Arena arena;
-
   std::optional<fuchsia_hardware_pinimpl::Metadata> metadata;
   {
-    zx::result result = compat::GetMetadata<fuchsia_hardware_pinimpl::Metadata>(
-        incoming(), DEVICE_METADATA_GPIO_CONTROLLER);
+    zx::result result =
+        fdf_metadata::GetMetadataIfExists<fuchsia_hardware_pinimpl::Metadata>(incoming());
     if (result.is_error()) {
-      if (result.status_value() == ZX_ERR_NOT_FOUND) {
-        FDF_LOG(INFO, "No gpio metadata provided");
-      } else {
-        FDF_LOG(ERROR, "Failed to decode metadata: %s", result.status_string());
-        completer(result.take_error());
-        return;
-      }
-    } else {
-      metadata.emplace(std::move(result.value()));
+      FDF_LOG(ERROR, "Failed to get metadata: %s", result.status_string());
+      completer(result.take_error());
+      return;
     }
+    if (!result.value().has_value()) {
+      FDF_LOG(INFO, "No gpio metadata provided");
+    }
+    metadata = std::move(result.value());
   }
 
   if (metadata.has_value() && metadata->controller_id().has_value()) {
