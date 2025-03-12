@@ -20,7 +20,7 @@ use ffx_target::Description;
 use fidl::prelude::*;
 use fidl_fuchsia_developer_ffx::{
     self as ffx, DaemonError, DaemonMarker, DaemonRequest, DaemonRequestStream,
-    RepositoryRegistryMarker, TargetCollectionMarker, VersionInfo,
+    TargetCollectionMarker, VersionInfo,
 };
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
 use fidl_fuchsia_overnet_protocol::NodeId;
@@ -435,13 +435,11 @@ impl Daemon {
 
     async fn start_protocols(&mut self) -> Result<()> {
         let cx = protocols::Context::new(self.clone());
-        let ((), ()) = futures::future::try_join(
-            self.protocol_register
-                .start(RepositoryRegistryMarker::PROTOCOL_NAME.to_string(), cx.clone()),
-            self.protocol_register.start(TargetCollectionMarker::PROTOCOL_NAME.to_string(), cx),
-        )
-        .await?;
-        Ok(())
+
+        self.protocol_register
+            .start(TargetCollectionMarker::PROTOCOL_NAME.to_string(), cx)
+            .await
+            .map_err(Into::into)
     }
 
     /// Awaits a target that has RCS active.
