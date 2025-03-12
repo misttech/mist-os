@@ -17,7 +17,6 @@
             protocol: [
                 "fuchsia.net.filter.Control",
                 "fuchsia.net.filter.State",
-                "fuchsia.net.ndp.RouterAdvertisementOptionWatcherProvider",
                 "fuchsia.net.root.Filter",
             ],
         },
@@ -40,7 +39,6 @@
             protocol: [
                 "fuchsia.net.filter.Control",
                 "fuchsia.net.filter.State",
-                "fuchsia.net.ndp.RouterAdvertisementOptionWatcherProvider",
                 "fuchsia.net.root.Filter",
             ],
             from: "self",
