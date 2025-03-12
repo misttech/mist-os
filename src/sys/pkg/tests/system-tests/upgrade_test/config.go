@@ -54,7 +54,7 @@ func newConfig(fs *flag.FlagSet) (*config, error) {
 
 	fs.DurationVar(&c.paveTimeout, "pave-timeout", 5*time.Minute, "Err if a pave takes longer than this time (default is 5 minutes)")
 	fs.UintVar(&c.cycleCount, "cycle-count", 1, "How many cycles to run the test before completing (default is 1)")
-	fs.DurationVar(&c.cycleTimeout, "cycle-timeout", 20*time.Minute, "Err if a test cycle takes longer than this time (default is 10 minutes)")
+	fs.DurationVar(&c.cycleTimeout, "cycle-timeout", 20*time.Minute, "Err if a test cycle takes longer than this time (default is 20 minutes)")
 	fs.BoolVar(&c.useFlash, "use-flash", false, "Provision device using flashing instead of paving")
 	fs.UintVar(&c.downgradeOTAAttempts, "downgrade-ota-attempts", 1, "Number of times to try to OTA from the downgrade build to the upgrade build before failing.")
 	fs.StringVar(&c.bootfsCompression, "bootfs-compression", "zstd.max", "compress storage images, default is zstd.max")
