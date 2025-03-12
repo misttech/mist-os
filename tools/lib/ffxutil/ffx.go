@@ -665,7 +665,23 @@ func (f *FFXInstance) RunAndGetOutput(ctx context.Context, args ...string) (stri
 
 func (f *FFXInstance) StartDaemon(ctx context.Context, daemonLog *os.File) *exec.Cmd {
 	args := []string{"daemon", "start"}
-	cmd := f.invoker(args).setStdout(daemonLog).setNoMachine().cmd()
+	// Special-case the daemon handling, since it's the one command where we want to redirect the stdout,
+	// _instead_ of specifying "-o ffx.log"
+	invoker := f.invoker(args)
+	ffx_cmd := invoker.ffx.cmdBuilder.command(f.ffxPath, false, args)
+	// Strip out the "--machine json" and "-o file" flags
+	for i, arg := range ffx_cmd {
+		if arg == "--machine" || arg == "-o" {
+			// Note: i+2 because we want to remove both "--machine"
+			// and the following arg
+			ffx_cmd = append(ffx_cmd[:i], ffx_cmd[i+2:]...)
+		}
+	}
+
+	cmd := f.runner.Command(ffx_cmd, subprocess.RunOptions{
+		Stdout: daemonLog,
+		Stderr: f.stderr,
+	})
 	logger.Debugf(ctx, "%s", cmd.Args)
 	return cmd
 }
@@ -685,7 +701,10 @@ func (f *FFXInstance) WaitForDaemon(ctx context.Context) error {
 	// has delays (b/330228364), so let's keep trying for 10 seconds instead of just 3, in order
 	// to address an occasional failure when the daemon doesn't respond quickly (b/316626057)
 	err := retry.Retry(ctx, retry.WithMaxAttempts(retry.NewConstantBackoff(time.Second), 10), func() error {
-		return f.RunWithTimeout(ctx, 0, "daemon", "echo")
+		// "ffx daemon echo" _does_ support "--machine json", but when it is specified, the error comes
+		// on stdout, so tefmo catches it despite the redirection of stderr. To preserve the redirection,
+		// we'll tell the invoker to use "--machine".
+		return f.invoker([]string{"daemon", "echo"}).setTimeout(0).setNoMachine().run(ctx)
 	}, nil)
 	if err != nil {
 		logger.Warningf(ctx, "failed to echo daemon: %s", output.String())
