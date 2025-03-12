@@ -35,19 +35,19 @@
             to: [ "#test" ],
         },
         {
-            directory: "dev-class",
+            service: "fuchsia.gpu.magma.Service",
             from: "parent",
             to: [ "#test" ],
         },
         {
+            config: "fuchsia.gpu.test.GpuVendorId",
             from: "self",
             to: "#test",
-            config: "fuchsia.gpu.test.GpuVendorId",
         },
         {
+            config: "fuchsia.gpu.test.GpuDriverUrl",
             from: "self",
             to: "#test",
-            config: "fuchsia.gpu.test.GpuDriverUrl",
         },
     ],
     expose: [

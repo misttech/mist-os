@@ -37,8 +37,8 @@ class TestDeviceBase {
   }
 
   void InitializeFromVendorId(uint64_t id) {
-    for (auto& p : std::filesystem::directory_iterator("/dev/class/gpu")) {
-      InitializeFromFileName(p.path().c_str());
+    for (auto& p : std::filesystem::directory_iterator("/svc/fuchsia.gpu.magma.Service")) {
+      InitializeFromFileName((static_cast<std::string>(p.path()) + "/device").c_str());
       uint64_t vendor_id;
       magma_status_t magma_status =
           magma_device_query(device_, MAGMA_QUERY_VENDOR_ID, NULL, &vendor_id);
@@ -76,9 +76,9 @@ class TestDeviceBase {
     // Loop until a new device with the correct specs is found.
     auto deadline_time = zx::clock::get_monotonic() + zx::sec(5);
     while (!found_device && zx::clock::get_monotonic() < deadline_time) {
-      for (auto& p : std::filesystem::directory_iterator("/dev/class/gpu")) {
-        auto magma_client =
-            component::Connect<fuchsia_gpu_magma::TestDevice>(static_cast<std::string>(p.path()));
+      for (auto& p : std::filesystem::directory_iterator("/svc/fuchsia.gpu.magma.Service")) {
+        auto magma_client = component::Connect<fuchsia_gpu_magma::TestDevice>(
+            static_cast<std::string>(p.path()) + "/device");
 
         magma_device_t device;
         EXPECT_EQ(MAGMA_STATUS_OK,
