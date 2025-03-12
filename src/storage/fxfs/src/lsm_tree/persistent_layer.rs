@@ -74,6 +74,7 @@ use anyhow::{anyhow, bail, ensure, Context, Error};
 use async_trait::async_trait;
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt};
 use fprint::TypeFingerprint;
+use fuchsia_sync::Mutex;
 use rand::Rng as _;
 use serde::{Deserialize, Serialize};
 use static_assertions::const_assert;
@@ -81,7 +82,7 @@ use std::cmp::Ordering;
 use std::io::{Read, Write as _};
 use std::marker::PhantomData;
 use std::ops::Bound;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 const PERSISTENT_LAYER_MAGIC: &[u8; 8] = b"FxfsLayr";
 
@@ -697,12 +698,11 @@ impl<K: Key, V: LayerValue> Layer<K, V> for PersistentLayer<K, V> {
     }
 
     fn lock(&self) -> Option<Arc<DropEvent>> {
-        self.close_event.lock().unwrap().clone()
+        self.close_event.lock().clone()
     }
 
     async fn close(&self) {
-        let listener =
-            self.close_event.lock().unwrap().take().expect("close already called").listen();
+        let listener = self.close_event.lock().take().expect("close already called").listen();
         listener.await;
     }
 

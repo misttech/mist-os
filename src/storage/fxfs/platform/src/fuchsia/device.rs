@@ -9,6 +9,7 @@ use block_client::{BlockFifoRequest, BlockFifoResponse};
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_hardware_block_volume::{self as volume, VolumeMarker, VolumeRequest};
 use fuchsia_async::{self as fasync, FifoReadable, FifoWritable};
+use fuchsia_sync::Mutex;
 use futures::stream::TryStreamExt;
 use futures::try_join;
 use fxfs::errors::FxfsError;
@@ -16,7 +17,6 @@ use fxfs::round::{round_down, round_up};
 use rustc_hash::FxHashMap as HashMap;
 use std::collections::BTreeMap;
 use std::hash::{Hash, Hasher};
-use std::sync::Mutex;
 use vfs::file::File;
 use vfs::node::Node;
 use {fidl_fuchsia_hardware_block as block, fidl_fuchsia_io as fio};
@@ -134,7 +134,7 @@ impl BlockServer {
 
     // Returns a VMO id that is currently not being used
     fn get_vmo_id(&self, vmo: zx::Vmo) -> Option<u16> {
-        let mut vmos = self.vmos.lock().unwrap();
+        let mut vmos = self.vmos.lock();
         let mut prev_id = 0;
         for &id in vmos.keys() {
             if id != prev_id + 1 {
@@ -160,7 +160,7 @@ impl BlockServer {
         let block_size = self.file.get_block_size();
 
         let data = {
-            let vmos = self.vmos.lock().unwrap();
+            let vmos = self.vmos.lock();
             let vmo = vmos.get(&request.vmoid).ok_or(FxfsError::NotFound)?;
             let mut buffer = vec![0u8; (request.length as u64 * block_size) as usize];
             vmo.read(&mut buffer[..], request.vmo_offset * block_size)?;
@@ -184,7 +184,7 @@ impl BlockServer {
         // Fill in the rest of the buffer if bytes_read is less than the requested amount
         buffer[bytes_read as usize..].fill(0);
 
-        let vmos = self.vmos.lock().unwrap();
+        let vmos = self.vmos.lock();
         let vmo = vmos.get(&request.vmoid).ok_or(FxfsError::NotFound)?;
         vmo.write(&buffer[..], request.vmo_offset * block_size)?;
 
@@ -199,7 +199,7 @@ impl BlockServer {
 
         match block_client::BlockOpcode::from_primitive(request.command.opcode) {
             Some(block_client::BlockOpcode::CloseVmo) => {
-                let mut vmos = self.vmos.lock().unwrap();
+                let mut vmos = self.vmos.lock();
                 match vmos.remove(&request.vmoid) {
                     Some(_vmo) => zx::sys::ZX_OK,
                     None => zx::sys::ZX_ERR_NOT_FOUND,
@@ -229,7 +229,7 @@ impl BlockServer {
         // Set up the BlockFifoResponse for this request, but do no process request yet
         let mut maybe_reply = {
             if is_group {
-                let mut groups = self.message_groups.lock().unwrap();
+                let mut groups = self.message_groups.lock();
                 if wants_reply {
                     let mut group = groups.remove(request.group);
                     group.increment_count();
@@ -265,7 +265,7 @@ impl BlockServer {
             match &mut maybe_reply {
                 None => {
                     // maybe_reply will only be None if it's part of a group request
-                    self.message_groups.lock().unwrap().get(request.group).set_status(status);
+                    self.message_groups.lock().get(request.group).set_status(status);
                 }
                 Some(reply) => {
                     reply.status = status;
@@ -298,7 +298,7 @@ impl BlockServer {
                     .try_for_each(|request| async {
                         let () = match request {
                             block::SessionRequest::GetFifo { responder } => {
-                                match self.maybe_server_fifo.lock().unwrap().take() {
+                                match self.maybe_server_fifo.lock().take() {
                                     Some(fifo) => responder.send(Ok(fifo.downcast()))?,
                                     None => {
                                         responder.send(Err(zx::Status::NO_RESOURCES.into_raw()))?
@@ -465,7 +465,7 @@ impl BlockServer {
         let channel_future = async {
             self.handle_requests(server).await?;
             // This is temporary for when client doesn't call for fifo
-            self.maybe_server_fifo.lock().unwrap().take();
+            self.maybe_server_fifo.lock().take();
             Ok(())
         };
 

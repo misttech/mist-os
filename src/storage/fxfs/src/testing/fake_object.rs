@@ -6,9 +6,10 @@ use crate::object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle};
 use crate::object_store::journal::JournalHandle;
 use anyhow::Error;
 use async_trait::async_trait;
+use fuchsia_sync::Mutex;
 use std::cmp::min;
 use std::ops::Range;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use storage_device::buffer::{BufferFuture, BufferRef, MutableBufferRef};
 use storage_device::buffer_allocator::{BufferAllocator, BufferSource};
 
@@ -22,7 +23,7 @@ impl FakeObject {
     }
 
     fn read(&self, offset: u64, mut buf: MutableBufferRef<'_>) -> Result<usize, Error> {
-        let our_buf = self.buf.lock().unwrap();
+        let our_buf = self.buf.lock();
         let to_do = min(buf.len(), our_buf.len() - offset as usize);
         buf.as_mut_slice()[0..to_do]
             .copy_from_slice(&our_buf[offset as usize..offset as usize + to_do]);
@@ -30,7 +31,7 @@ impl FakeObject {
     }
 
     fn write_or_append(&self, offset: Option<u64>, buf: BufferRef<'_>) -> Result<u64, Error> {
-        let mut our_buf = self.buf.lock().unwrap();
+        let mut our_buf = self.buf.lock();
         let offset = offset.unwrap_or(our_buf.len() as u64);
         let required_len = offset as usize + buf.len();
         if our_buf.len() < required_len {
@@ -41,11 +42,11 @@ impl FakeObject {
     }
 
     fn truncate(&self, size: u64) {
-        self.buf.lock().unwrap().resize(size as usize, 0);
+        self.buf.lock().resize(size as usize, 0);
     }
 
     pub fn get_size(&self) -> u64 {
-        self.buf.lock().unwrap().len() as u64
+        self.buf.lock().len() as u64
     }
 }
 

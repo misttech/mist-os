@@ -25,12 +25,13 @@ use async_trait::async_trait;
 use event_listener::Event;
 use fuchsia_async as fasync;
 use fuchsia_inspect::{NumericProperty as _, UintProperty};
+use fuchsia_sync::Mutex;
 use futures::FutureExt;
 use fxfs_crypto::Crypt;
 use once_cell::sync::OnceCell;
 use static_assertions::const_assert;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Weak};
 use storage_device::{Device, DeviceHolder};
 
 pub const MIN_BLOCK_SIZE: u64 = 4096;
@@ -530,7 +531,7 @@ impl FxFilesystem {
         assert_eq!(self.closed.swap(true, Ordering::SeqCst), false);
         self.shutdown_event.notify(usize::MAX);
         debug_assert_not_too_long!(self.graveyard.wait_for_reap());
-        let trim_task = self.trim_task.lock().unwrap().take();
+        let trim_task = self.trim_task.lock().take();
         if let Some(task) = trim_task {
             debug_assert_not_too_long!(task);
         }
@@ -549,7 +550,7 @@ impl FxFilesystem {
             Err(e) => error!(error:? = e; "Failed to sync filesystem; data may be lost"),
         }
         self.journal.terminate();
-        let flush_task = self.flush_task.lock().unwrap().take();
+        let flush_task = self.flush_task.lock().take();
         if let Some(task) = flush_task {
             debug_assert_not_too_long!(task);
         }
@@ -707,7 +708,7 @@ impl FxFilesystem {
     }
 
     fn maybe_start_flush_task(&self) {
-        let mut flush_task = self.flush_task.lock().unwrap();
+        let mut flush_task = self.flush_task.lock();
         if flush_task.is_none() {
             let journal = self.journal.clone();
             *flush_task = Some(fasync::Task::spawn(journal.flush_task()));
@@ -752,7 +753,7 @@ impl FxFilesystem {
         }
         let this = self.clone();
         let mut next_timer = delay;
-        *self.trim_task.lock().unwrap() = Some(fasync::Task::spawn(async move {
+        *self.trim_task.lock() = Some(fasync::Task::spawn(async move {
             loop {
                 let shutdown_listener = this.shutdown_event.listen();
                 // Note that we need to check if the filesystem was closed after we start listening
@@ -963,12 +964,13 @@ mod tests {
     use crate::object_store::{HandleOptions, ObjectDescriptor, ObjectStore, NO_OWNER};
     use crate::range::RangeExt;
     use fuchsia_async as fasync;
+    use fuchsia_sync::Mutex;
     use futures::future::join_all;
     use futures::stream::{FuturesUnordered, TryStreamExt};
     use fxfs_insecure_crypto::InsecureCrypt;
     use rustc_hash::FxHashMap as HashMap;
     use std::ops::Range;
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
     use std::time::Duration;
     use storage_device::fake_device::FakeDevice;
     use storage_device::DeviceHolder;
@@ -1039,7 +1041,7 @@ mod tests {
             }
 
             fn push(&self, operation: Operation, item: &Item<K, V>) {
-                self.0.lock().unwrap().push((operation, item.clone()));
+                self.0.lock().push((operation, item.clone()));
             }
         }
 
@@ -1056,10 +1058,7 @@ mod tests {
                 })
                 .on_new_store(move |store| {
                     let mutations = Arc::new(Mutations::new());
-                    object_mutations
-                        .lock()
-                        .unwrap()
-                        .insert(store.store_object_id(), mutations.clone());
+                    object_mutations.lock().insert(store.store_object_id(), mutations.clone());
                     store.tree().set_mutation_callback(Some(Box::new(move |op, item| {
                         mutations.push(op, item)
                     })));
@@ -1147,12 +1146,12 @@ mod tests {
         )
         .await;
 
-        let m1 = object_mutations.lock().unwrap();
-        let m2 = replayed_object_mutations.lock().unwrap();
+        let m1 = object_mutations.lock();
+        let m2 = replayed_object_mutations.lock();
         assert_eq!(m1.len(), m2.len());
         for (store_id, mutations) in &*m1 {
-            let mutations = mutations.0.lock().unwrap();
-            let replayed = m2.get(&store_id).expect("Found unexpected store").0.lock().unwrap();
+            let mutations = mutations.0.lock();
+            let replayed = m2.get(&store_id).expect("Found unexpected store").0.lock();
             assert_eq!(mutations.len(), replayed.len());
             for ((op1, i1), (op2, i2)) in mutations.iter().zip(replayed.iter()) {
                 assert_eq!(op1, op2);
@@ -1162,8 +1161,8 @@ mod tests {
             }
         }
 
-        let a1 = allocator_mutations.0.lock().unwrap();
-        let a2 = replayed_allocator_mutations.0.lock().unwrap();
+        let a1 = allocator_mutations.0.lock();
+        let a2 = replayed_allocator_mutations.0.lock();
         assert_eq!(a1.len(), a2.len());
         for ((op1, i1), (op2, i2)) in a1.iter().zip(a2.iter()) {
             assert_eq!(op1, op2);

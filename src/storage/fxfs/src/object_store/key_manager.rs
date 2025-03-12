@@ -7,13 +7,14 @@ use crate::log::*;
 use crate::object_store::{FSCRYPT_KEY_ID, VOLUME_DATA_KEY_ID};
 use anyhow::Error;
 use event_listener::Event;
+use fuchsia_sync::Mutex;
 use fxfs_crypto::{CipherSet, Crypt, FindKeyResult, Key, UnwrappedKeys, WrappedKeys};
 use scopeguard::ScopeGuard;
 use std::cell::UnsafeCell;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::future::Future;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 use {fuchsia_async as fasync, zx_status as zx};
 
@@ -113,7 +114,7 @@ impl Inner {
             fasync::Task::spawn(async move {
                 loop {
                     fasync::Timer::new(PURGE_TIMEOUT).await;
-                    let mut inner = inner.lock().unwrap();
+                    let mut inner = inner.lock();
                     if inner.keys.purge() {
                         inner.purge_task = None;
                         break;
@@ -148,7 +149,7 @@ impl UnwrapResult {
         permanent: bool,
         result: Result<Option<Arc<CipherSet>>, zx::Status>,
     ) -> bool {
-        let mut guard = inner.lock().unwrap();
+        let mut guard = inner.lock();
         // SAFETY: Safe because we hold the lock on `inner`.
         let cancelled = unsafe { *self.cancelled.get() };
         let set_error = |error| {
@@ -201,7 +202,7 @@ impl KeyManager {
     pub async fn get(&self, object_id: u64) -> Result<Option<Key>, Error> {
         loop {
             let (unwrap_result, listener) = {
-                let mut inner = self.inner.lock().unwrap();
+                let mut inner = self.inner.lock();
 
                 if let Some(keys) = inner.keys.get(object_id) {
                     return match keys.find_key(VOLUME_DATA_KEY_ID) {
@@ -245,7 +246,7 @@ impl KeyManager {
 
         loop {
             let listener = {
-                let mut inner = inner.lock().unwrap();
+                let mut inner = inner.lock();
 
                 if !force {
                     if let Some(keys) = inner.keys.get(object_id) {
@@ -401,7 +402,7 @@ impl KeyManager {
     /// This inserts the keys into the cache.  Any existing keys will be overwritten.  It's
     /// unspecified what happens if keys for the object are currently being unwrapped.
     pub fn insert(&self, object_id: u64, keys: impl ToCipherSet, permanent: bool) {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         inner.keys.insert(object_id, keys.to_cipher_set(), permanent);
         inner.start_purge_task(&self.inner);
     }
@@ -414,7 +415,7 @@ impl KeyManager {
         object_id: u64,
         merge: impl FnOnce(Option<&Arc<CipherSet>>) -> Arc<CipherSet>,
     ) {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         inner.keys.merge(object_id, merge);
         inner.start_purge_task(&self.inner);
     }
@@ -423,7 +424,7 @@ impl KeyManager {
     /// task that might be running to fetch keys will have finished.
     pub fn remove(&self, object_id: u64) -> impl Future<Output = ()> {
         {
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self.inner.lock();
             inner.keys.remove(object_id);
             if let Some(u) = inner.unwrapping.get(&object_id) {
                 // SAFETY: Safe because of lock on `inner`.
@@ -433,7 +434,7 @@ impl KeyManager {
         let inner = self.inner.clone();
         async move {
             let listener = {
-                if let Some(u) = inner.lock().unwrap().unwrapping.get(&object_id) {
+                if let Some(u) = inner.lock().unwrapping.get(&object_id) {
                     u.event.listen()
                 } else {
                     return;
@@ -445,7 +446,7 @@ impl KeyManager {
 
     /// This clears the caches of all keys.
     pub fn clear(&self) {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         inner.keys.clear();
         inner.unwrapping.clear();
     }

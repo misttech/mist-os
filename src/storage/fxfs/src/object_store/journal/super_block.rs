@@ -48,6 +48,7 @@ use crate::serialized_types::{
 use anyhow::{bail, ensure, Context, Error};
 use fprint::TypeFingerprint;
 use fuchsia_inspect::{Property as _, UintProperty};
+use fuchsia_sync::Mutex;
 use futures::FutureExt;
 use rustc_hash::FxHashMap as HashMap;
 use serde::{Deserialize, Serialize};
@@ -55,7 +56,7 @@ use std::collections::VecDeque;
 use std::fmt;
 use std::io::{Read, Write};
 use std::ops::Range;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::SystemTime;
 use storage_device::Device;
 use uuid::Uuid;
@@ -403,7 +404,7 @@ impl SuperBlockManager {
             }
         };
         info!(super_block:?, current_super_block:?; "loaded super-block");
-        *self.next_instance.lock().unwrap() = current_super_block.next();
+        *self.next_instance.lock() = current_super_block.next();
         Ok((super_block, root_parent))
     }
 
@@ -417,7 +418,7 @@ impl SuperBlockManager {
     ) -> Result<(), Error> {
         let root_store = filesystem.root_store();
         let object_id = {
-            let mut next_instance = self.next_instance.lock().unwrap();
+            let mut next_instance = self.next_instance.lock();
             let object_id = next_instance.object_id();
             *next_instance = next_instance.next();
             object_id

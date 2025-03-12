@@ -12,6 +12,7 @@ use anyhow::{bail, Error};
 use either::{Left, Right};
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
+use fuchsia_sync::Mutex;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use fxfs::errors::FxfsError;
@@ -22,7 +23,7 @@ use fxfs::object_store::transaction::{lock_keys, LockKey, Options, Transaction};
 use fxfs::object_store::{self, Directory, ObjectDescriptor, ObjectStore, Timestamp};
 use fxfs_macros::ToWeakNode;
 use std::any::Any;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use vfs::directory::dirents_sink::{self, AppendResult, Sink};
 use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
 use vfs::directory::entry_container::{
@@ -89,7 +90,7 @@ impl FxDirectory {
 
     pub fn set_deleted(&self) {
         self.directory.set_deleted();
-        self.watchers.lock().unwrap().send_event(&mut SingleNameEventProducer::deleted());
+        self.watchers.lock().send_event(&mut SingleNameEventProducer::deleted());
     }
 
     async fn lookup(
@@ -308,7 +309,7 @@ impl FxDirectory {
     /// Called to indicate a file or directory was removed from this directory.
     pub(crate) fn did_remove(&self, name: &str) {
         self.directory.owner().dirent_cache().remove(&(self.directory.object_id(), name));
-        self.watchers.lock().unwrap().send_event(&mut SingleNameEventProducer::removed(name));
+        self.watchers.lock().send_event(&mut SingleNameEventProducer::removed(name));
     }
 
     /// Called to indicate a file or directory was added to this directory.
@@ -320,7 +321,7 @@ impl FxDirectory {
                 node,
             );
         }
-        self.watchers.lock().unwrap().send_event(&mut SingleNameEventProducer::added(name));
+        self.watchers.lock().send_event(&mut SingleNameEventProducer::added(name));
     }
 
     /// As per fscrypt, a user cannot link an unencrypted file into an encrypted directory nor can
@@ -579,12 +580,12 @@ impl FxNode for FxDirectory {
     }
 
     fn parent(&self) -> Option<Arc<FxDirectory>> {
-        self.parent.as_ref().map(|p| p.lock().unwrap().clone())
+        self.parent.as_ref().map(|p| p.lock().clone())
     }
 
     fn set_parent(&self, parent: Arc<FxDirectory>) {
         match &self.parent {
-            Some(p) => *p.lock().unwrap() = parent,
+            Some(p) => *p.lock() = parent,
             None => panic!("Called set_parent on root node"),
         }
     }
@@ -1026,8 +1027,7 @@ impl VfsDirectory for FxDirectory {
         mask: fio::WatchMask,
         watcher: DirectoryWatcher,
     ) -> Result<(), zx::Status> {
-        let controller =
-            self.watchers.lock().unwrap().add(scope.clone(), self.clone(), mask, watcher);
+        let controller = self.watchers.lock().add(scope.clone(), self.clone(), mask, watcher);
         if mask.contains(fio::WatchMask::EXISTING) && !self.is_deleted() {
             scope.spawn(async move {
                 let layer_set = self.store().tree().layer_set();
@@ -1058,7 +1058,7 @@ impl VfsDirectory for FxDirectory {
     }
 
     fn unregister_watcher(self: Arc<Self>, key: usize) {
-        self.watchers.lock().unwrap().remove(key);
+        self.watchers.lock().remove(key);
     }
 }
 

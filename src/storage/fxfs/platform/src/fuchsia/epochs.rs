@@ -3,8 +3,9 @@
 // found in the LICENSE file.
 
 use event_listener::Event;
+use fuchsia_sync::RwLock;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 // usize::MAX % EPOCHS_SIZE should be EPOCHS_SIZE - 1.
 const EPOCHS_SIZE: usize = 16;
@@ -61,7 +62,7 @@ impl Epochs {
     /// that we always wait for all references prior to the barrier to finish.
     pub async fn barrier(&self) {
         let (epoch, mut listener) = {
-            let mut inner = self.inner.write().unwrap();
+            let mut inner = self.inner.write();
             let last = inner.last;
             let epoch = if last != inner.first && *inner.counts[last % EPOCHS_SIZE].get_mut() == 0 {
                 last - 1
@@ -75,7 +76,7 @@ impl Epochs {
         };
         loop {
             listener.await;
-            let mut inner = self.inner.write().unwrap();
+            let mut inner = self.inner.write();
             if inner.try_wait(epoch) {
                 return;
             }
@@ -85,7 +86,7 @@ impl Epochs {
 
     /// Adds a reference to the current epoch.
     pub fn add_ref(self: &Arc<Self>) -> RefGuard {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read();
         let epoch = inner.last;
         inner.counts[epoch % EPOCHS_SIZE].fetch_add(1, Ordering::Relaxed);
         RefGuard(self.clone(), epoch)
@@ -97,7 +98,7 @@ pub struct RefGuard(Arc<Epochs>, usize);
 impl Clone for RefGuard {
     fn clone(&self) -> Self {
         {
-            let inner = self.0.inner.read().unwrap();
+            let inner = self.0.inner.read();
             let count = &inner.counts[self.1 % EPOCHS_SIZE];
             count.fetch_add(1, Ordering::Relaxed);
             Self(self.0.clone(), self.1)
@@ -107,14 +108,14 @@ impl Clone for RefGuard {
 
 impl Drop for RefGuard {
     fn drop(&mut self) {
-        let inner = self.0.inner.read().unwrap();
+        let inner = self.0.inner.read();
         let count = &inner.counts[self.1 % EPOCHS_SIZE];
         if count.fetch_sub(1, Ordering::Relaxed) == 1
             && self.1 == inner.first
             && self.1 != inner.last
         {
             std::mem::drop(inner);
-            let mut inner = self.0.inner.write().unwrap();
+            let mut inner = self.0.inner.write();
             let mut first = inner.first.wrapping_add(1);
             while first != inner.last && *inner.counts[first % EPOCHS_SIZE].get_mut() == 0 {
                 first = first.wrapping_add(1);

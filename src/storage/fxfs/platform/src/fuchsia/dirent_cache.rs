@@ -3,12 +3,13 @@
 // found in the LICENSE file.
 
 use crate::fuchsia::node::FxNode;
+use fuchsia_sync::Mutex;
 use fxfs::object_handle::INVALID_OBJECT_ID;
 use linked_hash_map::LinkedHashMap;
 use rustc_hash::FxHasher;
 use std::borrow::Borrow;
 use std::hash::{BuildHasherDefault, Hash, Hasher};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 enum CacheHolder {
     Node(Arc<dyn FxNode>),
@@ -64,19 +65,19 @@ impl DirentCache {
 
     /// Fetch the limit for the cache.
     pub fn limit(&self) -> usize {
-        self.inner.lock().unwrap().limit
+        self.inner.lock().limit
     }
 
     /// Returns the number of elements in the cache.
     pub fn len(&self) -> usize {
-        self.inner.lock().unwrap().lru.len()
+        self.inner.lock().lru.len()
     }
 
     /// Lookup directory entry by name and directory object id.
     pub fn lookup(&self, key: &(u64, &str)) -> Option<Arc<dyn FxNode>> {
         assert_ne!(key.0, INVALID_OBJECT_ID, "Looked up dirent key reserved for timer.");
         if let CacheHolder::Node(node) =
-            self.inner.lock().unwrap().lru.get_refresh(key as &dyn DirentCacheKeyRef)?
+            self.inner.lock().lru.get_refresh(key as &dyn DirentCacheKeyRef)?
         {
             return Some(node.clone());
         }
@@ -86,19 +87,18 @@ impl DirentCache {
     /// Insert an object id for a directory entry.
     pub fn insert(&self, dir_id: u64, name: String, node: Arc<dyn FxNode>) {
         assert_ne!(dir_id, INVALID_OBJECT_ID, "Looked up dirent key reserved for timer.");
-        let _dropped =
-            self.inner.lock().unwrap().insert_internal(dir_id, name, CacheHolder::Node(node));
+        let _dropped = self.inner.lock().insert_internal(dir_id, name, CacheHolder::Node(node));
     }
 
     /// Remove an entry from the cache.
     pub fn remove(&self, key: &(u64, &str)) {
-        let _dropped_item = self.inner.lock().unwrap().lru.remove(key as &dyn DirentCacheKeyRef);
+        let _dropped_item = self.inner.lock().lru.remove(key as &dyn DirentCacheKeyRef);
     }
 
     /// Remove all items from the cache.
     pub fn clear(&self) {
         let _dropped = {
-            let mut this = self.inner.lock().unwrap();
+            let mut this = self.inner.lock();
             this.timer_in_queue = false;
             std::mem::replace(&mut this.lru, create_linked_hash_map())
         };
@@ -109,7 +109,7 @@ impl DirentCache {
         #[allow(clippy::collection_is_never_read)]
         let mut dropped_items;
         {
-            let mut this = self.inner.lock().unwrap();
+            let mut this = self.inner.lock();
 
             this.limit = limit;
             if this.lru.len() <= limit {
@@ -136,7 +136,7 @@ impl DirentCache {
         #[allow(clippy::collection_is_never_read)]
         let mut dropped_items = Vec::new();
         {
-            let mut this = self.inner.lock().unwrap();
+            let mut this = self.inner.lock();
             if this.timer_in_queue {
                 while let CacheHolder::Node(node) = this.lru.pop_front().unwrap().1 {
                     dropped_items.push(node);
@@ -369,9 +369,9 @@ mod tests {
         for i in 0..CACHE_SIZE {
             cache.insert(1, i.to_string(), Arc::new(FakeNode(i as u64)));
         }
-        assert!(cache.inner.lock().unwrap().lru.capacity() >= CACHE_SIZE);
+        assert!(cache.inner.lock().lru.capacity() >= CACHE_SIZE);
         cache.set_limit(8);
-        assert!(cache.inner.lock().unwrap().lru.capacity() < CACHE_SIZE);
+        assert!(cache.inner.lock().lru.capacity() < CACHE_SIZE);
     }
 
     #[fuchsia::test]
@@ -381,11 +381,11 @@ mod tests {
         for i in 0..CACHE_SIZE {
             cache.insert(1, i.to_string(), Arc::new(FakeNode(i as u64)));
         }
-        assert!(cache.inner.lock().unwrap().lru.capacity() >= CACHE_SIZE);
+        assert!(cache.inner.lock().lru.capacity() >= CACHE_SIZE);
         cache.recycle_stale_files();
         cache.recycle_stale_files(); // Remove everything from the cache.
-        assert_eq!(cache.inner.lock().unwrap().lru.len(), 0);
+        assert_eq!(cache.inner.lock().lru.len(), 0);
         cache.set_limit(8);
-        assert!(cache.inner.lock().unwrap().lru.capacity() < CACHE_SIZE);
+        assert!(cache.inner.lock().lru.capacity() < CACHE_SIZE);
     }
 }

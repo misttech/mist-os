@@ -27,12 +27,13 @@ use crate::testing::writer::Writer;
 use anyhow::{Context, Error};
 use assert_matches::assert_matches;
 use fidl_fuchsia_io as fio;
+use fuchsia_sync::Mutex;
 use futures::join;
 use fxfs_crypto::{Crypt, KeyPurpose, WrappedKeys};
 use fxfs_insecure_crypto::InsecureCrypt;
 use mundane::hash::{Digest, Hasher, Sha256};
 use std::ops::Deref;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use storage_device::fake_device::FakeDevice;
 use storage_device::DeviceHolder;
 
@@ -87,7 +88,7 @@ impl FsckTest {
                 } else {
                     println!("Fsck warning: {:?}", &err);
                 }
-                self.errors.lock().unwrap().push(err.clone());
+                self.errors.lock().push(err.clone());
             }),
             ..Default::default()
         };
@@ -109,7 +110,7 @@ impl FsckTest {
         self.filesystem.as_ref().unwrap().deref().clone()
     }
     fn errors(&self) -> Vec<FsckIssue> {
-        self.errors.lock().unwrap().clone()
+        self.errors.lock().clone()
     }
     fn get_crypt(&mut self) -> Arc<InsecureCrypt> {
         self.crypt.get_or_insert_with(|| Arc::new(InsecureCrypt::new())).clone()

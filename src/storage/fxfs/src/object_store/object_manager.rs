@@ -20,12 +20,13 @@ use crate::round::round_div;
 use crate::serialized_types::{Version, LATEST_VERSION};
 use anyhow::{anyhow, bail, ensure, Context, Error};
 use fuchsia_inspect::{Property as _, UintProperty};
+use fuchsia_sync::RwLock;
 use futures::FutureExt as _;
 use once_cell::sync::OnceCell;
 use rustc_hash::FxHashMap as HashMap;
 use std::collections::hash_map::Entry;
 use std::num::Saturating;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 // Data written to the journal eventually needs to be flushed somewhere (typically into layer
 // files).  Here we conservatively assume that could take up to four times as much space as it does
@@ -154,15 +155,15 @@ impl ObjectManager {
     }
 
     pub fn required_reservation(&self) -> u64 {
-        self.inner.read().unwrap().required_reservation()
+        self.inner.read().required_reservation()
     }
 
     pub fn root_parent_store_object_id(&self) -> u64 {
-        self.inner.read().unwrap().root_parent_store_object_id
+        self.inner.read().root_parent_store_object_id
     }
 
     pub fn root_parent_store(&self) -> Arc<ObjectStore> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read();
         inner.stores.get(&inner.root_parent_store_object_id).unwrap().clone()
     }
 
@@ -170,18 +171,18 @@ impl ObjectManager {
         if let Some(on_new_store) = &self.on_new_store {
             on_new_store(&store);
         }
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write();
         let store_id = store.store_object_id();
         inner.stores.insert(store_id, store);
         inner.root_parent_store_object_id = store_id;
     }
 
     pub fn root_store_object_id(&self) -> u64 {
-        self.inner.read().unwrap().root_store_object_id
+        self.inner.read().root_store_object_id
     }
 
     pub fn root_store(&self) -> Arc<ObjectStore> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read();
         inner.stores.get(&inner.root_store_object_id).unwrap().clone()
     }
 
@@ -189,20 +190,20 @@ impl ObjectManager {
         if let Some(on_new_store) = &self.on_new_store {
             on_new_store(&store);
         }
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write();
         let store_id = store.store_object_id();
         inner.stores.insert(store_id, store);
         inner.root_store_object_id = store_id;
     }
 
     pub fn is_system_store(&self, store_id: u64) -> bool {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read();
         store_id == inner.root_store_object_id || store_id == inner.root_parent_store_object_id
     }
 
     /// Returns the store which might or might not be locked.
     pub fn store(&self, store_object_id: u64) -> Option<Arc<ObjectStore>> {
-        self.inner.read().unwrap().stores.get(&store_object_id).cloned()
+        self.inner.read().stores.get(&store_object_id).cloned()
     }
 
     /// This is not thread-safe: it assumes that a store won't be forgotten whilst the loop is
@@ -256,7 +257,7 @@ impl ObjectManager {
         if let Some(on_new_store) = &self.on_new_store {
             on_new_store(&store);
         }
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write();
         let store_object_id = store.store_object_id();
         assert_ne!(store_object_id, inner.root_parent_store_object_id);
         assert_ne!(store_object_id, inner.root_store_object_id);
@@ -265,21 +266,21 @@ impl ObjectManager {
     }
 
     pub fn forget_store(&self, store_object_id: u64) {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write();
         assert_ne!(store_object_id, inner.allocator_object_id);
         inner.stores.remove(&store_object_id);
         inner.reservations.remove(&store_object_id);
     }
 
     pub fn set_allocator(&self, allocator: Arc<Allocator>) {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write();
         assert!(!inner.stores.contains_key(&allocator.object_id()));
         inner.allocator_object_id = allocator.object_id();
         inner.allocator = Some(allocator);
     }
 
     pub fn allocator(&self) -> Arc<Allocator> {
-        self.inner.read().unwrap().allocator.clone().unwrap()
+        self.inner.read().allocator.clone().unwrap()
     }
 
     /// Applies `mutation` to `object` with `context`.
@@ -292,7 +293,7 @@ impl ObjectManager {
     ) -> Result<(), Error> {
         debug!(oid = object_id, mutation:?; "applying mutation");
         let object = {
-            let mut inner = self.inner.write().unwrap();
+            let mut inner = self.inner.write();
             match mutation {
                 Mutation::BeginFlush => {
                     if let Some(entry) = inner.journal_checkpoints.get_mut(&object_id) {
@@ -362,7 +363,7 @@ impl ObjectManager {
     ) -> Result<(), Error> {
         debug!(checkpoint = context.checkpoint.file_offset; "REPLAY");
         let txn_size = {
-            let mut inner = self.inner.write().unwrap();
+            let mut inner = self.inner.write();
             if end_offset > inner.last_end_offset {
                 Some(end_offset - std::mem::replace(&mut inner.last_end_offset, end_offset))
             } else {
@@ -370,12 +371,12 @@ impl ObjectManager {
             }
         };
 
-        let allocator_object_id = self.inner.read().unwrap().allocator_object_id;
+        let allocator_object_id = self.inner.read().allocator_object_id;
 
         for (object_id, mutation) in mutations {
             if let Mutation::UpdateBorrowed(borrowed) = mutation {
                 if let Some(txn_size) = txn_size {
-                    self.inner.write().unwrap().borrowed_metadata_space = borrowed
+                    self.inner.write().borrowed_metadata_space = borrowed
                         .checked_add(reserved_space_from_journal_usage(txn_size))
                         .ok_or(FxfsError::Inconsistent)?;
                 }
@@ -401,7 +402,7 @@ impl ObjectManager {
 
     /// Opens the specified store if it isn't already.  This is *not* thread-safe.
     async fn open_store(&self, parent: &Arc<ObjectStore>, object_id: u64) -> Result<(), Error> {
-        if self.inner.read().unwrap().stores.contains_key(&object_id) {
+        if self.inner.read().stores.contains_key(&object_id) {
             return Ok(());
         }
         let store = ObjectStore::open(parent, object_id, Box::new(TreeCache::new()))
@@ -410,7 +411,7 @@ impl ObjectManager {
         if let Some(on_new_store) = &self.on_new_store {
             on_new_store(&store);
         }
-        assert!(self.inner.write().unwrap().stores.insert(object_id, store).is_none());
+        assert!(self.inner.write().stores.insert(object_id, store).is_none());
         Ok(())
     }
 
@@ -424,7 +425,7 @@ impl ObjectManager {
     ) -> Result<Option<Mutation>, Error> {
         // Record old values so we can see what changes as a result of this transaction.
         let old_amount = self.metadata_reservation().amount();
-        let old_required = self.inner.read().unwrap().required_reservation();
+        let old_required = self.inner.read().required_reservation();
 
         debug!(checkpoint = checkpoint.file_offset; "BEGIN TXN");
         let mutations = transaction.take_mutations();
@@ -441,7 +442,7 @@ impl ObjectManager {
             // or deallocated some data from the metadata reservation, or it might have made a
             // change that means we need to reserve more or less space (e.g. we compacted).
             let new_amount = self.metadata_reservation().amount();
-            let mut inner = self.inner.write().unwrap();
+            let mut inner = self.inner.write();
             let new_required = inner.required_reservation();
             let add = old_amount + new_required;
             let sub = new_amount + old_required;
@@ -456,7 +457,7 @@ impl ObjectManager {
             // This transaction should have had no impact on the metadata reservation or the amount
             // we need to reserve.
             debug_assert_eq!(self.metadata_reservation().amount(), old_amount);
-            debug_assert_eq!(self.inner.read().unwrap().required_reservation(), old_required);
+            debug_assert_eq!(self.inner.read().required_reservation(), old_required);
             None
         })
     }
@@ -470,7 +471,7 @@ impl ObjectManager {
         end_offset: u64,
     ) {
         let reservation = self.metadata_reservation();
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write();
         let journal_usage = end_offset - std::mem::replace(&mut inner.last_end_offset, end_offset);
 
         if journal_usage > inner.max_transaction_size.0 {
@@ -551,7 +552,7 @@ impl ObjectManager {
     /// Returns the journal file offsets that each object depends on and the checkpoint for the
     /// minimum offset.
     pub fn journal_file_offsets(&self) -> (HashMap<u64, u64>, Option<JournalCheckpoint>) {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read();
         let mut min_checkpoint = None;
         let mut offsets = HashMap::default();
         for (&object_id, checkpoint) in &inner.journal_checkpoints {
@@ -574,7 +575,6 @@ impl ObjectManager {
     pub fn journal_checkpoint(&self, object_id: u64) -> Option<JournalCheckpoint> {
         self.inner
             .read()
-            .unwrap()
             .journal_checkpoints
             .get(&object_id)
             .map(|checkpoints| checkpoints.earliest().clone())
@@ -583,7 +583,7 @@ impl ObjectManager {
     /// Returns true if the object identified by `object_id` is known to have updates recorded in
     /// the journal that the object depends upon.
     pub fn needs_flush(&self, object_id: u64) -> bool {
-        self.inner.read().unwrap().journal_checkpoints.contains_key(&object_id)
+        self.inner.read().journal_checkpoints.contains_key(&object_id)
     }
 
     /// Flushes all known objects.  This will then allow the journal space to be freed.
@@ -591,7 +591,7 @@ impl ObjectManager {
     /// Also returns the earliest known version of a struct on the filesystem.
     pub async fn flush(&self) -> Result<Version, Error> {
         let objects = {
-            let inner = self.inner.read().unwrap();
+            let inner = self.inner.read();
             let mut object_ids = inner.journal_checkpoints.keys().cloned().collect::<Vec<_>>();
             // Process objects in reverse sorted order because that will mean we compact the root
             // object store last which will ensure we include the metadata from the compactions of
@@ -618,11 +618,11 @@ impl ObjectManager {
     }
 
     fn object(&self, object_id: u64) -> Option<Arc<dyn JournalingObject>> {
-        self.inner.read().unwrap().object(object_id)
+        self.inner.read().object(object_id)
     }
 
     pub fn init_metadata_reservation(&self) -> Result<(), Error> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read();
         let required = inner.required_reservation();
         ensure!(required >= inner.borrowed_metadata_space, FxfsError::Inconsistent);
         let allocator = inner.allocator.as_ref().cloned().unwrap();
@@ -652,31 +652,31 @@ impl ObjectManager {
     }
 
     pub fn update_reservation(&self, object_id: u64, amount: u64) {
-        self.inner.write().unwrap().reservations.insert(object_id, amount);
+        self.inner.write().reservations.insert(object_id, amount);
     }
 
     pub fn reservation(&self, object_id: u64) -> Option<u64> {
-        self.inner.read().unwrap().reservations.get(&object_id).cloned()
+        self.inner.read().reservations.get(&object_id).cloned()
     }
 
     pub fn set_reserved_space(&self, amount: u64) {
-        self.inner.write().unwrap().reserved_space = amount;
+        self.inner.write().reserved_space = amount;
     }
 
     pub fn last_end_offset(&self) -> u64 {
-        self.inner.read().unwrap().last_end_offset
+        self.inner.read().last_end_offset
     }
 
     pub fn set_last_end_offset(&self, v: u64) {
-        self.inner.write().unwrap().last_end_offset = v;
+        self.inner.write().last_end_offset = v;
     }
 
     pub fn borrowed_metadata_space(&self) -> u64 {
-        self.inner.read().unwrap().borrowed_metadata_space
+        self.inner.read().borrowed_metadata_space
     }
 
     pub fn set_borrowed_metadata_space(&self, v: u64) {
-        self.inner.write().unwrap().borrowed_metadata_space = v;
+        self.inner.write().borrowed_metadata_space = v;
     }
 
     pub fn write_mutation(&self, object_id: u64, mutation: &Mutation, writer: journal::Writer<'_>) {
@@ -684,7 +684,7 @@ impl ObjectManager {
     }
 
     pub fn unlocked_stores(&self) -> Vec<Arc<ObjectStore>> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read();
         let mut stores = Vec::new();
         for store in inner.stores.values() {
             if !store.is_locked() {
@@ -705,7 +705,7 @@ impl ObjectManager {
                 if let Some(this) = this_clone.upgrade() {
                     let (required, borrowed, earliest_checkpoint) = {
                         // TODO(https://fxbug.dev/42069513): Push-back or rate-limit to prevent DoS.
-                        let inner = this.inner.read().unwrap();
+                        let inner = this.inner.read();
                         (
                             inner.required_reservation(),
                             inner.borrowed_metadata_space,
@@ -736,7 +736,7 @@ impl ObjectManager {
     /// we run the risk of there not being enough reserved.  To handle this, if the amount is
     /// significant, we force the journal to borrow the space (using a journal created transaction).
     pub fn needs_borrow_for_journal(&self, checkpoint: u64) -> bool {
-        checkpoint.checked_sub(self.inner.read().unwrap().last_end_offset).unwrap() > 256
+        checkpoint.checked_sub(self.inner.read().last_end_offset).unwrap() > 256
     }
 }
 

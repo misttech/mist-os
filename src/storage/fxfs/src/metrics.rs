@@ -4,10 +4,11 @@
 
 use crate::object_store::ObjectStore;
 use fuchsia_inspect::Node;
+use fuchsia_sync::Mutex;
 use futures::FutureExt;
 use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap as HashMap;
-use std::sync::{Mutex, Weak};
+use std::sync::Weak;
 
 /// Root node to which the filesystem Inspect tree will be attached.
 fn root() -> Node {
@@ -17,7 +18,7 @@ fn root() -> Node {
     #[cfg(not(target_os = "fuchsia"))]
     static FXFS_ROOT_NODE: Lazy<Mutex<Node>> = Lazy::new(|| Mutex::new(Node::default()));
 
-    FXFS_ROOT_NODE.lock().unwrap().clone_weak()
+    FXFS_ROOT_NODE.lock().clone_weak()
 }
 
 /// `fs.detail` node for holding fxfs-specific metrics.
@@ -25,7 +26,7 @@ pub fn detail() -> Node {
     static DETAIL_NODE: Lazy<Mutex<Node>> =
         Lazy::new(|| Mutex::new(root().create_child("fs.detail")));
 
-    DETAIL_NODE.lock().unwrap().clone_weak()
+    DETAIL_NODE.lock().clone_weak()
 }
 
 /// This is held to support unmounting and remounting of an object store. Nodes cannot be recreated,
@@ -37,12 +38,12 @@ pub struct ObjectStoresTracker {
 impl ObjectStoresTracker {
     /// Add a store to be tracked in inspect.
     pub fn register_store(&self, name: &str, store: Weak<ObjectStore>) {
-        self.stores.lock().unwrap().insert(name.to_owned(), store);
+        self.stores.lock().insert(name.to_owned(), store);
     }
 
     /// Stop tracking a store in inspect.
     pub fn unregister_store(&self, name: &str) {
-        self.stores.lock().unwrap().remove(name);
+        self.stores.lock().remove(name);
     }
 }
 
@@ -54,7 +55,7 @@ pub fn object_stores_tracker() -> &'static ObjectStoresTracker {
             async {
                 let inspector = fuchsia_inspect::Inspector::default();
                 let root = inspector.root();
-                for (name, store) in object_stores_tracker().stores.lock().unwrap().iter() {
+                for (name, store) in object_stores_tracker().stores.lock().iter() {
                     let store_arc = match store.upgrade() {
                         Some(store) => store,
                         None => continue,

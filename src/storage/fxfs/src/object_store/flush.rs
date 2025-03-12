@@ -70,7 +70,7 @@ impl ObjectStore {
                         "Flushing failed for store {}, re-locking and trying again.",
                         self.store_object_id()
                     );
-                    let owner = self.lock_state.lock().unwrap().owner();
+                    let owner = self.lock_state.lock().owner();
                     if let Some(owner) = owner {
                         owner
                             .force_lock(&self)
@@ -133,7 +133,7 @@ impl ObjectStore {
         }
 
         let layer_file_sizes =
-            if matches!(&*self.lock_state.lock().unwrap(), LockState::Locked) {
+            if matches!(&*self.lock_state.lock(), LockState::Locked) {
                 self.flush_locked(&txn_guard).await.with_context(|| {
                     format!("Failed to flush object store {}", self.store_object_id)
                 })?;
@@ -150,11 +150,11 @@ impl ObjectStore {
         if trace {
             info!(store_id = self.store_object_id(); "OS: end flush");
         }
-        if let Some(callback) = &*self.flush_callback.lock().unwrap() {
+        if let Some(callback) = &*self.flush_callback.lock() {
             callback(self);
         }
 
-        let mut counters = self.counters.lock().unwrap();
+        let mut counters = self.counters.lock();
         counters.num_flushes += 1;
         counters.last_flush_time = Some(std::time::SystemTime::now());
         if let Some(layer_file_sizes) = layer_file_sizes {
@@ -172,7 +172,6 @@ impl ObjectStore {
         let roll_mutations_key = self
             .mutations_cipher
             .lock()
-            .unwrap()
             .as_ref()
             .map(|cipher| {
                 cipher.offset() >= self.filesystem().options().roll_metadata_key_byte_count
@@ -200,14 +199,14 @@ impl ObjectStore {
                 let mut store_info = self.store.store_info().unwrap();
 
                 // Capture the offset in the cipher stream.
-                let mutations_cipher = self.store.mutations_cipher.lock().unwrap();
+                let mutations_cipher = self.store.mutations_cipher.lock();
                 if let Some(cipher) = mutations_cipher.as_ref() {
                     store_info.mutations_cipher_offset = cipher.offset();
                 }
 
                 // This will capture object IDs that might be in transactions not yet committed.  In
                 // theory, we could do better than this but it's not worth the effort.
-                store_info.last_object_id = self.store.last_object_id.lock().unwrap().id;
+                store_info.last_object_id = self.store.last_object_id.lock().id;
 
                 self.store_info.set(store_info).unwrap();
             }
@@ -346,7 +345,7 @@ impl ObjectStore {
 
         end_transaction
             .commit_with_callback(|_| {
-                let mut store_info = self.store_info.lock().unwrap();
+                let mut store_info = self.store_info.lock();
                 let info = store_info.as_mut().unwrap();
                 info.layers = new_store_info.layers;
                 info.encrypted_mutations_object_id = new_store_info.encrypted_mutations_object_id;
@@ -572,8 +571,7 @@ mod tests {
                     .expect("create_child_file failed");
                 i += 1;
                 transaction.commit().await.expect("commit failed");
-                let cipher_offset =
-                    store.mutations_cipher.lock().unwrap().as_ref().unwrap().offset();
+                let cipher_offset = store.mutations_cipher.lock().as_ref().unwrap().offset();
                 if cipher_offset < last_mutations_cipher_offset {
                     break;
                 }
@@ -624,7 +622,7 @@ mod tests {
             store.unlock(NO_OWNER, Arc::new(InsecureCrypt::new())).await.expect("unlock failed");
 
             // The key should get rolled when we unlock.
-            assert_eq!(store.mutations_cipher.lock().unwrap().as_ref().unwrap().offset(), 0);
+            assert_eq!(store.mutations_cipher.lock().as_ref().unwrap().offset(), 0);
 
             let root_dir = Directory::open(&store, store.root_directory_object_id())
                 .await

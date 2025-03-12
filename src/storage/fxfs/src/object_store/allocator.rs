@@ -117,6 +117,7 @@ use either::Either::{Left, Right};
 use event_listener::EventListener;
 use fprint::TypeFingerprint;
 use fuchsia_inspect::{ArrayProperty, HistogramProperty};
+use fuchsia_sync::Mutex;
 use futures::FutureExt;
 use merge::{filter_marked_for_deletion, filter_tombstones, merge};
 use rustc_hash::FxHasher;
@@ -128,7 +129,7 @@ use std::marker::PhantomData;
 use std::num::Saturating;
 use std::ops::Range;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Weak};
 
 /// This trait is implemented by things that own reservations.
 pub trait ReservationOwner: Send + Sync {
@@ -163,7 +164,7 @@ struct ReservationInner {
 
 impl<T: Borrow<U>, U: ReservationOwner + ?Sized> std::fmt::Debug for ReservationImpl<T, U> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.inner.lock().unwrap().fmt(f)
+        self.inner.lock().fmt(f)
     }
 }
 
@@ -183,19 +184,19 @@ impl<T: Borrow<U> + Clone + Send + Sync, U: ReservationOwner + ?Sized> Reservati
 
     /// Returns the total amount of the reservation, not accounting for anything that might be held.
     pub fn amount(&self) -> u64 {
-        self.inner.lock().unwrap().amount
+        self.inner.lock().amount
     }
 
     /// Adds more to the reservation.
     pub fn add(&self, amount: u64) {
-        self.inner.lock().unwrap().amount += amount;
+        self.inner.lock().amount += amount;
     }
 
     /// Returns the entire amount of the reservation.  The caller is responsible for maintaining
     /// consistency, i.e. updating counters, etc, and there can be no sub-reservations (an assert
     /// will fire otherwise).
     pub fn forget(&self) -> u64 {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         assert_eq!(inner.reserved, 0);
         std::mem::take(&mut inner.amount)
     }
@@ -204,7 +205,7 @@ impl<T: Borrow<U> + Clone + Send + Sync, U: ReservationOwner + ?Sized> Reservati
     /// i.e. updating counters, etc.  This will assert that the amount being forgotten does not
     /// exceed the available reservation amount; the caller should ensure that this is the case.
     pub fn forget_some(&self, amount: u64) {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         inner.amount -= amount;
         assert!(inner.reserved <= inner.amount);
     }
@@ -212,7 +213,7 @@ impl<T: Borrow<U> + Clone + Send + Sync, U: ReservationOwner + ?Sized> Reservati
     /// Returns a partial amount of the reservation. |amount| is passed the |limit| and should
     /// return the amount, which can be zero.
     fn reserve_with(&self, amount: impl FnOnce(u64) -> u64) -> ReservationImpl<&Self, Self> {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         let taken = amount(inner.amount - inner.reserved);
         inner.reserved += taken;
         ReservationImpl::new(self, self.owner_object_id, taken)
@@ -220,7 +221,7 @@ impl<T: Borrow<U> + Clone + Send + Sync, U: ReservationOwner + ?Sized> Reservati
 
     /// Reserves *exactly* amount if possible.
     pub fn reserve(&self, amount: u64) -> Option<ReservationImpl<&Self, Self>> {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         if inner.amount - inner.reserved < amount {
             None
         } else {
@@ -232,7 +233,7 @@ impl<T: Borrow<U> + Clone + Send + Sync, U: ReservationOwner + ?Sized> Reservati
     /// Commits a previously reserved amount from this reservation.  The caller is responsible for
     /// ensuring the amount was reserved.
     pub fn commit(&self, amount: u64) {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         inner.reserved -= amount;
         inner.amount -= amount;
     }
@@ -240,7 +241,7 @@ impl<T: Borrow<U> + Clone + Send + Sync, U: ReservationOwner + ?Sized> Reservati
     /// Returns some of the reservation.
     pub fn give_back(&self, amount: u64) {
         self.owner.borrow().release_reservation(self.owner_object_id, amount);
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         inner.amount -= amount;
         assert!(inner.reserved <= inner.amount);
     }
@@ -252,7 +253,7 @@ impl<T: Borrow<U> + Clone + Send + Sync, U: ReservationOwner + ?Sized> Reservati
         amount: u64,
     ) {
         assert_eq!(self.owner_object_id, other.owner_object_id());
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         if let Some(amount) = inner.amount.checked_sub(amount) {
             inner.amount = amount;
         } else {
@@ -265,7 +266,7 @@ impl<T: Borrow<U> + Clone + Send + Sync, U: ReservationOwner + ?Sized> Reservati
 
 impl<T: Borrow<U>, U: ReservationOwner + ?Sized> Drop for ReservationImpl<T, U> {
     fn drop(&mut self) {
-        let inner = self.inner.get_mut().unwrap();
+        let inner = self.inner.get_mut();
         assert_eq!(inner.reserved, 0);
         let owner_object_id = self.owner_object_id;
         if inner.amount > 0 {
@@ -282,7 +283,7 @@ impl<T: Borrow<U> + Send + Sync, U: ReservationOwner + ?Sized> ReservationOwner
     fn release_reservation(&self, owner_object_id: Option<u64>, amount: u64) {
         // Sub-reservations should belong to the same owner (or lack thereof).
         assert_eq!(owner_object_id, self.owner_object_id);
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         assert!(inner.reserved >= amount, "{} >= {}", inner.reserved, amount);
         inner.reserved -= amount;
     }
@@ -738,7 +739,7 @@ impl<'a> TrimmableExtents<'a> {
 
 impl<'a> Drop for TrimmableExtents<'a> {
     fn drop(&mut self) {
-        let mut inner = self.allocator.inner.lock().unwrap();
+        let mut inner = self.allocator.inner.lock();
         for device_range in std::mem::take(&mut self.extents) {
             inner.strategy.free(device_range.clone()).expect("drop trim extent");
             self.allocator
@@ -803,7 +804,7 @@ impl Allocator {
         committed_marked_for_deletion: bool,
     ) -> Result<impl LayerIterator<AllocatorKey, AllocatorValue>, Error> {
         let marked_for_deletion = {
-            let inner = self.inner.lock().unwrap();
+            let inner = self.inner.lock();
             if committed_marked_for_deletion {
                 &inner.info.marked_for_deletion
             } else {
@@ -820,14 +821,14 @@ impl Allocator {
     /// The index into the array is 'number of blocks'.
     /// The last bucket is a catch-all for larger allocation requests.
     pub fn allocation_size_histogram(&self) -> [u64; 64] {
-        self.inner.lock().unwrap().allocation_size_histogram
+        self.inner.lock().allocation_size_histogram
     }
 
     /// Creates a new (empty) allocator.
     pub async fn create(&self, transaction: &mut Transaction<'_>) -> Result<(), Error> {
         // Mark the allocator as opened before creating the file because creating a new
         // transaction requires a reservation.
-        assert_eq!(std::mem::replace(&mut self.inner.lock().unwrap().opened, true), false);
+        assert_eq!(std::mem::replace(&mut self.inner.lock().opened, true), false);
 
         let filesystem = self.filesystem.upgrade().unwrap();
         let root_store = filesystem.root_store();
@@ -850,7 +851,7 @@ impl Allocator {
         let root_store = filesystem.root_store();
 
         {
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self.inner.lock();
 
             inner.strategy = Box::new(strategy::BestFit::default());
         }
@@ -889,7 +890,7 @@ impl Allocator {
             }
 
             {
-                let mut inner = self.inner.lock().unwrap();
+                let mut inner = self.inner.lock();
 
                 // Check allocated_bytes fits within the device.
                 let mut device_bytes = self.device_size;
@@ -910,7 +911,7 @@ impl Allocator {
                 inner.info = info;
             }
 
-            self.counters.lock().unwrap().persistent_layer_file_sizes = layer_file_sizes;
+            self.counters.lock().persistent_layer_file_sizes = layer_file_sizes;
             self.tree.append_layers(handles).await.context("Failed to append allocator layers")?;
             self.filesystem.upgrade().unwrap().object_manager().update_reservation(
                 self.object_id,
@@ -924,7 +925,7 @@ impl Allocator {
     pub async fn on_replay_complete(self: &Arc<Self>) -> Result<(), Error> {
         // We can assume the device has been flushed.
         {
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self.inner.lock();
             inner.volumes_deleted_pending_sync.clear();
             inner.marked_for_deletion = inner.info.marked_for_deletion.clone();
         }
@@ -937,7 +938,7 @@ impl Allocator {
             return Err(FxfsError::Inconsistent).context("Device appears to contain no free space");
         }
 
-        assert_eq!(std::mem::replace(&mut self.inner.lock().unwrap().opened, true), false);
+        assert_eq!(std::mem::replace(&mut self.inner.lock().opened, true), false);
         Ok(())
     }
 
@@ -951,8 +952,8 @@ impl Allocator {
         layer_set.layers.push((self.temporary_allocations.clone() as Arc<dyn Layer<_, _>>).into());
         self.tree.add_all_layers_to_layer_set(&mut layer_set);
 
-        let overflow_markers = self.inner.lock().unwrap().strategy.overflow_markers();
-        self.inner.lock().unwrap().strategy.reset_overflow_markers();
+        let overflow_markers = self.inner.lock().strategy.overflow_markers();
+        self.inner.lock().strategy.reset_overflow_markers();
 
         let mut to_add = Vec::new();
         let mut merger = layer_set.merger();
@@ -986,13 +987,13 @@ impl Allocator {
             to_add.push(next_range);
             // Avoid taking a lock on inner for every free range.
             if to_add.len() > 100 {
-                let mut inner = self.inner.lock().unwrap();
+                let mut inner = self.inner.lock();
                 for range in to_add.drain(..) {
                     changed |= inner.strategy.force_free(range)?;
                 }
             }
         }
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         for range in to_add {
             changed |= inner.strategy.force_free(range)?;
         }
@@ -1060,7 +1061,7 @@ impl Allocator {
 
             // 'range' is based on the on-disk LSM tree. We need to check against any uncommitted
             // allocations and remove temporarily allocate the range for ourselves.
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self.inner.lock();
 
             while range.start < range.end {
                 let prefix =
@@ -1085,7 +1086,7 @@ impl Allocator {
             }
         }
         {
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self.inner.lock();
 
             assert!(inner.trim_reserved_bytes == 0, "Multiple trims ongoing");
             inner.trim_listener = Some(listener);
@@ -1102,17 +1103,17 @@ impl Allocator {
     pub fn parent_objects(&self) -> Vec<u64> {
         // The allocator tree needs to store a file for each of the layers in the tree, so we return
         // those, since nothing else references them.
-        self.inner.lock().unwrap().info.layers.clone()
+        self.inner.lock().info.layers.clone()
     }
 
     /// Returns all the current owner byte limits (in pairs of `(owner_object_id, bytes)`).
     pub fn owner_byte_limits(&self) -> Vec<(u64, u64)> {
-        self.inner.lock().unwrap().info.limit_bytes.iter().map(|(k, v)| (*k, *v)).collect()
+        self.inner.lock().info.limit_bytes.iter().map(|(k, v)| (*k, *v)).collect()
     }
 
     /// Returns (allocated_bytes, byte_limit) for the given owner.
     pub fn owner_allocation_info(&self, owner_object_id: u64) -> (u64, Option<u64>) {
-        let inner = self.inner.lock().unwrap();
+        let inner = self.inner.lock();
         (
             inner.owner_bytes.get(&owner_object_id).map(|b| b.used_bytes().0).unwrap_or(0u64),
             inner.info.limit_bytes.get(&owner_object_id).copied(),
@@ -1121,7 +1122,7 @@ impl Allocator {
 
     /// Returns owner bytes debug information.
     pub fn owner_bytes_debug(&self) -> String {
-        format!("{:?}", self.inner.lock().unwrap().owner_bytes)
+        format!("{:?}", self.inner.lock().owner_bytes)
     }
 
     fn needs_sync(&self) -> bool {
@@ -1129,7 +1130,7 @@ impl Allocator {
         // committed deallocated bytes, but we might want to trigger a sync if we're low and there
         // happens to be a lot of deallocated bytes as that might mean we can fully satisfy
         // allocation requests.
-        let inner = self.inner.lock().unwrap();
+        let inner = self.inner.lock();
         inner.unavailable_bytes().0 >= self.device_size
     }
 
@@ -1146,7 +1147,7 @@ impl Allocator {
             return;
         }
         // These 2 mutations should behave as though they're a single atomic mutation.
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         inner.remove_reservation(old_owner_object_id, amount);
         inner.add_reservation(None, amount);
     }
@@ -1160,13 +1161,13 @@ impl Allocator {
             async move {
                 let inspector = fuchsia_inspect::Inspector::default();
                 if let Some(this) = this_clone.upgrade() {
-                    let counters = this.counters.lock().unwrap();
+                    let counters = this.counters.lock();
                     let root = inspector.root();
                     root.record_uint("max_extent_size_bytes", this.max_extent_size_bytes);
                     root.record_uint("bytes_total", this.device_size);
                     let (allocated, reserved, used, unavailable) = {
                         // TODO(https://fxbug.dev/42069513): Push-back or rate-limit to prevent DoS.
-                        let inner = this.inner.lock().unwrap();
+                        let inner = this.inner.lock();
                         (
                             inner.allocated_bytes().0,
                             inner.reserved_bytes(),
@@ -1231,7 +1232,7 @@ impl Allocator {
                     }
                     root.record(alloc_sizes);
 
-                    let data = this.inner.lock().unwrap().rebuild_strategy_trigger_histogram;
+                    let data = this.inner.lock().rebuild_strategy_trigger_histogram;
                     let triggers = root.create_uint_linear_histogram(
                         "rebuild_strategy_triggers",
                         fuchsia_inspect::LinearHistogramParams {
@@ -1264,7 +1265,7 @@ impl Allocator {
 
 impl Drop for Allocator {
     fn drop(&mut self) {
-        let inner = self.inner.lock().unwrap();
+        let inner = self.inner.lock();
         // Uncommitted and reserved should be released back using RAII, so they should be zero.
         assert_eq!(inner.uncommitted_allocated_bytes(), 0);
         assert_eq!(inner.reserved_bytes(), 0);
@@ -1281,7 +1282,7 @@ impl Allocator {
     /// Returns information about the allocator such as the layer files storing persisted
     /// allocations.
     pub fn info(&self) -> AllocatorInfo {
-        self.inner.lock().unwrap().info.clone()
+        self.inner.lock().info.clone()
     }
 
     /// Tries to allocate enough space for |object_range| in the specified object and returns the
@@ -1316,7 +1317,7 @@ impl Allocator {
             len = r.amount();
             Left(r)
         } else {
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self.inner.lock();
             assert!(inner.opened);
             // Do not exceed the limit for the owner or the device.
             let device_used = inner.used_bytes();
@@ -1334,7 +1335,7 @@ impl Allocator {
 
         // If volumes have been deleted, flush the device so that we can use any of the freed space.
         let volumes_deleted = {
-            let inner = self.inner.lock().unwrap();
+            let inner = self.inner.lock();
             (!inner.volumes_deleted_pending_sync.is_empty())
                 .then(|| inner.volumes_deleted_pending_sync.clone())
         };
@@ -1348,14 +1349,14 @@ impl Allocator {
                 .sync(SyncOptions {
                     flush_device: true,
                     precondition: Some(Box::new(|| {
-                        !self.inner.lock().unwrap().volumes_deleted_pending_sync.is_empty()
+                        !self.inner.lock().volumes_deleted_pending_sync.is_empty()
                     })),
                     ..Default::default()
                 })
                 .await?;
 
             {
-                let mut inner = self.inner.lock().unwrap();
+                let mut inner = self.inner.lock();
                 for owner_id in volumes_deleted {
                     inner.volumes_deleted_pending_sync.remove(&owner_id);
                     inner.marked_for_deletion.insert(owner_id);
@@ -1404,7 +1405,7 @@ impl Allocator {
 
         let mut trim_listener = None;
         {
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self.inner.lock();
             inner.allocation_size_histogram[std::cmp::min(63, len / self.block_size) as usize] += 1;
 
             // If trimming would be the reason that this allocation gets cut short, wait for
@@ -1427,7 +1428,7 @@ impl Allocator {
 
         let result = loop {
             {
-                let mut inner = self.inner.lock().unwrap();
+                let mut inner = self.inner.lock();
 
                 // While we know rebuild_strategy and take_for_trim are not running (we hold guard),
                 // apply temporary_allocation removals.
@@ -1475,7 +1476,7 @@ impl Allocator {
         );
 
         {
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self.inner.lock();
             let owner_entry = inner.owner_bytes.entry(owner_object_id).or_default();
             owner_entry.uncommitted_allocated_bytes += len;
             // If the reservation has an owner, ensure they are the same.
@@ -1508,7 +1509,7 @@ impl Allocator {
         {
             let len = device_range.length().map_err(|_| FxfsError::InvalidArgs)?;
 
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self.inner.lock();
             let device_used = inner.used_bytes();
             let owner_id_bytes_left = inner.owner_id_bytes_left(owner_object_id);
             let owner_entry = inner.owner_bytes.entry(owner_object_id).or_default();
@@ -1554,7 +1555,7 @@ impl Allocator {
 
     /// Gets the bytes limit for an owner object.
     pub async fn get_bytes_limit(&self, owner_object_id: u64) -> Option<u64> {
-        self.inner.lock().unwrap().info.limit_bytes.get(&owner_object_id).copied()
+        self.inner.lock().info.limit_bytes.get(&owner_object_id).copied()
     }
 
     /// Deallocates the given device range for the specified object.
@@ -1590,7 +1591,7 @@ impl Allocator {
         // flushed (see comment below). A user may allocate and then deallocate space before calling
         // allocate() a second time, so if we do not clean up here, we may end up with the same
         // range in temporary_allocations twice (once for allocate, once for deallocate).
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         for device_range in inner.dropped_temporary_allocations.drain(..) {
             self.temporary_allocations.erase(&AllocatorKey { device_range });
         }
@@ -1643,7 +1644,7 @@ impl Allocator {
         // yet.
         #[allow(clippy::never_loop)] // Loop used as a for {} else {}.
         let deallocs = 'deallocs_outer: loop {
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self.inner.lock();
             for (index, dealloc) in inner.committed_deallocated.iter().enumerate() {
                 if dealloc.log_file_offset >= flush_log_offset {
                     let mut deallocs = inner.committed_deallocated.split_off(index);
@@ -1656,7 +1657,7 @@ impl Allocator {
         };
 
         // Now we can free those elements.
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         let mut totals = BTreeMap::<u64, u64>::new();
         for dealloc in deallocs {
             *(totals.entry(dealloc.owner_object_id).or_default()) +=
@@ -1684,7 +1685,7 @@ impl Allocator {
         amount: u64,
     ) -> Option<Reservation> {
         {
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self.inner.lock();
 
             let device_free = (Saturating(self.device_size) - inner.used_bytes()).0;
 
@@ -1708,7 +1709,7 @@ impl Allocator {
         amount: impl FnOnce(u64) -> u64,
     ) -> Reservation {
         let amount = {
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self.inner.lock();
 
             let device_free = (Saturating(self.device_size) - inner.used_bytes()).0;
 
@@ -1727,7 +1728,7 @@ impl Allocator {
 
     /// Returns the total number of allocated bytes.
     pub fn get_allocated_bytes(&self) -> u64 {
-        self.inner.lock().unwrap().allocated_bytes().0
+        self.inner.lock().allocated_bytes().0
     }
 
     /// Returns the size of bytes available to allocate.
@@ -1739,25 +1740,19 @@ impl Allocator {
     /// Note that this is quite an expensive operation as it copies the collection.
     /// This is intended for use in fsck() and friends, not general use code.
     pub fn get_owner_allocated_bytes(&self) -> BTreeMap<u64, u64> {
-        self.inner
-            .lock()
-            .unwrap()
-            .owner_bytes
-            .iter()
-            .map(|(k, v)| (*k, v.allocated_bytes.0))
-            .collect()
+        self.inner.lock().owner_bytes.iter().map(|(k, v)| (*k, v.allocated_bytes.0)).collect()
     }
 
     /// Returns the number of allocated and reserved bytes.
     pub fn get_used_bytes(&self) -> Saturating<u64> {
-        let inner = self.inner.lock().unwrap();
+        let inner = self.inner.lock();
         inner.used_bytes()
     }
 }
 
 impl ReservationOwner for Allocator {
     fn release_reservation(&self, owner_object_id: Option<u64>, amount: u64) {
-        self.inner.lock().unwrap().remove_reservation(owner_object_id, amount);
+        self.inner.lock().remove_reservation(owner_object_id, amount);
     }
 }
 
@@ -1771,7 +1766,7 @@ impl JournalingObject for Allocator {
     ) -> Result<(), Error> {
         match mutation {
             Mutation::Allocator(AllocatorMutation::MarkForDeletion(owner_object_id)) => {
-                let mut inner = self.inner.lock().unwrap();
+                let mut inner = self.inner.lock();
                 inner.owner_bytes.remove(&owner_object_id);
 
                 // We use `info.marked_for_deletion` to track the committed state and
@@ -1793,7 +1788,7 @@ impl JournalingObject for Allocator {
                 let len = item.key.device_range.length().unwrap();
                 let lower_bound = item.key.lower_bound_for_merge_into();
                 self.tree.merge_into(item, &lower_bound);
-                let mut inner = self.inner.lock().unwrap();
+                let mut inner = self.inner.lock();
                 let entry = inner.owner_bytes.entry(owner_object_id).or_default();
                 entry.allocated_bytes += len;
                 if let ApplyMode::Live(transaction) = context.mode {
@@ -1820,7 +1815,7 @@ impl JournalingObject for Allocator {
                 let len = item.key.device_range.length().unwrap();
 
                 {
-                    let mut inner = self.inner.lock().unwrap();
+                    let mut inner = self.inner.lock();
                     {
                         let entry = inner.owner_bytes.entry(owner_object_id).or_default();
                         entry.allocated_bytes -= len;
@@ -1852,13 +1847,13 @@ impl JournalingObject for Allocator {
                 // will be respected, it doesn't matter if the value is already set, or gets changed
                 // multiple times during replay. When it gets opened it will be merged in with the
                 // snapshot.
-                self.inner.lock().unwrap().info.limit_bytes.insert(owner_object_id, bytes);
+                self.inner.lock().info.limit_bytes.insert(owner_object_id, bytes);
             }
             Mutation::BeginFlush => {
                 self.tree.seal();
                 // Transfer our running count for allocated_bytes so that it gets written to the new
                 // info file when flush completes.
-                let mut inner = self.inner.lock().unwrap();
+                let mut inner = self.inner.lock();
                 let allocated_bytes =
                     inner.owner_bytes.iter().map(|(k, v)| (*k, v.allocated_bytes.0)).collect();
                 inner.info.allocated_bytes = allocated_bytes;
@@ -1873,7 +1868,7 @@ impl JournalingObject for Allocator {
         match mutation {
             Mutation::Allocator(AllocatorMutation::Allocate { device_range, owner_object_id }) => {
                 let len = device_range.length().unwrap();
-                let mut inner = self.inner.lock().unwrap();
+                let mut inner = self.inner.lock();
                 inner
                     .owner_bytes
                     .entry(owner_object_id)
@@ -2080,7 +2075,7 @@ impl<'a> Flusher<'a> {
         // Specifically, txn_write() below must allocate space and may fail if we prematurely
         // clear marked_for_deletion.
         let (new_info, marked_for_deletion) = {
-            let mut info = self.allocator.inner.lock().unwrap().info.clone();
+            let mut info = self.allocator.inner.lock().info.clone();
 
             // After compaction, since we always do a major compaction, all new layers have
             // marked_for_deletion objects removed.
@@ -2123,7 +2118,7 @@ impl<'a> Flusher<'a> {
                 // At this point we've committed the new layers to disk so we can start using them.
                 // This means we can also switch to the new AllocatorInfo which clears
                 // marked_for_deletion.
-                let mut inner = self.allocator.inner.lock().unwrap();
+                let mut inner = self.allocator.inner.lock();
                 inner.info = new_info;
                 for owner_id in marked_for_deletion {
                     inner.marked_for_deletion.remove(&owner_id);
@@ -2140,7 +2135,7 @@ impl<'a> Flusher<'a> {
             }
         }
 
-        let mut counters = self.allocator.counters.lock().unwrap();
+        let mut counters = self.allocator.counters.lock();
         counters.num_flushes += 1;
         counters.last_flush_time = Some(std::time::SystemTime::now());
         counters.persistent_layer_file_sizes = layer_file_sizes;
@@ -2170,9 +2165,10 @@ mod tests {
     use crate::range::RangeExt;
     use crate::round::round_up;
     use fuchsia_async as fasync;
+    use fuchsia_sync::Mutex;
     use std::cmp::{max, min};
     use std::ops::{Bound, Range};
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
     use storage_device::fake_device::FakeDevice;
     use storage_device::DeviceHolder;
 
@@ -2973,12 +2969,11 @@ mod tests {
                 .set_bytes_limit(&mut transaction, OWNER_ID, LIMIT)
                 .await
                 .expect("Failed to set limit.");
-            assert!(allocator.inner.lock().unwrap().info.limit_bytes.get(&OWNER_ID).is_none());
+            assert!(allocator.inner.lock().info.limit_bytes.get(&OWNER_ID).is_none());
             transaction.commit().await.expect("Failed to commit transaction");
             let bytes: u64 = *allocator
                 .inner
                 .lock()
-                .unwrap()
                 .info
                 .limit_bytes
                 .get(&OWNER_ID)
@@ -3125,10 +3120,7 @@ mod tests {
                 .await
                 .expect("allocate should fail");
             {
-                assert!(
-                    *trim_done_clone.lock().unwrap(),
-                    "Allocation finished before trim completed"
-                );
+                assert!(*trim_done_clone.lock(), "Allocation finished before trim completed");
             }
             transaction.commit().await.expect("commit failed");
         });
@@ -3139,7 +3131,7 @@ mod tests {
 
         // Once the free extents are released, the task should unblock.
         {
-            let mut trim_done = trim_done.lock().unwrap();
+            let mut trim_done = trim_done.lock();
             std::mem::drop(trimmable_extents);
             *trim_done = true;
         }

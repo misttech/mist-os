@@ -646,12 +646,13 @@ mod tests {
     use delivery_blob::CompressionMode;
     use event_listener::{Event, EventListener};
     use fuchsia_hash::Hash;
+    use fuchsia_sync::Mutex;
     use fxfs::object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle};
     use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
     use fxfs::object_store::{DataObjectHandle, HandleOptions, ObjectDescriptor, ObjectStore};
     use std::collections::BTreeMap;
     use std::mem::size_of;
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
     use std::time::Duration;
     use storage_device::buffer::{BufferRef, MutableBufferRef};
     use storage_device::buffer_allocator::{BufferAllocator, BufferFuture, BufferSource};
@@ -681,7 +682,7 @@ mod tests {
         }
 
         fn push_delay(&self, delay: EventListener) {
-            self.inner.lock().unwrap().delays.insert(0, delay);
+            self.inner.lock().delays.insert(0, delay);
         }
     }
 
@@ -707,12 +708,12 @@ mod tests {
         ) -> Result<u64, Error> {
             // We only append for now.
             assert!(offset.is_none());
-            let delay = self.inner.lock().unwrap().delays.pop();
+            let delay = self.inner.lock().delays.pop();
             if let Some(delay) = delay {
                 delay.await;
             }
             // This relocking has a TOCTOU flavour, but it shouldn't matter for this application.
-            self.inner.lock().unwrap().data.extend_from_slice(buf.as_slice());
+            self.inner.lock().data.extend_from_slice(buf.as_slice());
             Ok(buf.len() as u64)
         }
 
@@ -762,12 +763,12 @@ mod tests {
     #[async_trait]
     impl ReadObjectHandle for FakeReaderWriter {
         async fn read(&self, offset: u64, mut buf: MutableBufferRef<'_>) -> Result<usize, Error> {
-            let delay = self.inner.lock().unwrap().delays.pop();
+            let delay = self.inner.lock().delays.pop();
             if let Some(delay) = delay {
                 delay.await;
             }
             // This relocking has a TOCTOU flavour, but it shouldn't matter for this application.
-            let inner = self.inner.lock().unwrap();
+            let inner = self.inner.lock();
             assert!(offset as usize <= inner.data.len());
             let offset_end = std::cmp::min(offset as usize + buf.len(), inner.data.len());
             let size = offset_end - offset as usize;
@@ -776,7 +777,7 @@ mod tests {
         }
 
         fn get_size(&self) -> u64 {
-            self.inner.lock().unwrap().data.len() as u64
+            self.inner.lock().data.len() as u64
         }
     }
 
@@ -1353,7 +1354,7 @@ mod tests {
                 (&mut buff[IO_SIZE..IO_SIZE + size_of::<BlobMessage>()]).try_into().unwrap(),
             );
 
-            replay_handle.inner.lock().unwrap().data = buff;
+            replay_handle.inner.lock().data = buff;
             let delay1 = Event::new();
             replay_handle.push_delay(delay1.listen());
             let delay2 = Event::new();

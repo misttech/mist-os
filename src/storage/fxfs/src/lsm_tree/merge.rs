@@ -10,12 +10,13 @@ use crate::lsm_tree::types::{
 };
 use anyhow::Error;
 use async_trait::async_trait;
+use fuchsia_sync::Mutex;
 use futures::try_join;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::fmt::{Debug, Write};
 use std::ops::{Bound, Deref, DerefMut};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum ItemOp<K, V> {
@@ -354,7 +355,7 @@ impl<'a, K: Key + LayerKey + OrdLowerBound, V: Value> Merger<'a, K, V> {
         };
         let layer_count = pending_iterators.len();
         {
-            let mut counters = self.counters.lock().unwrap();
+            let mut counters = self.counters.lock();
             counters.num_seeks += 1;
             counters.layer_files_total += len;
             counters.layer_files_skipped += len - layer_count;
@@ -813,11 +814,12 @@ mod tests {
     use crate::testing::fake_object::{FakeObject, FakeObjectHandle};
     use crate::testing::writer::Writer;
     use fprint::TypeFingerprint;
+    use fuchsia_sync::Mutex;
     use fxfs_macros::FuzzyHash;
     use rand::Rng;
     use std::hash::Hash;
     use std::ops::{Bound, Range};
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
 
     #[derive(
         Clone,

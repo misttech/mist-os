@@ -21,6 +21,7 @@ fxfs_deps = [
   "//sdk/rust/zx-status",
   "//src/lib/diagnostics/inspect/rust",
   "//src/lib/fuchsia-async",
+  "//src/lib/fuchsia-sync",
   "//src/lib/mundane",
   "//src/storage/fxfs/crypto",
   "//src/storage/fxfs/trace",

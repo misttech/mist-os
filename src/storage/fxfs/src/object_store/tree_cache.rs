@@ -4,10 +4,10 @@
 
 use super::object_record::{ObjectKey, ObjectKeyData, ObjectValue};
 use crate::lsm_tree::cache::{ObjectCache, ObjectCachePlaceholder, ObjectCacheResult};
+use fuchsia_sync::Mutex;
 use linked_hash_map::{Entry, LinkedHashMap};
 use std::hash::BuildHasherDefault;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Mutex;
 
 fn filter(key: &ObjectKey) -> bool {
     match key.data {
@@ -33,7 +33,7 @@ struct Placeholder<'a> {
 impl Placeholder<'_> {
     fn replace_entry(&mut self, value: Option<CacheValue>) {
         let key = std::mem::replace(&mut self.key, ObjectKey::object(0));
-        let mut inner = self.cache.inner.lock().unwrap();
+        let mut inner = self.cache.inner.lock();
         // The value is present...
         if let Entry::Occupied(mut entry) = inner.entry(key) {
             // And the same placeholder as the token has...
@@ -99,7 +99,7 @@ impl ObjectCache<ObjectKey, ObjectValue> for TreeCache {
         if !filter(key) {
             return ObjectCacheResult::NoCache;
         }
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         match inner.get_refresh(key) {
             Some(CacheValue::Value(entry)) => ObjectCacheResult::Value(entry.clone()),
             Some(CacheValue::Placeholder(_)) => ObjectCacheResult::NoCache,
@@ -122,7 +122,7 @@ impl ObjectCache<ObjectKey, ObjectValue> for TreeCache {
         if !filter(&key) {
             return;
         }
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         if let Entry::Occupied(mut entry) = inner.entry(key) {
             if let Some(replacement) = value {
                 *(entry.get_mut()) = CacheValue::Value(replacement);

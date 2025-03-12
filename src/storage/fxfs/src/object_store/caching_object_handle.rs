@@ -6,8 +6,9 @@ use crate::errors::FxfsError;
 use crate::object_handle::{ObjectHandle, ReadObjectHandle};
 use anyhow::{anyhow, ensure, Error};
 use event_listener::{Event, EventListener};
+use fuchsia_sync::Mutex;
 use std::ops::Deref;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use storage_device::buffer::BufferFuture;
 
 pub const CHUNK_SIZE: usize = 128 * 1024;
@@ -117,7 +118,7 @@ impl<S: ReadObjectHandle> CachingObjectHandle<S> {
         }
         loop {
             let action = {
-                let mut chunks = self.chunks.lock().unwrap();
+                let mut chunks = self.chunks.lock();
                 match std::mem::take(&mut chunks[chunk_num]) {
                     Chunk::Missing => {
                         chunks[chunk_num] = Chunk::Pending;
@@ -147,7 +148,7 @@ impl<S: ReadObjectHandle> CachingObjectHandle<S> {
                     // `Missing` state.
                     let drop_guard = scopeguard::guard((), |_| {
                         {
-                            let mut chunks = self.chunks.lock().unwrap();
+                            let mut chunks = self.chunks.lock();
                             debug_assert!(matches!(chunks[chunk_num], Chunk::Pending));
                             chunks[chunk_num] = Chunk::Missing;
                         }
@@ -175,7 +176,7 @@ impl<S: ReadObjectHandle> CachingObjectHandle<S> {
                     let cached_chunk = CachedChunk(Arc::new(data));
 
                     {
-                        let mut chunks = self.chunks.lock().unwrap();
+                        let mut chunks = self.chunks.lock();
                         debug_assert!(matches!(chunks[chunk_num], Chunk::Pending));
                         chunks[chunk_num] = Chunk::Present(cached_chunk.clone());
                     }
@@ -195,7 +196,7 @@ impl<S: ReadObjectHandle> CachingObjectHandle<S> {
     pub fn purge(&self) {
         // Deallocate out of the lock scope, so we don't hold up readers.
         let mut to_deallocate = vec![];
-        let mut chunks = self.chunks.lock().unwrap();
+        let mut chunks = self.chunks.lock();
         for chunk in chunks.iter_mut() {
             if let Some(data) = chunk.maybe_purge() {
                 to_deallocate.push(data);

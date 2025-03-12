@@ -21,6 +21,7 @@ use fidl_fuchsia_fxfs::{
     ProjectIdRequestStream, ProjectIterToken,
 };
 use fs_inspect::{FsInspectVolume, VolumeData};
+use fuchsia_sync::Mutex;
 use futures::channel::oneshot;
 use futures::stream::{self, FusedStream, Stream};
 use futures::{FutureExt, StreamExt, TryStreamExt};
@@ -35,7 +36,7 @@ use std::future::Future;
 use std::pin::pin;
 #[cfg(any(test, feature = "testing"))]
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Weak};
 use std::time::Duration;
 use vfs::directory::entry::DirectoryEntry;
 use vfs::directory::entry_container::Directory as VfsDirectory;
@@ -184,7 +185,7 @@ impl FxVolume {
 
     /// Stop profiling, recover resources from it and finalize recordings.
     pub async fn stop_profile_tasks(self: &Arc<Self>) {
-        let Some(mut state) = self.profile_state.lock().unwrap().take() else { return };
+        let Some(mut state) = self.profile_state.lock().take() else { return };
         state.wait_for_replay_to_finish().await;
         self.pager.set_recorder(None);
         let _ = state.wait_for_recording_to_finish().await;
@@ -245,7 +246,7 @@ impl FxVolume {
             None
         };
 
-        let mut profile_state = self.profile_state.lock().unwrap();
+        let mut profile_state = self.profile_state.lock();
 
         info!("Recording new profile '{name}' for volume object {}", self.store.store_object_id());
         // Begin recording first to ensure that we capture any activity from the replay.
@@ -290,7 +291,7 @@ impl FxVolume {
         self.dirent_cache.clear();
 
         self.store.filesystem().graveyard().flush().await;
-        let task = std::mem::replace(&mut *self.background_task.lock().unwrap(), None);
+        let task = std::mem::replace(&mut *self.background_task.lock(), None);
         if let Some((task, terminate)) = task {
             let _ = terminate.send(());
             task.await;
@@ -395,7 +396,7 @@ impl FxVolume {
         config: MemoryPressureConfig,
         mem_monitor: Option<&MemoryPressureMonitor>,
     ) {
-        let mut background_task = self.background_task.lock().unwrap();
+        let mut background_task = self.background_task.lock();
         if background_task.is_none() {
             let (tx, rx) = oneshot::channel();
 
@@ -546,8 +547,8 @@ impl FxVolume {
                 info!(
                     "background_task: {}, profile_state: {}, dirent_cache count: {}, \
                      pager strong file refs={}, no tasks={}",
-                    this.background_task.lock().unwrap().is_some(),
-                    this.profile_state.lock().unwrap().is_some(),
+                    this.background_task.lock().is_some(),
+                    this.profile_state.lock().is_some(),
                     this.dirent_cache.len(),
                     crate::pager::STRONG_FILE_REFS.load(Ordering::Relaxed),
                     {

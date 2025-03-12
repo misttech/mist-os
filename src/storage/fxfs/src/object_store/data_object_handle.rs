@@ -30,6 +30,7 @@ use anyhow::{anyhow, bail, ensure, Context, Error};
 use async_trait::async_trait;
 use fidl_fuchsia_io as fio;
 use fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions, MerkleTreeBuilder};
+use fuchsia_sync::Mutex;
 use futures::stream::FuturesUnordered;
 use futures::TryStreamExt;
 use fxfs_trace::trace;
@@ -37,7 +38,7 @@ use mundane::hash::{Digest, Hasher, Sha256, Sha512};
 use std::cmp::min;
 use std::ops::{Deref, DerefMut, Range};
 use std::sync::atomic::{self, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use storage_device::buffer::{Buffer, BufferFuture, BufferRef, MutableBufferRef};
 
 mod allocated_ranges;
@@ -121,7 +122,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
     }
 
     pub fn is_verified_file(&self) -> bool {
-        matches!(*self.fsverity_state.lock().unwrap(), FsverityState::Some(_))
+        matches!(*self.fsverity_state.lock(), FsverityState::Some(_))
     }
 
     /// Sets `self.fsverity_state` to FsverityState::Started. Called at the top of `enable_verity`.
@@ -129,7 +130,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
     /// FxfsError::AlreadyBound. If another caller has already completed `enable_verity`, returns
     /// FxfsError::AlreadyExists.
     pub fn set_fsverity_state_started(&self) -> Result<(), Error> {
-        let mut fsverity_guard = self.fsverity_state.lock().unwrap();
+        let mut fsverity_guard = self.fsverity_state.lock();
         match *fsverity_guard {
             FsverityState::None => {
                 *fsverity_guard = FsverityState::Started;
@@ -145,7 +146,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
     /// Sets `self.fsverity_state` to Pending. Must be called before `finalize_fsverity_state()`.
     /// Asserts that the prior state of `self.fsverity_state` was `FsverityState::Started`.
     pub fn set_fsverity_state_pending(&self, descriptor: FsverityMetadata, merkle_tree: Box<[u8]>) {
-        let mut fsverity_guard = self.fsverity_state.lock().unwrap();
+        let mut fsverity_guard = self.fsverity_state.lock();
         assert!(matches!(*fsverity_guard, FsverityState::Started));
         *fsverity_guard = FsverityState::Pending(FsverityStateInner { descriptor, merkle_tree });
     }
@@ -153,7 +154,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
     /// Sets `self.fsverity_state` to Some. Panics if the prior state of `self.fsverity_state` was
     /// not `FsverityState::Pending(_)`.
     pub fn finalize_fsverity_state(&self) {
-        let mut fsverity_state_guard = self.fsverity_state.lock().unwrap();
+        let mut fsverity_state_guard = self.fsverity_state.lock();
         let mut_fsverity_state = fsverity_state_guard.deref_mut();
         let fsverity_state = std::mem::replace(mut_fsverity_state, FsverityState::None);
         match fsverity_state {
@@ -172,7 +173,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
     /// Sets `self.fsverity_state` directly to Some without going through the entire state machine.
     /// Used to set `self.fsverity_state` on open of a verified file.
     pub fn set_fsverity_state_some(&self, descriptor: FsverityMetadata, merkle_tree: Box<[u8]>) {
-        let mut fsverity_guard = self.fsverity_state.lock().unwrap();
+        let mut fsverity_guard = self.fsverity_state.lock();
         assert!(matches!(*fsverity_guard, FsverityState::None));
         *fsverity_guard = FsverityState::Some(FsverityStateInner { descriptor, merkle_tree });
     }
@@ -183,7 +184,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
     async fn verify_data(&self, mut offset: usize, buffer: &[u8]) -> Result<(), Error> {
         let block_size = self.block_size() as usize;
         assert!(offset % block_size == 0);
-        let fsverity_state = self.fsverity_state.lock().unwrap();
+        let fsverity_state = self.fsverity_state.lock();
         match &*fsverity_state {
             FsverityState::None => {
                 Err(anyhow!("Tried to verify read on a non verity-enabled file"))
@@ -288,7 +289,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
     pub async fn get_descriptor(
         &self,
     ) -> Result<Option<(fio::VerificationOptions, Vec<u8>)>, Error> {
-        let fsverity_state = self.fsverity_state.lock().unwrap();
+        let fsverity_state = self.fsverity_state.lock();
         match &*fsverity_state {
             FsverityState::None => Ok(None),
             FsverityState::Started | FsverityState::Pending(_) => Err(anyhow!(
@@ -1786,6 +1787,7 @@ mod tests {
     use crate::round::{round_down, round_up};
     use assert_matches::assert_matches;
     use bit_vec::BitVec;
+    use fuchsia_sync::Mutex;
     use futures::channel::oneshot::channel;
     use futures::stream::{FuturesUnordered, StreamExt};
     use futures::FutureExt;
@@ -1794,7 +1796,7 @@ mod tests {
     use mundane::hash::{Digest, Hasher, Sha256};
     use rand::Rng;
     use std::ops::Range;
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
     use std::time::Duration;
     use storage_device::fake_device::FakeDevice;
     use storage_device::DeviceHolder;
@@ -2900,7 +2902,7 @@ mod tests {
 
         let shared_context_clone = shared_context.clone();
         let post_commit = move || {
-            let store = shared_context_clone.lock().unwrap().store.as_ref().cloned().unwrap();
+            let store = shared_context_clone.lock().store.as_ref().cloned().unwrap();
             let shared_context = shared_context_clone.clone();
             async move {
                 // First run fsck on the current filesystem.
@@ -2923,7 +2925,7 @@ mod tests {
                     .expect("sync failed");
                 let device = fs.device().snapshot().expect("snapshot failed");
 
-                let object_id = shared_context.lock().unwrap().object_id.clone();
+                let object_id = shared_context.lock().object_id.clone();
 
                 let fs2 = FxFilesystemBuilder::new()
                     .skip_initial_reap(object_id.is_none())
@@ -2991,7 +2993,7 @@ mod tests {
         let root_vol = root_volume(fs.clone()).await.expect("root_volume failed");
         let store = root_vol.volume("test", NO_OWNER, None).await.expect("volume failed");
 
-        shared_context.lock().unwrap().store = Some(store.clone());
+        shared_context.lock().store = Some(store.clone());
 
         let root_directory =
             Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
@@ -3048,7 +3050,7 @@ mod tests {
 
             // Store the object ID so that we can make sure the object is always tombstoned
             // after remount (see above).
-            shared_context.lock().unwrap().object_id = Some(object.object_id());
+            shared_context.lock().object_id = Some(object.object_id());
 
             transaction = fs
                 .clone()
@@ -3185,7 +3187,7 @@ mod tests {
                 object.txn_write(&mut t, 0, buf.as_ref()).await.expect("write failed");
                 // This is a halting problem so all we can do is sleep.
                 fasync::Timer::new(Duration::from_millis(100)).await;
-                assert!(!*done.lock().unwrap());
+                assert!(!*done.lock());
                 t.commit().await.expect("commit failed");
             }
             .boxed(),

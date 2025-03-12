@@ -8,6 +8,7 @@ use crate::fuchsia::pager::{
 use crate::fuchsia::volume::FxVolume;
 use anyhow::{anyhow, ensure, Context, Error};
 use fidl_fuchsia_io as fio;
+use fuchsia_sync::Mutex;
 use fxfs::errors::FxfsError;
 use fxfs::filesystem::MAX_FILE_SIZE;
 use fxfs::log::*;
@@ -22,7 +23,7 @@ use fxfs::round::{how_many, round_up};
 use scopeguard::ScopeGuard;
 use std::future::Future;
 use std::ops::Range;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use storage_device::buffer::{Buffer, BufferFuture};
 use vfs::temp_clone::{unblock, TempClonable};
 
@@ -248,7 +249,7 @@ impl PagedObjectHandle {
     }
 
     pub fn set_read_only(&self) {
-        self.inner.lock().unwrap().read_only = true
+        self.inner.lock().read_only = true
     }
 
     pub fn get_size(&self) -> u64 {
@@ -309,7 +310,7 @@ impl PagedObjectHandle {
         &self,
         page_range: MarkDirtyRange<T>,
     ) -> Result<(), zx::Status> {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         if inner.read_only {
             // Enable-verity has already been called on this file.
             page_range.report_failure(zx::Status::BAD_STATE);
@@ -575,7 +576,7 @@ impl PagedObjectHandle {
                 *reservation_guard -= batch.page_count();
             }
             if first_batch {
-                self.inner.lock().unwrap().end_flush();
+                self.inner.lock().end_flush();
             }
 
             batch.writeback_end(vmo, pager);
@@ -594,20 +595,20 @@ impl PagedObjectHandle {
     async fn flush_locked<'a>(&self, _truncate_guard: &WriteGuard<'a>) -> Result<(), Error> {
         self.handle.owner().pager().page_in_barrier().await;
 
-        let pending_shrink = self.inner.lock().unwrap().pending_shrink;
+        let pending_shrink = self.inner.lock().pending_shrink;
         if let PendingShrink::ShrinkTo(size, update_has_overwrite_extents) = pending_shrink {
             let needs_trim = self
                 .shrink_file(size, update_has_overwrite_extents)
                 .await
                 .context("Failed to shrink file")?;
-            self.inner.lock().unwrap().pending_shrink =
+            self.inner.lock().pending_shrink =
                 if needs_trim { PendingShrink::NeedsTrim } else { PendingShrink::None };
         }
 
-        let pending_shrink = self.inner.lock().unwrap().pending_shrink;
+        let pending_shrink = self.inner.lock().pending_shrink;
         if let PendingShrink::NeedsTrim = pending_shrink {
             self.store().trim(self.object_id()).await.context("Failed to trim file")?;
-            self.inner.lock().unwrap().pending_shrink = PendingShrink::None;
+            self.inner.lock().pending_shrink = PendingShrink::None;
         }
 
         // If the file had several dirty pages and then was truncated to before those dirty pages
@@ -619,7 +620,7 @@ impl PagedObjectHandle {
         // dirtied between those 2 operations and dirty pages that were made irrelevant by the
         // truncate.
         let (mtime, crtime, (dirty_pages, reservation)) = {
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self.inner.lock();
             (
                 inner.dirty_mtime.begin_flush(self.was_file_modified_since_last_call()?),
                 inner.dirty_crtime.begin_flush(false),
@@ -628,7 +629,7 @@ impl PagedObjectHandle {
         };
 
         let mut reservation_guard = scopeguard::guard(dirty_pages, |dirty_pages| {
-            self.inner.lock().unwrap().put_back(dirty_pages, &reservation);
+            self.inner.lock().put_back(dirty_pages, &reservation);
         });
 
         let content_size = self.vmo().get_stream_size().context("get_stream_size failed")?;
@@ -641,7 +642,7 @@ impl PagedObjectHandle {
         if required_reserved_pages > dirty_pages {
             // This potentially takes more reservation than might be necessary.  We could perhaps
             // optimize this to take only what might be required.
-            let new_dirty_pages = self.inner.lock().unwrap().move_to(&reservation);
+            let new_dirty_pages = self.inner.lock().move_to(&reservation);
 
             // Make sure we account for pages we might not flush to ensure we keep them reserved.
             pages_not_flushed = dirty_pages + new_dirty_pages - required_reserved_pages;
@@ -667,7 +668,7 @@ impl PagedObjectHandle {
         if flush_batches.is_empty() {
             self.flush_metadata(content_size, previous_content_size, crtime, mtime).await?;
             dismiss_scopeguard(reservation_guard);
-            self.inner.lock().unwrap().end_flush();
+            self.inner.lock().end_flush();
         } else {
             self.flush_data(
                 &reservation,
@@ -681,7 +682,7 @@ impl PagedObjectHandle {
             .await?
         }
 
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         inner.put_back(pages_not_flushed, &reservation);
 
         Ok(())
@@ -728,7 +729,7 @@ impl PagedObjectHandle {
             self.handle.shrink(&mut transaction, new_size, update_has_overwrite_extents).await?.0;
 
         let (mtime, crtime) = {
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self.inner.lock();
             (
                 inner.dirty_mtime.begin_flush(self.was_file_modified_since_last_call()?),
                 inner.dirty_crtime.begin_flush(false),
@@ -747,7 +748,7 @@ impl PagedObjectHandle {
             .await
             .context("update_attributes failed")?;
         transaction.commit().await.context("Failed to commit transaction")?;
-        self.inner.lock().unwrap().end_flush();
+        self.inner.lock().end_flush();
 
         Ok(needs_trim)
     }
@@ -780,7 +781,7 @@ impl PagedObjectHandle {
         unblock(move || vmo.set_stream_size(new_size)).await?;
 
         let previous_content_size = self.handle.get_size();
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         if new_size < previous_content_size {
             inner.pending_shrink = match inner.pending_shrink {
                 PendingShrink::None => {
@@ -829,7 +830,7 @@ impl PagedObjectHandle {
             let keys =
                 lock_keys![LockKey::truncate(store.store_object_id(), self.handle.object_id())];
             _flush_guard = fs.lock_manager().write_lock(keys).await;
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self.inner.lock();
             let mut attributes = attributes.clone();
             // There is an assumption that when we expose ctime and mtime, that ctime is the same
             // as dirty_mtime (when it is some value). When we call `update_attributes(..)`,
@@ -857,7 +858,7 @@ impl PagedObjectHandle {
         // Any changes to the creation_time before this transaction are superseded by the values
         // set in this update.
         {
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self.inner.lock();
             if set_creation_time {
                 inner.dirty_crtime = DirtyTimestamp::None;
             }
@@ -873,7 +874,7 @@ impl PagedObjectHandle {
         // the handle to avoid a window where we might see old properties.  When we flush, we update
         // the handle and *then* remove the properties from `inner`.
         let (dirty_page_count, data_size, crtime, mtime) = {
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self.inner.lock();
 
             // If there are no dirty pages, the client can't have modified anything.
             if inner.dirty_page_count > 0 && self.was_file_modified_since_last_call()? {
@@ -901,7 +902,7 @@ impl PagedObjectHandle {
 
     /// Returns true if the handle needs flushing.
     pub fn needs_flush(&self) -> bool {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         if inner.dirty_crtime.needs_flush()
             || inner.dirty_mtime.needs_flush()
             || inner.dirty_page_count > 0
@@ -960,7 +961,7 @@ impl PagedObjectHandle {
 
 impl Drop for PagedObjectHandle {
     fn drop(&mut self) {
-        let inner = self.inner.lock().unwrap();
+        let inner = self.inner.lock();
         let reservation = inner.reservation();
         if reservation > 0 {
             self.allocator().release_reservation(Some(self.store().store_object_id()), reservation);
@@ -1189,6 +1190,7 @@ mod tests {
     use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy;
     use fuchsia_fs::file;
+    use fuchsia_sync::Condvar;
     use futures::channel::mpsc::{unbounded, UnboundedSender};
     use futures::{join, StreamExt};
     use fxfs::filesystem::{FxFilesystemBuilder, OpenFxFilesystem};
@@ -1197,7 +1199,7 @@ mod tests {
     use fxfs_macros::ToWeakNode;
     use std::collections::HashSet;
     use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
-    use std::sync::{Condvar, Weak};
+    use std::sync::Weak;
     use std::time::Duration;
     use storage_device::fake_device::FakeDevice;
     use storage_device::{buffer, DeviceHolder};
@@ -2226,7 +2228,7 @@ mod tests {
 
         impl File {
             fn unblock(&self, request: u64) {
-                self.unblocked_requests.lock().unwrap().insert(request);
+                self.unblocked_requests.lock().insert(request);
                 self.cvar.notify_all();
             }
         }
@@ -2293,9 +2295,9 @@ mod tests {
                 static COUNTER: AtomicU64 = AtomicU64::new(0);
                 let counter = COUNTER.fetch_add(1, Ordering::Relaxed);
                 if let Ok(()) = self.notifications.unbounded_send(Op::AfterAlignedRead(counter)) {
-                    let mut unblocked_requests = self.unblocked_requests.lock().unwrap();
+                    let mut unblocked_requests = self.unblocked_requests.lock();
                     while !unblocked_requests.remove(&counter) {
-                        unblocked_requests = self.cvar.wait(unblocked_requests).unwrap();
+                        self.cvar.wait(&mut unblocked_requests);
                     }
                 }
                 Ok(buffer)

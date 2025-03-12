@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fuchsia_sync::{Mutex, MutexGuard};
 use std::ops::Range;
-use std::sync::Mutex;
 
 /// Whether this particular logical file range is in overwrite or CoW mode. Overwrite mode ranges
 /// have overwrite extents already allocated, and should use multi_overwrite. CoW mode ranges
@@ -33,7 +33,7 @@ pub struct AllocatedRanges {
 pub struct RangeOverlapIter<'a> {
     query_range: Range<u64>,
     index: usize,
-    ranges: std::sync::MutexGuard<'a, Vec<Range<u64>>>,
+    ranges: MutexGuard<'a, Vec<Range<u64>>>,
 }
 
 impl<'a> Iterator for RangeOverlapIter<'a> {
@@ -74,7 +74,7 @@ impl AllocatedRanges {
     }
 
     pub fn clear(&self) {
-        self.ranges.lock().unwrap().clear();
+        self.ranges.lock().clear();
     }
 
     /// Find the overlapping overwrite ranges in the given range for this file, so writes can be
@@ -84,7 +84,7 @@ impl AllocatedRanges {
     /// Note: The returned iterator holds a lock on the ranges until it's dropped, so use it
     /// accordingly.
     pub fn overlap<'a>(&'a self, query_range: Range<u64>) -> RangeOverlapIter<'a> {
-        let ranges = self.ranges.lock().unwrap();
+        let ranges = self.ranges.lock();
         let index = match ranges.binary_search_by_key(&query_range.start, |r| r.end) {
             // If the start of the query range is exactly at the end of a range, there is zero
             // overlap with that range, so start with the next one.
@@ -98,7 +98,7 @@ impl AllocatedRanges {
     /// storing. This list of ranges, so it's easy to insert and search, is kept sorted and merged,
     /// so that the list has no overlapping ranges.
     pub fn apply_range(&self, new_range: Range<u64>) {
-        Self::apply_range_to(self.ranges.lock().unwrap().as_mut(), new_range)
+        Self::apply_range_to(self.ranges.lock().as_mut(), new_range)
     }
 
     pub fn apply_range_to(ranges: &mut Vec<Range<u64>>, new_range: Range<u64>) {
@@ -139,7 +139,7 @@ impl AllocatedRanges {
     /// completely removed by this truncate call. In this case, metadata for a file will need to be
     /// updated since there are no longer any overwrite ranges.
     pub fn truncate(&self, cutoff: u64) -> bool {
-        let mut ranges = self.ranges.lock().unwrap();
+        let mut ranges = self.ranges.lock();
         if ranges.is_empty() {
             // Nothing to do, return early. Since there were no ranges, we didn't _remove_ all the
             // ranges which is the specific case we want to flag on return.
@@ -221,7 +221,7 @@ mod tests {
 
         for case in cases {
             let ranges = AllocatedRanges::new(case.applied_ranges);
-            assert_eq!(*ranges.ranges.lock().unwrap(), case.expected_ranges);
+            assert_eq!(*ranges.ranges.lock(), case.expected_ranges);
         }
     }
 
@@ -371,7 +371,7 @@ mod tests {
         for (i, case) in cases.into_iter().enumerate() {
             let ranges = AllocatedRanges::new(case.applied);
             assert_eq!(ranges.truncate(case.cutoff), case.dropped_all, "failed case # {}", i);
-            assert_eq!(*ranges.ranges.lock().unwrap(), case.expected, "failed case # {}", i);
+            assert_eq!(*ranges.ranges.lock(), case.expected, "failed case # {}", i);
         }
     }
 }

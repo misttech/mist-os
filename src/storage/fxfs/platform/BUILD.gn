@@ -44,6 +44,7 @@ platform_deps = [
   "//src/lib/fidl/rust/fidl",
   "//src/lib/fuchsia-async",
   "//src/lib/fuchsia-component",
+  "//src/lib/fuchsia-sync",
   "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_rust",
   "//src/storage/fxfs:fxfs_macros",
   "//src/storage/fxfs:lib",

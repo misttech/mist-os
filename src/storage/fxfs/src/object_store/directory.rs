@@ -23,11 +23,12 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD as BASE64_URL_SAFE_NO_PAD;
 use base64::engine::Engine as _;
 use byteorder::{ByteOrder, LittleEndian};
 use fidl_fuchsia_io as fio;
+use fuchsia_sync::Mutex;
 use fxfs_crypto::{Cipher, CipherSet, Key, WrappedKeys};
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use zerocopy::IntoBytes;
 
 use super::FSCRYPT_KEY_ID;
@@ -207,7 +208,7 @@ impl<S: HandleOwner> Directory<S> {
     }
 
     pub fn wrapping_key_id(&self) -> Option<u128> {
-        self.wrapping_key_id.lock().unwrap().clone()
+        self.wrapping_key_id.lock().clone()
     }
 
     /// Retrieves keys from the key manager or unwraps the wrapped keys in the directory's key
@@ -571,7 +572,7 @@ impl<S: HandleOwner> Directory<S> {
         if self.is_deleted() {
             return Ok(None);
         }
-        let res = if self.wrapping_key_id.lock().unwrap().is_some() {
+        let res = if self.wrapping_key_id.lock().is_some() {
             if let Some(fscrypt_key) = self.get_fscrypt_key().await? {
                 let target_casefold_hash =
                     get_casefold_hash(Some(&fscrypt_key), name, self.casefold());
@@ -696,7 +697,7 @@ impl<S: HandleOwner> Directory<S> {
             self.casefold(),
         )
         .await?;
-        if self.wrapping_key_id.lock().unwrap().is_some() {
+        if self.wrapping_key_id.lock().is_some() {
             let key = if let Some(key) = self.get_fscrypt_key().await? {
                 key
             } else {
@@ -744,7 +745,7 @@ impl<S: HandleOwner> Directory<S> {
         handle: &DataObjectHandle<S>,
     ) -> Result<(), Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
-        if self.wrapping_key_id.lock().unwrap().is_some() {
+        if self.wrapping_key_id.lock().is_some() {
             let key = if let Some(key) = self.get_fscrypt_key().await? {
                 key
             } else {
@@ -845,7 +846,7 @@ impl<S: HandleOwner> Directory<S> {
         options: HandleOptions,
     ) -> Result<DataObjectHandle<S>, Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
-        let wrapping_key_id = self.wrapping_key_id.lock().unwrap().clone();
+        let wrapping_key_id = self.wrapping_key_id.lock().clone();
         let handle =
             ObjectStore::create_object(self.owner(), transaction, options, wrapping_key_id).await?;
         self.add_child_file(transaction, name, &handle).await?;
@@ -858,7 +859,7 @@ impl<S: HandleOwner> Directory<S> {
         transaction: &mut Transaction<'a>,
     ) -> Result<DataObjectHandle<S>, Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
-        let wrapping_key_id = self.wrapping_key_id.lock().unwrap().clone();
+        let wrapping_key_id = self.wrapping_key_id.lock().clone();
         let handle = ObjectStore::create_object(
             self.owner(),
             transaction,
@@ -1006,7 +1007,7 @@ impl<S: HandleOwner> Directory<S> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
         let sub_dirs_delta = if descriptor == ObjectDescriptor::Directory { 1 } else { 0 };
         // TODO(https://fxbug.dev/360171961): Add fscrypt symlink support.
-        if self.wrapping_key_id.lock().unwrap().is_some() {
+        if self.wrapping_key_id.lock().is_some() {
             if !matches!(descriptor, ObjectDescriptor::File | ObjectDescriptor::Directory) {
                 return Err(anyhow!(FxfsError::InvalidArgs)
                     .context("Encrypted directories can only have file or directory children"));
@@ -1089,7 +1090,7 @@ impl<S: HandleOwner> Directory<S> {
         transaction
             .commit_with_callback(|_| {
                 if let Some((key_id, unwrapped_key)) = wrapping_key {
-                    *self.wrapping_key_id.lock().unwrap() = Some(key_id);
+                    *self.wrapping_key_id.lock() = Some(key_id);
                     self.store().key_manager.merge(self.object_id(), |existing| {
                         let mut new = existing.map_or(Vec::new(), |e| e.ciphers().to_vec());
                         new.push(unwrapped_key);
@@ -1249,7 +1250,7 @@ impl<S: HandleOwner> Directory<S> {
         // We have three types of child records depending on directory features (Child,
         // CasefoldChild, EncryptedChild). EncryptedChild can be casefolded or not. To avoid leaking
         // complexity, we try to keep this implementation detail internal to this struct.
-        let (query_key, requested_filename) = if self.wrapping_key_id.lock().unwrap().is_some() {
+        let (query_key, requested_filename) = if self.wrapping_key_id.lock().is_some() {
             if let Some(key) = self.get_fscrypt_key().await? {
                 // Unlocked EncryptedChild case.
                 let casefold_hash = get_casefold_hash(Some(&key), from, self.casefold());
@@ -1306,7 +1307,7 @@ impl<S: HandleOwner> Directory<S> {
             }
             iter.advance().await?;
         }
-        let key = if self.wrapping_key_id.lock().unwrap().is_some() {
+        let key = if self.wrapping_key_id.lock().is_some() {
             self.get_fscrypt_key().await?
         } else {
             None
