@@ -131,8 +131,18 @@ void DisplayConfig::DiscardNonLayerDraftConfig() {
   draft_has_layer_list_change_ = false;
   draft_has_layer_list_change_property_.Set(false);
 
+  // TODO(https://fxbug.dev/402804098): Remove this workaround.
+  //
+  // We preserve the draft display mode to work
+  // around a Scenic issue where it forgets to call SetDisplayMode() again after
+  // discarding a draft configuration with a load-bearing SetDisplayMode().
+  const display_mode_t draft_mode = draft_.mode;
+
   draft_ = applied_;
   has_draft_nonlayer_config_change_ = false;
+
+  // TODO(https://fxbug.dev/402804098): Remove this workaround.
+  draft_.mode = draft_mode;
 }
 
 void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::Sync& completer) {
@@ -1009,8 +1019,8 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
     const rect_u_t display_area = {
         .x = 0,
         .y = 0,
-        .width = banjo_display_config.mode.h_addressable,
-        .height = banjo_display_config.mode.v_addressable,
+        .width = display_config.draft_.mode.h_addressable,
+        .height = display_config.draft_.mode.v_addressable,
     };
 
     // Normalize the display configuration, and perform Coordinator-level
@@ -1063,6 +1073,12 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
       }
       return false;
     }
+
+    ZX_DEBUG_ASSERT_MSG(display_config.draft_.layer_count == banjo_layers_index,
+                        "Draft configuration layer count %zu does not agree with list size %zu",
+                        display_config.draft_.layer_count, banjo_layers_index);
+    banjo_display_config = display_config.draft_;
+    banjo_display_config.layer_list = banjo_layers;
   }
 
   if (banjo_display_config.layer_count == 0) {
