@@ -99,6 +99,7 @@ test_names = [
   # keep-sorted start
   "load_policy",
   "memfd",
+  "mount",
   "pipe",
   "procattr",
   "selinuxfs",
