@@ -30,7 +30,7 @@ group("ansi_term") {
 }
 
 group("anyhow") {
-  public_deps = [ ":anyhow-v1_0_95" ]
+  public_deps = [ ":anyhow-v1_0_97" ]
 }
 
 group("arbitrary") {
@@ -1615,16 +1615,16 @@ rust_library("ansi_term-v0_12_1") {
   applicable_licenses = [ ":ansi_term-v0_12_1.license" ]
 }
 
-license("anyhow-v1_0_95.license") {
+license("anyhow-v1_0_97.license") {
   public_package_name = "anyhow"
   license_files =
-      [ "//third_party/rust_crates/vendor/anyhow-1.0.95/LICENSE-APACHE" ]
+      [ "//third_party/rust_crates/vendor/anyhow-1.0.97/LICENSE-APACHE" ]
 }
 
-rust_library("anyhow-v1_0_95") {
+rust_library("anyhow-v1_0_97") {
   crate_name = "anyhow"
-  crate_root = "//third_party/rust_crates/vendor/anyhow-1.0.95/src/lib.rs"
-  output_name = "anyhow-1bbb35b290ff3b78"
+  crate_root = "//third_party/rust_crates/vendor/anyhow-1.0.97/src/lib.rs"
+  output_name = "anyhow-323f0b77771f305a"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -1634,15 +1634,15 @@ rust_library("anyhow-v1_0_95") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=1bbb35b290ff3b78",
-    "-Cextra-filename=-1bbb35b290ff3b78",
+    "-Cmetadata=323f0b77771f305a",
+    "-Cextra-filename=-323f0b77771f305a",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":anyhow-v1_0_95.license" ]
+  applicable_licenses = [ ":anyhow-v1_0_97.license" ]
 }
 
 license("arbitrary-v1_0_3.license") {
@@ -9302,7 +9302,7 @@ rust_library("mock-omaha-server-v0_3_3") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":anyhow-v1_0_95" ]
+  deps += [ ":anyhow-v1_0_97" ]
   deps += [ ":argh-v0_1_12" ]
   deps += [ ":derive_builder-v0_11_1" ]
   deps += [ ":futures-v0_3_30" ]
@@ -10367,7 +10367,7 @@ rust_library("omaha_client-v0_2_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":anyhow-v1_0_95" ]
+  deps += [ ":anyhow-v1_0_97" ]
   deps += [ ":chrono-v0_4_34" ]
   deps += [ ":ecdsa-v0_14_8" ]
   deps += [ ":elliptic-curve-v0_12_3" ]
@@ -12333,7 +12333,7 @@ rust_proc_macro("prost-derive-v0_11_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":anyhow-v1_0_95" ]
+  deps += [ ":anyhow-v1_0_97" ]
   deps += [ ":itertools-v0_10_1" ]
   deps += [ ":proc-macro2-v1_0_86" ]
   deps += [ ":quote-v1_0_38" ]
@@ -13749,7 +13749,7 @@ icu_rust_library("rust_icu_common-v5_0_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":anyhow-v1_0_95" ]
+  deps += [ ":anyhow-v1_0_97" ]
   deps += [ ":rust_icu_sys-v5_0_0" ]
   deps += [ ":thiserror-v1_0_57" ]
 
@@ -14004,7 +14004,7 @@ icu_rust_library("rust_icu_uloc-v5_0_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":anyhow-v1_0_95" ]
+  deps += [ ":anyhow-v1_0_97" ]
   deps += [ ":log-v0_4_22" ]
   deps += [ ":paste-v1_0_15($host_toolchain)" ]
   deps += [ ":rust_icu_common-v5_0_0" ]
@@ -14153,7 +14153,7 @@ rust_library("rustfix-v0_6_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":anyhow-v1_0_95" ]
+  deps += [ ":anyhow-v1_0_97" ]
   deps += [ ":log-v0_4_22" ]
   deps += [ ":serde-v1_0_204" ]
   deps += [ ":serde_json-v1_0_128" ]
