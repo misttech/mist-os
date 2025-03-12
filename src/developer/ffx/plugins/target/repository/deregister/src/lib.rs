@@ -3,20 +3,15 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
-use errors::ffx_bail;
 use ffx_config::EnvironmentContext;
 use ffx_target_repository_deregister_args::DeregisterCommand;
 use ffx_writer::SimpleWriter;
-use fho::{bug, return_bug, return_user_error, user_error, FfxContext, FfxMain, FfxTool, Result};
-use fidl_fuchsia_developer_ffx::{
-    RepositoryConfig, RepositoryIteratorMarker, RepositoryRegistryProxy,
-};
-use fidl_fuchsia_developer_ffx_ext::RepositoryError;
+use fho::{bug, return_bug, user_error, FfxMain, FfxTool, Result};
 use fidl_fuchsia_pkg::RepositoryManagerProxy;
 use fidl_fuchsia_pkg_rewrite::EngineProxy;
 use fidl_fuchsia_pkg_rewrite_ext::{do_transaction, Rule};
-use pkg::{PkgServerInstanceInfo as _, PkgServerInstances, ServerMode};
-use target_holders::{daemon_protocol, moniker};
+use pkg::{PkgServerInstanceInfo as _, PkgServerInstances};
+use target_holders::moniker;
 use zx_status::Status;
 
 const REPOSITORY_MANAGER_MONIKER: &str = "/core/pkg-resolver";
@@ -24,8 +19,6 @@ const REPOSITORY_MANAGER_MONIKER: &str = "/core/pkg-resolver";
 pub struct DeregisterTool {
     #[command]
     cmd: DeregisterCommand,
-    #[with(daemon_protocol())]
-    repos: RepositoryRegistryProxy,
     context: EnvironmentContext,
     #[with(moniker(REPOSITORY_MANAGER_MONIKER))]
     repo_proxy: RepositoryManagerProxy,
@@ -61,56 +54,13 @@ impl FfxMain for DeregisterTool {
 
         let pkg_server_info = mgr.get_instance(repo_name.clone(), repo_port)?;
 
-        let target_spec = ffx_target::get_target_specifier(&self.context)
-            .await
-            .user_message("getting target specifier from config")?;
-
         if let Some(server_info) = pkg_server_info {
-            if server_info.server_mode == ServerMode::Daemon {
-                deregister_daemon(
-                    &server_info.name,
-                    target_spec,
-                    self.repos.clone(),
-                    self.engine_proxy,
-                )
-                .await?
-            } else {
-                deregister_standalone(&server_info.name, self.repo_proxy, self.engine_proxy).await?
-            }
+            deregister_standalone(&server_info.name, self.repo_proxy, self.engine_proxy).await?
         } else {
-            let deamon_repos = list_repositories(self.repos.clone()).await?;
-            if deamon_repos.iter().any(|repo| repo.name == repo_name) {
-                deregister_daemon(&repo_name, target_spec, self.repos.clone(), self.engine_proxy)
-                    .await?
-            } else {
-                deregister_standalone(&repo_name, self.repo_proxy, self.engine_proxy).await?
-            }
+            deregister_standalone(&repo_name, self.repo_proxy, self.engine_proxy).await?
         }
         Ok(())
     }
-}
-
-async fn list_repositories(repos_proxy: RepositoryRegistryProxy) -> Result<Vec<RepositoryConfig>> {
-    let (client, server) = fidl::endpoints::create_endpoints::<RepositoryIteratorMarker>();
-    repos_proxy.list_repositories(server).map_err(|e| bug!("error listing repositories: {e}"))?;
-    let client = client.into_proxy();
-
-    let mut repos = vec![];
-    loop {
-        let batch = client
-            .next()
-            .await
-            .map_err(|e| bug!("error fetching next batch of repositories: {e}"))?;
-        if batch.is_empty() {
-            break;
-        }
-
-        for repo in batch {
-            repos
-                .push(repo.try_into().map_err(|e| bug!("error converting repository config {e}"))?);
-        }
-    }
-    Ok(repos)
 }
 
 async fn deregister_standalone(
@@ -143,42 +93,6 @@ async fn deregister_standalone(
     };
     // Remove any alias rules.
     remove_aliases(repo_name, rewrite_proxy).await
-}
-
-async fn deregister_daemon(
-    repo_name: &str,
-    target_str: Option<String>,
-    repos: RepositoryRegistryProxy,
-    rewrite_proxy: EngineProxy,
-) -> Result<()> {
-    match repos
-        .deregister_target(repo_name, target_str.as_deref())
-        .await
-        .map_err(|e| bug!("{e}"))?
-        .map_err(RepositoryError::from)
-    {
-        Ok(()) => (),
-        Err(err @ RepositoryError::TargetCommunicationFailure) => {
-            ffx_bail!(
-                "Error while deregistering repository: {}\n\
-                Ensure that a target is running and connected with:\n\
-                $ ffx target list",
-                err,
-            )
-        }
-        Err(RepositoryError::ServerNotRunning) => {
-            return_user_error!(
-                "Failed to deregister repository: {:#}",
-                pkg::config::determine_why_repository_server_is_not_running().await
-            )
-        }
-        Err(err) => {
-            return_user_error!("Failed to deregister repository: {}", err)
-        }
-    };
-    // Remove any alias rules.
-    let repo_url = format!("fuchsia-pkg://{repo_name}");
-    remove_aliases(&repo_url, rewrite_proxy).await
 }
 
 async fn remove_aliases(repo_url: &str, rewrite_proxy: EngineProxy) -> Result<()> {
@@ -220,88 +134,17 @@ mod test {
     use ffx_config::ConfigLevel;
     use ffx_writer::TestBuffers;
     use fidl::endpoints::ServerEnd;
-    use fidl_fuchsia_developer_ffx::{
-        FileSystemRepositorySpec, PmRepositorySpec, RepositoryError, RepositoryIteratorRequest,
-        RepositoryRegistryRequest, RepositorySpec,
-    };
     use fidl_fuchsia_pkg_ext::{
         RepositoryConfigBuilder, RepositoryRegistrationAliasConflictMode, RepositoryStorageType,
     };
     use fidl_fuchsia_pkg_rewrite::{EditTransactionRequest, EngineRequest, RuleIteratorRequest};
     use futures::channel::oneshot::{channel, Receiver};
     use futures::StreamExt;
-    use pkg::PkgServerInfo;
+    use pkg::{PkgServerInfo, ServerMode};
     use std::collections::BTreeSet;
     use std::net::Ipv4Addr;
     use std::process;
     use target_holders::fake_proxy;
-
-    const REPO_NAME: &str = "some-name";
-    const TARGET_NAME: &str = "some-target";
-
-    fn fake_repo_list_handler(iterator: fidl::endpoints::ServerEnd<RepositoryIteratorMarker>) {
-        fuchsia_async::Task::spawn(async move {
-            let mut sent = false;
-            let mut iterator = iterator.into_stream();
-            while let Some(Ok(req)) = iterator.next().await {
-                match req {
-                    RepositoryIteratorRequest::Next { responder } => {
-                        if !sent {
-                            sent = true;
-                            responder
-                                .send(&[
-                                    RepositoryConfig {
-                                        name: "Test1".to_owned(),
-                                        spec: RepositorySpec::FileSystem(
-                                            FileSystemRepositorySpec {
-                                                metadata_repo_path: Some("a/b/meta".to_owned()),
-                                                blob_repo_path: Some("a/b/blobs".to_owned()),
-                                                ..Default::default()
-                                            },
-                                        ),
-                                    },
-                                    RepositoryConfig {
-                                        name: "Test2".to_owned(),
-                                        spec: RepositorySpec::Pm(PmRepositorySpec {
-                                            path: Some("c/d".to_owned()),
-                                            aliases: Some(vec![
-                                                "example.com".into(),
-                                                "fuchsia.com".into(),
-                                            ]),
-                                            ..Default::default()
-                                        }),
-                                    },
-                                ])
-                                .unwrap()
-                        } else {
-                            responder.send(&[]).unwrap()
-                        }
-                    }
-                }
-            }
-        })
-        .detach();
-    }
-
-    async fn setup_fake_server() -> (RepositoryRegistryProxy, Receiver<(String, Option<String>)>) {
-        let (sender, receiver) = channel();
-        let mut sender = Some(sender);
-        let repos = fake_proxy(move |req| match req {
-            RepositoryRegistryRequest::DeregisterTarget {
-                repository_name,
-                target_identifier,
-                responder,
-            } => {
-                sender.take().unwrap().send((repository_name, target_identifier)).unwrap();
-                responder.send(Ok(())).unwrap();
-            }
-            RepositoryRegistryRequest::ListRepositories { iterator, .. } => {
-                fake_repo_list_handler(iterator);
-            }
-            other => panic!("Unexpected request: {:?}", other),
-        });
-        (repos, receiver)
-    }
 
     async fn setup_fake_repo_manager_server(
     ) -> (RepositoryManagerProxy, Receiver<(String, Option<String>)>) {
@@ -404,15 +247,6 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_deregister() {
-        let (repos, receiver) = setup_fake_server().await;
-        let engine = setup_fake_engine_server();
-        deregister_daemon(REPO_NAME, Some(TARGET_NAME.to_string()), repos, engine).await.unwrap();
-        let got = receiver.await.unwrap();
-        assert_eq!(got, (REPO_NAME.to_string(), Some(TARGET_NAME.to_string()),));
-    }
-
-    #[fuchsia::test]
     async fn test_deregister_default_repository_standalone() {
         let env = ffx_config::test_init().await.unwrap();
 
@@ -425,7 +259,6 @@ mod test {
             .await
             .expect("Setting default target");
 
-        let repos = fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
         let (repo_mgr, _) = setup_fake_repo_manager_server().await;
 
         make_server_instance(ServerMode::Foreground, default_repo_name.to_string(), &env.context)
@@ -433,7 +266,6 @@ mod test {
 
         let tool = DeregisterTool {
             cmd: DeregisterCommand { repository: None, port: None },
-            repos,
             context: env.context.clone(),
             repo_proxy: repo_mgr,
             engine_proxy: setup_fake_engine_server(),
@@ -444,69 +276,6 @@ mod test {
 
         let res = tool.main(writer).await;
         assert!(res.is_ok(), "Expected result to be OK. Got: {res:?}");
-    }
-
-    #[fuchsia::test]
-    async fn test_deregister_default_repository_deamon() {
-        let env = ffx_config::test_init().await.unwrap();
-
-        let default_repo_name = "default-repo";
-        pkg::config::set_default_repository(default_repo_name).await.unwrap();
-        env.context
-            .query("target.default")
-            .level(Some(ConfigLevel::User))
-            .set("some-target".into())
-            .await
-            .expect("Setting default target");
-
-        let (repos, receiver) = setup_fake_server().await;
-        let (repo_mgr, _) = setup_fake_repo_manager_server().await;
-
-        make_server_instance(ServerMode::Daemon, default_repo_name.to_string(), &env.context)
-            .expect("creating test server");
-
-        let tool = DeregisterTool {
-            cmd: DeregisterCommand { repository: None, port: None },
-            repos,
-            context: env.context.clone(),
-            repo_proxy: repo_mgr,
-            engine_proxy: setup_fake_engine_server(),
-        };
-
-        let buffers = TestBuffers::default();
-        let writer = SimpleWriter::new_test(&buffers);
-
-        let res = tool.main(writer).await;
-        assert!(res.is_ok(), "Expected result to be OK. Got: {res:?}");
-
-        let got = receiver.await;
-        match got {
-            Ok((got_repo_name, got_target_name)) => assert_eq!(
-                (got_repo_name, got_target_name),
-                (default_repo_name.to_string(), Some(TARGET_NAME.to_string()),)
-            ),
-            Err(_e) => assert!(got.is_ok(), "Expected OK result, got {got:?}"),
-        };
-    }
-
-    #[fuchsia::test]
-    async fn test_deregister_returns_error() {
-        let repos = fake_proxy(move |req| match req {
-            RepositoryRegistryRequest::DeregisterTarget {
-                repository_name: _,
-                target_identifier: _,
-                responder,
-            } => {
-                responder.send(Err(RepositoryError::TargetCommunicationFailure)).unwrap();
-            }
-            other => panic!("Unexpected request: {:?}", other),
-        });
-
-        let engine = setup_fake_engine_server();
-
-        assert!(deregister_daemon(REPO_NAME, Some(TARGET_NAME.to_string()), repos, engine)
-            .await
-            .is_err());
     }
 
     #[fuchsia::test]
@@ -523,7 +292,6 @@ mod test {
             .await
             .expect("Setting default target");
 
-        let repos = fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
         let repo_mgr = fake_proxy(move |req| match req {
             fidl_fuchsia_pkg::RepositoryManagerRequest::Remove { responder, .. } => {
                 responder.send(Err(Status::NOT_FOUND.into_raw())).unwrap();
@@ -536,7 +304,6 @@ mod test {
 
         let tool = DeregisterTool {
             cmd: DeregisterCommand { repository: None, port: None },
-            repos,
             context: env.context.clone(),
             repo_proxy: repo_mgr,
             engine_proxy: setup_fake_engine_server(),

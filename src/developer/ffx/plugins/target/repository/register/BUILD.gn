@@ -24,7 +24,6 @@ ffx_plugin("ffx_target_repository_register") {
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:schemars",
     "//third_party/rust_crates:serde",
-    "//third_party/rust_crates:tracing",
   ]
   test_deps = [
     "//src/developer/ffx/lib/addr:lib",
@@ -36,6 +35,7 @@ ffx_plugin("ffx_target_repository_register") {
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:tracing",
   ]
   args_deps = [
     "//src/developer/ffx/core:lib",
