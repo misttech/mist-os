@@ -211,10 +211,10 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   Soname name_;
   AbiModule abi_module_;
   TlsModule tls_module_;
-  size_type static_tls_bias_ = 0;
-  bool can_unload_ = true;
   ModuleRefList direct_deps_;
   ModuleRefList module_tree_;
+  size_type static_tls_bias_ = 0;
+  bool can_unload_ = true;
   bool initialized_ = false;
 };
 
