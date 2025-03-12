@@ -38,6 +38,7 @@ import (
 	"fidl/fuchsia/net/interfaces"
 	"fidl/fuchsia/net/interfaces/admin"
 	"fidl/fuchsia/net/name"
+	fnetNdp "fidl/fuchsia/net/ndp"
 	"fidl/fuchsia/net/neighbor"
 	"fidl/fuchsia/net/root"
 	fnetRoutes "fidl/fuchsia/net/routes"
@@ -1039,6 +1040,17 @@ func Main() {
 					"netstack2 does not support %s",
 					routesAdmin.RuleTableV6Name,
 				)
+				component.CloseWithEpitaph(c, zx.ErrNotSupported)
+				return nil
+			},
+		)
+
+		componentCtx.OutgoingService.AddService(
+			fnetNdp.RouterAdvertisementOptionWatcherProviderName,
+			func(ctx context.Context, c zx.Channel) error {
+				_ = syslog.WarnTf(fnetNdp.RouterAdvertisementOptionWatcherProviderName,
+					"netstack2 does not support %s",
+					fnetNdp.RouterAdvertisementOptionWatcherProviderName)
 				component.CloseWithEpitaph(c, zx.ErrNotSupported)
 				return nil
 			},
