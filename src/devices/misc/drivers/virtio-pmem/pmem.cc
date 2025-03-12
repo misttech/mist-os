@@ -54,6 +54,14 @@ zx_status_t PmemDevice::Init() {
     FDF_LOG(ERROR, "failed to create VMO: %s", zx_status_get_string(status));
     return status;
   }
+  // Physical VMOs have a default cache policy of uncached. The persistent
+  // memory object exposes a region of normal memory (not device memory) so a
+  // cached policy is more appropriate.
+  status = phys_vmo_.set_cache_policy(ZX_CACHE_POLICY_CACHED);
+  if (status != ZX_OK) {
+    FDF_LOG(ERROR, "failed to set cache policy: %s", zx_status_get_string(status));
+    return status;
+  }
 
   // Initialize request virtqueue.
   status = request_virtio_queue_.Init(0);

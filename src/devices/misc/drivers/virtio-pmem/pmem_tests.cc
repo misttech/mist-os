@@ -151,6 +151,19 @@ TEST_F(PmemTestDriver, ServiceTest) {
   ASSERT_OK(run_result.status_value());
 }
 
+TEST_F(PmemTestDriver, CachePolicy) {
+  zx::result service = driver_test().Connect<fuchsia_hardware_virtio_pmem::Service::Device>();
+  ASSERT_OK(service.status_value());
+  zx::result run_result = driver_test().RunOnBackgroundDispatcherSync([&service]() {
+    fidl::Result vmo = fidl::Call(*service)->Get();
+    zx_info_vmo_t vmo_info{};
+    ASSERT_OK(vmo->vmo().get_info(ZX_INFO_VMO, &vmo_info, sizeof(vmo_info), nullptr, nullptr));
+    // VMO should have a cache policy of "cached".
+    EXPECT_EQ(vmo_info.cache_policy, ZX_CACHE_POLICY_CACHED);
+  });
+  ASSERT_OK(run_result.status_value());
+}
+
 FUCHSIA_DRIVER_EXPORT(TestPmemDriver);
 
 }  // namespace
