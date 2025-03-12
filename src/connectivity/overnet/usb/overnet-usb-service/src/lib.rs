@@ -15,6 +15,7 @@ use futures::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, StreamExt, Try
 use log::{debug, error, info, trace, warn};
 use std::io::Error;
 use std::pin::pin;
+use usb_vsock::{Header, Packet, PacketMut, PacketStream, PacketType};
 use zx::{SocketOpts, Status};
 
 static MTU: usize = 1024;
@@ -57,13 +58,14 @@ impl<P: SocketCallback> UsbConnection<P> {
         Self { callback, usb_socket_reader, usb_socket_writer }
     }
 
-    /// Waits for an [`OVERNET_MAGIC`] packet and sends the reply back, and then returns a
+    /// Waits for an [`PacketType::Sync`] packet and sends the reply back, and then returns a
     /// fresh client socket for that overnet session.
     async fn next_socket(&mut self, mut found_magic: bool) -> Option<Socket> {
-        let mut data = vec![0; OVERNET_MAGIC.len()];
+        let mut data = [0; MTU];
         while !found_magic {
-            let len = match self.usb_socket_reader.read(&mut data).await {
-                Ok(0) => {
+            let mut packets = match read_packet_stream(&mut self.usb_socket_reader, &mut data).await
+            {
+                Ok(None) => {
                     debug!("Usb socket closed");
                     return None;
                 }
@@ -71,22 +73,42 @@ impl<P: SocketCallback> UsbConnection<P> {
                     error!("Unexpected error on usb socket: {err}");
                     return None;
                 }
-                Ok(len) => len,
+                Ok(Some(packets)) => packets,
             };
-            debug!("Read {} bytes from usb socket", len);
 
-            if data == OVERNET_MAGIC {
-                found_magic = true;
-            } else {
-                warn!(
-                    "Got {} bytes of garbage data before magic string on usb socket, discarding",
-                    len
-                );
+            while let Some(packet) = packets.next() {
+                // note: we will deliberately warn and ignore for any vsock packets in the same
+                // usb packet as a sync packet, regardless of whether they were before or after.
+                match packet {
+                    Ok(Packet {
+                        header: Header { packet_type: PacketType::Sync, .. },
+                        payload,
+                    }) => {
+                        if payload == OVERNET_MAGIC {
+                            found_magic = true;
+                        } else {
+                            warn!(
+                                "Got unexpected payload of length {} in sync packet",
+                                payload.len()
+                            );
+                        }
+                    }
+                    Ok(packet) => {
+                        warn!("Got unexpected packet of type {:?} and length {} while waiting for sync packet. Ignoring.", packet.header.packet_type, packet.header.payload_len);
+                    }
+                    Err(err) => {
+                        warn!("Got invalid vsock packet while waiting for sync packet: {err:?}");
+                    }
+                }
             }
         }
 
-        debug!("Read magic string, sending it back and setting up a new link");
-        if let Err(err) = self.usb_socket_writer.write(OVERNET_MAGIC).await {
+        debug!("Read sync packet, sending it back and setting up a new link");
+        let mut header = Header::new(PacketType::Sync);
+        header.payload_len = (OVERNET_MAGIC.len() as u32).into();
+        let packet = Packet { header: &header, payload: OVERNET_MAGIC };
+        packet.write_to_unchecked(&mut data);
+        if let Err(err) = self.usb_socket_writer.write(&data).await {
             error!("Error writing overnet magic string to the usb socket: {err:?}");
             return None;
         }
@@ -138,6 +160,17 @@ impl<P: SocketCallback> UsbConnection<P> {
     }
 }
 
+async fn read_packet_stream<'a>(
+    reader: &mut (impl AsyncRead + Unpin),
+    mut buffer: &'a mut [u8],
+) -> Result<Option<PacketStream<'a>>, std::io::Error> {
+    let size = reader.read(&mut buffer).await?;
+    if size == 0 {
+        return Ok(None);
+    }
+    Ok(Some(PacketStream::new(&buffer[0..size])))
+}
+
 /// Reads from `reader` in `MTU`-sized chunks and then writes them out to `writer`, ensuring that
 /// we never write an item larger than `MTU` to it. This must be used with a datagram socket
 /// or other writer where writes are guaranteed to transmit all data if the write returns success.
@@ -147,14 +180,16 @@ async fn mtu_copy<const MTU: usize>(
 ) -> Result<(), Error> {
     let mut data = [0; MTU];
     loop {
-        let len = reader.read(&mut data).await?;
-        trace!("Read {len} bytes from normal source");
-        if len == 0 {
+        // add a data header to the packet
+        let packet = PacketMut::new_in(PacketType::Data, &mut data);
+        let payload_len = reader.read(packet.payload).await?;
+        trace!("Read {payload_len} bytes from normal source");
+        if payload_len == 0 {
             break;
         }
-        let data = &mut data[0..len];
+        let packet_len = packet.finish(payload_len).unwrap();
         // we assert here because this must be used with a datagram-like socket.
-        assert_eq!(writer.write(data).await?, len);
+        assert_eq!(writer.write(&data[..packet_len]).await?, packet_len);
     }
     Ok(())
 }
@@ -169,18 +204,28 @@ async fn magic_interrupt_copy<const MTU: usize>(
 ) -> Result<(), Error> {
     let mut data = [0; MTU];
     loop {
-        let len = reader.read(&mut data).await?;
-        trace!("Read {len} bytes from interruptable source");
-        if len == 0 {
+        let Some(mut packets) = read_packet_stream(reader, &mut data).await? else {
             break;
+        };
+        while let Some(packet) = packets.next() {
+            match packet {
+                Ok(Packet { header: Header { packet_type: PacketType::Sync, .. }, .. }) => {
+                    debug!("Found sync packet, ending stream");
+                    *found_magic = true;
+                    return Ok(());
+                }
+                Ok(Packet { header: Header { packet_type: PacketType::Data, .. }, payload }) => {
+                    writer.write_all(&payload).await?;
+                }
+                Ok(packet) => {
+                    warn!("Ignoring unexpected packet of type {:?}", packet.header.packet_type);
+                }
+                Err(err) => {
+                    error!("Failed to parse vsock packet, going back to waiting for sync packet: {err:?}");
+                    break;
+                }
+            }
         }
-        let data = &mut data[0..len];
-        if OVERNET_MAGIC == data {
-            debug!("Found magic string, ending stream");
-            *found_magic = true;
-            break;
-        }
-        writer.write_all(data).await?;
     }
     Ok(())
 }
@@ -321,22 +366,43 @@ mod tests {
         }
     }
 
+    fn make_packet(ptype: PacketType, data: &[u8]) -> Vec<u8> {
+        let header = &mut Header::new(ptype);
+        header.payload_len = (data.len() as u32).into();
+        let packet = Packet { header, payload: &data };
+        let mut packet_storage = vec![0; header.packet_size()];
+        packet.write_to_unchecked(&mut packet_storage);
+        packet_storage
+    }
+
+    fn sync_packet() -> Vec<u8> {
+        make_packet(PacketType::Sync, OVERNET_MAGIC)
+    }
+
+    fn data_packet(c: u8, len: usize) -> Vec<u8> {
+        let bytes = vec![c; len];
+        make_packet(PacketType::Data, &bytes)
+    }
+
     #[fuchsia::test]
     async fn test_mtu_copy() {
-        let inputs = [b'a'; 9000];
+        let inputs = [b'a'; 9001];
         let mut outputs = ExactPackets::default();
         mtu_copy::<1024>(&mut inputs.as_ref(), &mut outputs).await.unwrap();
         assert_eq!(
             Vec::from_iter(outputs.iter().map(|v| v.len())),
-            vec![1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 808],
-            "output has been chunked into MTU-sized bits"
+            vec![1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 25],
+            "output has been chunked into MTU-sized bits plus headers"
         )
     }
 
     #[fuchsia::test]
     async fn test_interrupt_copy() {
-        let mut inputs =
-            ExactPackets(VecDeque::from([vec![b'a'; 99], OVERNET_MAGIC.to_vec(), vec![b'b'; 99]]));
+        let mut inputs = ExactPackets(VecDeque::from([
+            data_packet(b'a', 99),
+            sync_packet(),
+            data_packet(b'b', 99),
+        ]));
         let mut outputs = ExactPackets::default();
         let mut found_magic = false;
         magic_interrupt_copy::<1024>(&mut found_magic, &mut inputs, &mut outputs).await.unwrap();
@@ -345,7 +411,11 @@ mod tests {
             VecDeque::from([vec![b'a'; 99]]),
             "output contains everything up to the magic reset string"
         );
-        assert_eq!(*inputs, VecDeque::from([vec![b'b'; 99]]), "input still contains the remainder");
+        assert_eq!(
+            *inputs,
+            VecDeque::from([data_packet(b'b', 99)]),
+            "input still contains the remainder"
+        );
         assert!(found_magic, "the magic reset string was found");
     }
 
@@ -359,7 +429,6 @@ mod tests {
     #[fuchsia::test]
     async fn test_usb_connection() {
         let scope = Scope::new();
-        //let mut inputs = ExactPackets(VecDeque::from([vec![b'a'; 10], OVERNET_MAGIC.to_vec(), vec![b'b'; 10], OVERNET_MAGIC.to_vec(), vec![b'c'; 10]]));
         let (usb_socket, other_end) = zx::Socket::create_datagram();
         let (mut usb_socket_reader, mut usb_socket_writer) =
             Socket::from_socket(usb_socket).split();
@@ -382,22 +451,43 @@ mod tests {
             expect_read(read_sock, expected).await;
         }
 
+        async fn expect_usb_round_trip(
+            mut usb_socket_writer: (impl AsyncWrite + Unpin),
+            socket: (impl AsyncRead + Unpin),
+            expected: impl AsRef<[u8]>,
+        ) {
+            usb_socket_writer
+                .write_all(&make_packet(PacketType::Data, expected.as_ref()))
+                .await
+                .unwrap();
+            expect_read(socket, expected).await;
+        }
+
+        async fn expect_socket_round_trip(
+            mut socket: (impl AsyncWrite + Unpin),
+            usb_socket_reader: (impl AsyncRead + Unpin),
+            expected: impl AsRef<[u8]>,
+        ) {
+            socket.write_all(expected.as_ref()).await.unwrap();
+            expect_read(usb_socket_reader, &make_packet(PacketType::Data, expected.as_ref())).await;
+        }
+
         println!("writing some garbage that should get ignored");
         usb_socket_writer
             .write_all(b"this is garbage and should not affect anything")
             .await
             .unwrap();
         println!("testing first socket");
-        expect_round_trip(&mut usb_socket_writer, &mut usb_socket_reader, OVERNET_MAGIC).await;
+        expect_round_trip(&mut usb_socket_writer, &mut usb_socket_reader, &sync_packet()).await;
         let mut socket = Socket::from_socket(link_rx.next().await.unwrap());
-        expect_round_trip(&mut socket, &mut usb_socket_reader, b"hello world!").await;
-        expect_round_trip(&mut usb_socket_writer, socket, b"hello back!!").await;
+        expect_socket_round_trip(&mut socket, &mut usb_socket_reader, b"hello world!").await;
+        expect_usb_round_trip(&mut usb_socket_writer, socket, b"hello back!!").await;
 
         println!("testing second socket");
-        expect_round_trip(&mut usb_socket_writer, &mut usb_socket_reader, OVERNET_MAGIC).await;
+        expect_round_trip(&mut usb_socket_writer, &mut usb_socket_reader, &sync_packet()).await;
         let mut socket = Socket::from_socket(link_rx.next().await.unwrap());
-        expect_round_trip(&mut socket, usb_socket_reader, b"hello new world!").await;
-        expect_round_trip(usb_socket_writer, socket, b"hello back again!!").await;
+        expect_socket_round_trip(&mut socket, usb_socket_reader, b"hello new world!").await;
+        expect_usb_round_trip(usb_socket_writer, socket, b"hello back again!!").await;
         println!("hilo");
 
         println!("waiting for close");
