@@ -4471,7 +4471,9 @@ assembly_input_bundle("example_assembly_bundle") {
       components = [
         {
           component_name = "bar"
-          shards = [ "//src/tests/assembly/assemble_image/compiled_package/meta/test.cml" ]
+          shards = [
+            "//src/tests/assembly/assemble_image/compiled_package/meta/bar.cml",
+          ]
         },
         {
           component_name = "baz"

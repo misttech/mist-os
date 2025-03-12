@@ -1,8 +1,10 @@
-// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    // verifying config in product assembly checks that a supported runner is specified
+    include: [ "test/include.cml" ],
+
+    // product assembly checks that a supported runner is specified
     program: {
         runner: "elf",
     },
@@ -15,7 +17,7 @@
         // This config field is mutable-by-parent, which scrutiny should not allow
         // in statically-defined config policies because policy-specified values could be
         // overidden at runtime.
-        verifier_fails_due_to_mutability_parent: {
+        mutable_by_parent_config: {
             type: "string",
             max_size: 100,
             mutability: [ "parent" ],

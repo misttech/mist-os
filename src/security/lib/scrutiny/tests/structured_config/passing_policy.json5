@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 {
     components: {
-        "fuchsia-pkg://fuchsia.com/package_with_structured_config_for_scrutiny_testing#meta/component_with_structured_config.cm": {
+        "fuchsia-pkg://fuchsia.com/for-test#meta/bar.cm": {
             fields: {
                 asserted_by_scrutiny_test: "check this string!",
             },

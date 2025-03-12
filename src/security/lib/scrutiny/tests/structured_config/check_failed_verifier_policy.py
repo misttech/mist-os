@@ -9,8 +9,8 @@ import subprocess
 import unittest
 
 # NB: These must be kept in sync with the values in BUILD.gn.
-component_name = "component_with_structured_config"
-package_name = "package_with_structured_config_for_scrutiny_testing"
+component_name = "bar"
+package_name = "for-test"
 expected_value_in_policy = "check this string!"
 
 
@@ -82,7 +82,7 @@ def main() -> None:
     expected_error = f"""
 └── fuchsia-pkg://fuchsia.com/{package_name}#meta/{component_name}.cm
       └── `asserted_by_scrutiny_test` has a different value ("{expected_value_in_policy}") than expected ("not the string that was packaged").
-      └── `verifier_fails_due_to_mutability_parent` has an expected value in the policy which could be overridden at runtime by ConfigMutability(PARENT)."""
+      └── `mutable_by_parent_config` has an expected value in the policy which could be overridden at runtime by ConfigMutability(PARENT)."""
     test.assertIn(
         expected_error, stderr, "error message must contain expected failures"
     )

@@ -29,8 +29,12 @@ class CompiledPackageTest(unittest.TestCase):
         outdir = os.path.join(assembly_outdir, "outdir")
         manifest = json.load(open(os.path.join(outdir, "image_assembly.json")))
 
+        # The package is compiled, as well having assembly-set structured config that causes it to
+        # be repackaged.
         self.assertIn(
-            os.path.join(outdir, "for-test", "package_manifest.json"),
+            os.path.join(
+                outdir, "repackaged", "for-test", "package_manifest.json"
+            ),
             manifest["base"],
             "The image assembly config should have 'for-test' in the base set",
         )

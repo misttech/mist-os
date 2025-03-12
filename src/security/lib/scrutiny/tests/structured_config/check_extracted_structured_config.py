@@ -8,8 +8,8 @@ import pathlib
 import unittest
 
 # NB: These must be kept in sync with the values in BUILD.gn.
-component_name = "component_with_structured_config"
-package_name = "package_with_structured_config_for_scrutiny_testing"
+component_name = "bar"
+package_name = "for-test"
 expected_value_in_policy = "check this string!"
 expected_value_for_dont_check = "don't check this string!"
 
@@ -37,7 +37,7 @@ def main() -> None:
         ],
         {
             "asserted_by_scrutiny_test": expected_value_in_policy,
-            "verifier_fails_due_to_mutability_parent": expected_value_for_dont_check,
+            "mutable_by_parent_config": expected_value_for_dont_check,
         },
         "configuration from system image did not match expectation",
     )

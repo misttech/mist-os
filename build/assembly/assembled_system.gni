@@ -67,6 +67,10 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #     assembled system.  (this is only a check made by GN, assembly itself may
 #     still access them)
 #
+#   enable_example_aib (optional; default=false)
+#     [boolean] If true, allow the use of the example / testing AIB by this
+#     assembly.  This is only for use by tests of assembly.
+#
 # Legacy Bundle parameters:
 #   include_legacy_bundle (optional; default=false)
 #     [bool] When true, a legacy bundle will be generated and included in product
@@ -626,7 +630,16 @@ template("assembled_system") {
       ffx_tool = "//src/developer/ffx/plugins/assembly:ffx_assembly_tool"
       ffx_tool_output_name = "ffx-assembly"
 
-      args = [
+      args = []
+
+      if (defined(invoker.enable_example_aib) && invoker.enable_example_aib) {
+        args += [
+          "--config",
+          "assembly_example_enabled=true",
+        ]
+      }
+
+      args += [
         "assembly",
         "product",
         "--product",
