@@ -10,9 +10,7 @@ zx_library("handoff") {
   public_deps = [
     "//vendor/misttech/zircon/kernel/lib/mistos/zx:headers",
     "//zircon/kernel/object:headers",
-  ]
-  deps = [
-    "//zircon/kernel/lib/init",
     "//zircon/kernel/phys:handoff",
   ]
+  deps = [ "//zircon/kernel/lib/init" ]
 }

@@ -38,6 +38,9 @@ source_set("top") {
     "//zircon/kernel/platform",
   ]
   if (is_mistos) {
-    deps += [ "//vendor/misttech/zircon/kernel/lib/starnix" ]
+    deps += [
+      "//vendor/misttech/zircon/kernel/lib/handoff",
+      "//vendor/misttech/zircon/kernel/lib/starnix",
+    ]
   }
 }
