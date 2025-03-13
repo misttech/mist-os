@@ -38,9 +38,9 @@ fn bench_toggle_lease(
     });
 }
 
-fn get_sag_benches() -> criterion::Benchmark {
+fn get_sag_benches(name: &'static str) -> criterion::Benchmark {
     let sag_arc = sag_work::obtain_sag_proxy();
-    criterion::Benchmark::new("TakeWakeLease", move |b| bench_take_wake_lease(b, sag_arc.clone()))
+    criterion::Benchmark::new(name, move |b| bench_take_wake_lease(b, sag_arc.clone()))
 }
 
 fn get_daemon_benches() -> criterion::Benchmark {
@@ -58,8 +58,7 @@ fn main() -> Result<()> {
         .measurement_time(std::time::Duration::from_millis(100))
         .sample_size(100);
 
-    // TODO(https://fxbug.dev/401297480): Add a new bench test without an existing token.
-
+    let _: &mut Criterion = c.bench("fuchsia.power.framework", get_sag_benches("TakeDropWakeLease"));
     let sag_arc = sag_work::obtain_sag_proxy();
     let _event_pair = sag_arc
         .take_wake_lease(
@@ -68,7 +67,7 @@ fn main() -> Result<()> {
         )
         .unwrap();
 
-    let _: &mut Criterion = c.bench("fuchsia.power.framework", get_sag_benches());
+    let _: &mut Criterion = c.bench("fuchsia.power.framework", get_sag_benches("TakeWakeLease"));
     let _: &mut Criterion = c.bench("fuchsia.power.framework", get_daemon_benches());
 
     Ok(())
