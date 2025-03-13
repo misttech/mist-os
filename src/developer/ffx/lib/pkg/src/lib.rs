@@ -4,9 +4,7 @@
 
 pub mod config;
 mod instance;
-pub mod metrics;
 pub mod repo;
-mod tunnel;
 
 pub use instance::{
     write_instance_info, PkgServerInfo, PkgServerInstanceInfo, PkgServerInstances, ServerMode,

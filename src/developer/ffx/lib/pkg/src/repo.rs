@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::tunnel::TunnelManager;
-use crate::{config as pkg_config, metrics, PkgServerInfo};
+use crate::PkgServerInfo;
 use async_lock::RwLock;
+use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_ffx_ext::{
     RepositoryError, RepositoryRegistrationAliasConflictMode, RepositoryTarget,
 };
@@ -12,266 +12,17 @@ use fidl_fuchsia_pkg::RepositoryManagerProxy;
 use fidl_fuchsia_pkg_ext::{MirrorConfigBuilder, RepositoryConfigBuilder};
 use fidl_fuchsia_pkg_rewrite::EngineProxy;
 use fidl_fuchsia_pkg_rewrite_ext::{do_transaction, Rule};
-use fuchsia_hyper::{new_https_client, HttpsClient};
-use fuchsia_repo::manager::RepositoryManager;
+use fuchsia_hyper::HttpsClient;
 use fuchsia_repo::repo_client::RepoClient;
 use fuchsia_repo::repository::{
     self, FileSystemRepository, HttpRepository, PmRepository, RepoProvider, RepositorySpec,
 };
-use fuchsia_repo::server::RepositoryServer;
 use fuchsia_url::RepositoryUrl;
-use futures::FutureExt as _;
-use protocols::prelude::Context;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::Duration;
 use url::Url;
 use zx_status::Status;
-use {fidl_fuchsia_developer_ffx as ffx, fuchsia_async as fasync};
-
-const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(5);
-
-#[derive(PartialEq)]
-pub enum SaveConfig {
-    Save,
-    DoNotSave,
-}
-
-// TODO(https://fxbug.dev/391921340) Refactor / trim when the repo daemon protocol is retired
-#[derive(Debug)]
-pub struct ServerInfo {
-    server: RepositoryServer,
-    task: fasync::Task<()>,
-    tunnel_manager: TunnelManager,
-}
-
-impl ServerInfo {
-    async fn new(
-        listen_addr: SocketAddr,
-        manager: Arc<RepositoryManager>,
-    ) -> std::io::Result<Self> {
-        tracing::debug!("Starting repository server on {}", listen_addr);
-
-        let (server_fut, sink, server) =
-            RepositoryServer::builder(listen_addr, Arc::clone(&manager)).start().await?;
-
-        tracing::info!("Started repository server on {}", server.local_addr());
-
-        // Spawn the server future in the background to process requests from clients.
-        let task = fasync::Task::local(server_fut);
-
-        let tunnel_manager = TunnelManager::new(server.local_addr(), sink);
-
-        Ok(ServerInfo { server, task, tunnel_manager })
-    }
-
-    pub fn local_addr(&self) -> SocketAddr {
-        self.server.local_addr()
-    }
-}
-
-// TODO(https://fxbug.dev/391921340) Refactor / trim when the repo daemon protocol is retired
-#[derive(Debug)]
-pub enum ServerState {
-    Running(ServerInfo),
-    Stopped,
-    Disabled,
-}
-
-impl ServerState {
-    pub async fn start_tunnel(&self, cx: &Context, target_nodename: &str) -> anyhow::Result<()> {
-        match self {
-            ServerState::Running(ref server_info) => {
-                server_info.tunnel_manager.start_tunnel(cx, target_nodename.to_string()).await
-            }
-            _ => Ok(()),
-        }
-    }
-
-    pub async fn stop(&mut self) -> Result<(), RepositoryError> {
-        match std::mem::replace(self, ServerState::Disabled) {
-            ServerState::Running(server_info) => {
-                *self = ServerState::Stopped;
-
-                tracing::debug!("Stopping the repository server");
-
-                server_info.server.stop();
-
-                futures::select! {
-                    () = server_info.task.fuse() => {
-                        tracing::debug!("Stopped the repository server");
-                    },
-                    () = fasync::Timer::new(SHUTDOWN_TIMEOUT).fuse() => {
-                        tracing::error!("Timed out waiting for the repository server to shut down");
-                    },
-                }
-
-                Ok(())
-            }
-            state => {
-                *self = state;
-
-                Err(RepositoryError::ServerNotRunning)
-            }
-        }
-    }
-
-    /// Returns the address is running on. Returns None if the server is not
-    /// running, or is unconfigured.
-    pub fn listen_addr(&self) -> Option<SocketAddr> {
-        match self {
-            ServerState::Running(x) => Some(x.server.local_addr()),
-            _ => None,
-        }
-    }
-}
-
-// TODO(https://fxbug.dev/391921340) Refactor / trim when the repo daemon protocol is retired
-pub struct RepoInner {
-    pub manager: Arc<RepositoryManager>,
-    pub server: ServerState,
-    https_client: HttpsClient,
-}
-
-// RepoInner can move.
-impl RepoInner {
-    pub fn new() -> Arc<RwLock<Self>> {
-        Arc::new(RwLock::new(RepoInner {
-            manager: RepositoryManager::new(),
-            server: ServerState::Disabled,
-            https_client: new_https_client(),
-        }))
-    }
-
-    pub async fn start_server(
-        &mut self,
-        socket_address: Option<SocketAddr>,
-    ) -> Result<Option<SocketAddr>, RepositoryError> {
-        // Exit early if the server is disabled.
-        let server_enabled = pkg_config::get_repository_server_enabled().await.map_err(|err| {
-            tracing::error!("failed to read save server enabled flag: {:#?}", err);
-            RepositoryError::InternalError
-        })?;
-
-        if !server_enabled {
-            tracing::debug!("repo server not enabled, not starting.");
-            return Ok(None);
-        }
-
-        // Exit early if we're already running on this address.
-        let listen_addr = match &self.server {
-            ServerState::Disabled => {
-                tracing::debug!("repo server state is disabled, not starting.");
-                return Ok(None);
-            }
-            ServerState::Running(info) => {
-                tracing::debug!("repo server state is running, not starting.");
-                return Ok(Some(info.server.local_addr()));
-            }
-            ServerState::Stopped => match {
-                if let Some(addr) = socket_address {
-                    Ok(Some(addr))
-                } else {
-                    pkg_config::repository_listen_addr().await
-                }
-            } {
-                Ok(Some(addr)) => addr,
-                Ok(None) => {
-                    tracing::error!(
-                        "repository.server.listen address not configured, not starting server"
-                    );
-
-                    metrics::server_disabled_event().await;
-                    return Ok(None);
-                }
-                Err(err) => {
-                    tracing::error!("Failed to read server address from config: {:#}", err);
-                    return Ok(None);
-                }
-            },
-        };
-
-        match ServerInfo::new(listen_addr, Arc::clone(&self.manager)).await {
-            Ok(info) => {
-                let local_addr = info.server.local_addr();
-                self.server = ServerState::Running(info);
-                pkg_config::set_repository_server_last_address_used(local_addr.to_string())
-                    .await
-                    .map_err(|err| {
-                    tracing::error!(
-                        "failed to save server last address used flag to config: {:#?}",
-                        err
-                    );
-                    ffx::RepositoryError::InternalError
-                })?;
-                metrics::server_started_event().await;
-                Ok(Some(local_addr))
-            }
-            Err(err) => {
-                tracing::error!("failed to start repository server: {:#?}", err);
-                metrics::server_failed_to_start_event(&err.to_string()).await;
-
-                match err.kind() {
-                    std::io::ErrorKind::AddrInUse => {
-                        Err(RepositoryError::ServerAddressAlreadyInUse)
-                    }
-                    _ => Err(RepositoryError::IoError),
-                }
-            }
-        }
-    }
-
-    pub async fn stop_server(&mut self) -> Result<(), ffx::RepositoryError> {
-        tracing::debug!("Stopping repository protocol");
-
-        self.server.stop().await?;
-
-        // Drop all repositories.
-        self.manager.clear();
-
-        tracing::info!("Repository protocol has been stopped");
-
-        Ok(())
-    }
-
-    pub fn get_backend(
-        &self,
-        repo_spec: &RepositorySpec,
-    ) -> Result<Box<dyn RepoProvider>, RepositoryError> {
-        repo_spec_to_backend(repo_spec, self.https_client.clone())
-    }
-}
-
-#[async_trait::async_trait(?Send)]
-pub trait Registrar {
-    async fn register_target(
-        &self,
-        cx: &Context,
-        mut target_info: RepositoryTarget,
-        save_config: SaveConfig,
-        inner: Arc<RwLock<RepoInner>>,
-        alias_conflict_mode: RepositoryRegistrationAliasConflictMode,
-    ) -> Result<(), ffx::RepositoryError>;
-
-    async fn register_target_with_fidl(
-        &self,
-        cx: &Context,
-        mut target_info: RepositoryTarget,
-        save_config: SaveConfig,
-        inner: Arc<RwLock<RepoInner>>,
-        alias_conflict_mode: RepositoryRegistrationAliasConflictMode,
-    ) -> Result<(), ffx::RepositoryError>;
-
-    async fn register_target_with_ssh(
-        &self,
-        cx: &Context,
-        mut target_info: RepositoryTarget,
-        save_config: SaveConfig,
-        inner: Arc<RwLock<RepoInner>>,
-        alias_conflict_mode: RepositoryRegistrationAliasConflictMode,
-    ) -> Result<(), ffx::RepositoryError>;
-}
 
 pub fn repo_spec_to_backend(
     repo_spec: &RepositorySpec,
@@ -316,7 +67,7 @@ pub fn repo_spec_to_backend(
     }
 }
 
-pub async fn update_repository(
+async fn update_repository(
     repo_name: &str,
     repo: &RwLock<RepoClient<Box<dyn RepoProvider>>>,
 ) -> Result<bool, ffx::RepositoryError> {
@@ -343,10 +94,6 @@ pub async fn register_target_with_repo_instance(
 ) -> Result<(), ffx::RepositoryError> {
     let repo_name: &str = &repo_target_info.repo_name;
     let target_ssh_host_address = target.ssh_host_address.clone();
-    let target_nodename = target.nodename.clone().ok_or_else(|| {
-        tracing::error!("target {:?} does not have a nodename", repo_target_info.target_identifier);
-        ffx::RepositoryError::TargetCommunicationFailure
-    })?;
 
     tracing::info!(
         "Registering repository {:?} for target {:?}",
@@ -393,21 +140,6 @@ pub async fn register_target_with_repo_instance(
                 }
             }
         }
-        // Checking for registration alias conflicts.
-        let check_alias_conflict = pkg_config::check_registration_alias_conflict(
-            repo_name,
-            target_nodename.as_str(),
-            aliases.clone().into_iter().collect(),
-        )
-        .await
-        .map_err(|e| {
-            tracing::error!("{e}");
-            ffx::RepositoryError::ConflictingRegistration
-        });
-        if alias_conflict_mode == RepositoryRegistrationAliasConflictMode::ErrorOut {
-            check_alias_conflict?
-        }
-
         aliases
     };
 
@@ -464,6 +196,7 @@ pub async fn register_target_with_repo_instance(
     }
 }
 
+/// Reads the alias mappings from the device via the EngineProxy.
 async fn read_alias_repos(
     engine_proxy: EngineProxy,
 ) -> Result<HashMap<String, Vec<String>>, ffx::RepositoryError> {
@@ -508,14 +241,10 @@ pub async fn register_target_with_fidl_proxies(
     target: &ffx::TargetInfo,
     repo_server_listen_addr: SocketAddr,
     repo: &Arc<RwLock<RepoClient<Box<dyn RepoProvider>>>>,
-    alias_conflict_mode: RepositoryRegistrationAliasConflictMode,
+    _alias_conflict_mode: RepositoryRegistrationAliasConflictMode,
 ) -> Result<(), ffx::RepositoryError> {
     let repo_name: &str = &repo_target_info.repo_name;
     let target_ssh_host_address = target.ssh_host_address.clone();
-    let target_nodename = target.nodename.clone().ok_or_else(|| {
-        tracing::error!("target {:?} does not have a nodename", repo_target_info.target_identifier);
-        ffx::RepositoryError::TargetCommunicationFailure
-    })?;
 
     tracing::info!(
         "Registering repository {:?} for target {:?}",
@@ -576,21 +305,6 @@ pub async fn register_target_with_fidl_proxies(
             repo.aliases().clone()
         };
 
-        // Checking for registration alias conflicts.
-        let check_alias_conflict = pkg_config::check_registration_alias_conflict(
-            repo_name,
-            target_nodename.as_str(),
-            aliases.clone().into_iter().collect(),
-        )
-        .await
-        .map_err(|e| {
-            tracing::error!("{e}");
-            ffx::RepositoryError::ConflictingRegistration
-        });
-        if alias_conflict_mode == RepositoryRegistrationAliasConflictMode::ErrorOut {
-            check_alias_conflict?
-        }
-
         (config, aliases)
     };
 
@@ -613,7 +327,7 @@ pub async fn register_target_with_fidl_proxies(
     Ok(())
 }
 
-pub fn aliases_to_rules(
+fn aliases_to_rules(
     repo_name: &str,
     aliases: &BTreeSet<String>,
 ) -> Result<Vec<Rule>, ffx::RepositoryError> {
@@ -721,9 +435,8 @@ pub fn create_repo_host(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
+    use fuchsia_hyper::new_https_client;
     use std::fs;
-    use std::net::Ipv4Addr;
 
     const EMPTY_REPO_PATH: &str =
         concat!(env!("ROOT_OUT_DIR"), "/test_data/ffx_lib_pkg/empty-repo");
@@ -747,71 +460,17 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_pm_repo_spec_to_backend() {
         let spec = pm_repo_spec();
         let backend = repo_spec_to_backend(&spec, new_https_client()).unwrap();
         assert_eq!(spec, backend.spec());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_filesystem_repo_spec_to_backend() {
         let spec = filesystem_repo_spec();
         let backend = repo_spec_to_backend(&spec, new_https_client()).unwrap();
         assert_eq!(spec, backend.spec());
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_http_repo_spec_to_backend() {
-        // Serve the empty repository
-        let repo_path = fs::canonicalize(EMPTY_REPO_PATH).unwrap();
-        let pm_backend = PmRepository::new(repo_path.try_into().unwrap());
-
-        let pm_repo =
-            RepoClient::from_trusted_remote(Box::new(pm_backend) as Box<_>).await.unwrap();
-        let manager = RepositoryManager::new();
-        manager.add("tuf", pm_repo);
-
-        let addr = (Ipv4Addr::LOCALHOST, 0).into();
-        let (server_fut, _, server) =
-            RepositoryServer::builder(addr, Arc::clone(&manager)).start().await.unwrap();
-
-        // Run the server in the background.
-        let _task = fasync::Task::local(server_fut);
-
-        let http_spec = RepositorySpec::Http {
-            metadata_repo_url: server.local_url() + "/tuf/",
-            blob_repo_url: server.local_url() + "/tuf/blobs/",
-            aliases: BTreeSet::new(),
-        };
-
-        let https_client = new_https_client();
-        let http_backend = repo_spec_to_backend(&http_spec, https_client.clone()).unwrap();
-        assert_eq!(http_spec, http_backend.spec());
-
-        // It rejects invalid urls.
-        assert_matches!(
-            repo_spec_to_backend(
-                &RepositorySpec::Http {
-                    metadata_repo_url: "hello there".to_string(),
-                    blob_repo_url: server.local_url() + "/tuf/blobs",
-                    aliases: BTreeSet::new(),
-                },
-                https_client.clone(),
-            ),
-            Err(RepositoryError::InvalidUrl)
-        );
-
-        assert_matches!(
-            repo_spec_to_backend(
-                &RepositorySpec::Http {
-                    metadata_repo_url: server.local_url() + "/tuf",
-                    blob_repo_url: "hello there".to_string(),
-                    aliases: BTreeSet::new(),
-                },
-                https_client.clone(),
-            ),
-            Err(RepositoryError::InvalidUrl)
-        );
     }
 }

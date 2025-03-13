@@ -324,12 +324,7 @@ async fn connect_to_repo(
             {
                 Some(spec)
             } else {
-                let spec = pkg::config::get_repository(&repo_name)
-                    .with_context(|| format!("Finding repo spec for {repo_name}"))?;
-                if spec.is_none() {
-                    ffx_bail!("No configuration found for {repo_name}")
-                }
-                spec
+                ffx_bail!("No configuration found for {repo_name}")
             }
         }
         RepoIdArgs::Path(path_buf) => {
@@ -356,14 +351,10 @@ async fn connect_to_repo(
             if let Some(repo_name) = pkg::config::get_default_repository().await? {
                 // Otherwise, check if the default repository exists. Don't error out if
                 // it doesn't.
-                if let Some(spec) =
-                    repo_spec_from_running_server(&context, repo_name.clone(), None)?
-                {
+                if let Some(spec) = repo_spec_from_running_server(&context, repo_name, None)? {
                     Some(spec)
                 } else {
-                    // return None here too, so we can fall through and check the in-tree case.
-                    pkg::config::get_repository(&repo_name)
-                        .with_context(|| format!("Finding repo spec for {repo_name}"))?
+                    None
                 }
             } else {
                 None

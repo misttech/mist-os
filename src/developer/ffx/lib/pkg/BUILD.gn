@@ -43,10 +43,7 @@ rustc_library("pkg") {
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
-    "//src/developer/ffx/lib/protocols:lib",
-    "//src/developer/ffx/lib/rcs:lib",
     "//src/developer/ffx/lib/timeout:lib",
-    "//src/lib/analytics/rust:lib",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-hyper",
@@ -56,12 +53,9 @@ rustc_library("pkg") {
     "//src/sys/pkg/lib/fuchsia-repo",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-lock",
-    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:camino",
-    "//third_party/rust_crates:futures",
     "//third_party/rust_crates:http",
     "//third_party/rust_crates:nix",
-    "//third_party/rust_crates:percent-encoding",
     "//third_party/rust_crates:schemars",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
@@ -73,8 +67,6 @@ rustc_library("pkg") {
   test_deps = [
     ":empty-repo-metadata",
     "//src/lib/fuchsia",
-    "//third_party/rust_crates:assert_matches",
-    "//third_party/rust_crates:maplit",
     "//third_party/rust_crates:pretty_assertions",
     "//third_party/rust_crates:tempfile",
   ]
@@ -83,9 +75,7 @@ rustc_library("pkg") {
     "src/config.rs",
     "src/instance.rs",
     "src/lib.rs",
-    "src/metrics.rs",
     "src/repo.rs",
-    "src/tunnel.rs",
   ]
 
   rustenv = [ "ROOT_OUT_DIR=$relative_root_out_dir" ]
