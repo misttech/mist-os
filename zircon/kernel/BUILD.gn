@@ -361,6 +361,7 @@ if (is_kernel) {
 
     if (is_mistos) {
       configs += [ "//build/config/fuchsia:mistos_define" ]
+      defines += [ "CUSTOM_DEFAULT_STACK_SIZE=16384" ]
     }
 
     cflags = [ "-fpie" ]
