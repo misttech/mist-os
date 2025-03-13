@@ -13,6 +13,7 @@
         colocate: "true",
         compat: "driver/ftl.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
+        allowed_scheduler_roles: [ "fuchsia.devices.block.drivers.ftl.device" ],
         fallback: "false",
     },
     capabilities: [

@@ -13,6 +13,7 @@
         colocate: "true",
         compat: "driver/block.core.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
+        allowed_scheduler_roles: [ "fuchsia.devices.block.drivers.core.block-server" ],
         fallback: "false",
     },
     use: [

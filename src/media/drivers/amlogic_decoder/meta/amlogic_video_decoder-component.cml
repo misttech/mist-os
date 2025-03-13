@@ -13,6 +13,15 @@
         colocate: "false",
         compat: "driver/amlogic_video_decoder.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
+        allowed_scheduler_roles: [
+            "fuchsia.media.drivers.amlogic-decoder.fidl",
+            "fuchsia.media.drivers.amlogic-decoder.parser-irq",
+            "fuchsia.media.drivers.amlogic-decoder.vdec-irq",
+            "fuchsia.media.drivers.amlogic-decoder.h264-core",
+            "fuchsia.media.drivers.amlogic-decoder.h264-stream-control",
+            "fuchsia.media.drivers.amlogic-decoder.vp9-input-processing",
+            "fuchsia.media.drivers.amlogic-decoder.vp9-stream-control",
+        ],
         fallback: "false",
     },
     use: [

@@ -12,6 +12,7 @@
         bind: "meta/bind/gt6853-bind.bindbc",
         compat: "driver/gt6853.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
+        allowed_scheduler_roles: [ "fuchsia.ui.input.drivers.gt6853.device" ],
     },
     use: [
         {

@@ -13,6 +13,7 @@
         bind: "meta/bind/sdhci-bind.bindbc",
         colocate: "true",
         default_dispatcher_opts: [ "allow_sync_calls" ],
+        allowed_scheduler_roles: [ "fuchsia.devices.sdhci.irq" ],
         fallback: "false",
     },
     capabilities: [

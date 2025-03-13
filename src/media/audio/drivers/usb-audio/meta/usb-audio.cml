@@ -13,6 +13,7 @@
         colocate: "true",
         compat: "driver/usb-audio.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
+        allowed_scheduler_roles: [ "fuchsia.devices.usb.audio" ],
         fallback: "false",
     },
     use: [

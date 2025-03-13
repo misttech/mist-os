@@ -13,6 +13,11 @@
         bind: 'meta/bind/spi.bindbc',
         colocate: 'true',
         default_dispatcher_opts: [ "allow_sync_calls" ],
+        allowed_scheduler_roles: [
+            "fuchsia.devices.spi.drivers.aml-spi.transaction",
+            "fuchsia.devices.spi.drivers.aml-spi.spi1",
+            "fuchsia.devices.spi.drivers.msm-spi.spi4",
+        ],
     },
     capabilities: [
         { service: 'fuchsia.hardware.spi.Service' },

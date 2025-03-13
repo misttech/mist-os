@@ -6,5 +6,10 @@
     program: {
         binary: "driver/msd_arm.so",
         bind: "meta/bind/msd_arm_bind.bindbc",
+        allowed_scheduler_roles: [
+            "fuchsia.graphics.drivers.msd-arm-mali.device",
+            "fuchsia.graphics.drivers.msd-arm-mali.gpu-interrupt",
+            "fuchsia.graphics.drivers.msd-arm-mali.mmu-interrupt",
+        ],
     },
 }

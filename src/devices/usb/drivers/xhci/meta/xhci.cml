@@ -11,6 +11,7 @@
         runner: "driver",
         binary: "driver/xhci.so",
         bind: "meta/bind/xhci.bindbc",
+        allowed_scheduler_roles: [ "fuchsia.devices.usb.drivers.xhci.interrupter" ],
         colocate: "false",
     },
     capabilities: [

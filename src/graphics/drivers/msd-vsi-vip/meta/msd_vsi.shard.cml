@@ -11,6 +11,10 @@
         bind: "meta/bind/msd_vsi_bind.bindbc",
         colocate: "true",
         default_dispatcher_opts: [ "allow_sync_calls" ],
+        allowed_scheduler_roles: [
+            "fuchsia.graphics.drivers.msd-vsi-vip.device",
+            "fuchsia.graphics.drivers.msd-vsi-vip.vsi-interrupt",
+        ],
         fallback: "false",
     },
     capabilities: [

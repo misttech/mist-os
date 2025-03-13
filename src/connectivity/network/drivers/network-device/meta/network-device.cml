@@ -13,6 +13,10 @@
         bind: "meta/bind/network-device.bindbc",
         colocate: "true",
         default_dispatcher_opts: [ "allow_sync_calls" ],
+        allowed_scheduler_roles: [
+            "fuchsia.devices.network.core.rx",
+            "fuchsia.devices.network.core.tx",
+        ],
         fallback: "false",
     },
     use: [

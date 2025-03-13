@@ -13,6 +13,7 @@
         colocate: "false",
         compat: "driver/aml-securemem.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
+        allowed_scheduler_roles: [ "fuchsia.devices.securemem.drivers.aml-securemem.server-loop" ],
         fallback: "false",
     },
     use: [
