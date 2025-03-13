@@ -424,7 +424,6 @@ assembly_input_bundle("bootstrap_userdebug") {
     "//src/devices/usb/bin/usbctl",
     "//src/storage/bin/dd:bootfs",
     "//src/storage/bin/df:bootfs",
-    "//src/storage/bin/storage-metrics:bootfs",
     "//src/zircon/bin/kstress:bootfs",
     "//src/zircon/bin/ktrace:bootfs",
     "//src/zircon/bin/loadgen:bootfs",
