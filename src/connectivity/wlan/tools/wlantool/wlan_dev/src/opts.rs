@@ -232,7 +232,7 @@ pub enum MinstrelCmd {
 pub struct ClientConnectCmd {
     #[structopt(short = "i", long = "iface", default_value = "0")]
     pub iface_id: u16,
-    #[structopt(short = "p", long = "password", help = "WPA2 PSK")]
+    #[structopt(short = "p", long = "password", help = "Password")]
     pub password: Option<String>,
     #[structopt(short = "hash", long = "hash", help = "WPA2 PSK as hex string")]
     pub psk: Option<String>,
@@ -245,6 +245,8 @@ pub struct ClientConnectCmd {
         help = "Determines the type of scan performed on non-DFS channels when connecting."
     )]
     pub scan_type: ScanTypeArg,
+    #[structopt(short = "b", long = "bssid", help = "Specific BSSID to connect to")]
+    pub bssid: Option<String>,
     #[structopt(
         raw(required = "true"),
         help = "SSID of the target network. Connecting via only an SSID is deprecated and will be \
