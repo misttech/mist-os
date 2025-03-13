@@ -18,6 +18,7 @@
                 "fuchsia.update.channelcontrol.ChannelControl",
                 "fuchsia.update.Listener",
                 "fuchsia.update.Manager",
+                "fuchsia.update.verify.ComponentOtaHealthCheck",
             ],
         },
     ],
@@ -81,6 +82,15 @@
         {
             protocol: "fuchsia.update.Listener",
             from: "self",
+        },
+        {
+            protocol: "fuchsia.update.verify.ComponentOtaHealthCheck",
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.update.verify.ComponentOtaHealthCheck",
+            from: "self",
+            to: "framework",
         },
     ],
     config: {

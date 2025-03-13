@@ -25,6 +25,9 @@ use fidl_fuchsia_update::{
 use fidl_fuchsia_update_channel::{ProviderRequest, ProviderRequestStream};
 use fidl_fuchsia_update_channelcontrol::{ChannelControlRequest, ChannelControlRequestStream};
 use fidl_fuchsia_update_ext::AttemptOptions;
+use fidl_fuchsia_update_verify::{
+    ComponentOtaHealthCheckRequest, ComponentOtaHealthCheckRequestStream, HealthStatus,
+};
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
@@ -224,6 +227,7 @@ pub enum IncomingServices {
     ChannelControl(ChannelControlRequestStream),
     ChannelProvider(ProviderRequestStream),
     Listener(ListenerRequestStream),
+    HealthCheck(ComponentOtaHealthCheckRequestStream),
 }
 
 impl<ST, SM> FidlServer<ST, SM>
@@ -279,7 +283,8 @@ where
             .add_fidl_service(IncomingServices::Manager)
             .add_fidl_service(IncomingServices::ChannelControl)
             .add_fidl_service(IncomingServices::ChannelProvider)
-            .add_fidl_service(IncomingServices::Listener);
+            .add_fidl_service(IncomingServices::Listener)
+            .add_fidl_service(IncomingServices::HealthCheck);
         const MAX_CONCURRENT: usize = 1000;
         // Handle each client connection concurrently.
         fs.for_each_concurrent(MAX_CONCURRENT, |stream| async {
@@ -326,6 +331,24 @@ where
                 {
                     Self::handle_on_update_check_completion_request(Rc::clone(&server), request)
                         .await?;
+                }
+            }
+            IncomingServices::HealthCheck(mut stream) => {
+                let app_set = Rc::clone(&server.borrow().app_set);
+                let app_set_health = app_set.lock().await.all_valid();
+
+                while let Some(ComponentOtaHealthCheckRequest::GetHealthStatus { responder }) =
+                    stream.try_next().await.expect("error running health check service")
+                {
+                    if app_set_health {
+                        responder
+                            .send(HealthStatus::Healthy)
+                            .expect("failed to send healthy status");
+                    } else {
+                        responder
+                            .send(HealthStatus::Unhealthy)
+                            .expect("failed to send unhealthy status");
+                    }
                 }
             }
         }
@@ -1182,6 +1205,7 @@ mod tests {
     };
     use fidl_fuchsia_update_channel::ProviderMarker;
     use fidl_fuchsia_update_channelcontrol::ChannelControlMarker;
+    use fidl_fuchsia_update_verify::ComponentOtaHealthCheckMarker;
     use fuchsia_async::TestExecutor;
     use fuchsia_inspect::Inspector;
     use futures::pin_mut;
@@ -1471,6 +1495,30 @@ mod tests {
             }
             responder.send().unwrap();
         }
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_get_health_check_status() {
+        let fidl = FidlServerBuilder::new().build().await;
+
+        let proxy =
+            spawn_fidl_server::<ComponentOtaHealthCheckMarker>(fidl, IncomingServices::HealthCheck);
+
+        assert_eq!(HealthStatus::Healthy, proxy.get_health_status().await.unwrap());
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_get_health_check_status_bad_app_set() {
+        let app_set = FuchsiaAppSet::new(
+            App::builder().id("id").version([0]).build(),
+            AppMetadata { appid_source: AppIdSource::ChannelConfig },
+        );
+        let fidl = FidlServerBuilder::new().with_app_set(app_set).build().await;
+
+        let proxy =
+            spawn_fidl_server::<ComponentOtaHealthCheckMarker>(fidl, IncomingServices::HealthCheck);
+
+        assert_eq!(HealthStatus::Unhealthy, proxy.get_health_status().await.unwrap());
     }
 
     #[fasync::run_singlethreaded(test)]
