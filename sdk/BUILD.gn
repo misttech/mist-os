@@ -949,7 +949,6 @@ if (is_host) {
       "//src/sys/pkg/bin/far:bin_sdk",
       "//src/sys/pkg/testing/fake-omaha-client:bin_sdk",
       "//tools/fidlcat:fidlcat_sdk",
-      "//tools/fuchsia-sdk-run:fuchsia-sdk-run_sdk",
       "//tools/net/device-finder:device-finder_sdk",
 
       # TODO(https://fxbug.dev/42177692): Remove these once the emulators are available independently.
@@ -1434,7 +1433,6 @@ if (current_toolchain == default_toolchain) {
         "//src/developer/ffx/plugins/target/ssh:ffx_target_ssh_e2e_tests_emulator_data",
         "//src/developer/ffx/tools/power/system-activity/application-activity:ffx_power_system_activity_application_activity_e2e_tests_emulator_data",
         "//src/developer/ffx/tools/target-package/tests:verify_ffx_target_package_explore_emulator_data",
-        "//tools/fuchsia-sdk-run:sdk_exported",
         "//vendor/*",
       ]
 
