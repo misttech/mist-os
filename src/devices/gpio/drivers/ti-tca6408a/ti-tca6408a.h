@@ -7,9 +7,11 @@
 
 #include <fidl/fuchsia.driver.compat/cpp/wire.h>
 #include <fidl/fuchsia.hardware.pinimpl/cpp/driver/fidl.h>
+#include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/device-protocol/i2c-channel.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/metadata/cpp/metadata_server.h>
 #include <lib/zx/result.h>
 
 namespace gpio {
@@ -79,6 +81,8 @@ class TiTca6408aDevice : public fdf::DriverBase {
   fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
   compat::SyncInitializedDeviceServer compat_server_;
+  fdf_metadata::MetadataServer<fuchsia_hardware_pinimpl::Metadata> pin_metadata_server_;
+  fdf_metadata::MetadataServer<fuchsia_scheduler::RoleName> scheduler_role_name_metadata_server_;
 };
 
 }  // namespace gpio
