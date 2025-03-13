@@ -118,8 +118,9 @@ import("//src/sys/pkg/bin/package-tool/package-tool.gni")
 #  generate_product_bundle_metadata (optional; default = use_bazel_images_only)
 #    Whether to generate the product bundle metadata for this product bundle.
 #
-#  product_bundle_name (optional; default = 'product.board')
-#    The product bundle will use this name instead of the currently active product.board name.
+#  product_bundle_name (required)
+#    The name of the product bundle produced in Bazel.
+#    This name will be used to populate the GN metadata.
 #
 #  generate_image_metadata (optional; default = use_bazel_images_only)
 #    Whether to generate image metadata for this product bundle.
@@ -151,6 +152,8 @@ template("bazel_product_bundle") {
          "bazel_product_image_target is required")
   assert(defined(invoker.bazel_inputs_from_gn),
          "bazel_inputs_from_gn is required")
+  assert(defined(invoker.product_bundle_name),
+         "product_bundle_name is required")
 
   targets = {
     bazel_build_group = "${target_name}_bazel_build_group"
@@ -512,11 +515,7 @@ template("bazel_product_bundle") {
       product_version = sdk_id
       assert(product_version != "")
 
-      _product_bundle_name = "${build_info_product}.${build_info_board}"
-      if (defined(invoker.product_bundle_name)) {
-        _product_bundle_name = invoker.product_bundle_name
-      }
-
+      _product_bundle_name = invoker.product_bundle_name
       _metadata.product_bundles = [
         {
           label = get_label_info(":$target_name", "label_with_toolchain")

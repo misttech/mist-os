@@ -67,6 +67,7 @@ if (is_fuchsia) {
 
   bazel_product_bundle("bazel_pb") {
     testonly = true
+    product_bundle_name = "updates_test.fake_board"
     allow_eng_platform_bundle_use = true
     bazel_product_bundle_target = ":fake_bundle"
     bazel_product_image_target = "//build/images/updates/tests:fake_product"

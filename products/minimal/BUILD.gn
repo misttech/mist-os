@@ -13,6 +13,7 @@ assert(
 if (current_cpu == "x64") {
   bazel_product_bundle("product_bundle.x64") {
     testonly = true
+    product_bundle_name = "minimal.x64"
     allow_eng_platform_bundle_use = true
     bazel_product_bundle_target = ":product_bundle.x64"
     bazel_product_image_target = ":image.x64"
@@ -36,6 +37,7 @@ if (current_cpu == "x64") {
 if (current_cpu == "arm64") {
   bazel_product_bundle("product_bundle.arm64") {
     testonly = true
+    product_bundle_name = "minimal.arm64"
     allow_eng_platform_bundle_use = true
     bazel_product_bundle_target = ":product_bundle.arm64"
     bazel_product_image_target = ":image.arm64"
@@ -50,6 +52,7 @@ if (current_cpu == "arm64") {
 
   bazel_product_bundle("product_bundle.vim3") {
     testonly = true
+    product_bundle_name = "minimal.vim3"
     allow_eng_platform_bundle_use = true
     bazel_product_bundle_target = ":product_bundle.vim3"
     bazel_product_image_target = ":image.vim3"
@@ -63,6 +66,7 @@ if (current_cpu == "arm64") {
 
   bazel_product_bundle("product_bundle.emac") {
     testonly = true
+    product_bundle_name = "minimal.emac"
     allow_eng_platform_bundle_use = true
     bazel_product_bundle_target = ":product_bundle.emac"
     bazel_product_image_target = ":image.emac"
@@ -77,6 +81,7 @@ if (current_cpu == "arm64") {
 if (current_cpu == "riscv64") {
   bazel_product_bundle("product_bundle.riscv64") {
     testonly = true
+    product_bundle_name = "minimal.riscv64"
     allow_eng_platform_bundle_use = true
     bazel_product_bundle_target = ":product_bundle.riscv64"
     bazel_product_image_target = ":image.riscv64"
