@@ -2,19 +2,39 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+HOST_PLATFORM := $(shell uname -s | tr '[:upper:]' '[:lower:]')
+HOST_ARCH := $(shell uname -m)
+
+ifeq ($(HOST_ARCH),x86_64)
+HOST_ARCH = x64
+else ifeq ($(HOST_ARCH),aarch64)
+HOST_ARCH = arm64
+else
+$(error Unsupported host architecture: $(HOST_ARCH))
+endif
+
+ifeq ($(HOST_PLATFORM),linux)
+HOST_OS = linux
+else ifeq ($(HOST_PLATFORM),darwin)
+HOST_OS = mac
+else
+$(error Unsupported host platform: $(HOST_PLATFORM))
+endif
+
 # Build variables
 MISTOSROOT ?= $(PWD)
 OUTPUT ?= out/default
-HOST_ARCH ?= $(shell $(MISTOSROOT)/meta/scripts/host-arch.sh)
-HOST_OS ?= $(shell $(MISTOSROOT)/meta/scripts/host-os.sh)
 GN ?= $(MISTOSROOT)/prebuilt/third_party/gn/$(HOST_OS)-$(HOST_ARCH)/gn
 NINJA ?= $(MISTOSROOT)/prebuilt/third_party/ninja/$(HOST_OS)-$(HOST_ARCH)/ninja
 NOECHO ?= @
 
+# By default, also show the number of actively running actions.
+export NINJA_STATUS="[%f/%t][%p/%w](%r) "
+# By default, print the 4 oldest commands that are still running.
 export NINJA_STATUS_MAX_COMMANDS=4
 export NINJA_STATUS_REFRESH_MILLIS=100
 export NINJA_PERSISTENT_MODE=0
-export NINJA_STATUS=[%f/%t](%r)
+
 
 # Some tools depends on this env var.
 export FUCHSIA_BUILD_DIR=$(MISTOSROOT)/$(OUTPUT)
@@ -34,7 +54,6 @@ args: ## Set up build dir and arguments file
 	$(NOECHO)echo "rust_incremental = \"incremental\"" >> $(OUTPUT)/args.gn
 	$(NOECHO)echo "host_labels = [ \"//build/rust:cargo_toml_gen\" ]" >> $(OUTPUT)/args.gn
 	$(NOECHO)echo "rbe_mode = \"off\"" >> $(OUTPUT)/args.gn
-	$(NOECHO)echo "platform_enable_user_pci = false" >> $(OUTPUT)/args.gn
 .PHONY: args
 
 debug: args ## Set debug arguments
