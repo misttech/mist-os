@@ -337,7 +337,7 @@ TEST(TraitsTestCase, InterruptTraits) {
   ASSERT_TRUE(zx::object_traits<zx::interrupt>::supports_duplication);
   ASSERT_FALSE(zx::object_traits<zx::interrupt>::supports_get_child);
   ASSERT_FALSE(zx::object_traits<zx::interrupt>::supports_set_profile);
-  ASSERT_FALSE(zx::object_traits<zx::interrupt>::supports_user_signal);
+  ASSERT_TRUE(zx::object_traits<zx::interrupt>::supports_user_signal);
   ASSERT_TRUE(zx::object_traits<zx::interrupt>::supports_wait);
   ASSERT_FALSE(zx::object_traits<zx::interrupt>::has_peer_handle);
 }

@@ -138,7 +138,7 @@ struct object_traits<interrupt> {
   static constexpr bool supports_duplication = true;
   static constexpr bool supports_get_child = false;
   static constexpr bool supports_set_profile = false;
-  static constexpr bool supports_user_signal = false;
+  static constexpr bool supports_user_signal = true;
   static constexpr bool supports_wait = true;
   static constexpr bool supports_kill = false;
   static constexpr bool has_peer_handle = false;
