@@ -140,7 +140,7 @@ impl HtmlCommand {
                     },
                     self.output
                         .join("contents")
-                        .join(format!("{}.html", simplify_name_for_linking(item.0))),
+                        .join(format!("{}.html", simplify_name_for_linking(&item.0.to_string()))),
                 )?;
                 Ok(())
             })

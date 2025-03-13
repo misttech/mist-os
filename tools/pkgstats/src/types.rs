@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use camino::Utf8PathBuf;
-use fuchsia_url::UnpinnedAbsolutePackageUrl;
+use fuchsia_url::{Hash, UnpinnedAbsolutePackageUrl};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
@@ -49,7 +49,7 @@ pub struct ComponentContents {
 #[derive(Serialize, Deserialize)]
 pub struct OutputSummary {
     pub packages: BTreeMap<UnpinnedAbsolutePackageUrl, PackageContents>,
-    pub contents: BTreeMap<String, FileInfo>,
+    pub contents: BTreeMap<Hash, FileInfo>,
     pub files: BTreeMap<u32, FileMetadata>,
     pub protocol_to_client: ProtocolToClientMap,
 }

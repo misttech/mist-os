@@ -15,7 +15,7 @@ use fuchsia_archive::Reader as FARReader;
 use fuchsia_pkg::PackageManifest;
 use fuchsia_repo::repo_client::RepoClient;
 use fuchsia_repo::repository::PmRepository;
-use fuchsia_url::UnpinnedAbsolutePackageUrl;
+use fuchsia_url::{Hash, UnpinnedAbsolutePackageUrl};
 use log::debug;
 use rayon::prelude::*;
 use rayon::ThreadPoolBuilder;
@@ -337,7 +337,7 @@ impl PackageErrors<'_> {
 fn process_package_manifest(
     manifest: PackageManifest,
     errors: PackageErrors<'_>,
-    content_hash_to_path: &Mutex<HashMap<String, Utf8PathBuf>>,
+    content_hash_to_path: &Mutex<HashMap<Hash, Utf8PathBuf>>,
 ) -> Option<(UnpinnedAbsolutePackageUrl, PackageContents)> {
     let url = match manifest.package_url() {
         Err(err) => {
@@ -361,7 +361,7 @@ fn process_package_manifest(
         if blob.path == "meta/" {
             process_far(&blob_source_path, &mut contents, &errors);
         } else {
-            content_hash_to_path.lock().unwrap().insert(blob.merkle.to_string(), blob_source_path);
+            content_hash_to_path.lock().unwrap().insert(blob.merkle, blob_source_path);
             contents
                 .files
                 .push(PackageFile { name: blob.path.to_string(), hash: blob.merkle.to_string() });
@@ -509,7 +509,7 @@ async fn process_universe(
     repo_path: Utf8PathBuf,
     errors: &Errors,
     names: &Mutex<HashMap<UnpinnedAbsolutePackageUrl, PackageContents>>,
-    content_hash_to_path: &Mutex<HashMap<String, Utf8PathBuf>>,
+    content_hash_to_path: &Mutex<HashMap<Hash, Utf8PathBuf>>,
     manifest_count: &AtomicUsize,
 ) -> Result<()> {
     let repo_path = repo_path
@@ -547,7 +547,7 @@ async fn process_universe(
                             &errors.for_package(PackageContext::Universe(&package.name)),
                         );
                     } else {
-                        content_hash_to_path.lock().unwrap().insert(hash.to_string(), path);
+                        content_hash_to_path.lock().unwrap().insert(hash, path);
                     }
                 }
             }
