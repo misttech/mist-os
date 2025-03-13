@@ -386,12 +386,19 @@ impl Socket {
     /// - `kernel`: The kernel that is used to fetch `SocketFs`, to store the created socket node.
     /// - `socket`: The socket to store in the `FsNode`.
     /// - `open_flags`: The `OpenFlags` which are used to create the `FileObject`.
-    pub fn new_file(
+    pub fn new_file<L>(
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         socket: SocketHandle,
         open_flags: OpenFlags,
-    ) -> FileHandle {
+    ) -> FileHandle
+    where
+        L: LockBefore<FileOpsCore>,
+    {
         let fs = socket_fs(current_task.kernel());
+        // Ensure sockfs gets labeled if mounted after the SELinux policy has been loaded.
+        security::file_system_resolve_security(locked, &current_task, &fs)
+            .expect("resolve fs security");
         let mode = mode!(IFSOCK, 0o777);
         let node = fs.create_node(
             current_task,
@@ -1111,6 +1118,7 @@ where
         .to_str()
         .map_err(|std::str::Utf8Error { .. }| errno!(EINVAL))?;
     let socket = new_socket_file(
+        locked,
         current_task,
         SocketDomain::Netlink,
         SocketType::Datagram,
@@ -1239,6 +1247,7 @@ where
     let flags: u32 = flags as u32;
 
     let socket = new_socket_file(
+        locked,
         current_task,
         SocketDomain::Netlink,
         SocketType::Datagram,

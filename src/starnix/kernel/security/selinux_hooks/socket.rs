@@ -64,6 +64,7 @@ pub fn socket_post_create(socket: &Socket, socket_node: &FsNode) {
 
 #[cfg(test)]
 mod tests {
+    use super::super::get_cached_sid;
     use super::*;
     use crate::security::selinux_hooks::testing::spawn_kernel_with_selinux_hooks_test_policy_and_run;
     use crate::vfs::socket::new_socket_file;
@@ -72,13 +73,14 @@ mod tests {
     #[fuchsia::test]
     async fn socket_post_create() {
         spawn_kernel_with_selinux_hooks_test_policy_and_run(
-            |_locked, current_task, security_server| {
+            |locked, current_task, security_server| {
                 let task_sid = security_server
                     .security_context_to_sid(b"u:object_r:test_socket_create_t:s0".into())
                     .expect("invalid security context");
                 current_task.security_state.lock().current_sid = task_sid;
 
                 let socket_node = new_socket_file(
+                    locked,
                     current_task,
                     SocketDomain::Unix,
                     SocketType::Stream,
@@ -90,6 +92,7 @@ mod tests {
                     socket_node.node().security_state.lock().class,
                     SocketClass::UnixStream.into()
                 );
+                assert_eq!(get_cached_sid(socket_node.node()), Some(task_sid));
             },
         )
     }

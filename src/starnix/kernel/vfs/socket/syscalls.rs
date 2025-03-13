@@ -34,7 +34,7 @@ use starnix_uapi::{
 use std::mem::size_of;
 
 pub fn sys_socket(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     domain: u32,
     socket_type: u32,
@@ -46,7 +46,8 @@ pub fn sys_socket(
     // Should we use parse_socket_protocol here?
     let protocol = SocketProtocol::from_raw(protocol);
     let open_flags = socket_flags_to_open_flags(flags);
-    let socket_file = new_socket_file(current_task, domain, socket_type, open_flags, protocol)?;
+    let socket_file =
+        new_socket_file(locked, current_task, domain, socket_type, open_flags, protocol)?;
 
     let fd_flags = socket_flags_to_fd_flags(flags);
     let fd = current_task.add_file(socket_file, fd_flags)?;
@@ -276,7 +277,7 @@ pub fn sys_accept4(
     }
 
     let open_flags = socket_flags_to_open_flags(flags);
-    let accepted_socket_file = Socket::new_file(current_task, accepted_socket, open_flags);
+    let accepted_socket_file = Socket::new_file(locked, current_task, accepted_socket, open_flags);
     let fd_flags = if flags & SOCK_CLOEXEC != 0 { FdFlags::CLOEXEC } else { FdFlags::empty() };
     let accepted_fd = current_task.add_file(accepted_socket_file, fd_flags)?;
     Ok(accepted_fd)
@@ -396,7 +397,7 @@ pub fn sys_getpeername(
 }
 
 pub fn sys_socketpair(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     domain: u32,
     socket_type: u32,
@@ -415,7 +416,8 @@ pub fn sys_socketpair(
     }
     let open_flags = socket_flags_to_open_flags(flags);
 
-    let (left, right) = UnixSocket::new_pair(current_task, domain, socket_type, open_flags)?;
+    let (left, right) =
+        UnixSocket::new_pair(locked, current_task, domain, socket_type, open_flags)?;
 
     let fd_flags = socket_flags_to_fd_flags(flags);
     // TODO: Eventually this will need to allocate two fd numbers (each of which could

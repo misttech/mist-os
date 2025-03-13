@@ -851,6 +851,7 @@ mod tests {
     async fn test_add_then_modify() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let (socket1, _socket2) = UnixSocket::new_pair(
+            &mut locked,
             &current_task,
             SocketDomain::Unix,
             SocketType::Stream,
