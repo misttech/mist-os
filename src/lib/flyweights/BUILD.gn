@@ -25,7 +25,9 @@ rustc_library("flyweights") {
     "//third_party/rust_crates:test-case",
   ]
   if (is_host) {
+    deps += [ "//third_party/rust_crates:schemars" ]
     test_deps += [ "//third_party/rust_crates:serial_test" ]
+    features = [ "json_schema" ]
   }
 }
 

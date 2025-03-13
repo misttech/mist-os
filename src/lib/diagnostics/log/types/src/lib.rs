@@ -15,6 +15,7 @@ pub mod serde_ext;
 
 /// Severities a log message can have, often called the log's "level".
 #[cfg_attr(feature = "serde", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", serde(rename_all = "UPPERCASE"))]
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 #[repr(u8)]
 pub enum Severity {

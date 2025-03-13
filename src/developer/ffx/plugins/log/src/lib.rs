@@ -6,7 +6,8 @@ use async_trait::async_trait;
 use diagnostics_data::{BuilderArgs, LogsDataBuilder, LogsProperty, Severity};
 use error::LogError;
 use ffx_log_args::LogCommand;
-use ffx_writer::{MachineWriter, ToolIO};
+use ffx_log_command_output::CommandOutputMachineWriter;
+use ffx_writer::ToolIO;
 use fho::{FfxMain, FfxTool};
 use fidl_fuchsia_diagnostics::{LogSettingsMarker, LogSettingsProxy, StreamParameters};
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker;
@@ -53,7 +54,7 @@ fho::embedded_plugin!(LogTool);
 
 #[async_trait::async_trait(?Send)]
 impl FfxMain for LogTool {
-    type Writer = MachineWriter<LogEntry>;
+    type Writer = CommandOutputMachineWriter;
 
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
         log_impl(writer, self.cmd, self.rcs_connector, true).await?;
@@ -342,7 +343,8 @@ mod tests {
     use assert_matches::assert_matches;
     use chrono::{Local, TimeZone};
     use diagnostics_data::{BuilderArgs, LogsDataBuilder, Severity, Timestamp};
-    use ffx_writer::{Format, TestBuffers};
+    use ffx_log_command_output::CommandOutput;
+    use ffx_writer::{Format, TestBuffers, VerifiedMachineWriter};
     use fidl_fuchsia_diagnostics::StreamMode;
     use fuchsia_async as fasync;
     use futures::StreamExt;
@@ -391,7 +393,7 @@ mod tests {
         };
         let tool = LogTool { cmd, rcs_connector };
         let buffers = TestBuffers::default();
-        let writer = MachineWriter::<LogEntry>::new_test(Some(Format::Json), &buffers);
+        let writer = CommandOutputMachineWriter::new_test(Some(Format::Json), &buffers);
 
         assert_matches!(tool.main_no_timestamp(writer).await, Ok(()));
         let output = buffers.into_stdout_str();
@@ -413,6 +415,10 @@ mod tests {
                 ),
             }
         );
+        let value: serde_json::Value = serde_json::from_str(&output).expect("parsing json");
+        if let Err(e) = VerifiedMachineWriter::<CommandOutput>::verify_schema(&value) {
+            panic!("Failed to verify JSON schema output of `{value:#?}`: {e}")
+        }
     }
 
     #[fuchsia::test]
@@ -437,7 +443,7 @@ mod tests {
 
         let tool = LogTool { cmd, rcs_connector };
         let buffers = TestBuffers::default();
-        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let writer = CommandOutputMachineWriter::new_test(None, &buffers);
 
         let error = format!("{}", tool.main_no_timestamp(writer).await.unwrap_err());
 
@@ -469,7 +475,7 @@ ffx log --force-set-severity.
         let rcs_connector = environment.rcs_connector().await;
         let tool = LogTool { cmd, rcs_connector };
         let buffers = TestBuffers::default();
-        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let writer = CommandOutputMachineWriter::new_test(None, &buffers);
         let mut event_stream = environment.take_event_stream().unwrap();
         if show_initial_timestamp {
             assert_matches!(tool.main(writer).await, Ok(()));
@@ -505,7 +511,7 @@ ffx log --force-set-severity.
         let rcs_connector = environment.rcs_connector().await;
         let tool = LogTool { cmd, rcs_connector };
         let buffers = TestBuffers::default();
-        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let writer = CommandOutputMachineWriter::new_test(None, &buffers);
         let mut event_stream = environment.take_event_stream().unwrap();
 
         assert_matches!(tool.main_no_timestamp(writer).await, Ok(()));
@@ -527,7 +533,7 @@ ffx log --force-set-severity.
         let rcs_connector = environment.rcs_connector().await;
         let tool = LogTool { cmd, rcs_connector };
         let buffers = TestBuffers::default();
-        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let writer = CommandOutputMachineWriter::new_test(None, &buffers);
 
         let result = tool.main_no_timestamp(writer).await;
         assert_matches!(result, Err(fho::Error::User(err)) => {
@@ -546,7 +552,7 @@ ffx log --force-set-severity.
         let rcs_connector = environment.rcs_connector().await;
         let tool = LogTool { cmd, rcs_connector };
         let buffers = TestBuffers::default();
-        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let writer = CommandOutputMachineWriter::new_test(None, &buffers);
         let mut event_stream = environment.take_event_stream().unwrap();
 
         assert_matches!(tool.main_no_timestamp(writer).await, Ok(()));
@@ -582,7 +588,7 @@ ffx log --force-set-severity.
         };
         let tool = LogTool { cmd, rcs_connector };
         let buffers = TestBuffers::default();
-        let writer = MachineWriter::<LogEntry>::new_test(Some(Format::Json), &buffers);
+        let writer = CommandOutputMachineWriter::new_test(Some(Format::Json), &buffers);
 
         assert_matches!(tool.main(writer).await, Ok(()));
         let output = buffers.into_stdout_str();
@@ -672,7 +678,7 @@ ffx log --force-set-severity.
         let rcs_connector = environment.rcs_connector().await;
         let tool = LogTool { cmd, rcs_connector };
         let buffers = TestBuffers::default();
-        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let writer = CommandOutputMachineWriter::new_test(None, &buffers);
         let mut event_stream = environment.take_event_stream().unwrap();
 
         // Intentionally unused. When in streaming mode, this should never return a value.
@@ -747,7 +753,7 @@ ffx log --force-set-severity.
         let rcs_connector = environment.rcs_connector().await;
         let tool = LogTool { cmd, rcs_connector };
         let buffers = TestBuffers::default();
-        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let writer = CommandOutputMachineWriter::new_test(None, &buffers);
         let mut event_stream = environment.take_event_stream().unwrap();
 
         // Intentionally unused. When in streaming mode, this should never return a value.
@@ -788,7 +794,7 @@ ffx log --force-set-severity.
         let rcs_connector = environment.rcs_connector().await;
         let tool = LogTool { cmd, rcs_connector };
         let buffers = TestBuffers::default();
-        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let writer = CommandOutputMachineWriter::new_test(None, &buffers);
         let mut event_stream = environment.take_event_stream().unwrap();
 
         // Intentionally unused. When in streaming mode, this should never return a value.
@@ -964,7 +970,7 @@ ffx log --force-set-severity.
         let rcs_connector = environment.rcs_connector().await;
         let tool = LogTool { cmd, rcs_connector };
         let buffers = TestBuffers::default();
-        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let writer = CommandOutputMachineWriter::new_test(None, &buffers);
         let selector = selector.into_iter().flatten().collect::<Vec<_>>();
         assert_matches!(tool.main_no_timestamp(writer).await, Ok(()));
         assert_eq!(buffers.into_stdout_str(), "[00000.000000][ffx] INFO: Hello world!\u{1b}[m\n");

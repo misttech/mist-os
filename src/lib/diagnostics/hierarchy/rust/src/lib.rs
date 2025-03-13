@@ -551,6 +551,7 @@ impl Error {
 }
 
 /// A linear histogram property.
+#[cfg_attr(feature = "json_schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct LinearHistogram<T> {
     /// The number of buckets. If indexes is None this should equal counts.len().
@@ -571,6 +572,7 @@ pub struct LinearHistogram<T> {
 }
 
 /// An exponential histogram property.
+#[cfg_attr(feature = "json_schema", derive(schemars::JsonSchema))]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct ExponentialHistogram<T> {
     /// The number of buckets. If indexes is None this should equal counts.len().
