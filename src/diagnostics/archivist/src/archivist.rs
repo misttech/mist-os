@@ -72,22 +72,22 @@ impl Archivist {
     /// Also installs `fuchsia.diagnostics.Archive` service.
     /// Call `install_log_services`
     pub async fn new(config: Config) -> Self {
-        let general_scope = fasync::Scope::new();
-        let servers_scope = fasync::Scope::new();
+        let general_scope = fasync::Scope::new_with_name("general");
+        let servers_scope = fasync::Scope::new_with_name("servers");
 
         // Initialize the pipelines that the archivist will expose.
         let pipeline_manager = PipelineManager::new(
             PathBuf::from(&config.pipelines_path),
             component::inspector().root().create_child("pipelines"),
             component::inspector().root().create_child("archive_accessor_stats"),
-            general_scope.new_child(),
+            general_scope.new_child_with_name("pipeline_manager"),
         )
         .await;
 
         // Initialize the core event router
         let mut event_router =
             EventRouter::new(component::inspector().root().create_child("events"));
-        let incoming_events_scope = general_scope.new_child();
+        let incoming_events_scope = general_scope.new_child_with_name("incoming_events");
         Self::initialize_external_event_sources(&mut event_router, &incoming_events_scope).await;
 
         let initial_interests =
@@ -102,7 +102,7 @@ impl Archivist {
             config.logs_max_cached_original_bytes,
             initial_interests,
             component::inspector().root(),
-            general_scope.new_child(),
+            general_scope.new_child_with_name("logs_repository"),
         );
         if !config.allow_serial_logs.is_empty() {
             let write_logs_to_serial =
@@ -112,11 +112,13 @@ impl Archivist {
         }
         let inspect_repo = Arc::new(InspectRepository::new(
             pipeline_manager.weak_pipelines(),
-            general_scope.new_child(),
+            general_scope.new_child_with_name("inspect_repository"),
         ));
 
-        let inspect_sink_server =
-            Arc::new(InspectSinkServer::new(Arc::clone(&inspect_repo), servers_scope.new_child()));
+        let inspect_sink_server = Arc::new(InspectSinkServer::new(
+            Arc::clone(&inspect_repo),
+            servers_scope.new_child_with_name("InspectSink"),
+        ));
 
         // Initialize our FIDL servers. This doesn't start serving yet.
         let accessor_server = Arc::new(ArchiveAccessorServer::new(
@@ -124,13 +126,17 @@ impl Archivist {
             Arc::clone(&logs_repo),
             config.maximum_concurrent_snapshots_per_reader,
             BatchRetrievalTimeout::from_seconds(config.per_component_batch_timeout_seconds),
-            servers_scope.new_child(),
+            servers_scope.new_child_with_name("ArchiveAccessor"),
         ));
 
-        let log_server =
-            Arc::new(LogServer::new(Arc::clone(&logs_repo), servers_scope.new_child()));
-        let log_stream_server =
-            Arc::new(LogStreamServer::new(Arc::clone(&logs_repo), servers_scope.new_child()));
+        let log_server = Arc::new(LogServer::new(
+            Arc::clone(&logs_repo),
+            servers_scope.new_child_with_name("Log"),
+        ));
+        let log_stream_server = Arc::new(LogStreamServer::new(
+            Arc::clone(&logs_repo),
+            servers_scope.new_child_with_name("LogStream"),
+        ));
 
         // Initialize the external event providers containing incoming diagnostics directories and
         // log sink connections.
@@ -332,7 +338,7 @@ impl Archivist {
             Arc::clone(&self.logs_repository),
             // Don't create this in the servers scope. We don't care about this protocol for
             // shutdown purposes.
-            self.general_scope.new_child(),
+            self.general_scope.new_child_with_name("LogSettings"),
         );
         svc_dir.add_fidl_service(move |stream| {
             debug!("fuchsia.diagnostics.LogSettings connection");
@@ -340,7 +346,8 @@ impl Archivist {
         });
 
         // Serve fuchsia.component.sandbox.Router
-        let router_scope = self.servers_scope.new_child();
+        let router_scope =
+            self.servers_scope.new_child_with_name("fuchsia.component.sandbox.Router");
         svc_dir.add_fidl_service(move |mut stream: fsandbox::DictionaryRouterRequestStream| {
             let id_gen = Clone::clone(&id_gen);
             let store = Clone::clone(&store);
