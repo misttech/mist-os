@@ -330,12 +330,16 @@ impl NetlinkSocketInner {
                 SO_SNDBUF => {
                     let requested_capacity: socklen_t =
                         current_task.read_object(user_opt.try_into()?)?;
+                    // SO_SNDBUF doubles the requested capacity to leave space for bookkeeping.
+                    // See https://man7.org/linux/man-pages/man7/socket.7.html
                     self.set_capacity(requested_capacity as usize * 2);
                 }
                 SO_RCVBUF => {
                     let requested_capacity: socklen_t =
                         current_task.read_object(user_opt.try_into()?)?;
-                    self.set_capacity(requested_capacity as usize);
+                    // SO_RCVBUF doubles the requested capacity to leave space for bookkeeping.
+                    // See https://man7.org/linux/man-pages/man7/socket.7.html
+                    self.set_capacity(requested_capacity as usize * 2);
                 }
                 SO_PASSCRED => {
                     let passcred: u32 = current_task.read_object(user_opt.try_into()?)?;
@@ -355,7 +359,7 @@ impl NetlinkSocketInner {
                     security::check_task_capable(current_task, CAP_NET_ADMIN)?;
                     let requested_capacity: socklen_t =
                         current_task.read_object(user_opt.try_into()?)?;
-                    self.set_capacity(requested_capacity as usize);
+                    self.set_capacity(requested_capacity as usize * 2);
                 }
                 _ => return error!(ENOSYS),
             },
