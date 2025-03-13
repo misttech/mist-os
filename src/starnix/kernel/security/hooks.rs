@@ -9,6 +9,7 @@ use super::{
 use crate::security::KernelState;
 use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::fs_args::MountParams;
+use crate::vfs::socket::Socket;
 use crate::vfs::{
     DirEntryHandle, FileHandle, FileObject, FileSystem, FileSystemHandle, FsNode, FsStr, FsString,
     Mount, NamespaceNode, OutputBuffer, ValueOrSize, XattrOp,
@@ -816,6 +817,12 @@ pub fn check_exec_access(
         },
         || Ok(ResolvedElfState { sid: None }),
     )
+}
+
+/// Computes and updates the socket security class for the `FsNode` associated with a new socket.
+pub fn socket_post_create(socket: &Socket, socket_node: &FsNode) {
+    profile_duration!("security.hooks.socket_post_create");
+    selinux_hooks::socket::socket_post_create(socket, socket_node);
 }
 
 /// Updates the SELinux thread group state on exec.

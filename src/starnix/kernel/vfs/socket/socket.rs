@@ -398,6 +398,7 @@ impl Socket {
             Anon::default(),
             FsNodeInfo::new_factory(mode, current_task.as_fscred()),
         );
+        security::socket_post_create(&socket, &node);
         FileObject::new_anonymous(current_task, SocketFile::new(socket), node, open_flags)
     }
 

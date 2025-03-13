@@ -10,6 +10,7 @@ pub(super) mod bpf;
 pub(super) mod file;
 pub(super) mod fs_node;
 pub(super) mod selinuxfs;
+pub(super) mod socket;
 pub(super) mod superblock;
 pub(super) mod task;
 pub(super) mod testing;

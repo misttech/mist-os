@@ -96,16 +96,70 @@ enumerable_enum! {
         File,
         /// The SELinux "filesystem" object class.
         FileSystem,
+        /// The SELinux "key_socket" object class.
+        KeySocket,
         /// The SELinux "lnk_file" object class.
         Link,
+        /// The SELinux "netlink_audit_socket" object class.
+        NetlinkAuditSocket,
+        /// The SELinux "netlink_connector_socket" object class.
+        NetlinkConnectorSocket,
+        /// The SELinux "netlink_crypto_socket" object class.
+        NetlinkCryptoSocket,
+        /// The SELinux "netlink_dnrt_socket" object class.
+        NetlinkDnrtSocket,
+        /// The SELinux "netlink_fib_lookup_socket" object class.
+        NetlinkFibLookupSocket,
+        /// The SELinux "netlink_firewall_socket" object class.
+        NetlinkFirewallSocket,
+        /// The SELinux "netlink_generic_socket" object class.
+        NetlinkGenericSocket,
+        /// The SELinux "netlink_ip6fw_socket" object class.
+        NetlinkIp6FwSocket,
+        /// The SELinux "netlink_iscsi_socket" object class.
+        NetlinkIscsiSocket,
+        /// The SELinux "netlink_kobject_uevent_socket" object class.
+        NetlinkKobjectUeventSocket,
+        /// The SELinux "netlink_netfilter_socket" object class.
+        NetlinkNetfilterSocket,
+        /// The SELinux "netlink_nflog_socket" object class.
+        NetlinkNflogSocket,
+        /// The SELinux "netlink_rdma_socket" object class.
+        NetlinkRdmaSocket,
+        /// The SELinux "netlink_route_socket" object class.
+        NetlinkRouteSocket,
+        /// The SELinux "netlink_scsitransport_socket" object class.
+        NetlinkScsitransportSocket,
+        /// The SELinux "netlink_selinux_socket" object class.
+        NetlinkSelinuxSocket,
+        /// The SELinux "netlink_socket" object class.
+        NetlinkSocket,
+        /// The SELinux "netlink_tcpdiag_socket" object class.
+        NetlinkTcpDiagSocket,
+        /// The SELinux "netlink_xfrm_socket" object class.
+        NetlinkXfrmSocket,
+        /// The SELinux "packet_socket" object class.
+        PacketSocket,
         /// The SELinux "process" object class.
         Process,
+        /// The SELinux "rawip_socket" object class.
+        RawIpSocket,
         /// The SELinux "security" object class.
         Security,
         /// The SELinux "sock_file" object class.
         SockFile,
         /// The SELinux "socket" object class.
         Socket,
+        /// The SELinux "tcp_socket" object class.
+        TcpSocket,
+        /// The SELinux "udp_socket" object class.
+        UdpSocket,
+        /// The SELinux "unix_dgram_socket" object class.
+        UnixDgramSocket,
+        /// The SELinux "unix_stream_socket" object class.
+        UnixStreamSocket,
+        /// The SELinux "vsock_socket" object class.
+        VSockSocket,
         // keep-sorted end
     }
 }
@@ -126,11 +180,38 @@ impl ObjectClass {
             Self::Fifo => "fifo_file",
             Self::File => "file",
             Self::FileSystem => "filesystem",
+            Self::KeySocket => "key_socket",
             Self::Link => "lnk_file",
+            Self::NetlinkAuditSocket => "netlink_audit_socket",
+            Self::NetlinkConnectorSocket => "netlink_connector_socket",
+            Self::NetlinkCryptoSocket => "netlink_crypto_socket",
+            Self::NetlinkDnrtSocket => "netlink_dnrt_socket",
+            Self::NetlinkFibLookupSocket => "netlink_fib_lookup_socket",
+            Self::NetlinkFirewallSocket => "netlink_firewall_socket",
+            Self::NetlinkGenericSocket => "netlink_generic_socket",
+            Self::NetlinkIp6FwSocket => "netlink_ip6fw_socket",
+            Self::NetlinkIscsiSocket => "netlink_iscsi_socket",
+            Self::NetlinkKobjectUeventSocket => "netlink_kobject_uevent_socket",
+            Self::NetlinkNetfilterSocket => "netlink_netfilter_socket",
+            Self::NetlinkNflogSocket => "netlink_nflog_socket",
+            Self::NetlinkRdmaSocket => "netlink_rdma_socket",
+            Self::NetlinkRouteSocket => "netlink_route_socket",
+            Self::NetlinkScsitransportSocket => "netlink_scsitransport_socket",
+            Self::NetlinkSelinuxSocket => "netlink_selinux_socket",
+            Self::NetlinkSocket => "netlink_socket",
+            Self::NetlinkTcpDiagSocket => "netlink_tcpdiag_socket",
+            Self::NetlinkXfrmSocket => "netlink_xfrm_socket",
+            Self::PacketSocket => "packet_socket",
             Self::Process => "process",
+            Self::RawIpSocket => "rawip_socket",
             Self::Security => "security",
             Self::SockFile => "sock_file",
             Self::Socket => "socket",
+            Self::TcpSocket => "tcp_socket",
+            Self::UdpSocket => "udp_socket",
+            Self::UnixDgramSocket => "unix_dgram_socket",
+            Self::UnixStreamSocket => "unix_stream_socket",
+            Self::VSockSocket => "vsock_socket",
             // keep-sorted end
         }
     }
@@ -240,18 +321,72 @@ enumerable_enum! {
     #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
     SocketClass {
         // keep-sorted start
+        Key,
+        Netlink,
+        NetlinkAudit,
+        NetlinkConnector,
+        NetlinkCrypto,
+        NetlinkDnrt,
+        NetlinkFibLookup,
+        NetlinkFirewall,
+        NetlinkGeneric,
+        NetlinkIp6Fw,
+        NetlinkIscsi,
+        NetlinkKobjectUevent,
+        NetlinkNetfilter,
+        NetlinkNflog,
+        NetlinkRdma,
+        NetlinkRoute,
+        NetlinkScsitransport,
+        NetlinkSelinux,
+        NetlinkTcpDiag,
+        NetlinkXfrm,
+        Packet,
+        RawIp,
         /// Generic socket class applied to all socket-like objects for which no more specific
         /// class is defined.
         Socket,
+        Tcp,
+        Udp,
+        UnixDgram,
+        UnixStream,
+        Vsock,
         // keep-sorted end
     }
 }
 
 impl From<SocketClass> for ObjectClass {
-    fn from(sock_class: SocketClass) -> Self {
-        match sock_class {
+    fn from(socket_class: SocketClass) -> Self {
+        match socket_class {
             // keep-sorted start
+            SocketClass::Key => Self::KeySocket,
+            SocketClass::Netlink => Self::NetlinkSocket,
+            SocketClass::NetlinkAudit => Self::NetlinkAuditSocket,
+            SocketClass::NetlinkConnector => Self::NetlinkConnectorSocket,
+            SocketClass::NetlinkCrypto => Self::NetlinkCryptoSocket,
+            SocketClass::NetlinkDnrt => Self::NetlinkDnrtSocket,
+            SocketClass::NetlinkFibLookup => Self::NetlinkFibLookupSocket,
+            SocketClass::NetlinkFirewall => Self::NetlinkFirewallSocket,
+            SocketClass::NetlinkGeneric => Self::NetlinkGenericSocket,
+            SocketClass::NetlinkIp6Fw => Self::NetlinkIp6FwSocket,
+            SocketClass::NetlinkIscsi => Self::NetlinkIscsiSocket,
+            SocketClass::NetlinkKobjectUevent => Self::NetlinkDnrtSocket,
+            SocketClass::NetlinkNetfilter => Self::NetlinkNetfilterSocket,
+            SocketClass::NetlinkNflog => Self::NetlinkNflogSocket,
+            SocketClass::NetlinkRdma => Self::NetlinkRdmaSocket,
+            SocketClass::NetlinkRoute => Self::NetlinkRouteSocket,
+            SocketClass::NetlinkScsitransport => Self::NetlinkScsitransportSocket,
+            SocketClass::NetlinkSelinux => Self::NetlinkSelinuxSocket,
+            SocketClass::NetlinkTcpDiag => Self::NetlinkTcpDiagSocket,
+            SocketClass::NetlinkXfrm => Self::NetlinkXfrmSocket,
+            SocketClass::Packet => Self::PacketSocket,
+            SocketClass::RawIp => Self::RawIpSocket,
             SocketClass::Socket => Self::Socket,
+            SocketClass::Tcp => Self::TcpSocket,
+            SocketClass::Udp => Self::UdpSocket,
+            SocketClass::UnixDgram => Self::UnixDgramSocket,
+            SocketClass::UnixStream => Self::UnixStreamSocket,
+            SocketClass::Vsock => Self::VSockSocket,
             // keep-sorted end
         }
     }
@@ -379,16 +514,70 @@ permission_enum! {
         File(FilePermission),
         /// Permissions for the well-known SELinux "filesystem" object class.
         FileSystem(FileSystemPermission),
+        /// Permissions for the well-known SELinux "packet_socket" object class.
+        KeySocket(KeySocketPermission),
         /// Permissions for the well-known SELinux "lnk_file" file-like object class.
         Link(LinkFilePermission),
+        /// Permissions for the well-known SELinux "netlink_audit_socket" file-like object class.
+        NetlinkAuditSocket(NetlinkAuditSocketPermission),
+        /// Permissions for the well-known SELinux "netlink_connector_socket" file-like object class.
+        NetlinkConnectorSocket(NetlinkConnectorSocketPermission),
+        /// Permissions for the well-known SELinux "netlink_crypto_socket" file-like object class.
+        NetlinkCryptoSocket(NetlinkCryptoSocketPermission),
+        /// Permissions for the well-known SELinux "netlink_dnrt_socket" file-like object class.
+        NetlinkDnrtSocket(NetlinkDnrtSocketPermission),
+        /// Permissions for the well-known SELinux "netlink_fib_lookup_socket" file-like object class.
+        NetlinkFibLookupSocket(NetlinkFibLookupSocketPermission),
+        /// Permissions for the well-known SELinux "netlink_firewall_socket" file-like object class.
+        NetlinkFirewallSocket(NetlinkFirewallSocketPermission),
+        /// Permissions for the well-known SELinux "netlink_generic_socket" file-like object class.
+        NetlinkGenericSocket(NetlinkGenericSocketPermission),
+        /// Permissions for the well-known SELinux "netlink_ip6fw_socket" file-like object class.
+        NetlinkIp6FwSocket(NetlinkIp6FwSocketPermission),
+        /// Permissions for the well-known SELinux "netlink_iscsi_socket" file-like object class.
+        NetlinkIscsiSocket(NetlinkIscsiSocketPermission),
+        /// Permissions for the well-known SELinux "netlink_kobject_uevent_socket" file-like object class.
+        NetlinkKobjectUeventSocket(NetlinkKobjectUeventSocketPermission),
+        /// Permissions for the well-known SELinux "netlink_netfilter_socket" file-like object class.
+        NetlinkNetfilterSocket(NetlinkNetfilterSocketPermission),
+        /// Permissions for the well-known SELinux "netlink_nflog_socket" file-like object class.
+        NetlinkNflogSocket(NetlinkNflogSocketPermission),
+        /// Permissions for the well-known SELinux "netlink_rdma_socket" file-like object class.
+        NetlinkRdmaSocket(NetlinkRdmaSocketPermission),
+        /// Permissions for the well-known SELinux "netlink_route_socket" file-like object class.
+        NetlinkRouteSocket(NetlinkRouteSocketPermission),
+        /// Permissions for the well-known SELinux "netlink_scsitransport_socket" file-like object class.
+        NetlinkScsitransportSocket(NetlinkScsitransportSocketPermission),
+        /// Permissions for the well-known SELinux "netlink_selinux_socket" file-like object class.
+        NetlinkSelinuxSocket(NetlinkSelinuxSocketPermission),
+        /// Permissions for the well-known SELinux "netlink_socket" file-like object class.
+        NetlinkSocket(NetlinkSocketPermission),
+        /// Permissions for the well-known SELinux "netlink_tcpdiag_socket" file-like object class.
+        NetlinkTcpDiagSocket(NetlinkTcpDiagSocketPermission),
+        /// Permissions for the well-known SELinux "netlink_xfrm_socket" file-like object class.
+        NetlinkXfrmSocket(NetlinkXfrmSocketPermission),
+        /// Permissions for the well-known SELinux "packet_socket" object class.
+        PacketSocket(PacketSocketPermission),
         /// Permissions for the well-known SELinux "process" object class.
         Process(ProcessPermission),
+        /// Permissions for the well-known SELinux "rawip_socket" object class.
+        RawIpSocket(RawIpSocketPermission),
         /// Permissions for access to parts of the "selinuxfs" used to administer and query SELinux.
         Security(SecurityPermission),
         /// Permissions for the well-known SELinux "sock_file" file-like object class.
         SockFile(SockFilePermission),
-        /// Permissions for the well-known SELinux "socket" file-like object class.
+        /// Permissions for the well-known SELinux "socket" object class.
         Socket(SocketPermission),
+        /// Permissions for the well-known SELinux "tcp_socket" object class.
+        TcpSocket(TcpSocketPermission),
+        /// Permissions for the well-known SELinux "udp_socket" object class.
+        UdpSocket(UdpSocketPermission),
+        /// Permissions for the well-known SELinux "unix_dgram_socket" object class.
+        UnixDgramSocket(UnixDgramSocketPermission),
+        /// Permissions for the well-known SELinux "unix_stream_socket" object class.
+        UnixStreamSocket(UnixStreamSocketPermission),
+        /// Permissions for the well-known SELinux "vsock_socket" object class.
+        VSockSocket(VsockSocketPermission),
         // keep-sorted end
     }
 }
@@ -603,10 +792,235 @@ common_permission_enum! {
 }
 
 impl CommonSocketPermission {
+    /// Returns the `class`-affine `Permission` value corresponding to this common permission.
+    /// This is used to allow hooks to resolve e.g. common "read" permission access based on the
+    /// "allow" rules for the correct target object class.
     pub fn for_class(&self, class: SocketClass) -> Permission {
         match class {
+            SocketClass::Key => KeySocketPermission::Common(self.clone()).into(),
+            SocketClass::Netlink => NetlinkSocketPermission::Common(self.clone()).into(),
+            SocketClass::NetlinkAudit => NetlinkAuditSocketPermission::Common(self.clone()).into(),
+            SocketClass::NetlinkConnector => {
+                NetlinkConnectorSocketPermission::Common(self.clone()).into()
+            }
+            SocketClass::NetlinkCrypto => {
+                NetlinkCryptoSocketPermission::Common(self.clone()).into()
+            }
+            SocketClass::NetlinkDnrt => NetlinkDnrtSocketPermission::Common(self.clone()).into(),
+            SocketClass::NetlinkFibLookup => {
+                NetlinkFibLookupSocketPermission::Common(self.clone()).into()
+            }
+            SocketClass::NetlinkFirewall => {
+                NetlinkFirewallSocketPermission::Common(self.clone()).into()
+            }
+            SocketClass::NetlinkGeneric => {
+                NetlinkGenericSocketPermission::Common(self.clone()).into()
+            }
+            SocketClass::NetlinkIp6Fw => NetlinkIp6FwSocketPermission::Common(self.clone()).into(),
+            SocketClass::NetlinkIscsi => NetlinkIscsiSocketPermission::Common(self.clone()).into(),
+            SocketClass::NetlinkKobjectUevent => {
+                NetlinkKobjectUeventSocketPermission::Common(self.clone()).into()
+            }
+            SocketClass::NetlinkNetfilter => {
+                NetlinkNetfilterSocketPermission::Common(self.clone()).into()
+            }
+            SocketClass::NetlinkNflog => NetlinkNflogSocketPermission::Common(self.clone()).into(),
+            SocketClass::NetlinkRdma => NetlinkRdmaSocketPermission::Common(self.clone()).into(),
+            SocketClass::NetlinkRoute => NetlinkRouteSocketPermission::Common(self.clone()).into(),
+            SocketClass::NetlinkScsitransport => {
+                NetlinkScsitransportSocketPermission::Common(self.clone()).into()
+            }
+            SocketClass::NetlinkSelinux => {
+                NetlinkSelinuxSocketPermission::Common(self.clone()).into()
+            }
+            SocketClass::NetlinkTcpDiag => {
+                NetlinkTcpDiagSocketPermission::Common(self.clone()).into()
+            }
+            SocketClass::NetlinkXfrm => NetlinkXfrmSocketPermission::Common(self.clone()).into(),
+            SocketClass::Packet => PacketSocketPermission::Common(self.clone()).into(),
+            SocketClass::RawIp => RawIpSocketPermission::Common(self.clone()).into(),
             SocketClass::Socket => SocketPermission::Common(self.clone()).into(),
+            SocketClass::Tcp => TcpSocketPermission::Common(self.clone()).into(),
+            SocketClass::Udp => UdpSocketPermission::Common(self.clone()).into(),
+            SocketClass::UnixDgram => UnixDgramSocketPermission::Common(self.clone()).into(),
+            SocketClass::UnixStream => UnixStreamSocketPermission::Common(self.clone()).into(),
+            SocketClass::Vsock => VsockSocketPermission::Common(self.clone()).into(),
         }
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "key_socket" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    KeySocketPermission extends CommonSocketPermission {
+    }
+}
+class_permission_enum! {
+    /// A well-known "netlink_socket" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    NetlinkSocketPermission extends CommonSocketPermission {
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "netlink_route_socket" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    NetlinkRouteSocketPermission extends CommonSocketPermission {
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "netlink_firewall_socket" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    NetlinkFirewallSocketPermission extends CommonSocketPermission {
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "netlink_tcpdiag_socket" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    NetlinkTcpDiagSocketPermission extends CommonSocketPermission {
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "netlink_nflog_socket" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    NetlinkNflogSocketPermission extends CommonSocketPermission {
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "netlink_xfrm_socket" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    NetlinkXfrmSocketPermission extends CommonSocketPermission {
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "netlink_selinux_socket" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    NetlinkSelinuxSocketPermission extends CommonSocketPermission {
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "netlink_iscsi_socket" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    NetlinkIscsiSocketPermission extends CommonSocketPermission {
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "netlink_audit_socket" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    NetlinkAuditSocketPermission extends CommonSocketPermission {
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "netlink_fib_lookup_socket" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    NetlinkFibLookupSocketPermission extends CommonSocketPermission {
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "netlink_connector_socket" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    NetlinkConnectorSocketPermission extends CommonSocketPermission {
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "netlink_netfilter_socket" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    NetlinkNetfilterSocketPermission extends CommonSocketPermission {
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "netlink_ip6fw_socket" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    NetlinkIp6FwSocketPermission extends CommonSocketPermission {
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "netlink_dnrt_socket" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    NetlinkDnrtSocketPermission extends CommonSocketPermission {
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "netlink_kobject_uevent_socket" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    NetlinkKobjectUeventSocketPermission extends CommonSocketPermission {
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "netlink_generic_socket" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    NetlinkGenericSocketPermission extends CommonSocketPermission {
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "netlink_scsitransport_socket" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    NetlinkScsitransportSocketPermission extends CommonSocketPermission {
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "netlink_rdma_socket" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    NetlinkRdmaSocketPermission extends CommonSocketPermission {
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "netlink_crypto_socket" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    NetlinkCryptoSocketPermission extends CommonSocketPermission {
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "packet_socket" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    PacketSocketPermission extends CommonSocketPermission {
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "rawip_socket" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    RawIpSocketPermission extends CommonSocketPermission {
     }
 }
 
@@ -615,6 +1029,46 @@ class_permission_enum! {
     /// policy enforcement hooks.
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
     SocketPermission extends CommonSocketPermission {
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "tcp_socket" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    TcpSocketPermission extends CommonSocketPermission {
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "udp_socket" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    UdpSocketPermission extends CommonSocketPermission {
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "unix_stream_socket" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    UnixStreamSocketPermission extends CommonSocketPermission {
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "unix_dgram_socket" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    UnixDgramSocketPermission extends CommonSocketPermission {
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "vsock_socket" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    VsockSocketPermission extends CommonSocketPermission {
     }
 }
 
@@ -789,6 +1243,14 @@ class_permission_enum! {
 }
 
 class_permission_enum! {
+    /// A well-known "sock_file" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    SockFilePermission extends CommonFilePermission {
+    }
+}
+
+class_permission_enum! {
     /// A well-known "process" class permission in SELinux policy that has a particular meaning in
     /// policy enforcement hooks.
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -865,14 +1327,6 @@ class_permission_enum! {
         SetEnforce("setenforce"),
         // keep-sorted end
      }
-}
-
-class_permission_enum! {
-    /// A well-known "sock_file" class permission in SELinux policy that has a particular meaning in
-    /// policy enforcement hooks.
-    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-    SockFilePermission extends CommonFilePermission {
-    }
 }
 
 /// Initial Security Identifier (SID) values defined by the SELinux Reference Policy.
