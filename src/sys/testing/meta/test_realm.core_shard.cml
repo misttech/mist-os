@@ -543,6 +543,11 @@
             to: "#testing",
         },
         {
+            service: "fuchsia.hardware.gpu.mali.UtilsService",
+            from: "parent",
+            to: "#testing",
+        },
+        {
             directory: "dev-class",
             from: "parent",
             as: "dev-sysmem",

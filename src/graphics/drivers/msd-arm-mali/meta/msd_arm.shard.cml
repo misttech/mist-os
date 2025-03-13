@@ -13,7 +13,12 @@
         fallback: "false",
     },
     capabilities: [
-        { service: "fuchsia.gpu.magma.Service" },
+        {
+            service: [
+                "fuchsia.gpu.magma.Service",
+                "fuchsia.hardware.gpu.mali.UtilsService",
+            ],
+        },
     ],
     use: [
         {
@@ -43,7 +48,10 @@
     ],
     expose: [
         {
-            service: "fuchsia.gpu.magma.Service",
+            service: [
+                "fuchsia.gpu.magma.Service",
+                "fuchsia.hardware.gpu.mali.UtilsService",
+            ],
             from: "self",
         },
     ],

@@ -91,12 +91,14 @@
         {
             // These services replace the directory capabilities above.
             service: [
+                "fuchsia.gpu.magma.PerformanceCounterService",
                 "fuchsia.gpu.magma.Service",
                 "fuchsia.hardware.audio.CodecConnectorService",
                 "fuchsia.hardware.audio.CompositeConnectorService",
                 "fuchsia.hardware.audio.DaiConnectorService",
                 "fuchsia.hardware.audio.StreamConfigConnectorInputService",
                 "fuchsia.hardware.audio.StreamConfigConnectorOutputService",
+                "fuchsia.hardware.gpu.mali.UtilsService",
             ],
             from: "parent",
             to: [ "#devices-tests" ],
