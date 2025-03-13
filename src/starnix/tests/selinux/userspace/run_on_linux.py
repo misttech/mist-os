@@ -76,7 +76,7 @@ def build_initrd(
         shutil.copy(output_path, initrd_dir / dest_path)
 
     subprocess.run(
-        "find . | cpio --quiet -H newc -o | gzip -9 -n > ../initrd.img",
+        "find . | cpio --quiet -R +0:+0 -H newc -o | gzip -9 -n > ../initrd.img",
         shell=True,
         check=True,
         cwd=initrd_dir,
