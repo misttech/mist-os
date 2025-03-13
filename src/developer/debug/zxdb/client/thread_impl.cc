@@ -10,12 +10,16 @@
 #include <iostream>
 #include <limits>
 
+#include "src/developer/debug/ipc/protocol.h"
 #include "src/developer/debug/ipc/records.h"
+#include "src/developer/debug/ipc/unwinder_support.h"
 #include "src/developer/debug/shared/logging/logging.h"
 #include "src/developer/debug/shared/message_loop.h"
+#include "src/developer/debug/shared/register_info.h"
 #include "src/developer/debug/shared/zx_status.h"
 #include "src/developer/debug/zxdb/client/breakpoint.h"
 #include "src/developer/debug/zxdb/client/breakpoint_observer.h"
+#include "src/developer/debug/zxdb/client/elf_memory_region.h"
 #include "src/developer/debug/zxdb/client/frame_impl.h"
 #include "src/developer/debug/zxdb/client/process_impl.h"
 #include "src/developer/debug/zxdb/client/remote_api.h"
@@ -26,7 +30,9 @@
 #include "src/developer/debug/zxdb/common/join_callbacks.h"
 #include "src/developer/debug/zxdb/expr/cast.h"
 #include "src/developer/debug/zxdb/expr/expr.h"
+#include "src/developer/debug/zxdb/symbols/loaded_module_symbols.h"
 #include "src/developer/debug/zxdb/symbols/process_symbols.h"
+#include "src/lib/unwinder/unwind.h"
 
 namespace zxdb {
 
@@ -467,19 +473,136 @@ void ThreadImpl::ResolveConditionalBreakpoint(const std::string& cond, Breakpoin
 
 void ThreadImpl::SyncFramesForStack(const Stack::SyncFrameOptions& options,
                                     fit::callback<void(const Err&)> callback) {
+  if (options.remote_unwind) {
+    return SyncFramesFromTarget(std::move(callback));
+  }
+
+  debug_ipc::ReadRegistersRequest request;
+  request.categories = {debug::RegisterCategory::kGeneral};
+  request.id = {.process = GetProcess()->GetKoid(), .thread = GetKoid()};
+
+  // Request the registers that will make up the top-most stack frame. The unwinder needs these for
+  // all unwinding strategies so fetching them is a prerequisite. We'll try to use local debug_info
+  // before deferring to the live process for unwinding.
+  session()->remote_api()->ReadRegisters(
+      request, [weak_this = weak_factory_.GetWeakPtr(), cb = std::move(callback)](
+                   const Err& err, debug_ipc::ReadRegistersReply reply) mutable {
+        if (!weak_this) {
+          return cb(Err("Thread died while fetching registers"));
+        }
+
+        if (err.has_error() || reply.registers.empty()) {
+          // This commonly happens for unit tests which historically expect the frames to only be
+          // available remotely and/or don't necessarily provide registers.
+          return weak_this->SyncFramesFromTarget(std::move(cb));
+        }
+
+        weak_this->UnwindWithRegisters(
+            debug_ipc::ConvertRegisters(weak_this->session()->arch(), reply.registers),
+            std::move(cb));
+      });
+}
+
+void ThreadImpl::UnwindWithRegisters(unwinder::Registers regs, fit::callback<void(const Err&)> cb) {
+  std::vector<debug_ipc::StackFrame> frames;
+
+  auto loaded_modules = GetProcess()->GetSymbols()->GetLoadedModuleSymbols();
+
+  std::vector<unwinder::Module> modules;
+  modules.reserve(loaded_modules.size());
+
+  unwinder_memory_.clear();
+  unwinder_memory_.reserve(loaded_modules.size());
+
+  for (const auto& loaded_module : loaded_modules) {
+    auto build_id_entry = session()->system().GetSymbols()->build_id_index().EntryForBuildID(
+        loaded_module->build_id());
+
+    // It's unlikely, but possible that the (likely stripped) binary file has some debug sections
+    // present, so we should use the ElfMemoryRegion object which knows how to decompress debug
+    // sections when that's enabled.
+    std::unique_ptr<ElfMemoryRegion> binary_file_memory = nullptr;
+    std::unique_ptr<ElfMemoryRegion> debug_info_file_memory = nullptr;
+    if (!build_id_entry.binary.empty()) {
+      binary_file_memory =
+          std::make_unique<ElfMemoryRegion>(loaded_module->load_address(), build_id_entry.binary);
+    }
+
+    if (!build_id_entry.debug_info.empty()) {
+      debug_info_file_memory = std::make_unique<ElfMemoryRegion>(loaded_module->load_address(),
+                                                                 build_id_entry.debug_info);
+    }
+
+    modules.emplace_back(loaded_module->load_address(), binary_file_memory.get(),
+                         debug_info_file_memory.get(), unwinder::Module::AddressMode::kFile);
+
+    unwinder_memory_.push_back(std::move(binary_file_memory));
+    unwinder_memory_.push_back(std::move(debug_info_file_memory));
+  }
+
+  // This probably doesn't need to be configurable, when someone types "bt" or "frame", they
+  // want to see the whole stack, and the PrettyStackManager already does a good job of
+  // removing the less helpful frames. For right now this matches what DebugAgent sends to
+  // the unwinder for remote unwinds.
+  constexpr size_t kMaxDepth = 256;
+
+  // Here we try unwinding using local debug info before deferring to the target. This lets us use
+  // potentially better .debug_frame section that is not loaded in the target executable, if
+  // present, or deal with cases where the .eh_frame section has been stripped from the target but
+  // remains in an unstripped binary that we have access to on the host.
+  unwinder_ = std::make_unique<unwinder::AsyncUnwinder>(modules);
+  unwinder_->Unwind(GetProcess(), regs, kMaxDepth,
+                    // Move the unwinder itself and the memory into the callback so they stay alive
+                    // for the duration of unwinding.
+                    [weak_this = weak_factory_.GetWeakPtr(),
+                     cb = std::move(cb)](std::vector<unwinder::Frame> unwinder_frames) mutable {
+                      // Release the unwinder and it's memory now that we're done with them.
+                      weak_this->unwinder_.reset();
+                      weak_this->unwinder_memory_.clear();
+
+                      // The unwinder's asynchronous API calls all callbacks reentrantly, so post a
+                      // task to the message loop to make sure we don't blow our own stack.
+                      debug::MessageLoop::Current()->PostTask(
+                          FROM_HERE, [weak_this, unwinder_frames = std::move(unwinder_frames),
+                                      cb = std::move(cb)]() mutable {
+                            if (!weak_this) {
+                              if (cb) {
+                                cb(Err("Thread died during unwinding."));
+                              }
+
+                              return;
+                            }
+
+                            // If something went wrong, the last frame will have an error condition.
+                            // In the typical unwinding termination case, the error is cleared.
+                            if (unwinder_frames.back().error.has_err()) {
+                              return weak_this->SyncFramesFromTarget(std::move(cb));
+                            }
+
+                            weak_this->stack_.SetFrames(debug_ipc::ThreadRecord::StackAmount::kFull,
+                                                        debug_ipc::ConvertFrames(unwinder_frames));
+
+                            if (cb) {
+                              cb(Err());
+                            }
+                          });
+                    });
+}
+
+void ThreadImpl::SyncFramesFromTarget(fit::callback<void(const Err&)> callback) {
   debug_ipc::ThreadStatusRequest request;
   request.id = {.process = process_->GetKoid(), .thread = koid_};
 
   session()->remote_api()->ThreadStatus(
       request, [callback = std::move(callback), thread = weak_factory_.GetWeakPtr()](
                    const Err& err, debug_ipc::ThreadStatusReply reply) mutable {
-        if (err.has_error()) {
-          callback(err);
+        if (!thread) {
+          callback(Err("Thread destroyed."));
           return;
         }
 
-        if (!thread) {
-          callback(Err("Thread destroyed."));
+        if (err.has_error()) {
+          callback(err);
           return;
         }
 

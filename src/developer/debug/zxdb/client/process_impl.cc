@@ -11,7 +11,8 @@
 #include <set>
 
 #include "lib/fit/defer.h"
-#include "src/developer/debug/shared/logging/logging.h"
+#include "src/developer/debug/ipc/protocol.h"
+#include "src/developer/debug/ipc/records.h"
 #include "src/developer/debug/shared/message_loop.h"
 #include "src/developer/debug/zxdb/client/memory_dump.h"
 #include "src/developer/debug/zxdb/client/process_symbol_data_provider.h"
@@ -20,10 +21,12 @@
 #include "src/developer/debug/zxdb/client/setting_schema_definition.h"
 #include "src/developer/debug/zxdb/client/target_impl.h"
 #include "src/developer/debug/zxdb/client/thread_impl.h"
+#include "src/developer/debug/zxdb/common/join_callbacks.h"
 #include "src/developer/debug/zxdb/symbols/elf_symbol.h"
 #include "src/developer/debug/zxdb/symbols/input_location.h"
 #include "src/developer/debug/zxdb/symbols/loaded_module_symbols.h"
 #include "src/developer/debug/zxdb/symbols/module_symbol_status.h"
+#include "src/lib/fxl/memory/ref_ptr.h"
 
 namespace zxdb {
 
@@ -354,12 +357,6 @@ void ProcessImpl::UpdateThreads(const std::vector<debug_ipc::ThreadRecord>& new_
 }
 
 void ProcessImpl::DidLoadModuleSymbols(LoadedModuleSymbols* module) {
-  // Force any stopped threads to update their cached stack with the new symbol information.
-  for (const auto& [koid, thread] : threads_) {
-    if (thread->CurrentStopSupportsFrames())
-      thread->GetStack().SyncFrames({.force_update = true}, [](const Err&) {});
-  }
-
   for (auto& observer : session()->process_observers())
     observer.DidLoadModuleSymbols(this, module);
 }
@@ -491,6 +488,67 @@ void ProcessImpl::FixupEmptyModuleNames(std::vector<debug_ipc::Module>& modules)
 void ProcessImpl::OnSymbolLoadFailure(const Err& err) {
   for (auto& observer : session()->process_observers())
     observer.OnSymbolLoadFailure(this, err);
+}
+
+void ProcessImpl::FetchMemoryRanges(std::vector<std::pair<uint64_t, uint32_t>> ranges,
+                                    fit::callback<void()> done) {
+  struct Pack {
+    Pack(const Err& err, std::vector<debug_ipc::MemoryBlock> blocks)
+        : err(err), blocks(std::move(blocks)) {}
+    Err err;
+    std::vector<debug_ipc::MemoryBlock> blocks;
+  };
+
+  auto joiner = fxl::MakeRefCounted<JoinCallbacks<Pack>>();
+
+  for (const auto& [addr, size] : ranges) {
+    debug_ipc::ReadMemoryRequest request;
+    request.address = addr;
+    request.size = size;
+    request.process_koid = GetKoid();
+
+    session()->remote_api()->ReadMemory(
+        request,
+        [cb = joiner->AddCallback()](const Err& err, debug_ipc::ReadMemoryReply reply) mutable {
+          return cb({err, std::move(reply.blocks)});
+        });
+  }
+
+  joiner->Ready([weak_this = weak_factory_.GetWeakPtr(), joiner,
+                 done = std::move(done)](std::vector<Pack> results) mutable {
+    if (!weak_this) {
+      joiner->Abandon();
+      return;
+    }
+
+    std::vector<debug_ipc::MemoryBlock> all_blocks;
+
+    for (const auto& result : results) {
+      all_blocks.insert(all_blocks.end(), result.blocks.begin(), result.blocks.end());
+    }
+
+    std::sort(all_blocks.begin(), all_blocks.end(),
+              [](const auto& lhs, const auto& rhs) { return lhs.address < rhs.address; });
+
+    weak_this->cached_memory_.emplace_back(std::move(all_blocks));
+
+    debug::MessageLoop::Current()->PostTask(FROM_HERE, [done = std::move(done)]() mutable {
+      FX_DCHECK(done);
+      done();
+    });
+  });
+}
+
+unwinder::Error ProcessImpl::ReadBytes(uint64_t addr, uint64_t size, void* dst) {
+  unwinder::Error err = unwinder::Success();
+
+  for (auto& memory : cached_memory_) {
+    if (err = memory.ReadBytes(addr, size, dst); err.ok()) {
+      return unwinder::Success();
+    }
+  }
+
+  return err;
 }
 
 }  // namespace zxdb

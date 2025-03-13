@@ -56,7 +56,7 @@ TEST_F(VerbsStackData, Stack) {
 
   // Inject a fake running process.
   constexpr uint64_t kProcessKoid = 1234;
-  InjectProcess(kProcessKoid);
+  InjectProcessWithModule(kProcessKoid, 0x1234);
   constexpr uint64_t kThreadKoid = 5678;
   Thread* thread = InjectThread(kProcessKoid, kThreadKoid);
 
