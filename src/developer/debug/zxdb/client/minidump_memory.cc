@@ -6,6 +6,8 @@
 
 #include <memory>
 
+#include "src/developer/debug/zxdb/client/elf_memory_region.h"
+#include "src/developer/debug/zxdb/client/file_memory_region.h"
 #include "src/lib/elflib/elflib.h"
 #include "src/lib/fxl/strings/string_printf.h"
 #include "src/lib/unwinder/module.h"
@@ -45,9 +47,19 @@ MinidumpMemory::MinidumpMemory(const crashpad::ProcessSnapshotMinidump& minidump
   for (const auto& minidump_mod : minidump.Modules()) {
     uint64_t base = minidump_mod->Address();
     auto entry = build_id_index.EntryForBuildID(MinidumpGetBuildId(*minidump_mod));
+    std::optional<ElfMemoryRegion> debug_info;
+    std::optional<ElfMemoryRegion> binary;
+
     if (!entry.debug_info.empty()) {
-      debug_modules_.emplace(base, FileMemoryRegion(base, entry.debug_info));
+      debug_info = ElfMemoryRegion(base, entry.debug_info);
     }
+
+    if (!entry.binary.empty()) {
+      binary = ElfMemoryRegion(base, entry.binary);
+    }
+
+    debug_modules_.emplace(base,
+                           Entry{.binary = std::move(binary), .debug_info = std::move(debug_info)});
 
     if (entry.binary.empty()) {
       continue;
@@ -141,8 +153,19 @@ unwinder::Memory* MinidumpMemory::GetMemoryRegion(uint64_t address) {
 std::vector<unwinder::Module> MinidumpMemory::GetUnwinderModules() {
   std::vector<unwinder::Module> res;
   res.reserve(debug_modules_.size());
-  for (auto& [addr, memory] : debug_modules_) {
-    res.emplace_back(addr, &memory, unwinder::Module::AddressMode::kFile);
+  for (auto& [addr, entry] : debug_modules_) {
+    unwinder::Memory* binary_memory;
+    unwinder::Memory* debug_info_memory;
+
+    if (entry.binary) {
+      binary_memory = &entry.binary.value();
+    }
+
+    if (entry.debug_info) {
+      debug_info_memory = &entry.debug_info.value();
+    }
+
+    res.emplace_back(addr, binary_memory, debug_info_memory, unwinder::Module::AddressMode::kFile);
   }
   return res;
 }
