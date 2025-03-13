@@ -40,7 +40,13 @@ if (is_host) {
       "templates/package.html.hbs",
     ]
     source_root = "src/main.rs"
-    sources = [ "src/main.rs" ]
+    sources = [
+      "src/html.rs",
+      "src/main.rs",
+      "src/print.rs",
+      "src/process.rs",
+      "src/types.rs",
+    ]
   }
   install_host_tools("install") {
     deps = [ ":bin" ]
