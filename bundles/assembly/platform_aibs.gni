@@ -454,9 +454,14 @@ required_userdebug_aib_names = required_user_aib_names + [
                                  "bootstrap_userdebug",
                                ]
 
+# An allowlist of experimental AIBs.
+#
 # If an AIB is added to this experimental list, it does not require security
 # review, but will be banned from user builds. These AIBs may still be used
 # on userdebug builds as long as scrutiny is not run on those builds.
+#
+# NOTE: This is an allowlist only. To include your AIB,  you must also add it
+# to the appropriate AIB list above.
 experimental_aib_names = [
   "adb_support",
   "bootstrap_realm_vsock_development_access",
