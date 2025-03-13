@@ -390,7 +390,6 @@ pub struct SignalInfoHeader {
     pub signo: u32,
     pub errno: i32,
     pub code: i32,
-    pub _pad: i32,
 }
 
 pub const SI_HEADER_SIZE: usize = std::mem::size_of::<SignalInfoHeader>();
@@ -483,7 +482,6 @@ macro_rules! signal_info_as_siginfo_bytes {
                     signo: $self.signal.number(),
                     errno: $self.errno,
                     code: $self.code,
-                    _pad: 0,
                 };
                 let mut array: [u8; SI_MAX_SIZE as usize] = [0; SI_MAX_SIZE as usize];
                 let _ = header.write_to(&mut array[..SI_HEADER_SIZE]);

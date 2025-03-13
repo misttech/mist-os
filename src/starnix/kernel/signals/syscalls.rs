@@ -2043,10 +2043,12 @@ mod tests {
 
         const TEST_VALUE: u64 = 101;
 
+        // Add the padding int for arch64
+        const ARCH64_SI_HEADER_SIZE: usize = SI_HEADER_SIZE + 4;
         // Taken from gVisor of SignalInfo in  //pkg/abi/linux/signal.go
-        const PID_DATA_OFFSET: usize = SI_HEADER_SIZE;
-        const UID_DATA_OFFSET: usize = SI_HEADER_SIZE + 4;
-        const VALUE_DATA_OFFSET: usize = SI_HEADER_SIZE + 8;
+        const PID_DATA_OFFSET: usize = ARCH64_SI_HEADER_SIZE;
+        const UID_DATA_OFFSET: usize = ARCH64_SI_HEADER_SIZE + 4;
+        const VALUE_DATA_OFFSET: usize = ARCH64_SI_HEADER_SIZE + 8;
 
         let mut data = vec![0u8; SI_MAX_SIZE as usize];
         let header = SignalInfoHeader {
