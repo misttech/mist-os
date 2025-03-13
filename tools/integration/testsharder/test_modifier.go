@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 
 	"go.fuchsia.dev/fuchsia/tools/build"
@@ -90,6 +91,13 @@ func LoadTestModifiers(ctx context.Context, testSpecs []build.TestSpec, manifest
 	return matchModifiersToTests(ctx, testSpecs, specs)
 }
 
+// TODO(https://fxbug.dev/384562300): Remove dm_reboot_bringup_test.sh when flake is fixed.
+// TODO(https://fxbug.dev/377625303): Remove kill_critical_process_test.sh when flake is fixed.
+var knownFlakyTests = []string{
+	"host_x64/obj/src/tests/reboot/dm_reboot_bringup_test/dm_reboot_bringup_test.sh",
+	"host_x64/obj/src/tests/reboot/kill_critical_process_test.sh",
+}
+
 // AffectedModifiers returns modifiers for tests that are in both testSpecs and
 // affectedTestNames.
 // maxAttempts will be applied to any test that is not multiplied.
@@ -126,8 +134,8 @@ func AffectedModifiers(testSpecs []build.TestSpec, affectedTestNames []string, m
 			// Only x64 Linux VMs are plentiful, don't multiply affected tests that
 			// would require any other type of bot. Also, don't multiply isolated tests
 			// because they are expected to be the only test running in its shard and
-			// should only run once.
-			if spec.CPU != x64 || (spec.OS != fuchsia && spec.OS != linux) || spec.Isolated {
+			// should only run once. Also don't multiply tests that are known to be flaky.
+			if spec.CPU != x64 || (spec.OS != fuchsia && spec.OS != linux) || spec.Isolated || slices.Contains(knownFlakyTests, name) {
 				ret = append(ret, ModifierMatch{
 					Test: name,
 					Modifier: TestModifier{
