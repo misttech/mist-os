@@ -21,21 +21,26 @@ class TestEnvironment : public fdf_testing::Environment {
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
     // Set up and add the compat device server.
     device_server_.Initialize("default");
-    ZX_ASSERT(device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                   &to_driver_vfs) == ZX_OK);
+    if (zx_status_t status =
+            device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs);
+        status != ZX_OK) {
+      return zx::error(status);
+    }
 
     // Add the i2c service.
-    ZX_ASSERT(to_driver_vfs
-                  .AddService<fuchsia_hardware_i2cimpl::Service>(i2c_impl_.CreateInstanceHandler())
-                  .is_ok());
+    if (zx::result result = to_driver_vfs.AddService<fuchsia_hardware_i2cimpl::Service>(
+            i2c_impl_.CreateInstanceHandler());
+        result.is_error()) {
+      return result.take_error();
+    }
     return zx::ok();
   }
 
   void AddMetadata(fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata metadata) {
     fit::result persisted = fidl::Persist(metadata);
-    ZX_ASSERT(persisted.is_ok());
-    ZX_ASSERT(device_server_.AddMetadata(DEVICE_METADATA_I2C_CHANNELS, persisted->data(),
-                                         persisted->size()) == ZX_OK);
+    ASSERT_TRUE(persisted.is_ok());
+    ASSERT_OK(device_server_.AddMetadata(DEVICE_METADATA_I2C_CHANNELS, persisted->data(),
+                                         persisted->size()));
   }
 
   FakeI2cImpl& i2c_impl() { return i2c_impl_; }
