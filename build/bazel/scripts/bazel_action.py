@@ -1286,6 +1286,15 @@ def main() -> int:
     if _DEBUG:
         debug("BUILD_CMD: " + " ".join(shlex.quote(c) for c in cmd))
 
+    # Save the command.profile.gz data for analysis.
+    # Convert '//some/gn:label' into 'obj/some/gn/label.command.profile.gz'
+    command_profile_dest = os.path.join(
+        current_dir,
+        "obj",
+        f"{args.gn_target_label[2:].replace(':', '/')}.command.profile.gz",
+    )
+    cmd += ["--profile", command_profile_dest]
+
     # NOTE: It is important to NOT capture output from this subprocess, to make
     # sure console output from Bazel are correctly printed out by Ninja.
     ret = subprocess.run(cmd)
