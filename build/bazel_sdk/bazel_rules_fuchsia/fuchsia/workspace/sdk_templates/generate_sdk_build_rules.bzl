@@ -1770,24 +1770,6 @@ def _merge_rules_fuchsia(runtime):
         executable = False,
     )
 
-    # Allow for a soft transition of the api level flag.
-    #TODO(b/402169646) remove this alias when OOT users are migrated
-    ctx.file("fuchsia/BUILD.bazel", content = """
-package(default_visibility = ["//visibility:public"])
-
-alias(
-    name = "fuchsia_api_level",
-    actual = "//flags:fuchsia_api_level",
-    deprecation = "Use @fuchsia_sdk//flags:fuchsia_api_level instead",
-)
-
-alias(
-    name = "repository_default_fuchsia_api_level",
-    actual = "//flags:repository_default_fuchsia_api_level",
-    deprecation = "Use @fuchsia_sdk//flags:repository_default_fuchsia_api_level instead",
-)
-    """, executable = False)
-
     # BUILD.bazel references //:.build-id in a fuchsia_debug_symbol()
     # target declaration. This directory may not exist when the input
     # IDK is an external repository, so create an empty one if needed.
