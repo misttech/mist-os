@@ -137,6 +137,7 @@ void BtHciBroadcom::GetFeatures(GetFeaturesCompleter::Sync& completer) {
   fidl::Arena arena;
   auto builder = fhbt::wire::VendorFeatures::Builder(arena);
   builder.acl_priority_command(true);
+  builder.android_vendor_extensions(fhbt::wire::AndroidVendorSupport::Builder(arena).Build());
   completer.Reply(builder.Build());
 }
 
@@ -417,7 +418,6 @@ constexpr auto kOpenFlags = fuchsia_io::Flags::kPermRead | fuchsia_io::Flags::kP
 fpromise::promise<void, zx_status_t> BtHciBroadcom::LoadFirmware() {
   zx::vmo fw_vmo;
   size_t fw_size;
-
 
   // If there's no firmware for this PID, we don't expect the bind to happen without a
   // corresponding entry in the firmware table. Please double-check the PID value and add an entry
