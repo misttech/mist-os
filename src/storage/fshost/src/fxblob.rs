@@ -7,27 +7,6 @@ use futures::StreamExt;
 use std::sync::Arc;
 use vfs::service;
 
-/// Make a new vfs service node that implements fuchsia.update.verify.BlobfsVerifier
-pub fn blobfs_verifier_service() -> Arc<service::Service> {
-    service::host(move |mut stream: fupdate::BlobfsVerifierRequestStream| async move {
-        while let Some(request) = stream.next().await {
-            match request {
-                Ok(fupdate::BlobfsVerifierRequest::Verify { responder, .. }) => {
-                    // TODO(https://fxbug.dev/42077105): Implement by calling out
-                    // to Fxfs' blob volume.
-                    responder.send(Ok(())).unwrap_or_else(|e| {
-                        log::error!("failed to send Verify response. error: {:?}", e);
-                    });
-                }
-                Err(e) => {
-                    log::error!("BlobfsVerifier server failed: {:?}", e);
-                    return;
-                }
-            }
-        }
-    })
-}
-
 /// Make a new vfs service node that implements fuchsia.update.ComponentOtaHealthCheck
 pub fn ota_health_check_service() -> Arc<service::Service> {
     service::host(move |mut stream: fupdate::ComponentOtaHealthCheckRequestStream| async move {

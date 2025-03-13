@@ -41,10 +41,6 @@
             from: "#blobfs",
         },
         {
-            protocol: "fuchsia.update.verify.BlobfsVerifier",
-            from: "#blobfs",
-        },
-        {
             protocol: "fuchsia.update.verify.ComponentOtaHealthCheck",
             from: "#blobfs",
         },

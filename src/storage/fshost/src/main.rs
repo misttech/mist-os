@@ -150,12 +150,6 @@ async fn main() -> Result<(), Error> {
             .unwrap();
         svc_dir
             .add_entry(
-                fidl_fuchsia_update_verify::BlobfsVerifierMarker::PROTOCOL_NAME,
-                fxblob::blobfs_verifier_service(),
-            )
-            .unwrap();
-        svc_dir
-            .add_entry(
                 fidl_fuchsia_update_verify::ComponentOtaHealthCheckMarker::PROTOCOL_NAME,
                 fxblob::ota_health_check_service(),
             )

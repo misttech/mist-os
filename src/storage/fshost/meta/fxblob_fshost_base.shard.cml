@@ -23,9 +23,6 @@
             path: "/fs/blob/root",
         },
         {
-            protocol: [ "fuchsia.update.verify.BlobfsVerifier" ],
-        },
-        {
             protocol: [ "fuchsia.update.verify.ComponentOtaHealthCheck" ],
         },
         {
@@ -99,10 +96,6 @@
         {
             protocol: "fuchsia.fs.startup.Volumes",
             from: "#fxfs",
-        },
-        {
-            protocol: "fuchsia.update.verify.BlobfsVerifier",
-            from: "self",
         },
         {
             protocol: "fuchsia.update.verify.ComponentOtaHealthCheck",

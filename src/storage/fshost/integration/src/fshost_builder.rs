@@ -190,7 +190,6 @@ impl FshostBuilder {
                 Route::new()
                     .capability(Capability::protocol::<ffshost::AdminMarker>())
                     .capability(Capability::protocol::<ffshost::RecoveryMarker>())
-                    .capability(Capability::protocol::<ffuv::BlobfsVerifierMarker>())
                     .capability(Capability::protocol::<ffuv::ComponentOtaHealthCheckMarker>())
                     .capability(Capability::protocol::<ffshost::StarnixVolumeProviderMarker>())
                     .capability(Capability::protocol::<fpartitions::PartitionsManagerMarker>())

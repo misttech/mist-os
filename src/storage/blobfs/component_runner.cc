@@ -36,7 +36,6 @@
 #include "src/storage/blobfs/mount.h"
 #include "src/storage/blobfs/page_loader.h"
 #include "src/storage/blobfs/service/admin.h"
-#include "src/storage/blobfs/service/health_check.h"
 #include "src/storage/blobfs/service/lifecycle.h"
 #include "src/storage/blobfs/service/ota_health_check.h"
 #include "src/storage/blobfs/service/startup.h"
@@ -214,8 +213,6 @@ zx::result<> ComponentRunner::Configure(std::unique_ptr<BlockDevice> device,
 
   auto svc_dir = fbl::MakeRefCounted<fs::PseudoDir>();
 
-  svc_dir->AddEntry(fidl::DiscoverableProtocolName<fuchsia_update_verify::BlobfsVerifier>,
-                    fbl::MakeRefCounted<HealthCheckService>(loop_.dispatcher(), *blobfs_));
   svc_dir->AddEntry(fidl::DiscoverableProtocolName<fuchsia_update_verify::ComponentOtaHealthCheck>,
                     fbl::MakeRefCounted<OtaHealthCheckService>(loop_.dispatcher(), *blobfs_));
   svc_dir->AddEntry(fidl::DiscoverableProtocolName<fuchsia_fs::Admin>,

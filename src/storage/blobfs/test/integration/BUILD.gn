@@ -298,42 +298,6 @@ wrap_with_decompressor("ota-health-check-service") {
   ]
 }
 
-test("blobfs_verifier_service") {
-  output_name = "blobfs_verifier_service_test"
-
-  # We need some extra system flags that the _ALL_SOURCE define exposes.
-  configs += [ "//build/config:all_source" ]
-
-  sources = [ "verifier_service_test.cc" ]
-  deps = [
-    ":blobfs_integration_fixtures",
-    "//sdk/fidl/fuchsia.update:fuchsia.update_cpp",
-    "//sdk/lib/component/incoming/cpp",
-    "//sdk/lib/fdio",
-    "//src/lib/fxl/test:gtest_main",
-    "//zircon/system/ulib/zx",
-  ]
-
-  # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,
-  # rather than builders.
-  configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
-}
-
-storage_driver_test_realm_v2_component("blobfs-verifier-service-component") {
-  deps = [
-    ":blobfs_verifier_service",
-    ":decompressor_includes",
-  ]
-}
-
-wrap_with_decompressor("blobfs-verifier-service") {
-  test_url = "fuchsia-pkg://fuchsia.com/blobfs-integration#meta/blobfs-verifier-service-component.cm"
-  forwarded_protocols = [
-    "fuchsia.logger.LogSink",
-    "fuchsia.process.Launcher",
-  ]
-}
-
 test("executable_mount") {
   testonly = true
   sources = [ "executable_mount_test.cc" ]
@@ -515,7 +479,6 @@ fuchsia_test_package("blobfs-integration-package") {
     ":blobfs-mount",
     ":blobfs-sync",
     ":blobfs-superblock",
-    ":blobfs-verifier-service",
     ":executable-mount",
     ":external-decompressor",
     ":ota-health-check-service",
@@ -527,7 +490,6 @@ fuchsia_test_package("blobfs-integration-package") {
     ":blobfs-mount-component",
     ":blobfs-superblock-component",
     ":blobfs-sync-component",
-    ":blobfs-verifier-service-component",
     ":executable-mount-component",
     ":external-decompressor-integration",
     ":ota-health-check-service-component",

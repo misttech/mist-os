@@ -8,6 +8,7 @@ use fidl::endpoints::create_proxy;
 use fidl_fuchsia_fs_startup::VolumeMarker as FsStartupVolumeMarker;
 use fidl_fuchsia_fshost::AdminMarker;
 use fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeMarker};
+use fidl_fuchsia_update_verify::HealthStatus;
 use fs_management::format::constants::DATA_PARTITION_LABEL;
 use fs_management::partition::{find_partition_in, PartitionMatcher};
 use fs_management::DATA_TYPE_GUID;
@@ -27,7 +28,6 @@ use {
     fidl::endpoints::Proxy,
     fidl_fuchsia_fshost::StarnixVolumeProviderMarker,
     fidl_fuchsia_fxfs::{BlobCreatorMarker, BlobReaderMarker},
-    fidl_fuchsia_update_verify::{BlobfsVerifierMarker, VerifyOptions},
     fshost_test_fixture::STARNIX_VOLUME_NAME,
 };
 
@@ -1072,21 +1072,18 @@ async fn migration_to_minfs() {
 
 #[fuchsia::test]
 #[cfg(feature = "fxblob")]
-async fn verify_blobs() {
+async fn health_check_blobs() {
     let mut builder = new_builder();
     builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec());
     let fixture = builder.build().await;
 
-    let blobfs_verifier = fixture
+    let blobfs_health_check = fixture
         .realm
         .root
-        .connect_to_protocol_at_exposed_dir::<BlobfsVerifierMarker>()
+        .connect_to_protocol_at_exposed_dir::<fidl_fuchsia_update_verify::ComponentOtaHealthCheckMarker>()
         .expect("connect_to_protcol_at_exposed_dir failed");
-    blobfs_verifier
-        .verify(&VerifyOptions::default())
-        .await
-        .expect("FIDL failure")
-        .expect("verify failure");
+    let status = blobfs_health_check.get_health_status().await.expect("FIDL failure");
+    assert_eq!(status, HealthStatus::Healthy);
 
     fixture.tear_down().await;
 }
@@ -1347,20 +1344,17 @@ async fn reset_initialized_gpt() {
 }
 
 #[fuchsia::test]
-async fn blobfs_verifier_service() {
+async fn health_check_service() {
     let mut builder = new_builder();
     builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec());
     let fixture = builder.build().await;
 
     let proxy = fuchsia_component::client::connect_to_protocol_at_dir_root::<
-        fidl_fuchsia_update_verify::BlobfsVerifierMarker,
+        fidl_fuchsia_update_verify::ComponentOtaHealthCheckMarker,
     >(fixture.exposed_dir())
     .unwrap();
-    proxy
-        .verify(&fidl_fuchsia_update_verify::VerifyOptions::default())
-        .await
-        .expect("FIDL error")
-        .expect("Verify failed");
+    let status = proxy.get_health_status().await.expect("FIDL error");
+    assert_eq!(status, HealthStatus::Healthy);
 
     fixture.tear_down().await;
 }

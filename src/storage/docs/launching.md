@@ -21,7 +21,7 @@ have the same structure to the export directory. The basic entries are -
 `diagnostics` provides the inspect tree implementation, which has a bunch of statistics and
 metrics. `fuchsia.fs.Admin` provides the ability to shut down a filesystem instance. `root` is the
 root of the filesystem. Other platform filesystems may include additional entries. For example,
-blobfs provides `/fuchsia.update.verify.BlobfsVerifier`.
+blobfs provides `/fuchsia.update.verify.ComponentOtaHealthVerification`.
 
 ## Launching filesystems with fs_management
 
