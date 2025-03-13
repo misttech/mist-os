@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use super::super::timer::Timers;
-use super::atomic_future::{AtomicFuture, AttemptPollResult};
+use super::atomic_future::{AtomicFutureHandle, AttemptPollResult};
 use super::packets::{PacketReceiver, PacketReceiverMap, ReceiverRegistration};
 use super::scope::ScopeHandle;
 use super::time::{BootInstant, MonotonicInstant};
@@ -14,10 +14,9 @@ use zx::BootDuration;
 use std::any::Any;
 use std::cell::{Cell, RefCell};
 use std::future::Future;
-use std::mem::ManuallyDrop;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU32, AtomicU64, AtomicUsize, Ordering};
-use std::sync::{Arc, Weak};
-use std::task::{Context, RawWaker, RawWakerVTable, Waker};
+use std::sync::Arc;
+use std::task::Context;
 use std::{fmt, u64, usize};
 
 pub(crate) const TASK_READY_WAKEUP_ID: u64 = u64::MAX - 1;
@@ -96,7 +95,7 @@ pub(crate) struct Executor {
     is_local: bool,
     receivers: Mutex<PacketReceiverMap<Arc<dyn PacketReceiver>>>,
     task_count: AtomicUsize,
-    pub(super) ready_tasks: SegQueue<Arc<Task>>,
+    pub(super) ready_tasks: SegQueue<TaskHandle>,
     time: ExecutorTime,
     // The low byte is the number of threads currently sleeping. The high byte is the number of
     // of wake-up notifications pending.
@@ -160,8 +159,9 @@ impl Executor {
                 let Some(task) = self.ready_tasks.pop() else {
                     return PollReadyTasksResult::NoneReady;
                 };
-                let complete = self.try_poll(&task);
-                if complete && task.id == MAIN_TASK_ID {
+                let task_id = task.id();
+                let complete = self.try_poll(task);
+                if complete && task_id == MAIN_TASK_ID {
                     return PollReadyTasksResult::MainTaskCompleted;
                 }
                 self.polled.fetch_add(1, Ordering::Relaxed);
@@ -186,44 +186,12 @@ impl Executor {
         }
     }
 
-    pub fn spawn(self: &Arc<Self>, scope: &ScopeHandle, future: AtomicFuture<'static>) -> usize {
-        let next_id = self.task_count.fetch_add(1, Ordering::Relaxed);
-        let task = {
-            let task = Task::new(next_id, scope.clone(), future);
-            if !scope.insert_task(next_id, task.clone()) {
-                return usize::MAX;
-            }
-            task
-        };
-        task.wake();
-        next_id
+    pub fn is_local(&self) -> bool {
+        self.is_local
     }
 
-    pub fn spawn_local<F: Future<Output = R> + 'static, R: 'static>(
-        self: &Arc<Self>,
-        scope: &ScopeHandle,
-        future: F,
-        detached: bool,
-    ) -> usize {
-        if !self.is_local {
-            panic!(
-                "Error: called `spawn_local` on multithreaded executor. \
-                 Use `spawn` or a `LocalExecutor` instead."
-            );
-        }
-
-        // SAFETY: We've confirmed that the futures here will never be used across multiple threads,
-        // so the Send requirements that `new_local` requires should be met.
-        self.spawn(scope, unsafe { AtomicFuture::new_local(future, detached) })
-    }
-
-    /// Spawns the main future.
-    pub fn spawn_main(self: &Arc<Self>, root_scope: &ScopeHandle, future: AtomicFuture<'static>) {
-        let task = Task::new(MAIN_TASK_ID, root_scope.clone(), future);
-        if !root_scope.insert_task(MAIN_TASK_ID, task.clone()) {
-            panic!("Could not spawn main task");
-        }
-        task.wake();
+    pub fn next_task_id(&self) -> usize {
+        self.task_count.fetch_add(1, Ordering::Relaxed)
     }
 
     pub fn notify_task_ready(&self) {
@@ -594,21 +562,18 @@ impl Executor {
         root_scope.drop_task_unchecked(MAIN_TASK_ID);
     }
 
-    fn try_poll(&self, task: &Arc<Task>) -> bool {
-        // SAFETY: We meet the contract for RawWaker/RawWakerVtable.
-        let task_waker = unsafe {
-            Waker::from_raw(RawWaker::new(Arc::as_ptr(task) as *const (), &BORROWED_VTABLE))
-        };
-        let poll_result = Task::set_current_with(&*task, || {
-            task.future.try_poll(&mut Context::from_waker(&task_waker))
+    fn try_poll(&self, task: TaskHandle) -> bool {
+        let task_waker = task.waker();
+        let poll_result = TaskHandle::set_current_with(&task, || {
+            task.try_poll(&mut Context::from_waker(&task_waker))
         });
         match poll_result {
             AttemptPollResult::Yield => {
-                self.ready_tasks.push(task.clone());
+                self.ready_tasks.push(task);
                 false
             }
             AttemptPollResult::IFinished | AttemptPollResult::Cancelled => {
-                task.scope.task_did_finish(task.id);
+                task.scope().task_did_finish(task.id());
                 true
             }
             _ => false,
@@ -639,7 +604,8 @@ impl Executor {
             let Some(task) = self.ready_tasks.pop() else {
                 break;
             };
-            if self.try_poll(&task) && task.id == MAIN_TASK_ID {
+            let task_id = task.id();
+            if self.try_poll(task) && task_id == MAIN_TASK_ID {
                 break;
             }
             self.polled.fetch_add(1, Ordering::Relaxed);
@@ -659,6 +625,11 @@ impl Executor {
                 }
             }
         }
+    }
+
+    pub fn task_is_ready(&self, task: TaskHandle) {
+        self.ready_tasks.push(task);
+        self.notify_task_ready();
     }
 }
 
@@ -743,30 +714,12 @@ impl EHandle {
         }
     }
 
-    /// See `Inner::spawn`.
-    pub(crate) fn spawn<R: Send + 'static>(
-        &self,
-        scope: &ScopeHandle,
-        future: impl Future<Output = R> + Send + 'static,
-    ) -> usize {
-        self.inner().spawn(scope, AtomicFuture::new(future, false))
-    }
-
     /// Spawn a new task to be run on this executor.
     ///
     /// Tasks spawned using this method must be thread-safe (implement the `Send` trait), as they
     /// may be run on either a singlethreaded or multithreaded executor.
     pub fn spawn_detached(&self, future: impl Future<Output = ()> + Send + 'static) {
-        self.inner().spawn(self.global_scope(), AtomicFuture::new(future, true));
-    }
-
-    /// See `Inner::spawn_local`.
-    pub(crate) fn spawn_local<R: 'static>(
-        &self,
-        scope: &ScopeHandle,
-        future: impl Future<Output = R> + 'static,
-    ) -> usize {
-        self.inner().spawn_local(scope, future, false)
+        self.global_scope().spawn(future);
     }
 
     /// Spawn a new task to be run on this executor.
@@ -775,7 +728,7 @@ impl EHandle {
     /// have to be threads-safe (implement the `Send` trait). In return, this method requires that
     /// this executor is a LocalExecutor.
     pub fn spawn_local_detached(&self, future: impl Future<Output = ()> + 'static) {
-        self.inner().spawn_local(self.global_scope(), future, true);
+        self.global_scope().spawn_local(future);
     }
 
     pub(crate) fn mono_timers(&self) -> &Arc<Timers<MonotonicInstant>> {
@@ -809,47 +762,29 @@ impl EHandle {
     }
 }
 
-pub(super) struct Task {
-    id: usize,
-    pub(super) future: AtomicFuture<'static>,
-    pub(super) scope: ScopeHandle,
-}
+// AtomicFutureHandle can have a lifetime (for local executors we allow the main task to have a
+// non-static lifetime).  The executor doesn't handle this though; the executor just assumes all
+// tasks have the 'static lifetime.  It's up to the local executor to extend the lifetime and make
+// it safe.
+pub type TaskHandle = AtomicFutureHandle<'static>;
 
-impl Task {
-    fn new(id: usize, scope: ScopeHandle, future: AtomicFuture<'static>) -> Arc<Self> {
-        let this = Arc::new(Self { id, future, scope });
-
-        // Take a weak reference now to be used as a waker.
-        let _ = Arc::downgrade(&this).into_raw();
-
-        this
-    }
-
-    pub(super) fn wake(self: &Arc<Self>) {
-        if self.future.mark_ready() {
-            self.scope.executor().ready_tasks.push(self.clone());
-            self.scope.executor().notify_task_ready();
-        }
-    }
-}
-
-impl Drop for Task {
-    fn drop(&mut self) {
-        // SAFETY: This balances the `into_raw` in `new`.
-        unsafe {
-            // TODO(https://fxbug.dev/328126836): We might need to revisit this when pointer
-            // provenance lands.
-            Weak::from_raw(self);
+impl TaskHandle {
+    pub fn spawn(self) -> bool {
+        if self.scope().insert_task(self.clone()) {
+            self.wake();
+            true
+        } else {
+            false
         }
     }
 }
 
 thread_local! {
-    static CURRENT_TASK: Cell<*const Task> = const { Cell::new(std::ptr::null()) };
+    static CURRENT_TASK: Cell<*const TaskHandle> = const { Cell::new(std::ptr::null()) };
 }
 
-impl Task {
-    pub(crate) fn with_current<R>(f: impl FnOnce(Option<&Task>) -> R) -> R {
+impl TaskHandle {
+    pub(crate) fn with_current<R>(f: impl FnOnce(Option<&TaskHandle>) -> R) -> R {
         CURRENT_TASK.with(|cur| {
             let cur = cur.get();
             let cur = unsafe { cur.as_ref() };
@@ -857,52 +792,13 @@ impl Task {
         })
     }
 
-    fn set_current_with<R>(task: &Task, f: impl FnOnce() -> R) -> R {
+    fn set_current_with<R>(task: &TaskHandle, f: impl FnOnce() -> R) -> R {
         CURRENT_TASK.with(|cur| {
             cur.set(task);
             let result = f();
             cur.set(std::ptr::null());
             result
         })
-    }
-}
-
-// This vtable is used for the waker that exists for the lifetime of the task, which gets dropped
-// above, so these functions never drop.
-static BORROWED_VTABLE: RawWakerVTable =
-    RawWakerVTable::new(waker_clone, waker_wake_by_ref, waker_wake_by_ref, waker_noop);
-
-static VTABLE: RawWakerVTable =
-    RawWakerVTable::new(waker_clone, waker_wake, waker_wake_by_ref, waker_drop);
-
-fn waker_clone(weak_raw: *const ()) -> RawWaker {
-    // SAFETY: `weak_raw` comes from a previous call to `into_raw`.
-    let weak = ManuallyDrop::new(unsafe { Weak::from_raw(weak_raw as *const Task) });
-    RawWaker::new((*weak).clone().into_raw() as *const _, &VTABLE)
-}
-
-fn waker_wake(weak_raw: *const ()) {
-    // SAFETY: `weak_raw` comes from a previous call to `into_raw`.
-    if let Some(task) = unsafe { Weak::from_raw(weak_raw as *const Task) }.upgrade() {
-        task.wake();
-    }
-}
-
-fn waker_wake_by_ref(weak_raw: *const ()) {
-    // SAFETY: `weak_raw` comes from a previous call to `into_raw`.
-    if let Some(task) =
-        ManuallyDrop::new(unsafe { Weak::from_raw(weak_raw as *const Task) }).upgrade()
-    {
-        task.wake();
-    }
-}
-
-fn waker_noop(_weak_raw: *const ()) {}
-
-fn waker_drop(weak_raw: *const ()) {
-    // SAFETY: `weak_raw` comes from a previous call to `into_raw`.
-    unsafe {
-        Weak::from_raw(weak_raw as *const Task);
     }
 }
 

@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::atomic_future::AtomicFuture;
 use super::common::{Executor, ExecutorTime, MAIN_TASK_ID};
 use super::scope::ScopeHandle;
 use fuchsia_sync::{Condvar, Mutex};
@@ -96,20 +95,17 @@ impl SendExecutor {
         let pair2 = pair.clone();
 
         // Spawn a future which will set the result upon completion.
-        Executor::spawn_main(
-            &self.inner,
-            &self.root_scope,
-            AtomicFuture::new(
-                future.map(move |fut_result| {
-                    let (lock, cvar) = &*pair2;
-                    let mut result = lock.lock();
-                    *result = Some(fut_result);
-                    cvar.notify_one();
-                }),
-                false,
-            ),
+        let task = self.root_scope.new_task(
+            Some(MAIN_TASK_ID),
+            future.map(move |fut_result| {
+                let (lock, cvar) = &*pair2;
+                let mut result = lock.lock();
+                *result = Some(fut_result);
+                cvar.notify_one();
+            }),
         );
-        self.root_scope.detach(MAIN_TASK_ID);
+        task.detach();
+        assert!(task.spawn());
 
         // Start worker threads, handing off timers from the current thread.
         self.inner.done.store(false, Ordering::SeqCst);

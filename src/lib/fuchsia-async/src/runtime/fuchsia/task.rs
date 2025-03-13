@@ -148,10 +148,7 @@ impl<T: Send + 'static> Task<T> {
     /// May panic if not called in the context of an executor (e.g. within a
     /// call to [`run`][crate::SendExecutor::run]).
     pub fn spawn(future: impl Future<Output = T> + Send + 'static) -> Task<T> {
-        let executor = EHandle::local();
-        let scope = executor.global_scope();
-        let task_id = executor.spawn(scope, future);
-        Task(JoinHandle::new(scope.clone(), task_id))
+        EHandle::local().global_scope().compute(future)
     }
 }
 
@@ -173,10 +170,7 @@ impl<T: 'static> Task<T> {
     /// May panic if not called in the context of an executor (e.g. within a
     /// call to [`run`][crate::SendExecutor::run]).
     pub fn local(future: impl Future<Output = T> + 'static) -> Task<T> {
-        let executor = EHandle::local();
-        let scope = executor.global_scope();
-        let task_id = executor.spawn_local(scope, future);
-        Task(JoinHandle::new(scope.clone(), task_id))
+        EHandle::local().global_scope().compute_local(future)
     }
 }
 

@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use super::super::task::JoinHandle;
-use super::atomic_future::{AtomicFuture, CancelAndDetachResult};
-use super::common::{Executor, Task};
+use super::atomic_future::{AtomicFutureHandle, CancelAndDetachResult};
+use super::common::{Executor, TaskHandle};
 use crate::condition::{Condition, ConditionGuard, WakerEntry};
 use crate::EHandle;
 use pin_project_lite::pin_project;
@@ -359,7 +359,10 @@ impl ScopeHandle {
     // This does not have the must_use attribute because it's common to detach and the lifetime of
     // the task is bound to the scope: when the scope is dropped, the task will be cancelled.
     pub fn spawn(&self, future: impl Future<Output = ()> + Send + 'static) -> JoinHandle<()> {
-        JoinHandle::new(self.clone(), self.executor().spawn(self, AtomicFuture::new(future, false)))
+        let task = self.new_task(None, future);
+        let id = task.id();
+        task.spawn();
+        JoinHandle::new(self.clone(), id)
     }
 
     /// Spawn a new task on the scope of a thread local executor.
@@ -367,7 +370,10 @@ impl ScopeHandle {
     /// NOTE: This is not supported with a [`SendExecutor`][crate::SendExecutor]
     /// and will cause a runtime panic. Use [`ScopeHandle::spawn`] instead.
     pub fn spawn_local(&self, future: impl Future<Output = ()> + 'static) -> JoinHandle<()> {
-        JoinHandle::new(self.clone(), self.executor().spawn_local(self, future, false))
+        let task = self.new_local_task(None, future);
+        let id = task.id();
+        task.spawn();
+        JoinHandle::new(self.clone(), id)
     }
 
     /// Like `spawn`, but for tasks that return a result.
@@ -378,8 +384,10 @@ impl ScopeHandle {
         &self,
         future: impl Future<Output = T> + Send + 'static,
     ) -> crate::Task<T> {
-        JoinHandle::new(self.clone(), self.executor().spawn(self, AtomicFuture::new(future, false)))
-            .into()
+        let task = self.new_task(None, future);
+        let id = task.id();
+        task.spawn();
+        JoinHandle::new(self.clone(), id).into()
     }
 
     /// Like `spawn`, but for tasks that return a result.
@@ -393,7 +401,10 @@ impl ScopeHandle {
         &self,
         future: impl Future<Output = T> + 'static,
     ) -> crate::Task<T> {
-        JoinHandle::new(self.clone(), self.executor().spawn_local(self, future, false)).into()
+        let task = self.new_local_task(None, future);
+        let id = task.id();
+        task.spawn();
+        JoinHandle::new(self.clone(), id).into()
     }
 
     pub(super) fn root(executor: Arc<Executor>) -> ScopeHandle {
@@ -442,6 +453,49 @@ impl ScopeHandle {
     /// Wake all the scope's tasks so their futures will be polled again.
     pub fn wake_all(&self) {
         self.lock().wake_all();
+    }
+
+    /// Creates a new task associated with this scope.  This does not spawn it on the executor.
+    /// That must be done separately.
+    pub(crate) fn new_task<'a, Fut: Future + Send + 'a>(
+        &self,
+        id: Option<usize>,
+        fut: Fut,
+    ) -> AtomicFutureHandle<'a>
+    where
+        Fut::Output: Send,
+    {
+        AtomicFutureHandle::new(
+            self.clone(),
+            id.unwrap_or_else(|| self.executor().next_task_id()),
+            fut,
+        )
+    }
+
+    /// Creates a new task associated with this scope.  This does not spawn it on the executor.
+    /// That must be done separately.
+    pub(crate) fn new_local_task<'a>(
+        &self,
+        id: Option<usize>,
+        fut: impl Future + 'a,
+    ) -> AtomicFutureHandle<'a> {
+        // Check that the executor is local.
+        if !self.executor().is_local() {
+            panic!(
+                "Error: called `new_local_task` on multithreaded executor. \
+                 Use `spawn` or a `LocalExecutor` instead."
+            );
+        }
+
+        // SAFETY: We've confirmed that the futures here will never be used across multiple threads,
+        // so the Send requirements that `new_local` requires should be met.
+        unsafe {
+            AtomicFutureHandle::new_local(
+                self.clone(),
+                id.unwrap_or_else(|| self.executor().next_task_id()),
+                fut,
+            )
+        }
     }
 }
 
@@ -494,7 +548,7 @@ mod state {
         pub parent: Option<ScopeHandle>,
         // LINT.IfChange
         children: HashSet<WeakScopeHandle>,
-        all_tasks: HashMap<usize, Arc<Task>>,
+        all_tasks: HashSet<TaskHandle>,
         // LINT.ThenChange(//src/developer/debug/zxdb/console/commands/verb_async_backtrace.cc)
         /// Wakers/results for joining each task.
         pub join_results: HashMap<usize, JoinResult>,
@@ -506,7 +560,7 @@ mod state {
 
     pub enum JoinResult {
         Waker(Waker),
-        Result(Arc<Task>),
+        Result(TaskHandle),
     }
 
     #[repr(u8)] // So zxdb can read the status.
@@ -551,21 +605,20 @@ mod state {
             }
         }
 
-        pub fn all_tasks(&self) -> &HashMap<usize, Arc<Task>> {
+        pub fn all_tasks(&self) -> &HashSet<TaskHandle> {
             &self.all_tasks
         }
 
         /// Attempts to add a task to the scope. Returns false if the scope cannot accept a task.
         #[must_use]
-        pub fn insert_task(&mut self, id: usize, task: Arc<Task>) -> bool {
+        pub fn insert_task(&mut self, task: TaskHandle) -> bool {
             if !self.status.can_spawn() {
                 return false;
             }
             if self.all_tasks.is_empty() && !self.register_first_task() {
                 return false;
             }
-            let existing = self.all_tasks.insert(id, task);
-            assert!(existing.is_none());
+            assert!(self.all_tasks.insert(task));
             true
         }
 
@@ -601,7 +654,7 @@ mod state {
         }
 
         pub fn wake_all(&self) {
-            for (_, task) in &self.all_tasks {
+            for task in &self.all_tasks {
                 task.wake();
             }
         }
@@ -676,8 +729,8 @@ mod state {
     }
 
     impl ScopeWaker<'_> {
-        pub fn take_task(&mut self, id: usize) -> Option<Arc<Task>> {
-            let task = self.all_tasks.remove(&id);
+        pub fn take_task(&mut self, id: usize) -> Option<TaskHandle> {
+            let task = self.all_tasks.take(&id);
             if task.is_some() {
                 self.on_task_removed(0);
             }
@@ -685,9 +738,9 @@ mod state {
         }
 
         pub fn task_did_finish(&mut self, id: usize) {
-            if let Some(task) = self.all_tasks.remove(&id) {
+            if let Some(task) = self.all_tasks.take(&id) {
                 self.on_task_removed(1);
-                if !task.future.is_detached() {
+                if !task.is_detached() {
                     match self.join_results.entry(id) {
                         Entry::Occupied(mut o) => {
                             let JoinResult::Waker(waker) =
@@ -710,11 +763,8 @@ mod state {
 
         pub fn set_closed_and_drain(
             &mut self,
-        ) -> (
-            HashMap<usize, Arc<Task>>,
-            HashMap<usize, JoinResult>,
-            hash_set::Drain<'_, WeakScopeHandle>,
-        ) {
+        ) -> (HashSet<TaskHandle>, HashMap<usize, JoinResult>, hash_set::Drain<'_, WeakScopeHandle>)
+        {
             self.close();
             let all_tasks = std::mem::take(&mut self.all_tasks);
             let join_results = std::mem::take(&mut self.join_results);
@@ -769,8 +819,8 @@ impl Drop for ScopeInner {
 
 impl ScopeHandle {
     fn with_current<R>(f: impl FnOnce(&ScopeHandle) -> R) -> R {
-        super::common::Task::with_current(|task| match task {
-            Some(task) => f(&task.scope),
+        super::common::TaskHandle::with_current(|task| match task {
+            Some(task) => f(task.scope()),
             None => f(EHandle::local().global_scope()),
         })
     }
@@ -792,7 +842,7 @@ impl ScopeHandle {
     pub(crate) fn detach(&self, task_id: usize) {
         let mut state = self.lock();
         if let Some(task) = state.all_tasks().get(&task_id) {
-            task.future.detach();
+            task.detach();
         }
         state.join_results.remove(&task_id);
     }
@@ -805,13 +855,13 @@ impl ScopeHandle {
     pub(crate) unsafe fn cancel_task<R>(&self, task_id: usize) -> Option<R> {
         let mut state = self.lock();
         if let Some(JoinResult::Result(task)) = state.join_results.remove(&task_id) {
-            return task.future.take_result();
+            return task.take_result();
         }
         state.all_tasks().get(&task_id).and_then(|task| {
-            if task.future.cancel() {
+            if task.cancel() {
                 self.inner.executor.ready_tasks.push(task.clone());
             }
-            task.future.take_result()
+            task.take_result()
         })
     }
 
@@ -820,7 +870,7 @@ impl ScopeHandle {
         let mut state = ScopeWaker::from(self.lock());
         state.join_results.remove(&task_id);
         if let Some(task) = state.all_tasks().get(&task_id) {
-            match task.future.cancel_and_detach() {
+            match task.cancel_and_detach() {
                 CancelAndDetachResult::Done => {
                     state.take_task(task_id);
                 }
@@ -847,7 +897,7 @@ impl ScopeHandle {
             Entry::Occupied(mut o) => match o.get_mut() {
                 JoinResult::Waker(waker) => *waker = cx.waker().clone(),
                 JoinResult::Result(task) => {
-                    if let Some(result) = task.future.take_result() {
+                    if let Some(result) = task.take_result() {
                         o.remove();
                         return Poll::Ready(result);
                     }
@@ -872,7 +922,7 @@ impl ScopeHandle {
             Entry::Occupied(mut o) => match o.get_mut() {
                 JoinResult::Waker(waker) => *waker = cx.waker().clone(),
                 JoinResult::Result(task) => {
-                    let result = task.future.take_result();
+                    let result = task.take_result();
                     o.remove();
                     return Poll::Ready(result);
                 }
@@ -885,8 +935,8 @@ impl ScopeHandle {
     }
 
     #[must_use]
-    pub(super) fn insert_task(&self, id: usize, task: Arc<Task>) -> bool {
-        self.lock().insert_task(id, task)
+    pub(super) fn insert_task(&self, task: TaskHandle) -> bool {
+        self.lock().insert_task(task)
     }
 
     /// Drops the specified task.
@@ -903,7 +953,7 @@ impl ScopeHandle {
         let mut state = ScopeWaker::from(self.lock());
         let task = state.take_task(task_id);
         if let Some(task) = task {
-            task.future.drop_future_unchecked();
+            task.drop_future_unchecked();
         }
     }
 
@@ -921,9 +971,9 @@ impl ScopeHandle {
                 // Already cancelled or closed.
                 continue;
             }
-            for task in state.all_tasks().values() {
-                if task.future.cancel() {
-                    task.scope.executor().ready_tasks.push(task.clone());
+            for task in state.all_tasks() {
+                if task.cancel() {
+                    task.scope().executor().ready_tasks.push(task.clone());
                 }
                 // Don't bother dropping tasks that are finished; the entire
                 // scope is going to be dropped soon anyway.
@@ -950,8 +1000,8 @@ impl ScopeHandle {
                 (tasks, join_results)
             };
             // Call task destructors once the scope lock is released so we don't risk a deadlock.
-            for (_id, task) in tasks {
-                task.future.try_drop().expect("Expected drop to succeed");
+            for task in tasks {
+                task.try_drop().expect("Expected drop to succeed");
             }
             std::mem::drop(join_results);
         }
