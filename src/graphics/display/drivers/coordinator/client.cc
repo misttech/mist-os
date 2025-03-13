@@ -411,8 +411,8 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
   zx::result<std::span<const display::DisplayTiming>> display_timings_result =
       controller_.GetDisplayTimings(display_id);
   if (display_timings_result.is_error()) {
-    fdf::error("Failed to get display timings for display #{}: {}", display_id.value(),
-               display_timings_result);
+    fdf::error("SetDisplayMode failed to get display timings for display ID {}: {}",
+               display_id.value(), display_timings_result);
     TearDown(display_timings_result.status_value());
     return;
   }
@@ -436,14 +436,21 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
       });
 
   if (display_timing_it == display_timings.end()) {
-    fdf::error("Display mode not found: ({} x {}) @ {} millihertz", request->mode.active_area.width,
-               request->mode.active_area.height, request->mode.refresh_rate_millihertz);
+    fdf::error("SetDisplayMode failed to find timings compatible with mode: {}x{} @ {}.{:03} Hz",
+               request->mode.active_area.width, request->mode.active_area.height,
+               request->mode.refresh_rate_millihertz / 1000,
+               request->mode.refresh_rate_millihertz % 1000);
     TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
 
+  fdf::info("SetDisplayMode found supported display timing for {}x{} @ {}.{:03} Hz",
+            display_timing_it->horizontal_active_px, display_timing_it->vertical_active_lines,
+            display_timing_it->vertical_field_refresh_rate_millihertz() / 1000,
+            display_timing_it->vertical_field_refresh_rate_millihertz() % 1000);
+
   if (display_timings.size() == 1) {
-    fdf::info("Display has only one timing available. Modeset is skipped.");
+    fdf::info("SetDisplayMode skipping modeset, because the display only supports one timing.");
     return;
   }
 
