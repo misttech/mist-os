@@ -542,6 +542,12 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
   // Every rectangle should have an associated image.
   const uint32_t num_images = static_cast<uint32_t>(data.images.size());
 
+  if (num_images == 0) {
+    // The Coordinator API doesn't allow zero layers.
+    // TODO(https://fxbug.dev/399228128): Use a Coordinator color layer instead of Vulkan fallback.
+    return false;
+  }
+
   // Since we map 1 image to 1 layer, if there are more images than layers available for
   // the given display, then they cannot be directly composited to the display in hardware.
   std::vector<fuchsia_hardware_display::wire::LayerId>& layers =
@@ -848,7 +854,6 @@ DisplayCompositor::RenderFrameResult DisplayCompositor::RenderFrame(
   const bool fallback_to_gpu_composition = !enable_display_composition_ ||
                                            test_args.force_gpu_composition ||
                                            !TryDirectToDisplay(render_data_list) || !CheckConfig();
-
   if (fallback_to_gpu_composition) {
     // Discard only if we have attempted to TryDirectToDisplay() and have an unapplied config.
     // DiscardConfig call is costly and we should avoid calling when it isn't necessary.
@@ -879,10 +884,6 @@ DisplayCompositor::RenderFrameResult DisplayCompositor::RenderFrame(
 bool DisplayCompositor::TryDirectToDisplay(const std::vector<RenderData>& render_data_list) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   FX_DCHECK(enable_display_composition_);
-
-  // TODO(https://fxbug.dev/377979329): re-enable direct-to-display once we have relaxed the display
-  // coordinator's restrictions on image reuse.
-  return false;
 
   for (const auto& data : render_data_list) {
     if (!SetRenderDataOnDisplay(data)) {
@@ -969,6 +970,9 @@ void DisplayCompositor::AddDisplay(scenic_impl::display::Display* display, const
   const auto pixel_format = renderer_->ChoosePreferredRenderTargetFormat(info.formats);
 
   const fuchsia::math::SizeU size = {/*width*/ info.dimensions.x, /*height*/ info.dimensions.y};
+  // JJOSH: leave these, probably.
+  FX_DCHECK(size.width > 0);
+  FX_DCHECK(size.height > 0);
 
   const fuchsia_hardware_display_types::wire::DisplayId display_id = display->display_id();
   FX_DCHECK(display_engine_data_map_.find(display_id.value) == display_engine_data_map_.end())
