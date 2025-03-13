@@ -10,6 +10,7 @@ rustc_library("linux_uapi") {
 
   sources = [
     "src/lib.rs",
+    "src/macros.rs",
     "src/manual.rs",
     "src/types.rs",
   ]
