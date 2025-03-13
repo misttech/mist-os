@@ -125,10 +125,3 @@ func ReadUntilMatchString(ctx context.Context, reader io.Reader, strings ...stri
 	b, err := ReadUntilMatch(ctx, reader, toMatch...)
 	return string(b), err
 }
-
-func min(a, b int) int {
-	if a <= b {
-		return a
-	}
-	return b
-}

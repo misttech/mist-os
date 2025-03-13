@@ -383,20 +383,6 @@ func MarkShardsSkipped(shards []*Shard) ([]*Shard, error) {
 	return newShards, nil
 }
 
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 func divRoundUp(a, b int) int {
 	if a%b == 0 {
 		return a / b
