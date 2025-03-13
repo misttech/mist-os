@@ -22,7 +22,7 @@ pub fn socket_post_create(socket: &Socket, socket_node: &FsNode) {
                 _ => SocketClass::Socket,
             },
             SocketType::Datagram => match socket.protocol {
-                SocketProtocol::IP | SocketProtocol::UDP => SocketClass::Tcp,
+                SocketProtocol::IP | SocketProtocol::UDP => SocketClass::Udp,
                 _ => SocketClass::Socket,
             },
             SocketType::Raw
