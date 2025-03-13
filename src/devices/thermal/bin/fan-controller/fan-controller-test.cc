@@ -3,27 +3,25 @@
 // found in the LICENSE file.
 #include "fan-controller.h"
 
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
+#include <lib/async/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/fdio/namespace.h>
+#include <lib/fdio/directory.h>
 #include <unistd.h>
 
 #include <queue>
 
-#include <fbl/auto_lock.h>
-#include <fbl/mutex.h>
 #include <zxtest/zxtest.h>
-
-#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
-#include "src/storage/lib/vfs/cpp/service.h"
-#include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
 
 namespace {
 
 class FakeWatcher : public fidl::Server<fuchsia_thermal::ClientStateWatcher> {
  public:
   explicit FakeWatcher(fidl::ServerEnd<fuchsia_thermal::ClientStateWatcher> server)
-      : binding_(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(server), this,
+      : binding_(async_get_default_dispatcher(), std::move(server), this,
                  fidl::kIgnoreBindingClosure) {}
   ~FakeWatcher() {
     if (completer_) {
@@ -45,7 +43,7 @@ class FakeWatcher : public fidl::Server<fuchsia_thermal::ClientStateWatcher> {
 class FakeClientStateServer : public fidl::Server<fuchsia_thermal::ClientStateConnector> {
  public:
   explicit FakeClientStateServer(fidl::ServerEnd<fuchsia_thermal::ClientStateConnector> server)
-      : binding_(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(server), this,
+      : binding_(async_get_default_dispatcher(), std::move(server), this,
                  fidl::kIgnoreBindingClosure) {}
   ~FakeClientStateServer() override { EXPECT_TRUE(expected_connect_.empty()); }
 
@@ -95,13 +93,9 @@ class FakeFanDevice : public fidl::Server<fuchsia_hardware_fan::Device> {
     completer.Reply({client_type_});
   }
 
-  fbl::RefPtr<fs::Service> AsService() {
-    return fbl::MakeRefCounted<fs::Service>(
-        [this](fidl::ServerEnd<fuchsia_hardware_fan::Device> server) {
-          bindings_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(server),
-                               this, fidl::kIgnoreBindingClosure);
-          return ZX_OK;
-        });
+  fidl::ProtocolHandler<fuchsia_hardware_fan::Device> handler() {
+    return bindings_.CreateHandler(this, async_get_default_dispatcher(),
+                                   fidl::kIgnoreBindingClosure);
   }
 
   void ExpectSetFanLevel(uint32_t level) { expected_set_fan_level_.emplace(level); }
@@ -115,54 +109,47 @@ class FakeFanDevice : public fidl::Server<fuchsia_hardware_fan::Device> {
 
 class FanControllerTest : public zxtest::Test {
  public:
-  void SetUp() override {
-    ASSERT_TRUE(dir_ != nullptr);
-
-    ASSERT_EQ(fdio_ns_get_installed(&ns_), ZX_OK);
-    zx::channel channel0, channel1;
-
-    // Serve up the emulated fan directory
-    auto [dir_client, dir_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-    ASSERT_EQ(vfs_.ServeDirectory(dir_, std::move(dir_server)), ZX_OK);
-    ASSERT_EQ(fdio_ns_bind(ns_, fan_controller::kFanDirectory, dir_client.TakeChannel().release()),
-              ZX_OK);
+  FanControllerTest() {
+    background_loop_.StartThread("background-loop");
 
     auto endpoints = fidl::Endpoints<fuchsia_thermal::ClientStateConnector>::Create();
     client_state_.emplace(std::move(endpoints.server));
     client_end_ = std::move(endpoints.client);
   }
 
-  void TearDown() override {
-    // Scoped directory entries have gone out of scope, but to avoid races we remove all entries.
-    auto result = fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(),
-                                           [this]() { dir_->RemoveAllEntries(); });
-    EXPECT_OK(result);
-    ASSERT_TRUE(dir_->IsEmpty());
-
-    ASSERT_NE(ns_, nullptr);
-    ASSERT_EQ(fdio_ns_unbind(ns_, fan_controller::kFanDirectory), ZX_OK);
-  }
-
   void StartFanController() {
-    fan_controller_ = std::make_unique<fan_controller::FanController>(
-        fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(client_end_));
+    auto [root_client, root_request] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    ASSERT_OK(outgoing_.SyncCall([root_request = std::move(root_request)](auto* outgoing) mutable {
+      return outgoing->Serve(std::move(root_request));
+    }));
+
+    auto svc_client = component::OpenDirectoryAt(root_client, "svc");
+    ASSERT_OK(svc_client);
+
+    fan_controller_.emplace(loop_.dispatcher(), std::move(client_end_), std::move(*svc_client));
   }
 
-  // Holds a ref to a pseudo dir entry that removes the entry when this object goes out of scope.
-  class ScopedDirent {
+  // Holds a ref to the outgoing directory that removes the instance when this object goes out of
+  // scope.
+  class FakeDevice {
    public:
-    ScopedDirent(std::string name, fbl::RefPtr<fs::PseudoDir> dir, async_dispatcher_t* dispatcher,
-                 const std::string& client_type)
+    FakeDevice(std::string name, async_dispatcher_t* dispatcher,
+               async_patterns::TestDispatcherBound<component::OutgoingDirectory>& outgoing,
+               const std::string& client_type)
         : name_(std::move(name)),
-          dir_(std::move(dir)),
-          dispatcher_(dispatcher),
+          outgoing_(outgoing),
           fan_(dispatcher, std::in_place, client_type) {
-      fan_.SyncCall(
-          [&](FakeFanDevice* fan) { ASSERT_OK(dir_->AddEntry(name_, fan->AsService())); });
+      auto handler = fan_.SyncCall([&](FakeFanDevice* fan) { return fan->handler(); });
+      ASSERT_OK(outgoing_.SyncCall([this, handler = std::move(handler)](
+                                       component::OutgoingDirectory* outgoing) mutable {
+        return outgoing->AddService<fuchsia_hardware_fan::Service>(
+            fuchsia_hardware_fan::Service::InstanceHandler({.device = std::move(handler)}), name_);
+      }));
     }
-    ~ScopedDirent() {
-      auto result = fdf::RunOnDispatcherSync(dispatcher_, [this]() { dir_->RemoveEntry(name_); });
-      ASSERT_OK(result);
+    ~FakeDevice() {
+      std::ignore = outgoing_.SyncCall([this](component::OutgoingDirectory* outgoing) {
+        return outgoing->RemoveService<fuchsia_hardware_fan::Service>(name_);
+      });
     }
 
     void ExpectSetFanLevel(uint32_t level) {
@@ -171,52 +158,51 @@ class FanControllerTest : public zxtest::Test {
 
    private:
     std::string name_;
-    fbl::RefPtr<fs::PseudoDir> dir_;
-    async_dispatcher_t* dispatcher_;
+    async_patterns::TestDispatcherBound<component::OutgoingDirectory>& outgoing_;
     async_patterns::TestDispatcherBound<FakeFanDevice> fan_;
   };
 
-  ScopedDirent AddDevice(const std::string& client_type) {
-    return ScopedDirent(std::to_string(next_device_number_++), dir_,
-                        dispatcher_->async_dispatcher(), client_type);
+  FakeDevice AddDevice(const std::string& client_type) {
+    return FakeDevice(client_type + std::to_string(next_device_number_++),
+                      background_loop_.dispatcher(), outgoing_, client_type);
   }
 
   void WaitForDevice(const std::string& client_type, size_t count) {
-    runtime_.RunUntil([this, client_type, count]() {
-      return fan_controller_->controller_fan_count(client_type) == count;
-    });
-    runtime_.RunUntil([this, client_type]() {
-      return client_state_.SyncCall(&FakeClientStateServer::watch_called, client_type);
-    });
+    while (fan_controller_->controller_fan_count(client_type) != count) {
+      loop_.RunUntilIdle();
+    }
+    while (!client_state_.SyncCall(&FakeClientStateServer::watch_called, client_type)) {
+      loop_.RunUntilIdle();
+    }
   }
 
   void ReplyToWatch(const std::string& client_type, uint32_t state) {
-    runtime_.RunUntil([this, client_type]() {
-      return client_state_.SyncCall(&FakeClientStateServer::watch_called, client_type);
-    });
+    while (!client_state_.SyncCall(&FakeClientStateServer::watch_called, client_type)) {
+      loop_.RunUntilIdle();
+    }
     client_state_.SyncCall(&FakeClientStateServer::ReplyToWatch, client_type, state);
-    runtime_.RunUntil([this, client_type]() {
-      return client_state_.SyncCall(&FakeClientStateServer::watch_called, client_type);
-    });
+    while (!client_state_.SyncCall(&FakeClientStateServer::watch_called, client_type)) {
+      loop_.RunUntilIdle();
+    }
   }
 
  private:
-  fdf_testing::DriverRuntime runtime_;
-  fdf::UnownedSynchronizedDispatcher dispatcher_ = runtime_.StartBackgroundDispatcher();
+  // Foreground loop for the test thread/fan controller
+  async::Loop loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  // Background loop for the fake fans and outgoing directory.
+  async::Loop background_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
 
   fidl::ClientEnd<fuchsia_thermal::ClientStateConnector> client_end_;
 
-  fdio_ns_t* ns_ = nullptr;
+  async_patterns::TestDispatcherBound<component::OutgoingDirectory> outgoing_{
+      background_loop_.dispatcher(), std::in_place, async_patterns::PassDispatcher};
   uint32_t next_device_number_ = 0;
-  fs::SynchronousVfs vfs_{dispatcher_->async_dispatcher()};
-  // Note this _must_ be RefPtrs since vfs_ will try to AdoptRef on the raw pointer passed to it.
-  fbl::RefPtr<fs::PseudoDir> dir_{fbl::MakeRefCounted<fs::PseudoDir>()};
   std::map<std::string, size_t> client_type_count_;
 
  protected:
-  std::unique_ptr<fan_controller::FanController> fan_controller_;
+  std::optional<fan_controller::FanController> fan_controller_;
   async_patterns::TestDispatcherBound<FakeClientStateServer> client_state_{
-      dispatcher_->async_dispatcher()};
+      background_loop_.dispatcher()};
 };
 
 TEST_F(FanControllerTest, DeviceBeforeStart) {
@@ -232,6 +218,9 @@ TEST_F(FanControllerTest, DeviceBeforeStart) {
 }
 
 TEST_F(FanControllerTest, DeviceAfterStart) {
+  // We need to add and remove a device to ensure the service directory exists.
+  auto _ = AddDevice("initialize");
+
   StartFanController();
 
   const std::string kClientType = "fan";
@@ -244,6 +233,9 @@ TEST_F(FanControllerTest, DeviceAfterStart) {
 }
 
 TEST_F(FanControllerTest, MultipleDevicesSameClientType) {
+  // We need to add and remove a device to ensure the service directory exists.
+  auto _ = AddDevice("initialize");
+
   StartFanController();
 
   const std::string kClientType = "fan";
@@ -260,6 +252,9 @@ TEST_F(FanControllerTest, MultipleDevicesSameClientType) {
 }
 
 TEST_F(FanControllerTest, MultipleDevicesDifferentClientTypes) {
+  // We need to add and remove a device to ensure the service directory exists.
+  auto _ = AddDevice("initialize");
+
   StartFanController();
 
   const std::string kClientType0 = "fan0";

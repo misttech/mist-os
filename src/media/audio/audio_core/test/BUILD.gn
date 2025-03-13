@@ -4,13 +4,9 @@
 
 group("test") {
   testonly = true
-  deps = [ "api" ]
-
-  # These have real-time requirements and must run in release builds (debug builds are too slow).
-  if (!is_debug) {
-    deps += [
-      "hardware:audio_core_hardware_tests",
-      "stress:audio_core_stress_tests",
-    ]
-  }
+  deps = [
+    "api",
+    "hardware",
+    "stress",
+  ]
 }

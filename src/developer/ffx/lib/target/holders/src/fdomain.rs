@@ -9,18 +9,30 @@ use fho::{FhoEnvironment, TryFromEnv as _};
 mod from_toolbox;
 mod remote_control_proxy;
 
-use from_toolbox::toolbox_or_f;
+use from_toolbox::toolbox_or;
 pub(crate) use remote_control_proxy::open_moniker_fdomain;
-pub use remote_control_proxy::{fake_proxy_f, RemoteControlProxyHolder};
+pub use remote_control_proxy::{fake_proxy, RemoteControlProxyHolder};
 
-/// Same as [`moniker`] but for FDomain
-pub fn moniker_f<P: FProxy>(moniker: impl AsRef<str>) -> WithToolbox<P, FDomainResourceDialect> {
-    toolbox_or_f(moniker)
+/// A decorator for proxy types in [`crate::FfxTool`] implementations so you can
+/// specify the moniker for the component exposing the proxy you're loading.
+///
+/// This is actually an alias to [`toolbox_or`], so it will also try
+/// your tool's default toolbox first.
+///
+/// Example:
+///
+/// ```rust
+/// #[derive(FfxTool)]
+/// struct Tool {
+///     #[with(fho::moniker("core/foo/thing"))]
+///     foo_proxy: FooProxy,
+/// }
+/// ```
+pub fn moniker<P: FProxy>(moniker: impl AsRef<str>) -> WithToolbox<P, FDomainResourceDialect> {
+    toolbox_or(moniker)
 }
 
-pub(crate) async fn connect_to_rcs_fdomain(
-    env: &FhoEnvironment,
-) -> Result<RemoteControlProxyHolder> {
+pub(crate) async fn connect_to_rcs(env: &FhoEnvironment) -> Result<RemoteControlProxyHolder> {
     let retry_count = 1;
     let mut tries = 0;
     // TODO(b/287693891): Remove explicit retries/timeouts here so they can be

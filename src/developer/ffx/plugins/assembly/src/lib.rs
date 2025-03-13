@@ -6,8 +6,8 @@ use anyhow::Context;
 use async_trait::async_trait;
 use errors::FfxError;
 use ffx_assembly_args::*;
-use fho::{AvailabilityFlag, FfxMain, FfxTool, Result, SimpleWriter};
-
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool, Result};
 mod base_package;
 mod blobfs;
 mod compiled_package;
@@ -22,7 +22,6 @@ pub mod vbmeta;
 pub mod vfs;
 
 #[derive(FfxTool)]
-#[check(AvailabilityFlag("assembly_enabled"))]
 pub struct AssemblyTool {
     #[command]
     cmd: AssemblyCommand,
@@ -60,8 +59,6 @@ impl FfxMain for AssemblyTool {
                         .map(|_| ())
                 }
             },
-            OperationClass::BoardInputBundle(args) => operations::board::board_input_bundle(args)
-                .context("Create Hardware Support Bundle"),
         }
         .map_err(flatten_error_sources)
     }

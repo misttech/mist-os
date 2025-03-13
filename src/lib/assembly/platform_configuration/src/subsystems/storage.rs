@@ -4,7 +4,6 @@
 
 use crate::subsystems::prelude::*;
 use anyhow::{bail, ensure, Context};
-use assembly_component_id_index::ComponentIdIndexBuilder;
 use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_config::storage_config::StorageConfig;
 use assembly_constants::{BootfsDestination, FileEntry};
@@ -37,20 +36,6 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             builder.platform_bundle("paver_legacy");
         }
 
-        // Build and add the component id index.
-        let mut index_builder = ComponentIdIndexBuilder::default();
-
-        // Find the default platform id index and add it to the builder.
-        // The "resources" directory is built and shipped alonside the platform
-        // AIBs which is how it becomes available to subsystems.
-        let core_index = context.get_resource("core_component_id_index.json5");
-        index_builder.index(core_index);
-
-        // If the product provided their own index, add it to the builder.
-        if let Some(product_index) = &storage_config.component_id_index.product_index {
-            index_builder.index(product_index);
-        }
-
         // Fetch a custom gen directory for placing temporary files. We get this
         // from the context, so that it can create unique gen directories for
         // each subsystem under the top-level assembly gen directory.
@@ -73,24 +58,6 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
                 destination: BootfsDestination::Zxcrypt,
             })
             .context("Adding zxcrypt config to bootfs")?;
-
-        // Build the component id index and add it as a bootfs file.
-        let index_path = index_builder.build(&gendir).context("Building component id index")?;
-        builder
-            .bootfs()
-            .file(FileEntry {
-                destination: BootfsDestination::ComponentIdIndex,
-                source: index_path.clone(),
-            })
-            .with_context(|| format!("Adding bootfs file {}", &index_path))?;
-        // Also add it to Sampler
-        builder
-            .package("sampler")
-            .config_data(FileEntry {
-                source: index_path,
-                destination: "component_id_index".to_string(),
-            })
-            .context("Adding component id index to sampler".to_string())?;
 
         if *context.feature_set_level == FeatureSupportLevel::Embeddable {
             // We don't need fshost in embeddable.

@@ -44,7 +44,9 @@
 set -e
 set -o pipefail
 
+# shellcheck source=/dev/null
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
+# shellcheck source=/dev/null
 source "${FUCHSIA_DIR}/tools/devshell/lib/style.sh" || exit $?
 
 # This sets up and shuts down reproxy automatically.
@@ -106,7 +108,7 @@ function ensure_gcloud() {
     if is_googler
     then
       _cmd=(sudo apt install -y google-cloud-cli)
-      echo "Install gcloud with the following command?: ${_cmd[@]}"
+      echo "Install gcloud with the following command?: ${_cmd[*]}"
       select yn in "y" "n" "Y" "N"
       do
         case "$yn" in
@@ -126,7 +128,7 @@ readonly global_gcloud_auth_args=(auth login --update-adc)
 function gcloud_auth() {
   # "$@" args are forwarded to 'gcloud auth login'
   ensure_gcloud &&
-    echo "running: gcloud ${global_gcloud_auth_args[@]}" "$@" &&
+    echo "running: gcloud ${global_gcloud_auth_args[*]}" "$@" &&
     echo "If you see a warning about running on a \"Google Compute Engine virtual machine\", hit 'Y' to continue to use a personal account." &&
     "$gcloud" "${global_gcloud_auth_args[@]}" "$@"
 }
@@ -173,7 +175,14 @@ function get_loas_cert_type_for_bazel() {
   echo "$loas_cert_type"
 }
 
+function ensure_adc_file_exists() {
+  # If this file doesn't already exist, generate it one time using gcloud auth.
+  local -r adc_file="$HOME/.config/gcloud/application_default_credentials.json"
+  [[ -f "$adc_file" ]] || gcloud_auth
+}
+
 function test_bazel_rbe() {
+  ensure_adc_file_exists
   setup_bazel_workspace
   # Test authentication to RBE and BES (both share the same gcloud auth).
   # Shutdown any bazel server each time to prevent it from caching
@@ -184,9 +193,9 @@ function test_bazel_rbe() {
   # where applicable.  Opt-out with FX_BUILD_AUTO_AUTH=0.
   # Eventually this will become permanent.
   local -r loas_cert_type="$(get_loas_cert_type_for_bazel)"
-  local -a auth_config=()
+  local -a auth_config_args=()
   if [[ "$loas_cert_type" == "unrestricted" ]]
-  then auth_config+=( --config=gcertauth )
+  then auth_config_args+=( --config=gcertauth )
   fi
   (
     cd "$BAZEL_TEST_DIR/workspace" &&
@@ -197,7 +206,7 @@ function test_bazel_rbe() {
           --nocache_test_results \
           --config=remote \
           --config=resultstore \
-          "${auth_config[@]}" \
+          "${auth_config_args[@]}" \
           --experimental_build_event_upload_max_retries=1 \
           --bes_timeout=3s \
           --bes_upload_mode=wait_for_upload_complete \
@@ -241,6 +250,12 @@ function auth_subcommand() {
       echo "Failed to authenticate with gcloud."
       return 1
     }
+  fi
+
+  # Run check-runt-network command if available. http://b/399096925
+  check_runt_script="${FUCHSIA_DIR}/vendor/google/scripts/devshell/check-runt-network"
+  if [[ -x "${check_runt_script}" ]]; then
+    "${check_runt_script}" || exit 1
   fi
 
   bazel_auth_test "${gcloud_auth_args[@]}" && \
@@ -386,6 +401,7 @@ function last_logdir_subcommand() {
   local -r logs_dir="${FUCHSIA_DIR}/${out_dir}/.reproxy_logs/${build_subdir}"
   if [[ -d "$logs_dir" ]]
   then
+    # shellcheck disable=SC2012
     local -r recent_rbe_log_dir="$(ls -1 -d "${logs_dir}"/reproxy.* | tail -n 1)"
     if [[ -d "$recent_rbe_log_dir" ]]
     then

@@ -94,7 +94,7 @@ impl MockCoordinator {
     pub fn emit_vsync_event(
         &self,
         display_id_value: u64,
-        stamp: display_types::ConfigStamp,
+        stamp: display::ConfigStamp,
     ) -> Result<()> {
         self.listener_proxy
             .on_vsync(

@@ -5,9 +5,11 @@
 // TODO(https://github.com/rust-lang/rust/issues/39371): remove
 #![allow(non_upper_case_globals)]
 
+use crate::bpf::attachments::{bpf_prog_attach, bpf_prog_detach, BpfAttachAttr};
 use crate::bpf::fs::{get_bpf_object, BpfFsDir, BpfFsObject, BpfHandle};
 use crate::bpf::program::{Program, ProgramInfo};
 use crate::mm::{MemoryAccessor, MemoryAccessorExt};
+use crate::security;
 use crate::task::CurrentTask;
 use crate::vfs::{
     Anon, FdFlags, FdNumber, FileObject, LookupContext, NamespaceNode, OutputBuffer,
@@ -146,6 +148,7 @@ pub fn sys_bpf(
         bpf_cmd_BPF_MAP_CREATE => {
             let map_attr: bpf_attr__bindgen_ty_1 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_MAP_CREATE {:?}", map_attr);
+            security::check_bpf_access(current_task, cmd, &map_attr, attr_size)?;
             let schema = MapSchema {
                 map_type: map_attr.map_type,
                 key_size: map_attr.key_size,
@@ -164,7 +167,6 @@ pub fn sys_bpf(
             {
                 flags |= BPF_F_RDONLY_PROG;
             }
-
             let map = Map::new(schema, flags).map_err(map_error_to_errno)?;
             install_bpf_fd(current_task, map)
         }
@@ -172,6 +174,7 @@ pub fn sys_bpf(
         bpf_cmd_BPF_MAP_LOOKUP_ELEM => {
             let elem_attr: bpf_attr__bindgen_ty_2 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_MAP_LOOKUP_ELEM");
+            security::check_bpf_access(current_task, cmd, &elem_attr, attr_size)?;
             let map_fd = FdNumber::from_raw(elem_attr.map_fd as i32);
             let map = get_bpf_object(current_task, map_fd)?;
             let map = map.as_map()?;
@@ -182,7 +185,7 @@ pub fn sys_bpf(
             // SAFETY: this union object was created with FromBytes so it's safe to access any
             // variant because all variants must be valid with all bit patterns.
             let user_value = UserAddress::from(unsafe { elem_attr.__bindgen_anon_1.value });
-            let value = map.lookup(&key).map_err(map_error_to_errno)?;
+            let value = map.lookup(&key).ok_or_else(|| errno!(ENOENT))?;
             current_task.write_memory(user_value, &value)?;
 
             Ok(SUCCESS)
@@ -192,6 +195,7 @@ pub fn sys_bpf(
         bpf_cmd_BPF_MAP_UPDATE_ELEM => {
             let elem_attr: bpf_attr__bindgen_ty_2 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_MAP_UPDATE_ELEM");
+            security::check_bpf_access(current_task, cmd, &elem_attr, attr_size)?;
             let map_fd = FdNumber::from_raw(elem_attr.map_fd as i32);
             let map = get_bpf_object(current_task, map_fd)?;
             let map = map.as_map()?;
@@ -213,6 +217,7 @@ pub fn sys_bpf(
         bpf_cmd_BPF_MAP_DELETE_ELEM => {
             let elem_attr: bpf_attr__bindgen_ty_2 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_MAP_DELETE_ELEM");
+            security::check_bpf_access(current_task, cmd, &elem_attr, attr_size)?;
             let map_fd = FdNumber::from_raw(elem_attr.map_fd as i32);
             let map = get_bpf_object(current_task, map_fd)?;
             let map = map.as_map()?;
@@ -229,6 +234,7 @@ pub fn sys_bpf(
         bpf_cmd_BPF_MAP_GET_NEXT_KEY => {
             let elem_attr: bpf_attr__bindgen_ty_2 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_MAP_GET_NEXT_KEY");
+            security::check_bpf_access(current_task, cmd, &elem_attr, attr_size)?;
             let map_fd = FdNumber::from_raw(elem_attr.map_fd as i32);
             let map = get_bpf_object(current_task, map_fd)?;
             let map = map.as_map()?;
@@ -258,6 +264,7 @@ pub fn sys_bpf(
         bpf_cmd_BPF_PROG_LOAD => {
             let prog_attr: bpf_attr__bindgen_ty_4 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_PROG_LOAD");
+            security::check_bpf_access(current_task, cmd, &prog_attr, attr_size)?;
 
             let user_code = UserRef::<bpf_insn>::new(UserAddress::from(prog_attr.insns));
             let code = current_task.read_objects_to_vec(user_code, prog_attr.insn_cnt as usize)?;
@@ -289,15 +296,14 @@ pub fn sys_bpf(
             };
             // Ensures the log buffer ends with a 0.
             log_buffer.write(b"\0")?;
-
             install_bpf_fd(current_task, program_or_stub)
         }
 
         // Attach an eBPF program to a target_fd at the specified attach_type hook.
         bpf_cmd_BPF_PROG_ATTACH => {
-            log_trace!("BPF_PROG_ATTACH");
-            track_stub!(TODO("https://fxbug.dev/322874307"), "Bpf::BPF_PROG_ATTACH");
-            Ok(SUCCESS)
+            let attach_attr: BpfAttachAttr = read_attr(current_task, attr_addr, attr_size)?;
+            security::check_bpf_access(current_task, cmd, &attach_attr, attr_size)?;
+            bpf_prog_attach(locked, current_task, attach_attr)
         }
 
         // Obtain information about eBPF programs associated with the specified attach_type hook.
@@ -305,6 +311,7 @@ pub fn sys_bpf(
             let mut prog_attr: bpf_attr__bindgen_ty_10 =
                 read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_PROG_QUERY");
+            security::check_bpf_access(current_task, cmd, &prog_attr, attr_size)?;
             track_stub!(TODO("https://fxbug.dev/322873416"), "Bpf::BPF_PROG_QUERY");
             current_task.write_memory(UserAddress::from(prog_attr.prog_ids), 1.as_bytes())?;
             prog_attr.__bindgen_anon_2.prog_cnt = std::mem::size_of::<u64>() as u32;
@@ -317,9 +324,10 @@ pub fn sys_bpf(
         bpf_cmd_BPF_OBJ_PIN => {
             let pin_attr: bpf_attr__bindgen_ty_5 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_OBJ_PIN {:?}", pin_attr);
+            security::check_bpf_access(current_task, cmd, &pin_attr, attr_size)?;
             let bpf_fd = FdNumber::from_raw(pin_attr.bpf_fd as i32);
             let object = get_bpf_object(current_task, bpf_fd)?;
-            let path_addr = UserCString::new(UserAddress::from(pin_attr.pathname));
+            let path_addr = UserCString::new(current_task, UserAddress::from(pin_attr.pathname));
             let pathname = current_task.read_c_string_to_vec(path_addr, PATH_MAX as usize)?;
             let (parent, basename) = current_task.lookup_parent_at(
                 locked,
@@ -337,7 +345,8 @@ pub fn sys_bpf(
         bpf_cmd_BPF_OBJ_GET => {
             let path_attr: bpf_attr__bindgen_ty_5 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_OBJ_GET {:?}", path_attr);
-            let path_addr = UserCString::new(UserAddress::from(path_attr.pathname));
+            security::check_bpf_access(current_task, cmd, &path_attr, attr_size)?;
+            let path_addr = UserCString::new(current_task, UserAddress::from(path_attr.pathname));
             let open_flags = match path_attr.file_flags {
                 BPF_F_RDONLY => OpenFlags::RDONLY,
                 BPF_F_WRONLY => OpenFlags::WRONLY,
@@ -358,6 +367,7 @@ pub fn sys_bpf(
             let mut get_info_attr: bpf_attr__bindgen_ty_9 =
                 read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_OBJ_GET_INFO_BY_FD {:?}", get_info_attr);
+            security::check_bpf_access(current_task, cmd, &get_info_attr, attr_size)?;
             let bpf_fd = FdNumber::from_raw(get_info_attr.bpf_fd as i32);
             let object = get_bpf_object(current_task, bpf_fd)?;
 
@@ -373,17 +383,27 @@ pub fn sys_bpf(
                 }
                 .as_bytes()
                 .to_owned(),
-                BpfHandle::Program(prog) =>
-                {
+                BpfHandle::Program(prog) => {
                     #[allow(unknown_lints, clippy::unnecessary_struct_initialization)]
-                    bpf_prog_info { type_: prog.info.program_type.into(), ..Default::default() }
-                        .as_bytes()
-                        .to_owned()
+                    bpf_prog_info {
+                        type_: prog.info.program_type.into(),
+                        // TODO: https://fxbug.dev/397389704 - return actual length.
+                        jited_prog_len: 1,
+                        ..Default::default()
+                    }
+                    .as_bytes()
+                    .to_owned()
                 }
-                BpfHandle::ProgramStub(type_) =>
-                {
+                BpfHandle::ProgramStub(type_) => {
                     #[allow(unknown_lints, clippy::unnecessary_struct_initialization)]
-                    bpf_prog_info { type_, ..Default::default() }.as_bytes().to_owned()
+                    bpf_prog_info {
+                        type_,
+                        // TODO: https://fxbug.dev/397389704 - return actual length.
+                        jited_prog_len: 1,
+                        ..Default::default()
+                    }
+                    .as_bytes()
+                    .to_owned()
                 }
                 _ => {
                     return error!(EINVAL);
@@ -407,13 +427,15 @@ pub fn sys_bpf(
         bpf_cmd_BPF_BTF_LOAD => {
             let btf_attr: bpf_attr__bindgen_ty_12 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_BTF_LOAD {:?}", btf_attr);
+            security::check_bpf_access(current_task, cmd, &btf_attr, attr_size)?;
             let data = current_task
                 .read_memory_to_vec(UserAddress::from(btf_attr.btf), btf_attr.btf_size as usize)?;
             install_bpf_fd(current_task, BpfTypeFormat { data })
         }
         bpf_cmd_BPF_PROG_DETACH => {
-            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_PROG_DETACH");
-            error!(EINVAL)
+            let attach_attr: BpfAttachAttr = read_attr(current_task, attr_addr, attr_size)?;
+            security::check_bpf_access(current_task, cmd, &attach_attr, attr_size)?;
+            bpf_prog_detach(locked, current_task, attach_attr)
         }
         bpf_cmd_BPF_PROG_RUN => {
             track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_PROG_RUN");

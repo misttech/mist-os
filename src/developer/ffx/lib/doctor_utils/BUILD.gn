@@ -9,6 +9,11 @@ rustc_library("lib") {
   version = "0.1.0"
   edition = "2021"
   with_unit_tests = true
+
+  visibility = [
+    ":*",
+    "//src/developer/ffx/plugins/doctor:*",
+  ]
   sources = [
     "src/daemon_manager.rs",
     "src/lib.rs",

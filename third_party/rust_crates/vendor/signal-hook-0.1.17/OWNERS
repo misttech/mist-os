@@ -6,8 +6,10 @@ include /src/developer/debug/OWNERS
 include /src/developer/ffx/OWNERS
 include /src/developer/ffx/plugins/debug/OWNERS
 include /src/developer/ffx/plugins/emulator/OWNERS
+include /src/developer/ffx/plugins/repository/OWNERS
 include /src/developer/ffx/plugins/session/OWNERS
 include /src/developer/ffx/plugins/test/OWNERS
 include /src/developer/ffx/tools/starnix/OWNERS
 include /src/devices/lib/OWNERS
 include /third_party/rust_crates/vendor/crossterm-0.19.0/OWNERS
+include /tools/funnel/OWNERS

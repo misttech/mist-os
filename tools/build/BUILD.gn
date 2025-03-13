@@ -5,6 +5,8 @@
 import("//build/go/go_library.gni")
 import("//build/go/go_test.gni")
 
+assert(is_host || is_linux, "build tools are all linux host binaries")
+
 group("tools") {
   testonly = true
 
@@ -61,7 +63,8 @@ go_library("build") {
   ]
   deps = [
     "//third_party/golibs:github.com/google/go-cmp",
-    "//third_party/golibs:golang.org/x/exp",
+    "//third_party/golibs:golang.org/x/exp/maps",
+    "//third_party/golibs:golang.org/x/exp/slices",
     "//tools/lib/hostplatform",
     "//tools/lib/jsonutil",
     "//tools/lib/osmisc",

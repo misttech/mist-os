@@ -26,3 +26,8 @@ closed protocol Device {
         server_end server_end:fuchsia.camera2.debug.Debug;
     });
 };
+
+// Added to allow service connection to replace devfs
+service Service {
+    device client_end:Device;
+};

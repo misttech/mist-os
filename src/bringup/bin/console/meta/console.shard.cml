@@ -153,8 +153,6 @@
             protocol: [
                 "fuchsia.kernel.Counter",
                 "fuchsia.kernel.DebugBroker",
-                "fuchsia.tracing.kernel.Controller",
-                "fuchsia.tracing.kernel.Reader",
             ],
             from: "#kernel_debug_broker",
             to: "#console-launcher",
@@ -169,6 +167,11 @@
         {
             protocol: [ "fuchsia.driver.development.Manager" ],
             from: "#driver_manager",
+            to: "#console-launcher",
+        },
+        {
+            protocol: [ "fuchsia.driver.registrar.DriverRegistrar" ],
+            from: "#driver_index",
             to: "#console-launcher",
         },
         {
@@ -262,7 +265,17 @@
             to: "#console-launcher",
         },
         {
+            service: "fuchsia.hardware.usb.peripheral.Service",
+            from: "#boot-drivers",
+            to: "#console-launcher",
+        },
+        {
             service: "fuchsia.gpu.magma.Service",
+            from: "#boot-drivers",
+            to: "#console-launcher",
+        },
+        {
+            service: "fuchsia.hardware.pty.Service",
             from: "#boot-drivers",
             to: "#console-launcher",
         },

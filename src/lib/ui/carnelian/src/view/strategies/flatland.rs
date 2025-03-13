@@ -327,7 +327,7 @@ impl FlatlandViewStrategy {
                                     trace_flow_id: event
                                         .pointer_sample
                                         .as_ref()
-                                        .and_then(|_| event.trace_flow_id),
+                                        .and(event.trace_flow_id),
                                     response_type: event.pointer_sample.as_ref().and_then(|_| {
                                         Some(fidl_fuchsia_ui_pointer::TouchResponseType::Yes)
                                     }),

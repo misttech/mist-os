@@ -116,7 +116,7 @@ fuchsia_package("fuchsia-fatfs") {
   deps = [ "//src/storage/fuchsia-fatfs/mounter:fatfs-mounter" ]
 }
 
-fuchsia_shell_package("fatfs-bin") {
+fuchsia_package("fatfs-bin") {
   deps = [ ":fatfs" ]
 }
 

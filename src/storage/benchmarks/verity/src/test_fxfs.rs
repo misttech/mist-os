@@ -6,7 +6,7 @@ use fidl_fuchsia_fxfs_test::{TestFxfsAdminRequest, TestFxfsAdminRequestStream};
 use fidl_fuchsia_io as fio;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_fs::directory::open_in_namespace;
-use fuchsia_storage_benchmarks::block_devices::FvmInstance;
+use fuchsia_storage_benchmarks::block_devices::BenchmarkVolumeFactory;
 use fuchsia_storage_benchmarks::filesystems::fxfs::Fxfs;
 use futures::StreamExt;
 use storage_benchmarks::{CacheClearableFilesystem, Filesystem, FilesystemConfig};
@@ -20,7 +20,8 @@ enum IncomingRequest {
 #[fuchsia::main]
 async fn main() {
     let config = verity_benchmarks_test_fxfs_config::Config::take_from_startup_handle();
-    let fvm_instance = FvmInstance::from_config(config.storage_host, config.fxfs_blob).await;
+    let fvm_instance =
+        BenchmarkVolumeFactory::from_config(config.storage_host, config.fxfs_blob).await;
 
     let mut fs = Fxfs::new(24 * 1024 * 1024).start_filesystem(&fvm_instance).await;
     let mut svc = ServiceFs::new();

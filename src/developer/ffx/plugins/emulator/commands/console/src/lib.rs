@@ -11,7 +11,8 @@ use ffx_config::EnvironmentContext;
 use ffx_emulator_config::EngineConsoleType;
 use ffx_emulator_console_args::ConsoleCommand;
 use ffx_emulator_engines::EngineBuilder;
-use fho::{bug, FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{bug, FfxMain, FfxTool};
 /// Sub-sub tool for `emu console`
 #[derive(FfxTool)]
 pub struct EmuConsoleTool {

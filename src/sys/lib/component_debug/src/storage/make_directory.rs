@@ -57,16 +57,17 @@ mod test {
             // Serve the root directory
             // Root directory should get Open call with CREATE flag
             let request = root_dir.try_next().await;
-            let object =
-                if let Ok(Some(fio::DirectoryRequest::Open3 { flags, path, object, .. })) = request
-                {
-                    assert_eq!(path, "test");
-                    assert!(flags.intersects(fio::Flags::FLAG_MAYBE_CREATE));
-                    assert!(flags.intersects(fio::Flags::PROTOCOL_DIRECTORY));
-                    object
-                } else {
-                    panic!("did not get open request: {:?}", request);
-                };
+            let object = if let Ok(Some(fio::DirectoryRequest::Open {
+                flags, path, object, ..
+            })) = request
+            {
+                assert_eq!(path, "test");
+                assert!(flags.intersects(fio::Flags::FLAG_MAYBE_CREATE));
+                assert!(flags.intersects(fio::Flags::PROTOCOL_DIRECTORY));
+                object
+            } else {
+                panic!("did not get open request: {:?}", request);
+            };
 
             // Serve the new test directory
             let mut test_dir = node_to_directory(object.into());

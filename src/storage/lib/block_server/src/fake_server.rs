@@ -4,9 +4,10 @@
 
 use anyhow::Error;
 use block_server::async_interface::{Interface, SessionManager};
-use block_server::{BlockServer, PartitionInfo, WriteOptions};
+use block_server::{BlockServer, DeviceInfo, PartitionInfo, WriteOptions};
 use fidl::endpoints::Proxy as _;
 use std::borrow::Cow;
+use std::num::NonZero;
 use std::sync::Arc;
 use {
     fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume,
@@ -55,6 +56,7 @@ pub struct FakeServer {
 }
 
 pub struct FakeServerOptions<'a> {
+    pub flags: fblock::Flag,
     pub block_count: Option<u64>,
     pub block_size: u32,
     pub initial_content: Option<&'a [u8]>,
@@ -65,6 +67,7 @@ pub struct FakeServerOptions<'a> {
 impl Default for FakeServerOptions<'_> {
     fn default() -> Self {
         FakeServerOptions {
+            flags: fblock::Flag::empty(),
             block_count: None,
             block_size: 512,
             initial_content: None,
@@ -97,6 +100,7 @@ impl From<FakeServerOptions<'_>> for FakeServer {
             server: BlockServer::new(
                 options.block_size,
                 Arc::new(Data {
+                    flags: options.flags,
                     block_size: options.block_size,
                     block_count: block_count,
                     data: vmo,
@@ -142,6 +146,7 @@ impl FakeServer {
 }
 
 struct Data {
+    flags: fblock::Flag,
     block_size: u32,
     block_count: u64,
     data: zx::Vmo,
@@ -149,14 +154,15 @@ struct Data {
 }
 
 impl Interface for Data {
-    async fn get_info(&self) -> Result<Cow<'_, PartitionInfo>, zx::Status> {
-        Ok(Cow::Owned(PartitionInfo {
+    async fn get_info(&self) -> Result<Cow<'_, DeviceInfo>, zx::Status> {
+        Ok(Cow::Owned(DeviceInfo::Partition(PartitionInfo {
+            device_flags: self.flags,
             block_range: Some(0..self.block_count),
             type_guid: TYPE_GUID.clone(),
             instance_guid: INSTANCE_GUID.clone(),
-            name: Some(PARTITION_NAME.to_string()),
+            name: PARTITION_NAME.to_string(),
             flags: 0u64,
-        }))
+        })))
     }
 
     async fn read(
@@ -165,6 +171,7 @@ impl Interface for Data {
         block_count: u32,
         vmo: &Arc<zx::Vmo>,
         vmo_offset: u64,
+        _trace_flow_id: Option<NonZero<u64>>,
     ) -> Result<(), zx::Status> {
         if let Some(observer) = self.observer.as_ref() {
             observer.read(device_block_offset, block_count, vmo, vmo_offset);
@@ -185,6 +192,7 @@ impl Interface for Data {
         vmo: &Arc<zx::Vmo>,
         vmo_offset: u64,
         opts: WriteOptions,
+        _trace_flow_id: Option<NonZero<u64>>,
     ) -> Result<(), zx::Status> {
         if let Some(observer) = self.observer.as_ref() {
             match observer.write(device_block_offset, block_count, vmo, vmo_offset, opts) {
@@ -199,14 +207,19 @@ impl Interface for Data {
         )
     }
 
-    async fn flush(&self) -> Result<(), zx::Status> {
+    async fn flush(&self, _trace_flow_id: Option<NonZero<u64>>) -> Result<(), zx::Status> {
         if let Some(observer) = self.observer.as_ref() {
             observer.flush();
         }
         Ok(())
     }
 
-    async fn trim(&self, device_block_offset: u64, block_count: u32) -> Result<(), zx::Status> {
+    async fn trim(
+        &self,
+        device_block_offset: u64,
+        block_count: u32,
+        _trace_flow_id: Option<NonZero<u64>>,
+    ) -> Result<(), zx::Status> {
         if let Some(observer) = self.observer.as_ref() {
             observer.trim(device_block_offset, block_count);
         }

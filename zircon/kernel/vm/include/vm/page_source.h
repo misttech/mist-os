@@ -69,8 +69,8 @@ class PageSource;
 class AnonymousPageRequester;
 
 struct VmoDebugInfo {
-  uintptr_t vmo_ptr;
   uint64_t vmo_id;
+  char vmo_name[8];
 };
 
 // The different types of page requests that can exist.
@@ -168,8 +168,9 @@ class PageProvider : public fbl::RefCounted<PageProvider> {
   // After OnClose is called, no more calls will be made except for ::WaitOnEvent.
   virtual void OnClose() = 0;
 
-  // Waits on an |event| associated with a page request.
-  virtual zx_status_t WaitOnEvent(Event* event) = 0;
+  // Waits on an |event| associated with a page request. The waiting thread can return early from
+  // the wait due to a suspend signal only if |suspendable| is true.
+  virtual zx_status_t WaitOnEvent(Event* event, bool suspendable) = 0;
 
   // Dumps relevant state for debugging purposes. The |max_items| parameter should be used to cap
   // the number of elements printed from any kind of variable sized list to prevent spam.
@@ -198,8 +199,9 @@ class PageRequestInterface : public fbl::RefCounted<PageRequestInterface> {
   virtual void CancelRequest(PageRequest* request) = 0;
   // Ask the page source to wait on this request, typically by forwarding to the page provider.
   // Note this gets called without a lock and so due to races the implementation needs to be
-  // tolerant of having already been detached/closed.
-  virtual zx_status_t WaitOnRequest(PageRequest* request) = 0;
+  // tolerant of having already been detached/closed. The waiting thread can return early from
+  // the wait due to a suspend signal only if |suspendable| is true.
+  virtual zx_status_t WaitOnRequest(PageRequest* request, bool suspendable) = 0;
 };
 
 // A page source is responsible for fulfilling page requests from a VMO with backing pages.
@@ -410,7 +412,7 @@ class PageSource final : public PageRequestInterface {
   zx_status_t PopulateRequest(PageRequest* request, uint64_t offset, uint64_t len,
                               VmoDebugInfo vmo_debug_info, page_request_type type);
 
-  zx_status_t WaitOnRequest(PageRequest* request) override;
+  zx_status_t WaitOnRequest(PageRequest* request, bool suspendable) override;
 
   // Helper that takes an existing request and a new request range and returns whether the new
   // range is any kind of continuation of the existing request. This is used for a mixture of
@@ -446,10 +448,12 @@ class PageRequest : public fbl::WAVLTreeContainable<PageRequest*>,
 
   // Returns ZX_OK on success, or a permitted error code if the backing page provider explicitly
   // failed this page request. Returns ZX_ERR_INTERNAL_INTR_KILLED if the thread was killed.
+  // Returns ZX_ERR_INTERNAL_INTR_RETRY if |suspendable| is true and the thread was suspended; the
+  // thread cannot be suspended in the wait if |suspendable| is false.
   // If this page requested is allowed to early wake then this can return success with the request
   // still active and queued with a PageSource. In this case it is invalid to attempt to use this
   // request with any other PageSource or for any other range without first doing CancelRequest.
-  zx_status_t Wait();
+  zx_status_t Wait(bool suspendable);
 
   // If initialized, asks the underlying PageRequestInterface to abort this request, by calling
   // PageRequestInterface::CancelRequest.
@@ -599,8 +603,8 @@ class MultiPageRequest {
   MultiPageRequest() = default;
   explicit MultiPageRequest(bool early_wake) : page_request_(early_wake) {}
 
-  // Wait on the currently active page request.
-  zx_status_t Wait();
+  // Wait on the currently active page request. The waiting thread is suspendable by default.
+  zx_status_t Wait(bool suspendable = true);
 
   // Retrieve the anonymous page request. The caller may or may not arm the AnonymousPageRequest, if
   // it does the anonymous request becomes considered active and no other request may be retrieved.

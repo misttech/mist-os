@@ -2,10 +2,11 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
+include /src/tee/OWNERS
+include /third_party/rust_crates/vendor/cmac-0.7.2/OWNERS
 include /third_party/rust_crates/vendor/elliptic-curve-0.12.3/OWNERS
 include /third_party/rust_crates/vendor/hmac-0.12.1/OWNERS
 include /third_party/rust_crates/vendor/md-5-0.10.5/OWNERS
-include /third_party/rust_crates/vendor/pbkdf2-0.11.0/OWNERS
-include /third_party/rust_crates/vendor/sha1-0.10.5/OWNERS
+include /third_party/rust_crates/vendor/sha1-0.10.6/OWNERS
 include /third_party/rust_crates/vendor/sha2-0.10.6/OWNERS
 include /third_party/rust_crates/vendor/signature-1.6.4/OWNERS

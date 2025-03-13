@@ -12,6 +12,7 @@ use anyhow::{bail, Error};
 use either::{Left, Right};
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
+use fuchsia_sync::Mutex;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use fxfs::errors::FxfsError;
@@ -22,7 +23,7 @@ use fxfs::object_store::transaction::{lock_keys, LockKey, Options, Transaction};
 use fxfs::object_store::{self, Directory, ObjectDescriptor, ObjectStore, Timestamp};
 use fxfs_macros::ToWeakNode;
 use std::any::Any;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use vfs::directory::dirents_sink::{self, AppendResult, Sink};
 use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
 use vfs::directory::entry_container::{
@@ -89,7 +90,7 @@ impl FxDirectory {
 
     pub fn set_deleted(&self) {
         self.directory.set_deleted();
-        self.watchers.lock().unwrap().send_event(&mut SingleNameEventProducer::deleted());
+        self.watchers.lock().send_event(&mut SingleNameEventProducer::deleted());
     }
 
     async fn lookup(
@@ -98,10 +99,7 @@ impl FxDirectory {
         mut path: Path,
         request: &ObjectRequest,
     ) -> Result<OpenedNode<dyn FxNode>, Error> {
-        if path.is_empty() {
-            if protocols.create_unnamed_temporary_in_directory_path() {
-                bail!(FxfsError::NotSupported)
-            }
+        if path.is_empty() && !protocols.create_unnamed_temporary_in_directory_path() {
             return Ok(OpenedNode::new(self.clone()));
         }
         let store = self.store();
@@ -111,7 +109,12 @@ impl FxDirectory {
             let last_segment = path.is_single_component();
             let current_dir =
                 current_node.into_any().downcast::<FxDirectory>().map_err(|_| FxfsError::NotDir)?;
-            let name = path.next().unwrap();
+            let name = path.next().unwrap_or_default();
+            // The only situation where we expect the name to be empty is when we are creating a
+            // temporary unnamed file.
+            if name.is_empty() && !protocols.create_unnamed_temporary_in_directory_path() {
+                bail!(FxfsError::InvalidArgs);
+            }
 
             // Create the transaction here if we might need to create the object so that we have a
             // lock in place.
@@ -119,50 +122,54 @@ impl FxDirectory {
                 store.store_object_id(),
                 current_dir.directory.object_id()
             )];
-            let transaction_or_guard =
-                if last_segment && protocols.creation_mode() != vfs::CreationMode::Never {
-                    if protocols.create_unnamed_temporary_in_directory_path() {
-                        bail!(FxfsError::NotSupported)
+            let create_object = match protocols.creation_mode() {
+                vfs::CreationMode::AllowExisting | vfs::CreationMode::Always => last_segment,
+                vfs::CreationMode::UnnamedTemporary
+                | vfs::CreationMode::UnlinkableUnnamedTemporary => name.is_empty(),
+                vfs::CreationMode::Never => false,
+            };
+            let transaction_or_guard = if create_object {
+                Left(fs.clone().new_transaction(keys, Options::default()).await?)
+            } else {
+                // When child objects are created, the object is created along with the
+                // directory entry in the same transaction, and so we need to hold a read lock
+                // over the lookup and open calls.
+                Right(fs.lock_manager().read_lock(keys).await)
+            };
+
+            let create_unnamed_temporary_file_in_this_segment =
+                create_object && protocols.create_unnamed_temporary_in_directory_path();
+            let child_descriptor = if create_unnamed_temporary_file_in_this_segment {
+                None
+            } else {
+                match self.directory.owner().dirent_cache().lookup(&(current_dir.object_id(), name))
+                {
+                    Some(node) => {
+                        let desc = node.object_descriptor();
+                        Some((node, desc))
                     }
-                    Left(fs.clone().new_transaction(keys, Options::default()).await?)
-                } else {
-                    // When child objects are created, the object is created along with the
-                    // directory entry in the same transaction, and so we need to hold a read lock
-                    // over the lookup and open calls.
-                    Right(fs.lock_manager().read_lock(keys).await)
-                };
+                    None => {
+                        if let Some((object_id, object_descriptor)) =
+                            current_dir.directory.lookup(name).await?
+                        {
+                            let child_node = self
+                                .volume()
+                                .get_or_load_node(
+                                    object_id,
+                                    object_descriptor.clone(),
+                                    Some(current_dir.clone()),
+                                )
+                                .await?;
 
-            let child_descriptor = match self
-                .directory
-                .owner()
-                .dirent_cache()
-                .lookup(&(current_dir.object_id(), name))
-            {
-                Some(node) => {
-                    let desc = node.object_descriptor();
-                    Some((node, desc))
-                }
-                None => {
-                    if let Some((object_id, object_descriptor)) =
-                        current_dir.directory.lookup(name).await?
-                    {
-                        let child_node = self
-                            .volume()
-                            .get_or_load_node(
-                                object_id,
-                                object_descriptor.clone(),
-                                Some(current_dir.clone()),
-                            )
-                            .await?;
-
-                        self.directory.owner().dirent_cache().insert(
-                            current_dir.object_id(),
-                            name.to_owned(),
-                            child_node.clone(),
-                        );
-                        Some((child_node, object_descriptor))
-                    } else {
-                        None
+                            self.directory.owner().dirent_cache().insert(
+                                current_dir.object_id(),
+                                name.to_owned(),
+                                child_node.clone(),
+                            );
+                            Some((child_node, object_descriptor))
+                        } else {
+                            None
+                        }
                     }
                 }
             };
@@ -211,14 +218,23 @@ impl FxDirectory {
                 }
                 None => {
                     if let Left(mut transaction) = transaction_or_guard {
-                        let new_node = current_dir
-                            .create_child(
-                                &mut transaction,
-                                name,
-                                protocols.create_directory(),
-                                request.create_attributes(),
-                            )
-                            .await?;
+                        let new_node = if create_unnamed_temporary_file_in_this_segment {
+                            current_dir
+                                .create_unnamed_temporary_file(
+                                    &mut transaction,
+                                    request.create_attributes(),
+                                )
+                                .await?
+                        } else {
+                            current_dir
+                                .create_child(
+                                    &mut transaction,
+                                    name,
+                                    protocols.create_directory(),
+                                    request.create_attributes(),
+                                )
+                                .await?
+                        };
                         let node = OpenedNode::new(new_node.clone());
                         if let GetResult::Placeholder(p) =
                             self.volume().cache().get_or_reserve(node.object_id()).await
@@ -272,10 +288,28 @@ impl FxDirectory {
         }
     }
 
+    async fn create_unnamed_temporary_file(
+        self: &Arc<Self>,
+        transaction: &mut Transaction<'_>,
+        create_attributes: Option<&fio::MutableNodeAttributes>,
+    ) -> Result<Arc<dyn FxNode>, Error> {
+        let file = FxFile::new_unnamed_temporary(
+            self.directory.create_child_unnamed_temporary_file(transaction).await?,
+        );
+        if let Some(attrs) = create_attributes {
+            file.handle()
+                .uncached_handle()
+                .update_attributes(transaction, Some(&attrs), None)
+                .await?;
+        }
+
+        Ok(file as Arc<dyn FxNode>)
+    }
+
     /// Called to indicate a file or directory was removed from this directory.
     pub(crate) fn did_remove(&self, name: &str) {
         self.directory.owner().dirent_cache().remove(&(self.directory.object_id(), name));
-        self.watchers.lock().unwrap().send_event(&mut SingleNameEventProducer::removed(name));
+        self.watchers.lock().send_event(&mut SingleNameEventProducer::removed(name));
     }
 
     /// Called to indicate a file or directory was added to this directory.
@@ -287,7 +321,7 @@ impl FxDirectory {
                 node,
             );
         }
-        self.watchers.lock().unwrap().send_event(&mut SingleNameEventProducer::added(name));
+        self.watchers.lock().send_event(&mut SingleNameEventProducer::added(name));
     }
 
     /// As per fscrypt, a user cannot link an unencrypted file into an encrypted directory nor can
@@ -330,6 +364,43 @@ impl FxDirectory {
         store.adjust_refs(&mut transaction, source_id, 1).await.map_err(map_to_status)?;
         transaction
             .commit_with_callback(|_| self.did_add(&name, None))
+            .await
+            .map_err(map_to_status)?;
+        Ok(())
+    }
+
+    // Move graveyard object out from the graveyard and link it to this path. We only expect to do
+    // this when linking an unnamed temporary file for the first time.
+    pub(crate) async fn link_graveyard_object<F>(
+        &self,
+        mut transaction: Transaction<'_>,
+        name: &str,
+        source_id: u64,
+        kind: ObjectDescriptor,
+        transaction_callback: F,
+    ) -> Result<(), zx::Status>
+    where
+        F: FnOnce() + Send,
+    {
+        let store = self.store();
+        if self.is_deleted() {
+            return Err(zx::Status::ACCESS_DENIED);
+        }
+        if self.directory.lookup(&name).await.map_err(map_to_status)?.is_some() {
+            return Err(zx::Status::ALREADY_EXISTS);
+        }
+        // Move object out from the graveyard and place into record. As we are moving the object
+        // from one record to the other, the reference count should stay the same.
+        store.remove_from_graveyard(&mut transaction, source_id);
+        self.directory
+            .insert_child(&mut transaction, &name, source_id, kind.clone())
+            .await
+            .map_err(map_to_status)?;
+        transaction
+            .commit_with_callback(|_| {
+                transaction_callback();
+                self.did_add(&name, None);
+            })
             .await
             .map_err(map_to_status)?;
         Ok(())
@@ -509,12 +580,12 @@ impl FxNode for FxDirectory {
     }
 
     fn parent(&self) -> Option<Arc<FxDirectory>> {
-        self.parent.as_ref().map(|p| p.lock().unwrap().clone())
+        self.parent.as_ref().map(|p| p.lock().clone())
     }
 
     fn set_parent(&self, parent: Arc<FxDirectory>) {
         match &self.parent {
-            Some(p) => *p.lock().unwrap() = parent,
+            Some(p) => *p.lock() = parent,
             None => panic!("Called set_parent on root node"),
         }
     }
@@ -667,7 +738,7 @@ impl MutableDirectory for FxDirectory {
                         let scope = self.volume().scope();
                         scope.spawn(
                             symlink::Connection::new(scope.clone(), node)
-                                .run(fio::OpenFlags::RIGHT_READABLE.to_object_request(connection)),
+                                .run(fio::PERM_READABLE.to_object_request(connection)),
                         );
                     })
                     .await
@@ -793,17 +864,25 @@ impl VfsDirectory for FxDirectory {
                     )
                 } else if node.is::<FxFile>() {
                     let node = node.downcast::<FxFile>().unwrap_or_else(|_| unreachable!());
-                    if flags.contains(fio::OpenFlags::RIGHT_WRITABLE) && node.is_verified_file() {
-                        log::error!("Tried to open a verified file with the RIGHT_WRITABLE flag.");
-                        return Err(zx::Status::NOT_SUPPORTED);
-                    }
+                    // TODO(https://fxbug.dev/397501864): Support opening block devices with the new
+                    // fuchsia.io/Directory.Open signature (e.g. via the `open3` impl below), or add
+                    // a separate protocol for this purpose.
                     if flags.contains(fio::OpenFlags::BLOCK_DEVICE) {
                         if node.is_verified_file() {
                             log::error!("Tried to expose a verified file as a block device.");
                             return Err(zx::Status::NOT_SUPPORTED);
                         }
-                        let mut server =
-                            BlockServer::new(node, object_request.take().into_channel());
+                        if !flags.contains(fio::OpenFlags::RIGHT_READABLE) {
+                            log::error!(
+                                "Opening a file as block device requires at least RIGHT_READABLE."
+                            );
+                            return Err(zx::Status::ACCESS_DENIED);
+                        }
+                        let mut server = BlockServer::new(
+                            node,
+                            /*read_only=*/ !flags.contains(fio::OpenFlags::RIGHT_WRITABLE),
+                            object_request.take().into_channel(),
+                        );
                         Ok(async move {
                             let _ = server.run().await;
                         }
@@ -948,8 +1027,7 @@ impl VfsDirectory for FxDirectory {
         mask: fio::WatchMask,
         watcher: DirectoryWatcher,
     ) -> Result<(), zx::Status> {
-        let controller =
-            self.watchers.lock().unwrap().add(scope.clone(), self.clone(), mask, watcher);
+        let controller = self.watchers.lock().add(scope.clone(), self.clone(), mask, watcher);
         if mask.contains(fio::WatchMask::EXISTING) && !self.is_deleted() {
             scope.spawn(async move {
                 let layer_set = self.store().tree().layer_set();
@@ -980,7 +1058,7 @@ impl VfsDirectory for FxDirectory {
     }
 
     fn unregister_watcher(self: Arc<Self>, key: usize) {
-        self.watchers.lock().unwrap().remove(key);
+        self.watchers.lock().remove(key);
     }
 }
 
@@ -995,11 +1073,11 @@ mod tests {
     use crate::directory::FxDirectory;
     use crate::file::FxFile;
     use crate::fuchsia::testing::{
-        close_dir_checked, close_file_checked, open3_dir, open3_dir_checked, open_dir,
-        open_dir_checked, open_file, open_file_checked, TestFixture, TestFixtureOptions,
+        close_dir_checked, close_file_checked, open_dir, open_dir_checked, open_file,
+        open_file_checked, TestFixture, TestFixtureOptions,
     };
     use assert_matches::assert_matches;
-    use fidl::endpoints::{create_proxy, ClientEnd, Proxy, ServerEnd};
+    use fidl::endpoints::{create_proxy, ClientEnd, Proxy};
     use fuchsia_fs::directory::{DirEntry, DirentKind};
     use fuchsia_fs::file;
     use futures::{join, StreamExt};
@@ -1045,11 +1123,17 @@ mod tests {
             let root = fixture.root();
 
             let flags = if i == 0 {
-                fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_READABLE
+                fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_READABLE
             } else {
-                fio::OpenFlags::RIGHT_READABLE
+                fio::PERM_READABLE
             };
-            let dir = open_dir_checked(&root, flags | fio::OpenFlags::DIRECTORY, "foo").await;
+            let dir = open_dir_checked(
+                &root,
+                "foo",
+                flags | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
+            )
+            .await;
             close_dir_checked(dir).await;
 
             device = fixture.close().await;
@@ -1062,12 +1146,17 @@ mod tests {
         let root = fixture.root();
 
         assert_eq!(
-            open_file(&root, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY, "foo")
-                .await
-                .expect_err("Open succeeded")
-                .root_cause()
-                .downcast_ref::<zx::Status>()
-                .expect("No status"),
+            open_file(
+                &root,
+                "foo",
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
+                &Default::default()
+            )
+            .await
+            .expect_err("Open succeeded")
+            .root_cause()
+            .downcast_ref::<zx::Status>()
+            .expect("No status"),
             &zx::Status::NOT_FOUND,
         );
 
@@ -1081,16 +1170,18 @@ mod tests {
 
         let f = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         close_file_checked(f).await;
 
         let f = open_file_checked(
             &root,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         close_file_checked(f).await;
@@ -1105,27 +1196,30 @@ mod tests {
 
         let d = open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
         close_dir_checked(d).await;
 
         let d = open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             "foo/bar",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
         close_dir_checked(d).await;
 
         let d = open_dir_checked(
             &root,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             "foo/bar",
+            fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
         close_dir_checked(d).await;
@@ -1140,11 +1234,12 @@ mod tests {
 
         let f = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::CREATE_IF_ABSENT
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::Flags::FLAG_MUST_CREATE
+                | fio::PERM_READABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         close_file_checked(f).await;
@@ -1152,11 +1247,12 @@ mod tests {
         assert_eq!(
             open_file(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::CREATE_IF_ABSENT
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::NOT_DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::Flags::FLAG_MUST_CREATE
+                    | fio::PERM_READABLE
+                    | fio::Flags::PROTOCOL_FILE,
+                &Default::default()
             )
             .await
             .expect_err("Open succeeded")
@@ -1176,11 +1272,12 @@ mod tests {
 
         let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -1208,23 +1305,29 @@ mod tests {
             .expect("unlink failed");
 
         assert_eq!(
-            open_file(&root, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY, "foo")
-                .await
-                .expect_err("Open succeeded")
-                .root_cause()
-                .downcast_ref::<zx::Status>()
-                .expect("No status"),
+            open_file(
+                &root,
+                "foo",
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
+                &Default::default()
+            )
+            .await
+            .expect_err("Open succeeded")
+            .root_cause()
+            .downcast_ref::<zx::Status>()
+            .expect("No status"),
             &zx::Status::NOT_FOUND,
         );
 
         // Create another file so we can verify that the extents were actually freed.
         let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             "bar",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         let buf = vec![0xaa as u8; 8192];
@@ -1241,11 +1344,12 @@ mod tests {
 
         let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         close_file_checked(file).await;
@@ -1256,12 +1360,17 @@ mod tests {
             .expect("unlink failed");
 
         assert_eq!(
-            open_file(&root, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY, "foo")
-                .await
-                .expect_err("Open succeeded")
-                .root_cause()
-                .downcast_ref::<zx::Status>()
-                .expect("No status"),
+            open_file(
+                &root,
+                "foo",
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
+                &Default::default()
+            )
+            .await
+            .expect_err("Open succeeded")
+            .root_cause()
+            .downcast_ref::<zx::Status>()
+            .expect("No status"),
             &zx::Status::NOT_FOUND,
         );
 
@@ -1275,11 +1384,12 @@ mod tests {
 
         let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -1293,12 +1403,17 @@ mod tests {
 
         // The child should immediately appear unlinked...
         assert_eq!(
-            open_file(&root, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY, "foo")
-                .await
-                .expect_err("Open succeeded")
-                .root_cause()
-                .downcast_ref::<zx::Status>()
-                .expect("No status"),
+            open_file(
+                &root,
+                "foo",
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
+                &Default::default()
+            )
+            .await
+            .expect_err("Open succeeded")
+            .root_cause()
+            .downcast_ref::<zx::Status>()
+            .expect("No status"),
             &zx::Status::NOT_FOUND,
         );
 
@@ -1322,17 +1437,19 @@ mod tests {
 
         let dir = open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
         let f = open_file_checked(
             &dir,
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             "bar",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_READABLE,
+            &Default::default(),
         )
         .await;
         close_file_checked(f).await;
@@ -1368,11 +1485,12 @@ mod tests {
 
         let dir = open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
@@ -1384,10 +1502,9 @@ mod tests {
         assert_eq!(
             open_file(
                 &dir,
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::CREATE
-                    | fio::OpenFlags::NOT_DIRECTORY,
-                "bar"
+                "bar",
+                fio::PERM_READABLE | fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE,
+                &Default::default()
             )
             .await
             .expect_err("Create file succeeded")
@@ -1412,21 +1529,21 @@ mod tests {
         const GRANDCHILD: &str = "baz";
         open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
             PARENT,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
         let open_parent = || async {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 PARENT,
+                fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
             .await
         };
@@ -1440,11 +1557,12 @@ mod tests {
         for _ in 0..100 {
             let d = open_dir_checked(
                 &parent,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 CHILD,
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
             .await;
             close_dir_checked(d).await;
@@ -1470,10 +1588,9 @@ mod tests {
             let writer = fasync::Task::spawn(async move {
                 let child_or = open_dir(
                     &parent,
-                    fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::RIGHT_WRITABLE
-                        | fio::OpenFlags::DIRECTORY,
                     CHILD,
+                    fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                    &Default::default(),
                 )
                 .await;
                 if let Err(e) = &child_or {
@@ -1489,10 +1606,9 @@ mod tests {
                 let _: Vec<_> = child.query().await.expect("query failed");
                 match open_file(
                     &child,
-                    fio::OpenFlags::CREATE
-                        | fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::NOT_DIRECTORY,
                     GRANDCHILD,
+                    fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
+                    &Default::default(),
                 )
                 .await
                 {
@@ -1535,11 +1651,12 @@ mod tests {
         let open_dir = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent = Arc::new(open_dir().await);
@@ -1548,8 +1665,9 @@ mod tests {
         for file in &files {
             let file = open_file_checked(
                 parent.as_ref(),
-                fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY,
                 file,
+                fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE,
+                &Default::default(),
             )
             .await;
             close_file_checked(file).await;
@@ -1558,8 +1676,9 @@ mod tests {
         for dir in &dirs {
             let dir = open_dir_checked(
                 parent.as_ref(),
-                fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY,
                 dir,
+                fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
             .await;
             close_dir_checked(dir).await;
@@ -1617,11 +1736,12 @@ mod tests {
 
         let parent = open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
@@ -1629,8 +1749,9 @@ mod tests {
         for file in &files {
             let file = open_file_checked(
                 &parent,
-                fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY,
                 file,
+                fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE,
+                &Default::default(),
             )
             .await;
             close_file_checked(file).await;
@@ -1679,11 +1800,12 @@ mod tests {
         let open_dir = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
 
@@ -1701,8 +1823,9 @@ mod tests {
             .expect("update_attributes failed");
         let dir = open_dir_checked(
             parent.as_ref(),
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
             "fee",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
@@ -1718,8 +1841,13 @@ mod tests {
         .expect("Failed to make FIDL call")
         .expect("Failed to set xattr with create");
 
-        let subdir =
-            open_dir_checked(&dir, fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY, "fo").await;
+        let subdir = open_dir_checked(
+            &dir,
+            "fo",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
+        )
+        .await;
         close_dir_checked(dir).await;
         close_dir_checked(subdir).await;
         close_dir_checked(Arc::try_unwrap(parent).unwrap()).await;
@@ -1729,8 +1857,9 @@ mod tests {
         let open_dir = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
@@ -1760,7 +1889,13 @@ mod tests {
         }
 
         let encrypted_dir = Arc::new(
-            open_dir_checked(parent.as_ref(), fio::OpenFlags::DIRECTORY, &encrypted_name).await,
+            open_dir_checked(
+                parent.as_ref(),
+                &encrypted_name,
+                fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
+            )
+            .await,
         );
 
         assert_eq!(
@@ -1794,11 +1929,12 @@ mod tests {
         let open_dir = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
 
@@ -1816,8 +1952,12 @@ mod tests {
             .expect("update_attributes failed");
         let file = open_file_checked(
             parent.as_ref(),
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::NOT_DIRECTORY,
             "fee",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -1845,8 +1985,9 @@ mod tests {
         let open_dir = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
@@ -1876,8 +2017,13 @@ mod tests {
         }
 
         let encrypted_file = Arc::new(
-            open_file_checked(parent.as_ref(), fio::OpenFlags::NOT_DIRECTORY, &encrypted_name)
-                .await,
+            open_file_checked(
+                parent.as_ref(),
+                &encrypted_name,
+                fio::Flags::PROTOCOL_FILE,
+                &Default::default(),
+            )
+            .await,
         );
 
         assert_eq!(
@@ -1896,8 +2042,9 @@ mod tests {
         let file = Arc::new(
             open_file_checked(
                 parent.as_ref(),
-                fio::OpenFlags::NOT_DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
                 "fee",
+                fio::Flags::PROTOCOL_FILE | fio::PERM_READABLE,
+                &Default::default(),
             )
             .await,
         );
@@ -1916,11 +2063,12 @@ mod tests {
         let open_dir = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
 
@@ -1947,11 +2095,12 @@ mod tests {
         let open_dir = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
 
@@ -1982,13 +2131,19 @@ mod tests {
             .expect("update_attributes failed");
         let dir = open_dir_checked(
             parent.as_ref(),
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
             "fee",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
-        let subdir =
-            open_dir_checked(&dir, fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY, "fo").await;
+        let subdir = open_dir_checked(
+            &dir,
+            "fo",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
+        )
+        .await;
         close_dir_checked(dir).await;
         close_dir_checked(subdir).await;
         close_dir_checked(Arc::try_unwrap(parent).unwrap()).await;
@@ -1998,8 +2153,9 @@ mod tests {
         let open_dir = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
@@ -2038,7 +2194,13 @@ mod tests {
         }
 
         let encrypted_dir = Arc::new(
-            open_dir_checked(parent.as_ref(), fio::OpenFlags::DIRECTORY, &encrypted_name).await,
+            open_dir_checked(
+                parent.as_ref(),
+                &encrypted_name,
+                fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
+            )
+            .await,
         );
 
         let encrypted_subdir_entries = readdir(Arc::clone(&encrypted_dir)).await;
@@ -2063,11 +2225,12 @@ mod tests {
         let open_dir = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
 
@@ -2089,8 +2252,9 @@ mod tests {
         for i in 0..300 {
             let dir = open_dir_checked(
                 parent.as_ref(),
-                fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
                 &format!("plaintext_{}", i),
+                fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
             .await;
             close_dir_checked(dir).await;
@@ -2104,8 +2268,9 @@ mod tests {
         let open_dir = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
@@ -2153,11 +2318,12 @@ mod tests {
         let open_dir = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
 
@@ -2175,13 +2341,19 @@ mod tests {
             .expect("update_attributes failed");
         let dir = open_dir_checked(
             parent.as_ref(),
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
             "fee",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
-        let subdir =
-            open_dir_checked(&dir, fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY, "fo").await;
+        let subdir = open_dir_checked(
+            &dir,
+            "fo",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
+        )
+        .await;
         close_dir_checked(dir).await;
         close_dir_checked(subdir).await;
 
@@ -2211,8 +2383,9 @@ mod tests {
         let open_dir = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
@@ -2230,7 +2403,13 @@ mod tests {
         }
 
         let encrypted_dir = Arc::new(
-            open_dir_checked(parent.as_ref(), fio::OpenFlags::DIRECTORY, &encrypted_name).await,
+            open_dir_checked(
+                parent.as_ref(),
+                &encrypted_name,
+                fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
+            )
+            .await,
         );
 
         let encrypted_subdir_entries = readdir(Arc::clone(&encrypted_dir)).await;
@@ -2255,11 +2434,12 @@ mod tests {
         let open_dir_1 = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
 
@@ -2268,11 +2448,12 @@ mod tests {
         let open_dir_2 = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo_2",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent_2: Arc<fio::DirectoryProxy> = Arc::new(open_dir_2().await);
@@ -2297,7 +2478,13 @@ mod tests {
             .expect("FIDL call failed")
             .map_err(zx::ok)
             .expect("update_attributes failed");
-        let file = open_file_checked(parent_1.as_ref(), fio::OpenFlags::CREATE, "fee").await;
+        let file = open_file_checked(
+            parent_1.as_ref(),
+            "fee",
+            fio::Flags::FLAG_MAYBE_CREATE,
+            &Default::default(),
+        )
+        .await;
 
         close_file_checked(file).await;
         close_dir_checked(Arc::try_unwrap(parent_1).unwrap()).await;
@@ -2309,10 +2496,9 @@ mod tests {
         let open_dir_1 = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent_1: Arc<fio::DirectoryProxy> = Arc::new(open_dir_1().await);
@@ -2320,10 +2506,9 @@ mod tests {
         let open_dir_2 = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo_2",
+                fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent_2: Arc<fio::DirectoryProxy> = Arc::new(open_dir_2().await);
@@ -2376,11 +2561,12 @@ mod tests {
         let open_dir_1 = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
 
@@ -2389,11 +2575,12 @@ mod tests {
         let open_dir_2 = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo_2",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent_2: Arc<fio::DirectoryProxy> = Arc::new(open_dir_2().await);
@@ -2422,7 +2609,13 @@ mod tests {
             .expect("FIDL call failed")
             .map_err(zx::ok)
             .expect("update_attributes failed");
-        let file = open_file_checked(parent_1.as_ref(), fio::OpenFlags::CREATE, "fee").await;
+        let file = open_file_checked(
+            parent_1.as_ref(),
+            "fee",
+            fio::Flags::FLAG_MAYBE_CREATE,
+            &Default::default(),
+        )
+        .await;
 
         close_file_checked(file).await;
 
@@ -2449,11 +2642,12 @@ mod tests {
         let open_dir_1 = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
 
@@ -2462,11 +2656,12 @@ mod tests {
         let open_dir_2 = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo_2",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent_2: Arc<fio::DirectoryProxy> = Arc::new(open_dir_2().await);
@@ -2484,7 +2679,13 @@ mod tests {
             .map_err(zx::ok)
             .expect("update_attributes failed");
 
-        let file = open_file_checked(parent_2.as_ref(), fio::OpenFlags::CREATE, "fee").await;
+        let file = open_file_checked(
+            parent_2.as_ref(),
+            "fee",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
+        )
+        .await;
 
         close_file_checked(file).await;
 
@@ -2511,11 +2712,12 @@ mod tests {
         let open_dir_1 = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
 
@@ -2524,11 +2726,12 @@ mod tests {
         let open_dir_2 = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo_2",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent_2: Arc<fio::DirectoryProxy> = Arc::new(open_dir_2().await);
@@ -2546,8 +2749,12 @@ mod tests {
             .expect("update_attributes failed");
         let file = open_file_checked(
             parent_1.as_ref(),
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE,
             "fee",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         let _ = file
@@ -2567,10 +2774,9 @@ mod tests {
         let open_dir_1 = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent_1: Arc<fio::DirectoryProxy> = Arc::new(open_dir_1().await);
@@ -2578,10 +2784,9 @@ mod tests {
         let open_dir_2 = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo_2",
+                fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent_2: Arc<fio::DirectoryProxy> = Arc::new(open_dir_2().await);
@@ -2622,7 +2827,8 @@ mod tests {
         );
 
         let file =
-            open_file_checked(parent_2.as_ref(), fio::OpenFlags::RIGHT_READABLE, "file_2").await;
+            open_file_checked(parent_2.as_ref(), "file_2", fio::PERM_READABLE, &Default::default())
+                .await;
         let (mutable_attributes, _immutable_attributes) = file
             .get_attributes(
                 fio::NodeAttributesQuery::CONTENT_SIZE
@@ -2658,11 +2864,12 @@ mod tests {
         let open_dir = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
 
@@ -2684,8 +2891,9 @@ mod tests {
             let filename: String = std::iter::repeat_with(one_char).take(100).collect();
             let dir = open_dir_checked(
                 parent.as_ref(),
-                fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
                 &filename,
+                fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
             .await;
             close_dir_checked(dir).await;
@@ -2710,8 +2918,9 @@ mod tests {
         let open_dir = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
@@ -2739,11 +2948,12 @@ mod tests {
         let open_dir = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent = Arc::new(open_dir().await);
@@ -2761,8 +2971,9 @@ mod tests {
 
         let file = open_file_checked(
             parent.as_ref(),
-            fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY,
             "file",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -2775,8 +2986,9 @@ mod tests {
         let open_dir = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
@@ -2797,9 +3009,13 @@ mod tests {
             }
         }
 
-        let file =
-            open_file_checked(parent.as_ref(), fio::OpenFlags::NOT_DIRECTORY, &encrypted_name)
-                .await;
+        let file = open_file_checked(
+            parent.as_ref(),
+            &encrypted_name,
+            fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
+        )
+        .await;
         let (_mutable_attributes, _immutable_attributes) = file
             .get_attributes(
                 fio::NodeAttributesQuery::CONTENT_SIZE
@@ -2824,11 +3040,12 @@ mod tests {
         let open_dir = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
 
@@ -2846,8 +3063,9 @@ mod tests {
             .expect("update_attributes failed");
         let dir = open_dir_checked(
             parent.as_ref(),
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
             "fee",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
@@ -2859,10 +3077,9 @@ mod tests {
         let open_dir = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
@@ -2921,11 +3138,12 @@ mod tests {
         let open_dir = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
 
@@ -2943,8 +3161,9 @@ mod tests {
             .expect("update_attributes failed");
         let dir = open_dir_checked(
             parent.as_ref(),
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
             "fee",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
@@ -2957,10 +3176,9 @@ mod tests {
         let open_dir = || {
             open_dir_checked(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
@@ -3006,7 +3224,13 @@ mod tests {
             .expect("FIDL call failed")
             .expect("rename should fail on a locked directory");
 
-        let _dir = open_dir_checked(parent.as_ref(), fio::OpenFlags::DIRECTORY, "new_fee").await;
+        let _dir = open_dir_checked(
+            parent.as_ref(),
+            "new_fee",
+            fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
+        )
+        .await;
         close_dir_checked(Arc::try_unwrap(parent).unwrap()).await;
         new_fixture.close().await;
     }
@@ -3018,11 +3242,12 @@ mod tests {
 
         let dir = open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
@@ -3081,30 +3306,27 @@ mod tests {
 
             let (proxy, server_end) = create_proxy::<fio::SymlinkMarker>();
             root.open(
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
-                fio::ModeType::empty(),
                 "symlink",
-                ServerEnd::new(server_end.into_channel()),
+                fio::PERM_READABLE | fio::Flags::FLAG_SEND_REPRESENTATION,
+                &Default::default(),
+                server_end.into_channel(),
             )
             .expect("open failed");
 
-            let on_open = proxy
+            let representation = proxy
                 .take_event_stream()
                 .next()
                 .await
-                .expect("missing OnOpen event")
-                .expect("failed to read event")
-                .into_on_open_();
+                .expect("missing Symlink event")
+                .expect("failed to read Symlink event")
+                .into_on_representation()
+                .expect("failed to decode OnRepresentation");
 
-            if let Some((0, Some(node_info))) = on_open {
-                assert_matches!(
-                    *node_info,
-                    fio::NodeInfoDeprecated::Symlink(fio::SymlinkObject { target, .. })
-                        if target == b"target"
-                );
-            } else {
-                panic!("Unexpected on_open {on_open:?}");
-            }
+            assert_matches!(representation,
+                fio::Representation::Symlink(fio::SymlinkInfo{
+                    target: Some(target), ..
+                }) if target == b"target"
+            );
 
             let (proxy, server_end) = create_proxy::<fio::SymlinkMarker>();
             root.create_symlink("symlink2", b"target2", Some(server_end))
@@ -3127,10 +3349,12 @@ mod tests {
             // Rename over the first symlink.
             open_file_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE,
                 "target",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_FILE,
+                &Default::default(),
             )
             .await;
             let (status, dst_token) = root.get_token().await.expect("FIDL call failed");
@@ -3163,29 +3387,30 @@ mod tests {
 
             let inner = open_dir_checked(
                 root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "bar",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
             .await;
             let inner2 = open_dir_checked(
                 &inner,
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 ".",
+                fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
             .await;
 
             let file = open_file_checked(
                 &inner,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::NOT_DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_FILE,
+                &Default::default(),
             )
             .await;
             assert_eq!(
@@ -3196,11 +3421,12 @@ mod tests {
 
             let file = open_file_checked(
                 &inner,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::NOT_DIRECTORY,
                 "foo2",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_FILE,
+                &Default::default(),
             )
             .await;
             assert_eq!(
@@ -3268,10 +3494,9 @@ mod tests {
         // it may resurrect the object in the tree, but the extents will all still be missing.
         let file = open_file_checked(
             fixture.root(),
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             "baz",
+            fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         let buff = file.read(5).await.expect("FIDL failed").expect("Read failed");
@@ -3295,30 +3520,27 @@ mod tests {
             async fn open_symlink(root: &fio::DirectoryProxy, path: &str) -> fio::SymlinkProxy {
                 let (proxy, server_end) = create_proxy::<fio::SymlinkMarker>();
                 root.open(
-                    fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
-                    fio::ModeType::empty(),
                     path,
-                    ServerEnd::new(server_end.into_channel()),
+                    fio::PERM_READABLE | fio::Flags::FLAG_SEND_REPRESENTATION,
+                    &Default::default(),
+                    server_end.into_channel(),
                 )
                 .expect("open failed");
 
-                let on_open = proxy
+                let representation = proxy
                     .take_event_stream()
                     .next()
                     .await
-                    .expect("missing OnOpen event")
-                    .expect("failed to read event")
-                    .into_on_open_();
+                    .expect("missing Symlink event")
+                    .expect("failed to read Symlink event")
+                    .into_on_representation()
+                    .expect("failed to decode OnRepresentation");
 
-                if let Some((0, Some(node_info))) = on_open {
-                    assert_matches!(
-                        *node_info,
-                        fio::NodeInfoDeprecated::Symlink(fio::SymlinkObject { target, .. })
-                            if target == b"target"
-                    );
-                } else {
-                    panic!("Unexpected on_open {on_open:?}");
-                }
+                assert_matches!(representation,
+                    fio::Representation::Symlink(fio::SymlinkInfo{
+                        target: Some(target), ..
+                    }) if target == b"target"
+                );
 
                 proxy
             }
@@ -3384,11 +3606,12 @@ mod tests {
 
             let dir = open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "dir",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
             .await;
 
@@ -3425,11 +3648,12 @@ mod tests {
 
         let file = open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
@@ -3521,11 +3745,12 @@ mod tests {
 
         let dir = open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
@@ -3590,11 +3815,12 @@ mod tests {
             let root = fixture.root();
             let dir = open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
             .await;
 
@@ -3920,11 +4146,12 @@ mod tests {
 
         let dir = open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
@@ -3969,7 +4196,7 @@ mod tests {
             ..Default::default()
         };
         let (node, server_end) = create_proxy::<fio::NodeMarker>();
-        root_dir.open3(path, flags, &options, server_end.into_channel()).expect("Reopening node");
+        root_dir.open(path, flags, &options, server_end.into_channel()).expect("Reopening node");
         let repr = node
             .take_event_stream()
             .next()
@@ -4013,7 +4240,7 @@ mod tests {
                 };
                 let (node, server_end) = create_proxy::<fio::NodeMarker>();
                 root_dir
-                    .open3(path, flags, &options, server_end.into_channel())
+                    .open(path, flags, &options, server_end.into_channel())
                     .expect("Creating node");
                 // Check event stream to allow the creation to complete.
                 assert!(node
@@ -4136,9 +4363,13 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let dir =
-            open_dir_checked(&root, fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY, "foo")
-                .await;
+        let dir = open_dir_checked(
+            &root,
+            "foo",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
+        )
+        .await;
 
         root.unlink("foo", &fio::UnlinkOptions::default())
             .await
@@ -4146,7 +4377,7 @@ mod tests {
             .expect("unlink failed");
 
         assert_eq!(
-            open_dir(&root, fio::OpenFlags::DIRECTORY, "foo")
+            open_dir(&root, "foo", fio::Flags::PROTOCOL_DIRECTORY, &Default::default())
                 .await
                 .expect_err("Open succeeded")
                 .root_cause()
@@ -4155,7 +4386,7 @@ mod tests {
             &zx::Status::NOT_FOUND,
         );
 
-        open_dir_checked(&dir, fio::OpenFlags::DIRECTORY, ".").await;
+        open_dir_checked(&dir, ".", fio::Flags::PROTOCOL_DIRECTORY, Default::default()).await;
 
         fixture.close().await;
     }
@@ -4167,8 +4398,13 @@ mod tests {
 
         const PATH: &str = "foo";
 
-        let dir =
-            open_dir_checked(&root, fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY, PATH).await;
+        let dir = open_dir_checked(
+            &root,
+            PATH,
+            fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
+        )
+        .await;
 
         root.unlink(PATH, &fio::UnlinkOptions::default())
             .await
@@ -4176,25 +4412,25 @@ mod tests {
             .expect("unlink failed");
 
         assert_eq!(
-            open3_dir(
+            open_dir(
                 &root,
+                PATH,
                 fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_SEND_REPRESENTATION,
-                &fio::Options::default(),
-                PATH
+                &fio::Options::default()
             )
             .await
-            .expect_err("Open3 succeeded unexpectedly")
+            .expect_err("Open succeeded unexpectedly")
             .root_cause()
             .downcast_ref::<zx::Status>()
             .expect("No status"),
             &zx::Status::NOT_FOUND,
         );
 
-        open3_dir_checked(
+        open_dir_checked(
             &dir,
-            fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_SEND_REPRESENTATION,
-            &fio::Options::default(),
             ".",
+            fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_SEND_REPRESENTATION,
+            fio::Options::default(),
         )
         .await;
 

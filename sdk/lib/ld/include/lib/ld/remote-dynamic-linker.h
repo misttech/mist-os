@@ -147,7 +147,8 @@ template <class Elf = elfldltl::Elf<>, RemoteLoadZygote Zygote = RemoteLoadZygot
           elfldltl::ElfMachine Machine = elfldltl::ElfMachine::kNative>
 class RemoteDynamicLinker {
  public:
-  using AbiStubPtr = typename RemoteAbiStub<Elf, Machine>::Ptr;
+  using AbiStub = RemoteAbiStub<Elf, Machine>;
+  using AbiStubPtr = AbiStub::Ptr;
   using Module = RemoteLoadModule<Elf, Zygote>;
   using DecodedModule = typename Module::Decoded;
   using DecodedModulePtr = typename DecodedModule::Ptr;

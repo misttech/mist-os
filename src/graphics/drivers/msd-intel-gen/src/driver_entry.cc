@@ -4,99 +4,69 @@
 
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
 #include <fuchsia/hardware/intelgpucore/cpp/banjo.h>
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
+#include <lib/driver/compat/cpp/compat.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/component/cpp/driver_export.h>
+#include <lib/magma/platform/platform_bus_mapper.h>
 #include <lib/magma/platform/zircon/zircon_platform_status.h>
 #include <lib/magma/util/dlog.h>
+#include <lib/magma/util/short_macros.h>
 #include <lib/magma_service/msd_defs.h>
-#include <lib/magma_service/sys_driver/dfv1/magma_device_impl.h>
+#include <lib/magma_service/sys_driver/magma_driver_base.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/resource.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <zircon/process.h>
 #include <zircon/types.h>
 
-#include <atomic>
-#include <set>
-#include <thread>
-
-#include <ddktl/device.h>
-#include <ddktl/fidl.h>
-#include <ddktl/protocol/empty-protocol.h>
-
+#if MAGMA_TEST_DRIVER
 #include "msd_intel_pci_device.h"
 
-#if MAGMA_TEST_DRIVER
 zx_status_t magma_indriver_test(magma::PlatformPciDevice* platform_device);
-
+using MagmaDriverBaseType = msd::MagmaTestDriverBase;
+#else
+using MagmaDriverBaseType = msd::MagmaProductionDriverBase;
 #endif
 
-class IntelDevice;
-
-using DdkDeviceType =
-    ddk::Device<IntelDevice, msd::MagmaDeviceImpl, ddk::Unbindable, ddk::Initializable>;
-class IntelDevice : public DdkDeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_GPU> {
+class IntelDevice : public MagmaDriverBaseType {
  public:
-  explicit IntelDevice(zx_device_t* parent_device) : DdkDeviceType(parent_device) {}
+  IntelDevice(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+      : MagmaDriverBaseType("magma_gpu", std::move(start_args), std::move(driver_dispatcher)) {}
 
-  int MagmaStart() FIT_REQUIRES(magma_mutex()) {
-    DLOG("magma_start");
+  zx::result<> MagmaStart() override;
 
-    set_magma_system_device(msd::MagmaSystemDevice::Create(
-        magma_driver(),
-        magma_driver()->CreateDevice(reinterpret_cast<msd::DeviceHandle*>(&gpu_core_protocol_))));
-    if (!magma_system_device())
-      return DRET_MSG(ZX_ERR_NO_RESOURCES, "Failed to create device");
-
-    DLOG("Created device %p", magma_system_device());
-    InitSystemDevice();
-
-    return ZX_OK;
+  void Stop() override {
+    MagmaDriverBaseType::Stop();
+    magma::PlatformBusMapper::SetInfoResource(zx::resource{});
   }
-
-  void DdkInit(ddk::InitTxn txn);
-  void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkRelease();
-
-  zx_status_t Init();
 
  private:
   intel_gpu_core_protocol_t gpu_core_protocol_;
 };
 
-void IntelDevice::DdkInit(ddk::InitTxn txn) {
-  set_zx_device(zxdev());
-  txn.Reply(InitChildDevices());
-}
+zx::result<> IntelDevice::MagmaStart() {
+  zx::result info_resource = GetInfoResource();
+  // Info resource may not be available on user builds.
+  if (info_resource.is_ok()) {
+    magma::PlatformBusMapper::SetInfoResource(std::move(*info_resource));
+  }
 
-void IntelDevice::DdkUnbind(ddk::UnbindTxn txn) {
-  // This will tear down client connections and cause them to return errors.
-  MagmaStop();
-  txn.Reply();
-}
-
-void IntelDevice::DdkRelease() {
-  MAGMA_LOG(INFO, "Starting device_release");
-
-  delete this;
-  MAGMA_LOG(INFO, "Finished device_release");
-}
-
-zx_status_t IntelDevice::Init() {
-  ddk::IntelGpuCoreProtocolClient gpu_core_client;
-  zx_status_t status =
-      ddk::IntelGpuCoreProtocolClient::CreateFromDevice(parent(), &gpu_core_client);
-  if (status != ZX_OK)
-    return DRET_MSG(status, "device_get_protocol failed: %d", status);
-
-  gpu_core_client.GetProto(&gpu_core_protocol_);
-
-  std::lock_guard<std::mutex> lock(magma_mutex());
+  std::lock_guard lock(magma_mutex());
   set_magma_driver(msd::Driver::Create());
+  if (!magma_driver()) {
+    DMESSAGE("Failed to create MagmaDriver");
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  DLOG("Created device %p", magma_system_device());
+
+  zx::result banjo = compat::ConnectBanjo<ddk::IntelGpuCoreProtocolClient>(incoming());
+  if (banjo.is_error()) {
+    MAGMA_LOG(ERROR, "Failed to connect to banjo %s", banjo.status_string());
+    return banjo.take_error();
+  }
+  banjo->GetProto(&gpu_core_protocol_);
+
 #if MAGMA_TEST_DRIVER
   DLOG("running magma indriver test");
   {
@@ -105,41 +75,15 @@ zx_status_t IntelDevice::Init() {
   }
 #endif
 
-  status = MagmaStart();
-  if (status != ZX_OK)
-    return status;
-
-  status = DdkAdd(ddk::DeviceAddArgs("magma_gpu").set_flags(DEVICE_ADD_NON_BINDABLE));
-  if (status != ZX_OK)
-    return DRET_MSG(status, "device_add failed");
-  return ZX_OK;
-}
-
-static zx_status_t sysdrv_bind(void* ctx, zx_device_t* parent) {
-  DLOG("sysdrv_bind start zx_device %p", parent);
-  magma::PlatformBusMapper::SetInfoResource(zx::unowned_resource(get_info_resource(parent)));
-
-  auto gpu = std::make_unique<IntelDevice>(parent);
-  if (!gpu)
-    return ZX_ERR_NO_MEMORY;
-
-  zx_status_t status = gpu->Init();
-  if (status != ZX_OK) {
-    return status;
+  set_magma_system_device(msd::MagmaSystemDevice::Create(
+      magma_driver(),
+      magma_driver()->CreateDevice(reinterpret_cast<msd::DeviceHandle*>(&gpu_core_protocol_))));
+  if (!magma_system_device()) {
+    MAGMA_LOG(ERROR, "Failed to create device");
+    return zx::error(ZX_ERR_NO_RESOURCES);
   }
-  // DdkAdd in Init took ownership of device.
-  (void)gpu.release();
 
-  DLOG("initialized magma system driver");
-
-  return ZX_OK;
+  return zx::ok();
 }
 
-static constexpr zx_driver_ops_t msd_driver_ops = []() {
-  zx_driver_ops_t ops = {};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = sysdrv_bind;
-  return ops;
-}();
-
-ZIRCON_DRIVER(gpu, msd_driver_ops, "magma", "0.1");
+FUCHSIA_DRIVER_EXPORT(IntelDevice);

@@ -32,12 +32,5 @@
             to: "#fs-collection",
             availability: "same_as_target",
         },
-        {
-            protocol: "fuchsia.scheduler.RoleManager",
-            from: "parent",
-            to: "#fs-collection",
-            availability: "same_as_target",
-            source_availability: "unknown",
-        },
     ],
 }

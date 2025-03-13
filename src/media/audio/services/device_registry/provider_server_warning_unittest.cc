@@ -21,7 +21,6 @@ namespace fha = fuchsia_hardware_audio;
 class ProviderServerCodecWarningTest : public AudioDeviceRegistryServerTestBase {};
 class ProviderServerCompositeWarningTest : public AudioDeviceRegistryServerTestBase {};
 class ProviderServerDaiWarningTest : public AudioDeviceRegistryServerTestBase {};
-class ProviderServerStreamConfigWarningTest : public AudioDeviceRegistryServerTestBase {};
 
 /////////////////////
 // Codec tests
@@ -164,15 +163,15 @@ TEST_F(ProviderServerCodecWarningTest, InvalidDriverClient) {
 TEST_F(ProviderServerCodecWarningTest, WrongDriverClient) {
   auto provider = CreateTestProviderServer();
   ASSERT_EQ(ProviderServer::count(), 1u);
-  auto fake_driver = CreateFakeStreamConfigOutput();
+  auto fake_driver = CreateFakeComposite();
   auto received_callback = false;
 
   provider->client()
       ->AddDevice({{
           .device_name = "Test device name",
           .device_type = fad::DeviceType::kCodec,
-          // StreamConfig driver_client doesn't match kCodec.
-          .driver_client = fad::DriverClient::WithStreamConfig(fake_driver->Enable()),
+          // driver_client doesn't match kCodec.
+          .driver_client = fad::DriverClient::WithComposite(fake_driver->Enable()),
       }})
       .Then([&received_callback](fidl::Result<fad::Provider::AddDevice>& result) {
         received_callback = true;
@@ -332,215 +331,14 @@ TEST_F(ProviderServerCompositeWarningTest, InvalidDriverClient) {
 TEST_F(ProviderServerCompositeWarningTest, WrongDriverClient) {
   auto provider = CreateTestProviderServer();
   ASSERT_EQ(ProviderServer::count(), 1u);
-  auto fake_driver = CreateFakeStreamConfigOutput();
-  auto received_callback = false;
-
-  provider->client()
-      ->AddDevice({{
-          .device_name = "Test device name",
-          .device_type = fad::DeviceType::kComposite,
-          // StreamConfig driver_client doesn't match kComposite.
-          .driver_client = fad::DriverClient::WithStreamConfig(fake_driver->Enable()),
-      }})
-      .Then([&received_callback](fidl::Result<fad::Provider::AddDevice>& result) {
-        received_callback = true;
-        ASSERT_TRUE(result.is_error());
-        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
-        EXPECT_EQ(result.error_value().domain_error(),
-                  fad::ProviderAddDeviceError::kWrongClientType)
-            << result.error_value();
-      });
-
-  RunLoopUntilIdle();
-  EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service()->devices().size(), 0u);
-  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
-  EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
-}
-
-/////////////////////
-// Dai tests
-//
-// Remove this test, once fad::Provider/AddDevice supports the Dai driver type.
-TEST_F(ProviderServerDaiWarningTest, Unsupported) {
-  auto provider = CreateTestProviderServer();
-  ASSERT_EQ(ProviderServer::count(), 1u);
-  auto fake_driver = CreateFakeStreamConfigInput();
-  auto received_callback = false;
-
-  provider->client()
-      ->AddDevice({{
-          .device_name = "Test device name",
-          .device_type = fad::DeviceType::kDai,
-          // Set a Dai device_type and driver_client -- which ADR doesn't yet support.
-          .driver_client = fad::DriverClient::WithDai(
-              // (as elsewhere, the zx::channel is from FakeStreamConfig, but that's irrelevant)
-              fidl::ClientEnd<fha::Dai>(fake_driver->Enable().TakeChannel())),
-      }})
-      .Then([&received_callback](fidl::Result<fad::Provider::AddDevice>& result) {
-        received_callback = true;
-        ASSERT_TRUE(result.is_error());
-        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
-        EXPECT_EQ(result.error_value().domain_error(),
-                  fad::ProviderAddDeviceError::kWrongClientType)
-            << result.error_value();
-      });
-
-  RunLoopUntilIdle();
-  EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service()->devices().size(), 0u);
-  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
-  EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
-}
-
-/////////////////////
-// StreamConfig tests
-//
-TEST_F(ProviderServerStreamConfigWarningTest, MissingDeviceName) {
-  auto provider = CreateTestProviderServer();
-  ASSERT_EQ(ProviderServer::count(), 1u);
-  auto fake_driver = CreateFakeStreamConfigOutput();
-  auto received_callback = false;
-
-  provider->client()
-      ->AddDevice({{
-          // missing .device_name
-          .device_type = fad::DeviceType::kOutput,
-          .driver_client = fad::DriverClient::WithStreamConfig(fake_driver->Enable()),
-      }})
-      .Then([&received_callback](fidl::Result<fad::Provider::AddDevice>& result) {
-        received_callback = true;
-        ASSERT_TRUE(result.is_error());
-        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
-        EXPECT_EQ(result.error_value().domain_error(), fad::ProviderAddDeviceError::kInvalidName)
-            << result.error_value();
-      });
-
-  RunLoopUntilIdle();
-  EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service()->devices().size(), 0u);
-  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
-}
-
-TEST_F(ProviderServerStreamConfigWarningTest, EmptyDeviceName) {
-  auto provider = CreateTestProviderServer();
-  ASSERT_EQ(ProviderServer::count(), 1u);
-  auto fake_driver = CreateFakeStreamConfigInput();
-  auto received_callback = false;
-
-  provider->client()
-      ->AddDevice({{
-          .device_name = "",  // empty .device_name
-          .device_type = fad::DeviceType::kInput,
-          .driver_client = fad::DriverClient::WithStreamConfig(fake_driver->Enable()),
-      }})
-      .Then([&received_callback](fidl::Result<fad::Provider::AddDevice>& result) {
-        received_callback = true;
-        ASSERT_TRUE(result.is_error());
-        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
-        EXPECT_EQ(result.error_value().domain_error(), fad::ProviderAddDeviceError::kInvalidName)
-            << result.error_value();
-      });
-
-  RunLoopUntilIdle();
-  EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service()->devices().size(), 0u);
-  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
-  EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
-}
-
-TEST_F(ProviderServerStreamConfigWarningTest, MissingDeviceType) {
-  auto provider = CreateTestProviderServer();
-  ASSERT_EQ(ProviderServer::count(), 1u);
-  auto fake_driver = CreateFakeStreamConfigOutput();
-  auto received_callback = false;
-
-  provider->client()
-      ->AddDevice({{
-          .device_name = "Test device name",
-          // missing .device_type
-          .driver_client = fad::DriverClient::WithStreamConfig(fake_driver->Enable()),
-      }})
-      .Then([&received_callback](fidl::Result<fad::Provider::AddDevice>& result) {
-        received_callback = true;
-        ASSERT_TRUE(result.is_error());
-        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
-        EXPECT_EQ(result.error_value().domain_error(), fad::ProviderAddDeviceError::kInvalidType)
-            << result.error_value();
-      });
-
-  RunLoopUntilIdle();
-  EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service()->devices().size(), 0u);
-  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
-  EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
-}
-
-TEST_F(ProviderServerStreamConfigWarningTest, MissingDriverClient) {
-  auto provider = CreateTestProviderServer();
-  ASSERT_EQ(ProviderServer::count(), 1u);
-  auto received_callback = false;
-
-  provider->client()
-      ->AddDevice({{
-          .device_name = "Test device name", .device_type = fad::DeviceType::kOutput,
-          // missing .driver_client
-      }})
-      .Then([&received_callback](fidl::Result<fad::Provider::AddDevice>& result) {
-        received_callback = true;
-        ASSERT_TRUE(result.is_error());
-        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
-        EXPECT_EQ(result.error_value().domain_error(),
-                  fad::ProviderAddDeviceError::kInvalidDriverClient)
-            << result.error_value();
-      });
-
-  RunLoopUntilIdle();
-  EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service()->devices().size(), 0u);
-  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
-  EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
-}
-
-TEST_F(ProviderServerStreamConfigWarningTest, InvalidDriverClient) {
-  auto provider = CreateTestProviderServer();
-  ASSERT_EQ(ProviderServer::count(), 1u);
-  auto received_callback = false;
-
-  provider->client()
-      ->AddDevice({{
-          .device_name = "Test device name",
-          .device_type = fad::DeviceType::kOutput,
-          .driver_client =
-              fad::DriverClient::WithStreamConfig(fidl::ClientEnd<fha::StreamConfig>()),
-      }})
-      .Then([&received_callback](fidl::Result<fad::Provider::AddDevice>& result) {
-        received_callback = true;
-        ASSERT_TRUE(result.is_error());
-        ASSERT_TRUE(result.error_value().is_framework_error()) << result.error_value();
-        EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_INVALID_ARGS)
-            << result.error_value();
-      });
-
-  RunLoopUntilIdle();
-  EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service()->devices().size(), 0u);
-  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
-  ASSERT_TRUE(provider_fidl_error_status().has_value());
-  EXPECT_EQ(*provider_fidl_error_status(), ZX_ERR_INVALID_ARGS);
-}
-
-TEST_F(ProviderServerStreamConfigWarningTest, WrongDriverClient) {
-  auto provider = CreateTestProviderServer();
-  ASSERT_EQ(ProviderServer::count(), 1u);
   auto fake_driver = CreateFakeCodecOutput();
   auto received_callback = false;
 
   provider->client()
       ->AddDevice({{
           .device_name = "Test device name",
-          .device_type = fad::DeviceType::kOutput,
-          // Codec driver_client doesn't match kOutput.
+          .device_type = fad::DeviceType::kComposite,
+          // driver_client doesn't match kComposite.
           .driver_client = fad::DriverClient::WithCodec(fake_driver->Enable()),
       }})
       .Then([&received_callback](fidl::Result<fad::Provider::AddDevice>& result) {

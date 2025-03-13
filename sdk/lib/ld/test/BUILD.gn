@@ -86,6 +86,7 @@ source_set("load-tests") {
   data_deps = [ ":load-tests.test-data" ]
   if (is_fuchsia) {
     sources += [
+      "ld-load-zircon-ldsvc-tests-base.cc",
       "ld-load-zircon-ldsvc-tests-base.h",
       "ld-load-zircon-process-tests-base.cc",
       "ld-load-zircon-process-tests-base.h",
@@ -97,6 +98,7 @@ source_set("load-tests") {
       "ld-startup-in-process-tests-zircon.h",
       "ld-startup-spawn-process-tests-zircon.cc",
       "ld-startup-spawn-process-tests-zircon.h",
+      "load-tests-ldsvc.cc",
       "load-tests-llvm-profdata.cc",
       "remote-tests.cc",
     ]
@@ -106,6 +108,7 @@ source_set("load-tests") {
       "..:remote",
       "../testing",
       "//sdk/lib/fdio",
+      "//sdk/lib/fit",
       "//zircon/system/ulib/zx",
     ]
 
@@ -165,7 +168,10 @@ load_tests = [
 ]
 
 if (is_fuchsia) {
-  load_tests_in_process += [ "llvm-profdata" ]
+  load_tests_in_process += [
+    "ldsvc-config",
+    "llvm-profdata",
+  ]
   load_tests += [
     "second-session",
     "second-session-module",
@@ -200,7 +206,15 @@ user_basic_redirect("load-tests.load-sets.basic") {
   public_deps = [
     "modules:indirect-deps.in-process.load-set",
     "modules:indirect-deps.load-set",
+    "modules:ldsvc-config.in-process.load-set",
+    "modules:ldsvc-config.load-set",
   ]
+  if (is_fuchsia) {
+    public_deps += [
+      "modules:second-session-module.load-set",
+      "modules:symbol-filter.load-set",
+    ]
+  }
 }
 
 if (is_fuchsia) {
@@ -214,14 +228,17 @@ if (is_fuchsia) {
       "data/64be",
       "data/64le",
     ]
-    outputs = [ "lib/test/{{source_file_part}}" ]
+    outputs = [ "lib/test/elf{{source_file_part}}" ]
 
     # LdRemoteTests.RemotePerfectSymbolFilterTestElf32 needs an Elf32 object,
     # but it doesn't really matter what machine or OS it's for.  The Elf32
     # target that conveniently works out of the box is armv7-linux-gnu.
-    # LdRemoteTests.ForeignMachine expects it to be ET_ARM in particular.
     elf32_tc = "//build/toolchain:linux_arm"
     data_deps = [ "modules:symbol-filter-elf32.fuchsia-test-data($elf32_tc)" ]
+
+    # LdRemoteTests.ForeignMachine expects that to be ET_ARM in particular,
+    # and also uses the matching stub dynamic linker.
+    data_deps += [ "..:ld-stub.user($elf32_tc)" ]
   }
 }
 

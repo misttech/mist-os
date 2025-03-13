@@ -7,22 +7,16 @@
 #include <lib/devicetree/matcher.h>
 #include <lib/fit/defer.h>
 
-#include <algorithm>
-
 #include "lib/boot-shim/devicetree.h"
 
 namespace boot_shim {
 
 devicetree::ScanState DevicetreeChosenNodeMatcherBase::HandleTtyNode(
     const devicetree::NodePath& path, const devicetree::PropertyDecoder& decoder) {
-  auto [compatible, status, interrupts, reg_property, reg_offset] =
-      decoder.FindProperties("compatible", "status", "interrupts", "reg", "reg-offset");
+  auto [compatible, interrupts, reg_property, reg_offset] =
+      decoder.FindProperties("compatible", "interrupts", "reg", "reg-offset");
   // Without this we cant figure out what driver to use.
   if (!compatible) {
-    return devicetree::ScanState::kActive;
-  }
-
-  if (status && status->AsString() != "okay") {
     return devicetree::ScanState::kActive;
   }
 
@@ -36,7 +30,18 @@ devicetree::ScanState DevicetreeChosenNodeMatcherBase::HandleTtyNode(
     return devicetree::ScanState::kActive;
   }
 
-  if (!uart_matcher_(decoder)) {
+  auto compatible_list = compatible->AsStringList();
+  if (!compatible_list) {
+    return devicetree::ScanState::kActive;
+  }
+
+  // Verify that the `tty.type` has the right prefix, vendor.
+  bool possible_tty =
+      tty_->vendor.empty() || std::ranges::any_of(*compatible_list, [this](std::string_view entry) {
+        return entry.starts_with(tty_->vendor);
+      });
+
+  if (!possible_tty || !uart_matcher_(decoder)) {
     return devicetree::ScanState::kActive;
   }
 

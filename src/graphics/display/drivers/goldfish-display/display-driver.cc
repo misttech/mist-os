@@ -42,8 +42,8 @@ zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> CreateAndInitializeSysme
   zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> connect_sysmem_protocol_result =
       incoming->Connect<fuchsia_sysmem2::Allocator>();
   if (connect_sysmem_protocol_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to connect to the sysmem Allocator FIDL protocol: %s",
-            connect_sysmem_protocol_result.status_string());
+    fdf::error("Failed to connect to the sysmem Allocator FIDL protocol: {}",
+               connect_sysmem_protocol_result);
     return connect_sysmem_protocol_result.take_error();
   }
   fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_allocator =
@@ -60,8 +60,7 @@ zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> CreateAndInitializeSysme
                   .id(pid)
                   .Build());
   if (!set_debug_status.ok()) {
-    FDF_LOG(ERROR, "Failed to set sysmem allocator debug info: %s",
-            set_debug_status.status_string());
+    fdf::error("Failed to set sysmem allocator debug info: {}", set_debug_status.status_string());
     return zx::error(set_debug_status.status());
   }
 
@@ -74,8 +73,8 @@ zx::result<std::unique_ptr<RenderControl>> CreateAndInitializeRenderControl(
       render_control_connect_pipe_service_result =
           incoming->Connect<fuchsia_hardware_goldfish_pipe::Service::Device>();
   if (render_control_connect_pipe_service_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to connect to the goldfish pipe FIDL service: %s",
-            render_control_connect_pipe_service_result.status_string());
+    fdf::error("Failed to connect to the goldfish pipe FIDL service: {}",
+               render_control_connect_pipe_service_result);
     return render_control_connect_pipe_service_result.take_error();
   }
   fidl::ClientEnd<fuchsia_hardware_goldfish_pipe::GoldfishPipe> render_control_pipe =
@@ -84,14 +83,14 @@ zx::result<std::unique_ptr<RenderControl>> CreateAndInitializeRenderControl(
   fbl::AllocChecker alloc_checker;
   auto render_control = fbl::make_unique_checked<RenderControl>(&alloc_checker);
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for RenderControl");
+    fdf::error("Failed to allocate memory for RenderControl");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   zx_status_t status =
       render_control->InitRcPipe(fidl::WireSyncClient(std::move(render_control_pipe)));
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to initialize RenderControl: %d", status);
+    fdf::error("Failed to initialize RenderControl: {}", status);
     return zx::error(status);
   }
 
@@ -111,8 +110,8 @@ zx::result<> DisplayDriver::Start() {
       connect_control_service_result =
           incoming()->Connect<fuchsia_hardware_goldfish::ControlService::Device>();
   if (connect_control_service_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to connect to the goldfish Control FIDL service: %s",
-            connect_control_service_result.status_string());
+    fdf::error("Failed to connect to the goldfish Control FIDL service: {}",
+               connect_control_service_result);
     return connect_control_service_result.take_error();
   }
   fidl::ClientEnd<fuchsia_hardware_goldfish::ControlDevice> control =
@@ -122,8 +121,8 @@ zx::result<> DisplayDriver::Start() {
       connect_pipe_service_result =
           incoming()->Connect<fuchsia_hardware_goldfish_pipe::Service::Device>();
   if (connect_pipe_service_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to connect to the goldfish pipe FIDL service: %s",
-            connect_pipe_service_result.status_string());
+    fdf::error("Failed to connect to the goldfish pipe FIDL service: {}",
+               connect_pipe_service_result);
     return connect_pipe_service_result.take_error();
   }
   fidl::ClientEnd<fuchsia_hardware_goldfish_pipe::GoldfishPipe> pipe =
@@ -132,8 +131,8 @@ zx::result<> DisplayDriver::Start() {
   zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> create_sysmem_allocator_result =
       CreateAndInitializeSysmemAllocator(incoming().get());
   if (create_sysmem_allocator_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to create and initialize sysmem allocator: %s",
-            create_sysmem_allocator_result.status_string());
+    fdf::error("Failed to create and initialize sysmem allocator: {}",
+               create_sysmem_allocator_result);
     return create_sysmem_allocator_result.take_error();
   }
   fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_allocator =
@@ -142,8 +141,7 @@ zx::result<> DisplayDriver::Start() {
   zx::result<std::unique_ptr<RenderControl>> create_render_control_result =
       CreateAndInitializeRenderControl(incoming().get());
   if (create_render_control_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to create and initialize RenderControl: %s",
-            create_render_control_result.status_string());
+    fdf::error("Failed to create and initialize RenderControl: {}", create_render_control_result);
     return create_render_control_result.take_error();
   }
   std::unique_ptr<RenderControl> render_control = std::move(create_render_control_result).value();
@@ -152,8 +150,7 @@ zx::result<> DisplayDriver::Start() {
       fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options{},
                                           "display-event-dispatcher", /*shutdown_handler=*/{});
   if (create_dispatcher_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to create display event dispatcher: %s",
-            create_dispatcher_result.status_string());
+    fdf::error("Failed to create display event dispatcher: {}", create_dispatcher_result);
     return create_dispatcher_result.take_error();
   }
   display_event_dispatcher_ = std::move(create_dispatcher_result).value();
@@ -163,13 +160,13 @@ zx::result<> DisplayDriver::Start() {
       &alloc_checker, std::move(control), std::move(pipe), std::move(sysmem_allocator),
       std::move(render_control), display_event_dispatcher_.async_dispatcher());
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for DisplayEngine");
+    fdf::error("Failed to allocate memory for DisplayEngine");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   zx::result<> init_result = display_engine_->Initialize();
   if (init_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to initialize DisplayEngine: %s", init_result.status_string());
+    fdf::error("Failed to initialize DisplayEngine: {}", init_result);
     return init_result.take_error();
   }
 
@@ -194,7 +191,7 @@ zx::result<> DisplayDriver::Start() {
   zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> controller_client_result =
       AddChild(name(), node_properties, node_offers);
   if (controller_client_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to add child node: %s", controller_client_result.status_string());
+    fdf::error("Failed to add child node: {}", controller_client_result);
     return controller_client_result.take_error();
   }
   controller_ = fidl::WireSyncClient(std::move(controller_client_result).value());

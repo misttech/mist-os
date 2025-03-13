@@ -17,9 +17,7 @@ trait UsizeExt {
 
 impl UsizeExt for usize {
     fn add(self, rhs: usize) -> Result<usize, std::io::Error> {
-        self.checked_add(rhs).ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::Other, "usize addition overflowed")
-        })
+        self.checked_add(rhs).ok_or_else(|| std::io::Error::other("usize addition overflowed"))
     }
 }
 
@@ -313,10 +311,7 @@ mod tests {
                 _offset: u64,
                 _buf: &mut [u8],
             ) -> Poll<std::io::Result<usize>> {
-                Poll::Ready(Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "BufferedAsyncReadAt forwarded the error",
-                )))
+                Poll::Ready(Err(std::io::Error::other("BufferedAsyncReadAt forwarded the error")))
             }
         }
 

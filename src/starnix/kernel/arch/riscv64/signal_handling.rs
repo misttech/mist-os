@@ -8,8 +8,10 @@ use crate::task::{CurrentTask, Task};
 use extended_pstate::riscv64::{RiscvVectorCsrs, NUM_V_REGISTERS, VLEN};
 use extended_pstate::ExtendedPstateState;
 use starnix_logging::log_debug;
+use starnix_types::arch::ArchWidth;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::math::round_up_to_increment;
+use starnix_uapi::math::round_down_to_increment;
+use starnix_uapi::signals::SigSet;
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
     self as uapi, errno, error, sigaction_t, sigaltstack, sigcontext, siginfo_t, ucontext,
@@ -17,10 +19,6 @@ use starnix_uapi::{
 
 /// The size of the red zone.
 pub const RED_ZONE_SIZE: u64 = 0;
-
-/// The size of the syscall instruction in bytes. `ECALL` is not compressed, i.e. it always takes 4
-/// bytes.
-pub const SYSCALL_INSTRUCTION_SIZE_BYTES: u64 = 4;
 
 /// The size, in bytes, of the signal stack frame.
 pub const SIG_STACK_SIZE: usize = std::mem::size_of::<SignalStackFrame>();
@@ -54,6 +52,7 @@ struct VState {
 impl SignalStackFrame {
     pub fn new(
         task: &Task,
+        arch_width: ArchWidth,
         registers: &mut RegisterState,
         extended_pstate: &ExtendedPstateState,
         signal_state: &SignalState,
@@ -106,7 +105,7 @@ impl SignalStackFrame {
         };
 
         let mut sigstack = SignalStackFrame {
-            siginfo_bytes: siginfo.as_siginfo_bytes(),
+            siginfo_bytes: siginfo.as_siginfo_bytes(arch_width)?,
             context,
             v_state,
             end_header: uapi::__riscv_ctx_hdr { magic: uapi::END_MAGIC, size: uapi::END_HDR_SIZE },
@@ -129,6 +128,10 @@ impl SignalStackFrame {
 
     pub fn from_bytes(bytes: [u8; SIG_STACK_SIZE]) -> SignalStackFrame {
         unsafe { std::mem::transmute(bytes) }
+    }
+
+    pub fn get_signal_mask(&self) -> SigSet {
+        self.context.uc_sigmask.into()
     }
 }
 
@@ -209,7 +212,7 @@ pub fn restore_registers(
 }
 
 pub fn align_stack_pointer(pointer: u64) -> u64 {
-    round_up_to_increment(pointer, 16).expect("Failed to round up stack pointer")
+    round_down_to_increment(pointer, 16).expect("Failed to round up stack pointer")
 }
 
 // Generates `__riscv_fp_state` struct from ExtendedPstateState.

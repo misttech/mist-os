@@ -43,9 +43,14 @@ pub async fn maybe_locally_resolve_target_spec(
     target_spec: Option<String>,
     env_context: &EnvironmentContext,
 ) -> Result<Option<String>> {
+    // This should be read as "is discovery enabled on the daemon".
     if crate::is_discovery_enabled(env_context).await {
         Ok(target_spec)
     } else {
+        tracing::warn!("crate::is_discovery_enabled is false - using local target resolution. is_usb_discovery_disabled is {}, is_mdns_discovery_disabled is {}",
+        ffx_config::is_usb_discovery_disabled(env_context).await,
+        ffx_config::is_mdns_discovery_disabled(env_context).await);
+
         locally_resolve_target_spec(target_spec, &QueryResolver::default(), env_context).await
     }
 }
@@ -200,8 +205,6 @@ pub async fn resolve_target_query(
     resolve_target_query_with_sources(
         query,
         ctx,
-        // TODO(colnnelson): Add DiscoverySources::FASTBOOT_FILE once feature
-        // is announced.
         DiscoverySources::MDNS
             | DiscoverySources::USB
             | DiscoverySources::MANUAL
@@ -246,7 +249,7 @@ async fn try_get_target_info(
 impl RetrievedTargetInfo {
     async fn get(context: &EnvironmentContext, addrs: &[addr::TargetAddr]) -> Result<Self> {
         let ssh_timeout: u64 =
-            ffx_config::get(CONFIG_TARGET_SSH_TIMEOUT).unwrap_or(DEFAULT_SSH_TIMEOUT_MS);
+            context.get(CONFIG_TARGET_SSH_TIMEOUT).unwrap_or(DEFAULT_SSH_TIMEOUT_MS);
         let ssh_timeout = Duration::from_millis(ssh_timeout);
         for addr in addrs {
             // Ensure there's a port
@@ -297,11 +300,20 @@ async fn get_handle_info(
     handle: TargetHandle,
     context: &EnvironmentContext,
 ) -> Result<ffx::TargetInfo> {
-    let (target_state, addresses) = match handle.state {
-        TargetState::Unknown => (ffx::TargetState::Unknown, None),
-        TargetState::Product(target_addrs) => (ffx::TargetState::Product, Some(target_addrs)),
-        TargetState::Fastboot(_) => (ffx::TargetState::Fastboot, None),
-        TargetState::Zedboot => (ffx::TargetState::Zedboot, None),
+    let mut serial_number = None;
+    let (target_state, fastboot_interface, addresses) = match handle.state {
+        TargetState::Unknown => (ffx::TargetState::Unknown, None, None),
+        TargetState::Product(target_addrs) => (ffx::TargetState::Product, None, Some(target_addrs)),
+        TargetState::Fastboot(state) => {
+            serial_number.replace(state.serial_number);
+            let (fastboot_connection, addresses) = match state.connection_state {
+                FastbootConnectionState::Usb => (ffx::FastbootInterface::Usb, None),
+                FastbootConnectionState::Tcp(addrs) => (ffx::FastbootInterface::Tcp, Some(addrs)),
+                FastbootConnectionState::Udp(addrs) => (ffx::FastbootInterface::Udp, Some(addrs)),
+            };
+            (ffx::TargetState::Fastboot, Some(fastboot_connection), addresses)
+        }
+        TargetState::Zedboot => (ffx::TargetState::Zedboot, None, None),
     };
     let RetrievedTargetInfo { rcs_state, product_config, board_config, ssh_address } =
         if let Some(ref target_addrs) = addresses {
@@ -318,16 +330,18 @@ async fn get_handle_info(
         target_state: Some(target_state),
         board_config,
         product_config,
+        serial_number,
+        fastboot_interface,
         ssh_address: ssh_address.map(|a| TargetAddr::from(a).into()),
         ..Default::default()
     })
 }
 
 pub async fn resolve_target_query_to_info(
-    query: TargetInfoQuery,
+    query: impl Into<TargetInfoQuery>,
     ctx: &EnvironmentContext,
 ) -> Result<Vec<ffx::TargetInfo>> {
-    let handles = resolve_target_query(query, ctx).await?;
+    let handles = resolve_target_query(query.into(), ctx).await?;
     let targets =
         join_all(handles.into_iter().map(|t| async { get_handle_info(t, ctx).await })).await;
     targets.into_iter().collect::<Result<Vec<ffx::TargetInfo>>>()
@@ -355,6 +369,7 @@ async fn resolve_target_query_with_sources(
     ctx: &EnvironmentContext,
     sources: DiscoverySources,
 ) -> Result<Vec<TargetHandle>> {
+    tracing::debug!("Resolving query: {:#?} with sources: {:#?}", query, sources);
     // Get nodename, in case we're trying to find an exact match
     QueryResolver::new(sources).resolve_target_query(query, ctx).await
 }
@@ -467,6 +482,9 @@ impl QueryResolver {
                                 None
                             } else {
                                 if query_matches_handle(&q_clone, h) {
+                                    tracing::debug!(
+                                        "Signaling early as discovered target matches query"
+                                    );
                                     found_ev.signal();
                                 }
                                 seen.borrow_mut().insert(h.clone());
@@ -505,9 +523,20 @@ fn query_matches_handle(query: &TargetInfoQuery, h: &TargetHandle) -> bool {
             }
         }
         TargetInfoQuery::Addr(ref sa) => {
+            fn addr_matches(addrs: &Vec<TargetAddr>, sa: &SocketAddr) -> bool {
+                addrs.iter().any(|a| a.ip() == sa.ip())
+            }
             if let TargetState::Product(addrs) = &h.state {
-                if addrs.iter().any(|a| a.ip() == sa.ip()) {
-                    return true;
+                return addr_matches(addrs, sa);
+            } else if let TargetState::Fastboot(fts) = &h.state {
+                match &fts.connection_state {
+                    FastbootConnectionState::Tcp(addrs) => {
+                        return addr_matches(addrs, sa);
+                    }
+                    FastbootConnectionState::Udp(addrs) => {
+                        return addr_matches(addrs, sa);
+                    }
+                    FastbootConnectionState::Usb => {}
                 }
             }
         }
@@ -559,8 +588,7 @@ impl QueryResolverT for QueryResolver {
         // This is something that is often mocked for testing. An improvement here would be to use the
         // environment context for locating manual targets.
         let finder = manual_targets::Config::default();
-        let ssh_timeout: u64 =
-            ffx_config::get(CONFIG_TARGET_SSH_TIMEOUT).unwrap_or(DEFAULT_SSH_TIMEOUT_MS);
+        let ssh_timeout: u64 = ctx.get(CONFIG_TARGET_SSH_TIMEOUT).unwrap_or(DEFAULT_SSH_TIMEOUT_MS);
         let ssh_timeout = Duration::from_millis(ssh_timeout);
         let mut res = None;
         for t in manual_targets::watcher::parse_manual_targets(&finder).await.into_iter() {

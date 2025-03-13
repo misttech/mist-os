@@ -8,6 +8,7 @@
 #include <lib/stdcompat/span.h>
 
 #include <array>
+#include <format>
 
 namespace registers {
 
@@ -185,5 +186,37 @@ constexpr cpp20::span<const PllId> PllIds() {
 constexpr int kMaximumConnectedDisplayCount = 4;
 
 }  // namespace intel_display
+
+template <>
+struct std::formatter<intel_display::DdiId> {
+  constexpr auto parse(auto& ctx) { return ctx.begin(); }
+  auto format(intel_display::DdiId ddi_id, std::format_context& ctx) const {
+    return std::format_to(ctx.out(), "{}", static_cast<int>(ddi_id));
+  }
+};
+
+template <>
+struct std::formatter<intel_display::TranscoderId> {
+  constexpr auto parse(auto& ctx) { return ctx.begin(); }
+  auto format(intel_display::TranscoderId transcoder_id, std::format_context& ctx) const {
+    return std::format_to(ctx.out(), "{}", transcoder_id);
+  }
+};
+
+template <>
+struct std::formatter<intel_display::PipeId> {
+  constexpr auto parse(auto& ctx) { return ctx.begin(); }
+  auto format(intel_display::PipeId pipe_id, std::format_context& ctx) const {
+    return std::format_to(ctx.out(), "{}", static_cast<int>(pipe_id));
+  }
+};
+
+template <>
+struct std::formatter<intel_display::PllId> {
+  constexpr auto parse(auto& ctx) { return ctx.begin(); }
+  auto format(intel_display::PllId pll_id, std::format_context& ctx) const {
+    return std::format_to(ctx.out(), "{}", static_cast<int>(pll_id));
+  }
+};
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_HARDWARE_COMMON_H_

@@ -24,7 +24,7 @@ async fn gets_dns_servers(name: &str) {
         setup_network_with::<Netstack2, _>(
             &sandbox,
             name,
-            None,
+            netemul::InterfaceConfig::default(),
             std::iter::once(&KnownServiceProvider::Dhcpv6Client),
         )
         .await
@@ -283,7 +283,7 @@ async fn test_setup<'a>(
         setup_network_with::<Netstack2, _>(
             sandbox,
             name,
-            None,
+            netemul::InterfaceConfig::default(),
             std::iter::once(&KnownServiceProvider::Dhcpv6Client),
         )
         .await

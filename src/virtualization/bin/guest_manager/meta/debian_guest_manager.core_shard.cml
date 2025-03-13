@@ -11,6 +11,8 @@
     ],
     offer: [
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-gpu",
@@ -18,13 +20,23 @@
             subdir: "gpu",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.gpu.magma.Service",
+            from: "parent",
+            to: "#debian-guest-manager",
+        },
+        {
             protocol: [
                 "fuchsia.kernel.HypervisorResource",
                 "fuchsia.kernel.VmexResource",
-                "fuchsia.logger.LogSink",
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.sysinfo.SysInfo",
             ],
+            from: "parent",
+            to: "#debian-guest-manager",
+        },
+        {
+            dictionary: "diagnostics",
             from: "parent",
             to: "#debian-guest-manager",
         },

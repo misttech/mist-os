@@ -19,6 +19,12 @@ def main():
         required=True,
     )
     parser.add_argument(
+        "--libprefix-rspfile",
+        type=argparse.FileType("r"),
+        help="File containing libprefix for ELF file when installed",
+        required=True,
+    )
+    parser.add_argument(
         "--depfile",
         type=argparse.FileType("w"),
         required=True,
@@ -40,6 +46,11 @@ def main():
 
     elf_files = [line[:-1] for line in args.rspfile.readlines()]
     args.rspfile.close()
+
+    [libprefix] = [
+        line[:-1] for line in args.libprefix_rspfile.readlines()
+    ] or [""]
+    args.libprefix_rspfile.close()
 
     args.depfile.write(f"{args.object.name}: {' '.join(elf_files)}\n")
     args.depfile.close()
@@ -136,6 +147,8 @@ def main():
             )
         )
         args.object.write(">,\n")
+        if libprefix:
+            args.object.write(f"    .libprefix = {c_str(libprefix)},\n")
         args.object.write("};\n")
         args.object.write(f"#endif  // DEFINED_{entry_name}\n")
 

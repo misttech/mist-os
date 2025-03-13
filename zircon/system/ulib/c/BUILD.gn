@@ -20,6 +20,7 @@ assert(libc == get_path_info(get_path_info(".", "abspath"), "dir"),
 # main target is a source_set() for libc proper and the "unittests" target is a
 # libc_test() suitable for inclusion in libc-unittests and Zircon's core-tests.
 libc_components = [
+  "compiler",
   "ctype",
   "errno",
   "fenv",
@@ -28,7 +29,7 @@ libc_components = [
   "math",
   "pthread",
   "scudo",
-  "startup",
+  "setjmp",
   "stdio",
   "stdlib",
 ]
@@ -58,7 +59,6 @@ group("legacy-components") {
   visibility = [ ":*" ]
   deps = [
     "sanitizers",
-    "setjmp",
     "stubs",
     "zircon",
     "//zircon/system/ulib/zx-panic-libc:as_source",
@@ -105,9 +105,8 @@ config("llvm-libc.config") {
   include_dirs = [
     ".",
 
-    # TODO(https://fxbug.dev/42105189): This directory provides headers to
-    # preempt and wrap certain llvm-libc headers to work around the
-    # incompatibility of the namespace-unclean Zircon headers.
+    # This directory provides headers to preempt and wrap certain llvm-libc
+    # headers to align with Fuchsia-specific code defined in this build.
     "include-preempt",
 
     llvm_libc,
@@ -126,17 +125,13 @@ config("testonly.config") {
   defines = [
     "LIBC_COPT_TEST_USE_ZXTEST",
 
-    # TODO(mcgrathr): This is being replaced by LIBC_COPT_TEST_USE_ZXTEST,
-    # but during the transition both are needed.
-    "LIBC_COPT_TEST_USE_FUCHSIA",
-
     # This namespace is different from the one used below for building libc
     # itself, mostly just for more visual clarity looking at backtraces from
     # unit test code and such.  Since the unit test code only ever gets linked
     # into a program using libc.so and not statically linked with the non-test
     # libc code, it's not actually ambiguous what it means in the context of
     # which binary contained the symbol.  But using a separate name is clearer.
-    "LIBC_NAMESPACE=llvm_libc_unittest",
+    "LIBC_NAMESPACE=fuchsia_libc_unittest",
   ]
 }
 
@@ -155,15 +150,7 @@ config("llvm-libc-public.config") {
     # depend on are shared targets that also go into libc proper.  In effect,
     # those separate integrations are using subsets of what an eventual libc.a
     # could provide to those use cases.
-    #
-    # TODO(mcgrathr): There's no important reason to make it either the same or
-    # different from the upstream default of `__llvm_libc`, but it seems like
-    # `__fuchsia_libc` would be preferable just to make it more clear that this
-    # build is quite different from the llvm-libc source tree's own cmake (or
-    # Bazel) build of the same llvm-libc code.  For now, there are a few places
-    # that hard-code `__llvm_libc` elsewhere in the source tree.  Perhaps
-    # rewire those to use some shared source of truth with this somehow.
-    "LIBC_NAMESPACE=__llvm_libc",
+    "LIBC_NAMESPACE=$libc_namespace",
   ]
 }
 
@@ -202,7 +189,7 @@ group("libc_test.deps") {
   testonly = true
   public_deps = [
     "include:headers",
-    "//zircon/system/ulib/zxtest",
+    "//zircon/system/ulib/zxtest:zxtest-streams",
   ]
 }
 
@@ -337,6 +324,12 @@ if (zircon_toolchain != false) {
       "//zircon/third_party/ulib/musl:legacy-impl",
     ]
 
+    # These things are only used in the new implementation.
+    assert_no_deps = [
+      "ld",
+      "startup",
+    ]
+
     if (!is_gcc && current_cpu == "riscv64" &&
         toolchain_variant.tags + [ "instrumented" ] - [ "instrumented" ] !=
         toolchain_variant.tags) {
@@ -355,6 +348,11 @@ if (zircon_toolchain != false) {
       ldflags = [ "-Wl,-z,rela" ]
     }
   }
+}
+
+source_set("asm-linkage") {
+  visibility = [ "./*" ]
+  public = [ "asm-linkage.h" ]
 }
 
 # This gets the actual shared_library() target defined above.

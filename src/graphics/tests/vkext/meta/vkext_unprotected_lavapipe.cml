@@ -40,19 +40,19 @@
     ],
     offer: [
         {
-            from: "self",
-            to: "#test",
             config: "fuchsia.gpu.test.SupportSysmemYuv",
-        },
-        {
             from: "self",
             to: "#test",
+        },
+        {
             config: "fuchsia.gpu.test.SupportSysmemRenderableLinear",
-        },
-        {
             from: "self",
             to: "#test",
+        },
+        {
             config: "fuchsia.gpu.test.SupportSysmemLinearNonRGBA",
+            from: "self",
+            to: "#test",
         },
         {
             protocol: "fuchsia.vulkan.loader.Loader",
@@ -79,40 +79,88 @@
             rights: [ "r*" ],
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-gpu",
             from: "#vulkan_loader_mock_directories",
             to: "#vulkan_loader",
             rights: [ "r*" ],
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.gpu.magma.Service",
+            from: "#vulkan_loader_mock_directories",
+            to: "#vulkan_loader",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-goldfish-pipe",
             from: "#vulkan_loader_mock_directories",
             to: "#vulkan_loader",
             rights: [ "r*" ],
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.goldfish.ControllerService",
+            from: "#vulkan_loader_mock_directories",
+            to: "#vulkan_loader",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-goldfish-control",
             from: "#vulkan_loader_mock_directories",
             to: "#vulkan_loader",
             rights: [ "r*" ],
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.goldfish.ControlService",
+            from: "#vulkan_loader_mock_directories",
+            to: "#vulkan_loader",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-goldfish-address-space",
             from: "#vulkan_loader_mock_directories",
             to: "#vulkan_loader",
             rights: [ "r*" ],
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.goldfish.AddressSpaceService",
+            from: "#vulkan_loader_mock_directories",
+            to: "#vulkan_loader",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-goldfish-sync",
             from: "#vulkan_loader_mock_directories",
             to: "#vulkan_loader",
             rights: [ "r*" ],
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.goldfish.SyncService",
+            from: "#vulkan_loader_mock_directories",
+            to: "#vulkan_loader",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-gpu-dependency-injection",
             from: "#vulkan_loader_mock_directories",
             to: "#vulkan_loader",
             rights: [ "r*" ],
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.gpu.magma.DependencyInjectionService",
+            from: "#vulkan_loader_mock_directories",
+            to: "#vulkan_loader",
         },
     ],
     expose: [

@@ -44,3 +44,8 @@ closed protocol Controller {
         session server_end:Device;
     });
 };
+
+// Added to allow service connection to replace devfs
+service Service {
+    controller client_end:Controller;
+};

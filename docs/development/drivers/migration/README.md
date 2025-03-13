@@ -69,7 +69,7 @@ missing in the playbook:
 - [**Connect and serve Banjo protocols in a DFv2 driver**][serve-banjo-protocols]:
   Serve Banjo protocols in a DFv2 driver and connect to
   its Banjo server from a DFv1 child driver.
-- [**Set up devfs in a DFv2 driver**][set-up-devfs]: Set up `devfs`
+- [**Set up services in a DFv2 driver**][set-up-services]: Set up services
   in a DFv2 driver so that the driver's services can be discovered
   by other Fuchsia components in the system.
 
@@ -86,6 +86,6 @@ missing in the playbook:
 [migrate-from-dfv1-to-dfv2]: /docs/development/drivers/migration/migrate-from-dfv1-to-dfv2/overview.md
 [set-up-compat-device-server]: /docs/development/drivers/migration/set-up-compat-device-server.md
 [serve-banjo-protocols]: /docs/development/drivers/migration/serve-banjo-protocols.md
-[set-up-devfs]: /docs/development/drivers/migration/set-up-devfs.md
+[set-up-services]: /docs/concepts/drivers/driver_communication.md
 [dfv2-concepts]: /docs/concepts/drivers/README.md
 [ddk]: /docs/development/drivers/concepts/driver_development/using-ddktl.md

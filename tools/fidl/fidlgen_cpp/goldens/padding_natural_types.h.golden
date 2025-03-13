@@ -1357,7 +1357,7 @@ inline Padding1ByteEnd::Padding1ByteEnd(uint16_t a, uint8_t b) noexcept
     : storage_({.a = std::move(a),
                 .b = std::move(b)}) {}
 inline Padding1ByteEnd::Padding1ByteEnd(const ::test_padding::Padding1ByteEnd& other) noexcept : ::test_padding::Padding1ByteEnd(other.CloneStorage_()) {}
-inline Padding1ByteEnd& ::test_padding::Padding1ByteEnd::operator=(const ::test_padding::Padding1ByteEnd & other) noexcept {
+inline Padding1ByteEnd& ::test_padding::Padding1ByteEnd::operator=(const ::test_padding::Padding1ByteEnd& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1380,7 +1380,7 @@ inline Padding2ByteEnd::Padding2ByteEnd(uint32_t a, uint16_t b) noexcept
     : storage_({.a = std::move(a),
                 .b = std::move(b)}) {}
 inline Padding2ByteEnd::Padding2ByteEnd(const ::test_padding::Padding2ByteEnd& other) noexcept : ::test_padding::Padding2ByteEnd(other.CloneStorage_()) {}
-inline Padding2ByteEnd& ::test_padding::Padding2ByteEnd::operator=(const ::test_padding::Padding2ByteEnd & other) noexcept {
+inline Padding2ByteEnd& ::test_padding::Padding2ByteEnd::operator=(const ::test_padding::Padding2ByteEnd& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1403,7 +1403,7 @@ inline Padding3ByteEnd::Padding3ByteEnd(uint32_t a, uint8_t b) noexcept
     : storage_({.a = std::move(a),
                 .b = std::move(b)}) {}
 inline Padding3ByteEnd::Padding3ByteEnd(const ::test_padding::Padding3ByteEnd& other) noexcept : ::test_padding::Padding3ByteEnd(other.CloneStorage_()) {}
-inline Padding3ByteEnd& ::test_padding::Padding3ByteEnd::operator=(const ::test_padding::Padding3ByteEnd & other) noexcept {
+inline Padding3ByteEnd& ::test_padding::Padding3ByteEnd::operator=(const ::test_padding::Padding3ByteEnd& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1426,7 +1426,7 @@ inline Padding4ByteEnd::Padding4ByteEnd(uint64_t a, uint32_t b) noexcept
     : storage_({.a = std::move(a),
                 .b = std::move(b)}) {}
 inline Padding4ByteEnd::Padding4ByteEnd(const ::test_padding::Padding4ByteEnd& other) noexcept : ::test_padding::Padding4ByteEnd(other.CloneStorage_()) {}
-inline Padding4ByteEnd& ::test_padding::Padding4ByteEnd::operator=(const ::test_padding::Padding4ByteEnd & other) noexcept {
+inline Padding4ByteEnd& ::test_padding::Padding4ByteEnd::operator=(const ::test_padding::Padding4ByteEnd& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1450,7 +1450,7 @@ inline Padding5ByteEnd::Padding5ByteEnd(uint64_t a, uint16_t b, uint8_t c) noexc
                 .b = std::move(b),
                 .c = std::move(c)}) {}
 inline Padding5ByteEnd::Padding5ByteEnd(const ::test_padding::Padding5ByteEnd& other) noexcept : ::test_padding::Padding5ByteEnd(other.CloneStorage_()) {}
-inline Padding5ByteEnd& ::test_padding::Padding5ByteEnd::operator=(const ::test_padding::Padding5ByteEnd & other) noexcept {
+inline Padding5ByteEnd& ::test_padding::Padding5ByteEnd::operator=(const ::test_padding::Padding5ByteEnd& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1478,7 +1478,7 @@ inline Padding6ByteEnd::Padding6ByteEnd(uint64_t a, uint16_t b) noexcept
     : storage_({.a = std::move(a),
                 .b = std::move(b)}) {}
 inline Padding6ByteEnd::Padding6ByteEnd(const ::test_padding::Padding6ByteEnd& other) noexcept : ::test_padding::Padding6ByteEnd(other.CloneStorage_()) {}
-inline Padding6ByteEnd& ::test_padding::Padding6ByteEnd::operator=(const ::test_padding::Padding6ByteEnd & other) noexcept {
+inline Padding6ByteEnd& ::test_padding::Padding6ByteEnd::operator=(const ::test_padding::Padding6ByteEnd& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1501,7 +1501,7 @@ inline Padding7ByteEnd::Padding7ByteEnd(uint64_t a, uint8_t b) noexcept
     : storage_({.a = std::move(a),
                 .b = std::move(b)}) {}
 inline Padding7ByteEnd::Padding7ByteEnd(const ::test_padding::Padding7ByteEnd& other) noexcept : ::test_padding::Padding7ByteEnd(other.CloneStorage_()) {}
-inline Padding7ByteEnd& ::test_padding::Padding7ByteEnd::operator=(const ::test_padding::Padding7ByteEnd & other) noexcept {
+inline Padding7ByteEnd& ::test_padding::Padding7ByteEnd::operator=(const ::test_padding::Padding7ByteEnd& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1524,7 +1524,7 @@ inline Padding1ByteMiddle::Padding1ByteMiddle(uint8_t a, uint16_t b) noexcept
     : storage_({.a = std::move(a),
                 .b = std::move(b)}) {}
 inline Padding1ByteMiddle::Padding1ByteMiddle(const ::test_padding::Padding1ByteMiddle& other) noexcept : ::test_padding::Padding1ByteMiddle(other.CloneStorage_()) {}
-inline Padding1ByteMiddle& ::test_padding::Padding1ByteMiddle::operator=(const ::test_padding::Padding1ByteMiddle & other) noexcept {
+inline Padding1ByteMiddle& ::test_padding::Padding1ByteMiddle::operator=(const ::test_padding::Padding1ByteMiddle& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1547,7 +1547,7 @@ inline Padding2ByteMiddle::Padding2ByteMiddle(uint16_t a, uint32_t b) noexcept
     : storage_({.a = std::move(a),
                 .b = std::move(b)}) {}
 inline Padding2ByteMiddle::Padding2ByteMiddle(const ::test_padding::Padding2ByteMiddle& other) noexcept : ::test_padding::Padding2ByteMiddle(other.CloneStorage_()) {}
-inline Padding2ByteMiddle& ::test_padding::Padding2ByteMiddle::operator=(const ::test_padding::Padding2ByteMiddle & other) noexcept {
+inline Padding2ByteMiddle& ::test_padding::Padding2ByteMiddle::operator=(const ::test_padding::Padding2ByteMiddle& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1570,7 +1570,7 @@ inline Padding3ByteMiddle::Padding3ByteMiddle(uint8_t a, uint32_t b) noexcept
     : storage_({.a = std::move(a),
                 .b = std::move(b)}) {}
 inline Padding3ByteMiddle::Padding3ByteMiddle(const ::test_padding::Padding3ByteMiddle& other) noexcept : ::test_padding::Padding3ByteMiddle(other.CloneStorage_()) {}
-inline Padding3ByteMiddle& ::test_padding::Padding3ByteMiddle::operator=(const ::test_padding::Padding3ByteMiddle & other) noexcept {
+inline Padding3ByteMiddle& ::test_padding::Padding3ByteMiddle::operator=(const ::test_padding::Padding3ByteMiddle& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1593,7 +1593,7 @@ inline Padding4ByteMiddle::Padding4ByteMiddle(uint32_t a, uint64_t b) noexcept
     : storage_({.a = std::move(a),
                 .b = std::move(b)}) {}
 inline Padding4ByteMiddle::Padding4ByteMiddle(const ::test_padding::Padding4ByteMiddle& other) noexcept : ::test_padding::Padding4ByteMiddle(other.CloneStorage_()) {}
-inline Padding4ByteMiddle& ::test_padding::Padding4ByteMiddle::operator=(const ::test_padding::Padding4ByteMiddle & other) noexcept {
+inline Padding4ByteMiddle& ::test_padding::Padding4ByteMiddle::operator=(const ::test_padding::Padding4ByteMiddle& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1617,7 +1617,7 @@ inline Padding5ByteMiddle::Padding5ByteMiddle(uint16_t a, uint8_t b, uint64_t c)
                 .b = std::move(b),
                 .c = std::move(c)}) {}
 inline Padding5ByteMiddle::Padding5ByteMiddle(const ::test_padding::Padding5ByteMiddle& other) noexcept : ::test_padding::Padding5ByteMiddle(other.CloneStorage_()) {}
-inline Padding5ByteMiddle& ::test_padding::Padding5ByteMiddle::operator=(const ::test_padding::Padding5ByteMiddle & other) noexcept {
+inline Padding5ByteMiddle& ::test_padding::Padding5ByteMiddle::operator=(const ::test_padding::Padding5ByteMiddle& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1645,7 +1645,7 @@ inline Padding6ByteMiddle::Padding6ByteMiddle(uint16_t a, uint64_t b) noexcept
     : storage_({.a = std::move(a),
                 .b = std::move(b)}) {}
 inline Padding6ByteMiddle::Padding6ByteMiddle(const ::test_padding::Padding6ByteMiddle& other) noexcept : ::test_padding::Padding6ByteMiddle(other.CloneStorage_()) {}
-inline Padding6ByteMiddle& ::test_padding::Padding6ByteMiddle::operator=(const ::test_padding::Padding6ByteMiddle & other) noexcept {
+inline Padding6ByteMiddle& ::test_padding::Padding6ByteMiddle::operator=(const ::test_padding::Padding6ByteMiddle& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1668,7 +1668,7 @@ inline Padding7ByteMiddle::Padding7ByteMiddle(uint8_t a, uint64_t b) noexcept
     : storage_({.a = std::move(a),
                 .b = std::move(b)}) {}
 inline Padding7ByteMiddle::Padding7ByteMiddle(const ::test_padding::Padding7ByteMiddle& other) noexcept : ::test_padding::Padding7ByteMiddle(other.CloneStorage_()) {}
-inline Padding7ByteMiddle& ::test_padding::Padding7ByteMiddle::operator=(const ::test_padding::Padding7ByteMiddle & other) noexcept {
+inline Padding7ByteMiddle& ::test_padding::Padding7ByteMiddle::operator=(const ::test_padding::Padding7ByteMiddle& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1693,7 +1693,7 @@ inline Padding4ByteAlignmentLength12::Padding4ByteAlignmentLength12(uint32_t a, 
                 .c = std::move(c),
                 .d = std::move(d)}) {}
 inline Padding4ByteAlignmentLength12::Padding4ByteAlignmentLength12(const ::test_padding::Padding4ByteAlignmentLength12& other) noexcept : ::test_padding::Padding4ByteAlignmentLength12(other.CloneStorage_()) {}
-inline Padding4ByteAlignmentLength12& ::test_padding::Padding4ByteAlignmentLength12::operator=(const ::test_padding::Padding4ByteAlignmentLength12 & other) noexcept {
+inline Padding4ByteAlignmentLength12& ::test_padding::Padding4ByteAlignmentLength12::operator=(const ::test_padding::Padding4ByteAlignmentLength12& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1727,7 +1727,7 @@ inline Padding2ByteAlignmentLength6::Padding2ByteAlignmentLength6(uint8_t a, uin
                 .b = std::move(b),
                 .c = std::move(c)}) {}
 inline Padding2ByteAlignmentLength6::Padding2ByteAlignmentLength6(const ::test_padding::Padding2ByteAlignmentLength6& other) noexcept : ::test_padding::Padding2ByteAlignmentLength6(other.CloneStorage_()) {}
-inline Padding2ByteAlignmentLength6& ::test_padding::Padding2ByteAlignmentLength6::operator=(const ::test_padding::Padding2ByteAlignmentLength6 & other) noexcept {
+inline Padding2ByteAlignmentLength6& ::test_padding::Padding2ByteAlignmentLength6::operator=(const ::test_padding::Padding2ByteAlignmentLength6& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1754,7 +1754,7 @@ inline Padding2ByteAlignmentLength6& Padding2ByteAlignmentLength6::c(uint8_t val
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_padding::Padding1ByteEnd> : public std::true_type{};
+struct IsFidlType<::test_padding::Padding1ByteEnd> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_padding::Padding1ByteEnd> {
@@ -1766,14 +1766,14 @@ struct TypeTraits<::test_padding::Padding1ByteEnd> {
 };
 
 template <>
-struct IsStruct<::test_padding::Padding1ByteEnd> : public std::true_type{};
+struct IsStruct<::test_padding::Padding1ByteEnd> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding1ByteEnd, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding1ByteEnd, 4> {};
 
 template <>
-struct IsFidlType<::test_padding::Padding2ByteEnd> : public std::true_type{};
+struct IsFidlType<::test_padding::Padding2ByteEnd> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_padding::Padding2ByteEnd> {
@@ -1785,14 +1785,14 @@ struct TypeTraits<::test_padding::Padding2ByteEnd> {
 };
 
 template <>
-struct IsStruct<::test_padding::Padding2ByteEnd> : public std::true_type{};
+struct IsStruct<::test_padding::Padding2ByteEnd> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding2ByteEnd, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding2ByteEnd, 8> {};
 
 template <>
-struct IsFidlType<::test_padding::Padding3ByteEnd> : public std::true_type{};
+struct IsFidlType<::test_padding::Padding3ByteEnd> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_padding::Padding3ByteEnd> {
@@ -1804,14 +1804,14 @@ struct TypeTraits<::test_padding::Padding3ByteEnd> {
 };
 
 template <>
-struct IsStruct<::test_padding::Padding3ByteEnd> : public std::true_type{};
+struct IsStruct<::test_padding::Padding3ByteEnd> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding3ByteEnd, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding3ByteEnd, 8> {};
 
 template <>
-struct IsFidlType<::test_padding::Padding4ByteEnd> : public std::true_type{};
+struct IsFidlType<::test_padding::Padding4ByteEnd> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_padding::Padding4ByteEnd> {
@@ -1823,14 +1823,14 @@ struct TypeTraits<::test_padding::Padding4ByteEnd> {
 };
 
 template <>
-struct IsStruct<::test_padding::Padding4ByteEnd> : public std::true_type{};
+struct IsStruct<::test_padding::Padding4ByteEnd> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding4ByteEnd, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding4ByteEnd, 16> {};
 
 template <>
-struct IsFidlType<::test_padding::Padding5ByteEnd> : public std::true_type{};
+struct IsFidlType<::test_padding::Padding5ByteEnd> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_padding::Padding5ByteEnd> {
@@ -1842,14 +1842,14 @@ struct TypeTraits<::test_padding::Padding5ByteEnd> {
 };
 
 template <>
-struct IsStruct<::test_padding::Padding5ByteEnd> : public std::true_type{};
+struct IsStruct<::test_padding::Padding5ByteEnd> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding5ByteEnd, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding5ByteEnd, 16> {};
 
 template <>
-struct IsFidlType<::test_padding::Padding6ByteEnd> : public std::true_type{};
+struct IsFidlType<::test_padding::Padding6ByteEnd> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_padding::Padding6ByteEnd> {
@@ -1861,14 +1861,14 @@ struct TypeTraits<::test_padding::Padding6ByteEnd> {
 };
 
 template <>
-struct IsStruct<::test_padding::Padding6ByteEnd> : public std::true_type{};
+struct IsStruct<::test_padding::Padding6ByteEnd> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding6ByteEnd, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding6ByteEnd, 16> {};
 
 template <>
-struct IsFidlType<::test_padding::Padding7ByteEnd> : public std::true_type{};
+struct IsFidlType<::test_padding::Padding7ByteEnd> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_padding::Padding7ByteEnd> {
@@ -1880,14 +1880,14 @@ struct TypeTraits<::test_padding::Padding7ByteEnd> {
 };
 
 template <>
-struct IsStruct<::test_padding::Padding7ByteEnd> : public std::true_type{};
+struct IsStruct<::test_padding::Padding7ByteEnd> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding7ByteEnd, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding7ByteEnd, 16> {};
 
 template <>
-struct IsFidlType<::test_padding::Padding1ByteMiddle> : public std::true_type{};
+struct IsFidlType<::test_padding::Padding1ByteMiddle> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_padding::Padding1ByteMiddle> {
@@ -1899,14 +1899,14 @@ struct TypeTraits<::test_padding::Padding1ByteMiddle> {
 };
 
 template <>
-struct IsStruct<::test_padding::Padding1ByteMiddle> : public std::true_type{};
+struct IsStruct<::test_padding::Padding1ByteMiddle> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding1ByteMiddle, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding1ByteMiddle, 4> {};
 
 template <>
-struct IsFidlType<::test_padding::Padding2ByteMiddle> : public std::true_type{};
+struct IsFidlType<::test_padding::Padding2ByteMiddle> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_padding::Padding2ByteMiddle> {
@@ -1918,14 +1918,14 @@ struct TypeTraits<::test_padding::Padding2ByteMiddle> {
 };
 
 template <>
-struct IsStruct<::test_padding::Padding2ByteMiddle> : public std::true_type{};
+struct IsStruct<::test_padding::Padding2ByteMiddle> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding2ByteMiddle, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding2ByteMiddle, 8> {};
 
 template <>
-struct IsFidlType<::test_padding::Padding3ByteMiddle> : public std::true_type{};
+struct IsFidlType<::test_padding::Padding3ByteMiddle> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_padding::Padding3ByteMiddle> {
@@ -1937,14 +1937,14 @@ struct TypeTraits<::test_padding::Padding3ByteMiddle> {
 };
 
 template <>
-struct IsStruct<::test_padding::Padding3ByteMiddle> : public std::true_type{};
+struct IsStruct<::test_padding::Padding3ByteMiddle> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding3ByteMiddle, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding3ByteMiddle, 8> {};
 
 template <>
-struct IsFidlType<::test_padding::Padding4ByteMiddle> : public std::true_type{};
+struct IsFidlType<::test_padding::Padding4ByteMiddle> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_padding::Padding4ByteMiddle> {
@@ -1956,14 +1956,14 @@ struct TypeTraits<::test_padding::Padding4ByteMiddle> {
 };
 
 template <>
-struct IsStruct<::test_padding::Padding4ByteMiddle> : public std::true_type{};
+struct IsStruct<::test_padding::Padding4ByteMiddle> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding4ByteMiddle, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding4ByteMiddle, 16> {};
 
 template <>
-struct IsFidlType<::test_padding::Padding5ByteMiddle> : public std::true_type{};
+struct IsFidlType<::test_padding::Padding5ByteMiddle> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_padding::Padding5ByteMiddle> {
@@ -1975,14 +1975,14 @@ struct TypeTraits<::test_padding::Padding5ByteMiddle> {
 };
 
 template <>
-struct IsStruct<::test_padding::Padding5ByteMiddle> : public std::true_type{};
+struct IsStruct<::test_padding::Padding5ByteMiddle> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding5ByteMiddle, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding5ByteMiddle, 16> {};
 
 template <>
-struct IsFidlType<::test_padding::Padding6ByteMiddle> : public std::true_type{};
+struct IsFidlType<::test_padding::Padding6ByteMiddle> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_padding::Padding6ByteMiddle> {
@@ -1994,14 +1994,14 @@ struct TypeTraits<::test_padding::Padding6ByteMiddle> {
 };
 
 template <>
-struct IsStruct<::test_padding::Padding6ByteMiddle> : public std::true_type{};
+struct IsStruct<::test_padding::Padding6ByteMiddle> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding6ByteMiddle, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding6ByteMiddle, 16> {};
 
 template <>
-struct IsFidlType<::test_padding::Padding7ByteMiddle> : public std::true_type{};
+struct IsFidlType<::test_padding::Padding7ByteMiddle> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_padding::Padding7ByteMiddle> {
@@ -2013,14 +2013,14 @@ struct TypeTraits<::test_padding::Padding7ByteMiddle> {
 };
 
 template <>
-struct IsStruct<::test_padding::Padding7ByteMiddle> : public std::true_type{};
+struct IsStruct<::test_padding::Padding7ByteMiddle> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding7ByteMiddle, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding7ByteMiddle, 16> {};
 
 template <>
-struct IsFidlType<::test_padding::Padding4ByteAlignmentLength12> : public std::true_type{};
+struct IsFidlType<::test_padding::Padding4ByteAlignmentLength12> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_padding::Padding4ByteAlignmentLength12> {
@@ -2032,14 +2032,14 @@ struct TypeTraits<::test_padding::Padding4ByteAlignmentLength12> {
 };
 
 template <>
-struct IsStruct<::test_padding::Padding4ByteAlignmentLength12> : public std::true_type{};
+struct IsStruct<::test_padding::Padding4ByteAlignmentLength12> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding4ByteAlignmentLength12, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding4ByteAlignmentLength12, 12> {};
 
 template <>
-struct IsFidlType<::test_padding::Padding2ByteAlignmentLength6> : public std::true_type{};
+struct IsFidlType<::test_padding::Padding2ByteAlignmentLength6> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_padding::Padding2ByteAlignmentLength6> {
@@ -2051,7 +2051,7 @@ struct TypeTraits<::test_padding::Padding2ByteAlignmentLength6> {
 };
 
 template <>
-struct IsStruct<::test_padding::Padding2ByteAlignmentLength6> : public std::true_type{};
+struct IsStruct<::test_padding::Padding2ByteAlignmentLength6> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding2ByteAlignmentLength6, ::fidl::internal::NaturalCodingConstraintEmpty> final

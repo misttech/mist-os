@@ -5,7 +5,6 @@
 use crate::wire::*;
 
 use num_traits::cast::cast;
-use once_cell::sync::Lazy;
 use std::collections::HashMap;
 
 /// Stringify a request code VIRTIO_SND_R_*.
@@ -26,19 +25,20 @@ pub fn request_code_to_string(code: u32) -> &'static str {
 
 // Store this mapping as a data structure so we can iterate over the keys.
 // See usage below.
-static WIRE_FORMAT_TO_FIDL: Lazy<HashMap<u8, fidl_fuchsia_media::AudioSampleFormat>> =
-    Lazy::new(|| {
-        HashMap::from([
-            (VIRTIO_SND_PCM_FMT_U8, fidl_fuchsia_media::AudioSampleFormat::Unsigned8),
-            (VIRTIO_SND_PCM_FMT_S16, fidl_fuchsia_media::AudioSampleFormat::Signed16),
-            (VIRTIO_SND_PCM_FMT_S24, fidl_fuchsia_media::AudioSampleFormat::Signed24In32),
-            (VIRTIO_SND_PCM_FMT_FLOAT, fidl_fuchsia_media::AudioSampleFormat::Float),
-        ])
-    });
+static WIRE_FORMAT_TO_FIDL: std::sync::LazyLock<
+    HashMap<u8, fidl_fuchsia_media::AudioSampleFormat>,
+> = std::sync::LazyLock::new(|| {
+    HashMap::from([
+        (VIRTIO_SND_PCM_FMT_U8, fidl_fuchsia_media::AudioSampleFormat::Unsigned8),
+        (VIRTIO_SND_PCM_FMT_S16, fidl_fuchsia_media::AudioSampleFormat::Signed16),
+        (VIRTIO_SND_PCM_FMT_S24, fidl_fuchsia_media::AudioSampleFormat::Signed24In32),
+        (VIRTIO_SND_PCM_FMT_FLOAT, fidl_fuchsia_media::AudioSampleFormat::Float),
+    ])
+});
 
 /// A bitmask of all supported formats: bit (1<<x) is set if we support format x.
-pub static WIRE_FORMATS_SUPPORTED_BITMASK: Lazy<u64> =
-    Lazy::new(|| WIRE_FORMAT_TO_FIDL.keys().fold(0u64, |acc, x| acc | (1u64 << x)));
+pub static WIRE_FORMATS_SUPPORTED_BITMASK: std::sync::LazyLock<u64> =
+    std::sync::LazyLock::new(|| WIRE_FORMAT_TO_FIDL.keys().fold(0u64, |acc, x| acc | (1u64 << x)));
 
 /// Translates the given wire format to a FIDL format.
 /// Returns None if the format is not supported.
@@ -48,7 +48,7 @@ pub fn wire_format_to_fidl(fmt: u8) -> Option<fidl_fuchsia_media::AudioSampleFor
 
 // Store this mapping as a data structure so we can iterate over the keys.
 // See usage below.
-static WIRE_RATE_TO_FIDL: Lazy<HashMap<u8, u32>> = Lazy::new(|| {
+static WIRE_RATE_TO_FIDL: std::sync::LazyLock<HashMap<u8, u32>> = std::sync::LazyLock::new(|| {
     HashMap::from([
         (VIRTIO_SND_PCM_RATE_8000, 8000),
         (VIRTIO_SND_PCM_RATE_11025, 11025),
@@ -66,8 +66,8 @@ static WIRE_RATE_TO_FIDL: Lazy<HashMap<u8, u32>> = Lazy::new(|| {
 });
 
 /// A bitmask of all supported rates: bit (1<<x) is set if we support format x.
-pub static WIRE_RATES_SUPPORTED_BITMASK: Lazy<u64> =
-    Lazy::new(|| WIRE_RATE_TO_FIDL.keys().fold(0u64, |acc, x| acc | (1u64 << x)));
+pub static WIRE_RATES_SUPPORTED_BITMASK: std::sync::LazyLock<u64> =
+    std::sync::LazyLock::new(|| WIRE_RATE_TO_FIDL.keys().fold(0u64, |acc, x| acc | (1u64 << x)));
 
 /// Translates the given wire rate to an integer frames-per-second as used in FIDL.
 /// Returns None if the rate is not supported.

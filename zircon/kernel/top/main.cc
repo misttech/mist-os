@@ -65,6 +65,9 @@ bool ConstructorsCalled() { return lk_global_constructors_called(); }
 
 // called from arch code
 void lk_main(paddr_t handoff_paddr) {
+  HandoffFromPhys(handoff_paddr);
+  ZX_DEBUG_ASSERT(gPhysHandoff != nullptr);
+
   // Initialize debug tracing (if enabled) as early as possible. This allows
   // debug tracing to be used before the debug log comes up, and before global
   // constructors are executed.  Note that if debug tracing is configured to be
@@ -94,8 +97,6 @@ void lk_main(paddr_t handoff_paddr) {
 
   // At this point the physmap (set up in start.S) is available and all static
   // constructors (if needed) have been run.
-  HandoffFromPhys(handoff_paddr);
-  ZX_DEBUG_ASSERT(gPhysHandoff != nullptr);
 
   lk_primary_cpu_init_level(LK_INIT_LEVEL_EARLIEST, LK_INIT_LEVEL_ARCH_EARLY - 1);
 
@@ -198,11 +199,15 @@ static int bootstrap2(void*) {
   arch_late_init_percpu();
   lk_primary_cpu_init_level(LK_INIT_LEVEL_ARCH_LATE, LK_INIT_LEVEL_USER - 1);
 
+  // End hand-off before shell initialization, as we want kernel state to be
+  // 'finalized' before we run any kernel scripts (e.g., for unit-testing).
+  HandoffEnd handoff_end = EndHandoff();
+
   // Give the kernel shell an opportunity to run. If it exits this function, continue booting.
   kernel_shell_init();
 
   dprintf(SPEW, "starting user space\n");
-  userboot_init();
+  userboot_init(ktl::move(handoff_end));
 
   dprintf(SPEW, "moving to last init level\n");
   lk_primary_cpu_init_level(LK_INIT_LEVEL_USER, LK_INIT_LEVEL_LAST);

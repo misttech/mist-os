@@ -392,6 +392,9 @@ closed protocol WlanFullmacImpl {
     strict QuerySpectrumManagementSupport() -> (struct {
         resp fuchsia.wlan.common.SpectrumManagementSupport;
     }) error zx.Status;
+    strict QueryTelemetrySupport() -> (struct {
+        resp fuchsia.wlan.stats.TelemetrySupport;
+    }) error zx.Status;
 
     // MLME operations
     strict StartScan(table {

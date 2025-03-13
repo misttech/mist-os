@@ -206,35 +206,27 @@ uint perms_to_arch_mmu_flags(uint32_t perms) {
 
 }  // namespace
 
-zx_status_t DeviceContext::SecondLevelMap(const fbl::RefPtr<VmObject>& vmo, uint64_t offset,
-                                          size_t size, uint32_t perms, bool map_contiguous,
-                                          paddr_t* virt_paddr, size_t* mapped_len) {
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
+zx::result<uint64_t> DeviceContext::SecondLevelMap(const fbl::RefPtr<VmObject>& vmo,
+                                                   uint64_t vmo_offset, size_t size,
+                                                   uint32_t perms) {
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(vmo_offset));
 
   uint flags = perms_to_arch_mmu_flags(perms);
 
-  if (vmo->LookupContiguous(offset, size, nullptr) != ZX_OK) {
-    return SecondLevelMapDiscontiguous(vmo, offset, size, flags, map_contiguous, virt_paddr,
-                                       mapped_len);
+  if (vmo->LookupContiguous(vmo_offset, size, nullptr) != ZX_OK) {
+    return SecondLevelMapDiscontiguous(vmo, vmo_offset, size, flags);
   }
-  return SecondLevelMapContiguous(vmo, offset, size, flags, virt_paddr, mapped_len);
+  return SecondLevelMapContiguous(vmo, vmo_offset, size, flags);
 }
 
-zx_status_t DeviceContext::SecondLevelMapDiscontiguous(const fbl::RefPtr<VmObject>& vmo,
-                                                       uint64_t offset, size_t size, uint flags,
-                                                       bool map_contiguous, paddr_t* virt_paddr,
-                                                       size_t* mapped_len) {
-  // If we don't need to map everything, don't try to map more than
-  // the min contiguity at a time.
+zx::result<uint64_t> DeviceContext::SecondLevelMapDiscontiguous(const fbl::RefPtr<VmObject>& vmo,
+                                                                uint64_t offset, size_t size,
+                                                                uint flags) {
   const uint64_t min_contig = minimum_contiguity();
-  if (!map_contiguous && size > min_contig) {
-    size = min_contig;
-  }
-
   RegionAllocator::Region::UPtr region;
   zx_status_t status = region_alloc_.GetRegion(size, min_contig, region);
   if (status != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
 
   // Reserve a spot in the allocated regions list, so the extension can't fail
@@ -242,7 +234,7 @@ zx_status_t DeviceContext::SecondLevelMapDiscontiguous(const fbl::RefPtr<VmObjec
   fbl::AllocChecker ac;
   allocated_regions_.reserve(allocated_regions_.size() + 1, &ac);
   if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   paddr_t base = region->base;
@@ -269,10 +261,10 @@ zx_status_t DeviceContext::SecondLevelMapDiscontiguous(const fbl::RefPtr<VmObjec
     };
     status = vmo->Lookup(offset, chunk_size, lookup_fn);
     if (status != ZX_OK) {
-      return status;
+      return zx::error(status);
     }
     if (pages_found != chunk_size / PAGE_SIZE) {
-      return ZX_ERR_NO_MEMORY;
+      return zx::error(ZX_ERR_NO_MEMORY);
     }
 
     size_t map_len = chunk_size / PAGE_SIZE;
@@ -280,7 +272,7 @@ zx_status_t DeviceContext::SecondLevelMapDiscontiguous(const fbl::RefPtr<VmObjec
     status = second_level_pt_.MapPages(base, paddrs, map_len, flags,
                                        SecondLevelPageTable::ExistingEntryAction::Error, &mapped);
     if (status != ZX_OK) {
-      return status;
+      return zx::error(status);
     }
     ASSERT(mapped == map_len);
 
@@ -291,25 +283,22 @@ zx_status_t DeviceContext::SecondLevelMapDiscontiguous(const fbl::RefPtr<VmObjec
 
   cleanup_partial.cancel();
 
-  *virt_paddr = region->base;
-  *mapped_len = size;
-
   allocated_regions_.push_back(ktl::move(region), &ac);
   // Check shouldn't be able to fail, since we reserved the capacity already
   ASSERT(ac.check());
 
   LTRACEF("Map(%02x:%02x.%1x): -> [%p, %p) %#x\n", bdf_.bus(), bdf_.dev(), bdf_.func(),
-          (void*)*virt_paddr, (void*)(*virt_paddr + *mapped_len), flags);
-  return ZX_OK;
+          (void*)region->base, (void*)(region->base + size), flags);
+  return zx::ok(region->base);
 }
 
-zx_status_t DeviceContext::SecondLevelMapContiguous(const fbl::RefPtr<VmObject>& vmo,
-                                                    uint64_t offset, size_t size, uint flags,
-                                                    paddr_t* virt_paddr, size_t* mapped_len) {
+zx::result<uint64_t> DeviceContext::SecondLevelMapContiguous(const fbl::RefPtr<VmObject>& vmo,
+                                                             uint64_t vmo_offset, size_t size,
+                                                             uint flags) {
   paddr_t paddr = UINT64_MAX;
-  zx_status_t status = vmo->LookupContiguous(offset, size, &paddr);
+  zx_status_t status = vmo->LookupContiguous(vmo_offset, size, &paddr);
   if (status != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
   DEBUG_ASSERT(paddr != UINT64_MAX);
 
@@ -317,7 +306,7 @@ zx_status_t DeviceContext::SecondLevelMapContiguous(const fbl::RefPtr<VmObject>&
   uint64_t min_contig = minimum_contiguity();
   status = region_alloc_.GetRegion(size, min_contig, region);
   if (status != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
 
   // Reserve a spot in the allocated regions list, so the extension can't fail
@@ -325,19 +314,16 @@ zx_status_t DeviceContext::SecondLevelMapContiguous(const fbl::RefPtr<VmObject>&
   fbl::AllocChecker ac;
   allocated_regions_.reserve(allocated_regions_.size() + 1, &ac);
   if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   size_t map_len = size / PAGE_SIZE;
   size_t mapped;
   status = second_level_pt_.MapPagesContiguous(region->base, paddr, map_len, flags, &mapped);
   if (status != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
   ASSERT(mapped == map_len);
-
-  *virt_paddr = region->base;
-  *mapped_len = map_len * PAGE_SIZE;
 
   allocated_regions_.push_back(ktl::move(region), &ac);
   // Check shouldn't be able to fail, since we reserved the capacity already
@@ -345,7 +331,7 @@ zx_status_t DeviceContext::SecondLevelMapContiguous(const fbl::RefPtr<VmObject>&
 
   LTRACEF("Map(%02x:%02x.%1x): [%p, %p) -> %p %#x\n", bdf_.bus(), bdf_.dev(), bdf_.func(),
           (void*)paddr, (void*)(paddr + size), (void*)paddr, flags);
-  return ZX_OK;
+  return zx::ok(region->base);
 }
 
 zx_status_t DeviceContext::SecondLevelMapIdentity(paddr_t base, size_t size, uint32_t perms) {

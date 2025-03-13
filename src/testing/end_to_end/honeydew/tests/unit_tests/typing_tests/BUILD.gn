@@ -14,24 +14,9 @@ if (is_host) {
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
   }
-
-  python_host_test("screenshot_image_test") {
-    main_source = "screenshot_image_test.py"
-    libraries = [
-      "//src/testing/end_to_end/honeydew",
-      "//src/testing/end_to_end/honeydew/tests/unit_tests/typing_tests/resources",
-      "//third_party/parameterized",
-      "//third_party/pypng",
-    ]
-    main_callable = "unittest.main"
-    extra_args = [ "-v" ]
-  }
 }
 
 group("tests") {
   testonly = true
-  public_deps = [
-    ":custom_types_test($host_toolchain)",
-    ":screenshot_image_test($host_toolchain)",
-  ]
+  public_deps = [ ":custom_types_test($host_toolchain)" ]
 }

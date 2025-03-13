@@ -21,9 +21,9 @@ impl InspectType for UintArrayProperty {}
 crate::impl_inspect_type_internal!(UintArrayProperty);
 
 impl ArrayProperty for UintArrayProperty {
-    type Type = u64;
+    type Type<'a> = u64;
 
-    fn set(&self, index: usize, value: impl Into<Self::Type>) {
+    fn set<'a>(&self, index: usize, value: impl Into<Self::Type<'a>>) {
         if let Some(ref inner_ref) = self.inner.inner_ref() {
             match inner_ref.state.try_lock() {
                 Ok(mut state) => {
@@ -48,7 +48,10 @@ impl ArrayProperty for UintArrayProperty {
 }
 
 impl ArithmeticArrayProperty for UintArrayProperty {
-    fn add(&self, index: usize, value: u64) {
+    fn add<'a>(&self, index: usize, value: Self::Type<'a>)
+    where
+        Self: 'a,
+    {
         if let Some(ref inner_ref) = self.inner.inner_ref() {
             match inner_ref.state.try_lock() {
                 Ok(mut state) => {
@@ -59,7 +62,10 @@ impl ArithmeticArrayProperty for UintArrayProperty {
         }
     }
 
-    fn subtract(&self, index: usize, value: u64) {
+    fn subtract<'a>(&self, index: usize, value: Self::Type<'a>)
+    where
+        Self: 'a,
+    {
         if let Some(ref inner_ref) = self.inner.inner_ref() {
             match inner_ref.state.try_lock() {
                 Ok(mut state) => {

@@ -12,6 +12,7 @@ driver_bind_rules("bind-fail-test-bind") {
 }
 
 fuchsia_cc_driver("fuchsia_driver") {
+  legacy = true
   output_name = "bind-fail-test-driver"
 
   configs += [

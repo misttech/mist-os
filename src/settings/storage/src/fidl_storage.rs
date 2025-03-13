@@ -582,7 +582,7 @@ mod tests {
         async fn run(self: Arc<Self>, mut requests: fio::DirectoryRequestStream) {
             while let Ok(Some(request)) = requests.try_next().await {
                 match request {
-                    fio::DirectoryRequest::Open {
+                    fio::DirectoryRequest::DeprecatedOpen {
                         flags,
                         mode,
                         path,
@@ -602,12 +602,12 @@ mod tests {
                             }
                             None => {
                                 self.real_dir
-                                    .open(flags, mode, &path, object)
+                                    .deprecated_open(flags, mode, &path, object)
                                     .expect("failed to forward Open request");
                             }
                         }
                     }
-                    fio::DirectoryRequest::Open3 {
+                    fio::DirectoryRequest::Open {
                         path,
                         flags,
                         options,
@@ -621,7 +621,7 @@ mod tests {
                             }
                             None => {
                                 self.real_dir
-                                    .open3(&path, flags, &options, object)
+                                    .open(&path, flags, &options, object)
                                     .expect("failed to forward Open3 request");
                             }
                         }

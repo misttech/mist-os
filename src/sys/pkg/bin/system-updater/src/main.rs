@@ -29,7 +29,6 @@ async fn main() {
         inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default());
 
     let history_node = inspector.root().create_child("history");
-
     let history = Arc::new(Mutex::new(UpdateHistory::load(history_node).await));
 
     let mut fs = ServiceFs::new_local();
@@ -40,7 +39,7 @@ async fn main() {
 
     // The install manager task will run the update attempt task,
     // listen for FIDL events, and notify monitors of update attempt progress.
-    let updater = RealUpdater::new(Arc::clone(&history), structured_config);
+    let updater = RealUpdater::new(history, structured_config);
     let attempt_node = inspector.root().create_child("current_attempt");
     let (install_manager_ch, install_manager_fut) = start_install_manager::<
         UpdateStateNotifier,
@@ -50,7 +49,7 @@ async fn main() {
     .await;
 
     // The FIDL server will forward requests to the install manager task via the control handle.
-    let server_fut = FidlServer::new(history, install_manager_ch).run(fs);
+    let server_fut = FidlServer::new(install_manager_ch).run(fs);
 
     // Start the tasks.
     futures::join!(fasync::Task::local(install_manager_fut), fasync::Task::local(server_fut));

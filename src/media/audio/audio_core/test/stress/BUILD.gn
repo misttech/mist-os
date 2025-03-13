@@ -7,6 +7,16 @@ import("//build/testing/cc_test_executable.gni")
 import("//src/media/audio/audio_core/package.gni")
 import("//src/media/audio/hardware.gni")
 
+# This suite has real-time requirements and must run in release builds (debug builds are too slow).
+group("stress") {
+  testonly = true
+
+  deps = []
+  if (!is_debug) {
+    deps += [ ":audio_core_stress_tests" ]
+  }
+}
+
 cc_test_executable("audio-core-stress-tests-bin") {
   sources = [ "loopback_stress_test.cc" ]
   deps = [

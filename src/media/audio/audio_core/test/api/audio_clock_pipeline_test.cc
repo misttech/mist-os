@@ -20,8 +20,8 @@
 
 #include <gmock/gmock.h>
 
-#include "src/media/audio/audio_core/shared/device_id.h"
-#include "src/media/audio/audio_core/shared/mixer/mixer.h"
+#include "src/media/audio/audio_core/device_id.h"
+#include "src/media/audio/audio_core/mixer/mixer.h"
 #include "src/media/audio/audio_core/testing/integration/hermetic_audio_test.h"
 #include "src/media/audio/lib/analysis/analysis.h"
 #include "src/media/audio/lib/analysis/generators.h"

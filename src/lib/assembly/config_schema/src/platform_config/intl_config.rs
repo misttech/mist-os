@@ -47,9 +47,11 @@ pub struct IntlConfig {
     /// The intl configuration type in use.  If unspecified, the Type::Default
     /// will be used on Standard systems, and Type::None on Utility and Bootstrp
     /// systems.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub config_type: Option<Type>,
 
     /// Should assembly include the zoneinfo files, in addition to the
     /// "regular" ICU time zone data.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub include_zoneinfo_files: bool,
 }

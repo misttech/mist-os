@@ -7,7 +7,7 @@ use crate::commands::utils;
 use crate::types::Error;
 use argh::{ArgsInfo, FromArgs};
 use component_debug::realm::Instance;
-use diagnostics_data::{Inspect, InspectData};
+use diagnostics_data::InspectData;
 use fidl_fuchsia_diagnostics::Selector;
 use fidl_fuchsia_sys2 as fsys;
 use serde::{Serialize, Serializer};
@@ -156,8 +156,7 @@ impl Command for ListCommand {
             vec![]
         };
         utils::ensure_tree_field_is_set(&mut selectors, None)?;
-        let inspect =
-            provider.snapshot::<Inspect>(self.accessor.as_deref(), selectors.into_iter()).await?;
+        let inspect = provider.snapshot(self.accessor.as_deref(), selectors.into_iter()).await?;
         let components = components_from_inspect_data(inspect);
         let results = list_response_items(self.with_url, components);
         Ok(ListResult(results))

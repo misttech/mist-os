@@ -33,6 +33,7 @@ fidl("zx") {
     "cache.fidl",
     "channel.fidl",
     "clock.fidl",
+    "counter.fidl",
     "cprng.fidl",
     "debug.fidl",
     "debuglog.fidl",

@@ -11,6 +11,10 @@
         main_process_critical: "true",
         forward_stdout_to: "none",
         forward_stderr_to: "none",
+        environ: [
+            // TODO(https://fxbug.dev/382623426): revisit this.
+            "SCUDO_OPTIONS=release_to_os_interval_ms=0",
+        ],
     },
     children: [
         {

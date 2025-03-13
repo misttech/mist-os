@@ -16,7 +16,6 @@
 //! The `update_crates` tool can also be configured at `./uses_local_registry/outdated.toml`.
 
 use argh::FromArgs;
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -116,7 +115,8 @@ fn main() {
 
 fn setup_test_directory(test_source_dir: PathBuf) -> PathBuf {
     /// We put the temp dir in a static so that a panic can suppress its cleanup routine.
-    static TEST_DIR: Lazy<Mutex<Option<TempDir>>> = Lazy::new(|| Mutex::new(None));
+    static TEST_DIR: std::sync::LazyLock<Mutex<Option<TempDir>>> =
+        std::sync::LazyLock::new(|| Mutex::new(None));
 
     let temp_test_dir = TempDir::new().unwrap();
     let output_path = temp_test_dir.path().to_owned();

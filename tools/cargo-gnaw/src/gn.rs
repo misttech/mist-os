@@ -570,25 +570,45 @@ pub fn write_rule<W: io::Write>(
         // Scan for LICENSE* files in the crate's root dir.
         // Disabled in unit tests, where package_root always fails.
 
+        fn generate_license_label(entry: &walkdir::DirEntry, project_root: &Path) -> String {
+            format!(
+                "//{}",
+                entry
+                    .path()
+                    .canonicalize()
+                    .unwrap()
+                    .strip_prefix(project_root)
+                    .unwrap()
+                    .to_string_lossy()
+            )
+        }
+
         for entry in WalkDir::new(target.package_root()).follow_links(false).into_iter() {
             let entry = entry.unwrap();
-            let file_name_lower = entry.file_name().to_string_lossy().to_lowercase();
+
+            let file_name = entry.file_name().to_string_lossy();
+            let file_name_lower = file_name.to_lowercase();
             if file_name_lower.starts_with("license")
                 || file_name_lower.starts_with("licence")
                 || file_name_lower.starts_with("copyright")
             {
-                let license_file_label = format!(
-                    "//{}",
-                    entry
-                        .path()
-                        .canonicalize()
-                        .unwrap()
-                        .strip_prefix(project_root)
-                        .unwrap()
-                        .to_string_lossy()
-                );
-                license_file_labels.push(license_file_label);
-                license_files_found = true;
+                if entry.file_type().is_file() {
+                    let license_file_label = generate_license_label(&entry, project_root);
+                    license_file_labels.push(license_file_label);
+                    license_files_found = true;
+                } else if entry.file_type().is_dir() && file_name == "LICENSES" {
+                    // A directory named "LICENSE" was found.
+                    // Assume all files within are licenses and collect them.
+                    for inner_entry in WalkDir::new(entry.path()).follow_links(false).into_iter() {
+                        let inner_entry = inner_entry.unwrap();
+                        if inner_entry.file_type().is_file() {
+                            let license_file_label =
+                                generate_license_label(&inner_entry, project_root);
+                            license_file_labels.push(license_file_label);
+                            license_files_found = true;
+                        }
+                    }
+                }
             }
         }
 

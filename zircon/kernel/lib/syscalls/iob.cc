@@ -21,7 +21,7 @@
 #include <object/process_dispatcher.h>
 
 // zx_status_t zx_iob_create
-zx_status_t sys_iob_create(uint64_t options, user_in_ptr<const void> regions, uint64_t num_regions,
+zx_status_t sys_iob_create(uint64_t options, user_in_ptr<const void> regions, size_t num_regions,
                            zx_handle_t* ep0_out, zx_handle_t* ep1_out) {
   if (options != 0) {
     return ZX_ERR_INVALID_ARGS;

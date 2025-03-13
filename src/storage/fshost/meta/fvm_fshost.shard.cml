@@ -1,0 +1,41 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// Stubs out some Fxfs-specific capabilities.  This helps satisfy static routing checks for targets
+// which depend on these Fxfs-specific capabilities (although any attempted use of the capabilities
+// will result in a hang).  This is subpar because it means we don't get the benefits of the static
+// routing checks, but component manifests aren't sufficiently expressive and integrated with the
+// build system to avoid this (since we can't have "optional" intermediate routing hops very
+// easily, see https://fxbug.dev/42058594).
+//
+// This is only necessary if we are not using storage-host, because we treat FVM as a container
+// equivalent to Fxblob in that case and the necessary protocols are exposed.
+// TODO(https://fxbug.dev/339491886): Remove when all products are switched over.
+{
+    capabilities: [
+        {
+            directory: "volumes",
+            rights: [ "rw*" ],
+            path: "/volumes",
+        },
+        {
+            protocol: [ "fuchsia.fs.startup.Volumes" ],
+        },
+    ],
+    expose: [
+        {
+            directory: "volumes",
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.fs.startup.Volumes",
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.fshost.StarnixVolumeProvider",
+            from: "void",
+            availability: "optional",
+        },
+    ],
+}

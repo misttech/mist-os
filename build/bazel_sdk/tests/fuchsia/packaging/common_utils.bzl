@@ -25,7 +25,7 @@ no_repo_default_api_level_failure_test = analysistest.make(
         "expected_failure_message": attr.string(),
     },
     config_settings = {
-        "@fuchsia_sdk//fuchsia:repository_default_fuchsia_api_level": "",
+        "@fuchsia_sdk//flags:repository_default_fuchsia_api_level": "",
     },
 )
 
@@ -36,7 +36,7 @@ unknown_repo_default_api_level_failure_test = analysistest.make(
         "expected_failure_message": attr.string(),
     },
     config_settings = {
-        "@fuchsia_sdk//fuchsia:repository_default_fuchsia_api_level": "98765",
+        "@fuchsia_sdk//flags:repository_default_fuchsia_api_level": "98765",
     },
 )
 
@@ -47,6 +47,6 @@ unknown_override_api_level_failure_test = analysistest.make(
         "expected_failure_message": attr.string(),
     },
     config_settings = {
-        "@fuchsia_sdk//fuchsia:fuchsia_api_level": "123456",
+        "@fuchsia_sdk//flags:fuchsia_api_level": "123456",
     },
 )

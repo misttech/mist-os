@@ -9,9 +9,17 @@ import("//build/rust/rustc_test.gni")
 import(
     "//src/security/tests/pkg_test/assemblies/assemble_security_pkg_test_system.gni")
 
+# Defines an assembly for testing bad signatures
+#
+# Params:
+#
+#    tuf_repo_configs [required]
+#      List of GN file paths to tuf repo configuration files.
+#
+#
 template("bad_signature_update") {
-  assert(defined(invoker.base_packages),
-         "base_packages must be defined for $target_name")
+  assert(defined(invoker.tuf_repo_configs),
+         "tuf_repo_configs must be defined for $target_name")
   assert(defined(invoker.update_domain),
          "update_domain must be defined for $target_name")
   assert(defined(invoker.root_ssl_cert),
@@ -21,7 +29,6 @@ template("bad_signature_update") {
   assert(defined(invoker.pkg_server_key),
          "pkg_server_key must be defined for $target_name")
 
-  assembly_base_packages = invoker.base_packages
   root_ssl_cert = invoker.root_ssl_cert
   pkg_server_certchain = invoker.pkg_server_certchain
   pkg_server_key = invoker.pkg_server_key
@@ -39,7 +46,8 @@ template("bad_signature_update") {
     update_domain = invoker.update_domain
     board_name = board_name
     root_ssl_cert = root_ssl_cert
-    base_packages = [ "//src/security/tests/pkg_test/assemblies/hello_world_v0:hello_world-package" ] + assembly_base_packages
+    tuf_repo_configs = invoker.tuf_repo_configs
+    base_packages = [ "//src/security/tests/pkg_test/assemblies/hello_world_v0:hello_world-package" ]
     packaged_assembly_directory = "hello_world_v0"
     system_version_file =
         "//src/security/tests/pkg_test/assemblies/v0_version.txt"
@@ -57,7 +65,8 @@ template("bad_signature_update") {
     update_domain = invoker.update_domain
     board_name = board_name
     root_ssl_cert = root_ssl_cert
-    base_packages = [ "//src/security/tests/pkg_test/assemblies/hello_world_v1:hello_world-package" ] + assembly_base_packages
+    tuf_repo_configs = invoker.tuf_repo_configs
+    base_packages = [ "//src/security/tests/pkg_test/assemblies/hello_world_v1:hello_world-package" ]
     packaged_assembly_directory = "hello_world_v1"
     system_version_file =
         "//src/security/tests/pkg_test/assemblies/v1_version.txt"

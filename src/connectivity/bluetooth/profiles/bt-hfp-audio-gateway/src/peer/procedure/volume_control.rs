@@ -40,7 +40,7 @@ impl Procedure for VolumeControlProcedure {
                 self.responded = true;
                 update.into()
             }
-            _ => ProcedureRequest::Error(ProcedureError::UnexpectedAg(update)),
+            _ => ProcedureError::UnexpectedAg(update).into(),
         }
     }
 
@@ -71,7 +71,7 @@ mod tests {
         let random_hf = at::Command::CindRead {};
         assert_matches!(
             procedure.hf_update(random_hf, &mut state),
-            ProcedureRequest::Error(ProcedureError::UnexpectedHf(_))
+            ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedHf(_))
         );
     }
 
@@ -83,7 +83,7 @@ mod tests {
         let random_ag = AgUpdate::ThreeWaySupport;
         assert_matches!(
             procedure.ag_update(random_ag, &mut state),
-            ProcedureRequest::Error(ProcedureError::UnexpectedAg(_))
+            ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedAg(_))
         );
     }
 

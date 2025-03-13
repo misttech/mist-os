@@ -97,6 +97,8 @@ config("compiler") {
   }
 
   if (is_fuchsia || is_mistos) {
+    ldflags += [ "-Wl,-z,start-stop-visibility=hidden" ]
+
     # ld.bfd doesn't support -z relro for the targets we use it for.
     if (!is_gcc || linker == "gold") {
       ldflags += [ "-Wl,-z,relro" ]
@@ -157,15 +159,6 @@ config("compiler") {
     # The driver passes the corresponding option on to the linker as well,
     # where it enables build ID-like PDB UUIDs without timestamp.
     compiler_flags += [ "-mno-incremental-linker-compatible" ]
-  }
-
-  # The toolchain-supplied headers come after include_dirs from targets and
-  # configs but before libc.
-  foreach(dir, zircon_toolchain.include_dirs_cc) {
-    cflags_cc += [
-      "-isystem",
-      rebase_path(dir, root_build_dir),
-    ]
   }
 
   lib_dirs = zircon_toolchain.lib_dirs

@@ -5,7 +5,7 @@
 //! Counters kept in bindings context.
 
 use net_types::ip::{GenericOverIp, Ip, IpVersionMarker, Ipv4, Ipv6};
-use netstack3_core::inspect::{Inspectable, Inspector};
+use netstack3_core::inspect::{Inspectable, Inspector, InspectorExt as _};
 use netstack3_core::types::Counter;
 
 /// Holder for generic bindings counters.

@@ -12,7 +12,7 @@ import fidl.fuchsia_wlan_policy as f_wlan_policy
 from fuchsia_controller_py import Channel, ZxStatus
 from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
 
-from honeydew import errors
+from honeydew import affordances_capable, errors
 from honeydew.affordances.connectivity.wlan.utils import errors as wlan_errors
 from honeydew.affordances.connectivity.wlan.utils.types import (
     AccessPointState,
@@ -24,9 +24,10 @@ from honeydew.affordances.connectivity.wlan.utils.types import (
     SecurityType,
 )
 from honeydew.affordances.connectivity.wlan.wlan_policy_ap import wlan_policy_ap
-from honeydew.interfaces.device_classes import affordances_capable
-from honeydew.interfaces.transports import ffx as ffx_transport
-from honeydew.interfaces.transports import fuchsia_controller as fc_transport
+from honeydew.transports.ffx import ffx as ffx_transport
+from honeydew.transports.fuchsia_controller import (
+    fuchsia_controller as fc_transport,
+)
 from honeydew.typing.custom_types import FidlEndpoint
 
 # List of required FIDLs for the affordance.
@@ -90,8 +91,6 @@ class WlanPolicyAp(AsyncAdapter, wlan_policy_ap.WlanPolicyAp):
         self._reboot_affordance.register_for_on_device_boot(self._connect_proxy)
         self._fuchsia_device_close.register_for_on_device_close(self._close)
 
-        self._access_point_controller = self._create_access_point_controller()
-
     def _close(self) -> None:
         """Release handle on ap controller.
 
@@ -138,24 +137,7 @@ class WlanPolicyAp(AsyncAdapter, wlan_policy_ap.WlanPolicyAp):
                 )
 
     def _connect_proxy(self) -> None:
-        """Re-initializes connection to the WLAN stack."""
-        self._access_point_provider_proxy = (
-            f_wlan_policy.AccessPointProvider.Client(
-                self._fc_transport.connect_device_proxy(
-                    _ACCESS_POINT_PROVIDER_PROXY
-                )
-            )
-        )
-        self._access_point_listener_proxy = (
-            f_wlan_policy.AccessPointListener.Client(
-                self._fc_transport.connect_device_proxy(
-                    _ACCESS_POINT_LISTENER_PROXY
-                )
-            )
-        )
-
-    def _create_access_point_controller(self) -> _AccessPointControllerState:
-        """Initialize the access point controller.
+        """Re-initializes connection to the WLAN stack.
 
         See fuchsia.wlan.policy/AccessPointProvider.GetController().
 
@@ -177,8 +159,14 @@ class WlanPolicyAp(AsyncAdapter, wlan_policy_ap.WlanPolicyAp):
             access_point_state_updates_server.serve()
         )
 
+        access_point_provider_proxy = f_wlan_policy.AccessPointProvider.Client(
+            self._fc_transport.connect_device_proxy(
+                _ACCESS_POINT_PROVIDER_PROXY
+            )
+        )
+
         try:
-            self._access_point_provider_proxy.get_controller(
+            access_point_provider_proxy.get_controller(
                 requests=controller_server.take(),
                 updates=updates_client.take(),
             )
@@ -187,7 +175,7 @@ class WlanPolicyAp(AsyncAdapter, wlan_policy_ap.WlanPolicyAp):
                 f"AccessPointProvider.GetController() error {status}"
             ) from status
 
-        return _AccessPointControllerState(
+        self._access_point_controller = _AccessPointControllerState(
             proxy=access_point_controller_proxy,
             updates=updates,
             access_point_state_updates_server_task=task,

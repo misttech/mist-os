@@ -835,7 +835,7 @@ All the **documentation pages** mentioned in this section:
 [brcmfmac-build-gn]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/BUILD.gn;l=170
 [wlanphy-impl-device-h]: https://fuchsia-review.git.corp.google.com/c/fuchsia/+/655947/75/src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/wlanphy-impl-device.h
 [wlanphy-device-dfv2-h]: https://fuchsia-review.git.corp.google.com/c/fuchsia/+/655947/75/src/connectivity/wlan/drivers/wlanphy/device_dfv2.h
-[driver-service-protocol]: /docs/get-started/sdk/learn/driver/driver-service.md#define_a_driver_service_protocol
+[driver-service-protocol]: /docs/development/drivers/tutorials/sdk_build_driver/driver-service.md#define_a_driver_service_protocol
 [phyimpl-fidl]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.wlan.phyimpl/phyimpl.fidl;l=96
 [ddktl-device-h]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/lib/ddktl/include/ddktl/device.h;l=610;drc=172f766331e1dd3509833ce5a9a86917d945b2d2?q=ddkconnectruntimeprotocol&ss=fuchsia
 [wlanoftmac-device-cc]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/connectivity/wlan/drivers/wlansoftmac/device.cc;l=312

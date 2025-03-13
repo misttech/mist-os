@@ -13,7 +13,6 @@ use diagnostics_data::{
     Data, LogTextColor, LogTextDisplayOptions, LogTextPresenter, LogTimeDisplayFormat, Logs,
     LogsData, LogsDataBuilder, LogsField, LogsProperty, Severity, Timezone,
 };
-use ffx_writer::ToolIO;
 use futures_util::future::Either;
 use futures_util::stream::FuturesUnordered;
 use futures_util::{select, StreamExt};
@@ -22,6 +21,7 @@ use std::fmt::Display;
 use std::io::Write;
 use std::time::Duration;
 use thiserror::Error;
+use writer::ToolIO;
 
 pub use diagnostics_data::Timestamp;
 
@@ -70,12 +70,17 @@ impl From<LogsData> for LogData {
 pub struct LogEntry {
     /// The log
     pub data: LogData,
-    /// The timestamp of the log translated to UTC
-    #[serde(
-        serialize_with = "diagnostics_data::serialize_timestamp",
-        deserialize_with = "diagnostics_data::deserialize_timestamp"
-    )]
-    pub timestamp: Timestamp,
+}
+
+impl LogEntry {
+    fn utc_timestamp(&self, boot_ts: Option<Timestamp>) -> Timestamp {
+        Timestamp::from_nanos(match &self.data {
+            LogData::TargetLog(data) => {
+                data.metadata.timestamp.into_nanos()
+                    + boot_ts.map(|value| value.into_nanos()).unwrap_or(0)
+            }
+        })
+    }
 }
 
 // Required if we want to use ffx's built-in I/O, but
@@ -96,16 +101,11 @@ pub trait Symbolize {
     async fn symbolize(&self, entry: LogEntry) -> Option<LogEntry>;
 }
 
-async fn handle_value<S>(one: Data<Logs>, boot_ts: Timestamp, symbolizer: &S) -> Option<LogEntry>
+async fn handle_value<S>(one: Data<Logs>, symbolizer: &S) -> Option<LogEntry>
 where
     S: Symbolize + ?Sized,
 {
-    let entry = LogEntry {
-        timestamp: Timestamp::from_nanos(
-            one.metadata.timestamp.into_nanos() + boot_ts.into_nanos(),
-        ),
-        data: one.into(),
-    };
+    let entry = LogEntry { data: one.into() };
     symbolizer.symbolize(entry).await
 }
 
@@ -129,7 +129,6 @@ fn generate_timestamp_message(boot_timestamp: Timestamp) -> LogEntry {
             ))
             .build(),
         ),
-        timestamp: Timestamp::from_nanos(0),
     }
 }
 
@@ -144,7 +143,6 @@ where
     F: LogFormatter + BootTimeAccessor,
     S: Symbolize + ?Sized,
 {
-    let boot_ts = formatter.get_boot_timestamp();
     let mut decoder = Box::pin(LogsDataStream::new(socket).fuse());
     let mut symbolize_pending = FuturesUnordered::new();
     if include_timestamp && !formatter.is_utc_time_format() {
@@ -157,7 +155,7 @@ where
     } {
         match value {
             Either::Left(Some(log)) => {
-                symbolize_pending.push(handle_value(log, boot_ts, symbolizer));
+                symbolize_pending.push(handle_value(log, symbolizer));
             }
             Either::Right(Some(Some(symbolized))) => match formatter.push_log(symbolized).await? {
                 LogProcessingResult::Exit => {
@@ -252,8 +250,8 @@ where
 }
 
 /// Converts from UTC time to boot time.
-fn utc_to_boot(boot_ts: Timestamp, utc: i64) -> Timestamp {
-    Timestamp::from_nanos(utc - boot_ts.into_nanos())
+fn utc_to_boot(boot_ts: Timestamp, utc: Timestamp) -> Timestamp {
+    Timestamp::from_nanos(utc.into_nanos() - boot_ts.into_nanos())
 }
 
 #[async_trait(?Send)]
@@ -262,29 +260,7 @@ where
     W: Write + ToolIO<OutputItem = LogEntry>,
 {
     async fn push_log(&mut self, log_entry: LogEntry) -> Result<LogProcessingResult, LogError> {
-        if self.filter_by_timestamp(&log_entry, self.options.since.as_ref(), |a, b| a <= b) {
-            return Ok(LogProcessingResult::Continue);
-        }
-
-        if self.filter_by_timestamp(&log_entry, self.options.until.as_ref(), |a, b| a >= b) {
-            return Ok(LogProcessingResult::Exit);
-        }
-
-        if !self.filters.matches(&log_entry) {
-            return Ok(LogProcessingResult::Continue);
-        }
-        match self.options.display {
-            Some(text_options) => {
-                let mut options_for_this_line_only = self.options.clone();
-                options_for_this_line_only.display = Some(text_options);
-                self.format_text_log(options_for_this_line_only, log_entry)?;
-            }
-            None => {
-                self.writer.item(&log_entry).map_err(|err| LogError::UnknownError(err.into()))?;
-            }
-        };
-
-        Ok(LogProcessingResult::Continue)
+        self.push_log_internal(log_entry, true).await
     }
 
     fn is_utc_time_format(&self) -> bool {
@@ -345,6 +321,58 @@ where
         self.filters.expand_monikers(getter).await
     }
 
+    pub async fn push_unfiltered_log(
+        &mut self,
+        log_entry: LogEntry,
+    ) -> Result<LogProcessingResult, LogError> {
+        self.push_log_internal(log_entry, false).await
+    }
+
+    async fn push_log_internal(
+        &mut self,
+        log_entry: LogEntry,
+        enable_filters: bool,
+    ) -> Result<LogProcessingResult, LogError> {
+        if enable_filters {
+            if self.filter_by_timestamp(&log_entry, self.options.since.as_ref(), |a, b| a <= b) {
+                return Ok(LogProcessingResult::Continue);
+            }
+
+            if self.filter_by_timestamp(&log_entry, self.options.until.as_ref(), |a, b| a >= b) {
+                return Ok(LogProcessingResult::Exit);
+            }
+
+            if !self.filters.matches(&log_entry) {
+                return Ok(LogProcessingResult::Continue);
+            }
+        }
+        match self.options.display {
+            Some(text_options) => {
+                let mut options_for_this_line_only = self.options.clone();
+                options_for_this_line_only.display = Some(text_options);
+                if !enable_filters {
+                    // For host logs, don't apply the boot time offset
+                    // as this is with reference to the UTC timeline
+                    if let LogTimeDisplayFormat::WallTime { ref mut offset, .. } =
+                        options_for_this_line_only.display.as_mut().unwrap().time_format
+                    {
+                        // 1 nanosecond so that LogTimeDisplayFormat in diagnostics_data
+                        // knows that we have a valid UTC offset. It normally falls back if
+                        // the UTC offset is 0. It prints at millisecond precision so being
+                        // off by +1 nanosecond isn't an issue.
+                        *offset = 1;
+                    };
+                }
+                self.format_text_log(options_for_this_line_only, log_entry)?;
+            }
+            None => {
+                self.writer.item(&log_entry).map_err(|err| LogError::UnknownError(err.into()))?;
+            }
+        };
+
+        Ok(LogProcessingResult::Continue)
+    }
+
     /// Creates a new DefaultLogFormatter from command-line arguments.
     pub fn new_from_args(cmd: &LogCommand, writer: W) -> Self {
         let is_json = writer.is_machine();
@@ -400,11 +428,14 @@ where
         };
         if timestamp.is_boot {
             callback(
-                &utc_to_boot(self.get_boot_timestamp(), log_entry.timestamp.into_nanos()),
+                &utc_to_boot(
+                    self.get_boot_timestamp(),
+                    log_entry.utc_timestamp(self.boot_ts_nanos),
+                ),
                 &timestamp.timestamp,
             )
         } else {
-            callback(&log_entry.timestamp, &timestamp.timestamp)
+            callback(&log_entry.utc_timestamp(self.boot_ts_nanos), &timestamp.timestamp)
         }
     }
 
@@ -457,8 +488,8 @@ mod test {
     use crate::parse_time;
     use assert_matches::assert_matches;
     use diagnostics_data::{LogsDataBuilder, Severity};
-    use ffx_writer::{Format, MachineWriter, TestBuffers};
     use std::cell::Cell;
+    use writer::{Format, JsonWriter, TestBuffers};
 
     use super::*;
 
@@ -555,7 +586,7 @@ mod test {
     #[fuchsia::test]
     async fn test_boot_timestamp_setter() {
         let buffers = TestBuffers::default();
-        let stdout = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let stdout = JsonWriter::<LogEntry>::new_test(None, &buffers);
         let options = LogFormatterOptions {
             display: Some(LogTextDisplayOptions {
                 time_format: LogTimeDisplayFormat::WallTime { tz: Timezone::Utc, offset: 0 },
@@ -570,7 +601,7 @@ mod test {
 
         // Boot timestamp is supported when using JSON output (for filtering)
         let buffers = TestBuffers::default();
-        let output = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let output = JsonWriter::<LogEntry>::new_test(None, &buffers);
         let options = LogFormatterOptions { display: None, ..Default::default() };
         let mut formatter = DefaultLogFormatter::new(LogFilterCriteria::default(), output, options);
         formatter.set_boot_timestamp(Timestamp::from_nanos(1234));
@@ -601,13 +632,7 @@ mod test {
         )
         .await
         .unwrap();
-        assert_eq!(
-            formatter.logs,
-            vec![LogEntry {
-                data: LogData::TargetLog(target_log),
-                timestamp: Timestamp::from_nanos(0)
-            }]
-        );
+        assert_eq!(formatter.logs, vec![LogEntry { data: LogData::TargetLog(target_log) }]);
     }
 
     #[fuchsia::test]
@@ -694,14 +719,8 @@ mod test {
         assert_eq!(
             formatter.logs,
             vec![
-                LogEntry {
-                    data: LogData::TargetLog(target_log_0),
-                    timestamp: Timestamp::from_nanos(0)
-                },
-                LogEntry {
-                    data: LogData::TargetLog(target_log_1),
-                    timestamp: Timestamp::from_nanos(1)
-                }
+                LogEntry { data: LogData::TargetLog(target_log_0) },
+                LogEntry { data: LogData::TargetLog(target_log_1) }
             ]
         );
     }
@@ -711,7 +730,7 @@ mod test {
         // test since and until args for the LogFormatter
         let symbolizer = NoOpSymbolizer {};
         let buffers = TestBuffers::default();
-        let stdout = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let stdout = JsonWriter::<LogEntry>::new_test(None, &buffers);
         let mut formatter = DefaultLogFormatter::new(
             LogFilterCriteria::default(),
             stdout,
@@ -812,7 +831,7 @@ mod test {
         // test since and until args for the LogFormatter
         let symbolizer = NoOpSymbolizer {};
         let buffers = TestBuffers::default();
-        let stdout = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let stdout = JsonWriter::<LogEntry>::new_test(None, &buffers);
         let mut formatter = DefaultLogFormatter::new(
             LogFilterCriteria::default(),
             stdout,
@@ -871,7 +890,6 @@ mod test {
 
     fn log_entry() -> LogEntry {
         LogEntry {
-            timestamp: Timestamp::from_nanos(0),
             data: LogData::TargetLog(
                 logs_data_builder().add_tag("tag1").add_tag("tag2").set_message("message").build(),
             ),
@@ -881,7 +899,7 @@ mod test {
     #[fuchsia::test]
     async fn test_default_formatter() {
         let buffers = TestBuffers::default();
-        let stdout = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let stdout = JsonWriter::<LogEntry>::new_test(None, &buffers);
         let options = LogFormatterOptions::default();
         let mut formatter =
             DefaultLogFormatter::new(LogFilterCriteria::default(), stdout, options.clone());
@@ -896,7 +914,7 @@ mod test {
     #[fuchsia::test]
     async fn test_default_formatter_with_hidden_metadata() {
         let buffers = TestBuffers::default();
-        let stdout = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let stdout = JsonWriter::<LogEntry>::new_test(None, &buffers);
         let options = LogFormatterOptions {
             display: Some(LogTextDisplayOptions { show_metadata: false, ..Default::default() }),
             ..LogFormatterOptions::default()
@@ -914,7 +932,7 @@ mod test {
     #[fuchsia::test]
     async fn test_default_formatter_with_json() {
         let buffers = TestBuffers::default();
-        let stdout = MachineWriter::<LogEntry>::new_test(Some(Format::Json), &buffers);
+        let stdout = JsonWriter::<LogEntry>::new_test(Some(Format::Json), &buffers);
         let options = LogFormatterOptions { display: None, ..Default::default() };
         {
             let mut formatter =
@@ -968,18 +986,9 @@ mod test {
         assert_eq!(
             formatter.logs,
             vec![
-                LogEntry {
-                    data: LogData::TargetLog(target_log_0),
-                    timestamp: Timestamp::from_nanos(0)
-                },
-                LogEntry {
-                    data: LogData::TargetLog(target_log_2),
-                    timestamp: Timestamp::from_nanos(2)
-                },
-                LogEntry {
-                    data: LogData::TargetLog(target_log_4),
-                    timestamp: Timestamp::from_nanos(4)
-                }
+                LogEntry { data: LogData::TargetLog(target_log_0) },
+                LogEntry { data: LogData::TargetLog(target_log_2) },
+                LogEntry { data: LogData::TargetLog(target_log_4) }
             ],
         );
     }
@@ -988,7 +997,7 @@ mod test {
     async fn test_symbolized_output() {
         let symbolizer = FakeFuchsiaSymbolizer;
         let buffers = TestBuffers::default();
-        let output = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let output = JsonWriter::<LogEntry>::new_test(None, &buffers);
         let mut formatter = DefaultLogFormatter::new(
             LogFilterCriteria::default(),
             output,

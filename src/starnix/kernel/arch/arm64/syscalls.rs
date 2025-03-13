@@ -52,10 +52,14 @@ pub fn sys_renameat(
 // Syscalls for arch32 usage
 #[cfg(feature = "arch32")]
 mod arch32 {
+    use crate::task::syscalls::do_clone;
     use crate::task::CurrentTask;
+    use linux_uapi::{clone_args, pid_t};
     use starnix_sync::{Locked, Unlocked};
     use starnix_uapi::errors::Errno;
+    use starnix_uapi::signals::SIGCHLD;
     use starnix_uapi::user_address::UserAddress;
+    use starnix_uapi::{CLONE_VFORK, CLONE_VM};
 
     #[allow(non_snake_case)]
     pub fn sys_arch32_ARM_set_tls(
@@ -65,6 +69,21 @@ mod arch32 {
     ) -> Result<(), Errno> {
         current_task.thread_state.registers.set_thread_pointer_register(addr.ptr() as u64);
         Ok(())
+    }
+
+    pub fn sys_arch32_vfork(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &mut CurrentTask,
+    ) -> Result<pid_t, Errno> {
+        do_clone(
+            locked,
+            current_task,
+            &clone_args {
+                flags: (CLONE_VFORK | CLONE_VM) as u64,
+                exit_signal: SIGCHLD.number() as u64,
+                ..Default::default()
+            },
+        )
     }
 }
 

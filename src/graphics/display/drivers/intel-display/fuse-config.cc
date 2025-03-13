@@ -97,25 +97,25 @@ FuseConfig FuseConfig::ReadFrom(fdf::MmioBuffer& mmio_space, uint16_t device_id)
 
 void FuseConfig::Log() {
   if (!graphics_enabled)
-    FDF_LOG(WARNING, "Unusual fuse state - Graphics disabled");
+    fdf::warn("Unusual fuse state - Graphics disabled");
 
   for (size_t i = 0; i < std::size(pipe_enabled); ++i) {
     if (!pipe_enabled[i])
-      FDF_LOG(WARNING, "Unusual fuse state - Pipe %zu disabled", i);
+      fdf::warn("Unusual fuse state - Pipe {} disabled", i);
   }
 
   if (!edp_enabled)
-    FDF_LOG(WARNING, "Unusual fuse state - eDP disabled");
+    fdf::warn("Unusual fuse state - eDP disabled");
   if (!display_capture_enabled)
-    FDF_LOG(WARNING, "Unusual fuse state - WD (display capture) disabled");
+    fdf::warn("Unusual fuse state - WD (display capture) disabled");
   if (!display_stream_compression_enabled)
-    FDF_LOG(WARNING, "Unusual fuse state - DSC disabled");
+    fdf::warn("Unusual fuse state - DSC disabled");
   if (!frame_buffer_compression_enabled)
-    FDF_LOG(WARNING, "Unusual fuse state - FBC disabled");
+    fdf::warn("Unusual fuse state - FBC disabled");
   if (!display_power_savings_enabled)
-    FDF_LOG(WARNING, "Unusual fuse state - DPST disabled");
+    fdf::warn("Unusual fuse state - DPST disabled");
 
-  FDF_LOG(TRACE, "Maximum clock: %d kHz", core_clock_limit_khz);
+  fdf::trace("Maximum clock: {} kHz", core_clock_limit_khz);
 }
 
 }  // namespace intel_display

@@ -372,9 +372,6 @@ type Protocol struct {
 	// in the protocol.
 	Events []*Method
 
-	// Generated struct holding variant-agnostic details about protocol.
-	ProtocolDetails name
-
 	// Transport contains information about the transport the protocol is
 	// used over.
 	Transport *Transport
@@ -485,12 +482,11 @@ func newProtocol(inner protocolInner) Protocol {
 	}
 
 	return Protocol{
-		protocolInner:   inner,
-		OneWayMethods:   filterBy(kinds{oneWayMethod}),
-		TwoWayMethods:   filterBy(kinds{twoWayMethod}),
-		ClientMethods:   filterBy(kinds{oneWayMethod, twoWayMethod}),
-		Events:          filterBy(kinds{eventMethod}),
-		ProtocolDetails: makeName("fidl::internal::ProtocolDetails").template(inner.Wire),
+		protocolInner: inner,
+		OneWayMethods: filterBy(kinds{oneWayMethod}),
+		TwoWayMethods: filterBy(kinds{twoWayMethod}),
+		ClientMethods: filterBy(kinds{oneWayMethod, twoWayMethod}),
+		Events:        filterBy(kinds{eventMethod}),
 	}
 }
 
@@ -551,7 +547,6 @@ type wireMethod struct {
 	WireCompleterImpl         name
 	WireCompleterBase         name
 	WireMethodTypes           name
-	WireOrdinal               name
 	WireRequestViewAlias      name
 	WireEvent                 name
 	WireResponse              name
@@ -576,7 +571,6 @@ func newWireMethod(name string, wireTypes wireTypeNames, protocolMarker name, me
 		WireCompleterImpl:         WireCompleterImpl.template(methodMarker),
 		WireCompleterBase:         WireCompleterBase.template(methodMarker),
 		WireMethodTypes:           WireMethodTypes.template(methodMarker),
-		WireOrdinal:               WireOrdinal.template(methodMarker),
 		WireRequestViewAlias:      s.appendName("RequestView"),
 		WireEvent:                 WireEvent.template(methodMarker),
 		WireResponse:              WireResponse.template(methodMarker),

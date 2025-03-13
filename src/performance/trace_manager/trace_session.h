@@ -126,7 +126,6 @@ class TraceSession {
   void OnProviderStarted(TraceProviderBundle* bundle);
   void CheckAllProvidersStarted();
   void NotifyStarted();
-  void FinishStartingDueToTimeout();
 
   // Provider stopping processing.
   void OnProviderStopped(TraceProviderBundle* bundle, bool write_results);

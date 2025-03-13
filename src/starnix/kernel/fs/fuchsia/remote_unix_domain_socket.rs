@@ -4,7 +4,7 @@
 
 use crate::fs::fuchsia::{new_remote_file, OpenFlags};
 use crate::task::{
-    CurrentTask, EventHandler, SignalHandler, SignalHandlerInner, Task, WaitCanceler, Waiter,
+    CurrentTask, EventHandler, SignalHandler, SignalHandlerInner, WaitCanceler, Waiter,
 };
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::socket::{
@@ -78,6 +78,7 @@ impl SocketOps for RemoteUnixDomainSocket {
 
     fn connect(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &SocketHandle,
         _current_task: &CurrentTask,
         _peer: SocketPeer,
@@ -85,16 +86,27 @@ impl SocketOps for RemoteUnixDomainSocket {
         error!(EISCONN)
     }
 
-    fn listen(&self, _socket: &Socket, _backlog: i32, _credentials: ucred) -> Result<(), Errno> {
+    fn listen(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _socket: &Socket,
+        _backlog: i32,
+        _credentials: ucred,
+    ) -> Result<(), Errno> {
         error!(EOPNOTSUPP)
     }
 
-    fn accept(&self, _socket: &Socket) -> Result<SocketHandle, Errno> {
+    fn accept(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _socket: &Socket,
+    ) -> Result<SocketHandle, Errno> {
         error!(EOPNOTSUPP)
     }
 
     fn bind(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         _socket_address: SocketAddress,
@@ -232,26 +244,40 @@ impl SocketOps for RemoteUnixDomainSocket {
         Ok(Self::get_events_from_signals(signals))
     }
 
-    fn shutdown(&self, _socket: &Socket, _how: SocketShutdownFlags) -> Result<(), Errno> {
+    fn shutdown(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _socket: &Socket,
+        _how: SocketShutdownFlags,
+    ) -> Result<(), Errno> {
         Ok(())
     }
 
-    fn close(&self, _socket: &Socket) {
+    fn close(&self, _locked: &mut Locked<'_, FileOpsCore>, _socket: &Socket) {
         let _ = self.client.close(zx::MonotonicInstant::ZERO);
     }
 
-    fn getsockname(&self, _socket: &Socket) -> Result<SocketAddress, Errno> {
+    fn getsockname(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _socket: &Socket,
+    ) -> Result<SocketAddress, Errno> {
         Ok(SocketAddress::default_for_domain(SocketDomain::Unix))
     }
 
-    fn getpeername(&self, socket: &Socket) -> Result<SocketAddress, Errno> {
-        self.getsockname(socket)
+    fn getpeername(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        socket: &Socket,
+    ) -> Result<SocketAddress, Errno> {
+        self.getsockname(locked, socket)
     }
 
     fn setsockopt(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
-        _task: &Task,
+        _current_task: &CurrentTask,
         _level: u32,
         _optname: u32,
         _user_opt: UserBuffer,
@@ -261,6 +287,7 @@ impl SocketOps for RemoteUnixDomainSocket {
 
     fn getsockopt(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         level: u32,
         optname: u32,

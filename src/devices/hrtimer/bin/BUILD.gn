@@ -17,7 +17,7 @@ executable("bin") {
   ]
 }
 
-fuchsia_shell_package("hrtimer-ctl") {
+fuchsia_package("hrtimer-ctl") {
   deps = [ ":bin" ]
 }
 

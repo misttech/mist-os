@@ -13,7 +13,6 @@
 #include <lib/zx/vmo.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
-#include <zircon/status.h>
 #include <zircon/syscalls/object.h>
 #include <zircon/types.h>
 
@@ -50,7 +49,7 @@ zx::result<SysmemBufferInfo> ImportedBufferCollection::GetSysmemMetadata(uint32_
   fidl::WireResult<fuchsia_sysmem2::BufferCollection::CheckAllBuffersAllocated> check_result =
       sysmem_client_->CheckAllBuffersAllocated();
   if (!check_result.ok()) {
-    FDF_LOG(ERROR, "CheckAllBuffersAllocated() FIDL call failed: %s", check_result.status_string());
+    fdf::error("CheckAllBuffersAllocated() FIDL call failed: {}", check_result.status_string());
     return zx::error(check_result.status());
   }
   const fit::result<fuchsia_sysmem2::wire::Error>& check_response = check_result.value();
@@ -60,15 +59,14 @@ zx::result<SysmemBufferInfo> ImportedBufferCollection::GetSysmemMetadata(uint32_
       return zx::error(ZX_ERR_SHOULD_WAIT);
     }
 
-    FDF_LOG(ERROR, "CheckAllBuffersAllocated() failed: %" PRIu32, fidl::ToUnderlying(error_value));
+    fdf::error("CheckAllBuffersAllocated() failed: {}", fidl::ToUnderlying(error_value));
     return zx::error(ZX_ERR_INTERNAL);
   }
 
   fidl::WireResult<fuchsia_sysmem2::BufferCollection::WaitForAllBuffersAllocated> wait_result =
       sysmem_client_->WaitForAllBuffersAllocated();
   if (!wait_result.ok()) {
-    FDF_LOG(ERROR, "WaitForAllBuffersAllocated() FIDL call failed: %s",
-            wait_result.status_string());
+    fdf::error("WaitForAllBuffersAllocated() FIDL call failed: {}", wait_result.status_string());
     return zx::error(wait_result.status());
   }
   const fit::result<fuchsia_sysmem2::wire::Error,
@@ -79,8 +77,7 @@ zx::result<SysmemBufferInfo> ImportedBufferCollection::GetSysmemMetadata(uint32_
     ZX_DEBUG_ASSERT_MSG(error_value != fuchsia_sysmem2::wire::Error::kPending,
                         "CheckAllBuffersAllocated() returned success incorrectly");
 
-    FDF_LOG(ERROR, "WaitForAllBuffersAllocated() failed: %" PRIu32,
-            fidl::ToUnderlying(error_value));
+    fdf::error("WaitForAllBuffersAllocated() failed: {}", fidl::ToUnderlying(error_value));
     return zx::error(ZX_ERR_INTERNAL);
   }
   fuchsia_sysmem2::wire::BufferCollectionInfo& collection_info =
@@ -88,8 +85,7 @@ zx::result<SysmemBufferInfo> ImportedBufferCollection::GetSysmemMetadata(uint32_
 
   ZX_DEBUG_ASSERT_MSG(collection_info.has_buffers(), "Sysmem deviated from its contract");
   if (buffer_index >= collection_info.buffers().count()) {
-    FDF_LOG(WARNING, "Rejecting access to out-of-range BufferCollection index: %" PRIu32,
-            buffer_index);
+    fdf::warn("Rejecting access to out-of-range BufferCollection index: {}", buffer_index);
     return zx::error(ZX_ERR_OUT_OF_RANGE);
   }
   fuchsia_sysmem2::wire::VmoBuffer& buffer = collection_info.buffers().at(buffer_index);
@@ -100,7 +96,7 @@ zx::result<SysmemBufferInfo> ImportedBufferCollection::GetSysmemMetadata(uint32_
 
   ZX_DEBUG_ASSERT_MSG(collection_info.has_settings(), "Sysmem deviated from its contract");
   if (!collection_info.settings().has_image_format_constraints()) {
-    FDF_LOG(WARNING, "Rejecting access BufferCollection without ImageFormatConstraints");
+    fdf::warn("Rejecting access BufferCollection without ImageFormatConstraints");
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
   fuchsia_sysmem2::wire::ImageFormatConstraints& image_format_constraints =
@@ -116,8 +112,8 @@ zx::result<SysmemBufferInfo> ImportedBufferCollection::GetSysmemMetadata(uint32_
 
   fuchsia_images2::wire::PixelFormat fidl_pixel_format = image_format_constraints.pixel_format();
   if (!display::PixelFormat::IsSupported(fidl_pixel_format)) {
-    FDF_LOG(WARNING, "Rejecting access to BufferCollection with unsupported PixelFormat: %" PRIu32,
-            static_cast<uint32_t>(fidl_pixel_format));
+    fdf::warn("Rejecting access to BufferCollection with unsupported PixelFormat: {}",
+              static_cast<uint32_t>(fidl_pixel_format));
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
   return zx::ok(SysmemBufferInfo{
@@ -145,7 +141,7 @@ zx::result<zx_koid_t> GetOwnProcessKoid() {
   zx_status_t status = process->get_info(ZX_INFO_HANDLE_BASIC, &process_info, sizeof(process_info),
                                          nullptr, nullptr);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to get process koid: %s", zx_status_get_string(status));
+    fdf::error("Failed to get process koid: {}", zx::make_result(status));
     return zx::error(status);
   }
   return zx::ok(process_info.koid);
@@ -169,7 +165,7 @@ zx::result<> ImportedImages::Initialize() {
           .id(koid_result.value())
           .Build());
   if (!set_debug_status.ok()) {
-    FDF_LOG(WARNING, "Failed to set sysmem debug info: %s", set_debug_status.status_string());
+    fdf::warn("Failed to set sysmem debug info: {}", set_debug_status.status_string());
     // This step was not essential to the initialization process. Sysmem debug
     // info is a developer convenience, and the driver can operate without it.
   }
@@ -181,8 +177,8 @@ zx::result<> ImportedImages::ImportBufferCollection(
     fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> buffer_collection_token) {
   auto buffer_collection_it = buffer_collections_.find(buffer_collection_id);
   if (buffer_collection_it != buffer_collections_.end()) {
-    FDF_LOG(WARNING, "Rejected BufferCollection import request with existing ID: %" PRIu64,
-            buffer_collection_id.value());
+    fdf::warn("Rejected BufferCollection import request with existing ID: {}",
+              buffer_collection_id.value());
     return zx::error(ZX_ERR_ALREADY_EXISTS);
   }
 
@@ -198,7 +194,7 @@ zx::result<> ImportedImages::ImportBufferCollection(
           .buffer_collection_request(std::move(collection_server_endpoint))
           .Build());
   if (!bind_result.ok()) {
-    FDF_LOG(ERROR, "FIDL call BindSharedCollection failed: %s", bind_result.status_string());
+    fdf::error("FIDL call BindSharedCollection failed: {}", bind_result.status_string());
     return zx::error(ZX_ERR_INTERNAL);
   }
 
@@ -206,7 +202,7 @@ zx::result<> ImportedImages::ImportBufferCollection(
   auto buffer_collection_node = fbl::make_unique_checked<ImportedBufferCollectionNode>(
       &alloc_checker, buffer_collection_id, std::move(collection_client_endpoint));
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for ImportedBufferCollectionNode");
+    fdf::error("Failed to allocate memory for ImportedBufferCollectionNode");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
   buffer_collections_.insert(std::move(buffer_collection_node));
@@ -218,8 +214,8 @@ zx::result<> ImportedImages::ReleaseBufferCollection(
     display::DriverBufferCollectionId buffer_collection_id) {
   auto buffer_collection_it = buffer_collections_.find(buffer_collection_id);
   if (buffer_collection_it == buffer_collections_.end()) {
-    FDF_LOG(WARNING, "Rejected request to release BufferCollection with unknown ID: %" PRIu64,
-            buffer_collection_id.value());
+    fdf::warn("Rejected request to release BufferCollection with unknown ID: {}",
+              buffer_collection_id.value());
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
@@ -231,8 +227,8 @@ zx::result<display::DriverImageId> ImportedImages::ImportImage(
     display::DriverBufferCollectionId buffer_collection_id, uint32_t buffer_index) {
   auto buffer_collection_it = buffer_collections_.find(buffer_collection_id);
   if (buffer_collection_it == buffer_collections_.end()) {
-    FDF_LOG(WARNING, "Rejected request to release BufferCollection with unknown ID: %" PRIu64,
-            buffer_collection_id.value());
+    fdf::warn("Rejected request to release BufferCollection with unknown ID: {}",
+              buffer_collection_id.value());
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
@@ -249,7 +245,7 @@ zx::result<display::DriverImageId> ImportedImages::ImportImage(
   auto image_node = fbl::make_unique_checked<ImportedImageNode>(
       &alloc_checker, image_id, std::move(sysmem_buffer_info).value());
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for ImportedImageNode");
+    fdf::error("Failed to allocate memory for ImportedImageNode");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
   images_.insert(std::move(image_node));
@@ -261,8 +257,7 @@ zx::result<display::DriverImageId> ImportedImages::ImportImage(
 zx::result<> ImportedImages::ReleaseImage(display::DriverImageId image_id) {
   auto image_it = images_.find(image_id);
   if (image_it == images_.end()) {
-    FDF_LOG(WARNING, "Rejected request to release Image with unknown ID: %" PRIu64,
-            image_id.value());
+    fdf::warn("Rejected request to release Image with unknown ID: {}", image_id.value());
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 

@@ -99,7 +99,7 @@ std::pair<zx::ticks, std::vector<uint64_t>> SampleThread(const zx::unowned_proce
                          /*pc_is_return_address=*/false,
                          /*placeholder*/ unwinder::Frame::Trust::kFP);
 
-    bool success = unwinder.Step(&memory, current.regs, next.regs).ok();
+    bool success = unwinder.Step(&memory, current, next).ok();
 
     // An undefined PC (e.g. on Linux) or 0 PC (e.g. on Fuchsia) marks the end of the unwinding.
     // Don't include this in the output because it's not a real frame and provides no information.

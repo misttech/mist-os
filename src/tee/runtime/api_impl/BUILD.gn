@@ -54,10 +54,25 @@ rustc_library("api_impl") {
     "//src/lib/fuchsia-runtime",
     "//src/tee/lib/tee_properties",
     "//src/tee/tee_internal_api:tee_internal",
+    "//third_party/rust_crates:aes",
+    "//third_party/rust_crates:cbc",
+    "//third_party/rust_crates:cipher",
+    "//third_party/rust_crates:cmac",
+    "//third_party/rust_crates:crypto-common",
+    "//third_party/rust_crates:digest",
+    "//third_party/rust_crates:ecb",
+    "//third_party/rust_crates:elliptic-curve",
+    "//third_party/rust_crates:hmac",
     "//third_party/rust_crates:libc",
     "//third_party/rust_crates:num-traits",
+    "//third_party/rust_crates:p256",
+    "//third_party/rust_crates:rand_core",
+    "//third_party/rust_crates:rsa",
+    "//third_party/rust_crates:sha1",
+    "//third_party/rust_crates:sha2",
+    "//third_party/rust_crates:thiserror",
   ]
-  test_configs = [ ":export_scudo_dynamic_options" ]
+  public_configs = [ ":export_scudo_dynamic_options" ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
   with_unit_tests = true
   test_deps = [ "//src/lib/fuchsia" ]

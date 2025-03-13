@@ -8,10 +8,10 @@
 #include <lib/device-protocol/pci.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/sync/cpp/completion.h>
+#include <lib/zx/result.h>
 #include <threads.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
-#include <zircon/status.h>
 #include <zircon/syscalls.h>
 #include <zircon/threads.h>
 
@@ -228,11 +228,11 @@ void Interrupts::Destroy() {
 void Interrupts::InterruptHandler(async_dispatcher_t* dispatcher, async::IrqBase* irq,
                                   zx_status_t status, const zx_packet_interrupt_t* interrupt) {
   if (status == ZX_ERR_CANCELED) {
-    FDF_LOG(INFO, "Vsync interrupt wait is cancelled.");
+    fdf::info("Vsync interrupt wait is cancelled.");
     return;
   }
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Vsync interrupt wait failed: %s", zx_status_get_string(status));
+    fdf::error("Vsync interrupt wait failed: {}", zx::make_result(status));
     // A failed async interrupt wait doesn't remove the interrupt from the
     // async loop, so we have to manually cancel it.
     irq->Cancel();
@@ -266,7 +266,7 @@ void Interrupts::InterruptHandler(async_dispatcher_t* dispatcher, async::IrqBase
                                             : DetectHotplugSkylake(mmio_space_);
     for (auto ddi : GetDdiIds(device_id_)) {
       if (detect_result.detected[ddi]) {
-        FDF_LOG(TRACE, "Detected hot plug interrupt on ddi %d", ddi);
+        fdf::trace("Detected hot plug interrupt on ddi {}", ddi);
         hotplug_callback_(ddi, detect_result.long_pulse[ddi]);
       }
     }
@@ -328,7 +328,7 @@ void Interrupts::HandlePipeInterrupt(PipeId pipe_id, zx_time_t timestamp) {
   interrupt_identity.WriteTo(mmio_space_);
 
   if (interrupt_identity.underrun()) {
-    FDF_LOG(WARNING, "Transcoder underrun on pipe %d", pipe_id);
+    fdf::warn("Transcoder underrun on pipe {}", pipe_id);
   }
   if (interrupt_identity.vsync()) {
     pipe_vsync_callback_(pipe_id, timestamp);
@@ -371,7 +371,7 @@ zx_status_t Interrupts::Init(PipeVsyncCallback pipe_vsync_callback,
   device_id_ = device_id;
 
   // Interrupt propagation will be re-enabled in ::FinishInit()
-  FDF_LOG(TRACE, "Disabling graphics and display interrupt propagation");
+  fdf::trace("Disabling graphics and display interrupt propagation");
 
   if (is_tgl(device_id_)) {
     auto graphics_primary_interrupts =
@@ -385,13 +385,13 @@ zx_status_t Interrupts::Init(PipeVsyncCallback pipe_vsync_callback,
   // Assume that PCI will enable bus mastering as required for MSI interrupts.
   zx_status_t status = pci.ConfigureInterruptMode(1, &irq_mode_);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to configure irq mode (%d)", status);
+    fdf::error("Failed to configure irq mode ({})", status);
     return ZX_ERR_INTERNAL;
   }
 
   status = pci.MapInterrupt(0, &irq_);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to map interrupt (%d)", status);
+    fdf::error("Failed to map interrupt ({})", status);
     return status;
   }
   irq_handler_.set_object(irq_.get());
@@ -404,15 +404,14 @@ zx_status_t Interrupts::Init(PipeVsyncCallback pipe_vsync_callback,
           [this](fdf_dispatcher_t*) { irq_handler_dispatcher_shutdown_completed_.Signal(); },
           kRoleName);
   if (create_dispatcher_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to create vsync Dispatcher: %s",
-            create_dispatcher_result.status_string());
+    fdf::error("Failed to create vsync Dispatcher: {}", create_dispatcher_result);
     return create_dispatcher_result.status_value();
   }
   irq_handler_dispatcher_ = std::move(create_dispatcher_result).value();
 
   status = irq_handler_.Begin(irq_handler_dispatcher_.async_dispatcher());
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to begin IRQ handler wait: %s", zx_status_get_string(status));
+    fdf::error("Failed to begin IRQ handler wait: {}", zx::make_result(status));
     return status;
   }
 
@@ -421,7 +420,7 @@ zx_status_t Interrupts::Init(PipeVsyncCallback pipe_vsync_callback,
 }
 
 void Interrupts::FinishInit() {
-  FDF_LOG(TRACE, "Interrupts re-enabled");
+  fdf::trace("Interrupts re-enabled");
 
   auto display_interrupts = registers::DisplayInterruptControl::Get().ReadFrom(mmio_space_);
   display_interrupts.set_interrupts_enabled(true).WriteTo(mmio_space_);

@@ -76,15 +76,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("failed to read swarming output from %s: %e", *swarmingOutputPath, err)
 		}
-		var perTestLogDir string
-		if *outputsDir != "" {
-			perTestLogDir = filepath.Join(*outputsDir, "per-test")
-		}
-		var testNames []string
-		for _, test := range inputSummary.Tests {
-			testNames = append(testNames, test.Name)
-		}
-		swarmingOutputPerTest, err = tefmocheck.SplitTestLogs(swarmingOutput, filepath.Base(*swarmingOutputPath), perTestLogDir, testNames)
+		swarmingOutputPerTest, err = tefmocheck.SplitTestLogs(swarmingOutput, filepath.Base(*swarmingOutputPath), *outputsDir, inputSummary.Tests)
 		if err != nil {
 			log.Fatalf("failed to split swarming output into per-test logs: %s", err)
 		}
@@ -103,7 +95,7 @@ func main() {
 			if test.Name != testLog.TestName {
 				log.Fatalf("swarmingOutputPerTest[%d].TestName != inputSummary.Tests[%d] (%q vs %q)", i, i, testLog.TestName, test.Name)
 			}
-			relPath, err := filepath.Rel(*outputsDir, testLog.FilePath)
+			relPath, err := filepath.Rel(filepath.Join(*outputsDir, test.OutputDir), testLog.FilePath)
 			if err != nil {
 				log.Fatal(err)
 			}

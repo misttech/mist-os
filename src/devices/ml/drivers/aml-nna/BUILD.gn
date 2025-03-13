@@ -20,6 +20,7 @@ driver_bind_rules("aml_nna_bind") {
 }
 
 fuchsia_cc_driver("aml-nna-driver") {
+  legacy = true
   output_name = "aml-nna"
   configs += [
     "//build/config:all_source",

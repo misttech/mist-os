@@ -6,6 +6,7 @@ use crate::mm::PAGE_SIZE;
 #[cfg(feature = "starnix_lite")]
 use crate::task::{ptrace_get_scope, ptrace_set_scope, CurrentTask, NetstackDevicesDirectory};
 #[cfg(not(feature = "starnix_lite"))]
+use crate::security;
 use crate::task::{
     ptrace_get_scope, ptrace_set_scope, CurrentTask, NetstackDevicesDirectory, SeccompAction,
 };
@@ -19,10 +20,10 @@ use starnix_sync::Mutex;
 use starnix_uapi::auth::{
     Capabilities, FsCred, CAP_LAST_CAP, CAP_NET_ADMIN, CAP_SYS_ADMIN, CAP_SYS_RESOURCE,
 };
+use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::version::{KERNEL_RELEASE, KERNEL_VERSION};
-use starnix_uapi::{errno, error};
 use std::borrow::Cow;
 use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 use uuid::Uuid;
@@ -1191,9 +1192,7 @@ impl SeccompActionsLogged {
 #[cfg(not(feature = "starnix_lite"))]
 impl BytesFileOps for SeccompActionsLogged {
     fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
-            return error!(EPERM);
-        }
+        security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
         SeccompAction::set_actions_logged(current_task.kernel(), &data)?;
         Ok(())
     }
@@ -1212,9 +1211,7 @@ impl PtraceYamaScope {
 
 impl BytesFileOps for PtraceYamaScope {
     fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
-            return error!(EPERM);
-        }
+        security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
         ptrace_set_scope(current_task.kernel(), &data)?;
         Ok(())
     }
@@ -1249,9 +1246,7 @@ where
 {
     fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
         // Is CAP_SYS_RESOURCE the correct capability for all these files?
-        if !current_task.creds().has_capability(CAP_SYS_RESOURCE) {
-            return error!(EPERM);
-        }
+        security::check_task_capable(current_task, CAP_SYS_RESOURCE)?;
         let value = fs_args::parse(FsString::from(data).as_ref())?;
         T::store(current_task, value);
         Ok(())

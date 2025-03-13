@@ -29,6 +29,7 @@ if (is_host) {
       "src/ir/primitive.rs",
       "src/ir/protocol.rs",
       "src/ir/schema.rs",
+      "src/ir/service.rs",
       "src/ir/struct.rs",
       "src/ir/table.rs",
       "src/ir/type.rs",
@@ -52,10 +53,12 @@ if (is_host) {
       # Templates
       "templates/alias.askama",
       "templates/bits.askama",
+      "templates/compat.askama",
       "templates/const.askama",
       "templates/enum.askama",
       "templates/protocol.askama",
       "templates/schema.askama",
+      "templates/service.askama",
       "templates/struct.askama",
       "templates/table.askama",
       "templates/union.askama",
@@ -77,15 +80,6 @@ if (is_host) {
 
   golden_files("fidlgen_rust_next_golden_tests") {
     testonly = true
-
-    formatter = {
-      script = "$rustc_prefix/bin/rustfmt"
-      inputs = [ "//rustfmt.toml" ]
-      args = [
-        "--config-path",
-        rebase_path(inputs[0], root_build_dir),
-      ]
-    }
 
     deps = []
     comparisons = []

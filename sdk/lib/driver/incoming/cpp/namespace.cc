@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.component.runner/cpp/natural_types.h>
+#include <fidl/fuchsia.component.runner/cpp/wire_types.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <zircon/availability.h>
 
@@ -85,13 +87,6 @@ Namespace& Namespace::operator=(Namespace&& other) noexcept {
   other.incoming_ = nullptr;
   svc_dir_ = std::move(other.svc_dir_);
   return *this;
-}
-
-zx::result<> Namespace::OpenDeprecated(const char* path, fuchsia_io::OpenFlags flags,
-                                       zx::channel server_end) const {
-  zx_status_t status =
-      fdio_ns_open(incoming_, path, static_cast<uint32_t>(flags), server_end.release());
-  return zx::make_result(status);
 }
 
 zx::result<> Namespace::Open(const char* path, fuchsia_io::Flags flags,

@@ -9,6 +9,7 @@ use fidl::endpoints::{ClientEnd, Proxy as _};
 use fidl_fuchsia_fs_startup::{CreateOptions, MountOptions};
 use fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose};
 use fidl_fuchsia_io as fio;
+use fs_management::filesystem::Filesystem;
 use fs_management::Fxfs;
 use fuchsia_component::client::connect_to_protocol;
 use rand::rngs::StdRng;
@@ -31,7 +32,9 @@ const METADATA_KEY: [u8; 32] = [
 ];
 
 #[derive(Copy, Clone)]
-struct FxfsAllocate;
+struct FxfsAllocate {
+    storage_host: bool,
+}
 
 impl FxfsAllocate {
     fn connect_to_crypt_service(&self) -> Result<ClientEnd<CryptMarker>> {
@@ -169,13 +172,13 @@ impl Test for FxfsAllocate {
     async fn setup(
         self: Arc<Self>,
         device_label: String,
-        device_path: Option<String>,
+        _device_path: Option<String>,
         _seed: u64,
     ) -> Result<()> {
-        log::info!(device_label:%, device_path:?; "setting up");
-        let partition_controller = set_up_partition(device_label, device_path).await?;
+        log::info!(device_label:%; "setting up");
+        let block_connector = set_up_partition(device_label, self.storage_host).await?;
 
-        let mut fxfs = Fxfs::new(partition_controller);
+        let mut fxfs = Filesystem::from_boxed_config(block_connector, Box::new(Fxfs::default()));
         fxfs.format().await?;
         let mut fs = fxfs.serve_multi_volume().await?;
         let crypt = Some(self.setup_crypt_service().await?);
@@ -193,14 +196,14 @@ impl Test for FxfsAllocate {
     async fn test(
         self: Arc<Self>,
         device_label: String,
-        device_path: Option<String>,
+        _device_path: Option<String>,
         seed: u64,
     ) -> Result<()> {
-        log::info!(device_label:%, device_path:?; "running load gen");
-        let partition_controller =
-            find_partition(device_label, device_path).await.context("find partition")?;
+        log::info!(device_label:%; "running load gen");
+        let block_connector =
+            find_partition(device_label, self.storage_host).await.context("find partition")?;
 
-        let mut fxfs = Fxfs::new(partition_controller);
+        let mut fxfs = Filesystem::from_boxed_config(block_connector, Box::new(Fxfs::default()));
         let mut fs = fxfs.serve_multi_volume().await.context("serve multi volume")?;
         let crypt = Some(self.setup_crypt_service().await.context("set up crypt service")?);
         let volume = fs
@@ -351,13 +354,13 @@ impl Test for FxfsAllocate {
     async fn verify(
         self: Arc<Self>,
         device_label: String,
-        device_path: Option<String>,
+        _device_path: Option<String>,
         _seed: u64,
     ) -> Result<()> {
-        log::info!(device_label:%, device_path:?; "verifying disk consistency");
-        let partition_controller = find_partition(device_label, device_path).await?;
+        log::info!(device_label:%; "verifying disk consistency");
+        let block_connector = find_partition(device_label, self.storage_host).await?;
 
-        let mut fxfs = Fxfs::new(partition_controller);
+        let mut fxfs = Filesystem::from_boxed_config(block_connector, Box::new(Fxfs::default()));
         fxfs.fsck().await.context("overall fsck")?;
 
         let mut fs = fxfs.serve_multi_volume().await.context("failed to serve")?;
@@ -371,7 +374,8 @@ impl Test for FxfsAllocate {
 
 #[fuchsia::main(logging_tags = ["blackout", "fxfs-allocate"])]
 async fn main() -> Result<()> {
-    let server = TestServer::new(FxfsAllocate)?;
+    let config = blackout_config::Config::take_from_startup_handle();
+    let server = TestServer::new(FxfsAllocate { storage_host: config.storage_host })?;
     server.serve().await;
 
     Ok(())

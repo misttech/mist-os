@@ -54,8 +54,12 @@ class Bindgen:
         self.c_types_prefix = ""
         # Notice header to place at the beginning of the file.
         self.notice_header = FUCHSIA_NOTICE_HEADER
+        # Whether to generate !#[allow(...)] directives.
+        self.generate_allows = True
         # Additional raw lines of Rust code to add to the beginning of the generated output.
         self.raw_lines = ""
+        # Whether to generate explicit padding fields in structs.
+        self.explicit_padding = True
         # Mark types as an an opaque blob of bytes with a size and alignment.
         self.opaque_types = []
         # Clang: Include directories (`-I`)
@@ -113,16 +117,22 @@ class Bindgen:
 
     def run_bindgen(self, input_file, output_file):
         # Bindgen arguments.
-        raw_lines = self.notice_header + GENERATED_FILE_HEADER + self.raw_lines
+        raw_lines = self.notice_header
+        if self.generate_allows:
+            raw_lines += GENERATED_FILE_HEADER
+        raw_lines += self.raw_lines
+
         args = [
             BINDGEN_PATH,
             "--no-layout-tests",
-            "--explicit-padding",
             "--raw-line",
             raw_lines,
             "-o",
             output_file,
         ]
+
+        if self.explicit_padding:
+            args += ["--explicit-padding"]
 
         if self.ignore_functions:
             args.append("--ignore-functions")

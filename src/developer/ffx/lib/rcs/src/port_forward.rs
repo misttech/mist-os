@@ -22,36 +22,25 @@ async fn socket_provider(
     rcs_proxy: &RemoteControlProxy,
     timeout: Duration,
 ) -> Result<fsock::ProviderProxy> {
-    let (proxy, server_end) = fidl::endpoints::create_proxy::<fsock::ProviderMarker>();
     let start_time = Instant::now();
-    let res = crate::open_with_timeout_at(
+    crate::open_with_timeout_at::<fsock::ProviderMarker>(
         timeout,
         crate::toolbox::MONIKER,
         OpenDirType::NamespaceDir,
         &format!("svc/{}", fsock::ProviderMarker::PROTOCOL_NAME),
         rcs_proxy,
-        server_end.into_channel(),
     )
-    .await;
-    let proxy = if res.is_ok() {
-        proxy
-    } else {
-        // Fallback to the legacy remote control moniker if toolbox doesn't contain the capability.
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fsock::ProviderMarker>();
-        let timeout = timeout.saturating_sub(Instant::now() - start_time);
-        crate::open_with_timeout_at(
-            timeout,
-            crate::REMOTE_CONTROL_MONIKER,
-            OpenDirType::NamespaceDir,
-            &format!("svc/{}", fsock::ProviderMarker::PROTOCOL_NAME),
-            rcs_proxy,
-            server_end.into_channel(),
-        )
-        .await?;
-        proxy
-    };
-
-    Ok(proxy)
+    .await?;
+    // Fallback to the legacy remote control moniker if toolbox doesn't contain the capability.
+    let timeout = timeout.saturating_sub(Instant::now() - start_time);
+    crate::open_with_timeout_at::<fsock::ProviderMarker>(
+        timeout,
+        crate::REMOTE_CONTROL_MONIKER,
+        OpenDirType::NamespaceDir,
+        &format!("svc/{}", fsock::ProviderMarker::PROTOCOL_NAME),
+        rcs_proxy,
+    )
+    .await
 }
 
 /// Container for a zx::Socket that came from the port forwarding API. This is

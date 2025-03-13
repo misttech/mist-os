@@ -4,9 +4,6 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#include "arch/ops.h"
-#if WITH_KERNEL_PCIE
-
 #include <lib/counters.h>
 #include <platform.h>
 #include <zircon/rights.h>
@@ -16,6 +13,8 @@
 #include <object/interrupt_dispatcher.h>
 #include <object/pci_device_dispatcher.h>
 #include <object/pci_interrupt_dispatcher.h>
+
+#include "arch/ops.h"
 
 KCOUNTER(dispatcher_pci_interrupt_create_count, "dispatcher.pci_interrupt.create")
 KCOUNTER(dispatcher_pci_interrupt_destroy_count, "dispatcher.pci_interrupt.destroy")
@@ -107,5 +106,3 @@ zx_status_t PciInterruptDispatcher::RegisterInterruptHandler() {
 void PciInterruptDispatcher::UnregisterInterruptHandler() {
   device_->RegisterIrqHandler(vector_, nullptr, nullptr);
 }
-
-#endif  // if WITH_KERNEL_PCIE

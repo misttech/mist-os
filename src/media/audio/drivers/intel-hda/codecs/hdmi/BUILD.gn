@@ -16,6 +16,7 @@ group("hdmi") {
 }
 
 fuchsia_cc_driver("hdmi-audio-codec-driver") {
+  legacy = true
   output_name = "hdmi-audio-codec"
   configs += [
     "//build/config:all_source",

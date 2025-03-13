@@ -7,23 +7,23 @@
 
 #include <fidl/fuchsia.hardware.fan/cpp/fidl.h>
 #include <fidl/fuchsia.thermal/cpp/fidl.h>
+#include <lib/component/incoming/cpp/service_member_watcher.h>
 
 #include <list>
 
-#include "src/lib/fsl/io/device_watcher.h"
-
 namespace fan_controller {
-
-constexpr char kFanDirectory[] = "/dev/class/fan";
 
 class FanController {
  public:
   explicit FanController(async_dispatcher_t* dispatcher,
-                         fidl::ClientEnd<fuchsia_thermal::ClientStateConnector> connector)
+                         fidl::ClientEnd<fuchsia_thermal::ClientStateConnector> connector,
+                         fidl::ClientEnd<fuchsia_io::Directory> svc_root)
       : dispatcher_(dispatcher),
         connector_(std::move(connector)),
-        device_watcher_(fsl::DeviceWatcher::Create(
-            kFanDirectory, fit::bind_member<&FanController::ExistsCallback>(this), dispatcher)) {}
+        svc_root_(std::move(svc_root)),
+        watcher_(svc_root_.borrow()) {
+    ZX_ASSERT(watcher_.Begin(dispatcher, fit::bind_member<&FanController::NewFan>(this)).is_ok());
+  }
 
 #ifdef FAN_CONTROLLER_TEST
   size_t controller_fan_count(const std::string& client_type) {
@@ -34,14 +34,14 @@ class FanController {
 #endif
 
  private:
-  void ExistsCallback(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
-                      const std::string& filename);
+  void NewFan(fidl::ClientEnd<fuchsia_hardware_fan::Device> client_end);
   zx::result<fidl::ClientEnd<fuchsia_thermal::ClientStateWatcher>> ConnectToWatcher(
       const std::string& client_type);
 
   async_dispatcher_t* dispatcher_;
   fidl::SyncClient<fuchsia_thermal::ClientStateConnector> connector_;
-  std::unique_ptr<fsl::DeviceWatcher> device_watcher_;
+  fidl::ClientEnd<fuchsia_io::Directory> svc_root_;
+  component::ServiceMemberWatcher<fuchsia_hardware_fan::Service::Device> watcher_;
 
   struct ControllerInstance {
     fidl::Client<fuchsia_thermal::ClientStateWatcher> watcher_;

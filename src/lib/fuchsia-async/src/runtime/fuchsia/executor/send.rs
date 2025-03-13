@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use super::atomic_future::AtomicFuture;
 use super::common::{Executor, ExecutorTime, MAIN_TASK_ID};
 use super::scope::ScopeHandle;
-use crate::atomic_future::AtomicFuture;
 use fuchsia_sync::{Condvar, Mutex};
 
 use futures::FutureExt;
@@ -12,7 +12,7 @@ use std::future::Future;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
-use std::{fmt, thread, usize};
+use std::{fmt, thread};
 
 /// A multi-threaded port-based executor for Fuchsia. Requires that tasks scheduled on it
 /// implement `Send` so they can be load balanced between worker threads.
@@ -33,6 +33,7 @@ pub struct SendExecutor {
     // LINT.ThenChange(//src/developer/debug/zxdb/console/commands/verb_async_backtrace.cc)
     /// Worker thread handles
     threads: Vec<thread::JoinHandle<()>>,
+    worker_init: Option<Arc<dyn Fn() + Send + Sync + 'static>>,
 }
 
 impl fmt::Debug for SendExecutor {
@@ -44,15 +45,33 @@ impl fmt::Debug for SendExecutor {
 impl SendExecutor {
     /// Create a new multi-threaded executor.
     #[allow(deprecated)]
-    pub fn new(num_threads: usize) -> Self {
-        let inner = Arc::new(Executor::new(
-            ExecutorTime::RealTime,
-            /* is_local */ false,
-            num_threads.try_into().expect("no more than 256 threads are supported"),
-        ));
+    pub fn new(num_threads: u8) -> Self {
+        Self::new_inner(num_threads, None)
+    }
+
+    /// Set a new worker initialization callback. Will be invoked once at the start of each worker
+    /// thread.
+    pub fn set_worker_init(&mut self, worker_init: impl Fn() + Send + Sync + 'static) {
+        self.worker_init = Some(Arc::new(worker_init) as Arc<dyn Fn() + Send + Sync + 'static>);
+    }
+
+    /// Apply the worker initialization callback to an owned executor, returning the executor.
+    ///
+    /// The initialization callback will be invoked once at the start of each worker thread.
+    pub fn with_worker_init(mut self, worker_init: fn()) -> Self {
+        self.set_worker_init(worker_init);
+        self
+    }
+
+    fn new_inner(
+        num_threads: u8,
+        worker_init: Option<Arc<dyn Fn() + Send + Sync + 'static>>,
+    ) -> Self {
+        let inner =
+            Arc::new(Executor::new(ExecutorTime::RealTime, /* is_local */ false, num_threads));
         let root_scope = ScopeHandle::root(inner.clone());
         Executor::set_local(root_scope.clone());
-        Self { inner, root_scope, threads: Vec::default() }
+        Self { inner, root_scope, threads: Vec::default(), worker_init }
     }
 
     /// Get a reference to the Fuchsia `zx::Port` being used to listen for events.
@@ -150,10 +169,18 @@ impl SendExecutor {
         for _ in 0..self.inner.num_threads {
             let inner = self.inner.clone();
             let root_scope = self.root_scope.clone();
-            self.threads.push(thread::spawn(move || {
-                Executor::set_local(root_scope);
-                inner.worker_lifecycle::</* UNTIL_STALLED: */ false>();
-            }));
+            let worker_init = self.worker_init.clone();
+            let thread = thread::Builder::new()
+                .name("executor_worker".to_string())
+                .spawn(move || {
+                    Executor::set_local(root_scope);
+                    if let Some(init) = worker_init.as_ref() {
+                        init();
+                    }
+                    inner.worker_lifecycle::</* UNTIL_STALLED: */ false>();
+                })
+                .expect("must be able to spawn threads");
+            self.threads.push(thread);
         }
     }
 
@@ -182,6 +209,7 @@ mod tests {
     use crate::{Task, Timer};
 
     use futures::channel::oneshot;
+    use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::{Arc, Condvar, Mutex};
 
     #[test]
@@ -211,5 +239,19 @@ mod tests {
             *lock.lock().unwrap() = true;
             cvar.notify_one();
         });
+    }
+
+    #[test]
+    fn worker_init_called_once_per_worker() {
+        static NUM_INIT_CALLS: AtomicU64 = AtomicU64::new(0);
+        fn initialize_test_worker() {
+            NUM_INIT_CALLS.fetch_add(1, Ordering::SeqCst);
+        }
+
+        let mut exec = SendExecutor::new(2).with_worker_init(initialize_test_worker);
+        exec.run(async {});
+        assert_eq!(NUM_INIT_CALLS.load(Ordering::SeqCst), 2);
+        exec.run(async {});
+        assert_eq!(NUM_INIT_CALLS.load(Ordering::SeqCst), 4);
     }
 }

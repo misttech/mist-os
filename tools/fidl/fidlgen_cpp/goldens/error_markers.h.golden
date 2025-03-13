@@ -30,6 +30,8 @@ class Example final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 1107623248440401476;
   };
 };
 
@@ -37,6 +39,6 @@ class Example final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_error::Example> : public std::true_type{};
+struct IsProtocol<::test_error::Example> : public std::true_type {};
 
 }  // namespace fidl

@@ -6,7 +6,6 @@ use anyhow::{anyhow, bail, Context, Result};
 use assembly_config_capabilities::CapabilityNamedMap;
 use assembly_config_schema::assembly_config::CompiledPackageDefinition;
 use assembly_config_schema::developer_overrides::DeveloperOnlyOptions;
-use assembly_file_relative_path::FileRelativePathBuf;
 use camino::{Utf8Path, Utf8PathBuf};
 use serde::Serialize;
 use std::collections::btree_map::Entry;
@@ -149,6 +148,22 @@ impl ConfigurationContext<'_> {
         feature_set_levels: &[FeatureSupportLevel],
         item_name: &str,
     ) -> anyhow::Result<()> {
+        self.ensure_build_type(build_types, item_name)?;
+        self.ensure_feature_set_level(feature_set_levels, item_name)
+    }
+
+    /// Ensure that the configuration context matches the given set of
+    /// build-types.
+    ///
+    /// Note that this is not a mechanism to enforce policy; they simply make configuration errors
+    /// more obvious to users by providing a clear error message.
+    ///
+    /// Returns an error if they do not, and Ok(()) if they do.
+    pub fn ensure_build_type(
+        &self,
+        build_types: &[BuildType],
+        item_name: &str,
+    ) -> anyhow::Result<()> {
         if !build_types.contains(self.build_type) {
             bail!(
                 "{} can only be enabled on the following build types, not '{}': [{}]",
@@ -157,8 +172,7 @@ impl ConfigurationContext<'_> {
                 build_types.iter().map(|b| b.to_string()).collect::<Vec<String>>().join(", ")
             );
         }
-
-        self.ensure_feature_set_level(feature_set_levels, item_name)
+        Ok(())
     }
 
     /// Ensure that the configuration context matches the give set of
@@ -284,7 +298,7 @@ pub(crate) trait PackageConfigBuilder {
     /// Add a set of optionally-present files with their destination paths
     fn optional_config_data_files(
         &mut self,
-        paths: Vec<(&Option<FileRelativePathBuf>, &str)>,
+        paths: Vec<(&Option<Utf8PathBuf>, &str)>,
     ) -> Result<&mut dyn PackageConfigBuilder>;
 }
 
@@ -716,12 +730,12 @@ impl PackageConfigBuilder for PackageConfiguration {
 
     fn optional_config_data_files(
         &mut self,
-        paths: Vec<(&Option<FileRelativePathBuf>, &str)>,
+        paths: Vec<(&Option<Utf8PathBuf>, &str)>,
     ) -> Result<&mut dyn PackageConfigBuilder> {
         for (source, destination) in paths {
             if let Some(source) = source {
                 self.config_data(FileEntry {
-                    source: source.clone().to_utf8_pathbuf(),
+                    source: source.clone(),
                     destination: destination.into(),
                 })
                 .with_context(|| format!("setting {}", destination))?;
@@ -948,7 +962,7 @@ mod tests {
         pub(crate) static ref BOARD_INFORMATION_FOR_TESTS: BoardInformation = BoardInformation {
             name: "Test Board".into(),
             provided_features: vec![],
-            input_bundles: vec![],
+            input_bundles: Default::default(),
             filesystems: BoardFilesystemConfig::default(),
             ..Default::default()
         };

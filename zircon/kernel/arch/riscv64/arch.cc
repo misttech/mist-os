@@ -77,10 +77,6 @@ void arch_init() TA_NO_THREAD_SAFETY_ANALYSIS {
   dprintf(INFO, "RISCV: Boot HART ID %u\n", riscv64_boot_hart_id());
   dprintf(INFO, "RISCV: Supervisor mode\n");
 
-  auto [total_boot_mem, used_boot_mem] = riscv64_boot_map_used_memory();
-  dprintf(INFO, "RISCV: used %#zx bytes out of %#zx bytes for boot page tables\n", used_boot_mem,
-          total_boot_mem);
-
   riscv64_feature_init();
 
   riscv64_sbi_init();

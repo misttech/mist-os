@@ -27,7 +27,4 @@ pub enum EbpfError {
 
     #[error("Invalid cBPF jump offset: 0x{0:x}")]
     InvalidCbpfJumpOffset(u32),
-
-    #[error("Unsupported program type: 0x{0:x}")]
-    UnsupportedProgramType(u32),
 }

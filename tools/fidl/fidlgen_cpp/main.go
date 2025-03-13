@@ -16,6 +16,7 @@ func main() {
 	generator.GenerateFiles(root, []string{
 		"WireHeader", "UnifiedHeader", "WireTestBase", "TestBase", "Markers",
 		"CommonTypesHeader", "CommonTypesSource",
+		"CommonTypesFormatHeader",
 		"WireTypesHeader", "WireTypesSource",
 		"WireMessagingHeader", "WireMessagingSource",
 		"NaturalTypesHeader", "NaturalOStreamSource",

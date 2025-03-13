@@ -94,8 +94,7 @@ class ScopedPageFreedList;
 // object is unreachable due to having a ref count of 0.
 class VmCowPages final : public VmHierarchyBase,
                          public fbl::ContainableBaseClasses<
-                             fbl::TaggedDoublyLinkedListable<VmCowPages*, internal::ChildListTag>>,
-                         public VmDeferredDeleter<VmCowPages> {
+                             fbl::TaggedDoublyLinkedListable<VmCowPages*, internal::ChildListTag>> {
  public:
   static zx_status_t Create(fbl::RefPtr<VmHierarchyState> root_lock, VmCowPagesOptions options,
                             uint32_t pmm_alloc_flags, uint64_t size,
@@ -106,10 +105,79 @@ class VmCowPages final : public VmHierarchyBase,
                                     fbl::RefPtr<VmHierarchyState> root_lock, uint64_t size,
                                     fbl::RefPtr<VmCowPages>* cow_pages);
 
+  // Define the lock retrieval functions differently depending on whether we should be returning a
+  // local lock instance, or the common one in the hierarchy_state_ptr. Due to the TA_RET_CAP
+  // statements we cannot perform |if constexpr| or equivalent indirection in the function body, and
+  // must have two completely different function definitions.
+  // In the absence of a local lock it is assumed, and enforced in vm_object_lock.h, that there is a
+  // shared lock in the hierarchy state. If there is both a local and a shared lock then the local
+  // lock is to be used for the improved lock tracking.
+#if VMO_USE_LOCAL_LOCK
+  Lock<VmoLockType>* lock() const TA_RET_CAP(lock_) { return &lock_; }
+  Lock<VmoLockType>& lock_ref() const TA_RET_CAP(lock_) { return lock_; }
+#else
+  Lock<VmoLockType>* lock() const TA_RET_CAP(hierarchy_state_ptr_->lock_ref()) {
+    return hierarchy_state_ptr_->lock();
+  }
+  Lock<VmoLockType>& lock_ref() const TA_RET_CAP(hierarchy_state_ptr_->lock_ref()) {
+    return hierarchy_state_ptr_->lock_ref();
+  }
+#endif
+
+  uint64_t lock_order() const {
+#if (LOCK_DEP_ENABLED_FEATURE_LEVEL > 0)
+    return lock_order_;
+#endif
+    // When the lock order isn't in use just return a garbage value, whatever is calculated using it
+    // will get thrown away regardless.
+    return 0;
+  }
+
+  // Similar to LockedPtr, but holds a RefPtr instead of a raw pointer.
+  class LockedRefPtr {
+   public:
+    LockedRefPtr() = default;
+    ~LockedRefPtr() { release(); }
+    LockedRefPtr(LockedRefPtr&& l) = default;
+    LockedRefPtr(const fbl::RefPtr<VmCowPages>& object, VmLockAcquireMode mode)
+        : LockedRefPtr(object, object->lock_order(), mode) {}
+    LockedRefPtr(fbl::RefPtr<VmCowPages> object, uint64_t lock_order, VmLockAcquireMode mode)
+        : ptr_(ktl::move(object)),
+          lock_(Guard<VmoLockType>(AssertOrderedLock, ptr_->lock(), lock_order, mode).take()) {}
+    ktl::pair<fbl::RefPtr<VmCowPages>, Guard<VmoLockType>::Adoptable> take() {
+      return {ktl::move(ptr_), ktl::move(lock_)};
+    }
+
+    VmCowPages& locked() const TA_ASSERT(locked().lock()) { return *ptr_; }
+
+    fbl::RefPtr<VmCowPages>&& release() {
+      if (ptr_) {
+        Guard<VmoLockType> guard{AdoptLock, ptr_->lock(), ktl::move(lock_)};
+      }
+      return ktl::move(ptr_);
+    }
+
+    VmCowPages* get() const { return ptr_.get(); }
+    VmCowPages& operator*() const { return *ptr_; }
+    VmCowPages* operator->() const { return get(); }
+
+    explicit operator bool() const { return !!ptr_; }
+    LockedRefPtr& operator=(LockedRefPtr&& other) {
+      release();
+      ptr_ = ktl::move(other.ptr_);
+      lock_ = ktl::move(other.lock_);
+      return *this;
+    }
+
+   private:
+    fbl::RefPtr<VmCowPages> ptr_;
+    Guard<VmoLockType>::Adoptable lock_;
+  };
+
   // Creates a copy-on-write clone with the desired parameters. This can fail due to various
   // internal states not being correct.
-  zx_status_t CreateCloneLocked(CloneType type, bool require_unidirection, VmCowRange range,
-                                fbl::RefPtr<VmCowPages>* cow_child) TA_REQ(lock());
+  zx::result<LockedRefPtr> CreateCloneLocked(SnapshotType type, bool require_unidirection,
+                                             VmCowRange range) TA_REQ(lock());
 
   // VmCowPages are initially created in the Init state and need to be transitioned to Alive prior
   // to being used. This is exposed for VmObjectPaged to call after ensuring that creation is
@@ -152,9 +220,7 @@ class VmCowPages final : public VmHierarchyBase,
     return !!(options_ & VmCowPagesOptions::kPreservingPageContentRoot);
   }
 
-  bool is_parent_hidden_locked() const TA_REQ(lock()) {
-    return parent_ && parent_locked().is_hidden();
-  }
+  bool is_parent_hidden_locked() const TA_REQ(lock()) { return parent_ && parent_->is_hidden(); }
 
   bool is_discardable() const { return !!discardable_tracker_; }
 
@@ -167,6 +233,74 @@ class VmCowPages final : public VmHierarchyBase,
     bool result = is_root_source_preserving_page_content();
     DEBUG_ASSERT(result == is_root_source_user_pager_backed());
     return result;
+  }
+
+  // can_borrow_locked() returns true if the VmCowPages is capable of borrowing pages, but whether
+  // the VmCowPages should actually borrow pages also depends on a borrowing-site-specific flag that
+  // the caller is responsible for checking (in addition to checking can_borrow_locked()).  Only if
+  // both are true should the caller actually borrow at the caller's specific potential borrowing
+  // site.  For example, see is_borrowing_in_supplypages_enabled() and
+  // is_borrowing_on_mru_enabled().
+  // Aside from the general borrowing in the pmm_physical_page_borrow_config being turned on and
+  // off, the ability to borrow is constant over the lifetime of the VmCowPages.
+  bool can_borrow_locked() const TA_REQ(lock()) {
+    // TODO(dustingreen): Or rashaeqbal@.  We can only borrow while the page is not dirty.
+    // Currently we enforce this by checking ShouldTrapDirtyTransitions() below and leaning on the
+    // fact that !ShouldTrapDirtyTransitions() dirtying isn't implemented yet.  We currently evict
+    // to reclaim instead of replacing the page, and we can't evict a dirty page since the contents
+    // would be lost.  Option 1: When a loaned page is about to become dirty, we could replace it
+    // with a non-loaned page.  Option 2: When reclaiming a loaned page we could replace instead of
+    // evicting (this may be simpler).
+
+    // Currently there needs to be a page source for any borrowing to be possible, due to
+    // requirements of a backlink and other assumptions in the VMO code. Returning early here in the
+    // absence of a page source simplifies the rest of the logic.
+    if (!page_source_) {
+      return false;
+    }
+
+    bool source_is_suitable = page_source_->properties().is_preserving_page_content;
+
+    // This ensures that if borrowing is globally disabled (no borrowing sites enabled), that we'll
+    // return false.  We could delete this bool without damaging correctness, but we want to
+    // mitigate a call site that maybe fails to check its call-site-specific settings such as
+    // is_borrowing_in_supplypages_enabled().
+    //
+    // We also don't technically need to check is_any_borrowing_enabled() here since pmm will check
+    // also, but by checking here, we minimize the amount of code that will run when
+    // !is_any_borrowing_enabled() (in case we have it disabled due to late discovery of a problem
+    // with borrowing).
+    bool borrowing_is_generally_acceptable =
+        pmm_physical_page_borrowing_config()->is_any_borrowing_enabled();
+
+    // Avoid borrowing and trapping dirty transitions overlapping for now; nothing really stops
+    // these from being compatible AFAICT - we're just avoiding overlap of these two things until
+    // later.
+    bool overlapping_with_other_features = page_source_->ShouldTrapDirtyTransitions();
+
+    return source_is_suitable && borrowing_is_generally_acceptable &&
+           !overlapping_with_other_features;
+  }
+
+  // In addition to whether a VmCowPages is allowed, for correctness reasons, to borrow pages there
+  // are other, potentially variable, factors that influence whether it's considered a good idea for
+  // this VmCowPages to borrow pages. In particular it's possible for this to change over the
+  // lifetime of the VmCowPages.
+  bool should_borrow_locked() const TA_REQ(lock()) {
+    const bool can_borrow = can_borrow_locked();
+    if (!can_borrow) {
+      return false;
+    }
+    // Exclude is_latency_sensitive_ to avoid adding latency due to reclaim.
+    //
+    // Currently we evict instead of replacing a page when reclaiming, so we want to avoid evicting
+    // pages that are latency sensitive or are fairly likely to be pinned at some point.
+    //
+    // We also don't want to borrow a page that might get pinned again since we want to mitigate the
+    // possibility of an invalid DMA-after-free.
+    const bool excluded_from_borrowing_for_latency_reasons =
+        high_priority_count_ != 0 || ever_pinned_;
+    return !excluded_from_borrowing_for_latency_reasons;
   }
 
   // Returns whether this cow pages node is dirty tracked.
@@ -579,9 +713,30 @@ class VmCowPages final : public VmHierarchyBase,
   bool DebugValidateVmoPageBorrowingLocked() const TA_REQ(lock());
 
   using RangeChangeOp = VmObject::RangeChangeOp;
-  // Apply the specified operation to all mappings in the given range. This is applied to all
-  // descendants within the range.
-  void RangeChangeUpdateLocked(VmCowRange range, RangeChangeOp op) TA_REQ(lock());
+  // Applies the specific operation to all mappings in the given range against this object. The
+  // operations is not applied to descendants/cow children.
+  enum class RangeChangeChildren : bool {
+    // The caller acknowledges that they may need to apply updates to mappings in the children, and
+    // promise to do so. A failure to actually perform the child range updates cannot be detected,
+    // but by requiring callers to explicitly acknowledge that they need to is intended to minimize
+    // errors.
+    Deferred,
+    // The caller states that they know that they have no children and therefore do not need to
+    // perform a range change on them. It is an error, and will trigger an assertion failure, to
+    // supply this if there are children.
+    AssumeNone,
+  };
+  void RangeChangeUpdateSelfLocked(VmCowRange range, RangeChangeOp op, RangeChangeChildren children)
+      TA_REQ(lock());
+  // Applies the specific operation to all mappings in the given range for against descendants/cow
+  // children. The operation is not applied for this object.
+  // Takes ownership, and will drop, the lock for this object as children are iterated.
+  void RangeChangeUpdateCowChildren(VmCowRange range, RangeChangeOp op,
+                                    Guard<VmoLockType>::Adoptable adopt) TA_EXCL(lock());
+  // TODO(https://fxbug.dev/338300943): Under fine grained locking children cannot be iterated while
+  // this VMOs lock is held. This method exists while call sites transition to the above method that
+  // takes ownership of the lock.
+  void RangeChangeUpdateCowChildrenLocked(VmCowRange range, RangeChangeOp op) TA_REQ(lock());
 
   // Promote pages in the specified range for reclamation under memory pressure. |offset| will be
   // rounded down to the page boundary, and |len| will be rounded up to the page boundary.
@@ -599,19 +754,19 @@ class VmCowPages final : public VmHierarchyBase,
   // the range will still be operated on. If this flag is not set then any kind of error causes an
   // immediate abort.
   zx_status_t ProtectRangeFromReclamationLocked(VmCowRange range, bool set_always_need,
-                                                bool ignore_errors, Guard<CriticalMutex>* guard)
+                                                bool ignore_errors, Guard<VmoLockType>* guard)
       TA_REQ(lock());
 
   // Ensures any pages in the specified range are not compressed, but does not otherwise commit any
   // pages. In order to handle delayed memory allocations, |guard| may be dropped one or more times.
-  zx_status_t DecompressInRangeLocked(VmCowRange range, Guard<CriticalMutex>* guard) TA_REQ(lock());
+  zx_status_t DecompressInRangeLocked(VmCowRange range, Guard<VmoLockType>* guard) TA_REQ(lock());
 
   // See VmObject::ChangeHighPriorityCountLocked
   void ChangeHighPriorityCountLocked(int64_t delta) TA_REQ(lock());
 
-  zx_status_t LockRangeLocked(VmCowRange range, zx_vmo_lock_state_t* lock_state_out);
-  zx_status_t TryLockRangeLocked(VmCowRange range);
-  zx_status_t UnlockRangeLocked(VmCowRange range);
+  zx_status_t LockRangeLocked(VmCowRange range, zx_vmo_lock_state_t* lock_state_out) TA_REQ(lock());
+  zx_status_t TryLockRangeLocked(VmCowRange range) TA_REQ(lock());
+  zx_status_t UnlockRangeLocked(VmCowRange range) TA_REQ(lock());
 
   uint64_t DebugGetPageCountLocked() const TA_REQ(lock());
   bool DebugIsPage(uint64_t offset) const;
@@ -648,7 +803,7 @@ class VmCowPages final : public VmHierarchyBase,
   zx_status_t ReplacePage(vm_page_t* before_page, uint64_t offset, bool with_loaned,
                           vm_page_t** after_page, AnonymousPageRequest* page_request)
       TA_EXCL(lock()) {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
     return ReplacePageLocked(before_page, offset, with_loaned, after_page, page_request);
   }
 
@@ -660,10 +815,12 @@ class VmCowPages final : public VmHierarchyBase,
   // Potentially transitions from Alive->Dead if the cow pages is unreachable (i.e. has no
   // paged_ref_ and no children). Used by the VmObjectPaged when it unlinks the paged_ref_, but
   // prior to dropping the RefPtr, giving the VmCowPages a chance to transition.
-  void MaybeDeadTransitionLocked(Guard<CriticalMutex>& guard) TA_REQ(lock());
+  // If a VmCowPages is returned then this is a parent that needs to have MaybeDeadTransition called
+  // on it.
+  fbl::RefPtr<VmCowPages> MaybeDeadTransitionLocked(Guard<VmoLockType>& guard) TA_REQ(lock());
 
   // Unlocked helper around MaybeDeadTransitionLocked
-  void MaybeDeadTransition();
+  fbl::RefPtr<VmCowPages> MaybeDeadTransition();
 
   // Helper to allocate a new page for the VMO, filling out the page request if necessary.
   zx_status_t AllocPage(vm_page_t** page, AnonymousPageRequest* page_request);
@@ -708,7 +865,7 @@ class VmCowPages final : public VmHierarchyBase,
   // private constructor (use Create...())
   VmCowPages(fbl::RefPtr<VmHierarchyState> root_lock, VmCowPagesOptions options,
              uint32_t pmm_alloc_flags, uint64_t size, fbl::RefPtr<PageSource> page_source,
-             ktl::unique_ptr<DiscardableVmoTracker> discardable_tracker);
+             ktl::unique_ptr<DiscardableVmoTracker> discardable_tracker, uint64_t lock_order);
 
   ~VmCowPages() override;
 
@@ -718,69 +875,95 @@ class VmCowPages final : public VmHierarchyBase,
       TA_REQ(lock());
 
   friend class fbl::RefPtr<VmCowPages>;
+  friend class LockedParentWalker;
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(VmCowPages);
+
+  // Helper class for managing a locked VmCowPages referenced by a raw pointer. This helper makes it
+  // easy pass around references to locked objects while retaining as much static analysis support
+  // as possible.
+  // This class needs to be declared fully inline here so that VmCowPages methods can reference it
+  // and so that this can reference the |lock()| member of VmCowPages.
+  class LockedPtr {
+   public:
+    LockedPtr() = default;
+    ~LockedPtr() { release(); }
+    LockedPtr(LockedPtr&& other) : ptr_(other.ptr_), lock_(other.take_lock()) {}
+    LockedPtr(VmCowPages* ptr, VmLockAcquireMode mode) : LockedPtr(ptr, ptr->lock_order(), mode) {}
+    LockedPtr(VmCowPages* ptr, uint64_t lock_order, VmLockAcquireMode mode) TA_EXCL(ptr->lock())
+        : ptr_(ptr),
+          lock_(Guard<VmoLockType>{AssertOrderedLock, ptr->lock(), lock_order, mode}.take()) {}
+    // Take both the pointer and the lock, leaving the LockedPtr empty. Caller must take ownership
+    // of the returned lock and release it.
+    ktl::pair<VmCowPages*, Guard<VmoLockType>::Adoptable> take() {
+      VmCowPages* ret = ptr_;
+      return {ret, take_lock()};
+    }
+    // Provide locked access to the underlying pointer. Must not be null.
+    VmCowPages& locked() const TA_ASSERT(locked().lock()) { return *ptr_; }
+    // Provide locked access toe the underlying pointer, or if the pointer is null locked access to
+    // the passed in object.
+    VmCowPages& locked_or(VmCowPages* self) const TA_REQ(self->lock())
+        TA_ASSERT(locked_or(self).lock()) {
+      if (ptr_) {
+        return *ptr_;
+      }
+      return *self;
+    }
+    const VmCowPages& locked_or(const VmCowPages* self) const TA_REQ(self->lock())
+        TA_ASSERT(locked_or(self).lock()) {
+      if (ptr_) {
+        return *ptr_;
+      }
+      return *self;
+    }
+    // Release the lock, returning the underlying pointer.
+    VmCowPages* release() {
+      auto [ret, lock] = take();
+      if (ret) {
+        Guard<VmoLockType> guard{AdoptLock, ret->lock(), ktl::move(lock)};
+      }
+      return ret;
+    }
+
+    explicit operator bool() const { return !!ptr_; }
+    VmCowPages* get() const { return ptr_; }
+    VmCowPages& operator*() const { return *ptr_; }
+    VmCowPages* operator->() const { return ptr_; }
+
+    LockedPtr& operator=(LockedPtr&& other) {
+      release();
+      auto [ptr, lock] = other.take();
+      // Whatever ptr and lock are they come from a LockedPtr that is assumed to be valid, and so
+      // assigning them into ourselves is assumed to valid and maintain our lock invariant.
+      ptr_ = ptr;
+      lock_ = ktl::move(lock);
+      return *this;
+    }
+
+   private:
+    // Helper for moving out the lock_ and clearing the ptr_ at the same time.
+    Guard<VmoLockType>::Adoptable&& take_lock() {
+      ptr_ = nullptr;
+      return ktl::move(lock_);
+    }
+    // Underlying object pointer and lock. The invariant that this class maintains is that if ptr_
+    // is null, then lock_ is invalid, otherwise if ptr_ is non-null then lock_ holds the adoptable
+    // lock acquisition of that object.
+    VmCowPages* ptr_ = nullptr;
+    Guard<VmoLockType>::Adoptable lock_;
+  };
 
   // Transitions from Alive->Dead, freeing pages and cleaning up state. Responsibility of the caller
   // to validate that it is correct to be doing this transition. May drop the lock during its
   // execution.
-  void DeadTransition(Guard<CriticalMutex>& guard) TA_REQ(lock());
+  // Might return its parent_ RefPtr, which the caller must check if a dead transition is needed and
+  // then release the RefPtr.
+  fbl::RefPtr<VmCowPages> DeadTransitionLocked(Guard<VmoLockType>& guard) TA_REQ(lock());
 
   bool is_hidden() const { return !!(options_ & VmCowPagesOptions::kHidden); }
   bool can_decommit_zero_pages() const {
     return !(options_ & VmCowPagesOptions::kCannotDecommitZeroPages);
-  }
-
-  // can_borrow_locked() returns true if the VmCowPages is capable of borrowing pages, but whether
-  // the VmCowPages should actually borrow pages also depends on a borrowing-site-specific flag that
-  // the caller is responsible for checking (in addition to checking can_borrow_locked()).  Only if
-  // both are true should the caller actually borrow at the caller's specific potential borrowing
-  // site.  For example, see is_borrowing_in_supplypages_enabled() and
-  // is_borrowing_on_mru_enabled().
-  bool can_borrow_locked() const TA_REQ(lock()) {
-    // TODO(dustingreen): Or rashaeqbal@.  We can only borrow while the page is not dirty.
-    // Currently we enforce this by checking ShouldTrapDirtyTransitions() below and leaning on the
-    // fact that !ShouldTrapDirtyTransitions() dirtying isn't implemented yet.  We currently evict
-    // to reclaim instead of replacing the page, and we can't evict a dirty page since the contents
-    // would be lost.  Option 1: When a loaned page is about to become dirty, we could replace it
-    // with a non-loaned page.  Option 2: When reclaiming a loaned page we could replace instead of
-    // evicting (this may be simpler).
-
-    // Currently there needs to be a page source for any borrowing to be possible, due to
-    // requirements of a backlink and other assumptions in the VMO code. Returning early here in the
-    // absence of a page source simplifies the rest of the logic.
-    if (!page_source_) {
-      return false;
-    }
-
-    bool source_is_suitable = page_source_->properties().is_preserving_page_content;
-
-    // This ensures that if borrowing is globally disabled (no borrowing sites enabled), that we'll
-    // return false.  We could delete this bool without damaging correctness, but we want to
-    // mitigate a call site that maybe fails to check its call-site-specific settings such as
-    // is_borrowing_in_supplypages_enabled().
-    //
-    // We also don't technically need to check is_any_borrowing_enabled() here since pmm will check
-    // also, but by checking here, we minimize the amount of code that will run when
-    // !is_any_borrowing_enabled() (in case we have it disabled due to late discovery of a problem
-    // with borrowing).
-    bool borrowing_is_generally_acceptable =
-        pmm_physical_page_borrowing_config()->is_any_borrowing_enabled();
-    // Exclude is_latency_sensitive_ to avoid adding latency due to reclaim.
-    //
-    // Currently we evict instead of replacing a page when reclaiming, so we want to avoid evicting
-    // pages that are latency sensitive or are fairly likely to be pinned at some point.
-    //
-    // We also don't want to borrow a page that might get pinned again since we want to mitigate the
-    // possibility of an invalid DMA-after-free.
-    bool excluded_from_borrowing_for_latency_reasons = high_priority_count_ != 0 || ever_pinned_;
-    // Avoid borrowing and trapping dirty transitions overlapping for now; nothing really stops
-    // these from being compatible AFAICT - we're just avoiding overlap of these two things until
-    // later.
-    bool overlapping_with_other_features = page_source_->ShouldTrapDirtyTransitions();
-
-    return source_is_suitable && borrowing_is_generally_acceptable &&
-           !excluded_from_borrowing_for_latency_reasons && !overlapping_with_other_features;
   }
 
   bool direct_source_supplies_zero_pages() const {
@@ -791,57 +974,44 @@ class VmCowPages final : public VmHierarchyBase,
     return !page_source_ || !page_source_->properties().is_preserving_page_content;
   }
 
-  bool is_cow_clonable_locked() const TA_REQ(lock()) {
-    // Copy-on-write clones of pager vmos or their descendants aren't supported as we can't
-    // efficiently make an immutable snapshot.
-    if (can_root_source_evict()) {
+  // Returns whether or not performing a bidirectional clone would result in a valid tree structure.
+  // This does not perform checks on whether there are pinned pages, or if a bidirectional clone
+  // would semantically make sense. Additionally the target |parent| for the new node should be
+  // passed in, which may or may not be the same as |parent_|.
+  bool can_bidirectional_clone_locked(const LockedPtr& parent) const TA_REQ(lock()) {
+    // If the immediate node has a page source of any kind then bidirectional cloning is not
+    // possible. A page source is otherwise permitted in the tree.
+    if (page_source_) {
       return false;
     }
 
-    // We also don't support COW clones for contiguous VMOs.
-    if (is_source_supplying_specific_physical_pages()) {
+    // Children may not exist on the current node, as the bidirectional clone path cannot presently
+    // fix them up.
+    if (children_list_len_ != 0) {
+      return false;
+    }
+
+    // If there is a parent then either that parent is hidden, or the parent is the root of the
+    // tree. This forbids creating a bi-directional clone at the end of chain of unidirectional
+    // clones.
+    if (parent && parent.locked().parent_ && !parent->is_hidden()) {
       return false;
     }
 
     return true;
   }
 
-  bool is_snapshot_at_least_on_write_supported() const TA_REQ(lock()) {
-    canary_.Assert();
-
-    if (is_parent_hidden_locked()) {
-      return false;
-    }
-
-    bool result = is_root_source_preserving_page_content();
-    DEBUG_ASSERT(result == is_root_source_user_pager_backed());
-
-    return result;
-  }
-
-  bool can_snapshot_modified_locked() const TA_REQ(lock()) {
-    // Root must be pager-backed.
+  // Returns whether or not performing a unidirectional clone would result in a valid tree
+  // structure. This does not mean that the a unidirectional clone would semantically make sense.
+  bool can_unidirectional_clone_locked() const TA_REQ(lock()) {
+    // Root must be pager-backed, otherwise we must always be doing a bidirectional clone.
     if (!is_root_source_user_pager_backed()) {
       return false;
     }
 
-    // We don't support COW clones for contiguous VMOs.
-    if (is_source_supplying_specific_physical_pages()) {
-      return false;
-    }
-
-    // Unless we are the root VMO, we can't snapshot if has children, as it would create an
-    // inconsistent hierarchy.
-    if (!parent_) {
-      return true;
-    }
-    if (children_list_len_ != 0) {
-      return false;
-    }
-
-    // Snapshot-modified is currently unsupported for at-least-on-write VMO chains of length >2.
-    AssertHeld(parent_->lock_ref());
-    if (parent_->parent_ && !is_parent_hidden_locked()) {
+    // Any parent must not be hidden. This transitively ensures that there is a never a
+    // unidirectional clone anywhere below a hidden parent.
+    if (parent_ && is_parent_hidden_locked()) {
       return false;
     }
 
@@ -859,20 +1029,21 @@ class VmCowPages final : public VmHierarchyBase,
   // See |ForEveryOwnedHierarchyPageInRange|. Each entry given to `T` is constant and may not be
   // modified in any way.
   template <typename T>
-  zx_status_t ForEveryOwnedHierarchyPageInRangeLocked(T func, uint64_t offset, uint64_t size) const
-      TA_REQ(lock());
+  zx_status_t ForEveryOwnedHierarchyPageInRangeLocked(T func, uint64_t offset, uint64_t size,
+                                                      const LockedPtr& parent) const TA_REQ(lock());
 
   // See |ForEveryOwnedHierarchyPageInRange|. Each entry given to `T` is a VmPageOrMarkerRef, which
   // supports limited mutation.
   template <typename T>
-  zx_status_t ForEveryOwnedMutableHierarchyPageInRangeLocked(T func, uint64_t offset, uint64_t size)
+  zx_status_t ForEveryOwnedMutableHierarchyPageInRangeLocked(T func, uint64_t offset, uint64_t size,
+                                                             const LockedPtr& parent)
       TA_REQ(lock());
 
   // See |ForEveryOwnedHierarchyPageInRange|. Each entry given to `T` is mutable and `T` may modify
   // it or replace it with an empty entry.
   template <typename T>
-  zx_status_t RemoveOwnedHierarchyPagesInRangeLocked(T func, uint64_t offset, uint64_t size)
-      TA_REQ(lock());
+  zx_status_t RemoveOwnedHierarchyPagesInRangeLocked(T func, uint64_t offset, uint64_t size,
+                                                     const LockedPtr& parent) TA_REQ(lock());
 
   // Iterates a range within a visible node, invoking a callback for every `VmPageListEntry` the
   // node owns (fully or partially) in that range.
@@ -893,6 +1064,8 @@ class VmCowPages final : public VmHierarchyBase,
   //  * `func`: Callback function invoked for each non-empty entry.
   //  * `offset`: Offset relative to `self` to begin iterating at.
   //  * `size`: Size of the range to iterate.
+  //  * `parent`: If the caller has locked the immediate parent, then it can pass it in here to
+  //              avoid double locking, otherwise if no parent or not locked a nullptr can be given.
   //
   // The type `S` must be implicitly convertible to a `VmCowPages` or a `const VmCowPages`.
   // The type `P` is `const VmPageOrMarker` if `S` is const, otherwise it is `VmPageOrMarker`.
@@ -907,10 +1080,8 @@ class VmCowPages final : public VmHierarchyBase,
   // from the failing `func` invocation.
   template <typename P, typename S, typename T>
   static zx_status_t ForEveryOwnedHierarchyPageInRange(S* self, T func, uint64_t offset,
-                                                       uint64_t size) TA_REQ(self->lock());
-
-  // Walks up the parent tree and returns the root, or |this| if there is no parent.
-  const VmCowPages* GetRootLocked() const TA_REQ(lock());
+                                                       uint64_t size, const LockedPtr& parent)
+      TA_REQ(self->lock());
 
   // Changes a Reference in the provided VmPageOrMarker into a real vm_page_t. The allocated page
   // is assumed to be for this VmCowPages, and so uses the pmm_alloc_flags_, but it is not assumed
@@ -1123,7 +1294,7 @@ class VmCowPages final : public VmHierarchyBase,
   zx_status_t CloneCowPageLocked(uint64_t offset, list_node_t* alloc_list, VmCowPages* page_owner,
                                  vm_page_t* page, uint64_t owner_offset,
                                  AnonymousPageRequest* page_request, vm_page_t** out_page)
-      TA_REQ(lock());
+      TA_REQ(lock()) TA_REQ(page_owner->lock());
 
   // Helper function that 'forks' the page into |offset| of the current node, which must be a
   // visible node. This function is similar to |CloneCowPageLocked|, but instead handles the case
@@ -1149,11 +1320,12 @@ class VmCowPages final : public VmHierarchyBase,
   zx_status_t CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* freed_list,
                                        VmCowPages* page_owner, vm_page_t* page,
                                        uint64_t owner_offset, AnonymousPageRequest* page_request)
-      TA_REQ(lock());
+      TA_REQ(lock()) TA_REQ(page_owner->lock());
 
   // Helper struct which encapsulates a parent node along with a range and limit relative to it.
   struct ParentAndRange {
-    VmCowPages* parent;
+    LockedPtr parent;
+    LockedPtr grandparent;
     uint64_t parent_offset;
     uint64_t parent_limit;
     uint64_t size;
@@ -1161,7 +1333,7 @@ class VmCowPages final : public VmHierarchyBase,
 
   // Helper function for |CloneUnidirectionalLocked| and |CloneBidirectionalLocked|.
   //
-  // Walks the hierarchy from the `parent` node to the root and finds the most distant node which
+  // Walks the hierarchy from the |this| node to the root and finds the most distant node which
   // could correctly be the parent for a new clone of this node.
   //
   // Computes a range and limit for the clone, relative to the final parent, such that the clone
@@ -1175,23 +1347,28 @@ class VmCowPages final : public VmHierarchyBase,
   //  * The root.
   //
   // The caller provides:
-  //  * `parent`: Parent node to begin the search from. It must be a visible node.
+  //  * `this`: Initial candidate parent node to begin the search from. It must be a visible node.
   //             The new clone is logically a clone of it.
   //  * `offset`: Offset of the clone relative to the initial parent.
   //  * `size`: Size of the clone.
   //  * `parent_must_be_hidden`: true iff the final parent must satisfy this constraint.
   //
-  // Returns the parent node along with the clones' range and limit relative to that parent.
-  static ParentAndRange FindParentAndRangeForCloneLocked(VmCowPages* parent, uint64_t offset,
-                                                         uint64_t size, bool parent_must_be_hidden);
+  // Returns the actual node that should be used as the parent of the clone, and if that node has a
+  // parent also returns a locked reference to that node. By locking the parent of the target parent
+  // the caller ensures that any reasoning that made the target valid remains valid until the clone
+  // can be created. As a result it is only valid to create the clone if done so whilst continuously
+  // holding the returned locks.
+  ParentAndRange FindParentAndRangeForCloneLocked(uint64_t offset, uint64_t size,
+                                                  bool parent_must_be_hidden) TA_REQ(lock());
 
   // Helper function for |CloneBidirectionalLocked|.
   //
-  // Adds the newly created bidirectionally cloned |child| as a child of this node at the location
-  // specified by |location|. The |location.parent| field must be |this| object. Also, updates the
-  // appropriate share counts for the pages that are now shared by the new child.
-  void AddBidirectionallyClonedChildLocked(ParentAndRange location, VmCowPages* child)
-      TA_REQ(lock());
+  // Adds the newly created bidirectionally cloned |child| as a child of this node. Also, updates
+  // the appropriate share counts for the pages that are now shared by the new child. If there is a
+  // parent_ then the passed in |parent| is a locked ptr to it.
+  void AddBidirectionallyClonedChildLocked(uint64_t offset, uint64_t limit, VmCowPages* child,
+                                           const LockedPtr& parent) TA_REQ(lock())
+      TA_REQ(child->lock());
 
   // Helper function for |CreateCloneLocked|.
   //
@@ -1206,12 +1383,9 @@ class VmCowPages final : public VmHierarchyBase,
   // any writes or newly committed pages made by ancestor nodes after the clone operation is
   // performed.
   //
-  // This node may not end up being the parent of the child, see |FindParentAndRangeForCloneLocked|.
-  // However if this node does end up being the parent, then this method will create a second new
-  // child node with the same properties as this node and this node will become the hidden parent of
-  // both new children.
-  zx_status_t CloneBidirectionalLocked(uint64_t offset, uint64_t size,
-                                       fbl::RefPtr<VmCowPages>* cow_child) TA_REQ(lock());
+  // If there is a parent_ then the passed in |parent| is a locked ptr to it.
+  zx::result<LockedRefPtr> CloneBidirectionalLocked(uint64_t offset, uint64_t limit, uint64_t size,
+                                                    const LockedPtr& parent) TA_REQ(lock());
 
   // Helper function for |CreateCloneLocked|.
   //
@@ -1227,9 +1401,9 @@ class VmCowPages final : public VmHierarchyBase,
   // have newly committed since this clone operation was performed - the clone may see these pages
   // to snapshot them but it is not guaranteed.
   //
-  // This node may not end up being the parent of the child, see |FindParentAndRangeForCloneLocked|.
-  zx_status_t CloneUnidirectionalLocked(uint64_t offset, uint64_t size,
-                                        fbl::RefPtr<VmCowPages>* cow_child) TA_REQ(lock());
+  // If there is a parent_ then the passed in |parent| is a locked ptr to it.
+  zx::result<LockedRefPtr> CloneUnidirectionalLocked(uint64_t offset, uint64_t limit, uint64_t size,
+                                                     const LockedPtr& parent) TA_REQ(lock());
 
   // Release any pages this VMO can reference from the provided start offset till the end of the
   // VMO. This releases both directly owned pages, as well as pages in hidden parents that may be
@@ -1241,7 +1415,7 @@ class VmCowPages final : public VmHierarchyBase,
 
   // When cleaning up a hidden vmo, merges the hidden vmo's content (e.g. page list, view
   // of the parent) into the remaining child.
-  void MergeContentWithChildLocked(VmCowPages* removed) TA_REQ(lock());
+  void MergeContentWithChildLocked() TA_REQ(lock());
 
   // Moves an existing page to the wired queue as a consequence of the page being pinned.
   void MoveToPinnedLocked(vm_page_t* page, uint64_t offset) TA_REQ(lock());
@@ -1275,34 +1449,24 @@ class VmCowPages final : public VmHierarchyBase,
 
   // Move all the pages from this VmCowPages object into another VmCowPages object.
   // The receiving VmCowPages must not have any pages yet.
-  void MovePagesIntoLocked(fbl::RefPtr<VmCowPages> other) TA_REQ(lock());
+  void MovePagesIntoLocked(VmCowPages& other) TA_REQ(lock()) TA_REQ(other.lock());
 
   // Replaces this node in its parent's child list with a hidden node and makes this node a child
   // of the newly created hidden node. Moves the pages that were stored at this node into the
   // newly created hidden node.
-  zx_status_t ReplaceWithHiddenNodeLocked(fbl::RefPtr<VmCowPages>* replacement_node) TA_REQ(lock());
+  zx::result<LockedRefPtr> ReplaceWithHiddenNodeLocked(const LockedPtr& parent) TA_REQ(lock());
 
   // Removes the specified child from this objects |children_list_| and performs any hierarchy
   // updates that need to happen as a result. This does not modify the |parent_| member of the
   // removed child and if this is not being called due to |removed| being destructed it is the
   // callers responsibility to correct parent_.
-  void RemoveChildLocked(VmCowPages* removed) TA_REQ(lock());
+  void RemoveChildLocked(VmCowPages* removed) TA_REQ(lock()) TA_REQ(removed->lock());
 
   // Inserts a newly created VmCowPages into this hierarchy as a child of this VmCowPages.
   // Initializes child members based on the passed in values that only have meaning when an object
   // is a child. This updates the parent_ field in child to hold a refptr to |this|.
-  void AddChildLocked(VmCowPages* child, uint64_t offset, uint64_t parent_limit) TA_REQ(lock());
-
-  // Helpers to give convenience locked access to the parent_. Only valid to be called if there is a
-  // parent.
-  VmCowPages& parent_locked() TA_REQ(lock()) TA_ASSERT(parent_locked().lock()) {
-    DEBUG_ASSERT(parent_);
-    return *parent_;
-  }
-  const VmCowPages& parent_locked() const TA_REQ(lock()) TA_ASSERT(parent_locked().lock()) {
-    DEBUG_ASSERT(parent_);
-    return *parent_;
-  }
+  void AddChildLocked(VmCowPages* child, uint64_t offset, uint64_t parent_limit) TA_REQ(lock())
+      TA_REQ(child->lock());
 
   void ReplaceChildLocked(VmCowPages* old, VmCowPages* new_child) TA_REQ(lock());
 
@@ -1354,10 +1518,10 @@ class VmCowPages final : public VmHierarchyBase,
   // the page is owned by this VMO at the specified offset.
   // Assumes that the provided |compressor| is not-null.
   //
-  // Borrows the guard for |lock_| and may drop the lock temporarily during execution.
+  // Takes ownership of the lock and releases it before returning.
   ReclaimCounts ReclaimPageForCompressionLocked(vm_page_t* page, uint64_t offset,
                                                 VmCompressor* compressor,
-                                                Guard<CriticalMutex>& guard) TA_REQ(lock());
+                                                Guard<VmoLockType>::Adoptable adopt);
 
   // Internal helper for performing reclamation against a discardable VMO. Assumes that the page is
   // owned by this VMO at the specified offset. If any discarding happens the number of pages is
@@ -1391,6 +1555,57 @@ class VmCowPages final : public VmHierarchyBase,
 
   // length of children_list_
   uint32_t children_list_len_ TA_GUARDED(lock()) = 0;
+
+#if VMO_USE_LOCAL_LOCK
+  mutable LOCK_DEP_INSTRUMENT(VmCowPages, VmoLockTraits::LocalLockType,
+                              VmoLockTraits::LocalLockFlags) lock_;
+#endif
+
+  // When acquiring multiple locks they must be acquired in order from lowest to highest. To support
+  // unidirectional clones, where nodes gain new children, and bidirectional clones, where nodes
+  // gain new parents, lock ordering is determined using the following scheme:
+  //  * A node with a page source, as it will always be the root, is given the highest order of
+  //    kLockOrderRoot.
+  //  * The first anonymous node in a chain is given the a lock order in the middle of
+  //    kLockOrderFirstAnon. This is nodes such as:
+  //    - Direct child of a root page source node.
+  //    - Direct Child of a hidden node.
+  //    - New anonymous root node.
+  //  * Children of visible anonymous nodes, i.e. unidirectional clones of a non-hidden non pager
+  //    backed node, take their parents lock order minus the kLockOrderDelta.
+  //  * Hidden nodes take either kLockOrderRoot, if they are becoming the root node, or their
+  //    parents lock order minus the kLockOrderDelta.
+  // The goal of this scheme is to provide room in the numbering for both unidirectional children
+  // to grow down at the bottom, and hidden nodes to grow down in the middle, without colliding. If
+  // children of hidden nodes did not start at kLockOrderFirstAnon, but instead just took a minimum
+  // lock order, then a collision would occur if:
+  //  1. A pager backed node is created that then has a hidden node below it, with two anonymous
+  //     leaf nodes below it.
+  //  2. A new clone is created from one of those leafs that can hang directly off the hidden node.
+  //  3. Both the original leaf nodes are closed, merging the remaining child with the hidden node.
+  //  4. A unidirectional clone is now created from what is now a unidirectional hierarchy.
+  // Here, space is needed to grow down, as we have effectively found a way to promote a leaf child
+  // of a hidden node to being part of a unidirectional clone chain.
+  //
+  // Having a non-contiguous numbering allows for using an alternate lock ordering scheme during
+  // clone construction and dead transitions. When creating new nodes since there are no other
+  // references the lock cannot be held and so we cannot deadlock. However we still need to provide
+  // a lock order to satisfy lockdep. Here the gaps created by kLockOrderDelta can be used as the
+  // order for these newly created nodes.
+  //
+  // During a dead transition where a hidden node merge needs to happen we need to hold locks of
+  // three nodes: the hidden node and both of its children. Here the order is that the children must
+  // be acquired in list order, and then the parent. When acquiring the second child, since its
+  // lock order would be equal to the first child, the guaranteed gap between the first child and
+  // the parent lock order is used instead.
+  static constexpr uint64_t kLockOrderDelta = 3;
+  static constexpr uint64_t kLockOrderRoot = UINT64_MAX - kLockOrderDelta;
+  static constexpr uint64_t kLockOrderFirstAnon = UINT64_MAX / 2;
+  // As lock orders are only validated when lockdep is enabled, the storage is only defined if
+  // lockdep is enabled.
+#if (LOCK_DEP_ENABLED_FEATURE_LEVEL > 0)
+  const uint64_t lock_order_;
+#endif
 
   uint64_t size_ TA_GUARDED(lock());
   // Offset in the *parent* where this object starts.
@@ -1471,6 +1686,7 @@ class VmCowPages final : public VmHierarchyBase,
   enum class LifeCycle : uint8_t {
     Init,
     Alive,
+    Dying,
     Dead,
   };
   LifeCycle life_cycle_ TA_GUARDED(lock()) = LifeCycle::Init;
@@ -1591,8 +1807,8 @@ class VmCowPages::LookupCursor {
   void DisableMarkAccessed() { mark_accessed_ = false; }
 
   // Exposed for lock assertions.
-  Lock<CriticalMutex>* lock() const TA_RET_CAP(target_->lock_ref()) { return target_->lock(); }
-  Lock<CriticalMutex>& lock_ref() const TA_RET_CAP(target_->lock_ref()) {
+  Lock<VmoLockType>* lock() const TA_RET_CAP(target_->lock_ref()) { return target_->lock(); }
+  Lock<VmoLockType>& lock_ref() const TA_RET_CAP(target_->lock_ref()) {
     return target_->lock_ref();
   }
 

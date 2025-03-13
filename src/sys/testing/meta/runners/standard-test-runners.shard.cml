@@ -28,6 +28,10 @@
             url: "fuchsia-pkg://fuchsia.com/gtest-runner#meta/gtest-runner.cm",
         },
         {
+            name: "zxtest_runner",
+            url: "fuchsia-pkg://fuchsia.com/zxtest-runner#meta/zxtest-runner.cm",
+        },
+        {
             name: "gunit_runner",
             url: "fuchsia-pkg://fuchsia.com/gunit-runner#meta/gunit-runner.cm",
         },
@@ -63,6 +67,7 @@
                 "#rust_test_create_raw_processes_runner",
                 "#rust_test_next_vdso_runner",
                 "#rust_test_runner",
+                "#zxtest_runner",
             ],
         },
         {
@@ -79,6 +84,7 @@
                 "#rust_test_create_raw_processes_runner",
                 "#rust_test_next_vdso_runner",
                 "#rust_test_runner",
+                "#zxtest_runner",
             ],
         },
         {
@@ -86,15 +92,13 @@
             from: "parent",
             as: "fuchsia.component.Introspector",
             to: [
-                "#elf_test_ambient_exec_runner",
-                "#elf_test_create_raw_processes_ambient_exec_runner",
-                "#elf_test_create_raw_processes_runner",
+                // Give Introspector to test runners that need it to support the component:start trace category.
                 "#elf_test_runner",
+                "#go_test_runner",
                 "#gtest_runner",
                 "#gunit_runner",
-                "#rust_test_create_raw_processes_runner",
-                "#rust_test_next_vdso_runner",
                 "#rust_test_runner",
+                "#zxtest_runner",
             ],
         },
         {
@@ -111,6 +115,7 @@
                 "#rust_test_create_raw_processes_runner",
                 "#rust_test_next_vdso_runner",
                 "#rust_test_runner",
+                "#zxtest_runner",
             ],
         },
         {
@@ -123,6 +128,7 @@
                 "#rust_test_create_raw_processes_runner",
                 "#rust_test_next_vdso_runner",
                 "#rust_test_runner",
+                "#zxtest_runner",
             ],
         },
     ],

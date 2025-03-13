@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use ffx_scrutiny_zbi_args::ScrutinyZbiCommand;
-use fho::{FfxMain, FfxTool, Result, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool, Result};
 use scrutiny_frontend::ZbiExtractController;
 
 #[derive(FfxTool)]

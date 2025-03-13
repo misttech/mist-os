@@ -30,6 +30,6 @@ __EXPORT zx_handle_t native_thread_get_zx_handle(std::thread::native_handle_type
 }
 
 __EXPORT zx_handle_t _zx_thread_self() {
-  return zxr_thread_get_handle(&__pthread_self()->zxr_thread);
+  return zxr_thread_self_handle(&__pthread_self()->zxr_thread);
 }
 __EXPORT decltype(zx_thread_self) zx_thread_self [[gnu::weak, gnu::alias("_zx_thread_self")]];

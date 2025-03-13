@@ -389,6 +389,7 @@ pub struct RepositoryManagerBuilder<S = UnsetCobaltSender, N = UnsetInspectNode>
 }
 
 impl<S, N> RepositoryManagerBuilder<S, N> {
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255328)
     /// Load a directory of [RepositoryConfigs](RepositoryConfig) files into the
     /// [RepositoryManager], or error out if we encounter errors during the load. The
     /// [RepositoryManagerBuilder] is also returned on error in case the errors should be ignored.

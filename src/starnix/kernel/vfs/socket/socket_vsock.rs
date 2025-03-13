@@ -77,6 +77,7 @@ impl SocketOps for VsockSocket {
     // we only connect from the enclosing OK.
     fn connect(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &SocketHandle,
         _current_task: &CurrentTask,
         _peer: SocketPeer,
@@ -84,7 +85,13 @@ impl SocketOps for VsockSocket {
         error!(EPROTOTYPE)
     }
 
-    fn listen(&self, _socket: &Socket, backlog: i32, _credentials: ucred) -> Result<(), Errno> {
+    fn listen(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _socket: &Socket,
+        backlog: i32,
+        _credentials: ucred,
+    ) -> Result<(), Errno> {
         let mut inner = self.lock();
         let is_bound = inner.address.is_some();
         let backlog = if backlog < 0 { DEFAULT_LISTEN_BACKLOG } else { backlog as usize };
@@ -101,7 +108,11 @@ impl SocketOps for VsockSocket {
         }
     }
 
-    fn accept(&self, socket: &Socket) -> Result<SocketHandle, Errno> {
+    fn accept(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        socket: &Socket,
+    ) -> Result<SocketHandle, Errno> {
         match socket.socket_type {
             SocketType::Stream | SocketType::SeqPacket => {}
             _ => return error!(EOPNOTSUPP),
@@ -117,6 +128,7 @@ impl SocketOps for VsockSocket {
 
     fn bind(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         socket_address: SocketAddress,
@@ -205,17 +217,27 @@ impl SocketOps for VsockSocket {
         self.lock().query_events(locked, current_task)
     }
 
-    fn shutdown(&self, _socket: &Socket, _how: SocketShutdownFlags) -> Result<(), Errno> {
+    fn shutdown(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _socket: &Socket,
+        _how: SocketShutdownFlags,
+    ) -> Result<(), Errno> {
         self.lock().state = VsockSocketState::Closed;
         Ok(())
     }
 
-    fn close(&self, socket: &Socket) {
+    fn close(&self, locked: &mut Locked<'_, FileOpsCore>, socket: &Socket) {
         // Call to shutdown should never fail, so unwrap is OK
-        self.shutdown(socket, SocketShutdownFlags::READ | SocketShutdownFlags::WRITE).unwrap();
+        self.shutdown(locked, socket, SocketShutdownFlags::READ | SocketShutdownFlags::WRITE)
+            .unwrap();
     }
 
-    fn getsockname(&self, socket: &Socket) -> Result<SocketAddress, Errno> {
+    fn getsockname(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        socket: &Socket,
+    ) -> Result<SocketAddress, Errno> {
         let inner = self.lock();
         if let Some(address) = &inner.address {
             Ok(address.clone())
@@ -224,7 +246,11 @@ impl SocketOps for VsockSocket {
         }
     }
 
-    fn getpeername(&self, socket: &Socket) -> Result<SocketAddress, Errno> {
+    fn getpeername(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        socket: &Socket,
+    ) -> Result<SocketAddress, Errno> {
         let inner = self.lock();
         match &inner.state {
             VsockSocketState::Connected(_) => {
@@ -331,9 +357,9 @@ mod tests {
         .expect("Failed to create socket.");
         current_task
             .abstract_vsock_namespace
-            .bind(&current_task, VSOCK_PORT, &listen_socket)
+            .bind(&mut locked, &current_task, VSOCK_PORT, &listen_socket)
             .expect("Failed to bind socket.");
-        listen_socket.listen(&current_task, 10).expect("Failed to listen.");
+        listen_socket.listen(&mut locked, &current_task, 10).expect("Failed to listen.");
 
         let listen_socket = current_task
             .abstract_vsock_namespace
@@ -347,7 +373,7 @@ mod tests {
             .remote_connection(&listen_socket, &current_task, remote)
             .unwrap();
 
-        let server_socket = listen_socket.accept().unwrap();
+        let server_socket = listen_socket.accept(&mut locked).unwrap();
 
         let test_bytes_in: [u8; 5] = [0, 1, 2, 3, 4];
         assert_eq!(fs1.write(&test_bytes_in[..]).unwrap(), test_bytes_in.len());
@@ -369,8 +395,8 @@ mod tests {
         assert_eq!(test_bytes_out.len(), fs1.read(&mut read_back_buf).unwrap());
         assert_eq!(&read_back_buf[..test_bytes_out.len()], &test_bytes_out);
 
-        server_socket.close();
-        listen_socket.close();
+        server_socket.close(&mut locked);
+        listen_socket.close(&mut locked);
     }
 
     #[::fuchsia::test]

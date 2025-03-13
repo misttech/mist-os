@@ -37,6 +37,8 @@ static constexpr std::string_view kManufacturer = "manufacturer";
 static constexpr std::string_view kProduct = "product";
 static constexpr std::string_view kUniqueId = "unique id";
 static constexpr std::string_view kClockDomain = "clock domain";
+static constexpr std::string_view kDriverTimeout = "driver timeouts";
+static constexpr std::string_view kDriverLateResponse = "driver late responses";
 
 static constexpr std::string_view kRingBufferElements = "ring buffer elements";
 static constexpr std::string_view kElementId = "element id";
@@ -168,6 +170,8 @@ class DeviceInspectInstance {
   std::shared_ptr<RingBufferInspectInstance> RecordRingBufferInstance(ElementId element_id,
                                                                       const zx::time& created_at);
 
+  void RecordCommandTimeout(const std::string& cmd_tag, const zx::duration& expected,
+                            std::optional<zx::duration> actual);
   void RecordError(const zx::time& failed_at);
   void RecordRemoval(const zx::time& removed_at);
 
@@ -190,6 +194,9 @@ class DeviceInspectInstance {
   inspect::BoolProperty healthy_;
   inspect::IntProperty failed_at_;
   inspect::IntProperty removed_at_;
+
+  inspect::UintProperty timeout_count_;
+  inspect::UintProperty late_response_count_;
 
   std::vector<std::shared_ptr<RingBufferElement>> ring_buffer_elements_;
 };

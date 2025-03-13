@@ -26,6 +26,11 @@
 
 namespace {
 
+constexpr arch::ArmMairNormalAttribute kNormalMemoryUncached{
+    .inner = arch::ArmCacheabilityAttribute::kNonCacheable,
+    .outer = arch::ArmCacheabilityAttribute::kNonCacheable,
+};
+
 // Set the Intermediate Physical address Size (IPS) or Physical address Size (PS)
 // value of the ArmTcrElX register.
 //
@@ -133,14 +138,16 @@ void ArchSetUpAddressSpace(AddressSpace& aspace) {
     return;
   }
 
-  // The following two attributes and indices must be kept in sync with those
+  // The following four attributes and indices must be kept in sync with those
   // used in the kernel proper
   //
   // LINT.IfChange
   auto mair = arch::ArmMemoryAttrIndirectionRegister::Get()
                   .FromValue(0)
+                  .SetAttribute(0, arch::ArmDeviceMemory::kNonGatheringNonReorderingNoEarlyAck)
                   .SetAttribute(1, ArchMmioMemoryType())
-                  .SetAttribute(2, kArchNormalMemoryType);
+                  .SetAttribute(2, kArchNormalMemoryType)
+                  .SetAttribute(3, kNormalMemoryUncached);
   // LINT.ThenChange(/zircon/kernel/arch/arm64/include/arch/arm64/mmu.h)
   aspace.Init(mair);
   aspace.SetUpIdentityMappings();

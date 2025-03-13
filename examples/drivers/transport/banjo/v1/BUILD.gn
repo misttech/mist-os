@@ -19,6 +19,7 @@ driver_bind_rules("parent_bind") {
 }
 
 fuchsia_cc_driver("parent_driver") {
+  legacy = true
   output_name = "banjo_transport_parent_v1"
   sources = [ "parent-driver.cc" ]
   deps = [
@@ -43,6 +44,7 @@ driver_bind_rules("child_bind") {
 }
 
 fuchsia_cc_driver("child_driver") {
+  legacy = true
   output_name = "banjo_transport_child_v1"
   sources = [ "child-driver.cc" ]
   deps = [

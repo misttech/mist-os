@@ -23,6 +23,7 @@ TEST_F(LoaderServiceTest, LoadObject) {
       {"libother.so", "not allowed", true},
       {"asan/libfdio.so", "asan fdio", true},
       {"asan/libother.so", "not allowed", true},
+      {"libstd-661b5bcf15972e43.so", "std", true},
   };
   ASSERT_NO_FATAL_FAILURE(CreateTestLoader(std::move(config), &loader));
 
@@ -37,6 +38,10 @@ TEST_F(LoaderServiceTest, LoadObject) {
   ASSERT_NO_FATAL_FAILURE(Config(client, "asan", zx::ok(ZX_OK)));
   EXPECT_NO_FATAL_FAILURE(LoadObject(client, "libfdio.so", zx::ok("asan fdio")));
   EXPECT_NO_FATAL_FAILURE(LoadObject(client, "libother.so", zx::error(ZX_ERR_ACCESS_DENIED)));
+  EXPECT_NO_FATAL_FAILURE(LoadObject(client, "libstd-661b5bcf15972e43.so", zx::ok("std")));
+  EXPECT_NO_FATAL_FAILURE(
+      LoadObject(client, "libnotstd-661b5bcf15972e43.so", zx::error(ZX_ERR_ACCESS_DENIED)));
+  EXPECT_NO_FATAL_FAILURE(LoadObject(client, "libstd.so", zx::error(ZX_ERR_ACCESS_DENIED)));
 }
 
 }  // namespace

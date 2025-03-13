@@ -24,10 +24,9 @@ use fidl::endpoints::ProtocolMarker;
 use moniker::{ExtendedMoniker, Moniker};
 use routing::capability_source::{
     AggregateCapability, AggregateMember, AnonymizedAggregateSource, BuiltinSource,
-    CapabilitySource, ComponentCapability, ComponentSource, FilteredAggregateCapabilityRouteData,
-    FilteredAggregateProviderSource, InternalCapability,
+    CapabilitySource, ComponentCapability, ComponentSource, FilteredAggregateProviderSource,
+    InternalCapability,
 };
-use routing::collection::new_filtered_aggregate_from_capability_source;
 use routing::component_instance::ComponentInstanceInterface;
 use routing::error::RoutingError;
 use routing::mapper::NoopRouteMapper;
@@ -201,6 +200,12 @@ pub trait RoutingTestModel {
     /// Checks using a capability from a component's exposed directory.
     async fn check_use_exposed_dir(&self, moniker: Moniker, check: CheckUse);
 
+    /// Checks if the capability name referred to in the first element of the path in the
+    /// `CheckUse` can successfully be routed from the capabilities exposed to framework. Panics if
+    /// `path.split()` is longer than one element. Yes it's hacky to use the path to carry a name
+    /// here, but since this is such a small edge case it doesn't seem worth the refactor.
+    async fn check_exposed_to_framework(&self, moniker: Moniker, check: CheckUse);
+
     /// Looks up a component instance by its moniker.
     async fn look_up_instance(&self, moniker: &Moniker) -> Result<Arc<Self::C>, anyhow::Error>;
 
@@ -304,6 +309,8 @@ macro_rules! instantiate_common_routing_tests {
             test_expose_directory_with_subdir,
             test_expose_from_self_and_child,
             test_use_not_exposed,
+            test_expose_to_framework_from_self,
+            test_expose_to_framework_from_child,
             test_use_protocol_denied_by_capability_policy,
             test_use_directory_with_alias_denied_by_capability_policy,
             test_use_protocol_partial_chain_allowed_by_capability_policy,
@@ -2213,6 +2220,110 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             .await;
     }
 
+    pub async fn test_expose_to_framework_from_self(&self) {
+        let components = vec![(
+            "a",
+            ComponentDeclBuilder::new()
+                .protocol_default("foo")
+                .expose(
+                    ExposeBuilder::protocol()
+                        .name("foo")
+                        .target_name("hippo")
+                        .target(ExposeTarget::Framework)
+                        .source(ExposeSource::Self_),
+                )
+                .build(),
+        )];
+        let model = T::new("a", components).build().await;
+        model
+            .check_exposed_to_framework(
+                Moniker::root(),
+                CheckUse::Protocol {
+                    path: "/hippo".parse().unwrap(),
+                    expected_res: ExpectedResult::Ok,
+                },
+            )
+            .await;
+    }
+
+    pub async fn test_expose_to_framework_from_child(&self) {
+        let components = vec![
+            (
+                "a",
+                ComponentDeclBuilder::new()
+                    .child_default("b")
+                    .expose(
+                        ExposeBuilder::protocol()
+                            .name("foo")
+                            .target_name("hippo")
+                            .target(ExposeTarget::Framework)
+                            .source(ExposeSource::Child("b".parse().unwrap())),
+                    )
+                    .build(),
+            ),
+            (
+                "b",
+                ComponentDeclBuilder::new()
+                    .protocol_default("foo")
+                    .expose(ExposeBuilder::protocol().name("foo").source(ExposeSource::Self_))
+                    .build(),
+            ),
+        ];
+        let model = T::new("a", components).build().await;
+        model
+            .check_exposed_to_framework(
+                Moniker::root(),
+                CheckUse::Protocol {
+                    path: "/hippo".parse().unwrap(),
+                    expected_res: ExpectedResult::Ok,
+                },
+            )
+            .await;
+    }
+
+    pub async fn test_expose_to_parent_and_framework(&self) {
+        let components = vec![
+            ("a", ComponentDeclBuilder::new().child_default("b").build()),
+            (
+                "b",
+                ComponentDeclBuilder::new()
+                    .protocol_default("foo")
+                    .expose(
+                        ExposeBuilder::protocol()
+                            .name("foo")
+                            .target_name("hippo")
+                            .source(ExposeSource::Self_),
+                    )
+                    .expose(
+                        ExposeBuilder::protocol()
+                            .name("foo")
+                            .target(ExposeTarget::Framework)
+                            .source(ExposeSource::Self_),
+                    )
+                    .build(),
+            ),
+        ];
+        let model = T::new("a", components).build().await;
+        model
+            .check_exposed_to_framework(
+                vec!["b"].try_into().unwrap(),
+                CheckUse::Protocol {
+                    path: "/hippo".parse().unwrap(),
+                    expected_res: ExpectedResult::Ok,
+                },
+            )
+            .await;
+        model
+            .check_use_exposed_dir(
+                vec!["b"].try_into().unwrap(),
+                CheckUse::Protocol {
+                    path: "/hippo".parse().unwrap(),
+                    expected_res: ExpectedResult::Ok,
+                },
+            )
+            .await;
+    }
+
     ///   (cm)
     ///    |
     ///    a
@@ -3233,8 +3344,6 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         let b_component =
             model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
-        let c_component =
-            model.look_up_instance(&vec!["c"].try_into().unwrap()).await.expect("c instance");
         let UseDecl::Service(use_decl) = use_decl else { unreachable!() };
         let source = route_capability(
             RouteRequest::UseService(use_decl),
@@ -3251,32 +3360,6 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         assert_eq!(
             source.source_moniker(),
             ExtendedMoniker::ComponentInstance("c".parse().unwrap())
-        );
-        let capability_provider =
-            new_filtered_aggregate_from_capability_source(source, c_component.as_weak());
-        let mut data = capability_provider.route_instances();
-        assert_eq!(data.len(), 1);
-        let data = data.remove(0).await.unwrap();
-        assert_matches!(
-            data,
-            FilteredAggregateCapabilityRouteData {
-                capability_source: CapabilitySource::Component(ComponentSource {
-                    moniker,
-                    capability,
-                }),
-                instance_filter,
-            }
-            if moniker == "c".parse().unwrap() &&
-                capability == ComponentCapability::Service(ServiceDecl {
-                    name: "foo".parse().unwrap(),
-                    source_path: Some("/svc/foo".parse().unwrap()),
-                }) &&
-                instance_filter == vec![
-                    NameMapping {
-                        source_name: "service_instance_0".parse().unwrap(),
-                        target_name: "service_instance_0".parse().unwrap(),
-                    }
-                ]
         );
     }
 
@@ -3316,8 +3399,6 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         let b_component =
             model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
-        let c_component =
-            model.look_up_instance(&vec!["c"].try_into().unwrap()).await.expect("c instance");
         let UseDecl::Service(use_decl) = use_decl else { unreachable!() };
         let source = route_capability(
             RouteRequest::UseService(use_decl),
@@ -3334,32 +3415,6 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         assert_eq!(
             source.source_moniker(),
             ExtendedMoniker::ComponentInstance("c".parse().unwrap())
-        );
-        let capability_provider =
-            new_filtered_aggregate_from_capability_source(source, c_component.as_weak());
-        let mut data = capability_provider.route_instances();
-        assert_eq!(data.len(), 1);
-        let data = data.remove(0).await.unwrap();
-        assert_matches!(
-            data,
-            FilteredAggregateCapabilityRouteData {
-                capability_source: CapabilitySource::Component(ComponentSource {
-                    moniker,
-                    capability,
-                }),
-                instance_filter,
-            }
-            if moniker == "c".parse().unwrap() &&
-                capability == ComponentCapability::Service(ServiceDecl {
-                    name: "foo".parse().unwrap(),
-                    source_path: Some("/svc/foo".parse().unwrap()),
-                }) &&
-                instance_filter == vec![
-                    NameMapping {
-                        source_name: "instance_0".parse().unwrap(),
-                        target_name: "renamed_instance_0".parse().unwrap(),
-                    }
-                ]
         );
     }
 

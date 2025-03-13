@@ -66,7 +66,7 @@ display_impl!(ConsoleType);
 ///                      |                              |
 ///                      -------------------------------|
 ///
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum EngineState {
     /// The New state is the initial state of the engine. This is the state assigned to the

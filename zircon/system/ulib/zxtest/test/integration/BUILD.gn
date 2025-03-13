@@ -83,9 +83,17 @@ test("zxtest-integration-streams") {
 fuchsia_unittest_package("zxtest-integration-test-pkg") {
   package_name = "zxtest-integration-test"
   deps = [ ":zxtest-integration" ]
+
+  # Because this is testing lower-level zx test assertions, do not run as a normal zxtest
+  # with the gtest runner.
+  deprecated_legacy_test_execution = true
 }
 
 fuchsia_unittest_package("zxtest-integration-stream-test-pkg") {
   package_name = "zxtest-integration-stream-test"
   deps = [ ":zxtest-integration-streams" ]
+
+  # Because this is testing lower-level zx test assertions, do not run as a normal zxtest
+  # with the gtest runner.
+  deprecated_legacy_test_execution = true
 }

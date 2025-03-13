@@ -96,9 +96,6 @@ void riscv64_mmu_early_init_percpu();
 void riscv64_mmu_init();
 void riscv64_mmu_prevm_init();
 
-// Return a tuple of the total size reserved for boot page tables and how much was used.
-std::tuple<size_t, size_t> riscv64_boot_map_used_memory();
-
 // Helper routines for various page table entry manipulation
 constexpr bool riscv64_pte_is_valid(pte_t pte) { return pte & RISCV64_PTE_V; }
 constexpr bool riscv64_pte_is_leaf(pte_t pte) { return (pte & RISCV64_PTE_PERM_MASK) != 0; }

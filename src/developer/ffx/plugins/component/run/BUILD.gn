@@ -15,6 +15,7 @@ if (is_host) {
       "//src/developer/ffx/lib/fho:lib",
       "//src/developer/ffx/lib/target/connector:lib",
       "//src/developer/ffx/lib/target/holders:lib",
+      "//src/developer/ffx/lib/writer:lib",
       "//src/developer/ffx/plugins/component/common:ffx_component",
       "//src/developer/ffx/plugins/log:ffx_log",
       "//src/developer/ffx/plugins/log:ffx_log_args",

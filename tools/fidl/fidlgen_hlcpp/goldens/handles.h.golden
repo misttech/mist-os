@@ -81,6 +81,8 @@ class Handles final {
 
   ::zx::interrupt interrupt_handle;
 
+  ::zx::iob iob_handle;
+
   ::zx::iommu iommu_handle;
 
   ::zx::job job_handle;
@@ -152,11 +154,11 @@ namespace fidl {
 
 template <>
 struct CodingTraits<::test::handles::Handles>
-    : public EncodableCodingTraits<::test::handles::Handles, 136> {};
+    : public EncodableCodingTraits<::test::handles::Handles, 140> {};
 
 template <>
 struct IsMemcpyCompatible<::test::handles::Handles> : public internal::BoolConstant<
-                                                          !HasPadding<::test::handles::Handles>::value && IsMemcpyCompatible<::zx::handle>::value && IsMemcpyCompatible<::zx::bti>::value && IsMemcpyCompatible<::zx::channel>::value && IsMemcpyCompatible<::zx::clock>::value && IsMemcpyCompatible<::zx::debuglog>::value && IsMemcpyCompatible<::zx::event>::value && IsMemcpyCompatible<::zx::eventpair>::value && IsMemcpyCompatible<::zx::exception>::value && IsMemcpyCompatible<::zx::fifo>::value && IsMemcpyCompatible<::zx::guest>::value && IsMemcpyCompatible<::zx::interrupt>::value && IsMemcpyCompatible<::zx::iommu>::value && IsMemcpyCompatible<::zx::job>::value && IsMemcpyCompatible<::zx::msi>::value && IsMemcpyCompatible<::zx::pager>::value && IsMemcpyCompatible<::zx::pmt>::value && IsMemcpyCompatible<::zx::port>::value && IsMemcpyCompatible<::zx::process>::value && IsMemcpyCompatible<::zx::profile>::value && IsMemcpyCompatible<::zx::resource>::value && IsMemcpyCompatible<::zx::socket>::value && IsMemcpyCompatible<::zx::stream>::value && IsMemcpyCompatible<::zx::suspend_token>::value && IsMemcpyCompatible<::zx::thread>::value && IsMemcpyCompatible<::zx::timer>::value && IsMemcpyCompatible<::zx::vcpu>::value && IsMemcpyCompatible<::zx::vmar>::value && IsMemcpyCompatible<::zx::vmo>::value && IsMemcpyCompatible<::fidl::InterfaceHandle<::test::handles::SomeProtocol>>::value && IsMemcpyCompatible<::fidl::InterfaceRequest<::test::handles::SomeProtocol>>::value> {};
+                                                          !HasPadding<::test::handles::Handles>::value && IsMemcpyCompatible<::zx::handle>::value && IsMemcpyCompatible<::zx::bti>::value && IsMemcpyCompatible<::zx::channel>::value && IsMemcpyCompatible<::zx::clock>::value && IsMemcpyCompatible<::zx::debuglog>::value && IsMemcpyCompatible<::zx::event>::value && IsMemcpyCompatible<::zx::eventpair>::value && IsMemcpyCompatible<::zx::exception>::value && IsMemcpyCompatible<::zx::fifo>::value && IsMemcpyCompatible<::zx::guest>::value && IsMemcpyCompatible<::zx::interrupt>::value && IsMemcpyCompatible<::zx::iob>::value && IsMemcpyCompatible<::zx::iommu>::value && IsMemcpyCompatible<::zx::job>::value && IsMemcpyCompatible<::zx::msi>::value && IsMemcpyCompatible<::zx::pager>::value && IsMemcpyCompatible<::zx::pmt>::value && IsMemcpyCompatible<::zx::port>::value && IsMemcpyCompatible<::zx::process>::value && IsMemcpyCompatible<::zx::profile>::value && IsMemcpyCompatible<::zx::resource>::value && IsMemcpyCompatible<::zx::socket>::value && IsMemcpyCompatible<::zx::stream>::value && IsMemcpyCompatible<::zx::suspend_token>::value && IsMemcpyCompatible<::zx::thread>::value && IsMemcpyCompatible<::zx::timer>::value && IsMemcpyCompatible<::zx::vcpu>::value && IsMemcpyCompatible<::zx::vmar>::value && IsMemcpyCompatible<::zx::vmo>::value && IsMemcpyCompatible<::fidl::InterfaceHandle<::test::handles::SomeProtocol>>::value && IsMemcpyCompatible<::fidl::InterfaceRequest<::test::handles::SomeProtocol>>::value> {};
 
 inline zx_status_t Clone(const ::test::handles::Handles& value,
                          ::test::handles::Handles* result) {
@@ -197,6 +199,9 @@ struct Equality<::test::handles::Handles> {
       return false;
     }
     if (!::fidl::Equals(_lhs.interrupt_handle, _rhs.interrupt_handle)) {
+      return false;
+    }
+    if (!::fidl::Equals(_lhs.iob_handle, _rhs.iob_handle)) {
       return false;
     }
     if (!::fidl::Equals(_lhs.iommu_handle, _rhs.iommu_handle)) {

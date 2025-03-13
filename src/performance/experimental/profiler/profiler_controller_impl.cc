@@ -146,10 +146,10 @@ zx::result<zx_koid_t> ReadElfJobId(const fidl::SyncClient<fuchsia_io::Directory>
     return endpoints.take_error();
   }
   fit::result<fidl::OneWayStatus> res =
-      directory->Open3({{.path = "elf/job_id",
-                         .flags = fuchsia_io::kPermReadable,
-                         .options = {},
-                         .object = endpoints->server.TakeChannel()}});
+      directory->Open({{.path = "elf/job_id",
+                        .flags = fuchsia_io::kPermReadable,
+                        .options = {},
+                        .object = endpoints->server.TakeChannel()}});
   if (res.is_error()) {
     return zx::error(ZX_ERR_IO);
   }

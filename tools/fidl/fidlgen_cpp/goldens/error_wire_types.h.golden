@@ -138,11 +138,11 @@ struct TypeTraits<::test_error::wire::ExampleFooRequest> {
 };
 
 template <>
-struct IsFidlType<::test_error::wire::ExampleFooRequest> : public std::true_type{};
+struct IsFidlType<::test_error::wire::ExampleFooRequest> : public std::true_type {};
 template <>
-struct IsWire<::test_error::wire::ExampleFooRequest> : public std::true_type{};
+struct IsWire<::test_error::wire::ExampleFooRequest> : public std::true_type {};
 template <>
-struct IsStruct<::test_error::wire::ExampleFooRequest> : public std::true_type{};
+struct IsStruct<::test_error::wire::ExampleFooRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_error::wire::ExampleFooRequest>);
 static_assert(offsetof(::test_error::wire::ExampleFooRequest, s) == 0);
 static_assert(sizeof(::test_error::wire::ExampleFooRequest) == TypeTraits<::test_error::wire::ExampleFooRequest>::kPrimarySize);
@@ -184,11 +184,11 @@ struct TypeTraits<::test_error::wire::ExampleFooResponse> {
 };
 
 template <>
-struct IsFidlType<::test_error::wire::ExampleFooResponse> : public std::true_type{};
+struct IsFidlType<::test_error::wire::ExampleFooResponse> : public std::true_type {};
 template <>
-struct IsWire<::test_error::wire::ExampleFooResponse> : public std::true_type{};
+struct IsWire<::test_error::wire::ExampleFooResponse> : public std::true_type {};
 template <>
-struct IsStruct<::test_error::wire::ExampleFooResponse> : public std::true_type{};
+struct IsStruct<::test_error::wire::ExampleFooResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_error::wire::ExampleFooResponse>);
 static_assert(offsetof(::test_error::wire::ExampleFooResponse, y) == 0);
 static_assert(sizeof(::test_error::wire::ExampleFooResponse) == TypeTraits<::test_error::wire::ExampleFooResponse>::kPrimarySize);
@@ -230,11 +230,11 @@ struct TypeTraits<::test_error::wire::ExampleFooResult> {
 };
 
 template <>
-struct IsFidlType<::test_error::wire::ExampleFooResult> : public std::true_type{};
+struct IsFidlType<::test_error::wire::ExampleFooResult> : public std::true_type {};
 template <>
-struct IsWire<::test_error::wire::ExampleFooResult> : public std::true_type{};
+struct IsWire<::test_error::wire::ExampleFooResult> : public std::true_type {};
 template <>
-struct IsUnion<::test_error::wire::ExampleFooResult> : public std::true_type{};
+struct IsUnion<::test_error::wire::ExampleFooResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_error::wire::ExampleFooResult>);
 
 template <typename Constraint, bool IsRecursive>

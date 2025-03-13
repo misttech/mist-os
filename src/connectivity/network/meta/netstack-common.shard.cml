@@ -75,5 +75,10 @@
             ],
             from: "self",
         },
+        {
+            protocol: "fuchsia.update.verify.ComponentOtaHealthCheck",
+            from: "self",
+            to: "framework",
+        },
     ],
 }

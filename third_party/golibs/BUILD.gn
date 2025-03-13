@@ -190,7 +190,6 @@ go_library("github.com/dustin/go-humanize") {
     "bytes.go",
     "comma.go",
     "commaf.go",
-    "english/words.go",
     "ftoa.go",
     "humanize.go",
     "number.go",
@@ -274,23 +273,6 @@ go_library("github.com/google/licenseclassifier") {
     "v2/searchset.go",
     "v2/tokenizer.go",
     "v2/trace.go",
-  ]
-}
-
-go_library("github.com/fsnotify/fsnotify") {
-  name = "github.com/fsnotify/fsnotify/..."
-  source_dir = "vendor/github.com/fsnotify/fsnotify"
-  deps = [ ":golang.org/x/sys" ]
-  sources = [
-    "fen.go",
-    "fsnotify.go",
-    "fsnotify_unsupported.go",
-    "inotify.go",
-    "inotify_poller.go",
-    "kqueue.go",
-    "open_mode_bsd.go",
-    "open_mode_darwin.go",
-    "windows.go",
   ]
 }
 
@@ -1093,17 +1075,29 @@ go_library("golang.org/x/crypto") {
   ]
 }
 
-go_library("golang.org/x/exp") {
-  name = "golang.org/x/exp/..."
-  source_dir = "vendor/golang.org/x/exp"
+go_library("golang.org/x/exp/constraints") {
+  name = "golang.org/x/exp/constraints"
+  source_dir = "vendor/golang.org/x/exp/constraints"
+  sources = [ "constraints.go" ]
+}
+
+go_library("golang.org/x/exp/maps") {
+  name = "golang.org/x/exp/maps"
+  source_dir = "vendor/golang.org/x/exp/maps"
+  deps = [ ":golang.org/x/exp/constraints" ]
+  sources = [ "maps.go" ]
+}
+
+go_library("golang.org/x/exp/slices") {
+  name = "golang.org/x/exp/slices"
+  source_dir = "vendor/golang.org/x/exp/slices"
+  deps = [ ":golang.org/x/exp/constraints" ]
   sources = [
-    "constraints/constraints.go",
-    "maps/maps.go",
-    "slices/cmp.go",
-    "slices/slices.go",
-    "slices/sort.go",
-    "slices/zsortanyfunc.go",
-    "slices/zsortordered.go",
+    "cmp.go",
+    "slices.go",
+    "sort.go",
+    "zsortanyfunc.go",
+    "zsortordered.go",
   ]
 }
 

@@ -111,59 +111,26 @@ use lock_order::impl_lock_after;
 use lock_order::relation::LockAfter;
 use net_types::ip::{Ipv4, Ipv6};
 
+// This lock level is used to provide unlocked access to stack state that does
+// not require any locking.
+//
+// Implementations of UnlockedAccess must ensure that they do not provide access
+// to any state that is held by a lock, in order not to sidestep the global lock
+// order declared below.
+pub enum UnlockedState {}
+
 pub struct IcmpAllSocketsSet<I>(PhantomData<I>, Never);
 pub struct IcmpSocketState<I>(PhantomData<I>, Never);
 pub struct IcmpBoundMap<I>(PhantomData<I>, Never);
 
 pub struct IcmpTokenBucket<I>(PhantomData<I>, Never);
-pub struct IcmpSendTimestampReply<I>(PhantomData<I>, Never);
 
 pub struct TcpAllSocketsSet<I>(PhantomData<I>, Never);
 pub struct TcpSocketState<I>(PhantomData<I>, Never);
 pub struct TcpDemux<I>(PhantomData<I>, Never);
-pub struct TcpIsnGenerator<I>(PhantomData<I>, Never);
 pub struct UdpAllSocketsSet<I>(PhantomData<I>, Never);
 pub struct UdpSocketState<I>(PhantomData<I>, Never);
 pub struct UdpBoundMap<I>(PhantomData<I>, Never);
-
-pub enum Ipv4StateNextPacketId {}
-// Provides unlocked access of IpCounters.
-pub struct IpStateCounters<I>(PhantomData<I>, Never);
-// Provides unlocked access to main route table ID.
-pub struct IpMainTableId<I>(PhantomData<I>, Never);
-// Provides unlocked access of IcmpTxCounters.
-pub struct IcmpTxCounters<I>(PhantomData<I>, Never);
-// Provides unlocked access of IcmpRxCounters.
-pub struct IcmpRxCounters<I>(PhantomData<I>, Never);
-/// Provides unlocked access of MulticastForwardingCounters.
-pub struct MulticastForwardingCounters<I>(PhantomData<I>, Never);
-// Provides unlocked access of RawIpSocketCounters.
-pub struct RawIpSocketCounters<I>(PhantomData<I>, Never);
-// Provides unlocked access of NudCounters.
-pub struct NudCounters<I>(PhantomData<I>, Never);
-// Provides unlocked access of NdpCounters.
-pub enum NdpCounters {}
-// Provides unlocked access of DeviceCounters.
-pub enum DeviceCounters {}
-// Provides unlocked access of EthernetDeviceCounters.
-pub enum EthernetDeviceCounters {}
-// Provides unlocked access of LoopbackDeviceCounters.
-pub enum LoopbackDeviceCounters {}
-// Provides unlocked access of PureIpDeviceCounters.
-pub enum PureIpDeviceCounters {}
-// Provides unlocked access of ArpCounters.
-pub enum ArpCounters {}
-// Provides unlocked access of TcpCounters.
-pub struct TcpCounters<I>(PhantomData<I>, Never);
-// Provides unlocked access of UdpCounters.
-pub struct UdpCounters<I>(PhantomData<I>, Never);
-// Provides unlocked access of SlaacCounters.
-pub enum SlaacCounters {}
-// Provides unlocked access to a device's routing metric.
-pub enum RoutingMetric {}
-// Provides unlocked access to the secret key used to generate temporary SLAAC
-// addresses.
-pub enum SlaacTempSecretKey {}
 
 pub struct IpDeviceConfiguration<I>(PhantomData<I>, Never);
 pub struct IpDeviceGmp<I>(PhantomData<I>, Never);
@@ -201,14 +168,12 @@ pub struct IpMulticastRouteTable<I>(PhantomData<I>, Never);
 // Lock level attributed to the table of pending multicast packets.
 pub struct IpMulticastForwardingPendingPackets<I>(PhantomData<I>, Never);
 
-pub enum DeviceLayerStateOrigin {}
 pub enum DeviceLayerState {}
 pub enum AllDeviceSockets {}
 pub enum AnyDeviceSockets {}
 pub enum DeviceSocketState {}
 pub enum DeviceSockets {}
 pub struct EthernetDeviceIpState<I>(PhantomData<I>, Never);
-pub enum EthernetDeviceStaticState {}
 pub enum EthernetDeviceDynamicState {}
 pub enum PureIpDeviceDynamicState {}
 

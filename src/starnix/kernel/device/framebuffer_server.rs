@@ -37,8 +37,8 @@ use std::sync::mpsc::channel;
 use std::sync::Arc;
 use {
     fidl_fuchsia_element as felement, fidl_fuchsia_images2 as fimages2, fidl_fuchsia_math as fmath,
-    fidl_fuchsia_sysmem2 as fsysmem2, fidl_fuchsia_ui_composition as fuicomposition,
-    fidl_fuchsia_ui_views as fuiviews, fuchsia_async as fasync,
+    fidl_fuchsia_ui_composition as fuicomposition, fidl_fuchsia_ui_views as fuiviews,
+    fuchsia_async as fasync,
 };
 
 /// The offset at which the framebuffer will be placed.
@@ -69,9 +69,6 @@ pub struct FramebufferServer {
     /// The Flatland proxy associated with this server.
     flatland: fuicomposition::FlatlandProxy,
 
-    /// The buffer collection that is registered with Flatland.
-    collection: fsysmem2::BufferCollectionInfo,
-
     /// The width of the display and framebuffer image.
     image_width: u32,
 
@@ -94,38 +91,29 @@ pub struct FramebufferServer {
 impl FramebufferServer {
     /// Returns a `FramebufferServer` that has created a scene and registered a buffer with
     /// Flatland.
-    pub fn new(width: u32, height: u32) -> Result<Self, Errno> {
+    pub fn new(width: u32, height: u32) -> Result<(Self, Arc<MemoryObject>), Errno> {
         let allocator = connect_to_protocol_sync::<fuicomposition::AllocatorMarker>()
             .map_err(|_| errno!(ENOENT))?;
         let flatland =
             connect_to_protocol::<fuicomposition::FlatlandMarker>().map_err(|_| errno!(ENOENT))?;
         flatland.set_debug_name("StarnixFrameBufferServer").map_err(|_| errno!(EINVAL))?;
 
-        let collection =
+        let memory =
             init_fb_scene(&flatland, &allocator, width, height).map_err(|_| errno!(EINVAL))?;
 
         let (presentation_sender, presentation_receiver) = unbounded();
-        Ok(Self {
-            flatland,
-            collection,
-            image_width: width,
-            image_height: height,
-            scene_state: Arc::new(Mutex::new(SceneState::Fb)),
-            viewport_id: (FB_IMAGE_ID.value + 1).into(),
-            presentation_sender: presentation_sender,
-            presentation_receiver: Arc::new(Mutex::new(Some(presentation_receiver))),
-        })
-    }
-
-    /// Returns a clone of the VMO that is shared with Flatland.
-    pub fn get_memory(&self) -> Result<MemoryObject, Errno> {
-        self.collection.buffers.as_ref().unwrap()[0]
-            .vmo
-            .as_ref()
-            .ok_or_else(|| errno!(EINVAL))?
-            .duplicate_handle(zx::Rights::SAME_RIGHTS)
-            .map(MemoryObject::from)
-            .map_err(|_| errno!(EINVAL))
+        Ok((
+            Self {
+                flatland,
+                image_width: width,
+                image_height: height,
+                scene_state: Arc::new(Mutex::new(SceneState::Fb)),
+                viewport_id: (FB_IMAGE_ID.value + 1).into(),
+                presentation_sender: presentation_sender,
+                presentation_receiver: Arc::new(Mutex::new(Some(presentation_receiver))),
+            },
+            memory.into(),
+        ))
     }
 
     // Present according to the scene state.
@@ -145,7 +133,7 @@ fn init_fb_scene(
     allocator: &fuicomposition::AllocatorSynchronousProxy,
     width: u32,
     height: u32,
-) -> Result<fsysmem2::BufferCollectionInfo, anyhow::Error> {
+) -> Result<MemoryObject, anyhow::Error> {
     flatland
         .create_transform(&ROOT_TRANSFORM_ID)
         .map_err(|_| anyhow!("error creating transform"))?;
@@ -229,7 +217,13 @@ fn init_fb_scene(
         .set_translation(&ROOT_TRANSFORM_ID, &fmath::Vec_ { x: TRANSLATION_X, y: 0 })
         .map_err(|_| anyhow!("error setting translation"))?;
 
-    Ok(allocation)
+    allocation.buffers.as_ref().unwrap()[0]
+        .vmo
+        .as_ref()
+        .ok_or_else(|| anyhow!("Failed to get VMO from allocation"))?
+        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+        .map(MemoryObject::from)
+        .map_err(|_| anyhow!("Failed to create MemoryObject from allocation"))
 }
 
 /// Initializes a flatland scene where only the child view is presented through

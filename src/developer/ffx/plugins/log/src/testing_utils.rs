@@ -166,6 +166,10 @@ impl TestEnvironment {
         self.disconnect_target();
     }
 
+    pub fn set_boot_timestamp(&mut self, new_boot_timestamp: u64) {
+        self.state.mutable.borrow_mut().boot_timestamp = new_boot_timestamp;
+    }
+
     pub fn disconnect_target(&mut self) {
         let mut mutable_state = self.state.mutable.borrow_mut();
         // This must have already been taken and is been awaited on.
@@ -271,12 +275,11 @@ fn setup_fake_rcs(state: Rc<State>) -> RemoteControlProxy {
                 RemoteControlRequest::EchoString { value, responder } => {
                     responder.send(value.as_ref()).expect("should send");
                 }
-                RemoteControlRequest::DeprecatedOpenCapability {
+                RemoteControlRequest::ConnectCapability {
                     moniker,
                     capability_set,
                     capability_name,
                     server_channel,
-                    flags: _,
                     responder,
                 } => {
                     assert_eq!(capability_set, rcs::OpenDirType::NamespaceDir);

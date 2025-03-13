@@ -12,7 +12,6 @@ rustc_library("lib") {
 
   deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.overnet.protocol:fuchsia.overnet.protocol_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//src/connectivity/overnet/lib/ascendd",
@@ -43,6 +42,7 @@ rustc_library("lib") {
 
   test_deps = [
     "//src/developer/ffx/lib/addr:lib",
+    "//src/lib/fuchsia",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:chrono",
     "//third_party/rust_crates:futures-lite",

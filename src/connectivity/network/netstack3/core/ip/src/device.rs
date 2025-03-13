@@ -25,7 +25,7 @@ use net_types::ip::{
     AddrSubnet, GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu,
     Subnet,
 };
-use net_types::{MulticastAddr, SpecifiedAddr, UnicastAddr, Witness};
+use net_types::{LinkLocalAddress as _, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness};
 use netstack3_base::{
     AnyDevice, AssignedAddrIpExt, CounterContext, DeferredResourceRemovalContext, DeviceIdContext,
     EventContext, ExistsError, HandleableTimer, Inspectable, Instant, InstantBindingsTypes,
@@ -60,9 +60,8 @@ use crate::internal::device::state::{
     IpDeviceConfiguration, IpDeviceFlags, IpDeviceState, IpDeviceStateBindingsTypes,
     IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4AddressEntry, Ipv4AddressState,
     Ipv4DeviceConfiguration, Ipv4DeviceState, Ipv6AddrConfig, Ipv6AddrManualConfig,
-    Ipv6AddrSlaacConfig, Ipv6AddressEntry, Ipv6AddressFlags, Ipv6AddressState,
-    Ipv6DeviceConfiguration, Ipv6DeviceState, Ipv6NetworkLearnedParameters, Lifetime,
-    PreferredLifetime, WeakAddressId,
+    Ipv6AddressEntry, Ipv6AddressFlags, Ipv6AddressState, Ipv6DeviceConfiguration, Ipv6DeviceState,
+    Ipv6NetworkLearnedParameters, Lifetime, PreferredLifetime, WeakAddressId,
 };
 use crate::internal::gmp::igmp::{IgmpPacketHandler, IgmpTimerId};
 use crate::internal::gmp::mld::{MldPacketHandler, MldTimerId};
@@ -822,25 +821,25 @@ pub trait Ipv6DeviceConfigurationContext<BC: IpDeviceBindingsContext<Ipv6, Self:
     ) -> O;
 }
 
+/// A link-layer address that can be used to generate IPv6 addresses.
+pub trait Ipv6LinkLayerAddr {
+    /// Gets the address as a byte slice.
+    fn as_bytes(&self) -> &[u8];
+
+    /// Gets the device's EUI-64 based interface identifier.
+    fn eui64_iid(&self) -> [u8; 8];
+}
+
 /// The execution context for an IPv6 device.
 pub trait Ipv6DeviceContext<BC: IpDeviceBindingsContext<Ipv6, Self::DeviceId>>:
     IpDeviceStateContext<Ipv6, BC>
 {
     /// A link-layer address.
-    type LinkLayerAddr: AsRef<[u8]>;
+    type LinkLayerAddr: Ipv6LinkLayerAddr;
 
-    /// Gets the device's link-layer address bytes, if the device supports
-    /// link-layer addressing.
-    fn get_link_layer_addr_bytes(
-        &mut self,
-        device_id: &Self::DeviceId,
-    ) -> Option<Self::LinkLayerAddr>;
-
-    /// Gets the device's EUI-64 based interface identifier.
-    ///
-    /// A `None` value indicates the device does not have an EUI-64 based
-    /// interface identifier.
-    fn get_eui64_iid(&mut self, device_id: &Self::DeviceId) -> Option<[u8; 8]>;
+    /// Gets the device's link-layer address, if the device supports link-layer
+    /// addressing.
+    fn get_link_layer_addr(&mut self, device_id: &Self::DeviceId) -> Option<Self::LinkLayerAddr>;
 
     /// Sets the link MTU for the device.
     fn set_link_mtu(&mut self, device_id: &Self::DeviceId, mtu: Mtu);
@@ -917,14 +916,11 @@ pub fn receive_igmp_packet<CC, BC, B, H>(
 /// An implementation of an IPv6 device.
 pub trait Ipv6DeviceHandler<BC>: IpDeviceHandler<Ipv6, BC> {
     /// A link-layer address.
-    type LinkLayerAddr: AsRef<[u8]>;
+    type LinkLayerAddr: Ipv6LinkLayerAddr;
 
-    /// Gets the device's link-layer address bytes, if the device supports
-    /// link-layer addressing.
-    fn get_link_layer_addr_bytes(
-        &mut self,
-        device_id: &Self::DeviceId,
-    ) -> Option<Self::LinkLayerAddr>;
+    /// Gets the device's link-layer address, if the device supports link-layer
+    /// addressing.
+    fn get_link_layer_addr(&mut self, device_id: &Self::DeviceId) -> Option<Self::LinkLayerAddr>;
 
     /// Sets the discovered retransmit timer for the device.
     fn set_discovered_retrans_timer(
@@ -987,13 +983,14 @@ pub trait Ipv6DeviceHandler<BC>: IpDeviceHandler<Ipv6, BC> {
     );
 
     /// Receives an MLD packet for processing.
-    fn receive_mld_packet<B: SplitByteSlice>(
+    fn receive_mld_packet<B: SplitByteSlice, H: IpHeaderInfo<Ipv6>>(
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
         src_ip: Ipv6SourceAddr,
         dst_ip: SpecifiedAddr<Ipv6Addr>,
         packet: MldPacket<B>,
+        header_info: &H,
     );
 }
 
@@ -1006,11 +1003,8 @@ impl<
 {
     type LinkLayerAddr = CC::LinkLayerAddr;
 
-    fn get_link_layer_addr_bytes(
-        &mut self,
-        device_id: &Self::DeviceId,
-    ) -> Option<CC::LinkLayerAddr> {
-        Ipv6DeviceContext::get_link_layer_addr_bytes(self, device_id)
+    fn get_link_layer_addr(&mut self, device_id: &Self::DeviceId) -> Option<CC::LinkLayerAddr> {
+        Ipv6DeviceContext::get_link_layer_addr(self, device_id)
     }
 
     fn set_discovered_retrans_timer(
@@ -1046,7 +1040,7 @@ impl<
         }) {
             DadAddressStateLookupResult::Assigned => IpAddressState::Assigned,
             DadAddressStateLookupResult::Tentative { matched_nonce: true } => {
-                self.increment(|counters| &counters.version_rx.drop_looped_back_dad_probe);
+                self.counters().version_rx.drop_looped_back_dad_probe.increment();
 
                 // Per RFC 7527 section 4.2, "the receiver compares the nonce
                 // included in the message, with any stored nonce on the
@@ -1168,13 +1162,14 @@ impl<
         })
     }
 
-    fn receive_mld_packet<B: SplitByteSlice>(
+    fn receive_mld_packet<B: SplitByteSlice, H: IpHeaderInfo<Ipv6>>(
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
         src_ip: Ipv6SourceAddr,
         dst_ip: SpecifiedAddr<Ipv6Addr>,
         packet: MldPacket<B>,
+        header_info: &H,
     ) {
         self.with_ipv6_device_configuration(device, |_config, mut core_ctx| {
             MldPacketHandler::receive_mld_packet(
@@ -1184,6 +1179,7 @@ impl<
                 src_ip,
                 dst_ip,
                 packet,
+                header_info,
             )
         })
     }
@@ -1256,7 +1252,7 @@ fn enable_ipv6_device_with_config<
 
     // Only generate a link-local address if the device supports link-layer
     // addressing.
-    if core_ctx.get_link_layer_addr_bytes(device_id).is_some() {
+    if core_ctx.get_link_layer_addr(device_id).is_some() {
         SlaacHandler::generate_link_local_address(core_ctx, bindings_ctx, device_id);
     }
 
@@ -1302,7 +1298,9 @@ fn disable_ipv6_device_with_config<
         })
         .into_iter()
         .for_each(|(addr_id, config)| {
-            if config == Some(Ipv6AddrConfig::SLAAC_LINK_LOCAL) {
+            if config
+                .is_some_and(|config| config.is_slaac() && addr_id.addr().addr().is_link_local())
+            {
                 del_ip_addr_inner_and_notify_handler(
                     core_ctx,
                     bindings_ctx,
@@ -1608,7 +1606,7 @@ pub fn add_ip_addr_subnet_with_config<
 
     if ip_enabled {
         // NB: We don't start DAD if the device is disabled. DAD will be
-        // performed when the device is enabled for all addressed.
+        // performed when the device is enabled for all addresses.
         DadHandler::start_duplicate_address_detection(core_ctx, bindings_ctx, device_id, &addr_id)
     }
 
@@ -1658,16 +1656,14 @@ impl<CC: SlaacHandler<BC>, BC: InstantContext> IpAddressRemovalHandler<Ipv6, BC>
         reason: AddressRemovedReason,
     ) {
         match config {
-            Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { inner, preferred_lifetime: _ }) => {
-                SlaacHandler::on_address_removed(
-                    self,
-                    bindings_ctx,
-                    device_id,
-                    addr_sub,
-                    inner,
-                    reason,
-                )
-            }
+            Ipv6AddrConfig::Slaac(config) => SlaacHandler::on_address_removed(
+                self,
+                bindings_ctx,
+                device_id,
+                addr_sub,
+                config,
+                reason,
+            ),
             Ipv6AddrConfig::Manual(_manual_config) => (),
         }
     }

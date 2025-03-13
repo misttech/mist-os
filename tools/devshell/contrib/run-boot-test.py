@@ -141,7 +141,7 @@ class BootTest(object):
 
     @staticmethod
     def is_boot_test(test_json):
-        return "product_bundle" in test_json
+        return bool(test_json.get("is_boot_test"))
 
     def is_uefi_boot(self):
         if self.efi_disk:
@@ -168,7 +168,7 @@ class BootTest(object):
         if self._state != self.ProductBundle.NOT_BUILT and not rebuild:
             return self._state == self.ProductBundle.BUILT
         build_command = ["fx", "build", self.label]
-        info("Rebuilidng: " + " ".join(build_command))
+        info("Rebuilding: " + " ".join(build_command))
         if subprocess.run(build_command, cwd=self.build_dir).returncode == 0:
             self._state = self.ProductBundle.BUILT
             self._set_images_if_built()

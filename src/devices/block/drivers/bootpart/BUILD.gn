@@ -15,6 +15,7 @@ driver_bind_rules("bootpart_bind") {
 }
 
 fuchsia_cc_driver("bootpart-driver") {
+  legacy = true
   output_name = "bootpart"
   configs += [
     "//build/config:all_source",

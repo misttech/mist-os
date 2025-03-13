@@ -124,6 +124,7 @@ pub enum RoamTriggerDataOutcome {
         scan_type: fidl_common::ScanType,
         network_identifier: types::NetworkIdentifier,
         credential: Credential,
+        reasons: Vec<RoamReason>,
     },
 }
 
@@ -131,6 +132,12 @@ pub enum RoamTriggerDataOutcome {
 pub enum RoamReason {
     RssiBelowThreshold,
     SnrBelowThreshold,
+}
+
+#[derive(Clone)]
+pub struct PolicyRoamRequest {
+    pub candidate: types::ScannedCandidate,
+    pub reasons: Vec<RoamReason>,
 }
 
 /// Only used for recording when the last roam attempts happened in order to limit their frequency.

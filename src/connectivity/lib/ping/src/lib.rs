@@ -110,23 +110,15 @@ pub trait TryFromSockAddr: Sized {
 
 impl TryFromSockAddr for std::net::SocketAddrV4 {
     fn try_from(addr: socket2::SockAddr) -> std::io::Result<Self> {
-        addr.as_socket_ipv4().ok_or_else(|| {
-            std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("socket address is not v4 {:?}", addr),
-            )
-        })
+        addr.as_socket_ipv4()
+            .ok_or_else(|| std::io::Error::other(format!("socket address is not v4 {:?}", addr)))
     }
 }
 
 impl TryFromSockAddr for std::net::SocketAddrV6 {
     fn try_from(addr: socket2::SockAddr) -> std::io::Result<Self> {
-        addr.as_socket_ipv6().ok_or_else(|| {
-            std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("socket address is not v6 {:?}", addr),
-            )
-        })
+        addr.as_socket_ipv6()
+            .ok_or_else(|| std::io::Error::other(format!("socket address is not v6 {:?}", addr)))
     }
 }
 
@@ -454,14 +446,11 @@ mod test {
                     })
                     .and_then(|(reply, addr)| {
                         if buf.len() < reply.len() {
-                            Err(std::io::Error::new(
-                                std::io::ErrorKind::Other,
-                                format!(
-                                    "recv buffer too small, got: {}, want: {}",
-                                    buf.len(),
-                                    reply.len()
-                                ),
-                            ))
+                            Err(std::io::Error::other(format!(
+                                "recv buffer too small, got: {}, want: {}",
+                                buf.len(),
+                                reply.len()
+                            )))
                         } else {
                             buf[..reply.len()].copy_from_slice(&reply);
                             Ok((reply.len(), addr))

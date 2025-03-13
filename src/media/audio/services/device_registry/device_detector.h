@@ -26,7 +26,7 @@ using DeviceDetectionIdleHandler = std::function<void(void)>;
 
 // This class detects devices and invokes the provided handler for those devices. It uses multiple
 // file-system watchers that focus on the device file system (devfs), specifically the locations
-// where registered audio devices are exposed (dev/class/audio-input, etc).
+// where registered audio devices are exposed (dev/class/audio-composite, etc).
 class DeviceDetector {
   struct DeviceNodeSpecifier {
     const char* path;
@@ -36,8 +36,6 @@ class DeviceDetector {
   static constexpr DeviceNodeSpecifier kAudioDevNodes[] = {
       {.path = "/dev/class/audio-composite",
        .device_type = fuchsia_audio_device::DeviceType::kComposite},
-      {.path = "/dev/class/audio-input", .device_type = fuchsia_audio_device::DeviceType::kInput},
-      {.path = "/dev/class/audio-output", .device_type = fuchsia_audio_device::DeviceType::kOutput},
       {.path = "/dev/class/codec", .device_type = fuchsia_audio_device::DeviceType::kCodec},
   };
 
@@ -61,17 +59,13 @@ class DeviceDetector {
                                                        false);
     initial_detection_complete_by_device_type_.emplace(fuchsia_audio_device::DeviceType::kComposite,
                                                        false);
-    initial_detection_complete_by_device_type_.emplace(fuchsia_audio_device::DeviceType::kInput,
-                                                       false);
-    initial_detection_complete_by_device_type_.emplace(fuchsia_audio_device::DeviceType::kOutput,
-                                                       false);
   }
   DeviceDetector() = delete;
 
   zx_status_t StartDeviceWatchers();
 
   // Open a devnode at the given path; use its FDIO device channel to connect (retrieve) the
-  // device's primary protocol (StreamConfig, etc).
+  // device's primary protocol (Composite, etc).
   void DriverClientFromDevFs(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
                              const std::string& name, fuchsia_audio_device::DeviceType device_type);
 

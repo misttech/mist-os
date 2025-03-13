@@ -4,7 +4,8 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool};
 use target_holders::moniker;
 use {
     ffx_power_system_activity_application_activity_args as args_mod,
@@ -15,7 +16,7 @@ use {
 pub struct ApplicationActivityTool {
     #[command]
     cmd: args_mod::Command,
-    #[with(moniker("/core/topology-test-daemon"))]
+    #[with(moniker("/core/system-activity-governor-controller"))]
     system_activity_control: fpt::SystemActivityControlProxy,
 }
 

@@ -54,6 +54,9 @@ type Irq = table {
     /// It is valid for this to be empty, however the resource will only be able
     /// to be retrieved using [`fuchsia.hardware.platform.device/GetInterruptById`].
     4: name string:fuchsia.driver.framework.MAX_RESOURCE_NAME_LENGTH;
+
+    /// If set to true, this interrupt will wake the device out of suspend.
+    5: wake_vector bool;
 };
 
 /// Definition of a bus transaction initiator (bti) for a platform device node.

@@ -177,9 +177,16 @@ impl AboveRootCapabilitiesForTest {
                 }
                 fdecl::Offer::Service(fdecl::OfferService {
                     target: Some(fdecl::Ref::Collection(fdecl::CollectionRef { name })),
+                    target_name: Some(target_name),
                     ..
-                })
-                | fdecl::Offer::Runner(fdecl::OfferRunner {
+                }) if collection_data.contains_key(name.as_str()) => {
+                    collection_data.get_mut(name.as_str()).unwrap().capabilities.push(
+                        Capability::service_by_name(target_name)
+                            .availability_same_as_target()
+                            .into(),
+                    );
+                }
+                fdecl::Offer::Runner(fdecl::OfferRunner {
                     target: Some(fdecl::Ref::Collection(fdecl::CollectionRef { name })),
                     ..
                 })
@@ -187,9 +194,7 @@ impl AboveRootCapabilitiesForTest {
                     target: Some(fdecl::Ref::Collection(fdecl::CollectionRef { name })),
                     ..
                 }) if collection_data.contains_key(name.as_str()) => {
-                    unimplemented!(
-                        "Services, runners and resolvers are not supported by realm builder"
-                    );
+                    unimplemented!("Runners and resolvers are not supported by realm builder");
                 }
                 _ => {
                     // Ignore anything else that is not routed to test collections

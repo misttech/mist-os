@@ -31,30 +31,38 @@ class PDev {
   PDev() = default;
   explicit PDev(fidl::ClientEnd<fuchsia_hardware_platform_device::Device> client);
 
+  fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> borrow();
+
   zx::result<fdf::MmioBuffer> MapMmio(
       uint32_t index, uint32_t cache_policy = ZX_CACHE_POLICY_UNCACHED_DEVICE) const;
+  zx::result<fdf::MmioBuffer> MapMmio(
+      cpp17::string_view name, uint32_t cache_policy = ZX_CACHE_POLICY_UNCACHED_DEVICE) const;
 
+  // Retrieves metadata from the platform device associated with the id |metadata_id| and unpersists
+  // it into |FidlType|. |FidlType| must be persistable. Assumes that the metadata from the platform
+  // device is a persisted |FidlType|.
   template <typename FidlType>
-  zx::result<FidlType> GetFidlMetadata(std::string_view metadata_id) const {
+  zx::result<FidlType> GetFidlMetadata(
+      std::string_view metadata_id = FidlType::kSerializableName) const {
     static_assert(fidl::IsFidlType<FidlType>::value, "|FidlType| must be a FIDL domain object.");
     static_assert(!fidl::IsResource<FidlType>::value,
                   "|FidlType| cannot be a resource type. Resources cannot be persisted.");
 
-    fidl::WireResult<fuchsia_hardware_platform_device::Device::GetMetadata> encoded_metadata =
+    fidl::WireResult<fuchsia_hardware_platform_device::Device::GetMetadata> persisted_metadata =
         pdev_->GetMetadata(fidl::StringView::FromExternal(metadata_id));
-    if (!encoded_metadata.ok()) {
-      return zx::error(encoded_metadata.status());
+    if (!persisted_metadata.ok()) {
+      return zx::error(persisted_metadata.status());
     }
-    if (encoded_metadata->is_error()) {
-      return encoded_metadata->take_error();
-    }
-
-    auto result = fidl::Unpersist<FidlType>(encoded_metadata.value()->metadata.get());
-    if (result.is_error()) {
-      return zx::error(result.error_value().status());
+    if (persisted_metadata->is_error()) {
+      return persisted_metadata->take_error();
     }
 
-    return zx::ok(result.value());
+    auto metadata = fidl::Unpersist<FidlType>(persisted_metadata.value()->metadata.get());
+    if (metadata.is_error()) {
+      return zx::error(metadata.error_value().status());
+    }
+
+    return zx::ok(metadata.value());
   }
 
   struct MmioInfo {
@@ -63,6 +71,7 @@ class PDev {
     zx::vmo vmo;
   };
   zx::result<MmioInfo> GetMmio(uint32_t index) const;
+  zx::result<MmioInfo> GetMmio(cpp17::string_view name) const;
 
   zx::result<zx::interrupt> GetInterrupt(uint32_t index, uint32_t flags = 0) const;
   zx::result<zx::interrupt> GetInterrupt(cpp17::string_view name, uint32_t flags = 0) const;

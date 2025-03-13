@@ -2,15 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::io::{stderr, stdout, Write};
-
-use crate::{Result, TestBuffers, ToolIO};
+use crate::{Result, ToolIO};
+use async_trait::async_trait;
+use fho::{FhoEnvironment, TryFromEnv};
+use std::io::Write;
+use writer::{TestBuffers, Writer};
 
 /// An object that can be used to produce output, with no support for outputting
 /// structured machine-interpretable output.
-pub struct SimpleWriter {
-    stdout: Box<dyn Write>,
-    stderr: Box<dyn Write>,
+pub struct SimpleWriter(Writer);
+
+impl From<writer::Writer> for SimpleWriter {
+    fn from(value: writer::Writer) -> Self {
+        SimpleWriter(value)
+    }
 }
 
 impl SimpleWriter {
@@ -21,20 +26,18 @@ impl SimpleWriter {
         O: Write + 'static,
         E: Write + 'static,
     {
-        let stdout = Box::new(stdout);
-        let stderr = Box::new(stderr);
-        Self { stdout, stderr }
+        Self(Writer::new_buffers(stdout, stderr))
     }
 
     /// Create a new Writer that doesn't support machine output at all
     pub fn new() -> Self {
-        Self::new_buffers(Box::new(stdout()), Box::new(stderr()))
+        Self(Writer::new())
     }
 
     /// Returns a writer backed by string buffers that can be extracted after
     /// the writer is done with
     pub fn new_test(test_writer: &TestBuffers) -> Self {
-        Self::new_buffers(test_writer.stdout.clone(), test_writer.stderr.clone())
+        Self(Writer::new_test(test_writer))
     }
 }
 
@@ -54,17 +57,24 @@ impl ToolIO for SimpleWriter {
     }
 
     fn stderr(&mut self) -> &'_ mut Box<dyn Write> {
-        &mut self.stderr
+        self.0.stderr()
     }
 }
 
 impl Write for SimpleWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.stdout.write(buf)
+        self.0.write(buf)
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
-        self.stdout.flush()
+        self.0.flush()
+    }
+}
+
+#[async_trait(?Send)]
+impl TryFromEnv for SimpleWriter {
+    async fn try_from_env(_env: &FhoEnvironment) -> fho::Result<Self> {
+        Ok(SimpleWriter::new())
     }
 }
 

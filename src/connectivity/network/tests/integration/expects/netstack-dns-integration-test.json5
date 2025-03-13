@@ -15,22 +15,11 @@
         },
         {
             type: "expect_failure_with_err_logs",
-            matchers: [
-                // TODO(https://fxbug.dev/341759423): Once
-                // Netstack3 exposes NDP RAs, listen for
-                // these servers in netcfg.
-                "discovered_ndp_dns_netcfg_basic_ns3::lookup_admin",
-                "discovered_ndp_dns_netcfg_advanced_ns3::lookup_admin",
-            ],
+            matchers: [],
         },
         {
             type: "skip",
-            matchers: [
-                // TODO(https://fxbug.dev/370098449): These tests are skipped to
-                // avoid flakiness in CQ due to the long timeout.
-                "discovered_ndp_dns_netcfg_basic_ns3::dns_server_watcher",
-                "discovered_ndp_dns_netcfg_advanced_ns3::dns_server_watcher",
-            ],
+            matchers: [],
         },
     ],
 }

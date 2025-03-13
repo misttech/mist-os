@@ -59,12 +59,11 @@ zx_status_t DeviceDetector::StartDeviceWatchers() {
             return;
           }
           if (device_type == fad::DeviceType::kCodec ||
-              device_type == fad::DeviceType::kComposite ||
-              device_type == fad::DeviceType::kInput || device_type == fad::DeviceType::kOutput) {
+              device_type == fad::DeviceType::kComposite) {
             ADR_LOG_OBJECT(kLogDeviceDetection) << "Successful detection, proceeding to Connect";
             DriverClientFromDevFs(dir, filename, device_type);
           } else {
-            ADR_WARN_OBJECT() << device_type << " device detection not yet supported";
+            ADR_WARN_OBJECT() << device_type << " device detection not supported";
             Inspector::Singleton()->RecordDetectionFailureUnsupported();
             return;
           }
@@ -123,24 +122,6 @@ void DeviceDetector::DriverClientFromDevFs(const fidl::ClientEnd<fuchsia_io::Dir
       return;
     }
     driver_client = fad::DriverClient::WithComposite(std::move(client_end.value()));
-  } else if (device_type == fad::DeviceType::kInput || device_type == fad::DeviceType::kOutput) {
-    zx::result client_end = component::ConnectAt<fha::StreamConfigConnector>(dir, name);
-    if (client_end.is_error()) {
-      FX_PLOGS(ERROR, client_end.error_value())
-          << "DeviceDetector failed to connect to device node at '" << name << "'";
-      Inspector::Singleton()->RecordDetectionFailureToConnect();
-      return;
-    }
-    fidl::Client connector(std::move(client_end.value()), dispatcher_);
-    auto [client, server] = fidl::Endpoints<fha::StreamConfig>::Create();
-    auto status = connector->Connect(std::move(server));
-    if (!status.is_ok()) {
-      FX_PLOGS(ERROR, status.error_value().status())
-          << "Connector/Connect failed for " << device_type;
-      Inspector::Singleton()->RecordDetectionFailureToConnect();
-      return;
-    }
-    driver_client = fad::DriverClient::WithStreamConfig(std::move(client));
   } else {
     ADR_WARN_METHOD() << device_type << " device detection not yet supported";
     Inspector::Singleton()->RecordDetectionFailureUnsupported();

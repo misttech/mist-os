@@ -102,9 +102,6 @@ void physmap_for_each_gap(fit::inline_function<void(vaddr_t base, size_t size)> 
 // prefetching device memory from the physmap.
 void physmap_protect_non_arena_regions();
 
-// Mark all arenas of the physmap as no-execute.
-void physmap_protect_arena_regions_noexecute();
-
 // Indicates that the caller is using the physmap for MMIO and that non RAM regions may therefore
 // not be unmapped. Must be called prior to physmap_protect_non_arena_regions.
 void physmap_preserve_gaps_for_mmio();

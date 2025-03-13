@@ -66,8 +66,8 @@ void FormatCharPointerNode(FormatNode* node, uint64_t ptr, const Type* char_type
 // The value is given rather than being extracted from the node so it can be different. It can be
 // either an Array symbol type or a pointer.
 void FormatArrayNode(FormatNode* node, const ExprValue& value, int elt_count,
-                     const FormatOptions& options, const fxl::RefPtr<EvalContext>& eval_context,
-                     fit::deferred_callback cb);
+                     const Type* erased_type, const FormatOptions& options,
+                     const fxl::RefPtr<EvalContext>& eval_context, fit::deferred_callback cb);
 
 // Formats a node for a pointer. This function is synchronous.
 //

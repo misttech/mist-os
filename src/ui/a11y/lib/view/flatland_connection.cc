@@ -5,6 +5,7 @@
 #include "src/ui/a11y/lib/view/flatland_connection.h"
 
 #include <lib/syslog/cpp/macros.h>
+#include <lib/trace/event.h>
 
 namespace a11y {
 
@@ -55,6 +56,7 @@ void FlatlandConnection::OnError(const fuchsia::ui::composition::FlatlandError& 
 
 void FlatlandConnection::OnNextFrameBegin(
     const fuchsia::ui::composition::OnNextFrameBeginValues& values) {
+  TRACE_DURATION("gfx", "A11y::FlatlandConnection::OnNextFrameBegin");
   present_credits_ += values.additional_present_credits();
   if (present_credits_ && !pending_presents_.empty()) {
     // Only iterate over the elements once, because they may be added back to
@@ -69,6 +71,7 @@ void FlatlandConnection::OnNextFrameBegin(
 
 void FlatlandConnection::OnFramePresented(
     const fuchsia::scenic::scheduling::FramePresentedInfo& info) {
+  TRACE_DURATION("gfx", "A11y::FlatlandConnection::OnFramePresented");
   for (size_t i = 0; i < info.presentation_infos.size(); ++i) {
     presented_callbacks_.front()(info.actual_presentation_time);
     presented_callbacks_.pop();

@@ -2,5 +2,8 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
+include /sdk/rust/zx/OWNERS
+include /src/diagnostics/OWNERS
+include /src/lib/flyweights/OWNERS
 include /src/starnix/OWNERS
-include /src/starnix/lib/selinux_policy/OWNERS
+include /src/starnix/lib/selinux/OWNERS

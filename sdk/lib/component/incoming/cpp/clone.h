@@ -33,13 +33,10 @@ template <typename Protocol>
 zx::result<fidl::ClientEnd<Protocol>> Clone(fidl::UnownedClientEnd<Protocol> client) {
   static_assert(internal::is_complete_v<Protocol>,
                 "|Protocol| must be defined to use |component::Clone|");
-  zx::result<zx::channel> result;
-  if constexpr (internal::has_fidl_method_fuchsia_unknown_clone_v<Protocol>) {
-    result =
-        internal::CloneRaw(fidl::UnownedClientEnd<fuchsia_unknown::Cloneable>(client.channel()));
-  } else {
-    static_assert(false, "|Protocol| must compose |fuchsia.unknown/Cloneable|.");
-  }
+  static_assert(internal::has_fidl_method_fuchsia_unknown_clone_v<Protocol>,
+                "|Protocol| must compose |fuchsia.unknown/Cloneable|.");
+  zx::result<zx::channel> result =
+      internal::CloneRaw(fidl::UnownedClientEnd<fuchsia_unknown::Cloneable>(client.channel()));
   if (!result.is_ok()) {
     return result.take_error();
   }

@@ -15,11 +15,13 @@ rustc_library("container") {
   deps = [
     ":container_macro",
     "//src/lib/assembly/package_copy",
+    "//src/lib/depfile",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:pathdiff",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:walkdir",
   ]
   test_deps = [
     "//src/sys/pkg/lib/fuchsia-hash",

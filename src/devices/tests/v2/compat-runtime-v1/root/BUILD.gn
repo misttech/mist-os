@@ -15,6 +15,7 @@ driver_bind_rules("bind") {
 }
 
 fuchsia_cc_driver("driver") {
+  legacy = true
   testonly = true
   output_name = "compat-runtime-v1-root"
   sources = [ "root.cc" ]

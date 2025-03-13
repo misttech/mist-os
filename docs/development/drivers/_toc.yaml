@@ -81,7 +81,7 @@ toc:
     path: /docs/development/sdk/navigating-a-bazel-and-fuchsia-sdk-based-development-environment.md
   - title: "Codelab: Build a driver"
     section:
-    - include: /docs/get-started/sdk/learn/driver/_toc.yaml
+    - include: /docs/development/drivers/tutorials/sdk_build_driver/_toc.yaml
   - title: "Driver binding"
     section:
     - title: "Write bind rules for a driver"

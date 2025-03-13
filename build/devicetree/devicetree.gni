@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/python/python_action.gni")
 import("//build/testing/golden_files.gni")
 import("//build/zircon/c_utils.gni")
 
@@ -186,7 +187,9 @@ template("dtb") {
   }
 
   # This actually compiles the DTB.
-  action(target_name) {
+  dtc_path = "//prebuilt/third_party/dtc/${host_platform}/dtc"
+  python_action(target_name) {
+    binary_label = "//build/devicetree:dtc_py"
     forward_variables_from(invoker,
                            [
                              "testonly",
@@ -198,20 +201,18 @@ template("dtb") {
     if (extension == "S") {
       deps += [ ":$processed_dts_target" ]
       sources = get_target_outputs(":$processed_dts_target")
-
-      # Extract name from <name>.dts.S.
-      source_name = get_path_info(sources[0], "name")
-      source_name = get_path_info(source_name, "name")
     } else {
       sources = invoker.sources
-      source_name = get_path_info(sources[0], "name")
     }
-
+    source_name = get_path_info(sources[0], "name")
     depfile = "$target_gen_dir/$source_name.d"
-    script = "//build/devicetree/dtc.sh"
-    inputs = [ "//prebuilt/third_party/dtc/${host_platform}/dtc" ]
-    include_dirs = get_target_outputs(":$dts_include_dirs_target")
-    sources += include_dirs
+    includes_file = get_target_outputs(":$dts_include_dirs_target")
+
+    # Inform the build that we will be accessing the compiler and .includes.txt for the target
+    inputs = [
+      dtc_path,
+      includes_file[0],
+    ]
 
     if (defined(invoker.outputs)) {
       outputs = invoker.outputs
@@ -220,15 +221,12 @@ template("dtb") {
     }
 
     args = [
-      rebase_path(inputs[0], root_build_dir),
-      rebase_path(include_dirs[0], root_build_dir),
-      "-i",
-      rebase_path("//", root_build_dir),
+      "compile",
+      rebase_path(dtc_path, root_build_dir),
       rebase_path(sources[0], root_build_dir),
-      "-o",
       rebase_path(outputs[0], root_build_dir),
-      "-d",
       rebase_path(depfile, root_build_dir),
+      rebase_path(includes_file[0], root_build_dir),
     ]
 
     if (defined(invoker.dtcflags)) {
@@ -259,7 +257,9 @@ template("dtb") {
 #     - Default: target_out_dir + "/" + get_path_info(sources[0], "name) + ".dts"
 #
 template("dts") {
-  action(target_name) {
+  dtc_path = "//prebuilt/third_party/dtc/${host_platform}/dtc"
+  python_action(target_name) {
+    binary_label = "//build/devicetree:dtc_py"
     forward_variables_from(invoker,
                            [
                              "sources",
@@ -272,9 +272,8 @@ template("dts") {
            "Only .dtb source files accepted.")
 
     source_name = get_path_info(sources[0], "name")
-    script = "//build/devicetree/dtc.sh"
-    inputs = [ "//prebuilt/third_party/dtc/${host_platform}/dtc" ]
 
+    inputs = [ dtc_path ]
     if (defined(invoker.outputs)) {
       outputs = invoker.outputs
     } else {
@@ -282,15 +281,9 @@ template("dts") {
     }
 
     args = [
-      rebase_path(inputs[0], root_build_dir),
-      "--",
-      "-I",
-      "dtb",
-      "-O",
-      "dts",
-      "--sort",
+      "decompile",
+      rebase_path(dtc_path, root_build_dir),
       rebase_path(sources[0], root_build_dir),
-      "-o",
       rebase_path(outputs[0], root_build_dir),
     ]
 

@@ -10,9 +10,9 @@
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/stdcompat/span.h>
+#include <lib/zx/result.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
-#include <zircon/status.h>
 #include <zircon/types.h>
 
 #include <cstdint>
@@ -76,17 +76,17 @@ Vout::Vout(std::unique_ptr<HdmiHost> hdmi_host, inspect::Node node, uint8_t visu
 zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVout(fdf::Namespace& incoming, uint32_t panel_type,
                                                       uint32_t width, uint32_t height,
                                                       inspect::Node node) {
-  FDF_LOG(INFO, "Fixed panel type is %d", panel_type);
+  fdf::info("Fixed panel type is {}", panel_type);
   const PanelConfig* panel_config = GetPanelConfig(panel_type);
   if (panel_config == nullptr) {
-    FDF_LOG(ERROR, "Failed to get panel config for panel %" PRIu32, panel_type);
+    fdf::error("Failed to get panel config for panel {}", panel_type);
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   zx::result<std::unique_ptr<DsiHost>> dsi_host_result =
       DsiHost::Create(incoming, panel_type, panel_config);
   if (dsi_host_result.is_error()) {
-    FDF_LOG(ERROR, "Could not create DSI host: %s", dsi_host_result.status_string());
+    fdf::error("Could not create DSI host: {}", dsi_host_result);
     return dsi_host_result.take_error();
   }
   std::unique_ptr<DsiHost> dsi_host = std::move(dsi_host_result).value();
@@ -95,20 +95,20 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVout(fdf::Namespace& incoming, 
   zx::result<fidl::ClientEnd<fuchsia_hardware_platform_device::Device>> pdev_result =
       incoming.Connect<fuchsia_hardware_platform_device::Service::Device>(kPdevFragmentName);
   if (pdev_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to get the pdev client: %s", pdev_result.status_string());
+    fdf::error("Failed to get the pdev client: {}", pdev_result);
     return pdev_result.take_error();
   }
   fidl::ClientEnd<fuchsia_hardware_platform_device::Device> platform_device =
       std::move(pdev_result).value();
   if (!platform_device.is_valid()) {
-    FDF_LOG(ERROR, "Failed to get a valid platform device client");
+    fdf::error("Failed to get a valid platform device client");
     return zx::error(ZX_ERR_INTERNAL);
   }
 
   zx::result<std::unique_ptr<Clock>> clock_result =
       Clock::Create(platform_device, kBootloaderDisplayEnabled);
   if (clock_result.is_error()) {
-    FDF_LOG(ERROR, "Could not create Clock: %s", clock_result.status_string());
+    fdf::error("Could not create Clock: {}", clock_result);
     return clock_result.take_error();
   }
   std::unique_ptr<Clock> clock = std::move(clock_result).value();
@@ -118,7 +118,7 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVout(fdf::Namespace& incoming, 
       fbl::make_unique_checked<Vout>(&alloc_checker, std::move(dsi_host), std::move(clock), width,
                                      height, panel_config, std::move(node));
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for Vout.");
+    fdf::error("Failed to allocate memory for Vout.");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
   return zx::ok(std::move(vout));
@@ -128,7 +128,7 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVoutForTesting(uint32_t panel_t
                                                                 uint32_t height) {
   const PanelConfig* panel_config = GetPanelConfig(panel_type);
   if (panel_config == nullptr) {
-    FDF_LOG(ERROR, "Failed to get panel config for panel %" PRIu32, panel_type);
+    fdf::error("Failed to get panel config for panel {}", panel_type);
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
@@ -137,7 +137,7 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVoutForTesting(uint32_t panel_t
       &alloc_checker,
       /*dsi_host=*/nullptr, /*dsi_clock=*/nullptr, width, height, panel_config, inspect::Node{});
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for Vout.");
+    fdf::error("Failed to allocate memory for Vout.");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
   return zx::ok(std::move(vout));
@@ -147,7 +147,7 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateHdmiVout(fdf::Namespace& incoming,
                                                        uint8_t visual_debug_level) {
   zx::result<std::unique_ptr<HdmiHost>> hdmi_host_result = HdmiHost::Create(incoming);
   if (hdmi_host_result.is_error()) {
-    FDF_LOG(ERROR, "Could not create HDMI host: %s", hdmi_host_result.status_string());
+    fdf::error("Could not create HDMI host: {}", hdmi_host_result);
     return hdmi_host_result.take_error();
   }
 
@@ -155,7 +155,7 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateHdmiVout(fdf::Namespace& incoming,
   std::unique_ptr<Vout> vout = fbl::make_unique_checked<Vout>(
       &alloc_checker, std::move(hdmi_host_result).value(), std::move(node), visual_debug_level);
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for Vout.");
+    fdf::error("Failed to allocate memory for Vout.");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
   return zx::ok(std::move(vout));
@@ -241,7 +241,7 @@ zx::result<> Vout::PowerOn() {
     case VoutType::kDsi: {
       zx::result<> clock_enable_result = dsi_.clock->Enable(dsi_.panel_config);
       if (!clock_enable_result.is_ok()) {
-        FDF_LOG(ERROR, "Could not enable display clocks: %s", clock_enable_result.status_string());
+        fdf::error("Could not enable display clocks: {}", clock_enable_result);
         return clock_enable_result;
       }
 
@@ -249,7 +249,7 @@ zx::result<> Vout::PowerOn() {
       // Configure and enable DSI host interface.
       zx::result<> dsi_host_enable_result = dsi_.dsi_host->Enable(dsi_.clock->GetBitrate());
       if (!dsi_host_enable_result.is_ok()) {
-        FDF_LOG(ERROR, "Could not enable DSI Host: %s", dsi_host_enable_result.status_string());
+        fdf::error("Could not enable DSI Host: {}", dsi_host_enable_result);
         return dsi_host_enable_result;
       }
       dsi_.clock->SetVideoOn(true);
@@ -258,7 +258,7 @@ zx::result<> Vout::PowerOn() {
     case VoutType::kHdmi: {
       zx::result<> hdmi_host_on_result = zx::make_result(hdmi_.hdmi_host->HostOn());
       if (!hdmi_host_on_result.is_ok()) {
-        FDF_LOG(ERROR, "Could not enable HDMI host: %s", hdmi_host_on_result.status_string());
+        fdf::error("Could not enable HDMI host: {}", hdmi_host_on_result);
         return hdmi_host_on_result;
       }
 
@@ -315,7 +315,7 @@ zx::result<> Vout::ApplyConfiguration(const display::DisplayTiming& timing) {
                       "Vout display timing setup is only supported for HDMI output.");
   zx_status_t status = hdmi_.hdmi_host->ModeSet(timing);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to set HDMI display timing: %s", zx_status_get_string(status));
+    fdf::error("Failed to set HDMI display timing: {}", zx::make_result(status));
     return zx::error(status);
   }
 
@@ -330,32 +330,30 @@ void Vout::Dump() {
       return;
     }
     case VoutType::kHdmi:
-      FDF_LOG(INFO, "horizontal_active_px = %d",
-              hdmi_.current_display_timing_.horizontal_active_px);
-      FDF_LOG(INFO, "horizontal_front_porch_px = %d",
-              hdmi_.current_display_timing_.horizontal_front_porch_px);
-      FDF_LOG(INFO, "horizontal_sync_width_px = %d",
-              hdmi_.current_display_timing_.horizontal_sync_width_px);
-      FDF_LOG(INFO, "horizontal_back_porch_px = %d",
-              hdmi_.current_display_timing_.horizontal_back_porch_px);
-      FDF_LOG(INFO, "vertical_active_lines = %d",
-              hdmi_.current_display_timing_.vertical_active_lines);
-      FDF_LOG(INFO, "vertical_front_porch_lines = %d",
-              hdmi_.current_display_timing_.vertical_front_porch_lines);
-      FDF_LOG(INFO, "vertical_sync_width_lines = %d",
-              hdmi_.current_display_timing_.vertical_sync_width_lines);
-      FDF_LOG(INFO, "vertical_back_porch_lines = %d",
-              hdmi_.current_display_timing_.vertical_back_porch_lines);
-      FDF_LOG(INFO, "pixel_clock_frequency_hz = %" PRId64,
-              hdmi_.current_display_timing_.pixel_clock_frequency_hz);
-      FDF_LOG(INFO, "fields_per_frame (enum) = %u",
-              static_cast<uint32_t>(hdmi_.current_display_timing_.fields_per_frame));
-      FDF_LOG(INFO, "hsync_polarity (enum) = %u",
-              static_cast<uint32_t>(hdmi_.current_display_timing_.hsync_polarity));
-      FDF_LOG(INFO, "vsync_polarity (enum) = %u",
-              static_cast<uint32_t>(hdmi_.current_display_timing_.vsync_polarity));
-      FDF_LOG(INFO, "vblank_alternates = %d", hdmi_.current_display_timing_.vblank_alternates);
-      FDF_LOG(INFO, "pixel_repetition = %d", hdmi_.current_display_timing_.pixel_repetition);
+      fdf::info("horizontal_active_px = {}", hdmi_.current_display_timing_.horizontal_active_px);
+      fdf::info("horizontal_front_porch_px = {}",
+                hdmi_.current_display_timing_.horizontal_front_porch_px);
+      fdf::info("horizontal_sync_width_px = {}",
+                hdmi_.current_display_timing_.horizontal_sync_width_px);
+      fdf::info("horizontal_back_porch_px = {}",
+                hdmi_.current_display_timing_.horizontal_back_porch_px);
+      fdf::info("vertical_active_lines = {}", hdmi_.current_display_timing_.vertical_active_lines);
+      fdf::info("vertical_front_porch_lines = {}",
+                hdmi_.current_display_timing_.vertical_front_porch_lines);
+      fdf::info("vertical_sync_width_lines = {}",
+                hdmi_.current_display_timing_.vertical_sync_width_lines);
+      fdf::info("vertical_back_porch_lines = {}",
+                hdmi_.current_display_timing_.vertical_back_porch_lines);
+      fdf::info("pixel_clock_frequency_hz = {}",
+                hdmi_.current_display_timing_.pixel_clock_frequency_hz);
+      fdf::info("fields_per_frame (enum) = {}",
+                static_cast<uint32_t>(hdmi_.current_display_timing_.fields_per_frame));
+      fdf::info("hsync_polarity (enum) = {}",
+                static_cast<uint32_t>(hdmi_.current_display_timing_.hsync_polarity));
+      fdf::info("vsync_polarity (enum) = {}",
+                static_cast<uint32_t>(hdmi_.current_display_timing_.vsync_polarity));
+      fdf::info("vblank_alternates = {}", hdmi_.current_display_timing_.vblank_alternates);
+      fdf::info("pixel_repetition = {}", hdmi_.current_display_timing_.pixel_repetition);
       return;
   }
   ZX_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));

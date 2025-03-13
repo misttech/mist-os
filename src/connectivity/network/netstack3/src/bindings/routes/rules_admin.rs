@@ -69,10 +69,12 @@ impl<I: Ip> TryFromFidl<RuleMatcher<I>> for netstack3_core::routes::RuleMatcher<
             mark_matchers: netstack3_core::routes::MarkMatchers::new(
                 mark_1
                     .into_iter()
-                    .map(|m| (netstack3_core::routes::MarkDomain::Mark1, to_core_mark_matcher(m)))
-                    .chain(mark_2.into_iter().map(|m| {
-                        (netstack3_core::routes::MarkDomain::Mark2, to_core_mark_matcher(m))
-                    })),
+                    .map(|m| (netstack3_core::ip::MarkDomain::Mark1, to_core_mark_matcher(m)))
+                    .chain(
+                        mark_2.into_iter().map(|m| {
+                            (netstack3_core::ip::MarkDomain::Mark2, to_core_mark_matcher(m))
+                        }),
+                    ),
             ),
         })
     }

@@ -6,5 +6,6 @@ include /src/developer/fastboot/OWNERS
 include /src/developer/ffx/OWNERS
 include /src/developer/ffx/lib/pbms/OWNERS
 include /src/developer/ffx/plugins/product/OWNERS
+include /src/developer/ffx/plugins/repository/OWNERS
 include /src/developer/ffx/tools/profiler/OWNERS
 include /src/sys/pkg/OWNERS

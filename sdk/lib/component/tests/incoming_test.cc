@@ -38,10 +38,10 @@ class IncomingTest : public gtest::RealLoopFixture {
     return PerformBlockingWork([&]() {
       auto [client, server] = fidl::Endpoints<fuchsia_io::Node>::Create();
       fidl::Request<fuchsia_io::Directory::Open> request(
-          /*flags=*/fuchsia_io::OpenFlags{},
-          /*mode=*/fuchsia_io::ModeType{},
           /*path=*/component::OutgoingDirectory::kServiceDirectory,
-          /*object=*/std::move(server));
+          /*flags=*/fuchsia_io::kPermReadable | fuchsia_io::Flags::kProtocolDirectory,
+          /*options=*/{},
+          /*object=*/server.TakeChannel());
       fit::result status = outgoing_client_->Open(std::move(request));
       ZX_ASSERT_MSG(status.is_ok(), "Failed to invoke fuchsia.io/Directory.Open: %s",
                     status.error_value().FormatDescription().c_str());

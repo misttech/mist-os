@@ -5,9 +5,9 @@
 #![allow(non_upper_case_globals)]
 
 use crate::ffi::{
-    create_connection, create_image, device_import, device_release, execute_command,
-    execute_immediate_commands, export_buffer, flush, get_buffer_handle, import_semaphore2, query,
-    read_notification_channel, release_connection,
+    create_connection, device_import, device_release, execute_command, execute_inline_commands,
+    export_buffer, flush, get_buffer_handle, import_semaphore2, query, read_notification_channel,
+    release_connection,
 };
 use crate::image_file::{ImageFile, ImageInfo};
 use crate::magma::{read_control_and_response, read_magma_command_and_type, StarnixPollItem};
@@ -37,8 +37,10 @@ use magma::{
     virtio_magma_connection_execute_command_ctrl_t, virtio_magma_connection_execute_command_resp_t,
     virtio_magma_connection_execute_immediate_commands_ctrl_t,
     virtio_magma_connection_execute_immediate_commands_resp_t,
-    virtio_magma_connection_flush_ctrl_t, virtio_magma_connection_flush_resp_t,
-    virtio_magma_connection_get_error_ctrl_t, virtio_magma_connection_get_error_resp_t,
+    virtio_magma_connection_execute_inline_commands_ctrl_t,
+    virtio_magma_connection_execute_inline_commands_resp_t, virtio_magma_connection_flush_ctrl_t,
+    virtio_magma_connection_flush_resp_t, virtio_magma_connection_get_error_ctrl_t,
+    virtio_magma_connection_get_error_resp_t,
     virtio_magma_connection_get_notification_channel_handle_ctrl_t,
     virtio_magma_connection_get_notification_channel_handle_resp_t,
     virtio_magma_connection_import_buffer_ctrl_t, virtio_magma_connection_import_buffer_resp_t,
@@ -66,6 +68,7 @@ use magma::{
     virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_CREATE_SEMAPHORE,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_EXECUTE_COMMAND,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_EXECUTE_IMMEDIATE_COMMANDS,
+    virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_EXECUTE_INLINE_COMMANDS,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_FLUSH,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_GET_ERROR,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_GET_NOTIFICATION_CHANNEL_HANDLE,
@@ -87,8 +90,6 @@ use magma::{
     virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_SEMAPHORE_EXPORT,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_SEMAPHORE_RESET,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_SEMAPHORE_SIGNAL,
-    virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_VIRT_CONNECTION_CREATE_IMAGE,
-    virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_VIRT_CONNECTION_GET_IMAGE_INFO,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_BUFFER_CLEAN_CACHE,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_BUFFER_GET_CACHE_POLICY,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_BUFFER_GET_INFO,
@@ -99,6 +100,7 @@ use magma::{
     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_CREATE_SEMAPHORE,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_EXECUTE_COMMAND,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_EXECUTE_IMMEDIATE_COMMANDS,
+    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_EXECUTE_INLINE_COMMANDS,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_GET_ERROR,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_GET_NOTIFICATION_CHANNEL_HANDLE,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_IMPORT_BUFFER,
@@ -114,17 +116,13 @@ use magma::{
     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_SEMAPHORE_EXPORT,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_SEMAPHORE_RESET,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_SEMAPHORE_SIGNAL,
-    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_VIRT_CONNECTION_GET_IMAGE_INFO,
     virtio_magma_device_create_connection_ctrl, virtio_magma_device_create_connection_resp_t,
     virtio_magma_device_query_ctrl_t, virtio_magma_device_query_resp_t,
     virtio_magma_device_release_ctrl_t, virtio_magma_device_release_resp_t,
     virtio_magma_poll_ctrl_t, virtio_magma_poll_resp_t, virtio_magma_semaphore_export_ctrl_t,
     virtio_magma_semaphore_export_resp_t, virtio_magma_semaphore_reset_ctrl_t,
     virtio_magma_semaphore_reset_resp_t, virtio_magma_semaphore_signal_ctrl_t,
-    virtio_magma_semaphore_signal_resp_t, virtio_magma_virt_connection_create_image_ctrl_t,
-    virtio_magma_virt_connection_create_image_resp_t,
-    virtio_magma_virt_connection_get_image_info_ctrl_t,
-    virtio_magma_virt_connection_get_image_info_resp_t, virtmagma_buffer_set_name_wrapper,
+    virtio_magma_semaphore_signal_resp_t, virtmagma_buffer_set_name_wrapper,
     MAGMA_CACHE_POLICY_CACHED, MAGMA_IMPORT_SEMAPHORE_ONE_SHOT, MAGMA_POLL_CONDITION_SIGNALED,
     MAGMA_POLL_TYPE_SEMAPHORE, MAGMA_STATUS_INVALID_ARGS, MAGMA_STATUS_MEMORY_ERROR,
     MAGMA_STATUS_OK, MAGMA_STATUS_TIMED_OUT,
@@ -137,7 +135,7 @@ use starnix_core::mm::{MemoryAccessorExt, ProtectionFlags};
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
 use starnix_core::vfs::{
-    fileops_impl_noop_sync, Anon, FdFlags, FdNumber, FileObject, FileOps, FsNode, MemoryFileObject,
+    fileops_impl_noop_sync, Anon, FdFlags, FdNumber, FileObject, FileOps, FsNode, MemoryRegularFile,
 };
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{impossible_error, log_error, log_warn, set_zx_name, track_stub};
@@ -301,7 +299,7 @@ impl MagmaFile {
                 file.memory.duplicate_handle(zx::Rights::SAME_RIGHTS).map_err(impossible_error)?,
                 buffer,
             ))
-        } else if let Some(file) = file.downcast_file::<MemoryFileObject>() {
+        } else if let Some(file) = file.downcast_file::<MemoryRegularFile>() {
             let buffer = BufferInfo::Default;
             Ok((
                 file.memory.duplicate_handle(zx::Rights::SAME_RIGHTS).map_err(impossible_error)?,
@@ -314,7 +312,7 @@ impl MagmaFile {
             // used instead of ImageFile. Or if not needed, maybe we can remove ImageFile without
             // any replacement.
             //
-            // TODO: Consider if we can have binder related code in starnix use MemoryFileObject for
+            // TODO: Consider if we can have binder related code in starnix use MemoryRegularFile for
             // any FD wrapping a VMO, or if that's not workable, we may want to have magma related
             // code use RemoteFileObject.
             let buffer = BufferInfo::Default;
@@ -354,19 +352,6 @@ impl MagmaFile {
         self.buffers.lock().insert(buffer, arc_buffer);
     }
 
-    /// Returns a `BufferInfo` for the given `magma_buffer_t`, if one exists for the given
-    /// `connection`. Otherwise returns `None`.
-    fn get_buffer_info(
-        &self,
-        connection: magma_connection_t,
-        buffer: magma_buffer_t,
-    ) -> Option<BufferInfo> {
-        match self.connections.lock().get(&connection) {
-            Some(buffers) => buffers.buffer_map.get(&buffer).cloned(),
-            _ => None,
-        }
-    }
-
     fn get_connection(
         &self,
         connection: magma_connection_t,
@@ -385,7 +370,7 @@ impl MagmaFile {
     }
 
     fn get_semaphore(&self, semaphore: magma_semaphore_t) -> Result<Arc<MagmaSemaphore>, i32> {
-        Ok(self.semaphores.lock().get(&semaphore).ok_or_else(|| MAGMA_STATUS_INVALID_ARGS)?.clone())
+        Ok(self.semaphores.lock().get(&semaphore).ok_or(MAGMA_STATUS_INVALID_ARGS)?.clone())
     }
 
     fn import_semaphore2(
@@ -506,50 +491,6 @@ impl FileOps for MagmaFile {
 
                 device_release(control, &mut response, &mut self.devices.lock());
 
-                current_task.write_object(UserRef::new(response_address), &response)
-            }
-            virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_VIRT_CONNECTION_CREATE_IMAGE => {
-                let (control, mut response): (
-                    virtio_magma_virt_connection_create_image_ctrl_t,
-                    virtio_magma_virt_connection_create_image_resp_t,
-                ) = read_control_and_response(current_task, &command)?;
-
-                let connection = self.get_connection(control.connection)?;
-
-                if let Ok(buffer) = create_image(current_task, control, &mut response, &connection)
-                {
-                    self.add_buffer_info(connection, response.image_out, buffer);
-                }
-
-                current_task.write_object(UserRef::new(response_address), &response)
-            }
-            virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_VIRT_CONNECTION_GET_IMAGE_INFO => {
-                let (control, mut response): (
-                    virtio_magma_virt_connection_get_image_info_ctrl_t,
-                    virtio_magma_virt_connection_get_image_info_resp_t,
-                ) = read_control_and_response(current_task, &command)?;
-
-                let image_info_address_ref =
-                    UserRef::new(UserAddress::from(control.image_info_out));
-                let image_info_ptr = current_task.read_object(image_info_address_ref)?;
-
-                match self.get_buffer_info(
-                    control.connection as magma_connection_t,
-                    control.image as magma_buffer_t,
-                ) {
-                    Some(BufferInfo::Image(image_info)) => {
-                        let image_info_ref = UserRef::new(image_info_ptr);
-                        current_task.write_object(image_info_ref, &image_info.info)?;
-                        response.result_return = MAGMA_STATUS_OK as u64;
-                    }
-                    _ => {
-                        log_error!("No image info was found for buffer: {:?}", { control.image });
-                        response.result_return = MAGMA_STATUS_INVALID_ARGS as u64;
-                    }
-                };
-
-                response.hdr.type_ =
-                    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_VIRT_CONNECTION_GET_IMAGE_INFO as u32;
                 current_task.write_object(UserRef::new(response_address), &response)
             }
             virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_FLUSH => {
@@ -1082,17 +1023,42 @@ impl FileOps for MagmaFile {
                     virtio_magma_connection_execute_immediate_commands_ctrl_t,
                     virtio_magma_connection_execute_immediate_commands_resp_t,
                 ) = read_control_and_response(current_task, &command)?;
+
+                let control = virtio_magma_connection_execute_inline_commands_ctrl_t {
+                    hdr: control.hdr,
+                    connection: control.connection,
+                    context_id: control.context_id,
+                    command_count: control.command_count,
+                    command_buffers: control.command_buffers,
+                };
                 let connection = self.get_connection(control.connection)?;
 
-                let status = execute_immediate_commands(
-                    current_task,
-                    control,
-                    &connection,
-                    |semaphore_id| self.get_semaphore(semaphore_id),
-                )?;
+                let status =
+                    execute_inline_commands(current_task, control, &connection, |semaphore_id| {
+                        self.get_semaphore(semaphore_id)
+                    })?;
 
                 response.hdr.type_ =
                     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_EXECUTE_IMMEDIATE_COMMANDS
+                        as u32;
+                response.result_return = status as u64;
+
+                current_task.write_object(UserRef::new(response_address), &response)
+            }
+            virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_EXECUTE_INLINE_COMMANDS => {
+                let (control, mut response): (
+                    virtio_magma_connection_execute_inline_commands_ctrl_t,
+                    virtio_magma_connection_execute_inline_commands_resp_t,
+                ) = read_control_and_response(current_task, &command)?;
+                let connection = self.get_connection(control.connection)?;
+
+                let status =
+                    execute_inline_commands(current_task, control, &connection, |semaphore_id| {
+                        self.get_semaphore(semaphore_id)
+                    })?;
+
+                response.hdr.type_ =
+                    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_EXECUTE_INLINE_COMMANDS
                         as u32;
                 response.result_return = status as u64;
 

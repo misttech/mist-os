@@ -19,7 +19,6 @@ namespace fad = fuchsia_audio_device;
 class RegistryServerWarningTest : public AudioDeviceRegistryServerTestBase {};
 class RegistryServerCodecWarningTest : public RegistryServerWarningTest {};
 class RegistryServerCompositeWarningTest : public RegistryServerWarningTest {};
-class RegistryServerStreamConfigWarningTest : public RegistryServerWarningTest {};
 
 /////////////////////
 // Device-less tests
@@ -404,109 +403,6 @@ TEST_F(RegistryServerCompositeWarningTest, CreateObserverBadObserver) {
 
 // TODO(https://fxbug.dev/42068381): If Health can change post-initialization, add a test case for:
 //   CreateObserver with token of Composite that was ready & Added, but then became unhealthy.
-
-/////////////////////
-// StreamConfig tests
-//
-// If the required 'observer_server' field is not set, we should fail.
-TEST_F(RegistryServerStreamConfigWarningTest, CreateObserverMissingObserver) {
-  auto fake_driver = CreateFakeStreamConfigOutput();
-  adr_service()->AddDevice(
-      Device::Create(adr_service(), dispatcher(), "Test output name", fad::DeviceType::kOutput,
-                     fad::DriverClient::WithStreamConfig(fake_driver->Enable())));
-
-  RunLoopUntilIdle();
-  ASSERT_EQ(adr_service()->devices().size(), 1u);
-  auto registry = CreateTestRegistryServer();
-  ASSERT_EQ(RegistryServer::count(), 1u);
-  auto received_callback = false;
-  std::optional<TokenId> added_id;
-  registry->client()->WatchDevicesAdded().Then(
-      [&received_callback,
-       &added_id](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
-        received_callback = true;
-        ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1u);
-        ASSERT_TRUE(result->devices()->at(0).token_id());
-        added_id = result->devices()->at(0).token_id();
-      });
-
-  RunLoopUntilIdle();
-  ASSERT_TRUE(received_callback);
-  ASSERT_TRUE(added_id.has_value());
-  auto [observer_client_end, observer_server_end] = CreateNaturalAsyncClientOrDie<fad::Observer>();
-  auto observer_client = fidl::Client<fad::Observer>(std::move(observer_client_end), dispatcher(),
-                                                     observer_fidl_handler().get());
-  received_callback = false;
-
-  registry->client()
-      ->CreateObserver({{
-          .token_id = added_id,
-      }})
-      .Then([&received_callback](fidl::Result<fad::Registry::CreateObserver>& result) {
-        received_callback = true;
-        ASSERT_TRUE(result.is_error());
-        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
-        EXPECT_EQ(result.error_value().domain_error(),
-                  fad::RegistryCreateObserverError::kInvalidObserver)
-            << result.error_value();
-      });
-
-  RunLoopUntilIdle();
-  EXPECT_TRUE(received_callback);
-  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
-}
-
-// If 'observer_server' is not set to a valid handle, we should fail.
-TEST_F(RegistryServerStreamConfigWarningTest, CreateObserverBadObserver) {
-  auto fake_driver = CreateFakeStreamConfigInput();
-  adr_service()->AddDevice(
-      Device::Create(adr_service(), dispatcher(), "Test input name", fad::DeviceType::kInput,
-                     fad::DriverClient::WithStreamConfig(fake_driver->Enable())));
-
-  RunLoopUntilIdle();
-  ASSERT_EQ(adr_service()->devices().size(), 1u);
-  auto registry = CreateTestRegistryServer();
-  ASSERT_EQ(RegistryServer::count(), 1u);
-  auto received_callback = false;
-  std::optional<TokenId> added_id;
-  registry->client()->WatchDevicesAdded().Then(
-      [&received_callback,
-       &added_id](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
-        received_callback = true;
-        ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1u);
-        ASSERT_TRUE(result->devices()->at(0).token_id());
-        added_id = result->devices()->at(0).token_id();
-      });
-
-  RunLoopUntilIdle();
-  ASSERT_TRUE(received_callback);
-  ASSERT_TRUE(added_id.has_value());
-  auto [observer_client_end, observer_server_end] = CreateNaturalAsyncClientOrDie<fad::Observer>();
-  auto observer_client = fidl::Client<fad::Observer>(std::move(observer_client_end), dispatcher(),
-                                                     observer_fidl_handler().get());
-  received_callback = false;
-
-  registry->client()
-      ->CreateObserver({{
-          .token_id = added_id,
-          .observer_server = fidl::ServerEnd<fad::Observer>(),
-      }})
-      .Then([&received_callback](fidl::Result<fad::Registry::CreateObserver>& result) {
-        received_callback = true;
-        ASSERT_TRUE(result.is_error());
-        ASSERT_TRUE(result.error_value().is_framework_error()) << result.error_value();
-        EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_INVALID_ARGS)
-            << result.error_value();
-      });
-
-  RunLoopUntilIdle();
-  EXPECT_TRUE(received_callback);
-  ASSERT_TRUE(registry_fidl_error_status().has_value());
-  EXPECT_EQ(*registry_fidl_error_status(), ZX_ERR_INVALID_ARGS);
-}
-
-// TODO(https://fxbug.dev/42068381): If Health can change post-initialization, add a test case for:
-//   CreateObserver with token of StreamConfig that was ready & Added, but then became unhealthy.
 
 }  // namespace
 }  // namespace media_audio

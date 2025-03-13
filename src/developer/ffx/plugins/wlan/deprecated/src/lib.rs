@@ -4,7 +4,8 @@
 
 use anyhow::Error;
 use async_trait::async_trait;
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool};
 use target_holders::moniker;
 use {
     ffx_wlan_deprecated_args as arg_types,

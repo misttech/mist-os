@@ -12,6 +12,16 @@ group("tests") {
   deps = [ ":blackout-target-test" ]
 }
 
+# We need a manifest to pull the config options out of, so we use the integration manifest
+fuchsia_component_manifest("blackout-integration-manifest") {
+  manifest = "//src/storage/blackout/target/blackout-integration/meta/blackout_integration.cml"
+}
+
+fuchsia_structured_config_rust_lib("blackout-config") {
+  name = "blackout_config"
+  cm_label = ":blackout-integration-manifest"
+}
+
 rustc_library("blackout-target") {
   edition = "2021"
   with_unit_tests = true
@@ -19,6 +29,7 @@ rustc_library("blackout-target") {
     "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.storage.partitions:fuchsia.storage.partitions_rust",
     "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
@@ -43,6 +54,9 @@ rustc_library("blackout-target") {
     "src/lib.rs",
     "src/static_tree.rs",
   ]
+
+  # TODO(https://fxbug.dev/390250858): Re-enable when lld issue is fixed.
+  exclude_toolchain_tags = [ "profile" ]
 }
 
 # These tests are broken out into their own components because they don't respond well when they

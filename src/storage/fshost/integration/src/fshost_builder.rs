@@ -57,11 +57,21 @@ impl<'a> IntoValueSpec for &'a str {
 pub struct FshostBuilder {
     component_name: &'static str,
     config_values: HashMap<&'static str, cm_rust::ConfigValueSpec>,
+    create_starnix_volume_crypt: bool,
 }
 
 impl FshostBuilder {
     pub fn new(component_name: &'static str) -> FshostBuilder {
-        FshostBuilder { component_name, config_values: HashMap::new() }
+        FshostBuilder {
+            component_name,
+            config_values: HashMap::new(),
+            create_starnix_volume_crypt: false,
+        }
+    }
+
+    pub fn create_starnix_volume_crypt(&mut self) -> &mut Self {
+        self.create_starnix_volume_crypt = true;
+        self
     }
 
     pub fn set_config_value(&mut self, key: &'static str, value: impl IntoValueSpec) -> &mut Self {
@@ -117,10 +127,7 @@ impl FshostBuilder {
             ("blobfs_cache_eviction_policy", "fuchsia.blobfs.CacheEvictionPolicy"),
         ]);
 
-        // Note that the `starnix_volume_name` config should not be set in the fshost integration
-        // test package because the builder is not aware of those and won't know to setup the crypt
-        // service.
-        if self.config_values.contains_key("starnix_volume_name") {
+        if self.create_starnix_volume_crypt {
             let user_fxfs_crypt = realm_builder
                 .add_child("user_fxfs_crypt", "#meta/fxfs-crypt.cm", ChildOptions::new().eager())
                 .await

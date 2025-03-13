@@ -110,9 +110,9 @@ impl Procedure for QueryOperatorProcedure {
             }
             (State::Terminated, at::Command::Cops { .. })
             | (State::Terminated, at::Command::CopsRead {}) => {
-                ProcedureRequest::Error(ProcedureError::AlreadyTerminated)
+                ProcedureError::AlreadyTerminated.into()
             }
-            (_, update) => ProcedureRequest::Error(ProcedureError::UnexpectedHf(update)),
+            (_, update) => ProcedureError::UnexpectedHf(update).into(),
         }
     }
 
@@ -123,9 +123,9 @@ impl Procedure for QueryOperatorProcedure {
                 update.into()
             }
             (State::Terminated, AgUpdate::NetworkOperatorName(..)) => {
-                ProcedureRequest::Error(ProcedureError::AlreadyTerminated)
+                ProcedureError::AlreadyTerminated.into()
             }
-            (_, update) => ProcedureRequest::Error(ProcedureError::UnexpectedAg(update)),
+            (_, update) => ProcedureError::UnexpectedAg(update).into(),
         }
     }
 
@@ -190,7 +190,7 @@ mod tests {
         let random_hf = at::Command::CindRead {};
         assert_matches!(
             procedure.hf_update(random_hf, &mut state),
-            ProcedureRequest::Error(ProcedureError::UnexpectedHf(_))
+            ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedHf(_))
         );
     }
 
@@ -202,7 +202,7 @@ mod tests {
         let random_ag = AgUpdate::ThreeWaySupport;
         assert_matches!(
             procedure.ag_update(random_ag, &mut state),
-            ProcedureRequest::Error(ProcedureError::UnexpectedAg(_))
+            ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedAg(_))
         );
     }
 
@@ -240,7 +240,7 @@ mod tests {
                 },
                 &mut state
             ),
-            ProcedureRequest::Error(ProcedureError::AlreadyTerminated)
+            ProcedureRequest::Error(err) if matches!(*err, ProcedureError::AlreadyTerminated)
         );
         assert_matches!(
             p.ag_update(
@@ -250,7 +250,7 @@ mod tests {
                 ),
                 &mut state
             ),
-            ProcedureRequest::Error(ProcedureError::AlreadyTerminated)
+            ProcedureRequest::Error(err) if matches!(*err, ProcedureError::AlreadyTerminated)
         );
     }
 

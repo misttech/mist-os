@@ -55,6 +55,14 @@ zx_status_t sys_pager_create(uint32_t options, zx_handle_t* out) {
     return status;
   }
 
+  char proc_name[ZX_MAX_NAME_LEN];
+  status = up->get_name(proc_name);
+  if (status == ZX_OK) {
+    // Stash the name of the creating process for debugging.
+    status = handle.dispatcher()->set_debug_name(proc_name, ZX_MAX_NAME_LEN);
+    DEBUG_ASSERT(status == ZX_OK);
+  }
+
   return up->MakeAndAddHandle(ktl::move(handle), rights, out);
 }
 

@@ -19,9 +19,12 @@ group("tests") {
     "fp_stack_glue:tests",
     "gvisor:tests",
     "memory_attribution:tests",
+    "nanohub:tests",
     "psi:tests",
     "reboot:tests",
+    "remotevol_shutdown:tests",
     "scheduler:tests",
+    "selinux/userspace:tests",
     "suspend:tests",
     "syscalls:tests",
     "sysrq:tests",
@@ -63,13 +66,14 @@ expect_includes("starnix_benchmark") {
 }
 
 if (host_os == "linux" && host_cpu == "x64") {
-  starnix_host_test_component("fdio-test") {
+  starnix_host_test_component("fdio_test") {
     test_label = "//sdk/lib/fdio/tests:fdio-test"
     test_type = "starnix"
+    test_binary = "fdio-test"
   }
 
   fuchsia_test_package("starnix_user_tests") {
-    test_components = [ ":fdio-test" ]
+    test_components = [ ":fdio_test" ]
 
     subpackages = starnix_test_subpackages +
                   [ "//src/starnix/containers/debian:debian_package" ]
@@ -88,12 +92,6 @@ starnix_linux_test_component("virtmagma_sync_file_tests") {
   test_type = "starnix"
 }
 
-starnix_linux_test_component("virtmagma_image_tests") {
-  test_label =
-      "//src/graphics/magma/tests_linux/unit_tests:virtmagma_image_tests"
-  test_type = "starnix"
-}
-
 starnix_linux_test_component("virtmagma_unit_tests") {
   test_label =
       "//src/graphics/magma/tests_linux/unit_tests:virtmagma_unit_tests"
@@ -103,7 +101,6 @@ starnix_linux_test_component("virtmagma_unit_tests") {
 fuchsia_test_package("starnix_magma_tests") {
   test_components = [
     ":virtmagma_conformance_tests",
-    ":virtmagma_image_tests",
     ":virtmagma_unit_tests",
     ":virtmagma_sync_file_tests",
   ]
@@ -120,9 +117,7 @@ fuchsia_test_package("starnix_magma_tests") {
     environments = [
       atlas_env,
       nuc7_env,
-
-      # TODO(b/341369599): Disable this test in NUC11 until bug is fixed.
-      # nuc11_env,
+      nuc11_env,
       vim3_env,
     ]
   }

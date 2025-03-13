@@ -4,7 +4,7 @@
 
 use crate::diagnostics::types::SnapshotInspectArgs;
 use anyhow::Error;
-use diagnostics_reader::{ArchiveReader, Inspect, RetryConfig};
+use diagnostics_reader::{ArchiveReader, RetryConfig};
 use fidl_fuchsia_diagnostics::ArchiveAccessorMarker;
 use fuchsia_component::client;
 use serde_json::Value;
@@ -26,12 +26,12 @@ impl DiagnosticsFacade {
         let service_path = format!("/svc/{}", args.service_name);
         let proxy =
             client::connect_to_protocol_at_path::<ArchiveAccessorMarker>(&service_path).unwrap();
-        let value = ArchiveReader::new()
+        let value = ArchiveReader::inspect()
             .retry(RetryConfig::never())
             .with_archive(proxy)
             .add_selectors(args.selectors.into_iter())
             .with_batch_retrieval_timeout_seconds(BATCH_RETRIEVAL_TIMEOUT_SECONDS)
-            .snapshot_raw::<Inspect, serde_json::Value>()
+            .snapshot_raw::<serde_json::Value>()
             .await?;
         Ok(value)
     }

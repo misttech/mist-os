@@ -14,7 +14,8 @@ use errors::{ffx_bail, ffx_bail_with_code, ffx_error, ffx_error_with_code, FfxEr
 use ffx_test_args::{
     EarlyBootProfileCommand, ListCommand, RunCommand, TestCommand, TestSubCommand,
 };
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::VerifiedMachineWriter;
+use fho::{FfxMain, FfxTool};
 use fidl::endpoints::create_proxy;
 use futures::FutureExt;
 use lazy_static::lazy_static;
@@ -58,7 +59,7 @@ fho::embedded_plugin!(TestTool);
 
 #[async_trait(?Send)]
 impl FfxMain for TestTool {
-    type Writer = SimpleWriter;
+    type Writer = VerifiedMachineWriter<()>;
 
     // TODO(https://fxbug.dev/42078544): use Writer when it becomes possible.
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
@@ -523,12 +524,11 @@ mod test {
                     // store channels so that they do not die.
                     let mut server_channels = vec![];
                     match request {
-                        fremotecontrol::RemoteControlRequest::DeprecatedOpenCapability {
+                        fremotecontrol::RemoteControlRequest::ConnectCapability {
                             moniker,
                             capability_set,
                             capability_name,
                             server_channel,
-                            flags: _,
                             responder,
                         } => {
                             assert_eq!(moniker, "toolbox");
@@ -974,12 +974,11 @@ mod test {
             let mut once = false;
             while let Some(request) = stream.try_next().await.unwrap() {
                 match request {
-                    fremotecontrol::RemoteControlRequest::DeprecatedOpenCapability {
+                    fremotecontrol::RemoteControlRequest::ConnectCapability {
                         moniker,
                         capability_set,
                         capability_name,
                         server_channel,
-                        flags: _,
                         responder,
                     } => {
                         assert!(!once);

@@ -37,7 +37,10 @@ VnodeF2fs::VnodeF2fs(F2fs *fs, ino_t ino, umode_t mode)
   Activate();
 }
 
-VnodeF2fs::~VnodeF2fs() { ReleasePagedVmo(); }
+VnodeF2fs::~VnodeF2fs() {
+  ReleasePagedVmo();
+  Deactivate();
+}
 
 fuchsia_io::NodeProtocolKinds VnodeF2fs::GetProtocols() const {
   return fuchsia_io::NodeProtocolKinds::kFile;
@@ -259,19 +262,22 @@ void VnodeF2fs::ReportPagerErrorUnsafe(const uint32_t op, const uint64_t offset,
 void VnodeF2fs::RecycleNode() TA_NO_THREAD_SAFETY_ANALYSIS {
   ZX_ASSERT_MSG(open_count() == 0, "RecycleNode[%s:%u]: open_count must be zero (%lu)",
                 GetNameView().data(), GetKey(), open_count());
-  auto delete_this = fit::defer([&]() TA_NO_THREAD_SAFETY_ANALYSIS {
-    Deactivate();
-    file_cache_->Reset();
-    ReleasePagedVmoUnsafe();
+  // It is safe to free vnodes that have been already evicted from vnode cache.
+  if (!(*this).fbl::WAVLTreeContainable<VnodeF2fs *>::InContainer()) {
     delete this;
-  });
-  // During PagedVfs::Teardown, f2fs object is not available. In this case, we just release
-  // resource. Orphans will be purged at next mount time.
-  if (fs()->IsTearDown()) {
     return;
   }
-
-  if (GetNlink()) {
+  std::optional vfs = this->vfs();
+  if ((vfs && vfs->get().IsTerminating()) || fs()->IsTearDown()) {
+    // During teardown, we just leave |this| alive in vnode cache. All vnodes in vnode
+    // cache will be freed when vnode cache is destroyed. There is no trial to make a RefPtr from
+    // |this| during teardown, and thus it is safe to call ResurrectRef() without acquiring
+    // VnodeCache::table_lock_. Orphans will be purged at next mount time.
+    ResurrectRef();
+    fbl::RefPtr<VnodeF2fs> vnode = fbl::ImportFromRawPtr(this);
+    [[maybe_unused]] auto leak = fbl::ExportToRawPtr(&vnode);
+    Deactivate();
+  } else if (GetNlink()) {
     // It should not happen since f2fs removes the last reference of dirty vnodes at checkpoint time
     // during which any file operations are not allowed.
     if (GetDirtyPageCount()) {
@@ -287,9 +293,12 @@ void VnodeF2fs::RecycleNode() TA_NO_THREAD_SAFETY_ANALYSIS {
       CleanupCache();
     }
     fs()->GetVCache().Downgrade(this);
-    delete_this.cancel();
+    Deactivate();
   } else {
-    EvictVnode();
+    // If |this| is an orphan, purge it .
+    Purge();
+    fs()->GetVCache().Evict(this);
+    delete this;
   }
 }
 
@@ -582,17 +591,13 @@ void VnodeF2fs::TruncateToSize() {
 
 void VnodeF2fs::ReleasePagedVmo() {
   std::lock_guard lock(mutex_);
-  ReleasePagedVmoUnsafe();
-}
-
-void VnodeF2fs::ReleasePagedVmoUnsafe() {
   if (paged_vmo()) {
     fbl::RefPtr<fs::Vnode> pager_reference = FreePagedVmo();
     ZX_DEBUG_ASSERT(!pager_reference);
   }
 }
 
-void VnodeF2fs::EvictVnode() {
+void VnodeF2fs::Purge() {
   if (ino_ == superblock_info_.GetNodeIno() || ino_ == superblock_info_.GetMetaIno()) {
     return;
   }
@@ -607,7 +612,6 @@ void VnodeF2fs::EvictVnode() {
     TruncateToSize();
   }
   RemoveInodePage();
-  fs()->GetVCache().Evict(this);
 }
 
 zx_status_t VnodeF2fs::InitFileCache(uint64_t nbytes) {
@@ -1048,8 +1052,8 @@ zx_status_t VnodeF2fs::TruncateInodeBlocks(pgoff_t from) {
   }
 
   const size_t level = node_path->depth;
-  const size_t(&node_offsets)[kMaxNodeBlockLevel] = node_path->node_offset;
-  size_t(&offsets_in_node)[kMaxNodeBlockLevel] = node_path->offset_in_node;
+  const size_t (&node_offsets)[kMaxNodeBlockLevel] = node_path->node_offset;
+  size_t (&offsets_in_node)[kMaxNodeBlockLevel] = node_path->offset_in_node;
   size_t node_offset = 0;
 
   LockedPage locked_ipage;

@@ -7,6 +7,7 @@ pub mod builtin_runner;
 pub mod crash_introspect;
 pub mod fuchsia_boot_resolver;
 pub mod log;
+pub mod ota_health_verification;
 pub mod realm_builder;
 pub mod runner;
 pub mod svc_stash_provider;

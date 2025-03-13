@@ -88,6 +88,8 @@ zx::result<> Dwc3::Start() {
 
   auto offers = compat_.CreateOffers2();
   offers.push_back(fdf::MakeOffer2<fdci::UsbDciService>());
+  offers.push_back(mac_address_metadata_server_.MakeOffer());
+  offers.push_back(serial_number_metadata_server_.MakeOffer());
 
   auto child = AddChild(name(), props, offers);
   if (child.is_error()) {
@@ -100,16 +102,38 @@ zx::result<> Dwc3::Start() {
 }
 
 zx_status_t Dwc3::AcquirePDevResources() {
-  auto pdev = incoming()->Connect<fpdev::Service::Device>("pdev");
-  if (pdev.is_error()) {
-    FDF_LOG(ERROR, "fidl::CreateEndpoints<fpdev::Service>(): %s", pdev.status_string());
-    return pdev.error_value();
+  auto pdev_client_end = incoming()->Connect<fpdev::Service::Device>("pdev");
+  if (pdev_client_end.is_error()) {
+    FDF_LOG(ERROR, "fidl::CreateEndpoints<fpdev::Service>(): %s", pdev_client_end.status_string());
+    return pdev_client_end.error_value();
   }
-  pdev_ = fdf::PDev{std::move(*pdev)};
 
-  if (!pdev_.is_valid()) {
-    FDF_LOG(ERROR, "Could not get platform device protocol");
-    return ZX_ERR_NOT_SUPPORTED;
+  pdev_ = fdf::PDev{std::move(pdev_client_end.value())};
+
+  // Initialize mac address metadata server.
+  if (zx::result result = mac_address_metadata_server_.SetMetadataFromPDevIfExists(pdev_);
+      result.is_error()) {
+    FDF_LOG(ERROR, "Failed to set metadata for mac address metdadata server: %s",
+            result.status_string());
+    return result.status_value();
+  }
+  if (zx::result result = mac_address_metadata_server_.Serve(*outgoing(), dispatcher());
+      result.is_error()) {
+    FDF_LOG(ERROR, "Failed to serve mac address metadata: %s", result.status_string());
+    return result.status_value();
+  }
+
+  // Initialize serial number metadata server.
+  if (zx::result result = serial_number_metadata_server_.SetMetadataFromPDevIfExists(pdev_);
+      result.is_error()) {
+    FDF_LOG(ERROR, "Failed to set metadata for serial number metdadata server: %s",
+            result.status_string());
+    return result.status_value();
+  }
+  if (zx::result result = serial_number_metadata_server_.Serve(*outgoing(), dispatcher());
+      result.is_error()) {
+    FDF_LOG(ERROR, "Failed to serve serial number metadata: %s", result.status_string());
+    return result.status_value();
   }
 
   auto mmio = pdev_.MapMmio(0);
@@ -339,7 +363,6 @@ zx_status_t Dwc3::ResetHw() {
     if ((zx::clock::get_monotonic() - start) >= kHwResetTimeout) {
       return ZX_ERR_TIMED_OUT;
     }
-    usleep(1000);
   }
 
   return ZX_OK;
@@ -544,6 +567,12 @@ void Dwc3::ConnectToEndpoint(ConnectToEndpointRequest& request,
 }
 
 void Dwc3::SetInterface(SetInterfaceRequest& request, SetInterfaceCompleter::Sync& completer) {
+  if (!request.interface().is_valid()) {
+    zxlogf(ERROR, "Interface should be valid");
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+
   std::lock_guard<std::mutex> lock(dci_lock_);
 
   if (dci_intf_.is_valid()) {
@@ -553,9 +582,11 @@ void Dwc3::SetInterface(SetInterfaceRequest& request, SetInterfaceCompleter::Syn
   }
 
   dci_intf_.Bind(std::move(request.interface()));
+  completer.Reply(zx::ok());
+}
 
-  StartPeripheralMode();
-
+void Dwc3::StartController(StartControllerCompleter::Sync& completer) {
+  ZX_ASSERT(!irq_thread_started_);
   // Start the interrupt thread.
   auto irq_thunk = +[](void* arg) -> int { return static_cast<Dwc3*>(arg)->IrqThread(); };
   if (int rc = thrd_create_with_name(&irq_thread_, irq_thunk, static_cast<void*>(this),
@@ -566,6 +597,39 @@ void Dwc3::SetInterface(SetInterfaceRequest& request, SetInterfaceCompleter::Syn
   }
   irq_thread_started_.store(true);
 
+  StartPeripheralMode();
+  completer.Reply(zx::ok());
+}
+
+void Dwc3::StopController(StopControllerCompleter::Sync& completer) {
+  Ep0Reset();
+  ep0_.Reset();
+  for (UserEndpoint& uep : user_endpoints_) {
+    CancelAll(uep.ep);
+    uep.Reset();
+  }
+
+  if (irq_thread_started_.load()) {
+    zx_status_t status = SignalIrqThread(IrqSignal::Exit);
+    // if we can't signal the thread, we are not going to be able to shut down
+    // and we should just terminate the process instead.
+    ZX_ASSERT(status == ZX_OK);
+    thrd_join(irq_thread_, nullptr);
+    irq_thread_started_.store(false);
+  }
+  irq_port_.cancel_key(0, 0);
+
+  zx_status_t status;
+  {
+    std::lock_guard<std::mutex> _(lock_);
+    status = ResetHw();
+  }
+  if (status != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to reset hardware %s", zx_status_get_string(status));
+    completer.Reply(zx::error(status));
+    return;
+  }
+  zx::nanosleep(zx::deadline_after(zx::msec(50)));
   completer.Reply(zx::ok());
 }
 
@@ -630,7 +694,7 @@ void Dwc3::DisableEndpoint(DisableEndpointRequest& request,
   FidlRequestQueue to_complete;
   {
     std::lock_guard<std::mutex> lock(uep->ep.lock);
-    to_complete = UserEpCancelAllLocked(*uep);
+    to_complete = CancelAllLocked(uep->ep);
     uep->fifo.Release();
     uep->ep.enabled = false;
   }
@@ -683,7 +747,7 @@ zx::result<> Dwc3::CommonCancelAll(uint8_t ep_addr) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  if (zx_status_t status = UserEpCancelAll(*uep); status != ZX_OK) {
+  if (zx_status_t status = CancelAll(uep->ep); status != ZX_OK) {
     return zx::error(status);
   }
   return zx::ok();
@@ -785,15 +849,14 @@ void Dwc3::EpServer::GetInfo(GetInfoCompleter::Sync& completer) {
 
 void Dwc3::EpServer::QueueRequests(QueueRequestsRequest& request,
                                    QueueRequestsCompleter::Sync& completer) {
+  std::lock_guard<std::mutex> lock(uep_->ep.lock);
   for (auto& req : request.req()) {
-    std::lock_guard<std::mutex> lock(uep_->ep.lock);
-
     usb::FidlRequest freq{std::move(req)};
 
     zx_status_t status{ZX_OK};
 
     if (!uep_->ep.enabled) {
-      status = ZX_ERR_BAD_STATE;
+      status = ZX_ERR_IO_NOT_PRESENT;
       FDF_LOG(ERROR, "Dwc3: ep(%u) not enabled!", uep_->ep.ep_num);
     }
 
@@ -823,12 +886,11 @@ void Dwc3::EpServer::QueueRequests(QueueRequestsRequest& request,
       continue;
     }
 
-    RequestInfo info{0, 0, uep_, std::move(freq)};
-    uep_->ep.queued_reqs.push(std::move(info));
+    uep_->ep.queued_reqs.push(RequestInfo{0, 0, uep_, std::move(freq)});
+  }
 
-    if (dwc3_->configured_) {
-      dwc3_->UserEpQueueNext(*uep_);
-    }
+  if (dwc3_->configured_) {
+    dwc3_->UserEpQueueNext(*uep_);
   }
 }
 

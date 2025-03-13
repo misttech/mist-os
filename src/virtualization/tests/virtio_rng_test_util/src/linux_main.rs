@@ -5,7 +5,7 @@
 
 use std::collections::HashSet;
 use std::fs::File;
-use std::io::{Error, ErrorKind, Read};
+use std::io::{Error, Read};
 
 fn run_test() -> std::io::Result<()> {
     let mut set = HashSet::new();
@@ -14,7 +14,7 @@ fn run_test() -> std::io::Result<()> {
         let mut buf = vec![0; 16];
         rng.read_exact(&mut buf)?;
         if !set.insert(buf) {
-            return Err(Error::new(ErrorKind::Other, "Repeated random draw"));
+            return Err(Error::other("Repeated random draw"));
         }
     }
     Ok(())

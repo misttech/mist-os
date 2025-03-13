@@ -4,7 +4,7 @@
 
 use crate::{test_topology, utils};
 use diagnostics_assertions::assert_data_tree;
-use diagnostics_reader::{ArchiveReader, Logs, Severity};
+use diagnostics_reader::{ArchiveReader, Severity};
 use fidl_fuchsia_archivist_test::LogPuppetLogRequest;
 use futures::StreamExt;
 use {fidl_fuchsia_archivist_test as ftest, fidl_fuchsia_diagnostics as fdiagnostics};
@@ -21,9 +21,9 @@ async fn log_attribution() {
     .expect("create base topology");
 
     let accessor = utils::connect_accessor(&realm, utils::ALL_PIPELINE).await;
-    let mut result = ArchiveReader::new()
+    let mut result = ArchiveReader::logs()
         .with_archive(accessor)
-        .snapshot_then_subscribe::<Logs>()
+        .snapshot_then_subscribe()
         .expect("snapshot then subscribe");
 
     let puppet = test_topology::connect_to_puppet(&realm, REALM_NAME).await.unwrap();

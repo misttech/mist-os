@@ -73,10 +73,11 @@ template("bootfs_files_for_assembly") {
            "The bootfs_files_for_assembly() template sets its own visibility")
 
     # The targets created by this template can only be used with assembly input
-    # bundles.
+    # bundles or developer overrides.
     visibility = [
       ":*",
       "//bundles/assembly/*",
+      "//local/*",
     ]
 
     deps = [ ":${labels.bootfs_distribution_entries}" ]

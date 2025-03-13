@@ -14,10 +14,10 @@ use {fidl_fuchsia_hardware_pci as fhpci, fidl_fuchsia_io as fio};
 pub async fn lspci(cmd: LspciCommand, dev: &fio::DirectoryProxy) -> Result<()> {
     let (bus, server) = fidl::endpoints::create_proxy::<fhpci::BusMarker>();
     let () = dev.open(
-        fio::OpenFlags::empty(),
-        fio::ModeType::empty(),
         &cmd.service,
-        fidl::endpoints::ServerEnd::new(server.into_channel()),
+        fio::Flags::PROTOCOL_SERVICE,
+        &Default::default(),
+        server.into_channel(),
     )?;
     let pci_ids = include_bytes!("../../../../../../../third_party/pciids/pci.ids.zst");
     // The capacity to 2 MB, because the decompressed data

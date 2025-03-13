@@ -4,7 +4,7 @@
 
 load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
 load(
-    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "@rules_fuchsia//fuchsia:defs.bzl",
     "fuchsia_devicetree",
     "fuchsia_devicetree_fragment",
     "fuchsia_devicetree_source",

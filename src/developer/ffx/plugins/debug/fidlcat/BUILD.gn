@@ -18,6 +18,7 @@ ffx_plugin("ffx_debug_fidlcat") {
     "//src/developer/ffx/lib/sdk:lib",
     "//src/developer/ffx/lib/symbol-index",
     "//src/developer/ffx/lib/target/holders:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",

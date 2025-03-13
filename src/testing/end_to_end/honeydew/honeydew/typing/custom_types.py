@@ -10,8 +10,6 @@ import ipaddress
 from dataclasses import dataclass
 from typing import TypeVar
 
-import fuchsia_controller_py as fuchsia_controller
-
 AnyString = TypeVar("AnyString", str, bytes)
 
 
@@ -145,48 +143,6 @@ class Sl4fServerAddress(IpPort):
         ip: IP Address of SL4F server
         port: Port where SL4F server is listening for SL4F requests
     """
-
-
-@dataclass(frozen=True)
-class FFXConfig:
-    """Dataclass that holds FFX config information.
-
-    Args:
-        binary_path: absolute path to the FFX binary.
-        isolate_dir: Directory that will be passed to `--isolate-dir`
-            arg of FFX
-        logs_dir: Directory that will be passed to `--config log.dir`
-            arg of FFX
-        logs_level: logs level that will be passed to `--config log.level`
-            arg of FFX
-        enable_mdns: Whether or not mdns need to be enabled. This will be
-            passed to `--config discovery.mdns.enabled` arg of FFX
-        subtools_search_path: A path of where ffx should
-            look for plugins.
-        proxy_timeout_secs: Proxy timeout in secs.
-        ssh_keepalive_timeout: SSH keep-alive timeout in secs.
-    """
-
-    binary_path: str
-    isolate_dir: fuchsia_controller.IsolateDir
-    logs_dir: str
-    logs_level: str | None
-    mdns_enabled: bool
-    subtools_search_path: str | None
-    proxy_timeout_secs: int | None
-    ssh_keepalive_timeout: int | None
-
-    def __str__(self) -> str:
-        return (
-            f"binary_path={self.binary_path}, "
-            f"isolate_dir={self.isolate_dir.directory()}, "
-            f"logs_dir={self.logs_dir}, "
-            f"logs_level={self.logs_level}, "
-            f"mdns_enabled={self.mdns_enabled}, "
-            f"subtools_search_path={self.subtools_search_path}, "
-            f"proxy_timeout_secs={self.proxy_timeout_secs}, "
-            f"ssh_keepalive_timeout={self.ssh_keepalive_timeout}, "
-        )
 
 
 @dataclass(frozen=True)

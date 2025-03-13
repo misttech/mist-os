@@ -7,10 +7,8 @@
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
-#include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 
-#include <ddk/metadata/clock.h>
 #include <soc/aml-meson/sm1-clk.h>
 #include <soc/aml-s905d3/s905d3-hw.h>
 
@@ -32,23 +30,6 @@ static const std::vector<fpbus::Mmio> clk_mmios{
         .base = S905D3_MSR_CLK_BASE,
         .length = S905D3_MSR_CLK_LENGTH,
     }},
-};
-
-// TODO(b/373903133): Remove once no longer referenced.
-constexpr clock_id_t kClockIds[] = {
-    {sm1_clk::CLK_RESET},  // PLACEHOLDER.
-
-    // For audio driver.
-    {sm1_clk::CLK_HIFI_PLL},
-    {sm1_clk::CLK_SYS_PLL_DIV16},
-    {sm1_clk::CLK_SYS_CPU_CLK_DIV16},
-
-    // For video decoder
-    {sm1_clk::CLK_DOS_GCLK_VDEC},
-    {sm1_clk::CLK_DOS},
-
-    // For GPU
-    {sm1_clk::CLK_GP0_PLL},
 };
 
 zx_status_t Nelson::ClkInit() {
@@ -97,13 +78,6 @@ zx_status_t Nelson::ClkInit() {
           .data = encoded_clock_ids_metadata.value(),
       }},
 #endif
-      // TODO(b/373903133): Remove once no longer referenced.
-      {{
-          .id = std::to_string(DEVICE_METADATA_CLOCK_IDS),
-          .data = std::vector<uint8_t>(
-              reinterpret_cast<const uint8_t*>(&kClockIds),
-              reinterpret_cast<const uint8_t*>(&kClockIds) + sizeof(kClockIds)),
-      }},
       {{
           .id = fuchsia_hardware_clockimpl::wire::InitMetadata::kSerializableName,
           .data = std::move(encoded_clock_init_metadata.value()),

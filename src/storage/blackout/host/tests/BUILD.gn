@@ -15,7 +15,7 @@ python_mobly_test("blackout_integration_test_no_reboot") {
   ]
   params = {
     # Blackout args
-    component_name = "/core/ffx-laboratory:blackout-target"
+    component_name = "/core/testing/storage-tests:blackout-target"
     component_url = "fuchsia-pkg://fuchsia.com/blackout-integration#meta/blackout-integration-component.cm"
     device_label = "test_label"
     device_path = "test_path"
@@ -37,7 +37,7 @@ python_mobly_test("blackout_integration_test_reboot") {
   ]
   params = {
     # Blackout args
-    component_name = "/core/ffx-laboratory:blackout-target"
+    component_name = "/core/testing/storage-tests:blackout-target"
     component_url = "fuchsia-pkg://fuchsia.com/blackout-integration#meta/blackout-integration-component.cm"
     device_label = "loop"
     device_path = "loop"
@@ -59,7 +59,7 @@ python_mobly_test("blackout_integration_test_fail") {
   ]
   params = {
     # Blackout args
-    component_name = "/core/ffx-laboratory:blackout-target"
+    component_name = "/core/testing/storage-tests:blackout-target"
     component_url = "fuchsia-pkg://fuchsia.com/blackout-integration#meta/blackout-integration-component.cm"
     device_label = "fail"
     device_path = "fail"
@@ -80,7 +80,7 @@ python_mobly_test("blackout_fxfs_tree_soft_reboot") {
   ]
   params = {
     # Blackout args
-    component_name = "/core/ffx-laboratory:blackout-target"
+    component_name = "/core/testing/storage-tests:blackout-target"
     component_url = "fuchsia-pkg://fuchsia.com/blackout-fxfs-tree#meta/blackout-fxfs-tree-component.cm"
     load_generation_duration = 30
 
@@ -108,7 +108,7 @@ python_mobly_test("blackout_fxfs_tree_hard_reboot") {
   ]
   params = {
     # Blackout args
-    component_name = "/core/ffx-laboratory:blackout-target"
+    component_name = "/core/testing/storage-tests:blackout-target"
     component_url = "fuchsia-pkg://fuchsia.com/blackout-fxfs-tree#meta/blackout-fxfs-tree-component.cm"
     load_generation_duration = 30
 
@@ -136,7 +136,7 @@ python_mobly_test("blackout_fxfs_allocate_soft_reboot") {
   ]
   params = {
     # Blackout args
-    component_name = "/core/ffx-laboratory:blackout-target"
+    component_name = "/core/testing/storage-tests:blackout-target"
     component_url = "fuchsia-pkg://fuchsia.com/blackout-fxfs-allocate#meta/blackout-fxfs-allocate-component.cm"
     load_generation_duration = 30
 
@@ -164,7 +164,7 @@ python_mobly_test("blackout_fxfs_allocate_hard_reboot") {
   ]
   params = {
     # Blackout args
-    component_name = "/core/ffx-laboratory:blackout-target"
+    component_name = "/core/testing/storage-tests:blackout-target"
     component_url = "fuchsia-pkg://fuchsia.com/blackout-fxfs-allocate#meta/blackout-fxfs-allocate-component.cm"
     load_generation_duration = 30
 

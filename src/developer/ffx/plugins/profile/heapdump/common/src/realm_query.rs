@@ -7,7 +7,6 @@ use component_debug::capability::{get_all_route_segments, RouteSegment};
 use errors::{ffx_bail, ffx_error};
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
-use fidl_fuchsia_io::OpenFlags;
 use fidl_fuchsia_memory_heapdump_client as fheapdump_client;
 use fidl_fuchsia_sys2::{OpenDirType, RealmQueryProxy};
 
@@ -59,20 +58,36 @@ pub async fn connect_to_collector(
         }
     };
 
-    let (collector_proxy, collector_server) =
-        fidl::endpoints::create_proxy::<fheapdump_client::CollectorMarker>();
+    // Try to connect via fuchsia.developer.remotecontrol/RemoteControl.ConnectCapability.
+    let (proxy, server) = fidl::endpoints::create_proxy::<fheapdump_client::CollectorMarker>();
+    if let Ok(response) = remote_control
+        .connect_capability(
+            &moniker,
+            OpenDirType::ExposedDir,
+            fheapdump_client::CollectorMarker::PROTOCOL_NAME,
+            server.into_channel(),
+        )
+        .await
+    {
+        response.map_err(|err| {
+            ffx_error!("Attempting to connect to moniker {moniker} failed with {err:?}",)
+        })?;
+        return Ok(proxy);
+    }
+    // Fallback to fuchsia.developer.remotecontrol/RemoteControl.DeprecatedOpenCapability.
+    // This can be removed once we drop support for API level 27.
+    let (proxy, server) = fidl::endpoints::create_proxy::<fheapdump_client::CollectorMarker>();
     remote_control
         .deprecated_open_capability(
             &moniker,
             OpenDirType::ExposedDir,
             fheapdump_client::CollectorMarker::PROTOCOL_NAME,
-            collector_server.into_channel(),
-            OpenFlags::empty(),
+            server.into_channel(),
+            Default::default(),
         )
         .await?
         .map_err(|err| {
             ffx_error!("Attempting to connect to moniker {moniker} failed with {err:?}",)
         })?;
-
-    Ok(collector_proxy)
+    return Ok(proxy);
 }

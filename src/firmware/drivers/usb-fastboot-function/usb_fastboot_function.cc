@@ -342,6 +342,16 @@ zx_status_t UsbFastbootFunction::Bind() {
     bulk_in_reqs_.Add(*std::move(request));
   }
 
+  zx::result result = DdkAddService<fuchsia_hardware_fastboot::Service>(
+      fuchsia_hardware_fastboot::Service::InstanceHandler({
+          .fastboot = bindings_.CreateHandler(
+              this, fdf::Dispatcher::GetCurrent()->async_dispatcher(), fidl::kIgnoreBindingClosure),
+      }));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to export serivce: %s", result.status_string());
+    return result.status_value();
+  }
+
   function_.SetInterface(this, &usb_function_interface_protocol_ops_);
   return DdkAdd(ddk::DeviceAddArgs("usb_fastboot_function")
                     .set_flags(DEVICE_ADD_NON_BINDABLE)

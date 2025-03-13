@@ -25,7 +25,7 @@ use netstack3_core::testutil::{
 };
 use netstack3_core::IpExt;
 use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
-use netstack3_ip::device::IpDeviceStateContext;
+use netstack3_ip::device::{IpDeviceStateContext, StableSlaacAddressConfiguration};
 use packet::{Buf, Serializer as _};
 use packet_formats::ethernet::EthernetFrameLengthCheck;
 use packet_formats::icmp::IcmpDestUnreachable;
@@ -586,7 +586,9 @@ fn test_add_ip_addr_subnet_link_local() {
             &device,
             Ipv6DeviceConfigurationUpdate {
                 slaac_config: SlaacConfigurationUpdate {
-                    enable_stable_addresses: Some(true),
+                    stable_address_configuration: Some(
+                        StableSlaacAddressConfiguration::ENABLED_WITH_EUI64,
+                    ),
                     ..Default::default()
                 },
                 ip_config: IpDeviceConfigurationUpdate {

@@ -3,44 +3,43 @@
 // found in the LICENSE file.
 
 use assembly_container::WalkPaths;
-use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
+use camino::Utf8PathBuf;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::common::option_path_schema;
+
 /// Platform configuration options for the factory store providers
-#[derive(
-    Debug,
-    Default,
-    Deserialize,
-    Serialize,
-    PartialEq,
-    JsonSchema,
-    SupportsFileRelativePaths,
-    WalkPaths,
-)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
 #[serde(default, deny_unknown_fields)]
 pub struct FactoryStoreProvidersConfig {
-    #[file_relative_paths]
+    #[schemars(schema_with = "option_path_schema")]
     #[walk_paths]
-    pub alpha: Option<FileRelativePathBuf>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alpha: Option<Utf8PathBuf>,
 
-    #[file_relative_paths]
+    #[schemars(schema_with = "option_path_schema")]
     #[walk_paths]
-    pub cast_credentials: Option<FileRelativePathBuf>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cast_credentials: Option<Utf8PathBuf>,
 
-    #[file_relative_paths]
+    #[schemars(schema_with = "option_path_schema")]
     #[walk_paths]
-    pub misc: Option<FileRelativePathBuf>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub misc: Option<Utf8PathBuf>,
 
-    #[file_relative_paths]
+    #[schemars(schema_with = "option_path_schema")]
     #[walk_paths]
-    pub play_ready: Option<FileRelativePathBuf>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub play_ready: Option<Utf8PathBuf>,
 
-    #[file_relative_paths]
+    #[schemars(schema_with = "option_path_schema")]
     #[walk_paths]
-    pub weave: Option<FileRelativePathBuf>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub weave: Option<Utf8PathBuf>,
 
-    #[file_relative_paths]
+    #[schemars(schema_with = "option_path_schema")]
     #[walk_paths]
-    pub widevine: Option<FileRelativePathBuf>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub widevine: Option<Utf8PathBuf>,
 }

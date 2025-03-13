@@ -14,6 +14,7 @@ use futures::stream::FusedStream;
 use futures::task::Poll;
 use futures::TryStreamExt;
 use std::pin::pin;
+use windowed_stats::experimental::testing::MockTimeMatrixClient;
 
 trait CobaltExt {
     // Respond to MetricEventLoggerRequest and extract its MetricEvent
@@ -88,6 +89,8 @@ pub struct TestHelper {
     pub persistence_sender: mpsc::Sender<String>,
     persistence_stream: mpsc::Receiver<String>,
 
+    pub mock_time_matrix_client: MockTimeMatrixClient,
+
     // Note: keep the executor field last in the struct so it gets dropped last.
     pub exec: fasync::TestExecutor,
 }
@@ -139,6 +142,38 @@ impl TestHelper {
             }
         }
         result
+    }
+
+    pub fn run_and_respond_query_telemetry_support<T>(
+        &mut self,
+        test_fut: &mut (impl Future<Output = T> + Unpin),
+        telemetry_support: Result<&fidl_fuchsia_wlan_stats::TelemetrySupport, i32>,
+    ) -> Poll<T> {
+        let result = self.exec.run_until_stalled(test_fut);
+        let telemetry_svc_stream = match &mut self.telemetry_svc_stream {
+            Some(telemetry_svc_stream) if !telemetry_svc_stream.is_terminated() => {
+                telemetry_svc_stream
+            }
+            _ => return result,
+        };
+
+        let mut telemetry_svc_req_fut = pin!(telemetry_svc_stream.try_next());
+        let request = match self.exec.run_until_stalled(&mut telemetry_svc_req_fut) {
+            Poll::Ready(Ok(Some(request))) => request,
+            _ => return result,
+        };
+
+        match request {
+            fidl_fuchsia_wlan_sme::TelemetryRequest::QueryTelemetrySupport { responder } => {
+                responder
+                    .send(telemetry_support)
+                    .expect("expect sending QueryTelemetrySupport response to succeed");
+            }
+            _ => {
+                panic!("unexpected request: {:?}", request);
+            }
+        }
+        self.exec.run_until_stalled(test_fut)
     }
 
     pub fn run_and_respond_iface_counter_stats_req<T>(
@@ -233,6 +268,8 @@ pub fn setup_test() -> TestHelper {
     const DEFAULT_BUFFER_SIZE: usize = 100; // arbitrary value
     let (persistence_sender, persistence_stream) = mpsc::channel(DEFAULT_BUFFER_SIZE);
 
+    let mock_time_matrix_client = MockTimeMatrixClient::new();
+
     TestHelper {
         inspector,
         inspect_node,
@@ -246,6 +283,7 @@ pub fn setup_test() -> TestHelper {
         telemetry_svc_stream: None,
         persistence_sender,
         persistence_stream,
+        mock_time_matrix_client,
         exec,
     }
 }

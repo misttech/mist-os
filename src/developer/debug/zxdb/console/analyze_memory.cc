@@ -69,7 +69,7 @@ void MemoryAnalysis::Schedule(const AnalyzeMemoryOptions& opts) {
         OnFrames(opts.thread->GetWeakPtr());
       } else {
         opts.thread->GetStack().SyncFrames(
-            false, [this_ref, weak_thread = opts.thread->GetWeakPtr()](const Err&) {
+            {}, [this_ref, weak_thread = opts.thread->GetWeakPtr()](const Err&) {
               // Can ignore the error, the frames will be re-queried from the thread and we'll check
               // the weak pointer in case its destroyed.
               this_ref->OnFrames(weak_thread);

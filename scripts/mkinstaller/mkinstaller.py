@@ -42,9 +42,9 @@ if sys.hexversion < 0x030700F0:
 
 # The GUIDs are from zircon/system/public/zircon/hw/gpt.h
 WORKSTATION_INSTALLER_GPT_GUID = "4dce98ce-e77e-45c1-a863-caf92f1330c1"
-ZIRCON_R_GPT_GUID = "a0e5cf57-2def-46be-a80c-a2067c37cd49"
-VBMETA_R_GPT_GUID = "6a2460c3-cd11-4e8b-80a8-12cce268ed0a"
-ABR_META_GPT_GUID = "1d75395d-f2c6-476b-a8b7-45cc1c97b476"
+GPT_ZIRCON_ABR_TYPE_GUID = "9b37fff6-2e58-466a-983a-f7926d0b04e0"
+GPT_VBMETA_ABR_TYPE_GUID = "421a8bfc-85d9-4d85-acda-b64eec0133e9"
+GPT_DURABLE_BOOT_TYPE_GUID = "a409e16b-78aa-4acc-995c-302352621a41"
 
 
 def make_unique_name(name, type):
@@ -79,11 +79,13 @@ class ManifestImage:
 # and the partition types they will have (passed to cgpt)
 IMAGES_RECOVERY_INSTALLER = [
     # The recovery image for chromebook-x64.
-    ManifestImage("recovery-installer", ["kernel"], "zbi.signed", "zircon-r"),
+    ManifestImage("recovery-installer", ["kernel"], "zbi.signed", "zircon_r"),
     # The recovery image and a bootloader for x64.
-    ManifestImage("recovery-installer", [ZIRCON_R_GPT_GUID], "zbi", "zircon-r"),
     ManifestImage(
-        "recovery-installer", [VBMETA_R_GPT_GUID], "vbmeta", "vbmeta_r"
+        "recovery-installer", [GPT_ZIRCON_ABR_TYPE_GUID], "zbi", "zircon_r"
+    ),
+    ManifestImage(
+        "recovery-installer", [GPT_VBMETA_ABR_TYPE_GUID], "vbmeta", "vbmeta_r"
     ),
     ManifestImage("fuchsia.esp", ["efi"], "blk"),
     # Installer uses `WORKSTATION_INSTALLER_GPT_GUID` to tell that it is a partition
@@ -92,11 +94,15 @@ IMAGES_RECOVERY_INSTALLER = [
     # Standard x64 partitions
     # This is the EFI system partition that will be installed to the target.
     ManifestImage("fuchsia.esp", [WORKSTATION_INSTALLER_GPT_GUID], "blk"),
-    ManifestImage("zircon-a", [WORKSTATION_INSTALLER_GPT_GUID], "zbi"),
+    ManifestImage(
+        "zircon-a", [WORKSTATION_INSTALLER_GPT_GUID], "zbi", "zircon_a"
+    ),
     ManifestImage(
         "zircon-a", [WORKSTATION_INSTALLER_GPT_GUID], "vbmeta", "vbmeta_a"
     ),
-    ManifestImage("zircon-r", [WORKSTATION_INSTALLER_GPT_GUID], "zbi"),
+    ManifestImage(
+        "zircon-r", [WORKSTATION_INSTALLER_GPT_GUID], "zbi", "zircon_r"
+    ),
     ManifestImage(
         "zircon-r", [WORKSTATION_INSTALLER_GPT_GUID], "vbmeta", "vbmeta_r"
     ),
@@ -104,10 +110,16 @@ IMAGES_RECOVERY_INSTALLER = [
     # The zircon-r.signed partition is used as both zedboot on the installation
     # disk and also the installed zircon-r partition.
     ManifestImage(
-        "zircon-r.signed", [WORKSTATION_INSTALLER_GPT_GUID], "zbi.signed"
+        "zircon-r.signed",
+        [WORKSTATION_INSTALLER_GPT_GUID],
+        "zbi.signed",
+        "zircon_r",
     ),
     ManifestImage(
-        "zircon-a.signed", [WORKSTATION_INSTALLER_GPT_GUID], "zbi.signed"
+        "zircon-a.signed",
+        [WORKSTATION_INSTALLER_GPT_GUID],
+        "zbi.signed",
+        "zircon_a",
     ),
     # Common partitions - installed everywhere.
     # Only one of these should exist at a time.
@@ -121,9 +133,11 @@ IMAGES_RECOVERY_INSTALLER = [
 # fastboot.
 IMAGES_RECOVERY_FASTBOOT = [
     # The recovery-eng image for chromebook-x64.
-    ManifestImage("recovery-eng", ["kernel"], "zbi.signed", "zircon-r"),
+    ManifestImage("recovery-eng", ["kernel"], "zbi.signed", "zircon_r"),
     # The recovery-eng image and a bootloader for x64.
-    ManifestImage("recovery-eng", [ZIRCON_R_GPT_GUID], "zbi", "zircon-r"),
+    ManifestImage(
+        "recovery-eng", [GPT_VBMETA_ABR_TYPE_GUID], "zbi", "zircon_r"
+    ),
     ManifestImage("fuchsia.esp", ["efi"], "blk"),
 ]
 
@@ -626,10 +640,11 @@ def Main(args):
                         )  # Make a 1MB partition.
                     )
 
-                # TODO(b/268532862): Use new GUID once switched to gigaboot++.
                 parts.append(
                     Partition(
-                        str(abr_data_file), ABR_META_GPT_GUID, "durable_boot"
+                        str(abr_data_file),
+                        GPT_DURABLE_BOOT_TYPE_GUID,
+                        "durable_boot",
                     )
                 )
 

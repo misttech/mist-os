@@ -6,7 +6,6 @@
 
 #include <fidl/test.protocols/cpp/markers.h>
 #include <fidl/test.protocols/cpp/natural_types.h>
-#include <fidl/test.protocols/cpp/wire_messaging.h>
 #include <lib/fidl/cpp/channel.h>
 #include <lib/fidl/cpp/client.h>
 #include <lib/fidl/cpp/internal/thenable.h>
@@ -379,6 +378,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocols::WithErrorSyntax::R
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_protocols::WithErrorSyntax::ResponseAsStruct>>;
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_protocols::WithErrorSyntax::ResponseAsStruct>&)>;
+  using DomainError = uint32_t;
 };
 
 template <>
@@ -388,6 +388,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocols::WithErrorSyntax::E
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_protocols::WithErrorSyntax::ErrorAsPrimitive>>;
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_protocols::WithErrorSyntax::ErrorAsPrimitive>&)>;
+  using DomainError = uint32_t;
 };
 
 template <>
@@ -397,6 +398,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocols::WithErrorSyntax::E
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_protocols::WithErrorSyntax::ErrorAsEnum>>;
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_protocols::WithErrorSyntax::ErrorAsEnum>&)>;
+  using DomainError = ::test_protocols::ErrorEnum;
 };
 
 template <>
@@ -406,6 +408,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocols::WithErrorSyntax::H
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_protocols::WithErrorSyntax::HandleInResult>>;
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_protocols::WithErrorSyntax::HandleInResult>&)>;
+  using DomainError = uint32_t;
 };
 
 #ifdef __Fuchsia__

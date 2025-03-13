@@ -5,7 +5,7 @@
 use crate::{Result, SessionId};
 use anyhow::Context as _;
 use assert_matches::assert_matches;
-use diagnostics_reader::{ArchiveReader, ComponentSelector, Inspect};
+use diagnostics_reader::{ArchiveReader, ComponentSelector};
 use fidl::endpoints::{create_endpoints, create_proxy, create_request_stream};
 use fidl_fuchsia_diagnostics::*;
 use fidl_fuchsia_logger::LogSinkMarker;
@@ -223,14 +223,14 @@ impl TestService {
     }
 
     async fn inspect_tree(&mut self) -> inspect::hierarchy::DiagnosticsHierarchy {
-        ArchiveReader::new()
+        ArchiveReader::inspect()
             .with_archive(self.archive.clone())
             .add_selector(ComponentSelector::new(vec![format!(
                 "realm_builder\\:{}/{}",
                 self.realm.root.child_name(),
                 MEDIASESSION_NAME,
             )]))
-            .snapshot::<Inspect>()
+            .snapshot()
             .await
             .expect("Got batch")
             .into_iter()

@@ -12,7 +12,7 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
+            dictionary: "diagnostics",
             from: "parent",
             to: "#auto-brightness",
         },
@@ -31,11 +31,19 @@
             subdir: "backlight",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-input-report",
             to: "#auto-brightness",
             subdir: "input-report",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.input.report.Service",
+            from: "parent",
+            to: "#auto-brightness",
         },
     ],
 }

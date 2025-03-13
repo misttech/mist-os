@@ -235,7 +235,9 @@ mod tests {
         let (fin_tx, fin_rx) = mpsc::channel();
         let (server_chan, client_chan) = fdf::Channel::<[u8]>::create();
         with_raw_dispatcher("driver registration", move |dispatcher| {
+            let dispatcher = dispatcher.clone();
             dispatcher
+                .clone()
                 .spawn_task(async move {
                     let channel_handle = server_chan.into_driver_handle().into_raw().get();
                     let driver_server = unsafe { initialize_func(channel_handle) } as usize;
@@ -248,12 +250,12 @@ mod tests {
                     )
                     .unwrap();
                     client_chan.write(start_msg).unwrap();
-                    let _ = client_chan.read_bytes(dispatcher.as_ref()).await.unwrap();
+                    let _ = client_chan.read_bytes(dispatcher.as_dispatcher_ref()).await.unwrap();
 
                     let stop_msg = DriverRequest::stop_as_message(Arena::new()).unwrap();
                     client_chan.write(stop_msg).unwrap();
                     let Err(Status::PEER_CLOSED) =
-                        client_chan.read_bytes(dispatcher.as_ref()).await
+                        client_chan.read_bytes(dispatcher.as_dispatcher_ref()).await
                     else {
                         panic!("expected peer closed from driver server after end message");
                     };

@@ -38,6 +38,13 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
             builder.platform_bundle("netsvc");
         };
 
+        if config.enable_netsvc_netboot {
+            if context.build_type == &BuildType::User {
+                anyhow::bail!("netsvc can't be included in user builds");
+            }
+            builder.kernel_arg(KernelArg::NetsvcNetboot(true));
+        };
+
         if matches!(context.build_type, BuildType::Eng | BuildType::UserDebug) {
             builder.platform_bundle("ptysvc");
             builder.platform_bundle("kernel_debug_broker_userdebug");
@@ -61,7 +68,7 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
                     builder
                         .bootfs()
                         .file(FileEntry {
-                            source: authorized_ssh_keys_path.clone().into(),
+                            source: authorized_ssh_keys_path.clone(),
                             destination: BootfsDestination::SshAuthorizedKeys,
                         })
                         .context("Setting authorized_keys")?;
@@ -69,7 +76,7 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
                     builder
                         .package("sshd-host")
                         .config_data(FileEntry {
-                            source: authorized_ssh_keys_path.clone().into(),
+                            source: authorized_ssh_keys_path.clone(),
                             destination: "authorized_keys".into(),
                         })
                         .context("Setting authorized_keys")?;
@@ -86,7 +93,7 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
                 builder
                     .package("sshd-host")
                     .config_data(FileEntry {
-                        source: authorized_ssh_ca_certs_path.clone().into(),
+                        source: authorized_ssh_ca_certs_path.clone(),
                         destination: "ssh_ca_pub_keys".into(),
                     })
                     .context("Setting authorized ssh ca certs")?;
@@ -116,6 +123,23 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
             &context.board_info.platform.development_support.enable_debug_access_port_for_soc
         {
             builder.kernel_arg(KernelArg::Arm64DebugDap(soc.clone()));
+        }
+
+        if config.tools.audio.driver_tools {
+            context.ensure_build_type_and_feature_set_level(
+                &[BuildType::Eng],
+                &[FeatureSupportLevel::Standard],
+                "Audio driver development tools",
+            )?;
+            builder.platform_bundle("audio_driver_development_tools");
+        }
+        if config.tools.audio.full_stack_tools {
+            context.ensure_build_type_and_feature_set_level(
+                &[BuildType::Eng],
+                &[FeatureSupportLevel::Standard],
+                "Audio full-stack development tools",
+            )?;
+            builder.platform_bundle("audio_full_stack_development_tools");
         }
 
         if config.tools.connectivity.enable_networking {
@@ -162,6 +186,11 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
                 "Bootstrap Testing Framework",
             )?;
             builder.platform_bundle("testing_support_bootstrap");
+        }
+
+        if config.enable_userboot_next_component_manager {
+            context.ensure_build_type(&[BuildType::Eng], "userboot.next")?;
+            builder.kernel_arg(KernelArg::UserbootNext("bin/component_manager+--boot".to_string()));
         }
 
         Ok(())

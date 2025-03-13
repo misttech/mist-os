@@ -40,7 +40,7 @@
 //!    let c = MyConfig {
 //!        inner: Inner { path: "path/to/file.txt" },
 //!    };
-//!    c.write_to_dir("my_dir").unwrap();
+//!    c.write_to_dir("my_dir", Some("depfile")).unwrap();
 //! }
 //! ```
 //!
@@ -56,5 +56,7 @@
 mod assembly_container;
 mod merge;
 
-pub use assembly_container::{AssemblyContainer, FileType, WalkPaths, WalkPathsFn};
+pub use assembly_container::{
+    AssemblyContainer, DirectoryPathBuf, FileType, WalkPaths, WalkPathsFn,
+};
 pub use assembly_container_macro::{assembly_container, WalkPaths};

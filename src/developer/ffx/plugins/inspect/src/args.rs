@@ -3,11 +3,9 @@
 // found in the LICENSE file.
 
 use argh::{ArgsInfo, FromArgs};
-use ffx_core::ffx_command;
 use iquery::commands::{ListAccessorsCommand, ListCommand, SelectorsCommand, ShowCommand};
 use std::path::PathBuf;
 
-#[ffx_command()]
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,

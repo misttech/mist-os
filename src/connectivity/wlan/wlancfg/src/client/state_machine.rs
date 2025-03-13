@@ -19,7 +19,7 @@ use crate::util::listener::{ClientListenerMessageSender, ClientNetworkState, Cli
 use crate::util::state_machine::{self, ExitReason, IntoStateExt, StateMachineStatusPublisher};
 use anyhow::format_err;
 use fuchsia_async::{self as fasync, DurationExt};
-use fuchsia_inspect::{Node as InspectNode, StringReference};
+use fuchsia_inspect::Node as InspectNode;
 use fuchsia_inspect_contrib::inspect_insert;
 use fuchsia_inspect_contrib::log::WriteInspect;
 use futures::channel::{mpsc, oneshot};
@@ -27,6 +27,7 @@ use futures::future::FutureExt;
 use futures::select;
 use futures::stream::{self, StreamExt, TryStreamExt};
 use log::{debug, error, info, warn};
+use std::borrow::Cow;
 use std::pin::Pin;
 use std::sync::Arc;
 use wlan_common::bss::BssDescription;
@@ -118,7 +119,7 @@ impl Status {
 }
 
 impl WriteInspect for Status {
-    fn write_inspect(&self, writer: &InspectNode, key: impl Into<StringReference>) {
+    fn write_inspect<'a>(&self, writer: &InspectNode, key: impl Into<Cow<'a, str>>) {
         match self {
             Status::Connected { channel, rssi, snr } => {
                 inspect_insert!(writer, var key: {

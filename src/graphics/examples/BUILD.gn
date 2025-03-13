@@ -35,5 +35,6 @@ group("vkproto") {
 
 group("vulkaninfo") {
   testonly = true
-  public_deps = [ "vulkaninfo" ]
+  public_deps =
+      [ "//third_party/Vulkan-Tools/src/vulkaninfo:vulkaninfo-package" ]
 }

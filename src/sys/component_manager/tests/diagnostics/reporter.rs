@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use diagnostics_assertions::{assert_data_tree, AnyProperty};
-use diagnostics_reader::{ArchiveReader, DiagnosticsHierarchy, Inspect};
+use diagnostics_reader::{ArchiveReader, DiagnosticsHierarchy};
 use fidl::endpoints::create_proxy;
 use {fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys};
 
@@ -63,9 +63,9 @@ fn assert_component_data(hierarchy: &DiagnosticsHierarchy, moniker: &str, koid: 
 
 #[fuchsia::main]
 async fn main() {
-    let data = ArchiveReader::new()
+    let data = ArchiveReader::inspect()
         .add_selector("<component_manager>:root")
-        .snapshot::<Inspect>()
+        .snapshot()
         .await
         .expect("got inspect data");
 

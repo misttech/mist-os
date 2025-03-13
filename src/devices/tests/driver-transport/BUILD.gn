@@ -47,6 +47,7 @@ driver_bind_rules("parent-driver-bind") {
 }
 
 fuchsia_cc_driver("parent-drv") {
+  legacy = true
   sources = [ "parent-driver.cc" ]
   deps = [
     ":fuchsia.driver.transport.test_cpp",
@@ -76,6 +77,7 @@ driver_bind_rules("child-driver-bind") {
 }
 
 fuchsia_cc_driver("child-drv") {
+  legacy = true
   sources = [ "child-driver.cc" ]
   deps = [
     ":child-driver-bind",

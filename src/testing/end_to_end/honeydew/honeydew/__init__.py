@@ -7,10 +7,9 @@ import logging
 from typing import Any
 
 from honeydew import errors
-from honeydew.fuchsia_device import fuchsia_device
-from honeydew.interfaces.device_classes import (
-    fuchsia_device as fuchsia_device_interface,
-)
+from honeydew.fuchsia_device import fuchsia_device as fuchsia_device_interface
+from honeydew.fuchsia_device import fuchsia_device_impl
+from honeydew.transports.ffx.config import FfxConfigData
 from honeydew.typing import custom_types
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -20,10 +19,9 @@ _CUSTOM_FUCHSIA_DEVICE_CLASS: (
 ) = None
 
 
-# List all the public methods
 def create_device(
     device_info: custom_types.DeviceInfo,
-    ffx_config: custom_types.FFXConfig,
+    ffx_config_data: FfxConfigData,
     # intentionally made this a Dict instead of dataclass to minimize the changes in remaining Lacewing stack every time we need to add a new configuration item
     config: dict[str, Any] | None = None,
 ) -> fuchsia_device_interface.FuchsiaDevice:
@@ -32,7 +30,7 @@ def create_device(
     Args:
         device_info: Fuchsia device information.
 
-        ffx_config: Ffx configuration that need to be used while running ffx
+        ffx_config_data: Ffx configuration that need to be used while running ffx
             commands.
 
         config: Honeydew device configuration, if any.
@@ -91,11 +89,12 @@ def create_device(
         device_class: type[
             fuchsia_device_interface.FuchsiaDevice
         ] | None = get_custom_fuchsia_device()
+
         if device_class is None:
-            device_class = fuchsia_device.FuchsiaDevice
+            device_class = fuchsia_device_impl.FuchsiaDeviceImpl
         return device_class(  # type: ignore[call-arg]
             device_info,
-            ffx_config,
+            ffx_config_data,
             config,
         )
     except errors.HoneydewError as err:

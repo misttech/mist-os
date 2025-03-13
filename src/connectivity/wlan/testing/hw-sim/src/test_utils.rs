@@ -27,6 +27,9 @@ use {
     fidl_fuchsia_wlan_tap as wlantap, fidl_test_wlan_realm as fidl_realm,
 };
 
+/// Percent of a timeout duration past which we log a warning.
+const TIMEOUT_WARN_THRESHOLD: f64 = 0.8;
+
 // Struct that allows a test suite to interact with the test realm.
 //
 // If the test suite needs to connect to a protocol exposed by the test realm, it MUST use the
@@ -180,10 +183,7 @@ where
                 debug!("Main future poll response is pending. Waiting for completion.");
                 Poll::Pending
             }
-            Poll::Ready(x) => {
-                info!("Main future complete. Events will no longer be processed from the event stream.");
-                Poll::Ready((x, helper.event_stream.take().unwrap()))
-            }
+            Poll::Ready(x) => Poll::Ready((x, helper.event_stream.take().unwrap())),
         }
     }
 }
@@ -351,7 +351,8 @@ impl TestHelper {
         H: Handler<(), wlantap::WlantapPhyEvent>,
         F: Future + Unpin,
     {
-        info!("Running main future until completion or timeout with event handler.");
+        info!("Running main future until completion or timeout with event handler: {}", context);
+        let start_time = zx::MonotonicInstant::get();
         let (item, stream) = TestHelperFuture {
             event_stream: Some(self.event_stream.take().unwrap()),
             handler,
@@ -359,6 +360,20 @@ impl TestHelper {
         }
         .expect_within(timeout, format!("Main future timed out: {}", context))
         .await;
+        let end_time = zx::MonotonicInstant::get();
+        let elapsed = end_time - start_time;
+        let elapsed_seconds = elapsed.into_seconds_f64();
+        let elapsed_ratio = elapsed_seconds / timeout.into_seconds_f64();
+        if elapsed_ratio < TIMEOUT_WARN_THRESHOLD {
+            info!("Main future completed in {:.2} seconds: {}", elapsed_seconds, context);
+        } else {
+            warn!(
+                "Main future completed in {:.2} seconds ({:.1}% of timeout): {}",
+                elapsed_seconds,
+                elapsed_ratio * 100.,
+                context,
+            );
+        }
         self.event_stream = Some(stream);
         item
     }

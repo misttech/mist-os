@@ -35,7 +35,8 @@ use netstack3_core::socket::{
 use netstack3_core::sync::RemoveResourceResult;
 use packet_formats::utils::NonZeroDuration;
 use {
-    fidl_fuchsia_net as fidl_net, fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net as fidl_net, fidl_fuchsia_net_ext as fnet_ext,
+    fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
     fidl_fuchsia_net_routes_ext as fnet_routes_ext, fidl_fuchsia_net_stack as fidl_net_stack,
@@ -1211,6 +1212,23 @@ impl<I: Ip> TryIntoFidlWithContext<fnet_routes_ext::InstalledRoute<I>> for Entry
     }
 }
 
+impl TryFromFidl<fnet_ext::Marks> for netstack3_core::routes::Marks {
+    type Error = Never;
+
+    fn try_from_fidl(marks: fnet_ext::Marks) -> Result<Self, Self::Error> {
+        Ok(Self::new(marks.into_iter().map(|(domain, mark)| (domain.into_core(), mark))))
+    }
+}
+
+impl TryFromFidl<fnet_routes_ext::ResolveOptions> for netstack3_core::routes::RouteResolveOptions {
+    type Error = Never;
+
+    fn try_from_fidl(options: fnet_routes_ext::ResolveOptions) -> Result<Self, Self::Error> {
+        let fnet_routes_ext::ResolveOptions { marks } = options;
+        Ok(Self { marks: marks.into_core() })
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct IllegalZeroValueError;
 
@@ -1268,38 +1286,38 @@ impl TryFromFidl<fnet_interfaces_admin::NudConfiguration> for NudUserConfigUpdat
     }
 }
 
-impl TryFromFidl<fposix_socket::MarkDomain> for netstack3_core::routes::MarkDomain {
+impl TryFromFidl<fidl_net::MarkDomain> for netstack3_core::ip::MarkDomain {
     type Error = Never;
 
-    fn try_from_fidl(fidl: fposix_socket::MarkDomain) -> Result<Self, Self::Error> {
+    fn try_from_fidl(fidl: fidl_net::MarkDomain) -> Result<Self, Self::Error> {
         Ok(match fidl {
-            fposix_socket::MarkDomain::Mark1 => netstack3_core::routes::MarkDomain::Mark1,
-            fposix_socket::MarkDomain::Mark2 => netstack3_core::routes::MarkDomain::Mark2,
+            fidl_net::MarkDomain::Mark1 => netstack3_core::ip::MarkDomain::Mark1,
+            fidl_net::MarkDomain::Mark2 => netstack3_core::ip::MarkDomain::Mark2,
         })
     }
 }
 
-impl IntoFidl<fposix_socket::MarkDomain> for netstack3_core::routes::MarkDomain {
-    fn into_fidl(self) -> fposix_socket::MarkDomain {
+impl IntoFidl<fidl_net::MarkDomain> for netstack3_core::ip::MarkDomain {
+    fn into_fidl(self) -> fidl_net::MarkDomain {
         match self {
-            netstack3_core::routes::MarkDomain::Mark1 => fposix_socket::MarkDomain::Mark1,
-            netstack3_core::routes::MarkDomain::Mark2 => fposix_socket::MarkDomain::Mark2,
+            netstack3_core::ip::MarkDomain::Mark1 => fidl_net::MarkDomain::Mark1,
+            netstack3_core::ip::MarkDomain::Mark2 => fidl_net::MarkDomain::Mark2,
         }
     }
 }
 
-impl TryFromFidl<fposix_socket::OptionalUint32> for netstack3_core::routes::Mark {
+impl TryFromFidl<fposix_socket::OptionalUint32> for netstack3_core::ip::Mark {
     type Error = Never;
 
     fn try_from_fidl(fidl: fposix_socket::OptionalUint32) -> Result<Self, Self::Error> {
         Ok(match fidl {
-            fposix_socket::OptionalUint32::Value(mark) => netstack3_core::routes::Mark(Some(mark)),
-            fposix_socket::OptionalUint32::Unset(_) => netstack3_core::routes::Mark(None),
+            fposix_socket::OptionalUint32::Value(mark) => netstack3_core::ip::Mark(Some(mark)),
+            fposix_socket::OptionalUint32::Unset(_) => netstack3_core::ip::Mark(None),
         })
     }
 }
 
-impl IntoFidl<fposix_socket::OptionalUint32> for netstack3_core::routes::Mark {
+impl IntoFidl<fposix_socket::OptionalUint32> for netstack3_core::ip::Mark {
     fn into_fidl(self) -> fposix_socket::OptionalUint32 {
         match self.0 {
             Some(mark) => fposix_socket::OptionalUint32::Value(mark),
@@ -1382,7 +1400,7 @@ impl IntoFidl<fnet_interfaces_admin::SlaacConfiguration> for SlaacConfigurationU
     fn into_fidl(self) -> fnet_interfaces_admin::SlaacConfiguration {
         let SlaacConfigurationUpdate {
             temporary_address_configuration,
-            enable_stable_addresses: _,
+            stable_address_configuration: _,
         } = self;
         fnet_interfaces_admin::SlaacConfiguration {
             temporary_address: temporary_address_configuration.map(|config| config.is_enabled()),
@@ -1393,7 +1411,7 @@ impl IntoFidl<fnet_interfaces_admin::SlaacConfiguration> for SlaacConfigurationU
 
 impl IntoFidl<fnet_interfaces_admin::SlaacConfiguration> for SlaacConfiguration {
     fn into_fidl(self) -> fnet_interfaces_admin::SlaacConfiguration {
-        let SlaacConfiguration { enable_stable_addresses: _, temporary_address_configuration } =
+        let SlaacConfiguration { stable_address_configuration: _, temporary_address_configuration } =
             self;
         fnet_interfaces_admin::SlaacConfiguration {
             temporary_address: Some(temporary_address_configuration.is_enabled()),

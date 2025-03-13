@@ -314,15 +314,7 @@ void PrimaryFidlServer::ExecuteCommand(ExecuteCommandRequestView request,
 void PrimaryFidlServer::ExecuteImmediateCommands(
     ExecuteImmediateCommandsRequestView request,
     ExecuteImmediateCommandsCompleter::Sync& completer) {
-  TRACE_DURATION("magma", "PrimaryFidlServer::ExecuteImmediateCommands");
-  MAGMA_DLOG("PrimaryFidlServer: ExecuteImmediateCommands");
-  FlowControl();
-
-  magma::Status status = delegate_->ExecuteImmediateCommands(
-      request->context_id, request->command_data.count(), request->command_data.data(),
-      request->semaphores.count(), request->semaphores.data());
-  if (!status)
-    SetError(&completer, status.get());
+  SetError(&completer, MAGMA_STATUS_UNIMPLEMENTED);
 }
 
 void PrimaryFidlServer::ExecuteInlineCommands(ExecuteInlineCommandsRequestView request,

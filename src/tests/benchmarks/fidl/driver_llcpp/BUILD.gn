@@ -49,7 +49,7 @@ executable("bin") {
          ] + gidl_deps
 }
 
-fuchsia_shell_package("driver_llcpp") {
+fuchsia_package("driver_llcpp") {
   testonly = true
   deps = [ ":bin" ]
 }

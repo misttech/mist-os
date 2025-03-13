@@ -20,7 +20,6 @@ if (zircon_toolchain != false) {
       "asan-stubs.c",
       "hooks.c",
       "hwasan-stubs.cc",
-      "log.c",
       "memory-snapshot.cc",
       "ubsan-stubs.cc",
     ]

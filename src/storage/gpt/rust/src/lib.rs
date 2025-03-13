@@ -1475,43 +1475,43 @@ mod tests {
         }
         const EXPECTED_PARTITIONS: [ExpectedPartition; 8] = [
             ExpectedPartition {
-                label: "fuchsia-esp",
-                type_guid: "c12a7328-f81f-11d2-ba4b-00a0c93ec93b",
+                label: "bootloader",
+                type_guid: "5ece94fe-4c86-11e8-a15b-480fcf35f8e6",
                 blocks: 11..12,
             },
             ExpectedPartition {
-                label: "zircon-a",
-                type_guid: "de30cc86-1f4a-4a31-93c4-66f147d33e05",
+                label: "zircon_a",
+                type_guid: "9b37fff6-2e58-466a-983a-f7926d0b04e0",
                 blocks: 12..13,
             },
             ExpectedPartition {
-                label: "zircon-b",
-                type_guid: "23cc04df-c278-4ce7-8471-897d1a4bcdf7",
+                label: "zircon_b",
+                type_guid: "9b37fff6-2e58-466a-983a-f7926d0b04e0",
                 blocks: 13..14,
             },
             ExpectedPartition {
-                label: "zircon-r",
-                type_guid: "a0e5cf57-2def-46be-a80c-a2067c37cd49",
+                label: "zircon_r",
+                type_guid: "9b37fff6-2e58-466a-983a-f7926d0b04e0",
                 blocks: 14..15,
             },
             ExpectedPartition {
                 label: "vbmeta_a",
-                type_guid: "a13b4d9a-ec5f-11e8-97d8-6c3be52705bf",
+                type_guid: "421a8bfc-85d9-4d85-acda-b64eec0133e9",
                 blocks: 15..16,
             },
             ExpectedPartition {
                 label: "vbmeta_b",
-                type_guid: "a288abf2-ec5f-11e8-97d8-6c3be52705bf",
+                type_guid: "421a8bfc-85d9-4d85-acda-b64eec0133e9",
                 blocks: 16..17,
             },
             ExpectedPartition {
                 label: "vbmeta_r",
-                type_guid: "6a2460c3-cd11-4e8b-80a8-12cce268ed0a",
+                type_guid: "421a8bfc-85d9-4d85-acda-b64eec0133e9",
                 blocks: 17..18,
             },
             ExpectedPartition {
-                label: "misc",
-                type_guid: "1d75395d-f2c6-476b-a8b7-45cc1c97b476",
+                label: "durable_boot",
+                type_guid: "a409e16b-78aa-4acc-995c-302352621a41",
                 blocks: 18..19,
             },
         ];

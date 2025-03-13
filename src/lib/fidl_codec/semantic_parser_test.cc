@@ -49,14 +49,14 @@ TEST_F(SemanticParserTest, GlobalExample) {
   Protocol* protocol = nullptr;
   library->GetProtocolByName("fuchsia.io/Directory", &protocol);
   ASSERT_NE(protocol, nullptr);
-  ProtocolMethod* method = protocol->GetMethodByName("Open3");
+  ProtocolMethod* method = protocol->GetMethodByName("Open");
   ASSERT_NE(method, nullptr);
-  // Checks that we currently don't have any semantic for Open3.
+  // Checks that we currently don't have any semantic for Open.
   ASSERT_EQ(method->semantic(), nullptr);
 
   std::string_view text =
       "library fuchsia.io {\n"
-      "  Directory::Open3 {\n"
+      "  Directory::Open {\n"
       "    request.object = handle / request.path;\n"
       "  }\n"
       "}\n"

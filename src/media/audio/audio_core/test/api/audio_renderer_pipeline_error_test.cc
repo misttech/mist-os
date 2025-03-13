@@ -3,7 +3,7 @@
 
 #include <zircon/types.h>
 
-#include "src/media/audio/audio_core/shared/device_id.h"
+#include "src/media/audio/audio_core/device_id.h"
 #include "src/media/audio/audio_core/test/api/audio_renderer_pipeline_test_shared.h"
 #include "src/media/audio/lib/analysis/generators.h"
 

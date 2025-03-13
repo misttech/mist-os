@@ -12,7 +12,21 @@
             rights: [ "r*" ],
             path: "/dev",
         },
-        { protocol: "fuchsia.process.Launcher" },
+        {
+            protocol: "fuchsia.storage.partitions.PartitionsManager",
+            availability: "optional",
+        },
+        {
+            service: "fuchsia.storage.partitions.PartitionService",
+            availability: "optional",
+        },
+        {
+            config: "fuchsia.fshost.StorageHost",
+            key: "storage_host",
+            type: "bool",
+            default: false,
+            availability: "optional",
+        },
     ],
     expose: [
         {

@@ -2,104 +2,27 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/bind/bind.gni")
-import("//build/components.gni")
 import("//build/drivers.gni")
-import("//build/test.gni")
-
-driver_bind_rules("overnet_usb_bind") {
-  rules = "meta/overnet_usb.bind"
-  bind_output = "overnet-usb.bindbc"
-  tests = "meta/bind-tests.json"
-  deps = [
-    "//src/devices/bind/fuchsia.google.platform.usb",
-    "//src/devices/bind/fuchsia.usb",
-    "//src/devices/bind/fuchsia.usb.comm",
-  ]
-}
-
-source_set("overnet-usb-lib") {
-  configs += [ "//build/config:all_source" ]
-  sources = [
-    "overnet_usb.cc",
-    "overnet_usb.h",
-  ]
-  public_deps = [
-    ":overnet_usb_bind",
-    "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.usb.composite:fuchsia.hardware.usb.composite_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.usb.function:fuchsia.hardware.usb.function_banjo_cpp",
-    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
-    "//sdk/fidl/fuchsia.hardware.overnet:fuchsia.hardware.overnet_cpp",
-    "//sdk/fidl/fuchsia.hardware.usb.endpoint:fuchsia.hardware.usb.endpoint_cpp",
-    "//sdk/fidl/fuchsia.hardware.usb.function:fuchsia.hardware.usb.function_cpp",
-    "//sdk/lib/async",
-    "//sdk/lib/async:async-cpp",
-    "//sdk/lib/async-loop:async-loop-cpp",
-    "//sdk/lib/async-loop:async-loop-default",
-    "//sdk/lib/driver/compat/cpp:cpp",
-    "//sdk/lib/driver/component/cpp:cpp",
-    "//sdk/lib/driver/devfs/cpp:cpp",
-    "//sdk/lib/driver/logging/cpp:cpp",
-    "//src/devices/bind/fuchsia.google.platform.usb:fuchsia.google.platform.usb_cpp",
-    "//src/devices/usb/lib/usb:usb-dfv2-compat-logging",
-    "//src/devices/usb/lib/usb-endpoint:usb-endpoint-client-dfv2-compat-logging",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/zx",
-  ]
-}
-
-fuchsia_cc_driver("overnet-usb-driver") {
-  output_name = "overnet-usb"
-
-  configs += [
-    "//build/config:all_source",
-    "//build/config/fuchsia:enable_zircon_asserts",
-  ]
-  deps = [ ":overnet-usb-lib" ]
-}
-
-fuchsia_driver_component("overnet-usb") {
-  component_name = "overnet-usb"
-  deps = [ ":overnet-usb-driver" ]
-  info = "meta/overnet-usb-info.json"
-  manifest = "meta/overnet-usb.cml"
-}
 
 fuchsia_driver_package("overnet-usb-package") {
   package_name = "overnet-usb"
-  driver_components = [ ":overnet-usb" ]
-}
-
-test("overnet-usb-test-bin") {
-  testonly = true
-  sources = [ "overnet_usb_test.cc" ]
-  deps = [
-    ":overnet-usb-lib",
-    "//sdk/banjo/fuchsia.hardware.usb.function:fuchsia.hardware.usb.function_banjo_cpp_mock",
-    "//sdk/lib/async-default",
-    "//sdk/lib/async-loop:async-loop-cpp",
-    "//sdk/lib/async-loop:async-loop-default",
-    "//sdk/lib/driver/testing/cpp",
-    "//src/devices/usb/lib/usb-endpoint:fake-usb-endpoint-server",
-    "//zircon/system/ulib/zxtest",
+  driver_components = [
+    "overnet-usb",
+    "overnet-usb-service",
   ]
 }
 
-fuchsia_unittest_package("overnet-usb-test") {
-  deps = [ ":overnet-usb-test-bin" ]
-  test_specs = {
-    environments = basic_envs
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
+group("drivers") {
+  deps = [
+    "overnet-usb",
+    "overnet-usb-service",
+  ]
 }
 
 group("tests") {
   testonly = true
   deps = [
-    ":overnet-usb-test",
-    ":overnet_usb_bind_test",
+    "overnet-usb:tests",
+    "overnet-usb-service:tests",
   ]
 }

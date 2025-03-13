@@ -13,10 +13,10 @@
 #include <mutex>
 
 #include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
@@ -27,7 +27,7 @@
 namespace display::testing {
 
 struct MockDisplayEngine::Expectation {
-  OnCoordinatorConnectedChecker on_coordinator_connected_checker;
+  CompleteCoordinatorConnectionChecker complete_coordinator_connection_checker;
   ImportBufferCollectionChecker import_buffer_collection_checker;
   ReleaseBufferCollectionChecker release_buffer_collection_checker;
   ImportImageChecker import_image_checker;
@@ -49,9 +49,10 @@ MockDisplayEngine::~MockDisplayEngine() {
   ZX_ASSERT_MSG(check_all_calls_replayed_called_, "CheckAllCallsReplayed() not called on a mock");
 }
 
-void MockDisplayEngine::ExpectOnCoordinatorConnected(OnCoordinatorConnectedChecker checker) {
+void MockDisplayEngine::ExpectCompleteCoordinatorConnection(
+    CompleteCoordinatorConnectionChecker checker) {
   std::lock_guard<std::mutex> lock(mutex_);
-  expectations_.push_back({.on_coordinator_connected_checker = std::move(checker)});
+  expectations_.push_back({.complete_coordinator_connection_checker = std::move(checker)});
 }
 
 void MockDisplayEngine::ExpectImportBufferCollection(ImportBufferCollectionChecker checker) {
@@ -127,15 +128,15 @@ void MockDisplayEngine::CheckAllAccessesReplayed() {
   check_all_calls_replayed_called_ = true;
 }
 
-void MockDisplayEngine::OnCoordinatorConnected() {
+display::EngineInfo MockDisplayEngine::CompleteCoordinatorConnection() {
   std::lock_guard<std::mutex> lock(mutex_);
   ZX_ASSERT_MSG(call_index_ < expectations_.size(), "All expected calls were already received");
   Expectation& call_expectation = expectations_[call_index_];
   ++call_index_;
 
-  ZX_ASSERT_MSG(call_expectation.on_coordinator_connected_checker != nullptr,
+  ZX_ASSERT_MSG(call_expectation.complete_coordinator_connection_checker != nullptr,
                 "Received call type does not match expected call type");
-  call_expectation.on_coordinator_connected_checker();
+  return call_expectation.complete_coordinator_connection_checker();
 }
 
 zx::result<> MockDisplayEngine::ImportBufferCollection(
@@ -218,7 +219,7 @@ display::ConfigCheckResult MockDisplayEngine::CheckConfiguration(
 void MockDisplayEngine::ApplyConfiguration(display::DisplayId display_id,
                                            display::ModeId display_mode_id,
                                            cpp20::span<const display::DriverLayer> layers,
-                                           display::ConfigStamp config_stamp) {
+                                           display::DriverConfigStamp config_stamp) {
   std::lock_guard<std::mutex> lock(mutex_);
   ZX_ASSERT_MSG(call_index_ < expectations_.size(), "All expected calls were already received");
   Expectation& call_expectation = expectations_[call_index_];
@@ -252,17 +253,6 @@ zx::result<> MockDisplayEngine::SetDisplayPower(display::DisplayId display_id, b
   ZX_ASSERT_MSG(call_expectation.set_display_power_checker != nullptr,
                 "Received call type does not match expected call type");
   return call_expectation.set_display_power_checker(display_id, power_on);
-}
-
-bool MockDisplayEngine::IsCaptureSupported() {
-  std::lock_guard<std::mutex> lock(mutex_);
-  ZX_ASSERT_MSG(call_index_ < expectations_.size(), "All expected calls were already received");
-  Expectation& call_expectation = expectations_[call_index_];
-  ++call_index_;
-
-  ZX_ASSERT_MSG(call_expectation.is_capture_supported_checker != nullptr,
-                "Received call type does not match expected call type");
-  return call_expectation.is_capture_supported_checker();
 }
 
 zx::result<> MockDisplayEngine::StartCapture(display::DriverCaptureImageId capture_image_id) {

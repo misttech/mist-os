@@ -43,6 +43,6 @@ impl SmallBitSet {
     pub fn first_empty_slot(&mut self) -> Option<u8> {
         let slot = self.bit_set.trailing_ones() as u8;
 
-        self.insert(slot).then(|| slot)
+        self.insert(slot).then_some(slot)
     }
 }

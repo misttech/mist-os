@@ -21,7 +21,6 @@
 
 #include <array>
 #include <cstdint>
-#include <limits>
 #include <optional>
 #include <string_view>
 #include <type_traits>
@@ -140,7 +139,7 @@ devicetree::ScanState ArmDevicetreeGicItem::HandleGicV3(
     if (redistributor_stride) {
       if (auto stride = redistributor_stride->AsUint32()) {
         dcfg.gicr_stride = *stride;
-      } else if (auto stride64 = redistributor_stride->AsUint64())  {
+      } else if (auto stride64 = redistributor_stride->AsUint64()) {
         dcfg.gicr_stride = *stride64;
       } else {
         OnError("GIC v3: failed to parse redistributor stride.");
@@ -159,9 +158,9 @@ devicetree::ScanState ArmDevicetreeGicItem::HandleGicV3(
   }
   auto regions = 1;
   if (redistributor_stride && redistributor_regions) {
-      if (auto parsed_regions = redistributor_regions->AsUint32()) {
-        regions = *parsed_regions;
-      }
+    if (auto parsed_regions = redistributor_regions->AsUint32()) {
+      regions = *parsed_regions;
+    }
   }
   if (regions < 1 || regions > 256) {
     OnError("GIC v3: Out of bounds '#redistributor-stride'.");
@@ -175,8 +174,8 @@ devicetree::ScanState ArmDevicetreeGicItem::HandleGicV3(
     (*mmio_observer_)(DevicetreeMmioRange::From(reg[GicV3Regs::kGicr]));
   } else {
     const size_t total_size = static_cast<size_t>(dcfg.gicr_stride * regions);
-    const DevicetreeMmioRange range = { .address = reg[GicV3Regs::kGicr].address().value(),
-                                        .size = total_size };
+    const DevicetreeMmioRange range = {.address = reg[GicV3Regs::kGicr].address().value(),
+                                       .size = total_size};
     (*mmio_observer_)(range);
   }
   dcfg.ipi_base = 0;

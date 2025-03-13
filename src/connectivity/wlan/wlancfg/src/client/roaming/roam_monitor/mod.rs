@@ -4,9 +4,7 @@
 
 use crate::client::config_management::Credential;
 use crate::client::connection_selection::ConnectionSelectionRequester;
-use crate::client::roaming::lib::{
-    PastRoamList, RoamEvent, RoamTriggerData, RoamTriggerDataOutcome, RoamingMode, RoamingPolicy,
-};
+use crate::client::roaming::lib::*;
 use crate::client::types;
 use crate::telemetry::{TelemetryEvent, TelemetrySender};
 use anyhow::{format_err, Error};
@@ -70,7 +68,7 @@ pub async fn serve_roam_monitor(
 ) -> Result<(), anyhow::Error> {
     // Queue of initialized roam searches.
     let mut roam_search_result_futs: FuturesUnordered<
-        LocalBoxFuture<'static, Result<types::ScannedCandidate, Error>>,
+        LocalBoxFuture<'static, Result<PolicyRoamRequest, Error>>,
     > = FuturesUnordered::new();
 
     loop {
@@ -78,14 +76,15 @@ pub async fn serve_roam_monitor(
             // Handle incoming trigger data.
             trigger_data = trigger_data_receiver.next() => if let Some(data) = trigger_data {
                 match roam_monitor.handle_roam_trigger_data(data).await {
-                    Ok(RoamTriggerDataOutcome::RoamSearch { scan_type, network_identifier, credential }) => {
+                    Ok(RoamTriggerDataOutcome::RoamSearch { scan_type, network_identifier, credential, reasons}) => {
                         telemetry_sender.send(TelemetryEvent::RoamingScan);
                         info!("Performing scan to find proactive local roaming candidates.");
                         let roam_search_fut = get_roaming_connection_selection_future(
                             connection_selection_requester.clone(),
                             scan_type,
-                            network_identifier.clone(),
-                            credential.clone(),
+                            network_identifier,
+                            credential,
+                            reasons
                         );
                         roam_search_result_futs.push(roam_search_fut.boxed());
                     },
@@ -96,7 +95,7 @@ pub async fn serve_roam_monitor(
             // Handle the result of a completed roam search, sending recommentation to roam if
             // necessary.
             roam_search_result = roam_search_result_futs.select_next_some() => match roam_search_result {
-                Ok(candidate) => {
+                Ok(PolicyRoamRequest { candidate, reasons: _ }) => {
                     if roam_monitor.should_send_roam_request(candidate.clone()).unwrap_or_else(|e| {
                             error!("Error validating selected roam candidate: {}", e);
                             false
@@ -142,12 +141,13 @@ async fn get_roaming_connection_selection_future(
     scan_type: fidl_common::ScanType,
     network_identifier: types::NetworkIdentifier,
     credential: Credential,
-) -> Result<types::ScannedCandidate, Error> {
+    reasons: Vec<RoamReason>,
+) -> Result<PolicyRoamRequest, Error> {
     match connection_selection_requester
         .do_roam_selection(scan_type, network_identifier, credential)
         .await?
     {
-        Some(candidate) => Ok(candidate),
+        Some(candidate) => Ok(PolicyRoamRequest { candidate, reasons }),
         None => Err(format_err!("No roam candidates found.")),
     }
 }
@@ -222,7 +222,7 @@ mod test {
     }
 
     #[test_case(RoamTriggerDataOutcome::Noop; "should not queue roam search")]
-    #[test_case(RoamTriggerDataOutcome::RoamSearch { scan_type: fidl_common::ScanType::Passive, network_identifier: generate_random_network_identifier(), credential: generate_random_password() }; "should queue roam search")]
+    #[test_case(RoamTriggerDataOutcome::RoamSearch { scan_type: fidl_common::ScanType::Passive, network_identifier: generate_random_network_identifier(), credential: generate_random_password(), reasons: vec![]}; "should queue roam search")]
     #[fuchsia::test(add_test_attr = false)]
     fn test_serve_loop_handles_trigger_data(response_to_should_roam_scan: RoamTriggerDataOutcome) {
         let mut exec = TestExecutor::new();
@@ -306,6 +306,7 @@ mod test {
             scan_type: fidl_common::ScanType::Passive,
             network_identifier: generate_random_network_identifier(),
             credential: generate_random_password(),
+            reasons: vec![],
         };
         roam_monitor.response_to_should_send_roam_request = response_to_should_send_roam_request;
 
@@ -378,6 +379,7 @@ mod test {
             scan_type: fidl_common::ScanType::Passive,
             network_identifier: generate_random_network_identifier(),
             credential: generate_random_password(),
+            reasons: vec![],
         };
         roam_monitor.response_to_should_send_roam_request = true;
 

@@ -422,6 +422,10 @@ type Key = flexible enum : uint32 {
     @available(added=9)
     POWER = 0xffff0002;
 
+    /// Sleep Button.
+    @available(added=NEXT)
+    SLEEP = 0xffff0003;
+
     /// Warning: following keycodes maybe changed in the future, please don't use!!!
     /// We use following keycodes in starnix tests. Most of them are keycodes in non-US keyboard
     /// layouts, we may move them to meaning enum once we support those keyboard layouts.

@@ -74,10 +74,8 @@
                 // TODO(https://fxbug.dev/365763270)
                 "EpollTest.EpollIsPollable",
 
-                // TODO(https://fxbug.dev/293950309)
-                "OtmpfileTest.TmpFileLinkIntoAfter",
-                "OtmpfileTest.TmpFileWithOExclShouldFailLinkInto",
-                "OtmpfileTest.TmpFileWithOCreatShouldFail",
+                // TODO(https://fxbug.dev/333132302)
+                "Madvise.MadvRemoveZeroesMemory",
             ],
         },
         {
@@ -93,12 +91,9 @@
                 // TODO(https://fxbug.dev/372236700): Fails with new toolchain.
                 "PtraceTest.InterruptAfterListen",
 
-                // TODO(https://fxbug.dev/379958264)
-                "CgroupTest.WriteToInterfaceFileAfterCgroupIsDeleted",
-
-                // TODO(https://fxbug.dev/384194637): deflake and re-enable
-                "CgroupFreezerTest.FreezeNestedCgroups",
-                "CgroupFreezerTest.MoveProcess",
+                // TODO(https://fxbug.dev/394934526)
+                "PtraceTest.PtraceAttachesToParentThread",
+                "PtraceTest.ExitKillFromThread",
             ],
         },
     ],

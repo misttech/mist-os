@@ -27,13 +27,14 @@ pub fn trace_fs(
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
-    Ok(current_task
-        .kernel()
-        .trace_fs
-        .get_or_init(|| {
-            TraceFs::new_fs(current_task, options).expect("tracefs constructed with valid options")
-        })
-        .clone())
+    struct TraceFsHandle(FileSystemHandle);
+
+    let handle = current_task.kernel().expando.get_or_init(|| {
+        TraceFsHandle(
+            TraceFs::new_fs(current_task, options).expect("tracefs constructed with valid options"),
+        )
+    });
+    Ok(handle.0.clone())
 }
 
 pub struct TraceFs;

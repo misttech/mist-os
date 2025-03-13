@@ -118,7 +118,7 @@ impl State {
         Self::write_internal(PERSISTENT_STATE_PATH, state)
     }
 
-    fn write_internal<P: AsRef<Path>>(path: P, state: &Self) -> Result<()> {
+    pub fn write_internal<P: AsRef<Path>>(path: P, state: &Self) -> Result<()> {
         let path = path.as_ref();
         debug!("writing persistent state: {:?} to {:?}", state, path);
         let state_str = serde_json::to_string(state).map_err(|e| {

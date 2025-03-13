@@ -98,7 +98,7 @@ fn main() -> Result<(), Error> {
     // Non-legacy sockets are serviced from a dedicated thread (which isn't counted here).  We
     // *must* always use a multi-threaded executor because we use `fasync::EHandle::poll_tasks`
     // which requires it.
-    let mut executor = fasync::SendExecutor::new(config.num_threads as usize);
+    let mut executor = fasync::SendExecutor::new(config.num_threads);
     executor.run(async_main(config)).context("async main")?;
     debug!("Exiting.");
     Ok(())

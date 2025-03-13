@@ -9,11 +9,23 @@ use std::collections::hash_map::Entry as HashMapEntry;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::{Bound, Deref, DerefMut};
 use std::rc::Rc;
+
+use elliptic_curve::sec1::ToEncodedPoint as _;
+use num_traits::FromPrimitive as _;
+use p256::NistP256;
+use rsa::traits::{PrivateKeyParts as _, PublicKeyParts as _};
+use rsa::{BigUint, RsaPrivateKey};
 use tee_internal::{
-    Attribute, AttributeId, BufferOrValue, Error, HandleFlags, MemRef, ObjectEnumHandle,
+    Attribute, AttributeId, BufferOrValue, EccCurve, Error, HandleFlags, MemRef, ObjectEnumHandle,
     ObjectHandle, ObjectInfo, Result as TeeResult, Storage as TeeStorage, Type, Usage, ValueFields,
     Whence, DATA_MAX_POSITION, OBJECT_ID_MAX_LEN,
 };
+use thiserror::Error;
+
+use crate::crypto::Rng;
+use crate::ErrorWithSize;
+
+type P256SecretKey = elliptic_curve::SecretKey<NistP256>;
 
 pub struct Storage {
     persistent_objects: PersistentObjects,
@@ -41,6 +53,14 @@ fn is_transient_handle(object: ObjectHandle) -> bool {
 // See Table 5-9: TEE_AllocateTransientObject Object Types and Key Sizes 4.
 //
 
+// A representation of a retrieved buffer attribute. Ideally, we'd just use
+// Option<&[u8]>, but some of the APIs we're gluing here like to return vector
+// representations.
+pub enum BufferAttribute<'a> {
+    Slice(&'a [u8]),
+    Vector(Vec<u8>),
+}
+
 // A internal trait representing the common key operations.
 //
 // TODO(https://fxbug.dev/371213067): Right now it's convenient to give default
@@ -50,9 +70,16 @@ fn is_transient_handle(object: ObjectHandle) -> bool {
 pub trait KeyType {
     fn new(_max_size: u32) -> TeeResult<Self>
     where
-        Self: Sized,
+        Self: Sized, // Not a subtrait to keep KeyType dyn-compatible
     {
         unimplemented!()
+    }
+
+    fn is_valid_size(_size: u32) -> bool
+    where
+        Self: Sized, // Not a subtrait to keep KeyType dyn-compatible
+    {
+        false
     }
 
     fn size(&self) -> u32 {
@@ -63,11 +90,11 @@ pub trait KeyType {
         0
     }
 
-    fn buffer_attribute(&self, _id: AttributeId) -> Option<&Vec<u8>> {
+    fn buffer_attribute(&self, _id: AttributeId) -> Option<BufferAttribute<'_>> {
         None
     }
 
-    fn value_attribute(&self, _id: AttributeId) -> Option<&ValueFields> {
+    fn value_attribute(&self, _id: AttributeId) -> Option<ValueFields> {
         None
     }
 
@@ -84,17 +111,78 @@ pub trait KeyType {
     }
 }
 
-#[derive(Clone)]
-pub struct SimpleSymmetricKey<const SIZE_MIN: u32, const SIZE_MAX: u32, const SIZE_MULTIPLE: u32> {
-    secret: Vec<u8>, // TEE_ATTR_SECRET_VALUE
+// An error type in service of extract_attributes!() below.
+#[derive(Error, Debug)]
+enum ExtractAttributeError {
+    #[error("{0:?} provided twice")]
+    ProvidedTwice(AttributeId),
+
+    #[error("Unexpected attribute: {0:?}")]
+    Unexpected(AttributeId),
 }
 
-impl<const SIZE_MIN: u32, const SIZE_MAX: u32, const SIZE_MULTIPLE: u32>
-    SimpleSymmetricKey<SIZE_MIN, SIZE_MAX, SIZE_MULTIPLE>
-{
-    const fn is_valid_size(size: u32) -> bool {
-        size >= SIZE_MIN && size <= SIZE_MAX && (size % SIZE_MULTIPLE) == 0
+// This trait exists only to aid in the definition of extract_attributes!
+// just below, injecting a dose of generics to support both the memory and
+// value attribute cases, which seems hard to do with macro tricks alone.
+trait ExtractAttributeInto<T> {
+    fn extract_into(self, value: &mut T) -> Result<(), ExtractAttributeError>;
+}
+
+impl<'a> ExtractAttributeInto<&'a [u8]> for &'a Attribute {
+    fn extract_into(self, value: &mut &'a [u8]) -> Result<(), ExtractAttributeError> {
+        if !value.is_empty() {
+            Err(ExtractAttributeError::ProvidedTwice(self.id))
+        } else {
+            *value = self.as_memory_reference().as_slice();
+            Ok(())
+        }
     }
+}
+
+impl ExtractAttributeInto<Option<ValueFields>> for &Attribute {
+    fn extract_into(self, value: &mut Option<ValueFields>) -> Result<(), ExtractAttributeError> {
+        if value.is_some() {
+            Err(ExtractAttributeError::ProvidedTwice(self.id))
+        } else {
+            *value = Some(*self.as_value());
+            Ok(())
+        }
+    }
+}
+
+// Extracts the expected attributes from a list, returning
+// Result<(), ExtractAttributeError>, ensuring that only expected ones are
+// present and nothing expected is duplicated.
+//
+// Example usage:
+// ```
+// let mut mem_attr: &[u8] = &[];
+// let mut val_attr: Option<ValueFields> = None;
+// ...
+// extract_attributes!(
+//     attrs,
+//     AttributeId::A => mem_attr, // If present, will set mem_attr as the A payload
+//     AttributeId::B => val_attr, // If present, will val_attr as the B payload
+//     ...
+// ).unwrap();
+// ```
+macro_rules! extract_attributes {
+    ($attributes:expr, $($id:path => $var:ident),*) => {
+        || -> Result<(), ExtractAttributeError> {
+            for attr in $attributes {
+                match attr.id {
+                    $( $id => attr.extract_into(&mut $var)?, )*
+                    _ => return Err(ExtractAttributeError::Unexpected(attr.id)),
+                }
+            }
+            Ok(())
+        }()
+    };
+}
+
+#[derive(Clone)]
+pub struct SimpleSymmetricKey<const SIZE_MIN: u32, const SIZE_MAX: u32, const SIZE_MULTIPLE: u32> {
+    pub secret: Vec<u8>, // TEE_ATTR_SECRET_VALUE
 }
 
 impl<const SIZE_MIN: u32, const SIZE_MAX: u32, const SIZE_MULTIPLE: u32> KeyType
@@ -107,23 +195,27 @@ impl<const SIZE_MIN: u32, const SIZE_MAX: u32, const SIZE_MULTIPLE: u32> KeyType
         const { assert!((SIZE_MAX % SIZE_MULTIPLE) == 0) };
 
         if Self::is_valid_size(max_size) {
-            Ok(Self { secret: Vec::with_capacity(max_size as usize) })
+            Ok(Self { secret: Vec::with_capacity((max_size / u8::BITS) as usize) })
         } else {
             Err(Error::NotSupported)
         }
     }
 
+    fn is_valid_size(size: u32) -> bool {
+        size >= SIZE_MIN && size <= SIZE_MAX && (size % SIZE_MULTIPLE) == 0
+    }
+
     fn size(&self) -> u32 {
-        self.secret.len() as u32
+        (self.secret.len() as u32) * u8::BITS
     }
 
     fn max_size(&self) -> u32 {
-        self.secret.capacity() as u32
+        (self.secret.capacity() as u32) * u8::BITS
     }
 
-    fn buffer_attribute(&self, id: AttributeId) -> Option<&Vec<u8>> {
+    fn buffer_attribute(&self, id: AttributeId) -> Option<BufferAttribute<'_>> {
         if id == AttributeId::SecretValue {
-            Some(&self.secret)
+            Some(BufferAttribute::Slice(&self.secret))
         } else {
             None
         }
@@ -136,142 +228,365 @@ impl<const SIZE_MIN: u32, const SIZE_MAX: u32, const SIZE_MULTIPLE: u32> KeyType
     fn populate(&mut self, attributes: &[Attribute]) -> TeeResult {
         debug_assert!(self.secret.is_empty());
 
-        // TODO(https://fxbug.dev/371213067): Abstract into a declarative macro
-        // for picking out required/optional attributes to be used across all
-        // populate() implementations?
-        let secret = {
-            let mut secret: &[u8] = &[];
-            let mut iter = attributes.iter();
-            while let Some(attr) = iter.next() {
-                match attr.id {
-                    AttributeId::SecretValue => {
-                        assert!(secret.is_empty(), "{:?} provided twice", attr.id);
-                        secret = attr.as_memory_reference().as_slice();
-                    }
-                    _ => panic!("Unexpected attribute: {:?}", attr.id),
-                }
-            }
-            assert!(
-                !secret.is_empty(),
-                "Missing expected attribute: {:?}",
-                AttributeId::SecretValue
-            );
-            secret
-        };
+        let mut secret: &[u8] = &[];
+        extract_attributes!(
+            attributes,
+            AttributeId::SecretValue => secret
+        )
+        .unwrap();
+        assert!(!secret.is_empty(), "Missing attribute for secret value");
+
         assert!(secret.len() <= self.secret.capacity());
         self.secret.extend_from_slice(secret);
         Ok(())
     }
 
-    // TODO(https://fxbug.dev/371213067): generate() too.
+    fn generate(&mut self, size: u32, params: &[Attribute]) -> TeeResult {
+        assert!(Self::is_valid_size(size));
+        assert!(size <= self.max_size());
+        if !params.is_empty() {
+            return Err(Error::BadParameters);
+        }
+        self.secret.resize((size / u8::BITS) as usize, 0);
+        zx::cprng_draw(self.secret.as_mut_slice());
+        Ok(())
+    }
 }
 
 pub type AesKey = SimpleSymmetricKey<128, 256, 64>; // 128, 192, or 256
-pub type DesKey = SimpleSymmetricKey<64, 64, 64>; // 64
-pub type Des3Key = SimpleSymmetricKey<128, 192, 64>; // 128 or 192
-pub type Sm4Key = SimpleSymmetricKey<128, 128, 128>; // 128
-pub type HmacMd5Key = SimpleSymmetricKey<64, 512, 8>;
 pub type HmacSha1Key = SimpleSymmetricKey<80, 512, 8>;
 pub type HmacSha224Key = SimpleSymmetricKey<112, 512, 8>;
 pub type HmacSha256Key = SimpleSymmetricKey<192, 1024, 8>;
 pub type HmacSha384Key = SimpleSymmetricKey<256, 512, 8>;
 pub type HmacSha512Key = SimpleSymmetricKey<256, 512, 8>;
-pub type HmacSha3_224Key = SimpleSymmetricKey<192, 1024, 8>;
-pub type HmacSha3_256Key = SimpleSymmetricKey<256, 1024, 8>;
-pub type HmacSha3_384Key = SimpleSymmetricKey<256, 512, 8>;
-pub type HmacSha3_512Key = SimpleSymmetricKey<256, 512, 8>;
-pub type HmacSm3Key = SimpleSymmetricKey<80, 1024, 8>;
-pub type GenericSecretKey = SimpleSymmetricKey<8, 4096, 8>;
 
-// TODO(https://fxbug.dev/371213067): Properly implement KeyType.
-#[allow(dead_code)]
-#[derive(Clone)]
-pub struct RsaPublicKey {
-    modulus: Vec<u8>,  // TEE_ATTR_RSA_MODULUS
-    exponent: Vec<u8>, // TEE_ATTR_RSA_PUBLIC_EXPONENT
-}
-
-impl KeyType for RsaPublicKey {}
-
-// TODO(https://fxbug.dev/371213067): Properly implement KeyType.
-#[allow(dead_code)]
-#[derive(Clone)]
 pub struct RsaKeypair {
-    modulus: Vec<u8>,          // TEE_ATTR_RSA_MODULUS
-    public_exponent: Vec<u8>,  // TEE_ATTR_RSA_PUBLIC_EXPONENT
-    private_exponent: Vec<u8>, // TEE_ATTR_RSA_PRIVATE_EXPONENT
-
-    prime1: Vec<u8>,      // TEE_ATTR_RSA_PRIME1
-    prime2: Vec<u8>,      // TEE_ATTR_RSA_PRIME2
-    exponent1: Vec<u8>,   // TEE_ATTR_RSA_EXPONENT1
-    exponent2: Vec<u8>,   // TEE_ATTR_RSA_EXPONENT2
-    coefficient: Vec<u8>, // TEE_ATTR_RSA_COEFFICIENT
+    private: Option<Rc<RsaPrivateKey>>,
+    max_size: u32,
 }
 
-impl KeyType for RsaKeypair {}
-
-// TODO(https://fxbug.dev/371213067): Properly implement KeyType.
-#[allow(dead_code)]
-#[derive(Clone)]
-pub struct DsaPublicKey {
-    prime: Vec<u8>,    // TEE_ATTR_DSA_PRIME
-    subprime: Vec<u8>, // TEE_ATTR_DSA_SUBPRIME
-    base: Vec<u8>,     // TEE_ATTR_DSA_BASE
-    public: Vec<u8>,   // TEE_ATTR_DSA_PUBLIC_VALUE
+impl RsaKeypair {
+    pub fn private_key(&self) -> Rc<RsaPrivateKey> {
+        self.private.as_ref().unwrap().clone()
+    }
 }
 
-impl KeyType for DsaPublicKey {}
-
-// TODO(https://fxbug.dev/371213067): Properly implement KeyType.
-#[allow(dead_code)]
-#[derive(Clone)]
-pub struct DsaKeypair {
-    prime: Vec<u8>,    // TEE_ATTR_DSA_PRIME
-    subprime: Vec<u8>, // TEE_ATTR_DSA_SUBPRIME
-    base: Vec<u8>,     // TEE_ATTR_DSA_BASE
-    public: Vec<u8>,   // TEE_ATTR_DSA_PUBLIC_VALUE
-    private: Vec<u8>,  // TEE_ATTR_DSA_PRIVATE_VALUE
+// A deep clone implementation as we don't want to the lifetimes of copied keys
+// to be tied to their originals.
+impl Clone for RsaKeypair {
+    fn clone(&self) -> Self {
+        let max_size = self.max_size;
+        if let Some(private) = &self.private {
+            Self { private: Some(Rc::new(private.deref().clone())), max_size }
+        } else {
+            Self { private: None, max_size }
+        }
+    }
 }
 
-impl KeyType for DsaKeypair {}
+impl KeyType for RsaKeypair {
+    fn new(max_size: u32) -> TeeResult<Self> {
+        if !Self::is_valid_size(max_size) {
+            return Err(Error::NotSupported);
+        }
+        Ok(Self { private: None, max_size })
+    }
 
-// TODO(https://fxbug.dev/371213067): Properly implement KeyType.
-#[allow(dead_code)]
-#[derive(Clone)]
-pub struct DhKeypair {
-    prime: Vec<u8>,   // TEE_ATTR_DH_PRIME
-    base: Vec<u8>,    // TEE_ATTR_DH_BASE
-    public: Vec<u8>,  // TEE_ATTR_DH_PUBLIC_VALUE
-    private: Vec<u8>, // TEE_ATTR_DH_PRIVATE_VALUE
+    fn is_valid_size(size: u32) -> bool {
+        (size % u8::BITS) == 0 && 512 <= size && size <= 4096
+    }
 
-    subprime: Vec<u8>,   // TEE_ATTR_DH_SUBPRIME
-    x_bits: ValueFields, // TEE_ATTR_DH_X_BITS
+    fn size(&self) -> u32 {
+        if let Some(private) = &self.private {
+            (private.size() as u32) * u8::BITS
+        } else {
+            0
+        }
+    }
+
+    fn max_size(&self) -> u32 {
+        self.max_size
+    }
+
+    fn buffer_attribute(&self, id: AttributeId) -> Option<BufferAttribute<'_>> {
+        let Some(private) = &self.private else {
+            return None;
+        };
+        match id {
+            AttributeId::RsaModulus => Some(BufferAttribute::Vector(private.n().to_bytes_be())),
+            AttributeId::RsaPublicExponent => {
+                Some(BufferAttribute::Vector(private.e().to_bytes_be()))
+            }
+            AttributeId::RsaPrivateExponent => {
+                Some(BufferAttribute::Vector(private.d().to_bytes_be()))
+            }
+            AttributeId::RsaPrime1 => {
+                Some(BufferAttribute::Vector(private.primes()[0].to_bytes_be()))
+            }
+            AttributeId::RsaPrime2 => {
+                Some(BufferAttribute::Vector(private.primes()[1].to_bytes_be()))
+            }
+            AttributeId::RsaExponent1 => {
+                Some(BufferAttribute::Vector(private.dp().unwrap().to_bytes_be()))
+            }
+            AttributeId::RsaExponent2 => {
+                Some(BufferAttribute::Vector(private.dq().unwrap().to_bytes_be()))
+            }
+            AttributeId::RsaCoefficient => {
+                Some(BufferAttribute::Vector(private.crt_coefficient().unwrap().to_bytes_be()))
+            }
+            _ => None,
+        }
+    }
+
+    fn reset(&mut self) {
+        self.private = None;
+    }
+
+    fn populate(&mut self, attributes: &[Attribute]) -> TeeResult {
+        assert!(self.private.is_none());
+
+        let mut modulus: &[u8] = &[];
+        let mut public_exponent: &[u8] = &[];
+        let mut private_exponent: &[u8] = &[];
+        let mut prime1: &[u8] = &[];
+        let mut prime2: &[u8] = &[];
+        let mut exponent1: &[u8] = &[];
+        let mut exponent2: &[u8] = &[];
+        let mut coefficient: &[u8] = &[];
+        extract_attributes!(
+            attributes,
+            AttributeId::RsaModulus => modulus,
+            AttributeId::RsaPublicExponent => public_exponent,
+            AttributeId::RsaPrivateExponent => private_exponent,
+            AttributeId::RsaPrime1 => prime1,
+            AttributeId::RsaPrime2 => prime2,
+            AttributeId::RsaExponent1 => exponent1,
+            AttributeId::RsaExponent2 => exponent2,
+            AttributeId::RsaCoefficient => coefficient
+        )
+        .unwrap();
+        assert!(!modulus.is_empty(), "Missing attribute for RSA modulus");
+        assert!(!public_exponent.is_empty(), "Missing attribute for RSA public exponent");
+        assert!(!private_exponent.is_empty(), "Missing attribute for RSA private exponent");
+
+        if !prime1.is_empty()
+            || prime2.is_empty()
+            || !exponent1.is_empty()
+            || !exponent2.is_empty()
+            || !coefficient.is_empty()
+        {
+            assert!(
+                !prime1.is_empty(),
+                "TEE_ATTR_RSA_PRIME1 is required if another CRT attribute is provided"
+            );
+            assert!(
+                !prime2.is_empty(),
+                "TEE_ATTR_RSA_PRIME2 is required if another CRT attribute is provided"
+            );
+            assert!(
+                !exponent1.is_empty(),
+                "TEE_ATTR_RSA_EXPONENT1 is required if another CRT attribute is provided"
+            );
+            assert!(
+                !exponent2.is_empty(),
+                "TEE_ATTR_RSA_EXPONENT2 is required if another CRT attribute is provided"
+            );
+            assert!(
+                !coefficient.is_empty(),
+                "TEE_ATTR_RSA_COEFFICIENT is required if another CRT attribute is provided"
+            );
+        }
+
+        let len: u32 = modulus.len().try_into().unwrap();
+        assert!(u8::BITS * len <= self.max_size());
+
+        let mut private_key = RsaPrivateKey::from_components(
+            BigUint::from_bytes_be(modulus),
+            BigUint::from_bytes_be(public_exponent),
+            BigUint::from_bytes_be(private_exponent),
+            vec![BigUint::from_bytes_be(prime1), BigUint::from_bytes_be(prime2)],
+        )
+        .map_err(|_| Error::BadParameters)?;
+
+        // Computes and populates the CRT coefficients accessed below and
+        // possibly in subsequent key use.
+        private_key.precompute().unwrap();
+
+        if !exponent1.is_empty() {
+            if *private_key.dp().unwrap() != BigUint::from_bytes_be(exponent1) {
+                return Err(Error::BadParameters);
+            }
+            if *private_key.dq().unwrap() != BigUint::from_bytes_be(exponent2) {
+                return Err(Error::BadParameters);
+            }
+            if private_key.crt_coefficient().unwrap() != BigUint::from_bytes_be(coefficient) {
+                return Err(Error::BadParameters);
+            }
+        }
+
+        self.private = Some(Rc::new(private_key));
+        Ok(())
+    }
+
+    fn generate(&mut self, size: u32, params: &[Attribute]) -> TeeResult {
+        assert!(Self::is_valid_size(size));
+        assert!(size <= self.max_size());
+        assert!(self.private.is_none());
+
+        let mut public_exponent: &[u8] = &[];
+        extract_attributes!(params, AttributeId::RsaPublicExponent => public_exponent)
+            .map_err(|_| Error::BadParameters)?;
+
+        let mut private_key = if public_exponent.is_empty() {
+            RsaPrivateKey::new(&mut Rng {}, size as usize)
+        } else {
+            RsaPrivateKey::new_with_exp(
+                &mut Rng {},
+                size as usize,
+                &BigUint::from_bytes_be(public_exponent),
+            )
+        }
+        .unwrap();
+
+        // Computes and populates the CRT coefficients accessed below and
+        // possibly in subsequent key use.
+        private_key.precompute().unwrap();
+
+        self.private = Some(Rc::new(private_key));
+
+        Ok(())
+    }
 }
 
-impl KeyType for DhKeypair {}
-
-// TODO(https://fxbug.dev/371213067): Properly implement KeyType.
-#[allow(dead_code)]
-#[derive(Clone)]
-pub struct EccPublicKey {
-    x: Vec<u8>,         // TEE_ATTR_ECC_PUBLIC_VALUE_X
-    y: Vec<u8>,         // TEE_ATTR_ECC_PUBLIC_VALUE_Y
-    curve: ValueFields, // TEE_ATTR_ECC_CURVE
-}
-
-impl KeyType for EccPublicKey {}
-
-// TODO(https://fxbug.dev/371213067): Properly implement KeyType.
-#[allow(dead_code)]
 #[derive(Clone)]
 pub struct EccKeypair {
-    x: Vec<u8>,         // TEE_ATTR_ECC_PUBLIC_VALUE_X
-    y: Vec<u8>,         // TEE_ATTR_ECC_PUBLIC_VALUE_Y
-    private: Vec<u8>,   // TEE_ATTR_ECC_PRIVATE_VALUE
-    curve: ValueFields, // TEE_ATTR_ECC_CURVE
+    secret: Option<Box<P256SecretKey>>,
 }
 
-impl KeyType for EccKeypair {}
+// Only NIST P-256 curves are supported at this time.
+impl KeyType for EccKeypair {
+    fn new(max_size: u32) -> TeeResult<Self> {
+        if !Self::is_valid_size(max_size) {
+            return Err(Error::NotSupported);
+        }
+        Ok(Self { secret: None })
+    }
+
+    fn is_valid_size(size: u32) -> bool {
+        size == 256
+    }
+
+    fn size(&self) -> u32 {
+        256
+    }
+
+    fn max_size(&self) -> u32 {
+        256
+    }
+
+    fn buffer_attribute(&self, id: AttributeId) -> Option<BufferAttribute<'_>> {
+        let Some(secret) = &self.secret else {
+            return None;
+        };
+        match id {
+            AttributeId::EccPrivateValue => {
+                Some(BufferAttribute::Vector(secret.to_be_bytes().as_slice().to_vec()))
+            }
+            AttributeId::EccPublicValueX => Some(BufferAttribute::Vector(
+                secret
+                    .public_key()
+                    .as_affine()
+                    .to_encoded_point(/*compress=*/ false)
+                    .x()
+                    .unwrap()
+                    .as_slice()
+                    .to_vec(),
+            )),
+            AttributeId::EccPublicValueY => Some(BufferAttribute::Vector(
+                secret
+                    .public_key()
+                    .as_affine()
+                    .to_encoded_point(/*compress=*/ false)
+                    .y()
+                    .unwrap()
+                    .as_slice()
+                    .to_vec(),
+            )),
+            _ => None,
+        }
+    }
+
+    fn value_attribute(&self, id: AttributeId) -> Option<ValueFields> {
+        match id {
+            AttributeId::EccCurve => Some(ValueFields { a: EccCurve::NistP256 as u32, b: 0 }),
+            _ => None,
+        }
+    }
+
+    fn reset(&mut self) {
+        self.secret = None;
+    }
+
+    fn populate(&mut self, attributes: &[Attribute]) -> TeeResult {
+        assert!(self.secret.is_none());
+
+        let mut private_value: &[u8] = &[];
+        let mut public_value_x: &[u8] = &[];
+        let mut public_value_y: &[u8] = &[];
+        let mut curve: Option<ValueFields> = None;
+        extract_attributes!(
+            attributes,
+            AttributeId::EccPrivateValue => private_value,
+            AttributeId::EccPublicValueX => public_value_x,
+            AttributeId::EccPublicValueY => public_value_y,
+            AttributeId::EccCurve => curve
+        )
+        .unwrap();
+        assert!(!private_value.is_empty(), "Missing attribute for ECC private value");
+        assert!(!public_value_x.is_empty(), "Missing attribute for ECC public value X");
+        assert!(!public_value_y.is_empty(), "Missing attribute for ECC public value Y");
+        assert!(curve.is_some(), "Missing attribute for ECC curve");
+
+        let curve = EccCurve::from_u32(curve.unwrap().a).ok_or(Error::NotSupported)?;
+        if curve != EccCurve::NistP256 {
+            return Err(Error::NotSupported);
+        }
+
+        let secret = P256SecretKey::from_be_bytes(private_value).unwrap();
+
+        // Check that provided public parameters coincide with those computed
+        // by the private key abstraction.
+        let point = secret.public_key().as_affine().to_encoded_point(/*compress=*/ false);
+        if point.x().unwrap().as_slice() != public_value_x {
+            return Err(Error::BadParameters);
+        }
+        if point.y().unwrap().as_slice() != public_value_y {
+            return Err(Error::BadParameters);
+        }
+        self.secret = Some(Box::new(secret));
+        Ok(())
+    }
+
+    fn generate(&mut self, size: u32, params: &[Attribute]) -> TeeResult {
+        assert!(Self::is_valid_size(size));
+        assert!(size <= self.max_size());
+        assert!(self.secret.is_none());
+
+        let mut curve: Option<ValueFields> = None;
+        extract_attributes!(params, AttributeId::EccCurve => curve)
+            .map_err(|_| Error::BadParameters)?;
+        assert!(curve.is_some(), "Missing attribute for ECC curve");
+
+        let curve = EccCurve::from_u32(curve.unwrap().a).ok_or(Error::NotSupported)?;
+        if curve != EccCurve::NistP256 {
+            return Err(Error::NotSupported);
+        }
+
+        self.secret = Some(Box::new(P256SecretKey::random(&mut Rng {})));
+        Ok(())
+    }
+}
 
 #[derive(Clone)]
 pub struct NoKey {}
@@ -283,6 +598,10 @@ impl KeyType for NoKey {
         } else {
             Err(Error::NotSupported)
         }
+    }
+
+    fn is_valid_size(size: u32) -> bool {
+        size == 0
     }
 
     fn reset(&mut self) {}
@@ -303,40 +622,14 @@ impl KeyType for NoKey {
 #[derive(Clone)]
 pub enum Key {
     Aes(AesKey),
-    Des(DesKey),
-    Des3(Des3Key),
-    HmacMd5(HmacMd5Key),
     HmacSha1(HmacSha1Key),
     HmacSha224(HmacSha224Key),
     HmacSha256(HmacSha256Key),
     HmacSha384(HmacSha384Key),
     HmacSha512(HmacSha512Key),
-    HmacSha3_224(HmacSha3_224Key),
-    HmacSha3_256(HmacSha3_256Key),
-    HmacSha3_384(HmacSha3_384Key),
-    HmacSha3_512(HmacSha3_512Key),
-    RsaPublicKey(RsaPublicKey),
     RsaKeypair(RsaKeypair),
-    DsaPublicKey(DsaPublicKey),
-    DsaKeypair(DsaKeypair),
-    DhKeypair(DhKeypair),
-    EcdsaPublicKey(EccPublicKey),
     EcdsaKeypair(EccKeypair),
-    EcdhPublicKey(EccPublicKey),
     EcdhKeypair(EccKeypair),
-    Ed25519PublicKey(EccPublicKey),
-    Ed25519Keypair(EccKeypair),
-    X25519PublicKey(EccPublicKey),
-    X25519Keypair(EccKeypair),
-    Sm2DsaPublicKey(EccPublicKey),
-    Sm2DsaKeypair(EccKeypair),
-    Sm2KepPublicKey(EccPublicKey),
-    Sm2KepKeypair(EccKeypair),
-    Sm2PkePublicKey(EccPublicKey),
-    Sm2PkeKeypair(EccKeypair),
-    Sm4(Sm4Key),
-    HmacSm3(HmacSm3Key),
-    GenericSecret(GenericSecretKey),
     Data(NoKey),
 }
 
@@ -345,129 +638,47 @@ macro_rules! get_key_variant {
     ($key:ident) => {
         match $key {
             Key::Aes(key) => key,
-            Key::Des(key) => key,
-            Key::Des3(key) => key,
-            Key::HmacMd5(key) => key,
             Key::HmacSha1(key) => key,
             Key::HmacSha224(key) => key,
             Key::HmacSha256(key) => key,
             Key::HmacSha384(key) => key,
             Key::HmacSha512(key) => key,
-            Key::HmacSha3_224(key) => key,
-            Key::HmacSha3_256(key) => key,
-            Key::HmacSha3_384(key) => key,
-            Key::HmacSha3_512(key) => key,
-            Key::RsaPublicKey(key) => key,
             Key::RsaKeypair(key) => key,
-            Key::DsaPublicKey(key) => key,
-            Key::DsaKeypair(key) => key,
-            Key::DhKeypair(key) => key,
-            Key::EcdsaPublicKey(key) => key,
             Key::EcdsaKeypair(key) => key,
-            Key::EcdhPublicKey(key) => key,
             Key::EcdhKeypair(key) => key,
-            Key::Ed25519PublicKey(key) => key,
-            Key::Ed25519Keypair(key) => key,
-            Key::X25519PublicKey(key) => key,
-            Key::X25519Keypair(key) => key,
-            Key::Sm2DsaPublicKey(key) => key,
-            Key::Sm2DsaKeypair(key) => key,
-            Key::Sm2KepPublicKey(key) => key,
-            Key::Sm2KepKeypair(key) => key,
-            Key::Sm2PkePublicKey(key) => key,
-            Key::Sm2PkeKeypair(key) => key,
-            Key::Sm4(key) => key,
-            Key::HmacSm3(key) => key,
-            Key::GenericSecret(key) => key,
             Key::Data(key) => key,
         }
     };
 }
 
 impl Key {
-    fn new(type_: Type, max_size: u32) -> TeeResult<Key> {
+    pub fn new(type_: Type, max_size: u32) -> TeeResult<Key> {
         match type_ {
             Type::Aes => AesKey::new(max_size).map(Self::Aes),
-            Type::Des => DesKey::new(max_size).map(Self::Des),
-            Type::Des3 => Des3Key::new(max_size).map(Self::Des3),
-            Type::Md5 => HmacMd5Key::new(max_size).map(Self::HmacMd5),
             Type::HmacSha1 => HmacSha1Key::new(max_size).map(Self::HmacSha1),
             Type::HmacSha224 => HmacSha224Key::new(max_size).map(Self::HmacSha224),
             Type::HmacSha256 => HmacSha256Key::new(max_size).map(Self::HmacSha256),
             Type::HmacSha384 => HmacSha384Key::new(max_size).map(Self::HmacSha384),
             Type::HmacSha512 => HmacSha512Key::new(max_size).map(Self::HmacSha512),
-            Type::HmacSha3_224 => HmacSha3_224Key::new(max_size).map(Self::HmacSha3_224),
-            Type::HmacSha3_256 => HmacSha3_256Key::new(max_size).map(Self::HmacSha3_256),
-            Type::HmacSha3_384 => HmacSha3_384Key::new(max_size).map(Self::HmacSha3_384),
-            Type::HmacSha3_512 => HmacSha3_512Key::new(max_size).map(Self::HmacSha3_512),
-            Type::RsaPublicKey => RsaPublicKey::new(max_size).map(Self::RsaPublicKey),
             Type::RsaKeypair => RsaKeypair::new(max_size).map(Self::RsaKeypair),
-            Type::DsaPublicKey => DsaPublicKey::new(max_size).map(Self::DsaPublicKey),
-            Type::DsaKeypair => DsaKeypair::new(max_size).map(Self::DsaKeypair),
-            Type::DhKeypair => DhKeypair::new(max_size).map(Self::DhKeypair),
-            Type::EcdsaPublicKey => EccPublicKey::new(max_size).map(Self::EcdsaPublicKey),
             Type::EcdsaKeypair => EccKeypair::new(max_size).map(Self::EcdsaKeypair),
-            Type::EcdhPublicKey => EccPublicKey::new(max_size).map(Self::EcdhPublicKey),
             Type::EcdhKeypair => EccKeypair::new(max_size).map(Self::EcdhKeypair),
-            Type::Ed25519PublicKey => EccPublicKey::new(max_size).map(Self::Ed25519PublicKey),
-            Type::Ed25519Keypair => EccKeypair::new(max_size).map(Self::Ed25519Keypair),
-            Type::X25519PublicKey => EccPublicKey::new(max_size).map(Self::X25519PublicKey),
-            Type::X25519Keypair => EccKeypair::new(max_size).map(Self::X25519Keypair),
-            Type::Sm2DsaPublicKey => EccPublicKey::new(max_size).map(Self::Sm2DsaPublicKey),
-            Type::Sm2DsaKeypair => EccKeypair::new(max_size).map(Self::Sm2DsaKeypair),
-            Type::Sm2KepPublicKey => EccPublicKey::new(max_size).map(Self::Sm2KepPublicKey),
-            Type::Sm2KepKeypair => EccKeypair::new(max_size).map(Self::Sm2KepKeypair),
-            Type::Sm2PkePublicKey => EccPublicKey::new(max_size).map(Self::Sm2PkePublicKey),
-            Type::Sm2PkeKeypair => EccKeypair::new(max_size).map(Self::Sm2PkeKeypair),
-            Type::Sm4 => Sm4Key::new(max_size).map(Self::Sm4),
-            Type::HmacSm3 => HmacSm3Key::new(max_size).map(Self::HmacSm3),
-            Type::GenericSecret => GenericSecretKey::new(max_size).map(Self::GenericSecret),
             Type::Data => NoKey::new(max_size).map(Self::Data),
-
-            // TODO(https://fxbug.dev/376093162): Handling of this type is
-            // absent from the spec.
-            Type::Hkdf => Err(Error::NotSupported),
-            Type::CorruptedObject => Err(Error::NotSupported),
+            _ => Err(Error::NotSupported),
         }
     }
 
-    fn get_type(&self) -> Type {
+    pub fn get_type(&self) -> Type {
         match self {
             Key::Aes(_) => Type::Aes,
-            Key::Des(_) => Type::Des,
-            Key::Des3(_) => Type::Des3,
-            Key::HmacMd5(_) => Type::Md5,
             Key::HmacSha1(_) => Type::HmacSha1,
             Key::HmacSha224(_) => Type::HmacSha224,
             Key::HmacSha256(_) => Type::HmacSha256,
             Key::HmacSha384(_) => Type::HmacSha384,
             Key::HmacSha512(_) => Type::HmacSha512,
-            Key::HmacSha3_224(_) => Type::HmacSha3_224,
-            Key::HmacSha3_256(_) => Type::HmacSha3_256,
-            Key::HmacSha3_384(_) => Type::HmacSha3_384,
-            Key::HmacSha3_512(_) => Type::HmacSha3_512,
-            Key::RsaPublicKey(_) => Type::RsaPublicKey,
             Key::RsaKeypair(_) => Type::RsaKeypair,
-            Key::DsaPublicKey(_) => Type::DsaPublicKey,
-            Key::DsaKeypair(_) => Type::DsaKeypair,
-            Key::DhKeypair(_) => Type::DhKeypair,
-            Key::EcdsaPublicKey(_) => Type::EcdsaPublicKey,
             Key::EcdsaKeypair(_) => Type::EcdsaKeypair,
-            Key::EcdhPublicKey(_) => Type::EcdhPublicKey,
             Key::EcdhKeypair(_) => Type::EcdhKeypair,
-            Key::Ed25519PublicKey(_) => Type::Ed25519PublicKey,
-            Key::Ed25519Keypair(_) => Type::Ed25519Keypair,
-            Key::X25519PublicKey(_) => Type::X25519PublicKey,
-            Key::X25519Keypair(_) => Type::X25519Keypair,
-            Key::Sm2DsaPublicKey(_) => Type::Sm2DsaPublicKey,
-            Key::Sm2DsaKeypair(_) => Type::Sm2DsaKeypair,
-            Key::Sm2KepPublicKey(_) => Type::Sm2KepPublicKey,
-            Key::Sm2KepKeypair(_) => Type::Sm2KepKeypair,
-            Key::Sm2PkePublicKey(_) => Type::Sm2PkePublicKey,
-            Key::Sm2PkeKeypair(_) => Type::Sm2PkeKeypair,
-            Key::Sm4(_) => Type::Sm4,
-            Key::HmacSm3(_) => Type::HmacSm3,
-            Key::GenericSecret(_) => Type::GenericSecret,
             Key::Data(_) => Type::Data,
         }
     }
@@ -564,8 +775,8 @@ impl TransientObjects {
     fn new() -> Self {
         Self {
             by_handle: HashMap::new(),
-            // Always even, per the described convention above
-            next_handle_value: 0,
+            // Always even, per the described convention above - also non-null.
+            next_handle_value: 2,
         }
     }
 
@@ -575,10 +786,14 @@ impl TransientObjects {
         let prev =
             self.by_handle.insert(handle.clone(), Rc::new(RefCell::new(TransientObject::new(key))));
         debug_assert!(prev.is_none());
+
         Ok(handle)
     }
 
     fn free(&mut self, handle: ObjectHandle) {
+        if handle.is_null() {
+            return;
+        }
         match self.by_handle.entry(handle) {
             HashMapEntry::Occupied(entry) => {
                 let _ = entry.remove();
@@ -1143,18 +1358,10 @@ impl Storage {
     }
 }
 
-/// Encapsulates an error of get_object_buffer_attribute(), which includes the
-/// actual length of the desired buffer attribute in the case where the
-/// caller-provided was too small.
-pub struct GetObjectBufferAttributeError {
-    pub error: Error,
-    pub actual_size: usize,
-}
-
 impl Storage {
     /// Returns the requested buffer-type attribute associated with the given
-    /// object, if any. It is written to the provided buffer and it is this
-    /// written subslice that is returned.
+    /// object, if any. It is written to the provided buffer and the size of
+    /// what is written is returned.
     ///
     /// Returns a wrapped value of Error::ItemNotFound if the object does not have
     /// such an attribute.
@@ -1164,37 +1371,41 @@ impl Storage {
     ///
     /// Panics if `object` is not a valid handle or if `attribute_id` is not of
     /// buffer type.
-    pub fn get_object_buffer_attribute<'a>(
+    pub fn get_object_buffer_attribute(
         &self,
         object: ObjectHandle,
         attribute_id: AttributeId,
-        buffer: &'a mut [u8],
-    ) -> Result<&'a [u8], GetObjectBufferAttributeError> {
+        buffer: &mut [u8],
+    ) -> Result<usize, ErrorWithSize> {
         assert!(!attribute_id.value());
 
-        let copy_from_key = |key: &Key,
-                             buffer: &'a mut [u8]|
-         -> Result<&'a [u8], GetObjectBufferAttributeError> {
-            if let Some(bytes) = key.buffer_attribute(attribute_id) {
-                if buffer.len() < bytes.len() {
-                    Err(GetObjectBufferAttributeError {
-                        error: Error::ShortBuffer,
-                        actual_size: bytes.len(),
-                    })
-                } else {
-                    let written = &mut buffer[..bytes.len()];
-                    written.copy_from_slice(bytes);
-                    Ok(written)
-                }
+        let copy_from_key = |obj: &dyn Object, buffer: &mut [u8]| -> Result<usize, ErrorWithSize> {
+            if !attribute_id.public() {
+                assert!(obj.usage().contains(Usage::EXTRACTABLE));
+            }
+
+            let attr = obj.key().buffer_attribute(attribute_id);
+            let bytes = match &attr {
+                None => return Err(ErrorWithSize::new(Error::ItemNotFound)),
+                Some(BufferAttribute::Slice(bytes)) => bytes,
+                Some(BufferAttribute::Vector(bytes)) => bytes.as_slice(),
+            };
+            if buffer.len() < bytes.len() {
+                Err(ErrorWithSize::short_buffer(bytes.len()))
             } else {
-                Err(GetObjectBufferAttributeError { error: Error::ItemNotFound, actual_size: 0 })
+                let written = &mut buffer[..bytes.len()];
+                written.copy_from_slice(bytes);
+                Ok(written.len())
             }
         };
 
         if is_transient_handle(object) {
-            copy_from_key(&self.transient_objects.get(object).key, buffer)
+            copy_from_key(self.transient_objects.get(object).deref(), buffer)
         } else {
-            copy_from_key(&self.persistent_objects.get(object).object.as_ref().borrow().key, buffer)
+            copy_from_key(
+                self.persistent_objects.get(object).object.as_ref().borrow().deref(),
+                buffer,
+            )
         }
     }
 
@@ -1212,18 +1423,21 @@ impl Storage {
     ) -> TeeResult<ValueFields> {
         assert!(!attribute_id.value());
 
-        let copy_from_key = |key: &Key| {
-            if let Some(value) = key.value_attribute(attribute_id) {
-                Ok(value.clone())
+        let copy_from_key = |obj: &dyn Object| {
+            if !attribute_id.public() {
+                assert!(obj.usage().contains(Usage::EXTRACTABLE));
+            }
+            if let Some(value) = obj.key().value_attribute(attribute_id) {
+                Ok(value)
             } else {
                 Err(Error::ItemNotFound)
             }
         };
 
         if is_transient_handle(object) {
-            copy_from_key(&self.transient_objects.get(object).key)
+            copy_from_key(self.transient_objects.get(object).deref())
         } else {
-            copy_from_key(&self.persistent_objects.get(object).object.borrow().key)
+            copy_from_key(self.persistent_objects.get(object).object.borrow().deref())
         }
     }
 

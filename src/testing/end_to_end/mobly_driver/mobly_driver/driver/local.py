@@ -109,19 +109,16 @@ class LocalDriver(base.BaseDriver):
         """
         mobly_controllers: List[Dict[str, Any]] = []
         for target in self._get_test_targets():
-            fx_device = {
-                "type": api_infra.FUCHSIA_DEVICE,
-                "name": target,
-            }
-
-            # Check if the target connected is "local" or "remote".
             target_ssh_address: api_ffx.TargetSshAddress = (
                 self._ffx_client.get_target_ssh_address(
                     target_name=target, isolate_dir=None
                 )
             )
-            if target_ssh_address.is_remote():
-                fx_device["device_ip_port"] = str(target_ssh_address)
+            fx_device = {
+                "type": api_infra.FUCHSIA_DEVICE,
+                "name": target,
+                "device_ip_port": str(target_ssh_address),
+            }
 
             mobly_controllers.append(fx_device)
 

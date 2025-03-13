@@ -169,13 +169,14 @@ impl StationaryMonitor {
             self.connection_data.previous_roam_scan_data.roam_reasons_prev_scan =
                 roam_reasons.clone();
             self.connection_data.previous_roam_scan_data.rssi_prev_roam_scan = rssi;
-            info!("Initiating roam search for roam reasons: {:?}", roam_reasons);
+            info!("Initiating roam search for roam reasons: {:?}", &roam_reasons);
             // Stationary monitor uses active roam scans to prioritize shorter scan times over power
             // consumption.
             return RoamTriggerDataOutcome::RoamSearch {
                 scan_type: fidl_common::ScanType::Active,
                 network_identifier: self.connection_data.network_identifier.clone(),
                 credential: self.connection_data.credential.clone(),
+                reasons: roam_reasons,
             };
         }
         RoamTriggerDataOutcome::Noop
@@ -312,8 +313,8 @@ mod test {
             ),
             channel::Channel::new(11, channel::Cbw::Cbw20),
         );
-        assert!(roam_reasons.iter().any(|&r| r == RoamReason::SnrBelowThreshold));
-        assert!(roam_reasons.iter().any(|&r| r == RoamReason::RssiBelowThreshold));
+        assert!(roam_reasons.contains(&RoamReason::SnrBelowThreshold));
+        assert!(roam_reasons.contains(&RoamReason::RssiBelowThreshold));
 
         let roam_reasons = check_signal_thresholds(
             &EwmaSignalData::new(
@@ -336,8 +337,8 @@ mod test {
             ),
             channel::Channel::new(36, channel::Cbw::Cbw80),
         );
-        assert!(roam_reasons.iter().any(|&r| r == RoamReason::SnrBelowThreshold));
-        assert!(roam_reasons.iter().any(|&r| r == RoamReason::RssiBelowThreshold));
+        assert!(roam_reasons.contains(&RoamReason::SnrBelowThreshold));
+        assert!(roam_reasons.contains(&RoamReason::RssiBelowThreshold));
 
         let roam_reasons = check_signal_thresholds(
             &EwmaSignalData::new(

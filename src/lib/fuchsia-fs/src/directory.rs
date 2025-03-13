@@ -145,6 +145,11 @@ pub fn open_directory_async(
 
     let flags = flags | fio::Flags::PROTOCOL_DIRECTORY;
 
+    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    parent
+        .open(path, flags, &fio::Options::default(), server_end.into_channel())
+        .map_err(OpenError::SendOpenRequest)?;
+    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
     parent
         .open3(path, flags, &fio::Options::default(), server_end.into_channel())
         .map_err(OpenError::SendOpenRequest)?;
@@ -163,6 +168,11 @@ pub async fn open_directory(
 
     let flags = flags | fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_SEND_REPRESENTATION;
 
+    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    parent
+        .open(path, flags, &fio::Options::default(), server_end.into_channel())
+        .map_err(OpenError::SendOpenRequest)?;
+    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
     parent
         .open3(path, flags, &fio::Options::default(), server_end.into_channel())
         .map_err(OpenError::SendOpenRequest)?;
@@ -184,6 +194,11 @@ pub async fn create_directory(
         | fio::Flags::PROTOCOL_DIRECTORY
         | fio::Flags::FLAG_SEND_REPRESENTATION;
 
+    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    parent
+        .open(path, flags, &fio::Options::default(), server_end.into_channel())
+        .map_err(OpenError::SendOpenRequest)?;
+    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
     parent
         .open3(path, flags, &fio::Options::default(), server_end.into_channel())
         .map_err(OpenError::SendOpenRequest)?;
@@ -224,6 +239,11 @@ pub fn open_file_async(
 
     let flags = flags | fio::Flags::PROTOCOL_FILE;
 
+    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    parent
+        .open(path, flags, &fio::Options::default(), server_end.into_channel())
+        .map_err(OpenError::SendOpenRequest)?;
+    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
     parent
         .open3(path, flags, &fio::Options::default(), server_end.into_channel())
         .map_err(OpenError::SendOpenRequest)?;
@@ -242,6 +262,11 @@ pub async fn open_file(
 
     let flags = flags | fio::Flags::PROTOCOL_FILE | fio::Flags::FLAG_SEND_REPRESENTATION;
 
+    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    parent
+        .open(path, flags, &fio::Options::default(), server_end.into_channel())
+        .map_err(OpenError::SendOpenRequest)?;
+    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
     parent
         .open3(path, flags, &fio::Options::default(), server_end.into_channel())
         .map_err(OpenError::SendOpenRequest)?;
@@ -261,6 +286,11 @@ pub async fn open_node(
 
     let flags = flags | fio::Flags::FLAG_SEND_REPRESENTATION;
 
+    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    parent
+        .open(path, flags, &fio::Options::default(), server_end.into_channel())
+        .map_err(OpenError::SendOpenRequest)?;
+    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
     parent
         .open3(path, flags, &fio::Options::default(), server_end.into_channel())
         .map_err(OpenError::SendOpenRequest)?;
@@ -278,6 +308,11 @@ pub fn open_async<P: fidl::endpoints::ProtocolMarker>(
 ) -> Result<P::Proxy, OpenError> {
     let (client, server_end) = fidl::endpoints::create_endpoints::<P>();
 
+    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    let () = parent
+        .open(path, flags, &fio::Options::default(), server_end.into_channel())
+        .map_err(OpenError::SendOpenRequest)?;
+    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
     let () = parent
         .open3(path, flags, &fio::Options::default(), server_end.into_channel())
         .map_err(OpenError::SendOpenRequest)?;
@@ -657,6 +692,12 @@ pub async fn remove_dir_recursive(
     name: &str,
 ) -> Result<(), EnumerateError> {
     let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+
+    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    root_dir
+        .open(name, DIR_FLAGS, &fio::Options::default(), dir_server.into_channel())
+        .map_err(|e| EnumerateError::Fidl("open", e))?;
+    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
     root_dir
         .open3(name, DIR_FLAGS, &fio::Options::default(), dir_server.into_channel())
         .map_err(|e| EnumerateError::Fidl("open", e))?;
@@ -682,6 +723,15 @@ fn remove_dir_contents(dir: fio::DirectoryProxy) -> BoxFuture<'static, Result<()
                 DirentKind::Directory => {
                     let (subdir, subdir_server) =
                         fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+                    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+                    dir.open(
+                        &dirent.name,
+                        DIR_FLAGS,
+                        &fio::Options::default(),
+                        subdir_server.into_channel(),
+                    )
+                    .map_err(|e| EnumerateError::Fidl("open", e))?;
+                    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
                     dir.open3(
                         &dirent.name,
                         DIR_FLAGS,

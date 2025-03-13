@@ -6,13 +6,17 @@
 """Regenerate the Ninja build plan and the Bazel workspace for the Fuchsia build system."""
 
 import argparse
+import filecmp
 import json
 import os
 import shlex
+import shutil
 import subprocess
 import sys
 import typing as T
 from pathlib import Path
+
+import build_tests_json
 
 _SCRIPT_DIR = Path(__file__).parent
 
@@ -20,20 +24,9 @@ _SCRIPT_DIR = Path(__file__).parent
 _BUILD_BAZEL_SCRIPTS = _SCRIPT_DIR / ".." / "build" / "bazel" / "scripts"
 sys.path.insert(0, str(_BUILD_BAZEL_SCRIPTS))
 
-# The list of imported files. To keep things simple, this should match
-# the import statement list below.
-_IMPORTED_PYTHON_FILES = (
-    "compute_content_hash.py",
-    "remote_services_utils.py",
-    "workspace_utils.py",
-)
-
 import compute_content_hash
 import remote_services_utils
 import workspace_utils
-
-# Assume this script lives under //build/
-_FUCHSIA_DIR = _SCRIPT_DIR.parent.resolve()
 
 _DEFAULT_HOST_TAG = "linux-x64"
 
@@ -110,7 +103,6 @@ def main() -> int:
     parser.add_argument(
         "--fuchsia-dir",
         type=Path,
-        default=_FUCHSIA_DIR,
         help="Fuchsia source directory (auto-detected).",
     )
     parser.add_argument(
@@ -182,18 +174,22 @@ def main() -> int:
             log("CMD: %s" % " ".join(shlex.quote(str(a)) for a in args))
         return subprocess.run(args, text=True, **kwd)
 
-    if not args.fuchsia_build_dir:
-        dot_fx_build_dir = args.fuchsia_dir / ".fx-build-dir"
-        if not dot_fx_build_dir.exists():
+    fuchsia_dir = args.fuchsia_dir
+    if fuchsia_dir:
+        fuchsia_dir = fuchsia_dir.resolve()
+    else:
+        fuchsia_dir = workspace_utils.find_fuchsia_dir(_SCRIPT_DIR)
+
+    build_dir = args.fuchsia_build_dir
+    if build_dir:
+        build_dir = build_dir.resolve()
+    else:
+        build_dir = workspace_utils.find_fx_build_dir(fuchsia_dir)
+        if not build_dir:
             parser.error(
                 "Cannot auto-detect build directory, please use --fuchsia-build-dir=DIR option!"
             )
-        args.fuchsia_build_dir = (
-            args.fuchsia_dir / dot_fx_build_dir.read_text().strip()
-        )
 
-    fuchsia_dir = args.fuchsia_dir.resolve()
-    build_dir = args.fuchsia_build_dir.resolve()
     if not build_dir.is_dir():
         parser.error(f"Build directory missing or invalid: {build_dir}")
 
@@ -257,8 +253,11 @@ def main() -> int:
             sys.executable,
             "-S",
             f"{build_dir_to_source_dir}/build/regenerator.py",
-            f"--fuchsia-dir={shlex.quote(str(fuchsia_dir))}",
-            f"--fuchsia-build-dir={shlex.quote(str(build_dir))}",
+            # Ensure the Fuchsia checkout and build directories are relative to the
+            # current directory to avoid confusing Ninja when they are moved or
+            # copied to a different location. See https://fxbug.dev/401221699
+            f"--fuchsia-dir={build_dir_to_source_dir}",
+            "--fuchsia-build-dir=.",
             f"--host-tag={args.host_tag}",
         ]
         regenerator_command = " ".join(
@@ -279,10 +278,16 @@ def main() -> int:
         extra_ninja_build_inputs.add(fuchsia_dir / "build" / "regenerator")
         extra_ninja_build_inputs.add(fuchsia_dir / "build" / "regenerator.py")
 
-        extra_ninja_build_inputs |= {
-            _BUILD_BAZEL_SCRIPTS / python_file
-            for python_file in _IMPORTED_PYTHON_FILES
-        }
+        log("Generating product_bundles.json.")
+        product_bundles_metadata = build_dir / "product_bundles_metadata.json"
+        product_bundles = build_dir / "product_bundles.json"
+        if not product_bundles.exists() or not filecmp.cmp(
+            product_bundles_metadata, product_bundles
+        ):
+            shutil.copy(product_bundles_metadata, product_bundles)
+
+        log("Generating tests.json.")
+        extra_ninja_build_inputs |= build_tests_json.build_tests_json(build_dir)
 
         # Where to store regenerator outputs. This must be in a directory specific to
         # the current Ninja build directory, to support building multiple Fuchsia build
@@ -342,6 +347,16 @@ def main() -> int:
             )
         )
 
+        # Generate the content of the @fuchsia_build_info directory.
+        log("Generating @fuchsia_build_info content")
+        extra_ninja_build_inputs |= (
+            workspace_utils.GnBuildArgs.generate_fuchsia_build_info(
+                fuchsia_dir=fuchsia_dir,
+                build_dir=build_dir,
+                repository_dir=regenerator_outputs_dir / "fuchsia_build_info",
+            )
+        )
+
         # Generate the bazel launcher and Bazel workspace files.
         log("Generating Fuchsia Bazel workspace and launcher")
         extra_ninja_build_inputs |= workspace_utils.generate_fuchsia_workspace(
@@ -351,13 +366,31 @@ def main() -> int:
             enable_bzlmod=False,
         )
 
+        # Find all imported Python modules and set them as extra inputs
+        # for safety. This avoids the need to manually track them, which
+        # is error-prone.
+        extra_ninja_build_inputs |= {
+            Path(m.__file__)
+            for m in sys.modules.values()
+            if hasattr(m, "__file__")
+        }
+
+        sorted_extra_ninja_build_inputs = sorted(
+            os.path.relpath(p, build_dir) for p in extra_ninja_build_inputs
+        )
+
+        if verbose >= 2:
+            print("- Extra Ninja inputs:")
+            for path in sorted_extra_ninja_build_inputs:
+                print(f"  {path}")
+
         # Patch build.ninja.d to ensure that Ninja will re-invoke the script if its
         # own source code, or any other extra implicit input, changes.
         log2("- Patching build.ninja.d")
         build_ninja_d_path = build_dir / "build.ninja.d"
         build_ninja_d = build_ninja_d_path.read_text().rstrip()
-        for extra_input in sorted(extra_ninja_build_inputs):
-            build_ninja_d += f" {os.path.relpath(extra_input, build_dir)}"
+        for extra_input in sorted_extra_ninja_build_inputs:
+            build_ninja_d += f" {extra_input}"
         build_ninja_d_path.write_text(build_ninja_d)
 
         log2("- Updating build.ninja.stamp timestamp")

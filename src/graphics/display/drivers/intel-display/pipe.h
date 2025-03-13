@@ -24,9 +24,9 @@
 #include "src/graphics/display/drivers/intel-display/registers-ddi.h"
 #include "src/graphics/display/drivers/intel-display/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-display/registers-transcoder.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 
 namespace intel_display {
 
@@ -53,7 +53,7 @@ class Pipe {
   using SetupGttImageFunc = fit::function<const GttRegion&(
       const image_metadata_t& image_metadata, uint64_t image_handle, uint32_t rotation)>;
   void ApplyConfiguration(const display_config_t* banjo_display_config,
-                          display::ConfigStamp config_stamp,
+                          display::DriverConfigStamp config_stamp,
                           const SetupGttImageFunc& setup_gtt_image,
                           const GetImagePixelFormatFunc& get_pixel_format);
 
@@ -101,7 +101,7 @@ class Pipe {
   // Display device registers only store image handles / addresses. We should
   // convert the handles to corresponding config stamps using the existing
   // mapping updated in |ApplyConfig()|.
-  display::ConfigStamp GetVsyncConfigStamp(const std::vector<uint64_t>& image_handles);
+  display::DriverConfigStamp GetVsyncConfigStamp(const std::vector<uint64_t>& image_handles);
 
  protected:
   bool attached_edp() const { return attached_edp_; }
@@ -110,10 +110,11 @@ class Pipe {
  private:
   void ConfigurePrimaryPlane(uint32_t plane_num, const layer_t* primary, bool enable_csc,
                              bool* scaler_1_claimed, registers::pipe_arming_regs* regs,
-                             display::ConfigStamp config_stamp,
+                             display::DriverConfigStamp config_stamp,
                              const SetupGttImageFunc& setup_gtt_image,
                              const GetImagePixelFormatFunc& get_pixel_format);
-  void DisableCursorPlane(registers::pipe_arming_regs* regs, display::ConfigStamp config_stamp);
+  void DisableCursorPlane(registers::pipe_arming_regs* regs,
+                          display::DriverConfigStamp config_stamp);
   void SetColorConversionOffsets(bool preoffsets, const float vals[3]);
   void ResetActiveTranscoder();
   void ResetScaler();
@@ -139,20 +140,20 @@ class Pipe {
   // Unused configuration stamps, which are older than all the current config
   // stamps used in the display layers, will be evicted from the list on each
   // Vsync.
-  std::list<display::ConfigStamp> pending_eviction_config_stamps_;
+  std::list<display::DriverConfigStamp> pending_eviction_config_stamps_;
 
   // The pipe registers only store the handle (address) of the images that are
   // being displayed. We need to keep a mapping from *image handle* to the
   // latest *config stamp* where this image is used so that we can know which
   // layer has the oldest configuration.
-  std::unordered_map<uintptr_t, display::ConfigStamp> latest_config_stamp_with_image_;
+  std::unordered_map<uintptr_t, display::DriverConfigStamp> latest_config_stamp_with_image_;
 
   // If the (there can be at most one) background color layer is enabled on the
   // pipe, we need to keep the config stamp of the configuration that enables
   // the color layer, so that we can return it on a Vsync event of a frame with
   // background color.
   // Set to `kInvalidConfigStamp` if there's no background color layer.
-  display::ConfigStamp config_stamp_with_color_layer_ = display::kInvalidConfigStamp;
+  display::DriverConfigStamp config_stamp_with_color_layer_ = display::kInvalidDriverConfigStamp;
 };
 
 class PipeSkylake : public Pipe {

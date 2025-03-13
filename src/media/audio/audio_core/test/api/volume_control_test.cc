@@ -5,7 +5,7 @@
 #include <fuchsia/media/audio/cpp/fidl.h>
 #include <fuchsia/media/cpp/fidl.h>
 
-#include "src/media/audio/audio_core/shared/stream_usage.h"
+#include "src/media/audio/audio_core/stream_usage.h"
 #include "src/media/audio/audio_core/testing/integration/hermetic_audio_test.h"
 
 using fuchsia::media::AudioCaptureUsage2;

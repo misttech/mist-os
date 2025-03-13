@@ -25,8 +25,8 @@ impl Puppet {
     async fn launch(proxy: fidl_fuchsia_validate_logs::LogSinkPuppetProxy) -> Result<Self, Error> {
         info!("Requesting info from the puppet.");
         let info = proxy.get_info().await?;
-        let reader = ArchiveReader::new();
-        let (logs, mut errors) = reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
+        let reader = ArchiveReader::logs();
+        let (logs, mut errors) = reader.snapshot_then_subscribe().unwrap().split_streams();
         let task = Task::spawn(async move {
             if let Some(e) = errors.next().await {
                 panic!("error in subscription: {}", e);

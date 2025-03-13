@@ -28,7 +28,7 @@ use wlan_common::ie::rsn::suite_selector::OUI;
 use wlan_common::ie::{self};
 use wlan_common::security::wep::WepKey;
 use wlan_common::security::SecurityAuthenticator;
-use wlan_common::timer::EventId;
+use wlan_common::timer::EventHandle;
 use wlan_rsn::auth;
 use wlan_rsn::rsna::{AuthRejectedReason, AuthStatus, SecAssocUpdate, UpdateSink};
 use wlan_statemachine::*;
@@ -121,7 +121,7 @@ pub struct Roaming {
 pub struct Disconnecting {
     cfg: ClientConfig,
     action: PostDisconnectAction,
-    timeout_id: EventId,
+    _timeout: Option<EventHandle>,
 }
 
 statemachine!(
@@ -138,6 +138,7 @@ statemachine!(
     Disconnecting => [Connecting, Idle],
 );
 
+#[allow(clippy::large_enum_variant)] // TODO(https://fxbug.dev/401087337)
 /// Only one PostDisconnectAction may be selected at a time. This means that
 /// in some cases a connect or disconnect might be reported as finished when
 /// we're actually still in a disconnecting state, since a different trigger
@@ -322,6 +323,7 @@ fn parse_wmm_from_ies(ies: &[u8]) -> Option<ie::WmmParam> {
 }
 
 impl Connecting {
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     fn on_connect_conf(
         mut self,
         conf: fidl_mlme::ConnectConfirm,
@@ -341,7 +343,7 @@ impl Connecting {
                         error!("{}", msg);
                         state_change_ctx.set_msg(msg);
                         send_deauthenticate_request(&self.cmd.bss.bssid, &context.mlme_sink);
-                        let timeout_id = context.timer.schedule(event::DeauthenticateTimeout);
+                        let timeout = context.timer.schedule(event::DeauthenticateTimeout);
                         return Err(Disconnecting {
                             cfg: self.cfg,
                             action: PostDisconnectAction::ReportConnectFinished {
@@ -352,7 +354,7 @@ impl Connecting {
                                 }
                                 .into(),
                             },
-                            timeout_id,
+                            _timeout: Some(timeout),
                         });
                     }
                 }
@@ -362,7 +364,7 @@ impl Connecting {
                 warn!("{}", msg);
                 state_change_ctx.set_msg(msg);
                 send_deauthenticate_request(&self.cmd.bss.bssid, &context.mlme_sink);
-                let timeout_id = context.timer.schedule(event::DeauthenticateTimeout);
+                let timeout = context.timer.schedule(event::DeauthenticateTimeout);
                 return Err(Disconnecting {
                     cfg: self.cfg,
                     action: PostDisconnectAction::ReportConnectFinished {
@@ -375,7 +377,7 @@ impl Connecting {
                             .into(),
                         ),
                     },
-                    timeout_id,
+                    _timeout: Some(timeout),
                 });
             }
         };
@@ -436,7 +438,7 @@ impl Connecting {
                           ind.reason_code, ind.locally_initiated);
         warn!("{}", msg);
         send_deauthenticate_request(&self.cmd.bss.bssid, &context.mlme_sink);
-        let timeout_id = context.timer.schedule(event::DeauthenticateTimeout);
+        let timeout = context.timer.schedule(event::DeauthenticateTimeout);
         state_change_ctx.set_msg(msg);
         Disconnecting {
             cfg: self.cfg,
@@ -450,7 +452,7 @@ impl Connecting {
                     .into(),
                 ),
             },
-            timeout_id,
+            _timeout: Some(timeout),
         }
     }
 
@@ -472,9 +474,9 @@ impl Connecting {
         process_sae_frame_rx(&mut self.cmd.protection, frame, context)
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     fn handle_timeout(
         mut self,
-        _event_id: EventId,
         event: Event,
         state_change_ctx: &mut Option<StateChangeContext>,
         context: &mut Context,
@@ -487,7 +489,7 @@ impl Connecting {
                 let msg = format!("failed to handle SAE timeout: {:?}", e);
                 error!("{}", msg);
                 send_deauthenticate_request(&self.cmd.bss.bssid, &context.mlme_sink);
-                let timeout_id = context.timer.schedule(event::DeauthenticateTimeout);
+                let timeout = context.timer.schedule(event::DeauthenticateTimeout);
                 state_change_ctx.set_msg(msg);
                 Err(Disconnecting {
                     cfg: self.cfg,
@@ -501,7 +503,7 @@ impl Connecting {
                             .into(),
                         ),
                     },
-                    timeout_id,
+                    _timeout: Some(timeout),
                 })
             }
         }
@@ -510,12 +512,13 @@ impl Connecting {
     fn disconnect(mut self, context: &mut Context, action: PostDisconnectAction) -> Disconnecting {
         report_connect_finished(&mut self.cmd.connect_txn_sink, ConnectResult::Canceled);
         send_deauthenticate_request(&self.cmd.bss.bssid, &context.mlme_sink);
-        let timeout_id = context.timer.schedule(event::DeauthenticateTimeout);
-        Disconnecting { cfg: self.cfg, action, timeout_id }
+        let timeout = context.timer.schedule(event::DeauthenticateTimeout);
+        Disconnecting { cfg: self.cfg, action, _timeout: Some(timeout) }
     }
 }
 
 impl Associated {
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     fn on_disassociate_ind(
         mut self,
         ind: fidl_mlme::DisassociateIndication,
@@ -547,8 +550,12 @@ impl Associated {
             let _ =
                 state_change_ctx.replace(StateChangeContext::Disconnect { msg, disconnect_source });
             send_deauthenticate_request(&self.latest_ap_state.bssid, &context.mlme_sink);
-            let timeout_id = context.timer.schedule(event::DeauthenticateTimeout);
-            Err(Disconnecting { cfg: self.cfg, action: PostDisconnectAction::None, timeout_id })
+            let timeout = context.timer.schedule(event::DeauthenticateTimeout);
+            Err(Disconnecting {
+                cfg: self.cfg,
+                action: PostDisconnectAction::None,
+                _timeout: Some(timeout),
+            })
         } else {
             if connected_duration.is_some() {
                 // Only notify clients of SME if the link was fully established.
@@ -650,6 +657,7 @@ impl Associated {
         Idle { cfg: self.cfg }
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     fn process_link_state_update<U, H>(
         mut self,
         update: U,
@@ -681,7 +689,8 @@ impl Associated {
             Ok(link_state) => link_state,
             Err(failure_reason) => {
                 send_deauthenticate_request(&self.latest_ap_state.bssid, &context.mlme_sink);
-                let timeout_id = context.timer.schedule(event::DeauthenticateTimeout);
+
+                let timeout = context.timer.schedule(event::DeauthenticateTimeout);
                 match self.roam_in_progress {
                     Some(roam_initiator) => {
                         report_roam_finished(
@@ -715,7 +724,7 @@ impl Associated {
                 return Err(Disconnecting {
                     cfg: self.cfg,
                     action: PostDisconnectAction::None,
-                    timeout_id,
+                    _timeout: Some(timeout),
                 });
             }
         };
@@ -741,6 +750,7 @@ impl Associated {
         Ok(Self { link_state, ..self })
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     fn on_eapol_ind(
         self,
         ind: fidl_mlme::EapolIndication,
@@ -767,6 +777,7 @@ impl Associated {
         self.process_link_state_update(ind, LinkState::on_eapol_ind, context, state_change_ctx)
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     fn on_eapol_conf(
         self,
         resp: fidl_mlme::EapolConfirm,
@@ -776,6 +787,7 @@ impl Associated {
         self.process_link_state_update(resp, LinkState::on_eapol_conf, context, state_change_ctx)
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     fn on_set_keys_conf(
         self,
         conf: fidl_mlme::SetKeysConfirm,
@@ -808,18 +820,18 @@ impl Associated {
         }
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     fn handle_timeout(
         mut self,
-        event_id: EventId,
         event: Event,
         state_change_ctx: &mut Option<StateChangeContext>,
         context: &mut Context,
     ) -> Result<Self, Disconnecting> {
-        match self.link_state.handle_timeout(event_id, event, state_change_ctx, context) {
+        match self.link_state.handle_timeout(event, state_change_ctx, context) {
             Ok(link_state) => Ok(Associated { link_state, ..self }),
             Err(failure_reason) => {
                 send_deauthenticate_request(&self.latest_ap_state.bssid, &context.mlme_sink);
-                let timeout_id = context.timer.schedule(event::DeauthenticateTimeout);
+                let timeout = context.timer.schedule(event::DeauthenticateTimeout);
                 match self.roam_in_progress {
                     Some(roam_initiator) => {
                         report_roam_finished(
@@ -851,19 +863,24 @@ impl Associated {
                     }
                 }
 
-                Err(Disconnecting { cfg: self.cfg, action: PostDisconnectAction::None, timeout_id })
+                Err(Disconnecting {
+                    cfg: self.cfg,
+                    action: PostDisconnectAction::None,
+                    _timeout: Some(timeout),
+                })
             }
         }
     }
 
     fn disconnect(self, context: &mut Context, action: PostDisconnectAction) -> Disconnecting {
         send_deauthenticate_request(&self.latest_ap_state.bssid, &context.mlme_sink);
-        let timeout_id = context.timer.schedule(event::DeauthenticateTimeout);
-        Disconnecting { cfg: self.cfg, action, timeout_id }
+        let timeout = context.timer.schedule(event::DeauthenticateTimeout);
+        Disconnecting { cfg: self.cfg, action, _timeout: Some(timeout) }
     }
 }
 
 // Used when the next state after a roam failure is conditionally determined (e.g. if target needs deauth).
+#[allow(clippy::large_enum_variant)] // TODO(https://fxbug.dev/401087337)
 enum AfterRoamFailureState {
     Idle(Idle),
     Disconnecting(Disconnecting),
@@ -874,6 +891,7 @@ impl Roaming {
     // association with the original BSS, we must ignore a disassoc from the original BSS. But a
     // disassociation from the target BSS means that the roam attempt failed, and we should
     // transition to Disconnecting.
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     fn on_disassociate_ind(
         self,
         ind: fidl_mlme::DisassociateIndication,
@@ -959,7 +977,6 @@ impl Roaming {
 
     fn handle_timeout(
         mut self,
-        _event_id: EventId,
         event: Event,
         state_change_ctx: &mut Option<StateChangeContext>,
         context: &mut Context,
@@ -1011,12 +1028,12 @@ impl Roaming {
         });
 
         send_deauthenticate_request(&failure.selected_bssid, &context.mlme_sink);
-        let timeout_id = context.timer.schedule(event::DeauthenticateTimeout);
+        let timeout = context.timer.schedule(event::DeauthenticateTimeout);
 
         Disconnecting {
             cfg,
             action: PostDisconnectAction::ReportRoamFinished { sink, result: failure.into() },
-            timeout_id,
+            _timeout: Some(timeout),
         }
     }
 
@@ -1047,25 +1064,22 @@ impl Disconnecting {
         Idle { cfg: self.cfg }.on_disconnect_complete(context, self.action, state_change_ctx)
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     fn handle_timeout(
         self,
-        event_id: EventId,
         event: Event,
         state_change_ctx: &mut Option<StateChangeContext>,
         context: &mut Context,
     ) -> Result<Self, AfterDisconnectState> {
         if let Event::DeauthenticateTimeout(_) = event {
-            if event_id == self.timeout_id {
-                let msg =
-                    "Completing disconnect without confirm due to disconnect timeout".to_string();
-                error!("{}", msg);
-                state_change_ctx.set_msg(msg);
-                return Err(Idle { cfg: self.cfg }.on_disconnect_complete(
-                    context,
-                    self.action,
-                    state_change_ctx,
-                ));
-            }
+            let msg = "Completing disconnect without confirm due to disconnect timeout".to_string();
+            error!("{}", msg);
+            state_change_ctx.set_msg(msg);
+            return Err(Idle { cfg: self.cfg }.on_disconnect_complete(
+                context,
+                self.action,
+                state_change_ctx,
+            ));
         }
         Ok(self)
     }
@@ -1346,36 +1360,35 @@ impl ClientState {
         new_state
     }
 
-    pub fn handle_timeout(self, event_id: EventId, event: Event, context: &mut Context) -> Self {
+    pub fn handle_timeout(self, event: Event, context: &mut Context) -> Self {
         let start_state = self.state_name();
         let mut state_change_ctx: Option<StateChangeContext> = None;
 
         let new_state = match self {
             Self::Connecting(state) => {
                 let (transition, connecting) = state.release_data();
-                match connecting.handle_timeout(event_id, event, &mut state_change_ctx, context) {
+                match connecting.handle_timeout(event, &mut state_change_ctx, context) {
                     Ok(connecting) => transition.to(connecting).into(),
                     Err(disconnecting) => transition.to(disconnecting).into(),
                 }
             }
             Self::Associated(state) => {
                 let (transition, associated) = state.release_data();
-                match associated.handle_timeout(event_id, event, &mut state_change_ctx, context) {
+                match associated.handle_timeout(event, &mut state_change_ctx, context) {
                     Ok(associated) => transition.to(associated).into(),
                     Err(disconnecting) => transition.to(disconnecting).into(),
                 }
             }
             Self::Roaming(state) => {
                 let (transition, roaming) = state.release_data();
-                match roaming.handle_timeout(event_id, event, &mut state_change_ctx, context) {
+                match roaming.handle_timeout(event, &mut state_change_ctx, context) {
                     Ok(roaming) => transition.to(roaming).into(),
                     Err(idle) => transition.to(idle).into(),
                 }
             }
             Self::Disconnecting(state) => {
                 let (transition, disconnecting) = state.release_data();
-                match disconnecting.handle_timeout(event_id, event, &mut state_change_ctx, context)
-                {
+                match disconnecting.handle_timeout(event, &mut state_change_ctx, context) {
                     Ok(disconnecting) => transition.to(disconnecting).into(),
                     Err(after_disconnect) => match after_disconnect {
                         AfterDisconnectState::Idle(idle) => transition.to(idle).into(),
@@ -1598,6 +1611,7 @@ impl ClientState {
     }
 }
 
+#[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
 fn roam_internal(
     state: Associated,
     context: &mut Context,
@@ -1632,7 +1646,7 @@ fn roam_internal(
             error!("Roam cannot proceed due to missing/malformed BSS description: {:?}", error);
 
             send_deauthenticate_request(deauth_addr, &context.mlme_sink);
-            let timeout_id = context.timer.schedule(event::DeauthenticateTimeout);
+            let timeout = context.timer.schedule(event::DeauthenticateTimeout);
 
             let disconnect_info = make_roam_disconnect_info(mlme_event_name, None);
 
@@ -1656,7 +1670,7 @@ fn roam_internal(
                     }
                     .into(),
                 },
-                timeout_id,
+                _timeout: Some(timeout),
             });
         }
     };
@@ -1678,7 +1692,7 @@ fn roam_internal(
             error!("Failed to configure protection for selected BSS during roam: {:?}", error);
 
             send_deauthenticate_request(deauth_addr, &context.mlme_sink);
-            let timeout_id = context.timer.schedule(event::DeauthenticateTimeout);
+            let timeout = context.timer.schedule(event::DeauthenticateTimeout);
 
             let disconnect_info = make_roam_disconnect_info(mlme_event_name, None);
 
@@ -1697,7 +1711,7 @@ fn roam_internal(
                     }
                     .into(),
                 },
-                timeout_id,
+                _timeout: Some(timeout),
             });
         }
     };
@@ -1736,6 +1750,7 @@ struct RoamResultFields {
 
 // If the roam attempt succeeded, move into Associated with the selected BSS.
 // If the roam attempt failed, return the next state, wrapped in AfterRoamFailureState.
+#[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
 fn roam_handle_result(
     mut state: Roaming,
     result_fields: RoamResultFields,
@@ -1916,7 +1931,11 @@ fn process_sae_updates(updates: UpdateSink, peer_sta_address: MacAddr, context: 
             ),
 
             SecAssocUpdate::ScheduleSaeTimeout(id) => {
-                let _ = context.timer.schedule(event::SaeTimeout(id));
+                // TODO(b/371613444): Plumb timer cancellation down to our SAE lib
+                // so we don't drop here. Because the SAE library sends timer requests
+                // into an event sink, we don't have a simple means to make the
+                // timer cancelation call available.
+                context.timer.schedule(event::SaeTimeout(id)).drop_without_cancel();
             }
             _ => (),
         }
@@ -2131,7 +2150,7 @@ mod tests {
     use wlan_common::ie::fake_ies::{fake_probe_resp_wsc_ie_bytes, get_vendor_ie_bytes_for_wsc_ie};
     use wlan_common::ie::rsn::rsne::Rsne;
     use wlan_common::test_utils::fake_features::{
-        fake_mac_sublayer_support, fake_security_support, fake_spectrum_management_support_empty,
+        fake_security_support, fake_spectrum_management_support_empty,
     };
     use wlan_common::test_utils::fake_stas::IesOverrides;
     use wlan_common::{assert_variant, fake_bss_description, timer};
@@ -2908,12 +2927,23 @@ mod tests {
         deadline: fuchsia_async::MonotonicInstant,
     ) -> timer::Event<E> {
         assert_variant!(executor.run_until_stalled(&mut timed_event_stream.next()), Poll::Pending);
-        assert_eq!(deadline, executor.wake_next_timer().expect("expected pending timer"));
-        executor.set_fake_time(deadline);
-        assert_variant!(
-            executor.run_until_stalled(&mut timed_event_stream.next()),
-            Poll::Ready(Some(timed_event)) => timed_event
-        )
+        loop {
+            let next_deadline = executor.wake_next_timer().expect("expected pending timer");
+            executor.set_fake_time(next_deadline);
+            if next_deadline == deadline {
+                return assert_variant!(
+                            executor.run_until_stalled(&mut timed_event_stream.next()),
+                            Poll::Ready(Some(timed_event)) => timed_event
+                );
+            } else {
+                // Assert that the timer has been cancelled, since we haven't yet
+                // reached the expected deadline.
+                assert_variant!(
+                    executor.run_until_stalled(&mut timed_event_stream.next()),
+                    Poll::Pending
+                );
+            }
+        }
     }
 
     #[test]
@@ -2950,7 +2980,7 @@ mod tests {
         suppl_mock.set_on_rsna_response_timeout(EstablishRsnaFailureReason::RsnaResponseTimeout(
             wlan_rsn::Error::EapolHandshakeNotStarted,
         ));
-        let state = state.handle_timeout(timed_event.id, timed_event.event, &mut h.context);
+        let state = state.handle_timeout(timed_event.event, &mut h.context);
 
         // Check that SME sends a deauthenticate request and fails the connection
         expect_deauth_req(&mut h.mlme_stream, bss.bssid, fidl_ieee80211::ReasonCode::StaLeaving);
@@ -3054,7 +3084,7 @@ mod tests {
                 suppl_mock
                     .set_on_rsna_retransmission_timeout_updates(tx_eapol_frame_update_sink.clone());
             }
-            state = state.handle_timeout(timed_event.id, timed_event.event, &mut h.context);
+            state = state.handle_timeout(timed_event.event, &mut h.context);
         }
 
         // Check that the connection does not fail
@@ -3148,17 +3178,14 @@ mod tests {
                 data: test_utils::eapol_key_frame().into(),
             },
         };
-        // Progress time to avoid scheduling two concurrent rsna response timeouts.
-        // TODO(https://fxbug.dev/371613444): Remove when our timer implementation supports better cancel behavior.
-        let first_rsna_response_deadline =
+
+        let rsna_response_deadline =
             zx::MonotonicDuration::from_millis(event::RSNA_RESPONSE_TIMEOUT_MILLIS).after_now();
-        h.executor.set_fake_time(zx::MonotonicDuration::from_millis(1).after_now());
+
         let mut state = state.on_mlme_event(eapol_ind, &mut h.context);
 
         // Cycle through the RSNA retransmission timeouts
         let mock_number_of_retransmissions = 5;
-        let second_rsna_response_deadline =
-            zx::MonotonicDuration::from_millis(event::RSNA_RESPONSE_TIMEOUT_MILLIS).after_now();
         for i in 0..=mock_number_of_retransmissions {
             expect_eapol_req(&mut h.mlme_stream, bss.bssid);
             expect_stream_empty(&mut h.mlme_stream, "unexpected event in mlme stream");
@@ -3177,30 +3204,20 @@ mod tests {
                 suppl_mock
                     .set_on_rsna_retransmission_timeout_updates(tx_eapol_frame_update_sink.clone());
             }
-            state = state.handle_timeout(timed_event.id, timed_event.event, &mut h.context);
+            state = state.handle_timeout(timed_event.event, &mut h.context);
         }
 
-        // Expire the first RSNA response timeout. This should do nothing.
-        let first_timeout = expect_next_event_at_deadline(
+        // Expire the RSNA response timeout
+        let timeout = expect_next_event_at_deadline(
             &mut h.executor,
             &mut timed_event_stream,
-            first_rsna_response_deadline,
+            rsna_response_deadline,
         );
-        assert_variant!(first_timeout.event, Event::RsnaResponseTimeout(..));
-        let state = state.handle_timeout(first_timeout.id, first_timeout.event, &mut h.context);
-        expect_stream_empty(&mut h.mlme_stream, "unexpected event in mlme stream");
-
-        // Expire the second RSNA response timeout
-        let second_timeout = expect_next_event_at_deadline(
-            &mut h.executor,
-            &mut timed_event_stream,
-            second_rsna_response_deadline,
-        );
-        assert_variant!(second_timeout.event, Event::RsnaResponseTimeout(..));
+        assert_variant!(timeout.event, Event::RsnaResponseTimeout(..));
         suppl_mock.set_on_rsna_response_timeout(EstablishRsnaFailureReason::RsnaResponseTimeout(
             wlan_rsn::Error::EapolHandshakeIncomplete("PTKSA never initialized".to_string()),
         ));
-        let state = state.handle_timeout(second_timeout.id, second_timeout.event, &mut h.context);
+        let state = state.handle_timeout(timeout.event, &mut h.context);
 
         expect_deauth_req(&mut h.mlme_stream, bss.bssid, fidl_ieee80211::ReasonCode::StaLeaving);
         assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
@@ -3300,9 +3317,6 @@ mod tests {
         assert!(suppl_mock.is_supplicant_started());
         let rsna_completion_deadline =
             zx::MonotonicDuration::from_millis(event::RSNA_COMPLETION_TIMEOUT_MILLIS).after_now();
-        let mut initial_rsna_response_deadline_in_effect = Some(
-            zx::MonotonicDuration::from_millis(event::RSNA_RESPONSE_TIMEOUT_MILLIS).after_now(),
-        );
 
         let mut timed_event_stream = timer::make_async_timed_event_stream(h.time_stream);
 
@@ -3313,9 +3327,7 @@ mod tests {
         }];
         suppl_mock.set_on_eapol_frame_updates(tx_eapol_frame_update_sink.clone());
 
-        // Send an initial EAPOL frame to SME. Advance the time to prevent scheduling
-        // simultaneous response timeouts for simplicity.
-        h.executor.set_fake_time(fuchsia_async::MonotonicInstant::from_nanos(100));
+        // Send an initial EAPOL frame to SME.
         let eapol_ind = fidl_mlme::EapolIndication {
             src_addr: bss.bssid.to_array(),
             dst_addr: fake_device_info().sta_addr,
@@ -3342,15 +3354,11 @@ mod tests {
                 rsna_retransmission_deadline,
             );
             assert_variant!(timed_event.event, Event::RsnaRetransmissionTimeout(_));
-            state = state.handle_timeout(timed_event.id, timed_event.event, &mut h.context);
+            state = state.handle_timeout(timed_event.event, &mut h.context);
             expect_stream_empty(&mut h.mlme_stream, "unexpected event in mlme stream");
 
             // Receive a frame just before the response timeout would have expired.
-            if let Some(initial_rsna_response_deadline) = initial_rsna_response_deadline_in_effect {
-                h.executor.set_fake_time(initial_rsna_response_deadline - just_before_duration);
-            } else {
-                h.executor.set_fake_time(rsna_response_deadline - just_before_duration);
-            }
+            h.executor.set_fake_time(rsna_response_deadline - just_before_duration);
             assert!(!h.executor.wake_expired_timers());
             // Setup mock response to transmit another EAPOL frame
             suppl_mock.set_on_eapol_frame_updates(tx_eapol_frame_update_sink.clone());
@@ -3361,33 +3369,8 @@ mod tests {
             rsna_retransmission_deadline =
                 zx::MonotonicDuration::from_millis(event::RSNA_RETRANSMISSION_TIMEOUT_MILLIS)
                     .after_now();
-            let prev_rsna_response_deadline = rsna_response_deadline;
             rsna_response_deadline =
                 zx::MonotonicDuration::from_millis(event::RSNA_RESPONSE_TIMEOUT_MILLIS).after_now();
-
-            // Expire the initial response timeout
-            if let Some(initial_rsna_response_deadline) =
-                initial_rsna_response_deadline_in_effect.take()
-            {
-                let timed_event = expect_next_event_at_deadline(
-                    &mut h.executor,
-                    &mut timed_event_stream,
-                    initial_rsna_response_deadline,
-                );
-                assert_variant!(timed_event.event, Event::RsnaResponseTimeout(..));
-                state = state.handle_timeout(timed_event.id, timed_event.event, &mut h.context);
-                expect_stream_empty(&mut h.mlme_stream, "unexpected event in mlme stream");
-            }
-
-            // Expire the response timeout scheduled after receipt of a frame
-            let timed_event = expect_next_event_at_deadline(
-                &mut h.executor,
-                &mut timed_event_stream,
-                prev_rsna_response_deadline,
-            );
-            assert_variant!(timed_event.event, Event::RsnaResponseTimeout(..));
-            state = state.handle_timeout(timed_event.id, timed_event.event, &mut h.context);
-            expect_stream_empty(&mut h.mlme_stream, "unexpected event in mlme stream");
         }
 
         // Expire the final retransmission timeout
@@ -3397,7 +3380,7 @@ mod tests {
             rsna_retransmission_deadline,
         );
         assert_variant!(timed_event.event, Event::RsnaRetransmissionTimeout(_));
-        state = state.handle_timeout(timed_event.id, timed_event.event, &mut h.context);
+        state = state.handle_timeout(timed_event.event, &mut h.context);
         expect_stream_empty(&mut h.mlme_stream, "unexpected event in mlme stream");
 
         // Advance to the completion timeout and setup a failure reason
@@ -3412,7 +3395,7 @@ mod tests {
                 wlan_rsn::Error::EapolHandshakeIncomplete("PTKSA never initialized".to_string()),
             ),
         );
-        let state = state.handle_timeout(timed_event.id, timed_event.event, &mut h.context);
+        let state = state.handle_timeout(timed_event.event, &mut h.context);
 
         // Check that SME sends a deauthenticate request and fails the connection
         expect_deauth_req(&mut h.mlme_stream, bss.bssid, fidl_ieee80211::ReasonCode::StaLeaving);
@@ -3513,8 +3496,8 @@ mod tests {
         });
 
         // Any timeout is ignored
-        let (_, timed_event) = h.time_stream.try_next().unwrap().expect("expect timed event");
-        state = state.handle_timeout(timed_event.id, timed_event.event, &mut h.context);
+        let (_, timed_event, _) = h.time_stream.try_next().unwrap().expect("expect timed event");
+        state = state.handle_timeout(timed_event.event, &mut h.context);
         assert_variant!(&state, ClientState::Associated(state) => {
             assert_variant!(&state.link_state, LinkState::LinkUp { .. });
         });
@@ -4358,10 +4341,10 @@ mod tests {
         assert_variant!(&state, ClientState::Disconnecting(_));
 
         let timed_event =
-            assert_variant!(h.time_stream.try_next(), Ok(Some((_, timed_event))) => timed_event);
+            assert_variant!(h.time_stream.try_next(), Ok(Some((_, timed_event, _))) => timed_event);
         assert_variant!(timed_event.event, Event::DeauthenticateTimeout(..));
 
-        let state = state.handle_timeout(timed_event.id, timed_event.event, &mut h.context);
+        let state = state.handle_timeout(timed_event.event, &mut h.context);
         assert_idle(state);
         assert_variant!(h.executor.run_until_stalled(&mut disconnect_fut), Poll::Ready(Ok(())));
 
@@ -5073,7 +5056,7 @@ mod tests {
         };
         mock_supplicant_controller
             .set_on_sae_timeout_updates(vec![SecAssocUpdate::TxSaeFrame(frame_tx)]);
-        let state = state.handle_timeout(1, event::SaeTimeout(2).into(), &mut h.context);
+        let state = state.handle_timeout(event::SaeTimeout(2).into(), &mut h.context);
         assert_variant!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::SaeFrameTx(_))));
         state
     }
@@ -5085,7 +5068,7 @@ mod tests {
         let mut h = TestHelper::new();
         mock_supplicant_controller
             .set_on_sae_timeout_failure(anyhow::anyhow!("Failed to process timeout"));
-        let state = state.handle_timeout(1, event::SaeTimeout(2).into(), &mut h.context);
+        let state = state.handle_timeout(event::SaeTimeout(2).into(), &mut h.context);
         let state = exchange_deauth(state, &mut h);
         assert_variant!(state, ClientState::Idle(_))
     }
@@ -5217,7 +5200,6 @@ mod tests {
                     &test_utils::fake_device_info([1u8; 6].into()),
                     &fake_spectrum_management_support_empty(),
                 )),
-                mac_sublayer_support: fake_mac_sublayer_support(),
                 security_support: fake_security_support(),
             };
             TestHelper { mlme_stream, time_stream, context, inspector, executor }
@@ -5604,7 +5586,7 @@ mod tests {
     }
 
     fn disconnecting_state(action: PostDisconnectAction) -> ClientState {
-        testing::new_state(Disconnecting { cfg: ClientConfig::default(), action, timeout_id: 0 })
+        testing::new_state(Disconnecting { cfg: ClientConfig::default(), action, _timeout: None })
             .into()
     }
 

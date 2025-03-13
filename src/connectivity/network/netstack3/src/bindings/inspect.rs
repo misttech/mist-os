@@ -9,13 +9,13 @@
 
 use std::string::ToString as _;
 
+use diagnostics_traits::{FuchsiaInspector, InspectorDeviceIdProvider};
 use fuchsia_inspect::Node;
 use net_types::ethernet::Mac;
 use net_types::ip::{Ipv4, Ipv6};
 use net_types::{UnicastAddr, Witness as _};
 use netstack3_core::device::{DeviceId, EthernetLinkDevice, WeakDeviceId};
 use netstack3_core::inspect::Inspector as _;
-use netstack3_fuchsia::{FuchsiaInspector, InspectorDeviceIdProvider};
 
 use crate::bindings::devices::{
     DeviceIdAndName, DeviceSpecificInfo, DynamicCommonInfo, DynamicNetdeviceInfo, EthernetInfo,
@@ -79,6 +79,7 @@ pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
     ctx.api().icmp_echo::<Ipv6>().inspect(&mut bindings_inspector);
     ctx.api().raw_ip_socket::<Ipv4>().inspect(&mut bindings_inspector);
     ctx.api().raw_ip_socket::<Ipv6>().inspect(&mut bindings_inspector);
+    ctx.api().device_socket().inspect(&mut bindings_inspector);
     inspector
 }
 

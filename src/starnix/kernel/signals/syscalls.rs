@@ -4,7 +4,7 @@
 
 pub use super::signal_handling::sys_restart_syscall;
 use super::signalfd::SignalFd;
-use crate::mm::{MemoryAccessor, MemoryAccessorExt};
+use crate::mm::MemoryAccessorExt;
 use crate::security;
 use crate::signals::{
     restore_from_signal_handler, send_signal, SignalDetail, SignalInfo, SignalInfoHeader,
@@ -16,7 +16,7 @@ use crate::task::{
 };
 use crate::vfs::{FdFlags, FdNumber};
 use starnix_uapi::uapi;
-use starnix_uapi::user_address::MultiArchUserRef;
+use starnix_uapi::user_address::{ArchSpecific, MultiArchUserRef};
 
 use starnix_logging::track_stub;
 use starnix_sync::{Locked, Unlocked};
@@ -28,29 +28,50 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS};
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::{
-    errno, error, pid_t, rusage, sigaction_t, sigaltstack, timespec, MINSIGSTKSZ, P_ALL, P_PGID,
-    P_PID, P_PIDFD, SFD_CLOEXEC, SFD_NONBLOCK, SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SI_MAX_SIZE,
-    SI_TKILL, SI_USER, SS_AUTODISARM, SS_DISABLE, SS_ONSTACK, WCONTINUED, WEXITED, WNOHANG,
-    WNOWAIT, WSTOPPED, WUNTRACED, __WALL, __WCLONE,
+    errno, error, pid_t, rusage, sigaltstack, P_ALL, P_PGID, P_PID, P_PIDFD, SFD_CLOEXEC,
+    SFD_NONBLOCK, SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SI_MAX_SIZE, SI_TKILL, SI_USER,
+    SS_AUTODISARM, SS_DISABLE, SS_ONSTACK, WCONTINUED, WEXITED, WNOHANG, WNOWAIT, WSTOPPED,
+    WUNTRACED, __WALL, __WCLONE,
 };
 use static_assertions::const_assert_eq;
-use zerocopy::FromBytes;
+use zerocopy::{FromBytes, Immutable, IntoBytes};
 
 // Rust will let us do this cast in a const assignment but not in a const generic constraint.
 const SI_MAX_SIZE_AS_USIZE: usize = SI_MAX_SIZE as usize;
+
+type SigAction64Ptr = MultiArchUserRef<uapi::sigaction_t, uapi::arch32::sigaction64_t>;
+type SigActionPtr = MultiArchUserRef<uapi::sigaction_t, uapi::arch32::sigaction_t>;
 
 pub fn sys_rt_sigaction(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     signum: UncheckedSignal,
-    user_action: UserRef<sigaction_t>,
-    user_old_action: UserRef<sigaction_t>,
+    user_action: SigAction64Ptr,
+    user_old_action: SigAction64Ptr,
     sigset_size: usize,
 ) -> Result<(), Errno> {
-    if sigset_size != std::mem::size_of::<SigSet>() {
-        return error!(EINVAL);
+    if user_action.is_arch32() && sigset_size == std::mem::size_of::<uapi::arch32::sigset_t>() {
+        let user_action = SigActionPtr::from_32(user_action.addr().into());
+        let user_old_action = SigActionPtr::from_32(user_old_action.addr().into());
+        return rt_sigaction(current_task, signum, user_action, user_old_action);
     }
 
+    if sigset_size != std::mem::size_of::<uapi::sigset_t>() {
+        return error!(EINVAL);
+    }
+    rt_sigaction(current_task, signum, user_action, user_old_action)
+}
+
+fn rt_sigaction<Arch32SigAction>(
+    current_task: &CurrentTask,
+    signum: UncheckedSignal,
+    user_action: MultiArchUserRef<uapi::sigaction_t, Arch32SigAction>,
+    user_old_action: MultiArchUserRef<uapi::sigaction_t, Arch32SigAction>,
+) -> Result<(), Errno>
+where
+    Arch32SigAction:
+        IntoBytes + FromBytes + Immutable + TryFrom<uapi::sigaction_t> + Into<uapi::sigaction_t>,
+{
     let signal = Signal::try_from(signum)?;
 
     let new_signal_action = if !user_action.is_null() {
@@ -61,7 +82,7 @@ pub fn sys_rt_sigaction(
             return error!(EINVAL);
         }
 
-        let signal_action = current_task.read_object(user_action)?;
+        let signal_action = current_task.read_multi_arch_object(user_action)?;
         Some(signal_action)
     } else {
         None
@@ -75,7 +96,7 @@ pub fn sys_rt_sigaction(
     };
 
     if !user_old_action.is_null() {
-        current_task.write_object(user_old_action, &old_action)?;
+        current_task.write_multi_arch_object(user_old_action, old_action)?;
     }
 
     Ok(())
@@ -145,7 +166,8 @@ pub fn sys_rt_sigprocmask(
 
 type SigAltStackPtr = MultiArchUserRef<uapi::sigaltstack, uapi::arch32::sigaltstack>;
 
-fn sigaltstack(
+pub fn sys_sigaltstack(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     user_ss: SigAltStackPtr,
     user_old_ss: SigAltStackPtr,
@@ -163,7 +185,9 @@ fn sigaltstack(
         if (ss.ss_flags & !((SS_AUTODISARM | SS_DISABLE) as i32)) != 0 {
             return error!(EINVAL);
         }
-        if ss.ss_flags & (SS_DISABLE as i32) == 0 && ss.ss_size < MINSIGSTKSZ as u64 {
+        let min_stack_size =
+            if current_task.is_arch32() { uapi::arch32::MINSIGSTKSZ } else { uapi::MINSIGSTKSZ };
+        if ss.ss_flags & (SS_DISABLE as i32) == 0 && ss.ss_size < min_stack_size as u64 {
             return error!(ENOMEM);
         }
     }
@@ -188,15 +212,6 @@ fn sigaltstack(
     }
 
     Ok(())
-}
-
-pub fn sys_sigaltstack(
-    _locked: &mut Locked<'_, Unlocked>,
-    current_task: &CurrentTask,
-    user_ss: UserRef<sigaltstack>,
-    user_old_ss: UserRef<sigaltstack>,
-) -> Result<(), Errno> {
-    sigaltstack(current_task, user_ss.into(), user_old_ss.into())
 }
 
 pub fn sys_rt_sigsuspend(
@@ -225,8 +240,8 @@ pub fn sys_rt_sigtimedwait(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     set_addr: UserRef<SigSet>,
-    siginfo_addr: UserAddress,
-    timeout_addr: UserRef<timespec>,
+    siginfo_addr: MultiArchUserRef<uapi::siginfo_t, uapi::arch32::siginfo_t>,
+    timeout_addr: MultiArchUserRef<uapi::timespec, uapi::arch32::timespec>,
     sigset_size: usize,
 ) -> Result<Signal, Errno> {
     if sigset_size != std::mem::size_of::<SigSet>() {
@@ -240,7 +255,7 @@ pub fn sys_rt_sigtimedwait(
     let deadline = if timeout_addr.is_null() {
         zx::MonotonicInstant::INFINITE
     } else {
-        let timeout = current_task.read_object(timeout_addr)?;
+        let timeout = current_task.read_multi_arch_object(timeout_addr)?;
         zx::MonotonicInstant::after(duration_from_timespec(timeout)?)
     };
 
@@ -287,7 +302,7 @@ pub fn sys_rt_sigtimedwait(
     };
 
     if !siginfo_addr.is_null() {
-        current_task.write_memory(siginfo_addr, &signal_info.as_siginfo_bytes())?;
+        signal_info.write(current_task, siginfo_addr)?;
     }
 
     Ok(signal_info.signal)
@@ -328,9 +343,7 @@ fn send_unchecked_signal(
     unchecked_signal: UncheckedSignal,
     si_code: i32,
 ) -> Result<(), Errno> {
-    if !current_task.can_signal(&target, unchecked_signal) {
-        return error!(EPERM);
-    }
+    current_task.can_signal(&target, unchecked_signal)?;
 
     // 0 is a sentinel value used to do permission checks.
     if unchecked_signal.is_zero() {
@@ -359,9 +372,7 @@ fn send_unchecked_signal_info(
     unchecked_signal: UncheckedSignal,
     siginfo_ref: UserAddress,
 ) -> Result<(), Errno> {
-    if !current_task.can_signal(&target, unchecked_signal) {
-        return error!(EPERM);
-    }
+    current_task.can_signal(&target, unchecked_signal)?;
 
     // 0 is a sentinel value used to do permission checks.
     if unchecked_signal.is_zero() {
@@ -761,9 +772,9 @@ pub fn sys_waitid(
     current_task: &CurrentTask,
     id_type: u32,
     id: i32,
-    user_info: UserAddress,
+    user_info: MultiArchUserRef<uapi::siginfo_t, uapi::arch32::siginfo_t>,
     options: u32,
-    user_rusage: UserRef<rusage>,
+    user_rusage: UserRef<uapi::rusage>,
 ) -> Result<(), Errno> {
     let mut waiting_options = WaitingOptions::new_for_waitid(options)?;
 
@@ -804,7 +815,7 @@ pub fn sys_waitid(
 
         if !user_info.is_null() {
             let siginfo = waitable_process.as_signal_info();
-            current_task.write_memory(user_info, &siginfo.as_siginfo_bytes())?;
+            siginfo.write(current_task, user_info)?;
         }
     } else if id_type == P_PIDFD {
         // From <https://man7.org/linux/man-pages/man2/pidfd_open.2.html>:
@@ -879,25 +890,11 @@ fn negate_pid(pid: pid_t) -> Result<pid_t, Errno> {
 // Syscalls for arch32 usage
 #[cfg(feature = "arch32")]
 mod arch32 {
-    use crate::signals::syscalls::{sigaltstack, SigAltStackPtr};
-    use crate::task::CurrentTask;
-    use starnix_sync::{Locked, Unlocked};
-    use starnix_uapi::errors::Errno;
-    use starnix_uapi::uapi;
-    use starnix_uapi::user_address::UserRef;
-
-    pub fn sys_arch32_sigaltstack(
-        _locked: &mut Locked<'_, Unlocked>,
-        current_task: &CurrentTask,
-        user_ss: UserRef<uapi::arch32::sigaltstack>,
-        user_old_ss: UserRef<uapi::arch32::sigaltstack>,
-    ) -> Result<(), Errno> {
-        sigaltstack(
-            current_task,
-            SigAltStackPtr::from_32(user_ss),
-            SigAltStackPtr::from_32(user_old_ss),
-        )
-    }
+    pub use super::{
+        sys_rt_sigaction as sys_arch32_rt_sigaction,
+        sys_rt_sigtimedwait as sys_arch32_rt_sigtimedwait,
+        sys_sigaltstack as sys_arch32_sigaltstack,
+    };
 }
 
 #[cfg(feature = "arch32")]
@@ -906,7 +903,7 @@ pub use arch32::*;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mm::PAGE_SIZE;
+    use crate::mm::{MemoryAccessor, PAGE_SIZE};
     use crate::signals::send_standard_signal;
     use crate::signals::testing::dequeue_signal_for_test;
     use crate::task::{ExitStatus, ProcessExitInfo};
@@ -918,7 +915,7 @@ mod tests {
         SIGCHLD, SIGHUP, SIGINT, SIGIO, SIGKILL, SIGRTMIN, SIGSEGV, SIGSTOP, SIGTERM, SIGTRAP,
         SIGUSR1,
     };
-    use starnix_uapi::{uaddr, uid_t, SI_QUEUE};
+    use starnix_uapi::{sigaction_t, uaddr, uid_t, SI_QUEUE};
     use zerocopy::IntoBytes;
 
     #[cfg(target_arch = "x86_64")]
@@ -931,7 +928,7 @@ mod tests {
         let nullptr = UserRef::<sigaltstack>::default();
 
         // Check that the initial state is disabled.
-        sys_sigaltstack(&mut locked, &current_task, nullptr, user_ss)
+        sys_sigaltstack(&mut locked, &current_task, nullptr.into(), user_ss.into())
             .expect("failed to call sigaltstack");
         let mut ss = current_task.read_object(user_ss).expect("failed to read struct");
         assert!(ss.ss_flags & (SS_DISABLE as i32) != 0);
@@ -941,12 +938,12 @@ mod tests {
         ss.ss_size = 0x1000;
         ss.ss_flags = SS_AUTODISARM as i32;
         current_task.write_object(user_ss, &ss).expect("failed to write struct");
-        sys_sigaltstack(&mut locked, &current_task, user_ss, nullptr)
+        sys_sigaltstack(&mut locked, &current_task, user_ss.into(), nullptr.into())
             .expect("failed to call sigaltstack");
         current_task
             .write_memory(addr, &[0u8; std::mem::size_of::<sigaltstack>()])
             .expect("failed to clear struct");
-        sys_sigaltstack(&mut locked, &current_task, nullptr, user_ss)
+        sys_sigaltstack(&mut locked, &current_task, nullptr.into(), user_ss.into())
             .expect("failed to call sigaltstack");
         let another_ss = current_task.read_object(user_ss).expect("failed to read struct");
         assert_eq!(ss.as_bytes(), another_ss.as_bytes());
@@ -954,12 +951,12 @@ mod tests {
         // Disable the sigaltstack and read it back out.
         let ss = sigaltstack { ss_flags: SS_DISABLE as i32, ..sigaltstack::default() };
         current_task.write_object(user_ss, &ss).expect("failed to write struct");
-        sys_sigaltstack(&mut locked, &current_task, user_ss, nullptr)
+        sys_sigaltstack(&mut locked, &current_task, user_ss.into(), nullptr.into())
             .expect("failed to call sigaltstack");
         current_task
             .write_memory(addr, &[0u8; std::mem::size_of::<sigaltstack>()])
             .expect("failed to clear struct");
-        sys_sigaltstack(&mut locked, &current_task, nullptr, user_ss)
+        sys_sigaltstack(&mut locked, &current_task, nullptr.into(), user_ss.into())
             .expect("failed to call sigaltstack");
         let ss = current_task.read_object(user_ss).expect("failed to read struct");
         assert!(ss.ss_flags & (SS_DISABLE as i32) != 0);
@@ -974,14 +971,14 @@ mod tests {
         let nullptr = UserRef::<sigaltstack>::default();
 
         // Check that the initial state is disabled.
-        sys_sigaltstack(&mut locked, &current_task, nullptr, user_ss)
+        sys_sigaltstack(&mut locked, &current_task, nullptr.into(), user_ss.into())
             .expect("failed to call sigaltstack");
         let mut ss = current_task.read_object(user_ss).expect("failed to read struct");
         assert!(ss.ss_flags & (SS_DISABLE as i32) != 0);
 
         // Try to install a sigaltstack with an invalid size.
         let sigaltstack_addr_size =
-            round_up_to_system_page_size(MINSIGSTKSZ as usize).expect("failed to round up");
+            round_up_to_system_page_size(uapi::MINSIGSTKSZ as usize).expect("failed to round up");
         let sigaltstack_addr = map_memory(
             &mut locked,
             &current_task,
@@ -990,9 +987,12 @@ mod tests {
         );
         ss.ss_sp = sigaltstack_addr.into();
         ss.ss_flags = 0;
-        ss.ss_size = MINSIGSTKSZ as u64 - 1;
+        ss.ss_size = uapi::MINSIGSTKSZ as u64 - 1;
         current_task.write_object(user_ss, &ss).expect("failed to write struct");
-        assert_eq!(sys_sigaltstack(&mut locked, &current_task, user_ss, nullptr), error!(ENOMEM));
+        assert_eq!(
+            sys_sigaltstack(&mut locked, &current_task, user_ss.into(), nullptr.into()),
+            error!(ENOMEM)
+        );
     }
 
     #[cfg(target_arch = "x86_64")]
@@ -1005,14 +1005,14 @@ mod tests {
         let nullptr = UserRef::<sigaltstack>::default();
 
         // Check that the initial state is disabled.
-        sys_sigaltstack(&mut locked, &current_task, nullptr, user_ss)
+        sys_sigaltstack(&mut locked, &current_task, nullptr.into(), user_ss.into())
             .expect("failed to call sigaltstack");
         let mut ss = current_task.read_object(user_ss).expect("failed to read struct");
         assert!(ss.ss_flags & (SS_DISABLE as i32) != 0);
 
         // Try to install a sigaltstack.
         let sigaltstack_addr_size =
-            round_up_to_system_page_size(MINSIGSTKSZ as usize).expect("failed to round up");
+            round_up_to_system_page_size(uapi::MINSIGSTKSZ as usize).expect("failed to round up");
         let sigaltstack_addr = map_memory(
             &mut locked,
             &current_task,
@@ -1023,7 +1023,7 @@ mod tests {
         ss.ss_flags = 0;
         ss.ss_size = sigaltstack_addr_size as u64;
         current_task.write_object(user_ss, &ss).expect("failed to write struct");
-        sys_sigaltstack(&mut locked, &current_task, user_ss, nullptr)
+        sys_sigaltstack(&mut locked, &current_task, user_ss.into(), nullptr.into())
             .expect("failed to call sigaltstack");
 
         // Changing the sigaltstack while we are there should be an error.
@@ -1031,7 +1031,10 @@ mod tests {
             (sigaltstack_addr + sigaltstack_addr_size).ptr() as u64;
         ss.ss_flags = SS_DISABLE as i32;
         current_task.write_object(user_ss, &ss).expect("failed to write struct");
-        assert_eq!(sys_sigaltstack(&mut locked, &current_task, user_ss, nullptr), error!(EPERM));
+        assert_eq!(
+            sys_sigaltstack(&mut locked, &current_task, user_ss.into(), nullptr.into()),
+            error!(EPERM)
+        );
 
         // However, setting the rsp to a different value outside the alt stack should allow us to
         // disable it.
@@ -1039,7 +1042,7 @@ mod tests {
             (sigaltstack_addr + sigaltstack_addr_size + 0x1000usize).ptr() as u64;
         let ss = sigaltstack { ss_flags: SS_DISABLE as i32, ..sigaltstack::default() };
         current_task.write_object(user_ss, &ss).expect("failed to write struct");
-        sys_sigaltstack(&mut locked, &current_task, user_ss, nullptr)
+        sys_sigaltstack(&mut locked, &current_task, user_ss.into(), nullptr.into())
             .expect("failed to call sigaltstack");
     }
 
@@ -1053,14 +1056,14 @@ mod tests {
         let nullptr = UserRef::<sigaltstack>::default();
 
         // Check that the initial state is disabled.
-        sys_sigaltstack(&mut locked, &current_task, nullptr, user_ss)
+        sys_sigaltstack(&mut locked, &current_task, nullptr.into(), user_ss.into())
             .expect("failed to call sigaltstack");
         let mut ss = current_task.read_object(user_ss).expect("failed to read struct");
         assert!(ss.ss_flags & (SS_DISABLE as i32) != 0);
 
         // Try to install a sigaltstack that takes the whole memory.
         let sigaltstack_addr_size =
-            round_up_to_system_page_size(MINSIGSTKSZ as usize).expect("failed to round up");
+            round_up_to_system_page_size(uapi::MINSIGSTKSZ as usize).expect("failed to round up");
         let sigaltstack_addr = map_memory(
             &mut locked,
             &current_task,
@@ -1071,7 +1074,7 @@ mod tests {
         ss.ss_flags = 0;
         ss.ss_size = u64::MAX;
         current_task.write_object(user_ss, &ss).expect("failed to write struct");
-        sys_sigaltstack(&mut locked, &current_task, user_ss, nullptr)
+        sys_sigaltstack(&mut locked, &current_task, user_ss.into(), nullptr.into())
             .expect("failed to call sigaltstack");
 
         // Changing the sigaltstack while we are there should be an error.
@@ -1079,13 +1082,16 @@ mod tests {
             (sigaltstack_addr + sigaltstack_addr_size).ptr() as u64;
         ss.ss_flags = SS_DISABLE as i32;
         current_task.write_object(user_ss, &ss).expect("failed to write struct");
-        assert_eq!(sys_sigaltstack(&mut locked, &current_task, user_ss, nullptr), error!(EPERM));
+        assert_eq!(
+            sys_sigaltstack(&mut locked, &current_task, user_ss.into(), nullptr.into()),
+            error!(EPERM)
+        );
 
         // However, setting the rsp to a low value should work (it doesn't wrap-around).
         current_task.thread_state.registers.rsp = 0u64;
         let ss = sigaltstack { ss_flags: SS_DISABLE as i32, ..sigaltstack::default() };
         current_task.write_object(user_ss, &ss).expect("failed to write struct");
-        sys_sigaltstack(&mut locked, &current_task, user_ss, nullptr)
+        sys_sigaltstack(&mut locked, &current_task, user_ss.into(), nullptr.into())
             .expect("failed to call sigaltstack");
     }
 
@@ -1408,8 +1414,8 @@ mod tests {
                 &current_task,
                 UncheckedSignal::from(SIGKILL),
                 // The signal is only checked when the action is set (i.e., action is non-null).
-                UserRef::<sigaction_t>::new(UserAddress::from(10)),
-                UserRef::<sigaction_t>::default(),
+                UserRef::<sigaction_t>::new(UserAddress::from(10)).into(),
+                UserRef::<sigaction_t>::default().into(),
                 std::mem::size_of::<SigSet>(),
             ),
             error!(EINVAL)
@@ -1420,8 +1426,8 @@ mod tests {
                 &current_task,
                 UncheckedSignal::from(SIGSTOP),
                 // The signal is only checked when the action is set (i.e., action is non-null).
-                UserRef::<sigaction_t>::new(UserAddress::from(10)),
-                UserRef::<sigaction_t>::default(),
+                UserRef::<sigaction_t>::new(UserAddress::from(10)).into(),
+                UserRef::<sigaction_t>::default().into(),
                 std::mem::size_of::<SigSet>(),
             ),
             error!(EINVAL)
@@ -1432,8 +1438,8 @@ mod tests {
                 &current_task,
                 UncheckedSignal::from(Signal::NUM_SIGNALS + 1),
                 // The signal is only checked when the action is set (i.e., action is non-null).
-                UserRef::<sigaction_t>::new(UserAddress::from(10)),
-                UserRef::<sigaction_t>::default(),
+                UserRef::<sigaction_t>::new(UserAddress::from(10)).into(),
+                UserRef::<sigaction_t>::default().into(),
                 std::mem::size_of::<SigSet>(),
             ),
             error!(EINVAL)
@@ -1461,8 +1467,8 @@ mod tests {
                 &mut locked,
                 &current_task,
                 UncheckedSignal::from(SIGHUP),
-                UserRef::<sigaction_t>::default(),
-                old_action_ref,
+                UserRef::<sigaction_t>::default().into(),
+                old_action_ref.into(),
                 std::mem::size_of::<SigSet>()
             ),
             Ok(())
@@ -1490,8 +1496,8 @@ mod tests {
                 &mut locked,
                 &current_task,
                 UncheckedSignal::from(SIGINT),
-                set_action_ref,
-                UserRef::<sigaction_t>::default(),
+                set_action_ref.into(),
+                UserRef::<sigaction_t>::default().into(),
                 std::mem::size_of::<SigSet>(),
             ),
             Ok(())
@@ -1570,7 +1576,7 @@ mod tests {
         let task2 = task1.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
         task2.set_creds(Credentials::with_ids(2, 2));
 
-        assert!(!task1.can_signal(&task2, SIGINT.into()));
+        assert!(task1.can_signal(&task2, SIGINT.into()).is_err());
         assert_eq!(sys_kill(&mut locked, &task2, task1.id, SIGINT.into()), error!(EPERM));
         assert_eq!(task1.read().queued_signal_count(SIGINT), 0);
     }
@@ -1585,7 +1591,7 @@ mod tests {
         task2.thread_group.setsid(&mut locked).expect("setsid");
         task2.set_creds(Credentials::with_ids(2, 2));
 
-        assert!(!task2.can_signal(&task1, SIGINT.into()));
+        assert!(task2.can_signal(&task1, SIGINT.into()).is_err());
         assert_eq!(sys_kill(&mut locked, &task2, -task1.id, SIGINT.into()), error!(EPERM));
         assert_eq!(task1.read().queued_signal_count(SIGINT), 0);
     }
@@ -1715,7 +1721,7 @@ mod tests {
                 &current_task,
                 P_PID,
                 id,
-                UserAddress::default(),
+                MultiArchUserRef::null(&current_task),
                 0,
                 UserRef::default()
             ),
@@ -1727,7 +1733,7 @@ mod tests {
                 &current_task,
                 P_PID,
                 id,
-                UserAddress::default(),
+                MultiArchUserRef::null(&current_task),
                 0xffff,
                 UserRef::default()
             ),
@@ -1998,14 +2004,15 @@ mod tests {
         child2.thread_group.exit(&mut locked, ExitStatus::Exit(42), None);
         std::mem::drop(child2);
 
-        let address = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+        let address: UserRef<uapi::siginfo_t> =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE).into();
         assert_eq!(
             sys_waitid(
                 &mut locked,
                 &current_task,
                 P_PGID,
                 child2_pid,
-                address,
+                address.into(),
                 WEXITED,
                 UserRef::default()
             ),
@@ -2015,7 +2022,15 @@ mod tests {
         assert_eq!(current_task.thread_group.read().zombie_children[0].pid, child1_pid);
 
         assert_eq!(
-            sys_waitid(&mut locked, &current_task, P_PGID, 0, address, WEXITED, UserRef::default()),
+            sys_waitid(
+                &mut locked,
+                &current_task,
+                P_PGID,
+                0,
+                address.into(),
+                WEXITED,
+                UserRef::default()
+            ),
             Ok(())
         );
     }

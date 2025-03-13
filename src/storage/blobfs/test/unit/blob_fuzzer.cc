@@ -49,13 +49,14 @@ fidl::ClientEnd<fuchsia_io::Directory> ServeOutgoingDirectory(ComponentRunner& r
 
 fidl::ClientEnd<fuchsia_io::Directory> GetRootDirectory(
     fidl::ClientEnd<fuchsia_io::Directory>& outgoing) {
-  auto root_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
-  auto status = fidl::WireCall(outgoing)->Open(
-      fuchsia_io::wire::OpenFlags::kRightReadable | fuchsia_io::wire::OpenFlags::kRightWritable |
-          fuchsia_io::wire::OpenFlags::kDirectory,
-      {}, "root", fidl::ServerEnd<fuchsia_io::Node>(root_endpoints.server.TakeChannel()));
+  auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  auto status = fidl::WireCall(outgoing)->Open("root",
+                                               fuchsia_io::wire::kPermReadable |
+                                                   fuchsia_io::wire::kPermWritable |
+                                                   fuchsia_io::wire::Flags::kProtocolDirectory,
+                                               {}, server.TakeChannel());
   ZX_ASSERT(status.ok());
-  return std::move(root_endpoints.client);
+  return std::move(client);
 }
 
 class BlobfsInstance {

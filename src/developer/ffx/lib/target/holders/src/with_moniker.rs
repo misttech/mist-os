@@ -27,7 +27,7 @@ where
 {
     type Output = P;
     async fn try_from_env_with(self, env: &FhoEnvironment) -> Result<Self::Output> {
-        let rcs_instance = crate::fdomain::connect_to_rcs_fdomain(&env).await?;
+        let rcs_instance = crate::fdomain::connect_to_rcs(&env).await?;
         crate::fdomain::open_moniker_fdomain(
             &rcs_instance,
             rcs_fdomain::OpenDirType::ExposedDir,

@@ -53,7 +53,7 @@ const MDNS_DISCOVERY_ENABLED: &str = "discovery.mdns.enabled";
 const MDNS_AUTOCONNECT_ENABLED: &str = "discovery.mdns.autoconnect";
 
 // Get the aliased value, along with the isolation alias -- both bools.
-async fn get_with_isolated_alias(
+fn get_with_isolated_alias(
     ctx: &EnvironmentContext,
     key: &str,
 ) -> Option<(Option<bool>, Option<bool>)> {
@@ -63,15 +63,18 @@ async fn get_with_isolated_alias(
 
 pub async fn is_usb_discovery_disabled(ctx: &EnvironmentContext) -> bool {
     let default = false;
-    match get_with_isolated_alias(ctx, FASTBOOT_USB_DISCOVERY_DISABLED).await {
+    match get_with_isolated_alias(ctx, FASTBOOT_USB_DISCOVERY_DISABLED) {
         None => return default,
         Some((usb, iso)) => usb.unwrap_or_else(|| iso.unwrap_or(default)),
     }
 }
 
-pub async fn is_analytics_disabled(ctx: &EnvironmentContext) -> bool {
+pub fn is_analytics_disabled(ctx: &EnvironmentContext) -> bool {
     let default = false;
-    match get_with_isolated_alias(ctx, FFX_ANALYTICS_DISABLED).await {
+    if ctx.has_no_environment() {
+        return true;
+    }
+    match get_with_isolated_alias(ctx, FFX_ANALYTICS_DISABLED) {
         None => return default,
         Some((ad, iso)) => ad.unwrap_or_else(|| iso.unwrap_or(default)),
     }
@@ -79,7 +82,7 @@ pub async fn is_analytics_disabled(ctx: &EnvironmentContext) -> bool {
 
 pub async fn is_mdns_discovery_disabled(ctx: &EnvironmentContext) -> bool {
     let default = false;
-    match get_with_isolated_alias(ctx, MDNS_DISCOVERY_ENABLED).await {
+    match get_with_isolated_alias(ctx, MDNS_DISCOVERY_ENABLED) {
         None => return default,
         // The option is _enabled_, so we have to invert it
         Some((mdns_disc, iso)) => mdns_disc.map(|b| !b).unwrap_or_else(|| iso.unwrap_or(default)),
@@ -88,7 +91,7 @@ pub async fn is_mdns_discovery_disabled(ctx: &EnvironmentContext) -> bool {
 
 pub async fn is_mdns_autoconnect_disabled(ctx: &EnvironmentContext) -> bool {
     let default = false;
-    match get_with_isolated_alias(ctx, MDNS_AUTOCONNECT_ENABLED).await {
+    match get_with_isolated_alias(ctx, MDNS_AUTOCONNECT_ENABLED) {
         None => return default,
         // The option is _enabled_, so we have to invert it
         Some((mdns_conn, iso)) => mdns_conn.map(|b| !b).unwrap_or_else(|| iso.unwrap_or(default)),
@@ -130,7 +133,7 @@ mod test {
             .unwrap();
 
         assert!(is_usb_discovery_disabled(&env.context).await);
-        assert!(is_analytics_disabled(&env.context).await);
+        assert!(is_analytics_disabled(&env.context));
         assert!(is_mdns_discovery_disabled(&env.context).await);
         assert!(is_mdns_autoconnect_disabled(&env.context).await);
     }
@@ -183,6 +186,6 @@ mod test {
         // (It's not clear we _want_ this behavior, but this is the current plan)
         assert!(!is_usb_discovery_disabled(&env.context).await);
         // Nothing else is affected
-        assert!(is_analytics_disabled(&env.context).await);
+        assert!(is_analytics_disabled(&env.context));
     }
 }

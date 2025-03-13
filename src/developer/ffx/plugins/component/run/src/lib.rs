@@ -12,10 +12,11 @@ use ffx_component::rcs::{
     connect_to_lifecycle_controller, connect_to_realm_query, connect_to_route_validator,
 };
 use ffx_component_run_args::RunComponentCommand;
-use ffx_core::macro_deps::errors::FfxError;
+use ffx_core::macro_deps::errors::ffx_error;
 use ffx_log::log_impl;
 use ffx_log_args::LogCommand;
-use fho::{FfxMain, FfxTool, MachineWriter};
+use ffx_writer::MachineWriter;
+use fho::{FfxMain, FfxTool};
 use futures::FutureExt;
 use log_command::LogEntry;
 use std::io::Write;
@@ -54,7 +55,7 @@ async fn cmd_impl(
         &mut writer,
     )
     .await
-    .map_err(|e| FfxError::Error(e, 1))?;
+    .map_err(|e| ffx_error!(e))?;
 
     // Run `doctor` on the new component to expose any routing problems.
     let route_validator = connect_to_route_validator(&rcs_proxy).await?;

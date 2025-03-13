@@ -25,6 +25,8 @@ core_tests = [
   "channel-iovec",
   "channel-write-etc",
   "clock",
+  "counter",
+  "cpu-features",
   "elf-tls",
   "event-pair",
   "exceptions",
@@ -86,6 +88,7 @@ bootfs_only = [
   "address-tagging",
   "job",
   "object-info",
+  "pager-process",
   "process",
   "vmar",
 
@@ -112,6 +115,7 @@ unified_only = [
   "bti",
   "default-exception-handler",  # needs job tree w/o exception handler.
   "debuglog:unified-only",
+  "hotplug",
   "interrupt",
   "next-vdso",
   "pager-writeback",

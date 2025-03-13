@@ -7,7 +7,8 @@
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use ffx_product_get_version_args::GetVersionCommand;
-use fho::{FfxContext, FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxContext, FfxMain, FfxTool};
 use sdk_metadata::ProductBundle;
 use std::io::Write;
 

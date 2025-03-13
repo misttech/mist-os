@@ -26,7 +26,7 @@ $HOME/.ssh/fuchsia_ed25519
 $HOME/.ssh/fuchsia_authorized_keys
 ```
 
-You can check the configuatrion and consistencty of the ssh keys by running
+You can check the configuration and consistency of the ssh keys by running
 `ffx config check-ssh-keys` which will also generate the keys if they are missing,
 or update the public key file to include the public key matching the private key
 if missing.

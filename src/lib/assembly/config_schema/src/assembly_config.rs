@@ -25,20 +25,15 @@ use crate::product_config::{ProductConfig, ProductPackageDetails};
 /// what is desired in the assembled product images, and then generates the
 /// complete Image Assembly configuration (`crate::config::ImageAssemblyConfig`)
 /// from that.
-#[derive(Debug, Deserialize, Serialize, JsonSchema, SupportsFileRelativePaths, WalkPaths)]
+#[derive(Debug, Deserialize, Serialize, JsonSchema, WalkPaths)]
 #[serde(deny_unknown_fields)]
 #[assembly_container(product_configuration.json)]
 pub struct AssemblyConfig {
-    #[file_relative_paths]
     #[walk_paths]
     pub platform: PlatformConfig,
-    #[file_relative_paths]
     #[walk_paths]
     #[serde(default)]
     pub product: ProductConfig,
-    // TOOD(https://fxbug.dev/390189313): Remove once all product configs stop using this field.
-    #[serde(default, skip_serializing)]
-    pub file_relative_paths: bool,
 }
 
 impl AssemblyConfig {
@@ -128,6 +123,50 @@ pub struct AssemblyInputBundle {
     pub memory_buckets: Vec<FileRelativePathBuf>,
 }
 
+impl AssemblyInputBundle {
+    /// Are all containers in this AIB empty.
+    pub fn is_empty(&self) -> bool {
+        // destructure to ensure that when new fields are added, they require this function
+        // to be touched.
+        let Self {
+            kernel,
+            qemu_kernel,
+            boot_args,
+            bootfs_packages,
+            bootfs_files,
+            packages,
+            config_data,
+            blobs,
+            base_drivers,
+            boot_drivers,
+            bootfs_shell_commands,
+            shell_commands,
+            packages_to_compile,
+            bootfs_files_package,
+            memory_buckets,
+        } = &self;
+
+        qemu_kernel.is_none()
+            && boot_args.is_empty()
+            && bootfs_packages.is_empty()
+            && bootfs_files.is_empty()
+            && packages.is_empty()
+            && config_data.is_empty()
+            && blobs.is_empty()
+            && base_drivers.is_empty()
+            && boot_drivers.is_empty()
+            && bootfs_shell_commands.is_empty()
+            && shell_commands.is_empty()
+            && packages_to_compile.is_empty()
+            && bootfs_files_package.is_none()
+            && memory_buckets.is_empty()
+            && (match &kernel {
+                Some(kernel) => kernel.args.is_empty() && kernel.path.is_none(),
+                None => true,
+            })
+    }
+}
+
 /// Contents of a compiled package. The contents provided by all
 /// selected AIBs are merged by `name` into a single package
 /// at assembly time.
@@ -177,7 +216,6 @@ mod tests {
     use super::*;
     use crate::common::PackageSet;
     use crate::platform_config::media_config::{AudioConfig, PlatformMediaConfig};
-    use crate::platform_config::swd_config::{OtaConfigs, UpdateChecker};
     use crate::platform_config::{BuildType, FeatureSupportLevel};
     use crate::product_config::ProductPackageDetails;
     use assembly_util as util;
@@ -328,100 +366,6 @@ mod tests {
             [(
                 "0".to_string(),
                 ProductPackageDetails {
-                    manifest: FileRelativePathBuf::FileRelative(
-                        "path/to/base/package_manifest.json".into()
-                    ),
-                    config_data: Vec::default()
-                }
-            )]
-            .into()
-        );
-        assert_eq!(
-            config.product.packages.cache,
-            [(
-                "0".to_string(),
-                ProductPackageDetails {
-                    manifest: FileRelativePathBuf::FileRelative(
-                        "path/to/cache/package_manifest.json".into()
-                    ),
-                    config_data: Vec::default()
-                }
-            )]
-            .into()
-        );
-        assert_eq!(
-            config.product.base_drivers,
-            vec![DriverDetails {
-                package: FileRelativePathBuf::FileRelative(
-                    "path/to/base/driver/package_manifest.json".into()
-                ),
-                components: vec!["meta/path/to/component.cml".into()]
-            }]
-        )
-    }
-
-    #[test]
-    fn test_product_assembly_config_with_relative_paths() {
-        let json5 = r#"
-        {
-          platform: {
-            build_type: "eng",
-            connectivity: {
-              network: {
-                netcfg_config_path: "a/b/c",
-                netstack_config_path: "a/b/c",
-                google_maps_api_key_path: "a/b/c",
-              },
-              mdns: {
-                config: "a/b/c",
-              },
-            },
-            development_support: {
-              authorized_ssh_keys_path: "a/b/c",
-              authorized_ssh_ca_certs_path: "a/b/c",
-            },
-            software_delivery: {
-              update_checker: {
-                omaha_client: {
-                  channels_path: "a/b/c",
-                },
-              },
-              tuf_config_paths: [
-                "a/b/c"
-              ],
-            },
-            storage: {
-              component_id_index: {
-                product_index: "component/id/index",
-              },
-            },
-          },
-          product: {
-            packages: {
-              base: [
-                { manifest: "base/package_manifest.json" }
-              ],
-              cache: [
-                { manifest: "cache/package_manifest.json" }
-              ],
-            },
-            component_policy: {
-              product_policies: [
-                "component/policy",
-              ],
-            },
-          },
-        }
-    "#;
-
-        let mut cursor = std::io::Cursor::new(json5);
-        let config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
-        let config = config.resolve_paths_from_file("path/to/assembly_config.json").unwrap();
-        assert_eq!(
-            config.product.packages.base,
-            [(
-                "0".to_string(),
-                ProductPackageDetails {
                     manifest: "path/to/base/package_manifest.json".into(),
                     config_data: Vec::default()
                 }
@@ -440,50 +384,41 @@ mod tests {
             .into()
         );
         assert_eq!(
-            config.platform.connectivity.network.netcfg_config_path.unwrap(),
-            FileRelativePathBuf::Resolved("path/to/a/b/c".into())
-        );
-        assert_eq!(
-            config.platform.connectivity.network.netstack_config_path.unwrap(),
-            FileRelativePathBuf::Resolved("path/to/a/b/c".into())
-        );
-        assert_eq!(
-            config.platform.connectivity.network.google_maps_api_key_path.unwrap(),
-            FileRelativePathBuf::Resolved("path/to/a/b/c".into())
-        );
-        assert_eq!(
-            config.platform.connectivity.mdns.config.unwrap(),
-            FileRelativePathBuf::Resolved("path/to/a/b/c".into())
-        );
-        assert_eq!(
-            config.platform.development_support.authorized_ssh_ca_certs_path.unwrap(),
-            FileRelativePathBuf::Resolved("path/to/a/b/c".into())
-        );
-        assert_eq!(
-            config.platform.development_support.authorized_ssh_keys_path.unwrap(),
-            FileRelativePathBuf::Resolved("path/to/a/b/c".into())
-        );
-        assert_eq!(
-            config.platform.software_delivery.tuf_config_paths[0],
-            FileRelativePathBuf::Resolved("path/to/a/b/c".into())
-        );
-        assert_eq!(
-            match config.platform.software_delivery.update_checker {
-                Some(UpdateChecker::OmahaClient(OtaConfigs { channels_path, .. })) => channels_path,
-                Some(_) => None,
-                None => None,
-            }
-            .unwrap(),
-            FileRelativePathBuf::Resolved("path/to/a/b/c".into())
-        );
-        assert_eq!(
-            config.platform.storage.component_id_index.product_index.unwrap(),
-            FileRelativePathBuf::Resolved("path/to/component/id/index".into())
-        );
-        assert_eq!(
-            config.product.component_policy.product_policies[0],
-            FileRelativePathBuf::Resolved("path/to/component/policy".into())
-        );
+            config.product.base_drivers,
+            vec![DriverDetails {
+                package: FileRelativePathBuf::FileRelative(
+                    "path/to/base/driver/package_manifest.json".into()
+                ),
+                components: vec!["meta/path/to/component.cml".into()]
+            }]
+        )
+    }
+
+    #[test]
+    fn test_product_assembly_config_with_relative_paths() {
+        let dir = tempdir().unwrap();
+        let dir_path = Utf8PathBuf::from_path_buf(dir.path().to_path_buf()).unwrap();
+
+        let config_path = dir_path.join("product_configuration.json");
+        let config_file = std::fs::File::create(&config_path).unwrap();
+
+        let index_path = dir_path.join("component_id_index.json");
+        std::fs::write(&index_path, "").unwrap();
+
+        let json = serde_json::json!({
+          "platform": {
+            "build_type": "eng",
+            "storage": {
+              "component_id_index": {
+                "product_index": "component_id_index.json",
+              },
+            },
+          },
+        });
+        serde_json::to_writer(config_file, &json).unwrap();
+        let config = AssemblyConfig::from_dir(&dir_path).unwrap();
+
+        assert_eq!(index_path, config.platform.storage.component_id_index.product_index.unwrap());
     }
 
     #[test]
@@ -667,15 +602,12 @@ mod tests {
         let mut config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
         config.product.packages.base.insert(
             "0".to_string(),
-            ProductPackageDetails {
-                manifest: FileRelativePathBuf::Resolved(package_manifest_path.clone()),
-                config_data: vec![],
-            },
+            ProductPackageDetails { manifest: package_manifest_path.clone(), config_data: vec![] },
         );
 
         // Test the logic to add proper package names.
         let config = config.add_package_names().unwrap();
         let details = config.product.packages.base.get("my_pkg").unwrap();
-        assert_eq!(details.manifest.as_utf8_pathbuf(), &package_manifest_path);
+        assert_eq!(&details.manifest, &package_manifest_path);
     }
 }

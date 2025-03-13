@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Error, Result};
-use diagnostics_reader::{ArchiveReader, Logs};
+use diagnostics_reader::ArchiveReader;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_diagnostics::{
     self as fdiagnostics, Interest, LogSettingsSetComponentInterestRequest, Severity,
@@ -22,9 +22,9 @@ pub(crate) async fn snapshot_and_stream_logs(
     realm_proxy: &RealmProxyClient,
 ) -> impl crate::assert::LogStream {
     let accessor = connect_accessor(realm_proxy, ALL_PIPELINE).await;
-    let subscription = ArchiveReader::new()
+    let subscription = ArchiveReader::logs()
         .with_archive(accessor)
-        .snapshot_then_subscribe::<Logs>()
+        .snapshot_then_subscribe()
         .expect("subscribe to logs");
     subscription.wait_for_ready().await;
     subscription

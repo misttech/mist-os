@@ -24,7 +24,6 @@
 #include <variant>
 #include <vector>
 
-#include <fbl/array.h>
 #include <fbl/auto_lock.h>
 #include <fbl/intrusive_double_list.h>
 #include <fbl/ref_ptr.h>
@@ -48,6 +47,7 @@
 #include "src/graphics/display/lib/api-types/cpp/event-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/layer-id.h"
+#include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 #include "src/graphics/display/lib/api-types/cpp/vsync-ack-cookie.h"
 
 namespace display_coordinator {
@@ -55,6 +55,15 @@ namespace display_coordinator {
 // Almost-POD used by Client to manage display configuration. Public state is used by Controller.
 class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>, display::DisplayId> {
  public:
+  explicit DisplayConfig(display::DisplayId display_id);
+
+  DisplayConfig(const DisplayConfig&) = delete;
+  DisplayConfig& operator=(const DisplayConfig&) = delete;
+  DisplayConfig(DisplayConfig&&) = delete;
+  DisplayConfig& operator=(DisplayConfig&&) = delete;
+
+  ~DisplayConfig();
+
   void InitializeInspect(inspect::Node* parent);
 
   bool apply_layer_change() {
@@ -64,35 +73,43 @@ class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>, display:
     return ret;
   }
 
-  // Discards all the pending config (except for pending layers lists)
+  // Discards all the draft changes (except for draft layers lists)
   // of a Display's `config`.
   //
-  // The display pending layers' pending config must be discarded before
-  // `DiscardNonLayerPendingConfig()` is called.
-  void DiscardNonLayerPendingConfig();
+  // The display draft layers' draft configs must be discarded before
+  // `DiscardNonLayerDraftConfig()` is called.
+  void DiscardNonLayerDraftConfig();
 
-  int current_layer_count() const { return static_cast<int>(current_.layer_count); }
-  const display_config_t* current_config() const { return &current_; }
-  const fbl::DoublyLinkedList<LayerNode*>& get_current_layers() const { return current_layers_; }
+  int applied_layer_count() const { return static_cast<int>(applied_.layer_count); }
+  const display_config_t* applied_config() const { return &applied_; }
+  const fbl::DoublyLinkedList<LayerNode*>& get_applied_layers() const { return applied_layers_; }
 
  private:
-  display_config_t current_;
-  display_config_t pending_;
+  // The last configuration sent to the display engine.
+  display_config_t applied_;
 
-  bool pending_layer_change_;
-  bool pending_apply_layer_change_;
-  fbl::DoublyLinkedList<LayerNode*> pending_layers_;
-  fbl::DoublyLinkedList<LayerNode*> current_layers_;
+  // The display configuration modified by client calls.
+  display_config_t draft_;
 
-  fbl::Array<CoordinatorPixelFormat> pixel_formats_;
+  // If true, the draft configuration's layer list may differ from the current
+  // configuration's list.
+  bool draft_has_layer_list_change_ = false;
 
-  bool display_config_change_ = false;
+  bool pending_apply_layer_change_ = false;
+  fbl::DoublyLinkedList<LayerNode*> draft_layers_;
+  fbl::DoublyLinkedList<LayerNode*> applied_layers_;
+
+  fbl::Vector<display::PixelFormat> pixel_formats_;
+
+  bool has_draft_nonlayer_config_change_ = false;
 
   friend Client;
   friend ClientProxy;
 
   inspect::Node node_;
-  inspect::BoolProperty pending_layer_change_property_;
+  // Reflects `draft_has_layer_list_change_`.
+  inspect::BoolProperty draft_has_layer_list_change_property_;
+  // Reflects `pending_apply_layer_change_`.
   inspect::BoolProperty pending_apply_layer_change_property_;
 };
 
@@ -147,11 +164,9 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
 
   uint8_t GetMinimumRgb() const { return client_minimum_rgb_; }
 
-  size_t ImportedImagesCountForTesting() const { return images_.size(); }
+  display::VsyncAckCookie LastAckedCookie() const { return acked_cookie_; }
 
-  // Used for testing
-  sync_completion_t* fidl_unbound() { return &fidl_unbound_; }
-  display::VsyncAckCookie LatestAckedCookie() const { return acked_cookie_; }
+  size_t ImportedImagesCountForTesting() const { return images_.size(); }
 
   // fidl::WireServer<fuchsia_hardware_display::Coordinator> overrides:
   void ImportImage(ImportImageRequestView request, ImportImageCompleter::Sync& _completer) override;
@@ -180,9 +195,9 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   void SetLayerImage2(SetLayerImage2RequestView request,
                       SetLayerImage2Completer::Sync& _completer) override;
   void CheckConfig(CheckConfigRequestView request, CheckConfigCompleter::Sync& _completer) override;
-  void ApplyConfig(ApplyConfigCompleter::Sync& _completer) override;
+  void DiscardConfig(DiscardConfigCompleter::Sync& _completer) override;
   void ApplyConfig3(ApplyConfig3RequestView request,
-                    ApplyConfigCompleter::Sync& _completer) override;
+                    ApplyConfig3Completer::Sync& _completer) override;
   void GetLatestAppliedConfigStamp(GetLatestAppliedConfigStampCompleter::Sync& _completer) override;
   void SetVsyncEventDelivery(SetVsyncEventDeliveryRequestView request,
                              SetVsyncEventDeliveryCompleter::Sync& _completer) override;
@@ -211,9 +226,6 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
                        SetDisplayPowerCompleter::Sync& _completer) override;
 
  private:
-  // Called by FIDL entrypoints such as `ApplyConfig()` and `ApplyConfig3()`.
-  void ApplyConfigFromFidl(display::ConfigStamp new_config_stamp);
-
   // Cleans up states of all current Images.
   // Returns true if any current layer has been modified.
   bool CleanUpAllImages();
@@ -223,13 +235,11 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   bool CleanUpImage(Image& image);
   void CleanUpCaptureImage(display::ImageId id);
 
-  // Displays' pending layers list may have been changed by pending
-  // SetDisplayLayers() operations.
+  // Displays' draft layers list may have been changed by SetDisplayLayers().
   //
-  // Restores the pending layer lists of all the Displays to their current
-  // (applied) layer list state respectively, undoing all pending changes to
-  // the layer lists.
-  void SetAllConfigPendingLayersToCurrentLayers();
+  // Restores the draft layer lists of all the displays to their applied layer
+  // list state respectively, undoing all draft changes to the layer lists.
+  void SetAllConfigDraftLayersToAppliedLayers();
 
   // `fuchsia.hardware.display/Coordinator.ImportImage()` helper for display
   // images.
@@ -247,7 +257,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   zx_status_t ImportImageForCapture(const display::ImageMetadata& image_metadata,
                                     display::BufferId buffer_id, display::ImageId image_id);
 
-  // Discards all the pending config on all Displays and Layers.
+  // Discards all the draft configs on all displays and layers.
   void DiscardConfig();
 
   void SetLayerImageImpl(display::LayerId layer_id, display::ImageId image_id,
@@ -262,8 +272,20 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   Image::Map images_;
   CaptureImage::Map capture_images_;
 
-  DisplayConfig::Map configs_;
-  bool pending_config_valid_ = false;
+  // Maps each known display ID to this client's display config.
+  //
+  // The client's knowledge of the connected displays can fall out of sync with
+  // this map. This is because the map is modified when the Coordinator
+  // processes display change events from display engine drivers, which happens
+  // before the client receives the display driver.
+  DisplayConfig::Map display_configs_;
+
+  // True iff CheckConfig() succeeded on the draft configuration.
+  //
+  // Set to false any time when the client modifies the draft configuration. Set
+  // to true when the client calls CheckConfig() and the check passes.
+  bool draft_display_config_was_validated_ = false;
+
   bool is_owner_ = false;
 
   // A counter for the number of times the client has successfully applied
@@ -273,7 +295,6 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
 
   // This is the client's clamped RGB value.
   uint8_t client_minimum_rgb_ = 0;
-  sync_completion_t fidl_unbound_;
 
   struct Collections {
     // The BufferCollection ID used in fuchsia.hardware.display.Controller
@@ -283,9 +304,6 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   std::map<display::BufferCollectionId, Collections> collection_map_;
 
   FenceCollection fences_;
-
-  // Used by layers to track which images are waiting on fences. Must outlive `layers_`.
-  LayerWaitingImageAllocator layer_waiting_image_allocator_;
 
   Layer::Map layers_;
 
@@ -347,7 +365,7 @@ class ClientProxy {
 
   // Requires holding `controller_.mtx()` lock.
   zx_status_t OnDisplayVsync(display::DisplayId display_id, zx_time_t timestamp,
-                             display::ConfigStamp controller_stamp);
+                             display::DriverConfigStamp driver_config_stamp);
   void OnDisplaysChanged(std::span<const display::DisplayId> added_display_ids,
                          std::span<const display::DisplayId> removed_display_ids);
   void SetOwnership(bool is_owner);
@@ -371,11 +389,12 @@ class ClientProxy {
   void ReapplySpecialConfigs();
 
   ClientId client_id() const { return handler_.id(); }
+  ClientPriority client_priority() const { return handler_.priority(); }
 
   inspect::Node& node() { return node_; }
 
   struct ConfigStampPair {
-    display::ConfigStamp controller_stamp;
+    display::DriverConfigStamp driver_stamp;
     display::ConfigStamp client_stamp;
   };
   std::list<ConfigStampPair>& pending_applied_config_stamps() {
@@ -388,6 +407,11 @@ class ClientProxy {
   void UpdateConfigStampMapping(ConfigStampPair stamps);
 
   void CloseForTesting();
+
+  display::VsyncAckCookie LastVsyncAckCookieForTesting();
+
+  // Fired after the FIDL client is unbound.
+  sync_completion_t* FidlUnboundCompletionForTesting();
 
   size_t ImportedImagesCountForTesting() const { return handler_.ImportedImagesCountForTesting(); }
 
@@ -408,8 +432,6 @@ class ClientProxy {
   static constexpr uint32_t kMaxImageHandles = 8;
 
  private:
-  friend IntegrationTest;
-
   fbl::Mutex mtx_;
   Controller& controller_;
 
@@ -440,6 +462,11 @@ class ClientProxy {
   bool acknowledge_request_sent_ = false;
 
   fit::function<void()> on_client_disconnected_;
+
+  // Fired when the FIDL connection is unbound.
+  //
+  // This member is thread-safe.
+  sync_completion_t fidl_unbound_completion_;
 
   // Mapping from controller_stamp to client_stamp for all configurations that
   // are already applied and pending to be presented on the display.

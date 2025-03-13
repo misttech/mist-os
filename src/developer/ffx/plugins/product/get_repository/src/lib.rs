@@ -7,7 +7,8 @@
 use anyhow::Result;
 use camino::Utf8PathBuf;
 use ffx_product_get_repository_args::GetRepositoryCommand;
-use fho::{bug, user_error, FfxMain, FfxTool, MachineWriter, ToolIO as _};
+use ffx_writer::{MachineWriter, ToolIO as _};
+use fho::{bug, user_error, FfxMain, FfxTool};
 use sdk_metadata::ProductBundle;
 use serde::{Deserialize, Serialize};
 use std::io::Write;

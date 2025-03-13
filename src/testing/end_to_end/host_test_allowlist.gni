@@ -14,6 +14,7 @@ wlan_fidls_allowlist = [
   "//sdk/fidl/fuchsia.wlan.minstrel:fuchsia.wlan.minstrel",
   "//sdk/fidl/fuchsia.wlan.mlme:fuchsia.wlan.mlme",
   "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme",
+  "//sdk/fidl/fuchsia.wlan.stats:fuchsia.wlan.stats",
 ]
 
 # These are FIDL libraries that are temporarily allowed to be depended on by the
@@ -24,7 +25,8 @@ wlan_fidls_allowlist = [
 # Please consult with the Lacewing team @ g/lacewing-admin before adding any new
 # entries in the list.
 #
-# TODO(https://fxbug.dev/326090508): Add these to the SDK or remove usage.
+# TODO(https://fxbug.dev/326090508): Stabilize and/or add these to the SDK or
+# remove usage.
 host_test_fidl_allowlist = [
                              # Used by Fuchsia Controller
                              "//src/developer/ffx/fidl:fuchsia.developer.ffx",

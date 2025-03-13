@@ -206,6 +206,7 @@ class Sdhci : public fdf::DriverBase, public ddk::SdmmcProtocol<Sdhci> {
 
   int IrqThread() TA_EXCL(mtx_);
   void HandleTransferInterrupt(InterruptStatus status) TA_REQ(mtx_);
+  void SetSchedulerRole(const std::string& role);
 
   zx::result<PendingRequest> StartRequest(const sdmmc_req_t& request,
                                           DmaDescriptorBuilder<OwnedVmoInfo>& builder) TA_REQ(mtx_);

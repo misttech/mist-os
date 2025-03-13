@@ -13,7 +13,7 @@ executable("paper_shader_compiler") {
     "//src/ui/lib/escher:escher_with_glslang",
     "//src/ui/lib/escher/shaders/util:shader_utils",
     "//third_party/glm",
-    "//third_party/shaderc:libshaderc",
+    "//third_party/shaderc/src:libshaderc",
   ]
 
   include_dirs = [

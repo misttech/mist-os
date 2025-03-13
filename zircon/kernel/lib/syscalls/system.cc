@@ -65,6 +65,7 @@
 #include <object/resource.h>
 #include <object/user_handles.h>
 #include <object/vm_object_dispatcher.h>
+#include <phys/handoff.h>
 #include <platform/halt_helper.h>
 #include <platform/halt_token.h>
 #include <platform/timer.h>
@@ -82,6 +83,8 @@
 // Allocate this many extra bytes at the end of the bootdata for the platform
 // to fill in with platform specific boot structures.
 const size_t kBootdataPlatformExtraBytes = PAGE_SIZE * 4;
+
+constexpr zx_duration_mono_t kMemoryStallMaxWindow = ZX_SEC(10);
 
 __BEGIN_CDECLS
 extern void mexec_asm(void);
@@ -357,7 +360,7 @@ NO_ASAN zx_status_t sys_system_mexec(zx_handle_t resource, zx_handle_t kernel_vm
       return ZX_ERR_IO_DATA_INTEGRITY;
     }
     const zbi_kernel_t* kernel = reinterpret_cast<const zbi_kernel_t*>(zbi.begin()->payload.data());
-    new_kernel_entry = get_kernel_base_phys() + kernel->entry;
+    new_kernel_entry = KernelPhysicalLoadAddress() + kernel->entry;
     ZX_ASSERT(zbi.take_error().is_ok());
   }
 
@@ -370,14 +373,15 @@ NO_ASAN zx_status_t sys_system_mexec(zx_handle_t resource, zx_handle_t kernel_vm
     return result;
   }
 
-  uintptr_t kernel_image_end = get_kernel_base_phys() + new_kernel_len;
+  uintptr_t kernel_image_end = KernelPhysicalLoadAddress() + new_kernel_len;
 
   paddr_t final_bootimage_addr = new_bootimage_addr;
   // For testing purposes, we may want the bootdata at a high address. Alternatively if our
   // coalesced VMO should overlap into the target kernel range then we also need to move it, and
   // placing it high is as good as anywhere else.
   if (gBootOptions->mexec_force_high_ramdisk ||
-      Intersects(final_bootimage_addr, bootimage_len, get_kernel_base_phys(), kernel_image_end)) {
+      Intersects(final_bootimage_addr, bootimage_len, KernelPhysicalLoadAddress(),
+                 kernel_image_end)) {
     const size_t page_count = bootimage_len / PAGE_SIZE + 1;
     fbl::AllocChecker ac;
     ktl::unique_ptr<paddr_t[]> paddrs(new (&ac) paddr_t[page_count]);
@@ -449,7 +453,7 @@ NO_ASAN zx_status_t sys_system_mexec(zx_handle_t resource, zx_handle_t kernel_vm
 
   // Op to move the new kernel into place.
   ops[ops_idx].src = (void*)new_kernel_addr;
-  ops[ops_idx].dst = (void*)get_kernel_base_phys();
+  ops[ops_idx].dst = (void*)KernelPhysicalLoadAddress();
   ops[ops_idx].len = new_kernel_len;
   ops_idx++;
 
@@ -592,6 +596,35 @@ zx_status_t sys_system_get_event(zx_handle_t root_job, uint32_t kind, zx_handle_
     default:
       return ZX_ERR_INVALID_ARGS;
   }
+}
+
+// zx_status_t zx_system_watch_memory_stall
+zx_status_t sys_system_watch_memory_stall(zx_handle_t resource, zx_system_memory_stall_type_t kind,
+                                          zx_duration_mono_t threshold, zx_duration_mono_t window,
+                                          zx_handle_t* out) {
+  auto up = ProcessDispatcher::GetCurrent();
+  zx_status_t res = up->EnforceBasicPolicy(ZX_POL_NEW_EVENT);
+  if (res != ZX_OK)
+    return res;
+
+  zx_status_t status =
+      validate_ranged_resource(resource, ZX_RSRC_KIND_SYSTEM, ZX_RSRC_SYSTEM_STALL_BASE, 1);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  if (window > kMemoryStallMaxWindow) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  KernelHandle<EventDispatcher> handle;
+  zx_rights_t rights;
+  status = MemoryStallEventDispatcher::Create(kind, threshold, window, &handle, &rights);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  return up->MakeAndAddHandle(ktl::move(handle), rights, out);
 }
 
 zx_status_t sys_system_set_performance_info(zx_handle_t resource, uint32_t topic,

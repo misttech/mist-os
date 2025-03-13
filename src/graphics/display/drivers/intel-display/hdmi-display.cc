@@ -126,21 +126,20 @@ bool HdmiDisplay::Query() {
   for (int i = 0; i < kMaxProbeDisplayAttemptCount; ++i) {
     has_display = gmbus_i2c_.ProbeDisplay();
     if (has_display) {
-      FDF_LOG(TRACE, "Found a hdmi/dvi monitor");
+      fdf::trace("Found a hdmi/dvi monitor");
       break;
     }
     zx_nanosleep(zx_deadline_after(ZX_MSEC(5)));
   }
 
   if (!has_display) {
-    FDF_LOG(TRACE, "Failed to find a display after %d attempts", kMaxProbeDisplayAttemptCount);
+    fdf::trace("Failed to find a display after {} attempts", kMaxProbeDisplayAttemptCount);
     return false;
   }
 
   zx::result<fbl::Vector<uint8_t>> read_extended_edid_result = gmbus_i2c_.ReadExtendedEdid();
   if (read_extended_edid_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to read E-EDID of the display: %s",
-            read_extended_edid_result.status_string());
+    fdf::error("Failed to read E-EDID of the display: {}", read_extended_edid_result);
     return false;
   }
 
@@ -175,14 +174,14 @@ bool HdmiDisplay::DdiModeset(const display::DisplayTiming& mode) {
   controller()->power()->SetDdiIoPowerState(ddi_id(), /*enable=*/true);
   if (!display::PollUntil([&] { return controller()->power()->GetDdiIoPowerState(ddi_id()); },
                           zx::usec(1), 20)) {
-    FDF_LOG(ERROR, "DDI %d IO power did not come up in 20us", ddi_id());
+    fdf::error("DDI {} IO power did not come up in 20us", ddi_id());
     return false;
   }
 
   controller()->power()->SetAuxIoPowerState(ddi_id(), /*enable=*/true);
   if (!display::PollUntil([&] { return controller()->power()->GetAuxIoPowerState(ddi_id()); },
                           zx::usec(1), 10)) {
-    FDF_LOG(ERROR, "DDI %d IO power did not come up in 10us", ddi_id());
+    fdf::error("DDI {} IO power did not come up in 10us", ddi_id());
     return false;
   }
 

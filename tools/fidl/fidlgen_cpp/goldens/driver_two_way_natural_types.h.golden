@@ -163,7 +163,7 @@ inline TwoWayAddRequest::TwoWayAddRequest(uint16_t addend1, uint16_t addend2) no
     : storage_({.addend1 = std::move(addend1),
                 .addend2 = std::move(addend2)}) {}
 inline TwoWayAddRequest::TwoWayAddRequest(const ::test_drivertwoway::TwoWayAddRequest& other) noexcept : ::test_drivertwoway::TwoWayAddRequest(other.CloneStorage_()) {}
-inline TwoWayAddRequest& ::test_drivertwoway::TwoWayAddRequest::operator=(const ::test_drivertwoway::TwoWayAddRequest & other) noexcept {
+inline TwoWayAddRequest& ::test_drivertwoway::TwoWayAddRequest::operator=(const ::test_drivertwoway::TwoWayAddRequest& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -185,7 +185,7 @@ inline TwoWayAddResponse::TwoWayAddResponse(Storage_ storage) noexcept : storage
 inline TwoWayAddResponse::TwoWayAddResponse(uint16_t sum) noexcept
     : storage_({.sum = std::move(sum)}) {}
 inline TwoWayAddResponse::TwoWayAddResponse(const ::test_drivertwoway::TwoWayAddResponse& other) noexcept : ::test_drivertwoway::TwoWayAddResponse(other.CloneStorage_()) {}
-inline TwoWayAddResponse& ::test_drivertwoway::TwoWayAddResponse::operator=(const ::test_drivertwoway::TwoWayAddResponse & other) noexcept {
+inline TwoWayAddResponse& ::test_drivertwoway::TwoWayAddResponse::operator=(const ::test_drivertwoway::TwoWayAddResponse& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -202,7 +202,7 @@ inline TwoWayAddResponse& TwoWayAddResponse::sum(uint16_t value) {
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_drivertwoway::TwoWayAddRequest> : public std::true_type{};
+struct IsFidlType<::test_drivertwoway::TwoWayAddRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_drivertwoway::TwoWayAddRequest> {
@@ -214,14 +214,14 @@ struct TypeTraits<::test_drivertwoway::TwoWayAddRequest> {
 };
 
 template <>
-struct IsStruct<::test_drivertwoway::TwoWayAddRequest> : public std::true_type{};
+struct IsStruct<::test_drivertwoway::TwoWayAddRequest> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_drivertwoway::TwoWayAddRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_drivertwoway::TwoWayAddRequest, 4> {};
 
 template <>
-struct IsFidlType<::test_drivertwoway::TwoWayAddResponse> : public std::true_type{};
+struct IsFidlType<::test_drivertwoway::TwoWayAddResponse> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_drivertwoway::TwoWayAddResponse> {
@@ -233,7 +233,7 @@ struct TypeTraits<::test_drivertwoway::TwoWayAddResponse> {
 };
 
 template <>
-struct IsStruct<::test_drivertwoway::TwoWayAddResponse> : public std::true_type{};
+struct IsStruct<::test_drivertwoway::TwoWayAddResponse> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_drivertwoway::TwoWayAddResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final

@@ -36,6 +36,7 @@ common_deps = [
 ]
 
 fuchsia_cc_driver("driver") {
+  legacy = true
   output_name = "acpi-battery"
   sources = [ "acpi_battery.cc" ]
   deps = common_deps + [ "//src/devices/lib/driver" ]

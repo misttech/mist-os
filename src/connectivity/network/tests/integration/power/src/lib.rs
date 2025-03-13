@@ -9,7 +9,6 @@
 use std::pin::pin;
 
 use assert_matches::assert_matches;
-use cm_rust::NativeIntoFidl as _;
 use fidl::endpoints::{DiscoverableProtocolMarker as _, ServiceMarker as _};
 use fidl::AsHandleRef;
 use fuchsia_async::TimeoutExt as _;
@@ -103,11 +102,9 @@ async fn create_power_realm<'a>(
         )),
         ..Default::default()
     }));
-    netstack_def.config_values.get_or_insert_with(|| Default::default()).push(
-        fnetemul::ChildConfigValue {
-            key: "suspend_enabled".to_string(),
-            value: cm_rust::ConfigValue::from(netstack_suspend_enabled).native_into_fidl(),
-        },
+    netstack_testing_common::realms::set_netstack3_suspend_enabled(
+        &mut netstack_def,
+        netstack_suspend_enabled,
     );
 
     let sag_def = fnetemul::ChildDef {

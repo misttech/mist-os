@@ -117,6 +117,10 @@ async fn run_usb_link(
     let mut buf = [0u8; MTU];
     loop {
         let size = {
+            tracing::trace!(
+                device = debug_path.as_str(),
+                "Reading from in endpoint for magic string"
+            );
             let read_fut = in_ep.read(&mut buf);
             let read_fut = pin!(read_fut);
             match select(read_fut, &mut magic_timer).await {
@@ -137,7 +141,12 @@ async fn run_usb_link(
             break;
         }
 
-        tracing::warn!(device = debug_path.as_str(), "Discarding {size} unexpected bytes");
+        tracing::warn!(
+            device = debug_path.as_str(),
+            "Discarding {size} unexpected bytes and attempting to resynchronize"
+        );
+
+        out_ep.write(OVERNET_MAGIC).await?;
     }
 
     let (out_ep_reader, out_writer) = circuit::stream::stream();
@@ -186,8 +195,7 @@ async fn run_usb_link(
 
     let tx = async move {
         loop {
-            // TODO(sadmac): Change to MTU when https://fxbug.dev/42075211 is fixed
-            let mut out = [0u8; 496];
+            let mut out = [0u8; MTU];
 
             // TODO: We could save a copy here by having a version of `read` with an async body.
             let got = out_ep_reader

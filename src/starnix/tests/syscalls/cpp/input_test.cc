@@ -20,6 +20,7 @@ namespace {
 
 const uint32_t kTouchInputMinor = 0;
 const uint32_t kKeyboardInputMinor = 1;
+const uint32_t kMouseInputMinor = 2;
 
 constexpr size_t min_bytes(size_t n_bits) { return (n_bits + 7) / 8; }
 
@@ -288,6 +289,136 @@ TEST(InputTest, DevicePropertiesMatchKeyboardProperties) {
         << "get supported input properties features failed: " << strerror(errno);
     ASSERT_TRUE(get_bit(buf, INPUT_PROP_DIRECT))
         << " INPUT_PROP_DIRECT not supported (but should be)";
+  }
+
+  // Getting the ABS_MT_SLOT range must succeed, but the actual values don't matter.
+  {
+    input_absinfo buf{};
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGABS(ABS_MT_SLOT), &buf))
+        << "get slot info failed: " << strerror(errno);
+  }
+
+  // Getting the ABS_MT_TRACKING_ID range must succeed, but the actual values don't matter.
+  {
+    input_absinfo buf{};
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGABS(ABS_MT_TRACKING_ID), &buf))
+        << "get tracking id info failed: " << strerror(errno);
+  }
+
+  // Getting the x-axis range must succeed, but the actual values don't matter.
+  {
+    input_absinfo buf{};
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGABS(ABS_MT_POSITION_X), &buf))
+        << "get x-axis info failed: " << strerror(errno);
+  }
+
+  // Getting the y-axis range must succeed, but the actual values don't matter.
+  {
+    input_absinfo buf{};
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGABS(ABS_MT_POSITION_Y), &buf))
+        << "get y-axis info failed: " << strerror(errno);
+  }
+}
+
+TEST(InputTest, DevicePropertiesMatchMouseWheelProperties) {
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
+  if (getuid() != 0) {
+    GTEST_SKIP() << "Can only be run as root.";
+  }
+
+  auto fd = GetInputFile(kMouseInputMinor);
+  ASSERT_TRUE(fd.is_valid());
+
+  // Getting the driver version must succeed, but the actual value doesn't matter.
+  {
+    uint32_t buf;
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGVERSION, &buf)) << "get version failed: " << strerror(errno);
+  }
+
+  // Getting the device identifier must succeed, but the actual value doesn't matter.
+  {
+    input_id buf;
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGID, &buf)) << "get identifier failed: " << strerror(errno);
+  }
+
+  // Getting the supported keys must succeed, with `BTN_MOUSE` unsupported so a cursor is not
+  // drawn on the screen.
+  {
+    constexpr auto kBufSize = min_bytes(KEY_MAX);
+    std::array<uint8_t, kBufSize> buf{};
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGBIT(EV_KEY, kBufSize), &buf))
+        << "get supported keys failed: " << strerror(errno);
+    ASSERT_FALSE(get_bit(buf, BTN_MOUSE)) << " BTN_MOUSE should not be supported";
+  }
+
+  // Getting the supported absolute position attributes must succeed, but Mouse should
+  // not support touch attributes.
+  {
+    constexpr auto kBufSize = min_bytes(ABS_MAX);
+    std::array<uint8_t, kBufSize> buf{};
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGBIT(EV_ABS, kBufSize), &buf))
+        << "get supported absolute position failed: " << strerror(errno);
+    ASSERT_FALSE(get_bit(buf, ABS_X)) << " ABS_X should not be supported";
+    ASSERT_FALSE(get_bit(buf, ABS_Y)) << " ABS_Y should not be supported";
+    ASSERT_FALSE(get_bit(buf, ABS_MT_SLOT)) << " ABS_MT_SLOT should not be supported";
+    ASSERT_FALSE(get_bit(buf, ABS_MT_TRACKING_ID)) << " ABS_MT_TRACKING_ID should not be supported";
+    ASSERT_FALSE(get_bit(buf, ABS_MT_POSITION_X)) << " ABS_MT_POSITION_X should not be supported";
+    ASSERT_FALSE(get_bit(buf, ABS_MT_POSITION_Y)) << " ABS_MT_POSITION_Y should not be supported";
+  }
+
+  // Getting the supported relative motion attributes must succeed, with `REL_WHEEL` supported
+  // but `REL_X` and `REL_Y` unsupported so a cursor is not drawn on the screen.
+  {
+    constexpr auto kBufSize = min_bytes(REL_MAX);
+    std::array<uint8_t, kBufSize> buf{};
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGBIT(EV_REL, kBufSize), &buf))
+        << "get supported relative motion failed: " << strerror(errno);
+    ASSERT_TRUE(get_bit(buf, REL_WHEEL)) << " REL_WHEEL not supported (but should be)";
+    ASSERT_FALSE(get_bit(buf, REL_X)) << " REL_X should not be supported";
+    ASSERT_FALSE(get_bit(buf, REL_Y)) << " REL_Y should not be supported";
+  }
+
+  // Getting the supported switches must succeed, but the actual values don't matter.
+  {
+    constexpr auto kBufSize = min_bytes(SW_MAX);
+    std::array<uint8_t, kBufSize> buf{};
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGBIT(EV_SW, kBufSize), &buf))
+        << "get supported switches failed: " << strerror(errno);
+  }
+
+  // Getting the supported LEDs must succeed, but the actual values don't matter.
+  {
+    constexpr auto kBufSize = min_bytes(LED_MAX);
+    std::array<uint8_t, kBufSize> buf{};
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGBIT(EV_LED, kBufSize), &buf))
+        << "get supported LEDs failed: " << strerror(errno);
+  }
+
+  // Getting the supported force feedbacks must succeed, but the actual values don't matter.
+  {
+    constexpr auto kBufSize = min_bytes(FF_MAX);
+    std::array<uint8_t, kBufSize> buf{};
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGBIT(EV_FF, kBufSize), &buf))
+        << "get supported force feedbacks failed: " << strerror(errno);
+  }
+
+  // Getting the supported miscellaneous features must succeed, but the actual values don't matter.
+  {
+    constexpr auto kBufSize = min_bytes(MSC_MAX);
+    std::array<uint8_t, kBufSize> buf{};
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGBIT(EV_MSC, kBufSize), &buf))
+        << "get supported miscellaneous features failed: " << strerror(errno);
+  }
+
+  // Getting the input properties must succeed, with `INPUT_PROP_DIRECT` and `INPUT_PROP_POINTER`
+  // unsupported.
+  {
+    constexpr auto kBufSize = min_bytes(INPUT_PROP_MAX);
+    std::array<uint8_t, kBufSize> buf{};
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGPROP(kBufSize), &buf))
+        << "get supported input properties features failed: " << strerror(errno);
+    ASSERT_FALSE(get_bit(buf, INPUT_PROP_DIRECT)) << " INPUT_PROP_DIRECT should not be supported";
+    ASSERT_FALSE(get_bit(buf, INPUT_PROP_POINTER)) << " INPUT_PROP_POINTER should not be supported";
   }
 
   // Getting the ABS_MT_SLOT range must succeed, but the actual values don't matter.

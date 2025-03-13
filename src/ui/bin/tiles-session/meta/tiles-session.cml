@@ -91,7 +91,16 @@
             availability: "same_as_target",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-bt-hci",
+            from: "parent",
+            to: "#elements",
+            availability: "same_as_target",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.bluetooth.Service",
             from: "parent",
             to: "#elements",
             availability: "same_as_target",

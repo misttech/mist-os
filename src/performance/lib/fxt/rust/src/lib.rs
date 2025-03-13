@@ -45,6 +45,7 @@ use crate::scheduling::RawSchedulingRecord;
 use crate::session::ResolveCtx;
 use crate::string::StringRecord;
 use crate::thread::ThreadRecord;
+use nom::Parser;
 use std::num::NonZero;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -175,19 +176,23 @@ impl<'a> RawTraceRecord<'a> {
 
         let (buf, rem) = buf.split_at(size_bytes);
         let (_, parsed) = match base_header.raw_type() {
-            METADATA_RECORD_TYPE => map(MetadataRecord::parse, |m| Self::Metadata(m))(buf),
-            INIT_RECORD_TYPE => map(InitRecord::parse, |i| Self::Init(i))(buf),
-            STRING_RECORD_TYPE => map(StringRecord::parse, |s| Self::String(s))(buf),
-            THREAD_RECORD_TYPE => map(ThreadRecord::parse, |t| Self::Thread(t))(buf),
-            EVENT_RECORD_TYPE => map(RawEventRecord::parse, |e| Self::Event(e))(buf),
-            BLOB_RECORD_TYPE => map(RawBlobRecord::parse, |b| Self::Blob(b))(buf),
+            METADATA_RECORD_TYPE => map(MetadataRecord::parse, |m| Self::Metadata(m)).parse(buf),
+            INIT_RECORD_TYPE => map(InitRecord::parse, |i| Self::Init(i)).parse(buf),
+            STRING_RECORD_TYPE => map(StringRecord::parse, |s| Self::String(s)).parse(buf),
+            THREAD_RECORD_TYPE => map(ThreadRecord::parse, |t| Self::Thread(t)).parse(buf),
+            EVENT_RECORD_TYPE => map(RawEventRecord::parse, |e| Self::Event(e)).parse(buf),
+            BLOB_RECORD_TYPE => map(RawBlobRecord::parse, |b| Self::Blob(b)).parse(buf),
             USERSPACE_OBJ_RECORD_TYPE => {
-                map(RawUserspaceObjRecord::parse, |u| Self::UserspaceObj(u))(buf)
+                map(RawUserspaceObjRecord::parse, |u| Self::UserspaceObj(u)).parse(buf)
             }
-            KERNEL_OBJ_RECORD_TYPE => map(RawKernelObjRecord::parse, |k| Self::KernelObj(k))(buf),
-            SCHEDULING_RECORD_TYPE => map(RawSchedulingRecord::parse, |s| Self::Scheduling(s))(buf),
-            LOG_RECORD_TYPE => map(RawLogRecord::parse, |l| Self::Log(l))(buf),
-            LARGE_RECORD_TYPE => map(RawLargeBlobRecord::parse, |l| Self::LargeBlob(l))(buf),
+            KERNEL_OBJ_RECORD_TYPE => {
+                map(RawKernelObjRecord::parse, |k| Self::KernelObj(k)).parse(buf)
+            }
+            SCHEDULING_RECORD_TYPE => {
+                map(RawSchedulingRecord::parse, |s| Self::Scheduling(s)).parse(buf)
+            }
+            LOG_RECORD_TYPE => map(RawLogRecord::parse, |l| Self::Log(l)).parse(buf),
+            LARGE_RECORD_TYPE => map(RawLargeBlobRecord::parse, |l| Self::LargeBlob(l)).parse(buf),
             raw_type => Ok((&[][..], Self::Unknown { raw_type })),
         }?;
 

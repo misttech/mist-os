@@ -50,6 +50,6 @@ fx set --auto-dir workbench_eng.x64 --with //src/graphics/display:tools \
     --with //src/graphics/display:tests
 ```
 
-[virtio-spec]: https://docs.oasis-open.org/virtio/virtio/v1.2/virtio-v1.2.html
-[virtio-spec-gpu-section]: https://docs.oasis-open.org/virtio/virtio/v1.2/cs01/virtio-v1.2-cs01.html#x1-3650007
-[virtio-spec-gpu-request-header]: https://docs.oasis-open.org/virtio/virtio/v1.2/cs01/virtio-v1.2-cs01.html#x1-3800007
+[virtio-spec]: https://docs.oasis-open.org/virtio/virtio/v1.3/virtio-v1.3.html
+[virtio-spec-gpu-section]: https://docs.oasis-open.org/virtio/virtio/v1.3/csd01/virtio-v1.3-csd01.html#x1-3960007
+[virtio-spec-gpu-request-header]: https://docs.oasis-open.org/virtio/virtio/v1.3/csd01/virtio-v1.3-csd01.html#x1-4110007

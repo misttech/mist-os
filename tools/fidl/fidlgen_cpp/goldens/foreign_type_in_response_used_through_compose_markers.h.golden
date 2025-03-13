@@ -30,6 +30,8 @@ class Top final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 4619180266423108403;
   };
 };
 
@@ -37,6 +39,6 @@ class Top final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_foreigntypeinresponseusedthroughcompose::Top> : public std::true_type{};
+struct IsProtocol<::test_foreigntypeinresponseusedthroughcompose::Top> : public std::true_type {};
 
 }  // namespace fidl

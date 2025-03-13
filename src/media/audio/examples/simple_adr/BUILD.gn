@@ -26,6 +26,6 @@ executable("bin") {
   ]
 }
 
-fuchsia_shell_package("simple_adr") {
+fuchsia_package("simple_adr") {
   deps = [ ":bin" ]
 }

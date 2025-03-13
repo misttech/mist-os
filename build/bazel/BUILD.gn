@@ -39,50 +39,18 @@ group("generate_fuchsia_sdk_repository") {
   deps = [ ":final_fuchsia_in_tree_sdk" ]
 }
 
+# LINT.IfChange
 generate_content_hash_file("fuchsia_in_tree_idk.hash") {
   source_paths = [ "$root_build_dir/sdk/exported/bazel_in_tree_idk" ]
-  output = "${bazel_main_top_dir}/workspace/fuchsia_build_generated/fuchsia_in_tree_idk.hash"
   deps = [ "//sdk:bazel_in_tree_idk" ]
 }
 
 generate_content_hash_file("fuchsia_internal_only_idk.hash") {
   source_paths = [ "$root_build_dir/sdk/exported/bazel_internal_only_idk" ]
-  output = "${bazel_main_top_dir}/workspace/fuchsia_build_generated/fuchsia_internal_only_idk.hash"
   deps = [ "//sdk:bazel_internal_only_idk" ]
 }
 
-# The @fuchsia_sdk repository is populated from the same content as @fuchsia_in_tree_idk
-# so create a symlink for its content hash for better speed. Then do the same for
-# @internal_sdk and @fuchsia_internal_only_idk.
-
-template("_create_content_hash_symlink") {
-  _link_target = invoker.target
-  _output =
-      "${bazel_main_top_dir}/workspace/fuchsia_build_generated/$target_name"
-  _input =
-      "${bazel_main_top_dir}/workspace/fuchsia_build_generated/${_link_target}"
-  _rebased_output = rebase_path(_output, root_build_dir)
-  action(target_name) {
-    script = "/bin/sh"
-    outputs = [ _output ]
-    inputs = [ _input ]
-    args = [
-      "-c",
-      "rm -f ${_rebased_output} && ln -sf ${_link_target} ${_rebased_output}",
-    ]
-    deps = invoker.deps
-  }
-}
-
-_create_content_hash_symlink("fuchsia_sdk.hash") {
-  target = "fuchsia_in_tree_idk.hash"
-  deps = [ ":fuchsia_in_tree_idk.hash" ]
-}
-
-_create_content_hash_symlink("internal_sdk.hash") {
-  target = "fuchsia_internal_only_idk.hash"
-  deps = [ ":fuchsia_internal_only_idk.hash" ]
-}
+# LINT.ThenChange(//build/bazel/scripts/workspace_utils.py)
 
 # Generate a symlink that points to the final version of the in-tree IDK
 # Nothing should depend on this directly, as it should only be used
@@ -212,10 +180,7 @@ group("bazel_action_allowlist") {
   ]
 
   # Bazel assembly used in tests
-  visibility += [
-    "//build/images/updates/tests:bazel_pb_bazel_build_group",
-    "//src/power/testing/system-integration/msd-arm-mali/custom-product:product_bundle_bazel_build_group",
-  ]
+  visibility += [ "//build/images/updates/tests:bazel_pb_bazel_build_group" ]
 
   # Bazel build related targets
   visibility += [

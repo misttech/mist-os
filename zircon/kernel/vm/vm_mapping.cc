@@ -234,7 +234,7 @@ zx_status_t VmMapping::ProtectLocked(vaddr_t base, size_t size, uint new_arch_mm
 
   DEBUG_ASSERT(object_);
   // grab the lock for the vmo
-  Guard<CriticalMutex> guard{object_->lock()};
+  Guard<VmoLockType> guard{object_->lock()};
 
   // Persist our current caching mode. Every protect region will have the same caching mode so we
   // can acquire this from any region.
@@ -333,7 +333,7 @@ zx_status_t VmMapping::UnmapLocked(vaddr_t base, size_t size) {
   // Grab the lock for the vmo. This is acquired here so that it is held continuously over both the
   // architectural unmap and the set_size_locked call.
   DEBUG_ASSERT(object_);
-  Guard<CriticalMutex> guard{object_->lock()};
+  Guard<VmoLockType> guard{object_->lock()};
 
   // Check if unmapping from one of the ends
   if (base_ == base || base + size == base_ + size_) {
@@ -352,12 +352,14 @@ zx_status_t VmMapping::UnmapLocked(vaddr_t base, size_t size) {
       // We need to remove ourselves from tree before updating base_, since base_ is the tree key.
       // In this case, size_ must also be updated outside of the tree to prevent overlapping ranges
       // when subtree_state_ is updated on insertion.
+      object_->RemoveMappingLocked(this);
       AssertHeld(parent_->lock_ref());
       fbl::RefPtr<VmAddressRegionOrMapping> ref(parent_->subregions_.RemoveRegion(this));
       base_ += size;
       object_offset_ += size;
       set_size_locked(size_ - size);
       parent_->subregions_.InsertRegion(ktl::move(ref));
+      object_->AddMappingLocked(this);
     } else {
       // Resize the protection range, will also cause it to discard any protection ranges that are
       // outside the new size.
@@ -650,6 +652,8 @@ class VmMappingCoalescer {
   // Submit any outstanding mappings to the MMU.
   zx_status_t Flush();
 
+  size_t TotalMapped() { return total_mapped_; }
+
   // Drop the current outstanding mappings without sending them to the MMU.
   void Drop() { count_ = 0; }
 
@@ -665,6 +669,7 @@ class VmMappingCoalescer {
   vaddr_t base_;
   paddr_t phys_[NumPages];
   size_t count_;
+  size_t total_mapped_ = 0;
   uint mmu_flags_;
   const ArchVmAspace::ExistingEntryAction existing_entry_action_;
 };
@@ -709,6 +714,7 @@ zx_status_t VmMappingCoalescer<NumPages>::Flush() {
   }
   DEBUG_ASSERT_MSG(ret != ZX_OK || mapped == count_, "mapped %zu, count %zu\n", mapped, count_);
   base_ += count_ * PAGE_SIZE;
+  total_mapped_ += count_;
   count_ = 0;
   return ret;
 }
@@ -743,7 +749,7 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
                object_->DebugIsRangePinned(object_offset_locked() + offset, len));
 
   // grab the lock for the vmo
-  Guard<CriticalMutex> object_guard{object_->lock()};
+  Guard<VmoLockType> object_guard{object_->lock()};
 
   // Cache whether the object is dirty tracked, we need to know this when computing mmu flags later.
   const bool dirty_tracked = object_->is_dirty_tracked();
@@ -911,7 +917,7 @@ zx_status_t VmMapping::DestroyLocked() {
 
   // grab the object lock to unmap and remove ourselves from its list.
   {
-    Guard<CriticalMutex> guard{object_->lock()};
+    Guard<VmoLockType> guard{object_->lock()};
     // Perform unmap holding the object lock to prevent mappings being modified in between.
     status = aspace_->arch_aspace().Unmap(base_, size_ / PAGE_SIZE, aspace_->EnlargeArchUnmap(),
                                           nullptr);
@@ -942,24 +948,16 @@ zx_status_t VmMapping::DestroyLocked() {
   return ZX_OK;
 }
 
-zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
-                                       MultiPageRequest* page_request) {
+ktl::pair<zx_status_t, uint32_t> VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
+                                                            const size_t additional_pages,
+                                                            MultiPageRequest* page_request) {
   VM_KTRACE_DURATION(
       2, "VmMapping::PageFault",
       ("user_id", KTRACE_ANNOTATED_VALUE(AssertHeld(lock_ref()), object_->user_id())),
       ("va", ktrace::Pointer{va}));
   canary_.Assert();
 
-  // Currently, PageFaultLocked only supports faulting a single page.
-  // TODO(https://fxbug.dev/380938506) expose num_pages argument to VmMapping::PageFaultLocked for
-  // use in VmAspace page fault functions. It will be the responsibility of the Aspace layer to
-  // calculate the fault range.
-  constexpr size_t num_pages = 1;
-
   DEBUG_ASSERT(IS_PAGE_ALIGNED(va));
-
-  // Maximum number of pages the optimisation can extend the function to fault.
-  static constexpr uint64_t kMaxOptPages = 16;
 
   // Fault batch size when num_pages > 1.
   static constexpr uint64_t kBatchPages = 16;
@@ -972,7 +970,7 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
 
   // Need to look up the mmu flags for this virtual address, as well as how large a region those
   // flags are for so we can cap the extra mappings we create.
-  MappingProtectionRanges::FlagsRange range =
+  const MappingProtectionRanges::FlagsRange range =
       ProtectRangesLocked().FlagsRangeAtAddr(base_, size_, va);
 
   // Build the mmu flags we need to have based on the page fault. This strategy of building the
@@ -1008,15 +1006,15 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
       // instruction fetch from a no execute region
       LTRACEF("permission failure: execute fault on no execute region\n");
     }
-    return ZX_ERR_ACCESS_DENIED;
+    return {ZX_ERR_ACCESS_DENIED, 0};
   }
 
   // grab the lock for the vmo
-  Guard<CriticalMutex> guard{object_->lock()};
+  Guard<VmoLockType> guard{object_->lock()};
 
   const uint64_t vmo_size = object_->size_locked();
   if (vmo_offset >= vmo_size) {
-    return ZX_ERR_OUT_OF_RANGE;
+    return {ZX_ERR_OUT_OF_RANGE, 0};
   }
 
   // Calculate the number of pages from va until the end of the VMO and protection range, so we
@@ -1024,34 +1022,33 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
   const size_t num_protection_range_pages = (range.region_top - va) / PAGE_SIZE;
   const size_t num_vmo_pages = (vmo_size - vmo_offset) / PAGE_SIZE;
 
-  // Calculate the number of pages from va until the end of the page table, so we don't make extra
-  // page table allocations for opportunistic pages.
-  vaddr_t last_va = va + ((num_pages - 1) * PAGE_SIZE);
-  const uint64_t next_pt_base = ArchVmAspace::NextUserPageTableOffset(last_va);
-  const size_t num_pt_pages = (next_pt_base - va) / PAGE_SIZE;
-
-  // Number of requested pages, trimmed to protection range & VMO.
-  const size_t num_requested_pages =
-      ktl::min({num_pages, num_protection_range_pages, num_vmo_pages});
-  DEBUG_ASSERT(is_in_range_locked(va, num_requested_pages * PAGE_SIZE));
-
-  // Number of opporturtunistic pages we can fault after the requested range. Currently, this is
-  // only applied if faulting 1 page.
-  const size_t ceil_pages_with_opt =
-      ktl::min({kMaxOptPages, num_pt_pages, num_protection_range_pages, num_vmo_pages});
-  const size_t num_opt_pages =
-      (num_requested_pages < ceil_pages_with_opt) ? ceil_pages_with_opt - num_requested_pages : 0;
-
   // Number of pages we're aiming to fault. If a range > 1 page is supplied, it is assumed the user
   // knows the appropriate range, so opportunistic pages will not be added.
-  const size_t num_fault_pages =
-      (num_pages == 1) ? num_requested_pages + num_opt_pages : num_requested_pages;
+  size_t num_fault_pages;
+  // Number of requested pages, trimmed to protection range & VMO.
+  size_t num_required_pages;
+  if (additional_pages == 0) {
+    // Calculate the number of pages from va until the end of the page table, so we don't make extra
+    // page table allocations for opportunistic pages.
+    const uint64_t next_pt_base = ArchVmAspace::NextUserPageTableOffset(va);
+    const size_t num_pt_pages = (next_pt_base - va) / PAGE_SIZE;
+    num_required_pages = 1;
+    // Number of opportunistic pages we can fault, including the required page.
+    num_fault_pages = ktl::min(
+        {kPageFaultMaxOptimisticPages, num_pt_pages, num_protection_range_pages, num_vmo_pages});
+  } else {
+    // Cap by requested pages
+    num_required_pages =
+        ktl::min({num_protection_range_pages, num_vmo_pages, additional_pages + 1});
+    num_fault_pages = num_required_pages;
+  }
+  DEBUG_ASSERT(num_required_pages > 0);
 
-  // Oppertunistic pages are not considered in currently_faulting optimisation, as it is not
+  // Opportunistic pages are not considered in currently_faulting optimisation, as it is not
   // guaranteed the mappings will be updated.
-  CurrentlyFaulting currently_faulting(this, vmo_offset, num_requested_pages * PAGE_SIZE);
+  CurrentlyFaulting currently_faulting(this, vmo_offset, num_required_pages * PAGE_SIZE);
 
-  static constexpr uint64_t coalescer_size = ktl::max(kMaxOptPages, kBatchPages);
+  static constexpr uint64_t coalescer_size = ktl::max(kPageFaultMaxOptimisticPages, kBatchPages);
 
   __UNINITIALIZED VmMappingCoalescer<coalescer_size> coalescer(
       this, va, range.mmu_flags, ArchVmAspace::ExistingEntryAction::Upgrade);
@@ -1063,7 +1060,7 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
     const size_t cursor_size = num_fault_pages * PAGE_SIZE;
     __UNINITIALIZED auto cursor = paged->GetLookupCursorLocked(vmo_offset, cursor_size);
     if (cursor.is_error()) {
-      return cursor.error_value();
+      return {cursor.error_value(), coalescer.TotalMapped()};
     }
     // Do not consider pages touched when mapping in, if they are actually touched they will
     // get an accessed bit set in the hardware.
@@ -1072,15 +1069,15 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
 
     // Fault requested pages.
     uint64_t offset = 0;
-    for (; offset < (num_requested_pages * PAGE_SIZE); offset += PAGE_SIZE) {
+    for (; offset < (num_required_pages * PAGE_SIZE); offset += PAGE_SIZE) {
       uint curr_mmu_flags = range.mmu_flags;
 
-      uint num_curr_pages = static_cast<uint>(num_requested_pages - (offset / PAGE_SIZE));
+      uint num_curr_pages = static_cast<uint>(num_required_pages - (offset / PAGE_SIZE));
       __UNINITIALIZED zx::result<VmCowPages::LookupCursor::RequireResult> result =
           cursor->RequirePage(write, num_curr_pages, page_request);
       if (result.is_error()) {
         coalescer.Flush();
-        return result.error_value();
+        return {result.error_value(), coalescer.TotalMapped()};
       }
 
       DEBUG_ASSERT(!write || result->writable);
@@ -1104,16 +1101,17 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
       if (status != ZX_OK) {
         // Flush any existing pages in the coalescer.
         coalescer.Flush();
-        return status;
+        return {status, coalescer.TotalMapped()};
       }
     }
 
     // Fault opportunistic pages. If a range is supplied, it is assumed the user knows the
     // appropriate range, so opportunistic pages will not be fault.
-    if (num_fault_pages > num_requested_pages) {
+    if (additional_pages == 0) {
+      DEBUG_ASSERT(num_fault_pages > 0);
       // Check how much space the coalescer has for faulting additional pages.
-      size_t extra_pages = coalescer.ExtraPageCapacityFrom(last_va + PAGE_SIZE);
-      extra_pages = ktl::min(extra_pages, num_opt_pages);
+      size_t extra_pages = coalescer.ExtraPageCapacityFrom(va + PAGE_SIZE);
+      extra_pages = ktl::min(extra_pages, num_fault_pages - 1);
 
       // Acquire any additional pages, but only if they already exist as the user has not attempted
       // to use these pages yet.
@@ -1137,14 +1135,14 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
 
     status = coalescer.AppendOrAdjustMapping(va, phys_base, range.mmu_flags);
     if (status != ZX_OK) {
-      return status;
+      return {status, coalescer.TotalMapped()};
     }
 
     // Extrapolate the pages from the base address.
     for (size_t offset = PAGE_SIZE; offset < phys_len; offset += PAGE_SIZE) {
       status = coalescer.Append(va + offset, phys_base + offset);
       if (status != ZX_OK) {
-        return status;
+        return {status, coalescer.TotalMapped()};
       }
     }
   }
@@ -1157,7 +1155,7 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
     // to unmap the range instead.
     currently_faulting.MappingUpdated();
   }
-  return status;
+  return {status, coalescer.TotalMapped()};
 }
 
 void VmMapping::ActivateLocked() {
@@ -1197,7 +1195,7 @@ void VmMapping::ActivateLocked() {
 }
 
 void VmMapping::Activate() {
-  Guard<CriticalMutex> guard{object_->lock()};
+  Guard<VmoLockType> guard{object_->lock()};
   ActivateLocked();
 }
 
@@ -1258,7 +1256,7 @@ void VmMapping::TryMergeRightNeighborLocked(VmMapping* right_candidate) {
   {
     // Although it was safe to read size_ without holding the object lock, we need to acquire it to
     // perform changes.
-    Guard<CriticalMutex> guard{AliasedLock, object_->lock(), right_candidate->object_->lock()};
+    Guard<VmoLockType> guard{AliasedLock, object_->lock(), right_candidate->object_->lock()};
 
     // Attempt to merge the protection region lists first. This is done first as a node allocation
     // might be needed, which could fail. If it fails we can still abort now without needing to roll
@@ -1365,7 +1363,7 @@ zx_status_t VmMapping::SetMemoryPriorityLocked(VmAddressRegion::MemoryPriority p
   memory_priority_ = priority;
   const bool is_high = priority == VmAddressRegion::MemoryPriority::HIGH;
   aspace_->ChangeHighPriorityCountLocked(is_high ? 1 : -1);
-  Guard<CriticalMutex> guard{object_->lock()};
+  Guard<VmoLockType> guard{object_->lock()};
   object_->ChangeHighPriorityCountLocked(is_high ? 1 : -1);
   return ZX_OK;
 }
@@ -1387,59 +1385,6 @@ void VmMapping::CommitHighMemoryPriority() {
   vmo->CommitHighPriorityPages(offset, len);
   // Ignore the return result of MapRange as this is just best effort.
   MapRange(offset, len, false, true);
-}
-
-zx_status_t MappingProtectionRanges::EnumerateProtectionRanges(
-    vaddr_t mapping_base, size_t mapping_size, vaddr_t base, size_t size,
-    fit::inline_function<zx_status_t(vaddr_t region_base, size_t region_len, uint mmu_flags)>&&
-        func) const {
-  DEBUG_ASSERT(size > 0);
-
-  // Have a short circuit for the single protect region case to avoid wavl tree processing in the
-  // common case.
-  if (protect_region_list_rest_.is_empty()) {
-    zx_status_t result = func(base, size, first_region_arch_mmu_flags_);
-    if (result == ZX_ERR_NEXT || result == ZX_ERR_STOP) {
-      return ZX_OK;
-    }
-    return result;
-  }
-
-  // See comments in the loop that explain what next and current represent.
-  auto next = protect_region_list_rest_.upper_bound(base);
-  auto current = next;
-  current--;
-  const vaddr_t range_top = base + (size - 1);
-  do {
-    // The region starting from 'current' and ending at 'next' represents a single protection
-    // domain. We first work that, remembering that either of these could be an invalid node,
-    // meaning the start or end of the mapping respectively.
-    const vaddr_t protect_region_base = current.IsValid() ? current->region_start : mapping_base;
-    const vaddr_t protect_region_top =
-        next.IsValid() ? (next->region_start - 1) : (mapping_base + (mapping_size - 1));
-    // We should only be iterating nodes that are actually part of the requested range.
-    DEBUG_ASSERT(base <= protect_region_top);
-    DEBUG_ASSERT(range_top >= protect_region_base);
-    // The region found is of an entire protection block, and could extend outside the requested
-    // range, so trim if necessary.
-    const vaddr_t region_base = ktl::max(protect_region_base, base);
-    const size_t region_len = ktl::min(protect_region_top, range_top) - region_base + 1;
-    zx_status_t result =
-        func(region_base, region_len,
-             current.IsValid() ? current->arch_mmu_flags : first_region_arch_mmu_flags_);
-    if (result != ZX_ERR_NEXT) {
-      if (result == ZX_ERR_STOP) {
-        return ZX_OK;
-      }
-      return result;
-    }
-    // Move to the next block.
-    current = next;
-    next++;
-    // Continue looping as long we operating on nodes that overlap with the requested range.
-  } while (current.IsValid() && current->region_start <= range_top);
-
-  return ZX_OK;
 }
 
 template <typename F>

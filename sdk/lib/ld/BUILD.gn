@@ -9,6 +9,7 @@ import("//build/toolchain/ifs_extract.gni")
 import("//build/toolchain/ifs_shared_library.gni")
 import("//build/toolchain/toolchain_environment.gni")
 import("//build/toolchain/zircon/user_basic_redirect.gni")
+import("distribution_manifest_prefix.gni")
 import("testing/test_elf_object.gni")
 
 # This is for executables linked to use the startup dynamic linker.  This does
@@ -48,6 +49,7 @@ library_headers("headers") {
     "lib/ld/decoded-module-in-memory.h",
     "lib/ld/decoded-module.h",
     "lib/ld/diagnostics.h",
+    "lib/ld/dl-phdr-info.h",
     "lib/ld/load-module.h",
     "lib/ld/load.h",
     "lib/ld/log-posix.h",
@@ -120,7 +122,12 @@ config("abi-soname") {
 }
 
 config("abi-interp") {
-  ldflags = [ "-Wl,-dynamic-linker=${toolchain_variant.libprefix}$abi_soname" ]
+  if (is_fuchsia) {
+    libprefix = toolchain_variant.libprefix
+  } else {
+    libprefix = ""
+  }
+  ldflags = [ "-Wl,-dynamic-linker=$libprefix$abi_soname" ]
 }
 
 generated_ifs_file("ld.ifs") {
@@ -193,6 +200,47 @@ template("ld_abi_user") {
   ld_label = ld_deps[0]
   assert(ld_deps == [ ld_label ])
 
+  if (defined(invoker.select) && invoker.select) {
+    # The ld-stub's install location is unrelated to the dependent executable
+    # itself, since ld-stub.so is just data for it and not meant to be
+    # compatible with its own ABI.  It has a path under lib/ just to make it
+    # easy to get an executable VMO under the Fuchsia package sandbox rules.
+    dist_target = redirect_target
+  } else {
+    dist_target = "$main_target.dist"
+
+    # This target rolls up the distribution_entries metadata from :ld-startup,
+    # which may be in a different toolchain whose $root_out_dir isn't known
+    # here.  That uses just the bare $abi_soname as installation destination.
+    # That's also what goes into PT_INTERP strings for uninstrumented
+    # executables (that is, ones built in variants with an empty libprefix).
+    #
+    # This is further prefixed by test packaging.  In the non-Fuchsia case,
+    # that expects a flat name and will insert the "lib/", so this isn't
+    # manifest rewriting step isn't really doing anything.  There is no
+    # non-test case for non-Fuchsia,
+    #
+    # For Fuchsia, it's the full path within the package namespace.  This is
+    # further prefixed in test cases; but there are also non-test cases.  It
+    # needs the "lib/" path prefix, but it also needs any to append to that any
+    # ${toolchain_variant.libprefix} that the dependent executable() will be
+    # using in its PT_INTERP.  That can only be added here because the
+    # user_basic_redirect() very well may reach a different user.basic variant
+    # that doesn't have the same (or any) libprefix.
+    distribution_manifest_prefix(dist_target) {
+      forward_variables_from(invoker,
+                             [
+                               "visibility",
+                               "testonly",
+                             ])
+      deps = [ ":$redirect_target" ]
+      if (is_fuchsia) {
+        # libprefix has a trailing slash, but prefix should not.
+        prefix = get_path_info("lib/${toolchain_variant.libprefix}any", "dir")
+      }
+    }
+  }
+
   # Leave breadcrumbs for test code to use via metadata.  For non-test code,
   # this just serves to reach the data_deps and metadata of various sorts.
   test_elf_object(main_target) {
@@ -201,7 +249,7 @@ template("ld_abi_user") {
                              "visibility",
                              "testonly",
                            ])
-    deps = [ ":$redirect_target" ]
+    deps = [ ":$dist_target" ]
   }
 
   # Get into the right toolchain and variant.
@@ -238,6 +286,10 @@ template("ld_abi_user") {
 # in which it could be in the same variant as its users.
 loadable_module("ld-stub") {
   visibility = [ "./*" ]
+
+  # Default output_name and output_dir produces this.
+  output_path = "$root_out_dir/$target_name.so"
+
   configs += [ ":abi-soname" ]
 
   if (is_linux) {
@@ -259,17 +311,24 @@ loadable_module("ld-stub") {
   # might be generated even with no C++ functions.
   exclude_toolchain_tags = [ "instrumented" ]
 
+  # Compute the ELF flavor to use in the installed file name.
+  if (toolchain_variant.tags + [ "ilp32" ] - [ "ilp32" ] !=
+      toolchain_variant.tags || current_cpu == "arm" || current_cpu == "x86" ||
+      current_cpu == "riscv") {
+    elf = "elf32le"
+  } else {
+    elf = "elf64le"
+  }
+
   metadata = {
     distribution_entries = [
       {
-        # This is further prefixed by test packaging.  In the non-Fuchsia case,
-        # that expects a flat name and will insert the "lib/".
-        if (is_fuchsia) {
-          destination = "lib/${toolchain_variant.libprefix}$target_name.so"
-        } else {
-          destination = "$target_name.so"
-        }
-        source = rebase_path("$root_out_dir/$target_name.so", root_build_dir)
+        # The install location doesn't depend on libprefix, since the place
+        # it's installed is where it's just data for a different program.  But
+        # file name it's installed under depends on ELF class/data and machine.
+        # This matches ld::RemoteAbiStub<...>::kFilename with "lib/" prefixed.
+        destination = "lib/ld-stub-$elf-$current_cpu.so"
+        source = rebase_path(output_path, root_build_dir)
         label = get_label_info(":$target_name", "label_with_toolchain")
       },
     ]
@@ -312,12 +371,10 @@ static_library("standalone") {
   visibility = [
     "./*",
     "//src/devices/bin/driver_manager/tests/modules/*",
+    "//zircon/kernel/lib/userabi/vdso/*",
   ]
 
   complete_static_lib = true
-
-  # TODO(https://fxbug.dev/374753100): Remove this after soft transition.
-  defines = [ "_LIBCPP_VERBOSE_ABORT_NOT_NOEXCEPT" ]
 
   sources = [ "standalone-assert.cc" ]
   deps = [
@@ -428,7 +485,7 @@ shared_library("ld-startup") {
   metadata = {
     distribution_entries = [
       {
-        destination = "lib/${toolchain_variant.libprefix}$abi_soname"
+        destination = abi_soname  # Rewritten by ld_abi_user().
         source = rebase_path(output_path, root_build_dir)
         label = get_label_info(":$target_name", "label_with_toolchain")
       },

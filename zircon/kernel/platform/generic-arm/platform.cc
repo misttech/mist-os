@@ -72,9 +72,6 @@
 
 #include <platform/ram_mappable_crashlog.h>
 
-// Defined in start.S.
-extern paddr_t kernel_entry_paddr;
-
 static ktl::atomic<int> panic_started;
 static ktl::atomic<int> halted;
 
@@ -157,7 +154,11 @@ zx_status_t platform_start_cpu(cpu_num_t cpu_id, uint64_t mpid) {
   clean_data_object(root_kernel_page_table_phys);
   arch::ThreadMemoryBarrier();
 
-  uint32_t ret = power_cpu_on(mpid, kernel_entry_paddr, 0);
+  uintptr_t kernel_secondary_entry_paddr =
+      KernelPhysicalLoadAddress() + (reinterpret_cast<uintptr_t>(&arm64_secondary_start) -
+                                     reinterpret_cast<uintptr_t>(__executable_start));
+
+  uint32_t ret = power_cpu_on(mpid, kernel_secondary_entry_paddr, 0);
   dprintf(INFO, "Trying to start cpu %u, mpid %#" PRIx64 " returned: %d\n", cpu_id, mpid, (int)ret);
   if (ret != 0) {
     return ZX_ERR_INTERNAL;
@@ -350,6 +351,8 @@ void platform_early_init(void) {
   // Initialize the PmmChecker now that the cmdline has been parsed.
   pmm_checker_init_from_cmdline();
 
+  arm64_boot_map_init(reinterpret_cast<uintptr_t>(__executable_start) -
+                      reinterpret_cast<uintptr_t>(KernelPhysicalLoadAddress()));
   for (const memalloc::Range& range : gPhysHandoff->memory.get()) {
     if (range.type == memalloc::Type::kPeripheral) {
       dprintf(INFO, "ZBI: peripheral range [%#" PRIx64 ", %#" PRIx64 ")\n", range.addr,

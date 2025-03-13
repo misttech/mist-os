@@ -19,6 +19,7 @@
         { service: "fuchsia.hardware.sdmmc.SdmmcMetadata" },
     ],
     use: [
+        { protocol: "fuchsia.scheduler.RoleManager" },
         { service: "fuchsia.hardware.sdmmc.SdmmcMetadata" },
         { service: "fuchsia.hardware.sdhci.Service" },
     ],

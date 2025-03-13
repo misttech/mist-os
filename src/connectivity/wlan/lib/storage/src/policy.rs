@@ -191,14 +191,8 @@ async fn init_telemetry_channel() -> Result<fidl_fuchsia_metrics::MetricEventLog
         ..Default::default()
     };
 
-    let experiment_ids = [];
-
     factory_proxy
-        .create_metric_event_logger_with_experiments(
-            &project_spec,
-            &experiment_ids,
-            cobalt_1dot1_server,
-        )
+        .create_metric_event_logger(&project_spec, cobalt_1dot1_server)
         .await
         .context("failed to create metrics event logger")?
         .map_err(|e| format_err!("failed to create metrics event logger: {:?}", e))?;

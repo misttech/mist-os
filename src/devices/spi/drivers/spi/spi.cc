@@ -21,20 +21,18 @@
 
 namespace spi {
 
-void SpiDevice::Start(fdf::StartCompleter completer) {
-  parent_.Bind(std::move(node()));
-
+zx::result<> SpiDriver::Start() {
   zx::result decoded = compat::GetMetadata<fuchsia_hardware_spi_businfo::SpiBusMetadata>(
       incoming(), DEVICE_METADATA_SPI_CHANNELS);
   if (!decoded.is_ok()) {
     FDF_LOG(ERROR, "Failed to decode metadata: %s", decoded.status_string());
-    return completer(decoded.take_error());
+    return decoded.take_error();
   }
 
   fuchsia_hardware_spi_businfo::SpiBusMetadata& metadata = *decoded;
   if (!metadata.bus_id()) {
     FDF_LOG(ERROR, "No bus ID metadata provided");
-    return completer(zx::error(ZX_ERR_INVALID_ARGS));
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   bus_id_ = *metadata.bus_id();
@@ -48,7 +46,7 @@ void SpiDevice::Start(fdf::StartCompleter completer) {
         fdf::SynchronizedDispatcher::Create({}, "SPI", [](fdf_dispatcher_t*) {}, role_name);
     if (result.is_error()) {
       FDF_LOG(ERROR, "Failed to create SynchronizedDispatcher: %s", result.status_string());
-      return completer(result.take_error());
+      return result.take_error();
     }
 
     // If scheduler role metadata was provided, create a new dispatcher using the role, and use that
@@ -60,40 +58,30 @@ void SpiDevice::Start(fdf::StartCompleter completer) {
 
   zx::result spi_impl_client_end = incoming()->Connect<fuchsia_hardware_spiimpl::Service::Device>();
   if (spi_impl_client_end.is_error()) {
-    return completer(spi_impl_client_end.take_error());
+    return spi_impl_client_end.take_error();
   }
 
   fdf::WireSharedClient spi_impl(*std::move(spi_impl_client_end), fidl_dispatcher()->get());
 
-  auto [controller_client, controller_server] =
-      fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
-  controller_.Bind(std::move(controller_client));
-
-  auto [node_client, node_server] = fidl::Endpoints<fuchsia_driver_framework::Node>::Create();
-  // Keep the Node client end so that the SPI root node is unbindable.
-  spi_node_.Bind(std::move(node_client));
-
-  fidl::Arena arena;
-  const auto args =
-      fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena).name(arena, "spi").Build();
-  auto result = parent_->AddChild(args, std::move(controller_server), std::move(node_server));
-  if (!result.ok()) {
-    return completer(zx::error(result.status()));
+  zx::result child = AddOwnedChild(kChildNodeName);
+  if (child.is_error()) {
+    FDF_LOG(ERROR, "Failed to add owned child: %s", child.status_string());
+    return child.take_error();
   }
-  if (result->is_error()) {
-    return completer(zx::error(ZX_ERR_INTERNAL));
-  }
+  child_ = std::move(child.value());
 
-  if (!metadata.channels()) {
-    FDF_LOG(INFO, "No channels supplied.");
-    completer(zx::ok());
+  if (metadata.channels()) {
+    if (zx::result result = AddChildren(metadata, std::move(spi_impl)); result.is_error()) {
+      return result.take_error();
+    }
   } else {
-    FDF_LOG(INFO, "%zu channels supplied.", metadata.channels()->size());
-    completer(AddChildren(metadata, std::move(spi_impl)));
+    FDF_LOG(INFO, "No channels supplied.");
   }
+
+  return zx::ok();
 }
 
-zx::result<> SpiDevice::AddChildren(
+zx::result<> SpiDriver::AddChildren(
     const fuchsia_hardware_spi_businfo::SpiBusMetadata& metadata,
     fdf::WireSharedClient<fuchsia_hardware_spiimpl::SpiImpl> client) {
   bool has_siblings = metadata.channels()->size() > 1;
@@ -170,7 +158,7 @@ zx::result<> SpiDevice::AddChildren(
                           .devfs_args(devfs)
                           .Build();
 
-    auto result = spi_node_->AddChild(args, std::move(controller_server), {});
+    auto result = fidl::WireCall(child_.node_)->AddChild(args, std::move(controller_server), {});
     if (!result.ok()) {
       FDF_LOG(ERROR, "Failed to add SPI child node: %s",
               result.error().FormatDescription().c_str());
@@ -189,4 +177,4 @@ zx::result<> SpiDevice::AddChildren(
 
 }  // namespace spi
 
-FUCHSIA_DRIVER_EXPORT(spi::SpiDevice);
+FUCHSIA_DRIVER_EXPORT(spi::SpiDriver);

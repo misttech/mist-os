@@ -129,6 +129,32 @@ func TestRunNinja(t *testing.T) {
 			},
 		},
 		{
+			// newer versions of ninja include exit code
+			name: "single failed target with exit code",
+			fail: true,
+			stdout: `
+                [792/4321](8) CXX a.o b.o
+                [793/4321](7) CXX d.o
+                FAILED: [code=1] d.o
+                output line 1
+                output line 2
+                [794/4321](4) CXX successful/e.o
+            `,
+			expectedFailureMessage: `
+                [793/4321](7) CXX d.o
+                FAILED: [code=1] d.o
+                output line 1
+                output line 2
+            `,
+			expectedActionData: &fintpb.NinjaActionMetrics{
+				InitialActions: 4321,
+				FinalActions:   4321,
+				ActionsByType: map[string]int32{
+					"CXX": 3,
+				},
+			},
+		},
+		{
 			name: "single failed target decreasing action counts",
 			fail: true,
 			stdout: `

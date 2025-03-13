@@ -5,6 +5,7 @@
 use crate::{trace_header, ParseError, ParseResult, THREAD_RECORD_TYPE};
 use nom::combinator::all_consuming;
 use nom::number::complete::le_u64;
+use nom::Parser;
 use std::num::NonZeroU8;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
@@ -94,9 +95,9 @@ impl ThreadRecord {
     pub(super) fn parse(buf: &[u8]) -> ParseResult<'_, Self> {
         let (buf, header) = ThreadHeader::parse(buf)?;
         let (rem, payload) = header.take_payload(buf)?;
-        let (payload, process_koid) = nom::combinator::map(le_u64, ProcessKoid)(payload)?;
+        let (payload, process_koid) = nom::combinator::map(le_u64, ProcessKoid).parse(payload)?;
         let (empty, thread_koid) =
-            all_consuming(nom::combinator::map(le_u64, ThreadKoid))(payload)?;
+            all_consuming(nom::combinator::map(le_u64, ThreadKoid)).parse(payload)?;
         assert!(empty.is_empty(), "all_consuming must not return any remaining buffer");
         let index =
             NonZeroU8::new(header.thread_index()).ok_or(nom::Err::Error(ParseError::InvalidRef))?;

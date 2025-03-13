@@ -4,11 +4,12 @@
 
 use ::async_trait::async_trait;
 use ::ffx_bluetooth_pandora_args::{PandoraCommand, PandoraSubCommand};
-use ::fho::{AvailabilityFlag, FfxMain, FfxTool, Result, SimpleWriter, ToolIO};
+use ::fho::{AvailabilityFlag, FfxMain, FfxTool, Result};
 use ::fidl_fuchsia_bluetooth_pandora::{
     GrpcServerControllerProxy, GrpcServerControllerStartRequest, RootcanalClientControllerProxy,
     RootcanalClientControllerStartRequest, ServiceError,
 };
+use ffx_writer::{SimpleWriter, ToolIO as _};
 use target_holders::toolbox;
 
 #[derive(FfxTool)]

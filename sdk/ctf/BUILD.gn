@@ -3,6 +3,8 @@
 # found in the LICENSE file.
 
 import("//build/config/build_api_module.gni")
+import("//build/python/python_action.gni")
+import("//build/python/python_binary.gni")
 import("//build/subbuild.gni")
 import("//build/testing/golden_files.gni")
 import("//sdk/ctf/build/ctf.gni")
@@ -64,6 +66,7 @@ group("ctf") {
     ":ctf_artifacts",
     ":golden_files",
     ":manifests",
+    ":summarize_ctf_fidl_methods($default_toolchain)",
     ":tests",
   ]
 }
@@ -134,27 +137,66 @@ generate_ctf_tests("check_test_templates") {
   deps = [ ":package_archive_manifest" ]
 }
 
-golden_files("golden_files") {
-  testonly = true
-  deps = [ ":package_archive_manifest($target_toolchain)" ]
+if (!is_host) {
+  golden_files("golden_files") {
+    testonly = true
+    deps = [ ":package_archive_manifest($target_toolchain)" ]
 
-  comparisons = []
-  foreach(dep, deps) {
-    _outputs = []
-    _outputs = get_target_outputs(dep)
-    _candidate = _outputs[0]
-    comparisons += [
-      {
-        golden = "//sdk/ctf/goldens/" + get_path_info(_candidate, "file")
-        candidate = _candidate
-      },
-    ]
+    comparisons = []
+    foreach(dep, deps) {
+      _outputs = []
+      _outputs = get_target_outputs(dep)
+      _candidate = _outputs[0]
+      comparisons += [
+        {
+          golden = "//sdk/ctf/goldens/" + get_path_info(_candidate, "file")
+          candidate = _candidate
+        },
+      ]
+    }
+  }
+
+  # Tests that we want to run in an FYI builder.
+  # We do not want failures from these tests to break the tree.
+  group("fyi") {
+    testonly = true
+    deps = []
   }
 }
 
-# Tests that we want to run in an FYI builder.
-# We do not want failures from these tests to break the tree.
-group("fyi") {
-  testonly = true
-  deps = []
+python_binary("summarize_fidl_methods_bin") {
+  enable_mypy = true
+  main_source = "summarize_fidl_methods.py"
+  deps = [ "//build/python/modules/depfile" ]
+}
+
+if (current_toolchain == default_toolchain) {
+  python_action("summarize_ctf_fidl_methods") {
+    binary_label = ":summarize_fidl_methods_bin"
+
+    sdk_fidl_json = "${root_build_dir}/sdk_fidl_json.json"
+    output_file = "${root_build_dir}/ctf_sdk_fidl_methods.json"
+    depfile = "${output_file}.d"
+
+    inputs = [ sdk_fidl_json ]
+    outputs = [ output_file ]
+
+    metadata = {
+      ctf_fidl_method_summary = [ output_file ]
+    }
+
+    args = [
+      "--sdk-fidl-json",
+      rebase_path(sdk_fidl_json, root_build_dir),
+      "--method-summary",
+      rebase_path(outputs[0], root_build_dir),
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
+    ]
+
+    deps = [
+      # Generates `sdk_fidl_json.json` and the files it refers to.
+      "//build/fidl:sdk_fidl",
+    ]
+  }
 }

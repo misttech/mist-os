@@ -30,6 +30,10 @@ enum class TtyType : uint8_t {
 struct Tty {
   TtyType type = TtyType::kAny;
   size_t index = 0;
+
+  // Provided when the `TtyType` is mapped to a specific vendor/manufacturer.
+  // Should match a devicetree binding vendor string.
+  std::string_view vendor;
 };
 
 // Best effort at parsing Linux-compatible `console=` command, if present.

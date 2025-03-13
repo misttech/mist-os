@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 using fuchsia.serial;
+using fuchsia.hardware.serialimpl;
 
-fuchsia.BIND_PROTOCOL == fuchsia.serial.BIND_PROTOCOL.IMPL_ASYNC;
+fuchsia.hardware.serialimpl.Service == fuchsia.hardware.serialimpl.Service.DriverTransport;
 fuchsia.BIND_SERIAL_CLASS == fuchsia.serial.BIND_SERIAL_CLASS.BLUETOOTH_HCI;

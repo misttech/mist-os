@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/test.gni")
 import("//build/testing/cc_test_executable.gni")
 
 # We don't have gunit in-tree, so this main function will replace all gunit
@@ -97,6 +98,18 @@ fuchsia_component("empty_test_component") {
   deps = [ ":gtest_runner_no_tests" ]
 }
 
+cc_test_executable("gtest_setup_failure") {
+  testonly = true
+  sources = [ "gtest_setup_failure.cc" ]
+
+  deps = [ "//src/lib/fxl/test:gtest_main" ]
+}
+
+fuchsia_unittest_component("gtest_setup_failure_component") {
+  component_name = "gtest_setup_failure"
+  deps = [ ":gtest_setup_failure" ]
+}
+
 executable_gtest_gunit("runner_sample_tests") {
   testonly = true
   sources = [ "sample_tests.cc" ]
@@ -180,6 +193,46 @@ fuchsia_component("concurrency_test_driver_component") {
   deps = [ ":concurrency_test_driver_gtest" ]
 }
 
+test("zxtest_success") {
+  sources = [ "zxtest_success.cc" ]
+  deps = [ "//zircon/system/ulib/zxtest" ]
+}
+
+fuchsia_unittest_component("zxtest_success_component") {
+  component_name = "zxtest_success"
+  deps = [ ":zxtest_success" ]
+}
+
+test("zxtest_failure") {
+  sources = [ "zxtest_failure.cc" ]
+  deps = [ "//zircon/system/ulib/zxtest" ]
+}
+
+fuchsia_unittest_component("zxtest_failure_component") {
+  component_name = "zxtest_failure"
+  deps = [ ":zxtest_failure" ]
+}
+
+test("zxtest_setup_failure") {
+  sources = [ "zxtest_setup_failure.cc" ]
+  deps = [ "//zircon/system/ulib/zxtest" ]
+}
+
+fuchsia_unittest_component("zxtest_setup_failure_component") {
+  component_name = "zxtest_setup_failure"
+  deps = [ ":zxtest_setup_failure" ]
+}
+
+test("zxtest_env_setup_failure") {
+  sources = [ "zxtest_env_setup_failure.cc" ]
+  deps = [ "//zircon/system/ulib/zxtest" ]
+}
+
+fuchsia_unittest_component("zxtest_env_setup_failure_component") {
+  component_name = "zxtest_env_setup_failure"
+  deps = [ ":zxtest_env_setup_failure" ]
+}
+
 group("gtest_all_bins") {
   testonly = true
   deps = [
@@ -227,7 +280,12 @@ fuchsia_package("gtest-runner-example-tests") {
     ":gtest_runner_sample_tests_component",
     ":gtest_runner_test_with_custom_args_component",
     ":gtest_runner_test_with_environ_component",
+    ":gtest_setup_failure_component",
     ":huge_gtest_component",
+    ":zxtest_env_setup_failure_component",
+    ":zxtest_failure_component",
+    ":zxtest_setup_failure_component",
+    ":zxtest_success_component",
     "//src/sys/component_manager/testing/echo_server",
     "//src/sys/test_runners:echo_server_for_concurrency_test",
   ]

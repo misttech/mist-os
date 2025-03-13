@@ -18,6 +18,11 @@ python_build_time_tests("compute_content_hash_test") {
   ]
 }
 
+python_build_time_tests("gn_targets_utils_test") {
+  tests = [ "gn_targets_utils_test.py" ]
+  inputs = [ "gn_targets_utils.py" ]
+}
+
 python_build_time_tests("remote_services_utils_test") {
   tests = [ "remote_services_utils_test.py" ]
   inputs = [ "remote_services_utils_test.py" ]
@@ -26,6 +31,20 @@ python_build_time_tests("remote_services_utils_test") {
 python_build_time_tests("workspace_utils_test") {
   tests = [ "workspace_utils_test.py" ]
   inputs = [ "workspace_utils.py" ]
+}
+
+python_build_time_tests("runfiles_utils_test") {
+  tests = [ "runfiles_utils_test.py" ]
+  inputs = [ "runfiles_utils.py" ]
+}
+
+python_build_time_tests("export_host_tests_test") {
+  tests = [ "export_host_tests_test.py" ]
+  inputs = [
+    "export_host_tests.py",
+    "runfiles_utils.py",
+    "workspace_utils.py",
+  ]
 }
 
 if (is_host) {
@@ -45,8 +64,11 @@ if (is_host) {
 group("tests") {
   testonly = true
   deps = [
+    ":export_host_tests_test($host_toolchain)",
+    ":gn_targets_utils_test($host_toolchain)",
     ":minimal_workspace_test($host_toolchain)",
     ":remote_services_utils_test",
+    ":runfiles_utils_test($host_toolchain)",
     ":workspace_utils_test($host_toolchain)",
   ]
 
@@ -54,8 +76,9 @@ group("tests") {
   # CI bots can run git commands properly.
   if (false) {
     deps += [
-      ":compute_content_hash_tests",
-      ":get_git_head_commit_tests",
+      ":compute_content_hash_test",
+      ":get_git_head_commit_test",
+      ":runfiles_utils_test",
     ]
   }
 }

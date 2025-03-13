@@ -14,11 +14,6 @@ _types_supporting_unstable_atoms = [
   "fidl_library",
   "cc_source_library",
 ]
-_categories_supporting_unstable_atoms = [
-  "internal",  # TODO(https://fxbug.dev/372986936): Remove when no more uses.
-  "partner_internal",  # TODO(https://fxbug.dev/364727245): Remove when fixed.
-  "partner",
-]
 _types_not_requiring_compatibility = [
   "bind_library",
   "companion_host_tool",
@@ -58,10 +53,9 @@ _types_not_requiring_compatibility = [
 #     Describes the availability of the element.
 #     Possible values, from most restrictive to least restrictive:
 #       - internal         : the atom is exposed in-tree to the Bazel SDK build via `@internal_sdk`.
-#       - cts              : Currently unsupported - See https://fxbug.dev/367760026.
+#       - compat_test      : May be used in CTF realm proxies to enable tests to configure the target.
 #       - partner_internal : The atom may be used internally by other atoms in SDKs for partners.
 #       - partner          : The atom may be included in SDKs for partners.
-#       - public           : The atom may be included in SDKs for all Fuchsia developers.
 #
 #   sdk_area (optional)
 #     The API area responsible for maintaining this SDK atom. See
@@ -180,10 +174,9 @@ template("sdk_atom") {
 
   _allowed_categories = [
     # "internal" is deprecated; only specific legacy cases below are allowed.
-    "cts",
+    "compat_test",
     "partner_internal",
     "partner",
-    "public",
   ]
 
   assert(
@@ -194,12 +187,15 @@ template("sdk_atom") {
           category == "internal",
       "'${target_name}' has unsupported SDK category '${category}'. Must be one of ${_allowed_categories}.")
 
-  # "cts" is not properly implemented and should not be used. See
-  # https://fxbug.dev/367760026.
-  # The public IDK does not yet exist, so "public" should not be used.
+  # Atom types other than FIDL must be in the "partner" SDK category because
+  # they are exposed directly to developers. If you have a use case for another
+  # type in a different category, contact the Platform Versioning team.
   assert(
-      category != "cts" && category != "public",
-      "'${target_name}' has SDK category '${category}', which is not yet supported.")
+      category == "partner" || type == "fidl_library" ||
+          # TODO(https://fxbug.dev/372986936): Remove once all exceptions in the
+          # assert below have been removed.
+          category == "internal",
+      "Atoms of type '${type}' must be in the 'partner' SDK category ('${category}').")
 
   if (category == "internal" &&
       # `sdk_source_set()` enforces an allowlist.
@@ -239,6 +235,7 @@ template("sdk_atom") {
       "`meta.stable` must be set if and only if the type ('${type}') is one of ${_types_supporting_unstable_atoms}.")
   if (defined(meta.stable)) {
     if (meta.stable) {
+      # TODO(https://fxbug.dev/372986936): Remove when no more uses.
       assert(category != "internal",
              "Atoms in SDK category '${category}' cannot be `stable`.")
       add_stable_property = true
@@ -246,12 +243,14 @@ template("sdk_atom") {
       # For types that specify stable, ensure the `api` file was specified for stable atoms.
       assert(defined(invoker.api))
     } else {
-      is_category_supporting_unstable =
-          _categories_supporting_unstable_atoms + [ category ] - [ category ] !=
-          _categories_supporting_unstable_atoms
+      # Categories other than "partner" exist only to ensure stability and thus
+      # should not have unstable atoms. If you have a use case for unstable
+      # atoms in another category, contact the Platform Versioning team.
       assert(
-          is_category_supporting_unstable,
-          "`meta.stable` must be true unless the SDK category ('${category}') is one of ${_categories_supporting_unstable_atoms}.")
+          category == "partner" ||
+              # TODO(https://fxbug.dev/372986936): Remove when no more uses.
+              category == "internal",
+          "`meta.stable` must be true unless the SDK category ('${category}') is 'partner'.")
       add_stable_property = false
     }
   } else {

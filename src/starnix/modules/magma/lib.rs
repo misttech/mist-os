@@ -8,7 +8,6 @@ mod image_file;
 mod init;
 #[allow(clippy::module_inception)]
 mod magma;
-mod vulkan;
 
 pub use ffi::get_magma_params;
 pub use file::MagmaFile;

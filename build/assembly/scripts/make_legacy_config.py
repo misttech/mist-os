@@ -12,7 +12,6 @@ import argparse
 import json
 import logging
 import sys
-from collections import defaultdict
 from dataclasses import dataclass
 
 import serialization
@@ -67,7 +66,6 @@ def copy_to_assembly_input_bundle(
     boot_args: list[str],
     config_data_entries: FileEntrylist,
     outdir: FilePath,
-    shell_commands: dict[str, list[str]],
     core_realm_shards: list[FilePath],
     bootfs_files_package: FilePath | None,
 ) -> tuple[AssemblyInputBundle, FilePath, DepSet]:
@@ -105,7 +103,6 @@ def copy_to_assembly_input_bundle(
     aib_creator.packages.update([PackageDetails(m, "cache") for m in cache])
 
     aib_creator.config_data = config_data_entries
-    aib_creator.shell_commands = shell_commands
 
     if core_realm_shards:
         # Pass the compiled_package_shards
@@ -137,9 +134,6 @@ def main() -> None:
     parser.add_argument("--outdir", required=True)
     parser.add_argument("--depfile")
     parser.add_argument("--export-manifest")
-    parser.add_argument(
-        "--shell-commands-packages-list", type=argparse.FileType("r")
-    )
     parser.add_argument("--core-realm-shards-list", type=argparse.FileType("r"))
     parser.add_argument("--bootfs-files-package", required=True)
     args = parser.parse_args()
@@ -152,26 +146,6 @@ def main() -> None:
         ]
     else:
         config_data_entries = []
-
-    shell_commands: dict[str, set[str]] = dict()
-    shell_deps = set()
-    if args.shell_commands_packages_list:
-        shell_commands = defaultdict(set)
-        for package in json.load(args.shell_commands_packages_list):
-            manifest_path, package_name = (
-                package["manifest_path"],
-                package["package_name"],
-            )
-            with open(manifest_path, "r") as fname:
-                package_aib = json_load(PackageManifest, fname)
-                shell_deps.add(manifest_path)
-                shell_commands[package_name].update(
-                    {
-                        blob.path
-                        for blob in package_aib.blobs
-                        if blob.path.startswith("bin/")
-                    }
-                )
 
     core_realm_shards: list[FilePath] = []
     if args.core_realm_shards_list:
@@ -208,6 +182,19 @@ def main() -> None:
         bootfs_packages_list = json.load(args.bootfs_packages_list)
         bootfs_packages = bootfs_packages_list
 
+    # Only include a bootfs files package if it's not empty.
+    bootfs_files_package = None
+    if args.bootfs_files_package:
+        with open(args.bootfs_files_package, "r") as fname:
+            bootfs_files_package_manifest = json_load(PackageManifest, fname)
+            if [
+                path
+                for path in bootfs_files_package_manifest.blobs_by_path().keys()
+                if path != "meta/"
+            ]:
+                # there are bootfs files, so include the package:
+                bootfs_files_package = args.bootfs_files_package
+
     # Create an Assembly Input Bundle from the remaining contents
     (
         assembly_input_bundle,
@@ -221,15 +208,10 @@ def main() -> None:
         boot_args,
         [entry.as_file_entry() for entry in config_data_entries],
         args.outdir,
-        {
-            package: sorted(list(components))
-            for (package, components) in shell_commands.items()
-        },
         core_realm_shards,
-        args.bootfs_files_package,
+        bootfs_files_package,
     )
 
-    deps.update(shell_deps)
     # Write out a fini manifest of the files that have been copied, to create a
     # package or archive that contains all of the files in the bundle.
     if args.export_manifest:

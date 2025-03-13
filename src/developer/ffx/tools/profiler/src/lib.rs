@@ -9,7 +9,8 @@ use args::{ProfilerCommand, ProfilerSubCommand};
 use async_fs::File;
 use core::fmt;
 use errors::{ffx_bail, ffx_error};
-use fho::{deferred, FfxMain, FfxTool, MachineWriter, ToolIO};
+use ffx_writer::{MachineWriter, ToolIO as _};
+use fho::{deferred, FfxMain, FfxTool};
 use fuchsia_async::unblock;
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -278,7 +279,6 @@ async fn run_session(
         std::path::PathBuf::from(&opts.output)
     };
     symbolize(&unsymbolized_path, &symbolized_path).await?;
-
     if !opts.pprof_conversion {
         return Ok(());
     }

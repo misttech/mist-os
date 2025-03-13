@@ -10,12 +10,15 @@ use wlan_rsn::{Error, NegotiatedProtection};
 pub trait Authenticator: std::fmt::Debug + std::marker::Send {
     fn get_negotiated_protection(&self) -> &NegotiatedProtection;
     fn reset(&mut self);
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     fn initiate(&mut self, update_sink: &mut UpdateSink) -> Result<(), Error>;
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     fn on_eapol_frame(
         &mut self,
         update_sink: &mut UpdateSink,
         frame: eapol::Frame<&[u8]>,
     ) -> Result<(), Error>;
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     fn on_eapol_conf(
         &mut self,
         update_sink: &mut UpdateSink,

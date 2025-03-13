@@ -105,7 +105,7 @@ audio_core_api_test_component("audio-clock-pipeline-test") {
   executable_deps = [
     "//sdk/lib/media/audio/cpp",
     "//sdk/lib/stdcompat",
-    "//src/media/audio/audio_core/shared/mixer",
+    "//src/media/audio/audio_core/mixer",
   ]
   test_type = "system"
 }
@@ -131,7 +131,7 @@ audio_core_api_test_component("audio-core-thermal-test") {
 
 audio_core_api_test_component("audio-device-enumerator-test") {
   source = "audio_device_enumerator_test.cc"
-  executable_deps = [ "//src/media/audio/audio_core/v1/testing" ]
+  executable_deps = [ "//src/media/audio/audio_core/testing:unittest_support" ]
   test_type = "system"
 }
 
@@ -167,7 +167,7 @@ audio_core_api_test_component("audio-renderer-pipeline-test") {
   source = "audio_renderer_pipeline_test.cc"
   executable_deps = [
     ":audio_api_pipeline_test_shared",
-    "//src/media/audio/audio_core/shared/mixer",
+    "//src/media/audio/audio_core/mixer",
     "//src/media/audio/lib/analysis",
   ]
   test_type = "system"

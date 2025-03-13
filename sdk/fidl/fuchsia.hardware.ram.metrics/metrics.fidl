@@ -78,3 +78,8 @@ closed protocol Device {
         value uint32;
     }) error zx.Status;
 };
+
+// Added to allow service connection to replace devfs
+service Service {
+    device client_end:Device;
+};

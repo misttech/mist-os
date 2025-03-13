@@ -85,6 +85,8 @@ class FakeCompositeRingBuffer final
   static uint64_t count() { return count_; }
   FakeComposite* parent() { return parent_; }
 
+  bool responsive();
+
  private:
   static inline uint64_t count_ = 0;
 
@@ -95,32 +97,41 @@ class FakeCompositeRingBuffer final
   uint32_t bytes_per_frame_;
 
   // GetProperties
+  std::vector<GetPropertiesCompleter::Async> get_properties_completers_;
   std::optional<bool> needs_cache_flush_or_invalidate_ = kDefaultNeedsCacheFlushInvalidate;
   std::optional<zx::duration> turn_on_delay_ = kDefaultTurnOnDelay;
   std::optional<uint32_t> driver_transfer_bytes_ = kDefaultDriverTransferBytes;
 
   // GetVmo
+  std::vector<GetVmoCompleter::Async> get_vmo_completers_;
   uint32_t requested_frames_;
   zx::vmo vmo_;
   size_t allocated_size_;
 
   // Start / Stop
+  std::vector<StartCompleter::Async> start_completers_;
+  std::vector<StopCompleter::Async> stop_completers_;
   bool started_ = false;
   zx::time mono_start_time_;
 
   // SetActiveChannels
   bool supports_active_channels_ = kDefaultSupportsActiveChannels;
+  std::vector<SetActiveChannelsCompleter::Async> set_active_channels_completers_;
   uint64_t active_channels_bitmask_;
   zx::time set_active_channels_completed_at_;
 
   // WatchDelayInfo
-  std::optional<WatchDelayInfoCompleter::Async> watch_delay_info_completer_;
+  std::vector<WatchDelayInfoCompleter::Async> watch_delay_info_completers_;
   std::optional<zx::duration> internal_delay_ = kDefaultInternalDelay;
   std::optional<zx::duration> external_delay_;
   bool delays_have_changed_ = true;
 
   // WatchClockRecoveryPositionInfo
+  std::vector<WatchClockRecoveryPositionInfoCompleter::Async>
+      watch_clock_recovery_position_info_completers_;
   uint32_t clock_recovery_notifications_per_ring_ = 0;
+
+  std::vector<fidl::UnknownMethodCompleter::Async> unknown_method_completers_;
 };
 
 }  // namespace media_audio

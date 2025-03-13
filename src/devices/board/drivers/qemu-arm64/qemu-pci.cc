@@ -27,7 +27,7 @@ namespace fpbus = fuchsia_hardware_platform_bus;
 zx_status_t QemuArm64Pciroot::Create(PciRootHost* root_host, QemuArm64Pciroot::Context ctx,
                                      zx_device_t* parent, const char* name) {
   auto pciroot = new QemuArm64Pciroot(root_host, ctx, parent, name);
-  return pciroot->DdkAdd(name);
+  return pciroot->DdkAdd(ddk::DeviceAddArgs(name).set_proto_id(ZX_PROTOCOL_PCIROOT));
 }
 
 zx_status_t QemuArm64Pciroot::PcirootGetBti(uint32_t bdf, uint32_t index, zx::bti* bti) {

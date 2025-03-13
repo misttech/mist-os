@@ -7,7 +7,7 @@ use component_events::events::*;
 use component_events::matcher::*;
 use component_events::sequence::*;
 use diagnostics_data::{Data, Logs};
-use diagnostics_reader::ArchiveReader;
+use diagnostics_reader::{ArchiveReader, LogsArchiveReader};
 use fuchsia_async as fasync;
 use fuchsia_component_test::{Capability, ChildOptions, ChildRef, RealmBuilder, Ref, Route};
 use regex::Regex;
@@ -157,7 +157,7 @@ pub async fn run_test<'a, Fut, FutLogsReader>(
     protocol_name: &str,
     test_kind: TestKind<'a>,
     input_setter: impl FnOnce(RealmBuilder, ChildRef) -> Fut,
-    logs_reader: impl Fn(ArchiveReader) -> FutLogsReader,
+    logs_reader: impl Fn(LogsArchiveReader) -> FutLogsReader,
 ) -> Result<(), Error>
 where
     Fut: Future<Output = Result<(RealmBuilder, ChildRef), Error>> + 'a,
@@ -288,10 +288,10 @@ where
         .unwrap();
 
     // Setup the archivist link, but don't read the logs yet!
-    let mut archivist_reader = ArchiveReader::new();
+    let mut archivist_reader = ArchiveReader::logs();
     child_names.iter().for_each(|child_name| {
         let moniker = format!("realm_builder:{}/{}", realm_instance.root.child_name(), child_name);
-        archivist_reader.select_all_for_moniker(moniker.as_str());
+        archivist_reader.select_all_for_component(moniker.as_str());
     });
 
     // Clean up the realm instance, and close all open processes.
@@ -353,7 +353,10 @@ pub fn logs_to_str_filtered<'a>(
 ///   /pkg/data/goldens/test_foo_bar_proxy.log.golden
 ///   /pkg/data/goldens/test_foo_bar_server.log.golden
 ///
-pub async fn assert_logs_eq_to_golden<'a>(log_reader: &'a ArchiveReader, comp: &'a dyn Component) {
+pub async fn assert_logs_eq_to_golden<'a>(
+    log_reader: &'a LogsArchiveReader,
+    comp: &'a dyn Component,
+) {
     assert_filtered_logs_eq_to_golden(&log_reader, comp, |_raw_log| true).await;
 }
 
@@ -361,7 +364,7 @@ pub async fn assert_logs_eq_to_golden<'a>(log_reader: &'a ArchiveReader, comp: &
 /// arbitrary logs. This is particularly useful if one or more languages produces logs that we don't
 /// want to include in the final, common output to be compared across language implementations.
 pub async fn assert_filtered_logs_eq_to_golden<'a>(
-    log_reader: &'a ArchiveReader,
+    log_reader: &'a LogsArchiveReader,
     comp: &'a dyn Component,
     filter_by_log: impl FnMut(&&Data<Logs>) -> bool + 'a + Copy,
 ) {
@@ -376,7 +379,7 @@ pub async fn assert_filtered_logs_eq_to_golden<'a>(
     let mut attempts = 0;
     while attempts < MAX_ATTEMPTS {
         attempts += 1;
-        let raw_logs = log_reader.snapshot::<Logs>().await.expect("can read from the accessor");
+        let raw_logs = log_reader.snapshot().await.expect("can read from the accessor");
 
         // Compare it to the actual components actual logs, asserting if there is a mismatch.
         let logs = logs_to_str_filtered(&raw_logs, Some(vec![comp]), filter_by_log)

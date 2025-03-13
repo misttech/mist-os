@@ -18,6 +18,8 @@
 
 namespace dl {
 
+using DlIteratePhdrCallback = int(dl_phdr_info*, size_t, void*);
+
 enum OpenSymbolScope : int {
   kLocal = RTLD_LOCAL,
   kGlobal = RTLD_GLOBAL,
@@ -124,11 +126,9 @@ class RuntimeDynamicLinker {
     // back to the caller.
     RuntimeModule& root_module = pending_modules.front();
 
-    // TODO(https://fxbug.dev/333573264): this assumes that all pending modules
-    // are not already in modules_.
     // After successful loading and relocation, append the new permanent modules
     // created by the linking session to the dynamic linker's module list.
-    modules_.splice(modules_.end(), pending_modules);
+    AddNewModules(std::move(pending_modules));
 
     // If RTLD_GLOBAL was passed, make the module and all of its dependencies
     // global. This is done after modules from the linking session have been
@@ -141,9 +141,18 @@ class RuntimeDynamicLinker {
     return diag.ok(&root_module);
   }
 
+  // Create a `dl_phdr_info` for each module in `modules_` and pass it
+  // to the caller-supplied `callback`. Iteration ceases when `callback` returns
+  // a non-zero value. The result of the last callback function to run is
+  // returned to the caller.
+  int IteratePhdrInfo(DlIteratePhdrCallback* callback, void* data) const;
+
  private:
   // A The RuntimeDynamicLinker can only be created with RuntimeDynamicLinker::Create...).
   RuntimeDynamicLinker() = default;
+
+  // Append new modules to the end of the `modules_`.
+  void AddNewModules(ModuleList modules);
 
   // Attempt to find the loaded module with the given name, returning a nullptr
   // if the module was not found.
@@ -161,6 +170,10 @@ class RuntimeDynamicLinker {
   // passive ABI into the RuntimeDynamicLinker.
   void PopulateStartupModules(fbl::AllocChecker& ac, const ld::abi::Abi<>& abi);
 
+  ld::DlPhdrInfoCounts dl_phdr_info_counts() const {
+    return {.adds = loaded_, .subs = loaded_ - modules_.size()};
+  }
+
   // The RuntimeDynamicLinker owns the list of all 'live' modules that have been
   // loaded into the system image.
   ModuleList modules_;
@@ -169,6 +182,10 @@ class RuntimeDynamicLinker {
   // creation and passed to LinkinSessions to be able to detect TLS modules
   // during relocation.
   size_type max_static_tls_modid_ = 0;
+
+  // This is incremented every time a module is loaded into the system. This
+  // number only ever increases and includes startup modules.
+  size_t loaded_ = 0;
 };
 
 }  // namespace dl

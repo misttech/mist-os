@@ -33,7 +33,7 @@ const CIRCUIT_REFRESH_RATE: std::time::Duration = std::time::Duration::from_mill
 
 #[async_trait::async_trait(?Send)]
 impl<T: TryFromEnv + 'static> FfxMain for DaemonStartTool<T> {
-    type Writer = fho::SimpleWriter;
+    type Writer = ffx_writer::SimpleWriter;
 
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
         if self.cmd.background {
@@ -102,8 +102,8 @@ mod test {
                 .await
                 .unwrap(),
         };
-        let test_buffers = fho::TestBuffers::default();
-        let writer = fho::SimpleWriter::new_test(&test_buffers);
+        let test_buffers = ffx_writer::TestBuffers::default();
+        let writer = ffx_writer::SimpleWriter::new_test(&test_buffers);
         assert!(tool.main(writer).await.is_ok());
     }
 
@@ -119,8 +119,8 @@ mod test {
                 .await
                 .unwrap(),
         };
-        let test_buffers = fho::TestBuffers::default();
-        let writer = fho::SimpleWriter::new_test(&test_buffers);
+        let test_buffers = ffx_writer::TestBuffers::default();
+        let writer = ffx_writer::SimpleWriter::new_test(&test_buffers);
         assert!(tool.main(writer).await.is_err());
     }
 }

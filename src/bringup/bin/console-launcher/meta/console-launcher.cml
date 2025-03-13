@@ -99,6 +99,7 @@
                 "fuchsia.diagnostics.host.ArchiveAccessor",
                 "fuchsia.diagnostics.LogSettings",
                 "fuchsia.driver.development.Manager",
+                "fuchsia.driver.registrar.DriverRegistrar",
                 "fuchsia.feedback.DataProvider",
                 "fuchsia.fshost.Admin",
                 "fuchsia.hardware.power.statecontrol.Admin",
@@ -175,6 +176,11 @@
             availability: "optional",
         },
         {
+            // Used by usbctl
+            service: "fuchsia.hardware.usb.peripheral.Service",
+            availability: "optional",
+        },
+        {
             service: "fuchsia.hardware.nfc.Service",
             availability: "optional",
         },
@@ -182,11 +188,11 @@
             service: "fuchsia.gpu.magma.Service",
             availability: "optional",
         },
+        { service: "fuchsia.hardware.pty.Service" },
         {
             protocol: [
                 "fuchsia.kernel.Counter",
                 "fuchsia.kernel.DebugBroker",
-                "fuchsia.tracing.kernel.Controller",
             ],
 
             // The source of this protocol, kernel_debug_broker,

@@ -4,6 +4,7 @@
 
 #include "src/developer/debug/zxdb/expr/resolve_array.h"
 
+#include "src/developer/debug/shared/logging/logging.h"
 #include "src/developer/debug/zxdb/common/err.h"
 #include "src/developer/debug/zxdb/expr/eval_context.h"
 #include "src/developer/debug/zxdb/expr/expr_value.h"
@@ -12,6 +13,8 @@
 #include "src/developer/debug/zxdb/expr/resolve_ptr_ref.h"
 #include "src/developer/debug/zxdb/symbols/arch.h"
 #include "src/developer/debug/zxdb/symbols/array_type.h"
+#include "src/developer/debug/zxdb/symbols/collection.h"
+#include "src/developer/debug/zxdb/symbols/data_member.h"
 #include "src/developer/debug/zxdb/symbols/modified_type.h"
 #include "src/developer/debug/zxdb/symbols/symbol_data_provider.h"
 #include "src/developer/debug/zxdb/symbols/type.h"
@@ -31,20 +34,24 @@ struct ArrayInfo {
 
   // Guaranteed for kind != kError.
   fxl::RefPtr<Type> original_value_type;  // Use for error messages.
-  fxl::RefPtr<Type> concrete_value_type;  // Use to get the size, etc.
+  fxl::RefPtr<Type> concrete_value_type;  // Use to get the element count, etc.
+  fxl::RefPtr<Type> erased_type;          // Use to get the size of one element, if the type does
+                                          // not match |concrete_value_type|.
 
   // Valid when kind == kStatic.
   fxl::RefPtr<ArrayType> static_type;
 };
 
 // On success, the ArrayInfo will have kind != kError.
-ErrOr<ArrayInfo> ClassifyArray(const fxl::RefPtr<EvalContext>& eval_context,
-                               const ExprValue& array) {
+ErrOr<ArrayInfo> ClassifyArray(const fxl::RefPtr<EvalContext>& eval_context, const ExprValue& array,
+                               const Type* erased_type) {
   if (!array.type())
     return Err("No type information.");
 
   ArrayInfo info;
+  info.erased_type = RefPtrTo(erased_type);
   fxl::RefPtr<Type> concrete = eval_context->GetConcreteType(array.type());
+
   if (const ArrayType* array_type = concrete->As<ArrayType>()) {
     info.kind = ArrayKind::kStatic;
     info.static_type = RefPtrTo(array_type);
@@ -61,6 +68,7 @@ ErrOr<ArrayInfo> ClassifyArray(const fxl::RefPtr<EvalContext>& eval_context,
 
       info.original_value_type = RefPtrTo(modified_type->modified().Get()->As<Type>());
       info.concrete_value_type = eval_context->GetConcreteType(info.original_value_type);
+
       if (!info.concrete_value_type)
         return Err("Bad type information for '%s'.", array.type()->GetFullName().c_str());
 
@@ -142,28 +150,36 @@ void ResolvePointerArray(const fxl::RefPtr<EvalContext>& eval_context, const Exp
     return cb(pointer_value_or.err());
   TargetPointer base_address = pointer_value_or.value();
 
-  uint32_t type_size = info.concrete_value_type->byte_size();
+  fxl::RefPtr<Type> type;
+  if (info.erased_type) {
+    type = info.erased_type;
+  } else {
+    type = info.concrete_value_type;
+  }
+
+  uint32_t type_size = type->byte_size();
   TargetPointer begin_address = base_address + type_size * begin_index;
   TargetPointer end_address = base_address + type_size * end_index;
 
   eval_context->GetDataProvider()->GetMemoryAsync(
       begin_address, end_address - begin_address,
-      [info, begin_address, count = end_index - begin_index, cb = std::move(cb)](
+      [begin_address, type, count = end_index - begin_index, cb = std::move(cb)](
           const Err& err, std::vector<uint8_t> data) mutable {
         if (err.has_error())
           return cb(err);
 
         // Convert returned raw memory to ExprValues.
-        uint32_t type_size = info.concrete_value_type->byte_size();
         std::vector<ExprValue> result;
         result.reserve(count);
+        uint32_t type_size = type->byte_size();
+
         for (size_t i = 0; i < count; i++) {
           size_t begin_offset = i * type_size;
           if (begin_offset + type_size > data.size())
             break;  // Ran out of data, leave remaining results uninitialized.
 
           std::vector<uint8_t> item_data(&data[begin_offset], &data[begin_offset + type_size]);
-          result.emplace_back(info.original_value_type, std::move(item_data),
+          result.emplace_back(type, std::move(item_data),
                               ExprValueSource(begin_address + begin_offset));
         }
         cb(std::move(result));
@@ -189,9 +205,10 @@ void DoResolveArray(const fxl::RefPtr<EvalContext>& eval_context, const ExprValu
 
 }  // namespace
 
-void ResolveArray(const fxl::RefPtr<EvalContext>& eval_context, const ExprValue& array,
-                  size_t begin_index, size_t end_index, fit::callback<void(ErrOrValueVector)> cb) {
-  auto info_or = ClassifyArray(eval_context, array);
+void ResolveArray(const fxl::RefPtr<EvalContext>& eval_context, const Type* erased_type,
+                  const ExprValue& array, size_t begin_index, size_t end_index,
+                  fit::callback<void(ErrOrValueVector)> cb) {
+  auto info_or = ClassifyArray(eval_context, array, erased_type);
   if (info_or.has_error())
     return cb(info_or.err());
 
@@ -200,7 +217,7 @@ void ResolveArray(const fxl::RefPtr<EvalContext>& eval_context, const ExprValue&
 
 void ResolveArrayItem(const fxl::RefPtr<EvalContext>& eval_context, const ExprValue& array,
                       size_t index, EvalCallback cb) {
-  auto info_or = ClassifyArray(eval_context, array);
+  auto info_or = ClassifyArray(eval_context, array, nullptr);
   if (info_or.ok()) {
     // Do regular array access.
     DoResolveArray(eval_context, array, info_or.value(), index, index + 1,
@@ -228,7 +245,7 @@ void ResolveArrayItem(const fxl::RefPtr<EvalContext>& eval_context, const ExprVa
 
 void CoerceArraySize(const fxl::RefPtr<EvalContext>& eval_context, const ExprValue& array,
                      size_t new_size, EvalCallback cb) {
-  auto info_or = ClassifyArray(eval_context, array);
+  auto info_or = ClassifyArray(eval_context, array, nullptr);
   if (info_or.has_error())
     return cb(info_or.err());
   ArrayInfo& info = info_or.value();
@@ -264,8 +281,14 @@ void CoerceArraySize(const fxl::RefPtr<EvalContext>& eval_context, const ExprVal
       if (pointer_value_or.has_error())
         return cb(pointer_value_or.err());
 
-      ArrayFromPointer(eval_context, pointer_value_or.value(), info.original_value_type, new_size,
-                       std::move(cb));
+      fxl::RefPtr<Type> type = nullptr;
+      if (info.erased_type) {
+        type = info.erased_type;
+      } else {
+        type = info.original_value_type;
+      }
+
+      ArrayFromPointer(eval_context, pointer_value_or.value(), type, new_size, std::move(cb));
       break;
     }
   }

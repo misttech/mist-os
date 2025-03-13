@@ -137,6 +137,30 @@ TEST(WritebackMuxControl, GetSetMux1Selection) {
   }
 }
 
+TEST(VideoInputInterfaceWidth, Width) {
+  VideoInputInterfaceWidth video_input_interface_width =
+      VideoInputInterfaceWidth::Get(VideoInputModuleId::kVideoInputModule0).FromValue(0);
+  video_input_interface_width.set_width_px(0xfed);
+  EXPECT_EQ(video_input_interface_width.width_minus_one_px(), 0xfecu);
+  EXPECT_EQ(video_input_interface_width.width_px(), 0xfed);
+}
+
+TEST(VideoInputWriteRangeHorizontal, SetHorizontalRange) {
+  VideoInputWriteRangeHorizontal video_input_write_range_horizontal =
+      VideoInputWriteRangeHorizontal::Get(VideoInputModuleId::kVideoInputModule0).FromValue(0);
+  video_input_write_range_horizontal.SetHorizontalRange(0xabc, 0xdef);
+  EXPECT_EQ(video_input_write_range_horizontal.left_px_inclusive(), 0xabcu);
+  EXPECT_EQ(video_input_write_range_horizontal.right_px_inclusive(), 0xdefu);
+}
+
+TEST(VideoInputWriteRangeVertical, SetVerticalRange) {
+  VideoInputWriteRangeVertical video_input_write_range_vertical =
+      VideoInputWriteRangeVertical::Get(VideoInputModuleId::kVideoInputModule0).FromValue(0);
+  video_input_write_range_vertical.SetVerticalRange(0xabc, 0xdef);
+  EXPECT_EQ(video_input_write_range_vertical.top_line_inclusive(), 0xabcu);
+  EXPECT_EQ(video_input_write_range_vertical.bottom_line_inclusive(), 0xdefu);
+}
+
 }  // namespace
 
 }  // namespace amlogic_display

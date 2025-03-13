@@ -10,21 +10,14 @@
     ],
     offer: [
         {
-            directory: "dev-class",
-            from: "#devfs",
-            as: "dev-vsock",
-            to: "#vsock",
-            subdir: "vsock",
-        },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "#archivist",
-            to: "#vsock",
-        },
-        {
             dictionary: "diagnostics",
             from: "self",
             to: [ "#vsock" ],
+        },
+        {
+            service: "fuchsia.hardware.vsock.Service",
+            from: "#boot-drivers",
+            to: "#vsock",
         },
         {
             protocol: "fuchsia.hardware.vsock.Device",

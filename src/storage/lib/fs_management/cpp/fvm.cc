@@ -11,6 +11,7 @@
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
+#include <lib/component/incoming/cpp/directory.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/fdio/cpp/caller.h>
@@ -368,7 +369,7 @@ zx::result<fuchsia_hardware_block_volume::wire::VolumeManagerInfo> FvmQuery(
 __EXPORT
 zx::result<fidl::ClientEnd<fuchsia_device::Controller>> OpenPartition(
     const PartitionMatcher& matcher, bool wait) {
-  zx::result dir = component::Connect<fuchsia_io::Directory>(kBlockDevPath);
+  zx::result dir = component::OpenDirectory(kBlockDevPath);
   if (dir.is_error()) {
     return dir.take_error();
   }
@@ -380,7 +381,7 @@ __EXPORT
 zx::result<fidl::ClientEnd<fuchsia_device::Controller>> OpenPartitionWithDevfs(
     fidl::UnownedClientEnd<fuchsia_io::Directory> devfs_root, const PartitionMatcher& matcher,
     bool wait) {
-  zx::result dir = component::ConnectAt<fuchsia_io::Directory>(devfs_root, kBlockDevRelativePath);
+  zx::result dir = component::OpenDirectoryAt(devfs_root, kBlockDevRelativePath);
   if (dir.is_error()) {
     return dir.take_error();
   }

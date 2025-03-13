@@ -110,6 +110,12 @@ pub enum KernelArg {
     /// The page scanner must be running for this option to have any effect. It
     /// can be enabled at boot unless `disable_at_boot` is set to True.
     PageScannerZeroPageScanCount(ZeroPageScanCount),
+
+    /// Enable the netboot functionality of the netsvc.
+    NetsvcNetboot(bool),
+
+    /// Enable userboot.next
+    UserbootNext(String),
 }
 
 /// Options for zero page scanner configuration.
@@ -218,6 +224,8 @@ impl KernelArg {
             Self::PageScannerZeroPageScanCount(z) => {
                 ("kernel.page-scanner.zero-page-scans-per-second", z.to_string())
             }
+            Self::NetsvcNetboot(b) => ("netsvc.netboot", b.to_string()),
+            Self::UserbootNext(s) => ("userboot.next", s.to_string()),
         };
         (key.to_string(), value)
     }
@@ -253,6 +261,10 @@ impl KernelArg {
             | Self::PageScannerZeroPageScanCount(_) => {
                 vec![format!("{}=*", key)]
             }
+
+            // These kernel args are eng-only, and therefore should never be in an allowlist.
+            Self::NetsvcNetboot(_) => vec![],
+            Self::UserbootNext(_) => vec![],
         }
     }
 }

@@ -6,48 +6,12 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/component/incoming/cpp/service_member_watcher.h>
 #include <lib/fastboot/fastboot.h>
-#include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/syscalls.h>
 
-#include "src/lib/fsl/io/device_watcher.h"
-
-constexpr char kUsbFastbootDirectory[] = "/dev/class/fastboot";
-
-zx::result<fidl::WireSyncClient<fuchsia_hardware_fastboot::FastbootImpl>>
-ConnectToUsbFastbootDevice() {
-  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
-  fidl::ClientEnd<fuchsia_hardware_fastboot::FastbootImpl> client;
-  auto watcher = fsl::DeviceWatcher::Create(
-      kUsbFastbootDirectory,
-      [&](const fidl::ClientEnd<fuchsia_io::Directory> &dir, const std::string &filename) {
-        if (client.is_valid()) {
-          FX_LOGS(INFO) << "There's already a connected client. Ignoring new devices";
-          return;
-        }
-
-        FX_LOGS(INFO) << "Connecting to " << kUsbFastbootDirectory << "/" << filename.data();
-        auto client_end =
-            component::ConnectAt<fuchsia_hardware_fastboot::FastbootImpl>(dir, filename);
-        if (!client_end.is_ok()) {
-          FX_LOGS(INFO) << "Fail to call connect to driver";
-          return;
-        }
-
-        client = std::move(client_end.value());
-        loop.Quit();
-      },
-      loop.dispatcher());
-  if (!watcher) {
-    FX_LOGS(ERROR) << "Could not create device watcher";
-    return zx::error(ZX_ERR_NOT_FOUND);
-  }
-
-  loop.Run();
-
-  return zx::ok(fidl::WireSyncClient(std::move(client)));
-}
+namespace {
 
 class UsbPacketTransport : public fastboot::Transport {
  public:
@@ -90,16 +54,19 @@ class UsbPacketTransport : public fastboot::Transport {
   fidl::WireSyncClient<fuchsia_hardware_fastboot::FastbootImpl> *device_ = nullptr;
   std::string_view packet_;
 };
+}  // namespace
 
 int main(int argc, const char **argv) {
   FX_LOGS(INFO) << "Starting fastboot usb";
-  auto connect_device = ConnectToUsbFastbootDevice();
+  auto connect_device =
+      component::SyncServiceMemberWatcher<fuchsia_hardware_fastboot::Service::Fastboot>()
+          .GetNextInstance(false);
   if (connect_device.is_error()) {
     FX_LOGS(ERROR) << "Failed to connect to usb fastboot device" << connect_device.status_string();
     return 1;
   }
-  fidl::WireSyncClient<fuchsia_hardware_fastboot::FastbootImpl> device =
-      std::move(connect_device.value());
+  fidl::WireSyncClient<fuchsia_hardware_fastboot::FastbootImpl> device(
+      std::move(connect_device.value()));
 
   fastboot::Fastboot fastboot(zx_system_get_physmem());
   while (true) {

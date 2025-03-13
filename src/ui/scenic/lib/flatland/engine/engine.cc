@@ -76,6 +76,9 @@ void Engine::InitializeInspectObjects() {
 void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_time,
                                   const FlatlandDisplay& display,
                                   scheduling::FramePresentedCallback callback) {
+  // Emit a counter called "ScenicRender" for visualization in the Trace Viewer.
+  static bool render_edge_flag = false;
+  TRACE_COUNTER("gfx", "ScenicRender", 0, "", TA_UINT32(render_edge_flag = !render_edge_flag));
   // NOTE: this name is important for benchmarking.  Do not remove or modify it
   // without also updating the "process_gfx_trace.go" script.
   TRACE_DURATION("gfx", "RenderFrame", "frame_number", frame_number, "time",
@@ -110,10 +113,10 @@ void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_t
                             hw_display->device_pixel_ratio(), scene_state.snapshot);
 
   // TODO(https://fxbug.dev/42156567): hack!  need a better place to call AddDisplay().
-  if (hack_seen_display_id_values_.find(hw_display->display_id().value()) ==
+  if (hack_seen_display_id_values_.find(hw_display->display_id().value) ==
       hack_seen_display_id_values_.end()) {
     // This display hasn't been added to the DisplayCompositor yet.
-    hack_seen_display_id_values_.insert(hw_display->display_id().value());
+    hack_seen_display_id_values_.insert(hw_display->display_id().value);
 
     DisplayInfo display_info{
         .dimensions = glm::uvec2{hw_display->width_in_px(), hw_display->height_in_px()},

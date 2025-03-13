@@ -6,7 +6,13 @@ use addr::TargetAddr;
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
+use discovery::events::TargetEvent;
+use discovery::{
+    DiscoveryBuilder, FastbootConnectionState, TargetDiscovery, TargetHandle, TargetState,
+};
 use errors::ffx_bail;
+use fastboot_file_discovery::FASTBOOT_FILE_PATH;
+use ffx_config::EnvironmentContext;
 use ffx_fastboot::common::cmd::OemFile;
 use ffx_fastboot::common::fastboot::{
     tcp_proxy, udp_proxy, usb_proxy, FastbootNetworkConnectionConfig,
@@ -16,34 +22,39 @@ use ffx_fastboot::util::{Event, UnlockEvent};
 use ffx_fastboot_interface::fastboot_interface::UploadProgress;
 use ffx_flash_args::FlashCommand;
 use ffx_ssh::SshKeyFiles;
-use fho::{FfxContext, FfxMain, FfxTool, VerifiedMachineWriter};
-use fidl_fuchsia_developer_ffx::{
-    FastbootInterface as FidlFastbootInterface, TargetInfo, TargetRebootState, TargetState,
-};
-use fuchsia_async::{MonotonicInstant, Timer};
-use futures::try_join;
+use ffx_writer::VerifiedMachineWriter;
+use fho::{deferred, return_bug, return_user_error, user_error, FfxContext, FfxMain, FfxTool};
+use fidl::Error;
+use fidl_fuchsia_developer_ffx::TargetState as FidlTargetState;
+use fidl_fuchsia_hardware_power_statecontrol::AdminProxy;
+use fidl_fuchsia_hwinfo::DeviceProxy;
+use futures::{try_join, FutureExt, StreamExt};
 use schemars::JsonSchema;
 use serde::Serialize;
+use std::cell::RefCell;
+use std::collections::HashSet;
 use std::io::Write;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::sync::Once;
-use target_holders::TargetProxyHolder;
+use std::rc::Rc;
+use target_holders::{moniker, TargetInfoHolder};
 use termion::{color, style};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Receiver;
 
 const SSH_OEM_COMMAND: &str = "add-staged-bootloader-file ssh.authorized_keys";
 
-/// Seconds to wait for until we warn the user we cannot rediscover the target
-/// in the bootloader
-const WAIT_WARN_SECS: u64 = 20;
-
 #[derive(FfxTool)]
+#[no_target]
 pub struct FlashTool {
     #[command]
     cmd: FlashCommand,
-    target_proxy: fho::Deferred<TargetProxyHolder>,
+    target_info: TargetInfoHolder,
+    ctx: EnvironmentContext,
+    #[with(deferred(moniker("/bootstrap/shutdown_shim")))]
+    power_proxy: fho::Deferred<AdminProxy>,
+    #[with(deferred(moniker("/core/hwinfo")))]
+    device_proxy: fho::Deferred<DeviceProxy>,
 }
 
 fho::embedded_plugin!(FlashTool);
@@ -80,9 +91,9 @@ impl FfxMain for FlashTool {
         preflight_checks(&self.cmd, &mut writer)?;
 
         // Massage FlashCommand
-        let cmd = preprocess_flash_cmd(self.cmd).await?;
+        let cmd = preprocess_flash_cmd(&self.cmd).await?;
 
-        flash_plugin_impl(self.target_proxy.await?, cmd, &mut writer).await
+        self.flash_plugin_impl(cmd, &mut writer).await
     }
 }
 
@@ -99,7 +110,8 @@ fn preflight_checks<W: Write>(cmd: &FlashCommand, mut writer: W) -> Result<()> {
     Ok(())
 }
 
-async fn preprocess_flash_cmd(mut cmd: FlashCommand) -> Result<FlashCommand> {
+async fn preprocess_flash_cmd(i_cmd: &FlashCommand) -> Result<FlashCommand> {
+    let cmd: &mut FlashCommand = &mut i_cmd.clone();
     match cmd.authorized_keys.as_ref() {
         Some(ssh) => {
             let ssh_file = match std::fs::canonicalize(ssh) {
@@ -150,7 +162,10 @@ async fn preprocess_flash_cmd(mut cmd: FlashCommand) -> Result<FlashCommand> {
 
     if cmd.manifest_path.is_some() {
         if !std::path::Path::exists(cmd.manifest_path.clone().unwrap().as_path()) {
-            ffx_bail!("Manifest path: {} does not exist", cmd.manifest_path.unwrap().display())
+            ffx_bail!(
+                "Manifest path: {} does not exist",
+                cmd.manifest_path.clone().unwrap().display()
+            )
         }
     }
 
@@ -169,6 +184,7 @@ async fn preprocess_flash_cmd(mut cmd: FlashCommand) -> Result<FlashCommand> {
     {
         let cleaned_product_bundle = cmd
             .product_bundle
+            .clone()
             .unwrap()
             .strip_prefix('"')
             .unwrap()
@@ -181,180 +197,288 @@ async fn preprocess_flash_cmd(mut cmd: FlashCommand) -> Result<FlashCommand> {
         );
         cmd.product_bundle = Some(cleaned_product_bundle);
     }
-    Ok(cmd)
+    Ok(cmd.to_owned())
 }
 
-#[tracing::instrument(skip(target_proxy, writer))]
-async fn flash_plugin_impl(
-    target_proxy: TargetProxyHolder,
-    cmd: FlashCommand,
-    writer: &mut VerifiedMachineWriter<FlashMessage>,
-) -> fho::Result<()> {
-    let mut info = target_proxy.identity().await.user_message("Error getting Target's identity")?;
+async fn rediscover_target(
+    ctx: &EnvironmentContext,
+    serial_number: Option<String>,
+) -> fho::Result<TargetState> {
+    // Do discovery of the target... and try to find it again then
+    // return the appropriate information
+    let emulator_instance_root: PathBuf = ctx
+        .get("emu.instance_dir")
+        .map_err(|e| user_error!("Unable to get config value: {:#?}", e))?;
+    let fastboot_file_path: PathBuf = ctx
+        .get(FASTBOOT_FILE_PATH)
+        .map_err(|e| user_error!("Unable to get config value: {:#?}", e))?;
+    let disco = DiscoveryBuilder::default()
+        .notify_removed(false)
+        .with_emulator_instance_root(emulator_instance_root)
+        .with_fastboot_devices_file_path(fastboot_file_path)
+        .build();
 
-    fn display_name(info: &TargetInfo) -> &str {
-        info.nodename.as_deref().or(info.serial_number.as_deref()).unwrap_or("<unknown>")
+    #[derive(Clone)]
+    struct Criteria {
+        serial: Option<String>,
     }
 
-    match info.target_state {
-        Some(TargetState::Fastboot) => {
-            // Nothing to do
-        }
-        Some(TargetState::Disconnected) => {
-            // Nothing to do, for a slightly different reason.
-            // Since there's no knowledge about the state of the target, assume the
-            // target is in Fastboot.
-            tracing::info!("Target not connected, assuming Fastboot state");
-        }
-        Some(_) => {
-            // Wait to allow the Target to fully cycle to the bootloader
-            writeln!(writer, "Waiting for Target to reboot...")
-                .user_message("Error writing user message")?;
-            writer.flush().user_message("Error flushing writer buffer")?;
+    let criteria = Criteria { serial: serial_number.clone() };
+    let c_clone = criteria.clone();
 
-            // Tell the target to reboot to the bootloader
-            target_proxy
-                .reboot(TargetRebootState::Bootloader)
-                .await
-                .user_message("Got error rebooting")?
-                .map_err(|e| anyhow!("Got error rebooting target: {:#?}", e))
-                .user_message("Got an error rebooting")?;
-
-            let wait_duration = Duration::seconds(1)
-                .to_std()
-                .user_message("Error converting 1 seconds to Duration")?;
-            let once = Once::new();
-            let start = MonotonicInstant::now();
-            loop {
-                // Get the info again since the target changed state
-                info = target_proxy
-                    .identity()
-                    .await
-                    .user_message("Error getting the target's identity")?;
-
-                if matches!(info.target_state, Some(TargetState::Fastboot)) {
-                    break;
-                }
-
-                // Warn the user
-                if MonotonicInstant::now() - start
-                    > fuchsia_async::MonotonicDuration::from_secs(WAIT_WARN_SECS)
-                {
-                    once.call_once(|| {
-                        let _ = writeln!(
-                            writer,
-                            "Have been waiting for Target \
-                                                {} to reboot to bootloader for \
-                                                more than {} seconds but still \
-                                                have not rediscovered it. You \
-                                                may want to cancel this \
-                                                operation and check your \
-                                                connection to the target",
-                            display_name(&info),
-                            WAIT_WARN_SECS
-                        );
-                    });
-                }
-
-                tracing::debug!("Target was requested to reboot to the bootloader, but was found in {:#?} state. Waiting 1 second.", info.target_state);
-                Timer::new(wait_duration).await;
+    let filter_target = move |handle: &TargetHandle| {
+        tracing::debug!("Considering handle: {:#?}", handle);
+        match &handle.state {
+            discovery::TargetState::Fastboot(fts)
+                if Some(fts.serial_number.clone()) == c_clone.serial =>
+            {
+                true
             }
-        }
-        None => {
-            ffx_bail!("Target had an unknown, non-existant state")
+            _ => {
+                tracing::debug!("Skipping handle: {:#?}", handle);
+                false
+            }
         }
     };
 
-    let start_time = Utc::now();
-
-    let res = match info.fastboot_interface {
-        None => ffx_bail!("Could not connect to {}: Target not in fastboot", display_name(&info)),
-        Some(FidlFastbootInterface::Usb) => {
-            let serial_num = info.serial_number.ok_or_else(|| {
-                anyhow!("Target was detected in Fastboot USB but did not have a serial number")
-            })?;
-            let mut proxy = usb_proxy(serial_num).await?;
-            let (client, server) = mpsc::channel(1);
-            try_join!(from_manifest(client, cmd, &mut proxy), handle_event(writer, server))
-                .map_err(fho::Error::from)?;
-            Ok::<(), fho::Error>(())
-        }
-        Some(FidlFastbootInterface::Udp) => {
-            // We take the first address as when a target is in Fastboot mode and over
-            // UDP it only exposes one address
-            if let Some(addr) = info.addresses.unwrap().into_iter().take(1).next() {
-                let target_addr: TargetAddr = addr.into();
-                let socket_addr: SocketAddr = target_addr.into();
-
-                let target_name = if let Some(nodename) = info.nodename {
-                    nodename
-                } else {
-                    writeln!(
-                        writer,
-                        r"
-Warning: the target does not have a node name and is in UDP fastboot mode.
-Rediscovering the target after bootloader reboot will be impossible.
-Please try --no-bootloader-reboot to avoid a reboot.
-Using address {} as node name",
-                        socket_addr
-                    )
-                    .user_message("Error writing user message")?;
-                    socket_addr.to_string()
-                };
-                let config = FastbootNetworkConnectionConfig::new_udp().await;
-                let fastboot_device_file_path: Option<PathBuf> =
-                    ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).ok();
-                let mut proxy =
-                    udp_proxy(target_name, fastboot_device_file_path, &socket_addr, config).await?;
-                let (client, server) = mpsc::channel(1);
-                try_join!(from_manifest(client, cmd, &mut proxy), handle_event(writer, server))
-                    .map_err(fho::Error::from)?;
-                Ok(())
-            } else {
-                ffx_bail!("Could not get a valid address for target");
+    let stream = disco.discover_devices(filter_target).await?;
+    let timer = fuchsia_async::Timer::new(std::time::Duration::from_millis(100000)).fuse();
+    let found_target_event = async_utils::event::Event::new();
+    let found_it = found_target_event.wait().fuse();
+    let seen = Rc::new(RefCell::new(HashSet::new()));
+    let discovered_devices_stream = stream
+        .filter_map(move |ev| {
+            let c_clone = criteria.clone();
+            let found_ev = found_target_event.clone();
+            let seen = seen.clone();
+            async move {
+                match ev {
+                    Ok(TargetEvent::Added(ref h)) => {
+                        if seen.borrow().contains(h) {
+                            None
+                        } else {
+                            match &h.state {
+                                discovery::TargetState::Fastboot(fts) => match c_clone.serial {
+                                    Some(c) if c == fts.serial_number => {
+                                        tracing::debug!("Found the target, firing signal");
+                                        found_ev.signal();
+                                    }
+                                    _ => {}
+                                },
+                                _ => {}
+                            }
+                            seen.borrow_mut().insert(h.clone());
+                            Some(Ok((*h).clone()))
+                        }
+                    }
+                    // We've only asked for Added events
+                    Ok(_) => unreachable!(),
+                    Err(e) => Some(Err(e)),
+                }
             }
-        }
-        Some(FidlFastbootInterface::Tcp) => {
-            // We take the first address as when a target is in Fastboot mode and over
-            // TCP it only exposes one address
-            if let Some(addr) = info.addresses.unwrap().into_iter().take(1).next() {
-                let target_addr: TargetAddr = addr.into();
-                let socket_addr: SocketAddr = target_addr.into();
+        })
+        .take_until(futures_lite::future::race(timer, found_it));
 
-                let target_name = if let Some(nodename) = info.nodename {
-                    nodename
-                } else {
-                    writeln!(
-                        writer,
+    let mut discovered_devices = discovered_devices_stream.collect::<Vec<Result<_, _>>>().await;
+
+    match discovered_devices.len() {
+        0 => {
+            return_bug!("Could not rediscover device after rebooting to the bootloader")
+        }
+        1 => {
+            let device_res = discovered_devices.pop().unwrap();
+            Ok((device_res?).state)
+        }
+        num @ _ => {
+            return_bug!("Expected to rediscover only one device, but found: {}", num)
+        }
+    }
+}
+
+async fn reboot_target_to_bootloader_and_rediscover(
+    writer: &mut VerifiedMachineWriter<FlashMessage>,
+    ctx: &EnvironmentContext,
+    device_proxy: DeviceProxy,
+    power_proxy: AdminProxy,
+) -> fho::Result<TargetState> {
+    // Wait to allow the Target to fully cycle to the bootloader
+    writeln!(writer, "Waiting for Target to reboot...")
+        .user_message("Error writing user message")?;
+    writer.flush().user_message("Error flushing writer buffer")?;
+
+    // Tell the target to reboot to the bootloader
+    // Should probably get the serial number of the target just in case
+    // let device_proxy = device_proxy.await.bug_context("Initializing device proxy")?;
+    let info = device_proxy.get_info().await.bug_context("Getting target device info")?;
+
+    // Tell the target to reboot to the bootloader
+    tracing::debug!("Target in Product state. Rebooting to bootloader...",);
+
+    // These calls erroring is fine...
+    match power_proxy.reboot_to_bootloader().await {
+        Ok(_) => {}
+        Err(e) => handle_fidl_connection_err(e)?,
+    };
+
+    rediscover_target(&ctx, info.serial_number).await
+}
+
+impl FlashTool {
+    async fn flash_plugin_impl(
+        self,
+        cmd: FlashCommand,
+        writer: &mut VerifiedMachineWriter<FlashMessage>,
+    ) -> fho::Result<()> {
+        let target_state = match &self.target_info.target_state {
+            Some(FidlTargetState::Fastboot) => {
+                // Nothing to do
+                tracing::debug!("Target already in Fastboot state");
+                let s: discovery::TargetHandle = (*self.target_info).clone().try_into()?;
+                s.state
+            }
+            Some(FidlTargetState::Product) => {
+                if self.ctx.is_strict() {
+                    return_user_error!(
                         r"
+When running in strict mode, this tool does not support Targets in Product mode.
+Reboot the Target to the bootloader and re-run this command."
+                    );
+                }
+                let device_proxy =
+                    self.device_proxy.await.bug_context("Initializing device proxy")?;
+                let power_proxy = self.power_proxy.await?;
+
+                reboot_target_to_bootloader_and_rediscover(
+                    writer,
+                    &self.ctx,
+                    device_proxy,
+                    power_proxy,
+                )
+                .await?
+            }
+            Some(FidlTargetState::Unknown) => {
+                ffx_bail!("Target is in an Unknown state.");
+            }
+            Some(FidlTargetState::Zedboot) => {
+                ffx_bail!("Bootloader operations not supported with Zedboot");
+            }
+            Some(FidlTargetState::Disconnected) => {
+                tracing::info!("Target: {:#?} not connected bailing", self.target_info);
+                ffx_bail!("Target is disconnected...");
+            }
+            None => {
+                ffx_bail!("Target had an unknown, non-existant state")
+            }
+        };
+
+        let start_time = Utc::now();
+
+        let res = match target_state {
+            TargetState::Fastboot(fastboot_state) => match fastboot_state.connection_state {
+                FastbootConnectionState::Usb => {
+                    let serial_num = fastboot_state.serial_number;
+                    let mut proxy = usb_proxy(serial_num).await?;
+                    let (client, server) = mpsc::channel(1);
+                    try_join!(from_manifest(client, cmd, &mut proxy), handle_event(writer, server))
+                        .map_err(fho::Error::from)?;
+                    Ok::<(), fho::Error>(())
+                }
+                FastbootConnectionState::Udp(addrs) => {
+                    // We take the first address as when a target is in Fastboot mode and over
+                    // UDP it only exposes one address
+                    if let Some(addr) = addrs.into_iter().take(1).next() {
+                        let target_addr: TargetAddr = addr.into();
+                        let socket_addr: SocketAddr = target_addr.into();
+
+                        let target_name = if let Some(nodename) = &self.target_info.nodename {
+                            nodename
+                        } else {
+                            writeln!(
+                                writer,
+                                r"
+    Warning: the target does not have a node name and is in UDP fastboot mode.
+    Rediscovering the target after bootloader reboot will be impossible.
+    Please try --no-bootloader-reboot to avoid a reboot.
+    Using address {} as node name",
+                                socket_addr
+                            )
+                            .user_message("Error writing user message")?;
+                            &socket_addr.to_string()
+                        };
+                        let config = FastbootNetworkConnectionConfig::new_udp().await;
+                        let fastboot_device_file_path: Option<PathBuf> =
+                            ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).ok();
+                        let mut proxy = udp_proxy(
+                            target_name.clone(),
+                            fastboot_device_file_path,
+                            &socket_addr,
+                            config,
+                        )
+                        .await?;
+                        let (client, server) = mpsc::channel(1);
+                        try_join!(
+                            from_manifest(client, cmd, &mut proxy),
+                            handle_event(writer, server)
+                        )
+                        .map_err(fho::Error::from)?;
+                        Ok(())
+                    } else {
+                        ffx_bail!("Could not get a valid address for target");
+                    }
+                }
+                FastbootConnectionState::Tcp(addrs) => {
+                    // We take the first address as when a target is in Fastboot mode and over
+                    // TCP it only exposes one address
+                    if let Some(addr) = addrs.into_iter().take(1).next() {
+                        let target_addr: TargetAddr = addr.into();
+                        let socket_addr: SocketAddr = target_addr.into();
+
+                        let target_name = if let Some(nodename) = &self.target_info.nodename {
+                            nodename
+                        } else {
+                            writeln!(
+                                writer,
+                                r"
 Warning: the target does not have a node name and is in TCP fastboot mode.
 Rediscovering the target after bootloader reboot will be impossible.
 Please try --no-bootloader-reboot to avoid a reboot.
 Using address {} as node name",
-                        socket_addr
-                    )
-                    .user_message("Error writing user message")?;
-                    socket_addr.to_string()
-                };
-                let config = FastbootNetworkConnectionConfig::new_tcp().await;
-                let fastboot_device_file_path: Option<PathBuf> =
-                    ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).ok();
-                let mut proxy =
-                    tcp_proxy(target_name, fastboot_device_file_path, &socket_addr, config).await?;
-                let (client, server) = mpsc::channel(1);
-                try_join!(from_manifest(client, cmd, &mut proxy), handle_event(writer, server))
-                    .map_err(fho::Error::from)?;
-                Ok(())
-            } else {
-                ffx_bail!("Could not get a valid address for target");
+                                socket_addr
+                            )
+                            .user_message("Error writing user message")?;
+                            &socket_addr.to_string()
+                        };
+                        let config = FastbootNetworkConnectionConfig::new_tcp().await;
+                        let fastboot_device_file_path: Option<PathBuf> =
+                            ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).ok();
+                        let mut proxy = tcp_proxy(
+                            target_name.clone(),
+                            fastboot_device_file_path,
+                            &socket_addr,
+                            config,
+                        )
+                        .await?;
+                        let (client, server) = mpsc::channel(1);
+                        try_join!(
+                            from_manifest(client, cmd, &mut proxy),
+                            handle_event(writer, server)
+                        )
+                        .map_err(fho::Error::from)?;
+                        Ok(())
+                    } else {
+                        ffx_bail!("Could not get a valid address for target");
+                    }
+                }
+            },
+            _ => {
+                ffx_bail!("Could not connect. Target not in fastboot: {}", target_state);
             }
-        }
-    };
+        };
 
-    match res {
-        Ok(()) => {
-            let duration = Utc::now().signed_duration_since(start_time);
-            let finished_message = format!("Continuing to boot - this could take awhile\n{}Done{}. {}Total Time{} [{}{:.2}s{}]",
+        match res {
+            Ok(()) => {
+                let duration = Utc::now().signed_duration_since(start_time);
+                let finished_message = format!("Continuing to boot - this could take awhile\n{}Done{}. {}Total Time{} [{}{:.2}s{}]",
                 color::Fg(color::Green),
                 style::Reset,
                 color::Fg(color::Green),
@@ -364,20 +488,45 @@ Using address {} as node name",
                 style::Reset
             );
 
-            writer.machine_or(
-                &FlashMessage::Finished { success: true, error_message: "".to_string() },
-                finished_message,
-            )?;
+                writer.machine_or(
+                    &FlashMessage::Finished { success: true, error_message: "".to_string() },
+                    finished_message,
+                )?;
+            }
+            Err(e) => {
+                writer.machine_or(
+                    &FlashMessage::Finished { success: false, error_message: format!("{}", e) },
+                    format!("Error: {:?}", e),
+                )?;
+                return Err(e);
+            }
         }
-        Err(e) => {
-            writer.machine_or(
-                &FlashMessage::Finished { success: false, error_message: format!("{}", e) },
-                format!("Error: {:?}", e),
-            )?;
-            return Err(e);
+        Ok(())
+    }
+}
+
+fn handle_fidl_connection_err(e: Error) -> fho::Result<()> {
+    match e {
+        Error::ClientChannelClosed { protocol_name, .. } => {
+            // Changing this to an info from warn since reboot has succeeded The assumption that
+            // reboot has succeeded is correct since we received a ClientChannelClosed
+            // successfully. So let's just make the message clearer to the user.
+            //
+            // Check the 'protocol_name' and if it is 'fuchsia.hardware.power.statecontrol.Admin'
+            // then we can be more confident that target reboot/shutdown has succeeded.
+            if protocol_name == "fuchsia.hardware.power.statecontrol.Admin" {
+                tracing::info!("Target reboot succeeded.");
+            } else {
+                tracing::info!("Assuming target reboot succeeded. Client received a PEER_CLOSED from '{protocol_name}'");
+            }
+            tracing::debug!("{:?}", e);
+            Ok(())
+        }
+        _ => {
+            tracing::error!("Target communication error: {:?}", e);
+            return_bug!("Target communication error: {:?}", e)
         }
     }
-    Ok(())
 }
 
 fn done_time(duration: Duration) -> String {
@@ -522,7 +671,7 @@ async fn handle_event(
 #[cfg(test)]
 mod test {
     use super::*;
-    use fho::Format;
+    use ffx_writer::Format;
     use pretty_assertions::assert_eq;
     use std::path::PathBuf;
     use tempfile::NamedTempFile;
@@ -536,14 +685,14 @@ mod test {
             .set("foo".into())
             .await
             .expect("creating temp product.path");
-        let cmd = preprocess_flash_cmd(FlashCommand { ..Default::default() }).await.unwrap();
+        let cmd = preprocess_flash_cmd(&FlashCommand { ..Default::default() }).await.unwrap();
         assert_eq!(cmd.product_bundle, Some("foo".to_string()));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_nonexistent_file_throws_err() {
         let _env = ffx_config::test_init().await.expect("Failed to initialize test env");
-        assert!(preprocess_flash_cmd(FlashCommand {
+        assert!(preprocess_flash_cmd(&FlashCommand {
             manifest_path: Some(PathBuf::from("ffx_test_does_not_exist")),
             ..Default::default()
         })
@@ -561,7 +710,7 @@ mod test {
         let ssh_tmp_file = NamedTempFile::new().expect("tmp access failed");
         let ssh_tmp_file_name = ssh_tmp_file.path().to_string_lossy().to_string();
 
-        let cmd = preprocess_flash_cmd(FlashCommand {
+        let cmd = preprocess_flash_cmd(&FlashCommand {
             product_bundle: Some(wrapped_pb_tmp_file_name),
             authorized_keys: Some(ssh_tmp_file_name),
             ..Default::default()
@@ -576,7 +725,7 @@ mod test {
         let _env = ffx_config::test_init().await.expect("Failed to initialize test env");
         let tmp_file = NamedTempFile::new().expect("tmp access failed");
         let tmp_file_name = tmp_file.path().to_string_lossy().to_string();
-        assert!(preprocess_flash_cmd(FlashCommand {
+        assert!(preprocess_flash_cmd(&FlashCommand {
             manifest_path: Some(PathBuf::from(tmp_file_name)),
             authorized_keys: Some("ssh_does_not_exist".to_string()),
             ..Default::default()

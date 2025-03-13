@@ -125,7 +125,9 @@ group("record_filesystem_sizes") {
   testonly = true
   if (!use_bringup_assembly) {
     if (use_bazel_images_only) {
-      deps = [ "${bazel_product_bundle_target}_elf_sizes" ]
+      if (bazel_product_bundle_target != "") {
+        deps = [ "${bazel_product_bundle_target}_elf_sizes" ]
+      }
     } else {
       deps = [ "//build/images/sizes:elf_sizes.json" ]
     }
@@ -178,6 +180,7 @@ if (build_uefi_disk && !product_skip_uefi_disk) {
     no_output_dir_leaks = false
 
     deps = [
+      "//:product_bundles",
       "//src/firmware/gigaboot/cpp:fuchsia",
       labels.images,
       labels.recovery_images,
@@ -185,7 +188,10 @@ if (build_uefi_disk && !product_skip_uefi_disk) {
     ]
     testonly = true
     tool = "//tools/make-fuchsia-vol"
-    inputs = [ mkfs_bin ]
+    inputs = [
+      mkfs_bin,
+      "$root_build_dir/product_bundles.json",
+    ]
 
     bootloader_path = rebase_path(
             "${root_build_dir}/kernel.efi_${target_cpu}/fuchsia-efi.efi")
@@ -291,7 +297,9 @@ group("default-images") {
   ]
 
   if (use_bazel_images_only) {
-    deps += [ "${bazel_product_bundle_target}_size_targets" ]
+    if (bazel_product_bundle_target != "") {
+      deps += [ "${bazel_product_bundle_target}_size_targets" ]
+    }
   } else {
     if (size_checker_input != {
         }) {

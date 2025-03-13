@@ -51,6 +51,8 @@ done
     --impl-debug \
     --output "${OUTPUT}" \
     --allowlist-function '(zx|fd)io_.+' \
+    --blocklist-function 'fdio_open_.+' \
+    --blocklist-function 'fdio_open' \
     --allowlist-type '(zx|fd)io_.+' \
     --allowlist-var 'FDIO_.+' \
     -- \

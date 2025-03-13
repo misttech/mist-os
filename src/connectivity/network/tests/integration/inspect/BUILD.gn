@@ -37,6 +37,7 @@ rustc_test("netstack2_inspect_tests") {
     "//src/lib/network/packet",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:itertools",
+    "//third_party/rust_crates:serde_json5",
     "//third_party/rust_crates:test-case",
   ]
 
@@ -58,10 +59,12 @@ rustc_test("netstack3_inspect_tests") {
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
     "//sdk/fidl/fuchsia.net.multicast.admin:fuchsia.net.multicast.admin_rust",
     "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
+    "//sdk/fidl/fuchsia.posix.socket.packet:fuchsia.posix.socket.packet_rust",
     "//sdk/fidl/fuchsia.posix.socket.raw:fuchsia.posix.socket.raw_rust",
     "//src/connectivity/lib/net-declare",
     "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/packet-formats",
+    "//src/connectivity/network/testing/netemul/fidl:fuchsia.netemul_rust",
     "//src/connectivity/network/testing/netemul/rust:lib",
     "//src/connectivity/network/tests/integration/common:netstack_testing_common",
     "//src/connectivity/network/tests/integration/macros:netstack_testing_macros",
@@ -79,6 +82,7 @@ rustc_test("netstack3_inspect_tests") {
     "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:libc",
     "//third_party/rust_crates:regex",
+    "//third_party/rust_crates:serde_json5",
     "//third_party/rust_crates:socket2",
     "//third_party/rust_crates:test-case",
   ]
@@ -122,13 +126,13 @@ resource("netstack-specified-procs-netemul-config") {
 }
 
 resource("ns2-sampler-config") {
-  sources = [ "//src/diagnostics/config/sampler/netstack.json" ]
+  sources = [ "//src/diagnostics/config/sampler/netstack.json5" ]
   outputs = [ "data/sampler-config/netstack.json" ]
 }
 
 resource("ns3-sampler-config") {
-  sources = [ "//src/diagnostics/config/sampler/netstack3.json" ]
-  outputs = [ "data/sampler-config/netstack3.json" ]
+  sources = [ "//src/diagnostics/config/sampler/netstack3.json5" ]
+  outputs = [ "data/sampler-config/netstack.json" ]
 }
 
 fuchsia_unittest_package("netstack3-inspect-integration-test") {

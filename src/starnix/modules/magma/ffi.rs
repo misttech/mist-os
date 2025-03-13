@@ -7,22 +7,19 @@ use crate::file::{
     MagmaDevice, MagmaSemaphore,
 };
 use crate::image_file::{ImageFile, ImageInfo};
-use crate::magma::create_drm_image;
 use bstr::BString;
 use magma::{
-    magma_buffer_export, magma_buffer_get_handle, magma_buffer_id_t, magma_buffer_t,
-    magma_command_descriptor, magma_connection_execute_command,
-    magma_connection_execute_immediate_commands, magma_connection_flush,
-    magma_connection_import_buffer, magma_connection_import_semaphore2,
+    magma_buffer_export, magma_buffer_get_handle, magma_buffer_t, magma_command_descriptor,
+    magma_connection_execute_command, magma_connection_execute_inline_commands,
+    magma_connection_flush, magma_connection_import_semaphore2,
     magma_connection_read_notification_channel, magma_connection_t, magma_device_create_connection,
     magma_device_import, magma_device_query, magma_device_t, magma_exec_command_buffer,
     magma_exec_resource, magma_handle_t, magma_inline_command_buffer, magma_status_t,
     virtio_magma_buffer_export_ctrl_t, virtio_magma_buffer_export_resp_t,
     virtio_magma_buffer_get_handle_ctrl_t, virtio_magma_buffer_get_handle_resp_t,
     virtio_magma_connection_execute_command_ctrl_t,
-    virtio_magma_connection_execute_immediate_commands_ctrl_t,
-    virtio_magma_connection_flush_ctrl_t, virtio_magma_connection_flush_resp_t,
-    virtio_magma_connection_read_notification_channel_ctrl_t,
+    virtio_magma_connection_execute_inline_commands_ctrl_t, virtio_magma_connection_flush_ctrl_t,
+    virtio_magma_connection_flush_resp_t, virtio_magma_connection_read_notification_channel_ctrl_t,
     virtio_magma_connection_read_notification_channel_resp_t,
     virtio_magma_connection_release_ctrl_t, virtio_magma_connection_release_resp_t,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_BUFFER_EXPORT,
@@ -33,20 +30,17 @@ use magma::{
     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_DEVICE_CREATE_CONNECTION,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_DEVICE_IMPORT,
     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_DEVICE_RELEASE,
-    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_VIRT_CONNECTION_CREATE_IMAGE,
     virtio_magma_device_create_connection_ctrl, virtio_magma_device_create_connection_resp_t,
     virtio_magma_device_import_ctrl_t, virtio_magma_device_import_resp_t,
     virtio_magma_device_query_ctrl_t, virtio_magma_device_query_resp_t,
     virtio_magma_device_release_ctrl_t, virtio_magma_device_release_resp_t,
-    virtio_magma_virt_connection_create_image_ctrl_t,
-    virtio_magma_virt_connection_create_image_resp_t, virtmagma_command_descriptor,
-    MAGMA_QUERY_VENDOR_ID, MAGMA_STATUS_INVALID_ARGS, MAGMA_STATUS_OK, MAGMA_VENDOR_ID_INTEL,
+    virtmagma_command_descriptor, MAGMA_QUERY_VENDOR_ID, MAGMA_STATUS_OK, MAGMA_VENDOR_ID_INTEL,
     MAGMA_VENDOR_ID_MALI,
 };
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::mm::{MemoryAccessor, MemoryAccessorExt};
 use starnix_core::task::CurrentTask;
-use starnix_core::vfs::{Anon, FdFlags, FsNodeInfo, MemoryFileObject};
+use starnix_core::vfs::{Anon, FdFlags, FsNodeInfo, MemoryRegularFile};
 use starnix_logging::track_stub;
 use starnix_types::user_buffer::UserBuffer;
 use starnix_uapi::errno;
@@ -110,59 +104,6 @@ pub fn create_connection(
             ConnectionInfo::new(Arc::new(MagmaConnection { handle: response.connection_out })),
         );
     }
-}
-
-/// Creates a DRM image VMO and imports it to magma.
-///
-/// Returns a `BufferInfo` containing the associated `BufferCollectionImportToken` and the magma
-/// image info.
-///
-/// Upon successful completion, `response.image_out` will contain the handle to the magma buffer.
-///
-/// SAFETY: Makes an FFI call which takes ownership of a raw VMO handle. Invalid parameters are
-/// dealt with by magma.
-pub fn create_image(
-    current_task: &CurrentTask,
-    control: virtio_magma_virt_connection_create_image_ctrl_t,
-    response: &mut virtio_magma_virt_connection_create_image_resp_t,
-    connection: &Arc<MagmaConnection>,
-) -> Result<BufferInfo, Errno> {
-    let create_info_address = UserAddress::from(control.create_info);
-    let create_info_ptr: u64 = current_task.read_object(UserRef::new(create_info_address))?;
-
-    let create_info_address = UserAddress::from(create_info_ptr);
-    let create_info = current_task.read_object(UserRef::new(create_info_address))?;
-
-    response.hdr.type_ =
-        virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_VIRT_CONNECTION_CREATE_IMAGE as u32;
-    response.result_return = MAGMA_STATUS_INVALID_ARGS as u64;
-    response.image_out = 0;
-    response.buffer_id_out = 0;
-    response.size_out = 0;
-
-    let (vmo, token, info) = create_drm_image(0, &create_info).map_err(|status| {
-        response.result_return = status as u64;
-        errno!(EINVAL)
-    })?;
-
-    let mut buffer_out = magma_buffer_t::default();
-    let mut buffer_id_out = magma_buffer_id_t::default();
-    let mut size_out = 0u64;
-    response.result_return = unsafe {
-        magma_connection_import_buffer(
-            connection.handle,
-            vmo.into_raw(),
-            &mut size_out,
-            &mut buffer_out,
-            &mut buffer_id_out,
-        ) as u64
-    };
-
-    response.image_out = buffer_out;
-    response.buffer_id_out = buffer_id_out;
-    response.size_out = size_out;
-
-    Ok(BufferInfo::Image(ImageInfo { info, token }))
 }
 
 /// Attempts to open a device at a path. Fails if the device is not a supported one.
@@ -425,10 +366,10 @@ where
 /// data into starnix in order to be able to pass pointers to the resources, command buffers, and
 /// semaphore ids to magma.
 ///
-/// SAFETY: Makes an FFI call to magma_execute_immediate_commands().
-pub fn execute_immediate_commands<F>(
+/// SAFETY: Makes an FFI call to magma_execute_inline_commands().
+pub fn execute_inline_commands<F>(
     current_task: &CurrentTask,
-    control: virtio_magma_connection_execute_immediate_commands_ctrl_t,
+    control: virtio_magma_connection_execute_inline_commands_ctrl_t,
     connection: &Arc<MagmaConnection>,
     get_semaphore: F,
 ) -> Result<magma_status_t, Errno>
@@ -499,7 +440,7 @@ where
                     &mut semaphore_ids_vec[i][0]
                 };
             }
-            magma_connection_execute_immediate_commands(
+            magma_connection_execute_inline_commands(
                 connection.handle,
                 control.context_id,
                 control.command_count,
@@ -562,7 +503,7 @@ pub fn export_buffer(
             } else {
                 Anon::new_file(
                     current_task,
-                    Box::new(MemoryFileObject::new(Arc::new(memory))),
+                    Box::new(MemoryRegularFile::new(Arc::new(memory))),
                     OpenFlags::RDWR,
                     "[fuchsia:magma_export_buffer]",
                 )
@@ -621,7 +562,7 @@ pub fn get_buffer_handle(
             MemoryObject::from(unsafe { zx::Vmo::from(zx::Handle::from_raw(buffer_handle_out)) });
         let file = Anon::new_file(
             current_task,
-            Box::new(MemoryFileObject::new(Arc::new(memory))),
+            Box::new(MemoryRegularFile::new(Arc::new(memory))),
             OpenFlags::RDWR,
             "[fuchsia:magma_buffer]",
         );
@@ -660,7 +601,7 @@ pub fn query(
         let memory_size = memory.get_size();
         let file = Anon::new_file_extended(
             current_task,
-            Box::new(MemoryFileObject::new(Arc::new(memory))),
+            Box::new(MemoryRegularFile::new(Arc::new(memory))),
             OpenFlags::RDWR,
             "[fuchsia:magma_vmo]",
             |id| {

@@ -1,7 +1,0 @@
-Name: glslang
-License: Apache-2.0, BSD-2-Clause, BSD-3-Clause, GPL-3.0-with-bison-exception, MIT
-License File: LICENSE.txt
-Upstream Git: https://github.com/KhronosGroup/glslang
-Description:
-
-An OpenGL and OpenGL ES shader front end and validator.

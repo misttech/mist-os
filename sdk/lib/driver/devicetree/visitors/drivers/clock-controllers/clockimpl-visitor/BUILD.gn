@@ -30,7 +30,6 @@ source_set("clockimpl") {
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.clock:fuchsia.clock_cpp",
     "//src/lib/ddk",
-    "//src/lib/ddk:ddk-metadata-headers",
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
@@ -50,7 +49,6 @@ test("clockimpl-visitor-test-bin") {
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.clock:fuchsia.clock_cpp",
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
-    "//src/lib/ddk:ddk-metadata-headers",
     "//src/lib/fxl/test:gtest_main",
   ]
 }

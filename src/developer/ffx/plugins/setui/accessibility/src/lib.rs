@@ -5,7 +5,8 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use ffx_setui_accessibility_args::{Accessibility, SubCommandEnum};
-use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{AvailabilityFlag, FfxMain, FfxTool};
 use fidl_fuchsia_settings::AccessibilityProxy;
 use target_holders::moniker;
 

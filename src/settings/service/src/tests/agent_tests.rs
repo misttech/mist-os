@@ -11,7 +11,6 @@ use crate::service_context::ServiceContext;
 use crate::storage::testing::InMemoryStorageFactory;
 use crate::{service, EnvironmentBuilder};
 use core::fmt::{Debug, Formatter};
-use fuchsia_async as fasync;
 use futures::channel::mpsc::UnboundedSender;
 use futures::future::LocalBoxFuture;
 use futures::lock::Mutex;
@@ -19,6 +18,7 @@ use futures::StreamExt;
 use rand::Rng;
 use std::collections::HashSet;
 use std::rc::Rc;
+use {fidl_fuchsia_update_verify as fupdate, fuchsia_async as fasync};
 
 const ENV_NAME: &str = "settings_service_agent_test_environment";
 
@@ -179,11 +179,19 @@ async fn test_environment_startup() {
     let (_, agent_generate) =
         TestAgent::create(startup_agent_id, LifespanTarget::Initialization, startup_tx);
 
-    assert!(EnvironmentBuilder::new(Rc::new(InMemoryStorageFactory::new()))
-        .agents(vec![service_agent_generate, agent_generate,])
+    let env = EnvironmentBuilder::new(Rc::new(InMemoryStorageFactory::new()))
+        .agents(vec![service_agent_generate, agent_generate])
         .spawn_nested(ENV_NAME)
         .await
-        .is_ok());
+        .expect("env should be available");
+
+    let health_check_proxy = env
+        .connector
+        .unwrap()
+        .connect_to_protocol::<fupdate::ComponentOtaHealthCheckMarker>()
+        .expect("health check should be available");
+    let status = health_check_proxy.get_health_status().await.expect("call succeeded");
+    assert_eq!(status, fupdate::HealthStatus::Healthy);
 }
 
 async fn create_authority() -> Authority {

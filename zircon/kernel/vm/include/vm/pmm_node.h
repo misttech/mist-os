@@ -63,6 +63,11 @@ class PmmNode {
   void FreePage(vm_page* page);
   void FreeList(list_node* list);
 
+  // Calls the provided function, passing |page| back into it, serialized with any other calls to
+  // |AllocLoanedPage| and |FreeLoanedPage|. This allows caller to know that while the |with_page|
+  // callback is running there are no in progress calls to these methods.
+  void WithLoanedPage(vm_page_t* page, fit::inline_function<void(vm_page_t*)> with_page);
+
   // Allocates a single page from the loaned pages list. The allocated page will always have
   // is_loaned() being true, and must be returned by either FreeLoanedPage or FreeLoanedList. If
   // there are not loaned pages available ZX_ERR_UNAVAILABLE is returned, as an absence of loaned
@@ -88,11 +93,25 @@ class PmmNode {
 
   void UnwirePage(vm_page* page);
 
-  // Contiguous page loaning routines
+  // Frees all pages in the given list and places them in the loaned state available to be returned
+  // from AllocLoanedPage.
   void BeginLoan(list_node* page_list);
-  void CancelLoan(paddr_t address, size_t count);
-  void EndLoan(paddr_t address, size_t count, list_node* page_list);
-  void DeleteLender(paddr_t address, size_t count);
+
+  // Marks a page that had been previously provided to BeginLoan as cancelled. This page may be in
+  // the FREE_LOANED state, or presently in use.
+  //
+  // This call prevents the page from being reused for any new purpose until EndLoan(). For
+  // presently-FREE_LOANED pages, this removes the pages from free_loaned_list_. For presently-used
+  // pages, this specifies that the page will not be added to free_loaned_list_ when later freed.
+  // Once this page is FREE_LOANED (to be ensured by the caller via PhysicalPageProvider reclaim of
+  // the pages), the loan can be ended with EndLoan().
+  void CancelLoan(vm_page_t* page);
+
+  // Allocates the page to the caller as a regular non-loaned page. Must currently be:
+  //  * Loaned (via BeginLoan).
+  //  * Have had its loan cancelled (via CancelLoan).
+  //  * Be in the FREE_LOANED state.
+  void EndLoan(vm_page_t* page);
 
   // See |pmm_set_free_memory_signal|
   bool SetFreeMemorySignal(uint64_t free_lower_bound, uint64_t free_upper_bound,
@@ -269,10 +288,6 @@ class PmmNode {
 
   void AllocPageHelperLocked(vm_page_t* page) TA_REQ(lock_);
   void AllocLoanedPageHelperLocked(vm_page_t* page) TA_REQ(loaned_list_lock_);
-
-  template <typename F>
-  void ForPagesInPhysRangeLocked(paddr_t start, size_t count, F func) TA_REQ(lock_)
-      TA_REQ(loaned_list_lock_);
 
   // This method should be called when the PMM fails to allocate in a user-visible way and will
   // (optionally) trigger an asynchronous OOM response.

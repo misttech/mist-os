@@ -69,50 +69,63 @@ TEST(VmoTransferDataTestCase, SnapshotChildSrc) {
   // TODO(https://fxbug.dev/42074633): Add ZX_VMO_CHILD_SNAPSHOT_MODIFIED to this list.
   uint32_t child_types[] = {ZX_VMO_CHILD_SNAPSHOT, ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE};
 
-  for (auto child_type : child_types) {
-    // Create VMOs to act as the source and destination VMOs for a transfer.
-    zx::vmo parent_vmo;
-    if (child_type == ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE) {
-      // If the child type is SNAPSHOT_AT_LEAST_ON_WRITE, we need the parent VMO to be pager
-      // backed, as children of this type are upgraded to pure snapshots for anonymous VMOs.
-      zx::pager pager;
-      zx::port port;
-      ASSERT_OK(zx::pager::create(0, &pager));
-      ASSERT_OK(zx::port::create(0, &port));
-      ASSERT_OK(zx_pager_create_vmo(pager.get(), 0, port.get(), 0, kSize,
-                                    parent_vmo.reset_and_get_address()));
+  for (auto child_of_src : {true, false}) {
+    for (auto child_type : child_types) {
+      // Create VMOs to act as the source and destination VMOs for a transfer.
+      zx::vmo parent_vmo;
+      if (child_type == ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE) {
+        // If the child type is SNAPSHOT_AT_LEAST_ON_WRITE, we need the parent VMO to be pager
+        // backed, as children of this type are upgraded to pure snapshots for anonymous VMOs.
+        zx::pager pager;
+        zx::port port;
+        ASSERT_OK(zx::pager::create(0, &pager));
+        ASSERT_OK(zx::port::create(0, &port));
+        ASSERT_OK(zx_pager_create_vmo(pager.get(), 0, port.get(), 0, kSize,
+                                      parent_vmo.reset_and_get_address()));
 
-      // Presupply pages to the pager backed VMO so that we don't need to wait for a request.
-      zx::vmo aux_vmo;
-      CreateVmoWithCharFill(&aux_vmo, 's', kSize);
-      ASSERT_OK(pager.supply_pages(parent_vmo, 0, kSize, aux_vmo, 0));
-    } else {
-      // If the child type is a pure snapshot, create an anonymous VMO.
-      CreateVmoWithCharFill(&parent_vmo, 's', kSize);
+        // Presupply pages to the pager backed VMO so that we don't need to wait for a request.
+        zx::vmo aux_vmo;
+        CreateVmoWithCharFill(&aux_vmo, 's', kSize);
+        ASSERT_OK(pager.supply_pages(parent_vmo, 0, kSize, aux_vmo, 0));
+      } else {
+        // If the child type is a pure snapshot, create an anonymous VMO.
+        CreateVmoWithCharFill(&parent_vmo, 's', kSize);
+      }
+      zx::vmo src_vmo;
+      ASSERT_OK(parent_vmo.create_child(child_type, 0, kChildSize, &src_vmo));
+
+      zx::vmo src_child_vmo;
+      if (child_of_src) {
+        // If making a child of the source we must populate part of the clone range, otherwise
+        // the child can get hung off the common parent without needing to be a CoW child of
+        // ourselves.
+        memset(expected, 's', kChildSize);
+        EXPECT_OK(src_vmo.write(expected, 0, PAGE_SIZE));
+        EXPECT_OK(src_vmo.create_child(child_type, 0, kChildSize, &src_child_vmo));
+      }
+
+      zx::vmo dst_vmo;
+      CreateVmoWithCharFill(&dst_vmo, 'd', kSize);
+
+      // Verify that transferring data from a snapshot child works.
+      ASSERT_OK(dst_vmo.transfer_data(0, 0, kChildSize, &src_vmo, 0));
+
+      // Verify that the src VMO has been zeroed out.
+      ASSERT_OK(src_vmo.read(got, 0, kChildSize));
+      memset(expected, 0, kChildSize);
+      EXPECT_BYTES_EQ(got, expected, kChildSize);
+
+      // Verify that the parent of the src VMO is unaffected.
+      ASSERT_OK(parent_vmo.read(got, 0, kSize));
+      memset(expected, 's', kSize);
+      EXPECT_BYTES_EQ(got, expected, kSize);
+
+      // Verify that the dst VMO correctly received the transferred data.
+      ASSERT_OK(dst_vmo.read(got, 0, kSize));
+      memset(expected, 's', kChildSize);
+      memset(&expected[kChildSize], 'd', kSize - kChildSize);
+      EXPECT_BYTES_EQ(got, expected, kSize);
     }
-    zx::vmo src_vmo;
-    ASSERT_OK(parent_vmo.create_child(child_type, 0, kChildSize, &src_vmo));
-    zx::vmo dst_vmo;
-    CreateVmoWithCharFill(&dst_vmo, 'd', kSize);
-
-    // Verify that transferring data from a snapshot child works.
-    ASSERT_OK(dst_vmo.transfer_data(0, 0, kChildSize, &src_vmo, 0));
-
-    // Verify that the src VMO has been zeroed out.
-    ASSERT_OK(src_vmo.read(got, 0, kChildSize));
-    memset(expected, 0, kChildSize);
-    EXPECT_BYTES_EQ(got, expected, kChildSize);
-
-    // Verify that the parent of the src VMO is unaffected.
-    ASSERT_OK(parent_vmo.read(got, 0, kSize));
-    memset(expected, 's', kSize);
-    EXPECT_BYTES_EQ(got, expected, kSize);
-
-    // Verify that the dst VMO correctly received the transferred data.
-    ASSERT_OK(dst_vmo.read(got, 0, kSize));
-    memset(expected, 's', kChildSize);
-    memset(&expected[kChildSize], 'd', kSize - kChildSize);
-    EXPECT_BYTES_EQ(got, expected, kSize);
   }
 }
 
@@ -125,50 +138,62 @@ TEST(VmoTransferDataTestCase, SnapshotChildDst) {
   // TODO(https://fxbug.dev/42074633): Add ZX_VMO_CHILD_SNAPSHOT_MODIFIED to this list.
   uint32_t child_types[] = {ZX_VMO_CHILD_SNAPSHOT, ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE};
 
-  for (auto child_type : child_types) {
-    // Create VMOs to act as the source and destination VMOs for a transfer.
-    zx::vmo src_vmo;
-    CreateVmoWithCharFill(&src_vmo, 's', kSize);
-    zx::vmo parent_vmo;
-    if (child_type == ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE) {
-      // If the child type is SNAPSHOT_AT_LEAST_ON_WRITE, we need the parent VMO to be pager
-      // backed, as children of this type are upgraded to pure snapshots for anonymous VMOs.
-      zx::pager pager;
-      zx::port port;
-      ASSERT_OK(zx::pager::create(0, &pager));
-      ASSERT_OK(zx::port::create(0, &port));
-      ASSERT_OK(zx_pager_create_vmo(pager.get(), 0, port.get(), 0, kSize,
-                                    parent_vmo.reset_and_get_address()));
+  for (auto child_of_dst : {true, false}) {
+    for (auto child_type : child_types) {
+      // Create VMOs to act as the source and destination VMOs for a transfer.
+      zx::vmo src_vmo;
+      CreateVmoWithCharFill(&src_vmo, 's', kSize);
+      zx::vmo parent_vmo;
+      if (child_type == ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE) {
+        // If the child type is SNAPSHOT_AT_LEAST_ON_WRITE, we need the parent VMO to be pager
+        // backed, as children of this type are upgraded to pure snapshots for anonymous VMOs.
+        zx::pager pager;
+        zx::port port;
+        ASSERT_OK(zx::pager::create(0, &pager));
+        ASSERT_OK(zx::port::create(0, &port));
+        ASSERT_OK(zx_pager_create_vmo(pager.get(), 0, port.get(), 0, kSize,
+                                      parent_vmo.reset_and_get_address()));
 
-      // Presupply pages to the pager backed VMO so that we don't need to wait for a request.
-      zx::vmo aux_vmo;
-      CreateVmoWithCharFill(&aux_vmo, 'd', kSize);
-      ASSERT_OK(pager.supply_pages(parent_vmo, 0, kSize, aux_vmo, 0));
-    } else {
-      // If the child type is a pure snapshot, create an anonymous VMO.
-      CreateVmoWithCharFill(&parent_vmo, 'd', kSize);
+        // Presupply pages to the pager backed VMO so that we don't need to wait for a request.
+        zx::vmo aux_vmo;
+        CreateVmoWithCharFill(&aux_vmo, 'd', kSize);
+        ASSERT_OK(pager.supply_pages(parent_vmo, 0, kSize, aux_vmo, 0));
+      } else {
+        // If the child type is a pure snapshot, create an anonymous VMO.
+        CreateVmoWithCharFill(&parent_vmo, 'd', kSize);
+      }
+      zx::vmo dst_vmo;
+      ASSERT_OK(parent_vmo.create_child(child_type, 0, kChildSize, &dst_vmo));
+
+      zx::vmo dst_child_vmo;
+      if (child_of_dst) {
+        // If making a child of the destination we must populate part of the clone range, otherwise
+        // the child can get hung off the common parent without needing to be a CoW child of
+        // ourselves.
+        memset(expected, 's', kChildSize);
+        EXPECT_OK(dst_vmo.write(expected, 0, PAGE_SIZE));
+        EXPECT_OK(dst_vmo.create_child(child_type, 0, kChildSize, &dst_child_vmo));
+      }
+
+      // Verify that transferring data to a snapshot child works.
+      ASSERT_OK(dst_vmo.transfer_data(0, 0, kChildSize, &src_vmo, 0));
+
+      // Verify that the destination has the transferred contents.
+      ASSERT_OK(dst_vmo.read(got, 0, kChildSize));
+      memset(expected, 's', kChildSize);
+      EXPECT_BYTES_EQ(got, expected, kChildSize);
+
+      // Verify that the src vmo was zeroed out in the transfer range.
+      ASSERT_OK(src_vmo.read(got, 0, kSize));
+      memset(expected, 0, kChildSize);
+      memset(&expected[kChildSize], 's', kSize - kChildSize);
+      EXPECT_BYTES_EQ(got, expected, kSize);
+
+      // Verify that the parent of the destination remained unchanged.
+      memset(expected, 'd', kSize);
+      ASSERT_OK(parent_vmo.read(got, 0, kSize));
+      EXPECT_BYTES_EQ(got, expected, kSize);
     }
-    zx::vmo dst_vmo;
-    ASSERT_OK(parent_vmo.create_child(child_type, 0, kChildSize, &dst_vmo));
-
-    // Verify that transferring data to a snapshot child works.
-    ASSERT_OK(dst_vmo.transfer_data(0, 0, kChildSize, &src_vmo, 0));
-
-    // Verify that the destination has the transferred contents.
-    ASSERT_OK(dst_vmo.read(got, 0, kChildSize));
-    memset(expected, 's', kChildSize);
-    EXPECT_BYTES_EQ(got, expected, kChildSize);
-
-    // Verify that the src vmo was zeroed out in the transfer range.
-    ASSERT_OK(src_vmo.read(got, 0, kSize));
-    memset(expected, 0, kChildSize);
-    memset(&expected[kChildSize], 's', kSize - kChildSize);
-    EXPECT_BYTES_EQ(got, expected, kSize);
-
-    // Verify that the parent of the destination remained unchanged.
-    memset(expected, 'd', kSize);
-    ASSERT_OK(parent_vmo.read(got, 0, kSize));
-    EXPECT_BYTES_EQ(got, expected, kSize);
   }
 }
 

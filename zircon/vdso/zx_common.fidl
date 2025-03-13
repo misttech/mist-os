@@ -91,6 +91,11 @@ type ObjType = strict enum : uint32 {
     STREAM = 31;
     MSI = 32;
     IOB = 33;
+    // TODO(https://fxbug.dev/339884866): Our versioning tooling does not yet
+    // support availability annotations for vDSO entry points. Enable this
+    // annotation once it's supported.
+    // @available(added=HEAD)
+    COUNTER = 34;
 };
 
 resource_definition Handle : uint32 {

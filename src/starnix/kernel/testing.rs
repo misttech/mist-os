@@ -10,7 +10,7 @@ use crate::fs::tmpfs::TmpFs;
 use crate::mm::syscalls::{do_mmap, sys_mremap};
 use crate::mm::{MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
 use crate::security;
-use crate::task::{CurrentTask, Kernel, Task, TaskBuilder};
+use crate::task::{CurrentTask, Kernel, SchedulerManager, Task, TaskBuilder};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_not_dir, Anon, CacheMode,
@@ -25,10 +25,11 @@ use starnix_types::arch::ArchWidth;
 use starnix_types::vfs::default_statfs;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::user_address::UserAddress;
+use starnix_uapi::user_address::{ArchSpecific, UserAddress};
 use starnix_uapi::{statfs, MAP_ANONYMOUS, MAP_PRIVATE, PROT_READ, PROT_WRITE};
 use std::ffi::CString;
 use std::mem::MaybeUninit;
+use std::ops::Deref;
 use std::sync::{mpsc, Arc};
 use zerocopy::{Immutable, IntoBytes};
 
@@ -162,7 +163,7 @@ fn create_test_kernel(
         b"".into(),
         Default::default(),
         ContainerNamespace::new(),
-        None,
+        SchedulerManager::empty_for_tests(),
         None,
         fuchsia_inspect::Node::default(),
         #[cfg(not(feature = "starnix_lite"))]
@@ -206,7 +207,11 @@ fn create_test_init_task(
     let system_task = kernel.kthreads.system_task();
     kernel
         .hrtimer_manager
-        .init(&system_task, /*wake_channel=*/ None)
+        .init(
+            &system_task,
+            /*wake_channel_for_test=*/ None,
+            /*wake_event_for_test=*/ None,
+        )
         .expect("init hrtimer manager worker thread");
 
     // Take the lock on thread group and task in the correct order to ensure any wrong ordering
@@ -588,6 +593,12 @@ impl std::borrow::Borrow<CurrentTask> for AutoReleasableTask {
 impl std::convert::AsRef<CurrentTask> for AutoReleasableTask {
     fn as_ref(&self) -> &CurrentTask {
         AutoReleasableTask::as_ref(self)
+    }
+}
+
+impl ArchSpecific for AutoReleasableTask {
+    fn is_arch32(&self) -> bool {
+        self.deref().is_arch32()
     }
 }
 

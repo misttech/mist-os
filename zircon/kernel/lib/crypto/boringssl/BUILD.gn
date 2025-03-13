@@ -14,9 +14,9 @@ source_set("boringssl") {
   ]
   public_configs = [ ":config" ]
   sources = [
-    "//third_party/boringssl/src/crypto/chacha/chacha.c",
-    "//third_party/boringssl/src/crypto/fipsmodule/sha/sha256.c",
-    "zircon-mem.c",
+    "//third_party/boringssl/src/crypto/chacha/chacha.cc",
+    "//third_party/boringssl/src/crypto/sha/sha256.cc",
+    "incs-and-stubs.cc",
   ]
 
   # This gets the main source's include_dirs and cflags for warnings.
@@ -42,7 +42,8 @@ config("config") {
   # statements to avoid pulling in C++ headers.
   include_dirs = [
     "//third_party/boringssl/src/include",
-    ".",
+    ".",  # For <sys/types.h>
+    "//",  # For .inc files
   ]
 
   if (is_gcc) {

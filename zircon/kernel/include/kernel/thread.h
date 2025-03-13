@@ -55,7 +55,6 @@
 class Dpc;
 struct BrwLockOps;
 class OwnedWaitQueue;
-class StackOwnedLoanedPagesInterval;
 class ThreadDispatcher;
 class VmAspace;
 class WaitQueue;
@@ -1450,13 +1449,10 @@ struct Thread : public ChainLockable {
     //
     // Calling any of these methods on a pure kernel thread (i.e. one without an associated
     // `ThreadDispatcher`) is a programming error.
-    static zx_status_t PageFault(vaddr_t va, uint flags) {
-      return Fault(FaultType::PageFault, va, flags);
-    }
-    static zx_status_t SoftFault(vaddr_t va, uint flags) {
-      return Fault(FaultType::SoftFault, va, flags);
-    }
-    static zx_status_t AccessedFault(vaddr_t va) { return Fault(FaultType::AccessedFault, va, 0); }
+    static zx_status_t PageFault(vaddr_t va, uint flags);
+    static zx_status_t SoftFault(vaddr_t va, uint flags);
+    static zx_status_t SoftFaultInRange(vaddr_t va, uint flags, size_t len);
+    static zx_status_t AccessedFault(vaddr_t va);
 
     // Generate a backtrace for the calling thread.
     //
@@ -1478,8 +1474,8 @@ struct Thread : public ChainLockable {
    private:
     // Handles a virtual memory fault in the address space that contains va. If there is no aspace
     // that contains va, or we don't have access to it, a ZX_ERR_NOT_FOUND is returned.
-    enum class FaultType : uint8_t { PageFault, SoftFault, AccessedFault };
-    static zx_status_t Fault(FaultType type, vaddr_t va, uint flags);
+    template <typename F>
+    static zx_status_t Fault(vaddr_t va, F resolve_fault);
   };  // struct Current;
 
   // Trait for the global Thread list.
@@ -1695,10 +1691,6 @@ struct Thread : public ChainLockable {
   // obtained, it will be left empty.
   void GetBacktrace(Backtrace& out_bt) TA_EXCL(get_lock());
 
-  StackOwnedLoanedPagesInterval* stack_owned_loaned_pages_interval() {
-    return stack_owned_loaned_pages_interval_;
-  }
-
   // Returns the last flow id allocated by TakeNextLockFlowId() for this thread.
   uint64_t lock_flow_id() const {
 #if LOCK_TRACING_ENABLED
@@ -1757,10 +1749,6 @@ struct Thread : public ChainLockable {
   // ScopedThreadExceptionContext is the only public way to call
   // SaveUserStateLocked and RestoreUserStateLocked.
   friend class ScopedThreadExceptionContext;
-
-  // StackOwnedLoanedPagesInterval is the only public way to set/clear the
-  // stack_owned_loaned_pages_interval().
-  friend class StackOwnedLoanedPagesInterval;
 
   // Dumping routines are allowed to see inside us.
   friend class ThreadDumper;
@@ -1844,10 +1832,6 @@ struct Thread : public ChainLockable {
 
   // Must only be accessed by "this" thread. May be null.
   ktl::unique_ptr<RestrictedState> restricted_state_;
-
-  // This is part of ensuring that all stack ownership of loaned pages can be boosted in priority
-  // via priority inheritance if a higher priority thread is trying to reclaim the loaned pages.
-  StackOwnedLoanedPagesInterval* stack_owned_loaned_pages_interval_ = nullptr;
 
 #if WITH_LOCK_DEP
   // state for runtime lock validation when in thread context

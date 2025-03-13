@@ -20,6 +20,7 @@ void ::test_handles::wire::Handles::_CloseHandles() {
   fifo_handle.reset();
   guest_handle.reset();
   interrupt_handle.reset();
+  iob_handle.reset();
   iommu_handle.reset();
   job_handle.reset();
   msi_handle.reset();

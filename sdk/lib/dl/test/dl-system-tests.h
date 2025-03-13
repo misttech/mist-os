@@ -44,7 +44,7 @@ class DlSystemTests : public DlSystemLoadTestsBase {
 
   static fit::result<Error, void*> DlSym(void* module, const char* ref);
 
-  static int DlIteratePhdr(DlIteratePhdrCallback, void* data);
+  static int DlIteratePhdr(DlIteratePhdrCallback* callback, void* data);
 
   // ExpectRootModule or Needed are called by tests when a file is expected to
   // be loaded from the file system for the first time. The following functions

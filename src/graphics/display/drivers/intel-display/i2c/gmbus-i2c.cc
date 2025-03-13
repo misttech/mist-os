@@ -166,14 +166,14 @@ bool GMBusI2c::ProbeDisplay() {
   // safe to call `I2cClearNack()`.
   auto clear_nack_on_failure = fit::defer([this]() __TA_NO_THREAD_SAFETY_ANALYSIS {
     if (!I2cClearNack()) {
-      FDF_LOG(TRACE, "Failed to clear nack");
+      fdf::trace("Failed to clear nack");
     }
   });
 
   uint8_t byte_read;
   bool read_result = GMBusRead(kDdcDataAddress, &byte_read, 1);
   if (!read_result) {
-    FDF_LOG(ERROR, "Failed to read a EDID byte from the E-DDC channel");
+    fdf::error("Failed to read a EDID byte from the E-DDC channel");
     return false;
   }
 
@@ -188,12 +188,12 @@ bool GMBusI2c::ProbeDisplay() {
             return registers::GMBusControllerStatus::Get().ReadFrom(&mmio_space).is_waiting();
           },
           zx::msec(1), 10)) {
-    FDF_LOG(ERROR, "Failed to transition GMBus Controller to wait state");
+    fdf::error("Failed to transition GMBus Controller to wait state");
     return false;
   }
 
   if (!I2cFinish()) {
-    FDF_LOG(ERROR, "Failed to finish DDC transactions");
+    fdf::error("Failed to finish DDC transactions");
     return false;
   }
 
@@ -232,9 +232,9 @@ zx::result<> GMBusI2c::ReadEdidBlock(int index, std::span<uint8_t, edid::kBlockS
     // and perform non-segmented DDC read operations if the segment pointer is
     // zero.
     if (segment_pointer == 0) {
-      FDF_LOG(INFO, "E-DDC segment pointer is not supported. Will perform DDC read.");
+      fdf::info("E-DDC segment pointer is not supported. Will perform DDC read.");
     } else {
-      FDF_LOG(ERROR, "Failed to set DDC segment %d for block %d", segment_pointer, index);
+      fdf::error("Failed to set DDC segment {} for block {}", segment_pointer, index);
       return zx::error(ZX_ERR_IO);
     }
   }
@@ -246,7 +246,7 @@ zx::result<> GMBusI2c::ReadEdidBlock(int index, std::span<uint8_t, edid::kBlockS
   // safe to call `I2cClearNack()`.
   auto clear_nack_on_failure = fit::defer([this]() __TA_NO_THREAD_SAFETY_ANALYSIS {
     if (!I2cClearNack()) {
-      FDF_LOG(TRACE, "Failed to clear nack");
+      fdf::trace("Failed to clear nack");
     }
   });
 
@@ -256,7 +256,7 @@ zx::result<> GMBusI2c::ReadEdidBlock(int index, std::span<uint8_t, edid::kBlockS
       static_cast<uint8_t>(index % 2 * static_cast<int>(edid::kBlockSize));
   bool write_offset_result = GMBusWrite(kDdcDataAddress, &initial_segment_offset, 1);
   if (!write_offset_result) {
-    FDF_LOG(ERROR, "Failed to write offset %d for block %d", initial_segment_offset, index);
+    fdf::error("Failed to write offset {} for block {}", initial_segment_offset, index);
     return zx::error(ZX_ERR_IO);
   }
 
@@ -271,13 +271,13 @@ zx::result<> GMBusI2c::ReadEdidBlock(int index, std::span<uint8_t, edid::kBlockS
             return registers::GMBusControllerStatus::Get().ReadFrom(&mmio_space).is_waiting();
           },
           zx::msec(1), 10)) {
-    FDF_LOG(ERROR, "Failed to transition GMBus Controller to wait state");
+    fdf::error("Failed to transition GMBus Controller to wait state");
     return zx::error(ZX_ERR_IO);
   }
 
   bool read_result = GMBusRead(kDdcDataAddress, edid_block.data(), edid_block.size());
   if (!read_result) {
-    FDF_LOG(ERROR, "Failed to read EDID block %d", index);
+    fdf::error("Failed to read EDID block {}", index);
     return zx::error(ZX_ERR_IO);
   }
 
@@ -286,12 +286,12 @@ zx::result<> GMBusI2c::ReadEdidBlock(int index, std::span<uint8_t, edid::kBlockS
             return registers::GMBusControllerStatus::Get().ReadFrom(&mmio_space).is_waiting();
           },
           zx::msec(1), 10)) {
-    FDF_LOG(ERROR, "Failed to transition GMBus Controller to wait state");
+    fdf::error("Failed to transition GMBus Controller to wait state");
     return zx::error(ZX_ERR_IO);
   }
 
   if (!I2cFinish()) {
-    FDF_LOG(ERROR, "Failed to finish DDC transactions");
+    fdf::error("Failed to finish DDC transactions");
     return zx::error(ZX_ERR_IO);
   }
 
@@ -369,7 +369,7 @@ bool GMBusI2c::I2cFinish() {
   gmbus_clock_port_select.WriteTo(mmio_space_);
 
   if (!idle) {
-    FDF_LOG(TRACE, "hdmi: GMBus i2c failed to go idle");
+    fdf::trace("hdmi: GMBus i2c failed to go idle");
   }
   return idle;
 }
@@ -389,11 +389,11 @@ bool GMBusI2c::I2cWaitForHwReady() {
             return gmbus_controller_status.nack_occurred() || gmbus_controller_status.is_ready();
           },
           zx::msec(1), 50)) {
-    FDF_LOG(TRACE, "hdmi: GMBus i2c wait for hwready timeout");
+    fdf::trace("hdmi: GMBus i2c wait for hwready timeout");
     return false;
   }
   if (gmbus_controller_status.nack_occurred()) {
-    FDF_LOG(TRACE, "hdmi: GMBus i2c got nack");
+    fdf::trace("hdmi: GMBus i2c got nack");
     return false;
   }
   return true;
@@ -413,7 +413,7 @@ bool GMBusI2c::I2cClearNack() {
             return !registers::GMBusControllerStatus::Get().ReadFrom(&mmio_space).is_active();
           },
           zx::msec(1), 10)) {
-    FDF_LOG(TRACE, "hdmi: GMBus i2c failed to clear active nack");
+    fdf::trace("hdmi: GMBus i2c failed to clear active nack");
     return false;
   }
 

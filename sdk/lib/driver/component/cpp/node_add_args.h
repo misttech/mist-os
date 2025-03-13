@@ -5,10 +5,10 @@
 #ifndef LIB_DRIVER_COMPONENT_CPP_NODE_ADD_ARGS_H_
 #define LIB_DRIVER_COMPONENT_CPP_NODE_ADD_ARGS_H_
 
-#include <fidl/fuchsia.component.decl/cpp/fidl.h>
-#include <fidl/fuchsia.component.decl/cpp/wire.h>
-#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
-#include <fidl/fuchsia.driver.framework/cpp/wire.h>
+#include <fidl/fuchsia.component.decl/cpp/natural_types.h>
+#include <fidl/fuchsia.component.decl/cpp/wire_types.h>
+#include <fidl/fuchsia.driver.framework/cpp/natural_types.h>
+#include <fidl/fuchsia.driver.framework/cpp/wire_types.h>
 #include <lib/component/incoming/cpp/constants.h>
 #include <lib/fidl/cpp/wire/arena.h>
 #include <lib/fidl/cpp/wire/traits.h>

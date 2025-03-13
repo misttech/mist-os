@@ -31,10 +31,17 @@
     ],
     use: [
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-input-report",
             from: "parent",
             rights: [ "r*" ],
             path: "/dev/class/input-report",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.input.report.Service",
+            from: "parent",
         },
         {
             directory: "config-data",

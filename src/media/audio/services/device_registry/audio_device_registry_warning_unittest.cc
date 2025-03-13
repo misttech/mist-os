@@ -26,26 +26,21 @@ TEST_F(AudioDeviceRegistryServerWarningTest, FindDeviceByTokenIdUnknown) {
 TEST_F(AudioDeviceRegistryServerWarningTest, UnhealthyDevices) {
   auto fake_codec = CreateFakeCodecOutput();
   auto fake_composite = CreateFakeComposite();
-  auto fake_stream = CreateFakeStreamConfigOutput();
 
   fake_codec->set_health_state(false);
   fake_composite->set_health_state(false);
-  fake_stream->set_health_state(false);
 
   auto codec_client = fake_codec->Enable();
   auto composite_client = fake_composite->Enable();
-  auto stream_config_client = fake_stream->Enable();
 
   AddDeviceForDetection("test codec", fad::DeviceType::kCodec,
                         fad::DriverClient::WithCodec(std::move(codec_client)));
   AddDeviceForDetection("test composite", fad::DeviceType::kComposite,
                         fad::DriverClient::WithComposite(std::move(composite_client)));
-  AddDeviceForDetection("test output", fad::DeviceType::kOutput,
-                        fad::DriverClient::WithStreamConfig(std::move(stream_config_client)));
 
   RunLoopUntilIdle();
   EXPECT_EQ(adr_service()->devices().size(), 0u);
-  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 3u);
+  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 2u);
 }
 
 /////////////////////
@@ -112,41 +107,6 @@ TEST_F(AudioDeviceRegistryServerWarningTest, FindCompositeByTokenIdRemoved) {
   auto token_id = adr_service()->devices().begin()->get()->token_id();
 
   fake_driver->DropComposite();
-  RunLoopUntilIdle();
-
-  EXPECT_EQ(adr_service()->FindDeviceByTokenId(token_id).first,
-            AudioDeviceRegistry::DevicePresence::Unknown);
-}
-
-/////////////////////
-// StreamConfig cases
-TEST_F(AudioDeviceRegistryServerWarningTest, FindStreamConfigByTokenIdError) {
-  auto fake_driver = CreateFakeStreamConfigInput();
-  fake_driver->set_health_state(false);
-  auto client = fake_driver->Enable();
-  AddDeviceForDetection("test input", fad::DeviceType::kInput,
-                        fad::DriverClient::WithStreamConfig(std::move(client)));
-
-  RunLoopUntilIdle();
-  EXPECT_EQ(adr_service()->devices().size(), 0u);
-  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 1u);
-  auto token_id = adr_service()->unhealthy_devices().begin()->get()->token_id();
-
-  EXPECT_EQ(adr_service()->FindDeviceByTokenId(token_id).first,
-            AudioDeviceRegistry::DevicePresence::Error);
-}
-
-TEST_F(AudioDeviceRegistryServerWarningTest, FindStreamConfigByTokenIdRemoved) {
-  auto fake_driver = CreateFakeStreamConfigOutput();
-  auto client = fake_driver->Enable();
-  AddDeviceForDetection("test output", fad::DeviceType::kOutput,
-                        fad::DriverClient::WithStreamConfig(std::move(client)));
-
-  RunLoopUntilIdle();
-  ASSERT_EQ(adr_service()->devices().size(), 1u);
-  auto token_id = adr_service()->devices().begin()->get()->token_id();
-
-  fake_driver->DropStreamConfig();
   RunLoopUntilIdle();
 
   EXPECT_EQ(adr_service()->FindDeviceByTokenId(token_id).first,

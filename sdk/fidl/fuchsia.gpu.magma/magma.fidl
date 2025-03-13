@@ -160,6 +160,7 @@ type BufferOp = flexible enum : uint32 {
 };
 
 /// The batch size used to send multiple immediate commands in a single message.
+@available(removed=NEXT)
 const MAX_IMMEDIATE_COMMANDS_DATA_SIZE uint32 = 2048;
 
 /// The batch size used to send multiple inline commands in a single message.
@@ -284,6 +285,7 @@ closed protocol Primary {
     /// Submits a series of commands for execution on the hardware without using a command buffer.
     /// `semaphores` must refer to events that have been imported, and will be signaled after
     /// the commands are completed.
+    @available(removed=NEXT)
     strict ExecuteImmediateCommands(struct {
         context_id ContextId;
         command_data vector<uint8>:MAX_IMMEDIATE_COMMANDS_DATA_SIZE;
@@ -441,6 +443,11 @@ closed protocol PerformanceCounterAccess {
     });
 };
 
+// Added to allow service connection to replace devfs
+service PerformanceCounterService {
+    access client_end:PerformanceCounterAccess;
+};
+
 closed protocol PerformanceCounterEvents {
     /// Signals that a performance counter buffer has data. These will be output in the order of
     /// when the reads are completed.
@@ -471,6 +478,12 @@ closed protocol DependencyInjection {
         provider client_end:fuchsia.memorypressure.Provider;
     });
 };
+
+// Added to allow service connection to replace devfs
+service DependencyInjectionService {
+    device client_end:DependencyInjection;
+};
+
 
 /// Each element of this enum represents a high-level goal of a specific power state.
 @available(added=HEAD)
@@ -547,6 +560,6 @@ open protocol PowerElementProvider {
 
 @available(added=HEAD)
 service Service {
-    device client_end:Device;
+    device client_end:CombinedDevice;
     power_element_provider client_end:PowerElementProvider;
 };

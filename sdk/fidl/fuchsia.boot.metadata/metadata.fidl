@@ -18,7 +18,7 @@ const PARTITION_GUID_LEN uint64 = 32;
 alias PartitionGuid = array<uint8, PARTITION_GUID_LEN>;
 
 /// This is a direct copy of [`zbi.PartitionMap`].
-type PartitionMap = struct {
+type PartitionMapEntry = struct {
     /// Total blocks used on the device.
     block_count uint64;
 
@@ -40,7 +40,7 @@ type PartitionMap = struct {
 type PartitionMapMetadata = table {
     /// The partition map as described in the Zircon Boot Image.
     // TODO(b/42062786): Use zbi.PartitionMap as type once the zbi FIDL library is in the SDK.
-    1: partition_map PartitionMap;
+    1: partition_map vector<PartitionMapEntry>:MAX;
 };
 
 const SERIAL_NUMBER_LEN uint8 = 32;

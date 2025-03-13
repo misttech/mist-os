@@ -14,7 +14,6 @@
             protocol: [
                 "fuchsia.fshost.Admin",
                 "fuchsia.hardware.power.statecontrol.Admin",
-                "fuchsia.logger.LogSink",
                 "fuchsia.paver.Paver",
             ],
             from: "parent",
@@ -26,11 +25,14 @@
             to: "#fastboot-usb",
         },
         {
-            directory: "dev-class",
+            service: "fuchsia.hardware.fastboot.Service",
             from: "parent",
-            as: "dev-class-fastboot",
             to: "#fastboot-usb",
-            subdir: "fastboot",
+        },
+        {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: [ "#bt-map-mce" ],
         },
     ],
 }

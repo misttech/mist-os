@@ -16,6 +16,7 @@
 #include <lib/async/default.h>
 #include <lib/async/dispatcher.h>
 #include <lib/async_patterns/cpp/dispatcher_bound.h>
+#include <lib/component/incoming/cpp/directory.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fastboot/fastboot.h>
@@ -728,17 +729,17 @@ TEST_F(FastbootFlashTest, FlashAssetZirconR) {
 }
 
 TEST_F(FastbootFlashTest, FlashAssetLegacyZirconA) {
-  TestFlashAsset("zircon-a", fuchsia_paver::wire::Configuration::kA,
+  TestFlashAsset("zircon_a", fuchsia_paver::wire::Configuration::kA,
                  fuchsia_paver::wire::Asset::kKernel);
 }
 
 TEST_F(FastbootFlashTest, FlashAssetLegacyZirconB) {
-  TestFlashAsset("zircon-b", fuchsia_paver::wire::Configuration::kB,
+  TestFlashAsset("zircon_b", fuchsia_paver::wire::Configuration::kB,
                  fuchsia_paver::wire::Asset::kKernel);
 }
 
 TEST_F(FastbootFlashTest, FlashAssetLegacyZirconR) {
-  TestFlashAsset("zircon-r", fuchsia_paver::wire::Configuration::kRecovery,
+  TestFlashAsset("zircon_r", fuchsia_paver::wire::Configuration::kRecovery,
                  fuchsia_paver::wire::Asset::kKernel);
 }
 
@@ -1067,7 +1068,7 @@ class FastbootRebootTest : public zxtest::Test {
 
     auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
-    zx::result svc_local = component::ConnectAt<fuchsia_io::Directory>(endpoints.client, "svc");
+    zx::result svc_local = component::OpenDirectoryAt(endpoints.client, "svc");
     ASSERT_OK(svc_local);
 
     svc_local_ = std::move(svc_local.value());
@@ -1234,7 +1235,7 @@ class FastbootFshostTest : public FastbootDownloadTest {
     loop_.StartThread("fastboot-fshost-test-loop");
     auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
-    zx::result svc_local = component::ConnectAt<fuchsia_io::Directory>(endpoints.client, "svc");
+    zx::result svc_local = component::OpenDirectoryAt(endpoints.client, "svc");
     ASSERT_OK(svc_local);
 
     svc_local_ = std::move(svc_local.value());
@@ -1458,7 +1459,7 @@ class FastbootBuildInfoTest : public FastbootDownloadTest {
     loop_.StartThread("fastboot-build-info-test-loop");
     auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
-    zx::result svc_local = component::ConnectAt<fuchsia_io::Directory>(endpoints.client, "svc");
+    zx::result svc_local = component::OpenDirectoryAt(endpoints.client, "svc");
     ASSERT_OK(svc_local);
 
     svc_local_ = std::move(svc_local.value());

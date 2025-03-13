@@ -2,7 +2,4 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /src/developer/ffx/OWNERS
-include /src/storage/OWNERS
-include /src/sys/live_usb/OWNERS
 include /tools/make-fuchsia-vol/OWNERS

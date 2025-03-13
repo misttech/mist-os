@@ -7,7 +7,7 @@
 //! which should enable the lower level logging which is disabled by default. Without having that
 //! flag correctly passed through test metadata to ffx/run-test-suite, this test should fail.
 
-use diagnostics_reader::{ArchiveReader, Logs};
+use diagnostics_reader::ArchiveReader;
 use futures::StreamExt;
 
 #[fuchsia::test]
@@ -16,7 +16,7 @@ async fn hello_world() {
     tracing::trace!("TRACE LEVEL MESSAGE");
     log::trace!("TRACE LEVEL MESSAGE 2");
 
-    let logs = ArchiveReader::new().snapshot_then_subscribe::<Logs>().unwrap().map(|r| r.unwrap());
+    let logs = ArchiveReader::logs().snapshot_then_subscribe().unwrap().map(|r| r.unwrap());
     let msgs = logs
         .filter(|log| {
             futures::future::ready(match log.tags() {

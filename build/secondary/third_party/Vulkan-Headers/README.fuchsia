@@ -1,9 +1,0 @@
-Name: Vulkan-Headers
-License: Apache 2.0
-License File: LICENSES/Apache-2.0.txt
-License File: LICENSES/MIT.txt
-Upstream Git: https://github.com/KhronosGroup/Vulkan-Headers
-Description:
-
-Vulkan header files and API registry.
-

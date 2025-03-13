@@ -14,15 +14,10 @@ ffx_plugin("ffx_repository") {
   config_data = [ "data/config.json" ]
 
   plugin_deps = [
-    "add:ffx_repository_add",
-    "add-from-pm:ffx_repository_add_from_pm",
     "create:ffx_repository_create",
     "default:ffx_repository_default",
-    "list:ffx_repository_list",
     "packages:ffx_repository_packages",
     "publish:ffx_repository_publish",
-    "remove:ffx_repository_remove",
-    "serve:ffx_repository_serve",
     "server:ffx_repository_server",
   ]
 

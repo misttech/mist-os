@@ -25,7 +25,6 @@
 #include <vm/vm.h>
 
 class VmAddressRegion;
-class VmEnumerator;
 class VmMapping;
 class VmAddressRegionOrMapping;
 
@@ -137,13 +136,6 @@ class VmAspace : public fbl::DoublyLinkedListable<VmAspace*>, public fbl::RefCou
   static void HarvestAllUserAccessedBits(NonTerminalAction non_terminal_action,
                                          TerminalAction terminal_action);
 
-  // Traverses the VM tree rooted at this node, in depth-first pre-order. If
-  // any methods of |ve| return false, the traversal stops and this method
-  // returns ZX_ERR_CANCELED. If the aspace is destroyed or otherwise not
-  // enumerable this returns ZX_ERR_BAD_STATE, otherwise ZX_OK is returned if
-  // traversal completes successfully.
-  zx_status_t EnumerateChildren(VmEnumerator* ve);
-
   // A collection of memory usage counts.
   struct vm_usage_t {
     // A count of bytes covered by VmMapping ranges.
@@ -183,6 +175,12 @@ class VmAspace : public fbl::DoublyLinkedListable<VmAspace*>, public fbl::RefCou
   //  * May be invoked spuriously in situations where the hardware mappings would have prevented a
   //    real PageFault from occurring.
   zx_status_t SoftFault(vaddr_t va, uint flags);
+  // Similar to SoftFault, but additionally takes a length indicating that the range of [va, va+len)
+  // is expected to be accessed with |flags| after resolving this fault. The aspace can take this
+  // range as a hint to attempt to preemptively avoid future faults.
+  // There are no alignment restrictions on |va| or |len|, although it is assumed that |len| is
+  // greater than zero.
+  zx_status_t SoftFaultInRange(vaddr_t va, uint flags, size_t len);
 
   // Generates an accessed flag fault against this aspace. This is a specialized version of
   // SoftFault that will only resolve a potential missing access flag and nothing else.
@@ -293,6 +291,9 @@ class VmAspace : public fbl::DoublyLinkedListable<VmAspace*>, public fbl::RefCou
   }
 
   fbl::RefPtr<VmAddressRegion> RootVmarLocked() TA_REQ(lock_);
+
+  // Internal helper for resolving page faults. Takes an aligned va.
+  zx_status_t PageFaultInternal(vaddr_t va, uint flags, size_t additional_pages);
 
   // magic
   fbl::Canary<fbl::magic("VMAS")> canary_;

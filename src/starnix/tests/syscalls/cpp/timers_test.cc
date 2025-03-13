@@ -38,13 +38,13 @@ TEST(Timers, RealtimeAlarm) {
   timer_t timer_id;
   struct sigevent sev = {};
   sev.sigev_notify = SIGEV_NONE;
-  EXPECT_NE(-1, timer_create(CLOCK_REALTIME_ALARM, &sev, &timer_id));
+  SAFE_SYSCALL(timer_create(CLOCK_REALTIME_ALARM, &sev, &timer_id));
 
   // Test timer 1 second in the future.
   struct itimerspec its = {};
   its.it_value = begin;
   its.it_value.tv_sec += 1;
-  EXPECT_NE(-1, timer_settime(timer_id, TIMER_ABSTIME, &its, nullptr));
+  SAFE_SYSCALL(timer_settime(timer_id, TIMER_ABSTIME, &its, nullptr));
 
   struct timespec sleep_t = {
       .tv_sec = 1,
@@ -59,5 +59,5 @@ TEST(Timers, RealtimeAlarm) {
   EXPECT_EQ(0, its.it_value.tv_nsec);
   EXPECT_EQ(0, timer_getoverrun(timer_id));
 
-  EXPECT_NE(-1, timer_delete(timer_id));
+  SAFE_SYSCALL(timer_delete(timer_id));
 }

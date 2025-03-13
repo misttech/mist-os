@@ -15,6 +15,7 @@ driver_bind_rules("usb_bus_bind") {
 }
 
 fuchsia_cc_driver("usb-bus-driver") {
+  legacy = true
   output_name = "usb-bus"
   configs += [
     "//build/config:all_source",

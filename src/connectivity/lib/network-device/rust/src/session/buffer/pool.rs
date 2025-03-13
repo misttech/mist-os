@@ -455,6 +455,15 @@ impl<K: AllocKind> Buffer<K> {
         Ok(())
     }
 
+    /// Returns this buffer as a mutable slice if it's not fragmented.
+    pub fn as_slice_mut(&mut self) -> Option<&mut [u8]> {
+        match &mut (*self.parts)[..] {
+            [] => Some(&mut []),
+            [one] => Some(one.as_slice_mut()),
+            _ => None,
+        }
+    }
+
     /// Pads the [`Buffer`] to minimum tx buffer length requirements.
     pub(in crate::session) fn pad(&mut self) -> Result<()> {
         let num_parts = self.parts.len();
@@ -884,6 +893,14 @@ impl BufferPart {
         }
         self.len = new_len;
         Ok(new_len)
+    }
+
+    /// Returns the buffer part as a slice.
+    fn as_slice_mut(&mut self) -> &mut [u8] {
+        // SAFETY: BufferPart requires the caller to guarantee the ptr used to
+        // create outlives its instance. BufferPart itself is not copy or clone
+        // so we can rely on unsafety of `new` to uphold this.
+        unsafe { std::slice::from_raw_parts_mut(self.ptr, self.len) }
     }
 }
 

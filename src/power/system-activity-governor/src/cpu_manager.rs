@@ -2,21 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::events::{SagEvent, SagEventLogger};
+
 use anyhow::Result;
 use async_trait::async_trait;
 use fidl_fuchsia_power_system::CpuLevel;
 use fuchsia_inspect::Node as INode;
-use fuchsia_inspect_contrib::nodes::BoundedListNode as IRingBuffer;
 use futures::channel::mpsc::{self, Receiver, Sender};
 use futures::lock::Mutex;
 use futures::{FutureExt, StreamExt};
 use power_broker_client::{run_power_element, PowerElementContext};
-use std::cell::{OnceCell, RefCell};
+use std::cell::OnceCell;
 use std::rc::Rc;
 use {
     fidl_fuchsia_hardware_suspend as fhsuspend, fidl_fuchsia_power_broker as fbroker,
-    fidl_fuchsia_power_observability as fobs, fidl_fuchsia_power_suspend as fsuspend,
-    fidl_fuchsia_power_system as fsystem, fuchsia_async as fasync,
+    fidl_fuchsia_power_suspend as fsuspend, fidl_fuchsia_power_system as fsystem,
+    fuchsia_async as fasync,
 };
 
 /// The result of a suspend request.
@@ -55,39 +56,114 @@ pub trait SuspendResumeListener {
 /// satisfied.
 pub struct SuspendBlockManager {
     marker: Mutex<Rc<()>>,
+    sag_event_logger: SagEventLogger,
 }
 
 impl SuspendBlockManager {
-    pub fn new() -> Self {
-        SuspendBlockManager { marker: Mutex::new(Rc::new(())) }
+    pub fn new(sag_event_logger: SagEventLogger) -> Self {
+        SuspendBlockManager { marker: Mutex::new(Rc::new(())), sag_event_logger }
     }
 
     /// Returns a suspend blocker, possibly needing to wait until an in-flight suspend attempt
     /// completes.
-    pub async fn get_blocker(&self) -> std::rc::Weak<()> {
+    pub async fn get_blocker(&self) -> SuspendBlockGuard<std::rc::Weak<()>> {
         let marker = self.marker.lock().await;
-        Rc::downgrade(&marker)
+        SuspendBlockGuard::new_suspend_blocker(
+            Rc::downgrade(&marker),
+            self.sag_event_logger.clone(),
+        )
     }
 
     /// Attempts to acquire a suspend blocker immediately, returning None if the system is currently
     /// executing a suspend attempt.
-    pub fn try_get_blocker(&self) -> Option<std::rc::Weak<()>> {
-        self.marker.try_lock().map(|marker| Rc::downgrade(&marker))
+    pub fn try_get_blocker(&self) -> Option<SuspendBlockGuard<std::rc::Weak<()>>> {
+        self.marker.try_lock().map(|marker| {
+            SuspendBlockGuard::new_suspend_blocker(
+                Rc::downgrade(&marker),
+                self.sag_event_logger.clone(),
+            )
+        })
     }
 
     /// If suspend is allowed, returns a guard that blocks further get_blocker() calls as long as it
     /// is held. Otherwise, returns None.
-    pub(crate) fn suspend_allowed(&self) -> Option<futures::lock::MutexGuard<'_, Rc<()>>> {
+    pub(crate) fn suspend_allowed(
+        &self,
+    ) -> Option<SuspendBlockGuard<futures::lock::MutexGuard<'_, Rc<()>>>> {
         match self.marker.try_lock() {
             None => None,
             Some(marker) => {
                 if Rc::weak_count(&marker) > 0 {
                     None
                 } else {
-                    Some(marker)
+                    Some(SuspendBlockGuard::new_suspend_lock(marker, self.sag_event_logger.clone()))
                 }
             }
         }
+    }
+}
+
+/// A guard for a "suspend blocker" returned by SuspendBlockManager.
+/// This object exists to allow tracking of when suspend is allowed again
+/// after a suspend blocker is dropped.
+pub struct SuspendBlockGuard<T> {
+    /// Data that is protected by this guard.
+    data: T,
+    /// SAG event logger used to track when lock/block is created and dropped.
+    sag_event_logger: SagEventLogger,
+    /// Function that is called when the guard is dropped.
+    drop_fn: fn(&Self),
+}
+
+impl<T> SuspendBlockGuard<T> {
+    /// Creates a "suspend lock" style guard.
+    /// Only one suspend lock is expected to exist at any time.
+    pub fn new_suspend_lock(data: T, sag_event_logger: SagEventLogger) -> Self {
+        sag_event_logger.log(SagEvent::SuspendLockAcquired);
+        SuspendBlockGuard {
+            data,
+            sag_event_logger,
+            drop_fn: |this| {
+                this.sag_event_logger.log(SagEvent::SuspendLockDropped);
+            },
+        }
+    }
+}
+
+impl SuspendBlockGuard<std::rc::Weak<()>> {
+    /// Creates a "suspend blocker" style guard.
+    /// Multiple suspend blockers may exist at any time. As long as one suspend
+    /// blocker exists, suspension will be blocked.
+    pub fn new_suspend_blocker(data: std::rc::Weak<()>, sag_event_logger: SagEventLogger) -> Self {
+        // Only signal SuspendBlockerAcquired when the first guard is created.
+        if data.weak_count() == 1 {
+            sag_event_logger.log(SagEvent::SuspendBlockerAcquired);
+        }
+
+        SuspendBlockGuard {
+            data,
+            sag_event_logger,
+            drop_fn: |this| {
+                // Only signal SuspendBlockerDropped when the last guard is dropped.
+                if this.data.weak_count() == 1 {
+                    this.sag_event_logger.log(SagEvent::SuspendBlockerDropped);
+                }
+            },
+        }
+    }
+}
+
+impl<T> Drop for SuspendBlockGuard<T> {
+    fn drop(&mut self) {
+        (self.drop_fn)(&self);
+    }
+}
+
+impl<T> std::ops::Deref for SuspendBlockGuard<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.data
     }
 }
 
@@ -114,7 +190,8 @@ pub struct CpuManager {
     inner: Mutex<CpuManagerInner>,
     /// SuspendResumeListener object to notify of suspend/resume.
     suspend_resume_listener: OnceCell<Rc<dyn SuspendResumeListener>>,
-    _inspect_node: RefCell<IRingBuffer>,
+    /// Logger for system-wide activity governor events.
+    sag_event_logger: SagEventLogger,
 }
 
 impl CpuManager {
@@ -122,7 +199,7 @@ impl CpuManager {
     pub fn new(
         cpu: Rc<PowerElementContext>,
         suspender: Option<fhsuspend::SuspenderProxy>,
-        inspect: INode,
+        sag_event_logger: SagEventLogger,
     ) -> Self {
         Self {
             inner: Mutex::new(CpuManagerInner {
@@ -130,10 +207,10 @@ impl CpuManager {
                 suspender,
                 suspend_state_index: 0,
                 cpu_element_is_inactive: false,
-                suspend_block_manager: Rc::new(SuspendBlockManager::new()),
+                suspend_block_manager: Rc::new(SuspendBlockManager::new(sag_event_logger.clone())),
             }),
             suspend_resume_listener: OnceCell::new(),
-            _inspect_node: RefCell::new(IRingBuffer::new(inspect, 128)),
+            sag_event_logger,
         }
     }
 
@@ -205,6 +282,7 @@ impl CpuManager {
             let inner = self.inner.lock().await;
             if !inner.cpu_element_is_inactive {
                 log::info!("Suspend not allowed because CPU element is not inactive");
+                self.sag_event_logger.log(SagEvent::SuspendAttemptBlocked);
                 return SuspendResult::NotAllowed;
             }
 
@@ -212,16 +290,12 @@ impl CpuManager {
                 Some(lock) => lock,
                 None => {
                     log::info!("Suspend not allowed due to outstanding wake leases");
+                    self.sag_event_logger.log(SagEvent::SuspendAttemptBlocked);
                     return SuspendResult::NotAllowed;
                 }
             };
 
-            self._inspect_node.borrow_mut().add_entry(|node| {
-                node.record_int(
-                    fobs::SUSPEND_ATTEMPTED_AT,
-                    zx::MonotonicInstant::get().into_nanos(),
-                );
-            });
+            self.sag_event_logger.log(SagEvent::SuspendAttempted);
             // LINT.IfChange
             log::info!("Suspending");
             // LINT.ThenChange(//src/testing/end_to_end/honeydew/honeydew/affordances/starnix/system_power_state_controller.py)
@@ -244,19 +318,18 @@ impl CpuManager {
             // LINT.IfChange
             log::info!(response:?; "Resuming");
             // LINT.ThenChange(//src/testing/end_to_end/honeydew/honeydew/affordances/starnix/system_power_state_controller.py)
-            self._inspect_node.borrow_mut().add_entry(|node| {
-                let time = zx::MonotonicInstant::get().into_nanos();
+
+            self.sag_event_logger.log(
                 if let Some(Ok(Ok(fhsuspend::SuspenderSuspendResponse {
-                    suspend_duration: Some(duration),
+                    suspend_duration: Some(suspend_duration),
                     ..
                 }))) = response
                 {
-                    node.record_int(fobs::SUSPEND_RESUMED_AT, time);
-                    node.record_int(fobs::SUSPEND_LAST_TIMESTAMP, duration);
+                    SagEvent::SuspendResumed { suspend_duration }
                 } else {
-                    node.record_int(fobs::SUSPEND_FAILED_AT, time);
-                }
-            });
+                    SagEvent::SuspendFailed
+                },
+            );
 
             listener.suspend_stats().update(Box::new(
                 |stats_opt: &mut Option<fsuspend::SuspendStats>| {

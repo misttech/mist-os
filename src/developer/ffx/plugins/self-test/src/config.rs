@@ -5,10 +5,11 @@
 use crate::test::new_isolate;
 use crate::{assert, assert_eq};
 use anyhow::*;
+use ffx_executor::FfxExecutor;
 
 pub(crate) async fn test_env() -> Result<()> {
     let isolate = new_isolate("config-env").await?;
-    let out = isolate.ffx(&["config", "env"]).await?;
+    let out = isolate.exec_ffx(&["config", "env"]).await?;
 
     assert!(out.status.success());
     assert!(out.stdout.contains("Environment:"));
@@ -21,7 +22,7 @@ pub(crate) async fn test_env() -> Result<()> {
 
 pub(crate) async fn test_env_get_global() -> Result<()> {
     let isolate = new_isolate("config-env-get-global").await?;
-    let out = isolate.ffx(&["config", "env", "get", "global"]).await?;
+    let out = isolate.exec_ffx(&["config", "env", "get", "global"]).await?;
 
     assert!(out.status.success());
     assert_eq!(out.stdout.trim(), "Global: none");
@@ -31,7 +32,7 @@ pub(crate) async fn test_env_get_global() -> Result<()> {
 
 pub(crate) async fn test_get_unknown_key() -> Result<()> {
     let isolate = new_isolate("config-get-unknown-key").await?;
-    let out = isolate.ffx(&["config", "get", "this-key-SHOULD-NOT-exist"]).await?;
+    let out = isolate.exec_ffx(&["config", "get", "this-key-SHOULD-NOT-exist"]).await?;
 
     assert!(out.stdout.is_empty());
     assert!(!out.stderr.is_empty());
@@ -45,12 +46,12 @@ pub(crate) async fn test_set_then_get() -> Result<()> {
     let isolate = new_isolate("config-set-then-get").await?;
     let value = "42";
 
-    let out = isolate.ffx(&["config", "set", "test-unique-key", value]).await?;
+    let out = isolate.exec_ffx(&["config", "set", "test-unique-key", value]).await?;
 
     assert!(out.stdout.is_empty());
     assert!(out.status.success());
 
-    let out_get = isolate.ffx(&["config", "get", "test-unique-key"]).await?;
+    let out_get = isolate.exec_ffx(&["config", "get", "test-unique-key"]).await?;
 
     assert_eq!(out_get.stdout.trim(), value);
     assert!(out_get.status.success());

@@ -9,18 +9,22 @@ use std::mem::size_of;
 use std::pin::pin;
 
 use assert_matches::assert_matches;
+use fidl_fuchsia_net_interfaces_ext::{
+    self as fnet_interfaces_ext, PositiveMonotonicInstant, PreferredLifetimeInfo,
+};
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_ext as fnet_ext,
     fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
-    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
-    fidl_fuchsia_net_routes_admin as fnet_routes_admin,
+    fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
     fidl_fuchsia_net_routes_ext as fnet_routes_ext, fidl_fuchsia_posix_socket as fposix_socket,
 };
 
 use anyhow::Context as _;
-use futures::{future, Future, FutureExt as _, StreamExt, TryFutureExt as _, TryStreamExt as _};
+use futures::{
+    future, Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _,
+};
 use net_declare::net_ip_v6;
 use net_types::ethernet::Mac;
 use net_types::ip::{self as net_types_ip, Ip, Ipv6};
@@ -72,17 +76,18 @@ const EXPECTED_DAD_RETRANSMIT_TIMER: zx::MonotonicDuration = zx::MonotonicDurati
 const EXPECTED_ROUTER_SOLICITATION_INTERVAL: zx::MonotonicDuration =
     zx::MonotonicDuration::from_seconds(4);
 
-/// As per [RFC 7217 section 6] Hosts SHOULD introduce a random delay between 0 and
-/// `IDGEN_DELAY` before trying a new tentative address.
-///
-/// [RFC 7217]: https://tools.ietf.org/html/rfc7217#section-6
-const DAD_IDGEN_DELAY: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(1);
+#[derive(Debug, PartialEq)]
+struct StableAddrs {
+    link_local: net_types::ip::Ipv6Addr,
+    global: net_types::ip::Ipv6Addr,
+}
 
-async fn install_and_get_ipv6_addrs_for_endpoint<N: Netstack>(
+async fn install_and_get_stable_ipv6_addrs_for_endpoint<N: Netstack>(
     realm: &netemul::TestRealm<'_>,
     endpoint: &netemul::TestEndpoint<'_>,
+    fake_endpoint: &netemul::TestFakeEndpoint<'_>,
     name: &str,
-) -> Vec<fnet::Subnet> {
+) -> StableAddrs {
     let (id, control, _device_control) = endpoint
         .add_to_stack(
             realm,
@@ -92,6 +97,22 @@ async fn install_and_get_ipv6_addrs_for_endpoint<N: Netstack>(
         .expect("installing interface");
     let did_enable = control.enable().await.expect("calling enable").expect("enable failed");
     assert!(did_enable);
+
+    // Wait for a Router Solicitation.
+    wait_for_router_solicitation(&fake_endpoint).await;
+
+    // Send a Router Advertisement with information for a SLAAC prefix.
+    let options = [NdpOptionBuilder::PrefixInformation(PrefixInformation::new(
+        ipv6_consts::GLOBAL_PREFIX.prefix(),  /* prefix_length */
+        false,                                /* on_link_flag */
+        true,                                 /* autonomous_address_configuration_flag */
+        99999,                                /* valid_lifetime */
+        99999,                                /* preferred_lifetime */
+        ipv6_consts::GLOBAL_PREFIX.network(), /* prefix */
+    ))];
+    send_ra_with_router_lifetime(&fake_endpoint, 0, &options, ipv6_consts::LINK_LOCAL_ADDR)
+        .await
+        .expect("failed to send router advertisement");
 
     let interface_state = realm
         .connect_to_protocol::<fnet_interfaces::StateMarker>()
@@ -105,48 +126,48 @@ async fn install_and_get_ipv6_addrs_for_endpoint<N: Netstack>(
         .expect("creating interface event stream"),
         &mut state,
         |iface| {
-            let ipv6_addresses = iface
-                .properties
-                .addresses
-                .iter()
-                .filter_map(
-                    |fnet_interfaces_ext::Address {
-                         addr,
-                         valid_until: _,
-                         preferred_lifetime_info: _,
-                         assignment_state,
-                     }| {
-                        assert_eq!(
-                            *assignment_state,
-                            fnet_interfaces::AddressAssignmentState::Assigned
-                        );
-                        match addr.addr {
-                            fnet::IpAddress::Ipv6(fnet::Ipv6Address { .. }) => Some(addr),
-                            fnet::IpAddress::Ipv4(fnet::Ipv4Address { .. }) => None,
+            let (link_local, global) = iface.properties.addresses.iter().fold(
+                (None, None),
+                |(mut link_local, mut global),
+                 fnet_interfaces_ext::Address { addr, assignment_state, .. }| {
+                    assert_eq!(
+                        *assignment_state,
+                        fnet_interfaces::AddressAssignmentState::Assigned
+                    );
+                    let addr = match addr.addr {
+                        fnet::IpAddress::Ipv6(fnet::Ipv6Address { addr }) => addr,
+                        fnet::IpAddress::Ipv4(fnet::Ipv4Address { .. }) => {
+                            return (link_local, global);
                         }
-                    },
-                )
-                .copied()
-                .collect::<Vec<_>>();
-            if ipv6_addresses.is_empty() {
-                None
-            } else {
-                Some(ipv6_addresses)
+                    };
+                    let v6_addr = net_types::ip::Ipv6Addr::from_bytes(addr);
+                    if v6_addr.is_unicast_link_local() {
+                        link_local = Some(v6_addr);
+                    } else if ipv6_consts::GLOBAL_PREFIX.contains(&v6_addr) {
+                        global = Some(v6_addr);
+                    }
+                    (link_local, global)
+                },
+            );
+            match (link_local, global) {
+                (Some(link_local), Some(global)) => Some(StableAddrs { link_local, global }),
+                _ => None,
             }
         },
     )
     .await
-    .expect("failed to observe interface addition");
+    .expect("failed to observe address generation");
 
     ipv6_addresses
 }
 
 /// Test that across netstack runs, a device will initially be assigned the same
-/// IPv6 addresses.
+/// stable IPv6 addresses (both link-local and global).
 #[netstack_test]
 #[variant(N, Netstack)]
-async fn consistent_initial_ipv6_addrs<N: Netstack>(name: &str) {
-    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+async fn consistent_initial_stable_ipv6_addrs<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let network = sandbox.create_network(name).await.expect("create network");
     let realm = sandbox
         .create_realm(
             name,
@@ -167,22 +188,22 @@ async fn consistent_initial_ipv6_addrs<N: Netstack>(name: &str) {
                 KnownServiceProvider::SecureStash,
             ],
         )
-        .expect("failed to create realm");
-    let endpoint = sandbox.create_endpoint(name).await.expect("failed to create endpoint");
-    let () = endpoint.set_link_up(true).await.expect("failed to set link up");
+        .expect("create realm");
+    let fake_ep = network.create_fake_endpoint().expect("create fake endpoint");
+    let endpoint = network.create_endpoint(name).await.expect("create endpoint");
+    endpoint.set_link_up(true).await.expect("set link up");
 
     // Make sure netstack uses the same addresses across runs for a device.
     let first_run_addrs =
-        install_and_get_ipv6_addrs_for_endpoint::<N>(&realm, &endpoint, name).await;
+        install_and_get_stable_ipv6_addrs_for_endpoint::<N>(&realm, &endpoint, &fake_ep, name)
+            .await;
 
     // Stop the netstack.
-    let () = realm
-        .stop_child_component(constants::netstack::COMPONENT_NAME)
-        .await
-        .expect("failed to stop netstack");
+    realm.stop_child_component(constants::netstack::COMPONENT_NAME).await.expect("stop netstack");
 
     let second_run_addrs =
-        install_and_get_ipv6_addrs_for_endpoint::<N>(&realm, &endpoint, name).await;
+        install_and_get_stable_ipv6_addrs_for_endpoint::<N>(&realm, &endpoint, &fake_ep, name)
+            .await;
     assert_eq!(first_run_addrs, second_run_addrs);
 }
 
@@ -882,158 +903,177 @@ async fn on_and_off_link_route_discovery<N: Netstack>(
 #[netstack_test]
 #[variant(N, Netstack)]
 async fn slaac_regeneration_after_dad_failure<N: Netstack>(name: &str) {
-    // Expects an NS message for DAD within timeout and returns the target address of the message.
-    async fn expect_ns_message_in(
-        fake_ep: &netemul::TestFakeEndpoint<'_>,
-        timeout: zx::MonotonicDuration,
-    ) -> net_types_ip::Ipv6Addr {
-        fake_ep
-            .frame_stream()
-            .try_filter_map(|(data, dropped)| {
-                assert_eq!(dropped, 0);
-                future::ok(
-                    parse_icmp_packet_in_ip_packet_in_ethernet_frame::<
-                        net_types_ip::Ipv6,
-                        _,
-                        NeighborSolicitation,
-                        _,
-                    >(&data,
-                        EthernetFrameLengthCheck::NoCheck,
-                        |p| assert_eq!(p.body().iter().filter(|option| match option {
-                            NdpOption::Nonce(_) => false,
-                            _ => true,
-                        }).count(), 0))
-                        .map_or(None, |(_src_mac, _dst_mac, _src_ip, _dst_ip, _ttl, message, _code)| {
-                            // If the NS target_address does not have the prefix we have advertised,
-                            // this is for some other address. We ignore it as it is not relevant to
-                            // our test.
-                            if !ipv6_consts::GLOBAL_PREFIX.contains(message.target_address()) {
-                                return None;
-                            }
+    #[derive(Clone, Copy, Debug, Default, PartialEq)]
+    enum SlaacAddrState {
+        #[default]
+        PrefixAdvertised,
+        DadFailed {
+            attempt: net_types_ip::Ipv6Addr,
+        },
+        Regenerated,
+    }
 
-                            Some(*message.target_address())
-                        }),
-                )
-            })
-            .try_next()
-            .map(|r| r.context("error getting OnData event"))
-            .on_timeout(timeout.after_now(), || {
-                Err(anyhow::anyhow!(
-                    "timed out waiting for a neighbor solicitation targetting address of prefix: {}",
-                    ipv6_consts::GLOBAL_PREFIX,
-                ))
-            })
-            .await.unwrap().expect("failed to get next OnData event")
+    impl SlaacAddrState {
+        async fn handle(
+            &mut self,
+            fake_ep: &netemul::TestFakeEndpoint<'_>,
+            addr: net_types_ip::Ipv6Addr,
+            state: fnet_interfaces::AddressAssignmentState,
+        ) {
+            match self {
+                Self::PrefixAdvertised => {
+                    assert_eq!(
+                        state,
+                        fnet_interfaces::AddressAssignmentState::Tentative,
+                        "address should be tentative until DAD succeeds"
+                    );
+                    // Pretend that there is a duplicate address situation.
+                    let snmc = addr.to_solicited_node_address();
+                    ndp::write_message(
+                        eth_consts::MAC_ADDR,
+                        Mac::from(&snmc),
+                        net_types_ip::Ipv6::UNSPECIFIED_ADDRESS,
+                        snmc.get(),
+                        NeighborSolicitation::new(addr),
+                        &[],
+                        &fake_ep,
+                    )
+                    .await
+                    .expect("failed to write DAD message");
+
+                    *self = Self::DadFailed { attempt: addr };
+                }
+                Self::DadFailed { attempt } => {
+                    if addr != *attempt
+                        && state == fnet_interfaces::AddressAssignmentState::Assigned
+                    {
+                        *self = Self::Regenerated;
+                    }
+                }
+                Self::Regenerated => {}
+            }
+        }
     }
 
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let (_network, realm, iface, fake_ep) =
-        setup_network_with::<N, _>(&sandbox, name, None, &[KnownServiceProvider::SecureStash])
-            .await
-            .expect("error setting up network");
+    let (_network, realm, iface, fake_ep) = setup_network_with::<N, _>(
+        &sandbox,
+        name,
+        InterfaceConfig {
+            name: Some(name.into()),
+            // Increase the number of transmits required for DAD to succeed to reduce the
+            // likelihood of flakes where DAD erroneously succeeds when it should fail. This
+            // number is chosen to be high enough to reduce flakiness while not extending
+            // the runtime of the test by too much.
+            dad_transmits: Some(4),
+            ..Default::default()
+        },
+        &[KnownServiceProvider::SecureStash],
+    )
+    .await
+    .expect("error setting up network");
 
     // Send a Router Advertisement with information for a SLAAC prefix.
+    //
+    // Advertise an infinite valid and preferred lifetime. This will allow us to
+    // differentiate between stable and temporary addresses, since temporary
+    // addresses have maximum values for these lifetimes, whereas stable addresses
+    // can use the infinite lifetimes as advertised.
     let options = [NdpOptionBuilder::PrefixInformation(PrefixInformation::new(
         ipv6_consts::GLOBAL_PREFIX.prefix(),  /* prefix_length */
         false,                                /* on_link_flag */
         true,                                 /* autonomous_address_configuration_flag */
-        99999,                                /* valid_lifetime */
-        99999,                                /* preferred_lifetime */
+        u32::MAX,                             /* valid_lifetime */
+        u32::MAX,                             /* preferred_lifetime */
         ipv6_consts::GLOBAL_PREFIX.network(), /* prefix */
     ))];
     send_ra_with_router_lifetime(&fake_ep, 0, &options, ipv6_consts::LINK_LOCAL_ADDR)
         .await
         .expect("failed to send router advertisement");
 
-    let tried_address = expect_ns_message_in(&fake_ep, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT).await;
-
-    // We pretend there is a duplicate address situation.
-    let snmc = tried_address.to_solicited_node_address();
-    let () = ndp::write_message::<&[u8], _>(
-        eth_consts::MAC_ADDR,
-        Mac::from(&snmc),
-        net_types_ip::Ipv6::UNSPECIFIED_ADDRESS,
-        snmc.get(),
-        NeighborSolicitation::new(tried_address),
-        &[],
-        &fake_ep,
-    )
-    .await
-    .expect("failed to write DAD message");
-
-    let target_address =
-        expect_ns_message_in(&fake_ep, DAD_IDGEN_DELAY + ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT).await;
-
-    // We expect two addresses for the SLAAC prefixes to be assigned to the NIC as the
-    // netstack should generate both a stable and temporary SLAAC address.
-    let expected_addrs = 2;
     let interface_state = realm
         .connect_to_protocol::<fnet_interfaces::StateMarker>()
         .expect("failed to connect to fuchsia.net.interfaces/State");
-    let () = fnet_interfaces_ext::wait_interface_with_id(
-        fnet_interfaces_ext::event_stream_from_state::<fnet_interfaces_ext::DefaultInterest>(
-            &interface_state,
-            fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
-        )
-        .expect("error getting interfaces state event stream"),
-        &mut fnet_interfaces_ext::InterfaceState::<(), _>::Unknown(iface.id()),
-        |iface| {
-            // We have to make sure 2 things:
-            // 1. We have `expected_addrs` addrs which have the advertised prefix for the
-            // interface.
-            // 2. The last tried address should be among the addresses for the interface.
-            let (slaac_addrs, has_target_addr) = iface.properties.addresses.iter().fold(
-                (0, false),
-                |(mut slaac_addrs, mut has_target_addr),
-                 &fnet_interfaces_ext::Address {
-                     addr: fnet::Subnet { addr, prefix_len: _ },
-                     valid_until: _,
-                     preferred_lifetime_info: _,
-                     assignment_state,
-                 }| {
-                    assert_eq!(assignment_state, fnet_interfaces::AddressAssignmentState::Assigned);
-                    match addr {
-                        fnet::IpAddress::Ipv4(fnet::Ipv4Address { .. }) => {}
-                        fnet::IpAddress::Ipv6(fnet::Ipv6Address { addr }) => {
-                            let configured_addr = net_types_ip::Ipv6Addr::from_bytes(addr);
-                            assert_ne!(
-                                configured_addr, tried_address,
-                                "address which previously failed DAD was assigned"
-                            );
-                            if ipv6_consts::GLOBAL_PREFIX.contains(&configured_addr) {
-                                slaac_addrs += 1;
-                            }
-                            if configured_addr == target_address {
-                                has_target_addr = true;
-                            }
-                        }
-                    }
-                    (slaac_addrs, has_target_addr)
-                },
-            );
 
-            assert!(
-                slaac_addrs <= expected_addrs,
-                "more addresses found than expected, found {}, expected {}",
-                slaac_addrs,
-                expected_addrs
-            );
-            if slaac_addrs == expected_addrs && has_target_addr {
-                Some(())
-            } else {
+    // We expect three SLAAC addresses to be assigned: one link-local address, and
+    // two global addresses for the advertised SLAAC prefix (one stable and one
+    // temporary).
+    //
+    // Register for interest in all addresses and all fields so we can observe
+    // addition of tentative addresses before DAD succeeds, along with their valid
+    // and preferred lifetimes in order to differentiate between stable and
+    // temporary addresses.
+    let (tx, mut rx) = futures::channel::mpsc::unbounded();
+    let mut state = fnet_interfaces_ext::InterfaceState::<(), _>::Unknown(iface.id());
+    let mut watcher_fut = Box::pin(
+        fnet_interfaces_ext::wait_interface_with_id(
+            fnet_interfaces_ext::event_stream_from_state::<fnet_interfaces_ext::AllInterest>(
+                &interface_state,
+                fnet_interfaces_ext::IncludedAddresses::All,
+            )
+            .expect("error getting interfaces state event stream"),
+            &mut state,
+            |iface| {
+                for addr in &iface.properties.addresses {
+                    tx.unbounded_send(addr.clone()).expect("receiver should not be dropped");
+                }
                 None
+            },
+        )
+        .map(|result| result.expect("observe SLAAC addresses on watcher")),
+    );
+
+    let [mut link_local, mut stable_global, mut temporary_global] = [SlaacAddrState::default(); 3];
+    loop {
+        futures::select! {
+            () = watcher_fut => panic!("watcher future should not complete"),
+            () = fuchsia_async::Timer::new(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT) => {
+                panic!(
+                    "timed out waiting for SLAAC addresses to fail DAD and be regenerated; final \
+                    state: link_local={link_local:?} stable_global={stable_global:?} \
+                    temporary_global={temporary_global:?}"
+                );
             }
-        },
-    )
-    .map_err(anyhow::Error::from)
-    .on_timeout(
-        (EXPECTED_DAD_RETRANSMIT_TIMER * EXPECTED_DUP_ADDR_DETECT_TRANSMITS * expected_addrs
-            + ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT)
-            .after_now(),
-        || Err(anyhow::anyhow!("timed out")),
-    )
-    .await
-    .expect("failed to wait for SLAAC addresses");
+            event = rx.next() => {
+                let fnet_interfaces_ext::Address {
+                    addr: fnet::Subnet { addr, .. },
+                    assignment_state,
+                    valid_until,
+                    preferred_lifetime_info,
+                } = event.expect("sender should not be dropped");
+                let addr = match addr {
+                    fnet::IpAddress::Ipv4(fnet::Ipv4Address { .. }) => continue,
+                    fnet::IpAddress::Ipv6(fnet::Ipv6Address { addr }) => {
+                        net_types_ip::Ipv6Addr::from_bytes(addr)
+                    }
+                };
+
+                let state = if addr.is_link_local() {
+                    &mut link_local
+                } else if ipv6_consts::GLOBAL_PREFIX.contains(&addr) {
+                    if valid_until == PositiveMonotonicInstant::INFINITE_FUTURE
+                        && preferred_lifetime_info == PreferredLifetimeInfo::preferred_forever()
+                    {
+                        &mut stable_global
+                    } else {
+                        &mut temporary_global
+                    }
+                } else {
+                    panic!(
+                        "observed unexpected IPv6 addr that is neither link-local nor in \
+                        advertised prefix {addr}"
+                    );
+                };
+
+                state.handle(&fake_ep, addr, assignment_state).await;
+
+                let addrs = [link_local, stable_global, temporary_global];
+                if addrs.iter().all(|state| *state == SlaacAddrState::Regenerated) {
+                    break;
+                }
+            }
+        }
+    }
 }
 
 fn check_mldv2_report(

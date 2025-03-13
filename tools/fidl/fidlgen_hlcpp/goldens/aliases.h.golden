@@ -126,7 +126,7 @@ struct CodingTraits<::test::aliases::ExampleOfUseOfAliases>
     : public EncodableCodingTraits<::test::aliases::ExampleOfUseOfAliases, 88> {};
 
 template <>
-struct HasPadding<::test::aliases::ExampleOfUseOfAliases> : public std::true_type{};
+struct HasPadding<::test::aliases::ExampleOfUseOfAliases> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::aliases::ExampleOfUseOfAliases> : public internal::BoolConstant<

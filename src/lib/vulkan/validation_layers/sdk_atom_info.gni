@@ -14,8 +14,9 @@ vulkan_validation_layers_sdk_atom_infos = [
   {
     module_name = "VkLayer_khronos_validation.so"
     module_label =
-        "//third_party/Vulkan-ValidationLayers:vulkan_validation_layers"
-    config_label = "//third_party/Vulkan-ValidationLayers:vulkan_gen_json_files"
+        "//third_party/Vulkan-ValidationLayers/src:vulkan_validation_layers"
+    config_label =
+        "//third_party/Vulkan-ValidationLayers/src:vulkan_gen_json_files"
     config_file =
         "$root_out_dir/$vulkan_data_subdir/VkLayer_khronos_validation.json"
   },

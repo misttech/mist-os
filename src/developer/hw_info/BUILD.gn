@@ -26,7 +26,7 @@ rustc_binary("hw_shell_bin") {
   source_root = "shell.rs"
 }
 
-fuchsia_shell_package("hw-info-shell") {
+fuchsia_package_with_single_component("hw-info-shell") {
   manifest = "meta/hw_info_shell.cml"
   deps = [ ":hw_shell_bin" ]
 }

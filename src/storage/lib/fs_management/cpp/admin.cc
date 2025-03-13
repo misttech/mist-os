@@ -20,17 +20,11 @@ namespace fs_management {
 
 __EXPORT
 zx::result<fidl::ClientEnd<fuchsia_io::Directory>> FsRootHandle(
-    fidl::UnownedClientEnd<fuchsia_io::Directory> export_root, fuchsia_io::wire::OpenFlags flags) {
+    fidl::UnownedClientEnd<fuchsia_io::Directory> export_root, fuchsia_io::wire::Flags flags) {
   auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-
   const fidl::Status result =
-      fidl::WireCall(export_root)
-          ->Open(flags, {}, "root", fidl::ServerEnd<fuchsia_io::Node>(server.TakeChannel()));
-  if (!result.ok()) {
-    return zx::error(result.status());
-  }
-
-  return zx::ok(std::move(client));
+      fidl::WireCall(export_root)->Open("root", flags, {}, server.TakeChannel());
+  return zx::make_result(result.status(), std::move(client));
 }
 
 }  // namespace fs_management

@@ -66,6 +66,7 @@ the current state of the RFCOMM server, use `ffx inspect show core/bluetooth-cor
             role = (Unassigned / Negotiating / Initiator / Responder)
             channel_#:
               dlci
+              server_channel
               initial_local_credits
               initial_remote_credits
               flow_controller:

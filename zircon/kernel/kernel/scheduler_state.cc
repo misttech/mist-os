@@ -37,8 +37,3 @@ void SchedulerState::RecomputeEffectiveProfile() {
 
   effective_profile_.Clean();
 }
-
-SchedulerState::BaseProfile::BaseProfile(int priority, bool inheritable)
-    : discipline{SchedDiscipline::Fair},
-      inheritable{inheritable},
-      fair{.weight{SchedulerState::ConvertPriorityToWeight(priority)}} {}

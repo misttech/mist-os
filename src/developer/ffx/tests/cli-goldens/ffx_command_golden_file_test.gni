@@ -14,13 +14,16 @@ template("ffx_command_golden_file_test") {
   if (defined(invoker.visible_label)) {
     _visible_label = invoker.visible_label
   }
-  _sdk_path = invoker.sdk_path
+
   visibility = [ ":*" ]
   if (defined(invoker.visibility)) {
     visibility += invoker.visibility
   }
 
-  _deps = []
+  _deps = [
+    "//src/developer/ffx:ffx_build_dir_config_file($default_toolchain)",
+    "//src/developer/ffx:host(//build/toolchain:host_x64)",
+  ]
   if (defined(invoker.deps)) {
     _deps += invoker.deps
   }
@@ -30,6 +33,8 @@ template("ffx_command_golden_file_test") {
       "golden_source_dir is required as the path to the golden files checked in.")
   golden_source_dir = invoker.golden_source_dir
 
+  _ffx_path = invoker.ffx_path
+  _tool_list = invoker.tool_list
   _golden_dir = "${target_out_dir}/goldens"
   _golden_filelist = "${golden_source_dir}/${command_name}_filelist.txt"
   _candidate_filelist = "${_golden_dir}/${command_name}_filelist.txt"
@@ -52,6 +57,12 @@ template("ffx_command_golden_file_test") {
 
   compiled_action("describe_ffx_${command_name}_cli_goldens") {
     testonly = true
+    depfile = "${target_out_dir}/$target_name.d"
+    inputs = [
+      "$root_build_dir/ffx-config.json",
+      _ffx_path,
+      _tool_list,
+    ]
 
     # Avoid using the host tool coming from previous builds.
     can_use_previously_built_tool = false
@@ -71,16 +82,26 @@ template("ffx_command_golden_file_test") {
       rebase_path(golden_source_dir, "//"),
       "--gen-comparisons",
       rebase_path(_comparisons_file, root_build_dir),
-      "--sdk-root",
-      rebase_path(_sdk_path, root_build_dir),
       "--filter-command",
       command_name,
+      "--ffx-path",
+      rebase_path(_ffx_path, root_build_dir),
+      "--tool-list",
+      rebase_path(_tool_list, root_build_dir),
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
     ]
     deps = _deps
   }
 
   compiled_action("invoke_ffx_${command_name}_cli_goldens") {
     testonly = true
+    depfile = "${target_out_dir}/$target_name.d"
+    inputs = [
+      "$root_build_dir/ffx-config.json",
+      _ffx_path,
+      _tool_list,
+    ]
 
     # Avoid using prebuilt versions of the host
     # tool coming from previous builds.
@@ -95,10 +116,14 @@ template("ffx_command_golden_file_test") {
     args = [
       "--out-dir",
       rebase_path(_golden_dir, root_build_dir),
-      "--sdk-root",
-      rebase_path(_sdk_path, root_build_dir),
       "--filter-command",
       command_name,
+      "--ffx-path",
+      rebase_path(_ffx_path, root_build_dir),
+      "--tool-list",
+      rebase_path(_tool_list, root_build_dir),
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
     ]
 
     deps = [

@@ -14,7 +14,7 @@ use std::ops::Deref;
 use std::pin::Pin;
 
 fn new_socket_address_conversion_error() -> std::io::Error {
-    io::Error::new(io::ErrorKind::Other, "socket address is not IPv4 or IPv6")
+    io::Error::other("socket address is not IPv4 or IPv6")
 }
 
 /// An I/O object representing a UDP socket.

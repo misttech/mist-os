@@ -7,7 +7,6 @@
 #ifndef ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_ELF_IMAGE_H_
 #define ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_ELF_IMAGE_H_
 
-#include <inttypes.h>
 #include <lib/code-patching/code-patching.h>
 #include <lib/elfldltl/load.h>
 #include <lib/elfldltl/memory.h>
@@ -154,7 +153,7 @@ class ElfImage {
   // Maps the image at its loaded address, mapping each of its load segments
   // with appropriate access permissions (modulo the execute-only exception of
   // AddressSpace::Map()). Must be called after Load().
-  fit::result<AddressSpace::MapError> MapInto(AddressSpace& aspace);
+  fit::result<AddressSpace::MapError> MapInto(AddressSpace& aspace) const;
 
   // Panic if the loaded file doesn't have a PT_INTERP matching the hex string
   // corresponding to this build ID note; the prefix is used in panic messages.

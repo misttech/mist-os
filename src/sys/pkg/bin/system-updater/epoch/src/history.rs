@@ -66,7 +66,7 @@ impl std::str::FromStr for History {
             epoch = Some(curr);
         }
 
-        Ok(History { epoch: epoch.ok_or_else(|| ParseError::Empty)? })
+        Ok(History { epoch: epoch.ok_or(ParseError::Empty)? })
     }
 }
 

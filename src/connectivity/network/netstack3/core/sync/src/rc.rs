@@ -395,7 +395,7 @@ impl<T> Primary<T> {
 
     /// Returns [`core::fmt::Debug`] implementation that is stable and unique
     /// for the data held behind this [`Primary`].
-    pub fn debug_id(&self) -> impl core::fmt::Debug {
+    pub fn debug_id(&self) -> impl core::fmt::Debug + '_ {
         let Self { inner } = self;
         debug_id::DebugId::WithToken {
             ptr: alloc::sync::Arc::as_ptr(inner),
@@ -542,7 +542,7 @@ impl<T> Strong<T> {
 
     /// Returns [`core::fmt::Debug`] implementation that is stable and unique
     /// for the data held behind this [`Strong`].
-    pub fn debug_id(&self) -> impl core::fmt::Debug {
+    pub fn debug_id(&self) -> impl core::fmt::Debug + '_ {
         let Self { inner, caller: _ } = self;
         debug_id::DebugId::WithToken {
             ptr: alloc::sync::Arc::as_ptr(inner),
@@ -635,7 +635,7 @@ impl<T> Weak<T> {
 
     /// Returns [`core::fmt::Debug`] implementation that is stable and unique
     /// for the data held behind this [`Weak`].
-    pub fn debug_id(&self) -> impl core::fmt::Debug {
+    pub fn debug_id(&self) -> impl core::fmt::Debug + '_ {
         match self.upgrade() {
             Some(strong) => {
                 let Strong { inner, caller: _ } = &strong;
@@ -1066,9 +1066,9 @@ mod tests {
         assert_debug_id_ne!(&primary1.debug_id(), &primary2.debug_id());
 
         // Verify that dropping an RC does not allow it's debug_id to be reused.
-        let id1 = primary1.debug_id();
+        let id1 = format!("{:?}", primary1.debug_id());
         std::mem::drop(primary1);
         let primary3 = Primary::new(1);
-        assert_debug_id_ne!(&id1, &primary3.debug_id());
+        assert_ne!(id1, format!("{:?}", primary3.debug_id()));
     }
 }

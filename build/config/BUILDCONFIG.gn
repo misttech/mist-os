@@ -8,6 +8,7 @@ import("//build/config/compilation_modes.gni")
 import("//build/config/python_interpreter.gni")
 import("//build/icu/build_config.gni")
 import("//build/rust/build.gni")
+import("//build/rust/rust_auxiliary.gni")
 import("//build/toolchain/rbe.gni")
 import("//build/toolchain/restat.gni")
 import("//build/tracer/tracer.gni")
@@ -192,6 +193,7 @@ if (toolchain_variant.instrumented) {
 
 # [START toolchain_is_variables]
 is_android = false
+is_apple = false
 is_chromeos = false
 is_fuchsia = false
 is_mistos = false
@@ -425,6 +427,7 @@ if (zircon_toolchain == false) {
   default_common_binary_configs += [
     "//build/config:compiler",
     "//build/config:language",
+    "//build/config:libc++-include",
     "//build/config:relative_paths",
     "//build/config:default_frame_pointers",
     "//build/config:default_include_dirs",
@@ -533,6 +536,7 @@ if (zircon_toolchain == false) {
     "//build/config:werror",
     "//build/config:no-template-backtrace-limit",
     "//build/config/zircon:compiler",
+    "//build/config:libc++-include",
     "//build/config/zircon:machine",
     "//build/config/zircon:default_assert_level",
     "//build/config/zircon:default_icf",
@@ -557,9 +561,6 @@ if (zircon_toolchain == false) {
       toolchain_variant.remove_executable_configs
   default_executable_deps = []
 }
-
-# Add profile-use config to build with the PGO collected profiles.
-default_common_binary_configs += [ "//build/config/profile:profile-use" ]
 
 # Rust proc macros don't support (Thin)LTO, so always remove it.
 default_rust_proc_macro_configs = default_shared_library_configs + [
@@ -1766,6 +1767,16 @@ declare_args() {
     },
 
     {
+      configs = [ "//build/config/profile:profile-use" ]
+      tags = [ "instrumented" ]
+    },
+
+    {
+      configs = [ "//build/config/profile:profile-use-rust" ]
+      tags = [ "instrumented" ]
+    },
+
+    {
       configs = [ "//build/config/sanitizers:tsan" ]
       tags = [
         "tsan",
@@ -2120,18 +2131,27 @@ declare_args() {
   all_toolchain_variants = []
 }
 
+# TODO(https://fxbug.dev/396658029): Remove this.
+if (include_clippy) {
+  assert(
+      select_variant == [],
+      "Use of clippy is currently not compatible with variants, if you need to build with 'select_variant', disable clippy with 'fx set ... --include-clippy=false' or 'include_clippy = false' in args.gn.  See https://fxbug.dev/396658029 for more information")
+}
+
 # Whether profile instrumentation is enabled for collecting coverage.
 is_coverage = select_variant + [
                 "coverage",
                 "coverage-rust",
                 "coverage-cts",
                 "profile",
+                "profile-rust",
               ] -
               [
                 "coverage",
                 "coverage-rust",
                 "coverage-cts",
                 "profile",
+                "profile-rust",
               ] != select_variant
 is_clang_coverage =
     select_variant + [ "coverage" ] - [ "coverage" ] != select_variant
@@ -3038,24 +3058,13 @@ template("_fuchsia_shared_library") {
     _link_output_dir =
         rebase_path(get_path_info(link_output_file, "dir"), root_build_dir)
 
-    # rustc doesn't support building dylibs with LTO enabled without the
-    # `-Zdylib-lto` flag. For now we just disable LTO on these targets.
-    if (defined(configs) && defined(crate_type)) {
-      configs += [
-        "//build/config/lto",
-        "//build/config/lto:thinlto",
-      ]
-      configs -= [
-        "//build/config/lto",
-        "//build/config/lto:thinlto",
-      ]
-    }
-
     # Note: the manifest-related metadata is added to the builder target as
     # some targets (e.g. drivers) depend on it directly in the builder
     # toolchain.
     metadata = {
       binaries = []
+
+      libprefix = [ toolchain_variant.libprefix ]
 
       # Used by link_output_rspfile(), see its documentation for details
       link_output_path = [ _link_output_path ]
@@ -3115,8 +3124,8 @@ template("_fuchsia_shared_library") {
       rust_barrier = []
 
       if (defined(invoker.crate_type)) {
-        rlib = [ "--extern=$crate_name=$_link_output_path" ]
-        searchdir = [ "-Ldependency=$_link_output_dir" ]
+        rust_rlib = [ "--extern=${crate_name}=${_link_output_path}" ]
+        rust_searchdir = [ "-Ldependency=${_link_output_dir}" ]
       }
     }
   }
@@ -3331,36 +3340,6 @@ template("basic_source_set") {
   }
 }
 
-import("//build/rust/rust_auxiliary.gni")
-
-# variables needed by above
-_rust_auxiliary_variables_to_forward = [
-  "actual_name",
-  "aliased_deps",
-  "configs",
-  "crate_name",
-  "crate_root",
-  "crate_type",
-  "define_rustdoc_test_override",
-  "disable_clippy",
-  "disable_rustdoc",
-  "enable_clippy_first_party",
-  "include_rustdoc_first_party",
-  "original_target_name",
-  "quiet_clippy",
-  "quiet_rustdoc",
-  "rust_crate_type",
-  "rustdoc_args",
-  "rustdoc_merge",
-  "rustdoc_out_dir",
-  "rustenv",
-  "rustflags",
-  "sources",
-  "testonly",
-  "visibility",
-  "zip_rustdoc_to",
-]
-
 # This wraps the built-in GN executable() template, adding a few more features:
 #
 # - Perform variant-based toolchain selection using variant_target(). See its
@@ -3419,29 +3398,6 @@ template("executable") {
   _executable_name = target_name
   variant_shared_redirection = false
 
-  _is_rust_target = defined(invoker.crate_root)
-  if (_is_rust_target) {
-    actual_name = "$target_name"
-
-    # Reuse the name (without .actual) defined in rustc_artifact.gni
-    if (defined(invoker.rust_auxiliary_name)) {
-      _rust_auxiliary_name = invoker.rust_auxiliary_name
-    } else {
-      _rust_auxiliary_name = "$target_name.aux"
-    }
-
-    rust_auxiliary(_rust_auxiliary_name) {
-      forward_variables_from(invoker, _rust_auxiliary_variables_to_forward)
-      invoker_deps = invoker.deps
-      if (!defined(rust_crate_type)) {
-        rust_crate_type = "bin"
-      }
-
-      # search index size, mostly.
-      disable_rustdoc_binary = true
-    }
-  }
-
   variant_target("executable") {
     deps = []
     assert_no_deps = []
@@ -3478,16 +3434,8 @@ template("executable") {
                              "visibility",
                            ])
 
-    if (defined(invoker.no_rust_aux_build_config_dep)) {
-      _no_rust_aux_build_config_dep = invoker.no_rust_aux_build_config_dep
-    } else {
-      _no_rust_aux_build_config_dep = false
-    }
     if (!defined(public_deps)) {
       public_deps = []
-    }
-    if (_is_rust_target && !no_rust_aux_build_config_dep) {
-      public_deps += [ ":$_rust_auxiliary_name" ]
     }
 
     if (!defined(output_dir)) {
@@ -3854,25 +3802,6 @@ template("source_set") {
 _built_in_target_types_without_public_wrapper -= [ "source_set" ]
 
 template("static_library") {
-  _is_rust_target = defined(invoker.crate_root)
-  if (_is_rust_target) {
-    actual_name = "$target_name"
-
-    # Reuse the name (without .actual) defined in rustc_artifact.gni
-    if (defined(invoker.rust_auxiliary_name)) {
-      _rust_auxiliary_name = invoker.rust_auxiliary_name
-    } else {
-      _rust_auxiliary_name = "$target_name.aux"
-    }
-
-    rust_auxiliary(_rust_auxiliary_name) {
-      forward_variables_from(invoker, _rust_auxiliary_variables_to_forward)
-      invoker_deps = invoker.deps
-      assert(rust_crate_type == "staticlib",
-             "should only be used by rustc_staticlib")
-    }
-  }
-
   _static_library_internal_wrapper(target_name) {
     deps = []
     public_deps = []
@@ -3903,14 +3832,6 @@ template("static_library") {
       deps += [ "${config}_source_deps" ]
     }
 
-    if (defined(invoker.no_rust_aux_build_config_dep)) {
-      _no_rust_aux_build_config_dep = invoker.no_rust_aux_build_config_dep
-    } else {
-      _no_rust_aux_build_config_dep = false
-    }
-    if (_is_rust_target && !no_rust_aux_build_config_dep) {
-      public_deps += [ ":$_rust_auxiliary_name" ]
-    }
     if ((is_fuchsia || is_mistos) && zircon_toolchain == false) {
       if (defined(crate_root)) {
         inputs += restat_rust_wrapper_inputs
@@ -3936,39 +3857,34 @@ _built_in_target_types_without_public_wrapper -= [ "static_library" ]
 #   direct and transitive dependencies.
 #
 template("rust_library") {
-  # rust_auxiliary has minimal imports unless we're including clippy or rustdoc
-  # should be safe to include here
-  import("//build/rust/rust_auxiliary.gni")
-  actual_name = "$target_name"
-
-  # Reuse the name (without .actual) defined in rustc_artifact.gni
-  if (defined(invoker.rust_auxiliary_name)) {
-    _rust_auxiliary_name = invoker.rust_auxiliary_name
-  } else {
-    _rust_auxiliary_name = "$target_name.aux"
-  }
-
   if (defined(invoker.output_dir)) {
     _searchdir_path = invoker.output_dir
   } else {
-    _searchdir_path = get_label_info(":$target_name", "target_out_dir")
+    _searchdir_path = get_label_info(":${target_name}", "target_out_dir")
     if (rust_one_rlib_per_dir) {
       _searchdir_path += "/" + target_name
     }
   }
-  _rlib_path = "$_searchdir_path/lib${invoker.output_name}.rlib"
+  _rlib_path = "${_searchdir_path}/lib${invoker.output_name}.rlib"
 
-  rust_auxiliary(_rust_auxiliary_name) {
-    forward_variables_from(invoker, _rust_auxiliary_variables_to_forward)
-    invoker_deps = invoker.deps
-    rlib_path = _rlib_path
-    searchdir_path = _searchdir_path
-    if (!defined(rust_crate_type)) {
-      rust_crate_type = "rlib"
+  _define_aux_deps = include_rustdoc
+  if (defined(invoker.define_aux_deps)) {
+    _define_aux_deps = invoker.define_aux_deps && _define_aux_deps
+  }
+  if (_define_aux_deps) {
+    _rust_auxiliary_name = "${target_name}.aux"
+    rust_aux_deps(_rust_auxiliary_name) {
+      forward_variables_from(invoker,
+                             [
+                               "deps",
+                               "data_deps",
+                               "public_deps",
+                               "testonly",
+                             ])
     }
   }
 
-  _rust_library_internal_wrapper(actual_name) {
+  _rust_library_internal_wrapper(target_name) {
     forward_variables_from(invoker,
                            "*",
                            [
@@ -3998,24 +3914,20 @@ template("rust_library") {
     _rlib_path = rebase_path(_rlib_path, root_build_dir)
     _searchdir_path = rebase_path(_searchdir_path, root_build_dir)
 
-    if (!defined(public_deps)) {
-      public_deps = []
+    if (_define_aux_deps) {
+      if (!defined(public_deps)) {
+        public_deps = []
+      }
+      public_deps += [ ":${_rust_auxiliary_name}" ]
     }
-    if (defined(invoker.no_rust_aux_build_config_dep)) {
-      _no_rust_aux_build_config_dep = invoker.no_rust_aux_build_config_dep
-    } else {
-      _no_rust_aux_build_config_dep = false
-    }
-    if (!_no_rust_aux_build_config_dep) {
-      public_deps += [ ":$_rust_auxiliary_name" ]
-    }
+
     metadata = {
       if (defined(invoker.metadata)) {
         forward_variables_from(invoker.metadata, "*")
       }
 
-      rlib = [ "--extern=$crate_name=$_rlib_path" ]
-      searchdir = [ "-Ldependency=$_searchdir_path" ]
+      rust_rlib = [ "--extern=${crate_name}=${_rlib_path}" ]
+      rust_searchdir = [ "-Ldependency=${_searchdir_path}" ]
       rust_barrier = []
     }
   }
@@ -4043,19 +3955,10 @@ template("rust_proc_macro") {
     }
     not_needed(invoker, "*")
   } else {
-    actual_name = "$target_name"
-
-    # Reuse the name (without .actual) defined in rustc_artifact.gni
-    if (defined(invoker.rust_auxiliary_name)) {
-      _rust_auxiliary_name = invoker.rust_auxiliary_name
-    } else {
-      _rust_auxiliary_name = "$target_name.aux"
-    }
-
     if (defined(invoker.output_dir)) {
       _searchdir_path = invoker.output_dir
     } else {
-      _searchdir_path = get_label_info(":$target_name", "target_out_dir")
+      _searchdir_path = get_label_info(":${target_name}", "target_out_dir")
       if (rust_one_rlib_per_dir) {
         _searchdir_path += "/" + target_name
       }
@@ -4066,13 +3969,21 @@ template("rust_proc_macro") {
     }
     _rlib_path = "$_searchdir_path/lib${invoker.output_name}.$_output_extension"
 
-    rust_auxiliary(_rust_auxiliary_name) {
-      forward_variables_from(invoker, _rust_auxiliary_variables_to_forward)
-      invoker_deps = invoker.deps
-      rlib_path = _rlib_path
-      searchdir_path = _searchdir_path
-      if (!defined(rust_crate_type)) {
-        rust_crate_type = "proc-macro"
+    _define_aux_deps = include_rustdoc
+    if (defined(invoker.define_aux_deps)) {
+      _define_aux_deps = invoker.define_aux_deps && _define_aux_deps
+    }
+    if (_define_aux_deps) {
+      # Reuse the name (without .actual) defined in rustc_artifact.gni
+      _rust_auxiliary_name = "${target_name}.aux"
+      rust_aux_deps(_rust_auxiliary_name) {
+        forward_variables_from(invoker,
+                               [
+                                 "deps",
+                                 "data_deps",
+                                 "public_deps",
+                                 "testonly",
+                               ])
       }
     }
 
@@ -4104,20 +4015,17 @@ template("rust_proc_macro") {
       if (!defined(public_deps)) {
         public_deps = []
       }
-      if (defined(invoker.no_rust_aux_build_config_dep)) {
-        _no_rust_aux_build_config_dep = invoker.no_rust_aux_build_config_dep
+      if (_define_aux_deps) {
+        public_deps += [ ":${_rust_auxiliary_name}" ]
       } else {
-        _no_rust_aux_build_config_dep = false
-      }
-      if (!_no_rust_aux_build_config_dep) {
-        public_deps += [ ":$_rust_auxiliary_name" ]
+        not_needed(invoker, [ "_rust_auxiliary_name" ])
       }
       metadata = {
         if (defined(invoker.metadata)) {
           forward_variables_from(invoker.metadata, "*")
         }
-        rlib = [ "--extern=$crate_name=$_rlib_path" ]
-        searchdir = [ "-Ldependency=$_searchdir_path" ]
+        rust_rlib = [ "--extern=${crate_name}=${_rlib_path}" ]
+        rust_searchdir = [ "-Ldependency=${_searchdir_path}" ]
         rust_barrier = []
       }
     }

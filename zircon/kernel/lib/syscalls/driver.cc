@@ -307,6 +307,44 @@ zx_status_t sys_bti_create(zx_handle_t iommu, uint32_t options, uint64_t bti_id,
   return up->MakeAndAddHandle(ktl::move(handle), rights, out);
 }
 
+// Helper for optimizing writing many small elements of user ptr array by allowing for a variable
+// amount of buffering.
+template <typename T, size_t Buf>
+class BufferedUserOutPtr {
+ public:
+  explicit BufferedUserOutPtr(user_out_ptr<T> out_ptr) : out_ptr_(out_ptr) {}
+  ~BufferedUserOutPtr() {
+    // Ensure Flush was called and everything got written out.
+    ASSERT(index_ == 0);
+  }
+  // Add a single element, either appending to the buffer and/or flushing the buffer if full.
+  zx_status_t Write(const T& item) {
+    buf_[index_] = item;
+    index_++;
+    if (index_ == Buf) {
+      return Flush();
+    }
+    return ZX_OK;
+  }
+  // Flush any remaining buffered items. Must be called prior to destruction.
+  zx_status_t Flush() {
+    zx_status_t status = out_ptr_.copy_array_to_user(buf_.data(), index_);
+    if (status != ZX_OK) {
+      return status;
+    }
+    out_ptr_ = out_ptr_.element_offset(index_);
+    index_ = 0;
+    return ZX_OK;
+  }
+
+ private:
+  size_t index_ = 0;
+  user_out_ptr<T> out_ptr_;
+  ktl::array<T, Buf> buf_;
+  // Expectation is this is going to be stack allocated, so ensure it's not too big.
+  static_assert(sizeof(buf_) < PAGE_SIZE);
+};
+
 // zx_status_t zx_bti_pin
 zx_status_t sys_bti_pin(zx_handle_t handle, uint32_t options, zx_handle_t vmo, uint64_t offset,
                         uint64_t size, user_out_ptr<zx_paddr_t> addrs, size_t addrs_count,
@@ -380,13 +418,6 @@ zx_status_t sys_bti_pin(zx_handle_t handle, uint32_t options, zx_handle_t vmo, u
     return ZX_ERR_INVALID_ARGS;
   }
 
-  constexpr size_t kAddrsLenLimitForStack = 4;
-  fbl::AllocChecker ac;
-  fbl::InlineArray<dev_vaddr_t, kAddrsLenLimitForStack> mapped_addrs(&ac, addrs_count);
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
-
   KernelHandle<PinnedMemoryTokenDispatcher> new_pmt_handle;
   zx_rights_t new_pmt_rights;
   status = bti_dispatcher->Pin(vmo_dispatcher->vmo(), offset, size, iommu_perms, &new_pmt_handle,
@@ -407,16 +438,77 @@ zx_status_t sys_bti_pin(zx_handle_t handle, uint32_t options, zx_handle_t vmo, u
   // not be valid after the move so we keep a RefPtr to the dispatcher instead.
   auto cleanup = fit::defer([disp = new_pmt_handle.dispatcher()]() { disp->Unpin(); });
 
-  status = new_pmt_handle.dispatcher()->EncodeAddrs(compress_results, contiguous,
-                                                    mapped_addrs.get(), addrs_count);
+  static_assert(sizeof(dev_vaddr_t) == sizeof(zx_paddr_t), "mismatched types");
+  BufferedUserOutPtr<zx_paddr_t, 32> buffered_addrs(addrs);
+
+  // Define a helper lambda with some state that can fetch potentially large ranges from the PMT,
+  // but return them gradually. This just serves as an optimization around repeatedly querying the
+  // PMT for a range that it knows is contiguous, but where we need to fill out multiple addresses
+  // for the user.
+  struct {
+    uint64_t offset = 0;
+    dev_vaddr_t addr = 0;
+    size_t remaining = 0;
+  } consume_state;
+  auto consume_addr = [&](size_t expected_contig) -> zx::result<dev_vaddr_t> {
+    // If the remaining part of the mapping we have cannot satisfy
+    if (expected_contig > consume_state.remaining) {
+      uint64_t remain = size - consume_state.offset;
+      zx_status_t status = new_pmt_handle.dispatcher()->QueryAddress(
+          consume_state.offset, remain, &consume_state.addr, &consume_state.remaining);
+      if (status != ZX_OK) {
+        return zx::error(status);
+      }
+      if (expected_contig > consume_state.remaining) {
+        // This happening suggests an error with contiguity calculations and/or the underlying IOMMU
+        // implementation not reporting its contiguity correctly.
+        // TODO: consider making this a louder error.
+        return zx::error(ZX_ERR_INVALID_ARGS);
+      }
+    }
+    const dev_vaddr_t ret = consume_state.addr;
+    consume_state.offset += expected_contig;
+    consume_state.addr += expected_contig;
+    consume_state.remaining -= expected_contig;
+    return zx::ok(ret);
+  };
+
+  // Based on the passed in options, determine what size chunks we are going to report to the user,
+  // and how many of those there will be.
+  size_t target_contig;
+  size_t expected_addrs;
+  if (compress_results) {
+    const size_t min_contig = bti_dispatcher->minimum_contiguity();
+    expected_addrs = ROUNDUP(size, min_contig) / min_contig;
+    target_contig = min_contig;
+  } else if (contiguous) {
+    expected_addrs = 1;
+    target_contig = size;
+  } else {
+    expected_addrs = size / PAGE_SIZE;
+    target_contig = PAGE_SIZE;
+  }
+  if (addrs_count != expected_addrs) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  // Calculate / lookup the addresses.
+  for (size_t i = 0; i < addrs_count; i++) {
+    const size_t expected_size = ktl::min(size - (target_contig * i), target_contig);
+    auto result = consume_addr(expected_size);
+    if (result.is_error()) {
+      return result.status_value();
+    }
+    status = buffered_addrs.Write(*result);
+    if (status != ZX_OK) {
+      return status;
+    }
+  }
+
+  status = buffered_addrs.Flush();
   if (status != ZX_OK) {
     return status;
   }
 
-  static_assert(sizeof(dev_vaddr_t) == sizeof(zx_paddr_t), "mismatched types");
-  if ((status = addrs.copy_array_to_user(mapped_addrs.get(), addrs_count)) != ZX_OK) {
-    return status;
-  }
   zx_status_t res = up->MakeAndAddHandle(ktl::move(new_pmt_handle), new_pmt_rights, pmt);
   if (res == ZX_OK) {
     cleanup.cancel();

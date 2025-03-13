@@ -6,8 +6,8 @@
 
 namespace flatland {
 
-const std::array<float, 9> kDefaultColorConversionCoefficients = {1, 0, 0, 0, 1, 0, 0, 0, 1};
-const std::array<float, 3> kDefaultColorConversionOffsets = {0, 0, 0};
+const fidl::Array<float, 9> kDefaultColorConversionCoefficients = {1, 0, 0, 0, 1, 0, 0, 0, 1};
+const fidl::Array<float, 3> kDefaultColorConversionOffsets = {0, 0, 0};
 
 void ColorConversionStateMachine::SetApplyConfigSucceeded() {
   // Save the current data as applied data and mark |dc_has_cc_| as true only if

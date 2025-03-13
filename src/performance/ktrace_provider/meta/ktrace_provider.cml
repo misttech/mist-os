@@ -11,8 +11,7 @@
         {
             protocol: [
                 "fuchsia.boot.ReadOnlyLog",
-                "fuchsia.tracing.kernel.Controller",
-                "fuchsia.tracing.kernel.Reader",
+                "fuchsia.kernel.DebugResource",
                 "fuchsia.tracing.provider.Registry",
             ],
         },

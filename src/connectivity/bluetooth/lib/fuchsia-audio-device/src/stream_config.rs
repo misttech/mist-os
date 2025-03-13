@@ -20,6 +20,7 @@ use crate::audio_frame_stream::AudioFrameStream;
 use crate::frame_vmo;
 use crate::types::{AudioSampleFormat, Error, Result};
 
+#[allow(clippy::large_enum_variant)] // TODO(https://fxbug.dev/401087115)
 pub(crate) enum StreamConfigOrTask {
     StreamConfig(SoftStreamConfig),
     Task(fasync::Task<Result<()>>),

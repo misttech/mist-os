@@ -3,7 +3,8 @@
 # found in the LICENSE file.
 
 import("//build/dist/resource.gni")
-import("//third_party/Vulkan-ValidationLayers/scripts/gn/layers-fuchsia.gni")
+import(
+    "//third_party/Vulkan-ValidationLayers/src/scripts/gn/layers-fuchsia.gni")
 
 # This defines a target that any fuchsia_component() or fuchsia_package()
 # can simply depend on to get the Vulkan validation layers loadable modules

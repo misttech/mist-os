@@ -5,7 +5,6 @@
 // Don't complain if one of info/warn/err/debug are unused.
 #![allow(unused)]
 
-use once_cell::sync::Lazy;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::atomic::AtomicBool;
@@ -72,15 +71,18 @@ impl Clock for Monotonic {
 }
 
 // Allow bursts of up to 30 log messages, but throttle to 1 log/s on average.
-static LIMITER: Lazy<RateLimiter<Monotonic>> =
-    Lazy::new(|| RateLimiter::new(Monotonic, 30, zx::MonotonicDuration::from_seconds(30)));
+static LIMITER: std::sync::LazyLock<RateLimiter<Monotonic>> = std::sync::LazyLock::new(|| {
+    RateLimiter::new(Monotonic, 30, zx::MonotonicDuration::from_seconds(30))
+});
 
 // Log everything in tests.
 #[cfg(test)]
-static LOG_EVERYTHING: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
+static LOG_EVERYTHING: std::sync::LazyLock<AtomicBool> =
+    std::sync::LazyLock::new(|| AtomicBool::new(false));
 
 #[cfg(not(test))]
-static LOG_EVERYTHING: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(true));
+static LOG_EVERYTHING: std::sync::LazyLock<AtomicBool> =
+    std::sync::LazyLock::new(|| AtomicBool::new(true));
 
 pub fn acquire_one() -> bool {
     if LOG_EVERYTHING.load(std::sync::atomic::Ordering::Relaxed) {

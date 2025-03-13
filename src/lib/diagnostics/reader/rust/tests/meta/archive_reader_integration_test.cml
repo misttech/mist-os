@@ -38,17 +38,5 @@
             from: "parent",
             to: "#archivist",
         },
-        {
-            event_stream: "stopped",
-            from: "parent",
-            to: "#archivist",
-        },
-        {
-            directory: "config-data",
-            from: "parent",
-            as: "config-data",
-            to: "#archivist",
-            subdir: "archivist",
-        },
     ],
 }

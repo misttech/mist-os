@@ -87,6 +87,25 @@ pid_t DoClone3(const clone_args* cl_args, size_t size, int (*func)(void*), void*
         [param] "r"(param), [clone3] "i"(SYS_clone3), [exit] "i"(SYS_exit)
       : "x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8", "x9", "x10", "x11", "x12", "x13",
         "x14", "x15", "x16", "x17", "cc", "memory");
+#elif defined(__arm__)
+  __asm__ volatile(
+      "mov r0, %[cl_args]\n"
+      "mov r1, %[size]\n"
+      "mov r7, %[clone3]\n"
+      "svc #0\n"
+      "cmp r0, #0\n"
+      "bne 1f\n"
+      "mov r0, %[param]\n"
+      "blx %[func]\n"
+      "mov r7, %[exit]\n"
+      "svc #0\n"
+      "bkpt\n"
+      "1:\n"
+      "mov %[pid], r0\n"
+      : [pid] "=r"(pid)
+      : [cl_args] "r"(cl_args), "m"(*cl_args), [size] "r"(size), [func] "r"(func),
+        [param] "r"(param), [clone3] "i"(SYS_clone3), [exit] "i"(SYS_exit)
+      : "r0", "r1", "r2", "r3", "r7", "r12", "lr", "cc", "memory");
 #elif defined(__x86_64__)
   __asm__ volatile(
       "syscall\n"

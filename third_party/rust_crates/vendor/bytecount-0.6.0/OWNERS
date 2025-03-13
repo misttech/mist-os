@@ -2,4 +2,4 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /third_party/rust_crates/vendor/nom_locate-2.1.0/OWNERS
+include /third_party/rust_crates/vendor/nom_locate-5.0.0/OWNERS

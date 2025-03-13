@@ -5,10 +5,11 @@
 use async_trait::async_trait;
 use component_debug::cli::{list_cmd_print, list_cmd_serialized};
 use component_debug::realm::Instance;
-use errors::FfxError;
+use errors::ffx_error;
 use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_list_args::ComponentListCommand;
-use fho::{FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
+use ffx_writer::{ToolIO as _, VerifiedMachineWriter};
+use fho::{FfxMain, FfxTool};
 use schemars::JsonSchema;
 use serde::Serialize;
 use target_holders::RemoteControlProxyHolder;
@@ -38,13 +39,13 @@ impl FfxMain for ListTool {
         if writer.is_machine() {
             let instances = list_cmd_serialized(self.cmd.filter, realm_query)
                 .await
-                .map_err(|e| FfxError::Error(e, 1))?;
+                .map_err(|e| ffx_error!(e))?;
             let output = ListOutput { instances };
             writer.machine(&output)?;
         } else {
             list_cmd_print(self.cmd.filter, self.cmd.verbose, realm_query, writer)
                 .await
-                .map_err(|e| FfxError::Error(e, 1))?;
+                .map_err(|e| ffx_error!(e))?;
         }
         Ok(())
     }
@@ -58,7 +59,8 @@ mod test {
     use anyhow::Result;
     use component_debug::realm::ResolvedInfo;
     use ffx_component_list_args::ComponentListCommand;
-    use fho::{FfxMain, Format, TestBuffers};
+    use ffx_writer::{Format, TestBuffers};
+    use fho::FfxMain;
     use fidl::endpoints::ServerEnd;
     use fidl_fuchsia_developer_remotecontrol::{
         RemoteControlMarker, RemoteControlProxy, RemoteControlRequest,
@@ -82,11 +84,10 @@ mod test {
             let querier = Rc::new(mock_realm_query);
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {
-                    RemoteControlRequest::DeprecatedOpenCapability {
+                    RemoteControlRequest::ConnectCapability {
                         moniker,
                         capability_set,
                         capability_name,
-                        flags: _,
                         server_channel,
                         responder,
                     } => {

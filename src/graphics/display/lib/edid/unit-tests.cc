@@ -18,7 +18,12 @@
 
 namespace {
 
-TEST(EdidTest, CaeValidationDtdOverflow) {
+class EdidTest : public ::testing::Test {
+ private:
+  fdf_testing::ScopedGlobalLogger logger_;
+};
+
+TEST_F(EdidTest, CaeValidationDtdOverflow) {
   edid::CeaEdidTimingExtension cea = {};
   cea.tag = edid::CeaEdidTimingExtension::kTag;
   cea.dtd_start_idx = 2;
@@ -26,17 +31,12 @@ TEST(EdidTest, CaeValidationDtdOverflow) {
   ASSERT_FALSE(cea.validate());
 }
 
-TEST(EdidTest, EisaVidLookup) {
+TEST_F(EdidTest, EisaVidLookup) {
   EXPECT_TRUE(!strcmp(edid::GetEisaVendorName(0x1e6d), "GOLDSTAR COMPANY LTD"));
   EXPECT_TRUE(!strcmp(edid::GetEisaVendorName(0x5a63), "VIEWSONIC CORPORATION"));
 }
 
-class EdidTest : public ::testing::Test {
- private:
-  fdf_testing::ScopedGlobalLogger logger_;
-};
-
-TEST(EdidTest, GetManufacturerIdAndName) {
+TEST_F(EdidTest, GetManufacturerIdAndName) {
   static constexpr uint8_t kHpZr30wEdidArray[] = {
       0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x22, 0xf0, 0x6c, 0x28, 0x01, 0x01, 0x01,
       0x01, 0x1e, 0x15, 0x01, 0x04, 0xb5, 0x40, 0x28, 0x78, 0xe2, 0x8d, 0x85, 0xad, 0x4f, 0x35,
@@ -69,7 +69,7 @@ TEST(EdidTest, GetManufacturerIdAndName) {
   EXPECT_STREQ(manufacturer_name, "HEWLETT PACKARD");
 }
 
-TEST(EdidTest, GetDisplayProductNameWithNameDescriptor) {
+TEST_F(EdidTest, GetDisplayProductNameWithNameDescriptor) {
   static constexpr uint8_t kHpZr30wEdidArray[] = {
       0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x22, 0xf0, 0x6c, 0x28, 0x01, 0x01, 0x01,
       0x01, 0x1e, 0x15, 0x01, 0x04, 0xb5, 0x40, 0x28, 0x78, 0xe2, 0x8d, 0x85, 0xad, 0x4f, 0x35,
@@ -98,7 +98,7 @@ TEST(EdidTest, GetDisplayProductNameWithNameDescriptor) {
   EXPECT_EQ(edid.GetDisplayProductName(), std::string("HP ZR30w"));
 }
 
-TEST(EdidTest, GetDisplayProductNameWithoutNameDescriptor) {
+TEST_F(EdidTest, GetDisplayProductNameWithoutNameDescriptor) {
   // This removes the name descriptor HP ZR30w EDID array and replaces it with
   // a placeholder display descriptor instead.
   static constexpr uint8_t kHpZr30wWithoutNameDescriptorEdidArray[] = {
@@ -124,7 +124,7 @@ TEST(EdidTest, GetDisplayProductNameWithoutNameDescriptor) {
   EXPECT_TRUE(edid.GetDisplayProductName().empty());
 }
 
-TEST(EdidTest, GetDisplayProductSerialWithSerialDescriptor) {
+TEST_F(EdidTest, GetDisplayProductSerialWithSerialDescriptor) {
   static constexpr uint8_t kHpZr30wEdidArray[] = {
       0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x22, 0xf0, 0x6c, 0x28, 0x01, 0x01, 0x01,
       0x01, 0x1e, 0x15, 0x01, 0x04, 0xb5, 0x40, 0x28, 0x78, 0xe2, 0x8d, 0x85, 0xad, 0x4f, 0x35,
@@ -152,7 +152,7 @@ TEST(EdidTest, GetDisplayProductSerialWithSerialDescriptor) {
   EXPECT_EQ(edid.GetDisplayProductSerialNumber(), std::string("CN413010YH"));
 }
 
-TEST(EdidTest, GetDisplayProductSerialWithoutSerialDescriptor) {
+TEST_F(EdidTest, GetDisplayProductSerialWithoutSerialDescriptor) {
   // This removes the serial descriptor HP ZR30w EDID array and replaces it with
   // a placeholder display descriptor instead.
   static constexpr uint8_t kHpZr30wWithoutSerialDescriptorEdidArray[] = {
@@ -181,6 +181,38 @@ TEST(EdidTest, GetDisplayProductSerialWithoutSerialDescriptor) {
   // (least-significant byte) 0x01, 0x02, 0x03, 0x04 (most-significant byte)
   // So the serial number is 0x04030201 = 67305985.
   EXPECT_EQ(edid.GetDisplayProductSerialNumber(), std::string("67305985"));
+}
+
+TEST_F(EdidTest, QemuVirtioGpuEdidParsesCorrectly) {
+  fit::result<const char*, edid::Edid> edid_result = edid::Edid::Create(edid::kQemuVirtioGpuEdid);
+  EXPECT_TRUE(edid_result.is_ok()) << "EDID parsing failed: " << edid_result.error_value();
+  edid::Edid edid = std::move(edid_result).value();
+
+  for (auto timing_it = edid::timing_iterator(&edid); timing_it.is_valid(); ++timing_it) {
+    const display::DisplayTiming& display_timing = *timing_it;
+    EXPECT_TRUE(display_timing.IsValid());
+  }
+
+  EXPECT_EQ(false, edid.is_hdmi());
+  EXPECT_EQ(false, edid.supports_basic_audio());
+}
+
+TEST_F(EdidTest, QemuVirtioGpuEdidWithPaddingParsesCorrectly) {
+  std::array<uint8_t, 1024> padded_edid_bytes;
+  std::copy(edid::kQemuVirtioGpuEdid.begin(), edid::kQemuVirtioGpuEdid.end(),
+            padded_edid_bytes.begin());
+
+  fit::result<const char*, edid::Edid> edid_result = edid::Edid::Create(padded_edid_bytes);
+  EXPECT_TRUE(edid_result.is_ok()) << "EDID parsing failed: " << edid_result.error_value();
+  edid::Edid edid = std::move(edid_result).value();
+
+  for (auto timing_it = edid::timing_iterator(&edid); timing_it.is_valid(); ++timing_it) {
+    const display::DisplayTiming& display_timing = *timing_it;
+    EXPECT_TRUE(display_timing.IsValid());
+  }
+
+  EXPECT_EQ(false, edid.is_hdmi());
+  EXPECT_EQ(false, edid.supports_basic_audio());
 }
 
 }  // namespace

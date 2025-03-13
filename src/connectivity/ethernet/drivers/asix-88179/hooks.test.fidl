@@ -13,3 +13,8 @@ closed protocol Hooks {
         status zx.Status;
     });
 };
+
+// Added to allow service connection to replace devfs
+service Service {
+    hooks client_end:Hooks;
+};

@@ -18,6 +18,9 @@
 #include <fbl/auto_lock.h>
 #include <virtio/virtio.h>
 
+#include "fidl/fuchsia.hardware.pty/cpp/wire_messaging.h"
+#include "lib/fidl/cpp/wire/channel.h"
+
 namespace virtio {
 
 namespace {
@@ -178,6 +181,16 @@ zx_status_t ConsoleDevice::Init() TA_NO_THREAD_SAFETY_ANALYSIS {
   for (size_t i = 0; i < kDescriptors; ++i) {
     TransferDescriptor* desc = port0_transmit_buffer_.GetDescriptor(i);
     port0_transmit_descriptors_.Add(desc);
+  }
+
+  zx::result result =
+      DdkAddService<fuchsia_hardware_pty::Service>(fuchsia_hardware_pty::Service::InstanceHandler({
+          .device = bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                            fidl::kIgnoreBindingClosure),
+      }));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add service: %s", result.status_string());
+    return result.status_value();
   }
 
   {

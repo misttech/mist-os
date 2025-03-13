@@ -120,6 +120,7 @@ fuchsia_package("package") {
 }
 
 fuchsia_cc_driver("fake-driver") {
+  ldflags = [ "-Wl,--undefined-version" ]
 }
 
 driver_bind_rules("test-bind") {
@@ -136,6 +137,7 @@ fuchsia_driver_component("test-bind-component") {
 }
 
 fuchsia_cc_driver("fake-driver2") {
+  ldflags = [ "-Wl,--undefined-version" ]
 }
 
 driver_bind_rules("test-bind2") {
@@ -152,6 +154,7 @@ fuchsia_driver_component("test-bind2-component") {
 }
 
 fuchsia_cc_driver("fake-fallback-driver") {
+  ldflags = [ "-Wl,--undefined-version" ]
 }
 
 driver_bind_rules("test-fallback-bind") {

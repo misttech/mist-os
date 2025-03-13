@@ -2,16 +2,17 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# shellcheck disable=SC2148
+# No shebang in this file is intentional
+
 # Return the top-directory of a given Bazel workspace used by the platform
 # build. A TOPDIR contains several files and directories like workspace/
 # or output_base/
 fx-bazel-top-dir () {
   # See //build/bazel/config/README.md
-  #
-  # $1: Optional workspace name, defaults to "main".
-  #
-  local INPUT_FILE="${FUCHSIA_DIR}/build/bazel/config/${1:-main}_workspace_top_dir"
-  local TOPDIR=$(<"${INPUT_FILE}")
+  local INPUT_FILE="${FUCHSIA_DIR}/build/bazel/config/main_workspace_top_dir"
+  local TOPDIR
+  TOPDIR=$(<"${INPUT_FILE}")
   echo "${FUCHSIA_BUILD_DIR}/${TOPDIR}"
 }
 
@@ -34,7 +35,7 @@ fx-update-bazel-workspace () {
     # Calling fx build is needed to ensure RBE environment variables are
     # properly set when generating the Ninja build plan. See b/315393497
     echo "fx-bazel: Regenerating Ninja build plan to ensure all workspace dependencies are correct!"
-    fx-command-run build build.ninja
+    fx-command-run build -- build.ninja
   fi
 }
 

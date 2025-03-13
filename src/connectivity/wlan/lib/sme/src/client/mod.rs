@@ -38,7 +38,7 @@ use wlan_rsn::auth;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fidl_fuchsia_wlan_sme as fidl_sme,
+    fidl_fuchsia_wlan_sme as fidl_sme, fidl_fuchsia_wlan_stats as fidl_stats,
 };
 
 // This is necessary to trick the private-in-public checker.
@@ -59,9 +59,6 @@ mod internal {
         pub(crate) timer: Timer<Event>,
         pub att_id: ConnectionAttemptId,
         pub(crate) inspect: Arc<inspect::SmeTree>,
-        // TODO(https://fxbug.dev/335283785): Remove or explain unused code.
-        #[allow(dead_code)]
-        pub mac_sublayer_support: fidl_common::MacSublayerSupport,
         pub security_support: fidl_common::SecuritySupport,
     }
 }
@@ -278,6 +275,7 @@ impl<T: Into<ConnectFailure>> From<T> for ConnectResult {
     }
 }
 
+#[allow(clippy::large_enum_variant)] // TODO(https://fxbug.dev/401087337)
 #[derive(Debug, PartialEq)]
 pub enum RoamResult {
     Success(Box<BssDescription>),
@@ -329,6 +327,7 @@ impl ConnectTransactionSink {
 
 pub type ConnectTransactionStream = mpsc::UnboundedReceiver<ConnectTransactionEvent>;
 
+#[allow(clippy::large_enum_variant)] // TODO(https://fxbug.dev/401087337)
 #[derive(Debug, PartialEq)]
 pub enum ConnectTransactionEvent {
     OnConnectResult { result: ConnectResult, is_reconnect: bool },
@@ -658,7 +657,6 @@ impl ClientSme {
         inspector: fuchsia_inspect::Inspector,
         inspect_node: fuchsia_inspect::Node,
         persistence_req_sender: auto_persist::PersistenceReqSender,
-        mac_sublayer_support: fidl_common::MacSublayerSupport,
         security_support: fidl_common::SecuritySupport,
         spectrum_management_support: fidl_common::SpectrumManagementSupport,
     ) -> (Self, MlmeSink, MlmeStream, timer::EventStream<Event>) {
@@ -697,7 +695,6 @@ impl ClientSme {
                     timer,
                     att_id: 0,
                     inspect,
-                    mac_sublayer_support,
                     security_support,
                 },
             },
@@ -848,6 +845,14 @@ impl ClientSme {
         }
     }
 
+    pub fn query_telemetry_support(
+        &mut self,
+    ) -> oneshot::Receiver<Result<fidl_stats::TelemetrySupport, i32>> {
+        let (responder, receiver) = Responder::new();
+        self.context.mlme_sink.send(MlmeRequest::QueryTelemetrySupport(responder));
+        receiver
+    }
+
     pub fn counter_stats(&mut self) -> oneshot::Receiver<fidl_mlme::GetIfaceCounterStatsResponse> {
         let (responder, receiver) = Responder::new();
         self.context.mlme_sink.send(MlmeRequest::GetIfaceCounterStats(responder));
@@ -937,7 +942,7 @@ impl super::Station for ClientSme {
             | event @ Event::RsnaRetransmissionTimeout(..)
             | event @ Event::SaeTimeout(..)
             | event @ Event::DeauthenticateTimeout(..) => {
-                state.handle_timeout(timed_event.id, event, &mut self.context)
+                state.handle_timeout(event, &mut self.context)
             }
             Event::InspectPulseCheck(..) => {
                 self.context.mlme_sink.send(MlmeRequest::WmmStatusReq);
@@ -985,7 +990,7 @@ mod tests {
         security::{wep::WEP40_KEY_BYTES, wpa::credential::PSK_SIZE_BYTES},
         test_utils::{
             fake_features::{
-                fake_mac_sublayer_support, fake_security_support, fake_security_support_empty,
+                fake_security_support, fake_security_support_empty,
                 fake_spectrum_management_support_empty,
             },
             fake_stas::{FakeProtectionCfg, IesOverrides},
@@ -1613,19 +1618,12 @@ mod tests {
         let sme_root_node = inspector.root().create_child("sme");
         let (persistence_req_sender, _persistence_receiver) =
             test_utils::create_inspect_persistence_channel();
-        let mut mac_sublayer_support = fake_mac_sublayer_support();
-        // TODO(https://fxbug.dev/42178810) - FullMAC still uses the old state machine. Once FullMAC is
-        //                         fully transitioned, this override will no longer be
-        //                         necessary.
-        mac_sublayer_support.device.mac_implementation_type =
-            fidl_common::MacImplementationType::Fullmac;
         let (mut sme, _mlme_sink, mut mlme_stream, _time_stream) = ClientSme::new(
             ClientConfig::from_config(SmeConfig::default().with_wep(), false),
             test_utils::fake_device_info(*CLIENT_ADDR),
             inspector,
             sme_root_node,
             persistence_req_sender,
-            mac_sublayer_support,
             fake_security_support(),
             fake_spectrum_management_support_empty(),
         );
@@ -2134,7 +2132,6 @@ mod tests {
             inspector,
             sme_root_node,
             persistence_req_sender,
-            fake_mac_sublayer_support(),
             fake_security_support(),
             fake_spectrum_management_support_empty(),
         );
@@ -2146,7 +2143,7 @@ mod tests {
         });
 
         let mut persist_event = None;
-        while let Ok(Some((_timeout, timed_event))) = time_stream.try_next() {
+        while let Ok(Some((_timeout, timed_event, _handle))) = time_stream.try_next() {
             if let Event::InspectPulsePersist(..) = timed_event.event {
                 persist_event = Some(timed_event);
                 break;
@@ -2204,19 +2201,12 @@ mod tests {
         let sme_root_node = inspector.root().create_child("sme");
         let (persistence_req_sender, _persistence_receiver) =
             test_utils::create_inspect_persistence_channel();
-        let mut mac_sublayer_support = fake_mac_sublayer_support();
-        // TODO(https://fxbug.dev/42178810) - FullMAC still uses the old state machine. Once FullMAC is
-        //                         fully transitioned, this override will no longer be
-        //                         necessary.
-        mac_sublayer_support.device.mac_implementation_type =
-            fidl_common::MacImplementationType::Fullmac;
         let (client_sme, _mlme_sink, mlme_stream, time_stream) = ClientSme::new(
             ClientConfig::default(),
             test_utils::fake_device_info(*CLIENT_ADDR),
             inspector,
             sme_root_node,
             persistence_req_sender,
-            mac_sublayer_support,
             fake_security_support(),
             fake_spectrum_management_support_empty(),
         );

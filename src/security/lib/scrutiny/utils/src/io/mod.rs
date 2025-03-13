@@ -63,7 +63,7 @@ impl<T: Read + Seek> ReadSeek for T {}
 
 /// Convert an `anyhow::Error` to a `std::io::Error`.
 fn anyhow_to_io(error: anyhow::Error) -> std::io::Error {
-    std::io::Error::new(std::io::ErrorKind::Other, error)
+    std::io::Error::other(error)
 }
 
 /// Modeled custom errors that can be encountered performing read and seek operations on a
@@ -172,14 +172,11 @@ impl<RS: Read + Seek> Read for WrappedReaderSeeker<RS> {
             let absolute_start = absolute_start.eval().map_err(anyhow_to_io)?;
             let absolute_end = absolute_end.eval().map_err(anyhow_to_io)?;
             if position < absolute_start || position > absolute_end {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    WrappedReaderSeekerError {
-                        position,
-                        lower_bound: absolute_start,
-                        upper_bound: absolute_end,
-                    },
-                ));
+                return Err(std::io::Error::other(WrappedReaderSeekerError {
+                    position,
+                    lower_bound: absolute_start,
+                    upper_bound: absolute_end,
+                }));
             }
         }
 
@@ -294,14 +291,11 @@ impl<RS: Read + Seek> Seek for WrappedReaderSeeker<RS> {
         let absolute_start = offset.eval().map_err(anyhow_to_io)?;
         let absolute_end = absolute_end.eval().map_err(anyhow_to_io)?;
         if new_position < absolute_start || new_position > absolute_end {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                WrappedReaderSeekerError {
-                    position: new_position,
-                    lower_bound: absolute_start,
-                    upper_bound: absolute_end,
-                },
-            ));
+            return Err(std::io::Error::other(WrappedReaderSeekerError {
+                position: new_position,
+                lower_bound: absolute_start,
+                upper_bound: absolute_end,
+            }));
         }
 
         self.reader_seeker.seek(SeekFrom::Start(new_position))?;

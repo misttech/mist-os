@@ -214,3 +214,8 @@ closed protocol Device {
         did_close bool;
     });
 };
+
+// Added to allow service connection to replace devfs
+service Service {
+    device_setup client_end:DeviceSetup;
+};

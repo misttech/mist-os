@@ -7,6 +7,7 @@ use crate::fuchsia::errors::map_to_status;
 use crate::volumes_directory::VolumesDirectory;
 use fidl_fuchsia_fxfs::DebugRequest;
 use fidl_fuchsia_io as fio;
+use fuchsia_sync::Mutex;
 use fxfs::filesystem::FxFilesystem;
 use fxfs::lsm_tree::types::LayerIterator;
 use fxfs::lsm_tree::Query;
@@ -15,7 +16,7 @@ use fxfs::object_store::{
     AttributeKey, DataObjectHandle, HandleOptions, ObjectKey, ObjectKeyData, ObjectStore,
 };
 use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Weak};
 use vfs::directory::dirents_sink::{self, AppendResult};
 use vfs::directory::entry::{DirectoryEntry, GetEntryInfo, OpenRequest};
 use vfs::directory::entry_container::Directory;
@@ -378,7 +379,6 @@ impl Directory for ObjectDirectory {
         let object_id = match pos {
             TraversalPosition::Start => 0,
             TraversalPosition::Name(_) => return Err(zx::Status::BAD_STATE),
-            TraversalPosition::Bytes(_) => return Err(zx::Status::BAD_STATE),
             TraversalPosition::Index(object_id) => *object_id,
             TraversalPosition::End => u64::MAX,
         };
@@ -497,10 +497,10 @@ impl FxfsDebug {
             let object_store_dir =
                 ObjectStoreDirectory::new(volume, Some(upgrade_weak(&self.root_store)?))?;
             let node = object_store_dir.vfs_root.clone();
-            self.volumes.lock().unwrap().insert(name.to_string(), object_store_dir);
+            self.volumes.lock().insert(name.to_string(), object_store_dir);
             self.volumes_dir.add_entry(name, node)
         } else {
-            self.volumes.lock().unwrap().remove(name);
+            self.volumes.lock().remove(name);
             self.volumes_dir.remove_entry(name, false).map(|_| ())
         }
     }

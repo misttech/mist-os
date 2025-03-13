@@ -506,10 +506,9 @@ mod tests {
 
         // The GC shouldn't be scheduled with an empty table.
         assert!(next_gc_time(core_ctx, bindings_ctx).is_none());
-        core_ctx.with_counters(|counters: &MulticastForwardingCounters<I>| {
-            assert_eq!(counters.pending_table_gc.get(), 0);
-            assert_eq!(counters.pending_packet_drops_gc.get(), 0);
-        });
+        let counters: &MulticastForwardingCounters<I> = core_ctx.counters();
+        assert_eq!(counters.pending_table_gc.get(), 0);
+        assert_eq!(counters.pending_packet_drops_gc.get(), 0);
 
         // Queue a packet, and expect the GC to be scheduled.
         let expected_first_gc = bindings_ctx.now() + PENDING_ROUTE_GC_PERIOD;
@@ -536,10 +535,9 @@ mod tests {
         assert_eq!(next_gc_time(core_ctx, bindings_ctx), Some(expected_second_gc));
 
         // Verify that `key1` was removed, but `key2` remains.
-        core_ctx.with_counters(|counters: &MulticastForwardingCounters<I>| {
-            assert_eq!(counters.pending_table_gc.get(), 1);
-            assert_eq!(counters.pending_packet_drops_gc.get(), 1);
-        });
+        let counters: &MulticastForwardingCounters<I> = core_ctx.counters();
+        assert_eq!(counters.pending_table_gc.get(), 1);
+        assert_eq!(counters.pending_packet_drops_gc.get(), 1);
         assert_matches!(remove_packet_queue(core_ctx, bindings_ctx, &key1), None);
         assert_matches!(remove_packet_queue(core_ctx, bindings_ctx, &key2), Some(_));
 
@@ -556,10 +554,9 @@ mod tests {
         assert_eq!(next_gc_time(core_ctx, bindings_ctx), Some(expected_second_gc));
         bindings_ctx.timers.instant.sleep(PENDING_ROUTE_GC_PERIOD);
         run_gc(core_ctx, bindings_ctx);
-        core_ctx.with_counters(|counters: &MulticastForwardingCounters<I>| {
-            assert_eq!(counters.pending_table_gc.get(), 2);
-            assert_eq!(counters.pending_packet_drops_gc.get(), 2);
-        });
+        let counters: &MulticastForwardingCounters<I> = core_ctx.counters();
+        assert_eq!(counters.pending_table_gc.get(), 2);
+        assert_eq!(counters.pending_packet_drops_gc.get(), 2);
         assert_matches!(remove_packet_queue(core_ctx, bindings_ctx, &key1), None);
         assert!(next_gc_time(core_ctx, bindings_ctx).is_none());
     }

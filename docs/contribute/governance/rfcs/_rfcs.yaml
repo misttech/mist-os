@@ -3452,3 +3452,42 @@
   reviewers: ['jamesr@google.com', 'lindkvist@google.com', 'maniscalco@google.com', 'mcgrathr@google.com', 'mvanotti@google.com', 'phosek@google.com', 'travisg@google.com']
   submitted: '2024-11-05'
   reviewed: '2025-01-21'
+
+- name: 'RFC-0265'
+  title: 'Counter: A simple Zircon object for synchronizing across processes'
+  short_description: 'Proposes a new Zircon object, zx::counter.'
+  authors: ['maniscalco@google.com']
+  file: '0265_zircon_counter_object.md'
+  area: ['Kernel']
+  issue: ['382751863']
+  gerrit_change_id: ['1170953']
+  status: 'Accepted'
+  reviewers: ['emircan@google.com', 'lindkvist@google.com', 'mcgrathr@google.com']
+  submitted: '2024-12-09'
+  reviewed: '2025-02-12'
+
+- name: 'RFC-0266'
+  title: 'Memory Mappable Kernel Clocks'
+  short_description: 'Provides a way for user-mode processes to read kernel clock state without a entering the Zircon kernel.'
+  authors: ['johngro@google.com']
+  file: '0266_memory_mappable_kernel_clocks.md'
+  area: ['Kernel']
+  issue: ['374816449, 374816524']
+  gerrit_change_id: ['1161916']
+  status: 'Accepted'
+  reviewers: ['rashaeqbal@google.com', 'rudymathu@google.com', 'jamesr@google.com', 'adanis@google.com', 'mpuryear@google.com']
+  submitted: '2024-11-21'
+  reviewed: '2025-02-14'
+
+- name: 'RFC-0267'
+  title: 'IOBuffer Ring Buffer Discipline'
+  short_description: 'A ring buffer discipline for IOBuffers.'
+  authors: ['csuter@google.com']
+  file: '0267_io_buffer_ring_buffer_discipline.md'
+  area: ['Diagnostics']
+  issue: ['319500512']
+  gerrit_change_id: ['1183493']
+  status: 'Accepted'
+  reviewers: ['adanis@google.comm', 'eieio@google.com', 'gmtr@google.com', 'miguelfrde@google.com']
+  submitted: '2025-01-07'
+  reviewed: '2025-02-20'

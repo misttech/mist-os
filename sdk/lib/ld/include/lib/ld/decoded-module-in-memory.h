@@ -54,6 +54,8 @@ class DecodedModuleInMemory : public DecodedModule<ElfLayout, SegmentContainer, 
     std::optional<size_type> stack_size;
   };
 
+  using FixedPhdrAllocator = elfldltl::FixedArrayFromFile<Phdr, kMaxPhdrs>;
+
   // Set when the PT_GNU_RELRO phdr is seen by set_relro or DecodeFromMemory.
   // If no such phdr is seen, this will be empty.  It can be passed directly to
   // the Loader::Commit method.  Note these are the unadjusted module-relative
@@ -77,9 +79,10 @@ class DecodedModuleInMemory : public DecodedModule<ElfLayout, SegmentContainer, 
   // As long as the PhdrAllocator object does not own the allocations it
   // returns, then it can be a consumed rvalue too.
   template <class Diagnostics, class Loader, class File,
-            typename PhdrAllocator = elfldltl::FixedArrayFromFile<Phdr, kMaxPhdrs>>
+            typename PhdrAllocator = FixedPhdrAllocator, class... PhdrObservers>
   constexpr auto LoadFromFile(Diagnostics& diag, Loader& loader, File&& file,
-                              PhdrAllocator&& phdr_allocator = PhdrAllocator{})
+                              PhdrAllocator&& phdr_allocator = PhdrAllocator{},
+                              PhdrObservers&&... phdr_observers)
       -> decltype(elfldltl::LoadHeadersFromFile<Elf>(  //
           diag, file, std::forward<PhdrAllocator>(phdr_allocator))) {
     assert(this->HasModule());
@@ -98,8 +101,8 @@ class DecodedModuleInMemory : public DecodedModule<ElfLayout, SegmentContainer, 
       // So everything else can wait until then.  With that, load_info() has
       // enough information to actually load the file.  Once the segments are
       // in all memory, then a metadata phdr can be decoded via its vaddr.
-      if (elfldltl::DecodePhdrs(diag, phdrs,
-                                this->load_info().GetPhdrObserver(loader.page_size())) &&
+      if (elfldltl::DecodePhdrs(diag, phdrs, this->load_info().GetPhdrObserver(loader.page_size()),
+                                std::forward<PhdrObservers>(phdr_observers)...) &&
           loader.Load(diag, this->load_info(), file.borrow())) [[likely]] {
         // Update the module to reflect the runtime vaddr bounds.
         SetModuleVaddrBounds(this->module(), this->load_info(), loader.load_bias());

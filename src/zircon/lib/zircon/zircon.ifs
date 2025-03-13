@@ -567,6 +567,10 @@ Symbols:
   - { Name: _zx_clock_get_monotonic, Type: Func }
   - { Name: _zx_clock_read, Type: Func }
   - { Name: _zx_clock_update, Type: Func }
+  - { Name: _zx_counter_add, Type: Func }
+  - { Name: _zx_counter_create, Type: Func }
+  - { Name: _zx_counter_read, Type: Func }
+  - { Name: _zx_counter_write, Type: Func }
   - { Name: _zx_cprng_add_entropy, Type: Func }
   - { Name: _zx_cprng_draw, Type: Func }
   - { Name: _zx_deadline_after, Type: Func }
@@ -712,6 +716,7 @@ Symbols:
   - { Name: _zx_system_set_processor_power_domain, Type: Func }
   - { Name: _zx_system_set_processor_power_state, Type: Func }
   - { Name: _zx_system_suspend_enter, Type: Func }
+  - { Name: _zx_system_watch_memory_stall, Type: Func }
   - { Name: _zx_task_create_exception_channel, Type: Func }
   - { Name: _zx_task_kill, Type: Func }
   - { Name: _zx_task_suspend, Type: Func }
@@ -1322,6 +1327,10 @@ Symbols:
   - { Name: zx_clock_get_monotonic, Type: Func, Weak: true }
   - { Name: zx_clock_read, Type: Func, Weak: true }
   - { Name: zx_clock_update, Type: Func, Weak: true }
+  - { Name: zx_counter_add, Type: Func, Weak: true }
+  - { Name: zx_counter_create, Type: Func, Weak: true }
+  - { Name: zx_counter_read, Type: Func, Weak: true }
+  - { Name: zx_counter_write, Type: Func, Weak: true }
   - { Name: zx_cprng_add_entropy, Type: Func, Weak: true }
   - { Name: zx_cprng_draw, Type: Func, Weak: true }
   - { Name: zx_deadline_after, Type: Func, Weak: true }
@@ -1467,6 +1476,7 @@ Symbols:
   - { Name: zx_system_set_processor_power_domain, Type: Func, Weak: true }
   - { Name: zx_system_set_processor_power_state, Type: Func, Weak: true }
   - { Name: zx_system_suspend_enter, Type: Func, Weak: true }
+  - { Name: zx_system_watch_memory_stall, Type: Func, Weak: true }
   - { Name: zx_task_create_exception_channel, Type: Func, Weak: true }
   - { Name: zx_task_kill, Type: Func, Weak: true }
   - { Name: zx_task_suspend, Type: Func, Weak: true }

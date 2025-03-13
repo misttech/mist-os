@@ -4,7 +4,7 @@
 
 use std::fmt::Display;
 use std::fs::File;
-use std::io::{BufRead, BufReader, ErrorKind};
+use std::io::{BufRead, BufReader};
 use std::process::Command;
 
 use camino::{Utf8Path, Utf8PathBuf};
@@ -146,10 +146,9 @@ impl ConfigDomain {
             .ok_or_else(|| {
                 FileError::with_path(
                     &path,
-                    LoadError::PathError(std::io::Error::new(
-                        ErrorKind::Other,
-                        format!("No parent directory for fuchsia_env file {path}"),
-                    )),
+                    LoadError::PathError(std::io::Error::other(format!(
+                        "No parent directory for fuchsia_env file {path}"
+                    ))),
                 )
             })?
             .to_owned();
@@ -239,7 +238,7 @@ impl ConfigDomain {
         update_cmd.env("FUCHSIA_VERSION_CHECK_FILES", join_paths(files));
 
         // check that the SDK exists at the given path.
-        if !sdk_root.manifest_exists() {
+        if sdk_root.manifest_path().is_none() {
             tracing::trace!("SDK manifest didn't exist for {sdk_root:?}");
             return Some(update_cmd);
         } else {
@@ -457,7 +456,10 @@ mod tests {
             FileStates::check_paths(rfc_root.clone(), &["manifest/bazel_sdk.ensure"]).unwrap();
         let mut known_state = FileStates::default();
         assert_matches!(
-            domain.needs_sdk_update(&SdkRoot::Full(rfc_root_sdk.clone().into()), &mut known_state),
+            domain.needs_sdk_update(
+                &SdkRoot::Full { root: rfc_root_sdk.clone().into(), manifest: None },
+                &mut known_state
+            ),
             Some(_),
             "sdk example with different existing state should need updating"
         );
@@ -467,14 +469,17 @@ mod tests {
         );
         assert_matches!(
             domain.needs_sdk_update(
-                &SdkRoot::Full(rfc_root_sdk.into()),
+                &SdkRoot::Full { root: rfc_root_sdk.into(), manifest: None },
                 &mut rfc_root_states.clone()
             ),
             None,
             "sdk example with correct state should not need updating"
         );
         assert_matches!(
-            domain.needs_sdk_update(&SdkRoot::Full(rfc_root.into()), &mut rfc_root_states.clone()),
+            domain.needs_sdk_update(
+                &SdkRoot::Full { root: rfc_root.into(), manifest: None },
+                &mut rfc_root_states.clone()
+            ),
             Some(_),
             "sdk example with invalid sdk root should need updating"
         );

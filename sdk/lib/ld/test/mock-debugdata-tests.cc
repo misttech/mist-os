@@ -103,7 +103,8 @@ TEST_F(LdMockDebugdataTests, MockSvcDirectory) {
   fidl::ClientEnd<fuchsia_io::Directory> svc_client_end;
   ASSERT_NO_FATAL_FAILURE(svc_dir.Serve(svc_client_end));
   fidl::SyncClient svc_client(std::move(svc_client_end));
-  auto open_result = svc_client->Open({{
+  // TODO(https://fxbug.dev/378924259): Migrate to new Open signature.
+  auto open_result = svc_client->DeprecatedOpen({{
       .path{fidl::DiscoverableProtocolName<fuchsia_debugdata::Publisher>},
       .object{fidl::ServerEnd<fuchsia_io::Node>(debugdata_server_end->TakeChannel())},
   }});

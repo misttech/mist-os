@@ -14,6 +14,8 @@ pub fn write_summary(
 ) -> std::io::Result<()> {
     write_summary_kernel_stats(f, &kernel_statistics)?;
     for principal in &value.principals {
+        writeln!(f)?;
+        writeln!(f)?;
         write_summary_principal(f, principal)?;
     }
     Ok(())
@@ -156,8 +158,7 @@ fn write_summary_kernel_stats(
         w,
         "    vmo_discardable_unlocked_bytes: {}",
         format_bytes(value.memory_statistics.vmo_discardable_unlocked_bytes.unwrap() as f64)
-    )?;
-    writeln!(w)
+    )
 }
 
 pub fn format_bytes(bytes: f64) -> String {

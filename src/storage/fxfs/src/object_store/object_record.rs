@@ -939,10 +939,6 @@ pub type ObjectItem = ObjectItemV43;
 pub type ObjectItemV43 = Item<ObjectKeyV43, ObjectValueV41>;
 pub type ObjectItemV41 = Item<ObjectKeyV40, ObjectValueV41>;
 pub type ObjectItemV40 = Item<ObjectKeyV40, ObjectValueV40>;
-pub type ObjectItemV38 = Item<ObjectKeyV32, ObjectValueV38>;
-pub type ObjectItemV37 = Item<ObjectKeyV32, ObjectValueV37>;
-pub type ObjectItemV33 = Item<ObjectKeyV32, ObjectValueV33>;
-pub type ObjectItemV32 = Item<ObjectKeyV32, ObjectValueV32>;
 
 impl From<ObjectItemV41> for ObjectItemV43 {
     fn from(item: ObjectItemV41) -> Self {
@@ -952,30 +948,6 @@ impl From<ObjectItemV41> for ObjectItemV43 {
 impl From<ObjectItemV40> for ObjectItemV41 {
     fn from(item: ObjectItemV40) -> Self {
         Self { key: item.key.into(), value: item.value.into(), sequence: item.sequence }
-    }
-}
-
-impl From<ObjectItemV38> for ObjectItemV40 {
-    fn from(item: ObjectItemV38) -> Self {
-        Self { key: item.key.into(), value: item.value.into(), sequence: item.sequence }
-    }
-}
-
-impl From<ObjectItemV37> for ObjectItemV38 {
-    fn from(item: ObjectItemV37) -> Self {
-        Self { key: item.key, value: item.value.into(), sequence: item.sequence }
-    }
-}
-
-impl From<ObjectItemV33> for ObjectItemV37 {
-    fn from(item: ObjectItemV33) -> Self {
-        Self { key: item.key, value: item.value.into(), sequence: item.sequence }
-    }
-}
-
-impl From<ObjectItemV32> for ObjectItemV33 {
-    fn from(item: ObjectItemV32) -> Self {
-        Self { key: item.key, value: item.value.into(), sequence: item.sequence }
     }
 }
 

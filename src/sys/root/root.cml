@@ -159,6 +159,7 @@
                 "fuchsia.pkg.PackageResolver-boot",
                 "fuchsia.process.Launcher",
                 "fuchsia.sys2.CrashIntrospect",
+                "fuchsia.update.verify.HealthVerification",
             ],
             from: "parent",
             to: "#bootstrap",

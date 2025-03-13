@@ -28,8 +28,10 @@ toc:
     path: /docs/contribute/open_projects/dart/null_safety.md
 - title: "Driver projects"
   section:
-  - title: "FIDL multiplexing deprecation"
-    path: /docs/contribute/open_projects/drivers/fidl_multiplexing.md
+  - title: "Devfs deprecation"
+    path: /docs/contribute/open_projects/drivers/devfs_to_service.md
+  - title: "Identifying service instances"
+    path: /docs/contribute/open_projects/drivers/identifying_service_instances.md
 - title: "Graduated projects"
   section:
   - title: "Overview"
@@ -46,3 +48,5 @@ toc:
     path: /docs/contribute/open_projects/graduated/typed_channels.md
   - title: "Undefined behavior issues"
     path: /docs/contribute/open_projects/graduated/ubsan.md
+  - title: "FIDL multiplexing deprecation"
+    path: /docs/contribute/open_projects/graduated/fidl_multiplexing.md

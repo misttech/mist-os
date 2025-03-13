@@ -14,7 +14,7 @@
     ],
     offer: [
         {
-            protocol: "fuchsia.logger.LogSink",
+            dictionary: "diagnostics",
             from: "parent",
             to: "#escher-examples",
         },
@@ -37,6 +37,8 @@
             to: "#escher-examples",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-display-coordinator",
@@ -44,6 +46,14 @@
             subdir: "display-coordinator",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.display.service",
+            from: "parent",
+            to: "#escher-examples",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-input",
@@ -51,11 +61,25 @@
             subdir: "input",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.input.Service",
+            from: "parent",
+            to: "#escher-examples",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-input-report",
             to: "#escher-examples",
             subdir: "input-report",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.input.report.Service",
+            from: "parent",
+            to: "#escher-examples",
         },
     ],
 }

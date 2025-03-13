@@ -167,6 +167,10 @@ class PendingCall {
   Submit submit_;
 };
 
+template <typename ReturnType, typename Call, typename Submit>
+PendingCall(Call call, Submit submit, internal::Tag<ReturnType>)
+    -> PendingCall<ReturnType, Call, Submit>;
+
 }  // namespace async_patterns
 
 #endif  // LIB_ASYNC_PATTERNS_CPP_PENDING_CALL_H_

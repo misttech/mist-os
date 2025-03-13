@@ -336,9 +336,9 @@ fn handle_pending_packets<I: IpLayerIpExt, CC, BC>(
             "Dropping pending packets for newly installed multicast route: {key:?}. \
             Multicast forwarding is disabled on input interface: {input_interface:?}"
         );
-        core_ctx.increment(|counters: &MulticastForwardingCounters<I>| {
-            &counters.pending_packet_drops_disabled_dev
-        });
+        CounterContext::<MulticastForwardingCounters<I>>::counters(core_ctx)
+            .pending_packet_drops_disabled_dev
+            .increment();
         return;
     }
 
@@ -355,9 +355,9 @@ fn handle_pending_packets<I: IpLayerIpExt, CC, BC>(
         };
         // Short circuit if the queued packet arrived on the wrong device.
         if device != input_interface {
-            core_ctx.increment(|counters: &MulticastForwardingCounters<I>| {
-                &counters.pending_packet_drops_wrong_dev
-            });
+            CounterContext::<MulticastForwardingCounters<I>>::counters(core_ctx)
+                .pending_packet_drops_wrong_dev
+                .increment();
             bindings_ctx.on_event(
                 MulticastForwardingEvent::WrongInputInterface {
                     key: key.clone(),
@@ -378,9 +378,9 @@ fn handle_pending_packets<I: IpLayerIpExt, CC, BC>(
 
         match &action {
             Action::Forward(targets) => {
-                core_ctx.increment(|counters: &MulticastForwardingCounters<I>| {
-                    &counters.pending_packet_tx
-                });
+                CounterContext::<MulticastForwardingCounters<I>>::counters(core_ctx)
+                    .pending_packet_tx
+                    .increment();
                 let packet_iter = RepeatN::new(packet, targets.len());
                 for (mut packet, MulticastRouteTarget { output_interface, min_ttl }) in
                     packet_iter.zip(targets.iter())
@@ -625,17 +625,13 @@ mod tests {
         assert_eq!(bindings_ctx.take_events(), expected_events);
 
         // Verify that counters are updated.
-        api.core_ctx().with_counters(|counters: &MulticastForwardingCounters<I>| {
-            assert_eq!(counters.pending_packet_tx.get(), if expect_sent_packet { 1 } else { 0 });
-            assert_eq!(
-                counters.pending_packet_drops_disabled_dev.get(),
-                if forwarding_enabled_for_dev { 0 } else { 1 }
-            );
-            assert_eq!(
-                counters.pending_packet_drops_wrong_dev.get(),
-                if right_dev { 0 } else { 1 }
-            );
-        });
+        let counters: &MulticastForwardingCounters<I> = api.core_ctx().counters();
+        assert_eq!(counters.pending_packet_tx.get(), if expect_sent_packet { 1 } else { 0 });
+        assert_eq!(
+            counters.pending_packet_drops_disabled_dev.get(),
+            if forwarding_enabled_for_dev { 0 } else { 1 }
+        );
+        assert_eq!(counters.pending_packet_drops_wrong_dev.get(), if right_dev { 0 } else { 1 });
     }
 
     #[ip_test(I)]

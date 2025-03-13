@@ -27,6 +27,7 @@ common_deps = [
 ]
 
 fuchsia_cc_driver("fuchsia_driver") {
+  legacy = true
   output_name = "tpm-driver"
   sources = [ "tpm.cc" ]
   deps = common_deps

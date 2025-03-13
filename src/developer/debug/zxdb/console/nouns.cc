@@ -17,6 +17,7 @@
 #include "src/developer/debug/zxdb/client/process.h"
 #include "src/developer/debug/zxdb/client/session.h"
 #include "src/developer/debug/zxdb/client/setting_schema_definition.h"
+#include "src/developer/debug/zxdb/client/stack.h"
 #include "src/developer/debug/zxdb/client/system.h"
 #include "src/developer/debug/zxdb/client/target.h"
 #include "src/developer/debug/zxdb/client/thread.h"
@@ -44,6 +45,7 @@ constexpr int kVerboseSwitch = 2;
 constexpr int kRawOutput = 3;
 constexpr int kForceRefresh = 4;
 constexpr int kInternalSwitch = 5;
+constexpr int kForceRemoteUnwind = 6;
 
 // Sets formatting options commonly used for outputting stack frames for the "frame" noun.
 FormatStackOptions GetFormatStackOptions(const Command& cmd, ConsoleContext* console_context) {
@@ -52,6 +54,15 @@ FormatStackOptions GetFormatStackOptions(const Command& cmd, ConsoleContext* con
 
   if (!cmd.HasSwitch(kRawOutput))
     opts.pretty_stack = console_context->pretty_stack_manager();
+
+  if (cmd.HasSwitch(kForceRefresh)) {
+    opts.sync_options.force_update = true;
+  }
+
+  if (cmd.HasSwitch(kForceRemoteUnwind)) {
+    opts.sync_options.force_update = true;
+    opts.sync_options.remote_unwind = true;
+  }
 
   return opts;
 }
@@ -79,8 +90,14 @@ Options
   -f
   --force
       Force an update to the stack when listing stack frames. This will always
-      request the latest stack frames from the target and re-evaluate all symbol
-      information.
+      reevaluate the complete call stack based on the current stop location. Use
+      --force-remote-unwind to unwind completely on the target.
+
+  --force-remote-unwind
+      Force the unwinding operation to happen from the target backend. Note that
+      this may result in different results than the default due to less metadata
+      availability on the target compared to the default option. Implies
+      --force.
 
   -r
   --raw
@@ -134,7 +151,7 @@ bool HandleFrameNoun(ConsoleContext* console_context, const Command& cmd,
   if (cmd.GetNounIndex(Noun::kFrame) == Command::kNoIndex) {
     // Just "frame", this lists available frames. Simple format is the default.
 
-    cmd_context->Output(FormatStack(cmd.thread(), cmd.HasSwitch(kForceRefresh), opts));
+    cmd_context->Output(FormatStack(cmd.thread(), opts));
     return true;
   } else if (cmd.GetNounIndex(Noun::kFrame) == Command::kWildcard) {
     cmd_context->ReportError(
@@ -342,9 +359,8 @@ bool HandleThreadNoun(ConsoleContext* console_context, const Command& cmd,
       return true;
     }
 
-    cmd_context->Output(FormatAllThreadStacks(cmd.all_threads(), cmd.HasSwitch(kForceRefresh),
-                                              GetFormatStackOptions(cmd, console_context),
-                                              cmd_context));
+    cmd_context->Output(FormatAllThreadStacks(
+        cmd.all_threads(), GetFormatStackOptions(cmd, console_context), cmd_context));
 
     return true;
   }
@@ -931,6 +947,7 @@ const std::vector<SwitchRecord>& GetNounSwitches() {
     switches.emplace_back(kVerboseSwitch, false, "verbose", 'v');
     switches.emplace_back(kForceRefresh, false, "force", 'f');
     switches.emplace_back(kInternalSwitch, false, "internal");
+    switches.emplace_back(kForceRemoteUnwind, false, "force-remote-unwind");
   }
   return switches;
 }

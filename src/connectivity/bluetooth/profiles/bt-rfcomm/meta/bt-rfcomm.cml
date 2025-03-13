@@ -20,6 +20,11 @@
             protocol: [ "fuchsia.bluetooth.bredr.Profile" ],
             from: "parent",
         },
+        {
+            protocol: [ "fuchsia.scheduler.RoleManager" ],
+            from: "parent",
+            availability: "optional",
+        },
     ],
     expose: [
         {

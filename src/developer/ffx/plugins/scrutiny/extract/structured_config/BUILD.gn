@@ -12,6 +12,7 @@ ffx_plugin("ffx_scrutiny_structured_config") {
 
   deps = [
     "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//src/security/lib/scrutiny/frontend",
     "//src/security/lib/scrutiny/utils",
     "//third_party/rust_crates:async-trait",

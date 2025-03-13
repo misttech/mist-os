@@ -55,7 +55,7 @@ class TestBase : public testing::Test {
 
   std::vector<const char*> desired_device_extensions_;
   std::unique_ptr<VulkanContext> context_;
-  vk::DispatchLoaderDynamic loader_;
+  vk::detail::DispatchLoaderDynamic loader_;
 };
 
 // Test the vulkan semaphore external fd extension.

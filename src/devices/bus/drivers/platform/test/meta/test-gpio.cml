@@ -3,15 +3,15 @@
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/lib/driver/compat/compat.shard.cml",
+        "driver_component/driver.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
         runner: "driver",
+        binary: "driver/test-gpio.so",
         bind: "meta/bind/test-gpio-bind.bindbc",
         default_dispatcher_opts: [ "allow_sync_calls" ],
-        compat: "driver/test-gpio.so",
         colocate: "true",
     },
     capabilities: [

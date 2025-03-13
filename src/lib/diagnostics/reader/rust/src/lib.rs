@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#![deny(missing_docs)]
+
+//! A library for reading Inspect and Log data from
+//! the ArchiveAccessor FIDL protocol.
+
 use async_stream::stream;
 use diagnostics_data::DiagnosticsData;
 use fidl_fuchsia_diagnostics::{
@@ -18,11 +23,18 @@ use futures::stream::FusedStream;
 use pin_project::pin_project;
 use serde::Deserialize;
 use std::future::ready;
+use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use thiserror::Error;
 use zx::{self as zx, MonotonicDuration};
+
+/// Alias for ArchiveReader<Logs>. Used for reading logs.
+pub type LogsArchiveReader = ArchiveReader<Logs>;
+
+/// Alias for ArchiveReader<Inspect>. Used for reading inspect.
+pub type InspectArchiveReader = ArchiveReader<Inspect>;
 
 pub use diagnostics_data::{Data, Inspect, Logs, Severity};
 pub use diagnostics_hierarchy::{hierarchy, DiagnosticsHierarchy, Property};
@@ -37,31 +49,40 @@ const FORMAT: Format = Format::Json;
 /// Errors that this library can return
 #[derive(Debug, Error)]
 pub enum Error {
+    /// Failed to connect to the archive accessor
     #[error("Failed to connect to the archive accessor")]
     ConnectToArchive(#[source] anyhow::Error),
 
+    /// Failed to create the BatchIterator channel ends
     #[error("Failed to create the BatchIterator channel ends")]
     CreateIteratorProxy(#[source] fidl::Error),
 
+    /// Failed to stream diagnostics from the accessor
     #[error("Failed to stream diagnostics from the accessor")]
     StreamDiagnostics(#[source] fidl::Error),
 
+    /// Failed to call iterator server
     #[error("Failed to call iterator server")]
     GetNextCall(#[source] fidl::Error),
 
+    /// Received error from the GetNext response
     #[error("Received error from the GetNext response: {0:?}")]
     GetNextReaderError(ReaderError),
 
+    /// Failed to read json received
     #[error("Failed to read json received")]
     ReadJson(#[source] serde_json::Error),
 
+    /// Failed to read cbor received
     #[cfg(fuchsia_api_level_at_least = "HEAD")]
     #[error("Failed to read cbor received")]
-    ReadCbor(#[source] serde_cbor::Error),
+    ReadCbor(#[source] anyhow::Error),
 
+    /// Failed to parse the diagnostics data from the json received
     #[error("Failed to parse the diagnostics data from the json received")]
     ParseDiagnosticsData(#[source] serde_json::Error),
 
+    /// Failed to read vmo from the response
     #[error("Failed to read vmo from the response")]
     ReadVmo(#[source] zx::Status),
 }
@@ -92,8 +113,45 @@ impl ComponentSelector {
     }
 }
 
+/// Trait used for things that can be converted to selector arguments.
 pub trait ToSelectorArguments {
+    /// Converts this to selector arguments.
     fn to_selector_arguments(self) -> Box<dyn Iterator<Item = SelectorArgument>>;
+}
+
+/// Trait used for things that can be converted to component selector arguments.
+pub trait ToComponentSelectorArguments {
+    /// Converts this to selector arguments.
+    fn to_component_selector_arguments(self) -> ComponentSelector;
+}
+
+impl ToComponentSelectorArguments for &str {
+    fn to_component_selector_arguments(self) -> ComponentSelector {
+        if self.contains("\\:") {
+            // String is already escaped, don't escape it.
+            ComponentSelector::new(self.split("/").map(|value| value.to_string()).collect())
+        } else {
+            // String isn't escaped, escape it
+            ComponentSelector::new(
+                selectors::sanitize_moniker_for_selectors(self)
+                    .split("/")
+                    .map(|value| value.to_string())
+                    .collect(),
+            )
+        }
+    }
+}
+
+impl ToComponentSelectorArguments for String {
+    fn to_component_selector_arguments(self) -> ComponentSelector {
+        self.as_str().to_component_selector_arguments()
+    }
+}
+
+impl ToComponentSelectorArguments for ComponentSelector {
+    fn to_component_selector_arguments(self) -> ComponentSelector {
+        self
+    }
 }
 
 impl ToSelectorArguments for String {
@@ -130,12 +188,15 @@ impl ToSelectorArguments for Selector {
     }
 }
 
-// Before unsealing this, consider whether your code belongs in this file.
+/// Before unsealing this, consider whether your code belongs in this file.
 pub trait SerializableValue: private::Sealed {
+    /// The Format of this SerializableValue. Either Logs or Inspect.
     const FORMAT_OF_VALUE: Format;
 }
 
+/// Trait used to verify that a JSON payload has a valid diagnostics payload.
 pub trait CheckResponse: private::Sealed {
+    /// Returns true if the response has a valid payload.
     fn has_payload(&self) -> bool;
 }
 
@@ -146,7 +207,7 @@ mod private {
     pub trait Sealed {}
 }
 impl private::Sealed for serde_json::Value {}
-impl private::Sealed for serde_cbor::Value {}
+impl private::Sealed for ciborium::Value {}
 impl<D: DiagnosticsData> private::Sealed for Data<D> {}
 
 impl<D: DiagnosticsData> CheckResponse for Data<D> {
@@ -171,37 +232,43 @@ impl CheckResponse for serde_json::Value {
 }
 
 #[cfg(fuchsia_api_level_at_least = "HEAD")]
-impl SerializableValue for serde_cbor::Value {
+impl SerializableValue for ciborium::Value {
     const FORMAT_OF_VALUE: Format = Format::Cbor;
 }
 
-impl CheckResponse for serde_cbor::Value {
+impl CheckResponse for ciborium::Value {
     fn has_payload(&self) -> bool {
         match self {
-            serde_cbor::Value::Map(m) => m
-                .get(&serde_cbor::Value::Text("payload".into()))
-                .map(|p| !matches!(p, serde_cbor::Value::Null))
-                .is_some(),
+            ciborium::Value::Map(m) => {
+                let payload_key = ciborium::Value::Text("payload".into());
+                m.iter().any(|(key, _)| *key == payload_key)
+            }
             _ => false,
         }
     }
 }
 
-/// Retry configuration for ArchiveReader.
+/// Retry configuration for ArchiveReader
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum RetryConfig {
+    /// The minimum schema count required for a successful read.
+    /// This guarantees that a read will contain at least MinSchemaCount
+    /// results.
     MinSchemaCount(usize),
 }
 
 impl RetryConfig {
+    /// Always retry
     pub fn always() -> Self {
         Self::MinSchemaCount(1)
     }
 
+    /// Never retry
     pub fn never() -> Self {
         Self::MinSchemaCount(0)
     }
 
+    /// Retry result_count times
     fn should_retry(&self, result_count: usize) -> bool {
         match self {
             Self::MinSchemaCount(min) => *min > result_count,
@@ -209,70 +276,48 @@ impl RetryConfig {
     }
 }
 
+/// A trait representing a type of diagnostics data.
+pub trait DiagnosticsDataType: private::Sealed {}
+
+impl private::Sealed for Logs {}
+
+impl private::Sealed for Inspect {}
+
+impl DiagnosticsDataType for Logs {}
+
+impl DiagnosticsDataType for Inspect {}
+
 /// Utility for reading inspect data of a running component using the injected Archive
 /// Reader service.
-#[derive(Clone)]
-pub struct ArchiveReader {
+pub struct ArchiveReader<T> {
     archive: Option<ArchiveAccessorProxy>,
     selectors: Vec<SelectorArgument>,
     retry_config: RetryConfig,
     timeout: Option<MonotonicDuration>,
     batch_retrieval_timeout_seconds: Option<i64>,
     max_aggregated_content_size_bytes: Option<u64>,
+    _phantom: PhantomData<T>,
 }
 
-impl Default for ArchiveReader {
-    fn default() -> Self {
-        Self {
-            timeout: None,
-            selectors: vec![],
-            retry_config: RetryConfig::always(),
-            archive: None,
-            batch_retrieval_timeout_seconds: None,
-            max_aggregated_content_size_bytes: None,
-        }
-    }
-}
-
-impl ArchiveReader {
-    /// Creates a new data fetcher with default configuration:
-    ///  - Maximum retries: 2^64-1
-    ///  - Timeout: Never. Use with_timeout() to set a timeout.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
+impl<T: DiagnosticsDataType> ArchiveReader<T> {
+    /// Initializes the ArchiveReader with a custom connection to an ArchiveAccessor.
+    /// By default, the connection will be initialized by connecting to
+    /// fuchsia.diagnostics.ArchiveAccessor
     pub fn with_archive(&mut self, archive: ArchiveAccessorProxy) -> &mut Self {
         self.archive = Some(archive);
         self
     }
 
-    /// Requests a single component tree (or sub-tree).
-    pub fn add_selector(&mut self, selector: impl ToSelectorArguments) -> &mut Self {
-        self.selectors.extend(selector.to_selector_arguments());
+    /// Sets the minimum number of schemas expected in a result in order for the
+    /// result to be considered a success.
+    pub fn with_minimum_schema_count(&mut self, minimum_schema_count: usize) -> &mut Self {
+        self.retry_config = RetryConfig::MinSchemaCount(minimum_schema_count);
         self
-    }
-
-    /// Requests all data for the component identified by the given moniker.
-    pub fn select_all_for_moniker(&mut self, moniker: &str) -> &mut Self {
-        let selector = format!("{}:[...]root", selectors::sanitize_moniker_for_selectors(moniker));
-        self.add_selector(selector)
     }
 
     /// Sets a custom retry configuration. By default we always retry.
     pub fn retry(&mut self, config: RetryConfig) -> &mut Self {
         self.retry_config = config;
-        self
-    }
-
-    pub fn add_selectors<T, S>(&mut self, selectors: T) -> &mut Self
-    where
-        T: Iterator<Item = S>,
-        S: ToSelectorArguments,
-    {
-        for selector in selectors {
-            self.add_selector(selector);
-        }
         self
     }
 
@@ -283,27 +328,19 @@ impl ArchiveReader {
         self
     }
 
-    pub fn with_aggregated_result_bytes_limit(&mut self, limit_bytes: u64) -> &mut Self {
-        self.max_aggregated_content_size_bytes = Some(limit_bytes);
-        self
-    }
-
-    /// Set the maximum time to wait for a wait for a single component
-    /// to have its diagnostics data "pumped".
-    pub fn with_batch_retrieval_timeout_seconds(&mut self, timeout: i64) -> &mut Self {
-        self.batch_retrieval_timeout_seconds = Some(timeout);
-        self
-    }
-
-    /// Sets the minumum number of schemas expected in a result in order for the
-    /// result to be considered a success.
-    pub fn with_minimum_schema_count(&mut self, minimum_schema_count: usize) -> &mut Self {
-        self.retry_config = RetryConfig::MinSchemaCount(minimum_schema_count);
+    /// Filters logs for a specific component or component selector.
+    /// If string input, the string may be either a component selector string
+    /// or a moniker, or a ComponentSelector may be passed directly.
+    pub fn select_all_for_component(
+        &mut self,
+        component: impl ToComponentSelectorArguments,
+    ) -> &mut Self {
+        self.selectors.extend(component.to_component_selector_arguments().to_selector_arguments());
         self
     }
 
     /// Connects to the ArchiveAccessor and returns data matching provided selectors.
-    pub async fn snapshot<D>(&self) -> Result<Vec<Data<D>>, Error>
+    async fn snapshot_shared<D>(&self) -> Result<Vec<Data<D>>, Error>
     where
         D: DiagnosticsData,
     {
@@ -315,51 +352,14 @@ impl ArchiveReader {
         Ok(data)
     }
 
-    /// Connects to the ArchiveAccessor and returns a stream of data containing a snapshot of the
-    /// current buffer in the Archivist as well as new data that arrives.
-    pub fn snapshot_then_subscribe<D>(&self) -> Result<Subscription<Data<D>>, Error>
-    where
-        D: DiagnosticsData + 'static,
-    {
-        let iterator = self.batch_iterator::<D>(StreamMode::SnapshotThenSubscribe, FORMAT)?;
-        Ok(Subscription::new(iterator))
-    }
-
-    /// Connects to the ArchiveAccessor and returns inspect data matching provided selectors.
-    /// Returns the raw json for each hierarchy fetched.
-    pub async fn snapshot_raw<D, T>(&self) -> Result<T, Error>
+    async fn snapshot_inner<D, Y>(&self, format: Format) -> Result<Vec<Y>, Error>
     where
         D: DiagnosticsData,
-        T: for<'a> Deserialize<'a> + SerializableValue + From<Vec<T>> + CheckResponse,
-    {
-        let data_future = self.snapshot_inner::<D, T>(T::FORMAT_OF_VALUE);
-        let data = match self.timeout {
-            Some(timeout) => data_future.on_timeout(timeout.after_now(), || Ok(Vec::new())).await?,
-            None => data_future.await?,
-        };
-        Ok(T::from(data))
-    }
-
-    /// Connects to the ArchiveAccessor and returns a stream of data containing a snapshot of the
-    /// current buffer in the Archivist as well as new data that arrives.
-    pub fn snapshot_then_subscribe_raw<D, T>(&self) -> Result<Subscription<T>, Error>
-    where
-        D: DiagnosticsData + 'static,
-        T: for<'a> Deserialize<'a> + Send + SerializableValue + 'static,
-    {
-        let iterator =
-            self.batch_iterator::<D>(StreamMode::SnapshotThenSubscribe, T::FORMAT_OF_VALUE)?;
-        Ok(Subscription::new(iterator))
-    }
-
-    async fn snapshot_inner<D, T>(&self, format: Format) -> Result<Vec<T>, Error>
-    where
-        D: DiagnosticsData,
-        T: for<'a> Deserialize<'a> + CheckResponse,
+        Y: for<'a> Deserialize<'a> + CheckResponse,
     {
         loop {
             let iterator = self.batch_iterator::<D>(StreamMode::Snapshot, format)?;
-            let result = drain_batch_iterator::<T>(Arc::new(iterator))
+            let result = drain_batch_iterator::<Y>(Arc::new(iterator))
                 .filter_map(|value| ready(value.ok()))
                 .collect::<Vec<_>>()
                 .await;
@@ -415,6 +415,107 @@ impl ArchiveReader {
     }
 }
 
+impl ArchiveReader<Logs> {
+    /// Creates an ArchiveReader for reading logs
+    pub fn logs() -> Self {
+        ArchiveReader::<Logs> {
+            timeout: None,
+            selectors: vec![],
+            retry_config: RetryConfig::always(),
+            archive: None,
+            batch_retrieval_timeout_seconds: None,
+            max_aggregated_content_size_bytes: None,
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Connects to the ArchiveAccessor and returns data matching provided selectors.
+    pub async fn snapshot(&self) -> Result<Vec<Data<Logs>>, Error> {
+        self.snapshot_shared::<Logs>().await
+    }
+
+    /// Connects to the ArchiveAccessor and returns a stream of data containing a snapshot of the
+    /// current buffer in the Archivist as well as new data that arrives.
+    pub fn snapshot_then_subscribe(&self) -> Result<Subscription<Data<Logs>>, Error> {
+        let iterator = self.batch_iterator::<Logs>(StreamMode::SnapshotThenSubscribe, FORMAT)?;
+        Ok(Subscription::new(iterator))
+    }
+}
+
+impl ArchiveReader<Inspect> {
+    /// Creates an ArchiveReader for reading Inspect data.
+    pub fn inspect() -> Self {
+        ArchiveReader::<Inspect> {
+            timeout: None,
+            selectors: vec![],
+            retry_config: RetryConfig::always(),
+            archive: None,
+            batch_retrieval_timeout_seconds: None,
+            max_aggregated_content_size_bytes: None,
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Set the maximum time to wait for a wait for a single component
+    /// to have its diagnostics data "pumped".
+    pub fn with_batch_retrieval_timeout_seconds(&mut self, timeout: i64) -> &mut Self {
+        self.batch_retrieval_timeout_seconds = Some(timeout);
+        self
+    }
+
+    /// Sets the total number of bytes allowed in a single VMO read.
+    pub fn with_aggregated_result_bytes_limit(&mut self, limit_bytes: u64) -> &mut Self {
+        self.max_aggregated_content_size_bytes = Some(limit_bytes);
+        self
+    }
+
+    /// Connects to the ArchiveAccessor and returns inspect data matching provided selectors.
+    /// Returns the raw json for each hierarchy fetched. This is used for CTF compatibility
+    /// tests (which test various implementation details of the JSON format),
+    /// and use beyond such tests is discouraged.
+    pub async fn snapshot_raw<T>(&self) -> Result<T, Error>
+    where
+        T: for<'a> Deserialize<'a> + SerializableValue + From<Vec<T>> + CheckResponse,
+    {
+        let data_future = self.snapshot_inner::<Inspect, T>(T::FORMAT_OF_VALUE);
+        let data = match self.timeout {
+            Some(timeout) => data_future.on_timeout(timeout.after_now(), || Ok(Vec::new())).await?,
+            None => data_future.await?,
+        };
+        Ok(T::from(data))
+    }
+
+    /// Requests all data for the component identified by the given moniker.
+    pub fn select_all_for_moniker(&mut self, moniker: &str) -> &mut Self {
+        let selector = format!("{}:[...]root", selectors::sanitize_moniker_for_selectors(moniker));
+        self.add_selector(selector)
+    }
+
+    /// Adds selectors used for performing filtering inspect hierarchies.
+    /// This may be called multiple times to add additional selectors.
+    pub fn add_selectors<T, S>(&mut self, selectors: T) -> &mut Self
+    where
+        T: Iterator<Item = S>,
+        S: ToSelectorArguments,
+    {
+        for selector in selectors {
+            self.add_selector(selector);
+        }
+        self
+    }
+
+    /// Requests a single component tree (or sub-tree).
+    pub fn add_selector(&mut self, selector: impl ToSelectorArguments) -> &mut Self {
+        self.selectors.extend(selector.to_selector_arguments());
+        self
+    }
+
+    /// Connects to the ArchiveAccessor and returns data matching provided selectors.
+    pub async fn snapshot(&self) -> Result<Vec<Data<Inspect>>, Error> {
+        self.snapshot_shared::<Inspect>().await
+    }
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 enum OneOrMany<T> {
@@ -451,7 +552,7 @@ where
                         let mut buf =
                             vec![0; vmo.get_content_size().expect("Always returns Ok") as usize];
                         vmo.read(&mut buf, 0).map_err(Error::ReadVmo)?;
-                        serde_cbor::from_slice(&buf).map_err(Error::ReadCbor)?
+                        ciborium::from_reader(buf.as_slice()).map_err(|err| Error::ReadCbor(err.into()))?
                     }
                     _ => OneOrMany::Many(vec![]),
                 };
@@ -469,6 +570,7 @@ where
     }
 }
 
+/// A subscription used for reading diagnostics data.
 #[pin_project]
 pub struct Subscription<T> {
     #[pin]
@@ -535,6 +637,7 @@ where
     }
 }
 
+/// A stream for reading diagnostics data
 #[pin_project]
 pub struct SubscriptionResultsStream<T> {
     #[pin]
@@ -610,14 +713,12 @@ mod tests {
     #[fuchsia::test]
     async fn inspect_data_for_component() -> Result<(), anyhow::Error> {
         let instance = start_component(ComponentOptions { publish_n_trees: 1 }).await?;
-
         let moniker = format!("realm_builder:{}/test_component", instance.root.child_name());
         let component_selector = selectors::sanitize_moniker_for_selectors(&moniker);
-        let results = ArchiveReader::new()
+        let results = ArchiveReader::inspect()
             .add_selector(format!("{component_selector}:[...]root"))
-            .snapshot::<Inspect>()
+            .snapshot()
             .await?;
-
         assert_eq!(results.len(), 1);
         assert_data_tree!(results[0].payload.as_ref().unwrap(), root: {
             "tree-0": 0u64,
@@ -629,7 +730,6 @@ mod tests {
                 },
             }
         });
-
         // add_selector can take either a String or a Selector.
         let lazy_property_selector = Selector {
             component_selector: Some(fdiagnostics::ComponentSelector {
@@ -654,23 +754,18 @@ mod tests {
             tree_names: Some(fdiagnostics::TreeNames::All(fdiagnostics::All {})),
             ..Default::default()
         };
-
         let int_property_selector = format!("{component_selector}:[...]root:int");
-        let mut reader = ArchiveReader::new();
+        let mut reader = ArchiveReader::inspect();
         reader.add_selector(int_property_selector).add_selector(lazy_property_selector);
-        let response = reader.snapshot::<Inspect>().await?;
-
+        let response = reader.snapshot().await?;
         assert_eq!(response.len(), 1);
-
         assert_eq!(response[0].moniker.to_string(), moniker);
-
         assert_data_tree!(response[0].payload.as_ref().unwrap(), root: {
             int: 3u64,
             "lazy-node": {
                 a: "test"
             }
         });
-
         Ok(())
     }
 
@@ -679,14 +774,12 @@ mod tests {
         let instance = start_component(ComponentOptions { publish_n_trees: 1 })
             .await
             .expect("component started");
-
         let moniker = format!("realm_builder:{}/test_component", instance.root.child_name());
-        let results = ArchiveReader::new()
+        let results = ArchiveReader::inspect()
             .select_all_for_moniker(&moniker)
-            .snapshot::<Inspect>()
+            .snapshot()
             .await
             .expect("snapshotted");
-
         assert_eq!(results.len(), 1);
         assert_data_tree!(results[0].payload.as_ref().unwrap(), root: {
             "tree-0": 0u64,
@@ -704,14 +797,14 @@ mod tests {
     async fn timeout() -> Result<(), anyhow::Error> {
         let instance = start_component(ComponentOptions { publish_n_trees: 1 }).await?;
 
-        let mut reader = ArchiveReader::new();
+        let mut reader = ArchiveReader::inspect();
         reader
             .add_selector(format!(
                 "realm_builder\\:{}/test_component:root",
                 instance.root.child_name()
             ))
             .with_timeout(zx::MonotonicDuration::from_nanos(0));
-        let result = reader.snapshot::<Inspect>().await;
+        let result = reader.snapshot().await;
         assert!(result.unwrap().is_empty());
         Ok(())
     }
@@ -755,11 +848,8 @@ mod tests {
                 }
             }
         }));
-        let result = ArchiveReader::new()
-            .with_archive(proxy)
-            .snapshot::<Inspect>()
-            .await
-            .expect("got result");
+        let result =
+            ArchiveReader::inspect().with_archive(proxy).snapshot().await.expect("got result");
         assert_eq!(result.len(), 1);
         assert_data_tree!(result[0].payload.as_ref().unwrap(), root: { x: 1u64 });
     }
@@ -782,10 +872,9 @@ mod tests {
             }
         });
         let proxy = spawn_fake_archive(serde_json::json!([value.clone()]));
-        let mut reader = ArchiveReader::new();
+        let mut reader = ArchiveReader::inspect();
         reader.with_archive(proxy);
-        let json_result =
-            reader.snapshot_raw::<Inspect, serde_json::Value>().await.expect("got result");
+        let json_result = reader.snapshot_raw::<serde_json::Value>().await.expect("got result");
         match json_result {
             serde_json::Value::Array(values) => {
                 assert_eq!(values.len(), 1);
@@ -793,14 +882,12 @@ mod tests {
             }
             result => panic!("unexpected result: {:?}", result),
         }
-        let cbor_result =
-            reader.snapshot_raw::<Inspect, serde_cbor::Value>().await.expect("got result");
+        let cbor_result = reader.snapshot_raw::<ciborium::Value>().await.expect("got result");
         match cbor_result {
-            serde_cbor::Value::Array(values) => {
+            ciborium::Value::Array(values) => {
                 assert_eq!(values.len(), 1);
                 let json_result =
-                    serde_cbor::value::from_value::<serde_json::Value>(values[0].to_owned())
-                        .expect("Should convert cleanly to JSON");
+                    values[0].deserialized::<serde_json::Value>().expect("convert to json");
                 assert_eq!(json_result, value);
             }
             result => panic!("unexpected result: {:?}", result),
@@ -811,7 +898,7 @@ mod tests {
     async fn snapshot_then_subscribe() {
         let (_instance, publisher, reader) = init_isolated_logging().await;
         let (mut stream, _errors) =
-            reader.snapshot_then_subscribe::<Logs>().expect("subscribed to logs").split_streams();
+            reader.snapshot_then_subscribe().expect("subscribed to logs").split_streams();
         log::set_boxed_logger(Box::new(publisher)).unwrap();
         info!("hello from test");
         error!("error from test");
@@ -821,46 +908,25 @@ mod tests {
         assert_eq!(log.msg().unwrap(), "error from test");
     }
 
-    #[fuchsia::test(logging = false)]
-    async fn snapshot_then_subscribe_raw() {
-        let (_instance, publisher, reader) = init_isolated_logging().await;
-        let (mut stream, _errors) = reader
-            .snapshot_then_subscribe_raw::<Logs, serde_json::Value>()
-            .expect("subscribed to logs")
-            .split_streams();
-        log::set_boxed_logger(Box::new(publisher)).unwrap();
-        info!("hello from test");
-        error!("error from test");
-        let log = stream.next().await.unwrap();
-        assert_eq!(log["payload"]["root"]["message"]["value"], "hello from test");
-        let log = stream.next().await.unwrap();
-        assert_eq!(log["payload"]["root"]["message"]["value"], "error from test");
-    }
-
     #[fuchsia::test]
     async fn read_many_trees_with_filtering() {
         let instance = start_component(ComponentOptions { publish_n_trees: 2 })
             .await
             .expect("component started");
-
         let selector = format!(
             "realm_builder\\:{}/test_component:[name=tree-0]root",
             instance.root.child_name()
         );
-
-        let results = ArchiveReader::new()
+        let results = ArchiveReader::inspect()
             .add_selector(selector)
             // Only one schema since empty schemas are filtered out
             .with_minimum_schema_count(1)
-            .snapshot::<Inspect>()
+            .snapshot()
             .await
             .expect("snapshotted");
-
         assert_matches!(results.iter().find(|v| v.metadata.name.as_ref() == "tree-1"), None);
-
         let should_have_data =
             results.into_iter().find(|v| v.metadata.name.as_ref() == "tree-0").unwrap();
-
         assert_data_tree!(should_have_data.payload.unwrap(), root: contains {
             "tree-0": 0u64,
         });
@@ -968,7 +1034,7 @@ mod tests {
         builder
     }
 
-    async fn init_isolated_logging() -> (RealmInstance, Publisher, ArchiveReader) {
+    async fn init_isolated_logging() -> (RealmInstance, Publisher, ArchiveReader<Logs>) {
         let instance = create_realm().await.build().await.unwrap();
         let log_sink_proxy =
             instance.root.connect_to_protocol_at_exposed_dir::<flogger::LogSinkMarker>().unwrap();
@@ -976,7 +1042,7 @@ mod tests {
             .root
             .connect_to_protocol_at_exposed_dir::<fdiagnostics::ArchiveAccessorMarker>()
             .unwrap();
-        let mut reader = ArchiveReader::new();
+        let mut reader = ArchiveReader::logs();
         reader.with_archive(accessor_proxy);
         let options = PublisherOptions::default()
             .wait_for_initial_interest(false)

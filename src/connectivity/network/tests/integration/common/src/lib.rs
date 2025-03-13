@@ -148,7 +148,7 @@ pub async fn get_inspect_data(
 ) -> Result<diagnostics_hierarchy::DiagnosticsHierarchy> {
     let moniker = realm.get_moniker().await.context("calling get moniker")?;
     let realm_moniker = selectors::sanitize_string_for_selectors(&moniker);
-    let mut data = diagnostics_reader::ArchiveReader::new()
+    let mut data = diagnostics_reader::ArchiveReader::inspect()
         .retry(diagnostics_reader::RetryConfig::MinSchemaCount(1))
         .add_selector(
             diagnostics_reader::ComponentSelector::new(vec![
@@ -158,7 +158,7 @@ pub async fn get_inspect_data(
             ])
             .with_tree_selector(tree_selector.into()),
         )
-        .snapshot::<diagnostics_reader::Inspect>()
+        .snapshot()
         .await
         .context("snapshot did not return any inspect data")?
         .into_iter()
@@ -244,8 +244,13 @@ pub async fn setup_network<'a, N: realms::Netstack>(
     netemul::TestInterface<'a>,
     netemul::TestFakeEndpoint<'a>,
 )> {
-    setup_network_with::<N, _>(sandbox, name, metric, std::iter::empty::<fnetemul::ChildDef>())
-        .await
+    setup_network_with::<N, _>(
+        sandbox,
+        name,
+        netemul::InterfaceConfig { metric, ..Default::default() },
+        std::iter::empty::<fnetemul::ChildDef>(),
+    )
+    .await
 }
 
 /// Sets up a realm with required services and a network used for tests
@@ -257,7 +262,7 @@ pub async fn setup_network<'a, N: realms::Netstack>(
 pub async fn setup_network_with<'a, N: realms::Netstack, I>(
     sandbox: &'a netemul::TestSandbox,
     name: &'a str,
-    metric: Option<u32>,
+    interface_config: netemul::InterfaceConfig<'a>,
     children: I,
 ) -> Result<(
     netemul::TestNetwork<'a>,
@@ -278,11 +283,7 @@ where
     let fake_ep = network.create_fake_endpoint()?;
 
     let iface = realm
-        .join_network_with_if_config(
-            &network,
-            name,
-            netemul::InterfaceConfig { name: Some(name.into()), metric, ..Default::default() },
-        )
+        .join_network_with_if_config(&network, name, interface_config)
         .await
         .context("failed to configure networking")?;
 

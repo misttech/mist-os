@@ -54,6 +54,7 @@ source_set("common") {
 }
 
 fuchsia_cc_driver("ftdi-driver") {
+  legacy = true
   output_name = "ftdi"
   deps = [
     ":common",
@@ -85,6 +86,7 @@ driver_bind_rules("ftdi_function_bind") {
 }
 
 fuchsia_cc_driver("ftdi-fake-usb-driver") {
+  legacy = true
   output_name = "ftdi-fake-usb"
   configs += [
     "//build/config:all_source",

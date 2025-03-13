@@ -4,7 +4,8 @@
 
 use async_trait::async_trait;
 use ffx_target_get_time_args::GetTimeCommand;
-use fho::{FfxContext, FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxContext, FfxMain, FfxTool};
 use target_holders::RemoteControlProxyHolder;
 
 #[derive(FfxTool)]

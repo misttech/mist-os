@@ -7,9 +7,9 @@
 
 #include "arm_gicv2m_pcie.h"
 
-#if WITH_KERNEL_PCIE
 #include <inttypes.h>
 #include <lib/lazy_init/lazy_init.h>
+#include <lib/pci/kpci.h>
 #include <lib/zbi-format/driver-config.h>
 #include <trace.h>
 #include <zircon/types.h>
@@ -54,6 +54,10 @@ lazy_init::LazyInit<ArmGicV2PciePlatformSupport, lazy_init::CheckType::None,
 }  // anonymous namespace
 
 void arm_gicv2_pcie_init(bool use_msi) {
+  if (!Pci::KernelPciEnabled()) {
+    return;
+  }
+
   // based on whether or not ZBI says we support MSI, initialize the v2m allocator
   if (use_msi) {
     dprintf(SPEW, "GICv2 MSI init\n");
@@ -82,9 +86,3 @@ void arm_gicv2_pcie_init(bool use_msi) {
         res);
   }
 }
-
-#else
-
-void arm_gicv2_pcie_init(bool use_msi) {}
-
-#endif  // if WITH_KERNEL_PCIE

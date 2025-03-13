@@ -26,7 +26,7 @@ class ResolveArrayTest : public TestWithLoop {};
 // as the array value.
 class TestPrettyArray : public PrettyType {
  public:
-  TestPrettyArray(){}
+  TestPrettyArray() {}
 
   void Format(FormatNode* node, const FormatOptions& options,
               const fxl::RefPtr<EvalContext>& context, fit::deferred_callback cb) override {}
@@ -58,7 +58,7 @@ TEST_F(ResolveArrayTest, ResolveVectorRegister) {
   // Ask for all 4 values.
   bool called = false;
   ErrOrValueVector result((std::vector<ExprValue>()));
-  ResolveArray(eval_context, value, 0, 4, [&called, &result](ErrOrValueVector cb_result) {
+  ResolveArray(eval_context, nullptr, value, 0, 4, [&called, &result](ErrOrValueVector cb_result) {
     called = true;
     result = std::move(cb_result);
     debug::MessageLoop::Current()->QuitNow();
@@ -108,7 +108,7 @@ TEST_F(ResolveArrayTest, ResolvePointer) {
 
   bool called = false;
   ErrOrValueVector result((std::vector<ExprValue>()));
-  ResolveArray(eval_context, value, kBeginIndex, kEndIndex,
+  ResolveArray(eval_context, nullptr, value, kBeginIndex, kEndIndex,
                [&called, &result](ErrOrValueVector cb_result) {
                  called = true;
                  result = std::move(cb_result);

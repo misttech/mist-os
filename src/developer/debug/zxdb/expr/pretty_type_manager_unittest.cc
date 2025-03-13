@@ -214,8 +214,8 @@ TEST_F(PrettyTypeManagerTest, RustStringObject) {
   // The String object representation is a Vec object containing bytes.
   uint8_t kRustObject[24] = {
       0x66,       0x77, 0x88, 0x99, 0x00, 0x00, 0x00, 0x00,  // Address = kStringAddress.
+      kStringLen, 0,    0,    0,    0,    0,    0,    0,     // Capacity = kStringLen.
       kStringLen, 0,    0,    0,    0,    0,    0,    0,     // Length = kStringLen.
-      kStringLen, 0,    0,    0,    0,    0,    0,    0      // Capacity = kStringLen.
   };
 
   auto alloc_namespace = fxl::MakeRefCounted<Namespace>("alloc");
@@ -226,16 +226,22 @@ TEST_F(PrettyTypeManagerTest, RustStringObject) {
   SymbolTestParentSetter alloc_ns_parent(alloc_namespace, MakeRustUnit());
   auto vec_type = MakeCollectionType(
       DwarfTag::kStructureType, "Vec<*>",
-      {{"buf", MakeCollectionType(
-                   DwarfTag::kStructureType, "Buffer",
-                   {{"ptr", MakeCollectionType(
-                                DwarfTag::kStructureType, "Pointer",
-                                {{"pointer",
-                                  MakeCollectionType(
-                                      DwarfTag::kStructureType, "core::ptr::non_null::NonNull<u8>",
-                                      {{"pointer", MakeRustCharPointerType()}})}})}})},
-       {"len", MakeUint64Type()},
-       {"cap", MakeUint64Type()}});
+      {
+          {"buf",
+           MakeCollectionType(
+               DwarfTag::kStructureType, "RawVec",
+               {{"inner",
+                 MakeCollectionType(
+                     DwarfTag::kStructureType, "RawVecInner",
+                     {{"ptr", MakeCollectionType(
+                                  DwarfTag::kStructureType, "Pointer",
+                                  {{"pointer", MakeCollectionType(
+                                                   DwarfTag::kStructureType,
+                                                   "core::ptr::Unique<u8>",
+                                                   {{"pointer", MakeRustCharPointerType()}})}})},
+                      {"cap", MakeUint64Type()}})}})},
+          {"len", MakeUint64Type()},
+      });
   SymbolTestParentSetter vec_type_parent(vec_type, vec_namespace);
   auto str_type = MakeCollectionType(DwarfTag::kStructureType, "String", {{"vec", vec_type}});
   SymbolTestParentSetter str_type_parent(str_type, string_namespace);

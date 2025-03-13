@@ -76,7 +76,7 @@ impl Procedure for CodecConnectionSetupProcedure {
             (state, update) => {
                 warn!(state:?, update:?; "CodecConnectionSetup: unexpected HF");
                 slc_state.codec_connection_setup_in_progress = false;
-                ProcedureRequest::Error(ProcedureError::UnexpectedHf(update))
+                ProcedureError::UnexpectedHf(update).into()
             }
         }
     }
@@ -122,7 +122,7 @@ impl Procedure for CodecConnectionSetupProcedure {
             (state, update) => {
                 warn!(state:?, update:?; "CodecConnectionSetup: unexpected AG");
                 slc_state.codec_connection_setup_in_progress = false;
-                ProcedureRequest::Error(ProcedureError::UnexpectedAg(update))
+                ProcedureError::UnexpectedAg(update).into()
             }
         }
     }
@@ -205,7 +205,7 @@ mod tests {
         let random_hf = at::Command::CindRead {};
         assert_matches!(
             procedure.hf_update(random_hf, &mut state),
-            ProcedureRequest::Error(ProcedureError::UnexpectedHf(_))
+            ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedHf(_))
         );
     }
 
@@ -217,7 +217,7 @@ mod tests {
         let random_ag = AgUpdate::ThreeWaySupport;
         assert_matches!(
             procedure.ag_update(random_ag, &mut state),
-            ProcedureRequest::Error(ProcedureError::UnexpectedAg(_))
+            ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedAg(_))
         );
     }
 

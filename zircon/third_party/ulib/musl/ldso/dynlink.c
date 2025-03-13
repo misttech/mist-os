@@ -1581,7 +1581,7 @@ static void do_init_fini(struct dso* p) {
       size_t n = dyn[DT_INIT_ARRAYSZ] / sizeof(size_t);
       size_t* fn = laddr(p, dyn[DT_INIT_ARRAY]);
       while (n--)
-        ((void (*)(void)) * fn++)();
+        ((void (*)(void))*fn++)();
     }
   }
   pthread_mutex_unlock(&init_fini_lock);
@@ -1601,7 +1601,7 @@ void __libc_start_init(void) {
     size_t n = dyn[DT_PREINIT_ARRAYSZ] / sizeof(size_t);
     size_t* fn = laddr(head, dyn[DT_PREINIT_ARRAY]);
     while (n--)
-      ((void (*)(void)) * fn++)();
+      ((void (*)(void))*fn++)();
   }
   pthread_mutex_unlock(&init_fini_lock);
 
@@ -2005,6 +2005,8 @@ LIBC_NO_SAFESTACK NO_ASAN NO_UBSAN_RISCV64 static dl_start_return_t __dls3(void*
         nbytes, nhandles, bootstrap, status, _zx_status_get_string(status));
     nbytes = nhandles = 0;
   }
+
+  _dl_log_write_preinit();
 
   zx_handle_t exec_vmo = ZX_HANDLE_INVALID;
   for (int i = 0; i < nhandles; ++i) {

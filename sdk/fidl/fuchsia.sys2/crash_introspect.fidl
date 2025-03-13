@@ -5,12 +5,12 @@
 library fuchsia.sys2;
 
 using fuchsia.component;
-using fuchsia.component.types;
+using fuchsia.url;
 using zx;
 
 /// Information stored when a thread crashes.
 type ComponentCrashInfo = table {
-    1: url string:fuchsia.component.types.MAX_URL_LENGTH;
+    1: url string:fuchsia.url.MAX_URL_LENGTH;
     2: moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
 };
 

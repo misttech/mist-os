@@ -67,6 +67,7 @@ source_set("optee_lib") {
 }
 
 fuchsia_cc_driver("optee-driver") {
+  legacy = true
   output_name = "optee"
   configs += [
     "//build/config:all_source",

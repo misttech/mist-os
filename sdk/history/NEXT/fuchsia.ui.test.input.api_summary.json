@@ -25,6 +25,14 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.ui.test.input/Keyboard.SimulateKeyPress",
+        "strictness": "strict",
+        "ordinal": "809417507635391407",
+        "direction": "two_way",
+        "request": "fuchsia.ui.test.input/KeyboardSimulateKeyPressRequest"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.ui.test.input/Keyboard.SimulateUsAsciiTextEntry",
         "strictness": "strict",
         "ordinal": "8147418876553280763",
@@ -89,6 +97,16 @@
     {
         "kind": "table",
         "name": "fuchsia.ui.test.input/KeyboardSimulateKeyEventRequest"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.ui.test.input/KeyboardSimulateKeyPressRequest.key_code",
+        "ordinal": "1",
+        "type": "fuchsia.input/Key"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.ui.test.input/KeyboardSimulateKeyPressRequest"
     },
     {
         "kind": "table/member",
@@ -756,6 +774,12 @@
     {
         "kind": "table",
         "name": "fuchsia.ui.test.input/TouchScreenSimulateMultiTapRequest"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.ui.test.input/TouchScreenSimulateSwipeRequest.duration",
+        "ordinal": "4",
+        "type": "int64"
     },
     {
         "kind": "table/member",

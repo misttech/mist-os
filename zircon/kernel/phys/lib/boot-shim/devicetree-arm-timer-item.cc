@@ -4,13 +4,12 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <lib/boot-shim/devicetree.h>
 #include <lib/devicetree/devicetree.h>
 #include <lib/devicetree/matcher.h>
 #include <lib/fit/defer.h>
 
 #include <algorithm>
-
-#include "lib/boot-shim/devicetree.h"
 
 namespace boot_shim {
 

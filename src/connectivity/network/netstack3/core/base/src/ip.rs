@@ -173,3 +173,19 @@ impl IpExt for Ipv6 {
         NonZeroU32::new(packet_formats::ipv6::IPV6_FIXED_HDR_LEN as u32).unwrap();
     const IP_MAX_PAYLOAD_LENGTH: NonZeroU32 = NonZeroU32::new(u16::MAX as u32).unwrap();
 }
+
+/// A mark attached to packets/sockets.
+///
+/// A mark can either be `None` or a `u32`. The mark can be carried by a
+/// socket or a packet, and `None` means the socket/packet is unmarked.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Mark(pub Option<u32>);
+
+/// Mark domains.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MarkDomain {
+    /// The first mark.
+    Mark1,
+    /// The second mark.
+    Mark2,
+}

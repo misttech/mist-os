@@ -20,11 +20,10 @@ use display_utils::{
 };
 use euclid::size2;
 use fidl_fuchsia_hardware_display::{
-    CoordinatorApplyConfig3Request, CoordinatorListenerRequest, CoordinatorProxy,
+    ConfigStamp, CoordinatorApplyConfig3Request, CoordinatorListenerRequest, CoordinatorProxy,
+    INVALID_CONFIG_STAMP_VALUE,
 };
-use fidl_fuchsia_hardware_display_types::{
-    ConfigStamp, ImageBufferUsage, ImageMetadata, INVALID_CONFIG_STAMP_VALUE, INVALID_DISP_ID,
-};
+use fidl_fuchsia_hardware_display_types::{ImageBufferUsage, ImageMetadata, INVALID_DISP_ID};
 use fuchsia_async::{self as fasync};
 use fuchsia_framebuffer::sysmem::BufferCollectionAllocator;
 use fuchsia_framebuffer::{FrameSet, FrameUsage, ImageId};

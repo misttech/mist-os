@@ -135,7 +135,7 @@ impl State {
             SynSent {
                 iss: segment.seq,
                 logical_len: segment.len(payload_len),
-                advertised_window_scale: segment.options.window_scale,
+                advertised_window_scale: segment.options.window_scale(),
                 // This unwrap cannot fail because WindowSize::MAX is 2^30-1,
                 // which is larger than the largest possible unscaled window
                 // size (2^16).
@@ -619,7 +619,7 @@ impl SynSent {
                     Some(Control::SYN) => {}
                 };
 
-                if segment.seq != iss || segment.options.window_scale != advertised_window_scale {
+                if segment.seq != iss || segment.options.window_scale() != advertised_window_scale {
                     return (self.into(), false);
                 }
 
@@ -679,7 +679,7 @@ impl SynSent {
                             return (Untracked {}.into(), true);
                         };
 
-                        let reply_window_scale = segment.options.window_scale;
+                        let reply_window_scale = segment.options.window_scale();
                         let reply_window_size =
                             WindowSize::from_u32(u16::from(segment.wnd).into()).unwrap();
 
@@ -932,7 +932,8 @@ mod tests {
 
     use assert_matches::assert_matches;
     use netstack3_base::{
-        Control, Options, SegmentHeader, SeqNum, UnscaledWindowSize, WindowScale, WindowSize,
+        Control, HandshakeOptions, Options, SegmentHeader, SeqNum, UnscaledWindowSize, WindowScale,
+        WindowSize,
     };
     use test_case::test_case;
 
@@ -992,11 +993,11 @@ mod tests {
         ack: None,
         wnd: UnscaledWindowSize::from(ORIGINAL_WND),
         control: Some(Control::SYN),
-        options: Options {
-            mss: None,
+        options: HandshakeOptions {
             // Same as existing.
             window_scale: WindowScale::new(ORIGINAL_WS),
-        },
+            ..Default::default()
+        }.into(),
     }; "different ISS")]
     #[test_case(SegmentHeader {
         // Same as existing.
@@ -1004,11 +1005,11 @@ mod tests {
         ack: None,
         wnd: UnscaledWindowSize::from(ORIGINAL_WND),
         control: Some(Control::SYN),
-        options: Options {
-            mss: None,
+        options: HandshakeOptions {
             // Different from existing.
             window_scale: WindowScale::new(ORIGINAL_WS + 1),
-        },
+            ..Default::default()
+        }.into(),
     }; "different window scale")]
     #[test_case(SegmentHeader {
         seq: ORIGINAL_ISS,
@@ -1016,10 +1017,10 @@ mod tests {
         ack: Some(SeqNum::new(10)),
         wnd: UnscaledWindowSize::from(ORIGINAL_WND),
         control: Some(Control::SYN),
-        options: Options {
-            mss: None,
+        options: HandshakeOptions {
             window_scale: WindowScale::new(2),
-        },
+            ..Default::default()
+        }.into(),
     }; "ack not allowed")]
     fn syn_sent_original_syn_not_retransmit(segment: SegmentHeader) {
         let state = SynSent {
@@ -1050,7 +1051,11 @@ mod tests {
             ack: None,
             wnd: UnscaledWindowSize::from(ORIGINAL_WND + 10),
             control: Some(Control::SYN),
-            options: Options { mss: None, window_scale: WindowScale::new(ORIGINAL_WS) },
+            options: HandshakeOptions {
+                window_scale: WindowScale::new(ORIGINAL_WS),
+                ..Default::default()
+            }
+            .into(),
         };
 
         let result = assert_matches!(
@@ -1203,7 +1208,8 @@ mod tests {
             ack: Some(ORIGINAL_ISS + 1),
             wnd: UnscaledWindowSize::from(REPLY_WND),
             control: Some(Control::SYN),
-            options: Options { mss: None, window_scale: reply_window_scale },
+            options: HandshakeOptions { window_scale: reply_window_scale, ..Default::default() }
+                .into(),
         };
 
         let new_state = assert_matches!(

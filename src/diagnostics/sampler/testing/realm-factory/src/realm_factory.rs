@@ -5,7 +5,7 @@
 use crate::mocks;
 use anyhow::*;
 use cm_rust::{CapabilityDecl, DictionaryDecl};
-use fidl_fuchsia_io::R_STAR_DIR;
+use component_id_index::Index;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{
     Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
@@ -13,6 +13,7 @@ use fuchsia_component_test::{
 use futures::channel::mpsc;
 use futures::lock::Mutex;
 use futures::StreamExt;
+use sampler_config::assembly::{ComponentIdInfoList, ProjectTemplate};
 use std::sync::Arc;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_diagnostics as fdiagnostics,
@@ -28,7 +29,29 @@ const SINGLE_COUNTER_URL: &str = "#meta/single_counter_test_component.cm";
 const SAMPLER_URL: &str = "#meta/sampler.cm";
 const ARCHIVIST_URL: &str = "#meta/archivist-for-embedding.cm";
 const SAMPLER_BINDER_ALIAS: &str = "fuchsia.component.SamplerBinder";
-const INSTANCE_ID_INDEX_NAME: &str = "component_id_index";
+const PROJECT_CONFIGS_CAPABILITY: &str = "fuchsia.diagnostics.sampler.ProjectConfigs";
+
+fn load_configs(index: Index) -> Vec<String> {
+    let mut project_configs = vec![
+        include_str!("../configs/reboot_required_config.json").to_string(),
+        include_str!("../configs/test_config.json").to_string(),
+    ];
+    let mut components: ComponentIdInfoList =
+        serde_json5::from_str(include_str!("../configs/components.json5")).unwrap();
+    components.add_instance_ids(&index);
+    let fire_templates = [
+        include_str!("../configs/fire_1.json5"),
+        include_str!("../configs/fire_2.json5"),
+        include_str!("../configs/fire_3.json5"),
+    ]
+    .into_iter()
+    .map(|s| serde_json5::from_str::<ProjectTemplate>(s).unwrap());
+    for fire_template in fire_templates {
+        let config = fire_template.expand(&components).expect("failed to expand fire template");
+        project_configs.push(serde_json5::to_string(&config).unwrap());
+    }
+    project_configs
+}
 
 pub async fn create_realm(options: ftest::RealmOptions) -> Result<RealmInstance, Error> {
     let sampler_component_name = options.sampler_component_name.as_deref().unwrap_or("sampler");
@@ -54,6 +77,32 @@ pub async fn create_realm(options: ftest::RealmOptions) -> Result<RealmInstance,
         wrapper_realm.add_child(sampler_component_name, SAMPLER_URL, ChildOptions::new()).await?;
     let test_case_archivist =
         wrapper_realm.add_child(test_archivist_name, ARCHIVIST_URL, ChildOptions::new()).await?;
+
+    builder
+        .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+            name: PROJECT_CONFIGS_CAPABILITY.parse()?,
+            value: cm_rust::ConfigValue::Vector(cm_rust::ConfigVectorValue::StringVector(
+                load_configs(mocks::fake_index()),
+            )),
+        }))
+        .await?;
+
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::configuration(PROJECT_CONFIGS_CAPABILITY))
+                .from(Ref::self_())
+                .to(&wrapper_realm),
+        )
+        .await?;
+    wrapper_realm
+        .add_route(
+            Route::new()
+                .capability(Capability::configuration(PROJECT_CONFIGS_CAPABILITY))
+                .from(Ref::parent())
+                .to(&sampler),
+        )
+        .await?;
 
     wrapper_realm
         .add_route(
@@ -97,9 +146,6 @@ pub async fn create_realm(options: ftest::RealmOptions) -> Result<RealmInstance,
         .add_route(
             Route::new()
                 .capability(Capability::protocol::<fpower::RebootMethodsWatcherRegisterMarker>())
-                .capability(
-                    Capability::directory("config-data").path("/config/data").rights(R_STAR_DIR),
-                )
                 .from(&mocks_server)
                 .to(&wrapper_realm),
         )
@@ -108,9 +154,6 @@ pub async fn create_realm(options: ftest::RealmOptions) -> Result<RealmInstance,
         .add_route(
             Route::new()
                 .capability(Capability::protocol::<fpower::RebootMethodsWatcherRegisterMarker>())
-                .capability(
-                    Capability::directory("config-data").path("/config/data").rights(R_STAR_DIR),
-                )
                 .from(Ref::parent())
                 .to(&sampler),
         )
@@ -266,11 +309,6 @@ async fn serve_mocks(handles: LocalComponentHandles) -> Result<(), Error> {
         .add_fidl_service(move |stream| {
             mocks::serve_reboot_controller(stream, rcv.clone());
         });
-
-    // Add the ID <-> moniker file for test.
-    let mut config_dir = fs.dir("config");
-    let mut config_data_dir = config_dir.dir("data");
-    config_data_dir.add_vmo_file_at(INSTANCE_ID_INDEX_NAME, mocks::id_file_vmo());
 
     fs.serve_connection(handles.outgoing_dir)?;
     fs.collect::<()>().await;

@@ -10,6 +10,7 @@
 #include <fidl/fuchsia.hardware.skipblock/cpp/wire.h>
 #include <fidl/fuchsia.sysinfo/cpp/wire.h>
 #include <lib/cksum.h>
+#include <lib/component/incoming/cpp/directory.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/zx/channel.h>
@@ -60,17 +61,16 @@ constexpr zx_vm_option_t kVmoRw = ZX_VM_PERM_READ | ZX_VM_PERM_WRITE;
 
 zx::result<fidl::WireSyncClient<skipblock::SkipBlock>> FindSysconfigPartition(
     fidl::UnownedClientEnd<fuchsia_io::Directory> dev) {
-  zx::result result = component::ConnectAt<fuchsia_io::Directory>(dev, "class/skip-block");
-  if (result.is_error()) {
-    return result.take_error();
+  zx::result directory = component::OpenDirectoryAt(dev, "class/skip-block");
+  if (directory.is_error()) {
+    return directory.take_error();
   }
-  const auto& directory = result.value();
   zx::result watch_result = device_watcher::WatchDirectoryForItems<
       zx::result<fidl::WireSyncClient<skipblock::SkipBlock>>>(
-      directory,
+      *directory,
       [&directory](std::string_view filename)
           -> std::optional<zx::result<fidl::WireSyncClient<skipblock::SkipBlock>>> {
-        zx::result client = component::ConnectAt<skipblock::SkipBlock>(directory, filename);
+        zx::result client = component::ConnectAt<skipblock::SkipBlock>(*directory, filename);
         if (client.is_error()) {
           return client.take_error();
         }

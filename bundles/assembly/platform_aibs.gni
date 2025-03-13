@@ -69,6 +69,7 @@ bootstrap_user_platform_aib_names = [
   # Platform drivers.
   "wlanphy_driver",
   "bt_transport_uart_driver",
+  "bus_kpci_driver",
   "bus_pci_driver",
   "realtek_8211f_driver",
   "xhci_driver",
@@ -110,9 +111,6 @@ bootstrap_userdebug_platform_aib_names = [
 
   # Wake alarms support: generic and then hardware-specific.
   "timekeeper_wake_alarms",
-
-  # Wake alarms support: hardware-specific.
-  "timekeeper_wake_alarms_aml_hrtimer",
 ]
 
 # These are the eng-buildtype-safe platform AIBs that are used by bootstrap
@@ -146,6 +144,9 @@ bootstrap_eng_platform_aib_names = [
 
   # Testing Support
   "testing_support_bootstrap",
+
+  # PCI utilities
+  "lspci",
 ]
 
 # The names of all of the platform's 'testonly=false' Assembly Input Bundles
@@ -360,6 +361,9 @@ _userdebug_aib_names = bootstrap_userdebug_platform_aib_names + [
 
                          # Development and debug tools for power framework
                          "power_framework_development_support",
+
+                         # Sensors support with playback.
+                         "sensors_framework_eng",
                        ]
 
 userdebug_platform_aib_names = user_platform_aib_names + _userdebug_aib_names
@@ -374,7 +378,7 @@ eng_only_platform_aib_names =
       "core_realm_development_access_eng",
 
       # This isn't in all eng builds, but is in some,
-      #and not in any non-eng builds.
+      # and not in any non-eng builds.
       "component_manager_with_tracing",
 
       # The minimal additions for eng build-type assemblies
@@ -411,16 +415,18 @@ eng_only_platform_aib_names =
 
       # Audio development/debugging
       "audio_development_support",
+      "audio_driver_development_tools",
+      "audio_full_stack_development_tools",
       "intel_hda",
-      "video_development_support",
 
-      # Sensors support with playback.
-      "sensors_framework_eng",
+      # Video development/debugging
+      "video_development_support",
 
       # Fake power sensor
       "fake_power_sensor",
 
       # Bluetooth testing support
+      "bluetooth_a2dp_with_consumer",
       "bluetooth_pandora",
 
       # Forensics
@@ -460,10 +466,10 @@ experimental_aib_names = [
   # Wake alarms support: generic and then hardware-specific.
   "timekeeper_wake_alarms",
 
-  # Wake alarms support: hardware-specific.
-  "timekeeper_wake_alarms_aml_hrtimer",
   "trusted_execution_environment",
   "session_manager_enable_pkg_cache",
+
+  "sensors_framework_eng",
 ]
 
 # Ensure that we do not list any experimental AIBs as required

@@ -19,20 +19,20 @@
 //! // }
 //! ```
 
+use fuchsia_inspect::Node;
+use std::borrow::Cow;
+
 mod impls;
 mod wrappers;
 
-pub use fuchsia_inspect::StringReference;
 pub use wrappers::{InspectBytes, InspectList, InspectListClosure, InspectUintArray};
-
-use fuchsia_inspect::Node;
 
 /// Trait for writing to a node in bounded lists.
 pub trait WriteInspect {
     /// Write a *single* value (property or child node) to |node| with the specified |key|.
     /// If multiple properties need to be written, consider creating a single child
     /// node with those properties.
-    fn write_inspect(&self, writer: &Node, key: impl Into<StringReference>);
+    fn write_inspect<'a>(&self, writer: &Node, key: impl Into<Cow<'a, str>>);
 }
 
 /// Macro to log a new entry to a bounded list node with the specified key-value pairs. Each value
@@ -127,7 +127,7 @@ macro_rules! inspect_insert {
     }};
 
     (@internal $node_writer:expr, $key:expr => $($rest:tt)+) => {{
-        let key: $crate::log::StringReference = $key.into();
+        let key: std::borrow::Cow<'_, _> = $key.into();
         inspect_insert!(@internal $node_writer, var key: $($rest)+);
     }};
 
@@ -186,14 +186,17 @@ macro_rules! inspect_insert {
 macro_rules! make_inspect_loggable {
     ($($args:tt)+) => {{
         use $crate::inspect_insert;
-        use fuchsia_inspect::{Node, StringReference};
+        use fuchsia_inspect::Node;
+        use std::borrow::Cow;
         struct WriteInspectClosure<F>(F);
-        impl<F> WriteInspect for WriteInspectClosure<F> where F: Fn(&Node, StringReference) {
-            fn write_inspect(&self, writer: &Node, key: impl Into<StringReference>) {
-                self.0(writer, key.into());
+        impl<F> WriteInspect for WriteInspectClosure<F>
+            where
+                F: Fn(&Node, String) {
+            fn write_inspect<'b>(&self, writer: &Node, key: impl Into<Cow<'b, str>>) {
+                self.0(writer, key.into().to_string());
             }
         }
-        let f = WriteInspectClosure(move |writer: &Node, key: StringReference| {
+        let f = WriteInspectClosure(move |writer: &Node, key| {
             let child = writer.create_child(key);
             inspect_insert!(child, $($args)+);
             writer.record(child);

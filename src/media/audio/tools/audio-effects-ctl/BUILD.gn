@@ -14,6 +14,6 @@ executable("bin") {
   ]
 }
 
-fuchsia_shell_package("audio-effects-ctl") {
+fuchsia_package("audio-effects-ctl") {
   deps = [ ":bin" ]
 }

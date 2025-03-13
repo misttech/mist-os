@@ -129,6 +129,9 @@ pub struct ThreadGroupMutableState {
 
     /// Channel to message when this thread group exits.
     exit_notifier: Option<futures::channel::oneshot::Sender<()>>,
+
+    /// True if the `ThreadGroup` shares any state with a parent or child process (via `clone()`).
+    pub is_sharing: bool,
 }
 
 /// A collection of `Task` objects that roughly correspond to a "process".
@@ -488,6 +491,7 @@ impl ThreadGroup {
                         .unwrap_or(Default::default()),
                     allowed_ptracers: PtraceAllowedPtracers::None,
                     exit_notifier: None,
+                    is_sharing: false,
                 }),
             };
 
@@ -542,10 +546,19 @@ impl ThreadGroup {
         let tasks = state.tasks().map(TempRef::into_static).collect::<Vec<_>>();
         drop(state);
 
-        // Detach from any ptraced tasks.
+        // Detach from any ptraced tasks, killing the ones that set PTRACE_O_EXITKILL.
         let tracees = self.ptracees.lock().keys().cloned().collect::<Vec<_>>();
         for tracee in tracees {
             if let Some(task_ref) = pids.get_task(tracee).clone().upgrade() {
+                let mut should_send_sigkill = false;
+                if let Some(ptrace) = &task_ref.read().ptrace {
+                    should_send_sigkill = ptrace.has_option(PtraceOptions::EXITKILL);
+                }
+                if should_send_sigkill {
+                    send_standard_signal(task_ref.as_ref(), SignalInfo::default(SIGKILL));
+                    continue;
+                }
+
                 let _ = ptrace_detach(self, task_ref.as_ref(), &UserAddress::NULL);
             }
         }
@@ -1052,7 +1065,7 @@ impl ThreadGroup {
             return error!(EINVAL);
         }
 
-        let has_admin = current_task.creds().has_capability(CAP_SYS_ADMIN);
+        let mut has_admin_capability_determined = false;
 
         // "If this terminal is already the controlling terminal of a different
         // session group, then the ioctl fails with EPERM, unless the caller
@@ -1063,17 +1076,19 @@ impl ThreadGroup {
             terminal_state.controller.as_ref().and_then(|cs| cs.session.upgrade())
         {
             if other_session != process_group.session {
-                if !has_admin || !steal {
+                if !steal {
                     return error!(EPERM);
                 }
+                security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
+                has_admin_capability_determined = true;
 
                 // Steal the TTY away. Unlike TIOCNOTTY, don't send signals.
                 other_session.write().controlling_terminal = None;
             }
         }
 
-        if !is_readable && !has_admin {
-            return error!(EPERM);
+        if !is_readable && !has_admin_capability_determined {
+            security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
         }
 
         session_writer.controlling_terminal =
@@ -1153,7 +1168,7 @@ impl ThreadGroup {
         resource: Resource,
         maybe_new_limit: Option<rlimit>,
     ) -> Result<rlimit, Errno> {
-        let can_increase_rlimit = current_task.creds().has_capability(CAP_SYS_RESOURCE);
+        let can_increase_rlimit = security::is_task_capable_noaudit(current_task, CAP_SYS_RESOURCE);
         let mut limit_state = self.limits.lock();
         limit_state.get_and_set(resource, maybe_new_limit, can_increase_rlimit)
     }
@@ -1458,9 +1473,7 @@ impl ThreadGroup {
         // Tasks can technically have different credentials, but in practice they are kept in sync.
         let state = self.read();
         let target_task = state.get_live_task()?;
-        if !current_task.can_signal(&target_task, unchecked_signal) {
-            return error!(EPERM);
-        }
+        current_task.can_signal(&target_task, unchecked_signal)?;
 
         // 0 is a sentinel value used to do permission checks.
         if unchecked_signal.is_zero() {
@@ -1881,6 +1894,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
             let mut task_state = task.write();
 
             if signal_info.signal == SIGKILL {
+                task_state.thaw();
                 task_state.set_stopped(StopState::ForceWaking, None, None, None);
             } else if signal_info.signal == SIGCONT {
                 task_state.set_stopped(StopState::Waking, None, None, None);

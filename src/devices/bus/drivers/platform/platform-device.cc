@@ -15,6 +15,7 @@
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fit/function.h>
+#include <lib/zbi-format/partition.h>
 #include <lib/zircon-internal/align.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,12 +32,66 @@
 #include "src/devices/bus/drivers/platform/node-util.h"
 #include "src/devices/bus/drivers/platform/platform-bus.h"
 #include "src/devices/bus/drivers/platform/platform-interrupt.h"
+#include "zircon/system/public/zircon/syscalls-next.h"
 
 namespace fdf {
 using namespace fuchsia_driver_framework;
 }
 
 namespace {
+
+fuchsia_boot_metadata::SerialNumberMetadata CreateSerialNumberMetadata(
+    const fbl::Array<uint8_t>& bytes) {
+  std::string serial_number{bytes.begin(), bytes.end()};
+  return fuchsia_boot_metadata::SerialNumberMetadata{{.serial_number{std::move(serial_number)}}};
+}
+
+zx::result<fuchsia_boot_metadata::PartitionMapMetadata> CreatePartitionMapMetadata(
+    const fbl::Array<uint8_t>& bytes) {
+  if (bytes.size() < sizeof(zbi_partition_map_t)) {
+    zxlogf(ERROR, "Incorrect number of bytes: Expected at least %lu bytes but actual is %lu bytes",
+           sizeof(zbi_partition_map_t), bytes.size());
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+  const auto* partition_map_entries = reinterpret_cast<zbi_partition_map_t*>(bytes.data());
+  auto partition_count = partition_map_entries[0].partition_count;
+  auto minimum_num_bytes = partition_count * sizeof(zbi_partition_map_t);
+  if (bytes.size() < minimum_num_bytes) {
+    zxlogf(ERROR, "Incorrect number of bytes: Expected at least %lu bytes but actual is %lu bytes",
+           minimum_num_bytes, bytes.size());
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  std::vector<fuchsia_boot_metadata::PartitionMapEntry> partition_map;
+  for (uint32_t i = 0; i < partition_count; ++i) {
+    const auto& entry = partition_map_entries[i];
+    std::array<uint8_t, fuchsia_boot_metadata::kPartitionGuidLen> guid;
+    static_assert(fuchsia_boot_metadata::kPartitionGuidLen >= sizeof(zbi_partition_guid_t));
+    std::ranges::copy(std::begin(entry.guid), std::end(entry.guid), guid.begin());
+    partition_map.emplace_back(
+        fuchsia_boot_metadata::PartitionMapEntry{{.block_count = entry.block_count,
+                                                  .block_size = entry.block_size,
+                                                  .partition_count = entry.partition_count,
+                                                  .reserved = entry.reserved,
+                                                  .guid = guid}});
+  }
+
+  return zx::ok(
+      fuchsia_boot_metadata::PartitionMapMetadata{{.partition_map = std::move(partition_map)}});
+}
+
+zx::result<fuchsia_boot_metadata::MacAddressMetadata> CreateMacAddressMetadata(
+    const fbl::Array<uint8_t>& bytes) {
+  fuchsia_net::MacAddress mac_address;
+  if (bytes.size() != mac_address.octets().size()) {
+    zxlogf(ERROR,
+           "Size of encoded MAC address is incorrect: expected %lu bytes but actual is %lu bytes",
+           mac_address.octets().size(), bytes.size());
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+  std::ranges::copy(bytes.begin(), bytes.end(), mac_address.octets().begin());
+  return zx::ok(fuchsia_boot_metadata::MacAddressMetadata{{.mac_address = std::move(mac_address)}});
+}
 
 zx::result<zx_device_str_prop_t> ConvertToDeviceStringProperty(
     const fuchsia_driver_framework::NodeProperty& property) {
@@ -242,6 +297,13 @@ zx_status_t PlatformDevice::PDevGetInterrupt(uint32_t index, uint32_t flags,
   if (flags == 0) {
     flags = static_cast<uint32_t>(irq.mode().value());
   }
+  if (flags & ZX_INTERRUPT_WAKE_VECTOR) {
+    zxlogf(WARNING,
+           "Client passing in ZX_INTERRUPT_WAKE_VECTOR. This will be an error in the future.");
+  }
+  if (bus_->suspend_enabled() && irq.wake_vector().has_value() && irq.wake_vector().value()) {
+    flags &= ZX_INTERRUPT_WAKE_VECTOR;
+  }
   auto vector = irq.irq().value();
   zxlogf(INFO, "Creating interrupt with vector %u for platform device \"%s\"", vector, name_);
   zx_status_t status = zx::interrupt::create(*bus_->GetIrqResource(), vector, flags, out_irq);
@@ -437,6 +499,9 @@ zx_status_t PlatformDevice::Start() {
 
   std::array fidl_service_offers = {
       fuchsia_hardware_platform_device::Service::Name,
+      ddk::MetadataServer<fuchsia_boot_metadata::SerialNumberMetadata>::kFidlServiceName,
+      ddk::MetadataServer<fuchsia_boot_metadata::PartitionMapMetadata>::kFidlServiceName,
+      ddk::MetadataServer<fuchsia_boot_metadata::MacAddressMetadata>::kFidlServiceName,
   };
   std::array runtime_service_offers = {
       fuchsia_hardware_platform_bus::Service::Name,
@@ -451,7 +516,7 @@ zx_status_t PlatformDevice::Start() {
                 fidl::kIgnoreBindingClosure),
         }));
     if (result.is_error()) {
-      zxlogf(ERROR, "could not add service to outgoing directory: %s", result.status_string());
+      zxlogf(ERROR, "Failed to add platform device service: %s", result.status_string());
       return result.error_value();
     }
 
@@ -468,6 +533,7 @@ zx_status_t PlatformDevice::Start() {
       zx::result result =
           outgoing_.AddService<fuchsia_hardware_platform_bus::Service>(std::move(handler));
       if (result.is_error()) {
+        zxlogf(ERROR, "Failed to add platform bus service: %s", result.status_string());
         return result.error_value();
       }
 
@@ -490,16 +556,48 @@ zx_status_t PlatformDevice::Start() {
     }
   }
 
+  // Setup boot metadata servers.
+  if (zx_status_t status = serial_number_metadata_server_.Serve(
+          outgoing_, fdf::Dispatcher::GetCurrent()->async_dispatcher());
+      status != ZX_OK) {
+    zxlogf(ERROR, "Failed to serve serial number metadata server: %s",
+           zx_status_get_string(status));
+    return status;
+  }
+
+  if (zx_status_t status = partition_map_metadata_server_.Serve(
+          outgoing_, fdf::Dispatcher::GetCurrent()->async_dispatcher());
+      status != ZX_OK) {
+    zxlogf(ERROR, "Failed to serve partition map metadata server: %s",
+           zx_status_get_string(status));
+    return status;
+  }
+
+  if (zx_status_t status = mac_address_metadata_server_.Serve(
+          outgoing_, fdf::Dispatcher::GetCurrent()->async_dispatcher());
+      status != ZX_OK) {
+    zxlogf(ERROR, "Failed to serve mac address metadata server: %s", zx_status_get_string(status));
+    return status;
+  }
+
   // Setup the outgoing directory.
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   if (endpoints.is_error()) {
+    zxlogf(ERROR, "Failed to create endpoints: %s", endpoints.status_string());
     return endpoints.status_value();
   }
   if (zx::result result = outgoing_.Serve(std::move(endpoints->server)); result.is_error()) {
+    zxlogf(ERROR, "Failed to serve outgoing directory: %s", result.status_string());
     return result.error_value();
   }
   args.set_outgoing_dir(endpoints->client.TakeChannel());
-  return DdkAdd(args);
+
+  if (zx_status_t status = DdkAdd(args); status != ZX_OK) {
+    zxlogf(ERROR, "Failed to add device: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  return ZX_OK;
 }
 
 void PlatformDevice::DdkInit(ddk::InitTxn txn) {
@@ -507,6 +605,7 @@ void PlatformDevice::DdkInit(ddk::InitTxn txn) {
   for (size_t i = 0; i < metadata_count; i++) {
     const auto& metadata = node_.metadata().value()[i];
     if (!IsValid(metadata)) {
+      zxlogf(INFO, "Metadata at index %lu is invalid", i);
       txn.Reply(ZX_ERR_INTERNAL);
       return;
     }
@@ -528,6 +627,8 @@ void PlatformDevice::DdkInit(ddk::InitTxn txn) {
       zx_status_t status =
           DdkAddMetadata(metadata_type, metadata_data->data(), metadata_data->size());
       if (status != ZX_OK) {
+        zxlogf(INFO, "Failed to add metadata with ID %s: %s", metadata_id.value().c_str(),
+               zx_status_get_string(status));
         txn.Reply(status);
         return;
       }
@@ -541,6 +642,7 @@ void PlatformDevice::DdkInit(ddk::InitTxn txn) {
   for (size_t i = 0; i < boot_metadata_count; i++) {
     const auto& metadata = node_.boot_metadata().value()[i];
     if (!IsValid(metadata)) {
+      zxlogf(INFO, "Boot metadata at index %lu is invalid", i);
       txn.Reply(ZX_ERR_INTERNAL);
       return;
     }
@@ -553,15 +655,65 @@ void PlatformDevice::DdkInit(ddk::InitTxn txn) {
     zx_status_t status = data.status_value();
     if (data.is_ok()) {
       // TODO(b/341981272): Remove `DdkAddMetadata()` once all drivers bound to platform devices
-      // do not use `device_get_metadata()` to retrieve metadata. They should be using
-      // fuchsia.hardware.platform.device/Device::GetMetadata().
+      // do not use `device_get_metadata()` to retrieve metadata.
       status = DdkAddMetadata(metadata_zbi_type.value(), data->data(), data->size());
       if (status != ZX_OK) {
-        zxlogf(WARNING, "%s failed to add metadata for new device", __func__);
+        zxlogf(WARNING, "Failed to add boot metadata with ZBI type %d: %s",
+               metadata_zbi_type.value(), zx_status_get_string(status));
+        ;
       }
 
       metadata_.emplace(std::to_string(metadata_zbi_type.value()),
                         std::vector<uint8_t>{data->begin(), data->end()});
+
+      switch (metadata_zbi_type.value()) {
+        case ZBI_TYPE_SERIAL_NUMBER: {
+          auto metadata = CreateSerialNumberMetadata(data.value());
+          if (zx_status_t status = serial_number_metadata_server_.SetMetadata(metadata);
+              status != ZX_OK) {
+            zxlogf(ERROR, "Failed to set metadata for serial number metadata server: %s",
+                   zx_status_get_string(status));
+            txn.Reply(status);
+            return;
+          }
+          break;
+        }
+        case ZBI_TYPE_DRV_PARTITION_MAP: {
+          zx::result metadata = CreatePartitionMapMetadata(data.value());
+          if (metadata.is_error()) {
+            zxlogf(ERROR, "Failed to create partition map metadata: %s", metadata.status_string());
+            txn.Reply(metadata.status_value());
+            return;
+          }
+          if (zx_status_t status = partition_map_metadata_server_.SetMetadata(metadata.value());
+              status != ZX_OK) {
+            zxlogf(ERROR, "Failed to set metadata for partition map metadata server: %s",
+                   zx_status_get_string(status));
+            txn.Reply(status);
+            return;
+          }
+          break;
+        }
+        case ZBI_TYPE_DRV_MAC_ADDRESS: {
+          zx::result metadata = CreateMacAddressMetadata(data.value());
+          if (metadata.is_error()) {
+            zxlogf(ERROR, "Failed to create mac address metadata: %s", metadata.status_string());
+            txn.Reply(metadata.status_value());
+            return;
+          }
+          if (zx_status_t status = mac_address_metadata_server_.SetMetadata(metadata.value());
+              status != ZX_OK) {
+            zxlogf(ERROR, "Failed to set metadata for mac address metadata server: %s",
+                   zx_status_get_string(status));
+            txn.Reply(status);
+            return;
+          }
+          break;
+        }
+        default:
+          zxlogf(INFO, "Ignoring boot metadata with zbi type %d", metadata_zbi_type.value());
+          break;
+      }
     }
   }
 

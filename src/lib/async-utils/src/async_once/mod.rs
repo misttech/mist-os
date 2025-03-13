@@ -140,7 +140,7 @@ mod test {
         let initializer = || async {
             let val = COUNTER.fetch_add(1, Ordering::SeqCst);
             if val == 0 {
-                Err(std::io::Error::new(std::io::ErrorKind::Other, "first attempt fails"))
+                Err(std::io::Error::other("first attempt fails"))
             } else {
                 Ok(true)
             }

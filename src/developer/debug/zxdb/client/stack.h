@@ -50,6 +50,16 @@ class FrameFingerprint;
 // operator[] functions.
 class Stack {
  public:
+  struct SyncFrameOptions {
+    // Clears the current set of frames before unwinding from the current location, forcing a
+    // complete stack unwind.
+    bool force_update = false;
+    // Requests the unwinder to be called from the target instead of locally. This can be useful
+    // when debug info from either an unstripped or split binary is insufficient to completely
+    // unwind (which is difficult to detect automatically).
+    bool remote_unwind = false;
+  };
+
   // Provides a way for this class to talk to the environment.
   class Delegate {
    public:
@@ -58,7 +68,8 @@ class Stack {
     // callback to indicate completion.
     //
     // The callback should be issued with an error if the object is destroyed during processing.
-    virtual void SyncFramesForStack(fit::callback<void(const Err&)> callback) = 0;
+    virtual void SyncFramesForStack(const SyncFrameOptions& opts,
+                                    fit::callback<void(const Err&)> callback) = 0;
 
     // Constructs a Frame implementation for the given IPC stack frame and location. The location
     // must be an input since inline frame expansion requires stack frames be constructed with
@@ -142,7 +153,7 @@ class Stack {
   //
   // If the stack is destroyed before the frames can be synced, the callback will be issued with an
   // error.
-  void SyncFrames(bool force, fit::callback<void(const Err&)> callback);
+  void SyncFrames(const SyncFrameOptions& opts, fit::callback<void(const Err&)> callback);
 
   // Provides a new set of frames computed by a backtrace in the debug_agent. In normal operation
   // this is called by the Thread.

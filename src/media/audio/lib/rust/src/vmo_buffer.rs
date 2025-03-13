@@ -48,6 +48,13 @@ impl VmoBuffer {
             )
             .map_err(|status| VmoBufferError::VmoMap(zx::Status::from(status)))?;
 
+        log::debug!(
+            "format {:?} num frames {} data_size_bytes {}",
+            format,
+            num_frames,
+            data_size_bytes
+        );
+
         Ok(Self { vmo, vmo_size_bytes, base_address, num_frames, format })
     }
 
@@ -67,12 +74,22 @@ impl VmoBuffer {
         let byte_offset = frame_offset as usize * self.format.bytes_per_frame() as usize;
         let num_frames_in_buf = buf.len() as u64 / self.format.bytes_per_frame() as u64;
 
+        let frames_per_mili = self.format.frames_per_second / 1000;
+        let mili_elapsed = frame / frames_per_mili as u64;
+        let seconds = mili_elapsed as f64 / 1000.0;
+
         // Check whether the buffer can be written to contiguously or if the write needs to be
         // split into two: one until the end of the buffer and one starting from the beginning.
         if (frame_offset + num_frames_in_buf) <= self.num_frames {
             self.vmo.write(&buf[..], byte_offset as u64).map_err(VmoBufferError::VmoWrite)?;
             // Flush cache so that hardware reads most recent write.
             self.flush_cache(byte_offset, buf.len()).map_err(VmoBufferError::VmoFlushCache)?;
+            log::debug!(
+                "frame {} wrote starting from position {} Time {}s",
+                frame,
+                byte_offset,
+                seconds
+            );
         } else {
             let frames_to_write_until_end = self.num_frames - frame_offset;
             let bytes_until_buffer_end =
@@ -85,10 +102,21 @@ impl VmoBuffer {
             self.flush_cache(byte_offset, bytes_until_buffer_end)
                 .map_err(VmoBufferError::VmoFlushCache)?;
 
+            if buf[bytes_until_buffer_end..].len() > self.vmo_size_bytes as usize {
+                log::error!("Remainder of write buffer is too big for the vmo.");
+            }
+
             // Write what remains to the beginning of the buffer.
             self.vmo.write(&buf[bytes_until_buffer_end..], 0).map_err(VmoBufferError::VmoWrite)?;
             self.flush_cache(0, buf.len() - bytes_until_buffer_end)
                 .map_err(VmoBufferError::VmoFlushCache)?;
+
+            log::debug!(
+                "frame {} wrote starting from position {}  (with looparound) Time {}s",
+                frame,
+                byte_offset,
+                seconds
+            );
         }
         Ok(())
     }
@@ -102,10 +130,20 @@ impl VmoBuffer {
         let byte_offset = frame_offset as usize * self.format.bytes_per_frame() as usize;
         let num_frames_in_buf = buf.len() as u64 / self.format.bytes_per_frame() as u64;
 
+        let frames_per_mili = self.format.frames_per_second / 1000; // 96
+        let mili_elapsed = frame / frames_per_mili as u64;
+        let seconds = mili_elapsed as f64 / 1000.0;
+
         // Check whether the buffer can be read from contiguously or if the read needs to be
         // split into two: one until the end of the buffer and one starting from the beginning.
         if (frame_offset + num_frames_in_buf) <= self.num_frames {
             // Flush and invalidate cache so we read the hardware's most recent write.
+            log::debug!(
+                "frame {} reading starting from position {} Time {}s",
+                frame,
+                byte_offset,
+                seconds
+            );
             self.flush_invalidate_cache(byte_offset as usize, buf.len())
                 .map_err(VmoBufferError::VmoFlushCache)?;
             self.vmo.read(buf, byte_offset as u64).map_err(VmoBufferError::VmoRead)?;
@@ -114,12 +152,22 @@ impl VmoBuffer {
             let bytes_until_buffer_end =
                 frames_to_write_until_end as usize * self.format.bytes_per_frame() as usize;
 
+            log::debug!(
+                "frame {} reading starting from position {}  (with looparound) Time {}s",
+                frame,
+                byte_offset,
+                seconds
+            );
             // Flush and invalidate cache so we read the hardware's most recent write.
             self.flush_invalidate_cache(byte_offset, bytes_until_buffer_end)
                 .map_err(VmoBufferError::VmoFlushCache)?;
             self.vmo
                 .read(&mut buf[..bytes_until_buffer_end], byte_offset as u64)
                 .map_err(VmoBufferError::VmoRead)?;
+
+            if buf[bytes_until_buffer_end..].len() > self.vmo_size_bytes as usize {
+                log::error!("Remainder of read buffer is too big for the vmo.");
+            }
 
             self.flush_invalidate_cache(0, buf.len() - bytes_until_buffer_end)
                 .map_err(VmoBufferError::VmoFlushCache)?;

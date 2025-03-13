@@ -636,11 +636,11 @@ struct TypeTraits<::test_arrays::wire::StructSmallArray> {
 };
 
 template <>
-struct IsFidlType<::test_arrays::wire::StructSmallArray> : public std::true_type{};
+struct IsFidlType<::test_arrays::wire::StructSmallArray> : public std::true_type {};
 template <>
-struct IsWire<::test_arrays::wire::StructSmallArray> : public std::true_type{};
+struct IsWire<::test_arrays::wire::StructSmallArray> : public std::true_type {};
 template <>
-struct IsStruct<::test_arrays::wire::StructSmallArray> : public std::true_type{};
+struct IsStruct<::test_arrays::wire::StructSmallArray> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_arrays::wire::StructSmallArray>);
 static_assert(offsetof(::test_arrays::wire::StructSmallArray, a) == 0);
 static_assert(sizeof(::test_arrays::wire::StructSmallArray) == TypeTraits<::test_arrays::wire::StructSmallArray>::kPrimarySize);
@@ -682,11 +682,11 @@ struct TypeTraits<::test_arrays::wire::StructLargeArray> {
 };
 
 template <>
-struct IsFidlType<::test_arrays::wire::StructLargeArray> : public std::true_type{};
+struct IsFidlType<::test_arrays::wire::StructLargeArray> : public std::true_type {};
 template <>
-struct IsWire<::test_arrays::wire::StructLargeArray> : public std::true_type{};
+struct IsWire<::test_arrays::wire::StructLargeArray> : public std::true_type {};
 template <>
-struct IsStruct<::test_arrays::wire::StructLargeArray> : public std::true_type{};
+struct IsStruct<::test_arrays::wire::StructLargeArray> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_arrays::wire::StructLargeArray>);
 static_assert(offsetof(::test_arrays::wire::StructLargeArray, a) == 0);
 static_assert(sizeof(::test_arrays::wire::StructLargeArray) == TypeTraits<::test_arrays::wire::StructLargeArray>::kPrimarySize);
@@ -728,11 +728,11 @@ struct TypeTraits<::test_arrays::wire::TableSmallArray> {
 };
 
 template <>
-struct IsFidlType<::test_arrays::wire::TableSmallArray> : public std::true_type{};
+struct IsFidlType<::test_arrays::wire::TableSmallArray> : public std::true_type {};
 template <>
-struct IsWire<::test_arrays::wire::TableSmallArray> : public std::true_type{};
+struct IsWire<::test_arrays::wire::TableSmallArray> : public std::true_type {};
 template <>
-struct IsTable<::test_arrays::wire::TableSmallArray> : public std::true_type{};
+struct IsTable<::test_arrays::wire::TableSmallArray> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_arrays::wire::TableSmallArray>);
 
 template <bool IsRecursive>
@@ -815,11 +815,11 @@ struct TypeTraits<::test_arrays::wire::TableLargeArray> {
 };
 
 template <>
-struct IsFidlType<::test_arrays::wire::TableLargeArray> : public std::true_type{};
+struct IsFidlType<::test_arrays::wire::TableLargeArray> : public std::true_type {};
 template <>
-struct IsWire<::test_arrays::wire::TableLargeArray> : public std::true_type{};
+struct IsWire<::test_arrays::wire::TableLargeArray> : public std::true_type {};
 template <>
-struct IsTable<::test_arrays::wire::TableLargeArray> : public std::true_type{};
+struct IsTable<::test_arrays::wire::TableLargeArray> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_arrays::wire::TableLargeArray>);
 
 template <bool IsRecursive>
@@ -902,11 +902,11 @@ struct TypeTraits<::test_arrays::wire::UnionSmallArray> {
 };
 
 template <>
-struct IsFidlType<::test_arrays::wire::UnionSmallArray> : public std::true_type{};
+struct IsFidlType<::test_arrays::wire::UnionSmallArray> : public std::true_type {};
 template <>
-struct IsWire<::test_arrays::wire::UnionSmallArray> : public std::true_type{};
+struct IsWire<::test_arrays::wire::UnionSmallArray> : public std::true_type {};
 template <>
-struct IsUnion<::test_arrays::wire::UnionSmallArray> : public std::true_type{};
+struct IsUnion<::test_arrays::wire::UnionSmallArray> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_arrays::wire::UnionSmallArray>);
 
 template <typename Constraint, bool IsRecursive>
@@ -1012,11 +1012,11 @@ struct TypeTraits<::test_arrays::wire::UnionLargeArray> {
 };
 
 template <>
-struct IsFidlType<::test_arrays::wire::UnionLargeArray> : public std::true_type{};
+struct IsFidlType<::test_arrays::wire::UnionLargeArray> : public std::true_type {};
 template <>
-struct IsWire<::test_arrays::wire::UnionLargeArray> : public std::true_type{};
+struct IsWire<::test_arrays::wire::UnionLargeArray> : public std::true_type {};
 template <>
-struct IsUnion<::test_arrays::wire::UnionLargeArray> : public std::true_type{};
+struct IsUnion<::test_arrays::wire::UnionLargeArray> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_arrays::wire::UnionLargeArray>);
 
 template <typename Constraint, bool IsRecursive>

@@ -16,7 +16,6 @@ test("service_hub_connector_tests_bin") {
     "//src/lib/fidl/contrib/connection:service_hub_connector",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
-    "//src/storage/lib/vfs/cpp",
   ]
 }
 
@@ -30,7 +29,6 @@ test("service_reconnector_tests_bin") {
     "//src/lib/fidl/contrib/connection:service_reconnector",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
-    "//src/storage/lib/vfs/cpp",
   ]
 }
 

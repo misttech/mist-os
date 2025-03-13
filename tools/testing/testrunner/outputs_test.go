@@ -40,14 +40,16 @@ func TestRecordingOfOutputs(t *testing.T) {
 	start := time.Unix(0, 0)
 	dataDir := t.TempDir()
 	outDir := filepath.Join(dataDir, "out")
+	testAOutDir := filepath.Join(url.PathEscape("fuchsia-pkg//foo#test_a"), "0")
+	testBOutDir := filepath.Join("test_b", "0")
 	suiteOutputDir := "suite_outputs"
 	suiteOutputFile1 := filepath.Join(suiteOutputDir, "file1")
 	suiteOutputFile2 := filepath.Join(suiteOutputDir, "file2")
 	caseOutputFile := filepath.Join("case1", "case_outputs")
 	origOutputs := map[string]string{
-		suiteOutputFile1: "test outputs",
-		suiteOutputFile2: "test outputs 2",
-		caseOutputFile:   "testcase outputs",
+		filepath.Join(testAOutDir, suiteOutputFile1): "test outputs",
+		filepath.Join(testAOutDir, suiteOutputFile2): "test outputs 2",
+		filepath.Join(testAOutDir, caseOutputFile):   "testcase outputs",
 	}
 	if err := writeFiles(outDir, origOutputs); err != nil {
 		t.Errorf("failed to write output files: %s", err)
@@ -81,12 +83,12 @@ func TestRecordingOfOutputs(t *testing.T) {
 					Format:      "FTF",
 					// Test having the OutputFile be a filename.
 					OutputFiles: []string{filepath.Base(caseOutputFile)},
-					OutputDir:   filepath.Join(outDir, "case1"),
+					OutputDir:   filepath.Join(outDir, testAOutDir, "case1"),
 				},
 			},
 			// Test having the OutputFile be a directory name.
 			OutputFiles: []string{suiteOutputDir},
-			OutputDir:   outDir,
+			OutputDir:   filepath.Join(outDir, testAOutDir),
 			Stdio:       []byte("STDOUT_A"),
 		},
 		{
@@ -108,8 +110,8 @@ func TestRecordingOfOutputs(t *testing.T) {
 	}
 	defer o.Close()
 
-	testAStdout := filepath.Join(url.PathEscape("fuchsia-pkg//foo#test_a"), "0", "stdout-and-stderr.txt")
-	testBStdout := filepath.Join("test_b", "0", "stdout-and-stderr.txt")
+	testAStdout := filepath.Join(testAOutDir, "stdout-and-stderr.txt")
+	testBStdout := filepath.Join(testBOutDir, "stdout-and-stderr.txt")
 	expectedSummary := runtests.TestSummary{
 		Tests: []runtests.TestDetails{{
 			Name:    "fuchsia-pkg://foo#test_a",
@@ -117,7 +119,8 @@ func TestRecordingOfOutputs(t *testing.T) {
 			// The expected OutputFiles in TestSummary should contain only files.
 			// If any of the TestResult OutputFiles point to directories, TestOutputs.Record()
 			// should list out all the files in those directories here.
-			OutputFiles:    []string{suiteOutputFile1, suiteOutputFile2, testAStdout},
+			OutputFiles:    []string{suiteOutputFile1, suiteOutputFile2, filepath.Base(testAStdout)},
+			OutputDir:      testAOutDir,
 			Result:         runtests.TestFailure,
 			StartTime:      start,
 			DurationMillis: 5,
@@ -145,7 +148,8 @@ func TestRecordingOfOutputs(t *testing.T) {
 		}, {
 			Name:           "test_b",
 			GNLabel:        "//a/b/c:test_b(//toolchain)",
-			OutputFiles:    []string{testBStdout},
+			OutputFiles:    []string{filepath.Base(testBStdout)},
+			OutputDir:      testBOutDir,
 			Result:         runtests.TestSuccess,
 			StartTime:      start,
 			DurationMillis: 10,
@@ -174,12 +178,12 @@ func TestRecordingOfOutputs(t *testing.T) {
 
 	// Populate all of the expected output files.
 	expectedContents := map[string]string{
-		testAStdout:      "STDOUT_A",
-		testBStdout:      "STDERR_B",
-		suiteOutputFile1: origOutputs[suiteOutputFile1],
-		suiteOutputFile2: origOutputs[suiteOutputFile2],
-		caseOutputFile:   origOutputs[caseOutputFile],
-		"summary.json":   string(summaryBytes),
+		testAStdout: "STDOUT_A",
+		testBStdout: "STDERR_B",
+		filepath.Join(testAOutDir, suiteOutputFile1): origOutputs[filepath.Join(testAOutDir, suiteOutputFile1)],
+		filepath.Join(testAOutDir, suiteOutputFile2): origOutputs[filepath.Join(testAOutDir, suiteOutputFile2)],
+		filepath.Join(testAOutDir, caseOutputFile):   origOutputs[filepath.Join(testAOutDir, caseOutputFile)],
+		"summary.json": string(summaryBytes),
 	}
 	for name, content := range expectedSinks {
 		// Add sinks to expectedContents.

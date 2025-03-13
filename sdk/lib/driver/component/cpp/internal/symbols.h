@@ -7,6 +7,8 @@
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 
+#include <unordered_set>
+
 namespace fdf_internal {
 
 template <typename T>
@@ -86,6 +88,20 @@ T GetSymbol(const std::optional<std::vector<fuchsia_driver_framework::NodeSymbol
             std::string_view module_name, std::string_view symbol_name, T default_value = nullptr) {
   auto value = SymbolValue<T>(symbols, module_name, symbol_name);
   return value.is_ok() ? *value : default_value;
+}
+
+inline std::unordered_set<std::string> GetModules(
+    const std::optional<std::vector<fuchsia_driver_framework::NodeSymbol>>& symbols) {
+  if (!symbols.has_value()) {
+    return {};
+  }
+  std::unordered_set<std::string> modules;
+  for (const auto& symbol : *symbols) {
+    if (symbol.module_name().has_value()) {
+      modules.insert(symbol.module_name().value());
+    }
+  }
+  return modules;
 }
 
 }  // namespace fdf_internal

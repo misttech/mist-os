@@ -100,7 +100,7 @@ TEST(ProcessTest, MiniProcessSanity) {
 
   EXPECT_OK(mini_process_cmd(cmd_channel, MINIP_CMD_ECHO_MSG, nullptr));
 
-  zx_handle_t oev;
+  zx_handle_t oev = ZX_HANDLE_INVALID;
   EXPECT_OK(mini_process_cmd(cmd_channel, MINIP_CMD_CREATE_EVENT, &oev));
 
   EXPECT_EQ(mini_process_cmd(cmd_channel, MINIP_CMD_EXIT_NORMAL, nullptr), ZX_ERR_PEER_CLOSED);

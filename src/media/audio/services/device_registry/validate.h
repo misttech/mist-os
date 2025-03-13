@@ -37,13 +37,6 @@ bool ClientIsValidForDeviceType(const fuchsia_audio_device::DeviceType& device_t
 std::vector<fuchsia_audio_device::PcmFormatSet> TranslateRingBufferFormatSets(
     const std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets);
 
-bool ValidateStreamProperties(
-    const fuchsia_hardware_audio::StreamProperties& stream_props,
-    std::optional<const fuchsia_hardware_audio::GainState> gain_state = std::nullopt,
-    std::optional<const fuchsia_hardware_audio::PlugState> plug_state = std::nullopt);
-bool ValidateGainState(
-    const fuchsia_hardware_audio::GainState& gain_state,
-    std::optional<const fuchsia_hardware_audio::StreamProperties> stream_props = std::nullopt);
 bool ValidatePlugState(const fuchsia_hardware_audio::PlugState& plug_state,
                        std::optional<fuchsia_hardware_audio::PlugDetectCapabilities>
                            plug_detect_capabilities = std::nullopt);

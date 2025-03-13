@@ -4,7 +4,8 @@
 
 use anyhow::Context as _;
 use camino::Utf8PathBuf;
-use fho::{return_user_error, user_error, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
+use ffx_writer::{ToolIO as _, VerifiedMachineWriter};
+use fho::{return_user_error, user_error, FfxMain, FfxTool};
 use fuchsia_merkle::MerkleTree;
 use rayon::prelude::*;
 use schemars::JsonSchema;
@@ -141,7 +142,7 @@ mod tests {
         let paths = test_data.iter().map(|(name, _)| dir_path.join(name)).collect();
 
         let cmd = HashCommand { paths, uncompressed: true };
-        let buffers = fho::TestBuffers::default();
+        let buffers = ffx_writer::TestBuffers::default();
         let writer = <BlobHashTool as FfxMain>::Writer::new_test(None, &buffers);
         BlobHashTool { cmd }.main(writer).await.expect("success");
 
@@ -182,7 +183,7 @@ f5a0dff4578d0150d3dace71b08733d5cd8cbe63a322633445c9ff0d9041b9c4  {0}/third_file
         let paths = test_data.iter().map(|(name, _)| dir_path.join(name)).collect();
 
         let cmd = HashCommand { paths, uncompressed: false };
-        let buffers = fho::TestBuffers::default();
+        let buffers = ffx_writer::TestBuffers::default();
         let writer = <BlobHashTool as FfxMain>::Writer::new_test(None, &buffers);
         BlobHashTool { cmd }.main(writer).await.expect("success");
 
@@ -218,8 +219,9 @@ f5a0dff4578d0150d3dace71b08733d5cd8cbe63a322633445c9ff0d9041b9c4  {0}/third_file
         let paths = test_data.iter().map(|(name, _)| dir_path.join(name)).collect();
 
         let cmd = HashCommand { paths, uncompressed: true };
-        let buffers = fho::TestBuffers::default();
-        let writer = <BlobHashTool as FfxMain>::Writer::new_test(Some(fho::Format::Json), &buffers);
+        let buffers = ffx_writer::TestBuffers::default();
+        let writer =
+            <BlobHashTool as FfxMain>::Writer::new_test(Some(ffx_writer::Format::Json), &buffers);
         BlobHashTool { cmd }.main(writer).await.expect("success");
 
         let (out, err) = buffers.into_strings();
@@ -246,7 +248,7 @@ f5a0dff4578d0150d3dace71b08733d5cd8cbe63a322633445c9ff0d9041b9c4  {0}/third_file
         const NAME: &str = "filename_that_does_not_exist";
 
         let cmd = HashCommand { paths: vec![NAME.into()], uncompressed: true };
-        let buffers = fho::TestBuffers::default();
+        let buffers = ffx_writer::TestBuffers::default();
         let writer = <BlobHashTool as FfxMain>::Writer::new_test(None, &buffers);
 
         BlobHashTool { cmd }.main(writer).await.expect("success");
@@ -265,8 +267,9 @@ f5a0dff4578d0150d3dace71b08733d5cd8cbe63a322633445c9ff0d9041b9c4  {0}/third_file
         const NAME: &str = "filename_that_does_not_exist";
 
         let cmd = HashCommand { paths: vec![NAME.into()], uncompressed: true };
-        let buffers = fho::TestBuffers::default();
-        let writer = <BlobHashTool as FfxMain>::Writer::new_test(Some(fho::Format::Json), &buffers);
+        let buffers = ffx_writer::TestBuffers::default();
+        let writer =
+            <BlobHashTool as FfxMain>::Writer::new_test(Some(ffx_writer::Format::Json), &buffers);
 
         assert_matches!(BlobHashTool { cmd }.main(writer).await, Err(fho::Error::User(_)));
         let (out, err) = buffers.into_strings();

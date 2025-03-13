@@ -862,7 +862,7 @@ class OtmpfileTest : public ::testing::Test {
   void SetUp() override {
     char *dir = getenv("MUTABLE_STORAGE");
     test_folder_ = dir == nullptr ? "/tmp/XXXXXX" : std::string(dir) + "/XXXXXX";
-    ASSERT_NE(mkdtemp(&test_folder_[0]), nullptr)
+    ASSERT_NE(mkdtemp(test_folder_.data()), nullptr)
         << "failed to create test folder: " << std::strerror(errno);
 
     test_file1_ = test_folder_ + "/testfile1";
@@ -887,6 +887,12 @@ class OtmpfileTest : public ::testing::Test {
   std::string test_file2_;
 };
 
+void CheckLinkCount(int fd, unsigned count) {
+  struct stat s;
+  ASSERT_EQ(fstat(fd, &s), 0);
+  ASSERT_EQ(s.st_nlink, count);
+}
+
 TEST_F(OtmpfileTest, TmpFileLinkIntoAfter) {
   // CAP_DAC_READ_SEARCH capability is required to use AT_EMPTY_PATH with linkat
   if (!test_helper::HasCapability(CAP_DAC_READ_SEARCH)) {
@@ -894,9 +900,7 @@ TEST_F(OtmpfileTest, TmpFileLinkIntoAfter) {
   }
   tmpfile_fd_ = fbl::unique_fd(open(test_folder_.c_str(), O_RDWR | O_TMPFILE));
   ASSERT_TRUE(tmpfile_fd_.is_valid()) << "open() with O_TMPFILE failed:" << strerror(errno);
-  struct stat stat_tmpfile;
-  SAFE_SYSCALL(fstat(tmpfile_fd_.get(), &stat_tmpfile));
-  ASSERT_EQ(stat_tmpfile.st_nlink, nlink_t{0}) << "Link count should be 0.";
+  ASSERT_NO_FATAL_FAILURE(CheckLinkCount(tmpfile_fd_.get(), 0));
 
   // Write to file. The contents are used later to verify that linkat worked.
   ASSERT_EQ(write(tmpfile_fd_.get(), "hello", 5), 5)
@@ -904,14 +908,11 @@ TEST_F(OtmpfileTest, TmpFileLinkIntoAfter) {
 
   // Test that we can link.
   SAFE_SYSCALL(linkat(tmpfile_fd_.get(), "", AT_FDCWD, test_file1_.c_str(), AT_EMPTY_PATH));
-  struct stat stat_linked_tmpfile;
-  SAFE_SYSCALL(fstat(tmpfile_fd_.get(), &stat_linked_tmpfile));
-  ASSERT_EQ(stat_linked_tmpfile.st_nlink, nlink_t{1}) << "Link count should be 1.";
+  ASSERT_NO_FATAL_FAILURE(CheckLinkCount(tmpfile_fd_.get(), 1));
 
   // Test that we can link again.
   SAFE_SYSCALL(linkat(tmpfile_fd_.get(), "", AT_FDCWD, test_file2_.c_str(), AT_EMPTY_PATH));
-  SAFE_SYSCALL(fstat(tmpfile_fd_.get(), &stat_linked_tmpfile));
-  ASSERT_EQ(stat_linked_tmpfile.st_nlink, nlink_t{2}) << "Link count should be 2.";
+  ASSERT_NO_FATAL_FAILURE(CheckLinkCount(tmpfile_fd_.get(), 2));
 
   // Verify contents.
   fbl::unique_fd test_file_fd(open(test_file1_.c_str(), O_RDONLY));
@@ -963,6 +964,34 @@ TEST_F(OtmpfileTest, TmpFileWithOCreatShouldFail) {
   EXPECT_EQ(saved_errno, EINVAL)
       << "open() with O_TMPFILE and O_CREAT are not compatible. Should fail with EINVAL:"
       << std::strerror(saved_errno);
+}
+
+TEST(LinkTest, FileLinkCount) {
+  // Create a temporary directory, store its absolute path and chdir to it.
+  char *dir = getenv("MUTABLE_STORAGE");
+  std::string test_folder =
+      dir == nullptr ? "/tmp/linkcount.XXXXXX" : std::string(dir) + "/linkcount.XXXXXX";
+  ASSERT_NE(mkdtemp(test_folder.data()), nullptr)
+      << "failed to create test folder: " << std::strerror(errno);
+
+  std::string test_file = test_folder + "/foo";
+  fbl::unique_fd foo_fd(creat(test_file.c_str(), S_IRWXU));
+  ASSERT_TRUE(foo_fd.is_valid()) << "Failed to open file:" << strerror(errno);
+  ASSERT_NO_FATAL_FAILURE(CheckLinkCount(foo_fd.get(), 1));
+
+  // Create link to the file. We should see link count increment.
+  std::string bar = test_folder + "/bar";
+  SAFE_SYSCALL(linkat(AT_FDCWD, test_file.c_str(), AT_FDCWD, bar.c_str(), 0));
+  ASSERT_NO_FATAL_FAILURE(CheckLinkCount(foo_fd.get(), 2));
+
+  // Unlink should decrement the link count.
+  EXPECT_EQ(unlink(bar.c_str()), 0);
+  ASSERT_NO_FATAL_FAILURE(CheckLinkCount(foo_fd.get(), 1));
+  EXPECT_EQ(unlink(test_file.c_str()), 0);
+  ASSERT_NO_FATAL_FAILURE(CheckLinkCount(foo_fd.get(), 0));
+
+  // Clean up.
+  ASSERT_EQ(rmdir(test_folder.c_str()), 0);
 }
 
 }  // namespace

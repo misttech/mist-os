@@ -34,11 +34,14 @@ sdk_source_set("board-test-helper") {
   ]
 }
 
-source_set("visitor-test-helper") {
+sdk_source_set("visitor-test-helper") {
+  sdk_name = "devicetree_visitor_test_helper"
+  category = "internal"
+  include_base = "//sdk"
+
   sources = [ "visitor-test-helper.h" ]
   deps = []
   public_deps = [ "//sdk/lib/driver/devicetree/manager:manager-test-helper" ]
-  testonly = true
 }
 
 group("devicetree-test-bazel-inputs") {

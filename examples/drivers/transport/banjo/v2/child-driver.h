@@ -5,6 +5,7 @@
 #ifndef EXAMPLES_DRIVERS_TRANSPORT_BANJO_V2_CHILD_DRIVER_H_
 #define EXAMPLES_DRIVERS_TRANSPORT_BANJO_V2_CHILD_DRIVER_H_
 
+#include <fidl/fuchsia.driver.framework/cpp/natural_messaging.h>
 #include <fuchsia/examples/gizmo/cpp/banjo.h>
 #include <lib/driver/component/cpp/driver_base.h>
 

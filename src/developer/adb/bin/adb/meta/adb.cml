@@ -11,11 +11,7 @@
         binary: "bin/adb",
     },
     use: [
-        {
-            directory: "dev-adb",
-            rights: [ "r*" ],
-            path: "/dev/class/adb",
-        },
+        { service: "fuchsia.hardware.adb.Service" },
         {
             protocol: "fuchsia.component.Realm",
             from: "parent",

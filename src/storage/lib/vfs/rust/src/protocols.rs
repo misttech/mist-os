@@ -270,11 +270,7 @@ impl ProtocolsExt for fio::Flags {
     fn to_directory_options(&self) -> Result<DirectoryOptions, Status> {
         // Verify protocols.
         if !self.is_dir_allowed() {
-            if self.is_file_allowed() && !self.is_symlink_allowed() {
-                return Err(Status::NOT_FILE);
-            } else {
-                return Err(Status::WRONG_TYPE);
-            }
+            return Err(if self.is_file_allowed() { Status::NOT_FILE } else { Status::WRONG_TYPE });
         }
 
         // Expand the POSIX flags to their respective rights. This is done with the assumption that
@@ -310,8 +306,13 @@ impl ProtocolsExt for fio::Flags {
     }
 
     fn to_service_options(&self) -> Result<ServiceOptions, Status> {
-        if !self.difference(fio::Flags::PROTOCOL_SERVICE).is_empty()
-            && !self.contains(fio::Flags::PROTOCOL_NODE)
+        // This should not be called if fio::Flags::PROTOCOL_NODE was set (`to_node_options` would
+        // be called instead).
+        assert!(!self.contains(fio::Flags::PROTOCOL_NODE));
+        if !self
+            .intersection(fio::MASK_KNOWN_PROTOCOLS)
+            .difference(fio::Flags::PROTOCOL_SERVICE)
+            .is_empty()
         {
             return if self.is_dir_allowed() {
                 Err(Status::NOT_DIR)
@@ -320,6 +321,10 @@ impl ProtocolsExt for fio::Flags {
             } else {
                 Err(Status::WRONG_TYPE)
             };
+        }
+
+        if !self.difference(fio::Flags::PROTOCOL_SERVICE).is_empty() {
+            return Err(Status::INVALID_ARGS);
         }
 
         Ok(ServiceOptions)
@@ -405,6 +410,8 @@ impl ToFileOptions for fio::OpenFlags {
                 rights
             },
             is_append: self.contains(fio::OpenFlags::APPEND),
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
+            is_linkable: true,
         })
     }
 }
@@ -436,6 +443,10 @@ impl ToFileOptions for fio::Flags {
         Ok(FileOptions {
             rights: flags_to_rights(self).intersection(ALLOWED_RIGHTS),
             is_append: self.contains(fio::Flags::FILE_APPEND),
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
+            is_linkable: !self.contains(
+                fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY | fio::FLAG_TEMPORARY_AS_NOT_LINKABLE,
+            ),
         })
     }
 }

@@ -7,7 +7,6 @@ use futures::prelude::*;
 use futures::task::{Context, Poll};
 use netext::{TokioAsyncReadExt, TokioAsyncWrapper};
 use std::fmt;
-use std::io::ErrorKind;
 use std::net::SocketAddr;
 use std::pin::Pin;
 use std::time::Duration;
@@ -71,10 +70,9 @@ where
                         let mut pkt_len = [0; 8];
                         let bytes_read = stream.read(&mut pkt_len).await?;
                         if bytes_read != pkt_len.len() {
-                            return Err(std::io::Error::new(
-                                ErrorKind::Other,
-                                format!("Could not read packet header"),
-                            ));
+                            return Err(std::io::Error::other(format!(
+                                "Could not read packet header"
+                            )));
                         }
                         u64::from_be_bytes(pkt_len)
                     }
@@ -155,10 +153,7 @@ where
                     // we try repeatedly until everything is written.
                     let written = stream.write(&data[start..]).await?;
                     if written == 0 {
-                        return Err(std::io::Error::new(
-                            ErrorKind::Other,
-                            format!("Write made no progress"),
-                        ));
+                        return Err(std::io::Error::other(format!("Write made no progress")));
                     }
 
                     start += written;

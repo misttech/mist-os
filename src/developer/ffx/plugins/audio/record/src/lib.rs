@@ -6,7 +6,8 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use blocking::Unblock;
 use ffx_audio_record_args::{AudioCaptureUsageExtended, RecordCommand};
-use fho::{FfxMain, FfxTool, SimpleWriter, ToolIO};
+use ffx_writer::{SimpleWriter, ToolIO as _};
+use fho::{FfxMain, FfxTool};
 use fidl::endpoints::create_proxy;
 use futures::{AsyncWrite, FutureExt};
 use target_holders::moniker;
@@ -112,8 +113,7 @@ where
 mod tests {
     use super::*;
     use ffx_audio_common::tests::SINE_WAV;
-    use ffx_writer::TestBuffers;
-    use fho::macro_deps::ffx_writer::TestBuffer;
+    use ffx_writer::{TestBuffer, TestBuffers};
 
     #[fuchsia::test]
     pub async fn test_record_no_cancel() -> Result<(), fho::Error> {

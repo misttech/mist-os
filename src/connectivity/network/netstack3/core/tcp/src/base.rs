@@ -15,11 +15,14 @@ use netstack3_base::{
 };
 use netstack3_ip::socket::{RouteResolutionOptions, SendOptions};
 use netstack3_ip::Marks;
-use packet_formats::icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode};
+use packet_formats::icmp::{
+    Icmpv4DestUnreachableCode, Icmpv4TimeExceededCode, Icmpv6DestUnreachableCode,
+};
 use packet_formats::ip::DscpAndEcn;
 use packet_formats::utils::NonZeroDuration;
 use rand::Rng;
 
+use crate::internal::buffer::BufferLimits;
 use crate::internal::socket::isn::IsnGenerator;
 use crate::internal::socket::{DualStackIpExt, Sockets, TcpBindingsTypes};
 use crate::internal::state::DEFAULT_MAX_SYN_RETRIES;
@@ -50,6 +53,10 @@ pub enum ConnectionError {
     SourceHostIsolated,
     /// The connection was closed because of a time out.
     TimedOut,
+    /// The connection was closed because of a lack of required permissions.
+    PermissionDenied,
+    /// The connection was closed because there was a protocol error.
+    ProtocolError,
 }
 
 impl ConnectionError {
@@ -70,6 +77,7 @@ impl ConnectionError {
                 Icmpv4DestUnreachableCode::DestPortUnreachable => {
                     Some(ConnectionError::PortUnreachable)
                 }
+                // TODO(https://fxbug.dev/42052672): update PMTU/MSS.
                 Icmpv4DestUnreachableCode::FragmentationRequired => None,
                 Icmpv4DestUnreachableCode::SourceRouteFailed => {
                     Some(ConnectionError::SourceRouteFailed)
@@ -105,18 +113,22 @@ impl ConnectionError {
                     Some(ConnectionError::HostUnreachable)
                 }
             },
-            // TODO(https://fxbug.dev/42052672): Map the following ICMP messages.
-            IcmpErrorCode::V4(
-                Icmpv4ErrorCode::ParameterProblem(_)
-                | Icmpv4ErrorCode::Redirect(_)
-                | Icmpv4ErrorCode::TimeExceeded(_),
-            ) => None,
+            IcmpErrorCode::V4(Icmpv4ErrorCode::ParameterProblem(_)) => {
+                Some(ConnectionError::ProtocolError)
+            }
+            IcmpErrorCode::V4(Icmpv4ErrorCode::TimeExceeded(
+                Icmpv4TimeExceededCode::TtlExpired,
+            )) => Some(ConnectionError::HostUnreachable),
+            IcmpErrorCode::V4(Icmpv4ErrorCode::TimeExceeded(
+                Icmpv4TimeExceededCode::FragmentReassemblyTimeExceeded,
+            )) => Some(ConnectionError::TimedOut),
+            IcmpErrorCode::V4(Icmpv4ErrorCode::Redirect(_)) => None,
             IcmpErrorCode::V6(Icmpv6ErrorCode::DestUnreachable(code)) => match code {
                 Icmpv6DestUnreachableCode::NoRoute => Some(ConnectionError::NetworkUnreachable),
                 Icmpv6DestUnreachableCode::CommAdministrativelyProhibited => {
-                    Some(ConnectionError::HostUnreachable)
+                    Some(ConnectionError::PermissionDenied)
                 }
-                Icmpv6DestUnreachableCode::BeyondScope => Some(ConnectionError::NetworkUnreachable),
+                Icmpv6DestUnreachableCode::BeyondScope => Some(ConnectionError::HostUnreachable),
                 Icmpv6DestUnreachableCode::AddrUnreachable => {
                     Some(ConnectionError::HostUnreachable)
                 }
@@ -124,16 +136,18 @@ impl ConnectionError {
                     Some(ConnectionError::PortUnreachable)
                 }
                 Icmpv6DestUnreachableCode::SrcAddrFailedPolicy => {
-                    Some(ConnectionError::SourceRouteFailed)
+                    Some(ConnectionError::PermissionDenied)
                 }
-                Icmpv6DestUnreachableCode::RejectRoute => Some(ConnectionError::NetworkUnreachable),
+                Icmpv6DestUnreachableCode::RejectRoute => Some(ConnectionError::PermissionDenied),
             },
-            // TODO(https://fxbug.dev/42052672): Map the following ICMP messages.
-            IcmpErrorCode::V6(
-                Icmpv6ErrorCode::PacketTooBig
-                | Icmpv6ErrorCode::ParameterProblem(_)
-                | Icmpv6ErrorCode::TimeExceeded(_),
-            ) => None,
+            IcmpErrorCode::V6(Icmpv6ErrorCode::ParameterProblem(_)) => {
+                Some(ConnectionError::ProtocolError)
+            }
+            IcmpErrorCode::V6(Icmpv6ErrorCode::TimeExceeded(_)) => {
+                Some(ConnectionError::HostUnreachable)
+            }
+            // TODO(https://fxbug.dev/42052672): update PMTU/MSS.
+            IcmpErrorCode::V6(Icmpv6ErrorCode::PacketTooBig) => None,
         }
     }
 }
@@ -179,6 +193,11 @@ impl Default for BufferSizes {
 }
 
 impl BufferSizes {
+    pub(crate) fn rcv_limits(&self) -> BufferLimits {
+        let Self { send: _, receive } = self;
+        BufferLimits { capacity: *receive, len: 0 }
+    }
+
     pub(crate) fn rwnd(&self) -> WindowSize {
         let Self { send: _, receive } = *self;
         WindowSize::new(receive).unwrap_or(WindowSize::MAX)
@@ -293,17 +312,7 @@ impl Default for SocketOptions {
             //   coalesce short segments
             nagle_enabled: true,
             user_timeout: None,
-            // RFC 9293 Section 4.2:
-            //   The delayed ACK algorithm specified in [RFC1122] SHOULD be used
-            //   by a TCP receiver.
-            // Delayed acks have *bad* performance for connections that are not
-            // interactive, especially when combined with the Nagle algorithm.
-            // We disable it by default here because:
-            //   1. RFC does not say MUST;
-            //   2. Common implementations like Linux has it turned off by
-            //   default.
-            // More context: https://news.ycombinator.com/item?id=10607422
-            delayed_ack: false,
+            delayed_ack: true,
             fin_wait2_timeout: Some(DEFAULT_FIN_WAIT2_TIMEOUT),
             max_syn_retries: DEFAULT_MAX_SYN_RETRIES,
             ip_options: TcpIpSockOptions::default(),

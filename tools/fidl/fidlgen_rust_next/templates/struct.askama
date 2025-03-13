@@ -1,14 +1,8 @@
 {% let is_static = strct.shape.max_out_of_line == 0 %}
+{% let has_padding = strct.shape.has_padding %}
 {% let base_name = strct.name.decl_name().camel() %}
 {% let name = filters::ident(base_name)? %}
 {% let wire_name = format!("Wire{base_name}") %}
-
-{% let params %}
-{% if is_static %}
-    {% let params = "" %}
-{% else %}
-    {% let params = "<'buf>" %}
-{% endif %}
 
 {{ self::doc_string(strct.attributes) -}}
 #[derive(
@@ -19,6 +13,9 @@
         Debug,
     {% endif %}
 )]
+{%- if is_static && !has_padding %}
+    #[repr(C)]
+{% endif -%}
 pub struct {{ name }} {
     {% for member in strct.members %}
         pub {{ member.name.snake()|ident }}: {{ context.natural_type(member.ty) }},
@@ -26,19 +23,37 @@ pub struct {{ name }} {
 }
 
 impl ::fidl_next::Encodable for {{ name }} {
-    type Encoded<'buf> = {{ wire_name }}{{ params }};
+    {% if is_static && !has_padding %}
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true
+            {% for member in strct.members %}
+                && <
+                    {{ context.natural_type(member.ty) }} as ::fidl_next::Encodable
+                >::COPY_OPTIMIZATION.is_enabled()
+            {% endfor %}
+        )
+    };
+    {% endif %}
+
+    type Encoded = {{ wire_name }};
 }
 
 impl<___E> ::fidl_next::Encode<___E> for {{ name }}
 where
-    {% for member in strct.members %}
-        {{ context.natural_type(member.ty) }}: ::fidl_next::Encode<___E>,
-    {% endfor %}
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+    {% if !is_static %}
+        ___E: ::fidl_next::Encoder,
+    {% endif %}
+    {% if strct.is_resource %}
+        ___E: ::fidl_next::fuchsia::HandleEncoder,
+    {% endif %}
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -57,7 +72,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<{{ name }}> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, {{ wire_name }}{{ params }}>;
+    type EncodedOption = ::fidl_next::WireBox<{{ wire_name }}>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<{{ name }}>
@@ -65,10 +80,11 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     {{ name }}: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -81,12 +97,26 @@ where
     }
 }
 
-impl{{ params }} ::fidl_next::TakeFrom<{{ wire_name }}{{ params }}> for {{ name }} {
-    fn take_from(from: &mut {{ wire_name }}{{ params }}) -> Self {
+impl ::fidl_next::TakeFrom<{{ wire_name }}> for {{ name }} {
+    {% if is_static && !has_padding %}
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true
+            {% for member in strct.members %}
+                && <
+                    {{ context.natural_type(member.ty) }} as ::fidl_next::Encodable
+                >::COPY_OPTIMIZATION.is_enabled()
+            {% endfor %}
+        )
+    };
+    {% endif %}
+
+    #[inline]
+    fn take_from(from: &{{ wire_name }}) -> Self {
         Self {
             {% for member in strct.members %}
                 {% let member_name = filters::ident(member.name.snake())? %}
-                {{ member_name }}: ::fidl_next::TakeFrom::take_from(&mut from.{{ member_name }}),
+                {{ member_name }}: ::fidl_next::TakeFrom::take_from(&from.{{ member_name }}),
             {% endfor %}
         }
     }
@@ -102,18 +132,21 @@ impl{{ params }} ::fidl_next::TakeFrom<{{ wire_name }}{{ params }}> for {{ name 
     {% endif %}
 )]
 #[repr(C)]
-pub struct {{ wire_name }}{{ params }} {
+pub struct {{ wire_name }} {
     {% for member in strct.members %}
         pub {{ member.name.snake()|ident }}: {{ context.wire_type(member.ty) }},
     {% endfor %}
 }
 
-unsafe impl<{% if !is_static %}'buf, {% endif %}___D> ::fidl_next::Decode<___D> for {{ wire_name }}{{ params }}
+unsafe impl<___D> ::fidl_next::Decode<___D> for {{ wire_name }}
 where
-    ___D: ?Sized,
-    {% for member in strct.members %}
-        {{ context.wire_type(member.ty) }}: ::fidl_next::Decode<___D>,
-    {% endfor %}
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
+    {% if !is_static %}
+        ___D: ::fidl_next::Decoder,
+    {% endif %}
+    {% if strct.is_resource %}
+        ___D: ::fidl_next::fuchsia::HandleDecoder,
+    {% endif %}
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

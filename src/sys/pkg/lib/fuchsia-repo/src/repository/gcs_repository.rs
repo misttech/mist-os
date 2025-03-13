@@ -128,9 +128,7 @@ where
 
                         return Ok(Resource {
                             content_range: content_len.into(),
-                            stream: Box::pin(
-                                body.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)),
-                            ),
+                            stream: Box::pin(body.map_err(std::io::Error::other)),
                         });
                     }
 
@@ -274,10 +272,7 @@ where
                     err => tuf::Error::Opaque(err.to_string()),
                 })?;
 
-            let reader = resp
-                .stream
-                .map_err(|err| io::Error::new(io::ErrorKind::Other, err))
-                .into_async_read();
+            let reader = resp.stream.map_err(io::Error::other).into_async_read();
 
             let reader: Box<dyn AsyncRead + Send + Unpin> = Box::new(reader);
             Ok(reader)
@@ -300,10 +295,7 @@ where
                     err => tuf::Error::Opaque(err.to_string()),
                 })?;
 
-            let reader = resp
-                .stream
-                .map_err(|err| io::Error::new(io::ErrorKind::Other, err))
-                .into_async_read();
+            let reader = resp.stream.map_err(io::Error::other).into_async_read();
 
             let reader: Box<dyn AsyncRead + Send + Unpin> = Box::new(reader);
             Ok(reader)

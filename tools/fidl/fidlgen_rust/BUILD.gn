@@ -68,12 +68,19 @@ if (is_host) {
     foreach(info, fidl_testdata_info) {
       if (info.denylist + [ "fidlgen_rust" ] - [ "fidlgen_rust" ] ==
           info.denylist) {
-        deps += [ "${info.target}_rust_generate($fidl_toolchain)" ]
+        deps += [
+          "${info.target}_rust_common_generate($fidl_toolchain)",
+          "${info.target}_rust_generate($fidl_toolchain)",
+        ]
         _library_underscore = string_replace(info.library, ".", "_")
         comparisons += [
           {
             golden = "goldens/${info.name}.rs.golden"
             candidate = "${info.fidl_gen_dir}/${info.target_name}/rust/fidl_${_library_underscore}.rs"
+          },
+          {
+            golden = "goldens/${info.name}_common.rs.golden"
+            candidate = "${info.fidl_gen_dir}/${info.target_name}/rust/fidl_${_library_underscore}_common.rs"
           },
         ]
       }
@@ -98,7 +105,10 @@ group("goldens") {
   foreach(info, fidl_testdata_info) {
     if (info[denylist_key] + [ "fidlgen_rust" ] - [ "fidlgen_rust" ] ==
         info[denylist_key]) {
-      deps += [ "${info.target}_rust" ]
+      deps += [
+        "${info.target}_rust",
+        "${info.target}_rust_common",
+      ]
     }
   }
 }

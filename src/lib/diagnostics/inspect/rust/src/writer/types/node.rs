@@ -8,12 +8,13 @@ use crate::writer::{
     DoubleLinearHistogramProperty, DoubleProperty, Error, Inner, InnerData, InnerType, InspectType,
     InspectTypeReparentable, Inspector, IntArrayProperty, IntExponentialHistogramProperty,
     IntLinearHistogramProperty, IntProperty, LazyNode, State, StringArrayProperty, StringProperty,
-    StringReference, UintArrayProperty, UintExponentialHistogramProperty,
-    UintLinearHistogramProperty, UintProperty, ValueList,
+    UintArrayProperty, UintExponentialHistogramProperty, UintLinearHistogramProperty, UintProperty,
+    ValueList,
 };
 use diagnostics_hierarchy::{ArrayFormat, ExponentialHistogramParams, LinearHistogramParams};
 use futures::future::BoxFuture;
 use inspect_format::{BlockIndex, LinkNodeDisposition};
+use std::borrow::Cow;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Inspect Node data type.
@@ -41,7 +42,7 @@ impl Node {
 
     /// Add a child to this node.
     #[must_use]
-    pub fn create_child(&self, name: impl Into<StringReference>) -> Node {
+    pub fn create_child<'a>(&self, name: impl Into<Cow<'a, str>>) -> Node {
         self.inner
             .inner_ref()
             .and_then(|inner_ref| {
@@ -56,7 +57,7 @@ impl Node {
     }
 
     /// Creates and keeps track of a child with the given `name`.
-    pub fn record_child<F>(&self, name: impl Into<StringReference>, initialize: F)
+    pub fn record_child<'a, F>(&self, name: impl Into<Cow<'a, str>>, initialize: F)
     where
         F: FnOnce(&Node),
     {
@@ -92,7 +93,7 @@ impl Node {
 
     /// Creates a new `IntProperty` with the given `name` and `value`.
     #[must_use]
-    pub fn create_int(&self, name: impl Into<StringReference>, value: i64) -> IntProperty {
+    pub fn create_int<'a>(&self, name: impl Into<Cow<'a, str>>, value: i64) -> IntProperty {
         self.inner
             .inner_ref()
             .and_then(|inner_ref| {
@@ -109,14 +110,14 @@ impl Node {
     }
 
     /// Records a new `IntProperty` with the given `name` and `value`.
-    pub fn record_int(&self, name: impl Into<StringReference>, value: i64) {
+    pub fn record_int<'a>(&self, name: impl Into<Cow<'a, str>>, value: i64) {
         let property = self.create_int(name.into(), value);
         self.record(property);
     }
 
     /// Creates a new `UintProperty` with the given `name` and `value`.
     #[must_use]
-    pub fn create_uint(&self, name: impl Into<StringReference>, value: u64) -> UintProperty {
+    pub fn create_uint<'a>(&self, name: impl Into<Cow<'a, str>>, value: u64) -> UintProperty {
         self.inner
             .inner_ref()
             .and_then(|inner_ref| {
@@ -133,14 +134,14 @@ impl Node {
     }
 
     /// Records a new `UintProperty` with the given `name` and `value`.
-    pub fn record_uint(&self, name: impl Into<StringReference>, value: u64) {
+    pub fn record_uint<'a>(&self, name: impl Into<Cow<'a, str>>, value: u64) {
         let property = self.create_uint(name.into(), value);
         self.record(property);
     }
 
     /// Creates a new `DoubleProperty` with the given `name` and `value`.
     #[must_use]
-    pub fn create_double(&self, name: impl Into<StringReference>, value: f64) -> DoubleProperty {
+    pub fn create_double<'a>(&self, name: impl Into<Cow<'a, str>>, value: f64) -> DoubleProperty {
         self.inner
             .inner_ref()
             .and_then(|inner_ref| {
@@ -157,16 +158,16 @@ impl Node {
     }
 
     /// Records a new `DoubleProperty` with the given `name` and `value`.
-    pub fn record_double(&self, name: impl Into<StringReference>, value: f64) {
+    pub fn record_double<'a>(&self, name: impl Into<Cow<'a, str>>, value: f64) {
         let property = self.create_double(name.into(), value);
         self.record(property);
     }
 
     /// Creates a new `StringArrayProperty` with the given `name` and `slots`.
     #[must_use]
-    pub fn create_string_array(
+    pub fn create_string_array<'a>(
         &self,
-        name: impl Into<StringReference>,
+        name: impl Into<Cow<'a, str>>,
         slots: usize,
     ) -> StringArrayProperty {
         self.inner
@@ -188,18 +189,18 @@ impl Node {
 
     /// Creates a new `IntArrayProperty` with the given `name` and `slots`.
     #[must_use]
-    pub fn create_int_array(
+    pub fn create_int_array<'a>(
         &self,
-        name: impl Into<StringReference>,
+        name: impl Into<Cow<'a, str>>,
         slots: usize,
     ) -> IntArrayProperty {
         self.create_int_array_internal(name.into(), slots, ArrayFormat::Default)
     }
 
     #[must_use]
-    pub(crate) fn create_int_array_internal(
+    pub(crate) fn create_int_array_internal<'a>(
         &self,
-        name: impl Into<StringReference>,
+        name: impl Into<Cow<'a, str>>,
         slots: usize,
         format: ArrayFormat,
     ) -> IntArrayProperty {
@@ -220,18 +221,18 @@ impl Node {
 
     /// Creates a new `UintArrayProperty` with the given `name` and `slots`.
     #[must_use]
-    pub fn create_uint_array(
+    pub fn create_uint_array<'a>(
         &self,
-        name: impl Into<StringReference>,
+        name: impl Into<Cow<'a, str>>,
         slots: usize,
     ) -> UintArrayProperty {
         self.create_uint_array_internal(name.into(), slots, ArrayFormat::Default)
     }
 
     #[must_use]
-    pub(crate) fn create_uint_array_internal(
+    pub(crate) fn create_uint_array_internal<'a>(
         &self,
-        name: impl Into<StringReference>,
+        name: impl Into<Cow<'a, str>>,
         slots: usize,
         format: ArrayFormat,
     ) -> UintArrayProperty {
@@ -252,18 +253,18 @@ impl Node {
 
     /// Creates a new `DoubleArrayProperty` with the given `name` and `slots`.
     #[must_use]
-    pub fn create_double_array(
+    pub fn create_double_array<'a>(
         &self,
-        name: impl Into<StringReference>,
+        name: impl Into<Cow<'a, str>>,
         slots: usize,
     ) -> DoubleArrayProperty {
         self.create_double_array_internal(name.into(), slots, ArrayFormat::Default)
     }
 
     #[must_use]
-    pub(crate) fn create_double_array_internal(
+    pub(crate) fn create_double_array_internal<'a>(
         &self,
-        name: impl Into<StringReference>,
+        name: impl Into<Cow<'a, str>>,
         slots: usize,
         format: ArrayFormat,
     ) -> DoubleArrayProperty {
@@ -286,9 +287,9 @@ impl Node {
 
     /// Creates a new `IntLinearHistogramProperty` with the given `name` and `params`.
     #[must_use]
-    pub fn create_int_linear_histogram(
+    pub fn create_int_linear_histogram<'a>(
         &self,
-        name: impl Into<StringReference>,
+        name: impl Into<Cow<'a, str>>,
         params: LinearHistogramParams<i64>,
     ) -> IntLinearHistogramProperty {
         IntLinearHistogramProperty::new(name.into(), params, self)
@@ -296,9 +297,9 @@ impl Node {
 
     /// Creates a new `UintLinearHistogramProperty` with the given `name` and `params`.
     #[must_use]
-    pub fn create_uint_linear_histogram(
+    pub fn create_uint_linear_histogram<'a>(
         &self,
-        name: impl Into<StringReference>,
+        name: impl Into<Cow<'a, str>>,
         params: LinearHistogramParams<u64>,
     ) -> UintLinearHistogramProperty {
         UintLinearHistogramProperty::new(name.into(), params, self)
@@ -306,9 +307,9 @@ impl Node {
 
     /// Creates a new `DoubleLinearHistogramProperty` with the given `name` and `params`.
     #[must_use]
-    pub fn create_double_linear_histogram(
+    pub fn create_double_linear_histogram<'a>(
         &self,
-        name: impl Into<StringReference>,
+        name: impl Into<Cow<'a, str>>,
         params: LinearHistogramParams<f64>,
     ) -> DoubleLinearHistogramProperty {
         DoubleLinearHistogramProperty::new(name.into(), params, self)
@@ -316,9 +317,9 @@ impl Node {
 
     /// Creates a new `IntExponentialHistogramProperty` with the given `name` and `params`.
     #[must_use]
-    pub fn create_int_exponential_histogram(
+    pub fn create_int_exponential_histogram<'a>(
         &self,
-        name: impl Into<StringReference>,
+        name: impl Into<Cow<'a, str>>,
         params: ExponentialHistogramParams<i64>,
     ) -> IntExponentialHistogramProperty {
         IntExponentialHistogramProperty::new(name.into(), params, self)
@@ -326,9 +327,9 @@ impl Node {
 
     /// Creates a new `UintExponentialHistogramProperty` with the given `name` and `params`.
     #[must_use]
-    pub fn create_uint_exponential_histogram(
+    pub fn create_uint_exponential_histogram<'a>(
         &self,
-        name: impl Into<StringReference>,
+        name: impl Into<Cow<'a, str>>,
         params: ExponentialHistogramParams<u64>,
     ) -> UintExponentialHistogramProperty {
         UintExponentialHistogramProperty::new(name.into(), params, self)
@@ -336,9 +337,9 @@ impl Node {
 
     /// Creates a new `DoubleExponentialHistogramProperty` with the given `name` and `params`.
     #[must_use]
-    pub fn create_double_exponential_histogram(
+    pub fn create_double_exponential_histogram<'a>(
         &self,
-        name: impl Into<StringReference>,
+        name: impl Into<Cow<'a, str>>,
         params: ExponentialHistogramParams<f64>,
     ) -> DoubleExponentialHistogramProperty {
         DoubleExponentialHistogramProperty::new(name.into(), params, self)
@@ -349,7 +350,7 @@ impl Node {
     /// `callback` is expected to create a new Inspector and return it;
     /// its contents will be rooted at the intended location (the `self` node).
     #[must_use]
-    pub fn create_lazy_child<F>(&self, name: impl Into<StringReference>, callback: F) -> LazyNode
+    pub fn create_lazy_child<'a, F>(&self, name: impl Into<Cow<'a, str>>, callback: F) -> LazyNode
     where
         F: Fn() -> BoxFuture<'static, Result<Inspector, anyhow::Error>> + Sync + Send + 'static,
     {
@@ -377,7 +378,7 @@ impl Node {
     /// `callback` will be invoked each time the component's Inspect is read.
     /// `callback` is expected to create a new Inspector and return it;
     /// its contents will be rooted at the intended location (the `self` node).
-    pub fn record_lazy_child<F>(&self, name: impl Into<StringReference>, callback: F)
+    pub fn record_lazy_child<'a, F>(&self, name: impl Into<Cow<'a, str>>, callback: F)
     where
         F: Fn() -> BoxFuture<'static, Result<Inspector, anyhow::Error>> + Sync + Send + 'static,
     {
@@ -390,7 +391,7 @@ impl Node {
     /// `callback` is expected to create a new Inspector and return it;
     /// its contents will be rooted at the intended location (the `self` node).
     #[must_use]
-    pub fn create_lazy_values<F>(&self, name: impl Into<StringReference>, callback: F) -> LazyNode
+    pub fn create_lazy_values<'a, F>(&self, name: impl Into<Cow<'a, str>>, callback: F) -> LazyNode
     where
         F: Fn() -> BoxFuture<'static, Result<Inspector, anyhow::Error>> + Sync + Send + 'static,
     {
@@ -418,7 +419,7 @@ impl Node {
     /// `callback` will be invoked each time the component's Inspect is read.
     /// `callback` is expected to create a new Inspector and return it;
     /// its contents will be rooted at the intended location (the `self` node).
-    pub fn record_lazy_values<F>(&self, name: impl Into<StringReference>, callback: F)
+    pub fn record_lazy_values<'a, F>(&self, name: impl Into<Cow<'a, str>>, callback: F)
     where
         F: Fn() -> BoxFuture<'static, Result<Inspector, anyhow::Error>> + Sync + Send + 'static,
     {
@@ -428,10 +429,10 @@ impl Node {
 
     /// Add a string property to this node.
     #[must_use]
-    pub fn create_string(
+    pub fn create_string<'a, 'b>(
         &self,
-        name: impl Into<StringReference>,
-        value: impl Into<StringReference>,
+        name: impl Into<Cow<'a, str>>,
+        value: impl Into<Cow<'b, str>>,
     ) -> StringProperty {
         self.inner
             .inner_ref()
@@ -449,10 +450,10 @@ impl Node {
     }
 
     /// Creates and saves a string property for the lifetime of the node.
-    pub fn record_string(
+    pub fn record_string<'a, 'b>(
         &self,
-        name: impl Into<StringReference>,
-        value: impl Into<StringReference>,
+        name: impl Into<Cow<'a, str>>,
+        value: impl Into<Cow<'b, str>>,
     ) {
         let property = self.create_string(name, value);
         self.record(property);
@@ -460,9 +461,9 @@ impl Node {
 
     /// Add a byte vector property to this node.
     #[must_use]
-    pub fn create_bytes(
+    pub fn create_bytes<'a>(
         &self,
-        name: impl Into<StringReference>,
+        name: impl Into<Cow<'a, str>>,
         value: impl AsRef<[u8]>,
     ) -> BytesProperty {
         self.inner
@@ -485,14 +486,14 @@ impl Node {
     }
 
     /// Creates and saves a bytes property for the lifetime of the node.
-    pub fn record_bytes(&self, name: impl Into<StringReference>, value: impl AsRef<[u8]>) {
+    pub fn record_bytes<'a>(&self, name: impl Into<Cow<'a, str>>, value: impl AsRef<[u8]>) {
         let property = self.create_bytes(name.into(), value);
         self.record(property);
     }
 
     /// Add a bool property to this node.
     #[must_use]
-    pub fn create_bool(&self, name: impl Into<StringReference>, value: bool) -> BoolProperty {
+    pub fn create_bool<'a>(&self, name: impl Into<Cow<'a, str>>, value: bool) -> BoolProperty {
         self.inner
             .inner_ref()
             .and_then(|inner_ref| {
@@ -509,7 +510,7 @@ impl Node {
     }
 
     /// Creates and saves a bool property for the lifetime of the node.
-    pub fn record_bool(&self, name: impl Into<StringReference>, value: bool) {
+    pub fn record_bool<'a>(&self, name: impl Into<Cow<'a, str>>, value: bool) {
         let property = self.create_bool(name.into(), value);
         self.record(property);
     }

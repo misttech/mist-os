@@ -6,6 +6,14 @@
     // be used always.
     offer: [
         {
+            // For wake alarms programming.
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-hrtimer",
+            to: "#timekeeper",
+            subdir: "hrtimer",
+        },
+        {
             // Wake alarms handling.
             protocol: [ "fuchsia.time.alarms.Wake" ],
             from: "#timekeeper",

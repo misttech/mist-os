@@ -60,10 +60,10 @@ fidl::ServerEnd<Protocol> CreateEndpointsAndBind(fidl::Client<Protocol>& client)
 void ReadElfJobId(fidl::Client<fuchsia_io::Directory> runtime_dir, const std::string& moniker,
                   fit::callback<void(zx_koid_t)> cb) {
   fidl::Client<fuchsia_io::File> job_id_file;
-  auto open_res = runtime_dir->Open3({"elf/job_id",
-                                      fuchsia_io::kPermReadable,
-                                      {},
-                                      CreateEndpointsAndBind(job_id_file).TakeChannel()});
+  auto open_res = runtime_dir->Open({"elf/job_id",
+                                     fuchsia_io::kPermReadable,
+                                     {},
+                                     CreateEndpointsAndBind(job_id_file).TakeChannel()});
   if (!open_res.is_ok()) {
     LOGS(Error) << "Failed to open elf/job_id for " << moniker;
     return cb(ZX_KOID_INVALID);

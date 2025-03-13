@@ -274,10 +274,11 @@ class MagmaDriverBase : public fdf::DriverBase,
         [this](fidl::ServerEnd<fuchsia_gpu_magma::PowerElementProvider> server_end) mutable {
           fidl::BindServer(dispatcher(), std::move(server_end), this);
         };
-    auto device_protocol = [this](fidl::ServerEnd<fuchsia_gpu_magma::Device> server_end) mutable {
-      fidl::BindServer(dispatcher(), fidl::ServerEnd<FidlDeviceType>(server_end.TakeChannel()),
-                       this);
-    };
+    auto device_protocol =
+        [this](fidl::ServerEnd<fuchsia_gpu_magma::CombinedDevice> server_end) mutable {
+          fidl::BindServer(dispatcher(), fidl::ServerEnd<FidlDeviceType>(server_end.TakeChannel()),
+                           this);
+        };
 
     fuchsia_gpu_magma::Service::InstanceHandler handler(
         {.device = std::move(device_protocol),

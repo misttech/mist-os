@@ -10,6 +10,7 @@ driver_bind_rules("sysdev-bind") {
 }
 
 fuchsia_cc_driver("sysdev-driver") {
+  legacy = true
   output_name = "sysdev"
   sources = [ "sysdev.cc" ]
   deps = [

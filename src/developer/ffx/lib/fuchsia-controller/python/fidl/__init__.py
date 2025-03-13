@@ -4,13 +4,13 @@
 
 from . import _import
 from ._async_socket import AsyncSocket
-from ._client import StopEventHandler
+from ._construct import construct_response_object
 from ._fidl_common import (
     DomainError,
     EpitaphError,
     FrameworkError,
+    StopEventHandler,
     StopServer,
-    construct_response_object,
 )
 from ._ipc import GlobalHandleWaker, HandleWaker
 

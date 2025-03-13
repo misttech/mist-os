@@ -53,14 +53,14 @@ zx_status_t Gtt::Init(const ddk::Pci& pci, fdf::MmioBuffer buffer, uint32_t fb_o
 
   zx_status_t status = pci.GetBti(0, &bti_);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to get bti (%d)", status);
+    fdf::error("Failed to get bti ({})", status);
     return status;
   }
 
   zx_info_bti_t info;
   status = bti_.get_info(ZX_INFO_BTI, &info, sizeof(zx_info_bti_t), nullptr, nullptr);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to fetch bti info (%d)", status);
+    fdf::error("Failed to fetch bti info ({})", status);
     return status;
   }
   min_contiguity_ = info.minimum_contiguity;
@@ -69,11 +69,11 @@ zx_status_t Gtt::Init(const ddk::Pci& pci, fdf::MmioBuffer buffer, uint32_t fb_o
   auto gmch_gfx_ctrl = registers::GmchGfxControl::Get().FromValue(0);
   status = pci.ReadConfig16(gmch_gfx_ctrl.kAddr, gmch_gfx_ctrl.reg_value_ptr());
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to read GfxControl");
+    fdf::error("Failed to read GfxControl");
     return status;
   }
   uint32_t gtt_size = gmch_gfx_ctrl.gtt_mappable_mem_size();
-  FDF_LOG(TRACE, "Gtt::Init gtt_size (for page tables) 0x%x", gtt_size);
+  fdf::trace("Gtt::Init gtt_size (for page tables) 0x{:x}", gtt_size);
   if (gtt_size == 0) {
     // IHD-OS-KBL-Vol 5-1.17 (intel-gfx-prm-osrc-kbl-vol05-memory_views.pdf p.35) lists that the GPU
     // supports a global GTT and the size can be either 128KB, 256KB, or 512KB, which further map to
@@ -84,20 +84,20 @@ zx_status_t Gtt::Init(const ddk::Pci& pci, fdf::MmioBuffer buffer, uint32_t fb_o
     // the |gtt_size| value here actually corresponds to "the amount of main memory that is
     // pre-allocated to supported the Internal GTT", which comes in sizes of 2MB, 4MB, and 8MB. Is
     // it an error if the BIOS does not pre-allocate this memory?
-    FDF_LOG(ERROR, "The BIOS pre-allocated memory size for the internal GTT is 0! Aborting.");
+    fdf::error("The BIOS pre-allocated memory size for the internal GTT is 0! Aborting.");
     return ZX_ERR_INTERNAL;
   }
 
   status = zx::vmo::create(PAGE_SIZE, 0, &scratch_buffer_);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to alloc scratch buffer (%d)", status);
+    fdf::error("Failed to alloc scratch buffer ({})", status);
     return status;
   }
 
   status = bti_.pin(ZX_BTI_PERM_READ, scratch_buffer_, 0, PAGE_SIZE, &scratch_buffer_paddr_, 1,
                     &scratch_buffer_pmt_);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to look up scratch buffer (%d)", status);
+    fdf::error("Failed to look up scratch buffer ({})", status);
     return status;
   }
 
@@ -186,7 +186,7 @@ zx_status_t GttRegionImpl::PopulateRegion(zx_handle_t vmo, uint64_t page_offset,
     status = gtt_->bti_.pin(flags, *zx::unowned_vmo(vmo_), vmo_offset, cur_len, paddrs,
                             actual_entries, &pmt);
     if (status != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to get paddrs (%d)", status);
+      fdf::error("Failed to get paddrs ({})", status);
       return status;
     }
     vmo_offset += cur_len;
@@ -226,7 +226,7 @@ void GttRegionImpl::ClearRegion() {
 
   for (zx::pmt& pmt : pmts_) {
     if (pmt.unpin() != ZX_OK) {
-      FDF_LOG(INFO, "Error unpinning gtt region");
+      fdf::info("Error unpinning gtt region");
     }
   }
   pmts_.reset();

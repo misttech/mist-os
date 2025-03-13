@@ -42,10 +42,7 @@ def fuchsia_cc_driver(
     #
     # NOTE: A value of //fuchsia/private:driver.ld will not work here, as it will
     # be interpreted as a package 'fucshia' or the project's workspace itself.
-    #
-    # Using @rules_fuchsia//fuchsia/private:driver.ld would break client workspaces
-    # that still use a standalone @fuchsia_sdk repository.
-    driver_ld_target = "@fuchsia_sdk//fuchsia/private:driver.ld"
+    driver_ld_target = "@rules_fuchsia//fuchsia/private:driver.ld"
 
     shared_lib_name = (output_name or "lib{}".format(name)).removesuffix(".so") + ".so"
 
@@ -59,7 +56,6 @@ def fuchsia_cc_driver(
     user_link_flags = [
         # We need to run our own linker script to limit the symbols that are exported
         # and to make the driver framework symbols global.
-        "-Wl,--undefined-version",
         "-Wl,--version-script",
         "$(location %s)" % driver_ld_target,
     ]
@@ -127,5 +123,5 @@ def fuchsia_cc_driver(
         tags = tags,
         # TODO(352586714) Enable this check when we understand why the symbols are getting
         # pulled in.
-        # restricted_symbols = "//fuchsia/private:driver_restricted_symbols.txt",
+        # restricted_symbols = "@rules_fuchsia//fuchsia/private:driver_restricted_symbols.txt",
     )

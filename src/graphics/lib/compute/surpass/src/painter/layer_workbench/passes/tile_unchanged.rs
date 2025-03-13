@@ -31,7 +31,7 @@ pub fn tile_unchanged_pass<'w, 'c, P: LayerProps>(
             })
             .unwrap_or_default();
 
-        (clear_color_is_unchanged && is_unchanged).then(|| OptimizerTileWriteOp::None)
+        (clear_color_is_unchanged && is_unchanged).then_some(OptimizerTileWriteOp::None)
     });
 
     match tile_paint {

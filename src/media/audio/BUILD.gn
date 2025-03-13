@@ -22,8 +22,8 @@ group("audio") {
 }
 
 fuchsia_fuzzer_component("audio-core-config-fuzzer") {
-  manifest = "audio_core/shared/meta/audio_core_config_fuzzer.cml"
-  deps = [ "audio_core/shared:audio_core_config_fuzzer" ]
+  manifest = "audio_core/meta/audio_core_config_fuzzer.cml"
+  deps = [ "audio_core:audio_core_config_fuzzer" ]
 }
 
 fuchsia_fuzzer_package("audio_fuzzers") {

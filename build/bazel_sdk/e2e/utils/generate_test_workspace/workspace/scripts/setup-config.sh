@@ -23,7 +23,7 @@ ensure_build_config_file() {
   tools/bazel run \
     --run_under="cd $PWD && " \
     --ui_event_filters=-info,-error,-debug,-stderr,-stdout \
-    @fuchsia_sdk//fuchsia/tools:ensure_build_config -- \
+    @rules_fuchsia//fuchsia/tools:ensure_build_config -- \
       --config-file ".fuchsia-build-config.json"
 }
 

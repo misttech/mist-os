@@ -53,8 +53,7 @@ template("bazel_board_configuration") {
     # represents the freshness of all outputs.
     directory_outputs = [
       {
-        bazel_dir =
-            "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_board_configuration"
+        bazel_dir = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}"
         ninja_dir = board_configuration_target
         copy_debug_symbols = true
         tracked_files = [ "board_configuration.json" ]

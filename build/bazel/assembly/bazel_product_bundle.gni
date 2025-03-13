@@ -278,6 +278,7 @@ template("bazel_product_bundle") {
           bazel_dir = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out"
           ninja_dir = _create_system_target
           tracked_files = [ "images.json" ]
+          copy_debug_symbols = true
         },
       ]
       deps = _common_deps

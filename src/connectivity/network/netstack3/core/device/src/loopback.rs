@@ -247,7 +247,7 @@ where
         let (frame, whole_body) =
             match buf.parse_with_view::<_, EthernetFrame<_>>(EthernetFrameLengthCheck::NoCheck) {
                 Err(e) => {
-                    self.increment(&device_id.clone().into(), |counters: &DeviceCounters| {
+                    self.increment_both(&device_id.clone().into(), |counters: &DeviceCounters| {
                         &counters.recv_parse_error
                     });
                     trace!("dropping invalid ethernet frame over loopback: {:?}", e);
@@ -269,7 +269,7 @@ where
                 None => device_id.clone().into(),
             };
 
-        self.increment(&target_device, |counters: &DeviceCounters| &counters.recv_frame);
+        self.increment_both(&target_device, |counters: &DeviceCounters| &counters.recv_frame);
 
         let frame_dest = FrameDestination::from_dest(frame.dst_mac(), Mac::UNSPECIFIED);
         let ethertype = frame.ethertype();
@@ -284,7 +284,7 @@ where
 
         match ethertype {
             Some(EtherType::Ipv4) => {
-                self.increment(&target_device, |counters: &DeviceCounters| {
+                self.increment_both(&target_device, |counters: &DeviceCounters| {
                     &counters.recv_ipv4_delivered
                 });
                 self.receive_frame(
@@ -298,7 +298,7 @@ where
                 );
             }
             Some(EtherType::Ipv6) => {
-                self.increment(&target_device, |counters: &DeviceCounters| {
+                self.increment_both(&target_device, |counters: &DeviceCounters| {
                     &counters.recv_ipv6_delivered
                 });
                 self.receive_frame(
@@ -312,13 +312,13 @@ where
                 );
             }
             Some(ethertype @ (EtherType::Arp | EtherType::Other(_))) => {
-                self.increment(device_id, |counters: &EthernetDeviceCounters| {
+                self.increment_both(device_id, |counters: &EthernetDeviceCounters| {
                     &counters.recv_unsupported_ethertype
                 });
                 trace!("not handling loopback frame of type {:?}", ethertype)
             }
             None => {
-                self.increment(device_id, |counters: &EthernetDeviceCounters| {
+                self.increment_both(device_id, |counters: &EthernetDeviceCounters| {
                     &counters.recv_no_ethertype
                 });
                 trace!("dropping ethernet frame without ethertype");
@@ -386,7 +386,7 @@ where
     S: Serializer,
     S::Buffer: BufferMut,
 {
-    core_ctx.increment(device_id, DeviceCounters::send_frame::<I>);
+    core_ctx.increment_both(device_id, DeviceCounters::send_frame::<I>);
 
     let target_device = match destination {
         IpPacketDestination::Loopback(device) => Some(device.downgrade()),
@@ -461,7 +461,7 @@ where
     S::Buffer: BufferMut,
     BC: DeviceLayerTypes,
 {
-    core_ctx.increment(device_id, |counters: &DeviceCounters| &counters.send_total_frames);
+    core_ctx.increment_both(device_id, |counters: &DeviceCounters| &counters.send_total_frames);
     match TransmitQueueHandler::<LoopbackDevice, _>::queue_tx_frame(
         core_ctx,
         bindings_ctx,
@@ -470,19 +470,21 @@ where
         frame,
     ) {
         Ok(()) => {
-            core_ctx.increment(device_id, |counters: &DeviceCounters| &counters.send_frame);
+            core_ctx.increment_both(device_id, |counters: &DeviceCounters| &counters.send_frame);
             Ok(())
         }
         Err(TransmitQueueFrameError::NoQueue(err)) => {
             unreachable!("loopback never fails to send a frame: {err:?}")
         }
         Err(TransmitQueueFrameError::QueueFull(serializer)) => {
-            core_ctx.increment(device_id, |counters: &DeviceCounters| &counters.send_queue_full);
+            core_ctx
+                .increment_both(device_id, |counters: &DeviceCounters| &counters.send_queue_full);
             Err(SendFrameError { serializer, error: SendFrameErrorReason::QueueFull })
         }
         Err(TransmitQueueFrameError::SerializeError(err)) => {
-            core_ctx
-                .increment(device_id, |counters: &DeviceCounters| &counters.send_serialize_error);
+            core_ctx.increment_both(device_id, |counters: &DeviceCounters| {
+                &counters.send_serialize_error
+            });
             Err(err.err_into())
         }
     }

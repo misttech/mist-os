@@ -61,19 +61,21 @@ async fn run_test(url: &str, expected_result: &str) {
         .root
         .connect_to_protocol_at_exposed_dir::<fsys::RealmQueryMarker>()
         .expect("failed to connect to RealmQuery");
-    let (trigger, server_end) = create_proxy::<ftest::TriggerMarker>();
-    let server_end = server_end.into_channel().into();
+    let (exposed_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
     realm_query
-        .deprecated_open(
-            ".",
-            fsys::OpenDirType::ExposedDir,
-            fio::OpenFlags::empty(),
-            fio::ModeType::empty(),
-            ftest::TriggerMarker::DEBUG_NAME,
-            server_end,
-        )
+        .open_directory(".", fsys::OpenDirType::ExposedDir, server_end)
         .await
         .unwrap()
+        .unwrap();
+
+    let (trigger, server_end) = create_proxy::<ftest::TriggerMarker>();
+    exposed_dir
+        .open(
+            ftest::TriggerMarker::DEBUG_NAME,
+            fio::Flags::PROTOCOL_SERVICE,
+            &Default::default(),
+            server_end.into_channel(),
+        )
         .unwrap();
     let result = trigger.run().await.expect("trigger failed");
     assert_eq!(result, expected_result, "Results did not match");
@@ -221,19 +223,21 @@ async fn route_directories_from_component_manager_namespace() {
         .root
         .connect_to_protocol_at_exposed_dir::<fsys::RealmQueryMarker>()
         .expect("failed to connect to RealmQuery");
-    let (trigger, server_end) = create_proxy::<ftest::TriggerMarker>();
-    let server_end = server_end.into_channel().into();
+    let (exposed_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
     realm_query
-        .deprecated_open(
-            ".",
-            fsys::OpenDirType::ExposedDir,
-            fio::OpenFlags::empty(),
-            fio::ModeType::empty(),
-            ftest::TriggerMarker::DEBUG_NAME,
-            server_end,
-        )
+        .open_directory(".", fsys::OpenDirType::ExposedDir, server_end)
         .await
         .unwrap()
+        .unwrap();
+
+    let (trigger, server_end) = create_proxy::<ftest::TriggerMarker>();
+    exposed_dir
+        .open(
+            ftest::TriggerMarker::DEBUG_NAME,
+            fio::Flags::PROTOCOL_SERVICE,
+            &Default::default(),
+            server_end.into_channel(),
+        )
         .unwrap();
 
     let result = trigger.run().await.expect("trigger failed");

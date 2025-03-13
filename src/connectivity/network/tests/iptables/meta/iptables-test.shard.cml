@@ -28,10 +28,18 @@
             to: "#realm_builder",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: [
                 "boot-kernel",
                 "dev-gpu",
             ],
+            from: "parent",
+            to: "#realm_builder",
+        },
+        {
+            // These services replace the directory capabilities above.
+            service: [ "fuchsia.gpu.magma.Service" ],
             from: "parent",
             to: "#realm_builder",
         },

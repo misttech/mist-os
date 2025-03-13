@@ -62,9 +62,40 @@ pub(crate) async fn serve_state(rs: fnet_routes::StateRequestStream, ctx: Ctx) {
     rs.try_for_each_concurrent(None, |req| async {
         match req {
             fnet_routes::StateRequest::Resolve { destination, responder } => {
-                let result = resolve(destination, ctx.clone()).await;
+                let result =
+                    resolve(ctx.clone(), destination, fnet_routes_ext::ResolveOptions::default())
+                        .await;
                 responder
-                    .send(result.as_ref().map_err(|e| e.into_raw()))
+                    .send(
+                        result
+                            .map(|r| match r {
+                                fnet_routes::ResolveResult::Direct(d) => {
+                                    fnet_routes::Resolved::Direct(d)
+                                }
+                                fnet_routes::ResolveResult::Gateway(g) => {
+                                    fnet_routes::Resolved::Gateway(g)
+                                }
+                                r @ fnet_routes::ResolveResult::__SourceBreaking { .. } => {
+                                    unreachable!("unknown resolve result: {:?}", r)
+                                }
+                            })
+                            .as_ref()
+                            .map_err(|err| match err {
+                                fnet_routes::ResolveError::AddressUnreachable => {
+                                    zx::Status::ADDRESS_UNREACHABLE.into_raw()
+                                }
+                                err @ fnet_routes::ResolveError::__SourceBreaking { .. } => {
+                                    unreachable!("impossible error for resolve {:?}", err)
+                                }
+                            }),
+                    )
+                    .unwrap_or_log("failed to respond");
+                Ok(())
+            }
+            fnet_routes::StateRequest::Resolve2 { destination, options, responder } => {
+                let result = resolve(ctx.clone(), destination, options.into()).await;
+                responder
+                    .send(result.as_ref().map_err(Clone::clone))
                     .unwrap_or_log("failed to respond");
                 Ok(())
             }
@@ -89,29 +120,33 @@ pub(crate) async fn serve_state(rs: fnet_routes::StateRequestStream, ctx: Ctx) {
 ///
 /// Returns `Err` if the destination can't be resolved.
 async fn resolve(
-    destination: fnet::IpAddress,
     ctx: Ctx,
-) -> Result<fnet_routes::Resolved, zx::Status> {
+    destination: fnet::IpAddress,
+    options: fnet_routes_ext::ResolveOptions,
+) -> Result<fnet_routes::ResolveResult, fnet_routes::ResolveError> {
     let addr: IpAddr = destination.into_core();
     match addr {
-        IpAddr::V4(addr) => resolve_inner(addr, ctx).await,
-        IpAddr::V6(addr) => resolve_inner(addr, ctx).await,
+        IpAddr::V4(addr) => resolve_inner(ctx, addr, options).await,
+        IpAddr::V6(addr) => resolve_inner(ctx, addr, options).await,
     }
 }
 
 /// The inner implementation of [`resolve`] that's generic over `Ip`.
 #[netstack3_core::context_ip_bounds(A::Version, BindingsCtx)]
 async fn resolve_inner<A: IpAddress>(
-    destination: A,
     mut ctx: Ctx,
-) -> Result<fnet_routes::Resolved, zx::Status>
+    destination: A,
+    options: fnet_routes_ext::ResolveOptions,
+) -> Result<fnet_routes::ResolveResult, fnet_routes::ResolveError>
 where
     A::Version: IpExt,
 {
     let sanitized_dst = SpecifiedAddr::new(destination)
         .map(|dst| {
             netstack3_core::routes::RoutableIpAddr::try_from(dst).map_err(
-                |netstack3_core::socket::AddrIsMappedError {}| zx::Status::ADDRESS_UNREACHABLE,
+                |netstack3_core::socket::AddrIsMappedError {}| {
+                    fnet_routes::ResolveError::AddressUnreachable
+                },
             )
         })
         .transpose()?;
@@ -121,16 +156,16 @@ where
         local_delivery_device: _,
         next_hop,
         internal_forwarding: _,
-    } = match ctx.api().routes::<A::Version>().resolve_route(sanitized_dst) {
+    } = match ctx.api().routes::<A::Version>().resolve_route(sanitized_dst, &options.into_core()) {
         Err(e) => {
             info!("Resolve failed for {}, {:?}", destination, e);
-            return Err(zx::Status::ADDRESS_UNREACHABLE);
+            return Err(fnet_routes::ResolveError::AddressUnreachable);
         }
         Ok(resolved_route) => resolved_route,
     };
     let (next_hop_addr, next_hop_type) = match next_hop {
         NextHop::RemoteAsNeighbor => {
-            (SpecifiedAddr::new(destination), Either::Left(fnet_routes::Resolved::Direct))
+            (SpecifiedAddr::new(destination), Either::Left(fnet_routes::ResolveResult::Direct))
         }
         NextHop::Broadcast(marker) => {
             <A::Version as Ip>::map_ip::<_, ()>(
@@ -138,9 +173,11 @@ where
                 |WrapBroadcastMarker(())| (),
                 |WrapBroadcastMarker(never)| match never {},
             );
-            (SpecifiedAddr::new(destination), Either::Left(fnet_routes::Resolved::Direct))
+            (SpecifiedAddr::new(destination), Either::Left(fnet_routes::ResolveResult::Direct))
         }
-        NextHop::Gateway(gateway) => (Some(gateway), Either::Right(fnet_routes::Resolved::Gateway)),
+        NextHop::Gateway(gateway) => {
+            (Some(gateway), Either::Right(fnet_routes::ResolveResult::Gateway))
+        }
     };
     let remote_mac = match &device {
         DeviceId::Loopback(_device) => None,
@@ -150,7 +187,7 @@ where
                 Some(resolve_ethernet_link_addr(&mut ctx, device, &addr).await?)
             } else {
                 warn!("Cannot attempt Ethernet link resolution for the unspecified address.");
-                return Err(zx::Status::ADDRESS_UNREACHABLE);
+                return Err(fnet_routes::ResolveError::AddressUnreachable);
             }
         }
         DeviceId::PureIp(_device) => None,
@@ -180,7 +217,7 @@ async fn resolve_ethernet_link_addr<A: IpAddress>(
     ctx: &mut Ctx,
     device: &EthernetDeviceId<BindingsCtx>,
     remote: &SpecifiedAddr<A>,
-) -> Result<Mac, zx::Status>
+) -> Result<Mac, fnet_routes::ResolveError>
 where
     A::Version: IpExt,
 {
@@ -189,7 +226,7 @@ where
         LinkResolutionResult::Pending(observer) => observer
             .await
             .expect("core must send link resolution result before dropping notifier")
-            .map_err(|AddressResolutionFailed| zx::Status::ADDRESS_UNREACHABLE),
+            .map_err(|AddressResolutionFailed| fnet_routes::ResolveError::AddressUnreachable),
     }
 }
 

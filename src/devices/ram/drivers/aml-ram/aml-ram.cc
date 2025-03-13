@@ -73,9 +73,18 @@ zx_status_t AmlRam::Create(void* context, zx_device_t* parent) {
     return device.error_value();
   }
 
-  zx_status_t status = device->DdkAdd(ddk::DeviceAddArgs("ram")
-                                          .set_flags(DEVICE_ADD_NON_BINDABLE)
-                                          .set_proto_id(ZX_PROTOCOL_AMLOGIC_RAM));
+  zx::result result = device->DdkAddService<fuchsia_hardware_ram_metrics::Service>(
+      fuchsia_hardware_ram_metrics::Service::InstanceHandler({
+          .device = device->bindings_.CreateHandler(
+              device.value().get(), fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+              fidl::kIgnoreBindingClosure),
+      }));
+  if (result.is_error()) {
+    zxlogf(ERROR, "aml-ram: Failed to add service, st = %s", result.status_string());
+    return result.status_value();
+  }
+
+  zx_status_t status = device->DdkAdd(ddk::DeviceAddArgs("ram").set_flags(DEVICE_ADD_NON_BINDABLE));
   if (status != ZX_OK) {
     zxlogf(ERROR, "aml-ram: Failed to add ram device, st = %d", status);
     return status;

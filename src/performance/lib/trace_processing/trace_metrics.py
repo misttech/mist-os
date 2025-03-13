@@ -16,7 +16,15 @@ import inspect as py_inspect
 import json
 import logging
 import pathlib
-from typing import Any, Iterable, Mapping, Sequence, TypeAlias, TypedDict
+from typing import (
+    Any,
+    Iterable,
+    Mapping,
+    NotRequired,
+    Sequence,
+    TypeAlias,
+    TypedDict,
+)
 
 from trace_processing import trace_model
 
@@ -62,7 +70,7 @@ class MetricDescription(TypedDict):
 class MetricsProcessorDescription(TypedDict):
     """Documents a single metrics processor."""
 
-    classname: str
+    classname: NotRequired[str]
     doc: str
     code_path: str
     line_no: int

@@ -31,7 +31,8 @@ use netstack3_ip::device::{
     IpDeviceFlags, IpDeviceStateContext, Ipv4DeviceConfigurationUpdate,
     Ipv6DeviceConfigurationUpdate, Ipv6DeviceHandler, Ipv6DeviceTimerId, Lifetime,
     PreferredLifetime, RsTimerId, SetIpAddressPropertiesError, SlaacConfigurationUpdate,
-    TemporarySlaacAddressConfiguration, UpdateIpConfigurationError,
+    StableSlaacAddressConfiguration, TemporarySlaacAddressConfiguration,
+    UpdateIpConfigurationError,
 };
 use netstack3_ip::gmp::{IgmpConfigMode, MldConfigMode, MldTimerId};
 use netstack3_ip::nud::{self, LinkResolutionResult};
@@ -248,7 +249,9 @@ fn enable_disable_ipv6() {
                 max_router_solicitations: Some(NonZeroU8::new(1)),
                 // Auto-generate a link-local address.
                 slaac_config: SlaacConfigurationUpdate {
-                    enable_stable_addresses: Some(true),
+                    stable_address_configuration: Some(
+                        StableSlaacAddressConfiguration::ENABLED_WITH_EUI64,
+                    ),
                     ..Default::default()
                 },
                 ip_config: IpDeviceConfigurationUpdate {
@@ -539,7 +542,9 @@ fn notify_on_dad_failure_ipv6() {
                 max_router_solicitations: Some(NonZeroU8::new(1)),
                 // Auto-generate a link-local address.
                 slaac_config: SlaacConfigurationUpdate {
-                    enable_stable_addresses: Some(true),
+                    stable_address_configuration: Some(
+                        StableSlaacAddressConfiguration::ENABLED_WITH_EUI64,
+                    ),
                     ..Default::default()
                 },
                 ip_config: IpDeviceConfigurationUpdate {
@@ -820,7 +825,9 @@ fn update_ipv6_configuration_return() {
                 dad_transmits: Some(NonZeroU16::new(1)),
                 max_router_solicitations: Some(NonZeroU8::new(2)),
                 slaac_config: SlaacConfigurationUpdate {
-                    enable_stable_addresses: Some(true),
+                    stable_address_configuration: Some(
+                        StableSlaacAddressConfiguration::ENABLED_WITH_EUI64
+                    ),
                     temporary_address_configuration: Some(
                         TemporarySlaacAddressConfiguration::enabled_with_rfc_defaults()
                     ),
@@ -838,7 +845,7 @@ fn update_ipv6_configuration_return() {
             dad_transmits: Some(None),
             max_router_solicitations: Some(None),
             slaac_config: SlaacConfigurationUpdate {
-                enable_stable_addresses: Some(false),
+                stable_address_configuration: Some(StableSlaacAddressConfiguration::Disabled),
                 temporary_address_configuration: Some(TemporarySlaacAddressConfiguration::Disabled),
             },
             ip_config: IpDeviceConfigurationUpdate {
@@ -922,7 +929,7 @@ fn update_ipv6_configuration_return() {
                 dad_transmits: Some(None),
                 max_router_solicitations: Some(None),
                 slaac_config: SlaacConfigurationUpdate {
-                    enable_stable_addresses: Some(false),
+                    stable_address_configuration: Some(StableSlaacAddressConfiguration::Disabled),
                     temporary_address_configuration: Some(
                         TemporarySlaacAddressConfiguration::Disabled
                     ),
@@ -940,7 +947,9 @@ fn update_ipv6_configuration_return() {
             dad_transmits: Some(NonZeroU16::new(1)),
             max_router_solicitations: Some(NonZeroU8::new(2)),
             slaac_config: SlaacConfigurationUpdate {
-                enable_stable_addresses: Some(true),
+                stable_address_configuration: Some(
+                    StableSlaacAddressConfiguration::ENABLED_WITH_EUI64
+                ),
                 temporary_address_configuration: Some(
                     TemporarySlaacAddressConfiguration::enabled_with_rfc_defaults()
                 ),
@@ -976,7 +985,11 @@ fn configure_link_local_address_generation(enable_stable_addresses: bool) {
 
     let new_config = Ipv6DeviceConfigurationUpdate {
         slaac_config: SlaacConfigurationUpdate {
-            enable_stable_addresses: Some(enable_stable_addresses),
+            stable_address_configuration: Some(if enable_stable_addresses {
+                StableSlaacAddressConfiguration::ENABLED_WITH_EUI64
+            } else {
+                StableSlaacAddressConfiguration::Disabled
+            }),
             ..Default::default()
         },
         ..Default::default()

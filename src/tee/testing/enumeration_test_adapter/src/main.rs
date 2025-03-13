@@ -171,9 +171,16 @@ async fn run_test_case_in_child(
     // Connect to fidl_fuchsia_component::RealmMarker
     let realm = connect_to_protocol::<fidl_fuchsia_component::RealmMarker>()
         .context("connecting to Realm protocol")?;
+
+    // It's natural to give the child component the same name as the test case.
+    // However, gtest likes to give parameterized test cases names with
+    // slashes, which are illegal characters for a component name. Accordingly,
+    // we replace those with, say, underscores.
+    let component_name = name.replace("/", "_");
+
     // Create a new child declaration.
     let child_decl = fidl_fuchsia_component_decl::Child {
-        name: Some(name.clone()),
+        name: Some(component_name.clone()),
         url: Some(launch_config.url.clone()),
         startup: Some(fidl_fuchsia_component_decl::StartupMode::Lazy),
         ..Default::default()
@@ -204,14 +211,14 @@ async fn run_test_case_in_child(
     if let Err(e) = realm
         .open_exposed_dir(
             &fidl_fuchsia_component_decl::ChildRef {
-                name: name.clone(),
+                name: component_name.clone(),
                 collection: Some(launch_config.collection.to_string()),
             },
             child_exposed_dir_server,
         )
         .await
     {
-        anyhow::bail!("Could not open exposed dir on child {name}: {e:?}");
+        anyhow::bail!("Could not open exposed dir on child {component_name}: {e:?}");
     }
     let child_test_protocol =
         connect_to_protocol_at_dir_root::<ftest::SuiteMarker>(&child_exposed_dir)

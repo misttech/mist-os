@@ -18,18 +18,18 @@ open protocol MemoryMonitor {
 /// Snapshot of the memory usage of the system, as seen by the server.
 type Snapshot = table {
     /// List of attribution claims.
-    2: attributions vector<Attribution>:MAX;
+    1: attributions vector<Attribution>:MAX;
     /// List of Principals on the system.
-    3: principals vector<Principal>:MAX;
+    2: principals vector<Principal>:MAX;
     /// List of kernel memory resources on the system. These resources are attributed to Principals
     /// by other Principals.
-    4: resources vector<Resource>:MAX;
+    3: resources vector<Resource>:MAX;
     /// Map from the vector index to the name of kernel resources.
     /// Resource names are often repeated across many resources; using this indirection reduces the
     /// amount of duplication within a `Snapshot` object.
-    5: resource_names vector<string:MAX>:MAX;
+    4: resource_names vector<string:MAX>:MAX;
     /// System-wide memory statistics from the kernel.
-    6: kernel_statistics KernelStatistics;
+    5: kernel_statistics KernelStatistics;
 };
 
 /// Globally-unique identifier used to refer to a specific [`Principal`]..
@@ -123,12 +123,23 @@ type Resource = table {
         /// Describes the memory usage of a VMO, both in directly reference memory, and
         /// via its parent VMO, if any.
         3: vmo table {
-            /// Number of committed bytes of this VMO.
-            1: committed_bytes uint64;
-            /// Number of populated bytes of this VMO.
-            2: populated_bytes uint64;
             /// If present, the parent VMO of this VMO.
-            3: parent zx.Koid;
+            1: parent zx.Koid;
+
+            /// Private number of committed bytes of this VMO.
+            2: private_committed_bytes uint64;
+            /// Private number of populated bytes of this VMO.
+            3: private_populated_bytes uint64;
+
+            /// Scaled number of committed bytes of this VMO.
+            4: scaled_committed_bytes uint64;
+            /// Scaled number of populated bytes of this VMO.
+            5: scaled_populated_bytes uint64;
+
+            /// Total number of committed bytes of this VMO.
+            6: total_committed_bytes uint64;
+            /// Total number of populated bytes of this VMO.
+            7: total_populated_bytes uint64;
         };
     };
 };

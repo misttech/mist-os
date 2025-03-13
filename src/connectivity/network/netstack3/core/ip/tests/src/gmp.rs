@@ -29,6 +29,7 @@ use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use netstack3_ip::device::{
     IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv4DeviceTimerId,
     Ipv6DeviceConfigurationUpdate, Ipv6DeviceTimerId, SlaacConfigurationUpdate,
+    StableSlaacAddressConfiguration,
 };
 use netstack3_ip::gmp::{
     IgmpConfigMode, IgmpTimerId, MldConfigMode, MldTimerId,
@@ -227,7 +228,9 @@ fn test_mldv1_enable_disable_integration() {
                     max_router_solicitations: Some(None),
                     // Auto-generate a link-local address.
                     slaac_config: SlaacConfigurationUpdate {
-                        enable_stable_addresses: Some(true),
+                        stable_address_configuration: Some(
+                            StableSlaacAddressConfiguration::ENABLED_WITH_EUI64,
+                        ),
                         ..Default::default()
                     },
                     ip_config: IpDeviceConfigurationUpdate {

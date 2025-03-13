@@ -43,17 +43,10 @@ class DeviceContext : public fbl::DoublyLinkedListable<ktl::unique_ptr<DeviceCon
   uint64_t aspace_size() const;
 
   // Use the second-level translation table to map the host pages in the given
-  // range on |vmo| to the guest's address |*virt_paddr|.  |size| is in bytes.
-  // |mapped_len| may be larger than |size|, if |size| was not page-aligned.
-  //
-  // If |map_contiguous| is false, this function may return a partial mapping,
-  // in which case |mapped_len| will indicate how many bytes were actually mapped.
-  //
-  // If |map_contiguous| is true, this function will never return a partial
-  // mapping, and |mapped_len| should be equal to |size|.
-  zx_status_t SecondLevelMap(const fbl::RefPtr<VmObject>& vmo, uint64_t offset, size_t size,
-                             uint32_t perms, bool map_contiguous, paddr_t* virt_paddr,
-                             size_t* mapped_len);
+  // range on |vmo| to the guest's address. Either maps the whole requested
+  // range, returning the base dev_addr_t, or fails.
+  zx::result<uint64_t> SecondLevelMap(const fbl::RefPtr<VmObject>& vmo, uint64_t vmo_offset,
+                                      size_t size, uint32_t perms);
   zx_status_t SecondLevelUnmap(paddr_t virt_paddr, size_t size);
 
   // Use the second-level translation table to identity-map the given range of
@@ -75,20 +68,15 @@ class DeviceContext : public fbl::DoublyLinkedListable<ktl::unique_ptr<DeviceCon
   // Shared initialization code for the two public Create() methods
   zx_status_t InitCommon();
 
-  // Map a VMO which may consist of discontiguous physical pages. If
-  // |map_contiguous| is true, this must either map the whole requested range
-  // contiguously, or fail. If |map_contiguous| is false, it may return
-  // success with a partial mapping.
-  zx_status_t SecondLevelMapDiscontiguous(const fbl::RefPtr<VmObject>& vmo, uint64_t offset,
-                                          size_t size, uint flags, bool map_contiguous,
-                                          paddr_t* virt_paddr, size_t* mapped_len);
+  // Map a VMO which may consist of discontiguous physical pages. Either maps
+  // the whole requested range, returning the base dev_addr_t, or fails.
+  zx::result<uint64_t> SecondLevelMapDiscontiguous(const fbl::RefPtr<VmObject>& vmo,
+                                                   uint64_t offset, size_t size, uint flags);
 
-  // Map a VMO which consists of contiguous physical pages. Currently we assume
-  // that all contiguous VMOs should be mapped as a contiguous range, so this
-  // function will not return a partial mapping.
-  zx_status_t SecondLevelMapContiguous(const fbl::RefPtr<VmObject>& vmo, uint64_t offset,
-                                       size_t size, uint flags, paddr_t* virt_paddr,
-                                       size_t* mapped_len);
+  // Map a VMO which consists of contiguous physical pages. Either maps
+  // the whole requested range, returning the base dev_addr_t, or fails.
+  zx::result<uint64_t> SecondLevelMapContiguous(const fbl::RefPtr<VmObject>& vmo, uint64_t offset,
+                                                size_t size, uint flags);
 
   IommuImpl* const parent_;
   union {

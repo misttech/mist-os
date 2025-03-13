@@ -247,6 +247,10 @@ _BAZEL_NO_CONTENT_HASH_REPOSITORIES = (
 # due to the stdout/stderr logs being too large.
 _DEBUG = False
 
+# Set this to True to debug .build-id copies from the Bazel output base
+# to the Ninja build directory.
+_DEBUG_BUILD_ID_COPIES = _DEBUG
+
 # Set this to True to assert when non-symlink repository files are found.
 # This is useful to find them when performing expensive builds on CQ
 _ASSERT_ON_IGNORED_FILES = True
@@ -403,19 +407,17 @@ def copy_file_if_changed(
 
 
 def force_symlink(target_path: str, link_path: str) -> None:
-    if os.path.islink(link_path) or os.path.exists(link_path):
-        os.remove(link_path)
-
-    link_parent = os.path.dirname(link_path)
-    os.makedirs(link_parent, exist_ok=True)
-    rel_target_path = os.path.relpath(target_path, link_parent)
-    os.symlink(rel_target_path, link_path)
-
-    real_dst_path = os.path.realpath(link_path)
-    real_src_path = os.path.realpath(target_path)
-    assert (
-        real_dst_path == real_src_path
-    ), f"Symlink creation failed {link_path} points to {real_dst_path}, not {real_src_path}"
+    link_dir = os.path.dirname(link_path)
+    os.makedirs(link_dir, exist_ok=True)
+    target_path = os.path.relpath(target_path, link_dir)
+    try:
+        os.symlink(target_path, link_path)
+    except OSError as e:
+        if e.errno == errno.EEXIST:
+            os.remove(link_path)
+            os.symlink(target_path, link_path)
+        else:
+            raise
 
 
 def depfile_quote(path: str) -> str:
@@ -472,6 +474,8 @@ def copy_build_id_dir(build_id_dir: str, bazel_output_base_dir: str) -> None:
             for obj in os.listdir(bid_path):
                 src_path = os.path.join(bid_path, obj)
                 dst_path = os.path.join(_BUILD_ID_PREFIX, path, obj)
+                if _DEBUG_BUILD_ID_COPIES:
+                    print(f"BUILD_ID {src_path} --> {dst_path}")
                 copy_file_if_changed(src_path, dst_path, bazel_output_base_dir)
 
 
@@ -578,7 +582,8 @@ class BazelLabelMapper(object):
                     file_prefix = file_prefix[1:]
 
             # First look into $BUILD_DIR/regenerator_outputs/bazel_content_hashes/
-            # then into $WORKSPACE/fuchsia_build_generated/
+            # then into $WORKSPACE/fuchsia_build_generated/ which should contain
+            # symlinks to Ninja-generated content hashes.
             hash_file = os.path.join(
                 self._output_dir,
                 "regenerator_outputs",
@@ -586,6 +591,7 @@ class BazelLabelMapper(object):
                 file_prefix + ".hash",
             )
             if not os.path.exists(hash_file):
+                # LINT.IfChange
                 hash_file = os.path.join(
                     self._root_workspace,
                     "fuchsia_build_generated",
@@ -593,6 +599,7 @@ class BazelLabelMapper(object):
                 )
                 if not os.path.exists(hash_file):
                     hash_file = ""
+                # LINT.ThenChange(//build/bazel/scripts/workspace_utils.py)
 
             self._repository_hash_map[repository_name] = hash_file
 
@@ -1030,16 +1037,8 @@ def main() -> int:
         help="Label of GN target invoking this script.",
     )
     parser.add_argument(
-        "--ninja-inputs-manifest",
-        help="Path to the manifest file describing bazel_input_xxx() dependencies.",
-    )
-    parser.add_argument(
-        "--gn-targets-repository-manifest",
-        help="Path to the manifest file describing the content of the @gn_targets repository.",
-    )
-    parser.add_argument(
-        "--gn-targets-all-licenses-spdx",
-        help="Path to the SPDX file describing licenses for all files in @gn_targets repository.",
+        "--gn-targets-repository-dir",
+        help="Path of @gn_targets repository directory for this invocation.",
     )
     parser.add_argument(
         "--bazel-targets",
@@ -1118,26 +1117,6 @@ def main() -> int:
     current_dir = os.getcwd()
     bazel_output_base_dir = find_bazel_output_base(args.workspace_dir)
 
-    # LINT.IfChange
-    if args.gn_targets_repository_manifest:
-        force_symlink(
-            target_path=args.gn_targets_repository_manifest,
-            link_path=os.path.join(
-                args.workspace_dir,
-                "fuchsia_build_generated/gn_targets_repository_manifest.json",
-            ),
-        )
-
-    if args.gn_targets_all_licenses_spdx:
-        force_symlink(
-            target_path=args.gn_targets_all_licenses_spdx,
-            link_path=os.path.join(
-                args.workspace_dir,
-                "fuchsia_build_generated/gn_targets_all_licenses_spdx.json",
-            ),
-        )
-    # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
-
     jobs = None
     if "--config=remote" in args.extra_bazel_args:
         cpus = os.cpu_count()
@@ -1150,6 +1129,19 @@ def main() -> int:
         job_count = os.environ.get("FUCHSIA_BAZEL_JOB_COUNT")
         if job_count:
             jobs = int(job_count)
+
+    if args.gn_targets_repository_dir:
+        # Update fuchsia_build_generated/gn_targets_dir to point
+        # to a new location that matches the content of @gn_target
+        # for the current bazel_action() target.
+        # LINT.IfChange
+        force_symlink(
+            os.path.realpath(args.gn_targets_repository_dir),
+            os.path.join(
+                args.workspace_dir, "fuchsia_build_generated/gn_targets_dir"
+            ),
+        )
+        # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
 
     def run_bazel_query(
         query_type: str, query_args: List[str], ignore_errors: bool
@@ -1169,11 +1161,7 @@ def main() -> int:
             On failure, if ignore_errors is False, then return (None, None),
             otherwise, return (stdout_lines, stderr_lines).
         """
-        query_cmd = [
-            args.bazel_launcher,
-            query_type,
-        ] + query_args
-
+        query_cmd = [args.bazel_launcher, query_type] + query_args
         if ignore_errors:
             query_cmd += ["--keep_going"]
 
@@ -1216,10 +1204,17 @@ def main() -> int:
         else:
             return ret.stdout.splitlines()
 
-    configured_args = [shlex.quote(arg) for arg in args.extra_bazel_args]
+    configured_args = args.extra_bazel_args
+
+    if any(
+        entry.copy_debug_symbols
+        for entry in args.package_outputs + args.directory_outputs
+    ):
+        # Ensure the build_id directories are produced.
+        configured_args += ["--output_groups=+build_id_dirs"]
 
     def run_starlark_cquery(
-        query_target: str, starlark_filename: str
+        query_targets: List[str], starlark_filename: str
     ) -> List[str]:
         result = get_bazel_query_output(
             "cquery",
@@ -1228,9 +1223,9 @@ def main() -> int:
                 "--output=starlark",
                 "--starlark:file",
                 get_input_starlark_file_path(starlark_filename),
-                query_target,
             ]
-            + configured_args,
+            + configured_args
+            + ["set(%s)" % " ".join(query_targets)],
         )
         assert result is not None
         return result
@@ -1284,13 +1279,6 @@ def main() -> int:
     # in the environment.
     if os.environ.get(_ENV_DEBUG_SANDBOX, "0") == "1":
         cmd.append("--sandbox_debug")
-
-    if any(
-        entry.copy_debug_symbols
-        for entry in args.package_outputs + args.directory_outputs
-    ):
-        # Ensure the build_id directories are produced.
-        cmd += ["--output_groups=+build_id_dirs"]
 
     if jobs:
         cmd += [f"--jobs={jobs}"]
@@ -1394,7 +1382,7 @@ def main() -> int:
             # Run a cquery to extract the FuchsiaPackageInfo and
             # FuchsiaDebugSymbolInfo provider values.
             query_result = run_starlark_cquery(
-                entry.package_label,
+                [entry.package_label],
                 "package_archive_manifest_and_debug_symbol_dirs.cquery",
             )
             assert (
@@ -1422,6 +1410,13 @@ def main() -> int:
                 )
 
             if entry.copy_debug_symbols:
+                if _DEBUG_BUILD_ID_COPIES:
+                    print(
+                        f"PACKAGE DEBUG SYMBOLS gn={args.gn_target_label} bazel={args.bazel_targets}"
+                    )
+                    for debug_symbol_dir in bazel_debug_symbol_dirs:
+                        print(f"  DIR: {debug_symbol_dir}")
+
                 for debug_symbol_dir in bazel_debug_symbol_dirs:
                     copy_build_id_dir(
                         os.path.join(bazel_execroot, debug_symbol_dir),
@@ -1435,11 +1430,15 @@ def main() -> int:
         force_symlink(target_path, link_path)
 
     dir_copies = []
+    missing_directories = []
     unwanted_files = []
     invalid_tracked_files = []
 
     for dir_output in args.directory_outputs:
         src_path = os.path.join(args.workspace_dir, dir_output.bazel_path)
+        if not os.path.exists(src_path):
+            missing_directories.append(src_path)
+            continue
         if not os.path.isdir(src_path):
             unwanted_files.append(src_path)
             continue
@@ -1451,9 +1450,14 @@ def main() -> int:
         dir_copies.append((src_path, dst_path, dir_output.tracked_files))
 
         if dir_output.copy_debug_symbols:
+            if _DEBUG_BUILD_ID_COPIES:
+                print(
+                    f"DIRECTORY DEBUG SYMBOLS gn={args.gn_target_label} bazel={args.bazel_targets} {src_path} -> {dst_path}"
+                )
+
             bazel_execroot = find_bazel_execroot(args.workspace_dir)
             debug_symbol_dirs = run_starlark_cquery(
-                args.bazel_targets[0],
+                args.bazel_targets,
                 "FuchsiaDebugSymbolInfo_debug_symbol_dirs.cquery",
             )
             for debug_symbol_dir in debug_symbol_dirs:
@@ -1462,16 +1466,23 @@ def main() -> int:
                     bazel_output_base_dir,
                 )
 
+    if missing_directories:
+        print(
+            "\nError: Directory provided to --directory-outputs is missing, got:\n\n%s\n"
+            % "\n".join(missing_directories)
+        )
+        return 1
+
     if unwanted_files:
         print(
-            "\nNon-directories are not allowed in --directory-outputs Bazel path, got:\n\n%s\n"
+            "\nError: Non-directories are not allowed in --directory-outputs Bazel path, got:\n\n%s\n"
             % "\n".join(unwanted_files)
         )
         return 1
 
     if invalid_tracked_files:
         print(
-            "\nMissing or non-directory tracked files from --directory-outputs Bazel path:\n\n%s\n"
+            "\nError: Missing or non-directory tracked files from --directory-outputs Bazel path:\n\n%s\n"
             % "\n".join(invalid_tracked_files)
         )
         return 1
@@ -1543,10 +1554,9 @@ These files are likely generated by a Bazel repository rule which has
 no associated content hash file. Due to this, Bazel may regenerate them
 semi-randomly in ways that confuse Ninja dependency computations.
 
-To solve this issue, change the build/bazel/scripts/workspace_utils.py
-script to add corresponding entries to the generated_repositories_inputs
-dictionary, to track all input files that the repository rule may
-access when it is run.
+To solve this issue, change the build/bazel/scripts/bazel_action.py script to
+add corresponding entries to the _BAZEL_NO_CONTENT_HASH_REPOSITORIES list, to
+track all input files that the repository rule may access when it is run.
 """,
                 file=sys.stderr,
             )

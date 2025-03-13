@@ -5,7 +5,8 @@
 use anyhow::Context;
 use async_trait::async_trait;
 use errors::{ffx_bail, ffx_error};
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool};
 use fuchsia_async::unblock;
 use std::process::Command;
 

@@ -60,15 +60,15 @@ zx::result<> OpenNamedServiceAtRaw(fidl::UnownedClientEnd<fuchsia_io::Directory>
                                    std::string_view service_path, std::string_view instance,
                                    zx::channel remote);
 
-// The internal |DirectoryOpenFunc| needs to take raw Zircon channels because
+// The internal |ProtocolOpenFunc| needs to take raw Zircon channels because
 // the FIDL runtime that interfaces with it cannot depend on the |fuchsia.io|
 // FIDL library.
-zx::result<> DirectoryOpenFunc(zx::unowned_channel dir, fidl::StringView path,
-                               fidl::internal::AnyTransport remote);
+zx::result<> ProtocolOpenFunc(zx::unowned_channel dir, fidl::StringView path,
+                              fidl::internal::AnyTransport remote);
 
 zx::result<fidl::ClientEnd<fuchsia_io::Directory>> GetGlobalServiceDirectory();
 
-// Determines if |Protocol| contains the |fuchsia.unknown/Cloneable.Clone2| method.
+// Determines if |Protocol| contains the |fuchsia.unknown/Cloneable.Clone| method.
 template <typename Protocol, typename = void>
 struct has_fidl_method_fuchsia_unknown_clone : public ::std::false_type {};
 #if FUCHSIA_API_LEVEL_AT_LEAST(26)
@@ -96,6 +96,25 @@ struct is_complete<T, std::void_t<std::integral_constant<std::size_t, sizeof(T)>
     : public std::true_type {};
 template <typename T>
 constexpr inline auto is_complete_v = is_complete<T>::value;
+
+// Ensures that |Protocol| is *not* a fuchsia.io protocol. Unlike most services/protocols,
+// fuchsia.io connections require a set of flags to be passed during opening that set the expected
+// rights on the resulting connection.
+//
+// This is not a type trait so that we can provide a consistent error message.
+template <typename Protocol>
+constexpr void EnsureCanConnectToProtocol() {
+  constexpr bool is_directory_protocol = std::is_same_v<Protocol, fuchsia_io::Directory>;
+  constexpr bool is_other_node_protocol = std::is_same_v<Protocol, fuchsia_io::Node> ||
+                                          std::is_same_v<Protocol, fuchsia_io::File>
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
+                                          || std::is_same_v<Protocol, fuchsia_io::Symlink>
+#endif
+      ;
+  static_assert(!is_directory_protocol,
+                "Use component::OpenDirectory or component::OpenDirectoryAt to open a directory.");
+  static_assert(!is_other_node_protocol, "Use std::filesystem or fdio to open a file/symlink.");
+}
 
 }  // namespace component::internal
 

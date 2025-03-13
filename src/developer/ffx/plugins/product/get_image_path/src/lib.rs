@@ -8,9 +8,8 @@ use async_trait::async_trait;
 use camino::{Utf8Path, Utf8PathBuf};
 use ffx_config::EnvironmentContext;
 use ffx_product_get_image_path_args::{GetImagePathCommand, ImageType, Slot};
-use fho::{
-    bug, return_user_error, user_error, Error, FfxMain, FfxTool, Result, VerifiedMachineWriter,
-};
+use ffx_writer::VerifiedMachineWriter;
+use fho::{bug, return_user_error, user_error, Error, FfxMain, FfxTool, Result};
 use schemars::JsonSchema;
 use sdk_metadata::ProductBundle;
 use serde::{Deserialize, Serialize};
@@ -32,6 +31,7 @@ pub enum CommandStatus {
 
 /// This plugin will get the path of image from the product bundle, based on the slot and image_type passed in.
 #[derive(FfxTool)]
+#[no_target]
 pub struct PbGetImagePathTool {
     #[command]
     pub cmd: GetImagePathCommand,
@@ -150,9 +150,9 @@ impl PbGetImagePathTool {
                 | (Image::VBMeta(path), Some(ImageType::VBMeta))
                 | (Image::FVM(path), Some(ImageType::Fvm))
                 | (Image::Fxfs { path, .. }, Some(ImageType::Fxfs))
-                | (Image::QemuKernel(path), Some(ImageType::QemuKernel)) => {
-                    Some(self.compute_path(path))
-                }
+                | (Image::FxfsSparse { path, .. }, Some(ImageType::FxfsFastboot))
+                | (Image::QemuKernel(path), Some(ImageType::QemuKernel))
+                | (Image::Dtbo(path), Some(ImageType::Dtbo)) => Some(self.compute_path(path)),
                 _ => None,
             })
             .transpose()
@@ -162,9 +162,10 @@ impl PbGetImagePathTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assembly_manifest::BlobfsContents;
     use assembly_partitions_config::PartitionsConfig;
     use ffx_config::ConfigLevel;
-    use fho::{Format, TestBuffers};
+    use ffx_writer::{Format, TestBuffers};
     use sdk_metadata::ProductBundleV2;
     use std::fs;
     use std::fs::File;
@@ -241,6 +242,11 @@ mod tests {
                 Image::ZBI { path: Utf8PathBuf::from("zbi/path"), signed: false },
                 Image::FVM(Utf8PathBuf::from(tempdir.join("system_a/fvm.blk"))),
                 Image::QemuKernel(Utf8PathBuf::from("qemu/path")),
+                Image::FxfsSparse {
+                    path: Utf8PathBuf::from("system_a/fxfs.sparse.blk"),
+                    contents: BlobfsContents::default(),
+                },
+                Image::Dtbo(Utf8PathBuf::from("system_a/sorrel-dtbo.img")),
             ]),
             system_b: None,
             system_r: None,
@@ -283,6 +289,21 @@ mod tests {
         {
             let tool = PbGetImagePathTool {
                 cmd: GetImagePathCommand {
+                    product_bundle: None,
+                    slot: Some(Slot::A),
+                    image_type: Some(ImageType::Dtbo),
+                    relative_path: false,
+                    bootloader: None,
+                },
+                env: env.context.clone(),
+            };
+            let path = tool.extract_image_path(pb.clone()).unwrap().unwrap();
+            let expected_path = Utf8PathBuf::from("system_a/sorrel-dtbo.img");
+            assert_eq!(expected_path, path);
+        }
+        {
+            let tool = PbGetImagePathTool {
+                cmd: GetImagePathCommand {
                     product_bundle: Some(tempdir.clone()),
                     slot: Some(Slot::A),
                     image_type: Some(ImageType::Fvm),
@@ -293,6 +314,21 @@ mod tests {
             };
             let path = tool.extract_image_path(pb.clone()).unwrap().unwrap();
             let expected_path = Utf8PathBuf::from("system_a/fvm.blk");
+            assert_eq!(expected_path, path);
+        }
+        {
+            let tool = PbGetImagePathTool {
+                cmd: GetImagePathCommand {
+                    product_bundle: Some(tempdir.clone()),
+                    slot: Some(Slot::A),
+                    image_type: Some(ImageType::FxfsFastboot),
+                    relative_path: false,
+                    bootloader: None,
+                },
+                env: env.context.clone(),
+            };
+            let path = tool.extract_image_path(pb.clone()).unwrap().unwrap();
+            let expected_path = Utf8PathBuf::from("system_a/fxfs.sparse.blk");
             assert_eq!(expected_path, path);
         }
         {

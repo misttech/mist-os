@@ -51,10 +51,14 @@ impl<T: ArrayProperty + InspectTypeInternal> Length for T {
 /// Trait implemented by all array properties providing common operations on arrays.
 pub trait ArrayProperty: Length + InspectTypeInternal {
     /// The type of the array entries.
-    type Type;
+    type Type<'a>
+    where
+        Self: 'a;
 
     /// Sets the array value to `value` at the given `index`.
-    fn set(&self, index: usize, value: impl Into<Self::Type>);
+    fn set<'a>(&self, index: usize, value: impl Into<Self::Type<'a>>)
+    where
+        Self: 'a;
 
     /// Sets all slots of the array to 0 and releases any references.
     fn clear(&self);
@@ -68,10 +72,14 @@ pub trait ArrayProperty: Length + InspectTypeInternal {
 
 pub trait ArithmeticArrayProperty: ArrayProperty {
     /// Adds the given `value` to the property current value at the given `index`.
-    fn add(&self, index: usize, value: Self::Type);
+    fn add<'a>(&self, index: usize, value: Self::Type<'a>)
+    where
+        Self: 'a;
 
     /// Subtracts the given `value` to the property current value at the given `index`.
-    fn subtract(&self, index: usize, value: Self::Type);
+    fn subtract<'a>(&self, index: usize, value: Self::Type<'a>)
+    where
+        Self: 'a;
 }
 
 /// Trait implemented by all histogram properties providing common operations.

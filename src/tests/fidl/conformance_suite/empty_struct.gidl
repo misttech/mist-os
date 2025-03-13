@@ -21,8 +21,8 @@ decode_failure("EmptyStructNonZeroBytes") {
     err = INVALID_EMPTY_STRUCT,
 }
 
-success("OneEmptyStructInStruct") {
-    value = OneEmptyStructInStruct{
+success("AnEmptyStructInStruct") {
+    value = AnEmptyStructInStruct{
         v: EmptyStruct{},
     },
     bytes = {
@@ -32,9 +32,9 @@ success("OneEmptyStructInStruct") {
     },
 }
 
-decode_failure("OneEmptyStructInStructNonZeroBytes") {
+decode_failure("AnEmptyStructInStructNonZeroBytes") {
     bindings_denylist = [llcpp, hlcpp],
-    type = OneEmptyStructInStruct,
+    type = AnEmptyStructInStruct,
     bytes = {
         v2 = [
             0x01, padding:7,

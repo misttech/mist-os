@@ -4,4 +4,5 @@
 
 include /src/developer/ffx/daemon/protocols/repo/OWNERS
 include /src/developer/ffx/lib/pkg/OWNERS
+include /src/developer/ffx/plugins/repository/OWNERS
 include /src/sys/pkg/OWNERS

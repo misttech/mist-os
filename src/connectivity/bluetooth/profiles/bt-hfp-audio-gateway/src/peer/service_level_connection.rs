@@ -437,7 +437,7 @@ impl ServiceLevelConnection {
     }
 
     /// Handles an error received as a result of operating a procedure.
-    fn procedure_error(&mut self, error: ProcedureError) {
+    fn procedure_error(&mut self, error: Box<ProcedureError>) {
         // TODO(https://fxbug.dev/42152554): Right now, we only send an Error AT response to the peer.
         // Different error cases may warrant different SLC behavior. For example, errors
         // before the SLC is initialized may warrant complete channel shutdown. Fix this method
@@ -603,13 +603,12 @@ impl ServiceLevelConnection {
         request
     }
 
-    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     /// Matches the incoming message to a procedure. Returns the procedure identifier
     /// for the given `command` or Error if the command couldn't be matched.
     fn match_command_to_procedure(
         &self,
         command: &at::Command,
-    ) -> Result<ProcedureMarker, ProcedureError> {
+    ) -> Result<ProcedureMarker, Box<ProcedureError>> {
         // If we haven't initialized the SLC yet, the only valid procedure to match is
         // the SLCI Procedure.
         if !self.state.initialized {
@@ -621,7 +620,7 @@ impl ServiceLevelConnection {
         match ProcedureMarker::match_command(command, self.initialized()) {
             Ok(ProcedureMarker::SlcInitialization) => {
                 warn!("Received unexpected SLCI command after SLC initialization: {:?}", command);
-                Err(command.into())
+                Err(Box::new(command.into()))
             }
             res => res,
         }
@@ -631,7 +630,7 @@ impl ServiceLevelConnection {
     fn process_requests_pending_initialization(
         &mut self,
         cx: &mut Context<'_>,
-    ) -> Option<Result<SlcRequest, ProcedureError>> {
+    ) -> Option<Result<SlcRequest, Box<ProcedureError>>> {
         if self.initialized() {
             while let Some((marker, request)) = self.requests_pending_initialization.pop_front() {
                 let request = self.handle_command(marker, request.into());
@@ -641,7 +640,7 @@ impl ServiceLevelConnection {
                     None => {
                         if let Some(conn) = &mut self.connection {
                             if let Err(e) = conn.try_send_queued(cx) {
-                                return Some(Err(e.into()));
+                                return Some(Err(Box::new(e.into())));
                             }
                         }
                         continue;
@@ -690,14 +689,14 @@ impl ServiceLevelConnection {
                             None => {
                                 if let Some(conn) = &mut self.connection {
                                     if let Err(e) = conn.try_send_queued(cx) {
-                                        return Poll::Ready(Some(Err(e.into())));
+                                        return Poll::Ready(Some(Err(Box::new(e.into()))));
                                     }
                                 }
                                 continue;
                             }
                         }
                     }
-                    Poll::Ready(Some(Err(e))) => return Poll::Ready(Some(Err(e.into()))),
+                    Poll::Ready(Some(Err(e))) => return Poll::Ready(Some(Err(Box::new(e.into())))),
                     Poll::Ready(None) => {
                         self.reset();
                         return Poll::Ready(None);
@@ -713,7 +712,7 @@ impl ServiceLevelConnection {
 }
 
 impl Stream for ServiceLevelConnection {
-    type Item = Result<SlcRequest, ProcedureError>;
+    type Item = Result<SlcRequest, Box<ProcedureError>>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         if self.is_terminated() {
@@ -739,7 +738,7 @@ impl Stream for ServiceLevelConnection {
         // Try to send any queued data in the RFCOMM channel.
         if let Some(conn) = &mut self.connection {
             if let Err(e) = conn.try_send_queued(cx) {
-                return Poll::Ready(Some(Err(e.into())));
+                return Poll::Ready(Some(Err(Box::new(e.into()))));
             }
         }
 
@@ -1099,7 +1098,7 @@ pub(crate) mod tests {
         // be an error.
         let cmd1 = at::Command::Brsf { features: HfFeatures::empty().bits() as i64 };
         assert_matches!(
-            slc.match_command_to_procedure(&cmd1.into()),
+            slc.match_command_to_procedure(&cmd1.into()).map_err(|e| *e),
             Err(ProcedureError::UnexpectedHf(_))
         );
     }

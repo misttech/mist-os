@@ -13,10 +13,16 @@
 #include <optional>
 
 #include <bind/fuchsia/cpp/bind.h>
-#include <ddk/metadata/gpio.h>
 #include <gtest/gtest.h>
 #include <sdk/lib/driver/testing/cpp/driver_runtime.h>
 #include <src/lib/testing/predicates/status.h>
+
+#define DECL_GPIO_PIN(x)     \
+  {                          \
+    {                        \
+      .pin = (x), .name = #x \
+    }                        \
+  }
 
 namespace gpio {
 
@@ -202,21 +208,26 @@ class GpioTest : public ::testing::Test {
 
   fdf_testing::ForegroundDriverTest<FixtureConfig>& driver_test() { return driver_test_; }
 
+ protected:
+  void SetGpioMetadata(const fuchsia_hardware_pinimpl::Metadata& metadata) {
+    fit::result encoded_metadata = fidl::Persist(metadata);
+    ASSERT_TRUE(encoded_metadata.is_ok());
+    driver_test().RunInEnvironmentTypeContext([&](GpioTestEnvironment& env) {
+      EXPECT_OK(env.compat().AddMetadata(DEVICE_METADATA_GPIO_CONTROLLER, encoded_metadata->data(),
+                                         encoded_metadata->size()));
+    });
+  }
+
  private:
   fdf_testing::ForegroundDriverTest<FixtureConfig> driver_test_;
 };
 
 TEST_F(GpioTest, TestGpioAll) {
-  driver_test().RunInEnvironmentTypeContext([](GpioTestEnvironment& env) {
-    constexpr gpio_pin_t pins[] = {
-        DECL_GPIO_PIN(1),
-        DECL_GPIO_PIN(2),
-        DECL_GPIO_PIN(3),
-    };
-
-    EXPECT_OK(env.compat().AddMetadata(DEVICE_METADATA_GPIO_PINS, pins,
-                                       std::size(pins) * sizeof(gpio_pin_t)));
-  });
+  SetGpioMetadata({{.pins = {{
+                        DECL_GPIO_PIN(1),
+                        DECL_GPIO_PIN(2),
+                        DECL_GPIO_PIN(3),
+                    }}}});
 
   EXPECT_TRUE(driver_test().StartDriver().is_ok());
 
@@ -352,16 +363,11 @@ TEST_F(GpioTest, TestGpioAll) {
 }
 
 TEST_F(GpioTest, TestPinAll) {
-  driver_test().RunInEnvironmentTypeContext([](GpioTestEnvironment& env) {
-    constexpr gpio_pin_t pins[] = {
-        DECL_GPIO_PIN(1),
-        DECL_GPIO_PIN(2),
-        DECL_GPIO_PIN(3),
-    };
-
-    EXPECT_OK(env.compat().AddMetadata(DEVICE_METADATA_GPIO_PINS, pins,
-                                       std::size(pins) * sizeof(gpio_pin_t)));
-  });
+  SetGpioMetadata({{.pins = {{
+                        DECL_GPIO_PIN(1),
+                        DECL_GPIO_PIN(2),
+                        DECL_GPIO_PIN(3),
+                    }}}});
 
   EXPECT_TRUE(driver_test().StartDriver().is_ok());
 
@@ -415,16 +421,11 @@ TEST_F(GpioTest, TestPinAll) {
 }
 
 TEST_F(GpioTest, ValidateMetadataOk) {
-  driver_test().RunInEnvironmentTypeContext([](GpioTestEnvironment& env) {
-    constexpr gpio_pin_t pins[] = {
-        DECL_GPIO_PIN(1),
-        DECL_GPIO_PIN(2),
-        DECL_GPIO_PIN(3),
-    };
-
-    EXPECT_OK(env.compat().AddMetadata(DEVICE_METADATA_GPIO_PINS, pins,
-                                       std::size(pins) * sizeof(gpio_pin_t)));
-  });
+  SetGpioMetadata({{.pins = {{
+                        DECL_GPIO_PIN(1),
+                        DECL_GPIO_PIN(2),
+                        DECL_GPIO_PIN(3),
+                    }}}});
 
   EXPECT_TRUE(driver_test().StartDriver().is_ok());
 
@@ -439,33 +440,28 @@ TEST_F(GpioTest, ValidateMetadataOk) {
 }
 
 TEST_F(GpioTest, ValidateMetadataRejectDuplicates) {
-  driver_test().RunInEnvironmentTypeContext([](GpioTestEnvironment& env) {
-    constexpr gpio_pin_t pins[] = {
-        DECL_GPIO_PIN(2),
-        DECL_GPIO_PIN(1),
-        DECL_GPIO_PIN(2),
-        DECL_GPIO_PIN(0),
-    };
-
-    EXPECT_OK(env.compat().AddMetadata(DEVICE_METADATA_GPIO_PINS, pins,
-                                       std::size(pins) * sizeof(gpio_pin_t)));
-  });
+  SetGpioMetadata({{.pins = {{
+                        DECL_GPIO_PIN(2),
+                        DECL_GPIO_PIN(1),
+                        DECL_GPIO_PIN(2),
+                        DECL_GPIO_PIN(0),
+                    }}}});
 
   ASSERT_FALSE(driver_test().StartDriver().is_ok());
 }
 
 TEST_F(GpioTest, ValidateGpioNameGeneration) {
-  constexpr gpio_pin_t pins_digit[] = {
+  const fuchsia_hardware_pinimpl::Pin pins_digit[] = {
       DECL_GPIO_PIN(2),
       DECL_GPIO_PIN(5),
       DECL_GPIO_PIN((11)),
   };
-  EXPECT_EQ(pins_digit[0].pin, 2u);
-  EXPECT_STREQ(pins_digit[0].name, "2");
-  EXPECT_EQ(pins_digit[1].pin, 5u);
-  EXPECT_STREQ(pins_digit[1].name, "5");
-  EXPECT_EQ(pins_digit[2].pin, 11u);
-  EXPECT_STREQ(pins_digit[2].name, "(11)");
+  EXPECT_EQ(pins_digit[0].pin().value(), 2u);
+  EXPECT_EQ(pins_digit[0].name().value(), "2");
+  EXPECT_EQ(pins_digit[1].pin().value(), 5u);
+  EXPECT_EQ(pins_digit[1].name().value(), "5");
+  EXPECT_EQ(pins_digit[2].pin().value(), 11u);
+  EXPECT_EQ(pins_digit[2].name().value(), "(11)");
 
 #define GPIO_TEST_NAME1 5
 #define GPIO_TEST_NAME2 (6)
@@ -473,7 +469,7 @@ TEST_F(GpioTest, ValidateGpioNameGeneration) {
   constexpr uint32_t GPIO_TEST_NAME4 = 8;  // constexpr should work too
 #define GEN_GPIO0(x) ((x) + 1)
 #define GEN_GPIO1(x) ((x) + 2)
-  constexpr gpio_pin_t pins[] = {
+  const fuchsia_hardware_pinimpl::Pin pins[] = {
       DECL_GPIO_PIN(GPIO_TEST_NAME1),
       DECL_GPIO_PIN(GPIO_TEST_NAME2),
       DECL_GPIO_PIN(GPIO_TEST_NAME3_OF_63_CHRS_ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890),
@@ -481,19 +477,20 @@ TEST_F(GpioTest, ValidateGpioNameGeneration) {
       DECL_GPIO_PIN(GEN_GPIO0(9)),
       DECL_GPIO_PIN(GEN_GPIO1(18)),
   };
-  EXPECT_EQ(pins[0].pin, 5u);
-  EXPECT_STREQ(pins[0].name, "GPIO_TEST_NAME1");
-  EXPECT_EQ(pins[1].pin, 6u);
-  EXPECT_STREQ(pins[1].name, "GPIO_TEST_NAME2");
-  EXPECT_EQ(pins[2].pin, 7u);
-  EXPECT_STREQ(pins[2].name, "GPIO_TEST_NAME3_OF_63_CHRS_ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890");
-  EXPECT_EQ(strlen(pins[2].name), GPIO_NAME_MAX_LENGTH - 1ul);
-  EXPECT_EQ(pins[3].pin, 8u);
-  EXPECT_STREQ(pins[3].name, "GPIO_TEST_NAME4");
-  EXPECT_EQ(pins[4].pin, 10u);
-  EXPECT_STREQ(pins[4].name, "GEN_GPIO0(9)");
-  EXPECT_EQ(pins[5].pin, 20u);
-  EXPECT_STREQ(pins[5].name, "GEN_GPIO1(18)");
+  EXPECT_EQ(pins[0].pin().value(), 5u);
+  EXPECT_EQ(pins[0].name().value(), "GPIO_TEST_NAME1");
+  EXPECT_EQ(pins[1].pin().value(), 6u);
+  EXPECT_EQ(pins[1].name().value(), "GPIO_TEST_NAME2");
+  EXPECT_EQ(pins[2].pin().value(), 7u);
+  EXPECT_EQ(pins[2].name().value(),
+            "GPIO_TEST_NAME3_OF_63_CHRS_ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890");
+  EXPECT_EQ(pins[2].name().value().size(), fuchsia_hardware_pin::kMaxPinNameLen - 1ul);
+  EXPECT_EQ(pins[3].pin().value(), 8u);
+  EXPECT_EQ(pins[3].name().value(), "GPIO_TEST_NAME4");
+  EXPECT_EQ(pins[4].pin().value(), 10u);
+  EXPECT_EQ(pins[4].name().value(), "GEN_GPIO0(9)");
+  EXPECT_EQ(pins[5].pin().value(), 20u);
+  EXPECT_EQ(pins[5].name().value(), "GEN_GPIO1(18)");
 #undef GPIO_TEST_NAME1
 #undef GPIO_TEST_NAME2
 #undef GPIO_TEST_NAME3_OF_63_CHRS_ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890
@@ -505,12 +502,6 @@ TEST_F(GpioTest, Init) {
   namespace fhgpio = fuchsia_hardware_gpio;
   namespace fhpin = fuchsia_hardware_pin;
   namespace fhpinimpl = fuchsia_hardware_pinimpl;
-
-  constexpr gpio_pin_t kGpioPins[] = {
-      DECL_GPIO_PIN(1),
-      DECL_GPIO_PIN(2),
-      DECL_GPIO_PIN(3),
-  };
 
   auto mode = [](uint32_t pin, fhgpio::BufferMode buffer_mode) {
     return fhpinimpl::InitStep::WithCall({{pin, fhpinimpl::InitCall::WithBufferMode(buffer_mode)}});
@@ -542,17 +533,14 @@ TEST_F(GpioTest, Init) {
   steps.push_back(config(3, fhpin::Configuration{{.function = 3}}));
   steps.push_back(config(3, fhpin::Configuration{{.drive_strength_ua = 2000}}));
 
-  fhpinimpl::Metadata metadata{{std::move(steps)}};
-  fit::result encoded = fidl::Persist(metadata);
-  ASSERT_TRUE(encoded.is_ok());
-
-  std::vector<uint8_t>& message = encoded.value();
-
-  driver_test().RunInEnvironmentTypeContext([&](GpioTestEnvironment& env) {
-    EXPECT_OK(
-        env.compat().AddMetadata(DEVICE_METADATA_GPIO_CONTROLLER, message.data(), message.size()));
-    EXPECT_OK(env.compat().AddMetadata(DEVICE_METADATA_GPIO_PINS, kGpioPins, sizeof(kGpioPins)));
-  });
+  SetGpioMetadata({{
+      .init_steps = std::move(steps),
+      .pins = {{
+          DECL_GPIO_PIN(1),
+          DECL_GPIO_PIN(2),
+          DECL_GPIO_PIN(3),
+      }},
+  }});
 
   EXPECT_TRUE(driver_test().StartDriver().is_ok());
 
@@ -586,15 +574,7 @@ TEST_F(GpioTest, InitWithoutPins) {
   steps.push_back(fhpinimpl::InitStep::WithCall(
       {{1, fhpinimpl::InitCall::WithPinConfig({{.pull = fhpin::Pull::kDown}})}}));
 
-  fhpinimpl::Metadata metadata{{std::move(steps)}};
-  fit::result encoded = fidl::Persist(metadata);
-  ASSERT_TRUE(encoded.is_ok());
-
-  std::vector<uint8_t>& message = encoded.value();
-  driver_test().RunInEnvironmentTypeContext([&](GpioTestEnvironment& env) {
-    EXPECT_OK(
-        env.compat().AddMetadata(DEVICE_METADATA_GPIO_CONTROLLER, message.data(), message.size()));
-  });
+  SetGpioMetadata({{.init_steps = std::move(steps)}});
 
   EXPECT_TRUE(driver_test().StartDriver().is_ok());
 
@@ -612,12 +592,6 @@ TEST_F(GpioTest, InitErrorHandling) {
   namespace fhgpio = fuchsia_hardware_gpio;
   namespace fhpin = fuchsia_hardware_pin;
   namespace fhpinimpl = fuchsia_hardware_pinimpl;
-
-  constexpr gpio_pin_t kGpioPins[] = {
-      DECL_GPIO_PIN(1),
-      DECL_GPIO_PIN(2),
-      DECL_GPIO_PIN(3),
-  };
 
   auto mode = [](uint32_t pin, fhgpio::BufferMode buffer_mode) {
     return fhpinimpl::InitStep::WithCall({{pin, fhpinimpl::InitCall::WithBufferMode(buffer_mode)}});
@@ -645,17 +619,14 @@ TEST_F(GpioTest, InitErrorHandling) {
   steps.push_back(config(2, fhpin::Configuration{{.function = 0}}));
   steps.push_back(config(2, fhpin::Configuration{{.drive_strength_ua = 1000}}));
 
-  fhpinimpl::Metadata metadata{{std::move(steps)}};
-  fit::result encoded = fidl::Persist(metadata);
-  ASSERT_TRUE(encoded.is_ok());
-
-  std::vector<uint8_t>& message = encoded.value();
-
-  driver_test().RunInEnvironmentTypeContext([&](GpioTestEnvironment& env) {
-    EXPECT_OK(
-        env.compat().AddMetadata(DEVICE_METADATA_GPIO_CONTROLLER, message.data(), message.size()));
-    EXPECT_OK(env.compat().AddMetadata(DEVICE_METADATA_GPIO_PINS, kGpioPins, sizeof(kGpioPins)));
-  });
+  SetGpioMetadata({{
+      .init_steps = std::move(steps),
+      .pins = {{
+          DECL_GPIO_PIN(1),
+          DECL_GPIO_PIN(2),
+          DECL_GPIO_PIN(3),
+      }},
+  }});
 
   EXPECT_TRUE(driver_test().StartDriver().is_ok());
 
@@ -681,23 +652,16 @@ TEST_F(GpioTest, InitErrorHandling) {
 TEST_F(GpioTest, ControllerId) {
   constexpr uint32_t kController = 5;
 
-  constexpr gpio_pin_t pins[] = {
+  static const std::vector<fuchsia_hardware_pinimpl::Pin> kPins = {
       DECL_GPIO_PIN(0),
       DECL_GPIO_PIN(1),
       DECL_GPIO_PIN(2),
   };
 
-  fuchsia_hardware_pinimpl::Metadata controller_metadata{{.controller_id = kController}};
-  const fit::result encoded_controller_metadata = fidl::Persist(controller_metadata);
-  ASSERT_TRUE(encoded_controller_metadata.is_ok());
-
-  driver_test().RunInEnvironmentTypeContext([&](GpioTestEnvironment& env) {
-    EXPECT_OK(env.compat().AddMetadata(DEVICE_METADATA_GPIO_PINS, pins,
-                                       std::size(pins) * sizeof(gpio_pin_t)));
-    EXPECT_OK(env.compat().AddMetadata(DEVICE_METADATA_GPIO_CONTROLLER,
-                                       encoded_controller_metadata->data(),
-                                       encoded_controller_metadata->size()));
-  });
+  SetGpioMetadata({{
+      .controller_id = kController,
+      .pins = kPins,
+  }});
 
   EXPECT_TRUE(driver_test().StartDriver().is_ok());
 
@@ -708,11 +672,17 @@ TEST_F(GpioTest, ControllerId) {
     EXPECT_EQ(node.children().at("gpio").children().count("gpio-2"), 1ul);
   });
 
-  for (const gpio_pin_t& pin : pins) {
+  for (const auto& pin : kPins) {
     driver_test().RunInNodeContext([&](fdf_testing::TestNode& node) {
-      ASSERT_EQ(node.children().at("gpio").children().count(std::string{"gpio-"} + pin.name), 1ul);
+      ASSERT_EQ(
+          node.children().at("gpio").children().count(std::string{"gpio-"} + pin.name().value()),
+          1ul);
       std::vector<fuchsia_driver_framework::NodeProperty> properties =
-          node.children().at("gpio").children().at(std::string{"gpio-"} + pin.name).GetProperties();
+          node.children()
+              .at("gpio")
+              .children()
+              .at(std::string{"gpio-"} + pin.name().value())
+              .GetProperties();
 
       ASSERT_EQ(properties.size(), 2ul);
 
@@ -720,7 +690,7 @@ TEST_F(GpioTest, ControllerId) {
       EXPECT_EQ(properties[0].key().string_value().value(), bind_fuchsia::GPIO_PIN);
 
       ASSERT_TRUE(properties[0].value().int_value().has_value());
-      EXPECT_EQ(properties[0].value().int_value().value(), pin.pin);
+      EXPECT_EQ(properties[0].value().int_value().value(), pin.pin().value());
 
       ASSERT_TRUE(properties[1].key().string_value().has_value());
       EXPECT_EQ(properties[1].key().string_value().value(), bind_fuchsia::GPIO_CONTROLLER);
@@ -734,16 +704,14 @@ TEST_F(GpioTest, ControllerId) {
 }
 
 TEST_F(GpioTest, SchedulerRole) {
-  constexpr gpio_pin_t pins[] = {
+  static const std::vector<fuchsia_hardware_pinimpl::Pin> kPins = {
       DECL_GPIO_PIN(0),
       DECL_GPIO_PIN(1),
       DECL_GPIO_PIN(2),
   };
+  SetGpioMetadata({{.pins = kPins}});
 
   driver_test().RunInEnvironmentTypeContext([&](GpioTestEnvironment& env) {
-    EXPECT_OK(env.compat().AddMetadata(DEVICE_METADATA_GPIO_PINS, pins,
-                                       std::size(pins) * sizeof(gpio_pin_t)));
-
     // Add scheduler role metadata that will cause the core driver to create a new driver
     // dispatcher. Verify that FIDL calls can still be made, and that dispatcher shutdown using the
     // unbind hook works.
@@ -763,9 +731,9 @@ TEST_F(GpioTest, SchedulerRole) {
     EXPECT_EQ(node.children().at("gpio").children().count("gpio-2"), 1ul);
   });
 
-  for (const gpio_pin_t& pin : pins) {
+  for (const auto& pin : kPins) {
     zx::result client_end = driver_test().Connect<fuchsia_hardware_gpio::Service::Device>(
-        std::string{"gpio-"} + pin.name);
+        std::string{"gpio-"} + pin.name().value());
     EXPECT_TRUE(client_end.is_ok());
 
     // Run the dispatcher to allow the connection to be established.
@@ -782,27 +750,24 @@ TEST_F(GpioTest, SchedulerRole) {
 }
 
 TEST_F(GpioTest, MultipleClients) {
-  constexpr gpio_pin_t pins[] = {
+  static const std::vector<fuchsia_hardware_pinimpl::Pin> kPins = {
       DECL_GPIO_PIN(0),
       DECL_GPIO_PIN(1),
       DECL_GPIO_PIN(2),
   };
 
-  driver_test().RunInEnvironmentTypeContext([&](GpioTestEnvironment& env) {
-    EXPECT_OK(env.compat().AddMetadata(DEVICE_METADATA_GPIO_PINS, pins,
-                                       std::size(pins) * sizeof(gpio_pin_t)));
-  });
+  SetGpioMetadata({{.pins = kPins}});
 
   EXPECT_TRUE(driver_test().StartDriver().is_ok());
 
-  fidl::WireClient<fuchsia_hardware_gpio::Gpio> clients[std::size(pins)]{};
-  for (size_t i = 0; i < std::size(clients); i++) {
+  std::vector<fidl::WireClient<fuchsia_hardware_gpio::Gpio>> clients;
+  for (size_t i = 0; i < kPins.size(); ++i) {
     zx::result client_end = driver_test().Connect<fuchsia_hardware_gpio::Service::Device>(
-        std::string{"gpio-"} + pins[i].name);
+        std::string{"gpio-"} + kPins[i].name().value());
     EXPECT_TRUE(client_end.is_ok());
-
-    clients[i].Bind(*std::move(client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher());
-    clients[i]->Read().ThenExactlyOnce([&, quit = i == std::size(clients) - 1](auto& result) {
+    clients.emplace_back(std::move(client_end.value()),
+                         fdf::Dispatcher::GetCurrent()->async_dispatcher());
+    clients.back()->Read().ThenExactlyOnce([&, quit = i == kPins.size() - 1](auto& result) {
       ASSERT_TRUE(result.ok());
       EXPECT_TRUE(result->is_ok());
       if (quit) {
@@ -817,16 +782,11 @@ TEST_F(GpioTest, MultipleClients) {
 }
 
 TEST_F(GpioTest, DebugDevfs) {
-  driver_test().RunInEnvironmentTypeContext([](GpioTestEnvironment& env) {
-    constexpr gpio_pin_t pins[] = {
-        DECL_GPIO_PIN(1),
-        DECL_GPIO_PIN(2),
-        DECL_GPIO_PIN(3),
-    };
-
-    EXPECT_OK(env.compat().AddMetadata(DEVICE_METADATA_GPIO_PINS, pins,
-                                       std::size(pins) * sizeof(gpio_pin_t)));
-  });
+  SetGpioMetadata({{.pins = {{
+                        DECL_GPIO_PIN(1),
+                        DECL_GPIO_PIN(2),
+                        DECL_GPIO_PIN(3),
+                    }}}});
 
   EXPECT_TRUE(driver_test().StartDriver().is_ok());
 
@@ -925,11 +885,10 @@ TEST_F(GpioTest, DebugDevfs) {
 }
 
 TEST_F(GpioTest, MultipleClientsGetInterrupts) {
-  driver_test().RunInEnvironmentTypeContext([](GpioTestEnvironment& env) {
-    constexpr gpio_pin_t pins[] = {DECL_GPIO_PIN(1), DECL_GPIO_PIN(2)};
-    EXPECT_OK(env.compat().AddMetadata(DEVICE_METADATA_GPIO_PINS, pins,
-                                       std::size(pins) * sizeof(gpio_pin_t)));
-  });
+  SetGpioMetadata({{.pins = {{
+                        DECL_GPIO_PIN(1),
+                        DECL_GPIO_PIN(2),
+                    }}}});
 
   EXPECT_TRUE(driver_test().StartDriver().is_ok());
 
@@ -1004,11 +963,9 @@ TEST_F(GpioTest, MultipleClientsGetInterrupts) {
 }
 
 TEST_F(GpioTest, UnbindingClientReleasesInterrupt) {
-  driver_test().RunInEnvironmentTypeContext([](GpioTestEnvironment& env) {
-    constexpr gpio_pin_t pins[] = {DECL_GPIO_PIN(1)};
-    EXPECT_OK(env.compat().AddMetadata(DEVICE_METADATA_GPIO_PINS, pins,
-                                       std::size(pins) * sizeof(gpio_pin_t)));
-  });
+  SetGpioMetadata({{.pins = {{
+                        DECL_GPIO_PIN(1),
+                    }}}});
 
   EXPECT_TRUE(driver_test().StartDriver().is_ok());
 
@@ -1071,11 +1028,9 @@ TEST_F(GpioTest, UnbindingClientReleasesInterrupt) {
 }
 
 TEST_F(GpioTest, OnlyClientWithInterruptCanConfigure) {
-  driver_test().RunInEnvironmentTypeContext([](GpioTestEnvironment& env) {
-    constexpr gpio_pin_t pins[] = {DECL_GPIO_PIN(1)};
-    EXPECT_OK(env.compat().AddMetadata(DEVICE_METADATA_GPIO_PINS, pins,
-                                       std::size(pins) * sizeof(gpio_pin_t)));
-  });
+  SetGpioMetadata({{.pins = {{
+                        DECL_GPIO_PIN(1),
+                    }}}});
 
   EXPECT_TRUE(driver_test().StartDriver().is_ok());
 
@@ -1187,11 +1142,9 @@ TEST_F(GpioTest, OnlyClientWithInterruptCanConfigure) {
 }
 
 TEST_F(GpioTest, DoubleGetInterruptAndRelease) {
-  driver_test().RunInEnvironmentTypeContext([](GpioTestEnvironment& env) {
-    constexpr gpio_pin_t pins[] = {DECL_GPIO_PIN(1)};
-    EXPECT_OK(env.compat().AddMetadata(DEVICE_METADATA_GPIO_PINS, pins,
-                                       std::size(pins) * sizeof(gpio_pin_t)));
-  });
+  SetGpioMetadata({{.pins = {{
+                        DECL_GPIO_PIN(1),
+                    }}}});
 
   EXPECT_TRUE(driver_test().StartDriver().is_ok());
 

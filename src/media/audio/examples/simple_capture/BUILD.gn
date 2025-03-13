@@ -23,6 +23,6 @@ executable("bin") {
   ]
 }
 
-fuchsia_shell_package("simple_capture") {
+fuchsia_package("simple_capture") {
   deps = [ ":bin" ]
 }

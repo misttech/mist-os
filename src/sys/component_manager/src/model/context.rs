@@ -31,6 +31,7 @@ pub struct ModelContext {
 }
 
 impl ModelContext {
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401254441)
     /// Constructs a new ModelContext from a RuntimeConfig.
     pub fn new(
         runtime_config: Arc<RuntimeConfig>,

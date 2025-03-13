@@ -56,7 +56,6 @@ source_set("amlogic-clk-driver-source") {
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
     "//sdk/fidl/fuchsia.hardware.clock.measure:fuchsia.hardware.clock.measure_cpp",
     "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
-    "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/devfs/cpp",
     "//sdk/lib/driver/metadata/cpp",
     "//sdk/lib/driver/platform-device/cpp",
@@ -67,6 +66,7 @@ source_set("amlogic-clk-driver-source") {
     "//zircon/system/ulib/zircon-internal",
   ]
   deps = [
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.clock:fuchsia.clock_cpp",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/mmio",

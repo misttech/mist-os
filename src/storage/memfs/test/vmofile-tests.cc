@@ -61,7 +61,7 @@ void shutdown_vfs(std::unique_ptr<memfs::Memfs> vfs) {
   sync_completion_wait(&completion, zx::sec(5).get());
 }
 
-TEST(VmofileTests, test_vmofile_basic) {
+TEST(VmofileTests, ReadOnly) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
   async_dispatcher_t* dispatcher = loop.dispatcher();
@@ -78,13 +78,11 @@ TEST(VmofileTests, test_vmofile_basic) {
   ASSERT_OK(vfs->CreateFromVmo(root.get(), "greeting", read_only_vmo.get(), 0, 13));
   ASSERT_OK(vfs->ServeDirectory(std::move(root), std::move(directory_endpoints.server)));
 
-  zx::result node_endpoints = fidl::CreateEndpoints<fio::Node>();
-  ASSERT_OK(node_endpoints.status_value());
-  auto open_result = fidl::WireCall(directory_endpoints.client)
-                         ->Open(fio::wire::OpenFlags::kRightReadable, {},
-                                fidl::StringView("greeting"), std::move(node_endpoints->server));
+  auto [file, server] = fidl::Endpoints<fio::File>::Create();
+  auto open_result =
+      fidl::WireCall(directory_endpoints.client)
+          ->Open(fidl::StringView("greeting"), fio::wire::kPermReadable, {}, server.TakeChannel());
   ASSERT_OK(open_result.status());
-  fidl::ClientEnd<fio::File> file(node_endpoints->client.TakeChannel());
 
   {
     const fidl::WireResult get_result =
@@ -153,7 +151,7 @@ TEST(VmofileTests, test_vmofile_basic) {
   shutdown_vfs(std::move(vfs));
 }
 
-TEST(VmofileTests, test_vmofile_exec) {
+TEST(VmofileTests, Executable) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
   async_dispatcher_t* dispatcher = loop.dispatcher();
@@ -180,14 +178,12 @@ TEST(VmofileTests, test_vmofile_exec) {
     ASSERT_OK(vfs->ServeDirectory(std::move(root), std::move(directory_endpoints.server)));
   }
 
-  zx::result node_endpoints = fidl::CreateEndpoints<fio::Node>();
-  ASSERT_OK(node_endpoints.status_value());
+  auto [file, server] = fidl::Endpoints<fio::File>::Create();
   auto open_result =
       fidl::WireCall(directory_endpoints.client)
-          ->Open(fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightExecutable, {},
-                 fidl::StringView("read_exec"), std::move(node_endpoints->server));
+          ->Open(fidl::StringView("read_exec"),
+                 fio::wire::kPermReadable | fio::wire::kPermExecutable, {}, server.TakeChannel());
   ASSERT_OK(open_result.status());
-  fidl::ClientEnd<fio::File> file(node_endpoints->client.TakeChannel());
 
   {
     const fidl::WireResult get_result =

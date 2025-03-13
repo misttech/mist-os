@@ -13,35 +13,32 @@ rustc_library("sampler-config") {
     "//src/connectivity/network/tests/integration/inspect/*",
     "//src/diagnostics/lib/sampler-config/*",
     "//src/diagnostics/sampler/*",
+    "//src/diagnostics/tools/merge_sampler_configs:*",
     "//src/lib/assembly/platform_configuration/*",
   ]
 
   deps = [
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
-    "//src/lib/diagnostics/inspect/rust",
     "//src/lib/diagnostics/selectors",
     "//src/sys/lib/component_id_index",
     "//src/sys/lib/moniker",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:glob",
-    "//third_party/rust_crates:log",
     "//third_party/rust_crates:serde",
-    "//third_party/rust_crates:serde_json5",
     "//third_party/rust_crates:thiserror",
   ]
 
   test_deps = [
     "//src/lib/fuchsia",
-    "//src/lib/fuchsia",
     "//third_party/rust_crates:assert_matches",
-    "//third_party/rust_crates:tempfile",
+    "//third_party/rust_crates:serde_json5",
   ]
 
   sources = [
+    "src/assembly/mod.rs",
+    "src/common.rs",
     "src/lib.rs",
-    "src/selector_list.rs",
-    "src/string_list.rs",
+    "src/runtime/mod.rs",
+    "src/utils.rs",
   ]
 
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
@@ -54,5 +51,8 @@ fuchsia_unittest_package("sampler-config-tests") {
 
 group("tests") {
   testonly = true
-  deps = [ ":sampler-config-tests" ]
+  deps = [
+    ":sampler-config-tests",
+    ":sampler-config_test($host_toolchain)",
+  ]
 }

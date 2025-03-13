@@ -5,8 +5,9 @@
 use crate::device::kobject::KObjectHandle;
 use crate::fs::sysfs::{
     sysfs_kernel_directory, sysfs_power_directory, CpuClassDirectory, KObjectDirectory,
+    VulnerabilitiesClassDirectory,
 };
-use crate::task::{CurrentTask, NetstackDevicesDirectory};
+use crate::task::{CurrentTask, Kernel, NetstackDevicesDirectory};
 use crate::vfs::{
     BytesFile, CacheConfig, CacheMode, FileSystem, FileSystemHandle, FileSystemOps,
     FileSystemOptions, FsNodeInfo, FsStr, PathBuilder, StaticDirectoryBuilder, StubEmptyFile,
@@ -20,6 +21,7 @@ use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::{ino_t, statfs, SYSFS_MAGIC};
+use std::sync::Arc;
 
 pub const SYSFS_DEVICES: &str = "devices";
 pub const SYSFS_BUS: &str = "bus";
@@ -116,11 +118,18 @@ impl SysFs {
             .objects
             .devices
             .get_or_create_child("system".into(), KObjectDirectory::new)
-            .get_or_create_child("cpu".into(), CpuClassDirectory::new);
+            .get_or_create_child("cpu".into(), CpuClassDirectory::new)
+            .get_or_create_child("vulnerabilities".into(), VulnerabilitiesClassDirectory::new);
 
         dir.build_root();
         fs
     }
+}
+
+struct SysFsHandle(FileSystemHandle);
+
+pub fn get_sys_fs(kernel: &Arc<Kernel>) -> Option<FileSystemHandle> {
+    kernel.expando.peek::<SysFsHandle>().map(|h| h.0.clone())
 }
 
 pub fn sys_fs(
@@ -128,7 +137,12 @@ pub fn sys_fs(
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
-    Ok(current_task.kernel().sys_fs.get_or_init(|| SysFs::new_fs(current_task, options)).clone())
+    Ok(current_task
+        .kernel()
+        .expando
+        .get_or_init(|| SysFsHandle(SysFs::new_fs(current_task, options)))
+        .0
+        .clone())
 }
 
 /// Creates a path to the `to` kobject in the devices tree, relative to the `from` kobject from

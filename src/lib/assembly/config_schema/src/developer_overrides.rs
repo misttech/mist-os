@@ -88,6 +88,10 @@ pub struct DeveloperOverrides {
     /// all serde_json::Value type.
     #[file_relative_paths]
     pub developer_provided_files: Vec<DeveloperProvidedFilesNode>,
+
+    /// Bootfs files to add via developer overrides
+    #[file_relative_paths]
+    pub bootfs_files_package: Option<FileRelativePathBuf>,
 }
 
 /// Special flags for assembly that can only be used in the context of developer

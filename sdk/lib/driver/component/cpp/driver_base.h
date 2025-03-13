@@ -5,7 +5,7 @@
 #ifndef LIB_DRIVER_COMPONENT_CPP_DRIVER_BASE_H_
 #define LIB_DRIVER_COMPONENT_CPP_DRIVER_BASE_H_
 
-#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
+#include <fidl/fuchsia.driver.framework/cpp/natural_types.h>
 #include <lib/component/outgoing/cpp/structured_config.h>
 #include <lib/driver/component/cpp/prepare_stop_completer.h>
 #include <lib/driver/component/cpp/start_completer.h>

@@ -7,7 +7,9 @@ use crate::signals::{SignalInfo, SignalState};
 use crate::task::{CurrentTask, Task};
 use extended_pstate::ExtendedPstateState;
 use starnix_logging::log_debug;
+use starnix_types::arch::ArchWidth;
 use starnix_uapi::errors::Errno;
+use starnix_uapi::signals::SigSet;
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
     self as uapi, error, sigaction_t, sigaltstack, sigcontext, siginfo_t, ucontext,
@@ -25,9 +27,6 @@ use static_assertions::const_assert_eq;
 ///   > stack pointer in the prologue and epilogue. This area is known as the red
 ///   > zone.
 pub const RED_ZONE_SIZE: u64 = 128;
-
-/// The size of the syscall instruction in bytes.
-pub const SYSCALL_INSTRUCTION_SIZE_BYTES: u64 = 2;
 
 /// A `SignalStackFrame` contains all the state that is stored on the stack prior
 /// to executing a signal handler.
@@ -78,6 +77,7 @@ pub const SIG_STACK_SIZE: usize = std::mem::size_of::<SignalStackFrame>();
 impl SignalStackFrame {
     pub fn new(
         _task: &Task,
+        arch_width: ArchWidth,
         registers: &RegisterState,
         extended_pstate: &ExtendedPstateState,
         signal_state: &SignalState,
@@ -128,7 +128,7 @@ impl SignalStackFrame {
         };
         Ok(SignalStackFrame {
             context,
-            siginfo_bytes: siginfo.as_siginfo_bytes(),
+            siginfo_bytes: siginfo.as_siginfo_bytes(arch_width)?,
             restorer_address: action.sa_restorer.addr,
             xstate: get_xstate(extended_pstate),
         })
@@ -140,6 +140,10 @@ impl SignalStackFrame {
 
     pub fn from_bytes(bytes: [u8; SIG_STACK_SIZE]) -> SignalStackFrame {
         unsafe { std::mem::transmute(bytes) }
+    }
+
+    pub fn get_signal_mask(&self) -> SigSet {
+        self.context.uc_sigmask.into()
     }
 }
 

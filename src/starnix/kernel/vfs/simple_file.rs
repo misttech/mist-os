@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::security;
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
@@ -66,7 +67,7 @@ where
         reason: CheckAccessReason,
     ) -> Result<(), Errno> {
         if self.capabilities != Capabilities::empty()
-            && current_task.creds().has_capability(self.capabilities)
+            && security::is_task_capable_noaudit(current_task, self.capabilities)
         {
             Ok(())
         } else {

@@ -128,7 +128,7 @@ impl Consumer {
         let conn_socket = Socket::get_from_file(&conn_file)?;
         let peer =
             SocketPeer::Handle(resolve_unix_socket_address(locked, current_task, socket_path)?);
-        conn_socket.connect(current_task, peer)?;
+        conn_socket.connect(locked, current_task, peer)?;
         let mut frame_reader = FrameReader::new(conn_file.clone());
         let mut request_id = 1;
 

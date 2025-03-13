@@ -23,11 +23,12 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD as BASE64_URL_SAFE_NO_PAD;
 use base64::engine::Engine as _;
 use byteorder::{ByteOrder, LittleEndian};
 use fidl_fuchsia_io as fio;
+use fuchsia_sync::Mutex;
 use fxfs_crypto::{Cipher, CipherSet, Key, WrappedKeys};
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use zerocopy::IntoBytes;
 
 use super::FSCRYPT_KEY_ID;
@@ -207,7 +208,7 @@ impl<S: HandleOwner> Directory<S> {
     }
 
     pub fn wrapping_key_id(&self) -> Option<u128> {
-        self.wrapping_key_id.lock().unwrap().clone()
+        self.wrapping_key_id.lock().clone()
     }
 
     /// Retrieves keys from the key manager or unwraps the wrapped keys in the directory's key
@@ -218,7 +219,9 @@ impl<S: HandleOwner> Directory<S> {
         let store = self.store();
         store
             .key_manager()
-            .get_fscrypt_key(object_id, store.crypt().unwrap().as_ref(), store.get_keys(object_id))
+            .get_fscrypt_key(object_id, store.crypt().unwrap().as_ref(), async || {
+                store.get_keys(object_id).await
+            })
             .await
     }
 
@@ -289,7 +292,7 @@ impl<S: HandleOwner> Directory<S> {
         casefold: bool,
     ) -> Result<Directory<S>, Error> {
         let store = owner.as_ref().as_ref();
-        let object_id = store.get_next_object_id(transaction).await?;
+        let object_id = store.get_next_object_id(transaction.txn_guard()).await?;
         let now = Timestamp::now();
         transaction.add(
             store.store_object_id(),
@@ -569,7 +572,7 @@ impl<S: HandleOwner> Directory<S> {
         if self.is_deleted() {
             return Ok(None);
         }
-        let res = if self.wrapping_key_id.lock().unwrap().is_some() {
+        let res = if self.wrapping_key_id.lock().is_some() {
             if let Some(fscrypt_key) = self.get_fscrypt_key().await? {
                 let target_casefold_hash =
                     get_casefold_hash(Some(&fscrypt_key), name, self.casefold());
@@ -686,6 +689,7 @@ impl<S: HandleOwner> Directory<S> {
         name: &str,
     ) -> Result<Directory<S>, Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
+
         let handle = Directory::create_with_options(
             transaction,
             self.owner(),
@@ -693,7 +697,7 @@ impl<S: HandleOwner> Directory<S> {
             self.casefold(),
         )
         .await?;
-        if self.wrapping_key_id.lock().unwrap().is_some() {
+        if self.wrapping_key_id.lock().is_some() {
             let key = if let Some(key) = self.get_fscrypt_key().await? {
                 key
             } else {
@@ -741,7 +745,7 @@ impl<S: HandleOwner> Directory<S> {
         handle: &DataObjectHandle<S>,
     ) -> Result<(), Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
-        if self.wrapping_key_id.lock().unwrap().is_some() {
+        if self.wrapping_key_id.lock().is_some() {
             let key = if let Some(key) = self.get_fscrypt_key().await? {
                 key
             } else {
@@ -842,12 +846,64 @@ impl<S: HandleOwner> Directory<S> {
         options: HandleOptions,
     ) -> Result<DataObjectHandle<S>, Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
-        let wrapping_key_id = self.wrapping_key_id.lock().unwrap().clone();
+        let wrapping_key_id = self.wrapping_key_id.lock().clone();
         let handle =
-            ObjectStore::create_object(self.owner(), transaction, options, None, wrapping_key_id)
-                .await?;
+            ObjectStore::create_object(self.owner(), transaction, options, wrapping_key_id).await?;
         self.add_child_file(transaction, name, &handle).await?;
         self.copy_project_id_to_object_in_txn(transaction, handle.object_id())?;
+        Ok(handle)
+    }
+
+    pub async fn create_child_unnamed_temporary_file<'a>(
+        &self,
+        transaction: &mut Transaction<'a>,
+    ) -> Result<DataObjectHandle<S>, Error> {
+        ensure!(!self.is_deleted(), FxfsError::Deleted);
+        let wrapping_key_id = self.wrapping_key_id.lock().clone();
+        let handle = ObjectStore::create_object(
+            self.owner(),
+            transaction,
+            HandleOptions::default(),
+            wrapping_key_id,
+        )
+        .await?;
+
+        // Copy project ID from self to the created file object.
+        let ObjectValue::Object { attributes: ObjectAttributes { project_id, .. }, .. } = self
+            .store()
+            .txn_get_object_mutation(&transaction, self.object_id())
+            .await
+            .unwrap()
+            .item
+            .value
+        else {
+            bail!(anyhow!(FxfsError::Inconsistent)
+                .context("Directory.create_child_file_with_options: expected mutation object"));
+        };
+
+        // Update the object mutation with parent's project ID.
+        let mut child_mutation = transaction
+            .get_object_mutation(
+                self.store().store_object_id(),
+                ObjectKey::object(handle.object_id()),
+            )
+            .unwrap()
+            .clone();
+        if let ObjectValue::Object {
+            attributes: ObjectAttributes { project_id: child_project_id, .. },
+            ..
+        } = &mut child_mutation.item.value
+        {
+            *child_project_id = project_id;
+        } else {
+            bail!(anyhow!(FxfsError::Inconsistent)
+                .context("Directory.create_child_file_with_options: expected file object"));
+        }
+        transaction.add(self.store().store_object_id(), Mutation::ObjectStore(child_mutation));
+
+        // Add object to graveyard - the object should be removed on remount.
+        self.store().add_to_graveyard(transaction, handle.object_id());
+
         Ok(handle)
     }
 
@@ -862,7 +918,7 @@ impl<S: HandleOwner> Directory<S> {
         // https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/limits.h.html.
         // See _POSIX_SYMLINK_MAX.
         ensure!(link.len() <= 256, FxfsError::BadPath);
-        let symlink_id = self.store().get_next_object_id(transaction).await?;
+        let symlink_id = self.store().get_next_object_id(transaction.txn_guard()).await?;
         transaction.add(
             self.store().store_object_id(),
             Mutation::insert_object(
@@ -951,7 +1007,7 @@ impl<S: HandleOwner> Directory<S> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
         let sub_dirs_delta = if descriptor == ObjectDescriptor::Directory { 1 } else { 0 };
         // TODO(https://fxbug.dev/360171961): Add fscrypt symlink support.
-        if self.wrapping_key_id.lock().unwrap().is_some() {
+        if self.wrapping_key_id.lock().is_some() {
             if !matches!(descriptor, ObjectDescriptor::File | ObjectDescriptor::Directory) {
                 return Err(anyhow!(FxfsError::InvalidArgs)
                     .context("Encrypted directories can only have file or directory children"));
@@ -1034,7 +1090,7 @@ impl<S: HandleOwner> Directory<S> {
         transaction
             .commit_with_callback(|_| {
                 if let Some((key_id, unwrapped_key)) = wrapping_key {
-                    *self.wrapping_key_id.lock().unwrap() = Some(key_id);
+                    *self.wrapping_key_id.lock() = Some(key_id);
                     self.store().key_manager.merge(self.object_id(), |existing| {
                         let mut new = existing.map_or(Vec::new(), |e| e.ciphers().to_vec());
                         new.push(unwrapped_key);
@@ -1194,7 +1250,7 @@ impl<S: HandleOwner> Directory<S> {
         // We have three types of child records depending on directory features (Child,
         // CasefoldChild, EncryptedChild). EncryptedChild can be casefolded or not. To avoid leaking
         // complexity, we try to keep this implementation detail internal to this struct.
-        let (query_key, requested_filename) = if self.wrapping_key_id.lock().unwrap().is_some() {
+        let (query_key, requested_filename) = if self.wrapping_key_id.lock().is_some() {
             if let Some(key) = self.get_fscrypt_key().await? {
                 // Unlocked EncryptedChild case.
                 let casefold_hash = get_casefold_hash(Some(&key), from, self.casefold());
@@ -1251,7 +1307,7 @@ impl<S: HandleOwner> Directory<S> {
             }
             iter.advance().await?;
         }
-        let key = if self.wrapping_key_id.lock().unwrap().is_some() {
+        let key = if self.wrapping_key_id.lock().is_some() {
             self.get_fscrypt_key().await?
         } else {
             None
@@ -1605,7 +1661,7 @@ mod tests {
     use crate::object_store::volume::root_volume;
     use crate::object_store::{
         HandleOptions, LockKey, ObjectDescriptor, ObjectStore, SetExtendedAttributeMode,
-        StoreObjectHandle,
+        StoreObjectHandle, NO_OWNER,
     };
     use assert_matches::assert_matches;
     use fidl_fuchsia_io as fio;
@@ -1704,7 +1760,7 @@ mod tests {
         let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
         let crypt: Arc<InsecureCrypt> = Arc::new(InsecureCrypt::new());
         let store = root_volume
-            .new_volume("test", Some(crypt.clone() as Arc<dyn Crypt>))
+            .new_volume("test", NO_OWNER, Some(crypt.clone() as Arc<dyn Crypt>))
             .await
             .expect("new_volume failed");
 
@@ -1762,7 +1818,7 @@ mod tests {
         let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
         let crypt: Arc<InsecureCrypt> = Arc::new(InsecureCrypt::new());
         let store = root_volume
-            .new_volume("test", Some(crypt.clone() as Arc<dyn Crypt>))
+            .new_volume("test", NO_OWNER, Some(crypt.clone() as Arc<dyn Crypt>))
             .await
             .expect("new_volume failed");
 
@@ -1808,7 +1864,7 @@ mod tests {
         let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
         let crypt: Arc<InsecureCrypt> = Arc::new(InsecureCrypt::new());
         let store = root_volume
-            .new_volume("test", Some(crypt.clone() as Arc<dyn Crypt>))
+            .new_volume("test", NO_OWNER, Some(crypt.clone() as Arc<dyn Crypt>))
             .await
             .expect("new_volume failed");
 
@@ -1881,7 +1937,7 @@ mod tests {
         let (parent_oid, src_oid, dst_oid) = {
             let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
             let store = root_volume
-                .new_volume("test", Some(crypt.clone() as Arc<dyn Crypt>))
+                .new_volume("test", NO_OWNER, Some(crypt.clone() as Arc<dyn Crypt>))
                 .await
                 .expect("new_volume failed");
 
@@ -1951,7 +2007,7 @@ mod tests {
         let fs = FxFilesystem::open(device).await.expect("open failed");
         let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
         let store = root_volume
-            .volume("test", Some(crypt.clone() as Arc<dyn Crypt>))
+            .volume("test", NO_OWNER, Some(crypt.clone() as Arc<dyn Crypt>))
             .await
             .expect("volume failed");
 
@@ -2009,7 +2065,7 @@ mod tests {
         let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
         let crypt: Arc<InsecureCrypt> = Arc::new(InsecureCrypt::new());
         let store = root_volume
-            .new_volume("test", Some(crypt.clone() as Arc<dyn Crypt>))
+            .new_volume("test", NO_OWNER, Some(crypt.clone() as Arc<dyn Crypt>))
             .await
             .expect("new_volume failed");
 
@@ -3074,7 +3130,7 @@ mod tests {
         {
             let root_volume = root_volume(filesystem.clone()).await.expect("root_volume failed");
             let store = root_volume
-                .new_volume("vol", Some(crypt.clone()))
+                .new_volume("vol", NO_OWNER, Some(crypt.clone()))
                 .await
                 .expect("new_volume failed");
             let mut transaction = filesystem
@@ -3120,7 +3176,8 @@ mod tests {
 
         {
             let root_volume = root_volume(filesystem.clone()).await.expect("root_volume failed");
-            let volume = root_volume.volume("vol", Some(crypt)).await.expect("volume failed");
+            let volume =
+                root_volume.volume("vol", NO_OWNER, Some(crypt)).await.expect("volume failed");
             let root_directory = Directory::open(&volume, volume.root_directory_object_id())
                 .await
                 .expect("open failed");
@@ -3145,8 +3202,10 @@ mod tests {
         let crypt = Arc::new(InsecureCrypt::new());
 
         let root_volume = root_volume(filesystem.clone()).await.expect("root_volume failed");
-        let store =
-            root_volume.new_volume("vol", Some(crypt.clone())).await.expect("new_volume failed");
+        let store = root_volume
+            .new_volume("vol", NO_OWNER, Some(crypt.clone()))
+            .await
+            .expect("new_volume failed");
         let directory =
             Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
 
@@ -3199,8 +3258,10 @@ mod tests {
         let crypt = Arc::new(InsecureCrypt::new());
 
         let root_volume = root_volume(filesystem.clone()).await.expect("root_volume failed");
-        let store =
-            root_volume.new_volume("vol", Some(crypt.clone())).await.expect("new_volume failed");
+        let store = root_volume
+            .new_volume("vol", NO_OWNER, Some(crypt.clone()))
+            .await
+            .expect("new_volume failed");
         let mut transaction = filesystem
             .clone()
             .new_transaction(
@@ -3283,8 +3344,10 @@ mod tests {
         let crypt = Arc::new(InsecureCrypt::new());
 
         let root_volume = root_volume(filesystem.clone()).await.expect("root_volume failed");
-        let store =
-            root_volume.new_volume("vol", Some(crypt.clone())).await.expect("new_volume failed");
+        let store = root_volume
+            .new_volume("vol", NO_OWNER, Some(crypt.clone()))
+            .await
+            .expect("new_volume failed");
         let mut transaction = filesystem
             .clone()
             .new_transaction(
@@ -3735,7 +3798,7 @@ mod tests {
         {
             let crypt: Arc<InsecureCrypt> = Arc::new(InsecureCrypt::new());
             let root_volume = root_volume(fs.clone()).await.unwrap();
-            let store = root_volume.new_volume("vol", Some(crypt.clone())).await.unwrap();
+            let store = root_volume.new_volume("vol", NO_OWNER, Some(crypt.clone())).await.unwrap();
 
             // Create a (very weak) key for our encrypted directory.
             let wrapping_key_id = 2;
@@ -3822,8 +3885,10 @@ mod tests {
         {
             let crypt: Arc<InsecureCrypt> = Arc::new(InsecureCrypt::new());
             let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
-            let store =
-                root_volume.volume("vol", Some(crypt.clone())).await.expect("volume failed");
+            let store = root_volume
+                .volume("vol", NO_OWNER, Some(crypt.clone()))
+                .await
+                .expect("volume failed");
             let dir = Directory::open(&store, object_id).await.expect("open failed");
             assert!(dir.casefold());
 
@@ -3901,7 +3966,7 @@ mod tests {
         {
             let crypt: Arc<InsecureCrypt> = Arc::new(InsecureCrypt::new());
             let root_volume = root_volume(fs.clone()).await.unwrap();
-            let store = root_volume.new_volume("vol", Some(crypt.clone())).await.unwrap();
+            let store = root_volume.new_volume("vol", NO_OWNER, Some(crypt.clone())).await.unwrap();
 
             // Create a (very weak) key for our encrypted directory.
             let wrapping_key_id = 2;
@@ -3984,8 +4049,10 @@ mod tests {
         {
             let crypt: Arc<InsecureCrypt> = Arc::new(InsecureCrypt::new());
             let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
-            let store =
-                root_volume.volume("vol", Some(crypt.clone())).await.expect("volume failed");
+            let store = root_volume
+                .volume("vol", NO_OWNER, Some(crypt.clone()))
+                .await
+                .expect("volume failed");
             let dir = Directory::open(&store, object_id).await.expect("open failed");
             assert!(dir.casefold());
 

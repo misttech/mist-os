@@ -16,6 +16,6 @@ executable("bin") {
   ]
 }
 
-fuchsia_shell_package("dsputil") {
+fuchsia_package("dsputil") {
   deps = [ ":bin" ]
 }

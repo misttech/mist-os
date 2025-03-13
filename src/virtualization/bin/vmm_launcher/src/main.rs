@@ -11,7 +11,7 @@ use fidl_fuchsia_virtualization::GuestLifecycleMarker;
 use fuchsia_component::{client, server};
 use vmm_launcher_config::Config;
 
-#[fuchsia::main(logging = true, threads = 1)]
+#[fuchsia::main(logging = true)]
 async fn main() -> Result<(), anyhow::Error> {
     let mut fs = server::ServiceFs::new();
     fs.dir("svc").add_service_connector(|server_end: ServerEnd<GuestLifecycleMarker>| server_end);

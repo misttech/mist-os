@@ -24,7 +24,6 @@ pub fn compile_container_manifest(
             "runner": "starnix",
             "features": features,
             "init": [],
-            "init_user": "root:x:0:0",
             "kernel_cmdline": "",
             "mounts": mounts,
             "name": container_name,

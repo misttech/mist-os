@@ -70,7 +70,13 @@ executable("devicetree-extract") {
   ]
 }
 
-fuchsia_shell_package("devicetree-extract-package") {
+# To use this tool with a product, use developer overrides for assembly
+# to register it as a shell command and add the package to product image.
+#
+# https://fuchsia.dev/fuchsia-src/development/build/assembly_developer_overrides#add-shell-command
+# https://fuchsia.dev/fuchsia-src/development/build/assembly_developer_overrides#add-package
+#
+fuchsia_package("devicetree-extract-package") {
   testonly = true
   deps = [ ":devicetree-extract" ]
   package_name = "devicetree-extract"

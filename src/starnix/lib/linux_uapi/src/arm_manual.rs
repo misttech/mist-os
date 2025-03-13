@@ -20,6 +20,41 @@ fn saturating_i64_to_i32(v: i64) -> i32 {
     }
 }
 
+macro_rules! translate_data {
+    ($type_name:ident; $( $field :ident ),+) => {
+      translate_data!(FROM32; $type_name; $( $field ),*);
+      translate_data!(TRYFROM64; $type_name; $( $field ),*);
+    };
+    (FROM32; $type_name:ident; $( $field :ident ),+) => {
+        impl From<crate::arch32::$type_name> for crate::$type_name {
+            fn from($type_name: crate::arch32::$type_name) -> Self {
+                Self {
+                    $( $field: $type_name.$field.into(),  )*
+                    ..Default::default()
+                }
+            }
+        }
+
+    };
+    (TRYFROM64; $type_name:ident; $( $field :ident ),+) => {
+        impl TryFrom<crate::$type_name> for crate::arch32::$type_name {
+            type Error = ();
+            fn try_from($type_name: crate::$type_name) -> Result<Self, ()> {
+                Ok(Self {
+                    $( $field: $type_name.$field.try_into().map_err(|_| ())?,  )*
+                    ..Default::default()
+                })
+            }
+        }
+    };
+}
+
+translate_data!(flock; l_type, l_whence, l_start, l_len, l_pid);
+translate_data!(itimerspec; it_interval, it_value);
+translate_data!(itimerval; it_interval, it_value);
+translate_data!(__kernel_fsid_t; val);
+translate_data!(sigaltstack; ss_sp, ss_flags, ss_size);
+
 impl From<crate::stat> for crate::arch32::stat64 {
     fn from(stat: crate::stat) -> Self {
         let mut result = Self::default();
@@ -45,6 +80,7 @@ impl From<crate::stat> for crate::arch32::stat64 {
     }
 }
 
+translate_data!(FROM32; timespec; tv_sec, tv_nsec);
 impl From<crate::timespec> for crate::arch32::timespec {
     fn from(tv: crate::timespec) -> Self {
         Self {
@@ -54,6 +90,7 @@ impl From<crate::timespec> for crate::arch32::timespec {
     }
 }
 
+translate_data!(FROM32; timeval; tv_sec, tv_usec);
 impl From<crate::timeval> for crate::arch32::timeval {
     fn from(tv: crate::timeval) -> Self {
         Self {
@@ -63,12 +100,7 @@ impl From<crate::timeval> for crate::arch32::timeval {
     }
 }
 
-impl From<crate::arch32::rlimit> for crate::rlimit {
-    fn from(rlimit: crate::arch32::rlimit) -> Self {
-        Self { rlim_cur: rlimit.rlim_cur.into(), rlim_max: rlimit.rlim_max.into() }
-    }
-}
-
+translate_data!(FROM32; rlimit; rlim_cur, rlim_max);
 impl From<crate::rlimit> for crate::arch32::rlimit {
     fn from(rlimit: crate::rlimit) -> Self {
         Self {
@@ -78,24 +110,158 @@ impl From<crate::rlimit> for crate::arch32::rlimit {
     }
 }
 
-impl From<crate::arch32::sigaltstack> for crate::sigaltstack {
-    fn from(sigaltstack: crate::arch32::sigaltstack) -> Self {
+impl TryFrom<crate::statfs> for crate::arch32::statfs64 {
+    type Error = ();
+    fn try_from(statfs: crate::statfs) -> Result<Self, ()> {
+        Ok(Self {
+            f_type: statfs.f_type.try_into().map_err(|_| ())?,
+            f_bsize: statfs.f_bsize.try_into().map_err(|_| ())?,
+            f_blocks: statfs.f_blocks.try_into().map_err(|_| ())?,
+            f_bfree: statfs.f_bfree.try_into().map_err(|_| ())?,
+            f_bavail: statfs.f_bavail.try_into().map_err(|_| ())?,
+            f_files: statfs.f_files.try_into().map_err(|_| ())?,
+            f_ffree: statfs.f_ffree.try_into().map_err(|_| ())?,
+            f_fsid: statfs.f_fsid.try_into().map_err(|_| ())?,
+            f_namelen: statfs.f_namelen.try_into().map_err(|_| ())?,
+            f_frsize: statfs.f_frsize.try_into().map_err(|_| ())?,
+            f_flags: statfs.f_flags.try_into().map_err(|_| ())?,
+            f_spare: Default::default(),
+        })
+    }
+}
+
+impl From<crate::arch32::__kernel_sigaction> for crate::__kernel_sigaction {
+    fn from(sigaction: crate::arch32::__kernel_sigaction) -> Self {
         Self {
-            ss_sp: sigaltstack.ss_sp.into(),
-            ss_flags: sigaltstack.ss_flags.into(),
-            ss_size: sigaltstack.ss_size.into(),
-            __bindgen_padding_0: Default::default(),
+            sa_handler: sigaction.sa_handler.into(),
+            sa_mask: crate::sigset_t { sig: [sigaction.sa_mask.into()] },
+            sa_flags: sigaction.sa_flags.into(),
+            sa_restorer: sigaction.sa_restorer.into(),
         }
     }
 }
 
-impl TryFrom<crate::sigaltstack> for crate::arch32::sigaltstack {
+impl From<crate::arch32::sigaction64> for crate::__kernel_sigaction {
+    fn from(sigaction: crate::arch32::sigaction64) -> Self {
+        Self {
+            sa_handler: sigaction.sa_handler.into(),
+            sa_mask: sigaction.sa_mask.into(),
+            sa_flags: sigaction.sa_flags.into(),
+            sa_restorer: sigaction.sa_restorer.into(),
+        }
+    }
+}
+
+impl TryFrom<crate::__kernel_sigaction> for crate::arch32::__kernel_sigaction {
     type Error = ();
-    fn try_from(sigaltstack: crate::sigaltstack) -> Result<Self, ()> {
+    fn try_from(sigaction: crate::__kernel_sigaction) -> Result<Self, ()> {
         Ok(Self {
-            ss_sp: sigaltstack.ss_sp.try_into().map_err(|_| ())?,
-            ss_flags: sigaltstack.ss_flags.try_into().map_err(|_| ())?,
-            ss_size: sigaltstack.ss_size.try_into().map_err(|_| ())?,
+            sa_handler: sigaction.sa_handler.try_into().map_err(|_| ())?,
+            sa_mask: sigaction.sa_mask.sig[0].try_into().map_err(|_| ())?,
+            sa_flags: sigaction.sa_flags.try_into().map_err(|_| ())?,
+            sa_restorer: sigaction.sa_restorer.try_into().map_err(|_| ())?,
+        })
+    }
+}
+
+impl TryFrom<crate::__kernel_sigaction> for crate::arch32::sigaction64 {
+    type Error = ();
+    fn try_from(sigaction: crate::__kernel_sigaction) -> Result<Self, ()> {
+        Ok(Self {
+            sa_handler: sigaction.sa_handler.try_into().map_err(|_| ())?,
+            sa_mask: sigaction.sa_mask.try_into().map_err(|_| ())?,
+            sa_flags: sigaction.sa_flags.try_into().map_err(|_| ())?,
+            sa_restorer: sigaction.sa_restorer.try_into().map_err(|_| ())?,
+        })
+    }
+}
+
+impl From<crate::arch32::sigset64_t> for crate::sigset_t {
+    fn from(sigset: crate::arch32::sigset64_t) -> Self {
+        Self { sig: [sigset.sig[0].into()] }
+    }
+}
+
+impl From<crate::sigset_t> for crate::arch32::sigset64_t {
+    fn from(sigset: crate::sigset_t) -> Self {
+        Self { sig: [sigset.sig[0] as u32] }
+    }
+}
+
+impl From<crate::arch32::sigval> for crate::sigval {
+    fn from(sigval: crate::arch32::sigval) -> Self {
+        // SAFETY: This is safe because the union has a single field.
+        let bindgen_opaque_blob = unsafe { sigval._bindgen_opaque_blob };
+        Self { _bindgen_opaque_blob: bindgen_opaque_blob.into() }
+    }
+}
+
+impl TryFrom<crate::sigval> for crate::arch32::sigval {
+    type Error = ();
+    fn try_from(sigval: crate::sigval) -> Result<Self, ()> {
+        // SAFETY: This is safe because the union has a single field.
+        let bindgen_opaque_blob = unsafe { sigval._bindgen_opaque_blob };
+        Ok(Self { _bindgen_opaque_blob: bindgen_opaque_blob.try_into().map_err(|_| ())? })
+    }
+}
+
+impl From<crate::arch32::sigevent> for crate::sigevent {
+    fn from(sigevent: crate::arch32::sigevent) -> Self {
+        let mut _sigev_un = crate::sigevent__bindgen_ty_1::default();
+        // SAFETY: This is safe because the union has all bytes defined.
+        match sigevent.sigev_notify as u32 {
+            crate::SIGEV_THREAD_ID => unsafe {
+                _sigev_un._tid = sigevent._sigev_un._tid.into();
+            },
+            crate::SIGEV_THREAD => unsafe {
+                _sigev_un._sigev_thread = crate::sigevent__bindgen_ty_1__bindgen_ty_1 {
+                    _function: sigevent._sigev_un._sigev_thread._function.into(),
+                    _attribute: sigevent._sigev_un._sigev_thread._attribute.into(),
+                };
+            },
+            _ => {}
+        }
+        Self {
+            sigev_value: sigevent.sigev_value.into(),
+            sigev_signo: sigevent.sigev_signo.into(),
+            sigev_notify: sigevent.sigev_notify.into(),
+            _sigev_un,
+        }
+    }
+}
+
+impl TryFrom<crate::sigevent> for crate::arch32::sigevent {
+    type Error = ();
+    fn try_from(sigevent: crate::sigevent) -> Result<Self, ()> {
+        let mut _sigev_un = crate::arch32::sigevent__bindgen_ty_1::default();
+        // SAFETY: This is safe because the union has all bytes defined.
+        match sigevent.sigev_notify as u32 {
+            crate::SIGEV_THREAD_ID => unsafe {
+                _sigev_un._tid = sigevent._sigev_un._tid.try_into().map_err(|_| ())?;
+            },
+            crate::SIGEV_THREAD => unsafe {
+                _sigev_un._sigev_thread = crate::arch32::sigevent__bindgen_ty_1__bindgen_ty_1 {
+                    _function: sigevent
+                        ._sigev_un
+                        ._sigev_thread
+                        ._function
+                        .try_into()
+                        .map_err(|_| ())?,
+                    _attribute: sigevent
+                        ._sigev_un
+                        ._sigev_thread
+                        ._attribute
+                        .try_into()
+                        .map_err(|_| ())?,
+                };
+            },
+            _ => {}
+        }
+        Ok(Self {
+            sigev_value: sigevent.sigev_value.try_into().map_err(|_| ())?,
+            sigev_signo: sigevent.sigev_signo.try_into().map_err(|_| ())?,
+            sigev_notify: sigevent.sigev_notify.try_into().map_err(|_| ())?,
+            _sigev_un,
         })
     }
 }

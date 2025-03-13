@@ -8,7 +8,7 @@ use crate::instance_actor::InstanceActor;
 use crate::Args;
 use anyhow::{anyhow, format_err};
 use async_trait::async_trait;
-use diagnostics_reader::{ArchiveReader, Inspect};
+use diagnostics_reader::ArchiveReader;
 use either::Either;
 use fidl::endpoints::Proxy as _;
 use fidl_fuchsia_device::ControllerMarker;
@@ -261,9 +261,9 @@ impl<FSC: Clone + FSConfig> FsEnvironment<FSC> {
         let mut timer = fuchsia_async::Interval::new(INSPECT_POLL_INTERVAL);
         loop {
             timer.next().await;
-            match ArchiveReader::new()
+            match ArchiveReader::inspect()
                 .select_all_for_moniker(&moniker)
-                .snapshot::<Inspect>()
+                .snapshot()
                 .await
                 .map_err(|e| anyhow!(e))
                 .and_then(|d| {

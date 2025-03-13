@@ -5,7 +5,6 @@
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 import("//src/sys/pkg/bin/grand-swd-binary/gsb.gni")
-import("system_update_committer_config.gni")
 
 # `system-update-committer` is conceptually a binary, but it built as a lib here so
 # it can be aggregated into //src/sys/pkg/bin/grand-swd-binary to save disk space.
@@ -37,33 +36,28 @@ rustc_library("lib") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:log",
-    "//third_party/rust_crates:serde",
-    "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:typed-builder",
   ]
   test_deps = [
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia-sync",
+    "//src/sys/pkg/testing/mock-health-verification",
     "//src/sys/pkg/testing/mock-paver",
     "//src/sys/pkg/testing/mock-reboot",
-    "//src/sys/pkg/testing/mock-verifier:lib",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:proptest",
   ]
 
   source_root = "src/main.rs"
   sources = [
-    "src/config.rs",
     "src/fidl.rs",
     "src/main.rs",
     "src/metadata.rs",
     "src/metadata/commit.rs",
-    "src/metadata/configuration.rs",
+    "src/metadata/configuration_without_recovery.rs",
     "src/metadata/errors.rs",
     "src/metadata/inspect.rs",
     "src/metadata/policy.rs",
-    "src/metadata/verify.rs",
     "src/reboot.rs",
   ]
 
@@ -104,17 +98,6 @@ fuchsia_unittest_component("unittest_component") {
 
 fuchsia_test_package("system-update-committer-tests") {
   test_components = [ ":unittest_component" ]
-}
-
-system_update_committer_config("enable_reboot_on_verification_failure") {
-  blobfs = "reboot_on_failure"
-  netstack = "reboot_on_failure"
-}
-
-system_update_committer_config("disable") {
-  blobfs = "ignore"
-  netstack = "ignore"
-  enable = false
 }
 
 group("hermetic_tests") {

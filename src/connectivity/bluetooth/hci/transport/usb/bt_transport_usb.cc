@@ -682,7 +682,7 @@ void Device::QueueInterruptRequestsLocked() {
   }
 }
 
-void Device::SnoopChannelWriteLocked(bt_hci_snoop_type_t type, bool is_received,
+void Device::SnoopChannelWriteLocked(enum SnoopPacketType type, bool is_received,
                                      const uint8_t* bytes, size_t length) {
   if (snoop_server_.has_value()) {
     if ((snoop_seq_ - acked_snoop_seq_) > kSeqNumMaxDiff) {
@@ -705,29 +705,35 @@ void Device::SnoopChannelWriteLocked(bt_hci_snoop_type_t type, bool is_received,
                                   : fhbt::PacketDirection::kHostToController);
 
     switch (type) {
-      case BT_HCI_SNOOP_TYPE_EVT: {
+      case SnoopPacketType::kEvent: {
         ZX_DEBUG_ASSERT(is_received);
         builder.packet(fhbt::wire::SnoopPacket::WithEvent(
             arena, fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(bytes), length)));
         break;
       }
-      case BT_HCI_SNOOP_TYPE_CMD: {
+      case SnoopPacketType::kCommand: {
         ZX_DEBUG_ASSERT(!is_received);
         builder.packet(fhbt::wire::SnoopPacket::WithCommand(
             arena, fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(bytes), length)));
         break;
       }
-      case BT_HCI_SNOOP_TYPE_ACL: {
+      case SnoopPacketType::kAclData: {
         builder.packet(fhbt::wire::SnoopPacket::WithAcl(
             arena, fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(bytes), length)));
         break;
       }
-      case BT_HCI_SNOOP_TYPE_SCO:
+      case SnoopPacketType::kScoData: {
         builder.packet(fhbt::wire::SnoopPacket::WithSco(
             arena, fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(bytes), length)));
         break;
+      }
+      case SnoopPacketType::kIsoData: {
+        builder.packet(fhbt::wire::SnoopPacket::WithIso(
+            arena, fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(bytes), length)));
+        break;
+      }
       default:
-        zxlogf(ERROR, "Snoop: Unknown snoop packet type: %u", type);
+        ZX_PANIC("Invalid snoop packet type");
     }
 
     builder.sequence(snoop_seq_++);
@@ -802,7 +808,7 @@ void Device::HciEventComplete(usb_request_t* req) {
             });
       }
 
-      SnoopChannelWriteLocked(BT_HCI_SNOOP_TYPE_EVT, /*is_received=*/true, byte_buffer, length);
+      SnoopChannelWriteLocked(SnoopPacketType::kEvent, /*is_received=*/true, byte_buffer, length);
 
       // Re-queue the HCI event USB request.
       status = usb_req_list_add_head(&free_event_reqs_, req, parent_req_size_);
@@ -849,7 +855,7 @@ void Device::HciEventComplete(usb_request_t* req) {
           });
     }
 
-    SnoopChannelWriteLocked(BT_HCI_SNOOP_TYPE_EVT, /*is_received=*/true, event_buffer_,
+    SnoopChannelWriteLocked(SnoopPacketType::kEvent, /*is_received=*/true, event_buffer_,
                             packet_size);
 
     uint32_t remaining = static_cast<uint32_t>(event_buffer_offset_ - packet_size);
@@ -916,7 +922,7 @@ void Device::HciAclReadComplete(usb_request_t* req) {
 
   // If the snoop client is available then try to write the packet even if HciTransport connection
   // was closed.
-  SnoopChannelWriteLocked(BT_HCI_SNOOP_TYPE_ACL, /*is_received=*/true,
+  SnoopChannelWriteLocked(SnoopPacketType::kAclData, /*is_received=*/true,
                           static_cast<uint8_t*>(buffer), req->response.actual);
 
   status = usb_req_list_add_head(&free_acl_read_reqs_, req, parent_req_size_);
@@ -949,7 +955,7 @@ void Device::HciAclWriteComplete(usb_request_t* req) {
       return;
     }
 
-    SnoopChannelWriteLocked(BT_HCI_SNOOP_TYPE_ACL, /*is_received=*/false,
+    SnoopChannelWriteLocked(SnoopPacketType::kAclData, /*is_received=*/false,
                             static_cast<uint8_t*>(buffer), req->response.actual);
   }
 }
@@ -1006,7 +1012,7 @@ void Device::OnScoReassemblerPacketLocked(cpp20::span<const uint8_t> packet) {
   }
 
   // If the snoop client available then try to write the packet even if sco connection was closed.
-  SnoopChannelWriteLocked(BT_HCI_SNOOP_TYPE_SCO, /*is_received=*/true, packet.data(),
+  SnoopChannelWriteLocked(SnoopPacketType::kScoData, /*is_received=*/true, packet.data(),
                           packet.size());
 }
 
@@ -1036,7 +1042,7 @@ void Device::HciScoWriteComplete(usb_request_t* req) {
       return;
     }
 
-    SnoopChannelWriteLocked(BT_HCI_SNOOP_TYPE_SCO, /*is_received=*/false,
+    SnoopChannelWriteLocked(SnoopPacketType::kScoData, /*is_received=*/false,
                             static_cast<uint8_t*>(buffer), req->response.actual);
   }
 }
@@ -1183,7 +1189,7 @@ void Device::Send(SendRequest& request, SendCompleter::Sync& completer) {
       completer.Reply();
       {
         std::lock_guard lock(mutex_);
-        SnoopChannelWriteLocked(BT_HCI_SNOOP_TYPE_CMD, /*is_received=*/false,
+        SnoopChannelWriteLocked(SnoopPacketType::kCommand, /*is_received=*/false,
                                 request.command().value().data(), request.command().value().size());
       }
 

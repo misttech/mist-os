@@ -50,20 +50,8 @@
 
 
 
-
-
+#ifdef __Fuchsia__
 }  // namespace test_bindingsdenylist
-
-#ifdef __Fuchsia__
-
-template<>
-struct ::fidl::internal::ProtocolDetails<::test_bindingsdenylist::OnlyLibfuzzerAndDeps> {
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 
 template<>
 struct ::fidl::internal::WireServerDispatcher<::test_bindingsdenylist::OnlyLibfuzzerAndDeps> final {
@@ -80,11 +68,12 @@ struct ::fidl::internal::WireServerDispatcher<::test_bindingsdenylist::OnlyLibfu
   static const ::fidl::internal::MethodEntry* entries_end_;
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
-};
+};namespace test_bindingsdenylist {
 
 #endif  // __Fuchsia__
 
 
+}  // namespace test_bindingsdenylist
 namespace fidl {
 
 
@@ -216,23 +205,11 @@ class ::fidl::WireServer<::test_bindingsdenylist::OnlyLibfuzzerAndDeps> : public
 
     
 
-
-
 }  // namespace fidl
 namespace test_bindingsdenylist {
 
+#ifdef __Fuchsia__
 }  // namespace test_bindingsdenylist
-
-#ifdef __Fuchsia__
-
-template<>
-struct ::fidl::internal::ProtocolDetails<::test_bindingsdenylist::OnlyCppAndDeps> {
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 
 template<>
 struct ::fidl::internal::WireServerDispatcher<::test_bindingsdenylist::OnlyCppAndDeps> final {
@@ -249,11 +226,12 @@ struct ::fidl::internal::WireServerDispatcher<::test_bindingsdenylist::OnlyCppAn
   static const ::fidl::internal::MethodEntry* entries_end_;
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
-};
+};namespace test_bindingsdenylist {
 
 #endif  // __Fuchsia__
 
 
+}  // namespace test_bindingsdenylist
 namespace fidl {
 
 
@@ -385,27 +363,10 @@ class ::fidl::WireServer<::test_bindingsdenylist::OnlyCppAndDeps> : public ::fid
 
     
 
-}  // namespace fidl
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_bindingsdenylist::DenyEachBinding::OnlyDenyDart> final { static constexpr uint64_t value = 8446571910689294295lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_bindingsdenylist::DenyEachBinding::OnlyDenyGo> final { static constexpr uint64_t value = 7311125300308839833lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_bindingsdenylist::DenyEachBinding::OnlyDenyLibfuzzer> final { static constexpr uint64_t value = 2184115815603862302lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_bindingsdenylist::DenyEachBinding::OnlyDenyRust> final { static constexpr uint64_t value = 3719805222870932662lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_bindingsdenylist::DenyEachBinding::OnlyDenySyzkaller> final { static constexpr uint64_t value = 2319043834522757514lu; };
-
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_bindingsdenylist::DenyEachBinding::OnlyDenyDart> {
@@ -430,7 +391,7 @@ struct ::fidl::internal::WireMethodTypes<::test_bindingsdenylist::DenyEachBindin
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -438,7 +399,7 @@ struct ::fidl::internal::WireMethodTypes<::test_bindingsdenylist::DenyEachBindin
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_bindingsdenylist::DenyEachBinding::OnlyDenyGo> {
@@ -463,7 +424,7 @@ struct ::fidl::internal::WireMethodTypes<::test_bindingsdenylist::DenyEachBindin
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -471,7 +432,7 @@ struct ::fidl::internal::WireMethodTypes<::test_bindingsdenylist::DenyEachBindin
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_bindingsdenylist::DenyEachBinding::OnlyDenyLibfuzzer> {
@@ -496,7 +457,7 @@ struct ::fidl::internal::WireMethodTypes<::test_bindingsdenylist::DenyEachBindin
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -504,7 +465,7 @@ struct ::fidl::internal::WireMethodTypes<::test_bindingsdenylist::DenyEachBindin
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_bindingsdenylist::DenyEachBinding::OnlyDenyRust> {
@@ -529,7 +490,7 @@ struct ::fidl::internal::WireMethodTypes<::test_bindingsdenylist::DenyEachBindin
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -537,7 +498,7 @@ struct ::fidl::internal::WireMethodTypes<::test_bindingsdenylist::DenyEachBindin
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_bindingsdenylist::DenyEachBinding::OnlyDenySyzkaller> {
@@ -562,25 +523,16 @@ struct ::fidl::internal::WireMethodTypes<::test_bindingsdenylist::DenyEachBindin
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
 
+}  // namespace fidl
 namespace test_bindingsdenylist {
 
+#ifdef __Fuchsia__
 }  // namespace test_bindingsdenylist
-
-#ifdef __Fuchsia__
-
-template<>
-struct ::fidl::internal::ProtocolDetails<::test_bindingsdenylist::DenyEachBinding> {
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 
 template<>
 struct ::fidl::internal::WireServerDispatcher<::test_bindingsdenylist::DenyEachBinding> final {
@@ -597,10 +549,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_bindingsdenylist::DenyEachB
   static const ::fidl::internal::MethodEntry* entries_end_;
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
-};
+};namespace test_bindingsdenylist {
 
 #endif  // __Fuchsia__
-
+}  // namespace test_bindingsdenylist
 
 #ifdef __Fuchsia__
 template<>
@@ -2263,23 +2215,11 @@ class ::fidl::WireServer<::test_bindingsdenylist::DenyEachBinding> : public ::fi
 
     
 
-
-
 }  // namespace fidl
 namespace test_bindingsdenylist {
 
+#ifdef __Fuchsia__
 }  // namespace test_bindingsdenylist
-
-#ifdef __Fuchsia__
-
-template<>
-struct ::fidl::internal::ProtocolDetails<::test_bindingsdenylist::Allowed> {
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 
 template<>
 struct ::fidl::internal::WireServerDispatcher<::test_bindingsdenylist::Allowed> final {
@@ -2296,11 +2236,12 @@ struct ::fidl::internal::WireServerDispatcher<::test_bindingsdenylist::Allowed> 
   static const ::fidl::internal::MethodEntry* entries_end_;
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
-};
+};namespace test_bindingsdenylist {
 
 #endif  // __Fuchsia__
 
 
+}  // namespace test_bindingsdenylist
 namespace fidl {
 
 
@@ -2432,18 +2373,10 @@ class ::fidl::WireServer<::test_bindingsdenylist::Allowed> : public ::fidl::inte
 
     
 
-}  // namespace fidl
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_bindingsdenylist::ImportsSameNameContext::Unattributed> final { static constexpr uint64_t value = 475191379775102607lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_bindingsdenylist::ImportsSameNameContext::AlwaysAppearsInImportingLibrary> final { static constexpr uint64_t value = 2914965219653596920lu; };
-
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_bindingsdenylist::ImportsSameNameContext::Unattributed> {
@@ -2452,7 +2385,7 @@ struct ::fidl::internal::WireMethodTypes<::test_bindingsdenylist::ImportsSameNam
       using Completer = fidl::Completer<>;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -2460,7 +2393,7 @@ struct ::fidl::internal::WireMethodTypes<::test_bindingsdenylist::ImportsSameNam
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_bindingsdenylist::ImportsSameNameContext::AlwaysAppearsInImportingLibrary> {
@@ -2469,25 +2402,16 @@ struct ::fidl::internal::WireMethodTypes<::test_bindingsdenylist::ImportsSameNam
       using Completer = fidl::Completer<>;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
 
+}  // namespace fidl
 namespace test_bindingsdenylist {
 
+#ifdef __Fuchsia__
 }  // namespace test_bindingsdenylist
-
-#ifdef __Fuchsia__
-
-template<>
-struct ::fidl::internal::ProtocolDetails<::test_bindingsdenylist::ImportsSameNameContext> {
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 
 template<>
 struct ::fidl::internal::WireServerDispatcher<::test_bindingsdenylist::ImportsSameNameContext> final {
@@ -2504,10 +2428,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_bindingsdenylist::ImportsSa
   static const ::fidl::internal::MethodEntry* entries_end_;
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
-};
+};namespace test_bindingsdenylist {
 
 #endif  // __Fuchsia__
-
+}  // namespace test_bindingsdenylist
 
 #ifdef __Fuchsia__
 template<>

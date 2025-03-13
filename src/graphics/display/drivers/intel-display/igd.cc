@@ -9,7 +9,6 @@
 #include <lib/zircon-internal/align.h>
 #include <lib/zx/resource.h>
 #include <lib/zx/result.h>
-#include <zircon/status.h>
 
 #include <climits>
 
@@ -101,7 +100,7 @@ static uint8_t iboost_idx_to_level(uint8_t iboost_idx) {
     case 2:
       return 7;
     default:
-      FDF_LOG(INFO, "Invalid iboost override");
+      fdf::info("Invalid iboost override");
       return 0;
   }
 }
@@ -210,11 +209,11 @@ bool IgdOpRegion::ProcessDdiConfigs() {
   uint16_t size;
   general_definitions_t* defs = GetSection<general_definitions_t>(&size);
   if (defs == nullptr) {
-    FDF_LOG(ERROR, "Couldn't find vbt general definitions");
+    fdf::error("Couldn't find vbt general definitions");
     return false;
   }
   if (size < sizeof(general_definitions_t)) {
-    FDF_LOG(ERROR, "Bad size in vbt general definitions");
+    fdf::error("Bad size in vbt general definitions");
     return false;
   }
   uint16_t num_configs =
@@ -228,16 +227,16 @@ bool IgdOpRegion::ProcessDdiConfigs() {
     auto ddi_flags = DdiFlags::Get().FromValue(cfg->ddi_flags);
     if (IsPortHdmi(cfg->port_type)) {
       if (!ddi_flags.tmds()) {
-        FDF_LOG(WARNING, "Malformed hdmi config");
+        fdf::warn("Malformed hdmi config");
         continue;
       }
     } else if (IsPortDisplayPort(cfg->port_type)) {
       if (!ddi_flags.dp()) {
-        FDF_LOG(WARNING, "Malformed dp config");
+        fdf::warn("Malformed dp config");
         continue;
       }
     } else {
-      FDF_LOG(WARNING, "The port %d is not supported, ignored.", cfg->port_type);
+      fdf::warn("The port {} is not supported, ignored.", cfg->port_type);
       continue;
     }
 
@@ -245,7 +244,7 @@ bool IgdOpRegion::ProcessDdiConfigs() {
     ZX_DEBUG_ASSERT(ddi.has_value());
 
     if (ddi_features_.find(*ddi) != ddi_features_.end()) {
-      FDF_LOG(WARNING, "Duplicate ddi config");
+      fdf::warn("Duplicate ddi config");
       continue;
     }
 
@@ -277,12 +276,12 @@ bool IgdOpRegion::Swsci(ddk::Pci& pci, uint16_t function, uint16_t subfunction,
   PciConfigOpRegion pci_op_region(pci);
   zx::result<bool> in_use_result = pci_op_region.IsSystemControlInterruptInUse();
   if (in_use_result.is_error()) {
-    FDF_LOG(WARNING, "Failed to read System Control Interrupt status from PCI OpRegion: %s",
-            in_use_result.status_string());
+    fdf::warn("Failed to read System Control Interrupt status from PCI OpRegion: {}",
+              in_use_result);
     return false;
   }
   if (in_use_result.value()) {
-    FDF_LOG(WARNING, "OpRegion System Control Interrupt still in use after boot firmware handoff");
+    fdf::warn("OpRegion System Control Interrupt still in use after boot firmware handoff");
     return false;
   }
 
@@ -298,8 +297,7 @@ bool IgdOpRegion::Swsci(ddk::Pci& pci, uint16_t function, uint16_t subfunction,
 
   zx::result<> trigger_result = pci_op_region.TriggerSystemControlInterrupt();
   if (trigger_result.is_error()) {
-    FDF_LOG(WARNING, "OpRegion System Control Interrupt triggering failed: %s",
-            trigger_result.status_string());
+    fdf::warn("OpRegion System Control Interrupt triggering failed: {}", trigger_result);
     return false;
   }
 
@@ -317,13 +315,13 @@ bool IgdOpRegion::Swsci(ddk::Pci& pci, uint16_t function, uint16_t subfunction,
         *additional_res = sci_interface->additional_params;
         return true;
       } else {
-        FDF_LOG(WARNING, "SWSCI failed (%x)", sci_exit_param.exit_result());
+        fdf::warn("SWSCI failed ({:x})", sci_exit_param.exit_result());
         return false;
       }
     }
     zx_nanosleep(zx_deadline_after(ZX_MSEC(1)));
   }
-  FDF_LOG(WARNING, "SWSCI timeout");
+  fdf::warn("SWSCI timeout");
   return false;
 }
 
@@ -342,7 +340,7 @@ bool IgdOpRegion::GetPanelType(ddk::Pci& pci, uint8_t* type) {
         auto details = GbdaPanelDetails::Get().FromValue(additional_res);
         if (details.panel_type_plus1() && details.panel_type_plus1() < (kNumPanelTypes + 1)) {
           *type = static_cast<uint8_t>(details.panel_type_plus1() - 1);
-          FDF_LOG(DEBUG, "SWSCI panel type %d", *type);
+          fdf::debug("SWSCI panel type {}", *type);
           return true;
         }
       }
@@ -365,25 +363,25 @@ bool IgdOpRegion::CheckForLowVoltageEdp(ddk::Pci& pci) {
     has_edp |= kv.second.is_edp;
   }
   if (!has_edp) {
-    FDF_LOG(DEBUG, "No edp found");
+    fdf::debug("No edp found");
     return true;
   }
 
   uint16_t size;
   edp_config_t* edp = GetSection<edp_config_t>(&size);
   if (edp == nullptr) {
-    FDF_LOG(WARNING, "Couldn't find edp general definitions");
+    fdf::warn("Couldn't find edp general definitions");
     return false;
   }
 
   if (!GetPanelType(pci, &panel_type_)) {
-    FDF_LOG(TRACE, "No panel type");
+    fdf::trace("No panel type");
     return false;
   }
   edp_is_low_voltage_ =
       !((edp->vswing_preemphasis[panel_type_ / 2] >> (4 * panel_type_ % 2)) & 0xf);
 
-  FDF_LOG(TRACE, "Is low voltage edp? %d", edp_is_low_voltage_);
+  fdf::trace("Is low voltage edp? {}", edp_is_low_voltage_);
 
   return true;
 }
@@ -407,25 +405,24 @@ zx_status_t IgdOpRegion::Init(zx::unowned_resource mmio_resource, ddk::Pci& pci)
     // situation (since OpRegion support is optional for workstation systems),
     // and we can do display initialization in many cases without OpRegion
     // information.
-    FDF_LOG(WARNING, "Failed to get Memory OpRegion address: %s",
-            memory_op_region_address.status_string());
+    fdf::warn("Failed to get Memory OpRegion address: {}", memory_op_region_address);
     return memory_op_region_address.error_value();
   }
 
-  FDF_LOG(TRACE, "Memory OpRegion start: %08" PRIx64, memory_op_region_address.value());
+  fdf::trace("Memory OpRegion start: {:08x}", memory_op_region_address.value());
   {
     zx::result<AcpiMemoryRegion> memory_op_region = AcpiMemoryRegion::Create(
         mmio_resource->borrow(), memory_op_region_address.value(), kIgdOpRegionLen);
     if (memory_op_region.is_error()) {
-      FDF_LOG(ERROR, "Failed to map IGD Memory OpRegion: %s",
-              zx_status_get_string(memory_op_region.error_value()));
+      fdf::error("Failed to map IGD Memory OpRegion: {}",
+                 zx::make_result(memory_op_region.error_value()));
       return memory_op_region.error_value();
     }
 
     memory_op_region_ = std::move(memory_op_region).value();
     igd_opregion_ = reinterpret_cast<igd_opregion_t*>(memory_op_region_.data().data());
     if (!igd_opregion_->validate()) {
-      FDF_LOG(ERROR, "Failed to validate IGD Memory OpRegion");
+      fdf::error("Failed to validate IGD Memory OpRegion");
       return ZX_ERR_INTERNAL;
     }
   }
@@ -439,8 +436,8 @@ zx_status_t IgdOpRegion::Init(zx::unowned_resource mmio_resource, ddk::Pci& pci)
     zx::result<AcpiMemoryRegion> extended_vbt_region = AcpiMemoryRegion::Create(
         mmio_resource->borrow(), memory_op_region_address.value() + rvda, rvds);
     if (extended_vbt_region.is_error()) {
-      FDF_LOG(ERROR, "Failed to map extended VBT: %s",
-              zx_status_get_string(extended_vbt_region.error_value()));
+      fdf::error("Failed to map extended VBT: {}",
+                 zx::make_result(extended_vbt_region.error_value()));
       return extended_vbt_region.error_value();
     }
 
@@ -451,7 +448,7 @@ zx_status_t IgdOpRegion::Init(zx::unowned_resource mmio_resource, ddk::Pci& pci)
   }
 
   if (!vbt_header->validate()) {
-    FDF_LOG(ERROR, "Failed to validate vbt header");
+    fdf::error("Failed to validate vbt header");
     return ZX_ERR_INTERNAL;
   }
 
@@ -460,14 +457,14 @@ zx_status_t IgdOpRegion::Init(zx::unowned_resource mmio_resource, ddk::Pci& pci)
   uint16_t vbt_size = vbt_header->vbt_size;
   if (!bdb_->validate() || bdb_->bios_data_blocks_size > vbt_size ||
       vbt_header->bios_data_blocks_offset + bdb_->bios_data_blocks_size > vbt_size) {
-    FDF_LOG(ERROR, "Failed to validate bdb header");
+    fdf::error("Failed to validate bdb header");
     return ZX_ERR_INTERNAL;
   }
 
   // TODO(stevensd): 196 seems old enough that all gen9 processors will have it. If we want to
   // support older hardware, we'll need to handle missing data.
   if (bdb_->version < 196) {
-    FDF_LOG(ERROR, "Out of date vbt (%d)", bdb_->version);
+    fdf::error("Out of date vbt ({})", bdb_->version);
     return ZX_ERR_INTERNAL;
   }
 

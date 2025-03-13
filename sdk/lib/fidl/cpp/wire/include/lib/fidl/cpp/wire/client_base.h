@@ -197,8 +197,7 @@ class ResponseContext : public fidl::internal_wavl::WAVLTreeContainable<Response
 template <typename FidlMethod>
 class WireResponseContext : public internal::ResponseContext {
  public:
-  WireResponseContext()
-      : ::fidl::internal::ResponseContext(internal::WireOrdinal<FidlMethod>::value) {}
+  WireResponseContext() : ::fidl::internal::ResponseContext(FidlMethod::kOrdinal) {}
 
   // Invoked when a response has been received or an error was detected for this
   // call.

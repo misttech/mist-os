@@ -4,11 +4,18 @@
 
 import("//build/rust/rustc_library.gni")
 
+assert(is_host, "ffx_config is for use with the host toolchain only")
+
 rustc_library("lib") {
   name = "ffx_config"
   version = "0.1.0"
   edition = "2021"
   with_unit_tests = true
+
+  assert_no_deps = [
+    "//src/developer/ffx/daemon/*",
+    "//src/developer/ffx/lib/target/*",
+  ]
 
   deps = [
     "macro:config-macros",

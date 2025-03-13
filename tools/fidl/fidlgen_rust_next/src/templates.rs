@@ -32,11 +32,7 @@ impl Context {
     }
 
     fn wire_type<'a>(&'a self, ty: &'a Type) -> WireTypeTemplate<'a> {
-        WireTypeTemplate { ty, anonymous: false, context: self }
-    }
-
-    fn anonymous_wire_type<'a>(&'a self, ty: &'a Type) -> WireTypeTemplate<'a> {
-        WireTypeTemplate { ty, anonymous: true, context: self }
+        WireTypeTemplate { ty, context: self }
     }
 
     fn wire_optional_id<'a>(&'a self, id: &'a CompId) -> PrefixedIdTemplate<'a> {
@@ -50,10 +46,20 @@ impl Context {
     ) -> NaturalConstantTemplate<'a> {
         NaturalConstantTemplate { constant, ty, context: self }
     }
+
+    fn compat(&self) -> CompatTemplate<'_> {
+        CompatTemplate { context: self }
+    }
 }
 
 fn doc_string(attributes: &Attributes) -> DocStringTemplate<'_> {
     DocStringTemplate { attributes }
+}
+
+#[derive(Template)]
+#[template(path = "compat.askama")]
+struct CompatTemplate<'a> {
+    context: &'a Context,
 }
 
 #[derive(Template)]
@@ -74,7 +80,6 @@ struct PrefixedIdTemplate<'a> {
 #[template(path = "wire_type.askama")]
 struct WireTypeTemplate<'a> {
     ty: &'a Type,
-    anonymous: bool,
     context: &'a Context,
 }
 
@@ -111,6 +116,7 @@ template!(bits(bits: Bits) -> BitsTemplate = "bits.askama");
 template!(cnst(cnst: Const) -> ConstTemplate = "const.askama");
 template!(enm(enm: Enum) -> EnumTemplate = "enum.askama");
 template!(protocol(protocol: Protocol) -> ProtocolTemplate = "protocol.askama");
+template!(service(service: Service) -> ServiceTemplate = "service.askama");
 template!(strct(strct: Struct) -> StructTemplate = "struct.askama");
 template!(table(table: Table) -> TableTemplate = "table.askama");
 template!(union(union: Union) -> UnionTemplate = "union.askama");
@@ -132,44 +138,24 @@ impl BitsTemplate<'_> {
 }
 
 struct UnionTemplateStrings {
-    params: &'static str,
-    phantom: &'static str,
-    decode_param: &'static str,
-    decode_where: &'static str,
     decode_unknown: &'static str,
     decode_as: &'static str,
+    encode_as: &'static str,
 }
 
 impl UnionTemplate<'_> {
-    fn has_only_static_members(&self) -> bool {
-        let mut result = true;
-        for member in &self.union.members {
-            if member.ty.shape.max_out_of_line != 0 {
-                result = false;
-                break;
-            }
-        }
-        result
-    }
-
     fn template_strings(&self) -> &'static UnionTemplateStrings {
         if self.union.shape.max_out_of_line == 0 {
             &UnionTemplateStrings {
-                params: "",
-                phantom: "()",
-                decode_param: "",
-                decode_where: "___D: ::fidl_next::decoder::InternalHandleDecoder",
                 decode_unknown: "decode_unknown_static",
                 decode_as: "decode_as_static",
+                encode_as: "encode_as_static",
             }
         } else {
             &UnionTemplateStrings {
-                params: "<'buf>",
-                phantom: "&'buf mut [::fidl_next::Chunk]",
-                decode_param: "'buf, ",
-                decode_where: "___D: ::fidl_next::Decoder<'buf>",
                 decode_unknown: "decode_unknown",
                 decode_as: "decode_as",
+                encode_as: "encode_as",
             }
         }
     }

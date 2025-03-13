@@ -5,11 +5,13 @@
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
+#include <fidl/fuchsia.hardware.spi.businfo/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.spiimpl/cpp/driver/wire.h>
 #include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/metadata/cpp/metadata_server.h>
 #include <lib/fit/function.h>
 #include <lib/fpromise/promise.h>
 #include <lib/fzl/pinned-vmo.h>
@@ -291,11 +293,14 @@ class AmlSpiDriver : public fdf::DriverBase {
                               const zx::result<fuchsia_scheduler::RoleName>& scheduler_role_name);
   void OnCompatServerInitialized(fdf::StartCompleter completer);
   void AddNode(fdf::MmioBuffer mmio, const amlogic_spi::amlspi_config_t& config,
-               zx::interrupt interrupt, zx::bti bti, fdf::StartCompleter completer);
+               zx::interrupt interrupt, zx::bti bti,
+               std::optional<std::vector<uint8_t>> encoded_spi_bus_metadata,
+               fdf::StartCompleter completer);
 
   fpromise::promise<amlogic_spi::amlspi_config_t, zx_status_t> GetConfig();
   fpromise::promise<zx::interrupt, zx_status_t> GetInterrupt();
   fpromise::promise<zx::bti, zx_status_t> GetBti();
+  fpromise::promise<std::optional<std::vector<uint8_t>>, zx_status_t> GetSpiBusMetadata();
 
   fbl::Array<AmlSpi::ChipInfo> InitChips(const amlogic_spi::amlspi_config_t& config);
   zx::result<compat::DeviceServer::GenericProtocol> GetBanjoProto(compat::BanjoProtoId id);
@@ -307,6 +312,7 @@ class AmlSpiDriver : public fdf::DriverBase {
   compat::AsyncInitializedDeviceServer compat_server_;
   std::unique_ptr<AmlSpi> device_;
   async::Executor executor_;
+  fdf_metadata::MetadataServer<fuchsia_hardware_spi_businfo::SpiBusMetadata> metadata_server_;
 };
 
 }  // namespace spi

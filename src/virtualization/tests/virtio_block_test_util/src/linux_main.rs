@@ -4,7 +4,7 @@
 #![deny(warnings)]
 
 use std::fs::{File, OpenOptions};
-use std::io::{Error, ErrorKind, Read, Seek, SeekFrom, Write};
+use std::io::{Error, Read, Seek, SeekFrom, Write};
 use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -72,16 +72,16 @@ fn check(block_dev: &File, block_size: u32, block_count: u64) -> std::io::Result
     let actual_block_count = block_dev_size(block_dev);
 
     if block_size != actual_block_size {
-        return Err(Error::new(
-            ErrorKind::Other,
-            format!("Incorrect size: {} (expected {}).", actual_block_size, block_size),
-        ));
+        return Err(Error::other(format!(
+            "Incorrect size: {} (expected {}).",
+            actual_block_size, block_size
+        )));
     }
     if block_count != actual_block_count {
-        return Err(Error::new(
-            ErrorKind::Other,
-            format!("Incorrect count: {} (expected {}).", actual_block_count, block_count),
-        ));
+        return Err(Error::other(format!(
+            "Incorrect count: {} (expected {}).",
+            actual_block_count, block_count
+        )));
     }
     Ok(())
 }
@@ -96,7 +96,7 @@ fn read_block(
     let mut data: Vec<u8> = vec![0; block_size as usize];
     block_dev.read_exact(&mut data)?;
     if !data.iter().all(|&b| b == expected) {
-        return Err(Error::new(ErrorKind::Other, "Incorrect data read"));
+        return Err(Error::other("Incorrect data read"));
     }
     Ok(())
 }

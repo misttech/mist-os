@@ -39,6 +39,7 @@ source_set("common") {
     "//sdk/lib/async",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/metadata/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/fit-promise",
     "//src/devices/lib/amlogic",

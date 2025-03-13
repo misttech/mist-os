@@ -63,7 +63,7 @@ impl Procedure for NrecProcedure {
                 let response = Box::new(Into::into);
                 SlcRequest::SetNrec { enable, response }.into()
             }
-            (_, update) => ProcedureRequest::Error(ProcedureError::UnexpectedHf(update)),
+            (_, update) => ProcedureError::UnexpectedHf(update).into(),
         }
     }
 
@@ -74,7 +74,7 @@ impl Procedure for NrecProcedure {
                 self.state.transition();
                 update.into()
             }
-            (_, update) => ProcedureRequest::Error(ProcedureError::UnexpectedAg(update)),
+            (_, update) => ProcedureError::UnexpectedAg(update).into(),
         }
     }
 
@@ -124,7 +124,7 @@ mod tests {
         let random_hf = at::Command::CindRead {};
         assert_matches!(
             proc.hf_update(random_hf, &mut state),
-            ProcedureRequest::Error(ProcedureError::UnexpectedHf(_))
+            ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedHf(_))
         );
     }
 
@@ -136,7 +136,7 @@ mod tests {
         let random_ag = AgUpdate::ThreeWaySupport;
         assert_matches!(
             proc.ag_update(random_ag, &mut state),
-            ProcedureRequest::Error(ProcedureError::UnexpectedAg(_))
+            ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedAg(_))
         );
     }
 
@@ -162,11 +162,11 @@ mod tests {
         assert!(proc.is_terminated());
         assert_matches!(
             proc.hf_update(at::Command::Nrec { nrec: true }, &mut state),
-            ProcedureRequest::Error(ProcedureError::UnexpectedHf(_))
+            ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedHf(_))
         );
         assert_matches!(
             proc.ag_update(AgUpdate::Ok, &mut state),
-            ProcedureRequest::Error(ProcedureError::UnexpectedAg(_))
+            ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedAg(_))
         );
     }
 }

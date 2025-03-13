@@ -30,6 +30,8 @@ class OneWay final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 7942965975761529343;
   };
 };
 
@@ -37,6 +39,6 @@ class OneWay final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_driveroneway::OneWay> : public std::true_type{};
+struct IsProtocol<::test_driveroneway::OneWay> : public std::true_type {};
 
 }  // namespace fidl

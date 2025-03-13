@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/test.placeholders/cpp/test_base.h>
 #include <fuchsia/vulkan/loader/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -10,14 +12,34 @@
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/vfs/cpp/pseudo_dir.h>
+#include <lib/vfs/cpp/service.h>
 
 #include "src/lib/fxl/command_line.h"
 #include "src/lib/fxl/log_settings_command_line.h"
 
+namespace {
+
+class EchoImpl final : public fidl::testing::TestBase<test_placeholders::Echo> {
+ protected:
+  void EchoString(EchoStringRequest& request, EchoStringCompleter::Sync& completer) override {
+    completer.Reply({{.response = request.value()}});
+  }
+
+  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
+    ZX_PANIC("Not implemented!");
+  }
+};
+
 // This is a fake Vulkan loader service that implements just enough for the libvulkan.so to work.
 class LoaderImpl final : public fuchsia::vulkan::loader::Loader {
  public:
-  explicit LoaderImpl() = default;
+  explicit LoaderImpl() : device_fs_(std::make_unique<vfs::PseudoDir>()) {
+    auto echo_service =
+        std::make_unique<vfs::Service>(echo_instance_.bind_handler(async_get_default_dispatcher()));
+    device_fs_->AddEntry("echo", std::move(echo_service));
+  }
+
   ~LoaderImpl() final = default;
 
   // Adds a binding for fuchsia::vulkan::loader::Loader to |outgoing|
@@ -52,11 +74,12 @@ class LoaderImpl final : public fuchsia::vulkan::loader::Loader {
   }
 
   void ConnectToDeviceFs(zx::channel channel) override {
-    // The fake libvulkan implementation expects to be able to read
-    // libvulkan_fake.json from the device fs.
-    fdio_open3("/pkg/data/manifest", static_cast<uint64_t>(fuchsia::io::PERM_READABLE),
-               channel.release());
+    // The fake libvulkan implementation tries to connect to the echo protocol at "echo"
+    ZX_ASSERT(device_fs_->Serve(fuchsia_io::wire::kPermReadable,
+                                fidl::ServerEnd<fuchsia_io::Directory>(std::move(channel))) ==
+              ZX_OK);
   }
+
   void GetSupportedFeatures(GetSupportedFeaturesCallback callback) override {
     fuchsia::vulkan::loader::Features features =
         fuchsia::vulkan::loader::Features::CONNECT_TO_DEVICE_FS |
@@ -78,8 +101,12 @@ class LoaderImpl final : public fuchsia::vulkan::loader::Loader {
                channel.release());
   }
 
+  EchoImpl echo_instance_;
+  std::unique_ptr<vfs::PseudoDir> device_fs_;
   fidl::BindingSet<fuchsia::vulkan::loader::Loader> bindings_;
 };
+
+}  // namespace
 
 int main(int argc, const char* const* argv) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);

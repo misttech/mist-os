@@ -2,10 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/elfldltl/layout.h>
+
 #include <latch>
 #include <stop_token>
 #include <thread>
 
+#include "dl-iterate-phdr-tests.h"
 #include "dl-load-tests.h"
 #include "startup-symbols.h"
 
@@ -16,6 +19,8 @@ TYPED_TEST_SUITE(DlTests, dl::testing::TestTypes);
 
 using dl::testing::IsUndefinedSymbolErrMsg;
 using dl::testing::RunFunction;
+
+using size_type = elfldltl::Elf<>::size_type;
 
 TYPED_TEST(DlTests, TlsDescStaticStartupModules) {
   const std::string kStaticTlsDescModuleFile = "static-tls-desc-module.so";
@@ -56,7 +61,7 @@ struct TlsLoadedSymbolNames {
   const char* module;
   const char* early_module;
   const char* data_symbol;
-  const char* bss1_symbol;
+  const char* bss_symbol;
   const char* weak_symbol;
 };
 
@@ -74,10 +79,12 @@ constexpr const char* kTlsDescEarlyLoadedModuleName = "tls-desc-initial-dep-modu
 // Symbol name differences between GD and LD versions of the module.
 constexpr const char* kGdDataSymbolName = "get_tls_dep_data";
 constexpr const char* kGdBss1SymbolName = "get_tls_dep_bss1";
+constexpr const char* kGdBss0SymbolName = "get_tls_dep_bss0";
 constexpr const char* kGdWeakSymbolName = "get_tls_dep_weak";
 
 constexpr const char* kLdDataSymbolName = "get_tls_ld_dep_data";
 constexpr const char* kLdBss1SymbolName = "get_tls_ld_dep_bss1";
+constexpr const char* kLdBss0SymbolName = "get_tls_ld_dep_bss0";
 
 constexpr const char* kEarlyLoadedModuleSymbolName = "get_tls_initial_dep_data";
 
@@ -88,8 +95,8 @@ constexpr int kTlsLdDataInitialVal = 23;
 struct TlsTestCtx {
   // The tls_dep_data initial value: 42 for GD, 23 for LD.
   int tls_data_initial_val;
-  // The bss1 initial value: Always 0.
-  char bss1_initial_val = {0};
+  // The bss initial value: Always 0.
+  char bss_initial_val = {0};
   // Are we testing the TLSDESC case?
   bool is_tlsdesc;
   // Are we testing the LD case?
@@ -305,8 +312,7 @@ void DynamicTlsFastPath(Test& self, const TlsLoadedSymbolNames& names, const Tls
 
   OpenModule mod(self);
   ASSERT_NO_FATAL_FAILURE(mod.InitModule(names.module, RTLD_NOW | RTLD_LOCAL,
-                                         {names.data_symbol, names.bss1_symbol},
-                                         names.data_symbol));
+                                         {names.data_symbol, names.bss_symbol}, names.data_symbol));
 
   if (mod.Skip()) {
     // If the module wasn't compiled to have the right type of TLS relocations,
@@ -328,7 +334,7 @@ void DynamicTlsFastPath(Test& self, const TlsLoadedSymbolNames& names, const Tls
   auto access_tls_vars = [&names, &mod = std::as_const(mod), &ctx]() {
     EXPECT_THAT(mod.template TryAccess<int>(names.data_symbol),
                 std::optional(std::pair{ctx.tls_data_initial_val, ctx.tls_data_initial_val + 1}));
-    EXPECT_THAT(mod.template TryAccess<char>(names.bss1_symbol), std::optional(std::pair{0, 1}));
+    EXPECT_THAT(mod.template TryAccess<char>(names.bss_symbol), std::optional(std::pair{0, 1}));
 
     if (!ctx.is_local_dynamic && ctx.is_tlsdesc) {
       // Only the TLSDESC case is guaranteed to return a nullptr for a missing weak symbol.
@@ -367,13 +373,13 @@ TYPED_TEST(DlTests, TlsDescGlobalDynamicFastPath) {
       .module = kTlsDescGdModuleName,
       .early_module = kTlsDescEarlyLoadedModuleName,
       .data_symbol = kGdDataSymbolName,
-      .bss1_symbol = kGdBss1SymbolName,
+      .bss_symbol = kGdBss1SymbolName,
       .weak_symbol = kGdWeakSymbolName,
   };
 
   TlsTestCtx ctx = {
       .tls_data_initial_val = kTlsGdDataInitialVal,
-      .bss1_initial_val = 0,
+      .bss_initial_val = 0,
       .is_tlsdesc = true,
       .is_local_dynamic = false,
   };
@@ -390,13 +396,13 @@ TYPED_TEST(DlTests, TlsGetAddrGlobalDynamicFastPath) {
       .module = kTraditionalTlsGdModuleName,
       .early_module = kTraditionalTlsEarlyLoadedModuleName,
       .data_symbol = kGdDataSymbolName,
-      .bss1_symbol = kGdBss1SymbolName,
+      .bss_symbol = kGdBss1SymbolName,
       .weak_symbol = kGdWeakSymbolName,
   };
 
   TlsTestCtx ctx = {
       .tls_data_initial_val = kTlsGdDataInitialVal,
-      .bss1_initial_val = 0,
+      .bss_initial_val = 0,
       .is_tlsdesc = false,
       .is_local_dynamic = false,
   };
@@ -414,13 +420,13 @@ TYPED_TEST(DlTests, TlsDescLocalDynamicFastPath) {
       .module = kTlsDescLdModuleName,
       .early_module = kTlsDescEarlyLoadedModuleName,
       .data_symbol = kLdDataSymbolName,
-      .bss1_symbol = kLdBss1SymbolName,
+      .bss_symbol = kLdBss1SymbolName,
       .weak_symbol = nullptr,
   };
 
   TlsTestCtx ctx = {
       .tls_data_initial_val = kTlsLdDataInitialVal,
-      .bss1_initial_val = 0,
+      .bss_initial_val = 0,
       .is_tlsdesc = true,
       .is_local_dynamic = true,
   };
@@ -438,13 +444,13 @@ TYPED_TEST(DlTests, TlsGetAddrLocalDynamicFastPath) {
       .module = kTraditionalTlsLdModuleName,
       .early_module = kTraditionalTlsEarlyLoadedModuleName,
       .data_symbol = kLdDataSymbolName,
-      .bss1_symbol = kLdBss1SymbolName,
+      .bss_symbol = kLdBss1SymbolName,
       .weak_symbol = nullptr,
   };
 
   TlsTestCtx ctx = {
       .tls_data_initial_val = kTlsLdDataInitialVal,
-      .bss1_initial_val = 0,
+      .bss_initial_val = 0,
       .is_tlsdesc = false,
       .is_local_dynamic = true,
   };
@@ -494,7 +500,7 @@ void DynamicTlsSlowPath(Test& self, const TlsLoadedSymbolNames& names, const Tls
   auto access_tls_vars = [&names, &mod = std::as_const(mod), &ctx]() {
     EXPECT_THAT(mod.template TryAccess<int>(names.data_symbol),
                 std::optional(std::pair{ctx.tls_data_initial_val, ctx.tls_data_initial_val + 1}));
-    EXPECT_THAT(mod.template TryAccess<char>(names.bss1_symbol), std::optional(std::pair{0, 1}));
+    EXPECT_THAT(mod.template TryAccess<char>(names.bss_symbol), std::optional(std::pair{0, 1}));
     if (!ctx.is_local_dynamic && ctx.is_tlsdesc) {
       // Only the TLSDESC case is guaranteed to return a nullptr for a missing weak symbol.
       EXPECT_EQ(RunFunction<int*>(mod[names.weak_symbol]), nullptr);
@@ -514,7 +520,7 @@ void DynamicTlsSlowPath(Test& self, const TlsLoadedSymbolNames& names, const Tls
   tr.MainWaitForWorkerReady();
 
   ASSERT_NO_FATAL_FAILURE(mod.InitModule(names.module, RTLD_NOW | RTLD_LOCAL,
-                                         {names.data_symbol, names.bss1_symbol}, names.module));
+                                         {names.data_symbol, names.bss_symbol}, names.data_symbol));
   if (mod.Skip()) {
     tr.RequestStop();
     tr.MainLetWorkersRun();
@@ -556,13 +562,13 @@ TYPED_TEST(DlTests, TlsDescGlobalDynamicSlowPath) {
       .module = kTlsDescGdModuleName,
       .early_module = kTlsDescEarlyLoadedModuleName,
       .data_symbol = kGdDataSymbolName,
-      .bss1_symbol = kGdBss1SymbolName,
+      .bss_symbol = kGdBss1SymbolName,
       .weak_symbol = kGdWeakSymbolName,
   };
 
   TlsTestCtx ctx = {
       .tls_data_initial_val = kTlsGdDataInitialVal,
-      .bss1_initial_val = 0,
+      .bss_initial_val = 0,
       .is_tlsdesc = true,
       .is_local_dynamic = false,
   };
@@ -580,13 +586,13 @@ TYPED_TEST(DlTests, TlsGetAddrGlobalDynamicSlowPath) {
       .module = kTraditionalTlsGdModuleName,
       .early_module = kTraditionalTlsEarlyLoadedModuleName,
       .data_symbol = kGdDataSymbolName,
-      .bss1_symbol = kGdBss1SymbolName,
+      .bss_symbol = kGdBss1SymbolName,
       .weak_symbol = kGdWeakSymbolName,
   };
 
   TlsTestCtx ctx = {
       .tls_data_initial_val = kTlsGdDataInitialVal,
-      .bss1_initial_val = 0,
+      .bss_initial_val = 0,
       .is_tlsdesc = false,
       .is_local_dynamic = false,
   };
@@ -604,13 +610,13 @@ TYPED_TEST(DlTests, TlsDescLocalDynamicSlowPath) {
       .module = kTlsDescLdModuleName,
       .early_module = kTlsDescEarlyLoadedModuleName,
       .data_symbol = kLdDataSymbolName,
-      .bss1_symbol = kLdBss1SymbolName,
+      .bss_symbol = kLdBss1SymbolName,
       .weak_symbol = nullptr,
   };
 
   TlsTestCtx ctx = {
       .tls_data_initial_val = kTlsLdDataInitialVal,
-      .bss1_initial_val = 0,
+      .bss_initial_val = 0,
       .is_tlsdesc = true,
       .is_local_dynamic = true,
   };
@@ -628,18 +634,84 @@ TYPED_TEST(DlTests, TlsGetAddrLocalDynamicSlowPath) {
       .module = kTraditionalTlsLdModuleName,
       .early_module = kTraditionalTlsEarlyLoadedModuleName,
       .data_symbol = kLdDataSymbolName,
-      .bss1_symbol = kLdBss1SymbolName,
+      .bss_symbol = kLdBss1SymbolName,
       .weak_symbol = nullptr,
   };
 
   TlsTestCtx ctx = {
       .tls_data_initial_val = kTlsLdDataInitialVal,
-      .bss1_initial_val = 0,
+      .bss_initial_val = 0,
       .is_tlsdesc = false,
       .is_local_dynamic = true,
   };
 
   DynamicTlsSlowPath(*this, kModuleNames, ctx);
+}
+
+// Test that the relocations for TLS variables with global dynamic access are
+// correct using __tls_get_addr. This test uses a mock __tls_get_addr function
+// that simply returns the GOT pointer that is passed to it. This test checks
+// that the GOT data is as expected.
+void DynamicTlsGetAddrRelocTest(auto& self, const TlsLoadedSymbolNames& names) {
+  constexpr size_type kExpectedDataOffset = 0u;
+  constexpr size_type kExpectedBssOffset = 32u;
+
+  OpenModule open(self);
+  ASSERT_NO_FATAL_FAILURE(open.InitModule(names.module, RTLD_NOW | RTLD_LOCAL,
+                                          {names.data_symbol, names.bss_symbol},
+                                          names.data_symbol));
+  if (open.Skip()) {
+    // Skip if __tls_get_addr is not emitted on this machine.
+    GTEST_SKIP() << "test requires __tls_get_addr to resolve symbols";
+  }
+
+  // The TLS modid will be compared with what is shown by dl_iterate_phdr.
+  auto info = GetPhdrInfoForModule(self, names.module);
+
+  auto tls_data_got = RunFunction<elfldltl::Elf<>::TlsGetAddrGot<>*>(open[names.data_symbol]);
+
+  // Check that the TLS modid for this symbol matches the TLS modid in dl_phdr_info.
+  EXPECT_EQ(tls_data_got->tls_modid(), info.tls_modid());
+
+  // The offset of the tls_data variable should be zero since it's the only
+  // initialized TLS variable in the file.
+  EXPECT_EQ(tls_data_got->offset + elfldltl::TlsTraits<>::kTlsRelativeBias, kExpectedDataOffset);
+
+  // Check the GOT values for an uninitialized variable.
+  auto tls_bss_got = RunFunction<elfldltl::Elf<>::TlsGetAddrGot<>*>(open[names.bss_symbol]);
+  EXPECT_EQ(tls_bss_got->tls_modid(), info.tls_modid());
+
+  // The offset of this uninitialized variable will always follow the
+  // initialized int variable.
+  EXPECT_EQ(tls_bss_got->offset + elfldltl::TlsTraits<>::kTlsRelativeBias, kExpectedBssOffset);
+}
+
+TYPED_TEST(DlTests, TlsGetAddrGlobalDynamicReloc) {
+  if constexpr (!TestFixture::kSupportsDynamicTls) {
+    GTEST_SKIP() << "test requires dynamic TLS support";
+  }
+
+  constexpr TlsLoadedSymbolNames kModuleNames = {
+      .module = "tls-get-addr-global-dynamic-reloc.so",
+      .data_symbol = kGdDataSymbolName,
+      .bss_symbol = kGdBss0SymbolName,
+  };
+
+  DynamicTlsGetAddrRelocTest(*this, kModuleNames);
+}
+
+TYPED_TEST(DlTests, TlsGetAddrLocalDynamicReloc) {
+  if constexpr (!TestFixture::kSupportsDynamicTls) {
+    GTEST_SKIP() << "test requires dynamic TLS support";
+  }
+
+  constexpr TlsLoadedSymbolNames kModuleNames = {
+      .module = "tls-get-addr-local-dynamic-reloc.so",
+      .data_symbol = kLdDataSymbolName,
+      .bss_symbol = kLdBss0SymbolName,
+  };
+
+  DynamicTlsGetAddrRelocTest(*this, kModuleNames);
 }
 
 }  // namespace

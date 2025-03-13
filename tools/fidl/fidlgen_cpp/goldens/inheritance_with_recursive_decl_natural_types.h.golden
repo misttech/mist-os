@@ -167,9 +167,9 @@ namespace fidl {
 #ifdef __Fuchsia__
 
 template <>
-struct IsResource<::test_inheritancewithrecursivedecl::ParentFirstRequest> : public std::true_type{};
+struct IsResource<::test_inheritancewithrecursivedecl::ParentFirstRequest> : public std::true_type {};
 template <>
-struct IsFidlType<::test_inheritancewithrecursivedecl::ParentFirstRequest> : public std::true_type{};
+struct IsFidlType<::test_inheritancewithrecursivedecl::ParentFirstRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_inheritancewithrecursivedecl::ParentFirstRequest> {
@@ -181,7 +181,7 @@ struct TypeTraits<::test_inheritancewithrecursivedecl::ParentFirstRequest> {
 };
 
 template <>
-struct IsStruct<::test_inheritancewithrecursivedecl::ParentFirstRequest> : public std::true_type{};
+struct IsStruct<::test_inheritancewithrecursivedecl::ParentFirstRequest> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_inheritancewithrecursivedecl::ParentFirstRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
@@ -192,9 +192,9 @@ struct internal::NaturalCodingTraits<::test_inheritancewithrecursivedecl::Parent
 #ifdef __Fuchsia__
 
 template <>
-struct IsResource<::test_inheritancewithrecursivedecl::ChildSecondRequest> : public std::true_type{};
+struct IsResource<::test_inheritancewithrecursivedecl::ChildSecondRequest> : public std::true_type {};
 template <>
-struct IsFidlType<::test_inheritancewithrecursivedecl::ChildSecondRequest> : public std::true_type{};
+struct IsFidlType<::test_inheritancewithrecursivedecl::ChildSecondRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_inheritancewithrecursivedecl::ChildSecondRequest> {
@@ -206,7 +206,7 @@ struct TypeTraits<::test_inheritancewithrecursivedecl::ChildSecondRequest> {
 };
 
 template <>
-struct IsStruct<::test_inheritancewithrecursivedecl::ChildSecondRequest> : public std::true_type{};
+struct IsStruct<::test_inheritancewithrecursivedecl::ChildSecondRequest> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_inheritancewithrecursivedecl::ChildSecondRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final

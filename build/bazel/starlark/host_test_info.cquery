@@ -1,0 +1,17 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+#
+# Starlark function used to extract runtime information about test targets.
+# Used by the export_host_tests.py script.
+
+def format(target):
+    f = providers(target)["FilesToRunProvider"]
+    # LINT.IfChange
+    return {
+        "label": str(target.label),
+        "repo_name": target.label.repo_name,
+        "executable": f.executable.path,
+        "runfiles_manifest": f.runfiles_manifest.path,
+    }
+    # LINT.ThenChange(../scripts/export_host_tests.py)

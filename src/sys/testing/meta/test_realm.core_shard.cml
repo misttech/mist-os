@@ -24,6 +24,12 @@
             to: "#testing",
         },
         {
+            protocol: "fuchsia.fshost.StarnixVolumeProvider",
+            from: "parent",
+            to: "#testing",
+            availability: "optional",
+        },
+        {
             protocol: [
                 "fuchsia.boot.ReadOnlyLog",
                 "fuchsia.boot.WriteOnlyLog",
@@ -262,6 +268,7 @@
             to: "#testing",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-codec",
@@ -269,6 +276,14 @@
             subdir: "codec",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.audio.CodecConnectorService",
+            from: "parent",
+            to: "#testing",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-display-coordinator",
@@ -276,6 +291,14 @@
             subdir: "display-coordinator",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.display.service",
+            from: "parent",
+            to: "#testing",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-mediacodec",
@@ -283,6 +306,14 @@
             subdir: "media-codec",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.mediacodec.Service",
+            from: "parent",
+            to: "#testing",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-goldfish-address-space",
@@ -290,6 +321,14 @@
             subdir: "goldfish-address-space",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.goldfish.AddressSpaceService",
+            from: "parent",
+            to: "#testing",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-goldfish-control",
@@ -297,6 +336,14 @@
             subdir: "goldfish-control",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.goldfish.ControlService",
+            from: "parent",
+            to: "#testing",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-goldfish-pipe",
@@ -304,6 +351,14 @@
             subdir: "goldfish-pipe",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.goldfish.ControllerService",
+            from: "parent",
+            to: "#testing",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-goldfish-sync",
@@ -311,6 +366,14 @@
             subdir: "goldfish-sync",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.goldfish.SyncService",
+            from: "parent",
+            to: "#testing",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-gpu",
@@ -318,6 +381,14 @@
             subdir: "gpu",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.gpu.magma.Service",
+            from: "parent",
+            to: "#testing",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-gpu-performance-counters",
@@ -325,6 +396,13 @@
             subdir: "gpu-performance-counters",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.gpu.magma.PerformanceCounterService",
+            from: "parent",
+            to: "#testing",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-audio-input",
@@ -332,6 +410,13 @@
             subdir: "audio-input",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.audio.StreamConfigConnectorInputService",
+            from: "parent",
+            to: "#testing",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-audio-output",
@@ -339,6 +424,13 @@
             subdir: "audio-output",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.audio.StreamConfigConnectorOutputService",
+            from: "parent",
+            to: "#testing",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-dai",
@@ -346,6 +438,13 @@
             subdir: "dai",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.audio.DaiConnectorService",
+            from: "parent",
+            to: "#testing",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-audio-composite",
@@ -353,6 +452,14 @@
             subdir: "audio-composite",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.audio.CompositeConnectorService",
+            from: "parent",
+            to: "#testing",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-input",
@@ -360,11 +467,25 @@
             subdir: "input",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.input.Service",
+            from: "parent",
+            to: "#testing",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-input-report",
             to: "#testing",
             subdir: "input-report",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.input.report.Service",
+            from: "parent",
+            to: "#testing",
         },
         {
             directory: "dev-class",
@@ -391,11 +512,19 @@
         // Tests of the media system want to test against the real hardware
         // TODO(https://fxbug.dev/42164198): Remove when specialized test realms are ready.
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-mediacodec",
             to: "#testing",
             subdir: "media-codec",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.mediacodec.Service",
+            from: "parent",
+            to: "#testing",
         },
         {
             directory: "dev-class",
@@ -443,11 +572,7 @@
 
         // Profiling tests need access to the ktrace data
         {
-            protocol: [
-                "fuchsia.kernel.Counter",
-                "fuchsia.tracing.kernel.Controller",
-                "fuchsia.tracing.kernel.Reader",
-            ],
+            protocol: [ "fuchsia.kernel.Counter" ],
             from: "parent",
             to: "#testing",
             availability: "same_as_target",
@@ -512,6 +637,11 @@
 
         // Needed for storage-tests
         {
+            directory: [ "volumes" ],
+            from: "parent",
+            to: "#testing",
+        },
+        {
             config: [
                 "fuchsia.fshost.FxfsBlob",
                 "fuchsia.fshost.StorageHost",
@@ -527,11 +657,19 @@
             source_availability: "unknown",
         },
         {
-            protocol: [ "fuchsia.storage.partitions.PartitionsManager" ],
+            protocol: [
+                "fuchsia.fs.startup.Volumes",
+                "fuchsia.storage.partitions.PartitionsManager",
+            ],
             from: "parent",
             to: "#testing",
             availability: "optional",
             source_availability: "unknown",
+        },
+        {
+            service: [ "fuchsia.gpu.magma.Service" ],
+            from: "parent",
+            to: "#testing",
         },
     ],
 }

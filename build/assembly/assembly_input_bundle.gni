@@ -2,8 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/assembly_input_bundle_archive.gni")
-import("//build/assembly/assembly_input_bundle_package.gni")
 import("//build/bazel/bazel_inputs.gni")
 import("//build/components/fuchsia_package.gni")
 import("//build/group_with_inputs.gni")
@@ -201,21 +199,6 @@ import("//build/python/python_action.gni")
 #    [list of paths] Paths to memory bucket configs that should get merged and
 #    passed to memory monitor.
 #
-#  create_aib_package (optional; default: true)
-#    [boolean] Set to true to also create a package that contains the contents
-#    of the AIB.
-#      target: '{$target_name}.pkg'
-#      outputs: [
-#                 '${bundle_dir}/${bundle_name}.pkg/meta.far',
-#                 '${bundle_dir}/${bundle_name}.pkg/package_manifest.json',
-#               ]
-#
-#  create_aib_archive (optional; default: true)
-#    [boolean] Set to true to create a tgz archive that contains the contents of
-#    the AIB.
-#      target: '{$target_name}.tgz'
-#      outputs: [ '${bundle_dir}/${bundle_name}.tgz' ]
-#
 #
 #  Outputs
 #    A directory structure and manifest that matches that documented in
@@ -244,10 +227,6 @@ template("assembly_input_bundle") {
   labels = {
     # The AIB itself
     assembly_input_bundle = "$target_name.bundle"
-
-    # The assembly bundle package and archive labels
-    assembly_input_bundle_package = "${target_name}.pkg"
-    assembly_input_bundle_archive = "${target_name}.tgz"
 
     bazel_inputs = "${target_name}_bazel_inputs"
     gn_targets_name = target_name
@@ -278,15 +257,6 @@ template("assembly_input_bundle") {
     assembly_input_bundle_manifest =
         "${assembly_input_bundle_dir}.fini_manifest"
 
-    # The AIB package's meta.far (optionally used)
-    assembly_input_bundle_package_metafar =
-        "${assembly_input_bundle_dir}.pkg/meta.far"
-
-    # The AIB archive and the manifest used to create it (optionally used)
-    assembly_input_bundle_archive = "${assembly_input_bundle_dir}.tgz"
-    assembly_input_bundle_archive_manifest =
-        "${assembly_input_bundle_dir}.tgz.fini_manifest"
-
     _gen_files = "${target_gen_dir}/${target_name}"
     shell_commands_list = "${_gen_files}/shell_commands.list"
 
@@ -301,19 +271,6 @@ template("assembly_input_bundle") {
     # The list of user-provided compiled_package_definitions to include in
     # the AIB config
     compiled_packages = "${assembly_input_bundle_dir}.compiled_packages"
-  }
-
-  # See if the fuchsia-pkg and archive for the AIB are to be created.
-  forward_variables_from(invoker,
-                         [
-                           "create_aib_package",
-                           "create_aib_archive",
-                         ])
-  if (!defined(create_aib_package)) {
-    create_aib_package = true
-  }
-  if (!defined(create_aib_archive)) {
-    create_aib_archive = true
   }
 
   creation_args = []
@@ -804,16 +761,6 @@ template("assembly_input_bundle") {
     ]
     args += creation_args
 
-    # If packaging or archiving the AIB, write out the fini manifest needed to
-    # do so.
-    if (create_aib_package || create_aib_archive) {
-      args += [
-        "--export-manifest",
-        rebase_path(files.assembly_input_bundle_manifest, root_build_dir),
-      ]
-      outputs += [ files.assembly_input_bundle_manifest ]
-    }
-
     inputs = creation_inputs
     deps = creation_deps
 
@@ -828,42 +775,6 @@ template("assembly_input_bundle") {
       system_image_package_barrier = []
       shell_commands_barrier = []
       assembly_input_archives_barrier = []
-    }
-  }
-
-  # Optionally create the fuchsia-pkg for the AIB.
-  if (create_aib_package) {
-    assembly_input_bundle_package(labels.assembly_input_bundle_package) {
-      forward_variables_from(invoker,
-                             [
-                               "testonly",
-                               "visibility",
-                             ])
-      package_name = bundle_name
-      package_outdir = "${bundles_dir}/${bundle_name}.pkg"
-      manifest = files.assembly_input_bundle_manifest
-      deps = [ ":${labels.assembly_input_bundle}" ]
-    }
-  }
-
-  # Optionally create the archive for the AIB.
-  if (create_aib_archive) {
-    assembly_input_bundle_archive(labels.assembly_input_bundle_archive) {
-      forward_variables_from(invoker,
-                             [
-                               "testonly",
-                               "visibility",
-                             ])
-      archive_name = bundle_name
-      archive_outdir = bundles_dir
-      manifest = files.assembly_input_bundle_manifest
-      deps = [ ":${labels.assembly_input_bundle}" ]
-
-      # If the package was created, include it in the archive.
-      if (create_aib_package) {
-        meta_far = files.assembly_input_bundle_package_metafar
-        deps += [ ":${labels.assembly_input_bundle_package}" ]
-      }
     }
   }
 
@@ -887,13 +798,6 @@ template("assembly_input_bundle") {
                            ])
     deps = [ ":${labels.bazel_inputs}" ]
     public_deps = [ ":${labels.assembly_input_bundle}" ]
-    if (create_aib_package) {
-      public_deps += [ ":${labels.assembly_input_bundle_package}" ]
-    }
-    if (create_aib_archive) {
-      public_deps += [ ":${labels.assembly_input_bundle_archive}" ]
-    }
-
     metadata = {
       assembly_input_bundles = [
         {

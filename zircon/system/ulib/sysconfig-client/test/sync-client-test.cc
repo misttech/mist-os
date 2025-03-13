@@ -12,6 +12,7 @@
 #include <lib/async-loop/loop.h>
 #include <lib/async/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/component/incoming/cpp/directory.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/driver-integration-test/fixture.h>
@@ -203,7 +204,7 @@ class SyncClientTest : public zxtest::Test {
                     .is_ok());
       auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
-      zx::result svc_local = component::ConnectAt<fuchsia_io::Directory>(client_end, "svc");
+      zx::result svc_local = component::OpenDirectoryAt(client_end, "svc");
       ZX_ASSERT(svc_local.is_ok());
       ZX_ASSERT(ns->outgoing.Serve(std::move(server_end)).is_ok());
       return std::move(svc_local.value());

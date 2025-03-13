@@ -14,6 +14,7 @@ driver_bind_rules("ti_tas5707-bind") {
 }
 
 fuchsia_cc_driver("tas5707-driver") {
+  legacy = true
   output_name = "tas5707"
   configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
   sources = [ "tas5707.cc" ]

@@ -45,9 +45,15 @@ zx_status_t magma_indriver_test(ParentDeviceDfv2* device) {
   delete listeners.Release(listeners.default_result_printer());
   listeners.Append(new magma::GtestPrinter);
 
-  MAGMA_LOG(INFO, "[DRV START=]\n");
-  zx_status_t status = RUN_ALL_TESTS() == 0 ? ZX_OK : ZX_ERR_INTERNAL;
-  MAGMA_LOG(INFO, "[DRV END===]\n[==========]\n");
+  // Use a thread with a well-known lifetime to run the test to ensure all
+  // gtest-internal TLS state is released by the end of testing.
+  zx_status_t status;
+  std::thread test_thread([&]() {
+    MAGMA_LOG(INFO, "[DRV START=]\n");
+    status = RUN_ALL_TESTS() == 0 ? ZX_OK : ZX_ERR_INTERNAL;
+    MAGMA_LOG(INFO, "[DRV END===]\n[==========]\n");
+  });
+  test_thread.join();
   platform_device_s.reset();
   return status;
 }

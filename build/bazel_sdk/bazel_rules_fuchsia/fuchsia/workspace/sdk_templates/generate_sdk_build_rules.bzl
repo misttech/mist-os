@@ -107,6 +107,8 @@ filegroup(
 
 _SDK_TEMPLATES = {
     "api_version": "//fuchsia/workspace/sdk_templates:api_version_template.bzl",
+    "api_level_constraint": "//fuchsia/workspace/sdk_templates:api_level_constraint.template",
+    "api_level_flag": "//fuchsia/workspace/sdk_templates:api_level_flags.template",
     "bind_library": "//fuchsia/workspace/sdk_templates:bind_library.BUILD.template",
     "cc_library": "//fuchsia/workspace/sdk_templates:cc_library.BUILD.template",
     "cc_prebuilt_library": "//fuchsia/workspace/sdk_templates:cc_prebuilt_library.BUILD.template",
@@ -381,6 +383,15 @@ def _generate_sysroot_build_rules(
     for ifs_file in meta.get("ifs_files", []):
         files.append("pkg/sysroot/" + ifs_file)
     arch_list = process_context.constants.target_cpus
+
+    # TODO(https://fxbug.dev/385408047): Prefer API level-specific "variants"
+    # instances when available. Then use values from "versions" for "HEAD" only
+    # when "variants" does not include "HEAD".
+    if not "versions" in meta:
+        fail("The Bazel SDK does not yet support versioned sysroots and thus requires 'versions'.")
+
+    # TODO(https://fxbug.dev/385406226): Remove this block once the SDK always
+    # includes artifacts for "HEAD" in "variants".
     for arch in arch_list:
         meta_for_arch = meta["versions"][arch]
         if "debug_libs" in meta_for_arch:
@@ -664,6 +675,29 @@ def _generate_api_version_rules(
         },
     )
 
+    constraint_build_file = _constraints_build_file(ctx)
+
+    # writes the api level constraints to the constraints build file
+    _merge_template(
+        ctx,
+        constraint_build_file,
+        _sdk_template_path(runtime, "api_level_constraint"),
+        {
+            "{{target_cpus}}": _get_starlark_list(runtime, process_context.constants.target_cpus),
+        },
+    )
+
+    # write the api level flags
+    flags_build_file = _flags_build_file(ctx)
+
+    # writes the api level constraints to the constraints build file
+    _merge_template(
+        ctx,
+        flags_build_file,
+        _sdk_template_path(runtime, "api_level_flag"),
+        {},
+    )
+
 # buildifier: disable=unused-variable
 def _generate_fidl_library_build_rules(
         runtime,
@@ -884,11 +918,11 @@ def _to_fuchsia_cpu_name(cpu_name):
     return _TO_FUCHSIA_CPU_NAME_MAP.get(cpu_name, cpu_name)
 
 # Maps a Fuchsia cpu name to the corresponding config_setting() label in
-# @fuchsia_sdk//fuchsia/constraints
+# @rules_fuchsia//fuchsia/constraints
 _FUCHSIA_CPU_CONSTRAINT_MAP = {
-    "x64": "@fuchsia_sdk//fuchsia/constraints:cpu_x64",
-    "arm64": "@fuchsia_sdk//fuchsia/constraints:cpu_arm64",
-    "riscv64": "@fuchsia_sdk//fuchsia/constraints:cpu_riscv64",
+    "x64": "@rules_fuchsia//fuchsia/constraints:cpu_x64",
+    "arm64": "@rules_fuchsia//fuchsia/constraints:cpu_arm64",
+    "riscv64": "@rules_fuchsia//fuchsia/constraints:cpu_riscv64",
 }
 
 # Maps a variant name to the corresponding config_setting() label in
@@ -899,24 +933,8 @@ _FUCHSIA_CLANG_VARIANT_MAP = {
     "hwasan": "@fuchsia_clang//:hwasan_variant",
 }
 
-# Maps a Fuchsia API level to the corresponding config_setting() label in
-# @fuchsia_sdk//fuchsia/constraints
-def _fuchsia_api_level_constraint(api_level, default = "//conditions:default"):
-    if _is_undefined_api_level(api_level):
-        return default
-    return "//fuchsia/constraints:api_level_%s" % api_level
-
 def _get_api_level(variant):
-    api_level = variant["api_level"]
-    return "HEAD" if _is_undefined_api_level(api_level) else api_level
-
-def _is_undefined_api_level(api_level):
-    return api_level in (-1, "unversioned")
-
-def _api_level_deprecation_message(api_level):
-    if _is_undefined_api_level(api_level):
-        return '"Warning: Dependencies with unstable API levels are being used, incompatibility may occur."'
-    return "None"
+    return variant["api_level"]
 
 # We can't just do f"//:{file}" for file srcs, since the relative dir may have a
 # BUILD.bazel file, making that subdir its own Bazel package.
@@ -963,6 +981,84 @@ def _generate_cc_prebuilt_library_build_rules(
     prebuilt_select = {}
     dist_select = {}
 
+    has_distlibs = False
+
+    # Process the arch directories first then the variants, so that the variants
+    # will override the arch directories when both are present.
+    # TODO(https://fxbug.dev/385406226): Remove the first two for loops once
+    # //sdk:bazel_internal_only_libs no longer contains any prebuilts.
+
+    # Process "binaries" if present.
+    if "binaries" in meta:
+        # add all supported architectures to the select, even if they are not available in the current SDK,
+        # so that SDKs for different architectures can be composed by a simple directory merge.
+        arch_list = process_context.constants.target_cpus
+        for arch in arch_list:
+            constraint = "@fuchsia_sdk//constraints:is_%s_api_HEAD" % (arch)
+            dist_select[constraint] = ["//%s/%s-HEAD:dist" % (relative_dir, arch)]
+            prebuilt_select[constraint] = [
+                "//%s/%s-HEAD:prebuilts" % (relative_dir, arch),
+            ]
+
+        for arch in arch_list:
+            head_dirname = "%s-HEAD" % (arch)
+            per_arch_build_file = build_file.dirname.get_child(
+                head_dirname,
+            ).get_child("BUILD.bazel")
+            ctx.file(per_arch_build_file, content = _header(), executable = False)
+
+            linklib = meta["binaries"][arch]["link"]
+            _merge_template(
+                ctx,
+                per_arch_build_file,
+                _sdk_template_path(runtime, "cc_prebuilt_library_linklib"),
+                {
+                    "{{link_lib}}": _final_bazel_path(linklib),
+                    "{{library_type}}": meta["format"],
+                    "{{rules_fuchsia}}": process_context.rules_fuchsia,
+                },
+            )
+            process_context.files_to_copy[meta["_meta_sdk_root"]].append(linklib)
+
+            if "dist" in meta["binaries"][arch]:
+                has_distlibs = True
+                dist_lib = meta["binaries"][arch]["dist"]
+                process_context.files_to_copy[meta["_meta_sdk_root"]].append(
+                    dist_lib,
+                )
+
+                debug_lib = meta["binaries"][arch].get("debug", dist_lib)
+                if debug_lib.startswith(".build-id/"):
+                    _merge_template(
+                        ctx,
+                        per_arch_build_file,
+                        _sdk_template_path(runtime, "cc_prebuilt_library_distlib"),
+                        {
+                            "{{dist_lib}}": _final_bazel_path(dist_lib),
+                            "{{dist_path}}": meta["binaries"][arch]["dist_path"],
+                            "{{rules_fuchsia}}": process_context.rules_fuchsia,
+                        },
+                    )
+                else:
+                    _merge_template(
+                        ctx,
+                        per_arch_build_file,
+                        _sdk_template_path(
+                            runtime,
+                            "cc_prebuilt_library_distlib_unstripped",
+                        ),
+                        {
+                            "{{stripped_file}}": _final_bazel_path(dist_lib),
+                            "{{unstripped_file}}": _final_bazel_path(debug_lib),
+                            "{{dist_path}}": meta["binaries"][arch]["dist_path"],
+                            "{{rules_fuchsia}}": process_context.rules_fuchsia,
+                        },
+                    )
+                    if debug_lib != dist_lib:
+                        process_context.files_to_copy[meta["_meta_sdk_root"]].append(debug_lib)
+
+    # Process "variants".
+
     prebuilt_variants = []
     if "variants" in meta:
         for variant in meta["variants"]:
@@ -974,7 +1070,7 @@ def _generate_cc_prebuilt_library_build_rules(
                 runtime.make_struct(
                     name = "%s-api-%s" % (arch, api_level),
                     link_lib = values["link_lib"],
-                    constraint = "@fuchsia_sdk//fuchsia/constraints:is_%s_api_%s" %
+                    constraint = "@fuchsia_sdk//constraints:is_%s_api_%s" %
                                  (arch, api_level),
                     os = "@platforms//os:fuchsia",
                     arch = arch,
@@ -988,7 +1084,7 @@ def _generate_cc_prebuilt_library_build_rules(
             )
 
     for variant in prebuilt_variants:
-        constraint = "@fuchsia_sdk//fuchsia/constraints:is_%s_api_%s" % (
+        constraint = "@fuchsia_sdk//constraints:is_%s_api_%s" % (
             variant.arch,
             variant.api_level,
         )
@@ -1054,74 +1150,7 @@ def _generate_cc_prebuilt_library_build_rules(
                 if debug_lib != dist_lib:
                     process_context.files_to_copy[meta["_meta_sdk_root"]].append(debug_lib)
 
-    # add all supported architectures to the select, even if they are not available in the current SDK,
-    # so that SDKs for different architectures can be composed by a simple directory merge.
-    arch_list = process_context.constants.target_cpus
-    for arch in arch_list:
-        constraint = "@fuchsia_sdk//fuchsia/constraints:is_%s_api_HEAD" % (arch)
-        dist_select[constraint] = ["//%s/%s-HEAD:dist" % (relative_dir, arch)]
-        prebuilt_select[constraint] = [
-            "//%s/%s-HEAD:prebuilts" % (relative_dir, arch),
-        ]
-
-    has_distlibs = False
-
-    for arch in arch_list:
-        head_dirname = "%s-HEAD" % (arch)
-        per_arch_build_file = build_file.dirname.get_child(
-            head_dirname,
-        ).get_child("BUILD.bazel")
-        ctx.file(per_arch_build_file, content = _header(), executable = False)
-
-        linklib = meta["binaries"][arch]["link"]
-        _merge_template(
-            ctx,
-            per_arch_build_file,
-            _sdk_template_path(runtime, "cc_prebuilt_library_linklib"),
-            {
-                "{{link_lib}}": _final_bazel_path(linklib),
-                "{{library_type}}": meta["format"],
-                "{{rules_fuchsia}}": process_context.rules_fuchsia,
-            },
-        )
-        process_context.files_to_copy[meta["_meta_sdk_root"]].append(linklib)
-
-        if "dist" in meta["binaries"][arch]:
-            has_distlibs = True
-            dist_lib = meta["binaries"][arch]["dist"]
-            process_context.files_to_copy[meta["_meta_sdk_root"]].append(
-                dist_lib,
-            )
-
-            debug_lib = meta["binaries"][arch].get("debug", dist_lib)
-            if debug_lib.startswith(".build-id/"):
-                _merge_template(
-                    ctx,
-                    per_arch_build_file,
-                    _sdk_template_path(runtime, "cc_prebuilt_library_distlib"),
-                    {
-                        "{{dist_lib}}": _final_bazel_path(dist_lib),
-                        "{{dist_path}}": meta["binaries"][arch]["dist_path"],
-                        "{{rules_fuchsia}}": process_context.rules_fuchsia,
-                    },
-                )
-            else:
-                _merge_template(
-                    ctx,
-                    per_arch_build_file,
-                    _sdk_template_path(
-                        runtime,
-                        "cc_prebuilt_library_distlib_unstripped",
-                    ),
-                    {
-                        "{{stripped_file}}": _final_bazel_path(dist_lib),
-                        "{{unstripped_file}}": _final_bazel_path(debug_lib),
-                        "{{dist_path}}": meta["binaries"][arch]["dist_path"],
-                        "{{rules_fuchsia}}": process_context.rules_fuchsia,
-                    },
-                )
-                if debug_lib != dist_lib:
-                    process_context.files_to_copy[meta["_meta_sdk_root"]].append(debug_lib)
+    # Apply the results.
 
     prebuilt_select_str = (
         "variant_select(" + _get_starlark_dict(runtime, prebuilt_select) + ")"
@@ -1174,15 +1203,11 @@ def _generate_package_build_rules(
                    (name, variant["arch"], _get_api_level(variant)),
             files = variant["files"],
             manifest = variant["manifest_file"],
-            deprecation = _api_level_deprecation_message(_get_api_level(variant)),
             constraint = "is_%s_api_%s" %
                          (variant["arch"], _get_api_level(variant)),
             os = "@platforms//os:fuchsia",
             cpu = _FUCHSIA_CPU_CONSTRAINT_MAP[variant["arch"]].replace("@fuchsia_sdk", "@" + process_context.rules_fuchsia),
-            api_level = _fuchsia_api_level_constraint(
-                _get_api_level(variant),
-                None,
-            ),
+            api_level = "//constraints:api_level_%s" % _get_api_level(variant),
         )
         for variant in meta["variants"]
     ]
@@ -1206,15 +1231,12 @@ def _generate_package_build_rules(
                     relative_dir,
                     variant.manifest,
                 ),
-                "{{deprecation}}": variant.deprecation,
                 "{{rules_fuchsia}}": process_context.rules_fuchsia,
             },
         )
         process_context.files_to_copy[meta["_meta_sdk_root"]].extend(
             variant.files,
         )
-
-    rules_fuchsia = process_context.rules_fuchsia
 
     _merge_template(
         ctx,
@@ -1225,9 +1247,8 @@ def _generate_package_build_rules(
             "{{select_map}}": _get_starlark_dict(
                 runtime,
                 {
-                    "@%s//fuchsia/constraints:%s" %
-                    (rules_fuchsia, variant.constraint): ":%s" %
-                                                         variant.name
+                    "//constraints:%s" %
+                    variant.constraint: ":%s" % variant.name
                     for variant in package_variants
                 },
             ),
@@ -1266,6 +1287,21 @@ def _generate_python_e2e_test_rules(
         build_file,
         process_context,
         parent_sdk_contents):
+    # Helper functions to handle the unversioned tests.
+    # TODO(https://fxbug.dev/330373943): Remove once tests are versioned.
+    def _fuchsia_api_level_constraint(api_level, default = "//conditions:default"):
+        if _is_undefined_api_level(api_level):
+            return default
+        return "//constraints:api_level_%s" % api_level
+
+    def _api_level_deprecation_message(api_level):
+        if _is_undefined_api_level(api_level):
+            return '"Warning: Dependencies with unstable API levels are being used, incompatibility may occur."'
+        return "None"
+
+    def _is_undefined_api_level(api_level):
+        return api_level == "unversioned"
+
     ctx = runtime.ctx
     process_context.files_to_copy[meta["_meta_sdk_root"]].extend(meta["files"])
 
@@ -1316,6 +1352,8 @@ def _generate_python_e2e_test_rules(
                     _fuchsia_api_level_constraint(api_level): "//%s/%s:%s" %
                                                               (relative_dir, api_level, name)
                     for api_level in files_for_api_level
+                } | {
+                    "//conditions:default": "//:empty",
                 },
             ),
         },
@@ -1464,6 +1502,18 @@ def _write_cmc_includes(runtime, process_context):
 
 def _root_build_file(ctx):
     return ctx.path("BUILD.bazel")
+
+def _constraints_build_file(ctx):
+    build_file = _root_build_file(ctx).dirname.get_child("constraints").get_child("BUILD.bazel")
+    if not build_file.exists:
+        ctx.file(build_file, content = _header(), executable = False)
+    return build_file
+
+def _flags_build_file(ctx):
+    build_file = _root_build_file(ctx).dirname.get_child("flags").get_child("BUILD.bazel")
+    if not build_file.exists:
+        ctx.file(build_file, content = _header(), executable = False)
+    return build_file
 
 def _type_from_meta(runtime, meta):
     if "type" in meta:
@@ -1695,91 +1745,9 @@ def _generate_sdk_build_rules(
     }
     runtime.file_copier(files_to_copy)
 
-def _merge_rules_fuchsia(runtime, use_rules_fuchsia):
+def _merge_rules_fuchsia(runtime):
     ctx = runtime.ctx
     rules_fuchsia_root = runtime.label_to_path("//:BUILD.bazel").dirname
-
-    def _adjust_content_for_rules_fuchsia(content):
-        # Adjust "//fuchsia//<foo> into "@fuchsia//fuchsia
-        content = content.replace("\"//fuchsia", "\"@rules_fuchsia//fuchsia")
-
-        # As a special case, continue to use @fuchsia_sdk//fuchsia:fuchsia_api_level
-        # as a user-settable build attribute.
-        content = content.replace("@rules_fuchsia//fuchsia:fuchsia_api_level", "@fuchsia_sdk//fuchsia:fuchsia_api_level")
-
-        # Another special case if @fuchsia_sdk//fuchsia:toolchain which is still referenced
-        # directly in @rules_fuchsia at the moment.
-        content = content.replace("@rules_fuchsia//fuchsia:toolchain", "@fuchsia_sdk//fuchsia:toolchain")
-        content = content.replace("@rules_fuchsia//fuchsia/toolchains:sdk", "@fuchsia_sdk//fuchsia/toolchains:sdk")
-
-        return content
-
-    if use_rules_fuchsia:
-        # For backwards compatibility, ensure that a statement like
-        # load("@fuchsia_sdk//fuchsia:defs.bzl", "foo") is equivalent
-        # to load("@rules_fuchsia//fuchsia:defs.bzl", "foo").
-        #
-        # This is done by copying the .bzl files from @rules_fuchsia//fuchsia/
-        # into @fuchsia_sdk//fuchsia/ after changing the load() label references
-        # in them from "//fuchsia<something>" to
-        # "@rules_fuchsia//fuchsia<something>" instead. This works because all
-        # these files simply re-exports symbols loaded from other source
-        # packages.
-        child_directories = [
-            "fuchsia/constraints/platforms",
-            "fuchsia/constraints",
-            "fuchsia",
-        ]
-        for child_dir in child_directories:
-            source_dir = rules_fuchsia_root.get_child(child_dir)
-            for build_file in source_dir.readdir():
-                if not build_file.is_dir:
-                    content = ctx.read(build_file)
-                    content = _adjust_content_for_rules_fuchsia(content)
-                    ctx.file(child_dir + "/" + build_file.basename, content)
-
-        # @fuchsia_sdk//fuchsia/private:driver.ld,
-        # @fuchsia_sdk//fuchsia/private:driver_restricted_symbols.txt are
-        # accessed by the fuchsia_cc_driver() macro which is run in the
-        # context of project-specific BUILD.bazel files. Create two alias()
-        # targets to @rules_fuchsia//fuchsia/private:<name> for these
-        #
-        # Similarly, visitor.ld is used by fuchsia_devicetree_visitor().
-        ctx.file(
-            "fuchsia/private/BUILD.bazel",
-            """# AUTO-GENERATED - DO NOT EDIT
-alias(
-    name = "driver.ld",
-    actual = "@rules_fuchsia//fuchsia/private:driver.ld",
-    visibility = ["//visibility:public"],
-)
-
-alias(
-    name = "driver_restricted_symbols.txt",
-    actual = "@rules_fuchsia//fuchsia/private:driver_restricted_symbols.txt",
-    visibility = ["//visibility:public"],
-)
-
-alias(
-    name = "visitor.ld",
-    actual = "@rules_fuchsia//fuchsia/private:visitor.ld",
-    visibility = ["//visibility:public"],
-)
-""",
-        )
-
-        # Needed by the SDK test suite.
-        ctx.symlink(rules_fuchsia_root.get_child("fuchsia", "tools"), "fuchsia/tools")
-
-        # Until we completely remove the toolchain types from the fuchsia_sdk we need
-        # to make sure we have them defined. We copy over the build file for the
-        # toolchains for now.
-        ctx.symlink(rules_fuchsia_root.get_child("fuchsia", "toolchains", "BUILD.bazel"), "fuchsia/toolchains/BUILD.bazel")
-    else:
-        # Simply symlink the content of @rules_fuchsia into the current
-        # repository instead.
-        ctx.symlink(rules_fuchsia_root.get_child("common"), "common")
-        ctx.symlink(rules_fuchsia_root.get_child("fuchsia"), "fuchsia")
 
     rules_fuchsia_build = ctx.read(
         rules_fuchsia_root.get_child("BUILD.bazel"),
@@ -1802,16 +1770,29 @@ alias(
         executable = False,
     )
 
+    # Allow for a soft transition of the api level flag.
+    #TODO(b/402169646) remove this alias when OOT users are migrated
+    ctx.file("fuchsia/BUILD.bazel", content = """
+package(default_visibility = ["//visibility:public"])
+
+alias(
+    name = "fuchsia_api_level",
+    actual = "//flags:fuchsia_api_level",
+    deprecation = "Use @fuchsia_sdk//flags:fuchsia_api_level instead",
+)
+
+alias(
+    name = "repository_default_fuchsia_api_level",
+    actual = "//flags:repository_default_fuchsia_api_level",
+    deprecation = "Use @fuchsia_sdk//flags:repository_default_fuchsia_api_level instead",
+)
+    """, executable = False)
+
     # BUILD.bazel references //:.build-id in a fuchsia_debug_symbol()
     # target declaration. This directory may not exist when the input
     # IDK is an external repository, so create an empty one if needed.
     if not ctx.path(".build-id").exists:
         ctx.file(".build-id/.empty-on-purpose")
-
-    if use_rules_fuchsia:
-        content = ctx.read("BUILD.bazel")
-        content = _adjust_content_for_rules_fuchsia(content)
-        ctx.file("BUILD.bazel", content)
 
 def _export_all_files(runtime):
     ctx = runtime.ctx
@@ -1876,7 +1857,7 @@ def generate_sdk_repository(runtime, manifests, use_rules_fuchsia):
     # substitutions directly to the call to ctx.template above.
     _generate_sdk_build_rules(runtime, manifests, constants, rules_fuchsia_name)
 
-    _merge_rules_fuchsia(runtime, use_rules_fuchsia)
+    _merge_rules_fuchsia(runtime)
 
     # Should only be called after all BUILD.bazel files have been added.
     _export_all_files(runtime)

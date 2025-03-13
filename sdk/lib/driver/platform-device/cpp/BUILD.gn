@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/cpp/sdk_source_set.gni")
-import("//build/test.gni")
 
 sdk_source_set("cpp") {
   category = "partner"
@@ -27,30 +26,7 @@ sdk_source_set("cpp") {
   public_configs = [ "//sdk/config" ]
 }
 
-test("driver-platform-device-test") {
-  sources = [ "pdev-test.cc" ]
-
-  deps = [
-    ":cpp",
-    "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp_testing",
-    "//sdk/lib/async-default",
-    "//sdk/lib/async-loop:async-loop-cpp",
-    "//sdk/lib/async-loop:async-loop-default",
-    "//sdk/lib/async_patterns/testing/cpp",
-    "//sdk/lib/driver/fake-bti/cpp",
-    "//sdk/lib/driver/fake-platform-device/cpp",
-    "//sdk/lib/driver/fake-resource/cpp",
-    "//src/devices/lib/mmio:test_helper",
-    "//zircon/system/ulib/zxtest",
-  ]
-}
-
-fuchsia_unittest_package("package") {
-  package_name = "driver-platform-device-test"
-  deps = [ ":driver-platform-device-test" ]
-}
-
 group("tests") {
   testonly = true
-  deps = [ ":package" ]
+  deps = [ "tests:package" ]
 }

@@ -42,6 +42,7 @@ group("driver_test_realm") {
     "//src/devices/bin/driver-index:component",
     "//src/devices/bin/driver_host:component",
     "//src/devices/bin/driver_manager:driver_shared_libraries",
+    "//src/devices/bin/driver_manager/devfs:component",
   ]
 }
 

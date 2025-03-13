@@ -28,6 +28,9 @@ template("assemble_network_conformance_system") {
 
   board_configuration(labels.board_config) {
     name = "network-conformance"
+    kernel = {
+      halt_on_panic = true
+    }
     filesystems = {
       fvm = {
         slice_size = 1048576
@@ -53,7 +56,9 @@ template("assemble_network_conformance_system") {
         config_type = "none"
       }
       graphics = {
-        enable_virtual_console = false
+        virtual_console = {
+          enable = false
+        }
       }
     }
     base_packages = [
@@ -99,6 +104,7 @@ template("assemble_network_conformance_system") {
   assembled_system(target_name) {
     testonly = true
     include_legacy_bundle = true
+    legacy_bundle_must_be_empty = true
 
     if (!fxfs_blob) {
       generate_fvm = true
@@ -110,7 +116,5 @@ template("assemble_network_conformance_system") {
 
     product_assembly_config_label = ":${labels.product_config}"
     board_config_label = ":${labels.board_config}"
-
-    cmdline = [ "kernel.halt-on-panic=true" ]
   }
 }

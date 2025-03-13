@@ -268,7 +268,7 @@ inline ExampleFooRequest::ExampleFooRequest(Storage_ storage) noexcept : storage
 inline ExampleFooRequest::ExampleFooRequest(::std::string s) noexcept
     : storage_({.s = std::move(s)}) {}
 inline ExampleFooRequest::ExampleFooRequest(const ::test_error::ExampleFooRequest& other) noexcept : ::test_error::ExampleFooRequest(other.CloneStorage_()) {}
-inline ExampleFooRequest& ::test_error::ExampleFooRequest::operator=(const ::test_error::ExampleFooRequest & other) noexcept {
+inline ExampleFooRequest& ::test_error::ExampleFooRequest::operator=(const ::test_error::ExampleFooRequest& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -285,7 +285,7 @@ inline ExampleFooResponse::ExampleFooResponse(Storage_ storage) noexcept : stora
 inline ExampleFooResponse::ExampleFooResponse(int64_t y) noexcept
     : storage_({.y = std::move(y)}) {}
 inline ExampleFooResponse::ExampleFooResponse(const ::test_error::ExampleFooResponse& other) noexcept : ::test_error::ExampleFooResponse(other.CloneStorage_()) {}
-inline ExampleFooResponse& ::test_error::ExampleFooResponse::operator=(const ::test_error::ExampleFooResponse & other) noexcept {
+inline ExampleFooResponse& ::test_error::ExampleFooResponse::operator=(const ::test_error::ExampleFooResponse& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -302,7 +302,7 @@ inline ExampleFooResponse& ExampleFooResponse::y(int64_t value) {
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_error::ExampleFooRequest> : public std::true_type{};
+struct IsFidlType<::test_error::ExampleFooRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_error::ExampleFooRequest> {
@@ -314,14 +314,14 @@ struct TypeTraits<::test_error::ExampleFooRequest> {
 };
 
 template <>
-struct IsStruct<::test_error::ExampleFooRequest> : public std::true_type{};
+struct IsStruct<::test_error::ExampleFooRequest> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_error::ExampleFooRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_error::ExampleFooRequest, 16> {};
 
 template <>
-struct IsFidlType<::test_error::ExampleFooResponse> : public std::true_type{};
+struct IsFidlType<::test_error::ExampleFooResponse> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_error::ExampleFooResponse> {
@@ -333,14 +333,14 @@ struct TypeTraits<::test_error::ExampleFooResponse> {
 };
 
 template <>
-struct IsStruct<::test_error::ExampleFooResponse> : public std::true_type{};
+struct IsStruct<::test_error::ExampleFooResponse> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_error::ExampleFooResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_error::ExampleFooResponse, 8> {};
 
 template <>
-struct IsFidlType<::test_error::ExampleFooResult> : public std::true_type{};
+struct IsFidlType<::test_error::ExampleFooResult> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_error::ExampleFooResult> {
@@ -352,7 +352,7 @@ struct TypeTraits<::test_error::ExampleFooResult> {
 };
 
 template <>
-struct IsUnion<::test_error::ExampleFooResult> : public std::true_type{};
+struct IsUnion<::test_error::ExampleFooResult> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_error::ExampleFooResult, ::fidl::internal::NaturalCodingConstraintEmpty> final

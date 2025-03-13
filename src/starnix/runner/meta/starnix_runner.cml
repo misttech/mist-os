@@ -13,8 +13,8 @@
     },
     children: [
         {
-            name: "psi-provider",
-            url: "#meta/psi-provider.cm",
+            name: "psi_provider",
+            url: "#meta/psi_provider.cm",
         },
     ],
     collections: [
@@ -45,6 +45,7 @@
             protocol: "fuchsia.component.Realm",
             from: "framework",
         },
+        { protocol: "fuchsia.scheduler.RoleManager" },
         {
             protocol: [
                 "fuchsia.power.system.ActivityGovernor",
@@ -99,12 +100,14 @@
         },
         {
             protocol: [
+                "fuchsia.hardware.google.nanohub.Device",
                 "fuchsia.hardware.sockettunnel.Device",
                 "fuchsia.net.stack.Stack",
                 "fuchsia.power.battery.BatteryManager",
                 "fuchsia.power.broker.Topology",
                 "fuchsia.power.suspend.Stats",
                 "fuchsia.power.system.ActivityGovernor",
+                "fuchsia.time.external.Adjust",
                 "fuchsia.tracing.provider.Registry",
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",
@@ -130,12 +133,20 @@
             to: [ "#kernels" ],
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-gpu",
             from: "parent",
             to: [ "#kernels" ],
         },
         {
-            directory: "dev-adb",
+            // This service replaces the directory capability above.
+            service: "fuchsia.gpu.magma.Service",
+            from: "parent",
+            to: [ "#kernels" ],
+        },
+        {
+            service: "fuchsia.hardware.adb.Service",
             from: "parent",
             to: [ "#kernels" ],
         },
@@ -147,12 +158,12 @@
         {
             protocol: [ "fuchsia.kernel.StallResource" ],
             from: "parent",
-            to: "#psi-provider",
+            to: "#psi_provider",
             availability: "optional",
         },
         {
             protocol: [ "fuchsia.starnix.psi.PsiProvider" ],
-            from: "#psi-provider",
+            from: "#psi_provider",
             to: "#kernels",
         },
     ],

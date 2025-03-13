@@ -11,6 +11,7 @@ group("tests") {
     "compat-runtime:tests",
     "compat-runtime-v1:tests",
     "ddk-init-test:tests",
+    "devfs-export-service:tests",
     "devfs_exporter:tests",
     "driver-runner-integration:tests",
     "dynamic_offers:tests",
@@ -21,6 +22,7 @@ group("tests") {
     "node_group:tests",
     "rebind:tests",
     "reload-driver:tests",
+    "reload-driver-nested-composite:tests",
     "replace-driver:tests",
     "replace-failed-driver:tests",
     "restart-on-crash:tests",
@@ -39,6 +41,7 @@ group("drivers") {
     "compat-runtime:drivers",
     "compat-runtime-v1:drivers",
     "ddk-init-test:drivers",
+    "devfs-export-service:root",
     "devfs_exporter:root",
     "dynamic_offers:leaf",
     "dynamic_offers:root",
@@ -51,6 +54,7 @@ group("drivers") {
     "node_group:root",
     "rebind:drivers",
     "reload-driver:drivers",
+    "reload-driver-nested-composite:drivers",
     "replace-driver:drivers",
     "replace-failed-driver:drivers",
     "restart-on-crash:drivers",
@@ -59,5 +63,6 @@ group("drivers") {
     "runtime-protocol:leaf",
     "runtime-protocol:root",
     "services:root",
+    "services:v1_driver_component",
   ]
 }

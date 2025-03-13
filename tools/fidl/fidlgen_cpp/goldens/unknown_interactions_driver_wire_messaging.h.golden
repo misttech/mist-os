@@ -39,66 +39,10 @@
   class UnknownInteractionsClosedDriverProtocol;
     
 
-}  // namespace test_unknowninteractions
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictOneWay> final { static constexpr uint64_t value = 6982839851953080288lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleOneWay> final { static constexpr uint64_t value = 1083620022582160398lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWay> final { static constexpr uint64_t value = 1481114722667499972lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayFields> final { static constexpr uint64_t value = 6841797014773573215lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayUnion> final { static constexpr uint64_t value = 1451514501977162287lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayTable> final { static constexpr uint64_t value = 3330693085881435529lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayErr> final { static constexpr uint64_t value = 8222960355260037542lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayFieldsErr> final { static constexpr uint64_t value = 225387363174180470lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayUnionErr> final { static constexpr uint64_t value = 3066880266580913088lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayTableErr> final { static constexpr uint64_t value = 708169949929096689lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWay> final { static constexpr uint64_t value = 2929398860738426482lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFields> final { static constexpr uint64_t value = 8423663794424433896lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnion> final { static constexpr uint64_t value = 8216450897182897849lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTable> final { static constexpr uint64_t value = 1049265954148894210lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayErr> final { static constexpr uint64_t value = 5583489590753947170lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFieldsErr> final { static constexpr uint64_t value = 6033174601748665003lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnionErr> final { static constexpr uint64_t value = 6235121653537390575lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTableErr> final { static constexpr uint64_t value = 940887795361350656lu; };
-
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_unknowninteractions
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictOneWay> {
@@ -107,7 +51,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
       using Completer = fidl::Completer<>;
 };
 
-
+namespace test_unknowninteractions {
 
 #endif  // __Fuchsia__
 
@@ -115,7 +59,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_unknowninteractions
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleOneWay> {
@@ -124,7 +68,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
       using Completer = fidl::Completer<>;
 };
 
-
+namespace test_unknowninteractions {
 
 #endif  // __Fuchsia__
 
@@ -132,7 +76,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_unknowninteractions
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWay> {
@@ -154,7 +98,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace test_unknowninteractions {
 
 #endif  // __Fuchsia__
 
@@ -162,7 +106,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_unknowninteractions
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayFields> {
@@ -185,7 +129,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace test_unknowninteractions {
 
 #endif  // __Fuchsia__
 
@@ -193,7 +137,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_unknowninteractions
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayUnion> {
@@ -216,7 +160,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace test_unknowninteractions {
 
 #endif  // __Fuchsia__
 
@@ -224,7 +168,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_unknowninteractions
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayTable> {
@@ -247,7 +191,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace test_unknowninteractions {
 
 #endif  // __Fuchsia__
 
@@ -255,7 +199,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_unknowninteractions
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayErr> {
@@ -279,7 +223,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace test_unknowninteractions {
 
 #endif  // __Fuchsia__
 
@@ -287,7 +231,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_unknowninteractions
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayFieldsErr> {
@@ -311,7 +255,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace test_unknowninteractions {
 
 #endif  // __Fuchsia__
 
@@ -319,7 +263,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_unknowninteractions
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayUnionErr> {
@@ -343,7 +287,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace test_unknowninteractions {
 
 #endif  // __Fuchsia__
 
@@ -351,7 +295,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_unknowninteractions
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayTableErr> {
@@ -375,7 +319,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace test_unknowninteractions {
 
 #endif  // __Fuchsia__
 
@@ -383,7 +327,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_unknowninteractions
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWay> {
@@ -406,7 +350,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace test_unknowninteractions {
 
 #endif  // __Fuchsia__
 
@@ -414,7 +358,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_unknowninteractions
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFields> {
@@ -437,7 +381,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace test_unknowninteractions {
 
 #endif  // __Fuchsia__
 
@@ -445,7 +389,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_unknowninteractions
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnion> {
@@ -468,7 +412,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace test_unknowninteractions {
 
 #endif  // __Fuchsia__
 
@@ -476,7 +420,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_unknowninteractions
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTable> {
@@ -499,7 +443,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace test_unknowninteractions {
 
 #endif  // __Fuchsia__
 
@@ -507,7 +451,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_unknowninteractions
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayErr> {
@@ -531,7 +475,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace test_unknowninteractions {
 
 #endif  // __Fuchsia__
 
@@ -539,7 +483,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_unknowninteractions
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFieldsErr> {
@@ -563,7 +507,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace test_unknowninteractions {
 
 #endif  // __Fuchsia__
 
@@ -571,7 +515,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_unknowninteractions
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnionErr> {
@@ -595,7 +539,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace test_unknowninteractions {
 
 #endif  // __Fuchsia__
 
@@ -603,7 +547,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace test_unknowninteractions
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTableErr> {
@@ -627,25 +571,15 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
-
-#endif  // __Fuchsia__
-
-
 namespace test_unknowninteractions {
 
-}  // namespace test_unknowninteractions
-
-#ifdef __Fuchsia__
-
-template<>
-struct ::fidl::internal::ProtocolDetails<::test_unknowninteractions::UnknownInteractionsDriverProtocol> {
-};
-
 #endif  // __Fuchsia__
 
-#ifdef __Fuchsia__
 
+
+
+#ifdef __Fuchsia__
+}  // namespace test_unknowninteractions
 
 template<>
 struct ::fidl::internal::WireServerDispatcher<::test_unknowninteractions::UnknownInteractionsDriverProtocol> final {
@@ -661,10 +595,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_unknowninteractions::Unknow
   static const ::fidl::internal::MethodEntry entries_[];
   static const ::fidl::internal::MethodEntry* entries_end_;
   static const ::fidl::internal::UnknownMethodHandlerEntry unknown_method_handler_entry_;
-};
+};namespace test_unknowninteractions {
 
 #endif  // __Fuchsia__
-
+}  // namespace test_unknowninteractions
 
 #ifdef __Fuchsia__
 template<>
@@ -4886,42 +4820,10 @@ class ::fdf::WireServer<::test_unknowninteractions::UnknownInteractionsDriverPro
 
     
 
-}  // namespace fidl
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictOneWay> final { static constexpr uint64_t value = 200845620698173917lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::FlexibleOneWay> final { static constexpr uint64_t value = 3790953144423004126lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWay> final { static constexpr uint64_t value = 523076268125513549lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayFields> final { static constexpr uint64_t value = 902155904889801604lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayUnion> final { static constexpr uint64_t value = 8952307689721713673lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayTable> final { static constexpr uint64_t value = 3114064683372134045lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayErr> final { static constexpr uint64_t value = 7057260423103547829lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayFieldsErr> final { static constexpr uint64_t value = 6490530264582540031lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayUnionErr> final { static constexpr uint64_t value = 2319476129312263555lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayTableErr> final { static constexpr uint64_t value = 6883106306697493305lu; };
-
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictOneWay> {
@@ -4930,7 +4832,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
       using Completer = fidl::Completer<>;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -4938,7 +4840,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::FlexibleOneWay> {
@@ -4947,7 +4849,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
       using Completer = fidl::Completer<>;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -4955,7 +4857,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWay> {
@@ -4977,7 +4879,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -4985,7 +4887,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayFields> {
@@ -5008,7 +4910,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -5016,7 +4918,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayUnion> {
@@ -5039,7 +4941,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -5047,7 +4949,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayTable> {
@@ -5070,7 +4972,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -5078,7 +4980,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayErr> {
@@ -5102,7 +5004,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -5110,7 +5012,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayFieldsErr> {
@@ -5134,7 +5036,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -5142,7 +5044,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayUnionErr> {
@@ -5166,7 +5068,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -5174,7 +5076,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayTableErr> {
@@ -5198,25 +5100,16 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
 
+}  // namespace fidl
 namespace test_unknowninteractions {
 
+#ifdef __Fuchsia__
 }  // namespace test_unknowninteractions
-
-#ifdef __Fuchsia__
-
-template<>
-struct ::fidl::internal::ProtocolDetails<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol> {
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 
 template<>
 struct ::fidl::internal::WireServerDispatcher<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol> final {
@@ -5232,10 +5125,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_unknowninteractions::Unknow
   static const ::fidl::internal::MethodEntry entries_[];
   static const ::fidl::internal::MethodEntry* entries_end_;
   static const ::fidl::internal::UnknownMethodHandlerEntry unknown_method_handler_entry_;
-};
+};namespace test_unknowninteractions {
 
 #endif  // __Fuchsia__
-
+}  // namespace test_unknowninteractions
 
 #ifdef __Fuchsia__
 template<>
@@ -7452,39 +7345,10 @@ class ::fdf::WireServer<::test_unknowninteractions::UnknownInteractionsAjarDrive
 
     
 
-}  // namespace fidl
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictOneWay> final { static constexpr uint64_t value = 9111839835597799810lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWay> final { static constexpr uint64_t value = 2815690661228737027lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayFields> final { static constexpr uint64_t value = 5761316743698652038lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayUnion> final { static constexpr uint64_t value = 7235351480214368636lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayTable> final { static constexpr uint64_t value = 1839495150551777151lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayErr> final { static constexpr uint64_t value = 4350840352076287137lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayFieldsErr> final { static constexpr uint64_t value = 3933117456632607830lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayUnionErr> final { static constexpr uint64_t value = 4598950031783776653lu; };
-
-template<>
-struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayTableErr> final { static constexpr uint64_t value = 1456858375973362525lu; };
-
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictOneWay> {
@@ -7493,7 +7357,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
       using Completer = fidl::Completer<>;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -7501,7 +7365,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWay> {
@@ -7523,7 +7387,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -7531,7 +7395,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayFields> {
@@ -7554,7 +7418,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -7562,7 +7426,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayUnion> {
@@ -7585,7 +7449,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -7593,7 +7457,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayTable> {
@@ -7616,7 +7480,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -7624,7 +7488,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayErr> {
@@ -7648,7 +7512,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -7656,7 +7520,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayFieldsErr> {
@@ -7680,7 +7544,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -7688,7 +7552,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayUnionErr> {
@@ -7712,7 +7576,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
@@ -7720,7 +7584,7 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
 #ifdef __Fuchsia__
 
 
-
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayTableErr> {
@@ -7744,25 +7608,16 @@ struct ::fidl::internal::WireMethodTypes<::test_unknowninteractions::UnknownInte
   >;
 };
 
-
+namespace fidl {
 
 #endif  // __Fuchsia__
 
 
+}  // namespace fidl
 namespace test_unknowninteractions {
 
+#ifdef __Fuchsia__
 }  // namespace test_unknowninteractions
-
-#ifdef __Fuchsia__
-
-template<>
-struct ::fidl::internal::ProtocolDetails<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol> {
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 
 template<>
 struct ::fidl::internal::WireServerDispatcher<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol> final {
@@ -7779,10 +7634,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_unknowninteractions::Unknow
   static const ::fidl::internal::MethodEntry* entries_end_;
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
-};
+};namespace test_unknowninteractions {
 
 #endif  // __Fuchsia__
-
+}  // namespace test_unknowninteractions
 
 #ifdef __Fuchsia__
 template<>

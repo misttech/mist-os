@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use heck::SnakeCase;
+use heck::ToSnakeCase;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 

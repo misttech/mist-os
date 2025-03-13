@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use addr::TargetAddr;
-use anyhow::{anyhow, bail, Result};
+use anyhow::{bail, Result};
 use manual_targets::watcher::{ManualTargetEvent, ManualTargetState};
 use std::fmt;
 use std::fmt::Display;
@@ -151,24 +151,36 @@ impl TryFrom<ffx::TargetInfo> for TargetHandle {
     type Error = anyhow::Error;
 
     fn try_from(info: ffx::TargetInfo) -> Result<Self, Self::Error> {
-        let addresses = info.addresses.ok_or_else(|| anyhow!("Addresses are populated"))?;
+        let addresses = info.addresses.unwrap_or_default();
         // Get the TargetAddrs
         let mut addrs: Vec<_> = addresses.into_iter().map(TargetAddr::from).collect();
         // Sorting them this way put ipv6 above ipv4
         addrs.sort_by(|a, b| b.cmp(a));
 
-        if addrs.is_empty() {
-            bail!("There must be at least one target address")
+        fn assert_non_empty_addrs(addrs: &Vec<TargetAddr>) -> Result<(), anyhow::Error> {
+            if addrs.is_empty() {
+                bail!("There must be at least one target address")
+            }
+            Ok(())
         }
 
         let state = match info.fastboot_interface {
-            None => TargetState::Product(addrs),
+            None => {
+                assert_non_empty_addrs(&addrs)?;
+                TargetState::Product(addrs)
+            }
             Some(iface) => {
                 let serial_number = info.serial_number.unwrap_or_else(|| "".to_string());
                 let connection_state = match iface {
                     ffx::FastbootInterface::Usb => FastbootConnectionState::Usb,
-                    ffx::FastbootInterface::Udp => FastbootConnectionState::Udp(addrs),
-                    ffx::FastbootInterface::Tcp => FastbootConnectionState::Tcp(addrs),
+                    ffx::FastbootInterface::Udp => {
+                        assert_non_empty_addrs(&addrs)?;
+                        FastbootConnectionState::Udp(addrs)
+                    }
+                    ffx::FastbootInterface::Tcp => {
+                        assert_non_empty_addrs(&addrs)?;
+                        FastbootConnectionState::Tcp(addrs)
+                    }
                 };
                 TargetState::Fastboot(FastbootTargetState { serial_number, connection_state })
             }

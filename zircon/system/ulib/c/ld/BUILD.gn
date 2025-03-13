@@ -5,29 +5,34 @@
 import("//src/zircon/lib/zircon/libzircon.gni")
 import("//zircon/system/ulib/c/libc.gni")
 
-# This is linked into the legacy libc.so to satisfy references from the old
-# musl integrated dynamic linker code.
-group("musl-glue") {
-  deps = [
-    ":musl-glue.basic",
-    "//zircon/third_party/ulib/musl/src/thread:tls_get_addr",
-  ]
+# This will be linked into the new libc.so to integrate with //sdk/lib/ld.  It
+# will never be used by the legacy libc.so, so this directory is not in the
+# $components list in ../BUILD.gn; it has no unittests target.
+libc_source_set("ld") {
+  sources = []
 }
 
-# These things are called too early in startup to use the compiler ABI.
-libc_source_set("musl-glue.basic") {
+# This is linked into the legacy libc.so to satisfy references from the old
+# musl integrated dynamic linker code.
+libc_source_set("musl-glue") {
+  # These things are called too early in startup to use the compiler ABI.
+  # (Except __sanitizer_log_write, but see comments above.)
   basic_abi = true
 
   # These symbols are what the legacy libc.so gets from this libc_source_set().
   global_symbols = [
+    "__sanitizer_log_write",
     "_dl_log_write",
     "_dl_log_write_init",
     "_dl_log_write_init_fallback",
+    "_dl_log_write_preinit",
     "_dl_phdr_report_globals",
   ]
 
+  undefined_symbols = [ "_dl_log_unlogged" ]
+
   # All the vDSO's symbols are safe since it uses only the basic ABI anyway.
-  undefined_symbols = libzircon_linkage_names
+  undefined_symbols += libzircon_linkage_names
 
   # _dl_log_write's global state has destructor registration, though it takes
   # care to be constinit so it's guaranteed safe to use before constructors.
@@ -37,12 +42,15 @@ libc_source_set("musl-glue.basic") {
     "__dso_handle",
   ]
 
-  # TODO(https://fxbug.dev/374753100): Remove this after soft transition.
-  defines = [ "_LIBCPP_VERBOSE_ABORT_NOT_NOEXCEPT" ]
-
   sources = [
     "_dl_log_write.cc",
     "_dl_phdr_report_globals.cc",
+
+    # This is not really part of the glue with ld per se, but in the legacy
+    # musl implementation it is intertwined with the ld glue code.  In the new
+    # implementation the function is defined in the ":log" target above and it
+    # directly uses the passive ABI.
+    "__sanitizer_log_write.cc",
   ]
   deps = [
     "../stdlib:hermetic",

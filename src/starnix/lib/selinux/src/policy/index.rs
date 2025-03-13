@@ -457,13 +457,13 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         // Return first match. The `checkpolicy` tool will not compile a policy that has
         // multiple matches, so behavior on multiple matches is undefined.
         self.parsed_policy
-            .access_vectors()
+            .access_vector_rules()
             .iter()
-            .find(|access_vector| {
-                access_vector.is_type_transition()
-                    && access_vector.source_type() == source_type
-                    && access_vector.target_type() == target_type
-                    && access_vector.target_class() == class.id()
+            .find(|access_vector_rule| {
+                access_vector_rule.is_type_transition()
+                    && access_vector_rule.source_type() == source_type
+                    && access_vector_rule.target_type() == target_type
+                    && access_vector_rule.target_class() == class.id()
             })
             .map(|x| x.new_type().unwrap())
     }
@@ -475,16 +475,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         class: &Class<PS>,
         name: NullessByteStr<'_>,
     ) -> Option<TypeId> {
-        let entry = self.parsed_policy.filename_transitions().iter().find(|transition| {
-            transition.target_type() == target_type
-                && transition.target_class() == class.id()
-                && transition.name_bytes() == name.as_bytes()
-        })?;
-        entry
-            .outputs()
-            .iter()
-            .find(|entry| entry.has_source_type(source_type))
-            .map(|x| x.out_type())
+        self.parsed_policy.compute_filename_transition(source_type, target_type, class.id(), name)
     }
 
     fn range_transition_new_range(

@@ -14,7 +14,7 @@ use net_types::{SpecifiedAddr, Witness as _};
 use netstack3_base::sync::{PrimaryRc, RwLock};
 use netstack3_base::{
     AnyDevice, ContextPair, DeferredResourceRemovalContext, DeviceIdContext, Inspector,
-    InspectorDeviceExt, ReferenceNotifiersExt as _, RemoveResourceResultWithContext,
+    InspectorDeviceExt, MarkDomain, ReferenceNotifiersExt as _, RemoveResourceResultWithContext,
     StrongDeviceIdentifier, WrapBroadcastMarker,
 };
 
@@ -31,6 +31,13 @@ use crate::internal::types::{
     Destination, Entry, EntryAndGeneration, Metric, NextHop, OrderedEntry, ResolvedRoute,
     RoutableIpAddr,
 };
+
+/// The options for [`RoutesApi::resolve_route`] api.
+#[derive(Debug, Clone, Default)]
+pub struct RouteResolveOptions {
+    /// The marks for the resolution.
+    pub marks: Marks,
+}
 
 /// The routes API for a specific IP version `I`.
 pub struct RoutesApi<I: Ip, C>(C, IpVersionMarker<I>);
@@ -150,17 +157,12 @@ where
     pub fn resolve_route(
         &mut self,
         destination: Option<RoutableIpAddr<I::Addr>>,
+        RouteResolveOptions { marks }: &RouteResolveOptions,
     ) -> Result<
         ResolvedRoute<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
         ResolveRouteError,
     > {
-        base::resolve_output_route_to_destination(
-            self.core_ctx(),
-            None,
-            None,
-            destination,
-            &Marks::default(),
-        )
+        base::resolve_output_route_to_destination(self.core_ctx(), None, None, destination, marks)
     }
 
     /// Selects the device to use for gateway routes when the device was
@@ -222,12 +224,16 @@ where
                             for (domain, matcher) in
                                 mark_matchers.iter().filter_map(|(d, m)| m.map(|m| (d, m)))
                             {
+                                let domain_str = match domain {
+                                    MarkDomain::Mark1 => "Mark1",
+                                    MarkDomain::Mark2 => "Mark2",
+                                };
                                 match matcher {
                                     MarkMatcher::Unmarked => {
-                                        inspector.record_str(domain.to_str(), "Unmarked")
+                                        inspector.record_str(domain_str, "Unmarked")
                                     }
                                     MarkMatcher::Marked { start, end, mask } => inspector
-                                        .record_debug_child(domain, |inspector| {
+                                        .record_child(domain_str, |inspector| {
                                             inspector.record_str("Mask", &format!("{mask:#010x}"));
                                             inspector.record_str(
                                                 "Range",

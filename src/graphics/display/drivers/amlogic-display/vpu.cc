@@ -106,7 +106,7 @@ zx::result<std::unique_ptr<Vpu>> Vpu::Create(
   auto vpu = fbl::make_unique_checked<Vpu>(&alloc_checker, std::move(vpu_mmio), std::move(hhi_mmio),
                                            std::move(aobus_mmio), std::move(reset_mmio));
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for Vpu");
+    fdf::error("Failed to allocate memory for Vpu");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -415,7 +415,7 @@ void Vpu::AfbcPower(bool power_on) {
 zx_status_t Vpu::CaptureInit(uint8_t canvas_idx, uint32_t height, uint32_t stride) {
   fbl::AutoLock lock(&capture_mutex_);
   if (capture_state_ == CAPTURE_ACTIVE) {
-    FDF_LOG(ERROR, "Capture in progress");
+    fdf::error("Capture in progress");
     return ZX_ERR_UNAVAILABLE;
   }
 
@@ -437,7 +437,11 @@ zx_status_t Vpu::CaptureInit(uint8_t canvas_idx, uint32_t height, uint32_t strid
       .set_hold_lines(0)
       .set_input_source_selection(VideoInputCommandControl::InputSource::kWritebackMux0)
       .WriteTo(&vpu_mmio_);
-  VdinLFifoCtrlReg::Get().FromValue(0).set_fifo_buf_size(0x780).WriteTo(&vpu_mmio_);
+
+  VideoInputLinearFifoControl::Get(kVideoInputModuleId)
+      .FromValue(0)
+      .set_linear_fifo_buffer_size_pixels(1920)
+      .WriteTo(&vpu_mmio_);
 
   // Setup input channel FIFO.
   VideoInputChannelFifoControl3::Get(kVideoInputModuleId)
@@ -505,28 +509,36 @@ zx_status_t Vpu::CaptureInit(uint8_t canvas_idx, uint32_t height, uint32_t strid
       .set_preoffset2(capture_yuv2rgb_preoffset[2])
       .WriteTo(&vpu_mmio_);
 
-  // setup vdin input dimensions
-  VdinIntfWidthM1Reg::Get().FromValue(stride - 1).WriteTo(&vpu_mmio_);
-
-  // Configure memory size
-  VdInWrHStartEndReg::Get()
+  // Setup the input dimensions for video input module (VDIN1)'s memory
+  // interface.
+  ZX_DEBUG_ASSERT(stride > 0);
+  VideoInputInterfaceWidth::Get(kVideoInputModuleId)
       .ReadFrom(&vpu_mmio_)
-      .set_start(0)
-      .set_end(stride - 1)
-      .WriteTo(&vpu_mmio_);
-  VdInWrVStartEndReg::Get()
-      .ReadFrom(&vpu_mmio_)
-      .set_start(0)
-      .set_end(height - 1)
+      .set_width_px(stride)
       .WriteTo(&vpu_mmio_);
 
-  // Write output canvas index, 128 bit endian, eol with width, enable 4:4:4 RGB888 mode
-  VdInWrCtrlReg::Get()
+  // Configure write range on the capture buffer image.
+  VideoInputWriteRangeHorizontal::Get(kVideoInputModuleId)
       .ReadFrom(&vpu_mmio_)
-      .set_eol_sel(1)
-      .set_word_swap(1)
-      .set_memory_format(1)
-      .set_canvas_idx(canvas_idx)
+      .set_endianness_128_bit(VideoInputWriteRangeHorizontal::Endianness::kBig)
+      .SetHorizontalRange(0, stride - 1)
+      .WriteTo(&vpu_mmio_);
+  VideoInputWriteRangeVertical::Get(kVideoInputModuleId)
+      .ReadFrom(&vpu_mmio_)
+      .SetVerticalRange(0, height - 1)
+      .WriteTo(&vpu_mmio_);
+
+  VideoInputWriteControl::Get(kVideoInputModuleId)
+      .ReadFrom(&vpu_mmio_)
+      .set_line_end_indicator_selection(VideoInputWriteControl::LineEndIndicator::kWidth)
+      // The memory interface by default writes pixels in 128-bit big-endian
+      // format. By swapping consecutive 64-bit pairs before writing, it writes
+      // pixels in 64-bit big-endian format. The canvas format must be
+      // configured to match this format.
+      .set_consecutive_64bit_pairs_reordered(true)
+      .set_yuv_sampling_storage_format(
+          VideoInputWriteControl::YuvSamplingStorageFormat::kYuv444Packed)
+      .set_luma_canvas_address(canvas_idx)
       .WriteTo(&vpu_mmio_);
 
   // TODO(fxbug.com/132123): This seems unnecessary. Vpu::PowerOn() already
@@ -543,39 +555,61 @@ zx_status_t Vpu::CaptureInit(uint8_t canvas_idx, uint32_t height, uint32_t strid
 zx_status_t Vpu::CaptureStart() {
   fbl::AutoLock lock(&capture_mutex_);
   if (capture_state_ != CAPTURE_IDLE) {
-    FDF_LOG(ERROR, "Capture state is not idle! (%d)", capture_state_);
+    fdf::error("Capture state is not idle! ({})", static_cast<int>(capture_state_));
     return ZX_ERR_BAD_STATE;
   }
 
   // Now that loopback mode is configured, start capture
-  // pause write output
-  VdInWrCtrlReg::Get().ReadFrom(&vpu_mmio_).set_write_ctrl(0).WriteTo(&vpu_mmio_);
 
-  // disable vdin path
+  // Pause writing to the memory while the VDIN is being configured.
+  VideoInputWriteControl::Get(kVideoInputModuleId)
+      .ReadFrom(&vpu_mmio_)
+      .set_write_request_unpaused(false)
+      .WriteTo(&vpu_mmio_);
+
+  // Disable input path for VDIN.
   VideoInputCommandControl::Get(kVideoInputModuleId)
       .ReadFrom(&vpu_mmio_)
       .set_video_input_enabled(false)
       .WriteTo(&vpu_mmio_);
 
-  // reset mif
-  VdInMiscCtrlReg::Get().ReadFrom(&vpu_mmio_).set_mif_reset(1).WriteTo(&vpu_mmio_);
+  // Reset the memory interface.
+  VideoInputMiscellaneousControl::Get()
+      .ReadFrom(&vpu_mmio_)
+      .set_video_input_module1_memory_interface_reset(true)
+      .WriteTo(&vpu_mmio_);
   zx_nanosleep(zx_deadline_after(ZX_USEC(10)));
-  VdInMiscCtrlReg::Get().ReadFrom(&vpu_mmio_).set_mif_reset(0).WriteTo(&vpu_mmio_);
+  VideoInputMiscellaneousControl::Get()
+      .ReadFrom(&vpu_mmio_)
+      .set_video_input_module1_memory_interface_reset(false)
+      .WriteTo(&vpu_mmio_);
 
-  // resume write output
-  VdInWrCtrlReg::Get().ReadFrom(&vpu_mmio_).set_write_ctrl(1).WriteTo(&vpu_mmio_);
+  // Resumes writing to the memory.
+  VideoInputWriteControl::Get(kVideoInputModuleId)
+      .ReadFrom(&vpu_mmio_)
+      .set_write_request_unpaused(true)
+      .WriteTo(&vpu_mmio_);
 
   // wait until resets finishes
   zx_nanosleep(zx_deadline_after(ZX_MSEC(20)));
 
   // Clear status bit
-  VdInWrCtrlReg::Get().ReadFrom(&vpu_mmio_).set_done_status_clear_bit(1).WriteTo(&vpu_mmio_);
+  VideoInputWriteControl::Get(kVideoInputModuleId)
+      .ReadFrom(&vpu_mmio_)
+      .set_direct_write_done_cleared(true)
+      .WriteTo(&vpu_mmio_);
 
   // Set as urgent
-  VdInWrCtrlReg::Get().ReadFrom(&vpu_mmio_).set_write_req_urgent(1).WriteTo(&vpu_mmio_);
+  VideoInputWriteControl::Get(kVideoInputModuleId)
+      .ReadFrom(&vpu_mmio_)
+      .set_write_request_urgent(true)
+      .WriteTo(&vpu_mmio_);
 
   // Enable loopback
-  VdInWrCtrlReg::Get().ReadFrom(&vpu_mmio_).set_write_mem_enable(1).WriteTo(&vpu_mmio_);
+  VideoInputWriteControl::Get(kVideoInputModuleId)
+      .ReadFrom(&vpu_mmio_)
+      .set_write_request_enabled(true)
+      .WriteTo(&vpu_mmio_);
 
   // enable vdin path
   VideoInputCommandControl::Get(kVideoInputModuleId)
@@ -591,64 +625,73 @@ zx_status_t Vpu::CaptureDone() {
   fbl::AutoLock lock(&capture_mutex_);
   capture_state_ = CAPTURE_IDLE;
   // pause write output
-  VdInWrCtrlReg::Get().ReadFrom(&vpu_mmio_).set_write_ctrl(0).WriteTo(&vpu_mmio_);
+  VideoInputWriteControl::Get(kVideoInputModuleId)
+      .ReadFrom(&vpu_mmio_)
+      .set_write_request_unpaused(false)
+      .WriteTo(&vpu_mmio_);
 
   // disable vdin path
   VideoInputCommandControl::Get(kVideoInputModuleId)
       .ReadFrom(&vpu_mmio_)
-      .set_video_input_enabled(0)
+      .set_video_input_enabled(false)
       .WriteTo(&vpu_mmio_);
 
-  // reset mif
-  VdInMiscCtrlReg::Get().ReadFrom(&vpu_mmio_).set_mif_reset(1).WriteTo(&vpu_mmio_);
+  // Reset memory interface.
+  VideoInputMiscellaneousControl::Get()
+      .ReadFrom(&vpu_mmio_)
+      .set_video_input_module1_memory_interface_reset(true)
+      .WriteTo(&vpu_mmio_);
   zx_nanosleep(zx_deadline_after(ZX_USEC(10)));
-  VdInMiscCtrlReg::Get().ReadFrom(&vpu_mmio_).set_mif_reset(0).WriteTo(&vpu_mmio_);
+  VideoInputMiscellaneousControl::Get()
+      .ReadFrom(&vpu_mmio_)
+      .set_video_input_module1_memory_interface_reset(false)
+      .WriteTo(&vpu_mmio_);
 
   return ZX_OK;
 }
 
 void Vpu::CapturePrintRegisters() {
-  FDF_LOG(INFO, "** Display Loopback Register Dump **");
-  FDF_LOG(INFO, "VdInComCtrl0Reg = 0x%x",
-          VideoInputCommandControl::Get(kVideoInputModuleId).ReadFrom(&vpu_mmio_).reg_value());
-  FDF_LOG(INFO, "VdInComStatus0Reg = 0x%x",
-          VideoInputCommandStatus0::Get(kVideoInputModuleId).ReadFrom(&vpu_mmio_).reg_value());
-  FDF_LOG(INFO, "VdInMatrixCtrlReg = 0x%x",
-          VdInMatrixCtrlReg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  FDF_LOG(INFO, "VdinCoef00_01Reg = 0x%x",
-          VdinCoef00_01Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  FDF_LOG(INFO, "VdinCoef02_10Reg = 0x%x",
-          VdinCoef02_10Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  FDF_LOG(INFO, "VdinCoef11_12Reg = 0x%x",
-          VdinCoef11_12Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  FDF_LOG(INFO, "VdinCoef20_21Reg = 0x%x",
-          VdinCoef20_21Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  FDF_LOG(INFO, "VdinCoef22Reg = 0x%x", VdinCoef22Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  FDF_LOG(INFO, "VdinOffset0_1Reg = 0x%x",
-          VdinOffset0_1Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  FDF_LOG(INFO, "VdinOffset2Reg = 0x%x", VdinOffset2Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  FDF_LOG(INFO, "VdinPreOffset0_1Reg = 0x%x",
-          VdinPreOffset0_1Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  FDF_LOG(INFO, "VdinPreOffset2Reg = 0x%x",
-          VdinPreOffset2Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  FDF_LOG(INFO, "VdinLFifoCtrlReg = 0x%x",
-          VdinLFifoCtrlReg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  FDF_LOG(INFO, "VdinIntfWidthM1Reg = 0x%x",
-          VdinIntfWidthM1Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  FDF_LOG(INFO, "VdInWrCtrlReg = 0x%x", VdInWrCtrlReg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  FDF_LOG(INFO, "VdInWrHStartEndReg = 0x%x",
-          VdInWrHStartEndReg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  FDF_LOG(INFO, "VdInWrVStartEndReg = 0x%x",
-          VdInWrVStartEndReg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  FDF_LOG(INFO, "VdInAFifoCtrl3Reg = 0x%x",
-          VideoInputChannelFifoControl3::Get(kVideoInputModuleId).ReadFrom(&vpu_mmio_).reg_value());
-  FDF_LOG(INFO, "VdInMiscCtrlReg = 0x%x", VdInMiscCtrlReg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  FDF_LOG(INFO, "VdInIfMuxCtrlReg = 0x%x",
-          WritebackMuxControl::Get().ReadFrom(&vpu_mmio_).reg_value());
+  fdf::info("** Display Loopback Register Dump **");
+  fdf::info("VdInComCtrl0Reg = 0x{:x}",
+            VideoInputCommandControl::Get(kVideoInputModuleId).ReadFrom(&vpu_mmio_).reg_value());
+  fdf::info("VdInComStatus0Reg = 0x{:x}",
+            VideoInputCommandStatus0::Get(kVideoInputModuleId).ReadFrom(&vpu_mmio_).reg_value());
+  fdf::info("VdInMatrixCtrlReg = 0x{:x}",
+            VdInMatrixCtrlReg::Get().ReadFrom(&vpu_mmio_).reg_value());
+  fdf::info("VdinCoef00_01Reg = 0x{:x}", VdinCoef00_01Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
+  fdf::info("VdinCoef02_10Reg = 0x{:x}", VdinCoef02_10Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
+  fdf::info("VdinCoef11_12Reg = 0x{:x}", VdinCoef11_12Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
+  fdf::info("VdinCoef20_21Reg = 0x{:x}", VdinCoef20_21Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
+  fdf::info("VdinCoef22Reg = 0x{:x}", VdinCoef22Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
+  fdf::info("VdinOffset0_1Reg = 0x{:x}", VdinOffset0_1Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
+  fdf::info("VdinOffset2Reg = 0x{:x}", VdinOffset2Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
+  fdf::info("VdinPreOffset0_1Reg = 0x{:x}",
+            VdinPreOffset0_1Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
+  fdf::info("VdinPreOffset2Reg = 0x{:x}",
+            VdinPreOffset2Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
+  fdf::info("VdinLFifoCtrlReg = 0x{:x}\n",
+            VideoInputLinearFifoControl::Get(kVideoInputModuleId).ReadFrom(&vpu_mmio_).reg_value());
+  fdf::info("VdinIntfWidthM1Reg = 0x{:x}\n",
+            VideoInputInterfaceWidth::Get(kVideoInputModuleId).ReadFrom(&vpu_mmio_).reg_value());
+  fdf::info("VdInWrCtrlReg = 0x{:x}\n",
+            VideoInputWriteControl::Get(kVideoInputModuleId).ReadFrom(&vpu_mmio_).reg_value());
+  fdf::info(
+      "VdInWrHStartEndReg = 0x{:x}\n",
+      VideoInputWriteRangeHorizontal::Get(kVideoInputModuleId).ReadFrom(&vpu_mmio_).reg_value());
+  fdf::info(
+      "VdInWrVStartEndReg = 0x{:x}\n",
+      VideoInputWriteRangeVertical::Get(kVideoInputModuleId).ReadFrom(&vpu_mmio_).reg_value());
+  fdf::info(
+      "VdInAFifoCtrl3Reg = 0x{:x}\n",
+      VideoInputChannelFifoControl3::Get(kVideoInputModuleId).ReadFrom(&vpu_mmio_).reg_value());
+  fdf::info("VdInMiscCtrlReg = 0x{:x}\n",
+            VideoInputMiscellaneousControl::Get().ReadFrom(&vpu_mmio_).reg_value());
+  fdf::info("VdInIfMuxCtrlReg = 0x{:x}\n",
+            WritebackMuxControl::Get().ReadFrom(&vpu_mmio_).reg_value());
 
-  FDF_LOG(INFO, "Dumping from 0x1300 to 0x1373");
+  fdf::info("Dumping from 0x1300 to 0x1373");
   for (int i = 0x1300; i <= 0x1373; i++) {
-    FDF_LOG(INFO, "reg[0x%x] = 0x%x", i, vpu_mmio_.Read32(i << 2));
+    fdf::info("reg[0x{:x}] = 0x{:x}", i, vpu_mmio_.Read32(i << 2));
   }
 }
 

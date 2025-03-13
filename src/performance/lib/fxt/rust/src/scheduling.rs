@@ -10,6 +10,7 @@ use crate::thread::{ProcessKoid, ProcessRef, ThreadKoid, ThreadRef};
 use crate::{trace_header, ParseError, ParseResult, Provider, SCHEDULING_RECORD_TYPE};
 use nom::combinator::all_consuming;
 use nom::number::complete::le_u64;
+use nom::Parser;
 use std::num::NonZero;
 
 const LEGACY_CONTEXT_SWITCH_SCHEDULING_TYPE: u8 = 0;
@@ -86,13 +87,13 @@ impl<'a> RawSchedulingRecord<'a> {
         let base_header = SchedulingHeader::parse(buf)?.1;
         match base_header.record_type() {
             LEGACY_CONTEXT_SWITCH_SCHEDULING_TYPE => {
-                map(RawLegacyContextSwitchEvent::parse, Self::LegacyContextSwitch)(buf)
+                map(RawLegacyContextSwitchEvent::parse, Self::LegacyContextSwitch).parse(buf)
             }
             CONTEXT_SWITCH_SCHEDULING_TYPE => {
-                map(RawContextSwitchEvent::parse, Self::ContextSwitch)(buf)
+                map(RawContextSwitchEvent::parse, Self::ContextSwitch).parse(buf)
             }
             THREAD_WAKEUP_SCHEDULING_TYPE => {
-                map(RawThreadWakeupEvent::parse, Self::ThreadWakeup)(buf)
+                map(RawThreadWakeupEvent::parse, Self::ThreadWakeup).parse(buf)
             }
             unknown => {
                 let size_bytes = base_header.size_words() as usize * 8;
@@ -158,7 +159,8 @@ impl<'a> RawContextSwitchEvent<'a> {
         let (payload, ticks) = Ticks::parse(payload)?;
         let (payload, outgoing_thread_id) = le_u64(payload)?;
         let (payload, incoming_thread_id) = le_u64(payload)?;
-        let (empty, args) = all_consuming(|p| RawArg::parse_n(header.num_args(), p))(payload)?;
+        let (empty, args) =
+            all_consuming(|p| RawArg::parse_n(header.num_args(), p)).parse(payload)?;
         assert!(empty.is_empty(), "all_consuming must not return any remaining buffer");
         Ok((
             rem,
@@ -225,7 +227,8 @@ impl<'a> RawThreadWakeupEvent<'a> {
         let (rem, payload) = header.take_payload(buf)?;
         let (payload, ticks) = Ticks::parse(payload)?;
         let (payload, waking_thread_id) = le_u64(payload)?;
-        let (empty, args) = all_consuming(|p| RawArg::parse_n(header.num_args(), p))(payload)?;
+        let (empty, args) =
+            all_consuming(|p| RawArg::parse_n(header.num_args(), p)).parse(payload)?;
         assert!(empty.is_empty(), "all_consuming must not return any remaining buffer");
         Ok((rem, Self { ticks, cpu_id: header.cpu_id(), waking_thread_id, args }))
     }
@@ -300,7 +303,7 @@ impl RawLegacyContextSwitchEvent {
         let (payload, outgoing_thread) = ThreadRef::parse(header.outgoing_thread(), payload)?;
         let (payload, incoming_process) = ProcessRef::parse(header.incoming_thread(), payload)?;
         let (empty, incoming_thread) =
-            all_consuming(|p| ThreadRef::parse(header.incoming_thread(), p))(payload)?;
+            all_consuming(|p| ThreadRef::parse(header.incoming_thread(), p)).parse(payload)?;
         assert!(empty.is_empty(), "all_consuming must not return any remaining buffer");
 
         Ok((

@@ -34,8 +34,8 @@ class PinnedMemoryTokenDispatcher final
     : public SoloDispatcher<PinnedMemoryTokenDispatcher, ZX_DEFAULT_PMT_RIGHTS>,
       public fbl::ContainableBaseClasses<
           fbl::TaggedDoublyLinkedListable<PinnedMemoryTokenDispatcher*, PmtListTag>,
-          fbl::TaggedDoublyLinkedListable<fbl::RefPtr<PinnedMemoryTokenDispatcher>, PmtQuarantineListTag>
-      > {
+          fbl::TaggedDoublyLinkedListable<fbl::RefPtr<PinnedMemoryTokenDispatcher>,
+                                          PmtQuarantineListTag>> {
  public:
   ~PinnedMemoryTokenDispatcher();
 
@@ -46,18 +46,8 @@ class PinnedMemoryTokenDispatcher final
   // the quarantine.
   void Unpin();
 
-  // |mapped_addrs_count| must be either
-  // 1) If |compress_results|, |pinned_vmo_.size()|/|bti_.minimum_contiguity()|, rounded up, in
-  // which case each returned address represents a run of |bti_.minimum_contiguity()| bytes (with
-  // the exception of the last which may be short)
-  // 2) If |contiguous|, 1, in which case the returned address is the start of the
-  // contiguous memory.
-  // 3) Otherwise, |pinned_vmo_.size()|/|PAGE_SIZE|, in which case each returned address
-  // represents a single page.
-  //
-  // Returns ZX_ERR_INVALID_ARGS if |mapped_addrs_count| is not exactly the value described above.
-  zx_status_t EncodeAddrs(bool compress_results, bool contiguous, dev_vaddr_t* mapped_addrs,
-                          size_t mapped_addrs_count);
+  zx_status_t QueryAddress(uint64_t offset, uint64_t size, dev_vaddr_t* mapped_addr,
+                           size_t* mapped_len);
 
   // Returns the number of bytes pinned by the PMT.
   uint64_t size() const { return pinned_vmo_.size(); }
@@ -73,13 +63,11 @@ class PinnedMemoryTokenDispatcher final
 
  private:
   PinnedMemoryTokenDispatcher(fbl::RefPtr<BusTransactionInitiatorDispatcher> bti,
-                              PinnedVmObject pinned_vmo, fbl::Array<dev_vaddr_t> mapped_addrs);
+                              PinnedVmObject pinned_vmo);
   DISALLOW_COPY_ASSIGN_AND_MOVE(PinnedMemoryTokenDispatcher);
 
   zx_status_t MapIntoIommu(uint32_t perms);
   zx_status_t UnmapFromIommuLocked() TA_REQ(get_lock());
-
-  void InvalidateMappedAddrsLocked() TA_REQ(get_lock());
 
   PinnedVmObject pinned_vmo_;
 
@@ -87,7 +75,7 @@ class PinnedMemoryTokenDispatcher final
   bool explicitly_unpinned_ TA_GUARDED(get_lock()) = false;
 
   const fbl::RefPtr<BusTransactionInitiatorDispatcher> bti_;
-  const fbl::Array<dev_vaddr_t> mapped_addrs_ TA_GUARDED(get_lock());
+  uint64_t map_token_ TA_GUARDED(get_lock()) = UINT64_MAX;
 
   // Set to true during Create() once we are fully initialized. Do not call
   // any |bti_| locking methods if this is false, since that indicates we're

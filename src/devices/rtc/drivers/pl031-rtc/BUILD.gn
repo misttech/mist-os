@@ -12,6 +12,7 @@ driver_bind_rules("pl031_rtc_bind") {
 }
 
 fuchsia_cc_driver("pl031-rtc-driver") {
+  legacy = true
   output_name = "pl031-rtc"
   configs += [
     "//build/config:all_source",

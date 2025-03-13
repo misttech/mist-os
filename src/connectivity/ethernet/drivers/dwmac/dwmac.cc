@@ -37,6 +37,10 @@ constexpr uint32_t kEthMacMmio = 0;
 
 constexpr char kPdevFragment[] = "pdev";
 
+// Report an MTU of 1514. That's 1500 for the IP layer, plus 14 for the Ethernet
+// header.
+constexpr uint32_t kReportedMtu = 1514;
+
 }  // namespace
 
 template <typename T, typename U>
@@ -137,7 +141,7 @@ void DWMacDevice::SendPortStatus() {
   if (netdevice_.is_valid()) {
     port_status_t port_status = {
         .flags = online_ ? STATUS_FLAGS_ONLINE : 0,
-        .mtu = 1500,
+        .mtu = kReportedMtu,
     };
     zxlogf(ERROR, "Communicating port status of %d", (int)online_);
     netdevice_.PortStatusChanged(kPortId, &port_status);
@@ -971,7 +975,7 @@ void DWMacDevice::NetworkPortGetStatus(port_status_t* out_status) {
   network::SharedAutoLock lock{&state_lock_};
   *out_status = port_status_t{
       .flags = online_ ? STATUS_FLAGS_ONLINE : 0,
-      .mtu = 1500,
+      .mtu = kReportedMtu,
   };
 }
 

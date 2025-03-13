@@ -28,6 +28,7 @@ type Parameter = struct {
 // TODO(https://fxbug.dev/42158155): Ideally this would just be an alias of
 // `string:MAX_NAME_LENGTH`, but that is not supported in FIDL yet; see
 // https://fuchsia.dev/error/fi-0062 for more information.
+@serializable
 type RoleName = struct {
     role string:MAX_NAME_LENGTH;
 };

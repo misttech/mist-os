@@ -43,6 +43,22 @@
         },
         capability_policy: [
             {
+                source_moniker: "/",
+                source: "framework",
+                source_name: "fuchsia.component.Introspector",
+                capability: "protocol",
+                target_monikers: [
+                    "/core/testing/elf_test_runner",
+                    "/core/testing/fuzz_test_runner",
+                    "/core/testing/go_test_runner",
+                    "/core/testing/gtest_runner",
+                    "/core/testing/gunit_runner",
+                    "/core/testing/rust_test_runner",
+                    "/core/testing/starnix_test_runner",
+                    "/core/testing/zxtest_runner",
+                ],
+            },
+            {
                 source_moniker: "<component_manager>",
                 source: "component",
                 source_name: "fuchsia.kernel.CpuResource",
@@ -62,6 +78,7 @@
                     "/core/sshd-host/shell:**",
                     "/core/testing/vfs-compliance-tests:**",
                     "/core/trace_manager/cpuperf_provider/cpu-trace",
+                    "/core/trace_manager/ktrace_provider",
                 ],
             },
             {

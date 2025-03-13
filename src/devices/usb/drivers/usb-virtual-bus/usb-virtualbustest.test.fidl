@@ -8,3 +8,8 @@ closed protocol BusTest {
         success bool;
     });
 };
+
+// Added to allow service connection to replace devfs
+service Service {
+    device client_end:BusTest;
+};

@@ -46,30 +46,6 @@ class HttpTimeoutError(HttpRequestError, TimeoutError):
     """Exception for errors raised by HTTP requests timing out on host machine."""
 
 
-class Sl4fError(TransportError):
-    """Exception for errors raised by SL4F requests."""
-
-
-class Sl4fTimeoutError(Sl4fError, TimeoutError):
-    """Exception for errors raised by SL4F request timeouts."""
-
-
-class SerialError(TransportError):
-    """Exception for errors raised by host-target communication over serial."""
-
-
-class FfxCommandError(TransportError):
-    """Exception for errors raised by ffx commands running on host machine."""
-
-
-class FuchsiaControllerError(TransportError):
-    """Exception for errors raised by Fuchsia Controller requests."""
-
-
-class FastbootCommandError(HoneydewError):
-    """Exception for errors raised by Fastboot commands."""
-
-
 class HealthCheckError(HoneydewError):
     """Raised when health_check fails."""
 
@@ -78,56 +54,12 @@ class TransportConnectionError(HoneydewError):
     """Raised when transport's check_connection fails."""
 
 
-class Sl4fConnectionError(TransportConnectionError):
-    """Raised when FFX transport's check_connection fails."""
-
-
-class FfxConnectionError(TransportConnectionError):
-    """Raised when FFX transport's check_connection fails."""
-
-
-class FuchsiaControllerConnectionError(TransportConnectionError):
-    """Raised when Fuchsia-Controller transport's check_connection fails."""
-
-
-class FastbootConnectionError(TransportConnectionError):
-    """Raised when Fastboot transport's check_connection fails."""
-
-
-class FfxConfigError(HoneydewError):
-    """Raised by ffx.FfxConfig class."""
-
-
 class HoneydewTimeoutError(HoneydewError):
     """Exception for timeout based raised by Honeydew."""
 
 
-class FfxTimeoutError(HoneydewTimeoutError):
-    """Exception for timeout based errors raised by ffx commands running on host machine."""
-
-
-class HoneydewRtcError(HoneydewError):
-    """Raised by rtc.Rtc class."""
-
-
 class HoneydewDataResourceError(HoneydewError):
     """Raised when Honeydew fails to fetch its data resources."""
-
-
-class HoneydewNetstackError(HoneydewError):
-    """Raised by netstack affordances."""
-
-
-class HoneydewLocationError(HoneydewError):
-    """Raised by location affordance."""
-
-
-class TracingError(HoneydewError):
-    """Raised by tracing affordance."""
-
-
-class TracingStateError(TracingError):
-    """Raised by tracing affordance when in an unexpected state."""
 
 
 class FuchsiaStateError(HoneydewError):
@@ -149,10 +81,6 @@ class NotSupportedError(HoneydewError):
 
 class StarnixError(HoneydewError):
     """Exception to be raised if a starnix operation fails."""
-
-
-class UserInputError(HoneydewError):
-    """Exception to be raised by UserInput"""
 
 
 class InspectError(HoneydewError):

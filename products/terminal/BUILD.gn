@@ -15,7 +15,6 @@ bazel_inputs = [
   "//src/fonts/asset_providers:open-fonts-collection-bazel",
   "//build/images/flash:esp.bazel_input",
   "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
-  "//build/images/zedboot:zedboot.bazel_legacy_aib",
 
   # Cache packages.
   "//src/ui/bin/terminal:terminal.bazel_input",
@@ -146,6 +145,16 @@ if (target_cpu == "arm64") {
     bazel_product_image_target = ":image_with_netstack2.arm64"
     bazel_recovery_image_target = "//products/zedboot:arm64"
     bazel_elf_sizes_target = ":elf_sizes_with_netstack2.arm64"
+    bazel_inputs_from_gn = bazel_inputs
+  }
+
+  bazel_product_bundle("product_bundle_with_netstack2.qemu-arm64") {
+    testonly = true
+    allow_eng_platform_bundle_use = true
+    bazel_product_bundle_target = ":product_bundle_with_netstack2.qemu-arm64"
+    bazel_product_image_target = ":image.qemu-arm64"
+    bazel_recovery_image_target = "//products/zedboot:qemu-arm64"
+    bazel_elf_sizes_target = ":elf_sizes.qemu-arm64"
     bazel_inputs_from_gn = bazel_inputs
   }
 

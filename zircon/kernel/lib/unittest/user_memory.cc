@@ -16,21 +16,20 @@ UserMemory::~UserMemory() {
 }
 
 // static
-ktl::unique_ptr<UserMemory> UserMemory::CreateInAspace(fbl::RefPtr<VmObject> vmo,
-                                                       fbl::RefPtr<VmAspace>& aspace, uint8_t tag,
-                                                       uint8_t align_pow2) {
+ktl::unique_ptr<UserMemory> UserMemory::CreateInVmar(fbl::RefPtr<VmObject> vmo,
+                                                     fbl::RefPtr<VmAddressRegion>& vmar,
+                                                     uint8_t tag, uint8_t align_pow2) {
   size_t size = vmo->size();
 
-  DEBUG_ASSERT(aspace);
-  DEBUG_ASSERT(aspace->is_user());
-  fbl::RefPtr<VmAddressRegion> root_vmar = aspace->RootVmar();
-  DEBUG_ASSERT(root_vmar);
+  DEBUG_ASSERT(vmar);
+  DEBUG_ASSERT(vmar->aspace()->is_user());
+
   constexpr uint32_t vmar_flags =
       VMAR_FLAG_CAN_MAP_READ | VMAR_FLAG_CAN_MAP_WRITE | VMAR_FLAG_CAN_MAP_EXECUTE;
   constexpr uint arch_mmu_flags =
       ARCH_MMU_FLAG_PERM_USER | ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE;
-  auto mapping_result = root_vmar->CreateVmMapping(/* offset= */ 0, size, align_pow2, vmar_flags,
-                                                   vmo, 0, arch_mmu_flags, "unittest");
+  auto mapping_result = vmar->CreateVmMapping(/* offset= */ 0, size, align_pow2, vmar_flags, vmo, 0,
+                                              arch_mmu_flags, "unittest");
   if (mapping_result.is_error()) {
     unittest_printf("CreateVmMapping failed: %d\n", mapping_result.status_value());
     return nullptr;
@@ -52,6 +51,16 @@ ktl::unique_ptr<UserMemory> UserMemory::CreateInAspace(fbl::RefPtr<VmObject> vmo
   unmap.cancel();
 
   return mem;
+}
+
+// static
+ktl::unique_ptr<UserMemory> UserMemory::CreateInAspace(fbl::RefPtr<VmObject> vmo,
+                                                       fbl::RefPtr<VmAspace>& aspace, uint8_t tag,
+                                                       uint8_t align_pow2) {
+  DEBUG_ASSERT(aspace);
+  fbl::RefPtr<VmAddressRegion> root_vmar = aspace->RootVmar();
+  DEBUG_ASSERT(root_vmar);
+  return CreateInVmar(vmo, root_vmar, tag, align_pow2);
 }
 
 // static

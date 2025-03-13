@@ -13,13 +13,6 @@ if (is_host) {
   golden_files("fidlgen_cpp_golden_tests") {
     testonly = true
 
-    formatter = {
-      script = "$root_out_dir/clang-format-wrapper"
-      inputs = [ "${clang_prefix}/clang-format" ]
-      args = [ rebase_path(inputs[0], root_build_dir) ]
-      deps = [ "//tools/fidl/clang-format-wrapper" ]
-    }
-
     deps = []
     comparisons = []
     foreach(info, fidl_testdata_info) {
@@ -40,6 +33,10 @@ if (is_host) {
           {
             golden = "goldens/${info.name}_markers.h.golden"
             candidate = "$_gen_dir/$_include_path/markers.h"
+          },
+          {
+            golden = "goldens/${info.name}_common_types_format.h.golden"
+            candidate = "$_gen_dir/$_include_path/common_types_format.h"
           },
           {
             golden = "goldens/${info.name}_common_types.h.golden"
@@ -200,7 +197,7 @@ if (is_host) {
   go_binary("fidlgen_cpp") {
     sources = [ "main.go" ]
     deps = [
-      "codegen",
+      "//tools/fidl/fidlgen_cpp/codegen",
       "//tools/fidl/lib/fidlgen_cpp",
     ]
   }

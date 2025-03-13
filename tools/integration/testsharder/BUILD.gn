@@ -45,7 +45,8 @@ go_library("testsharder_lib") {
 
   deps = [
     ":proto_lib",
-    "//third_party/golibs:golang.org/x/exp",
+    "//third_party/golibs:golang.org/x/exp/maps",
+    "//third_party/golibs:golang.org/x/exp/slices",
     "//tools/build",
     "//tools/integration/fint:proto_lib",
     "//tools/lib/color",
@@ -63,7 +64,7 @@ go_library("main") {
   ]
   deps = [
     ":testsharder_lib",
-    "//third_party/golibs:golang.org/x/exp",
+    "//third_party/golibs:golang.org/x/exp/slices",
     "//tools/lib/flagmisc",
   ]
 }

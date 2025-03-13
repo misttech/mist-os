@@ -222,6 +222,7 @@ where
                 moniker: aggregation_component.moniker().clone(),
                 sources: sources.clone(),
                 members,
+                instances: vec![],
             }))
         }
         OfferResult::OfferFromFilteredAggregate(offers, aggregation_component) => {
@@ -338,6 +339,7 @@ where
                 moniker: aggregation_component.moniker().clone(),
                 sources: sources.clone(),
                 members,
+                instances: vec![],
             }))
         }
     }
@@ -716,6 +718,7 @@ impl Use {
                     moniker: target.moniker().clone(),
                     sources: sources.clone(),
                     members: vec![AggregateMember::Collection(name.clone())],
+                    instances: vec![],
                 }),
             )),
             UseSource::Debug => {
@@ -762,6 +765,7 @@ impl Use {
 /// The environment `Registration` phase of routing.
 pub struct Registration<R>(PhantomData<R>);
 
+#[allow(clippy::large_enum_variant)] // TODO(https://fxbug.dev/401087293)
 /// The result of routing a Registration declaration to the next phase.
 enum RegistrationResult<C: ComponentInstanceInterface + 'static, O: Clone + fmt::Debug> {
     /// The source of the Registration was found (Framework, AboveRoot, etc.).
@@ -1184,6 +1188,7 @@ where
 #[derive(Debug)]
 pub struct Expose();
 
+#[allow(clippy::large_enum_variant)] // TODO(https://fxbug.dev/401087293)
 /// The result of routing an Expose declaration to the next phase.
 enum ExposeResult<C: ComponentInstanceInterface + 'static> {
     /// The source of the Expose was found (Framework, Component, etc.).
@@ -1349,6 +1354,7 @@ impl<'a, T> Iterator for RouteBundleIter<'a, T> {
 
 impl<'a, T> ExactSizeIterator for RouteBundleIter<'a, T> {}
 
+#[allow(clippy::large_enum_variant)] // TODO(https://fxbug.dev/401087293)
 enum ExposeSegment<C: ComponentInstanceInterface + 'static> {
     Done(ExposeResult<C>),
     Next(RouteBundle<ExposeDecl>, Arc<C>),

@@ -213,7 +213,7 @@ async fn run_blackhole_interface(
                 dad_transmits: Some(None),
                 max_router_solicitations: Some(None),
                 slaac_config: SlaacConfigurationUpdate {
-                    enable_stable_addresses: Some(true),
+                    stable_address_configuration: None,
                     temporary_address_configuration: None,
                 },
                 ip_config,
@@ -267,7 +267,7 @@ async fn run_device_control(
                 Err(e) => Err(e)
             },
             ready_task = tasks.next() => {
-                let () = ready_task.unwrap_or_else(|| ());
+                let () = ready_task.unwrap_or(());
                 continue;
             }
         };
@@ -1094,7 +1094,7 @@ fn set_configuration(
                     dad_transmits: dad_transmits.map(|v| NonZeroU16::new(v)),
                     slaac_config: SlaacConfigurationUpdate {
                         temporary_address_configuration,
-                        enable_stable_addresses: None,
+                        stable_address_configuration: None,
                     },
                     max_router_solicitations: None,
                     mld_mode,
@@ -1791,7 +1791,9 @@ async fn address_state_provider_main_loop(
                                     AddressStateProviderCancellationReason::InvalidProperties,
                                 );
                             }
-                            AddressStateProviderError::Fidl(_) => todo!(),
+                            AddressStateProviderError::Fidl(_) => {
+                                break None;
+                            }
                         }
                     }
                 },

@@ -7,6 +7,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/component/incoming/cpp/service_member_watcher.h>
 #include <lib/usb-peripheral-utils/event-watcher.h>
 
 #include <filesystem>
@@ -14,8 +15,6 @@
 #include <usb/cdc.h>
 #include <usb/peripheral.h>
 #include <usb/usb.h>
-
-constexpr char kDevUsbPeripheralDir[] = "/dev/class/usb-peripheral";
 
 #define MANUFACTURER_STRING "Zircon"
 #define CDC_PRODUCT_STRING "CDC Ethernet"
@@ -265,18 +264,12 @@ int main(int argc, const char** argv) {
     return -1;
   }
 
-  std::optional<std::string> path;
-  for (const auto& dir_entry : std::filesystem::directory_iterator(kDevUsbPeripheralDir)) {
-    path = dir_entry.path().string();
-    break;
-  }
-  if (!path.has_value()) {
-    fprintf(stderr, "could not find a device in %s\n", kDevUsbPeripheralDir);
-    return -1;
-  }
-  zx::result client_end = component::Connect<peripheral::Device>(path.value());
+  component::SyncServiceMemberWatcher<fuchsia_hardware_usb_peripheral::Service::Device> watcher;
+  // Wait indefinitely until a service instance appears in the service directory
+  zx::result<fidl::ClientEnd<fuchsia_hardware_usb_peripheral::Device>> client_end =
+      watcher.GetNextInstance(false);
   if (client_end.is_error()) {
-    fprintf(stderr, "could not connect to device %s: %s\n", path.value().c_str(),
+    fprintf(stderr, "could not connect to usb-peripheral service: %s\n",
             client_end.status_string());
     return -1;
   }

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 mod abstract_socket_namespace;
+mod cgroup;
 mod current_task;
 mod hr_timer_manager;
 mod interval_timer;
@@ -28,6 +29,7 @@ mod uts_namespace;
 mod waiter;
 
 pub use abstract_socket_namespace::*;
+pub use cgroup::*;
 pub use current_task::*;
 pub use hr_timer_manager::*;
 pub use interval_timer::*;

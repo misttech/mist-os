@@ -6,7 +6,7 @@ use super::data::Data;
 use super::trials::{self, Step};
 use super::{puppet, results, PUPPET_MONIKER};
 use anyhow::{bail, Error};
-use diagnostics_reader::{ArchiveReader, ComponentSelector, Inspect};
+use diagnostics_reader::{ArchiveReader, ComponentSelector};
 use fidl_diagnostics_validate as validate;
 
 pub async fn run_all_trials() -> results::Results {
@@ -241,9 +241,9 @@ async fn try_compare<ActionType: std::fmt::Debug>(
             }
         }
         if puppet.config.test_archive {
-            let archive_data = match ArchiveReader::new()
+            let archive_data = match ArchiveReader::inspect()
                 .add_selector(ComponentSelector::new(vec![PUPPET_MONIKER.to_string()]))
-                .snapshot::<Inspect>()
+                .snapshot()
                 .await
             {
                 Ok(archive_data) => archive_data,

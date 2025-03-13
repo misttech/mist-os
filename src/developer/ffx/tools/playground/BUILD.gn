@@ -31,6 +31,7 @@ rustc_library("lib") {
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/rcs:lib",
     "//src/developer/ffx/lib/target/holders:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//src/developer/ffx/playground",
     "//src/lib/analytics/rust:lib",
     "//src/lib/fidl/rust/fidl",

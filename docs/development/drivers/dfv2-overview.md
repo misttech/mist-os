@@ -90,7 +90,7 @@ See the following tutorials under the **SDK** section:
 [driver-runtime-api]: /docs/development/drivers/developer_guide/driver-runtime-api-guidelines.md
 [driver-rubric]: /docs/development/drivers/developer_guide/rubric.md
 [dma]: /docs/development/drivers/concepts/driver_development/dma.md
-[driver-codelab]: /docs/get-started/sdk/learn/driver/introduction.md
+[driver-codelab]: /docs/development/drivers/tutorials/sdk_build_driver/introduction.md
 [write-bind-rules]: /docs/development/sdk/write-bind-rules-for-driver.md
 [driver-unit-testing]: /docs/development/sdk/driver-testing/driver-unit-testing-quick-start.md
 [view-driver-info]: /docs/development/tools/ffx/workflows/view-driver-information.md

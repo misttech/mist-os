@@ -513,13 +513,24 @@ class AIBCreator:
             )
         )
 
-        # Copy the package that contains the bootfs files.
+        # Copy the package that contains the bootfs files, but only if it's not empty.
         if self.bootfs_files_package:
-            (
-                bootfs_pkg_manifest_path,
-                _,
-            ) = self.package_copier.add_package(self.bootfs_files_package)
-            result.bootfs_files_package = bootfs_pkg_manifest_path
+            deps.add(self.bootfs_files_package)
+            with open(self.bootfs_files_package, "r") as fname:
+                manifest = json_load(PackageManifest, fname)
+                if [
+                    path
+                    for path in manifest.blobs_by_path().keys()
+                    if path != "meta/"
+                ]:
+                    # there are bootfs files, so include the package:
+                    (
+                        bootfs_pkg_manifest_path,
+                        _,
+                    ) = self.package_copier.add_package(
+                        self.bootfs_files_package
+                    )
+                    result.bootfs_files_package = bootfs_pkg_manifest_path
 
         # Copy the memory bucket entries
         _memory_buckets_entries = [

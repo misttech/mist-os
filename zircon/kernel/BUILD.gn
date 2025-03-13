@@ -11,7 +11,6 @@ import("//build/toolchain/zircon/zircon_toolchain_suite.gni")
 import("//build/zbi/zbi.gni")
 import("//build/zircon/c_utils.gni")
 import("//build/zircon/zircon_cpu.gni")
-import("//src/devices/bus/drivers/pci/pci.gni")
 import("//zircon/kernel/phys/kernel_elf_binary.gni")
 import("kernel_package.gni")
 import("kernel_shell_script.gni")
@@ -37,10 +36,6 @@ declare_args() {
   # injecting new instances of subsystems that the kernel has defined modularly
   # (e.g., pdev drivers or k commands).
   kernel_extra_deps = []
-}
-
-if (platform_enable_user_pci) {
-  disable_kernel_pci = true
 }
 
 if (current_toolchain == default_toolchain) {
@@ -360,10 +355,6 @@ if (is_kernel) {
       "EXPERIMENTAL_THREAD_SAMPLER_ENABLED=$experimental_thread_sampler_enabled",
     ]
 
-    if (!disable_kernel_pci) {
-      defines += [ "WITH_KERNEL_PCIE" ]
-    }
-
     if (kernel_no_userabi) {
       defines += [ "KERNEL_NO_USERABI" ]
     }
@@ -518,21 +509,34 @@ if (is_kernel) {
   kernel_elf_binary("physzircon") {
     visibility = [ ":*" ]
 
-    configs += [
-      ":elf-kernel.config",
-      ":kernel_defsym",
-    ]
+    configs += [ ":kernel.config" ]
     deps = [
       ":zircon-main",
       "phys:physboot.kernel",
     ]
   }
 
-  config("elf-kernel.config") {
+  # See kernel.ld where KERNEL_GOT_TOLERANCE is used.
+  if (current_cpu == "arm64" && is_gcc) {
+    # Each slot is 8 bytes.  The first two special slots are always there if
+    # .got is there at all, per psABI.  GNU (BFD) ld seems to emit two more
+    # unused slots with no associated relocs to explain their existence.
+    got_tolerance = 32
+  } else {
+    got_tolerance = 0
+  }
+
+  config("kernel.config") {
     visibility = [ ":*" ]
 
-    inputs = [ "elf-kernel.ld" ]
+    inputs = [ "kernel.ld" ]
+
     ldflags = [ "-Wl,-T," + rebase_path(inputs[0], root_build_dir) ]
+
+    assignments = [ "KERNEL_GOT_TOLERANCE=$got_tolerance" ] + kernel_defines
+    foreach(assignment, assignments) {
+      ldflags += [ "-Wl,-defsym,$assignment" ]
+    }
 
     configs = [
       "//build/config/zircon:static-pie-compile",
@@ -562,28 +566,6 @@ if (is_kernel) {
     visibility = [ ":*" ]
     deps = [ ":physzircon" ]
     outputs = [ physzircon_rspfile ]
-  }
-
-  # See elf-kernel.ld where KERNEL_GOT_TOLERANCE is used.
-  if (current_cpu == "arm64" && is_gcc) {
-    # Each slot is 8 bytes.  The first two special slots are always there if
-    # .got is there at all, per psABI.  GNU (BFD) ld seems to emit two more
-    # unused slots with no associated relocs to explain their existence.
-    got_tolerance = 32
-  } else {
-    got_tolerance = 0
-  }
-
-  # These are needed only in the linker script.
-  linker_script_defines = [ "KERNEL_GOT_TOLERANCE=$got_tolerance" ]
-
-  # This supplies those variables for use in linker scripts.
-  config("kernel_defsym") {
-    visibility = [ ":*" ]
-    ldflags = []
-    foreach(assignment, kernel_defines + linker_script_defines) {
-      ldflags += [ "-Wl,-defsym,$assignment" ]
-    }
   }
 
   group("test") {

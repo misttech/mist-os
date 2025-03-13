@@ -87,6 +87,5 @@ fuchsia_unittest_package("reloaddriver_test") {
     "target-1:component",
     "target-2:component",
     "//sdk/lib/driver_test_realm:driver_test_realm_component",
-    "//src/devices/bin/driver_host:component",
   ]
 }

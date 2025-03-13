@@ -6,7 +6,6 @@
 #include <lib/fit/defer.h>
 
 #include <string_view>
-#include <utility>
 
 #include <fbl/alloc_checker.h>
 
@@ -16,12 +15,15 @@
 #include <ktl/unique_ptr.h>
 #endif
 #include <fbl/string_printf.h>
+#include <zxtest/base/json-reporter.h>
 #include <zxtest/base/log-sink.h>
 #include <zxtest/base/runner.h>
 
 namespace zxtest {
 
 const Runner::Options Runner::kDefaultOptions;
+
+thread_local std::vector<zxtest::Message*> Runner::scoped_traces_;
 
 namespace internal {
 
@@ -155,6 +157,7 @@ int Runner::Run(const Runner::Options& options) {
   }
   event_broadcaster_.OnProgramEnd(*this);
   is_running_ = false;
+
   return test_driver_.HadAnyFailures() ? -1 : 0;
 }
 
@@ -166,16 +169,35 @@ void Runner::List(const Runner::Options& options) {
   summary_.total_iterations = options.repeat;
   EnforceOptions(options);
 
-  for (const auto& test_case : test_cases_) {
-    if (test_case.MatchingTestCount() == 0) {
-      continue;
-    }
+  auto* maybe_json_reporter = json_reporter_.get();
 
-    reporter_.mutable_log_sink()->Write("%s\n", test_case.name().c_str());
-    for (size_t i = 0; i < test_case.MatchingTestCount(); ++i) {
-      reporter_.mutable_log_sink()->Write("  .%s\n",
-                                          test_case.GetMatchingTestInfo(i).name().c_str());
+  if (maybe_json_reporter) {
+    maybe_json_reporter->set_list_mode(true);
+    maybe_json_reporter->OnProgramStart(*this);
+  }
+
+  for (const auto& test_case : test_cases_) {
+    if (maybe_json_reporter) {
+      maybe_json_reporter->OnTestCaseStart(test_case);
     }
+    if (test_case.MatchingTestCount() != 0) {
+      reporter_.mutable_log_sink()->Write("%s\n", test_case.name().c_str());
+      for (size_t i = 0; i < test_case.MatchingTestCount(); ++i) {
+        auto& info = test_case.GetMatchingTestInfo(i);
+        if (maybe_json_reporter) {
+          maybe_json_reporter->OnTestStart(test_case, info);
+          maybe_json_reporter->OnTestSuccess(test_case, info);
+        }
+        reporter_.mutable_log_sink()->Write("  .%s\n", info.name().c_str());
+      }
+    }
+    if (maybe_json_reporter) {
+      maybe_json_reporter->OnTestCaseEnd(test_case);
+    }
+  }
+
+  if (maybe_json_reporter) {
+    maybe_json_reporter->OnProgramEnd(*this);
   }
 }
 
@@ -191,6 +213,23 @@ void Runner::EnforceOptions(const Runner::Options& options) {
       summary_.active_test_case_count++;
       summary_.active_test_count += test_case.MatchingTestCount();
       test_case.SetReturnOnFailure(options.break_on_failure);
+    }
+  }
+
+  // Set up JSON output if enabled.
+  if (!options.output_path.empty()) {
+    auto view = std::string_view(options.output_path);
+    if (view.starts_with("json:")) {
+      std::string path(view.substr(5));
+      FILE* f = fopen(path.c_str(), "w");
+      if (f == nullptr) {
+        reporter_.mutable_log_sink()->Write("ERROR: Failed to open output file %s\n",
+                                            options.output_path.c_str());
+      } else {
+        auto new_sink = std::make_unique<FileLogSink>(f, [](FILE* f) { fclose(f); });
+        json_reporter_ = std::make_unique<internal::JsonReporter>(std::move(new_sink));
+        event_broadcaster_.Subscribe(json_reporter_.get());
+      }
     }
   }
 }

@@ -127,7 +127,7 @@ fn parse_command(command: Pair<'_>) -> Result<Definition> {
     let parsed_optional_type_name = match optional_type_name {
         Some(n) => {
             let id = parse_identifier(n)?;
-            (!id.is_empty()).then(|| id)
+            (!id.is_empty()).then_some(id)
         }
         None => None,
     };
@@ -175,7 +175,7 @@ fn parse_delimited_arguments(delimited_arguments: Pair<'_>) -> Result<DelimitedA
     let parsed_delimited_argument_delimiter_option = match delimited_argument_delimiter_option {
         Some(delimiter) => {
             let string = parse_string(delimiter)?;
-            (!string.is_empty()).then(|| string)
+            (!string.is_empty()).then_some(string)
         }
         None => None,
     };
@@ -190,7 +190,7 @@ fn parse_delimited_arguments(delimited_arguments: Pair<'_>) -> Result<DelimitedA
     let parsed_delimited_argument_terminator_option = match delimited_argument_terminator_option {
         Some(terminator) => {
             let string = parse_string(terminator)?;
-            (!string.is_empty()).then(|| string)
+            (!string.is_empty()).then_some(string)
         }
         None => None,
     };
@@ -241,7 +241,7 @@ fn parse_response(response: Pair<'_>) -> Result<Definition> {
     let parsed_optional_type_name = match optional_type_name {
         Some(n) => {
             let id = parse_identifier(n)?;
-            (!id.is_empty()).then(|| id)
+            (!id.is_empty()).then_some(id)
         }
         None => None,
     };

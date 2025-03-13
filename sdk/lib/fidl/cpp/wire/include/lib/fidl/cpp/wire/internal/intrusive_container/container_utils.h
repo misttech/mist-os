@@ -439,8 +439,9 @@ struct KeyEraseUtils<ContainerType, KeyTraits,
   }
 };
 
-// Swaps two plain old data types with size no greater than 64 bits.
-template <typename T, typename = std::enable_if_t<std::is_pod_v<T> && (sizeof(T) <= 8)>>
+// Swaps two trivially copyable types with size no greater than 64 bits.
+template <typename T,
+          typename = std::enable_if_t<std::is_trivially_copyable_v<T> && (sizeof(T) <= 8)>>
 inline void Swap(T& a, T& b) noexcept {
   T tmp = a;
   a = b;

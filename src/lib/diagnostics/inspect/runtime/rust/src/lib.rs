@@ -253,7 +253,7 @@ mod tests {
     use component_events::matcher::EventMatcher;
     use diagnostics_assertions::assert_json_diff;
     use diagnostics_hierarchy::DiagnosticsHierarchy;
-    use diagnostics_reader::{ArchiveReader, Inspect};
+    use diagnostics_reader::ArchiveReader;
     use fidl::endpoints::RequestStream;
     use fidl_fuchsia_inspect::{InspectSinkRequest, InspectSinkRequestStream};
     use fuchsia_component_test::ScopedInstance;
@@ -299,9 +299,9 @@ mod tests {
 
         started_stream.await.expect("failed to observe Started event");
 
-        let hierarchy = ArchiveReader::new()
+        let hierarchy = ArchiveReader::inspect()
             .add_selector("coll\\:interesting_name:[name=tree-0]root")
-            .snapshot::<Inspect>()
+            .snapshot()
             .await?
             .into_iter()
             .next()

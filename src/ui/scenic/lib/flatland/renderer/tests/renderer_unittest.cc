@@ -102,7 +102,7 @@ glm::ivec4 GetPixel(const uint8_t* vmo_host, uint32_t width, uint32_t x, uint32_
         }                                                                   \
       }                                                                     \
     }                                                                       \
-    EXPECT_EQ(black_pixels, kTargetWidth* kTargetHeight - color_count);     \
+    EXPECT_EQ(black_pixels, kTargetWidth * kTargetHeight - color_count);    \
   }
 
 // Utility function to simplify tests, since setting up a buffer collection is a process that
@@ -1671,11 +1671,11 @@ VK_TEST_F(VulkanRendererTest, ColorCorrectionTest) {
   auto [escher, renderer] = CreateEscherAndPrewarmedRenderer();
 
   // Set the color correction data on the renderer.
-  static const std::array<float, 3> preoffsets = {0, 0, 0};
-  static const std::array<float, 9> matrix = {0.288299f, 0.052709f,  -0.257912f,
-                                              0.711701f, 0.947291f,  0.257912f,
-                                              0.000000f, -0.000000f, 1.000000f};
-  static const std::array<float, 3> postoffsets = {0, 0, 0};
+  static const fidl::Array<float, 3> preoffsets = {0, 0, 0};
+  static const fidl::Array<float, 9> matrix = {0.288299f, 0.052709f,  -0.257912f,
+                                               0.711701f, 0.947291f,  0.257912f,
+                                               0.000000f, -0.000000f, 1.000000f};
+  static const fidl::Array<float, 3> postoffsets = {0, 0, 0};
   renderer->SetColorConversionValues(matrix, preoffsets, postoffsets);
 
   // Setup the render target collection.

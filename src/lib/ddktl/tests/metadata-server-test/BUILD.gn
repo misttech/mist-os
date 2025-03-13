@@ -10,8 +10,8 @@ import("//build/test.gni")
 group("tests") {
   testonly = true
   deps = [
-    ":metadata_server_mock_ddk_test_package",
-    ":metadata_server_test_package",
+    ":ddk_metadata_server_test",
+    ":metadata_server_mock_ddk_test",
   ]
 }
 
@@ -30,7 +30,7 @@ bind_library("metadata_server_test_bind_library") {
   public_deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
-test("metadata_server_test") {
+test("ddk_metadata_server_test_bin") {
   testonly = true
   sources = [ "metadata_server_test.cc" ]
 
@@ -44,7 +44,7 @@ test("metadata_server_test") {
   ]
 }
 
-fuchsia_unittest_package("metadata_server_test_package") {
+fuchsia_unittest_package("ddk_metadata_server_test") {
   test_specs = {
     # Allow error logging for when `MetadataServer::GetMetadata()` fails.
     log_settings = {
@@ -53,14 +53,14 @@ fuchsia_unittest_package("metadata_server_test_package") {
   }
 
   deps = [
-    ":metadata_server_test",
+    ":ddk_metadata_server_test_bin",
     "metadata-forwarder-test-driver:component",
     "metadata-retriever-test-driver:component",
     "metadata-sender-test-driver:component",
   ]
 }
 
-test("metadata_server_mock_ddk_test") {
+test("metadata_server_mock_ddk_test_bin") {
   testonly = true
   sources = [ "mock_ddk_test.cc" ]
 
@@ -80,6 +80,6 @@ test("metadata_server_mock_ddk_test") {
   ]
 }
 
-fuchsia_unittest_package("metadata_server_mock_ddk_test_package") {
-  deps = [ ":metadata_server_mock_ddk_test" ]
+fuchsia_unittest_package("metadata_server_mock_ddk_test") {
+  deps = [ ":metadata_server_mock_ddk_test_bin" ]
 }

@@ -52,11 +52,11 @@ struct TypeTraits<::test_byteandbytes::wire::ByteAndBytes> {
 };
 
 template <>
-struct IsFidlType<::test_byteandbytes::wire::ByteAndBytes> : public std::true_type{};
+struct IsFidlType<::test_byteandbytes::wire::ByteAndBytes> : public std::true_type {};
 template <>
-struct IsWire<::test_byteandbytes::wire::ByteAndBytes> : public std::true_type{};
+struct IsWire<::test_byteandbytes::wire::ByteAndBytes> : public std::true_type {};
 template <>
-struct IsStruct<::test_byteandbytes::wire::ByteAndBytes> : public std::true_type{};
+struct IsStruct<::test_byteandbytes::wire::ByteAndBytes> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_byteandbytes::wire::ByteAndBytes>);
 static_assert(offsetof(::test_byteandbytes::wire::ByteAndBytes, single_byte) == 0);
 static_assert(sizeof(::test_byteandbytes::wire::ByteAndBytes) == TypeTraits<::test_byteandbytes::wire::ByteAndBytes>::kPrimarySize);

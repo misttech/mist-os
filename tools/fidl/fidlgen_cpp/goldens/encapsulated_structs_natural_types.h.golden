@@ -474,7 +474,7 @@ inline Int8Int32::Int8Int32(int8_t a, int32_t b) noexcept
     : storage_({.a = std::move(a),
                 .b = std::move(b)}) {}
 inline Int8Int32::Int8Int32(const ::test_encapsulatedstructs::Int8Int32& other) noexcept : ::test_encapsulatedstructs::Int8Int32(other.CloneStorage_()) {}
-inline Int8Int32& ::test_encapsulatedstructs::Int8Int32::operator=(const ::test_encapsulatedstructs::Int8Int32 & other) noexcept {
+inline Int8Int32& ::test_encapsulatedstructs::Int8Int32::operator=(const ::test_encapsulatedstructs::Int8Int32& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -497,7 +497,7 @@ inline Int16Int8::Int16Int8(int16_t a, int8_t b) noexcept
     : storage_({.a = std::move(a),
                 .b = std::move(b)}) {}
 inline Int16Int8::Int16Int8(const ::test_encapsulatedstructs::Int16Int8& other) noexcept : ::test_encapsulatedstructs::Int16Int8(other.CloneStorage_()) {}
-inline Int16Int8& ::test_encapsulatedstructs::Int16Int8::operator=(const ::test_encapsulatedstructs::Int16Int8 & other) noexcept {
+inline Int16Int8& ::test_encapsulatedstructs::Int16Int8::operator=(const ::test_encapsulatedstructs::Int16Int8& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -519,7 +519,7 @@ inline ArrayInt16Int8::ArrayInt16Int8(Storage_ storage) noexcept : storage_(std:
 inline ArrayInt16Int8::ArrayInt16Int8(::std::array<::test_encapsulatedstructs::Int16Int8, 3> arr) noexcept
     : storage_({.arr = std::move(arr)}) {}
 inline ArrayInt16Int8::ArrayInt16Int8(const ::test_encapsulatedstructs::ArrayInt16Int8& other) noexcept : ::test_encapsulatedstructs::ArrayInt16Int8(other.CloneStorage_()) {}
-inline ArrayInt16Int8& ::test_encapsulatedstructs::ArrayInt16Int8::operator=(const ::test_encapsulatedstructs::ArrayInt16Int8 & other) noexcept {
+inline ArrayInt16Int8& ::test_encapsulatedstructs::ArrayInt16Int8::operator=(const ::test_encapsulatedstructs::ArrayInt16Int8& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -538,7 +538,7 @@ inline StructPaddingTestStruct::StructPaddingTestStruct(::test_encapsulatedstruc
                 .inner = std::move(inner),
                 .array = std::move(array)}) {}
 inline StructPaddingTestStruct::StructPaddingTestStruct(const ::test_encapsulatedstructs::StructPaddingTestStruct& other) noexcept : ::test_encapsulatedstructs::StructPaddingTestStruct(other.CloneStorage_()) {}
-inline StructPaddingTestStruct& ::test_encapsulatedstructs::StructPaddingTestStruct::operator=(const ::test_encapsulatedstructs::StructPaddingTestStruct & other) noexcept {
+inline StructPaddingTestStruct& ::test_encapsulatedstructs::StructPaddingTestStruct::operator=(const ::test_encapsulatedstructs::StructPaddingTestStruct& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -609,7 +609,7 @@ inline TopLevelStruct& TopLevelStruct::b(::test_encapsulatedstructs::NonInlineSt
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_encapsulatedstructs::Int8Int32> : public std::true_type{};
+struct IsFidlType<::test_encapsulatedstructs::Int8Int32> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_encapsulatedstructs::Int8Int32> {
@@ -621,14 +621,14 @@ struct TypeTraits<::test_encapsulatedstructs::Int8Int32> {
 };
 
 template <>
-struct IsStruct<::test_encapsulatedstructs::Int8Int32> : public std::true_type{};
+struct IsStruct<::test_encapsulatedstructs::Int8Int32> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_encapsulatedstructs::Int8Int32, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_encapsulatedstructs::Int8Int32, 8> {};
 
 template <>
-struct IsFidlType<::test_encapsulatedstructs::Int16Int8> : public std::true_type{};
+struct IsFidlType<::test_encapsulatedstructs::Int16Int8> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_encapsulatedstructs::Int16Int8> {
@@ -640,14 +640,14 @@ struct TypeTraits<::test_encapsulatedstructs::Int16Int8> {
 };
 
 template <>
-struct IsStruct<::test_encapsulatedstructs::Int16Int8> : public std::true_type{};
+struct IsStruct<::test_encapsulatedstructs::Int16Int8> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_encapsulatedstructs::Int16Int8, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_encapsulatedstructs::Int16Int8, 4> {};
 
 template <>
-struct IsFidlType<::test_encapsulatedstructs::ArrayInt16Int8> : public std::true_type{};
+struct IsFidlType<::test_encapsulatedstructs::ArrayInt16Int8> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_encapsulatedstructs::ArrayInt16Int8> {
@@ -659,14 +659,14 @@ struct TypeTraits<::test_encapsulatedstructs::ArrayInt16Int8> {
 };
 
 template <>
-struct IsStruct<::test_encapsulatedstructs::ArrayInt16Int8> : public std::true_type{};
+struct IsStruct<::test_encapsulatedstructs::ArrayInt16Int8> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_encapsulatedstructs::ArrayInt16Int8, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_encapsulatedstructs::ArrayInt16Int8, 12> {};
 
 template <>
-struct IsFidlType<::test_encapsulatedstructs::StructPaddingTestStruct> : public std::true_type{};
+struct IsFidlType<::test_encapsulatedstructs::StructPaddingTestStruct> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_encapsulatedstructs::StructPaddingTestStruct> {
@@ -678,7 +678,7 @@ struct TypeTraits<::test_encapsulatedstructs::StructPaddingTestStruct> {
 };
 
 template <>
-struct IsStruct<::test_encapsulatedstructs::StructPaddingTestStruct> : public std::true_type{};
+struct IsStruct<::test_encapsulatedstructs::StructPaddingTestStruct> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_encapsulatedstructs::StructPaddingTestStruct, ::fidl::internal::NaturalCodingConstraintEmpty> final
@@ -687,9 +687,9 @@ struct internal::NaturalCodingTraits<::test_encapsulatedstructs::StructPaddingTe
 #ifdef __Fuchsia__
 
 template <>
-struct IsResource<::test_encapsulatedstructs::NonInlineStructTestStruct> : public std::true_type{};
+struct IsResource<::test_encapsulatedstructs::NonInlineStructTestStruct> : public std::true_type {};
 template <>
-struct IsFidlType<::test_encapsulatedstructs::NonInlineStructTestStruct> : public std::true_type{};
+struct IsFidlType<::test_encapsulatedstructs::NonInlineStructTestStruct> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_encapsulatedstructs::NonInlineStructTestStruct> {
@@ -701,7 +701,7 @@ struct TypeTraits<::test_encapsulatedstructs::NonInlineStructTestStruct> {
 };
 
 template <>
-struct IsStruct<::test_encapsulatedstructs::NonInlineStructTestStruct> : public std::true_type{};
+struct IsStruct<::test_encapsulatedstructs::NonInlineStructTestStruct> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_encapsulatedstructs::NonInlineStructTestStruct, ::fidl::internal::NaturalCodingConstraintEmpty> final
@@ -712,9 +712,9 @@ struct internal::NaturalCodingTraits<::test_encapsulatedstructs::NonInlineStruct
 #ifdef __Fuchsia__
 
 template <>
-struct IsResource<::test_encapsulatedstructs::TopLevelStruct> : public std::true_type{};
+struct IsResource<::test_encapsulatedstructs::TopLevelStruct> : public std::true_type {};
 template <>
-struct IsFidlType<::test_encapsulatedstructs::TopLevelStruct> : public std::true_type{};
+struct IsFidlType<::test_encapsulatedstructs::TopLevelStruct> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_encapsulatedstructs::TopLevelStruct> {
@@ -726,7 +726,7 @@ struct TypeTraits<::test_encapsulatedstructs::TopLevelStruct> {
 };
 
 template <>
-struct IsStruct<::test_encapsulatedstructs::TopLevelStruct> : public std::true_type{};
+struct IsStruct<::test_encapsulatedstructs::TopLevelStruct> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_encapsulatedstructs::TopLevelStruct, ::fidl::internal::NaturalCodingConstraintEmpty> final

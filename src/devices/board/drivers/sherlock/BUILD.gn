@@ -21,6 +21,7 @@ driver_bind_rules("sherlock-bind") {
 
 template("sherlock_driver") {
   fuchsia_cc_driver(target_name + "-driver") {
+    legacy = true
     output_name = invoker.target_name
     forward_variables_from(invoker, "*")
 
@@ -91,6 +92,7 @@ template("sherlock_driver") {
       "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
       "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp",
       "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_bindlib_cpp",
+      "//sdk/fidl/fuchsia.hardware.spi.businfo:fuchsia.hardware.spi.businfo_cpp",
       "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib_cpp",
       "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
       "//sdk/fidl/fuchsia.hardware.tee:fuchsia.hardware.tee_bindlib_cpp",

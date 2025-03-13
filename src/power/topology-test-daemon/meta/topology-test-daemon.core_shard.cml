@@ -12,10 +12,7 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.power.broker.Topology",
-                "fuchsia.power.system.ActivityGovernor",
-            ],
+            protocol: [ "fuchsia.power.broker.Topology" ],
             from: "parent",
             to: "#topology-test-daemon",
             availability: "optional",

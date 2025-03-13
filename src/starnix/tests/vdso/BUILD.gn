@@ -10,29 +10,29 @@ import("//src/starnix/tests/starnix_test_subpackages.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":starnix-vdso-time-tests" ]
+  deps = [ ":starnix-vdso_time-tests" ]
 }
 
-test("vdso-calculate-utc-test-bin") {
+test("vdso_calculate_utc_test-bin") {
   # TODO(https://fxbug.dev/297293167) enable ASan instrumentation for Linux binaries in Starnix
   exclude_toolchain_tags = [ "asan" ]
-  sources = [ "vdso-calculate-utc-test.cc" ]
+  sources = [ "vdso_calculate_utc_test.cc" ]
   deps = [
     "//src/lib/fxl/test:gtest_main",
-    "//src/starnix/kernel:vdso-calculate-utc",
+    "//src/starnix/kernel:vdso_calculate_utc",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
   ]
 }
 
-starnix_linux_test_component("vdso-calculate-utc-test") {
-  test_label = ":vdso-calculate-utc-test-bin"
-  test_binary = "vdso-calculate-utc-test-bin"
+starnix_linux_test_component("vdso_calculate_utc_test") {
+  test_label = ":vdso_calculate_utc_test-bin"
+  test_binary = "vdso_calculate_utc_test-bin"
   test_type = "starnix"
 }
 
-fuchsia_test_package("starnix-vdso-time-tests") {
-  test_components = [ ":vdso-calculate-utc-test" ]
+fuchsia_test_package("starnix-vdso_time-tests") {
+  test_components = [ ":vdso_calculate_utc_test" ]
 
   subpackages = starnix_test_subpackages
   subpackages += [ "//src/starnix/containers/debian:debian_package" ]

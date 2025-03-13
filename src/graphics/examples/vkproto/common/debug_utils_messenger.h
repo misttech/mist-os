@@ -36,9 +36,9 @@ class DebugUtilsMessenger {
   std::shared_ptr<vk::Instance> instance_;
   const bool use_defaults_ = true;
   vk::DebugUtilsMessengerCreateInfoEXT debug_utils_messenger_info_{};
-  vk::DispatchLoaderDynamic dispatch_loader_{};
-
-  vk::UniqueHandle<vk::DebugUtilsMessengerEXT, vk::DispatchLoaderDynamic> debug_utils_messenger_;
+  vk::detail::DispatchLoaderDynamic dispatch_loader_{};
+  vk::UniqueHandle<vk::DebugUtilsMessengerEXT, vk::detail::DispatchLoaderDynamic>
+      debug_utils_messenger_;
 };
 
 }  // namespace vkp

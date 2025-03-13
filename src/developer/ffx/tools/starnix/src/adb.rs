@@ -126,7 +126,9 @@ impl AdbConnectArgs {
             return_bug!("Couldn't run adb connect. stdout={stdout} stderr={stderr}");
         }
 
-        eprintln!("adb is connected! You may need to run `export ANDROID_SERIAL={adb_address}`.");
+        eprintln!("adb is connected!");
+        eprintln!("See https://fuchsia.dev/go/troubleshoot-adb-connect if it doesn't work.");
+        eprintln!("This connection's \"serial number\" for adb is `{adb_address}`.");
         Ok(())
     }
 }

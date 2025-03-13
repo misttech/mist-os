@@ -10,19 +10,20 @@ pub struct ExampleUseOfVectors {
 }
 
 impl ::fidl_next::Encodable for ExampleUseOfVectors {
-    type Encoded<'buf> = WireExampleUseOfVectors<'buf>;
+    type Encoded = WireExampleUseOfVectors;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ExampleUseOfVectors
 where
-    Vec<u8>: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
-    Vec<Vec<bool>>: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -45,7 +46,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ExampleUseOfVectors> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireExampleUseOfVectors<'buf>>;
+    type EncodedOption = ::fidl_next::WireBox<WireExampleUseOfVectors>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ExampleUseOfVectors>
@@ -53,10 +54,11 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     ExampleUseOfVectors: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -69,13 +71,14 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireExampleUseOfVectors<'buf>> for ExampleUseOfVectors {
-    fn take_from(from: &mut WireExampleUseOfVectors<'buf>) -> Self {
+impl ::fidl_next::TakeFrom<WireExampleUseOfVectors> for ExampleUseOfVectors {
+    #[inline]
+    fn take_from(from: &WireExampleUseOfVectors) -> Self {
         Self {
-            vector_of_uint8: ::fidl_next::TakeFrom::take_from(&mut from.vector_of_uint8),
+            vector_of_uint8: ::fidl_next::TakeFrom::take_from(&from.vector_of_uint8),
 
             vector_of_vector_of_bool: ::fidl_next::TakeFrom::take_from(
-                &mut from.vector_of_vector_of_bool,
+                &from.vector_of_vector_of_bool,
             ),
         }
     }
@@ -84,20 +87,17 @@ impl<'buf> ::fidl_next::TakeFrom<WireExampleUseOfVectors<'buf>> for ExampleUseOf
 /// The wire type corersponding to [`ExampleUseOfVectors`].
 #[derive(Debug)]
 #[repr(C)]
-pub struct WireExampleUseOfVectors<'buf> {
-    pub vector_of_uint8: ::fidl_next::WireVector<'buf, u8>,
+pub struct WireExampleUseOfVectors {
+    pub vector_of_uint8: ::fidl_next::WireVector<u8>,
 
-    pub vector_of_vector_of_bool:
-        ::fidl_next::WireVector<'buf, ::fidl_next::WireVector<'buf, bool>>,
+    pub vector_of_vector_of_bool: ::fidl_next::WireVector<::fidl_next::WireVector<bool>>,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireExampleUseOfVectors<'buf>
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleUseOfVectors
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ::fidl_next::WireVector<'buf, u8>: ::fidl_next::Decode<___D>,
-
-    ::fidl_next::WireVector<'buf, ::fidl_next::WireVector<'buf, bool>>: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -118,3 +118,9 @@ where
         Ok(())
     }
 }
+
+/// Commonly-used items that should usually be in scope, such as extension traits.
+pub mod prelude {}
+
+/// Compatibility shims which mimic some API surfaces of the current Rust bindings.
+pub mod compat {}

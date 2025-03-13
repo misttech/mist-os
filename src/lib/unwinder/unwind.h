@@ -9,51 +9,15 @@
 #include <utility>
 #include <vector>
 
+#include "sdk/lib/fit/include/lib/fit/function.h"
 #include "src/lib/unwinder/cfi_unwinder.h"
-#include "src/lib/unwinder/error.h"
+#include "src/lib/unwinder/frame.h"
 #include "src/lib/unwinder/memory.h"
 #include "src/lib/unwinder/module.h"
 #include "src/lib/unwinder/registers.h"
+#include "src/lib/unwinder/unwinder_base.h"
 
 namespace unwinder {
-
-struct Frame {
-  enum class Trust {
-    kScan,     // From scanning the stack with heuristics, least reliable.
-    kSCS,      // From the shadow call stack.
-    kFP,       // From the frame pointer.
-    kPLT,      // From PLT unwinder.
-    kCFI,      // From call frame info / .eh_frame section.
-    kContext,  // From the input / context, most reliable.
-  };
-
-  // Register status at each return site. Unknown registers may be included.
-  Registers regs;
-
-  // Whether the PC in |regs| is a return address or a precise code location.
-  //
-  // PC is usually a precise location for the first frame and a return address for the rest frames.
-  // However, it could also be a precise location when it's not a regular function call, e.g., in
-  // signal frames or when unwinding into restricted mode in Starnix.
-  bool pc_is_return_address;
-
-  // Trust level of the frame.
-  Trust trust;
-
-  // Error when unwinding from this frame, which could be non-fatal and present in any frames.
-  Error error = Success();
-
-  // Whether the above error is fatal and aborts the unwinding, causing the stack to be incomplete.
-  // This could only be true for the last frame.
-  bool fatal_error = false;
-
-  // Disallow default constructors.
-  Frame(Registers regs, bool pc_is_return_address, Trust trust)
-      : regs(std::move(regs)), pc_is_return_address(pc_is_return_address), trust(trust) {}
-
-  // Useful for debugging.
-  std::string Describe() const;
-};
 
 // The main unwinder. It caches the unwind tables so repeated unwinding is faster.
 //
@@ -78,6 +42,24 @@ class Unwinder {
   // If |current.fatal_error| is false, |next.regs| and |next.trust| will be populated.
   void Step(Memory* stack, Frame& current, Frame& next);
 
+  CfiUnwinder cfi_unwinder_;
+};
+
+class AsyncUnwinder {
+ public:
+  explicit AsyncUnwinder(const std::vector<Module>& modules);
+
+  void Unwind(AsyncMemory::Delegate* delegate, const Registers& registers, size_t max_depth,
+              fit::callback<void(std::vector<Frame>)> cb);
+
+ private:
+  void Step(Frame& current);
+  void OnStep(Frame next);
+
+  fit::callback<void(std::vector<Frame>)> on_done_;
+  size_t max_depth_;
+  std::vector<Frame> result_;
+  std::unique_ptr<AsyncMemory> stack_;
   CfiUnwinder cfi_unwinder_;
 };
 

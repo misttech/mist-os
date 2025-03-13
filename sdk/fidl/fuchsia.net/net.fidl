@@ -84,5 +84,26 @@ type MacAddress = struct {
     octets array<uint8, 6>;
 };
 
+/// A mark that is used to make route decisions and can be attached to packets.
+@available(added=HEAD)
+alias Mark = uint32;
+
+/// Domains for a mark. This allows multiple marks to be set and retrieved
+/// independently.
+@available(added=HEAD)
+type MarkDomain = strict enum : uint8 {
+    MARK_1 = 1;
+    MARK_2 = 2;
+};
+
+/// Includes all the marks the platform supports.
+@available(added=HEAD)
+type Marks = table {
+    /// The mark in the `MARK_1` domain.
+    1: mark_1 Mark;
+    /// The mark in the `MARK_2` domain.
+    2: mark_2 Mark;
+};
+
 /// The metric of a route. Lower metrics indicate higher priority.
 alias RouteMetric = uint32;

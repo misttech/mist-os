@@ -48,6 +48,7 @@ struct UngracefulRebootTestParam {
 
   std::string output_crash_signature;
   std::optional<zx::duration> output_uptime;
+  std::optional<zx::duration> output_runtime;
   cobalt::LastRebootReason output_last_reboot_reason;
 };
 
@@ -65,6 +66,7 @@ struct GracefulRebootWithCrashTestParam {
 
   std::string output_crash_signature;
   zx::duration output_uptime;
+  zx::duration output_runtime;
   cobalt::LastRebootReason output_last_reboot_reason;
   bool output_is_fatal;
 };
@@ -124,15 +126,18 @@ using GenericReporterTest = ReporterTest<UngracefulRebootTestParam /*does not ma
 
 TEST_F(GenericReporterTest, Succeed_WellFormedRebootLog) {
   const zx::duration uptime = zx::msec(74715002);
+  const zx::duration runtime = zx::msec(73415072);
   const feedback::RebootLog reboot_log(
       feedback::RebootReason::kKernelPanic,
-      "ZIRCON REBOOT REASON (KERNEL PANIC)\n\nUPTIME (ms)\n74715002", uptime, std::nullopt);
+      "ZIRCON REBOOT REASON (KERNEL PANIC)\n\nUPTIME (ms)\n74715002\nRUNTIME (ms)\n73415072",
+      uptime, runtime, std::nullopt);
 
   SetUpCrashReporterServer(
       std::make_unique<stubs::CrashReporter>(stubs::CrashReporter::Expectations{
           .crash_signature = ToCrashSignature(reboot_log.RebootReason()),
           .reboot_log = reboot_log.RebootLogStr(),
           .uptime = reboot_log.Uptime(),
+          .runtime = reboot_log.Runtime(),
           .is_fatal = true,
       }));
   SetUpCobaltServer(std::make_unique<stubs::CobaltLoggerFactory>());
@@ -148,11 +153,12 @@ TEST_F(GenericReporterTest, Succeed_WellFormedRebootLog) {
 
 TEST_F(GenericReporterTest, Succeed_RootJobTerminationRebootLog) {
   const zx::duration uptime = zx::msec(74715002);
+  const zx::duration runtime = zx::msec(73415072);
   const feedback::RebootLog reboot_log(
       feedback::RebootReason::kRootJobTermination,
-      "ZIRCON REBOOT REASON (USERSPACE ROOT JOB TERMINATION)\n\nUPTIME (ms)\n74715002\n"
+      "ZIRCON REBOOT REASON (USERSPACE ROOT JOB TERMINATION)\n\nUPTIME (ms)\n74715002\nRUNTIME (ms)\n73415072\n"
       "ROOT JOB TERMINATED BY CRITICAL PROCESS DEATH: foo (1)",
-      uptime, "foo");
+      uptime, runtime, "foo");
 
   SetUpCrashReporterServer(
       std::make_unique<stubs::CrashReporter>(stubs::CrashReporter::Expectations{
@@ -160,6 +166,7 @@ TEST_F(GenericReporterTest, Succeed_RootJobTerminationRebootLog) {
               ToCrashSignature(reboot_log.RebootReason(), reboot_log.CriticalProcess()),
           .reboot_log = reboot_log.RebootLogStr(),
           .uptime = reboot_log.Uptime(),
+          .runtime = reboot_log.Runtime(),
           .is_fatal = true,
       }));
   SetUpCobaltServer(std::make_unique<stubs::CobaltLoggerFactory>());
@@ -176,13 +183,14 @@ TEST_F(GenericReporterTest, Succeed_RootJobTerminationRebootLog) {
 TEST_F(GenericReporterTest, Succeed_NoUptime) {
   const feedback::RebootLog reboot_log(feedback::RebootReason::kKernelPanic,
                                        "ZIRCON REBOOT REASON (KERNEL PANIC)\n", std::nullopt,
-                                       std::nullopt);
+                                       std::nullopt, std::nullopt);
 
   SetUpCrashReporterServer(
       std::make_unique<stubs::CrashReporter>(stubs::CrashReporter::Expectations{
           .crash_signature = ToCrashSignature(reboot_log.RebootReason()),
           .reboot_log = reboot_log.RebootLogStr(),
           .uptime = std::nullopt,
+          .runtime = std::nullopt,
           .is_fatal = true,
       }));
   SetUpCobaltServer(std::make_unique<stubs::CobaltLoggerFactory>());
@@ -193,6 +201,32 @@ TEST_F(GenericReporterTest, Succeed_NoUptime) {
               UnorderedElementsAreArray({
                   cobalt::Event(cobalt::LastRebootReason::kKernelPanic, /*duration=*/0u),
               }));
+}
+
+TEST_F(GenericReporterTest, Succeed_NoRuntime) {
+  const zx::duration uptime = zx::msec(74715002);
+  const feedback::RebootLog reboot_log(
+      feedback::RebootReason::kKernelPanic,
+      "ZIRCON REBOOT REASON (KERNEL PANIC)\n\nUPTIME (ms)\n74715002", uptime, std::nullopt,
+      std::nullopt);
+
+  SetUpCrashReporterServer(
+      std::make_unique<stubs::CrashReporter>(stubs::CrashReporter::Expectations{
+          .crash_signature = ToCrashSignature(reboot_log.RebootReason()),
+          .reboot_log = reboot_log.RebootLogStr(),
+          .uptime = uptime,
+          .runtime = std::nullopt,
+          .is_fatal = true,
+      }));
+  SetUpCobaltServer(std::make_unique<stubs::CobaltLoggerFactory>());
+
+  ReportOn(reboot_log);
+
+  EXPECT_THAT(
+      ReceivedCobaltEvents(),
+      UnorderedElementsAreArray({
+          cobalt::Event(cobalt::LastRebootReason::kKernelPanic, /*duration=*/uptime.to_usecs()),
+      }));
 }
 
 class SimpleRedactor : public RedactorBase {
@@ -213,13 +247,14 @@ class SimpleRedactor : public RedactorBase {
 TEST_F(GenericReporterTest, Succeed_RedactsData) {
   const feedback::RebootLog reboot_log(feedback::RebootReason::kKernelPanic,
                                        "ZIRCON REBOOT REASON (KERNEL PANIC)\n", std::nullopt,
-                                       std::nullopt);
+                                       std::nullopt, std::nullopt);
 
   SetUpCrashReporterServer(
       std::make_unique<stubs::CrashReporter>(stubs::CrashReporter::Expectations{
           .crash_signature = ToCrashSignature(reboot_log.RebootReason()),
           .reboot_log = "<REDACTED>",
           .uptime = std::nullopt,
+          .runtime = std::nullopt,
           .is_fatal = true,
       }));
   SetUpCobaltServer(std::make_unique<stubs::CobaltLoggerFactory>());
@@ -235,15 +270,18 @@ TEST_F(GenericReporterTest, Succeed_RedactsData) {
 
 TEST_F(GenericReporterTest, Succeed_NoCrashReportFiledCleanReboot) {
   const zx::duration uptime = zx::msec(74715002);
-  const feedback::RebootLog reboot_log(feedback::RebootReason::kGenericGraceful,
-                                       "ZIRCON REBOOT REASON (NO CRASH)\n\nUPTIME (ms)\n74715002",
-                                       uptime, std::nullopt);
+  const zx::duration runtime = zx::msec(73415072);
+  const feedback::RebootLog reboot_log(
+      feedback::RebootReason::kGenericGraceful,
+      "ZIRCON REBOOT REASON (NO CRASH)\n\nUPTIME (ms)\n74715002\nRUNTIME (ms)\n73415072", uptime,
+      runtime, std::nullopt);
 
   SetUpCrashReporterServer(
       std::make_unique<stubs::CrashReporter>(stubs::CrashReporter::Expectations{
           .crash_signature = ToCrashSignature(reboot_log.RebootReason()),
           .reboot_log = reboot_log.RebootLogStr(),
           .uptime = uptime,
+          .runtime = runtime,
           .is_fatal = true,
       }));
   SetUpCobaltServer(std::make_unique<stubs::CobaltLoggerFactory>());
@@ -258,7 +296,7 @@ TEST_F(GenericReporterTest, Succeed_NoCrashReportFiledCleanReboot) {
 
 TEST_F(GenericReporterTest, Succeed_NoCrashReportFiledColdReboot) {
   const feedback::RebootLog reboot_log(feedback::RebootReason::kCold, "", std::nullopt,
-                                       std::nullopt);
+                                       std::nullopt, std::nullopt);
 
   SetUpCrashReporterServer(std::make_unique<stubs::CrashReporterNoFileExpected>());
   SetUpCobaltServer(std::make_unique<stubs::CobaltLoggerFactory>());
@@ -273,9 +311,11 @@ TEST_F(GenericReporterTest, Succeed_NoCrashReportFiledColdReboot) {
 
 TEST_F(GenericReporterTest, Fail_CrashReporterFailsToFile) {
   const zx::duration uptime = zx::msec(74715002);
+  const zx::duration runtime = zx::msec(73415072);
   const feedback::RebootLog reboot_log(
       feedback::RebootReason::kKernelPanic,
-      "ZIRCON REBOOT REASON (KERNEL PANIC)\n\nUPTIME (ms)\n74715002", uptime, std::nullopt);
+      "ZIRCON REBOOT REASON (KERNEL PANIC)\n\nUPTIME (ms)\n74715002\nRUNTIME (ms)\n73415072",
+      uptime, runtime, std::nullopt);
   SetUpCrashReporterServer(std::make_unique<stubs::CrashReporterAlwaysReturnsError>());
   SetUpCobaltServer(std::make_unique<stubs::CobaltLoggerFactory>());
 
@@ -292,8 +332,8 @@ TEST_F(GenericReporterTest, Succeed_DoesNothingIfAlreadyReportedOn) {
 
   const feedback::RebootLog reboot_log(
       feedback::RebootReason::kKernelPanic,
-      "ZIRCON REBOOT REASON (KERNEL PANIC)\n\nUPTIME (ms)\n74715002", zx::msec(74715002),
-      std::nullopt);
+      "ZIRCON REBOOT REASON (KERNEL PANIC)\n\nUPTIME (ms)\n74715002\nRUNTIME (ms)\n73415072",
+      zx::msec(74715002), zx::msec(73415072), std::nullopt);
 
   SetUpCrashReporterServer(std::make_unique<stubs::CrashReporterNoFileExpected>());
   SetUpCobaltServer(std::make_unique<stubs::CobaltLoggerFactory>());
@@ -305,68 +345,76 @@ TEST_F(GenericReporterTest, Succeed_DoesNothingIfAlreadyReportedOn) {
 
 using UngracefulReporterTest = ReporterTest<UngracefulRebootTestParam>;
 
-INSTANTIATE_TEST_SUITE_P(WithVariousRebootLogs, UngracefulReporterTest,
-                         ::testing::ValuesIn(std::vector<UngracefulRebootTestParam>({
-                             {
-                                 "KernelPanic",
-                                 "ZIRCON REBOOT REASON (KERNEL PANIC)\n\nUPTIME (ms)\n65487494",
-                                 "FINAL REBOOT REASON (KERNEL PANIC)",
-                                 "fuchsia-kernel-panic",
-                                 zx::msec(65487494),
-                                 cobalt::LastRebootReason::kKernelPanic,
-                             },
-                             {
-                                 "OOM",
-                                 "ZIRCON REBOOT REASON (OOM)\n\nUPTIME (ms)\n65487494",
-                                 "FINAL REBOOT REASON (OOM)",
-                                 "fuchsia-oom",
-                                 zx::msec(65487494),
-                                 cobalt::LastRebootReason::kSystemOutOfMemory,
-                             },
-                             {
-                                 "Spontaneous",
-                                 "ZIRCON REBOOT REASON (UNKNOWN)\n\nUPTIME (ms)\n65487494",
-                                 "FINAL REBOOT REASON (SPONTANEOUS)",
-                                 "fuchsia-brief-power-loss",
-                                 zx::msec(65487494),
-                                 cobalt::LastRebootReason::kBriefPowerLoss,
-                             },
-                             {
-                                 "SoftwareWatchdogTimeout",
-                                 "ZIRCON REBOOT REASON (SW WATCHDOG)\n\nUPTIME (ms)\n65487494",
-                                 "FINAL REBOOT REASON (SOFTWARE WATCHDOG TIMEOUT)",
-                                 "fuchsia-sw-watchdog-timeout",
-                                 zx::msec(65487494),
-                                 cobalt::LastRebootReason::kSoftwareWatchdogTimeout,
-                             },
-                             {
-                                 "HardwareWatchdogTimeout",
-                                 "ZIRCON REBOOT REASON (HW WATCHDOG)\n\nUPTIME (ms)\n65487494",
-                                 "FINAL REBOOT REASON (HARDWARE WATCHDOG TIMEOUT)",
-                                 "fuchsia-hw-watchdog-timeout",
-                                 zx::msec(65487494),
-                                 cobalt::LastRebootReason::kHardwareWatchdogTimeout,
-                             },
-                             {
-                                 "BrownoutPower",
-                                 "ZIRCON REBOOT REASON (BROWNOUT)\n\nUPTIME (ms)\n65487494",
-                                 "FINAL REBOOT REASON (BROWNOUT)",
-                                 "fuchsia-brownout",
-                                 zx::msec(65487494),
-                                 cobalt::LastRebootReason::kBrownout,
-                             },
-                             {
-                                 "NotParseable",
-                                 "NOT PARSEABLE",
-                                 "FINAL REBOOT REASON (NOT PARSEABLE)",
-                                 "fuchsia-reboot-log-not-parseable",
-                                 std::nullopt,
-                                 cobalt::LastRebootReason::kUnknown,
-                             },
-                         })),
-                         [](const testing::TestParamInfo<UngracefulRebootTestParam>& info) {
-                           return info.param.test_name;
-                         });
+INSTANTIATE_TEST_SUITE_P(
+    WithVariousRebootLogs, UngracefulReporterTest,
+    ::testing::ValuesIn(std::vector<UngracefulRebootTestParam>({
+        {
+            "KernelPanic",
+            "ZIRCON REBOOT REASON (KERNEL PANIC)\n\nUPTIME (ms)\n65487494\nRUNTIME (ms)\n64208920",
+            "FINAL REBOOT REASON (KERNEL PANIC)",
+            "fuchsia-kernel-panic",
+            zx::msec(65487494),
+            zx::msec(64208920),
+            cobalt::LastRebootReason::kKernelPanic,
+        },
+        {
+            "OOM",
+            "ZIRCON REBOOT REASON (OOM)\n\nUPTIME (ms)\n65487494\nRUNTIME (ms)\n64208920",
+            "FINAL REBOOT REASON (OOM)",
+            "fuchsia-oom",
+            zx::msec(65487494),
+            zx::msec(64208920),
+            cobalt::LastRebootReason::kSystemOutOfMemory,
+        },
+        {
+            "Spontaneous",
+            "ZIRCON REBOOT REASON (UNKNOWN)\n\nUPTIME (ms)\n65487494\nRUNTIME (ms)\n64208920",
+            "FINAL REBOOT REASON (SPONTANEOUS)",
+            "fuchsia-brief-power-loss",
+            zx::msec(65487494),
+            zx::msec(64208920),
+            cobalt::LastRebootReason::kBriefPowerLoss,
+        },
+        {
+            "SoftwareWatchdogTimeout",
+            "ZIRCON REBOOT REASON (SW WATCHDOG)\n\nUPTIME (ms)\n65487494\nRUNTIME (ms)\n64208920",
+            "FINAL REBOOT REASON (SOFTWARE WATCHDOG TIMEOUT)",
+            "fuchsia-sw-watchdog-timeout",
+            zx::msec(65487494),
+            zx::msec(64208920),
+            cobalt::LastRebootReason::kSoftwareWatchdogTimeout,
+        },
+        {
+            "HardwareWatchdogTimeout",
+            "ZIRCON REBOOT REASON (HW WATCHDOG)\n\nUPTIME (ms)\n65487494\nRUNTIME (ms)\n64208920",
+            "FINAL REBOOT REASON (HARDWARE WATCHDOG TIMEOUT)",
+            "fuchsia-hw-watchdog-timeout",
+            zx::msec(65487494),
+            zx::msec(64208920),
+            cobalt::LastRebootReason::kHardwareWatchdogTimeout,
+        },
+        {
+            "BrownoutPower",
+            "ZIRCON REBOOT REASON (BROWNOUT)\n\nUPTIME (ms)\n65487494\nRUNTIME (ms)\n64208920",
+            "FINAL REBOOT REASON (BROWNOUT)",
+            "fuchsia-brownout",
+            zx::msec(65487494),
+            zx::msec(64208920),
+            cobalt::LastRebootReason::kBrownout,
+        },
+        {
+            "NotParseable",
+            "NOT PARSEABLE",
+            "FINAL REBOOT REASON (NOT PARSEABLE)",
+            "fuchsia-reboot-log-not-parseable",
+            std::nullopt,
+            std::nullopt,
+            cobalt::LastRebootReason::kUnknown,
+        },
+    })),
+    [](const testing::TestParamInfo<UngracefulRebootTestParam>& info) {
+      return info.param.test_name;
+    });
 
 TEST_P(UngracefulReporterTest, Succeed) {
   const auto param = GetParam();
@@ -378,6 +426,7 @@ TEST_P(UngracefulReporterTest, Succeed) {
           .reboot_log = fxl::StringPrintf("%s\n%s\n\n%s", param.zircon_reboot_log.c_str(),
                                           kNoGracefulReason, param.reboot_reason.c_str()),
           .uptime = param.output_uptime,
+          .runtime = param.output_runtime,
           .is_fatal = true,
       }));
   SetUpCobaltServer(std::make_unique<stubs::CobaltLoggerFactory>());
@@ -419,7 +468,8 @@ INSTANTIATE_TEST_SUITE_P(WithVariousRebootLogs, GracefulReporterTest,
 TEST_P(GracefulReporterTest, Succeed) {
   const auto param = GetParam();
 
-  WriteZirconRebootLogContents("ZIRCON REBOOT REASON (NO CRASH)\n\nUPTIME (ms)\n65487494");
+  WriteZirconRebootLogContents(
+      "ZIRCON REBOOT REASON (NO CRASH)\n\nUPTIME (ms)\n65487494\nRUNTIME (ms)\n64208920");
   if (param.graceful_reboot_log.has_value()) {
     WriteGracefulRebootLogContents(param.graceful_reboot_log.value());
   }
@@ -437,7 +487,8 @@ TEST_P(GracefulReporterTest, Succeed) {
 }
 
 TEST_P(GracefulReporterTest, Succeed_FDR) {
-  WriteZirconRebootLogContents("ZIRCON REBOOT REASON (NO CRASH)\n\nUPTIME (ms)\n65487494");
+  WriteZirconRebootLogContents(
+      "ZIRCON REBOOT REASON (NO CRASH)\n\nUPTIME (ms)\n65487494\nRUNTIME (ms)\n64208920");
   SetAsFdr();
 
   SetUpCrashReporterServer(std::make_unique<stubs::CrashReporterNoFileExpected>());
@@ -463,6 +514,7 @@ INSTANTIATE_TEST_SUITE_P(WithVariousRebootLogs, GracefulWithCrashReporterTest,
                                  "FINAL REBOOT REASON (SESSION FAILURE)",
                                  "fuchsia-session-failure",
                                  zx::msec(65487494),
+                                 zx::msec(64208920),
                                  cobalt::LastRebootReason::kSessionFailure,
                                  false,
                              },
@@ -472,6 +524,7 @@ INSTANTIATE_TEST_SUITE_P(WithVariousRebootLogs, GracefulWithCrashReporterTest,
                                  "FINAL REBOOT REASON (OOM)",
                                  "fuchsia-oom",
                                  zx::msec(65487494),
+                                 zx::msec(64208920),
                                  cobalt::LastRebootReason::kSystemOutOfMemory,
                                  true,
                              },
@@ -481,6 +534,7 @@ INSTANTIATE_TEST_SUITE_P(WithVariousRebootLogs, GracefulWithCrashReporterTest,
                                  "FINAL REBOOT REASON (SYSMGR FAILURE)",
                                  "fuchsia-sysmgr-failure",
                                  zx::msec(65487494),
+                                 zx::msec(64208920),
                                  cobalt::LastRebootReason::kSysmgrFailure,
                                  true,
                              },
@@ -490,6 +544,7 @@ INSTANTIATE_TEST_SUITE_P(WithVariousRebootLogs, GracefulWithCrashReporterTest,
                                  "FINAL REBOOT REASON (CRITICAL COMPONENT FAILURE)",
                                  "fuchsia-critical-component-failure",
                                  zx::msec(65487494),
+                                 zx::msec(64208920),
                                  cobalt::LastRebootReason::kCriticalComponentFailure,
                                  true,
                              },
@@ -499,6 +554,7 @@ INSTANTIATE_TEST_SUITE_P(WithVariousRebootLogs, GracefulWithCrashReporterTest,
                                  "FINAL REBOOT REASON (RETRY SYSTEM UPDATE)",
                                  "fuchsia-retry-system-update",
                                  zx::msec(65487494),
+                                 zx::msec(64208920),
                                  cobalt::LastRebootReason::kRetrySystemUpdate,
                                  true,
                              },
@@ -508,6 +564,7 @@ INSTANTIATE_TEST_SUITE_P(WithVariousRebootLogs, GracefulWithCrashReporterTest,
                                  "FINAL REBOOT REASON (HIGH TEMPERATURE)",
                                  "fuchsia-reboot-high-temperature",
                                  zx::msec(65487494),
+                                 zx::msec(64208920),
                                  cobalt::LastRebootReason::kHighTemperature,
                                  true,
                              },
@@ -517,6 +574,7 @@ INSTANTIATE_TEST_SUITE_P(WithVariousRebootLogs, GracefulWithCrashReporterTest,
                                  "FINAL REBOOT REASON (GENERIC GRACEFUL)",
                                  "fuchsia-undetermined-userspace-reboot",
                                  zx::msec(65487494),
+                                 zx::msec(64208920),
                                  cobalt::LastRebootReason::kGenericGraceful,
                                  true,
                              },
@@ -526,6 +584,7 @@ INSTANTIATE_TEST_SUITE_P(WithVariousRebootLogs, GracefulWithCrashReporterTest,
                                  "FINAL REBOOT REASON (GENERIC GRACEFUL)",
                                  "fuchsia-undetermined-userspace-reboot",
                                  zx::msec(65487494),
+                                 zx::msec(64208920),
                                  cobalt::LastRebootReason::kGenericGraceful,
                                  true,
                              },
@@ -535,6 +594,7 @@ INSTANTIATE_TEST_SUITE_P(WithVariousRebootLogs, GracefulWithCrashReporterTest,
                                  "FINAL REBOOT REASON (GENERIC GRACEFUL)",
                                  "fuchsia-undetermined-userspace-reboot",
                                  zx::msec(65487494),
+                                 zx::msec(64208920),
                                  cobalt::LastRebootReason::kGenericGraceful,
                                  true,
                              },
@@ -545,8 +605,9 @@ INSTANTIATE_TEST_SUITE_P(WithVariousRebootLogs, GracefulWithCrashReporterTest,
 TEST_P(GracefulWithCrashReporterTest, Succeed) {
   const auto param = GetParam();
 
-  const std::string zircon_reboot_log = fxl::StringPrintf(
-      "ZIRCON REBOOT REASON (NO CRASH)\n\nUPTIME (ms)\n%lu", param.output_uptime.to_msecs());
+  const std::string zircon_reboot_log =
+      fxl::StringPrintf("ZIRCON REBOOT REASON (NO CRASH)\n\nUPTIME (ms)\n%lu\nRUNTIME (ms)\n%lu",
+                        param.output_uptime.to_msecs(), param.output_runtime.to_secs());
   WriteZirconRebootLogContents(zircon_reboot_log);
 
   if (param.graceful_reboot_log != "NONE") {
@@ -560,6 +621,7 @@ TEST_P(GracefulWithCrashReporterTest, Succeed) {
               "%s\nGRACEFUL REBOOT REASONS: (%s)\n\n%s", zircon_reboot_log.c_str(),
               param.graceful_reboot_log.c_str(), param.reboot_reason.c_str()),
           .uptime = param.output_uptime,
+          .runtime = param.output_runtime,
           .is_fatal = param.output_is_fatal,
       }));
   SetUpCobaltServer(std::make_unique<stubs::CobaltLoggerFactory>());

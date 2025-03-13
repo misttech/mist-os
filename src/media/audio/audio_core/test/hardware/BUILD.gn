@@ -6,6 +6,16 @@ import("//build/components.gni")
 import("//build/testing/cc_test_executable.gni")
 import("//src/media/audio/hardware.gni")
 
+# This suite has real-time requirements and must run in release builds (debug builds are too slow).
+group("hardware") {
+  testonly = true
+
+  deps = []
+  if (!is_debug) {
+    deps += [ ":audio_core_hardware_tests" ]
+  }
+}
+
 fuchsia_unittest_package("audio_core_hardware_tests") {
   manifest = "meta/audio_core_hardware_tests.cml"
   deps = [ ":audio_core_hardware_tests_bin" ]

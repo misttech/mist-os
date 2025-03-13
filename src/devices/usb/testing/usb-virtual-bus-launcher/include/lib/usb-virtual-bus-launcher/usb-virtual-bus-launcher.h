@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_USB_VIRTUAL_BUS_LAUNCHER_USB_VIRTUAL_BUS_LAUNCHER_H_
-#define LIB_USB_VIRTUAL_BUS_LAUNCHER_USB_VIRTUAL_BUS_LAUNCHER_H_
+#ifndef SRC_DEVICES_USB_TESTING_USB_VIRTUAL_BUS_LAUNCHER_INCLUDE_LIB_USB_VIRTUAL_BUS_LAUNCHER_USB_VIRTUAL_BUS_LAUNCHER_H_
+#define SRC_DEVICES_USB_TESTING_USB_VIRTUAL_BUS_LAUNCHER_INCLUDE_LIB_USB_VIRTUAL_BUS_LAUNCHER_USB_VIRTUAL_BUS_LAUNCHER_H_
 
 #include <fidl/fuchsia.hardware.usb.peripheral/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.virtual.bus/cpp/wire.h>
@@ -44,6 +44,9 @@ class BusLauncher {
   // Get a file descriptor to the root of driver_test_realm's devfs.
   int GetRootFd();
 
+  // Get the exposed directory of the driver_test_realm's root node.
+  fidl::UnownedClientEnd<fuchsia_io::Directory> GetExposedDir();
+
   // Disable the virtual bus.
   [[nodiscard]] zx_status_t Disable();
 
@@ -62,4 +65,4 @@ class BusLauncher {
 
 }  // namespace usb_virtual
 
-#endif  // LIB_USB_VIRTUAL_BUS_LAUNCHER_USB_VIRTUAL_BUS_LAUNCHER_H_
+#endif  // SRC_DEVICES_USB_TESTING_USB_VIRTUAL_BUS_LAUNCHER_INCLUDE_LIB_USB_VIRTUAL_BUS_LAUNCHER_USB_VIRTUAL_BUS_LAUNCHER_H_

@@ -9,13 +9,12 @@ use anyhow::{format_err, Error};
 use nom::branch::alt;
 use nom::bytes::complete::{is_not, tag, take_while, take_while_m_n};
 use nom::character::complete::{char, none_of, one_of};
-use nom::character::{is_alphabetic, is_alphanumeric};
 use nom::combinator::{all_consuming, map, opt, peek, recognize};
-use nom::error::{convert_error, VerboseError};
 use nom::multi::{fold_many0, many0, separated_list0};
-use nom::sequence::{delimited, pair, preceded, separated_pair, terminated, tuple};
+use nom::sequence::{delimited, pair, preceded, separated_pair, terminated};
 use nom::Err::{self, Incomplete};
-use nom::{IResult, InputLength, Slice};
+use nom::{AsChar, IResult, Input, Parser};
+use nom_language::error::{convert_error, VerboseError};
 
 pub type ParsingResult<'a, O> = IResult<ParsingContext<'a>, O, VerboseError<ParsingContext<'a>>>;
 
@@ -58,7 +57,7 @@ pub type ParsingResult<'a, O> = IResult<ParsingContext<'a>, O, VerboseError<Pars
 
 // Matches 0 or more whitespace characters: \n, \t, ' '.
 fn whitespace(i: ParsingContext<'_>) -> ParsingResult<'_, ParsingContext<'_>> {
-    take_while(|c| " \n\t".contains(c))(i)
+    take_while(|c| " \n\t".contains(c)).parse(i)
 }
 
 // spewing() is useful for debugging. If you touch this file, you will
@@ -83,9 +82,11 @@ where
 }*/
 
 // A bit of syntactic sugar - just adds optional whitespace in front of any parser.
-fn spaced<'a, F, O>(parser: F) -> impl FnMut(ParsingContext<'a>) -> ParsingResult<'a, O>
+fn spaced<'a, F, O>(
+    parser: F,
+) -> impl Parser<ParsingContext<'a>, Output = O, Error = VerboseError<ParsingContext<'a>>>
 where
-    F: FnMut(ParsingContext<'a>) -> ParsingResult<'a, O>,
+    F: Parser<ParsingContext<'a>, Output = O, Error = VerboseError<ParsingContext<'a>>>,
 {
     preceded(whitespace, parser)
 }
@@ -95,11 +96,12 @@ where
 fn simple_name(i: ParsingContext<'_>) -> ParsingResult<'_, &str> {
     map(
         recognize(pair(
-            take_while_m_n(1, 1, |c: char| c.is_ascii() && (is_alphabetic(c as u8) || c == '_')),
-            take_while(|c: char| c.is_ascii() && (is_alphanumeric(c as u8) || c == '_')),
+            take_while_m_n(1, 1, |c: char| c.is_ascii() && (c.is_alpha() || c == '_')),
+            take_while(|c: char| c.is_ascii() && (c.is_alphanum() || c == '_')),
         )),
         |name: ParsingContext<'_>| name.into_inner(),
-    )(i)
+    )
+    .parse(i)
 }
 
 // Parses two simple names joined by "::" to form a namespaced name. Returns a
@@ -107,19 +109,21 @@ fn simple_name(i: ParsingContext<'_>) -> ParsingResult<'_, &str> {
 fn name_with_namespace(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree> {
     map(separated_pair(simple_name, tag("::"), simple_name), move |(s1, s2)| {
         ExpressionTree::Variable(VariableName::new(format!("{}::{}", s1, s2)))
-    })(i)
+    })
+    .parse(i)
 }
 
 // Parses a simple name with no namespace and returns a Metric-type Expression
 // holding the simple name.
 fn name_no_namespace(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree> {
-    map(simple_name, move |s: &str| ExpressionTree::Variable(VariableName::new(s.to_string())))(i)
+    map(simple_name, move |s: &str| ExpressionTree::Variable(VariableName::new(s.to_string())))
+        .parse(i)
 }
 
 // Parses either a simple or namespaced name and returns a Metric-type Expression
 // holding it.
 fn name(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree> {
-    alt((name_with_namespace, name_no_namespace))(i)
+    alt((name_with_namespace, name_no_namespace)).parse(i)
 }
 
 // Parse a decimal literal as specified in https://doc.rust-lang.org/reference/tokens.html#integer-literals
@@ -127,10 +131,10 @@ fn name(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree> {
 // Parse the first decimal digit
 // Consume all the remaining (DEC_DIGIT|_)
 fn decimal_literal(i: ParsingContext<'_>) -> ParsingResult<'_, &str> {
-    map(
-        recognize(tuple((one_of("0123456789"), many0(one_of("0123456789_"))))),
-        |d: ParsingContext<'_>| d.into_inner(),
-    )(i)
+    map(recognize((one_of("0123456789"), many0(one_of("0123456789_")))), |d: ParsingContext<'_>| {
+        d.into_inner()
+    })
+    .parse(i)
 }
 
 // Parse float exponent as specified in https://doc.rust-lang.org/reference/tokens.html#floating-point-literals
@@ -141,15 +145,16 @@ fn decimal_literal(i: ParsingContext<'_>) -> ParsingResult<'_, &str> {
 // Consume all the remaining (DEC_DIGIT|_)
 fn float_exponent(i: ParsingContext<'_>) -> ParsingResult<'_, &str> {
     map(
-        recognize(tuple((
+        recognize((
             one_of("eE"),
             opt(one_of("+-")),
             many0(char('_')),
             one_of("0123456789"),
             many0(one_of("0123456789_")),
-        ))),
+        )),
         |exponent: ParsingContext<'_>| exponent.into_inner(),
-    )(i)
+    )
+    .parse(i)
 }
 
 // Parse a floating point literal
@@ -164,24 +169,20 @@ fn float_exponent(i: ParsingContext<'_>) -> ParsingResult<'_, &str> {
 //  5. DECIMAL_LITERAL Eg. 1_2__3__4 (1234)
 fn double(i: ParsingContext<'_>) -> ParsingResult<'_, f64> {
     map(
-        recognize(tuple((
+        recognize((
             opt(one_of("+-")),
             alt((
-                recognize(tuple((char('.'), decimal_literal, opt(float_exponent)))),
-                recognize(tuple((decimal_literal, float_exponent))),
-                recognize(tuple((
-                    decimal_literal,
-                    char('.'),
-                    decimal_literal,
-                    opt(float_exponent),
-                ))),
-                recognize(tuple((decimal_literal, char('.'), peek(none_of("._"))))),
-                recognize(tuple((decimal_literal, char('.')))),
+                recognize((char('.'), decimal_literal, opt(float_exponent))),
+                recognize((decimal_literal, float_exponent)),
+                recognize((decimal_literal, char('.'), decimal_literal, opt(float_exponent))),
+                recognize((decimal_literal, char('.'), peek(none_of("._")))),
+                recognize((decimal_literal, char('.'))),
                 recognize(decimal_literal),
             )),
-        ))),
+        )),
         |d: ParsingContext<'_>| d.into_inner().replace("_", "").parse::<f64>().unwrap(),
-    )(i)
+    )
+    .parse(i)
 }
 
 // Returns a Value-type expression holding either an Int or Float number.
@@ -194,7 +195,7 @@ fn number(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree> {
     match double(i) {
         Ok((remaining, float)) => {
             let number_len = i.input_len() - remaining.input_len(); // How many characters were accepted
-            match i.slice(..number_len).into_inner().parse::<i64>() {
+            match i.take(number_len).into_inner().parse::<i64>() {
                 Ok(int) => Ok((remaining, ExpressionTree::Value(MetricValue::Int(int)))),
                 Err(_) => Ok((remaining, ExpressionTree::Value(MetricValue::Float(float)))),
             }
@@ -208,7 +209,7 @@ macro_rules! any_string {
         let mid = map(recognize($mid), |s: ParsingContext<'_>| {
             ExpressionTree::Value(MetricValue::String(s.into_inner().to_string()))
         });
-        delimited($left, mid, $right)($i)
+        delimited($left, mid, $right).parse($i)
     }};
 }
 
@@ -241,7 +242,8 @@ fn string(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree> {
         escaped_single_quote_string,
         double_quote_string,
         escaped_double_quote_string,
-    ))(i)
+    ))
+    .parse(i)
 }
 
 macro_rules! function {
@@ -301,25 +303,27 @@ fn function_name_parser(i: ParsingContext<'_>) -> ParsingResult<'_, Function> {
             function!("True", True),
             function!("False", False),
         )),
-    ))(i)
+    ))
+    .parse(i)
 }
 
 fn function_expression(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree> {
     let open_paren = spaced(char('('));
     let expressions = separated_list0(spaced(char(',')), expression_top);
     let close_paren = spaced(char(')'));
-    let function_sequence = tuple((function_name_parser, open_paren, expressions, close_paren));
+    let function_sequence = (function_name_parser, open_paren, expressions, close_paren);
     map(function_sequence, move |(function, _, operands, _)| {
         ExpressionTree::Function(function, operands)
-    })(i)
+    })
+    .parse(i)
 }
 
 fn vector_expression(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree> {
     let open_bracket = spaced(char('['));
     let expressions = separated_list0(spaced(char(',')), expression_top);
     let close_bracket = spaced(char(']'));
-    let vector_sequence = tuple((open_bracket, expressions, close_bracket));
-    map(vector_sequence, move |(_, items, _)| ExpressionTree::Vector(items))(i)
+    let vector_sequence = (open_bracket, expressions, close_bracket);
+    map(vector_sequence, move |(_, items, _)| ExpressionTree::Vector(items)).parse(i)
 }
 
 // I use "primitive" to mean an expression that is not an infix operator pair:
@@ -328,7 +332,8 @@ fn vector_expression(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree>
 fn expression_primitive(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree> {
     let paren_expr = delimited(char('('), terminated(expression_top, whitespace), char(')'));
     let res =
-        spaced(alt((paren_expr, function_expression, vector_expression, number, string, name)))(i);
+        spaced(alt((paren_expr, function_expression, vector_expression, number, string, name)))
+            .parse(i);
     res
 }
 
@@ -349,7 +354,8 @@ fn expression_muldiv(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree>
         ),
         move || init.take().unwrap(),
         |acc, (op, expr)| ExpressionTree::Function(op, vec![acc, expr]),
-    )(i)
+    )
+    .parse(i)
 }
 
 // Scans for muldiv expressions (which may be a single primitive expression)
@@ -361,7 +367,8 @@ fn expression_addsub(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree>
         pair(alt((math!("+", Add), math!("-", Sub))), expression_muldiv),
         move || init.take().unwrap(),
         |acc, (op, expr)| ExpressionTree::Function(op, vec![acc, expr]),
-    )(i)
+    )
+    .parse(i)
 }
 
 // Top-level expression. Should match the entire expression string, and also
@@ -378,11 +385,12 @@ fn expression_top(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree> {
         math!("<", Less),
     ));
     alt((
-        map(tuple((expression_addsub, comparison, expression_addsub)), move |(left, op, right)| {
+        map((expression_addsub, comparison, expression_addsub), move |(left, op, right)| {
             ExpressionTree::Function(op, vec![left, right])
         }),
         expression_addsub,
-    ))(i)
+    ))
+    .parse(i)
 }
 
 // Parses a given string into either an Error or an Expression ready
@@ -390,7 +398,7 @@ fn expression_top(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree> {
 pub(crate) fn parse_expression(i: &str, namespace: &str) -> Result<ExpressionTree, Error> {
     let ctx = ParsingContext::new(i, namespace);
     let mut match_whole = all_consuming(terminated(expression_top, whitespace));
-    match match_whole(ctx) {
+    match match_whole.parse(ctx) {
         Err(Err::Error(e)) | Err(Err::Failure(e)) => Err(format_err!(
             "Expression Error: \n{}",
             convert_error(

@@ -275,6 +275,10 @@ bool UserPager::CreateVmoInternal(uint64_t byte_size, uint32_t options, Vmo** vm
     return false;
   }
 
+  // Give the VMO a name for debugging.
+  const char* vmo_name = "testvmo";
+  vmo.set_property(ZX_PROP_NAME, vmo_name, strlen(vmo_name));
+
   auto paged_vmo = Vmo::Create(std::move(vmo), tracked_vmo_size, next_key_);
   if (paged_vmo == nullptr) {
     fprintf(stderr, "could not create Vmo instance\n");

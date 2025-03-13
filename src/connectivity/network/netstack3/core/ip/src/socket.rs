@@ -483,7 +483,7 @@ where
         O: SendOptions<I> + RouteResolutionOptions<I>,
     {
         // TODO(joshlf): Call `trace!` with relevant fields from the socket.
-        self.increment(|counters| &counters.send_ip_packet);
+        self.counters().send_ip_packet.increment();
 
         send_ip_packet(self, bindings_ctx, ip_sock, body, options, tx_metadata)
     }
@@ -863,7 +863,8 @@ where
 
     let previous_dst = remote_ip.addr();
     let mut packet = filter::TxPacket::new(local_ip.addr(), remote_ip.addr(), *proto, &mut body);
-    let mut packet_metadata = IpLayerPacketMetadata::from_tx_metadata(tx_metadata);
+    let mut packet_metadata =
+        IpLayerPacketMetadata::from_tx_metadata_and_marks(tx_metadata, *options.marks());
 
     match core_ctx.filter_handler().local_egress_hook(
         bindings_ctx,
@@ -896,7 +897,7 @@ where
             next_hop: new_next_hop,
             local_delivery_device: new_local_delivery_device,
             internal_forwarding: new_internal_forwarding,
-        } = resolve(
+        } = match resolve(
             core_ctx,
             bindings_ctx,
             socket_device,
@@ -904,10 +905,13 @@ where
             remote_ip,
             options.transparent(),
             options.marks(),
-        )
-        .inspect_err(|_| {
-            packet_metadata.acknowledge_drop();
-        })?;
+        ) {
+            Ok(r) => r,
+            Err(err) => {
+                packet_metadata.acknowledge_drop();
+                return Err(err);
+            }
+        };
         local_ip = new_local_ip;
         egress_device = new_device;
         next_hop = new_next_hop;

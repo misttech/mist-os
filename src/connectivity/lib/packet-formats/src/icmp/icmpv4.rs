@@ -19,6 +19,46 @@ use super::{
     IcmpZeroCode, IdAndSeq, OriginalPacket,
 };
 
+/// Dispatches expressions to the type-safe variants of [`Icmpv4Packet`] or
+/// [`Icmpv4PacketRaw`].
+///
+/// # Usage
+///
+/// ```
+/// icmpv4_dispatch!(packet, p => p.message_mut().foo());
+///
+/// icmpv4_dispatch!(packet: raw, p => p.message_mut().foo());
+/// ```
+#[macro_export]
+macro_rules! icmpv4_dispatch {
+    (__internal__, $x:ident, $variable:pat => $expression:expr, $typ:ty) => {
+        {
+            use $typ::*;
+
+            match $x {
+                EchoReply($variable) => $expression,
+                DestUnreachable($variable) => $expression,
+                Redirect($variable) => $expression,
+                EchoRequest($variable) => $expression,
+                TimeExceeded($variable) => $expression,
+                ParameterProblem($variable) => $expression,
+                TimestampRequest($variable) => $expression,
+                TimestampReply($variable) => $expression,
+            }
+        }
+    };
+    ($x:ident : raw, $variable:pat => $expression:expr) => {
+        $crate::icmpv4_dispatch!(__internal__,
+            $x, $variable => $expression,
+            $crate::icmp::Icmpv4PacketRaw)
+    };
+    ($x:ident, $variable:pat => $expression:expr) => {
+        $crate::icmpv4_dispatch!(__internal__,
+            $x, $variable => $expression,
+            $crate::icmp::Icmpv4Packet)
+    };
+}
+
 /// An ICMPv4 packet with a dynamic message type.
 ///
 /// Unlike `IcmpPacket`, `Packet` only supports ICMPv4, and does not
@@ -58,17 +98,7 @@ impl<B: SplitByteSlice> ParsablePacket<B, IcmpParseArgs<Ipv4Addr>> for Icmpv4Pac
     type Error = ParseError;
 
     fn parse_metadata(&self) -> ParseMetadata {
-        use self::Icmpv4Packet::*;
-        match self {
-            EchoReply(p) => p.parse_metadata(),
-            DestUnreachable(p) => p.parse_metadata(),
-            Redirect(p) => p.parse_metadata(),
-            EchoRequest(p) => p.parse_metadata(),
-            TimeExceeded(p) => p.parse_metadata(),
-            ParameterProblem(p) => p.parse_metadata(),
-            TimestampRequest(p) => p.parse_metadata(),
-            TimestampReply(p) => p.parse_metadata(),
-        }
+        icmpv4_dispatch!(self, p => p.parse_metadata())
     }
 
     fn parse<BV: BufferView<B>>(buffer: BV, args: IcmpParseArgs<Ipv4Addr>) -> ParseResult<Self> {
@@ -121,17 +151,7 @@ impl<B: SplitByteSlice> ParsablePacket<B, ()> for Icmpv4PacketRaw<B> {
     type Error = ParseError;
 
     fn parse_metadata(&self) -> ParseMetadata {
-        use self::Icmpv4PacketRaw::*;
-        match self {
-            EchoReply(p) => p.parse_metadata(),
-            DestUnreachable(p) => p.parse_metadata(),
-            Redirect(p) => p.parse_metadata(),
-            EchoRequest(p) => p.parse_metadata(),
-            TimeExceeded(p) => p.parse_metadata(),
-            ParameterProblem(p) => p.parse_metadata(),
-            TimestampRequest(p) => p.parse_metadata(),
-            TimestampReply(p) => p.parse_metadata(),
-        }
+        icmpv4_dispatch!(self: raw, p => p.parse_metadata())
     }
 
     fn parse<BV: BufferView<B>>(buffer: BV, _args: ()) -> ParseResult<Self> {

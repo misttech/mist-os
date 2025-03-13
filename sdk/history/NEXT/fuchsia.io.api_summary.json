@@ -172,6 +172,14 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.io/Directory.DeprecatedOpen",
+        "strictness": "strict",
+        "ordinal": "3193127272456937152",
+        "direction": "one_way",
+        "request": "fuchsia.io/DirectoryDeprecatedOpenRequest"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.io/Directory.DeprecatedSetFlags",
         "strictness": "strict",
         "ordinal": "5950864159036794675",
@@ -269,17 +277,9 @@
         "kind": "protocol/member",
         "name": "fuchsia.io/Directory.Open",
         "strictness": "strict",
-        "ordinal": "3193127272456937152",
-        "direction": "one_way",
-        "request": "fuchsia.io/DirectoryOpenRequest"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.io/Directory.Open3",
-        "strictness": "strict",
         "ordinal": "6236883748953765593",
         "direction": "one_way",
-        "request": "fuchsia.io/DirectoryOpen3Request"
+        "request": "fuchsia.io/DirectoryOpenRequest"
     },
     {
         "kind": "protocol/member",
@@ -432,6 +432,35 @@
     },
     {
         "kind": "struct/member",
+        "name": "fuchsia.io/DirectoryDeprecatedOpenRequest.flags",
+        "ordinal": "1",
+        "type": "fuchsia.io/OpenFlags"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.io/DirectoryDeprecatedOpenRequest.mode",
+        "ordinal": "2",
+        "type": "fuchsia.io/ModeType"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.io/DirectoryDeprecatedOpenRequest.object",
+        "ordinal": "4",
+        "type": "server_end:fuchsia.io/Node"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.io/DirectoryDeprecatedOpenRequest.path",
+        "ordinal": "3",
+        "type": "string:4095"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.io/DirectoryDeprecatedOpenRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
         "name": "fuchsia.io/DirectoryGetTokenResponse.s",
         "ordinal": "1",
         "type": "int32"
@@ -496,55 +525,26 @@
     },
     {
         "kind": "struct/member",
-        "name": "fuchsia.io/DirectoryOpen3Request.flags",
+        "name": "fuchsia.io/DirectoryOpenRequest.flags",
         "ordinal": "2",
         "type": "fuchsia.io/Flags"
     },
     {
         "kind": "struct/member",
-        "name": "fuchsia.io/DirectoryOpen3Request.object",
+        "name": "fuchsia.io/DirectoryOpenRequest.object",
         "ordinal": "4",
         "type": "zx/Handle:CHANNEL"
     },
     {
         "kind": "struct/member",
-        "name": "fuchsia.io/DirectoryOpen3Request.options",
+        "name": "fuchsia.io/DirectoryOpenRequest.options",
         "ordinal": "3",
         "type": "fuchsia.io/Options"
     },
     {
         "kind": "struct/member",
-        "name": "fuchsia.io/DirectoryOpen3Request.path",
-        "ordinal": "1",
-        "type": "string:4095"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.io/DirectoryOpen3Request",
-        "resourceness": "resource"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.io/DirectoryOpenRequest.flags",
-        "ordinal": "1",
-        "type": "fuchsia.io/OpenFlags"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.io/DirectoryOpenRequest.mode",
-        "ordinal": "2",
-        "type": "fuchsia.io/ModeType"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.io/DirectoryOpenRequest.object",
-        "ordinal": "4",
-        "type": "server_end:fuchsia.io/Node"
-    },
-    {
-        "kind": "struct/member",
         "name": "fuchsia.io/DirectoryOpenRequest.path",
-        "ordinal": "3",
+        "ordinal": "1",
         "type": "string:4095"
     },
     {

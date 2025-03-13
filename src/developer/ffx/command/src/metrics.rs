@@ -45,7 +45,7 @@ impl MetricsSession {
     pub async fn start(context: &EnvironmentContext) -> Result<Self> {
         let invoker = context.get("fuchsia.analytics.ffx_invoker").unwrap_or(None);
         let build_info = context.build_info();
-        let enabled = context.analytics_enabled().await;
+        let enabled = context.analytics_enabled();
         let analytics_path = context.get_analytics_path();
         let sdk_version = if enabled {
             get_sdk_version(&context).unwrap_or_else(|| UNKNOWN_SDK.to_string())

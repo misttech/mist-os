@@ -8,6 +8,7 @@
 #include <lib/ld/remote-dynamic-linker.h>
 #include <lib/ld/remote-perfect-symbol-filter.h>
 #include <lib/ld/remote-zygote.h>
+#include <lib/ld/testing/test-elf-object.h>
 
 #include <gtest/gtest.h>
 
@@ -59,6 +60,11 @@ TEST_F(LdRemoteTests, RemoteDynamicLinker) {
   // own means.
   zx::vmo exec_vmo;
   ASSERT_NO_FATAL_FAILURE(exec_vmo = GetExecutableVmo("many-deps"));
+
+  // This makes sure the Needed() call below finds the files in the test
+  // packaging correctly.  These are only aspects of the test framework API,
+  // not of the remote dynamic linker API.
+  ConfigFromInterp(exec_vmo.borrow());
 
   // Decode the main executable.  This transfers ownership of the zx::vmo for
   // the executable into the new fbl::RefPtr<ld::RemoteDecodedModule> object.
@@ -265,6 +271,10 @@ TEST_F(LdRemoteTests, SecondSession) {
   ld::RemoteAbiStub<>::Ptr abi_stub = ld::RemoteAbiStub<>::Create(diag, TakeStubLdVmo(), kPageSize);
   ASSERT_TRUE(abi_stub);
 
+  zx::vmo exec_vmo = GetExecutableVmo("second-session");
+  ASSERT_TRUE(exec_vmo);
+  ConfigFromInterp(exec_vmo.borrow());
+
   // First do a complete dynamic linking session for the main executable.
   ASSERT_NO_FATAL_FAILURE(Needed({
       "libindirect-deps-a.so",
@@ -278,9 +288,6 @@ TEST_F(LdRemoteTests, SecondSession) {
   {
     Linker linker;
     linker.set_abi_stub(abi_stub);
-
-    zx::vmo exec_vmo;
-    ASSERT_NO_FATAL_FAILURE(exec_vmo = GetExecutableVmo("second-session"));
 
     Linker::Module::DecodedPtr decoded_executable =
         Linker::Module::Decoded::Create(diag, std::move(exec_vmo), kPageSize);
@@ -331,14 +338,17 @@ TEST_F(LdRemoteTests, SecondSession) {
   // executable and vDSO from the first session as implicit modules.
   Linker::size_type test_start_fnptr = 0;
   {
+    constexpr Linker::Soname kPathPrefix{"second-session-module"};
+    constexpr Linker::Soname kRootModule{"second-session-module.so"};
+    constexpr std::string_view kDepModule = "libsecond-session-module-deps-a.so";
+
     Linker second_linker;
     second_linker.set_abi_stub(abi_stub);
 
     // Point GetLibVmo() to the different place for this module's deps.
-    LdsvcPathPrefix("second-session-module");
+    LdsvcPathPrefix(kPathPrefix.str());
 
     // Acquire the VMO for the root module.
-    constexpr Linker::Soname kRootModule{"second-session-module.so"};
     zx::vmo module_vmo;
     ASSERT_NO_FATAL_FAILURE(module_vmo = GetLibVmo(kRootModule.str()));
 
@@ -350,10 +360,11 @@ TEST_F(LdRemoteTests, SecondSession) {
     // Add in the root module with the implicit modules from the first session.
     initial_modules.emplace_back(Linker::RootModule(decoded_module, kRootModule));
 
-    // Prime fresh expectations for get_dep callbacks from this session.
+    // Prime fresh expectations for get_dep callbacks from this session.  There
+    // is no PT_INTERP in the root module to key off, so rely on the build-time
+    // record to find where dependencies got packaged.
     ASSERT_NO_FATAL_FAILURE(VerifyAndClearNeeded());
-    constexpr std::string_view kDepModule = "libsecond-session-module-deps-a.so";
-    ASSERT_NO_FATAL_FAILURE(Needed({kDepModule}));
+    ASSERT_NO_FATAL_FAILURE(NeededViaLoadSet(kPathPrefix, {kDepModule}));
     ASSERT_NO_FATAL_FAILURE(LdsvcExpectNeeded());
 
     // Now resolve dependencies, including the preloaded implicit modules as
@@ -435,7 +446,9 @@ TEST_F(LdRemoteTests, Zygote) {
   ZygoteLinker linker{abi_stub};
 
   zx::vmo exec_vmo = GetExecutableVmo("zygote");
-  EXPECT_TRUE(exec_vmo);
+  ASSERT_TRUE(exec_vmo);
+  ConfigFromInterp(exec_vmo.borrow());
+
   zx::vmo vdso_vmo;
   zx_status_t status = ld::testing::GetVdsoVmo()->duplicate(ZX_RIGHT_SAME_RIGHTS, &vdso_vmo);
   EXPECT_EQ(status, ZX_OK) << zx_status_get_string(status);
@@ -539,6 +552,7 @@ TEST_F(LdRemoteTests, Zygote) {
   zx::vmo secondary_vmo;
   ASSERT_NO_FATAL_FAILURE(secondary_vmo = GetExecutableVmo(kSecondaryName.str()));
   EXPECT_TRUE(secondary_vmo);
+  ConfigFromInterp(secondary_vmo.borrow());
   Linker::Module::DecodedPtr secondary =
       Linker::Module::Decoded::Create(diag, std::move(secondary_vmo), kPageSize);
 
@@ -649,8 +663,9 @@ TEST_F(LdRemoteTests, LoadedBy) {
   LdsvcPathPrefix("many-deps");
 
   // Decode the main executable.
-  zx::vmo vmo;
-  ASSERT_NO_FATAL_FAILURE(vmo = GetExecutableVmo("many-deps"));
+  zx::vmo vmo = GetExecutableVmo("many-deps");
+  ASSERT_TRUE(vmo);
+  ConfigFromInterp(vmo.borrow());
 
   // Prime expectations for its dependencies.
   ASSERT_NO_FATAL_FAILURE(Needed({
@@ -740,13 +755,17 @@ TEST_F(LdRemoteTests, SymbolFilter) {
   zx_status_t status = ld::testing::GetVdsoVmo()->duplicate(ZX_RIGHT_SAME_RIGHTS, &vdso_vmo);
   EXPECT_EQ(status, ZX_OK) << zx_status_get_string(status);
 
+  zx::vmo exec_vmo = GetExecutableVmo("symbol-filter");
+  ASSERT_TRUE(exec_vmo);
+  ConfigFromInterp(exec_vmo.borrow());
+
   auto decode = [](zx::vmo vmo) {
     auto diag = elfldltl::testing::ExpectOkDiagnostics();
     return Linker::Module::Decoded::Create(diag, std::move(vmo), kPageSize);
   };
 
   Linker::InitModuleList init_modules = {
-      Linker::Executable(decode(GetExecutableVmo("symbol-filter"))),
+      Linker::Executable(decode(std::move(exec_vmo))),
       Linker::Implicit(decode(GetLibVmo("libsymbol-filter-dep17.so"))),
       Linker::Implicit(decode(GetLibVmo("libsymbol-filter-dep23.so"))),
       Linker::Implicit(decode(GetLibVmo("libsymbol-filter-dep42.so"))),
@@ -807,6 +826,20 @@ void PerfectSymbolFilterTest(Test& test, std::string_view path_prefix) {
   using Module = ld::RemoteLoadModule<Elf>;
 
   test.LdsvcPathPrefix(path_prefix);
+  {
+    // The only need to find the nominal executable is to inform GetLibVmo
+    // where to look in the test packaging.
+    zx::vmo exec_vmo;
+    if constexpr (Elf::kClass == elfldltl::ElfClass::k32) {
+      // The elf32 file is not packaged quite normally yet.
+      const std::string executable_path =
+          std::filesystem::path("test") / path_prefix / "lib" / path_prefix;
+      exec_vmo = elfldltl::testing::GetTestLibVmo(executable_path);
+    } else {
+      exec_vmo = Test::GetExecutableVmo(path_prefix);
+    }
+    test.ConfigFromInterp(exec_vmo.borrow());
+  }
 
   auto diag = elfldltl::testing::ExpectOkDiagnostics();
   auto decoded = Module::Decoded::Create(diag, test.GetLibVmo("libsymbol-filter-dep17.so"),
@@ -894,6 +927,8 @@ TEST_F(LdRemoteTests, ForeignMachine) {
   using ForeignLinker =
       ld::RemoteDynamicLinker<ForeignElf, ld::RemoteLoadZygote::kNo, kForeignMachine>;
 
+  using ForeignStub = ForeignLinker::AbiStub;
+
   // Init() creates the process where the test modules will be loaded, and
   // provides its root VMAR.  The modules understand only a 32-bit address
   // space, so they must go into the low 4GiB of the test process.
@@ -926,16 +961,22 @@ TEST_F(LdRemoteTests, ForeignMachine) {
 
   LdsvcPathPrefix("symbol-filter-elf32");
 
+  zx::vmo stub_vmo = elfldltl::testing::GetTestLibVmo(ForeignStub::kFilename);
+  ASSERT_TRUE(stub_vmo);
+
   auto diag = elfldltl::testing::ExpectOkDiagnostics();
   ForeignLinker linker;
-  linker.set_abi_stub(ld::RemoteAbiStub<ForeignElf, kForeignMachine>::Create(
-      diag, GetLibVmo("ld-stub.so"), kForeignPageSize));
+  linker.set_abi_stub(ForeignStub::Create(diag, std::move(stub_vmo), kForeignPageSize));
   ASSERT_TRUE(linker.abi_stub());
 
   // The non-Fuchsia executable gets packaged under lib/ in the test data.
+  zx::vmo exec_vmo = GetLibVmo("symbol-filter-elf32");
+  ASSERT_TRUE(exec_vmo);
+  ConfigFromInterp(exec_vmo.borrow());
+
   ForeignLinker::Module::DecodedPtr executable;
-  ASSERT_TRUE(executable = ForeignLinker::Module::Decoded::Create(
-                  diag, GetLibVmo("symbol-filter-elf32"), kForeignPageSize));
+  ASSERT_TRUE(executable = ForeignLinker::Module::Decoded::Create(  //
+                  diag, std::move(exec_vmo), kForeignPageSize));
 
   auto get_dep = GetDepFunction<ForeignLinker>(diag, kForeignPageSize);
   ASSERT_NO_FATAL_FAILURE(Needed({
@@ -971,6 +1012,13 @@ struct OnEachLayout {
 
 constexpr auto OnAllLayouts = elfldltl::AllFormats<OnEachLayout>{};
 
+constexpr std::string_view kTestPrefix = "test/";
+constexpr std::string_view kTestSuffix;
+
+template <class Elf>
+constexpr std::string_view kRemoteDecodedFileTestFile =
+    Elf::template kFilename<kTestPrefix, elfldltl::ElfMachine::kNone, kTestSuffix>;
+
 template <class Elf>
 struct RemoteDecodedFileTest {
   using size_type = Elf::size_type;
@@ -980,24 +1028,7 @@ struct RemoteDecodedFileTest {
   static constexpr size_type kPageSize = 0x1000;
 
   static zx::vmo TestData() {
-    std::string name = "test/";
-    switch (Elf::kClass) {
-      case elfldltl::ElfClass::k32:
-        name += "32";
-        break;
-      case elfldltl::ElfClass::k64:
-        name += "64";
-        break;
-    }
-    switch (Elf::kData) {
-      case elfldltl::ElfData::k2Lsb:
-        name += "le";
-        break;
-      case elfldltl::ElfData::k2Msb:
-        name += "be";
-        break;
-    }
-    return elfldltl::testing::GetTestLibVmo(name);
+    return elfldltl::testing::GetTestLibVmo(kRemoteDecodedFileTestFile<Elf>);
   }
 
   static void Test() {

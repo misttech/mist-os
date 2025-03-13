@@ -563,7 +563,7 @@ impl DeviceInfo {
             .ok_or_else(|| Error::Config("buffer_stride is zero".to_owned()))?;
 
         let min_tx_data = match usize::try_from(*min_tx_buffer_length)
-            .map(|min_tx| (min_tx <= buffer_length).then(|| min_tx))
+            .map(|min_tx| (min_tx <= buffer_length).then_some(min_tx))
         {
             Ok(Some(min_tx_buffer_length)) => min_tx_buffer_length,
             // Either the conversion or the comparison failed.

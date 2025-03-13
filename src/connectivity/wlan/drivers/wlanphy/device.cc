@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.wlan.device/cpp/wire.h>
 #include <fuchsia/wlan/common/cpp/fidl.h>
 #include <fuchsia/wlan/internal/cpp/fidl.h>
+#include <inttypes.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/driver.h>
 #include <lib/driver/component/cpp/driver_base.h>
@@ -137,8 +138,7 @@ zx_status_t Device::AddWlanDeviceConnector() {
 
 void Device::GetSupportedMacRoles(GetSupportedMacRolesCompleter::Sync& completer) {
   ltrace_fn();
-  constexpr uint32_t kTag = 'GSMC';
-  fdf::Arena fdf_arena(kTag);
+  fdf::Arena fdf_arena(0u);
 
   client_.buffer(fdf_arena)->GetSupportedMacRoles().ThenExactlyOnce(
       [completer = completer.ToAsync()](
@@ -169,8 +169,7 @@ const fidl::Array<uint8_t, 6> NULL_MAC_ADDR{0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 void Device::CreateIface(CreateIfaceRequestView request, CreateIfaceCompleter::Sync& completer) {
   ltrace_fn();
-  constexpr uint32_t kTag = 'CIFC';
-  fdf::Arena fdf_arena(kTag);
+  fdf::Arena fdf_arena(0u);
 
   fidl::Arena fidl_arena;
   auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(fidl_arena);
@@ -199,7 +198,7 @@ void Device::CreateIface(CreateIfaceRequestView request, CreateIfaceCompleter::S
         }
 
         if (!result->value()->has_iface_id()) {
-          lerror("iface_id does not exist");
+          lerror("CreateIface failed. Response missing iface_id");
           completer.ReplyError(ZX_ERR_INTERNAL);
           return;
         }
@@ -209,8 +208,7 @@ void Device::CreateIface(CreateIfaceRequestView request, CreateIfaceCompleter::S
 
 void Device::DestroyIface(DestroyIfaceRequestView request, DestroyIfaceCompleter::Sync& completer) {
   ltrace_fn();
-  constexpr uint32_t kTag = 'DIFC';
-  fdf::Arena fdf_arena(kTag);
+  fdf::Arena fdf_arena(0u);
 
   fidl::Arena fidl_arena;
   auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplDestroyIfaceRequest::Builder(fidl_arena);
@@ -242,8 +240,7 @@ void Device::DestroyIface(DestroyIfaceRequestView request, DestroyIfaceCompleter
 void Device::SetCountry(SetCountryRequestView request, SetCountryCompleter::Sync& completer) {
   ltrace_fn();
   ldebug_device("SetCountry to %s", wlan::common::Alpha2ToStr(request->req.alpha2).c_str());
-  constexpr uint32_t kTag = 'SCNT';
-  fdf::Arena fdf_arena(kTag);
+  fdf::Arena fdf_arena(0u);
 
   auto alpha2 = ::fidl::Array<uint8_t, fuchsia_wlan_phyimpl::wire::kWlanphyAlpha2Len>();
   memcpy(alpha2.data(), request->req.alpha2.data(), fuchsia_wlan_phyimpl::wire::kWlanphyAlpha2Len);
@@ -271,8 +268,7 @@ void Device::SetCountry(SetCountryRequestView request, SetCountryCompleter::Sync
 
 void Device::GetCountry(GetCountryCompleter::Sync& completer) {
   ltrace_fn();
-  constexpr uint32_t kTag = 'GCNT';
-  fdf::Arena fdf_arena(kTag);
+  fdf::Arena fdf_arena(0u);
 
   client_.buffer(fdf_arena)->GetCountry().ThenExactlyOnce(
       [completer = completer.ToAsync()](
@@ -280,20 +276,20 @@ void Device::GetCountry(GetCountryCompleter::Sync& completer) {
         fuchsia_wlan_device::wire::CountryCode resp;
         zx_status_t status;
         if (!result.ok()) {
-          ldebug_device("GetCountry failed with FIDL error %s", result.status_string());
+          lerror("GetCountry failed with FIDL error %s", result.status_string());
           status = result.status();
           completer.ReplyError(status);
           return;
         }
         if (result->is_error()) {
-          ldebug_device("GetCountry failed with error %s",
-                        zx_status_get_string(result->error_value()));
+          lerror("GetCountry failed with error %s", zx_status_get_string(result->error_value()));
           status = result->error_value();
           completer.ReplyError(status);
           return;
         }
         if (!result->value()->is_alpha2()) {
-          lerror("only alpha2 format is supported");
+          lerror("GetCountry failed. Response union is not an alpha2: %" PRIu64,
+                 result->value()->Which());
           completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
           return;
         }
@@ -306,20 +302,18 @@ void Device::GetCountry(GetCountryCompleter::Sync& completer) {
 
 void Device::ClearCountry(ClearCountryCompleter::Sync& completer) {
   ltrace_fn();
-  constexpr uint32_t kTag = 'CCNT';
-  fdf::Arena fdf_arena(kTag);
+  fdf::Arena fdf_arena(0u);
 
   client_.buffer(fdf_arena)->ClearCountry().ThenExactlyOnce(
       [completer = completer.ToAsync()](
           fdf::WireUnownedResult<fuchsia_wlan_phyimpl::WlanPhyImpl::ClearCountry>& result) mutable {
         if (!result.ok()) {
-          ldebug_device("ClearCountry failed with FIDL error %s", result.status_string());
+          lerror("ClearCountry failed with FIDL error %s", result.status_string());
           completer.Reply(result.status());
           return;
         }
         if (result->is_error()) {
-          ldebug_device("ClearCountry failed with error %s",
-                        zx_status_get_string(result->error_value()));
+          lerror("ClearCountry failed with error %s", zx_status_get_string(result->error_value()));
           completer.Reply(result->error_value());
           return;
         }
@@ -332,8 +326,7 @@ void Device::SetPowerSaveMode(SetPowerSaveModeRequestView request,
                               SetPowerSaveModeCompleter::Sync& completer) {
   ltrace_fn();
   ldebug_device("SetPowerSaveMode to %d", request->req);
-  constexpr uint32_t kTag = 'SPSM';
-  fdf::Arena fdf_arena(kTag);
+  fdf::Arena fdf_arena(0u);
 
   fidl::Arena fidl_arena;
   auto builder =
@@ -347,13 +340,13 @@ void Device::SetPowerSaveMode(SetPowerSaveModeRequestView request,
               fdf::WireUnownedResult<fuchsia_wlan_phyimpl::WlanPhyImpl::SetPowerSaveMode>&
                   result) mutable {
             if (!result.ok()) {
-              ldebug_device("SetPowerSaveMode failed with FIDL error %s", result.status_string());
+              lerror("SetPowerSaveMode failed with FIDL error %s", result.status_string());
               completer.Reply(result.status());
               return;
             }
             if (result->is_error()) {
-              ldebug_device("SetPowerSaveMode failed with error %s",
-                            zx_status_get_string(result->error_value()));
+              lerror("SetPowerSaveMode failed with error %s",
+                     zx_status_get_string(result->error_value()));
               completer.Reply(result->error_value());
               return;
             }
@@ -364,27 +357,26 @@ void Device::SetPowerSaveMode(SetPowerSaveModeRequestView request,
 
 void Device::GetPowerSaveMode(GetPowerSaveModeCompleter::Sync& completer) {
   ltrace_fn();
-  constexpr uint32_t kTag = 'GPSM';
-  fdf::Arena fdf_arena(kTag);
+  fdf::Arena fdf_arena(0u);
 
   client_.buffer(fdf_arena)->GetPowerSaveMode().ThenExactlyOnce(
       [completer = completer.ToAsync()](
           fdf::WireUnownedResult<fuchsia_wlan_phyimpl::WlanPhyImpl::GetPowerSaveMode>&
               result) mutable {
         if (!result.ok()) {
-          ldebug_device("GetPowerSaveMode failed with FIDL error %s", result.status_string());
+          lerror("GetPowerSaveMode failed with FIDL error %s", result.status_string());
           completer.ReplyError(result.status());
           return;
         }
         if (result->is_error()) {
-          ldebug_device("GetPowerSaveMode failed with error %s",
-                        zx_status_get_string(result->error_value()));
+          lerror("GetPowerSaveMode failed with error %s",
+                 zx_status_get_string(result->error_value()));
           completer.ReplyError(result->error_value());
           return;
         }
 
         if (!result->value()->has_ps_mode()) {
-          lerror("ps mode is not present in response");
+          lerror("GetPowerSaveMode failed. Response missing ps_mode.");
           completer.ReplyError(ZX_ERR_INTERNAL);
           return;
         }

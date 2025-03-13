@@ -58,7 +58,7 @@ class MoonflowerPartitioner : public DevicePartitioner {
 
   zx::result<> Flush() const override { return zx::ok(); }
 
-  zx::result<> OnStop() const override;
+  zx::result<> OnStop() const override { return zx::ok(); }
 
   // Like FindPartition() above, but returns all matching entries.
   zx::result<std::vector<std::unique_ptr<BlockPartitionClient>>> FindAllPartitions(

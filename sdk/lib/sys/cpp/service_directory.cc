@@ -52,6 +52,11 @@ std::shared_ptr<ServiceDirectory> ServiceDirectory::CreateWithRequest(
 
 zx_status_t ServiceDirectory::Connect(const std::string& interface_name,
                                       zx::channel request) const {
+  // Our API contract states we should return `ZX_ERR_UNAVAILABLE` if the directory backing this
+  // service directory is invalid, but `fdio_service_connect_at` will return `ZX_ERR_BAD_HANDLE`.
+  if (!directory_.unowned_channel()->is_valid()) {
+    return ZX_ERR_UNAVAILABLE;
+  }
   return fdio_service_connect_at(directory_.unowned_channel()->get(), interface_name.c_str(),
                                  request.release());
 }

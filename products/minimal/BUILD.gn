@@ -21,7 +21,6 @@ if (current_cpu == "x64") {
     bazel_inputs_from_gn = [
       "//build/images/flash:esp.bazel_input",
       "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
-      "//build/images/zedboot:zedboot.bazel_legacy_aib",
     ]
     if (board_configuration_label != false) {
       bazel_inputs_from_gn += [
@@ -46,7 +45,6 @@ if (current_cpu == "arm64") {
       "//boards/arm64:arm64.bazel_input",
       "//build/images/flash:esp.bazel_input",
       "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
-      "//build/images/zedboot:zedboot.bazel_legacy_aib",
     ]
   }
 
@@ -59,7 +57,6 @@ if (current_cpu == "arm64") {
     bazel_elf_sizes_target = ":elf_sizes.vim3"
     bazel_inputs_from_gn = [
       "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
-      "//build/images/zedboot:zedboot.bazel_legacy_aib",
       "//boards/vim3:bazel_inputs",
     ]
   }
@@ -72,7 +69,6 @@ if (current_cpu == "arm64") {
     bazel_elf_sizes_target = ":elf_sizes.emac"
     bazel_inputs_from_gn = [
       "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
-      "//build/images/zedboot:zedboot.bazel_legacy_aib",
       "//src/devices/board/drivers/vim3-devicetree:vim3-dtb",
     ]
   }
@@ -89,7 +85,6 @@ if (current_cpu == "riscv64") {
     bazel_inputs_from_gn = [
       "//boards/riscv64:riscv64.bazel_input",
       "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
-      "//build/images/zedboot:zedboot.bazel_legacy_aib",
     ]
   }
 }

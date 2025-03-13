@@ -5,7 +5,7 @@
 #ifndef SRC_PERFORMANCE_KTRACE_PROVIDER_DEVICE_READER_H_
 #define SRC_PERFORMANCE_KTRACE_PROVIDER_DEVICE_READER_H_
 
-#include <fidl/fuchsia.tracing.kernel/cpp/fidl.h>
+#include <lib/zx/resource.h>
 
 #include "src/performance/ktrace_provider/reader.h"
 
@@ -13,22 +13,21 @@ namespace ktrace_provider {
 
 class DeviceReader : public Reader {
  public:
-  DeviceReader();
-
-  zx_status_t Init();
+  explicit DeviceReader(zx::resource debug_resource);
 
  private:
   static constexpr size_t kChunkSize{16 * 4 * 1024};
 
   void ReadMoreData() override;
 
-  fidl::SyncClient<fuchsia_tracing_kernel::Reader> ktrace_reader_;
   uint32_t offset_ = 0;
+  zx::resource debug_resource_;
 
   // We read data into this buffer in byte sized chunks, but we want to read out aligned 8 byte
   // fxt words.
   alignas(8) char buffer_[kChunkSize];
 
+  // Delete both copy and new as Reader holds a raw pointer to the storage
   DeviceReader(const DeviceReader&) = delete;
   DeviceReader(DeviceReader&&) = delete;
   DeviceReader& operator=(const DeviceReader&) = delete;

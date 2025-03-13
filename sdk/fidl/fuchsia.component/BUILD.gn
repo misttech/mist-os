@@ -34,4 +34,5 @@ fidl("fuchsia.component") {
   excluded_checks = [ "invalid-case-for-decl-name" ]
 
   enable_hlcpp = true
+  enable_rust_next = true
 }

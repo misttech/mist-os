@@ -7,6 +7,7 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 
+use cm_rust::NativeIntoFidl as _;
 use fidl::endpoints::DiscoverableProtocolMarker as _;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_net_debug as fnet_debug,
@@ -18,11 +19,12 @@ use {
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
     fidl_fuchsia_net_masquerade as fnet_masquerade,
     fidl_fuchsia_net_multicast_admin as fnet_multicast_admin, fidl_fuchsia_net_name as fnet_name,
-    fidl_fuchsia_net_neighbor as fnet_neighbor, fidl_fuchsia_net_reachability as fnet_reachability,
-    fidl_fuchsia_net_root as fnet_root, fidl_fuchsia_net_routes as fnet_routes,
-    fidl_fuchsia_net_routes_admin as fnet_routes_admin, fidl_fuchsia_net_stack as fnet_stack,
-    fidl_fuchsia_net_test_realm as fntr, fidl_fuchsia_net_virtualization as fnet_virtualization,
-    fidl_fuchsia_netemul as fnetemul, fidl_fuchsia_posix_socket as fposix_socket,
+    fidl_fuchsia_net_ndp as fnet_ndp, fidl_fuchsia_net_neighbor as fnet_neighbor,
+    fidl_fuchsia_net_reachability as fnet_reachability, fidl_fuchsia_net_root as fnet_root,
+    fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
+    fidl_fuchsia_net_stack as fnet_stack, fidl_fuchsia_net_test_realm as fntr,
+    fidl_fuchsia_net_virtualization as fnet_virtualization, fidl_fuchsia_netemul as fnetemul,
+    fidl_fuchsia_posix_socket as fposix_socket,
     fidl_fuchsia_posix_socket_packet as fposix_socket_packet,
     fidl_fuchsia_posix_socket_raw as fposix_socket_raw, fidl_fuchsia_stash as fstash,
     fidl_fuchsia_update_verify as fupdate_verify,
@@ -105,6 +107,7 @@ impl NetstackVersion {
             NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => &common_services_and!(
                 fnet_filter::ControlMarker::PROTOCOL_NAME,
                 fnet_filter::StateMarker::PROTOCOL_NAME,
+                fnet_ndp::RouterAdvertisementOptionWatcherProviderMarker::PROTOCOL_NAME,
                 fnet_root::FilterMarker::PROTOCOL_NAME,
             ),
         }
@@ -467,6 +470,11 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                                     >(
                                         constants::dns_resolver::COMPONENT_NAME,
                                     )),
+                                    fnetemul::Capability::ChildDep(protocol_dep::<
+                                        fnet_ndp::RouterAdvertisementOptionWatcherProviderMarker,
+                                    >(
+                                        constants::netstack::COMPONENT_NAME,
+                                    )),
                                     fnetemul::Capability::NetemulDevfs(fnetemul::DevfsDep {
                                         name: Some(
                                             constants::netcfg::DEV_CLASS_NETWORK.to_string(),
@@ -709,6 +717,30 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
             },
         }
     }
+}
+
+/// Set the `opaque_iids` structured configuration value for Netstack3.
+pub fn set_netstack3_opaque_iids(netstack: &mut fnetemul::ChildDef, value: bool) {
+    const KEY: &str = "opaque_iids";
+    set_structured_config_value(netstack, KEY.to_owned(), cm_rust::ConfigValue::from(value));
+}
+
+/// Set the `suspend_enabled` structured configuration value for Netstack3.
+pub fn set_netstack3_suspend_enabled(netstack: &mut fnetemul::ChildDef, value: bool) {
+    const KEY: &str = "suspend_enabled";
+    set_structured_config_value(netstack, KEY.to_owned(), cm_rust::ConfigValue::from(value));
+}
+
+/// Set a structured configuration value for the provided component.
+fn set_structured_config_value(
+    component: &mut fnetemul::ChildDef,
+    key: String,
+    value: cm_rust::ConfigValue,
+) {
+    component
+        .config_values
+        .get_or_insert_default()
+        .push(fnetemul::ChildConfigValue { key, value: value.native_into_fidl() });
 }
 
 /// Abstraction for a Fuchsia component which offers network stack services.

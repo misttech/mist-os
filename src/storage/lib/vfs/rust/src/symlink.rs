@@ -304,7 +304,7 @@ impl<T: Symlink> Connection<T> {
         value: fio::ExtendedAttributeValue,
         mode: fio::SetExtendedAttributeMode,
     ) -> Result<(), Status> {
-        if name.iter().any(|c| *c == 0) {
+        if name.contains(&0) {
             return Err(Status::INVALID_ARGS);
         }
         let val = decode_extended_attribute_value(value)?;

@@ -78,6 +78,7 @@ static_library("boot-shim") {
     "devicetree-riscv-cpu-topology-item.cc",
     "devicetree-riscv-plic-item.cc",
     "devicetree-riscv-timer-item.cc",
+    "devicetree-serial-number-item.cc",
     "efi-boot-shim.cc",
     "efi.cc",
     "pool-mem-config.cc",
@@ -160,6 +161,7 @@ if (!is_kernel) {
       "devicetree-riscv-cpu-topology-item-test.cc",
       "devicetree-riscv-plic-item-test.cc",
       "devicetree-riscv-timer-item-test.cc",
+      "devicetree-serial-number-item-test.cc",
     ]
     deps = [
       ":boot-shim",

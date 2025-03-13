@@ -15,7 +15,7 @@ rustc_library("log-command") {
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//sdk/rust/zx-types",
     "//src/developer/ffx/lib/errors:lib",
-    "//src/developer/ffx/lib/writer:lib",
+    "//src/developer/lib/writer:lib",
     "//src/lib/diagnostics/data/rust",
     "//src/lib/diagnostics/selectors",
     "//src/lib/fidl/rust/fidl",

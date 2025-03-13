@@ -320,7 +320,7 @@ fn get_json_type_string_from_field_attrs(
 ) -> String {
     attrs.json_type.clone().unwrap_or_else(|| {
         get_json_type_string_from_ty_string(&rust_ty_string)
-            .unwrap_or_else(|| if attrs.recurse { "object" } else { "string" })
+            .unwrap_or(if attrs.recurse { "object" } else { "string" })
             .to_string()
     })
 }

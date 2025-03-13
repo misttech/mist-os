@@ -49,6 +49,14 @@ class UsbVirtualDevice : public UsbVirtualDeviceType,
     completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
   }
 
+  void StartController(StartControllerCompleter::Sync& completer) override {
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  }
+
+  void StopController(StopControllerCompleter::Sync& completer) override {
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  }
+
   void ConfigureEndpoint(ConfigureEndpointRequest& request,
                          ConfigureEndpointCompleter::Sync& completer) override {
     completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));

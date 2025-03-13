@@ -16,11 +16,6 @@ const DESIRED_PATH_PREFIXES: &[&str] = &["/dev/", "/proc/", "/sys/"];
 
 /// Path prefixes excluded from inspect output.
 const IGNORED_PATH_PREFIXES: &[&str] = &[
-    // TODO(https://fxbug.dev/322255433) these directories have dynamically generated contents that
-    // are difficult to stub, so just exclude them from the not_found list.
-    "/dev/cpuctl",
-    "/dev/cpuset",
-    "/dev/stune",
     // This path should only be implemented on ARM, ignore it everywhere else.
     #[cfg(not(target_arch = "aarch64"))]
     "/proc/sys/abi/swp",
@@ -31,7 +26,6 @@ const IGNORED_PATH_PREFIXES: &[&str] = &[
     "/sys/dev/block",
     "/sys/dev/char",
     // Ignore paths for specific filesystems we don't implement.
-    "/sys/fs/cgroup",
     "/sys/fs/f2fs",
     "/sys/fs/incremental-fs",
     "/sys/fs/pstore",
@@ -54,7 +48,7 @@ pub fn track_file_not_found(path: BString) {
         match NOT_FOUND_COUNTS.lock().entry(path) {
             Entry::Occupied(mut o) => *o.get_mut() += 1,
             Entry::Vacant(v) => {
-                crate::log_warn!(
+                crate::log_debug!(
                     tag = "not_found",
                     path:% = v.key();
                     "couldn't resolve",
@@ -112,7 +106,6 @@ mod tests {
     #[test]
     fn dedupe_expected_paths() {
         let original_paths = &[
-            "/dev/cpuctl/dex2oat/cgroup.procs",
             "/dev/pmsg0",
             "/proc/1006/cgroup",
             "/proc/1006/schedstat",
@@ -134,12 +127,6 @@ mod tests {
             "/sys/devices/system/cpu/cpu1uevent",
             "/sys/devices/virtual/block/loop0/queueuevent",
             "/sys/devices/virtual/block/loop1/queueuevent",
-            "/sys/fs/cgroup/uid_0/pid_1006/cgroup.events",
-            "/sys/fs/cgroup/uid_0/pid_182/cgroup.events",
-            "/sys/fs/cgroup/uid_0/pid_45/cgroup.events",
-            "/sys/fs/cgroup/uid_1000/pid_184/cgroup.events",
-            "/sys/fs/cgroup/uid_1000/pid_50/cgroup.events",
-            "/sys/fs/cgroup/uid_1002/pid_1006/cgroup.events",
             "/sys/fs/f2fs/features",
             "/sys/kernel/debug/tracing/events/ext4/ext4_da_write_begin/enable",
             "/sys/kernel/debug/tracing/events/f2fs/f2fs_get_data_block/enable",
@@ -162,7 +149,6 @@ mod tests {
                 .map(|(p, n)| (p.to_string(), n))
                 .collect::<Vec<(String, u64)>>();
         let expected = [
-            ("/dev/cpuctl/dex2oat/cgroup.procs", 1),
             ("/dev/pmsg0", 1),
             ("/proc/N/cgroup", 4),
             ("/proc/N/schedstat", 4),
@@ -176,7 +162,6 @@ mod tests {
             ("/sys/devices/system/cpu/cpuN/cpufreq/stats/time_in_state", 2),
             ("/sys/devices/system/cpu/cpuNuevent", 2),
             ("/sys/devices/virtual/block/loopN/queueuevent", 2),
-            ("/sys/fs/cgroup/uid_N/pid_N/cgroup.events", 6),
             ("/sys/fs/f2fs/features", 1),
             ("/sys/kernel/debug/tracing/events/ext4/ext4_da_write_begin/enable", 1),
             ("/sys/kernel/debug/tracing/events/f2fs/f2fs_get_data_block/enable", 1),

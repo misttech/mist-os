@@ -51,6 +51,7 @@ Symbols:
   - { Name: zxio_setsockopt, Type: Func }
   - { Name: zxio_shutdown, Type: Func }
   - { Name: zxio_socket, Type: Func }
+  - { Name: zxio_socket_with_options, Type: Func }
   - { Name: zxio_sync, Type: Func }
   - { Name: zxio_token_get, Type: Func }
   - { Name: zxio_truncate, Type: Func }

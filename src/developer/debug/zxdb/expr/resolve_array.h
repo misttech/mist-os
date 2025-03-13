@@ -24,8 +24,9 @@ class EvalContext;
 // The input will be clipped to the array size so the result may be empty or smaller than requested.
 //
 // This does not apply pretty types for item resolution.
-void ResolveArray(const fxl::RefPtr<EvalContext>& eval_context, const ExprValue& array,
-                  size_t begin_index, size_t end_index, fit::callback<void(ErrOrValueVector)>);
+void ResolveArray(const fxl::RefPtr<EvalContext>& eval_context, const Type* original_type,
+                  const ExprValue& array, size_t begin_index, size_t end_index,
+                  fit::callback<void(ErrOrValueVector)>);
 
 // Resolves a single item in an array and applies pretty types for item resolution. This is the
 // backend for array access [ <number> ] in expressions.

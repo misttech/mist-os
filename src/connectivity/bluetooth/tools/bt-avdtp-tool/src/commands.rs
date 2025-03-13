@@ -6,8 +6,7 @@ use rustyline::completion::Completer;
 use rustyline::error::ReadlineError;
 use rustyline::highlight::Highlighter;
 use rustyline::hint::Hinter;
-use rustyline::validate::Validator;
-use rustyline::{Context, Helper};
+use rustyline::Helper;
 use std::borrow::Cow::{self, Borrowed, Owned};
 use std::fmt;
 use std::str::FromStr;
@@ -112,12 +111,7 @@ impl CmdHelper {
 impl Completer for CmdHelper {
     type Candidate = String;
 
-    fn complete(
-        &self,
-        line: &str,
-        _pos: usize,
-        _context: &Context<'_>,
-    ) -> Result<(usize, Vec<String>), ReadlineError> {
+    fn complete(&self, line: &str, _pos: usize) -> Result<(usize, Vec<String>), ReadlineError> {
         let components: Vec<_> = line.trim_start().split_whitespace().collect();
 
         // Check whether we have entered a command and either whitespace or a partial argument.
@@ -140,11 +134,9 @@ impl Completer for CmdHelper {
 }
 
 impl Hinter for CmdHelper {
-    type Hint = String;
-
     /// Provide a hint for what argument should be presented next.
     /// Returns None if no hint is available.
-    fn hint(&self, line: &str, _pos: usize, _context: &Context<'_>) -> Option<String> {
+    fn hint(&self, line: &str, _pos: usize) -> Option<String> {
         let needs_space = !line.ends_with(" ");
         line.trim()
             .parse::<Cmd>()
@@ -165,8 +157,6 @@ impl Highlighter for CmdHelper {
     }
 }
 
-impl Validator for CmdHelper {}
-
 /// CmdHelper can be used as an `Editor` helper for entering input commands
 impl Helper for CmdHelper {}
 
@@ -179,8 +169,6 @@ pub enum ReplControl {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rustyline::history::MemHistory;
-    use rustyline::Context;
 
     #[test]
     fn test_gen_commands_macro() {
@@ -194,24 +182,21 @@ mod tests {
 
     #[test]
     fn test_completer() {
-        let history = MemHistory::new();
-        let context = Context::new(&history);
-
         let cmdhelper = CmdHelper::new();
         assert!(cmdhelper
-            .complete("establ", 0, &context)
+            .complete("establ", 0)
             .unwrap()
             .1
             .contains(&"establish-stream".to_string()));
-        assert!(cmdhelper.complete("he", 0, &context).unwrap().1.contains(&"help".to_string()));
-        assert!(cmdhelper.complete("sus", 0, &context).unwrap().1.contains(&"suspend".to_string()));
+        assert!(cmdhelper.complete("he", 0).unwrap().1.contains(&"help".to_string()));
+        assert!(cmdhelper.complete("sus", 0).unwrap().1.contains(&"suspend".to_string()));
         assert!(cmdhelper
-            .complete("suspend-", 0, &context)
+            .complete("suspend-", 0)
             .unwrap()
             .1
             .contains(&"suspend-reconfigure".to_string()));
         assert!(cmdhelper
-            .complete("get-a", 0, &context)
+            .complete("get-a", 0)
             .unwrap()
             .1
             .contains(&"get-all-capabilities".to_string()));

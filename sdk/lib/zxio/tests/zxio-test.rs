@@ -305,7 +305,7 @@ async fn test_xattr_dir() {
     let (dir_client, dir_server) = zx::Channel::create();
     fixture
         .root()
-        .open3(
+        .open(
             "foo",
             fio::PERM_READABLE
                 | fio::PERM_WRITABLE
@@ -351,7 +351,7 @@ async fn test_xattr_dir_multiple_attributes() {
     let (dir_client, dir_server) = zx::Channel::create();
     fixture
         .root()
-        .open3(
+        .open(
             "foo",
             fio::PERM_READABLE
                 | fio::PERM_WRITABLE
@@ -443,7 +443,7 @@ async fn test_xattr_file_large_attribute() {
     let (foo_client, foo_server) = zx::Channel::create();
     fixture
         .root()
-        .open3(
+        .open(
             "foo",
             fio::PERM_READABLE
                 | fio::PERM_WRITABLE

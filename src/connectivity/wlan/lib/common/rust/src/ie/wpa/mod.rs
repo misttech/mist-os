@@ -12,8 +12,7 @@ use nom::bytes::streaming::take;
 use nom::combinator::map;
 use nom::multi::length_count;
 use nom::number::streaming::le_u16;
-use nom::sequence::tuple;
-use nom::IResult;
+use nom::{IResult, Parser};
 
 // The WPA1 IE is not fully specified by IEEE. This format was derived from pcap.
 // Note that this file only parses fields specific to WPA -- IE headers and MSFT-specific fields
@@ -80,7 +79,7 @@ fn read_suite_selector<T>(input: &[u8]) -> IResult<&[u8], T>
 where
     T: suite_selector::Factory<Suite = T>,
 {
-    let (i1, bytes) = take(4usize)(input)?;
+    let (i1, bytes) = take(4usize).parse(input)?;
     let oui = Oui::new([bytes[0], bytes[1], bytes[2]]);
     return Ok((i1, T::new(oui, bytes[3])));
 }
@@ -98,18 +97,14 @@ pub fn from_bytes(input: &[u8]) -> IResult<&[u8], WpaIe> {
     map(
         // A terminated eof is not used since this IE sometimes adds extra
         // non-compliant bytes.
-        tuple((
-            le_u16,
-            parse_cipher,
-            length_count(le_u16, parse_cipher),
-            length_count(le_u16, parse_akm),
-        )),
+        (le_u16, parse_cipher, length_count(le_u16, parse_cipher), length_count(le_u16, parse_akm)),
         |(_wpa_type, multicast_cipher, unicast_cipher_list, akm_list)| WpaIe {
             multicast_cipher,
             unicast_cipher_list,
             akm_list,
         },
-    )(input)
+    )
+    .parse(input)
 }
 
 #[cfg(test)]

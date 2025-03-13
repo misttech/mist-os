@@ -5,9 +5,8 @@
 #[cfg(not(feature = "starnix_lite"))]
 use crate::bpf::fs::get_bpf_object;
 #[cfg(not(feature = "starnix_lite"))]
-use crate::bpf::program::LinkedProgram;
 use crate::mm::MemoryAccessorExt;
-use crate::task::{CurrentTask, EventHandler, Task, WaitCanceler, WaitQueue, Waiter};
+use crate::task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter};
 use crate::vfs::buffers::{
     AncillaryData, InputBuffer, MessageQueue, MessageReadInfo, OutputBuffer, UnixControlData,
 };
@@ -20,8 +19,8 @@ use crate::vfs::{
     LookupContext, Message,
 };
 use ebpf::{
-    BpfProgramContext, BpfValue, CbpfConfig, DataWidth, FieldMapping, Packet, ProgramArgument,
-    StructMapping, Type,
+    BpfProgramContext, BpfValue, CbpfConfig, DataWidth, EbpfProgram, FieldMapping, Packet,
+    ProgramArgument, StructMapping, Type,
 };
 use ebpf_api::{
     get_socket_filter_helpers, PinnedMap, ProgramType, SocketFilterContext, SK_BUF_ID, SK_BUF_TYPE,
@@ -425,6 +424,7 @@ impl UnixSocket {
 impl SocketOps for UnixSocket {
     fn connect(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         socket: &SocketHandle,
         current_task: &CurrentTask,
         peer: SocketPeer,
@@ -442,7 +442,13 @@ impl SocketOps for UnixSocket {
         }
     }
 
-    fn listen(&self, socket: &Socket, backlog: i32, credentials: ucred) -> Result<(), Errno> {
+    fn listen(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        socket: &Socket,
+        backlog: i32,
+        credentials: ucred,
+    ) -> Result<(), Errno> {
         match socket.socket_type {
             SocketType::Stream | SocketType::SeqPacket => {}
             _ => return error!(EOPNOTSUPP),
@@ -464,7 +470,11 @@ impl SocketOps for UnixSocket {
         }
     }
 
-    fn accept(&self, socket: &Socket) -> Result<SocketHandle, Errno> {
+    fn accept(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        socket: &Socket,
+    ) -> Result<SocketHandle, Errno> {
         match socket.socket_type {
             SocketType::Stream | SocketType::SeqPacket => {}
             _ => return error!(EOPNOTSUPP),
@@ -479,6 +489,7 @@ impl SocketOps for UnixSocket {
 
     fn bind(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         socket_address: SocketAddress,
@@ -615,7 +626,12 @@ impl SocketOps for UnixSocket {
     /// Shuts down this socket according to how, preventing any future reads and/or writes.
     ///
     /// Used by the shutdown syscalls.
-    fn shutdown(&self, _socket: &Socket, how: SocketShutdownFlags) -> Result<(), Errno> {
+    fn shutdown(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _socket: &Socket,
+        how: SocketShutdownFlags,
+    ) -> Result<(), Errno> {
         let peer = {
             let mut inner = self.lock();
             let peer = inner.peer().ok_or_else(|| errno!(ENOTCONN))?.clone();
@@ -641,7 +657,7 @@ impl SocketOps for UnixSocket {
     /// which changes how read() behaves on that socket. Second, close
     /// transitions the internal state of this socket to Closed, which breaks
     /// the reference cycle that exists in the connected state.
-    fn close(&self, socket: &Socket) {
+    fn close(&self, _locked: &mut Locked<'_, FileOpsCore>, socket: &Socket) {
         let (maybe_peer, has_unread) = {
             let mut inner = self.lock();
             let maybe_peer = inner.peer().map(Arc::clone);
@@ -667,7 +683,11 @@ impl SocketOps for UnixSocket {
     ///
     /// The name is derived from the address and domain. A socket
     /// will always have a name, even if it is not bound to an address.
-    fn getsockname(&self, socket: &Socket) -> Result<SocketAddress, Errno> {
+    fn getsockname(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        socket: &Socket,
+    ) -> Result<SocketAddress, Errno> {
         let inner = self.lock();
         if let Some(address) = &inner.address {
             Ok(address.clone())
@@ -679,15 +699,20 @@ impl SocketOps for UnixSocket {
     /// Returns the name of the peer of this socket, if such a peer exists.
     ///
     /// Returns an error if the socket is not connected.
-    fn getpeername(&self, _socket: &Socket) -> Result<SocketAddress, Errno> {
+    fn getpeername(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _socket: &Socket,
+    ) -> Result<SocketAddress, Errno> {
         let peer = self.lock().peer().ok_or_else(|| errno!(ENOTCONN))?.clone();
-        peer.getsockname()
+        peer.getsockname(locked)
     }
 
     fn setsockopt(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
-        task: &Task,
+        current_task: &CurrentTask,
         level: u32,
         optname: u32,
         user_opt: UserBuffer,
@@ -695,51 +720,54 @@ impl SocketOps for UnixSocket {
         match level {
             SOL_SOCKET => match optname {
                 SO_SNDBUF => {
-                    let requested_capacity: socklen_t = task.read_object(user_opt.try_into()?)?;
+                    let requested_capacity: socklen_t =
+                        current_task.read_object(user_opt.try_into()?)?;
                     // See StreamUnixSocketPairTest.SetSocketSendBuf for why we multiply by 2 here.
                     self.set_send_capacity(requested_capacity as usize * 2);
                 }
                 SO_RCVBUF => {
-                    let requested_capacity: socklen_t = task.read_object(user_opt.try_into()?)?;
+                    let requested_capacity: socklen_t =
+                        current_task.read_object(user_opt.try_into()?)?;
                     self.set_receive_capacity(requested_capacity as usize);
                 }
                 SO_LINGER => {
-                    let mut linger: uapi::linger = task.read_object(user_opt.try_into()?)?;
+                    let mut linger: uapi::linger =
+                        current_task.read_object(user_opt.try_into()?)?;
                     if linger.l_onoff != 0 {
                         linger.l_onoff = 1;
                     }
                     self.set_linger(linger);
                 }
                 SO_PASSCRED => {
-                    let passcred: u32 = task.read_object(user_opt.try_into()?)?;
+                    let passcred: u32 = current_task.read_object(user_opt.try_into()?)?;
                     self.set_passcred(passcred != 0);
                 }
                 SO_BROADCAST => {
-                    let broadcast: u32 = task.read_object(user_opt.try_into()?)?;
+                    let broadcast: u32 = current_task.read_object(user_opt.try_into()?)?;
                     self.set_broadcast(broadcast != 0);
                 }
                 SO_NO_CHECK => {
-                    let no_check: u32 = task.read_object(user_opt.try_into()?)?;
+                    let no_check: u32 = current_task.read_object(user_opt.try_into()?)?;
                     self.set_no_check(no_check != 0);
                 }
                 SO_REUSEADDR => {
-                    let reuseaddr: u32 = task.read_object(user_opt.try_into()?)?;
+                    let reuseaddr: u32 = current_task.read_object(user_opt.try_into()?)?;
                     self.set_reuseaddr(reuseaddr != 0);
                 }
                 SO_REUSEPORT => {
-                    let reuseport: u32 = task.read_object(user_opt.try_into()?)?;
+                    let reuseport: u32 = current_task.read_object(user_opt.try_into()?)?;
                     self.set_reuseport(reuseport != 0);
                 }
                 SO_KEEPALIVE => {
-                    let keepalive: u32 = task.read_object(user_opt.try_into()?)?;
+                    let keepalive: u32 = current_task.read_object(user_opt.try_into()?)?;
                     self.set_keepalive(keepalive != 0);
                 }
 
                 SO_ATTACH_BPF => {
                     #[cfg(not(feature = "starnix_lite"))]
                     {
-                        let fd: FdNumber = task.read_object(user_opt.try_into()?)?;
-                        let object = get_bpf_object(task, fd)?;
+                        let fd: FdNumber = current_task.read_object(user_opt.try_into()?)?;
+                        let object = get_bpf_object(current_task, fd)?;
                         let program = object.as_program()?;
 
                         let linked_program = program.link(
@@ -763,6 +791,7 @@ impl SocketOps for UnixSocket {
 
     fn getsockopt(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         socket: &Socket,
         level: u32,
         optname: u32,
@@ -800,8 +829,8 @@ impl SocketOps for UnixSocket {
 
     fn ioctl(
         &self,
-        socket: &Socket,
         locked: &mut Locked<'_, Unlocked>,
+        socket: &Socket,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -935,7 +964,7 @@ impl UnixSocketInner {
             // TODO(https://fxbug.dev/385015056): Fill in SkBuf.
             let mut sk_buf = SkBuf::default();
 
-            let s = bpf_program.program.run(&mut context, &mut sk_buf);
+            let s = bpf_program.run(&mut context, &mut sk_buf);
             if s == 0 {
                 None
             } else {
@@ -1058,7 +1087,7 @@ impl BpfProgramContext for UnixSocketEbpfContext {
     const CBPF_CONFIG: &'static CbpfConfig = &SOCKET_FILTER_CBPF_CONFIG;
 }
 
-type UnixSocketFilter = LinkedProgram<UnixSocketEbpfContext>;
+type UnixSocketFilter = EbpfProgram<UnixSocketEbpfContext>;
 
 #[cfg(test)]
 mod tests {
@@ -1077,9 +1106,9 @@ mod tests {
         )
         .expect("Failed to create socket.");
         socket
-            .bind(&current_task, SocketAddress::Unix(b"\0".into()))
+            .bind(&mut locked, &current_task, SocketAddress::Unix(b"\0".into()))
             .expect("Failed to bind socket.");
-        socket.listen(&current_task, 10).expect("Failed to listen.");
+        socket.listen(&mut locked, &current_task, 10).expect("Failed to listen.");
         let connecting_socket = Socket::new(
             &current_task,
             SocketDomain::Unix,
@@ -1088,10 +1117,10 @@ mod tests {
         )
         .expect("Failed to connect socket.");
         connecting_socket
-            .connect(&current_task, SocketPeer::Handle(socket.clone()))
+            .connect(&mut locked, &current_task, SocketPeer::Handle(socket.clone()))
             .expect("Failed to connect socket.");
         assert_eq!(Ok(FdEvents::POLLIN), socket.query_events(&mut locked, &current_task));
-        let server_socket = socket.accept().unwrap();
+        let server_socket = socket.accept(&mut locked).unwrap();
 
         let opt_size = std::mem::size_of::<socklen_t>();
         let user_address =
@@ -1099,9 +1128,11 @@ mod tests {
         let send_capacity: socklen_t = 4 * 4096;
         current_task.write_memory(user_address, &send_capacity.to_ne_bytes()).unwrap();
         let user_buffer = UserBuffer { address: user_address, length: opt_size };
-        server_socket.setsockopt(&current_task, SOL_SOCKET, SO_SNDBUF, user_buffer).unwrap();
+        server_socket
+            .setsockopt(&mut locked, &current_task, SOL_SOCKET, SO_SNDBUF, user_buffer)
+            .unwrap();
 
-        let opt_bytes = server_socket.getsockopt(SOL_SOCKET, SO_SNDBUF, 0).unwrap();
+        let opt_bytes = server_socket.getsockopt(&mut locked, SOL_SOCKET, SO_SNDBUF, 0).unwrap();
         let retrieved_capacity = socklen_t::from_ne_bytes(opt_bytes.try_into().unwrap());
         // Setting SO_SNDBUF actually sets it to double the size
         assert_eq!(2 * send_capacity, retrieved_capacity);

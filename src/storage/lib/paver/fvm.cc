@@ -243,9 +243,9 @@ zx::result<fidl::ClientEnd<fuchsia_device::Controller>> TryBindToFvmDriver(
 
   // Check if fvm already exists, and return it if it does.
   int fd;
-  if (zx_status_t status =
-          fdio_open3_fd_at(devfs_root.get(), path.c_str(),
-                           static_cast<uint64_t>(fuchsia_io::Flags::kProtocolDirectory), &fd);
+  if (zx_status_t status = fdio_open3_fd_at(
+          devfs_root.get(), path.c_str(),
+          uint64_t{fuchsia_io::wire::kPermReadable | fuchsia_io::Flags::kProtocolDirectory}, &fd);
       status != ZX_OK) {
     ERROR("Failed to open %s: %s\n", path.c_str(), zx_status_get_string(status));
     return zx::error(status);

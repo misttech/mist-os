@@ -134,13 +134,8 @@
             subdir: "kernel",
         },
         {
-            directory: "dev-class",
-            from: "parent",
-            as: "dev-hrtimer",
-            to: [ "#starnix_runner" ],
-            subdir: "hrtimer",
-        },
-        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-gpu",
@@ -148,11 +143,15 @@
             subdir: "gpu",
         },
         {
-            directory: "dev-class",
+            // This service replaces the directory capability above.
+            service: "fuchsia.gpu.magma.Service",
             from: "parent",
-            as: "dev-adb",
             to: [ "#starnix_runner" ],
-            subdir: "adb",
+        },
+        {
+            service: "fuchsia.hardware.adb.Service",
+            from: "parent",
+            to: [ "#starnix_runner" ],
         },
         {
             protocol: [
@@ -163,6 +162,13 @@
             from: "parent",
             to: "#starnix_runner",
             availability: "optional",
+        },
+        {
+            protocol: "fuchsia.hardware.google.nanohub.Device",
+            from: "#nanohub",
+            to: "#starnix_runner",
+            availability: "optional",
+            source_availability: "unknown",
         },
         {
             protocol: "fuchsia.hardware.sockettunnel.Device",
@@ -186,6 +192,12 @@
             from: "parent",
             to: "#starnix_runner",
             availability: "transitional",
+        },
+        {
+            protocol: [ "fuchsia.time.external.Adjust" ],
+            from: "#timekeeper",
+            to: "#starnix_runner",
+            availability: "optional",
         },
     ],
     expose: [

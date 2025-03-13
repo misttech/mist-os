@@ -13,8 +13,8 @@ class ServiceTest : public testing::TestBase {};
 
 TEST_F(ServiceTest, OpenServiceAt) {
   fidl::InterfaceHandle<fuchsia::io::Directory> directory;
-  zx_status_t status =
-      fdio_ns_service_connect(ns(), "/svc", directory.NewRequest().TakeChannel().release());
+  zx_status_t status = fdio_ns_open3(ns(), "/svc", uint64_t{fuchsia::io::PERM_READABLE},
+                                     directory.NewRequest().TakeChannel().release());
   ASSERT_EQ(ZX_OK, status);
 
   auto default_service = OpenServiceAt<fuchsia::examples::EchoService>(directory);

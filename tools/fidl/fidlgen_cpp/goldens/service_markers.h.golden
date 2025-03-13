@@ -30,6 +30,8 @@ class FirstProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 6352548393671797041;
   };
 };
 
@@ -54,6 +56,8 @@ class SecondProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 8121179205110225988;
   };
 };
 
@@ -61,9 +65,9 @@ class SecondProtocol final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_service::FirstProtocol> : public std::true_type{};
+struct IsProtocol<::test_service::FirstProtocol> : public std::true_type {};
 
 template <>
-struct IsProtocol<::test_service::SecondProtocol> : public std::true_type{};
+struct IsProtocol<::test_service::SecondProtocol> : public std::true_type {};
 
 }  // namespace fidl

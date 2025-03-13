@@ -5,7 +5,8 @@
 use async_trait::async_trait;
 use ffx_config::EnvironmentContext;
 use ffx_wait_args::WaitOptions;
-use fho::{Error, FfxContext, FfxMain, FfxTool, Result, VerifiedMachineWriter};
+use ffx_writer::VerifiedMachineWriter;
+use fho::{Error, FfxContext, FfxMain, FfxTool, Result};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::future::Future;
@@ -104,7 +105,7 @@ impl<T: DeviceWaiter + fho::TryFromEnv> WaitOperation<T> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use fho::{Format, TestBuffers};
+    use ffx_writer::{Format, TestBuffers};
 
     // This is just here to satisfy trait bounds.
     #[async_trait(?Send)]

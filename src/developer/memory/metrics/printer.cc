@@ -33,7 +33,7 @@ rapidjson::SizeType safecast(size_t v) {
 
 class SocketWriteStream {
  public:
-  typedef char Ch;
+  using Ch = char;
 
   explicit SocketWriteStream(zx::socket& socket) : socket_(socket) {}
 
@@ -390,7 +390,10 @@ void TextPrinter::OutputSummary(const Summary& summary, Sorted sorted, zx_koid_t
 
 void TextPrinter::PrintDigest(const Digest& digest) {
   TRACE_DURATION("memory_metrics", "TextPrinter::PrintDigest");
-  for (auto const& bucket : digest.buckets()) {
+  std::vector<Bucket> buckets = digest.buckets();
+  std::ranges::sort(buckets, [](const Bucket& a, const Bucket& b) { return a.size() > b.size(); });
+
+  for (auto const& bucket : buckets) {
     char size_buf[kMaxFormattedStringSize];
     FormatSize(bucket.size(), size_buf);
     os_ << bucket.name() << ": " << size_buf << "\n";
@@ -400,7 +403,10 @@ void TextPrinter::PrintDigest(const Digest& digest) {
 void TextPrinter::OutputDigest(const Digest& digest) {
   TRACE_DURATION("memory_metrics", "TextPrinter::OutputDigest");
   auto const time = digest.time() / 1000000000;
-  for (auto const& bucket : digest.buckets()) {
+  std::vector<Bucket> buckets = digest.buckets();
+  std::ranges::sort(buckets, [](const Bucket& a, const Bucket& b) { return a.size() > b.size(); });
+
+  for (auto const& bucket : buckets) {
     os_ << time << "," << bucket.name() << "," << bucket.size() << "\n";
   }
 }

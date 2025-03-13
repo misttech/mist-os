@@ -4,6 +4,7 @@
 
 use anyhow::Error;
 use fidl_fuchsia_tee::{self as ftee, Buffer, Direction, ParameterUnknown, Value};
+use std::ops::Range;
 use tee_internal::{Param, ParamType, ParamTypes, ValueFields};
 
 struct Memref {
@@ -75,7 +76,10 @@ fn import_value_from_fidl(value: Value) -> Result<(Param, ParamInfo), Error> {
     }
 }
 
-fn import_buffer_from_fidl(buffer: Buffer) -> Result<(Param, ParamInfo), Error> {
+fn import_buffer_from_fidl(
+    buffer: Buffer,
+    mapped_param_ranges: &mut Vec<Range<usize>>,
+) -> Result<(Param, ParamInfo), Error> {
     if let Some(direction) = buffer.direction {
         let mapping_offset = match buffer.offset {
             None => anyhow::bail!("Missing offset"),
@@ -107,6 +111,8 @@ fn import_buffer_from_fidl(buffer: Buffer) -> Result<(Param, ParamInfo), Error> 
                 .map(0, &vmo, mapping_offset, mapped_length, flags)
                 .map_err(|e| anyhow::anyhow!("Unable to map VMO: {e:?}"))?;
 
+            mapped_param_ranges.push(addr..addr + mapped_length);
+
             (Some(vmo), addr, data_size, mapped_length)
         } else {
             // The VMO can be omitted meaning that no memory is
@@ -135,7 +141,10 @@ fn import_buffer_from_fidl(buffer: Buffer) -> Result<(Param, ParamInfo), Error> 
 }
 
 impl ParamAdapter {
-    pub fn from_fidl(parameters: Vec<ftee::Parameter>) -> Result<(Self, ParamTypes), Error> {
+    pub fn from_fidl(
+        parameters: Vec<ftee::Parameter>,
+        mapped_param_ranges: &mut Vec<Range<usize>>,
+    ) -> Result<(Self, ParamTypes), Error> {
         if parameters.len() > 4 {
             anyhow::bail!("Expected <= 4 parameters in set but got {}", parameters.len());
         }
@@ -151,7 +160,7 @@ impl ParamAdapter {
             use fidl_fuchsia_tee::Parameter;
             let (param, info) = match param {
                 Parameter::None(_) => (empty_tee_param(), ParamInfo::None),
-                Parameter::Buffer(buffer) => import_buffer_from_fidl(buffer)?,
+                Parameter::Buffer(buffer) => import_buffer_from_fidl(buffer, mapped_param_ranges)?,
                 Parameter::Value(value) => import_value_from_fidl(value)?,
                 ParameterUnknown!() => anyhow::bail!("Unexpected parameter type"),
             };
@@ -267,7 +276,7 @@ mod test {
     fn empty_fidl_parameters_to_tee_params() -> Result<(), Error> {
         let fidl_parameters = vec![];
 
-        let (mut adapter, param_types) = ParamAdapter::from_fidl(fidl_parameters)?;
+        let (mut adapter, param_types) = ParamAdapter::from_fidl(fidl_parameters, &mut vec![])?;
 
         assert_eq!(param_types.as_u32(), 0);
 
@@ -291,7 +300,7 @@ mod test {
             ftee::Parameter::Value(Value { ..Default::default() }),
         ];
 
-        let result = ParamAdapter::from_fidl(fidl_parameters);
+        let result = ParamAdapter::from_fidl(fidl_parameters, &mut vec![]);
 
         assert!(result.is_err());
         Ok(())
@@ -306,7 +315,7 @@ mod test {
             ..Default::default()
         })];
 
-        let (mut adapter, param_types) = ParamAdapter::from_fidl(fidl_parameters)?;
+        let (mut adapter, param_types) = ParamAdapter::from_fidl(fidl_parameters, &mut vec![])?;
 
         assert_eq!(param_types.get(0), ParamType::ValueInput);
         assert_eq!(param_types.get(1), ParamType::None);
@@ -341,7 +350,7 @@ mod test {
             }),
         ];
 
-        let (mut adapter, param_types) = ParamAdapter::from_fidl(fidl_parameters)?;
+        let (mut adapter, param_types) = ParamAdapter::from_fidl(fidl_parameters, &mut vec![])?;
         assert_eq!(param_types.get(0), ParamType::ValueInput);
         assert_eq!(param_types.get(1), ParamType::ValueInout);
         assert_eq!(param_types.get(2), ParamType::None);
@@ -401,7 +410,7 @@ mod test {
             }),
         ];
 
-        let (mut adapter, param_types) = ParamAdapter::from_fidl(fidl_parameters)?;
+        let (mut adapter, param_types) = ParamAdapter::from_fidl(fidl_parameters, &mut vec![])?;
         assert_eq!(param_types.get(0), ParamType::MemrefInout);
         assert_eq!(param_types.get(1), ParamType::MemrefInput);
         assert_eq!(param_types.get(2), ParamType::MemrefInout);
@@ -469,7 +478,7 @@ mod test {
             }),
         ];
 
-        let (mut adapter, param_types) = ParamAdapter::from_fidl(fidl_parameters)?;
+        let (mut adapter, param_types) = ParamAdapter::from_fidl(fidl_parameters, &mut vec![])?;
         assert_eq!(param_types.get(0), ParamType::MemrefInput);
         assert_eq!(param_types.get(1), ParamType::MemrefInout);
         assert_eq!(param_types.get(2), ParamType::MemrefOutput);
@@ -495,7 +504,7 @@ mod test {
 
     #[fuchsia::test]
     fn test_export_empty_to_fidl() -> Result<(), Error> {
-        let (adapter, param_types) = ParamAdapter::from_fidl(vec![])?;
+        let (adapter, param_types) = ParamAdapter::from_fidl(vec![], &mut vec![])?;
         assert_eq!(param_types.get(0), ParamType::None);
         assert_eq!(param_types.get(1), ParamType::None);
         assert_eq!(param_types.get(2), ParamType::None);
@@ -532,7 +541,7 @@ mod test {
                 ..Default::default()
             }),
         ];
-        let (adapter, param_types) = ParamAdapter::from_fidl(fidl_parameters)?;
+        let (adapter, param_types) = ParamAdapter::from_fidl(fidl_parameters, &mut vec![])?;
         assert_eq!(param_types.get(0), ParamType::ValueInput);
         assert_eq!(param_types.get(1), ParamType::ValueInout);
         assert_eq!(param_types.get(2), ParamType::ValueOutput);
@@ -583,7 +592,7 @@ mod test {
                 ..Default::default()
             }),
         ];
-        let (mut adapter, param_types) = ParamAdapter::from_fidl(fidl_parameters)?;
+        let (mut adapter, param_types) = ParamAdapter::from_fidl(fidl_parameters, &mut vec![])?;
         assert_eq!(param_types.get(0), ParamType::ValueInout);
         assert_eq!(param_types.get(1), ParamType::ValueOutput);
         assert_eq!(param_types.get(2), ParamType::None);
@@ -639,7 +648,7 @@ mod test {
             ..Default::default()
         })];
 
-        let (mut adapter, param_types) = ParamAdapter::from_fidl(fidl_parameters)?;
+        let (mut adapter, param_types) = ParamAdapter::from_fidl(fidl_parameters, &mut vec![])?;
         assert_eq!(param_types.get(0), ParamType::MemrefInout);
         assert_eq!(param_types.get(1), ParamType::None);
         assert_eq!(param_types.get(2), ParamType::None);
@@ -712,7 +721,7 @@ mod test {
             }),
         ];
 
-        let (mut adapter, param_types) = ParamAdapter::from_fidl(fidl_parameters)?;
+        let (mut adapter, param_types) = ParamAdapter::from_fidl(fidl_parameters, &mut vec![])?;
         assert_eq!(param_types.get(0), ParamType::MemrefInout);
         assert_eq!(param_types.get(1), ParamType::MemrefInout);
         assert_eq!(param_types.get(2), ParamType::None);

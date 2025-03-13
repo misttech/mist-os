@@ -52,8 +52,8 @@ use netstack3_base::sync::RwLock;
 use netstack3_base::{
     trace_duration, AnyDevice, BidirectionalConverter as _, ContextPair, Control, CoreTimerContext,
     CounterContext, CtxPair, DeferredResourceRemovalContext, DeviceIdContext, EitherDeviceId,
-    ExistsError, HandleableTimer, IcmpErrorCode, Inspector, InspectorDeviceExt,
-    InstantBindingsTypes, IpDeviceAddr, IpExt, LocalAddressError, Mss,
+    ExistsError, HandleableTimer, IcmpErrorCode, Inspector, InspectorDeviceExt, InspectorExt,
+    InstantBindingsTypes, IpDeviceAddr, IpExt, LocalAddressError, Mark, MarkDomain, Mss,
     OwnedOrRefsBidirectionalConverter, PortAllocImpl, ReferenceNotifiersExt as _,
     RemoveResourceResult, RngContext, Segment, SeqNum, StrongDeviceIdentifier as _,
     TimerBindingsTypes, TimerContext, TracingContext, TxMetadataBindingsTypes,
@@ -63,7 +63,7 @@ use netstack3_filter::Tuple;
 use netstack3_ip::socket::{
     DeviceIpSocketHandler, IpSock, IpSockCreateAndSendError, IpSockCreationError, IpSocketHandler,
 };
-use netstack3_ip::{self as ip, BaseTransportIpContext, Mark, MarkDomain, TransportIpContext};
+use netstack3_ip::{self as ip, BaseTransportIpContext, TransportIpContext};
 use packet_formats::ip::IpProto;
 use smallvec::{smallvec, SmallVec};
 use thiserror::Error;
@@ -1765,8 +1765,7 @@ impl<
         error: IcmpErrorCode,
     ) -> NewlyClosed {
         let Connection { soft_error, state, .. } = self;
-        let (new_soft_error, newly_closed) =
-            core_ctx.with_counters(|counters| state.on_icmp_error(counters, error, seq));
+        let (new_soft_error, newly_closed) = state.on_icmp_error(core_ctx.counters(), error, seq);
         *soft_error = soft_error.or(new_soft_error);
         newly_closed
     }
@@ -2427,7 +2426,7 @@ where
         });
         match &result {
             Err(BindError::LocalAddressError(LocalAddressError::FailedToAllocateLocalPort)) => {
-                core_ctx.increment(|counters| &counters.failed_port_reservations);
+                core_ctx.counters().failed_port_reservations.increment();
             }
             Err(_) | Ok(_) => {}
         }
@@ -2485,6 +2484,9 @@ where
     }
 
     /// Accepts an established socket from the queue of a listener socket.
+    ///
+    /// Note: The accepted socket will have the marks of the incoming SYN
+    /// instead of the listener itself.
     pub fn accept(
         &mut self,
         id: &TcpApiSocketId<I, C>,
@@ -2797,13 +2799,13 @@ where
         match &result {
             Ok(()) => {}
             Err(err) => {
-                core_ctx.increment(|counters| &counters.failed_connection_attempts);
+                core_ctx.counters().failed_connection_attempts.increment();
                 match err {
                     ConnectError::NoRoute => {
-                        core_ctx.increment(|counters| &counters.active_open_no_route_errors)
+                        core_ctx.counters().active_open_no_route_errors.increment()
                     }
                     ConnectError::NoPort => {
-                        core_ctx.increment(|counters| &counters.failed_port_reservations)
+                        core_ctx.counters().failed_port_reservations.increment()
                     }
                     _ => {}
                 }
@@ -2972,13 +2974,11 @@ where
                             let _: Result<(), CloseError> = conn.state.shutdown_recv();
 
                             conn.defunct = true;
-                            let newly_closed = match core_ctx.with_counters(|counters| {
-                                conn.state.close(
-                                    counters,
-                                    CloseReason::Close { now: bindings_ctx.now() },
-                                    &conn.socket_options,
-                                )
-                            }) {
+                            let newly_closed = match conn.state.close(
+                                core_ctx.counters(),
+                                CloseReason::Close { now: bindings_ctx.now() },
+                                &conn.socket_options,
+                            ) {
                                 Err(CloseError::NoConnection) => NewlyClosed::No,
                                 Err(CloseError::Closing) | Ok(NewlyClosed::No) => {
                                     do_send_inner(&id, conn, &addr, timer, core_ctx, bindings_ctx)
@@ -3128,13 +3128,11 @@ where
                                 return Ok(());
                             }
 
-                            match core_ctx.with_counters(|counters| {
-                                conn.state.close(
-                                    counters,
-                                    CloseReason::Shutdown,
-                                    &conn.socket_options,
-                                )
-                            }) {
+                            match conn.state.close(
+                                core_ctx.counters(),
+                                CloseReason::Shutdown,
+                                &conn.socket_options,
+                            ) {
                                 Ok(newly_closed) => {
                                     let newly_closed = match newly_closed {
                                         NewlyClosed::Yes => NewlyClosed::Yes,
@@ -4637,7 +4635,7 @@ fn close_pending_socket<WireI, SockI, DC, BC>(
     BC: TcpBindingsContext,
 {
     debug!("aborting pending socket {sock_id:?}");
-    let (maybe_reset, newly_closed) = core_ctx.with_counters(|counters| conn.state.abort(counters));
+    let (maybe_reset, newly_closed) = conn.state.abort(core_ctx.counters());
     handle_newly_closed(core_ctx, bindings_ctx, newly_closed, demux_id, conn_addr, timer);
     if let Some(reset) = maybe_reset {
         let ConnAddr { ip, device: _ } = conn_addr;
@@ -4711,9 +4709,12 @@ where
     CC: TransportIpContext<WireI, BC> + CounterContext<TcpCounters<SockI>>,
 {
     let newly_closed = loop {
-        match core_ctx.with_counters(|counters| {
-            conn.state.poll_send(counters, u32::MAX, bindings_ctx.now(), &conn.socket_options)
-        }) {
+        match conn.state.poll_send(
+            core_ctx.counters(),
+            u32::MAX,
+            bindings_ctx.now(),
+            &conn.socket_options,
+        ) {
             Ok(seg) => {
                 send_tcp_segment(
                     core_ctx,
@@ -5265,7 +5266,7 @@ where
             },
             conn_addr,
         );
-        core_ctx.increment(|counters| &counters.active_connection_openings);
+        core_ctx.counters().active_connection_openings.increment();
         TcpSocketStateInner::Bound(BoundSocketState::Connected { conn, sharing, timer })
     })())
 }
@@ -5411,9 +5412,10 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
     // acknowledged by the peer. That lives entirely in the TCP module and we
     // don't need to track segments sitting in device queues.
     let tx_metadata: BC::TxMetadata = Default::default();
+    let Segment { header, data } = segment;
     let result = match ip_sock {
         Some(ip_sock) => {
-            let body = tcp_serialize_segment(segment, conn_addr);
+            let body = tcp_serialize_segment(&header, data, conn_addr);
             core_ctx
                 .send_ip_packet(bindings_ctx, ip_sock, body, ip_sock_options, tx_metadata)
                 .map_err(|err| IpSockCreateAndSendError::Send(err))
@@ -5428,22 +5430,22 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
                 IpProto::Tcp.into(),
                 ip_sock_options,
                 tx_metadata,
-                |_addr| tcp_serialize_segment(segment, conn_addr),
+                |_addr| tcp_serialize_segment(&header, data, conn_addr),
             )
         }
     };
     match result {
         Ok(()) => {
-            core_ctx.increment(|counters| &counters.segments_sent);
+            core_ctx.counters().segments_sent.increment();
             match control {
                 None => {}
-                Some(Control::RST) => core_ctx.increment(|counters| &counters.resets_sent),
-                Some(Control::SYN) => core_ctx.increment(|counters| &counters.syns_sent),
-                Some(Control::FIN) => core_ctx.increment(|counters| &counters.fins_sent),
+                Some(Control::RST) => core_ctx.counters().resets_sent.increment(),
+                Some(Control::SYN) => core_ctx.counters().syns_sent.increment(),
+                Some(Control::FIN) => core_ctx.counters().fins_sent.increment(),
             }
         }
         Err(err) => {
-            core_ctx.increment(|counters| &counters.segment_send_errors);
+            core_ctx.counters().segment_send_errors.increment();
             match socket_id {
                 Some(socket_id) => debug!("{:?}: failed to send segment: {:?}", socket_id, err),
                 None => debug!("TCP: failed to send segment: {:?}", err),
@@ -5492,7 +5494,10 @@ mod tests {
         BaseTransportIpContext, HopLimits, IpTransportContext, LocalDeliveryPacketInfo,
     };
     use packet::{Buf, BufferMut, ParseBuffer as _};
-    use packet_formats::icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode};
+    use packet_formats::icmp::{
+        Icmpv4DestUnreachableCode, Icmpv4ParameterProblemCode, Icmpv4TimeExceededCode,
+        Icmpv6DestUnreachableCode, Icmpv6ParameterProblemCode, Icmpv6TimeExceededCode,
+    };
     use packet_formats::tcp::{TcpParseArgs, TcpSegment};
     use rand::Rng as _;
     use test_case::test_case;
@@ -5587,6 +5592,8 @@ mod tests {
     struct TcpCoreCtx<D: FakeStrongDeviceId, BT: TcpBindingsTypes> {
         tcp: FakeDualStackTcpState<D, BT>,
         ip_socket_ctx: InnerCoreCtx<D>,
+        // Marks to attach for incoming packets.
+        recv_packet_marks: netstack3_ip::Marks,
     }
 
     impl<D: FakeStrongDeviceId, BT: TcpBindingsTypes> ContextProvider for TcpCoreCtx<D, BT> {
@@ -5625,7 +5632,10 @@ mod tests {
                         Ipv4::recv_src_addr(*meta.src_ip),
                         meta.dst_ip,
                         buffer,
-                        &LocalDeliveryPacketInfo::default(),
+                        &LocalDeliveryPacketInfo {
+                            marks: core_ctx.recv_packet_marks,
+                            ..Default::default()
+                        },
                     )
                     .expect("failed to deliver bytes");
                 }
@@ -5637,7 +5647,10 @@ mod tests {
                         Ipv6::recv_src_addr(*meta.src_ip),
                         meta.dst_ip,
                         buffer,
-                        &LocalDeliveryPacketInfo::default(),
+                        &LocalDeliveryPacketInfo {
+                            marks: core_ctx.recv_packet_marks,
+                            ..Default::default()
+                        },
                     )
                     .expect("failed to deliver bytes");
                 }
@@ -6134,9 +6147,8 @@ mod tests {
     impl<I: Ip, D: FakeStrongDeviceId, BT: TcpTestBindingsTypes<D>> CounterContext<TcpCounters<I>>
         for TcpCoreCtx<D, BT>
     {
-        fn with_counters<O, F: FnOnce(&TcpCounters<I>) -> O>(&self, cb: F) -> O {
-            let counters = I::map_ip((), |()| &self.tcp.v4.counters, |()| &self.tcp.v6.counters);
-            cb(counters)
+        fn counters(&self) -> &TcpCounters<I> {
+            I::map_ip((), |()| &self.tcp.v4.counters, |()| &self.tcp.v6.counters)
         }
     }
 
@@ -6147,7 +6159,11 @@ mod tests {
         BT::Instant: Default,
     {
         fn with_ip_socket_ctx_state(state: FakeDualStackIpSocketCtx<D>) -> Self {
-            Self { tcp: Default::default(), ip_socket_ctx: FakeCoreCtx::with_state(state) }
+            Self {
+                tcp: Default::default(),
+                ip_socket_ctx: FakeCoreCtx::with_state(state),
+                recv_packet_marks: Default::default(),
+            }
         }
     }
 
@@ -6155,7 +6171,6 @@ mod tests {
         fn new<I: TcpTestIpExt>(
             addr: SpecifiedAddr<I::Addr>,
             peer: SpecifiedAddr<I::Addr>,
-            _prefix: u8,
         ) -> Self {
             Self::with_ip_socket_ctx_state(FakeDualStackIpSocketCtx::new(core::iter::once(
                 FakeDeviceConfig {
@@ -6224,7 +6239,6 @@ mod tests {
                         core_ctx: TcpCoreCtx::new::<I>(
                             I::TEST_ADDRS.local_ip,
                             I::TEST_ADDRS.remote_ip,
-                            I::TEST_ADDRS.subnet.prefix(),
                         ),
                         bindings_ctx: TcpBindingsCtx::default(),
                     },
@@ -6235,7 +6249,6 @@ mod tests {
                         core_ctx: TcpCoreCtx::new::<I>(
                             I::TEST_ADDRS.remote_ip,
                             I::TEST_ADDRS.local_ip,
-                            I::TEST_ADDRS.subnet.prefix(),
                         ),
                         bindings_ctx: TcpBindingsCtx::default(),
                     },
@@ -6577,31 +6590,24 @@ mod tests {
         let mut assert_counters =
             |context_name: &'static str, ExpectedCounters { tx, rx, passive_open, active_open }| {
                 net.with_context(context_name, |ctx| {
-                    ctx.core_ctx.with_counters(|counters: &TcpCounters<I>| {
-                        let c = counters.as_ref();
-                        assert_eq!(c.segment_send_errors.get(), 0, "{}", context_name);
-                        assert_eq!(c.segments_sent.get(), tx, "{}", context_name);
-                        assert_eq!(c.invalid_segments_received.get(), 0, "{}", context_name);
-                        assert_eq!(c.valid_segments_received.get(), rx, "{}", context_name);
-                        assert_eq!(c.received_segments_dispatched.get(), rx, "{}", context_name);
-                        assert_eq!(
-                            c.active_connection_openings.get(),
-                            active_open,
-                            "{}",
-                            context_name
-                        );
-                        assert_eq!(
-                            c.passive_connection_openings.get(),
-                            passive_open,
-                            "{}",
-                            context_name
-                        );
-                        assert_eq!(c.failed_connection_attempts.get(), 0, "{}", context_name);
-                        // Each side of the connection sends and receives a,
-                        // SYN, regardless of it initiated the connection.
-                        assert_eq!(c.syns_sent.get(), 1);
-                        assert_eq!(c.syns_received.get(), 1);
-                    })
+                    let c: &TcpCounters<I> = ctx.core_ctx.counters();
+                    assert_eq!(c.segment_send_errors.get(), 0, "{}", context_name);
+                    assert_eq!(c.segments_sent.get(), tx, "{}", context_name);
+                    assert_eq!(c.invalid_segments_received.get(), 0, "{}", context_name);
+                    assert_eq!(c.valid_segments_received.get(), rx, "{}", context_name);
+                    assert_eq!(c.received_segments_dispatched.get(), rx, "{}", context_name);
+                    assert_eq!(c.active_connection_openings.get(), active_open, "{}", context_name);
+                    assert_eq!(
+                        c.passive_connection_openings.get(),
+                        passive_open,
+                        "{}",
+                        context_name
+                    );
+                    assert_eq!(c.failed_connection_attempts.get(), 0, "{}", context_name);
+                    // Each side of the connection sends and receives a,
+                    // SYN, regardless of it initiated the connection.
+                    assert_eq!(c.syns_sent.get(), 1);
+                    assert_eq!(c.syns_received.get(), 1);
                 })
             };
         // Communication done by `bind_listen_connect_accept_inner`:
@@ -6628,7 +6634,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.local_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
         let s1 = api.create(Default::default());
@@ -6658,7 +6663,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.local_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
         for port in 1..=u16::MAX {
@@ -6702,7 +6706,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.remote_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
         let unbound = api.create(Default::default());
@@ -6721,7 +6724,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(
             Ipv6::TEST_ADDRS.local_ip,
             Ipv6::TEST_ADDRS.remote_ip,
-            Ipv6::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<Ipv6>();
         let unbound = api.create(Default::default());
@@ -6742,7 +6744,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(
             Ipv6::TEST_ADDRS.local_ip,
             Ipv6::TEST_ADDRS.remote_ip,
-            Ipv6::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<Ipv6>();
         let socket = api.create(Default::default());
@@ -6828,8 +6829,8 @@ mod tests {
         let server_ip = SpecifiedAddr::new(net_ip_v6!("1:2:3:4::")).unwrap();
         let mut net = FakeTcpNetworkSpec::new_network(
             [
-                (LOCAL, TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(client_ip, server_ip, 0))),
-                (REMOTE, TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(server_ip, client_ip, 0))),
+                (LOCAL, TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(client_ip, server_ip))),
+                (REMOTE, TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(server_ip, client_ip))),
             ],
             |net, meta| {
                 if net == LOCAL {
@@ -6902,8 +6903,8 @@ mod tests {
         let client_ip = SpecifiedAddr::new(net_ip_v6!("1:2:3:4::")).unwrap();
         let mut net = FakeTcpNetworkSpec::new_network(
             [
-                (LOCAL, TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(server_ip, client_ip, 0))),
-                (REMOTE, TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(client_ip, server_ip, 0))),
+                (LOCAL, TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(server_ip, client_ip))),
+                (REMOTE, TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(client_ip, server_ip))),
             ],
             |net, meta| {
                 if net == LOCAL {
@@ -7199,7 +7200,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.remote_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
         let socket = api.create(Default::default());
@@ -7230,7 +7230,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.remote_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
         let local = SocketAddr { ip: ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip), port: PORT_1 };
@@ -7259,22 +7258,8 @@ mod tests {
         let server_ip = SpecifiedAddr::new(net_ip_v6!("fe80::2")).unwrap();
         let mut net = FakeTcpNetworkSpec::new_network(
             [
-                (
-                    LOCAL,
-                    TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(
-                        server_ip,
-                        client_ip,
-                        Ipv6::LINK_LOCAL_UNICAST_SUBNET.prefix(),
-                    )),
-                ),
-                (
-                    REMOTE,
-                    TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(
-                        client_ip,
-                        server_ip,
-                        Ipv6::LINK_LOCAL_UNICAST_SUBNET.prefix(),
-                    )),
-                ),
+                (LOCAL, TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(server_ip, client_ip))),
+                (REMOTE, TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(client_ip, server_ip))),
             ],
             move |net, meta: DualStackSendIpPacketMeta<_>| {
                 if net == LOCAL {
@@ -7340,11 +7325,7 @@ mod tests {
     fn bound_connection_info_zoned_addrs() {
         let local_ip = LinkLocalAddr::new(net_ip_v6!("fe80::1")).unwrap().into_specified();
         let remote_ip = LinkLocalAddr::new(net_ip_v6!("fe80::2")).unwrap().into_specified();
-        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(
-            local_ip,
-            remote_ip,
-            Ipv6::LINK_LOCAL_UNICAST_SUBNET.prefix(),
-        ));
+        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(local_ip, remote_ip));
 
         let local_addr = SocketAddr {
             ip: ZonedAddr::Zoned(AddrAndZone::new(local_ip, FakeDeviceId).unwrap()),
@@ -7596,7 +7577,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.remote_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
         let unbound = api.create(Default::default());
@@ -7614,7 +7594,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.remote_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
         let socket = api.create(Default::default());
@@ -7785,7 +7764,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.remote_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
         let socket = api.create(Default::default());
@@ -7816,7 +7794,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.remote_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
 
@@ -7851,7 +7828,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.remote_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
 
@@ -7902,7 +7878,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.remote_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
         let first = api.create(Default::default());
@@ -7994,7 +7969,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.remote_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
 
@@ -8036,7 +8010,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.remote_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
 
@@ -8093,38 +8066,44 @@ mod tests {
         );
     }
 
-    #[test_case(Icmpv4DestUnreachableCode::DestNetworkUnreachable => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::DestHostUnreachable => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::DestProtocolUnreachable => ConnectionError::ProtocolUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::DestPortUnreachable => ConnectionError::PortUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::SourceRouteFailed => ConnectionError::SourceRouteFailed)]
-    #[test_case(Icmpv4DestUnreachableCode::DestNetworkUnknown => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::DestHostUnknown => ConnectionError::DestinationHostDown)]
-    #[test_case(Icmpv4DestUnreachableCode::SourceHostIsolated => ConnectionError::SourceHostIsolated)]
-    #[test_case(Icmpv4DestUnreachableCode::NetworkAdministrativelyProhibited => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::HostAdministrativelyProhibited => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::NetworkUnreachableForToS => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::HostUnreachableForToS => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::CommAdministrativelyProhibited => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::HostPrecedenceViolation => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::PrecedenceCutoffInEffect => ConnectionError::HostUnreachable)]
-    fn icmp_destination_unreachable_connect_v4(
-        error: Icmpv4DestUnreachableCode,
-    ) -> ConnectionError {
-        icmp_destination_unreachable_connect_inner::<Ipv4>(Icmpv4ErrorCode::DestUnreachable(error))
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestNetworkUnreachable) => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestHostUnreachable) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestProtocolUnreachable) => ConnectionError::ProtocolUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestPortUnreachable) => ConnectionError::PortUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::SourceRouteFailed) => ConnectionError::SourceRouteFailed)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestNetworkUnknown) => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestHostUnknown) => ConnectionError::DestinationHostDown)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::SourceHostIsolated) => ConnectionError::SourceHostIsolated)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::NetworkAdministrativelyProhibited) => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::HostAdministrativelyProhibited) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::NetworkUnreachableForToS) => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::HostUnreachableForToS) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::CommAdministrativelyProhibited) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::HostPrecedenceViolation) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::PrecedenceCutoffInEffect) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::ParameterProblem(Icmpv4ParameterProblemCode::PointerIndicatesError) => ConnectionError::ProtocolError)]
+    #[test_case(Icmpv4ErrorCode::ParameterProblem(Icmpv4ParameterProblemCode::MissingRequiredOption) => ConnectionError::ProtocolError)]
+    #[test_case(Icmpv4ErrorCode::ParameterProblem(Icmpv4ParameterProblemCode::BadLength) => ConnectionError::ProtocolError)]
+    #[test_case(Icmpv4ErrorCode::TimeExceeded(Icmpv4TimeExceededCode::TtlExpired) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::TimeExceeded(Icmpv4TimeExceededCode::FragmentReassemblyTimeExceeded) => ConnectionError::TimedOut)]
+    fn icmp_destination_unreachable_connect_v4(error: Icmpv4ErrorCode) -> ConnectionError {
+        icmp_destination_unreachable_connect_inner::<Ipv4>(error)
     }
 
-    #[test_case(Icmpv6DestUnreachableCode::NoRoute => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv6DestUnreachableCode::CommAdministrativelyProhibited => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv6DestUnreachableCode::BeyondScope => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv6DestUnreachableCode::AddrUnreachable => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv6DestUnreachableCode::PortUnreachable => ConnectionError::PortUnreachable)]
-    #[test_case(Icmpv6DestUnreachableCode::SrcAddrFailedPolicy => ConnectionError::SourceRouteFailed)]
-    #[test_case(Icmpv6DestUnreachableCode::RejectRoute => ConnectionError::NetworkUnreachable)]
-    fn icmp_destination_unreachable_connect_v6(
-        error: Icmpv6DestUnreachableCode,
-    ) -> ConnectionError {
-        icmp_destination_unreachable_connect_inner::<Ipv6>(Icmpv6ErrorCode::DestUnreachable(error))
+    #[test_case(Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::NoRoute) => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::CommAdministrativelyProhibited) => ConnectionError::PermissionDenied)]
+    #[test_case(Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::BeyondScope) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::AddrUnreachable) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::PortUnreachable) => ConnectionError::PortUnreachable)]
+    #[test_case(Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::SrcAddrFailedPolicy) => ConnectionError::PermissionDenied)]
+    #[test_case(Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::RejectRoute) => ConnectionError::PermissionDenied)]
+    #[test_case(Icmpv6ErrorCode::ParameterProblem(Icmpv6ParameterProblemCode::ErroneousHeaderField) => ConnectionError::ProtocolError)]
+    #[test_case(Icmpv6ErrorCode::ParameterProblem(Icmpv6ParameterProblemCode::UnrecognizedNextHeaderType) => ConnectionError::ProtocolError)]
+    #[test_case(Icmpv6ErrorCode::ParameterProblem(Icmpv6ParameterProblemCode::UnrecognizedIpv6Option) => ConnectionError::ProtocolError)]
+    #[test_case(Icmpv6ErrorCode::TimeExceeded(Icmpv6TimeExceededCode::HopLimitExceeded) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv6ErrorCode::TimeExceeded(Icmpv6TimeExceededCode::FragmentReassemblyTimeExceeded) => ConnectionError::HostUnreachable)]
+    fn icmp_destination_unreachable_connect_v6(error: Icmpv6ErrorCode) -> ConnectionError {
+        icmp_destination_unreachable_connect_inner::<Ipv6>(error)
     }
 
     fn icmp_destination_unreachable_connect_inner<I: TcpTestIpExt + IcmpIpExt>(
@@ -8137,7 +8116,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.remote_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
 
@@ -8165,42 +8143,44 @@ mod tests {
         api.get_socket_error(&connection).unwrap()
     }
 
-    #[test_case(Icmpv4DestUnreachableCode::DestNetworkUnreachable => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::DestHostUnreachable => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::DestProtocolUnreachable => ConnectionError::ProtocolUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::DestPortUnreachable => ConnectionError::PortUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::SourceRouteFailed => ConnectionError::SourceRouteFailed)]
-    #[test_case(Icmpv4DestUnreachableCode::DestNetworkUnknown => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::DestHostUnknown => ConnectionError::DestinationHostDown)]
-    #[test_case(Icmpv4DestUnreachableCode::SourceHostIsolated => ConnectionError::SourceHostIsolated)]
-    #[test_case(Icmpv4DestUnreachableCode::NetworkAdministrativelyProhibited => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::HostAdministrativelyProhibited => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::NetworkUnreachableForToS => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::HostUnreachableForToS => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::CommAdministrativelyProhibited => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::HostPrecedenceViolation => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::PrecedenceCutoffInEffect => ConnectionError::HostUnreachable)]
-    fn icmp_destination_unreachable_established_v4(
-        error: Icmpv4DestUnreachableCode,
-    ) -> ConnectionError {
-        icmp_destination_unreachable_established_inner::<Ipv4>(Icmpv4ErrorCode::DestUnreachable(
-            error,
-        ))
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestNetworkUnreachable) => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestHostUnreachable) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestProtocolUnreachable) => ConnectionError::ProtocolUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestPortUnreachable) => ConnectionError::PortUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::SourceRouteFailed) => ConnectionError::SourceRouteFailed)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestNetworkUnknown) => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestHostUnknown) => ConnectionError::DestinationHostDown)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::SourceHostIsolated) => ConnectionError::SourceHostIsolated)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::NetworkAdministrativelyProhibited) => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::HostAdministrativelyProhibited) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::NetworkUnreachableForToS) => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::HostUnreachableForToS) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::CommAdministrativelyProhibited) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::HostPrecedenceViolation) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::PrecedenceCutoffInEffect) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::ParameterProblem(Icmpv4ParameterProblemCode::PointerIndicatesError) => ConnectionError::ProtocolError)]
+    #[test_case(Icmpv4ErrorCode::ParameterProblem(Icmpv4ParameterProblemCode::MissingRequiredOption) => ConnectionError::ProtocolError)]
+    #[test_case(Icmpv4ErrorCode::ParameterProblem(Icmpv4ParameterProblemCode::BadLength) => ConnectionError::ProtocolError)]
+    #[test_case(Icmpv4ErrorCode::TimeExceeded(Icmpv4TimeExceededCode::TtlExpired) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::TimeExceeded(Icmpv4TimeExceededCode::FragmentReassemblyTimeExceeded) => ConnectionError::TimedOut)]
+    fn icmp_destination_unreachable_established_v4(error: Icmpv4ErrorCode) -> ConnectionError {
+        icmp_destination_unreachable_established_inner::<Ipv4>(error)
     }
 
-    #[test_case(Icmpv6DestUnreachableCode::NoRoute => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv6DestUnreachableCode::CommAdministrativelyProhibited => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv6DestUnreachableCode::BeyondScope => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv6DestUnreachableCode::AddrUnreachable => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv6DestUnreachableCode::PortUnreachable => ConnectionError::PortUnreachable)]
-    #[test_case(Icmpv6DestUnreachableCode::SrcAddrFailedPolicy => ConnectionError::SourceRouteFailed)]
-    #[test_case(Icmpv6DestUnreachableCode::RejectRoute => ConnectionError::NetworkUnreachable)]
-    fn icmp_destination_unreachable_established_v6(
-        error: Icmpv6DestUnreachableCode,
-    ) -> ConnectionError {
-        icmp_destination_unreachable_established_inner::<Ipv6>(Icmpv6ErrorCode::DestUnreachable(
-            error,
-        ))
+    #[test_case(Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::NoRoute) => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::CommAdministrativelyProhibited) => ConnectionError::PermissionDenied)]
+    #[test_case(Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::BeyondScope) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::AddrUnreachable) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::PortUnreachable) => ConnectionError::PortUnreachable)]
+    #[test_case(Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::SrcAddrFailedPolicy) => ConnectionError::PermissionDenied)]
+    #[test_case(Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::RejectRoute) => ConnectionError::PermissionDenied)]
+    #[test_case(Icmpv6ErrorCode::ParameterProblem(Icmpv6ParameterProblemCode::ErroneousHeaderField) => ConnectionError::ProtocolError)]
+    #[test_case(Icmpv6ErrorCode::ParameterProblem(Icmpv6ParameterProblemCode::UnrecognizedNextHeaderType) => ConnectionError::ProtocolError)]
+    #[test_case(Icmpv6ErrorCode::ParameterProblem(Icmpv6ParameterProblemCode::UnrecognizedIpv6Option) => ConnectionError::ProtocolError)]
+    #[test_case(Icmpv6ErrorCode::TimeExceeded(Icmpv6TimeExceededCode::HopLimitExceeded) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv6ErrorCode::TimeExceeded(Icmpv6TimeExceededCode::FragmentReassemblyTimeExceeded) => ConnectionError::HostUnreachable)]
+    fn icmp_destination_unreachable_established_v6(error: Icmpv6ErrorCode) -> ConnectionError {
+        icmp_destination_unreachable_established_inner::<Ipv6>(error)
     }
 
     fn icmp_destination_unreachable_established_inner<I: TcpTestIpExt + IcmpIpExt>(
@@ -8434,11 +8414,11 @@ mod tests {
                         Connection {
                         state: State::TimeWait(TimeWait {
                             last_seq,
-                            last_ack,
+                            closed_rcv,
                             expiry,
                             ..
                         }), ..
-                        } => (*last_seq, *last_ack, *expiry)
+                        } => (*last_seq, closed_rcv.ack, *expiry)
                     )
                 }
             )
@@ -8822,7 +8802,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.remote_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
         let socket = api.create(Default::default());
@@ -8846,7 +8825,16 @@ mod tests {
             DualStackConverter = I::DualStackConverter,
         >,
     {
+        // We want the accepted socket to be marked 101 for MARK_1 and 102 for MARK_2.
+        let expected_marks = [(MarkDomain::Mark1, 101), (MarkDomain::Mark2, 102)];
+        let marks = netstack3_ip::Marks::new(expected_marks);
         let mut net = new_test_net::<I>();
+
+        for c in [LOCAL, REMOTE] {
+            net.with_context(c, |ctx| {
+                ctx.core_ctx.recv_packet_marks = marks;
+            })
+        }
 
         let backlog = NonZeroUsize::new(1).unwrap();
         let server_port = NonZeroU16::new(1234).unwrap();
@@ -8872,7 +8860,9 @@ mod tests {
         net.with_context(REMOTE, |ctx| {
             let (accepted, _addr, _accepted_ends) =
                 ctx.tcp_api::<I>().accept(&server).expect("failed to accept");
-            assert_eq!(ctx.tcp_api::<I>().get_mark(&accepted, MarkDomain::Mark1), Mark(Some(1)));
+            for (domain, expected) in expected_marks {
+                assert_eq!(ctx.tcp_api::<I>().get_mark(&accepted, domain), Mark(Some(expected)));
+            }
         });
     }
 

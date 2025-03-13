@@ -11,7 +11,7 @@ use crate::experimental::series::buffer::BufferStrategy;
 use crate::experimental::series::interpolation::Interpolation;
 use crate::experimental::series::statistic::{Metadata, Statistic};
 use crate::experimental::series::{FoldError, MatrixSampler, SamplingProfile, TimeMatrix};
-use crate::experimental::serve::{InspectedTimeMatrix, TimeMatrixClient};
+use crate::experimental::serve::{InspectSender, InspectedTimeMatrix, TimeMatrixClient};
 
 /// A type that maps the presence of an optional builder field to another type.
 pub trait Optional {
@@ -91,6 +91,7 @@ where
         TimeMatrix<F, P>: 'static + MatrixSampler<F::Sample> + Send,
         Metadata<F>: 'static + Send + Sync,
         F: BufferStrategy<F::Aggregation, P> + Statistic,
+        F::Sample: Send,
         P: Interpolation<FillSample<F> = F::Sample>,
     {
         let SampleDataRecord { statistic, metadata, .. } = self;
@@ -139,6 +140,7 @@ where
         TimeMatrix<F, P>: 'static + MatrixSampler<F::Sample> + Send,
         Metadata<F>: 'static + Send + Sync,
         F: BufferStrategy<F::Aggregation, P> + Statistic,
+        F::Sample: Send,
         P: Interpolation<FillSample<F> = F::Sample>,
     {
         let SampleDataRecord { statistic, .. } = self;

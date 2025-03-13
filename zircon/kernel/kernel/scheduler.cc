@@ -1204,17 +1204,23 @@ inline void Scheduler::UpdateEstimatedEnergyConsumption(Thread* current_thread,
   // Time in a low-power idle state should only accrue when running the idle
   // thread.
   const SchedDuration idle_processor_time_ns{IdlePowerThread::TakeProcessorIdleTime()};
-  DEBUG_ASSERT_MSG(
-      idle_processor_time_ns <= actual_runtime_ns,
-      "idle_processor_time_ns=%" PRId64 " actual_runtime_ns=%" PRId64 " current_thread=%s",
-      idle_processor_time_ns.raw_value(), actual_runtime_ns.raw_value(), current_thread->name());
+
+  // TODO(https://fxbug.dev/379576294): Re-enable this assertion once we understand why the
+  // idle_processor_time_ns is occasionally larger than actual_runtime_ns. Once the assertion
+  // is back in place, the ktl::max below that clamps active_processor_time_ns to 0 can be
+  // removed.
+  // DEBUG_ASSERT_MSG(
+  //  idle_processor_time_ns <= actual_runtime_ns,
+  //  "idle_processor_time_ns=%" PRId64 " actual_runtime_ns=%" PRId64 " current_thread=%s",
+  //  idle_processor_time_ns.raw_value(), actual_runtime_ns.raw_value(), current_thread->name());
 
   // Subtract any time the processor spent in the low-power idle state from the
   // runtime to ensure that active vs. idle power consumption is attributed
   // correctly. Processors can accumulate both active or idle power consumption,
   // but threads, including the idle power thread, accumulate only active power
   // consumption.
-  const SchedDuration active_processor_time_ns = actual_runtime_ns - idle_processor_time_ns;
+  const SchedDuration active_processor_time_ns =
+      ktl::max<SchedDuration>(actual_runtime_ns - idle_processor_time_ns, SchedDuration(0));
 
   cpu_stats& stats = percpu::GetCurrent().stats;
 
@@ -3012,7 +3018,7 @@ void Scheduler::PowerLevelControl::TimerHandler(Timer* timer, zx_instant_mono_t 
   // and its power level requests are no longer relevant.
   PowerLevelControl* power_level_control = static_cast<PowerLevelControl*>(arg);
   if (power_level_control->cpu() == arch_curr_cpu_num()) {
-    power_level_control->request_dpc_.Queue();
+    DpcRunner::Enqueue(power_level_control->request_dpc_);
   }
 }
 

@@ -17,6 +17,7 @@ use {
 mod processors;
 pub(crate) mod util;
 pub use crate::processors::connect_disconnect::DisconnectInfo;
+pub use crate::processors::power::{IfacePowerLevel, UnclearPowerDemand};
 pub use crate::processors::toggle_events::ClientConnectionsToggleEvent;
 pub use util::sender::TelemetrySender;
 #[cfg(test)]
@@ -27,16 +28,32 @@ const PERSISTENCE_SERVICE_PATH: &str = "/svc/fuchsia.diagnostics.persist.DataPer
 
 #[derive(Debug)]
 pub enum TelemetryEvent {
-    /// Report a connection result.
-    ConnectResult { result: fidl_ieee80211::StatusCode, bss: Box<BssDescription> },
-    /// Report a disconnection.
-    Disconnect { info: DisconnectInfo },
-    /// Report a client connections enabled or disabled event.
-    ClientConnectionsToggle { event: ClientConnectionsToggleEvent },
-    /// Report creation of client iface.
-    ClientIfaceCreated { iface_id: u16 },
-    /// Report destruction of client iface.
-    ClientIfaceDestroyed { iface_id: u16 },
+    ConnectResult {
+        result: fidl_ieee80211::StatusCode,
+        bss: Box<BssDescription>,
+    },
+    Disconnect {
+        info: DisconnectInfo,
+    },
+    // We should maintain docstrings if we can see any possibility of ambiguity for an enum
+    /// Client connections enabled or disabled
+    ClientConnectionsToggle {
+        event: ClientConnectionsToggleEvent,
+    },
+    ClientIfaceCreated {
+        iface_id: u16,
+    },
+    ClientIfaceDestroyed {
+        iface_id: u16,
+    },
+    IfacePowerLevelChanged {
+        iface_power_level: IfacePowerLevel,
+        iface_id: u16,
+    },
+    /// System suspension imminent
+    SuspendImminent,
+    /// Unclear power level requested by policy layer
+    UnclearPowerDemand(UnclearPowerDemand),
 }
 
 /// Attempts to connect to the Cobalt service.
@@ -107,9 +124,12 @@ pub fn serve_telemetry(
     const METADATA_NODE_NAME: &str = "metadata";
     let inspect_metadata_node = inspect_node.create_child(METADATA_NODE_NAME);
     let inspect_time_series_node = inspect_node.create_child("time_series");
+    let driver_specific_time_series_node = inspect_time_series_node.create_child("driver_specific");
 
     let (time_matrix_client, time_series_fut) =
         serve_time_matrix_inspection(inspect_time_series_node);
+    let (driver_specific_time_series_client, driver_specific_time_series_fut) =
+        serve_time_matrix_inspection(driver_specific_time_series_node);
 
     // Create and initialize modules
     let connect_disconnect = processors::connect_disconnect::ConnectDisconnectLogger::new(
@@ -120,7 +140,8 @@ pub fn serve_telemetry(
         persistence_req_sender,
         &time_matrix_client,
     );
-
+    let power_logger =
+        processors::power::PowerLogger::new(cobalt_1dot1_proxy.clone(), &inspect_node);
     let mut toggle_logger =
         processors::toggle_events::ToggleLogger::new(cobalt_1dot1_proxy, &inspect_node);
 
@@ -128,6 +149,7 @@ pub fn serve_telemetry(
         processors::client_iface_counters::ClientIfaceCountersLogger::new(
             monitor_svc_proxy,
             &time_matrix_client,
+            driver_specific_time_series_client,
         );
 
     let fut = async move {
@@ -150,6 +172,7 @@ pub fn serve_telemetry(
                         }
                         Disconnect { info } => {
                             connect_disconnect.log_disconnect(&info).await;
+                            power_logger.handle_iface_disconnect(info.iface_id).await;
                         }
                         ClientConnectionsToggle { event } => {
                             toggle_logger.log_toggle_event(event).await;
@@ -159,7 +182,20 @@ pub fn serve_telemetry(
                         }
                         ClientIfaceDestroyed { iface_id } => {
                             client_iface_counters_logger.handle_iface_destroyed(iface_id).await;
+                            power_logger.handle_iface_destroyed(iface_id).await;
                         }
+                        IfacePowerLevelChanged { iface_power_level, iface_id } => {
+                            power_logger.log_iface_power_event(iface_power_level, iface_id).await;
+                        }
+                        // TODO(b/340921554): either watch for suspension directly in the library,
+                        // or plumb this from callers once suspend mechanisms are integrated
+                        SuspendImminent => {
+                            power_logger.handle_suspend_imminent().await;
+                        }
+                        UnclearPowerDemand(demand) => {
+                            power_logger.handle_unclear_power_demand(demand).await;
+                        }
+
                     }
                 }
                 _ = telemetry_interval.next() => {
@@ -168,6 +204,7 @@ pub fn serve_telemetry(
             }
         }
     };
-    let fut = future::try_join(fut, time_series_fut).map_ok(|((), ())| ());
+    let fut = future::try_join3(fut, time_series_fut, driver_specific_time_series_fut)
+        .map_ok(|((), (), ())| ());
     (sender, fut)
 }

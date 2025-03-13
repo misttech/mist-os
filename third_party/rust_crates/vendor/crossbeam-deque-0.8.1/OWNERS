@@ -3,3 +3,4 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /third_party/rust_crates/vendor/crossbeam-0.8.0/OWNERS
+include /third_party/rust_crates/vendor/rayon-core-1.12.1/OWNERS

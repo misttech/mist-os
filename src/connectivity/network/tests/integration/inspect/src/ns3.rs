@@ -30,7 +30,9 @@ use net_declare::{fidl_mac, fidl_subnet, net_ip_v4, net_ip_v6, std_ip_v4, std_ip
 use net_types::ethernet::Mac;
 use net_types::ip::{Ip, IpAddress, IpVersion, Ipv4, Ipv4Addr, Ipv6};
 use net_types::{AddrAndPortFormatter, Witness as _};
-use netstack_testing_common::realms::{Netstack3, TestSandboxExt as _};
+use netstack_testing_common::realms::{
+    KnownServiceProvider, Netstack3, NetstackVersion, TestSandboxExt as _,
+};
 use netstack_testing_common::{constants, get_inspect_data};
 use netstack_testing_macros::netstack_test;
 use packet::{ParseBuffer as _, Serializer as _};
@@ -47,8 +49,10 @@ use test_case::test_case;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_filter as fnet_filter,
     fidl_fuchsia_net_filter_ext as fnet_filter_ext,
-    fidl_fuchsia_net_multicast_admin as fnet_multicast_admin,
-    fidl_fuchsia_posix_socket as fposix_socket, fidl_fuchsia_posix_socket_raw as fposix_socket_raw,
+    fidl_fuchsia_net_multicast_admin as fnet_multicast_admin, fidl_fuchsia_netemul as fnetemul,
+    fidl_fuchsia_posix_socket as fposix_socket,
+    fidl_fuchsia_posix_socket_packet as fposix_socket_packet,
+    fidl_fuchsia_posix_socket_raw as fposix_socket_raw,
 };
 
 enum TcpSocketState {
@@ -494,6 +498,45 @@ async fn inspect_raw_ip_sockets<I: TestIpExt>(name: &str) {
     })
 }
 
+#[netstack_test]
+async fn inspect_device_sockets(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let realm =
+        sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create realm");
+
+    // Ensure ns3 has started and that there is a Socket to collect inspect data about.
+    let _device_socket =
+        realm.packet_socket(fposix_socket_packet::Kind::Link).await.expect("create device socket");
+
+    let data =
+        get_inspect_data(&realm, "netstack", "root").await.expect("inspect data should be present");
+
+    // Debug print the tree to make debugging easier in case of failures.
+    println!("Got inspect data: {:#?}", data);
+    // NB: The sockets are keyed by an opaque debug identifier.
+    let sockets = data.get_child("Sockets").unwrap();
+    let sock_name = assert_matches!(&sockets.children[..], [socket] => socket.name.clone());
+    diagnostics_assertions::assert_data_tree!(data, "root": contains {
+        Sockets: {
+            sock_name => {
+                Protocol: "None",
+                Device: "Any",
+                Counters: {
+                    Rx: {
+                        DeliveredFrames: 0u64,
+                    },
+                    Tx: {
+                        SentFrames: 0u64,
+                        QueueFullError: 0u64,
+                        AllocError: 0u64,
+                        SizeConstraintError: 0u64,
+                    },
+                },
+            },
+        }
+    })
+}
+
 /// Helper function that returns the ID of the loopback interface.
 async fn get_loopback_id(realm: &netemul::TestRealm<'_>) -> u64 {
     let interfaces_state = realm
@@ -677,8 +720,13 @@ async fn inspect_multicast_routes(name: &str) {
 async fn inspect_devices(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
-    let realm =
-        sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create realm");
+
+    // Disable the use of opaque IIDs in SLAAC address generation so addresses are
+    // deterministic (based on the MAC address) and we can assert on them below.
+    let mut netstack: fnetemul::ChildDef =
+        KnownServiceProvider::Netstack(NetstackVersion::Netstack3).into();
+    netstack_testing_common::realms::set_netstack3_opaque_iids(&mut netstack, false);
+    let realm = sandbox.create_realm(name, [netstack]).expect("failed to create realm");
 
     // Install netdevice device so that non-Loopback device Inspect properties can be asserted upon.
     const NETDEV_NAME: &str = "test-eth";
@@ -788,6 +836,54 @@ async fn inspect_devices(name: &str) {
                             UnsupportedEthertype: 0u64,
                         },
                     },
+                    IGMP: {
+                        Rx: {
+                            IGMPv1Query: 0u64,
+                            IGMPv2Query: 0u64,
+                            IGMPv3Query: 0u64,
+                            IGMPv1Report: 0u64,
+                            IGMPv2Report: 0u64,
+                            IGMPv3Report: 0u64,
+                            LeaveGroup: 0u64,
+                            Errors: {
+                                ParseFailed: 0u64,
+                                MissingRouterAlertInQuery: 0u64,
+                                RejectedGeneralQuery: 0u64,
+                                BadTTL: 0u64,
+                            },
+                        },
+                        Tx: {
+                            IGMPv1Report: 0u64,
+                            IGMPv2Report: 0u64,
+                            IGMPv3Report: 0u64,
+                            LeaveGroup: 0u64,
+                            Errors: {
+                                SendFailed: 0u64,
+                            },
+                        },
+                    },
+                    MLD: {
+                        Rx: {
+                            MLDv1Query: 0u64,
+                            MLDv2Query: 0u64,
+                            MLDv1Report: 0u64,
+                            MLDv2Report: 0u64,
+                            LeaveGroup: 0u64,
+                            Errors: {
+                                MissingRouterAlert: 0u64,
+                                BadSourceAddress: 0u64,
+                                BadHopLimit: 0u64,
+                            },
+                        },
+                        Tx: {
+                            MLDv1Report: 0u64,
+                            MLDv2Report: 0u64,
+                            LeaveGroup: 0u64,
+                            Errors: {
+                                SendFailed: 0u64,
+                            },
+                        },
+                    },
                 }
             },
             "2": {
@@ -827,6 +923,9 @@ async fn inspect_devices(name: &str) {
                             // the number of DAD transmits to `u16::MAX` above.
                             Assigned: false,
                             Temporary: false,
+                            CreationTime: diagnostics_assertions::AnyUintProperty,
+                            DadCounter: diagnostics_assertions::AnyUintProperty,
+                            RegenCounter: 0u64,
                         }
                     },
                     Configuration: {
@@ -871,6 +970,59 @@ async fn inspect_devices(name: &str) {
                         Rx: {
                             NoEthertype: 0u64,
                             UnsupportedEthertype: 0u64,
+                        },
+                    },
+                    IGMP: {
+                        Rx: {
+                            IGMPv1Query: 0u64,
+                            IGMPv2Query: 0u64,
+                            IGMPv3Query: 0u64,
+                            IGMPv1Report: 0u64,
+                            IGMPv2Report: 0u64,
+                            IGMPv3Report: 0u64,
+                            LeaveGroup: 0u64,
+                            Errors: {
+                                ParseFailed: 0u64,
+                                MissingRouterAlertInQuery: 0u64,
+                                RejectedGeneralQuery: 0u64,
+                                BadTTL: 0u64,
+                            },
+                        },
+                        Tx: {
+                            IGMPv1Report: 0u64,
+                            IGMPv2Report: 0u64,
+                            IGMPv3Report: 0u64,
+                            LeaveGroup: 0u64,
+                            Errors: {
+                                SendFailed: 0u64,
+                            },
+                        },
+                    },
+                    MLD: {
+                        Rx: {
+                            MLDv1Query: 0u64,
+                            MLDv2Query: 0u64,
+                            MLDv1Report: 0u64,
+                            MLDv2Report: 0u64,
+                            LeaveGroup: 0u64,
+                            Errors: {
+                                MissingRouterAlert: 0u64,
+                                BadSourceAddress: 0u64,
+                                BadHopLimit: 0u64,
+                            },
+                        },
+                        Tx: {
+                            MLDv1Report: 0u64,
+                            // Note: Duplicate address detection (DAD) joins the
+                            // solicited-node multicast group for the interface.
+                            // This may or may not cause a report to have been
+                            // sent by the netstack (depending on if the join
+                            // finishes before inspect counters are fetched).
+                            MLDv2Report: diagnostics_assertions::AnyUintProperty,
+                            LeaveGroup: 0u64,
+                            Errors: {
+                                SendFailed: 0u64,
+                            },
                         },
                     },
                 }
@@ -1040,6 +1192,54 @@ async fn inspect_counters(name: &str) {
                     },
                 },
             },
+            "IGMP": {
+                Rx: {
+                    IGMPv1Query: 0u64,
+                    IGMPv2Query: 0u64,
+                    IGMPv3Query: 0u64,
+                    IGMPv1Report: 0u64,
+                    IGMPv2Report: 0u64,
+                    IGMPv3Report: 0u64,
+                    LeaveGroup: 0u64,
+                    Errors: {
+                        ParseFailed: 0u64,
+                        MissingRouterAlertInQuery: 0u64,
+                        RejectedGeneralQuery: 0u64,
+                        BadTTL: 0u64,
+                    },
+                },
+                Tx: {
+                    IGMPv1Report: 0u64,
+                    IGMPv2Report: 0u64,
+                    IGMPv3Report: 0u64,
+                    LeaveGroup: 0u64,
+                    Errors: {
+                        SendFailed: 0u64,
+                    },
+                },
+            },
+            "MLD": {
+                Rx: {
+                    MLDv1Query: 0u64,
+                    MLDv2Query: 0u64,
+                    MLDv1Report: 0u64,
+                    MLDv2Report: 0u64,
+                    LeaveGroup: 0u64,
+                    Errors: {
+                        MissingRouterAlert: 0u64,
+                        BadSourceAddress: 0u64,
+                        BadHopLimit: 0u64,
+                    },
+                },
+                Tx: {
+                    MLDv1Report: 0u64,
+                    MLDv2Report: 0u64,
+                    LeaveGroup: 0u64,
+                    Errors: {
+                        SendFailed: 0u64,
+                    },
+                },
+            },
             "IPv4": {
                 PacketTx: {
                     Sent: 1u64,
@@ -1191,6 +1391,17 @@ async fn inspect_counters(name: &str) {
                         SentPackets: 0u64,
                         ChecksumErrors: 0u64,
                     },
+                },
+            },
+            "DeviceSockets": {
+                "Rx": {
+                    DeliveredFrames: 0u64,
+                },
+                "Tx": {
+                    SentFrames: 0u64,
+                    QueueFullError: 0u64,
+                    AllocError: 0u64,
+                    SizeConstraintError: 0u64,
                 },
             },
             "UDP": {

@@ -31,6 +31,9 @@ rustc_library("selinux") {
   inputs = [
     "testdata/composite_policies/compiled/allow_fork.pp",
     "testdata/composite_policies/compiled/class_defaults_policy.pp",
+    "testdata/composite_policies/compiled/handle_unknown_policy-allow.pp",
+    "testdata/composite_policies/compiled/handle_unknown_policy-deny.pp",
+    "testdata/composite_policies/compiled/handle_unknown_policy-reject.pp",
     "testdata/composite_policies/compiled/minimal_policy.pp",
     "testdata/composite_policies/compiled/range_transition_policy.pp",
     "testdata/composite_policies/compiled/role_transition_not_allowed_policy.pp",
@@ -45,6 +48,8 @@ rustc_library("selinux") {
     "testdata/micro_policies/allow_a_t_a1_attr_class0_perm0_a2_attr_class0_perm1_policy.pp",
     "testdata/micro_policies/allow_a_t_b_attr_class0_perm0_policy.pp",
     "testdata/micro_policies/allow_a_t_b_t_class0_perm0_policy.pp",
+    "testdata/micro_policies/allow_with_constraints_policy.pp",
+    "testdata/micro_policies/allowxperm_policy.pp",
     "testdata/micro_policies/constraints_policy.pp",
     "testdata/micro_policies/file_no_defaults_policy.pp",
     "testdata/micro_policies/file_range_source_high_policy.pp",
@@ -87,8 +92,8 @@ rustc_library("selinux") {
     # Fuchsia/starnix builds use `fuchsia-inspect-contrib` for self-profiling.
     deps += [ "//src/lib/diagnostics/inspect/contrib/rust" ]
 
-    # Fuchsia/starnix builds use `starnix-sync` for lock primitives.
-    deps += [ "//src/starnix/lib/starnix-sync" ]
+    # Fuchsia/starnix builds use `starnix_sync` for lock primitives.
+    deps += [ "//src/starnix/lib/starnix_sync" ]
 
     # Fuchsia/starnix async tests rely on additional dependencies.
     test_deps += [

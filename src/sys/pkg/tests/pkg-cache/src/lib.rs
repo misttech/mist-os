@@ -20,10 +20,10 @@ use fuchsia_sync::Mutex;
 use futures::future::BoxFuture;
 use futures::prelude::*;
 use mock_boot_arguments::MockBootArgumentsService;
+use mock_health_verification::MockHealthVerificationService;
 use mock_metrics::MockMetricEventLoggerFactory;
 use mock_paver::{MockPaverService, MockPaverServiceBuilder};
 use mock_reboot::MockRebootService;
-use mock_verifier::MockVerifierService;
 use std::collections::HashMap;
 use std::sync::Arc;
 use vfs::directory::entry_container::Directory as _;
@@ -559,25 +559,14 @@ where
 
         // Set up verifier service so we can verify that we reject GC until after the verifier
         // commits this boot/slot as successful, lest we break rollbacks.
-        let verifier_service = Arc::new(MockVerifierService::new(|_| Ok(())));
+        let verifier_service = Arc::new(MockHealthVerificationService::new(|| zx::Status::OK));
         {
             let verifier_service = Arc::clone(&verifier_service);
             local_child_svc_dir
                 .add_entry(
-                    fupdate_verify::BlobfsVerifierMarker::PROTOCOL_NAME,
+                    fupdate_verify::HealthVerificationMarker::PROTOCOL_NAME,
                     vfs::service::host(move |stream| {
-                        Arc::clone(&verifier_service).run_blobfs_verifier_service(stream)
-                    }),
-                )
-                .unwrap();
-        }
-        {
-            let verifier_service = Arc::clone(&verifier_service);
-            local_child_svc_dir
-                .add_entry(
-                    fupdate_verify::NetstackVerifierMarker::PROTOCOL_NAME,
-                    vfs::service::host(move |stream| {
-                        Arc::clone(&verifier_service).run_netstack_verifier_service(stream)
+                        Arc::clone(&verifier_service).run_health_verification_service(stream)
                     }),
                 )
                 .unwrap();
@@ -815,8 +804,7 @@ where
             .add_route(
                 Route::new()
                     .capability(Capability::protocol::<fidl_fuchsia_paver::PaverMarker>())
-                    .capability(Capability::protocol::<fupdate_verify::BlobfsVerifierMarker>())
-                    .capability(Capability::protocol::<fupdate_verify::NetstackVerifierMarker>())
+                    .capability(Capability::protocol::<fupdate_verify::HealthVerificationMarker>())
                     .from(&service_reflector)
                     .to(&system_update_committer),
             )
@@ -928,7 +916,7 @@ pub struct Mocks {
     pub logger_factory: Arc<MockMetricEventLoggerFactory>,
     pub reboot_service: Arc<MockRebootService>,
     _paver_service: Arc<MockPaverService>,
-    _verifier_service: Arc<MockVerifierService>,
+    _verifier_service: Arc<MockHealthVerificationService>,
 }
 
 struct Apps {

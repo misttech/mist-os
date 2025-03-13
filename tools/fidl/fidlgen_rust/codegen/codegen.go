@@ -16,10 +16,11 @@ var templates embed.FS
 
 type Generator struct {
 	fdomain bool
+	common  bool
 	*fidlgen.Generator
 }
 
-func NewGenerator(rustfmtPath, rustfmtConfigPath string, fdomain bool) *Generator {
+func NewGenerator(rustfmtPath, rustfmtConfigPath string, fdomain bool, common bool, use_common string) *Generator {
 	var args []string
 	if rustfmtConfigPath != "" {
 		args = append(args, "--config-path", rustfmtConfigPath)
@@ -36,7 +37,17 @@ func NewGenerator(rustfmtPath, rustfmtConfigPath string, fdomain bool) *Generato
 					return "fidl::encoding::DefaultFuchsiaResourceDialect"
 				}
 			},
-			"FDomain": func() bool { return fdomain },
+			"FDomain":     func() bool { return fdomain },
+			"IsCommon":    func() bool { return common },
+			"UseCommon":   func() string { return use_common },
+			"UsingCommon": func() bool { return use_common != "" },
+			"EmitType": func(is_value bool) bool {
+				if is_value {
+					return common || use_common == ""
+				} else {
+					return !common
+				}
+			},
 			"MarkerNamespace": func() string {
 				if fdomain {
 					return "fdomain_client::fidl"

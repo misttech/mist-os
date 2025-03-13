@@ -57,6 +57,7 @@ source_set("lib") {
 }
 
 fuchsia_cc_driver("ge2d-driver-driver") {
+  legacy = true
   output_name = "ge2d"
   sources = [ "bind.cc" ]
   deps = [

@@ -5,6 +5,7 @@
 */}}
 
 {{- define "TableDeclaration" }}
+{{- if EmitType .IsValueType }}
 {{- range .DocComments }}
 ///{{ . }}
 {{- end }}
@@ -22,8 +23,10 @@ pub struct {{ .Name }} {
 
 impl fidl::{{ if .IsValueType }}Persistable{{ else }}Standalone<{{ ResourceDialect }}>{{ end }} for {{ .Name }} {}
 {{- end }}
+{{- end }}
 
 {{- define "TableInternal" }}
+{{- if EmitType .IsValueType }}
 impl {{ .Name }} {
     #[inline(always)]
     fn max_ordinal_present(&self) -> u64 {
@@ -200,4 +203,5 @@ impl{{ $resourceDialectGeneric }} fidl::encoding::Decode<Self, {{ $resourceDiale
         Ok(())
     }
 }
+{{- end }}
 {{ end }}

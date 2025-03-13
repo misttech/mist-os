@@ -267,9 +267,6 @@ class RestrictedMode : public zxtest::TestWithParam<RestrictedBlobInfo> {
   // This function tests if machine-specific restricted mode is not supported
   // based on if it fails on what should be a valid state configuration.
   void ArchUnsupportedCheck() {
-    NEEDS_NEXT_SKIP(zx_restricted_bind_state);
-    NEEDS_NEXT_SKIP(zx_restricted_enter);
-
     // If there is no matching blob, it has been removed for lack of support.
     auto blob_entry = restricted_blobs_->find(restricted_blob_info_.machine);
     if (blob_entry == restricted_blobs_->end()) {
@@ -282,37 +279,10 @@ class RestrictedMode : public zxtest::TestWithParam<RestrictedBlobInfo> {
       return;
     }
 
-    zx::vmo vmo;
-    // Failures here will fail the test.
-    ASSERT_OK(zx_restricted_bind_state(0, vmo.reset_and_get_address()));
-    auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
-
-    // Configure the initial register state.
     auto state = ArchRegisterStateFactory::Create(restricted_blob_info_.machine);
-    state->InitializeRegisters(GetTlsAddress(0));
-
-    // Use a known-good pc with a minimal code path before returning.
-    state->set_pc(restricted_symbols().addr_of("exception_bounce_exception_address"));
-
-    // Write the state to the state VMO.
-    ASSERT_OK(vmo.write(&state->restricted_state(), 0, sizeof(state->restricted_state())));
-
-    zx_restricted_reason_t reason_code = 99;
-    // Enter restricted mode with reasonable args that should return with a
-    // reason_code.
-    //
-    // If the machine register state is unsupported, it will return ZX_ERR_BAD_STATE.
-    if (restricted_enter_wrapper(0, reinterpret_cast<uintptr_t>(&restricted_exit), &reason_code) ==
-        ZX_ERR_BAD_STATE) {
-      auto blob = std::move(blob_entry->second);
-      // Only test once, then remove the blob so we skip all other tests.
-      restricted_blobs_->erase(blob_entry);
-      blob.reset();
+    if (!state->ArchSupported()) {
       ZXTEST_SKIP() << "hardware does not support blob:" << restricted_blob_info_.name;
     }
-    // Ensure the reason code was changed.  If we failed with a different error,
-    // there's still a problem.
-    ASSERT_NE(reason_code, 99);
   }
 
   void SetUp() override {
@@ -358,6 +328,32 @@ class RestrictedMode : public zxtest::TestWithParam<RestrictedBlobInfo> {
   size_t register_bytes() const {
     return restricted_blob_info_.machine == elfldltl::ElfMachine::kNative ? sizeof(uint64_t)
                                                                           : sizeof(uint32_t);
+  }
+
+  // This helper provides a uniform means of adding debugging logs to any
+  // failing/flaky test output.
+  void MaybeDebugLog(zx_restricted_reason_t expected_reason, zx_restricted_reason_t real_reason,
+                     zx::vmo* vmo) {
+    if (expected_reason == real_reason || !vmo) {
+      return;
+    }
+    auto state = GetArchRegisterState();
+    if (real_reason == ZX_RESTRICTED_REASON_EXCEPTION) {
+      zx_restricted_exception_t exception_state = {};
+      if (vmo->read(&exception_state, 0, sizeof(exception_state)) != ZX_OK) {
+        return;
+      }
+      if (sizeof(exception_state.exception) == exception_state.exception.header.size) {
+        ADD_FAILURE() << "dumping exception state to stdout";
+        state->PrintExceptionState(exception_state);
+      }
+    } else {
+      zx_restricted_state_t rstate = {};
+      if (vmo->read(&rstate, 0, sizeof(rstate)) != ZX_OK) {
+        return;
+      }
+      state->PrintState(rstate);
+    }
   }
 
  protected:
@@ -555,6 +551,7 @@ TEST_P(RestrictedMode, Basic) {
   zx_restricted_reason_t reason_code = 99;
   ASSERT_OK(
       restricted_enter_wrapper(0, reinterpret_cast<uintptr_t>(&restricted_exit), &reason_code));
+  MaybeDebugLog(ZX_RESTRICTED_REASON_SYSCALL, reason_code, &vmo);
   ASSERT_EQ(ZX_RESTRICTED_REASON_SYSCALL, reason_code);
 
   // Read the state out of the thread.
@@ -903,6 +900,7 @@ TEST_P(RestrictedMode, KickBeforeEnter) {
   ASSERT_OK(
       restricted_enter_wrapper(0, reinterpret_cast<uintptr_t>(&restricted_exit), &reason_code));
   EXPECT_EQ(reason_code, ZX_RESTRICTED_REASON_KICK);
+  MaybeDebugLog(ZX_RESTRICTED_REASON_KICK, reason_code, &vmo);
 
   // Read the state out of the thread.
   ASSERT_OK(vmo.read(&state->restricted_state(), 0, sizeof(state->restricted_state())));
@@ -926,6 +924,7 @@ TEST_P(RestrictedMode, KickBeforeEnter) {
   ASSERT_OK(
       restricted_enter_wrapper(0, reinterpret_cast<uintptr_t>(&restricted_exit), &reason_code));
   EXPECT_EQ(reason_code, ZX_RESTRICTED_REASON_SYSCALL);
+  MaybeDebugLog(ZX_RESTRICTED_REASON_SYSCALL, reason_code, &vmo);
 
   // Read the state out of the thread.
   ASSERT_OK(vmo.read(&state->restricted_state(), 0, sizeof(state->restricted_state())));
@@ -1042,6 +1041,7 @@ TEST_P(RestrictedMode, KickWhileStartingAndExiting) {
     ASSERT_OK(
         restricted_enter_wrapper(0, reinterpret_cast<uintptr_t>(&restricted_exit), &reason_code));
     EXPECT_EQ(reason_code, ZX_RESTRICTED_REASON_KICK);
+    MaybeDebugLog(ZX_RESTRICTED_REASON_KICK, reason_code, &vmo);
   });
 
   // Get the KOID of the child thread and communicate it to the exception handler.
@@ -1098,7 +1098,8 @@ TEST_P(RestrictedMode, KickWhileRunning) {
   uint64_t reason_code = 99;
   ASSERT_OK(
       restricted_enter_wrapper(0, reinterpret_cast<uintptr_t>(&restricted_exit), &reason_code));
-  EXPECT_EQ(reason_code, ZX_RESTRICTED_REASON_KICK);
+  MaybeDebugLog(ZX_RESTRICTED_REASON_KICK, reason_code, &vmo);
+  ASSERT_EQ(reason_code, ZX_RESTRICTED_REASON_KICK);
 
   kicker.join();
   EXPECT_EQ(flag->load(), 1);
@@ -1162,6 +1163,7 @@ TEST_P(RestrictedMode, KickJustBeforeSyscall) {
   uint64_t reason_code = 99;
   ASSERT_OK(
       restricted_enter_wrapper(0, reinterpret_cast<uintptr_t>(&restricted_exit), &reason_code));
+  MaybeDebugLog(ZX_RESTRICTED_REASON_KICK, reason_code, &vmo);
   ASSERT_EQ(ZX_RESTRICTED_REASON_KICK, reason_code);
   kicker.join();
 }

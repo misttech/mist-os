@@ -439,22 +439,14 @@ Error CfiParser::ParseInstructions(Memory* elf, uint64_t instructions_begin,
 }
 
 Error CfiParser::Step(Memory* stack, RegisterID return_address_register, const Registers& current,
-                      Registers& next) {
+                      Registers& next, std::optional<uint64_t> maybe_cfa) {
   uint64_t cfa;
-  switch (cfa_location_.type) {
-    case CfaLocation::Type::kUndefined:
-      return Error("undefined CFA");
-    case CfaLocation::Type::kOffset:
-      if (auto err = current.Get(cfa_location_.reg, cfa); err.has_err()) {
-        return err;
-      }
-      cfa += cfa_location_.offset;
-      break;
-    case CfaLocation::Type::kExpression:
-      if (auto err = cfa_location_.expression.Eval(stack, current, {}, cfa); err.has_err()) {
-        return err;
-      }
-      break;
+  if (!maybe_cfa) {
+    if (auto err = PrepareToStep(stack, current, cfa); err.has_err()) {
+      return err;
+    }
+  } else {
+    cfa = *maybe_cfa;
   }
 
   for (auto& [reg, location] : register_locations_) {
@@ -493,6 +485,8 @@ Error CfiParser::Step(Memory* stack, RegisterID return_address_register, const R
           next.Set(reg, val);
         }
         break;
+      default:
+        break;
     }
   }
 
@@ -526,6 +520,61 @@ Error CfiParser::Step(Memory* stack, RegisterID return_address_register, const R
   }
 
   LOG_DEBUG("%s => %s\n", current.Describe().c_str(), next.Describe().c_str());
+  return Success();
+}
+
+void CfiParser::AsyncStep(AsyncMemory* stack, RegisterID return_address_register,
+                          const Registers& current, fit::callback<void(Error, Registers)> cb) {
+  uint64_t cfa;
+  if (auto err = PrepareToStep(stack, current, cfa); err.has_err()) {
+    return cb(err, Registers(current.arch()));
+  }
+
+  std::vector<std::pair<uint64_t, uint32_t>> ranges;
+  // At this level all of the fetches will be for exactly one machine register sized integer.
+  constexpr uint32_t kSize = 8;
+
+  for (auto& [reg, location] : register_locations_) {
+    if (location.type == RegisterLocation::Type::kOffset) {
+      ranges.emplace_back(cfa + location.offset, kSize);
+    } else if (location.type == RegisterLocation::Type::kExpression ||
+               location.type == RegisterLocation::Type::kValExpression) {
+      uint64_t addr;
+      // Create a copy so we don't invalidate the location's expr.
+      auto expr = location.expression;
+      expr.Eval(stack, current, {cfa}, addr);
+      ranges.emplace_back(addr, kSize);
+    }
+  }
+
+  stack->FetchMemoryRanges(ranges, [=, cb = std::move(cb)]() mutable {
+    // Now we should have all the needed memory fetched from the target so we can call the
+    // synchronous Step to do the evaluations.
+    Registers next(current.arch());
+    auto err = Step(stack, return_address_register, current, next, cfa);
+
+    LOG_DEBUG("%s => %s\n", current.Describe().c_str(), next.Describe().c_str());
+    cb(err, next);
+  });
+}
+
+Error CfiParser::PrepareToStep(Memory* stack, const Registers& current, uint64_t& cfa) {
+  switch (cfa_location_.type) {
+    case CfaLocation::Type::kUndefined:
+      return Error("undefined CFA");
+    case CfaLocation::Type::kOffset:
+      if (auto err = current.Get(cfa_location_.reg, cfa); err.has_err()) {
+        return err;
+      }
+      cfa += cfa_location_.offset;
+      break;
+    case CfaLocation::Type::kExpression:
+      if (auto err = cfa_location_.expression.Eval(stack, current, {}, cfa); err.has_err()) {
+        return err;
+      }
+      break;
+  }
+
   return Success();
 }
 

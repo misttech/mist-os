@@ -39,6 +39,7 @@ common_deps = [
 ]
 
 fuchsia_cc_driver("address_space_driver-driver") {
+  legacy = true
   output_name = "goldfish_address_space"
 
   sources = [ "address_space_device.cc" ]

@@ -9,7 +9,7 @@ import logging
 import subprocess
 
 import ffxtestcase
-import honeydew
+from honeydew.transports.ffx.errors import FfxCommandError
 from mobly import asserts, test_runner
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -28,6 +28,7 @@ class FfxTest(ffxtestcase.FfxTestCase):
 
     def test_get_ssh_address_includes_port(self) -> None:
         """Test `ffx target get-ssh-address` output returns as expected."""
+        # NOTE: This test fails if the device under test is an user-mode networking emulator.
         output = self.dut.ffx.run(["target", "get-ssh-address", "-t", "5"])
         asserts.assert_true(
             ":22" in output, f"expected stdout to contain ':22',got {output}"
@@ -96,7 +97,7 @@ class FfxTest(ffxtestcase.FfxTestCase):
         asserts.assert_equal(devices[0]["rcs_state"], "N")
         # Assert that we are not probing the device to identify the type
         asserts.assert_equal(devices[0]["target_type"], "Unknown")
-        with asserts.assert_raises(honeydew.errors.FfxCommandError):
+        with asserts.assert_raises(FfxCommandError):
             self.dut.ffx.run(["-c", "daemon.autostart=false", "daemon", "echo"])
 
     # TODO(b/355292969): re-enable when client-side discovery is re-enabled
@@ -132,7 +133,7 @@ class FfxTest(ffxtestcase.FfxTestCase):
         asserts.assert_not_equal(devices[0]["target_type"], "Unknown")
 
         # Make sure the daemon hadn't started running
-        with asserts.assert_raises(honeydew.errors.FfxCommandError):
+        with asserts.assert_raises(FfxCommandError):
             self.dut.ffx.run(["-c", "daemon.autostart=false", "daemon", "echo"])
 
     def test_local_discovery(self) -> None:
@@ -184,7 +185,12 @@ class FfxTest(ffxtestcase.FfxTestCase):
         asserts.assert_equal(output_json["type"], "user")
         asserts.assert_equal(
             output_json["message"],
-            "Failed to create remote control proxy. Please check the connection to the target;`ffx doctor -v` may help diagnose the issue.",
+            (
+                "Failed to create remote control proxy: "
+                'Timeout attempting to reach target "this-should-not-exist". '
+                "Please check the connection to the target; "
+                "`ffx doctor -v` may help diagnose the issue."
+            ),
         )
         asserts.assert_equal(output_json["code"], 1)
 
@@ -197,15 +203,20 @@ class FfxTest(ffxtestcase.FfxTestCase):
             "server",
             "start",
             "--background",
-            "--daemon",
+            "--foreground",
         ]
         (code, stdout, stderr) = self.run_ffx_unchecked(cmd)
-        output_json = json.loads(stdout)
-        asserts.assert_equal(stderr, "")
+        try:
+            output_json = json.loads(stdout)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"could not parse string as JSON: {e}.  {stdout}")
+
+        # This is an expected message on stderr. The log file is changed for package servers.
+        asserts.assert_in("Switching log file to", stderr)
         asserts.assert_equal(output_json["type"], "user")
         asserts.assert_equal(
             output_json["message"],
-            "--daemon and --background are mutually exclusive",
+            "--background and --foreground are mutually exclusive",
         )
         asserts.assert_equal(output_json["code"], 1)
 

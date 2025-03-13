@@ -8,7 +8,8 @@
 use anyhow::{bail, Context, Result};
 
 use ffx_product_show_args::ShowCommand;
-use fho::{FfxMain, FfxTool, SimpleWriter, ToolIO as _};
+use ffx_writer::{SimpleWriter, ToolIO as _};
+use fho::{FfxMain, FfxTool};
 use sdk_metadata::{ProductBundle, ProductBundleV2, VirtualDevice, VirtualDeviceManifest};
 use serde_json::to_string_pretty;
 use std::io::{stdin, stdout};

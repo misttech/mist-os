@@ -64,7 +64,7 @@ Deprecated interfaces include:
 
 1. [StreamConfig](/sdk/fidl/fuchsia.hardware.audio/stream_config.fidl):
 Used to capture or render audio by
-[audio_core](/src/media/audio/audio_core/v1/README.md) and
+[audio_core](/src/media/audio/audio_core/README.md) and
 [audio-driver-ctl](/src/media/audio/tools/audio-driver-ctl). The former is the
 version 1 of the core of the audio system (providing software mixing, routing,
 etc.) and the latter is a utility used for testing and bringup of new platforms.

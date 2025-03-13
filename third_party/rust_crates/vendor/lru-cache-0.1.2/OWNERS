@@ -3,5 +3,5 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /src/connectivity/bluetooth/OWNERS
-include /src/lib/fuchsia-hyper/OWNERS
+include /src/lib/diagnostics/inspect/contrib/rust/OWNERS
 include /third_party/rust_crates/vendor/trust-dns-resolver-0.22.0/OWNERS

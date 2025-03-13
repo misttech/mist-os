@@ -195,3 +195,157 @@ async fn test_parallel_execution() {
     let expected_events = expected_events.into_iter().group_by_test_case_unordered();
     assert_events_eq(&expected_events, &events);
 }
+
+#[fuchsia_async::run_singlethreaded(test)]
+async fn launch_and_test_zxtest_success() {
+    let test_url = "fuchsia-pkg://fuchsia.com/gtest-runner-example-tests#meta/zxtest_success.cm";
+    let mut run_options = default_options();
+    run_options.parallel = Some(1);
+    let (events, _logs) = run_test(test_url, run_options).await.unwrap();
+
+    let grouped = events.into_iter().group_by_test_case_ordered();
+
+    assert_eq!(
+        grouped.get(&Some("BasicTest.Basic".to_string())).unwrap().non_artifact_events,
+        vec![
+            RunEvent::case_found("BasicTest.Basic"),
+            RunEvent::case_started("BasicTest.Basic"),
+            RunEvent::case_stopped("BasicTest.Basic", CaseStatus::Passed),
+            RunEvent::case_finished("BasicTest.Basic"),
+        ]
+    );
+    assert_eq!(
+        grouped.get(&Some("BasicTest.Basic2".to_string())).unwrap().non_artifact_events,
+        vec![
+            RunEvent::case_found("BasicTest.Basic2"),
+            RunEvent::case_started("BasicTest.Basic2"),
+            RunEvent::case_stopped("BasicTest.Basic2", CaseStatus::Passed),
+            RunEvent::case_finished("BasicTest.Basic2"),
+        ]
+    );
+    assert_eq!(
+        grouped.get(&Some("BasicTest.SkipMe".to_string())).unwrap().non_artifact_events,
+        vec![
+            RunEvent::case_found("BasicTest.SkipMe"),
+            RunEvent::case_started("BasicTest.SkipMe"),
+            RunEvent::case_stopped("BasicTest.SkipMe", CaseStatus::Skipped),
+            RunEvent::case_finished("BasicTest.SkipMe"),
+        ]
+    );
+}
+
+#[fuchsia_async::run_singlethreaded(test)]
+async fn launch_and_test_zxtest_failure() {
+    let test_url = "fuchsia-pkg://fuchsia.com/gtest-runner-example-tests#meta/zxtest_failure.cm";
+    let mut run_options = default_options();
+    run_options.parallel = Some(1);
+    let (events, _logs) = run_test(test_url, run_options).await.unwrap();
+
+    let expected_events = vec![
+        RunEvent::suite_started(),
+        RunEvent::case_found("BasicTest.BasicFailure"),
+        RunEvent::case_started("BasicTest.BasicFailure"),
+        RunEvent::case_stopped("BasicTest.BasicFailure", CaseStatus::Failed),
+        RunEvent::case_finished("BasicTest.BasicFailure"),
+        RunEvent::suite_stopped(SuiteStatus::Failed),
+    ];
+
+    // zxtest prints to stdout and on failure to stderr, strip for comparison
+    assert_eq!(
+        expected_events,
+        events
+            .into_iter()
+            .filter(|v| if let RunEvent::CaseStdout { .. } | RunEvent::CaseStderr { .. } = v {
+                false
+            } else {
+                true
+            })
+            .collect::<Vec<_>>()
+    );
+}
+
+#[fuchsia_async::run_singlethreaded(test)]
+async fn launch_and_test_gtest_setup_failure() {
+    let test_url =
+        "fuchsia-pkg://fuchsia.com/gtest-runner-example-tests#meta/gtest_setup_failure.cm";
+    let mut run_options = default_options();
+    run_options.parallel = Some(1);
+    let (events, _logs) = run_test(test_url, run_options).await.unwrap();
+
+    let expected_events = vec![
+        RunEvent::suite_started(),
+        RunEvent::case_found("SetupFailingTest.Test"),
+        RunEvent::case_started("SetupFailingTest.Test"),
+        RunEvent::case_stopped("SetupFailingTest.Test", CaseStatus::Failed),
+        RunEvent::case_finished("SetupFailingTest.Test"),
+        RunEvent::suite_stopped(SuiteStatus::Failed),
+    ];
+
+    // gtest output is very detailed here, but we only want to test non-output events.
+    assert_eq!(
+        expected_events,
+        events
+            .into_iter()
+            .filter(|v| if let RunEvent::CaseStdout { .. } | RunEvent::CaseStderr { .. } = v {
+                false
+            } else {
+                true
+            })
+            .collect::<Vec<_>>()
+    )
+}
+
+#[fuchsia_async::run_singlethreaded(test)]
+async fn launch_and_test_zxtest_setup_failure() {
+    let test_url =
+        "fuchsia-pkg://fuchsia.com/gtest-runner-example-tests#meta/zxtest_setup_failure.cm";
+    let mut run_options = default_options();
+    run_options.parallel = Some(1);
+    let (events, _logs) = run_test(test_url, run_options).await.unwrap();
+
+    let event_groups = events.into_iter().group_by_test_case_unordered();
+
+    assert_eq!(
+        event_groups.get(&Some("SetupFailingTest.Test".to_string())).unwrap().non_artifact_events,
+        vec![
+            RunEvent::case_found("SetupFailingTest.Test"),
+            RunEvent::case_started("SetupFailingTest.Test"),
+            RunEvent::case_stopped("SetupFailingTest.Test", CaseStatus::Failed),
+            RunEvent::case_finished("SetupFailingTest.Test"),
+        ]
+    );
+
+    assert_eq!(
+        event_groups
+            .get(&Some("SetupFailingTestSuite.Test".to_string()))
+            .unwrap()
+            .non_artifact_events,
+        vec![
+            RunEvent::case_found("SetupFailingTestSuite.Test"),
+            RunEvent::case_started("SetupFailingTestSuite.Test"),
+            RunEvent::case_stopped("SetupFailingTestSuite.Test", CaseStatus::Failed),
+            RunEvent::case_finished("SetupFailingTestSuite.Test"),
+        ]
+    );
+}
+
+#[fuchsia_async::run_singlethreaded(test)]
+async fn launch_and_test_zxtest_env_setup_failure() {
+    let test_url =
+        "fuchsia-pkg://fuchsia.com/gtest-runner-example-tests#meta/zxtest_env_setup_failure.cm";
+    let mut run_options = default_options();
+    run_options.parallel = Some(1);
+    let (events, _logs) = run_test(test_url, run_options).await.unwrap();
+
+    let event_groups = events.into_iter().group_by_test_case_unordered();
+
+    assert_eq!(
+        event_groups.get(&Some("SomeSuite.SomeTest".to_string())).unwrap().non_artifact_events,
+        vec![
+            RunEvent::case_found("SomeSuite.SomeTest"),
+            RunEvent::case_started("SomeSuite.SomeTest"),
+            RunEvent::case_stopped("SomeSuite.SomeTest", CaseStatus::Failed),
+            RunEvent::case_finished("SomeSuite.SomeTest"),
+        ]
+    );
+}

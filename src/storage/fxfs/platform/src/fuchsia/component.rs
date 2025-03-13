@@ -199,16 +199,16 @@ impl Component {
                 }
             }),
         )?;
-
-        self.export_dir.clone().open(
+        let flags = fio::PERM_READABLE
+            | fio::PERM_WRITABLE
+            | fio::PERM_EXECUTABLE
+            | fio::Flags::PROTOCOL_DIRECTORY;
+        self.export_dir.clone().open3(
             self.scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY
-                | fio::OpenFlags::RIGHT_EXECUTABLE,
             Path::dot(),
-            outgoing_dir.into(),
-        );
+            flags,
+            &mut vfs::ObjectRequest::new(flags, &Default::default(), outgoing_dir.into()),
+        )?;
 
         if let Some(channel) = lifecycle_channel {
             let me = self.clone();
@@ -488,7 +488,7 @@ impl Component {
 #[cfg(test)]
 mod tests {
     use super::{new_block_client, Component};
-    use fidl::endpoints::{Proxy, ServerEnd};
+    use fidl::endpoints::Proxy;
     use fidl_fuchsia_fs::AdminMarker;
     use fidl_fuchsia_fs_startup::{
         CompressionAlgorithm, CreateOptions, EvictionPolicyOverride, MountOptions, StartOptions,
@@ -501,6 +501,7 @@ mod tests {
     use futures::{pin_mut, select};
     use fxfs::filesystem::FxFilesystem;
     use fxfs::object_store::volume::root_volume;
+    use fxfs::object_store::NO_OWNER;
     use ramdevice_client::RamdiskClientBuilder;
     use std::pin::Pin;
     use storage_device::block_device::BlockDevice;
@@ -533,7 +534,10 @@ mod tests {
             .expect("FxFilesystem::new_empty failed");
             {
                 let root_volume = root_volume(fs.clone()).await.expect("Open root_volume failed");
-                root_volume.new_volume("default", None).await.expect("Create volume failed");
+                root_volume
+                    .new_volume("default", NO_OWNER, None)
+                    .await
+                    .expect("Create volume failed");
             }
             fs.close().await.expect("close failed");
         }
@@ -693,12 +697,7 @@ mod tests {
             let (volumes_dir_proxy, server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             client
-                .open(
-                    fio::OpenFlags::RIGHT_READABLE,
-                    fio::ModeType::empty(),
-                    "volumes",
-                    ServerEnd::new(server_end.into_channel()),
-                )
+                .open("volumes", fio::PERM_READABLE, &Default::default(), server_end.into_channel())
                 .expect("open failed");
 
             let fs_admin_proxy = connect_to_protocol_at_dir_svc::<AdminMarker>(client)

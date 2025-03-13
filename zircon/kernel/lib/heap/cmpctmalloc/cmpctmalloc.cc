@@ -131,16 +131,13 @@
 #include <lib/ktrace.h>
 #include <trace.h>
 
-#include <kernel/auto_preempt_disabler.h>
-
 #define LOCAL_TRACE_DURATION(label, name, ...) \
   ktrace::Scope name = KTRACE_BEGIN_SCOPE_ENABLE(false, "kernel:sched", label, ##__VA_ARGS__)
 
 #define LOCAL_TRACE_DURATION_END(name) name.End()
 
-#define PREEMPT_DISABLE(name) AutoPreemptDisabler name
-
-using LockGuard = ::Guard<Mutex>;
+// See definition of |TheHeapLock| for an explanation of why we're using |CriticalMutex|.
+using LockGuard = ::Guard<CriticalMutex>;
 
 KCOUNTER(malloc_size_le_64, "malloc.size_le_64")
 KCOUNTER(malloc_size_le_96, "malloc.size_le_96")
@@ -163,7 +160,6 @@ static_assert(ZX_DEBUG_ASSERT_IMPLEMENTED, "Expect debug assertions in host buil
 
 #define LOCAL_TRACE_DURATION(label, name, ...)
 #define LOCAL_TRACE_DURATION_END(name)
-#define PREEMPT_DISABLE(name)
 
 class __TA_SCOPED_CAPABILITY LockGuard {
  public:
@@ -916,7 +912,6 @@ NO_ASAN void* cmpct_alloc(size_t size) {
 
   rounded_up += sizeof(header_t);
 
-  PREEMPT_DISABLE(preempt_disable);
   LockGuard guard(TheHeapLock::Get());
   LOCAL_TRACE_DURATION("locked", trace_lock);
   int bucket = find_nonempty_bucket(start_bucket);
@@ -1047,7 +1042,6 @@ NO_ASAN void cmpct_free(void* payload) {
     return;
   }
 
-  PREEMPT_DISABLE(preempt_disable);
   LockGuard guard(TheHeapLock::Get());
   LOCAL_TRACE_DURATION("locked", trace_locked);
   header_t* header = (header_t*)payload - 1;
@@ -1060,7 +1054,6 @@ NO_ASAN void cmpct_sized_free(void* payload, size_t s) {
     return;
   }
 
-  PREEMPT_DISABLE(preempt_disable);
   LockGuard guard(TheHeapLock::Get());
   LOCAL_TRACE_DURATION("locked", trace_locked);
   header_t* header = (header_t*)payload - 1;
@@ -1088,7 +1081,6 @@ NO_ASAN void* cmpct_memalign(size_t alignment, size_t size) {
     return NULL;
   }
 
-  PREEMPT_DISABLE(preempt_disable);
   LockGuard guard(TheHeapLock::Get());
   LOCAL_TRACE_DURATION("locked", trace_lock);
 #if KERNEL_ASAN

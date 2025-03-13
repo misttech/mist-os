@@ -3,11 +3,14 @@
 // found in the LICENSE file.
 
 use itertools::Itertools as _;
+use sampler_config::runtime::ProjectConfig;
+use std::fs::File;
+use std::io::BufReader;
 
 /// The location where [`inspect_for_sampler_test_inner`] will pull Sampler
 /// config from. All tests must make sure to output sampler config into that
 /// directory (minus the leading "/pkg") in their dependencies.
-const SAMPLER_CONFIG_DIR: &str = "/pkg/data/sampler-config";
+const SAMPLER_CONFIG_FILE: &str = "/pkg/data/sampler-config/netstack.json";
 
 /// Encapsulate logic for getting inspect data between NS2 and NS3, which sadly
 /// have slightly different methods of doing so.
@@ -18,22 +21,13 @@ pub(crate) trait InspectDataGetter {
 /// The core part of the NS2 and NS3 test that validates that the selectors used
 /// in the Sampler config are present in the inspect data.
 pub(crate) async fn inspect_for_sampler_test_inner<S: InspectDataGetter>(getter: &S) {
-    let sampler_config = sampler_config::SamplerConfigBuilder::default()
-        .sampler_dir(SAMPLER_CONFIG_DIR)
-        .load()
-        .expect("SamplerConfig load failed");
-    let project_config = match &sampler_config.project_configs[..] {
-        [project_config] => project_config,
-        project_configs => panic!("expected one project_config but got {:#?}", project_configs),
-    };
+    let file = File::open(SAMPLER_CONFIG_FILE).expect("open config file");
+    let mut reader = BufReader::new(file);
+    let project_config: ProjectConfig =
+        serde_json5::from_reader(&mut reader).expect("loaded sampler config");
     for metric_config in &project_config.metrics {
         let selector = match &metric_config.selectors[..] {
-            [selector] => {
-                &selector
-                    .as_ref()
-                    .expect("SamplerConfig load should never return None for selectors")
-                    .selector
-            }
+            [selector] => selector,
             selectors => panic!("expected one selector but got {:#?}", selectors),
         };
         let fidl_fuchsia_diagnostics::Selector { tree_selector, .. } = selector;

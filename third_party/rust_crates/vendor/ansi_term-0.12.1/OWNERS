@@ -6,5 +6,4 @@ include /src/sys/lib/component_debug/OWNERS
 include /src/sys/run_test_suite/OWNERS
 include /third_party/rust_crates/vendor/clap-2.34.0/OWNERS
 include /third_party/rust_crates/vendor/pretty_assertions-1.2.1/OWNERS
-include /third_party/rust_crates/vendor/tracing-subscriber-0.3.15/OWNERS
 include /tools/pretty_serial/OWNERS

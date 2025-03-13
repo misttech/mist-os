@@ -101,7 +101,7 @@ inline ExampleUseOfVectors::ExampleUseOfVectors(::std::vector<uint8_t> vector_of
     : storage_({.vector_of_uint8 = std::move(vector_of_uint8),
                 .vector_of_vector_of_bool = std::move(vector_of_vector_of_bool)}) {}
 inline ExampleUseOfVectors::ExampleUseOfVectors(const ::test_vectors::ExampleUseOfVectors& other) noexcept : ::test_vectors::ExampleUseOfVectors(other.CloneStorage_()) {}
-inline ExampleUseOfVectors& ::test_vectors::ExampleUseOfVectors::operator=(const ::test_vectors::ExampleUseOfVectors & other) noexcept {
+inline ExampleUseOfVectors& ::test_vectors::ExampleUseOfVectors::operator=(const ::test_vectors::ExampleUseOfVectors& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -123,7 +123,7 @@ inline ExampleUseOfVectors& ExampleUseOfVectors::vector_of_vector_of_bool(::std:
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_vectors::ExampleUseOfVectors> : public std::true_type{};
+struct IsFidlType<::test_vectors::ExampleUseOfVectors> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_vectors::ExampleUseOfVectors> {
@@ -135,7 +135,7 @@ struct TypeTraits<::test_vectors::ExampleUseOfVectors> {
 };
 
 template <>
-struct IsStruct<::test_vectors::ExampleUseOfVectors> : public std::true_type{};
+struct IsStruct<::test_vectors::ExampleUseOfVectors> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_vectors::ExampleUseOfVectors, ::fidl::internal::NaturalCodingConstraintEmpty> final

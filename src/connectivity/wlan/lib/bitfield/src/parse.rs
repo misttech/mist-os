@@ -75,6 +75,7 @@ impl Parse for UserType {
     }
 }
 
+#[allow(clippy::large_enum_variant)] // TODO(https://fxbug.dev/401087337)
 pub enum AliasSpec {
     Unnamed {
         _underscore: Token![_],

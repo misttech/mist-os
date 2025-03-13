@@ -68,6 +68,9 @@ rustc_library("framework") {
     "//src/sys/test_runners:tmp_storage",
   ]
   with_unit_tests = true
+
+  # TODO(https://fxbug.dev/390250858): Re-enable when lld issue is fixed.
+  exclude_toolchain_tags = [ "profile" ]
 }
 
 rustc_binary("fuchsia-storage-benchmarks") {

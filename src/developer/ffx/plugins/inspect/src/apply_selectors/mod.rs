@@ -12,7 +12,6 @@ use errors::ffx_error;
 use ffx_inspect_args::ApplySelectorsCommand;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorProxy;
-use iquery::commands::DiagnosticsProvider;
 use std::fs::read_to_string;
 use std::io::{stdin, stdout};
 use std::path::Path;
@@ -46,7 +45,9 @@ pub async fn execute(
             .await
             .map_err(|e| anyhow!(ffx_error!("Failed to connect to realm query: {e}")))?;
         let provider = HostArchiveReader::new(diagnostics_proxy, realm_query);
-        provider.snapshot::<Inspect>(cmd.accessor_path.as_deref(), std::iter::empty()).await?
+        provider
+            .snapshot_diagnostics_data::<Inspect>(cmd.accessor_path.as_deref(), std::iter::empty())
+            .await?
     };
     let moniker = match cmd.moniker {
         Some(m) => Some(ExtendedMoniker::parse_str(&m)?),

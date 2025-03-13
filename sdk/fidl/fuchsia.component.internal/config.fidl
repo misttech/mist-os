@@ -55,7 +55,7 @@ type Config = table {
 
     /// The number of threads to use for running component_manager's executor.
     /// If not present, interpreted as 1.
-    7: num_threads uint32;
+    7: num_threads uint8;
 
     /// URL of the root component to launch. This field is used if the no URL
     /// is passed to component manager. If value is passed in both places, then

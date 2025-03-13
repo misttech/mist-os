@@ -58,7 +58,11 @@ def format_export(export):
             f'    {arg["type"]} {arg["name"]}' for arg in export["arguments"]
         )
     )
-    lines[-1] = f"{lines[-1]});"
+    if "attributes" in export:
+        lines[-1] = f"{lines[-1]})"
+        lines.append(f'{export["attributes"]};')
+    else:
+        lines[-1] = f"{lines[-1]});"
     lines.append("")
     return "\n".join(lines)
 

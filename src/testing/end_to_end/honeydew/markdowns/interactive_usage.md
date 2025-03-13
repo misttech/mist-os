@@ -43,8 +43,8 @@ in interactive python terminal, you need to run the below commands.
 >>> FUCHSIA_ROOT = os.environ.get("FUCHSIA_DIR")
 >>> FFX_BIN = f"{FUCHSIA_ROOT}/.jiri_root/bin/ffx"
 >>> FFX_PLUGINS_PATH=f"{FUCHSIA_ROOT}/out/default/host-tools"
->>> from honeydew.transports import ffx
->>> ffx_config = ffx.FfxConfig()
+>>> from honeydew.transports.ffx import ffx_impl
+>>> ffx_config = ffx_impl.FfxConfig()
 >>> ffx_config.setup(binary_path=FFX_BIN, isolate_dir=None, logs_dir="/tmp/logs/honeydew/", logs_level="debug", enable_mdns=True, subtools_search_path=FFX_PLUGINS_PATH, proxy_timeout_secs=60)
 
 >>> import honeydew

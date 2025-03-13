@@ -149,6 +149,8 @@ class BootShim : public BootShimBase {
     return *this;
   }
 
+  constexpr std::string_view legacy_cmdline() const { return Get<Cmdline>()[Cmdline::kLegacy]; }
+
   // Log how things look after calling set_* methods.
   void Log(ByteView ramdisk) const { BootShimBase::Log(Get<Cmdline>(), ramdisk); }
 

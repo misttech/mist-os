@@ -101,3 +101,8 @@ closed protocol Connector {
         request server_end:Phy;
     });
 };
+
+// Added to allow service connection to replace devfs
+service Service {
+    device client_end:Connector;
+};

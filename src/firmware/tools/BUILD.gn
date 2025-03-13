@@ -9,9 +9,20 @@ if (is_host) {
     main_source = "cipd_utils_test.py"
     sources = [ "cipd_utils.py" ]
   }
+
+  python_host_test("android_boot_image_test") {
+    main_source = "android_boot_image_test.py"
+    sources = [
+      "android_boot_image.py",
+      "test_data/android_boot_image/test_boot_image.bin",
+    ]
+  }
 }
 
 group("tests") {
   testonly = true
-  public_deps = [ ":cipd_utils_test($host_toolchain)" ]
+  public_deps = [
+    ":android_boot_image_test($host_toolchain)",
+    ":cipd_utils_test($host_toolchain)",
+  ]
 }

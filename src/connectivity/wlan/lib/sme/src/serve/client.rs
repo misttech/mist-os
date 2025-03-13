@@ -31,7 +31,6 @@ type Sme = client_sme::ClientSme;
 pub fn serve(
     cfg: crate::Config,
     device_info: fidl_mlme::DeviceInfo,
-    mac_sublayer_support: fidl_common::MacSublayerSupport,
     security_support: fidl_common::SecuritySupport,
     spectrum_management_support: fidl_common::SpectrumManagementSupport,
     event_stream: MlmeEventStream,
@@ -53,7 +52,6 @@ pub fn serve(
         inspector,
         inspect_node,
         persistence_req_sender,
-        mac_sublayer_support,
         security_support,
         spectrum_management_support,
     );
@@ -113,6 +111,14 @@ async fn handle_telemetry_fidl_request(
     request: TelemetryRequest,
 ) -> Result<(), fidl::Error> {
     match request {
+        TelemetryRequest::QueryTelemetrySupport { responder, .. } => {
+            let support_fut = sme.lock().query_telemetry_support();
+            let support = support_fut
+                .await
+                .map_err(|_| zx::Status::CONNECTION_ABORTED.into_raw())
+                .and_then(|result| result);
+            responder.send(support.as_ref().map_err(|e| *e))
+        }
         TelemetryRequest::GetCounterStats { responder, .. } => {
             let counter_stats_fut = sme.lock().counter_stats();
             let counter_stats = counter_stats_fut

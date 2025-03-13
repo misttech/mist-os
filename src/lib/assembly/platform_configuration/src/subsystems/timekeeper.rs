@@ -5,6 +5,7 @@
 use crate::subsystems::prelude::*;
 use anyhow::{anyhow, Context, Result};
 
+use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_config::timekeeper_config::TimekeeperConfig;
 
 pub(crate) struct TimekeeperSubsystem;
@@ -32,39 +33,58 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
         // allows Timekeeper to serve an endpoint for such runtime behavior changes.
         // Only eng builds are allowed to have this feature.
         let serve_test_protocols = config.serve_test_protocols;
+        let use_persistent_storage = config.use_persistent_storage;
 
         // See:
         // https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0115_build_types?hl=en#definitions
-        if serve_test_protocols {
-            if *context.build_type != BuildType::Eng {
-                return Err(anyhow!(
-                    "`serve_test_protocols==true` is only allowed in `eng` builds, see RFC 0115"
-                ));
-            }
-            // Gives Timekeeper some mutable persistent storage ("data").
+        if serve_test_protocols && *context.build_type != BuildType::Eng {
+            return Err(anyhow!(
+                "`serve_test_protocols==true` is only allowed in `eng` builds, see RFC 0115"
+            ));
+        }
+
+        // Gives Timekeeper some mutable persistent storage ("data").
+        //
+        // `serve_test_protocols` is gating this capability because historically it also was
+        // used to gate persistent storage. `use_persistent_storage` is a direct setting.
+        if serve_test_protocols || use_persistent_storage {
             builder.platform_bundle("timekeeper_persistence");
         }
 
+        let has_aml_timer = context.board_info.provides_feature("fuchsia::aml-hrtimer");
+
         // If set, Timekeeper will serve `fuchsia.time.alarms` and will connect
         // to the appropriate hardware device to do so.
-        let serve_fuchsia_time_alarms = config.serve_fuchsia_time_alarms;
-
-        let has_aml_timer = context.board_info.provides_feature("fuchsia::aml-hrtimer");
+        //
+        // At the moment the flag is set only if all conditions are met, i.e. the functionality
+        // is requested, and the underlying driver is available.
+        let serve_fuchsia_time_alarms = config.serve_fuchsia_time_alarms && has_aml_timer;
 
         // Adds hrtimer routing only for boards that have hardware support for
         // doing so.
-        if has_aml_timer && serve_fuchsia_time_alarms {
+        if serve_fuchsia_time_alarms {
             // For all devices.
             builder.platform_bundle("timekeeper_wake_alarms");
-            // At the moment only the aml-hrtimer is supported. Stay tuned.
-            builder.platform_bundle("timekeeper_wake_alarms_aml_hrtimer");
         }
 
+        // Always on counter is used instead of a persistent RTC on some platforms.
         let has_always_on_counter =
             context.board_info.provides_feature("fuchsia::always_on_counter");
+
+        // The always on counter is useless without persistent storage to persist the
+        // counter values as would be done in an RTC chip.
+        let use_always_on_counter = has_always_on_counter && use_persistent_storage;
+
         // Allows Timekeeper to short-circuit RTC driver detection at startup.
         let has_real_time_clock = context.board_info.provides_feature("fuchsia::real_time_clock")
-            || has_always_on_counter;
+            || use_always_on_counter;
+
+        // Refer to //src/sys/time/timekeeper/config.shard.cml
+        // for details.
+        builder.set_config_capability(
+            "fuchsia.time.config.WritableUTCTime",
+            Config::new(ConfigValueType::Bool, config.serve_fuchsia_time_external_adjust.into()),
+        )?;
 
         let mut config_builder = builder
             .package("timekeeper")
@@ -93,9 +113,13 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
             // TODO: b/295537795 - provide this setting somehow.
             .field("power_topology_integration_enabled", false)?
             .field("serve_test_protocols", serve_test_protocols)?
+            // Should this now be removed in favor of WritableUTCTime above?
+            .field("serve_fuchsia_time_external_adjust", config.serve_fuchsia_time_external_adjust)?
             .field("has_real_time_clock", has_real_time_clock)?
-            .field("has_always_on_counter", has_always_on_counter)?
+            .field("has_always_on_counter", use_always_on_counter)?
             .field("utc_start_at_startup_when_invalid_rtc", config.utc_start_at_startup_when_invalid_rtc)?
+            .field("utc_max_allowed_delta_past_sec", config.utc_max_allowed_delta_past_sec)?
+            .field("utc_max_allowed_delta_future_sec", config.utc_max_allowed_delta_future_sec)?
             .field("serve_fuchsia_time_alarms", serve_fuchsia_time_alarms)?;
 
         let mut time_source_config_builder = builder

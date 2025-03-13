@@ -1,7 +1,7 @@
 # Copyright 2020 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-import("//build/components/fuchsia_shell_package.gni")
+import("//build/components/fuchsia_package.gni")
 
 group("benchmark") {
   public_deps = [ ":camera_benchmark" ]
@@ -29,8 +29,10 @@ executable("camera_benchmark_bin") {
   sources = [ "main.cc" ]
   deps = [
     ":lib",
+    "//sdk/fidl/fuchsia.hardware.ram.metrics:fuchsia.hardware.ram.metrics_cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
   ]

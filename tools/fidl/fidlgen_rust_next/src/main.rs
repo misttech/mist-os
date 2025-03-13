@@ -62,7 +62,11 @@ fn main() {
     let schema = serde_json::from_reader::<_, Schema>(BufReader::new(file))
         .expect("failed to parse source JSON IR");
 
-    let config = Config { emit_debug_impls: true, resource_bindings: ResourceBindings::default() };
+    let config = Config {
+        emit_compat: true,
+        emit_debug_impls: true,
+        resource_bindings: ResourceBindings::default(),
+    };
     let context = Context::new(schema, config);
 
     let result = context.render().expect("failed to emit FIDL bindings");
@@ -75,7 +79,7 @@ fn main() {
     }
     writer.flush().unwrap();
 
-    Command::new(args.rustfmt)
+    Command::new(&args.rustfmt)
         .arg("--config-path")
         .arg(&args.rustfmt_config)
         .arg(&args.output_filename)

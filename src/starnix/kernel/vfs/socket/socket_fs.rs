@@ -30,9 +30,22 @@ impl FileSystemOps for SocketFs {
 }
 
 /// Returns a handle to the `SocketFs` instance in `kernel`, initializing it if needed.
-pub fn socket_fs(kernel: &Arc<Kernel>) -> &FileSystemHandle {
-    kernel.socket_fs.get_or_init(|| {
-        FileSystem::new(kernel, CacheMode::Uncached, SocketFs, FileSystemOptions::default())
-            .expect("socketfs constructed with valid options")
-    })
+pub fn socket_fs(kernel: &Arc<Kernel>) -> FileSystemHandle {
+    struct SocketFsHandle(FileSystemHandle);
+
+    kernel
+        .expando
+        .get_or_init(|| {
+            SocketFsHandle(
+                FileSystem::new(
+                    kernel,
+                    CacheMode::Uncached,
+                    SocketFs,
+                    FileSystemOptions::default(),
+                )
+                .expect("socketfs constructed with valid options"),
+            )
+        })
+        .0
+        .clone()
 }

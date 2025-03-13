@@ -11,14 +11,17 @@ group("tests") {
   deps = [ ":driver-restricted-symbols-tests" ]
 }
 
-source_set("driver_symbols") {
+static_library("driver_symbols") {
   sources = [
     "restricted_symbols.h",
     "symbols.cc",
     "symbols.h",
   ]
   deps = [ "//zircon/system/ulib/zircon-internal" ]
-  public_deps = [ "//zircon/system/ulib/zx" ]
+  public_deps = [
+    "//zircon/system/public",
+    "//zircon/system/ulib/zx",
+  ]
 }
 
 test("driver_symbols_test") {
@@ -36,4 +39,23 @@ fuchsia_unittest_component("driver_symbols_unittests") {
 
 fuchsia_test_package("driver-restricted-symbols-tests") {
   test_components = [ ":driver_symbols_unittests" ]
+}
+
+rustc_library("driver_symbols_rust") {
+  name = "driver_symbols"
+  version = "0.1.0"
+  edition = "2021"
+
+  deps = [
+    "//sdk/rust/zx",
+    "//sdk/rust/zx-types",
+  ]
+
+  non_rust_deps = [ ":driver_symbols" ]
+
+  sources = [
+    "src/bindings.rs",
+    "src/lib.rs",
+    "src/symbols.rs",
+  ]
 }

@@ -5,5 +5,6 @@
 include /src/connectivity/overnet/OWNERS
 include /src/performance/memory/OWNERS
 include /src/storage/OWNERS
+include /src/sys/pkg/OWNERS
 include /third_party/rust_crates/vendor/gpt-3.0.0/OWNERS
 include /tools/make-fuchsia-vol/OWNERS

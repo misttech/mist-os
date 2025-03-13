@@ -5,8 +5,9 @@
 #ifndef LIB_DRIVER_COMPAT_CPP_SERVICE_OFFERS_H_
 #define LIB_DRIVER_COMPAT_CPP_SERVICE_OFFERS_H_
 
-#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
-#include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.driver.framework/cpp/natural_types.h>
+#include <fidl/fuchsia.driver.framework/cpp/wire_types.h>
+#include <fidl/fuchsia.io/cpp/markers.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/fit/defer.h>

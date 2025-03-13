@@ -25,6 +25,7 @@
 #
 
 load("@fuchsia_build_config//:defs.bzl", "build_config")
+load("@fuchsia_build_info//:args.bzl", fuchsia_target_cpu = "target_cpu")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -39,12 +40,14 @@ platform(
 
 # The //build/bazel/platforms:host platform is used to target
 # the build configuration matching the current host machine.
-platform(
+alias(
     name = "host",
-    constraint_values = [
-        build_config.host_platform_os_constraint,
-        build_config.host_platform_cpu_constraint,
-    ],
+    actual = ":" + build_config.host_tag_alt,
+)
+
+alias(
+    name = "default",
+    actual = ":fuchsia_" + fuchsia_target_cpu,
 )
 
 # The following platforms will be used to generate binaries

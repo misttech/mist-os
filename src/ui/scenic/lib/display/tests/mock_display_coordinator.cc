@@ -16,8 +16,8 @@ namespace scenic_impl {
 namespace display {
 namespace test {
 
-MockDisplayCoordinator::MockDisplayCoordinator(fuchsia_hardware_display::Info display_info)
-    : display_info_(std::move(display_info)) {}
+MockDisplayCoordinator::MockDisplayCoordinator(fuchsia_hardware_display::wire::Info display_info)
+    : display_info_(display_info) {}
 
 MockDisplayCoordinator::~MockDisplayCoordinator() = default;
 
@@ -29,7 +29,7 @@ void MockDisplayCoordinator::Bind(
     dispatcher = async_get_default_dispatcher();
   }
   binding_ = fidl::BindServer(dispatcher, std::move(coordinator_server), this);
-  listener_ = fidl::SyncClient(std::move(listener_client));
+  listener_.Bind(std::move(listener_client), dispatcher);
 }
 
 void MockDisplayCoordinator::ResetCoordinatorBinding() {
@@ -40,29 +40,31 @@ void MockDisplayCoordinator::ResetCoordinatorBinding() {
   listener_ = {};
 }
 
-void MockDisplayCoordinator::ImportEvent(ImportEventRequest& request,
-                                         ImportEventCompleter::Sync& completer) {
+void MockDisplayCoordinator::ImportEvent(
+    fuchsia_hardware_display::wire::CoordinatorImportEventRequest* request,
+    ImportEventCompleter::Sync& completer) {
   ++import_event_count_;
   if (import_event_fn_) {
-    import_event_fn_(std::move(request.event()), request.id());
+    import_event_fn_(std::move(request->event), request->id);
   }
 }
 
 void MockDisplayCoordinator::SetDisplayColorConversion(
-    SetDisplayColorConversionRequest& request,
+    fuchsia_hardware_display::wire::CoordinatorSetDisplayColorConversionRequest* request,
     SetDisplayColorConversionCompleter::Sync& completer) {
   ++set_display_color_conversion_count_;
   if (set_display_color_conversion_fn_) {
-    set_display_color_conversion_fn_(request.display_id(), request.preoffsets(),
-                                     request.coefficients(), request.postoffsets());
+    set_display_color_conversion_fn_(request->display_id, request->preoffsets,
+                                     request->coefficients, request->postoffsets);
   }
 }
 
-void MockDisplayCoordinator::SetMinimumRgb(SetMinimumRgbRequest& request,
-                                           SetMinimumRgbCompleter::Sync& completer) {
+void MockDisplayCoordinator::SetMinimumRgb(
+    fuchsia_hardware_display::wire::CoordinatorSetMinimumRgbRequest* request,
+    SetMinimumRgbCompleter::Sync& completer) {
   ++set_minimum_rgb_count_;
   if (set_minimum_rgb_fn_) {
-    set_minimum_rgb_fn_(request.minimum_rgb());
+    set_minimum_rgb_fn_(request->minimum_rgb);
   }
 
   completer.Reply(fit::ok());
@@ -70,81 +72,92 @@ void MockDisplayCoordinator::SetMinimumRgb(SetMinimumRgbRequest& request,
 
 void MockDisplayCoordinator::CreateLayer(CreateLayerCompleter::Sync& completer) {
   static uint64_t layer_id_value = 1;
-  fuchsia_hardware_display::CoordinatorCreateLayerResponse response({{.value = layer_id_value++}});
-  completer.Reply(fit::ok(std::move(response)));
+  fuchsia_hardware_display::wire::CoordinatorCreateLayerResponse response{
+      {.value = layer_id_value++},
+  };
+  completer.Reply(fit::ok(&response));
 }
 
-void MockDisplayCoordinator::SetDisplayLayers(SetDisplayLayersRequest& request,
-                                              SetDisplayLayersCompleter::Sync& completer) {
+void MockDisplayCoordinator::SetDisplayLayers(
+    fuchsia_hardware_display::wire::CoordinatorSetDisplayLayersRequest* request,
+    SetDisplayLayersCompleter::Sync& completer) {
   ++set_display_layers_count_;
   if (set_display_layers_fn_) {
-    set_display_layers_fn_(request.display_id(), request.layer_ids());
+    set_display_layers_fn_(request->display_id, request->layer_ids);
   }
 }
 
-void MockDisplayCoordinator::ImportImage(ImportImageRequest& request,
-                                         ImportImageCompleter::Sync& completer) {
+void MockDisplayCoordinator::ImportImage(
+    fuchsia_hardware_display::wire::CoordinatorImportImageRequest* request,
+    ImportImageCompleter::Sync& completer) {
   completer.Reply(fit::ok());
 }
 
 void MockDisplayCoordinator::SetLayerPrimaryPosition(
-    SetLayerPrimaryPositionRequest& request, SetLayerPrimaryPositionCompleter::Sync& completer) {
+    fuchsia_hardware_display::wire::CoordinatorSetLayerPrimaryPositionRequest* request,
+    SetLayerPrimaryPositionCompleter::Sync& completer) {
   ++set_layer_primary_position_count_;
   if (set_layer_primary_position_fn_) {
-    set_layer_primary_position_fn_(request.layer_id(), request.image_source_transformation(),
-                                   request.image_source(), request.display_destination());
+    set_layer_primary_position_fn_(request->layer_id, request->image_source_transformation,
+                                   request->image_source, request->display_destination);
   }
 }
 
-void MockDisplayCoordinator::CheckConfig(CheckConfigRequest& request,
-                                         CheckConfigCompleter::Sync& completer) {
+void MockDisplayCoordinator::CheckConfig(
+    fuchsia_hardware_display::wire::CoordinatorCheckConfigRequest* request,
+    CheckConfigCompleter::Sync& completer) {
   fuchsia_hardware_display_types::ConfigResult result =
       fuchsia_hardware_display_types::ConfigResult::kOk;
-  std::vector<fuchsia_hardware_display::ClientCompositionOp> ops;
+  std::vector<fuchsia_hardware_display::wire::ClientCompositionOp> ops;
   ++check_config_count_;
   if (check_config_fn_) {
-    check_config_fn_(request.discard(), &result, &ops);
+    check_config_fn_(request->discard, &result, &ops);
   }
 
-  completer.Reply({{
-      .res = result,
-      .ops = ops,
-  }});
+  completer.Reply(
+      result,
+      fidl::VectorView<fuchsia_hardware_display::wire::ClientCompositionOp>::FromExternal(ops));
 }
 
-void MockDisplayCoordinator::AcknowledgeVsync(AcknowledgeVsyncRequest& request,
-                                              AcknowledgeVsyncCompleter::Sync& completer) {
+void MockDisplayCoordinator::AcknowledgeVsync(
+    fuchsia_hardware_display::wire::CoordinatorAcknowledgeVsyncRequest* request,
+    AcknowledgeVsyncCompleter::Sync& completer) {
   ++acknowledge_vsync_count_;
   if (acknowledge_vsync_fn_) {
-    acknowledge_vsync_fn_(request.cookie());
+    acknowledge_vsync_fn_(request->cookie);
   }
 }
 
-void MockDisplayCoordinator::SetDisplayPower(SetDisplayPowerRequest& request,
-                                             SetDisplayPowerCompleter::Sync& completer) {
+void MockDisplayCoordinator::SetDisplayPower(
+    fuchsia_hardware_display::wire::CoordinatorSetDisplayPowerRequest* request,
+    SetDisplayPowerCompleter::Sync& completer) {
   if (set_display_power_result_ == ZX_OK) {
-    display_power_on_ = request.power_on();
+    display_power_on_ = request->power_on;
     completer.Reply(fit::ok());
   } else {
     completer.Reply(fit::error(set_display_power_result_));
   }
 }
 
-void MockDisplayCoordinator::SetDisplayMode(SetDisplayModeRequest& request,
-                                            SetDisplayModeCompleter::Sync& completer) {
-  auto it_mode =
-      std::find(display_info_.modes().begin(), display_info_.modes().end(), request.mode());
-  FX_CHECK(it_mode != display_info_.modes().end());
+void MockDisplayCoordinator::SetDisplayMode(
+    fuchsia_hardware_display::wire::CoordinatorSetDisplayModeRequest* request,
+    SetDisplayModeCompleter::Sync& completer) {
+  auto request_mode = fidl::ToNatural(request->mode);
+  for (auto& mode : display_info_.modes) {
+    if (fidl::ToNatural(mode) == request_mode) {
+      return;
+    }
+  }
+  FX_CHECK(false) << "Failed to set display mode";
 }
 
 void MockDisplayCoordinator::SendOnDisplayChangedRequest() {
   FX_CHECK(binding_.has_value());
-  fit::result<fidl::OneWayStatus> result = listener()->OnDisplaysChanged({{.added =
-                                                                               {
-                                                                                   display_info_,
-                                                                               },
-                                                                           .removed = {}}});
-  FX_CHECK(result.is_ok());
+  fidl::OneWayStatus result = listener().sync()->OnDisplaysChanged(
+      fidl::VectorView<fuchsia_hardware_display::wire::Info>::FromExternal(
+          const_cast<fuchsia_hardware_display::wire::Info*>(&display_info_), 1),
+      {});
+  FX_CHECK(result.ok());
 }
 
 }  // namespace test

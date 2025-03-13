@@ -283,10 +283,7 @@ impl OverlayNode {
     }
 
     fn main_entry(&self) -> &ActiveEntry {
-        self.upper
-            .get()
-            .or_else(|| self.lower.as_ref())
-            .expect("Expected either upper or lower node")
+        self.upper.get().or(self.lower.as_ref()).expect("Expected either upper or lower node")
     }
 
     fn init_fs_node_for_child(

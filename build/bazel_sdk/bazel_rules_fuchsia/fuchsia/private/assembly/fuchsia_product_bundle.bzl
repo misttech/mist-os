@@ -11,6 +11,7 @@ load(
     "fuchsia_collect_all_debug_symbols_infos_aspect",
     "transform_collected_debug_symbols_infos",
 )
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 load(
     "//fuchsia/private/workflows:fuchsia_product_bundle_tasks.bzl",
     "fuchsia_product_bundle_tasks",
@@ -27,7 +28,6 @@ load(
     "FuchsiaVirtualDeviceInfo",
 )
 load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")
-load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 DELIVERY_BLOB_TYPE = struct(
     UNCOMPRESSED = "0",
@@ -56,7 +56,6 @@ def fuchsia_product_bundle(
     ```
     fuchsia_product_bundle(
         name = "product_bundle",
-        board_name = "<your_board>",
         product_bundle_name = "<your_product_name>",
         partitions_config = ":your_partitions_config",
         main = ":your_image",
@@ -111,6 +110,7 @@ def _build_zipped_product_bundle_impl(ctx):
             "PB_ZIP_PATH": pb_zip.path,
         },
         progress_message = "Creating zipped product bundle for %s" % ctx.label.name,
+        mnemonic = "CreatePBZip",
         **LOCAL_ONLY_ACTION_KWARGS
     )
 
@@ -257,6 +257,7 @@ def _verify_bootfs_filelist(
         env = {"FFX_ISOLATE_DIR": ffx_isolate_dir.path},
         command = "\n".join(script_lines),
         progress_message = "Verify Bootfs file list for %s" % label_name,
+        mnemonic = "VerifyBootfsFileList",
         **LOCAL_ONLY_ACTION_KWARGS
     )
     return stamp_file
@@ -293,6 +294,7 @@ def _verify_kernel_cmdline(
         env = {"FFX_ISOLATE_DIR": ffx_isolate_dir.path},
         command = "\n".join(script_lines),
         progress_message = "Verify Kernel Cmdline for %s" % label_name,
+        mnemonic = "VerifyKernelCmdline",
         **LOCAL_ONLY_ACTION_KWARGS
     )
     return stamp_file
@@ -328,6 +330,7 @@ def _verify_route_sources(
         env = {"FFX_ISOLATE_DIR": ffx_isolate_dir.path},
         command = "\n".join(script_lines),
         progress_message = "Verify Route sources for %s" % ctx.label.name,
+        mnemonic = "VerifyRouteSource",
         **LOCAL_ONLY_ACTION_KWARGS
     )
     return [stamp_file, tmp_dir]
@@ -363,6 +366,7 @@ def _verify_component_resolver_allowlist(
         env = {"FFX_ISOLATE_DIR": ffx_isolate_dir.path},
         command = "\n".join(script_lines),
         progress_message = "Verify Component Resolver for %s" % ctx.label.name,
+        mnemonic = "VerifyComponentResolver",
         **LOCAL_ONLY_ACTION_KWARGS
     )
     return [stamp_file, tmp_dir]
@@ -407,6 +411,7 @@ def _verify_routes(
         env = {"FFX_ISOLATE_DIR": ffx_isolate_dir.path},
         command = "\n".join(script_lines),
         progress_message = "Verify Routes for %s" % ctx.label.name,
+        mnemonic = "VerifyRoutes",
         **LOCAL_ONLY_ACTION_KWARGS
     )
     return [stamp_file, tmp_dir]
@@ -446,6 +451,7 @@ def _verify_base_packages(
         env = {"FFX_ISOLATE_DIR": ffx_isolate_dir.path},
         command = "\n".join(script_lines),
         progress_message = "Verify Static pkgs for %s" % label_name,
+        mnemonic = "VerifyStaticPkgs",
         **LOCAL_ONLY_ACTION_KWARGS
     )
     return [stamp_file, tmp_dir]
@@ -487,6 +493,7 @@ def _verify_pre_signing(
         env = {"FFX_ISOLATE_DIR": ffx_isolate_dir.path},
         command = "\n".join(script_lines),
         progress_message = "Verify pre-signing checks for %s" % label_name,
+        mnemonic = "VerifyPresigningChecks",
         **LOCAL_ONLY_ACTION_KWARGS
     )
     return stamp_file
@@ -522,6 +529,7 @@ def _verify_structured_config(
         env = {"FFX_ISOLATE_DIR": ffx_isolate_dir.path},
         command = "\n".join(script_lines),
         progress_message = "Verify structured config for %s" % ctx.label.name,
+        mnemonic = "VerifyStructedConfig",
         **LOCAL_ONLY_ACTION_KWARGS
     )
     return [stamp_file, tmp_dir]
@@ -557,6 +565,7 @@ def _extract_structured_config(ctx, ffx_invocation, ffx_scrutiny_inputs, pb_out_
         env = {"FFX_ISOLATE_DIR": ffx_isolate_dir.path},
         command = "\n".join(script_lines),
         progress_message = "Extract structured config for %s" % ctx.label.name,
+        mnemonic = "ExtractStructuredConfig",
         **LOCAL_ONLY_ACTION_KWARGS
     )
     return [structured_config, depfile]
@@ -569,7 +578,10 @@ def _build_fuchsia_product_bundle_impl(ctx):
     pb_out_dir = ctx.actions.declare_directory(ctx.label.name + "_out")
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
     size_report = ctx.actions.declare_file(ctx.label.name + "_size_report.json")
-    product_name = "{}.{}".format(ctx.attr.product_bundle_name, ctx.attr.board_name)
+    if ctx.attr.board_name:
+        product_bundle_name = "{}.{}".format(ctx.attr.product_bundle_name, ctx.attr.board_name)
+    else:
+        product_bundle_name = ctx.attr.product_bundle_name
     delivery_blob_type = ctx.attr.delivery_blob_type
 
     # In the future, the product bundles should be versioned independently of
@@ -584,7 +596,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
         "product",
         "create",
         "--product-name",
-        product_name,
+        product_bundle_name,
         "--product-version",
         product_version,
         "--partitions $PARTITIONS_PATH",
@@ -662,6 +674,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
         command = script,
         env = env,
         progress_message = "Creating product bundle for %s" % ctx.label.name,
+        mnemonic = "CreatePB",
         **LOCAL_ONLY_ACTION_KWARGS
     )
     deps = [pb_out_dir, size_report] + partitions_configuration.files + ctx.files.main
@@ -703,7 +716,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
         FuchsiaProductBundleInfo(
             is_remote = False,
             product_bundle = pb_out_dir,
-            product_name = product_name,
+            product_bundle_name = product_bundle_name,
             product_version = product_version,
             build_id_dirs = build_id_dirs,
         ),
@@ -722,12 +735,12 @@ _build_fuchsia_product_bundle = rule(
     toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     executable = True,
     attrs = {
+        # Deprecated. Please provide the entire name in `product_bundle_name`.
         "board_name": attr.string(
             doc = "Name of the board this PB runs on. E.g. x64.",
-            mandatory = True,
         ),
         "product_bundle_name": attr.string(
-            doc = "Name of the Fuchsia product. E.g. workstation_eng.",
+            doc = "Name of the Fuchsia product. E.g. workstation_eng.x64",
         ),
         "product_bundle_version": attr.string(
             doc = "Version of the Fuchsia product. E.g. 35.20221231.0.1.",
@@ -781,11 +794,6 @@ _build_fuchsia_product_bundle = rule(
             doc = "Default virtual device to run when none is specified.",
             providers = [FuchsiaVirtualDeviceInfo],
             default = None,
-        ),
-        "_rebase_flash_manifest": attr.label(
-            default = "//fuchsia/tools:rebase_flash_manifest",
-            executable = True,
-            cfg = "exec",
         ),
         "_platform_user_scrutiny_config": attr.label(
             doc = "Scrutiny config listing platform content of user products",

@@ -6,8 +6,10 @@
 //! destination files in this central location. The resulting enums are iterated over in order to
 //! generate scrutiny golden files.
 
+use assembly_container::{FileType, WalkPaths, WalkPathsFn};
 use assembly_util::NamedMapKey;
 use camino::Utf8PathBuf;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
@@ -15,14 +17,31 @@ use strum_macros::EnumIter;
 pub trait Destination: NamedMapKey + Clone + std::fmt::Display {}
 
 /// A mapping between a file source and destination.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct FileEntry<D: Destination> {
     /// The path of the source file.
+    #[schemars(schema_with = "path_schema")]
     pub source: Utf8PathBuf,
 
     /// The destination path to put the file.
     pub destination: D,
+}
+
+pub fn path_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+    let mut schema: schemars::schema::SchemaObject = <String>::json_schema(gen).into();
+    schema.format = Some("Utf8PathBuf".to_owned());
+    schema.into()
+}
+
+impl<D: Destination> WalkPaths for FileEntry<D> {
+    fn walk_paths_with_dest<F: WalkPathsFn>(
+        &mut self,
+        found: &mut F,
+        dest: Utf8PathBuf,
+    ) -> anyhow::Result<()> {
+        found(&mut self.source, dest, FileType::Unknown)
+    }
 }
 
 impl<D: Destination> std::fmt::Display for FileEntry<D> {
@@ -63,6 +82,8 @@ pub enum BootfsDestination {
     ForTest,
     /// Any file that came from an AIB.
     FromAIB(String),
+    /// Any file that came from the product.
+    FromProduct(String),
 }
 
 impl std::fmt::Display for BootfsDestination {
@@ -71,7 +92,7 @@ impl std::fmt::Display for BootfsDestination {
             f,
             "{}",
             match self {
-                Self::FromAIB(s) => return write!(f, "{}", s),
+                Self::FromAIB(s) | Self::FromProduct(s) => return write!(f, "{}", s),
                 Self::AdditionalBootArgs => "config/additional_boot_args",
                 Self::BootfsPackageIndex => "data/bootfs_packages",
                 Self::ComponentIdIndex => "config/component_id_index",

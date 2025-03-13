@@ -7,9 +7,7 @@
 use anyhow::{Context as _, Error};
 use fidl_fuchsia_hardware_vsock::DeviceMarker;
 use fidl_fuchsia_vsock::ConnectorRequestStream;
-use fuchsia_component::client::{
-    connect_to_named_protocol_at_dir_root, connect_to_protocol_at_path,
-};
+use fuchsia_component::client::{connect_to_protocol_at_path, Service};
 use fuchsia_component::server::ServiceFs;
 use futures::{StreamExt, TryStreamExt};
 use vsock_service_config::Config;
@@ -30,26 +28,15 @@ async fn main() -> Result<(), Error> {
     }
 
     let guest_vsock_device = if config.guest_to_host_supported {
-        const DEV_CLASS_VSOCK: &str = "/dev/class/vsock";
-        let vsock_dir =
-            fuchsia_fs::directory::open_in_namespace(DEV_CLASS_VSOCK, fuchsia_fs::PERM_READABLE)
-                .context("Open vsock dir")?;
-        let path = device_watcher::watch_for_files(&vsock_dir)
+        let device = Service::open(fidl_fuchsia_hardware_vsock::ServiceMarker)
+            .context("Failed to open service")?
+            .watch_for_any()
             .await
-            .with_context(|| format!("Watching for files in {}", DEV_CLASS_VSOCK))?
-            .try_next()
-            .await
-            .with_context(|| format!("Getting a file from {}", DEV_CLASS_VSOCK))?;
-        let path =
-            path.ok_or_else(|| anyhow::anyhow!("Could not find device in {}", DEV_CLASS_VSOCK))?;
-        let path =
-            path.to_str().ok_or_else(|| anyhow::anyhow!("Expected valid utf-8 device name"))?;
-        let path = format!("{path}/device_protocol");
+            .context("Failed to find instance")?
+            .connect_to_device()
+            .context("Failed to connect to device protocol")?;
 
-        Some(
-            connect_to_named_protocol_at_dir_root::<DeviceMarker>(&vsock_dir, &path)
-                .context("Failed to connect vsock device")?,
-        )
+        Some(device)
     } else {
         None
     };

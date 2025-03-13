@@ -6,7 +6,7 @@ package expectation
 
 import "go.fuchsia.dev/fuchsia/src/connectivity/network/testing/conformance/expectation/outcome"
 
-var dhcpv6ClientPDExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]outcome.Outcome{
+var dhcpv6ClientPDExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]outcome.Outcome{
 	{1, 1}: Pass,
 	{2, 1}: Pass,
 	{2, 2}: Pass,

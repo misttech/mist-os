@@ -21,6 +21,8 @@ type flagsDef struct {
 	rustfmtPath        *string
 	rustfmtConfigPath  *string
 	fdomain            *bool
+	common             *bool
+	use_common         *string
 	includeDrivers     *bool
 }
 
@@ -34,12 +36,14 @@ var flags = flagsDef{
 	rustfmtConfigPath: flag.String("rustfmt-config", "",
 		"path to rustfmt.toml."),
 	fdomain:        flag.Bool("fdomain", false, "if given, generate FDomain bindings."),
+	common:         flag.Bool("common", false, "if given, generate only the common (non-resource) data structures."),
+	use_common:     flag.String("use_common", "", "if given, depend on the given crate name for the common (non-resource) data structures."),
 	includeDrivers: flag.Bool("include-drivers", false, "whether to include driver transport protocols or not"),
 }
 
 // valid returns true if the parsed flags are valid.
 func (f flagsDef) valid() bool {
-	return *f.jsonPath != "" && *f.outputFilenamePath != ""
+	return *f.jsonPath != "" && *f.outputFilenamePath != "" && (!*f.common || (!*f.fdomain && *f.use_common == ""))
 }
 
 func printUsage() {
@@ -68,7 +72,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	generator := codegen.NewGenerator(*flags.rustfmtPath, *flags.rustfmtConfigPath, *flags.fdomain)
+	generator := codegen.NewGenerator(*flags.rustfmtPath, *flags.rustfmtConfigPath, *flags.fdomain, *flags.common, *flags.use_common)
 	err = generator.GenerateFidl(
 		root, *flags.outputFilenamePath, *flags.includeDrivers)
 	if err != nil {

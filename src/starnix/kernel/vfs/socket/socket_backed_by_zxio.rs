@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::bpf::attachments::{SockAddrEbpfProgramResult, SockAddrOp};
 use crate::fs::fuchsia::zxio::{zxio_query_events, zxio_wait_async};
 use crate::mm::{MemoryAccessorExt, UNIFIED_ASPACES_ENABLED};
 use crate::task::{CurrentTask, EventHandler, Task, WaitCanceler, Waiter};
@@ -256,6 +257,28 @@ impl ZxioBackedSocket {
             )
         })
     }
+
+    fn run_sockaddr_ebpf(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        socket: &Socket,
+        current_task: &CurrentTask,
+        op: SockAddrOp,
+        socket_address: &SocketAddress,
+    ) -> Result<(), Errno> {
+        let ebpf_result = current_task.kernel().root_cgroup_ebpf_programs.run_sock_addr_prog(
+            locked,
+            op,
+            socket.domain,
+            socket.socket_type,
+            socket.protocol,
+            socket_address,
+        )?;
+        match ebpf_result {
+            SockAddrEbpfProgramResult::Allow => Ok(()),
+            SockAddrEbpfProgramResult::Block => error!(EPERM),
+        }
+    }
 }
 
 impl SocketOps for ZxioBackedSocket {
@@ -286,14 +309,26 @@ impl SocketOps for ZxioBackedSocket {
 
     fn connect(
         &self,
-        _socket: &SocketHandle,
-        _current_task: &CurrentTask,
+        locked: &mut Locked<'_, FileOpsCore>,
+        socket: &SocketHandle,
+        current_task: &CurrentTask,
         peer: SocketPeer,
     ) -> Result<(), Errno> {
         match peer {
-            SocketPeer::Address(SocketAddress::Inet(addr))
-            | SocketPeer::Address(SocketAddress::Inet6(addr))
-            | SocketPeer::Address(SocketAddress::Packet(addr)) => self
+            SocketPeer::Address(
+                ref address @ (SocketAddress::Inet(_) | SocketAddress::Inet6(_)),
+            ) => {
+                self.run_sockaddr_ebpf(locked, socket, current_task, SockAddrOp::Connect, address)?
+            }
+            _ => (),
+        };
+
+        match peer {
+            SocketPeer::Address(
+                SocketAddress::Inet(addr)
+                | SocketAddress::Inet6(addr)
+                | SocketAddress::Packet(addr),
+            ) => self
                 .zxio
                 .connect(&addr)
                 .map_err(|status| from_status_like_fdio!(status))?
@@ -302,14 +337,24 @@ impl SocketOps for ZxioBackedSocket {
         }
     }
 
-    fn listen(&self, _socket: &Socket, backlog: i32, _credentials: ucred) -> Result<(), Errno> {
+    fn listen(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _socket: &Socket,
+        backlog: i32,
+        _credentials: ucred,
+    ) -> Result<(), Errno> {
         self.zxio
             .listen(backlog)
             .map_err(|status| from_status_like_fdio!(status))?
             .map_err(|out_code| errno_from_zxio_code!(out_code))
     }
 
-    fn accept(&self, socket: &Socket) -> Result<SocketHandle, Errno> {
+    fn accept(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        socket: &Socket,
+    ) -> Result<SocketHandle, Errno> {
         let zxio = self
             .zxio
             .accept()
@@ -326,10 +371,13 @@ impl SocketOps for ZxioBackedSocket {
 
     fn bind(
         &self,
-        _socket: &Socket,
-        _current_task: &CurrentTask,
+        locked: &mut Locked<'_, FileOpsCore>,
+        socket: &Socket,
+        current_task: &CurrentTask,
         socket_address: SocketAddress,
     ) -> Result<(), Errno> {
+        self.run_sockaddr_ebpf(locked, socket, current_task, SockAddrOp::Bind, &socket_address)?;
+
         match socket_address {
             SocketAddress::Inet(addr)
             | SocketAddress::Inet6(addr)
@@ -418,23 +466,36 @@ impl SocketOps for ZxioBackedSocket {
         zxio_query_events(&self.zxio)
     }
 
-    fn shutdown(&self, _socket: &Socket, how: SocketShutdownFlags) -> Result<(), Errno> {
+    fn shutdown(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _socket: &Socket,
+        how: SocketShutdownFlags,
+    ) -> Result<(), Errno> {
         self.zxio
             .shutdown(how)
             .map_err(|status| from_status_like_fdio!(status))?
             .map_err(|out_code| errno_from_zxio_code!(out_code))
     }
 
-    fn close(&self, _socket: &Socket) {}
+    fn close(&self, _locked: &mut Locked<'_, FileOpsCore>, _socket: &Socket) {}
 
-    fn getsockname(&self, socket: &Socket) -> Result<SocketAddress, Errno> {
+    fn getsockname(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        socket: &Socket,
+    ) -> Result<SocketAddress, Errno> {
         match self.zxio.getsockname() {
             Err(_) | Ok(Err(_)) => Ok(SocketAddress::default_for_domain(socket.domain)),
             Ok(Ok(addr)) => SocketAddress::from_bytes(addr),
         }
     }
 
-    fn getpeername(&self, _socket: &Socket) -> Result<SocketAddress, Errno> {
+    fn getpeername(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _socket: &Socket,
+    ) -> Result<SocketAddress, Errno> {
         self.zxio
             .getpeername()
             .map_err(|status| from_status_like_fdio!(status))?
@@ -444,28 +505,29 @@ impl SocketOps for ZxioBackedSocket {
 
     fn setsockopt(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
-        task: &Task,
+        current_task: &CurrentTask,
         level: u32,
         optname: u32,
         user_opt: UserBuffer,
     ) -> Result<(), Errno> {
         match (level, optname) {
             (SOL_SOCKET, SO_ATTACH_FILTER) => {
-                let fprog = task.read_object::<sock_fprog>(user_opt.try_into()?)?;
+                let fprog = current_task.read_object::<sock_fprog>(user_opt.try_into()?)?;
                 if u32::from(fprog.len) > BPF_MAXINSNS || fprog.len == 0 {
                     return error!(EINVAL);
                 }
                 let code: Vec<sock_filter> =
-                    task.read_objects_to_vec(fprog.filter.into(), fprog.len as usize)?;
-                self.attach_cbpf_filter(task, code)
+                    current_task.read_objects_to_vec(fprog.filter.into(), fprog.len as usize)?;
+                self.attach_cbpf_filter(current_task, code)
             }
             (SOL_IP, IP_RECVERR) => {
                 track_stub!(TODO("https://fxbug.dev/333060595"), "SOL_IP.IP_RECVERR");
                 Ok(())
             }
             (SOL_SOCKET, SO_MARK) => {
-                let mark = task.read_object::<u32>(user_opt.try_into()?)?;
+                let mark = current_task.read_object::<u32>(user_opt.try_into()?)?;
                 let socket_mark = zxio_socket_mark {
                     is_present: true,
                     domain: ZXIO_SOCKET_MARK_SO_MARK,
@@ -480,7 +542,7 @@ impl SocketOps for ZxioBackedSocket {
                     .map_err(|out_code| errno_from_zxio_code!(out_code))
             }
             _ => {
-                let optval = task.read_buffer(&user_opt)?;
+                let optval = current_task.read_buffer(&user_opt)?;
                 self.zxio
                     .setsockopt(level as i32, optname as i32, &optval)
                     .map_err(|status| from_status_like_fdio!(status))?
@@ -491,6 +553,7 @@ impl SocketOps for ZxioBackedSocket {
 
     fn getsockopt(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         level: u32,
         optname: u32,

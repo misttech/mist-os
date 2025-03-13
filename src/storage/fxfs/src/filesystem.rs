@@ -16,21 +16,22 @@ use crate::object_store::transaction::{
     ReadGuard, Transaction, TRANSACTION_METADATA_MAX_AMOUNT,
 };
 use crate::object_store::volume::{root_volume, VOLUMES_DIRECTORY};
-use crate::object_store::ObjectStore;
+use crate::object_store::{ObjectStore, NO_OWNER};
 use crate::range::RangeExt;
-use crate::serialized_types::Version;
+use crate::serialized_types::{Version, LATEST_VERSION};
 use crate::{debug_assert_not_too_long, metrics};
-use anyhow::{bail, Context, Error};
+use anyhow::{bail, ensure, Context, Error};
 use async_trait::async_trait;
 use event_listener::Event;
 use fuchsia_async as fasync;
 use fuchsia_inspect::{NumericProperty as _, UintProperty};
+use fuchsia_sync::Mutex;
 use futures::FutureExt;
 use fxfs_crypto::Crypt;
 use once_cell::sync::OnceCell;
 use static_assertions::const_assert;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Weak};
 use storage_device::{Device, DeviceHolder};
 
 pub const MIN_BLOCK_SIZE: u64 = 4096;
@@ -91,6 +92,9 @@ pub struct Options {
     // is done.
     // Default values are (5 minutes, 24 hours).
     pub trim_config: Option<(std::time::Duration, std::time::Duration)>,
+
+    // If true, journal will not be used for writes.
+    pub image_builder_mode: bool,
 }
 
 impl Default for Options {
@@ -102,6 +106,7 @@ impl Default for Options {
             post_commit_hook: None,
             skip_initial_reap: false,
             trim_config: Some((TRIM_AFTER_BOOT_TIMER, TRIM_INTERVAL_TIMER)),
+            image_builder_mode: false,
         }
     }
 }
@@ -186,6 +191,22 @@ impl OpenFxFilesystem {
         std::mem::drop(self);
         debug_assert_not_too_long!(fut)
     }
+
+    /// Used to finalize a filesystem image when in image_builder_mode.
+    /// Returns the actual number of bytes used to store data, which may be useful in truncating
+    /// the image size down.
+    pub async fn finalize(self) -> Result<(DeviceHolder, u64), Error> {
+        ensure!(
+            self.journal().image_builder_mode(),
+            "finalize() only valid in image_builder_mode."
+        );
+        self.journal().allocate_journal().await?;
+        self.journal().set_image_builder_mode(false);
+        self.journal().compact().await?;
+        let actual_size = self.allocator().maximum_offset();
+        self.close().await?;
+        Ok((self.take_device().await, actual_size))
+    }
 }
 
 impl From<Arc<FxFilesystem>> for OpenFxFilesystem {
@@ -196,6 +217,9 @@ impl From<Arc<FxFilesystem>> for OpenFxFilesystem {
 
 impl Drop for OpenFxFilesystem {
     fn drop(&mut self) {
+        if self.options.image_builder_mode && self.journal().image_builder_mode() {
+            error!("OpenFxFilesystem in image_builder_mode dropped without calling finalize().");
+        }
         if !self.options.read_only && !self.closed.load(Ordering::SeqCst) {
             error!("OpenFxFilesystem dropped without first being closed. Data loss may occur.");
         }
@@ -249,6 +273,16 @@ impl FxFilesystemBuilder {
     /// Incompatible with `format`.
     pub fn read_only(mut self, read_only: bool) -> Self {
         self.options.read_only = read_only;
+        self
+    }
+
+    /// For image building and in-place migration.
+    ///
+    /// This mode avoids the initial write of super blocks and skips the journal for all
+    /// transactions. The user *must* call `finalize()` before closing the filesystem to trigger
+    /// a compaction of in-memory data structures, a minimal journal and a write to SuperBlock A.
+    pub fn image_builder_mode(mut self, enabled: bool) -> Self {
+        self.options.image_builder_mode = enabled;
         self
     }
 
@@ -332,6 +366,8 @@ impl FxFilesystemBuilder {
         let objects = Arc::new(ObjectManager::new(self.on_new_store));
         let journal = Arc::new(Journal::new(objects.clone(), self.journal_options));
 
+        let image_builder_mode = self.options.image_builder_mode;
+
         let block_size = std::cmp::max(device.block_size().into(), MIN_BLOCK_SIZE);
         assert_eq!(block_size % MIN_BLOCK_SIZE, 0);
         assert!(block_size <= MAX_BLOCK_SIZE, "Max supported block size is 64KiB");
@@ -371,11 +407,21 @@ impl FxFilesystemBuilder {
             transaction_limit_event: Event::new(),
         });
 
+        if image_builder_mode {
+            filesystem.journal().set_image_builder_mode(true);
+        }
+
         filesystem.journal.set_trace(self.trace);
         if self.format {
             filesystem.journal.init_empty(filesystem.clone()).await?;
-            // Start the graveyard's background reaping task.
-            filesystem.graveyard.clone().reap_async();
+            if !image_builder_mode {
+                // The filesystem isn't valid until superblocks are written but we want to defer
+                // that until last when migrating filesystems or building system images.
+                filesystem.journal.init_superblocks().await?;
+
+                // Start the graveyard's background reaping task.
+                filesystem.graveyard.clone().reap_async();
+            }
 
             // Create the root volume directory.
             let root_store = filesystem.root_store();
@@ -426,7 +472,7 @@ impl FxFilesystemBuilder {
 
         filesystem.closed.store(false, Ordering::SeqCst);
 
-        if !read_only {
+        if !read_only && !image_builder_mode {
             // Start the background tasks.
             filesystem.graveyard.clone().reap_async();
 
@@ -485,7 +531,7 @@ impl FxFilesystem {
         assert_eq!(self.closed.swap(true, Ordering::SeqCst), false);
         self.shutdown_event.notify(usize::MAX);
         debug_assert_not_too_long!(self.graveyard.wait_for_reap());
-        let trim_task = self.trim_task.lock().unwrap().take();
+        let trim_task = self.trim_task.lock().take();
         if let Some(task) = trim_task {
             debug_assert_not_too_long!(task);
         }
@@ -504,7 +550,7 @@ impl FxFilesystem {
             Err(e) => error!(error:? = e; "Failed to sync filesystem; data may be lost"),
         }
         self.journal.terminate();
-        let flush_task = self.flush_task.lock().unwrap().take();
+        let flush_task = self.flush_task.lock().take();
         if let Some(task) = flush_task {
             debug_assert_not_too_long!(task);
         }
@@ -605,7 +651,24 @@ impl FxFilesystem {
         debug_assert_not_too_long!(self.lock_manager.commit_prepare(&transaction));
         self.maybe_start_flush_task();
         let _guard = debug_assert_not_too_long!(self.commit_mutex.lock());
-        let journal_offset = self.journal.commit(transaction).await?;
+        let journal_offset = if self.journal().image_builder_mode() {
+            let journal_checkpoint =
+                JournalCheckpoint { file_offset: 0, checksum: 0, version: LATEST_VERSION };
+            let maybe_mutation = self
+                .object_manager()
+                .apply_transaction(transaction, &journal_checkpoint)
+                .expect("Transactions must not fail in image_builder_mode");
+            if let Some(mutation) = maybe_mutation {
+                assert!(matches!(mutation, Mutation::UpdateBorrowed(_)));
+                // These are Mutation::UpdateBorrowed which are normally used to track borrowing of
+                // metadata reservations. As we are image-building and not using the journal,
+                // we don't track this.
+            }
+            self.object_manager().did_commit_transaction(transaction, &journal_checkpoint, 0);
+            0
+        } else {
+            self.journal.commit(transaction).await?
+        };
         self.completed_transactions.add(1);
 
         // For now, call the callback whilst holding the lock.  Technically, we don't need to do
@@ -645,7 +708,7 @@ impl FxFilesystem {
     }
 
     fn maybe_start_flush_task(&self) {
-        let mut flush_task = self.flush_task.lock().unwrap();
+        let mut flush_task = self.flush_task.lock();
         if flush_task.is_none() {
             let journal = self.journal.clone();
             *flush_task = Some(fasync::Task::spawn(journal.flush_task()));
@@ -690,7 +753,7 @@ impl FxFilesystem {
         }
         let this = self.clone();
         let mut next_timer = delay;
-        *self.trim_task.lock().unwrap() = Some(fasync::Task::spawn(async move {
+        *self.trim_task.lock() = Some(fasync::Task::spawn(async move {
             loop {
                 let shutdown_listener = this.shutdown_event.listen();
                 // Note that we need to check if the filesystem was closed after we start listening
@@ -724,6 +787,11 @@ impl FxFilesystem {
         self: &Arc<Self>,
         options: transaction::Options<'a>,
     ) -> Result<(MetadataReservation, Option<&'a Reservation>, Option<Hold<'a>>), Error> {
+        if self.options.image_builder_mode {
+            // Image builder mode avoids the journal so reservation tracking for metadata overheads
+            // doesn't make sense and so we essentially have 'all or nothing' semantics instead.
+            return Ok((MetadataReservation::Borrowed, None, None));
+        }
         if !options.skip_journal_checks {
             self.maybe_start_flush_task();
             self.journal.check_journal_space().await?;
@@ -838,7 +906,7 @@ pub async fn mkfs_with_volume(
         // expect instead of propagating errors here, since otherwise we could drop |fs| before
         // close is called, which leads to confusing and unrelated error messages.
         let root_volume = root_volume(fs.clone()).await.expect("Open root_volume failed");
-        root_volume.new_volume(volume_name, crypt).await.expect("Create volume failed");
+        root_volume.new_volume(volume_name, NO_OWNER, crypt).await.expect("Create volume failed");
     }
     fs.close().await?;
     Ok(())
@@ -893,13 +961,16 @@ mod tests {
     use crate::object_store::journal::JournalOptions;
     use crate::object_store::transaction::{lock_keys, LockKey, Options};
     use crate::object_store::volume::root_volume;
-    use crate::object_store::{HandleOptions, ObjectStore};
+    use crate::object_store::{HandleOptions, ObjectDescriptor, ObjectStore, NO_OWNER};
+    use crate::range::RangeExt;
     use fuchsia_async as fasync;
+    use fuchsia_sync::Mutex;
     use futures::future::join_all;
     use futures::stream::{FuturesUnordered, TryStreamExt};
     use fxfs_insecure_crypto::InsecureCrypt;
     use rustc_hash::FxHashMap as HashMap;
-    use std::sync::{Arc, Mutex};
+    use std::ops::Range;
+    use std::sync::Arc;
     use std::time::Duration;
     use storage_device::fake_device::FakeDevice;
     use storage_device::DeviceHolder;
@@ -970,7 +1041,7 @@ mod tests {
             }
 
             fn push(&self, operation: Operation, item: &Item<K, V>) {
-                self.0.lock().unwrap().push((operation, item.clone()));
+                self.0.lock().push((operation, item.clone()));
             }
         }
 
@@ -987,10 +1058,7 @@ mod tests {
                 })
                 .on_new_store(move |store| {
                     let mutations = Arc::new(Mutations::new());
-                    object_mutations
-                        .lock()
-                        .unwrap()
-                        .insert(store.store_object_id(), mutations.clone());
+                    object_mutations.lock().insert(store.store_object_id(), mutations.clone());
                     store.tree().set_mutation_callback(Some(Box::new(move |op, item| {
                         mutations.push(op, item)
                     })));
@@ -1078,12 +1146,12 @@ mod tests {
         )
         .await;
 
-        let m1 = object_mutations.lock().unwrap();
-        let m2 = replayed_object_mutations.lock().unwrap();
+        let m1 = object_mutations.lock();
+        let m2 = replayed_object_mutations.lock();
         assert_eq!(m1.len(), m2.len());
         for (store_id, mutations) in &*m1 {
-            let mutations = mutations.0.lock().unwrap();
-            let replayed = m2.get(&store_id).expect("Found unexpected store").0.lock().unwrap();
+            let mutations = mutations.0.lock();
+            let replayed = m2.get(&store_id).expect("Found unexpected store").0.lock();
             assert_eq!(mutations.len(), replayed.len());
             for ((op1, i1), (op2, i2)) in mutations.iter().zip(replayed.iter()) {
                 assert_eq!(op1, op2);
@@ -1093,8 +1161,8 @@ mod tests {
             }
         }
 
-        let a1 = allocator_mutations.0.lock().unwrap();
-        let a2 = replayed_allocator_mutations.0.lock().unwrap();
+        let a1 = allocator_mutations.0.lock();
+        let a2 = replayed_allocator_mutations.0.lock();
         assert_eq!(a1.len(), a2.len());
         for ((op1, i1), (op2, i2)) in a1.iter().zip(a2.iter()) {
             assert_eq!(op1, op2);
@@ -1201,7 +1269,7 @@ mod tests {
                     .expect("sync failed");
 
                 let store = root_volume
-                    .new_volume("test", Some(Arc::new(InsecureCrypt::new())))
+                    .new_volume("test", NO_OWNER, Some(Arc::new(InsecureCrypt::new())))
                     .await
                     .expect("new_volume failed");
                 let root_directory = Directory::open(&store, store.root_directory_object_id())
@@ -1311,7 +1379,7 @@ mod tests {
                 let store = root_volume(fs.clone())
                     .await
                     .expect("root_volume failed")
-                    .volume("test", Some(Arc::new(InsecureCrypt::new())))
+                    .volume("test", NO_OWNER, Some(Arc::new(InsecureCrypt::new())))
                     .await
                     .expect("volume failed");
 
@@ -1391,7 +1459,7 @@ mod tests {
                 let store = root_volume(fs.clone())
                     .await
                     .expect("root_volume failed")
-                    .volume("test", Some(Arc::new(InsecureCrypt::new())))
+                    .volume("test", NO_OWNER, Some(Arc::new(InsecureCrypt::new())))
                     .await
                     .expect("volume failed");
                 // We should be able to open the C object.
@@ -1422,5 +1490,99 @@ mod tests {
 
             fs.close().await.expect("close failed");
         }
+    }
+
+    #[fuchsia::test]
+    async fn test_image_builder_mode_no_early_writes() {
+        const BLOCK_SIZE: u32 = 4096;
+        let device = DeviceHolder::new(FakeDevice::new(2048, BLOCK_SIZE));
+        device.reopen(true);
+        let fs = FxFilesystemBuilder::new()
+            .format(true)
+            .image_builder_mode(true)
+            .open(device)
+            .await
+            .expect("open failed");
+        // Image builder mode only writes when data is written or fs.finalize() is called, so
+        // we shouldn't see any errors here.
+        fs.close().await.expect("closed");
+    }
+
+    #[fuchsia::test]
+    async fn test_image_builder_mode() {
+        const BLOCK_SIZE: u32 = 4096;
+        const EXISTING_FILE_RANGE: Range<u64> = 4096 * 1024..4096 * 1025;
+        let device = DeviceHolder::new(FakeDevice::new(2048, BLOCK_SIZE));
+
+        // Write some fake file data at an offset in the image and confirm it as an fxfs file below.
+        {
+            let mut write_buf =
+                device.allocate_buffer(EXISTING_FILE_RANGE.length().unwrap() as usize).await;
+            write_buf.as_mut_slice().fill(0xf0);
+            device.write(EXISTING_FILE_RANGE.start, write_buf.as_ref()).await.expect("write");
+        }
+
+        device.reopen(true);
+
+        let device = {
+            let fs = FxFilesystemBuilder::new()
+                .format(true)
+                .image_builder_mode(true)
+                .open(device)
+                .await
+                .expect("open failed");
+            {
+                let root_store = fs.root_store();
+                let root_directory =
+                    Directory::open(&root_store, root_store.root_directory_object_id())
+                        .await
+                        .expect("open failed");
+                // Create a file referencing existing data on device.
+                let handle;
+                {
+                    let mut transaction = fs
+                        .clone()
+                        .new_transaction(
+                            lock_keys![LockKey::object(
+                                root_directory.store().store_object_id(),
+                                root_directory.object_id()
+                            )],
+                            Options::default(),
+                        )
+                        .await
+                        .expect("new transaction");
+                    handle = root_directory
+                        .create_child_file(&mut transaction, "test")
+                        .await
+                        .expect("create file");
+                    handle.extend(&mut transaction, EXISTING_FILE_RANGE).await.expect("extend");
+                    transaction.commit().await.expect("commit");
+                }
+            }
+            fs.device().reopen(false);
+            let (device, _size) = fs.finalize().await.expect("finalize");
+            device
+        };
+        device.reopen(false);
+        let fs = FxFilesystem::open(device).await.expect("open failed");
+        fsck(fs.clone()).await.expect("fsck failed");
+
+        // Confirm that the test file points at the correct data.
+        let root_store = fs.root_store();
+        let root_directory = Directory::open(&root_store, root_store.root_directory_object_id())
+            .await
+            .expect("open failed");
+        let (object_id, descriptor) =
+            root_directory.lookup("test").await.expect("lookup failed").unwrap();
+        assert_eq!(descriptor, ObjectDescriptor::File);
+        let test_file =
+            ObjectStore::open_object(&root_store, object_id, HandleOptions::default(), None)
+                .await
+                .expect("open failed");
+        let mut read_buf =
+            test_file.allocate_buffer(EXISTING_FILE_RANGE.length().unwrap() as usize).await;
+        test_file.read(0, read_buf.as_mut()).await.expect("read failed");
+        assert_eq!(read_buf.as_slice(), [0xf0; 4096]);
+        fs.close().await.expect("closed");
     }
 }

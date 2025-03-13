@@ -56,7 +56,9 @@ class DisplayEngineBanjoAdapter : public ddk::DisplayEngineProtocol<DisplayEngin
   compat::DeviceServer::BanjoConfig CreateBanjoConfig();
 
   // ddk::DisplayEngineProtocol
-  void DisplayEngineSetListener(const display_engine_listener_protocol_t* display_engine_listener);
+  void DisplayEngineCompleteCoordinatorConnection(
+      const display_engine_listener_protocol_t* display_engine_listener,
+      engine_info_t* out_banjo_engine_info);
   void DisplayEngineUnsetListener();
   zx_status_t DisplayEngineImportBufferCollection(uint64_t banjo_driver_buffer_collection_id,
                                                   zx::channel buffer_collection_token);
@@ -78,20 +80,9 @@ class DisplayEngineBanjoAdapter : public ddk::DisplayEngineProtocol<DisplayEngin
       const image_buffer_usage_t* banjo_image_buffer_usage,
       uint64_t banjo_driver_buffer_collection_id);
   zx_status_t DisplayEngineSetDisplayPower(uint64_t banjo_display_id, bool power_on);
-  bool DisplayEngineIsCaptureSupported();
   zx_status_t DisplayEngineStartCapture(uint64_t capture_handle);
   zx_status_t DisplayEngineReleaseCapture(uint64_t capture_handle);
   zx_status_t DisplayEngineSetMinimumRgb(uint8_t minimum_rgb);
-
-  // TODO(https://fxbug.dev/42080631): Remove these transitional overloads.
-  config_check_result_t DisplayEngineCheckConfiguration(
-      const display_config_t* banjo_display_configs_array, size_t banjo_display_configs_count,
-      layer_composition_operations_t* out_layer_composition_operations_list,
-      size_t out_layer_composition_operations_size,
-      size_t* out_layer_composition_operations_actual);
-  void DisplayEngineApplyConfiguration(const display_config_t* banjo_display_configs_array,
-                                       size_t banjo_display_configs_count,
-                                       const config_stamp_t* banjo_config_stamp);
 
   display_engine_protocol_t GetProtocol();
 

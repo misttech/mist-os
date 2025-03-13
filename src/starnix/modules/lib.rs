@@ -11,7 +11,7 @@ use starnix_core::device::mem::{mem_device_init, DevRandom};
 use starnix_core::device::{simple_device_ops, DeviceMode};
 use starnix_core::fs::devpts::{dev_pts_fs, tty_device_init};
 use starnix_core::fs::devtmpfs::dev_tmp_fs;
-use starnix_core::fs::fuchsia::new_remote_fs;
+use starnix_core::fs::fuchsia::{new_remote_fs, new_remote_vol};
 use starnix_core::fs::nmfs::nmfs;
 use starnix_core::fs::proc::proc_fs;
 use starnix_core::fs::sysfs::{sys_fs, DeviceDirectory};
@@ -19,14 +19,13 @@ use starnix_core::fs::tmpfs::tmp_fs;
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::fs_registry::FsRegistry;
 use starnix_core::vfs::pipe::register_pipe_fs;
-use starnix_modules_cgroup::{CgroupV1Fs, CgroupV2Fs};
+use starnix_modules_cgroupfs::{cgroup2_fs, CgroupV1Fs};
 use starnix_modules_device_mapper::{create_device_mapper, device_mapper_init};
 use starnix_modules_ext4::ExtFilesystem;
 use starnix_modules_functionfs::FunctionFs;
 use starnix_modules_fuse::{new_fuse_fs, new_fusectl_fs, open_fuse_device};
 use starnix_modules_loop::{create_loop_control_device, loop_device_init};
 use starnix_modules_overlayfs::new_overlay_fs;
-use starnix_modules_remote_vol::new_remote_vol;
 use starnix_modules_selinuxfs::selinux_fs;
 use starnix_modules_tracefs::trace_fs;
 use starnix_modules_tun::DevTun;
@@ -108,7 +107,7 @@ pub fn register_common_file_systems(_locked: &mut Locked<'_, Unlocked>, kernel: 
     #[cfg(not(feature = "starnix_lite"))]
     registry.register(b"bpf".into(), BpfFs::new_fs);
     registry.register(b"cgroup".into(), CgroupV1Fs::new_fs);
-    registry.register(b"cgroup2".into(), CgroupV2Fs::new_fs);
+    registry.register(b"cgroup2".into(), cgroup2_fs);
     // Cpusets use the generic cgroup (v1) subsystem.
     // From https://docs.kernel.org/admin-guide/cgroup-v1/cpusets.html
     registry.register(b"cpuset".into(), CgroupV1Fs::new_fs);

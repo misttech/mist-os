@@ -20,4 +20,5 @@ fidl("fuchsia.component.sandbox") {
   ]
 
   enable_hlcpp = true
+  enable_rust_next = true
 }

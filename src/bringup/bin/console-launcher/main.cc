@@ -10,6 +10,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/component/incoming/cpp/service_member_watcher.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
@@ -83,46 +84,12 @@ std::ostream& operator<<(std::ostream& os, const std::vector<std::string>& args)
 
 zx::result<fidl::ClientEnd<fuchsia_hardware_pty::Device>> ConnectToPty(
     const console_launcher::Arguments& args) {
-  if (!args.device_topological_suffix.has_value()) {
-    return component::Connect<fuchsia_hardware_pty::Device>("/svc/console");
+  if (args.use_virtio_console) {
+    return component::SyncServiceMemberWatcher<fuchsia_hardware_pty::Service::Device>()
+        .GetNextInstance(false);
   }
-  std::string_view suffix = args.device_topological_suffix.value();
 
-  zx::result console_directory_result = component::OpenServiceRoot("/dev/class/console");
-  if (console_directory_result.is_error()) {
-    return console_directory_result.take_error();
-  }
-  fidl::ClientEnd console_directory = std::move(console_directory_result.value());
-
-  zx::result watch_result = device_watcher::WatchDirectoryForItems<
-      zx::result<fidl::ClientEnd<fuchsia_hardware_pty::Device>>>(
-      console_directory,
-      [&](std::string_view file_name)
-          -> std::optional<zx::result<fidl::ClientEnd<fuchsia_hardware_pty::Device>>> {
-        std::string controller_path = std::string(file_name).append("/device_controller");
-        zx::result controller =
-            component::ConnectAt<fuchsia_device::Controller>(console_directory, controller_path);
-        if (controller.is_error()) {
-          return controller.take_error();
-        }
-
-        fidl::WireResult result = fidl::WireCall(controller.value())->GetTopologicalPath();
-        if (!result.ok()) {
-          return zx::error(result.status());
-        }
-        fit::result response = result.value();
-        if (response.is_error()) {
-          return response.take_error();
-        }
-        if (!cpp20::ends_with(response.value()->path.get(), suffix)) {
-          return std::nullopt;
-        }
-        return component::ConnectAt<fuchsia_hardware_pty::Device>(console_directory, file_name);
-      });
-  if (watch_result.is_error()) {
-    return watch_result.take_error();
-  }
-  return std::move(watch_result.value());
+  return component::Connect<fuchsia_hardware_pty::Device>("/svc/console");
 }
 
 zx::result<fidl::ClientEnd<fuchsia_hardware_pty::Device>> CreateVirtualConsole(
@@ -341,7 +308,7 @@ int main(int argv, char** argc) {
                                          fio::Flags::kFlagSendRepresentation;
     const fidl::Status result =
         fidl::WireCall(fidl::UnownedClientEnd<fuchsia_io::Directory>(flat->handle[i]))
-            ->Open3(".", kFlags, {}, server_end.TakeChannel());
+            ->Open(".", kFlags, {}, server_end.TakeChannel());
     if (!result.ok()) {
       FX_PLOGS(ERROR, result.status()) << "failed to reopen '" << path << "'";
       continue;
@@ -366,8 +333,9 @@ int main(int argv, char** argc) {
                   if (fragment_len < 0) {
                     const void* path_ptr = path.data();
                     const void* component_ptr = component.data();
-                    FX_LOGS(FATAL) << "expected overlapping memory:" << " path@" << path_ptr << "="
-                                   << path << " component@" << component_ptr << "=" << component;
+                    FX_LOGS(FATAL) << "expected overlapping memory:"
+                                   << " path@" << path_ptr << "=" << path << " component@"
+                                   << component_ptr << "=" << component;
                   }
                   return path.substr(0, static_cast<size_t>(fragment_len));
                 }();

@@ -7,6 +7,7 @@ if (is_host) {
     testonly = true
     deps = [
       "component:host_tests",
+      "emulator:host_tests",
       "profile:host_tests",
       "target:host_tests",
     ]

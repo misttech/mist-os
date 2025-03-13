@@ -5,64 +5,59 @@
 use std::num::NonZeroU8;
 
 use assembly_container::WalkPaths;
-use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
+use camino::Utf8PathBuf;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Platform configuration options for the connectivity area.
-#[derive(
-    Debug,
-    Default,
-    Deserialize,
-    Serialize,
-    PartialEq,
-    JsonSchema,
-    SupportsFileRelativePaths,
-    WalkPaths,
-)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
 #[serde(default, deny_unknown_fields)]
 pub struct PlatformConnectivityConfig {
-    #[file_relative_paths]
     #[walk_paths]
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub network: PlatformNetworkConfig,
+
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub wlan: PlatformWlanConfig,
-    #[file_relative_paths]
+
     #[walk_paths]
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub mdns: MdnsConfig,
+
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub thread: ThreadConfig,
+
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub weave: WeaveConfig,
+
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub netpol: NetpolConfig,
+
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub location: LocationConfig,
 }
 
 /// Platform configuration options for the network area.
-#[derive(
-    Debug,
-    Default,
-    Deserialize,
-    Serialize,
-    PartialEq,
-    JsonSchema,
-    SupportsFileRelativePaths,
-    WalkPaths,
-)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
 #[serde(default, deny_unknown_fields)]
 pub struct PlatformNetworkConfig {
     /// Only used to control networking for the `utility` and `minimal`
     /// feature_set_levels.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub networking: Option<NetworkingConfig>,
 
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub netstack_version: NetstackVersion,
 
-    #[file_relative_paths]
     #[walk_paths]
     #[schemars(schema_with = "crate::option_path_schema")]
-    pub netcfg_config_path: Option<FileRelativePathBuf>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub netcfg_config_path: Option<Utf8PathBuf>,
 
-    #[file_relative_paths]
     #[walk_paths]
     #[schemars(schema_with = "crate::option_path_schema")]
-    pub netstack_config_path: Option<FileRelativePathBuf>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub netstack_config_path: Option<Utf8PathBuf>,
 
     /// Number of threads used by Netstack3.
     ///
@@ -70,17 +65,19 @@ pub struct PlatformNetworkConfig {
     ///
     /// NOTE: An error will be thrown if this is set and Netstack2 is selected
     /// as the system netstack.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub netstack_thread_count: Option<NetstackThreadCount>,
 
-    #[file_relative_paths]
     #[walk_paths]
     #[schemars(schema_with = "crate::option_path_schema")]
-    pub google_maps_api_key_path: Option<FileRelativePathBuf>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub google_maps_api_key_path: Option<Utf8PathBuf>,
 
     /// Controls how long the http client will wait when it is idle before it
     /// escrows its FIDL connections back to the component framework and exits.
     /// If the value is negative or left out, then the http client will not
     /// stop after it idles.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub http_client_stop_on_idle_timeout_millis: Option<i64>,
 
     /// Controls whether the unified binary for networking should be used.
@@ -89,9 +86,11 @@ pub struct PlatformNetworkConfig {
     /// products, trading off multiple small binaries for one large binary that
     /// is smaller than the sum of its separate parts thanks to linking
     /// optimizations.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub use_unified_binary: bool,
 
     /// Whether to include network-tun.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub include_tun: bool,
 }
 
@@ -149,11 +148,20 @@ pub enum NetworkingConfig {
 #[serde(default, deny_unknown_fields)]
 pub struct PlatformWlanConfig {
     /// Enable the use of legacy security types like WEP and/or WPA1
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub legacy_privacy_support: bool,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub recovery_profile: Option<WlanRecoveryProfile>,
+
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub recovery_enabled: bool,
+
     /// Defines roaming behavior for device.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub roaming_policy: WlanRoamingPolicy,
+
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub policy_layer: WlanPolicyLayer,
 }
 
@@ -187,8 +195,11 @@ pub enum WlanRoamingPolicy {
     Disabled,
     Enabled {
         #[serde(default)]
+        #[serde(skip_serializing_if = "crate::common::is_default")]
         profile: WlanRoamingProfile,
+
         #[serde(default)]
+        #[serde(skip_serializing_if = "crate::common::is_default")]
         mode: WlanRoamingMode,
     },
 }
@@ -214,27 +225,19 @@ pub enum WlanRoamingMode {
 // LINT.ThenChange(//src/connectivity/wlan/wlancfg/src/client/roaming/lib.rs)
 
 /// Platform configuration options to use for the mdns area.
-#[derive(
-    Debug,
-    Default,
-    Deserialize,
-    Serialize,
-    PartialEq,
-    JsonSchema,
-    SupportsFileRelativePaths,
-    WalkPaths,
-)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
 #[serde(deny_unknown_fields)]
 pub struct MdnsConfig {
     /// Enable a wired service so that ffx can discover the device.
     /// If nothing is set, a reasonable default is chosen based on the build type.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub publish_fuchsia_dev_wired_service: Option<bool>,
 
     /// Service config file.
-    #[file_relative_paths]
     #[walk_paths]
     #[schemars(schema_with = "crate::option_path_schema")]
-    pub config: Option<FileRelativePathBuf>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub config: Option<Utf8PathBuf>,
 }
 
 /// Platform configuration options to use for the thread area.
@@ -242,6 +245,7 @@ pub struct MdnsConfig {
 #[serde(default, deny_unknown_fields)]
 pub struct ThreadConfig {
     /// Include the LoWPAN service.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub include_lowpan: bool,
 }
 
@@ -251,6 +255,7 @@ pub struct ThreadConfig {
 pub struct WeaveConfig {
     /// The URL of the weave component.
     ///   e.g. fuchsia-pkg://fuchsia.com/weavestack#meta/weavestack.cm
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub component_url: Option<String>,
 }
 
@@ -259,6 +264,7 @@ pub struct WeaveConfig {
 #[serde(default, deny_unknown_fields)]
 pub struct NetpolConfig {
     /// Whether to include network-socket-proxy.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub include_socket_proxy: bool,
 }
 
@@ -266,5 +272,6 @@ pub struct NetpolConfig {
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct LocationConfig {
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub enable_emergency_location_provider: bool,
 }

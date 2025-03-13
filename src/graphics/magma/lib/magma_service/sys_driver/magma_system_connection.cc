@@ -92,19 +92,6 @@ magma::Status MagmaSystemConnection::ExecuteCommandBuffers(
                                         signal_semaphores, flags);
 }
 
-magma::Status MagmaSystemConnection::ExecuteImmediateCommands(uint32_t context_id,
-                                                              uint64_t commands_size,
-                                                              void* commands,
-                                                              uint64_t semaphore_count,
-                                                              uint64_t* semaphore_ids) {
-  auto context = LookupContext(context_id);
-  if (!context)
-    return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS,
-                          "Attempting to execute command buffer on invalid context");
-
-  return context->ExecuteImmediateCommands(commands_size, commands, semaphore_count, semaphore_ids);
-}
-
 magma::Status MagmaSystemConnection::ExecuteInlineCommands(
     uint32_t context_id, std::vector<magma_inline_command_buffer> commands) {
   auto context = LookupContext(context_id);

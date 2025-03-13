@@ -46,7 +46,6 @@ rustc_binary("virtio_sound_bin") {
     "//third_party/rust_crates:iota",
     "//third_party/rust_crates:log",
     "//third_party/rust_crates:num-traits",
-    "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:scopeguard",
     "//third_party/rust_crates:tokio",
     "//third_party/rust_crates:zerocopy",

@@ -6,7 +6,6 @@ load(
     "@rules_fuchsia//fuchsia:assembly.bzl",
     "BUILD_TYPES",
     "fuchsia_board_configuration",
-    "fuchsia_legacy_bundle",
     "fuchsia_partitions_configuration",
     "fuchsia_product",
     "fuchsia_product_bundle",
@@ -18,17 +17,10 @@ fuchsia_board_configuration(
     board_name = "fake_board",
 )
 
-fuchsia_legacy_bundle(
-    name = "legacy_gn_aib",
-    files = "@gn_targets//build/images/updates/tests:fx_publish_test.gn_assembly.bazel_legacy_aib",
-)
-
 fuchsia_product_configuration(
     name = "product_assembly_config",
     cache_packages = [
-        # FIXME(https://issuetracker.google.com/288468542): Uncomment once
-        # bazel-generated package manifests use relative paths for blobs.
-        # "//build/bazel/examples/hello_cpp:pkg",
+        "//build/bazel/examples/hello_cpp:pkg",
     ],
     product_config_json = {
         "platform": {
@@ -54,7 +46,6 @@ fuchsia_product(
     name = "fake_product",
     testonly = True,
     board_config = ":board_config",
-    legacy_bundle = ":legacy_gn_aib",
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_assembly_config",
 )

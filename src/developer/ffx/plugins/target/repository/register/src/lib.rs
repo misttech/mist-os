@@ -5,9 +5,9 @@
 use async_trait::async_trait;
 use ffx_config::EnvironmentContext;
 use ffx_target_repository_register_args::RegisterCommand;
+use ffx_writer::VerifiedMachineWriter;
 use fho::{
     bug, return_bug, return_user_error, user_error, Error, FfxContext, FfxMain, FfxTool, Result,
-    VerifiedMachineWriter,
 };
 use fidl_fuchsia_developer_ffx::{RepositoryRegistryProxy, RepositoryTarget, TargetInfo};
 use fidl_fuchsia_developer_ffx_ext::{RepositoryError, RepositoryTarget as FfxRepositoryTarget};
@@ -133,7 +133,7 @@ impl RegisterTool {
             // If so, treat it as a daemon based repo
             // with a warning. Once we migrate away from the daemon, it should go back to being an error.
 
-            if get_repository(&repo_name).await?.is_some() {
+            if get_repository(&repo_name)?.is_some() {
                 tracing::warn!("Repository server \"{repo_name}\" not running. Treating this as a daemon based server.");
                 eprintln!("Repository server \"{repo_name}\" not running. Treating this as a daemon based server.");
                 eprintln!("If \"{repo_name}\" is supposed to be a standalone server, please start it before running this command.");
@@ -238,7 +238,7 @@ mod test {
     use ffx_config::keys::TARGET_DEFAULT_KEY;
     use ffx_config::ConfigLevel;
     use ffx_target::TargetProxy;
-    use fho::{Format, TestBuffers};
+    use ffx_writer::{Format, TestBuffers};
     use fidl_fuchsia_developer_ffx::{
         RepositoryError, RepositoryRegistryRequest, RepositoryStorageType, SshHostAddrInfo,
         TargetRequest,

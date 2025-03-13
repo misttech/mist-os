@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 # buildifier: disable=module-docstring
-load("@fuchsia_sdk//fuchsia:private_defs.bzl", "FuchsiaProductConfigInfo")
+load("@rules_fuchsia//fuchsia:private_defs.bzl", "FuchsiaProductConfigInfo")
 load("//test_utils:json_validator.bzl", "CREATE_VALIDATION_SCRIPT_ATTRS", "create_validation_script_provider")
 
 def _fuchsia_product_configuration_test_impl(ctx):
@@ -19,9 +19,6 @@ def _fuchsia_product_configuration_test_impl(ctx):
         config_dir = product_config.directory
 
     relative_path = "product_configuration.json"
-    if product_config.config_path:
-        relative_path = product_config.config_path
-
     return [create_validation_script_provider(
         ctx,
         config_dir,

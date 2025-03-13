@@ -6,7 +6,6 @@
 
 #include <fidl/test.unknowninteractions/cpp/markers.h>
 #include <fidl/test.unknowninteractions/cpp/natural_types.h>
-#include <fidl/test.unknowninteractions/cpp/wire_messaging.h>
 #include <lib/fidl/cpp/channel.h>
 #include <lib/fidl/cpp/client.h>
 #include <lib/fidl/cpp/internal/thenable.h>
@@ -72,6 +71,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownI
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayErr>>;
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayErr>&)>;
+  using DomainError = int32_t;
 };
 
 template <>
@@ -81,6 +81,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownI
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayFieldsErr>>;
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayFieldsErr>&)>;
+  using DomainError = int32_t;
 };
 
 template <>
@@ -90,6 +91,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownI
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayUnionErr>>;
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayUnionErr>&)>;
+  using DomainError = int32_t;
 };
 
 template <>
@@ -99,6 +101,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownI
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayTableErr>>;
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayTableErr>&)>;
+  using DomainError = int32_t;
 };
 
 template <>
@@ -144,6 +147,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownI
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayErr>>;
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayErr>&)>;
+  using DomainError = int32_t;
 };
 
 template <>
@@ -153,6 +157,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownI
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayFieldsErr>>;
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayFieldsErr>&)>;
+  using DomainError = int32_t;
 };
 
 template <>
@@ -162,6 +167,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownI
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayUnionErr>>;
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayUnionErr>&)>;
+  using DomainError = int32_t;
 };
 
 template <>
@@ -171,6 +177,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownI
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayTableErr>>;
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayTableErr>&)>;
+  using DomainError = int32_t;
 };
 
 template <>
@@ -1144,6 +1151,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownI
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayErr>>;
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayErr>&)>;
+  using DomainError = int32_t;
 };
 
 template <>
@@ -1153,6 +1161,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownI
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayFieldsErr>>;
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayFieldsErr>&)>;
+  using DomainError = int32_t;
 };
 
 template <>
@@ -1162,6 +1171,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownI
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayUnionErr>>;
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayUnionErr>&)>;
+  using DomainError = int32_t;
 };
 
 template <>
@@ -1171,6 +1181,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownI
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayTableErr>>;
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayTableErr>&)>;
+  using DomainError = int32_t;
 };
 
 template <>
@@ -1777,6 +1788,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownI
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayErr>>;
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayErr>&)>;
+  using DomainError = int32_t;
 };
 
 template <>
@@ -1786,6 +1798,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownI
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayFieldsErr>>;
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayFieldsErr>&)>;
+  using DomainError = int32_t;
 };
 
 template <>
@@ -1795,6 +1808,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownI
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayUnionErr>>;
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayUnionErr>&)>;
+  using DomainError = int32_t;
 };
 
 template <>
@@ -1804,6 +1818,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownI
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayTableErr>>;
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayTableErr>&)>;
+  using DomainError = int32_t;
 };
 
 template <>

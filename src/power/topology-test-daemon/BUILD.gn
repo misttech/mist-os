@@ -12,8 +12,9 @@ rustc_binary("bin") {
   testonly = true
 
   deps = [
+    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
+    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
-    "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
     "//sdk/fidl/fuchsia.power.topology.test:fuchsia.power.topology.test_rust",
     "//sdk/rust/zx",
     "//src/lib/diagnostics/inspect/runtime/rust",
@@ -22,7 +23,6 @@ rustc_binary("bin") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
-    "//src/lib/fuchsia-component-test",
     "//src/power/broker/client",
     "//src/power/topology-test-daemon/power-element-runner/fidl:test.powerelementrunner_rust",
     "//third_party/rust_crates:anyhow",

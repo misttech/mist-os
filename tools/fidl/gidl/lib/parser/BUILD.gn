@@ -9,7 +9,7 @@ assert(is_host, "GIDL only runs on host")
 
 go_library("parser") {
   deps = [
-    "//third_party/golibs:golang.org/x/exp",
+    "//third_party/golibs:golang.org/x/exp/slices",
     "//tools/fidl/gidl/lib/ir",
     "//tools/fidl/lib/fidlgen",
   ]

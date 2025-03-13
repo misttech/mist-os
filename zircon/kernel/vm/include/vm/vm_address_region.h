@@ -716,10 +716,10 @@ class VmAddressRegion final : public VmAddressRegionOrMapping {
     return base >= base_ && offset < size_ && size_ - offset >= size;
   }
 
-  // Traverses this vmar (and any sub-vmars) starting at this node, in depth-first pre-order. If any
-  // methods of |ve| return false, the traversal stops and this method returns ZX_ERR_CANCELED. If
-  // this vmar is not alive (in the LifeCycleState sense) or otherwise not enumerable this returns
-  // ZX_ERR_BAD_STATE, otherwise ZX_OK is returned if traversal completes successfully.
+  // Traverses this vmar (and any sub-vmars) starting at this node, in depth-first pre-order. See
+  // VmEnumerator for more details. If this vmar is not alive (in the LifeCycleState sense) or
+  // otherwise not enumerable this returns ZX_ERR_BAD_STATE, otherwise the result of enumeration is
+  // returned.
   zx_status_t EnumerateChildren(VmEnumerator* ve) TA_EXCL(lock());
 
  protected:
@@ -730,10 +730,6 @@ class VmAddressRegion final : public VmAddressRegionOrMapping {
   explicit VmAddressRegion(VmAspace& kernel_aspace);
   // Count the allocated pages, caller must be holding the aspace lock
   AttributionCounts GetAttributedMemoryLocked() TA_REQ(lock()) override;
-
-  // Used to implement VmAspace::EnumerateChildren and VmAddressRegion::EnumerateChildren.
-  // |aspace_->lock()| must be held.
-  zx_status_t EnumerateChildrenLocked(VmEnumerator* ve) TA_REQ(lock());
 
   zx_status_t SetMemoryPriorityLocked(MemoryPriority priority) override TA_REQ(lock());
   void CommitHighMemoryPriority() override TA_EXCL(lock());
@@ -788,10 +784,6 @@ class VmAddressRegion final : public VmAddressRegionOrMapping {
   zx_status_t AllocSpotLocked(size_t size, uint8_t align_pow2, uint arch_mmu_flags, vaddr_t* spot,
                               vaddr_t upper_limit = ktl::numeric_limits<vaddr_t>::max())
       TA_REQ(lock());
-
-  template <typename ON_VMAR, typename ON_MAPPING>
-  zx_status_t EnumerateChildrenInternalLocked(vaddr_t min_addr, vaddr_t max_addr, ON_VMAR on_vmar,
-                                              ON_MAPPING on_mapping) TA_REQ(lock());
 
   RegionList<VmAddressRegionOrMapping> subregions_ TA_GUARDED(lock());
 
@@ -852,11 +844,59 @@ class MappingProtectionRanges {
   // specified by range_base and range_size must be within this mappings base_ and size_. The
   // provided callback is called in virtual address order for each protection type. ZX_ERR_NEXT
   // and ZX_ERR_STOP can be used to control iteration, with any other status becoming the return
-  // value of this method.
-  zx_status_t EnumerateProtectionRanges(
-      vaddr_t mapping_base, size_t mapping_size, vaddr_t base, size_t size,
-      fit::inline_function<zx_status_t(vaddr_t region_base, size_t region_size, uint mmu_flags)>&&
-          func) const;
+  // value of this method. The callback |func| is assumed to have a type signature of:
+  // |zx_status_t(vaddr_t region_base, size_t region_size, uint mmu_flags)|
+  template <typename F>
+  zx_status_t EnumerateProtectionRanges(vaddr_t mapping_base, size_t mapping_size, vaddr_t base,
+                                        size_t size, F func) const {
+    DEBUG_ASSERT(size > 0);
+
+    // Have a short circuit for the single protect region case to avoid wavl tree processing in the
+    // common case.
+    if (protect_region_list_rest_.is_empty()) {
+      zx_status_t result = func(base, size, first_region_arch_mmu_flags_);
+      if (result == ZX_ERR_NEXT || result == ZX_ERR_STOP) {
+        return ZX_OK;
+      }
+      return result;
+    }
+
+    // See comments in the loop that explain what next and current represent.
+    auto next = protect_region_list_rest_.upper_bound(base);
+    auto current = next;
+    current--;
+    const vaddr_t range_top = base + (size - 1);
+    do {
+      // The region starting from 'current' and ending at 'next' represents a single protection
+      // domain. We first work that, remembering that either of these could be an invalid node,
+      // meaning the start or end of the mapping respectively.
+      const vaddr_t protect_region_base = current.IsValid() ? current->region_start : mapping_base;
+      const vaddr_t protect_region_top =
+          next.IsValid() ? (next->region_start - 1) : (mapping_base + (mapping_size - 1));
+      // We should only be iterating nodes that are actually part of the requested range.
+      DEBUG_ASSERT(base <= protect_region_top);
+      DEBUG_ASSERT(range_top >= protect_region_base);
+      // The region found is of an entire protection block, and could extend outside the requested
+      // range, so trim if necessary.
+      const vaddr_t region_base = ktl::max(protect_region_base, base);
+      const size_t region_len = ktl::min(protect_region_top, range_top) - region_base + 1;
+      zx_status_t result =
+          func(region_base, region_len,
+               current.IsValid() ? current->arch_mmu_flags : first_region_arch_mmu_flags_);
+      if (result != ZX_ERR_NEXT) {
+        if (result == ZX_ERR_STOP) {
+          return ZX_OK;
+        }
+        return result;
+      }
+      // Move to the next block.
+      current = next;
+      next++;
+      // Continue looping as long we operating on nodes that overlap with the requested range.
+    } while (current.IsValid() && current->region_start <= range_top);
+
+    return ZX_OK;
+  }
 
   // Merges protection ranges such that |right| is left cleared, and |this| contains the information
   // of both ranges. It is an error to call this if |this| and |right| are not virtually contiguous.
@@ -955,8 +995,7 @@ class MappingProtectionRanges {
 };
 
 // A representation of the mapping of a VMO into the address space
-class VmMapping final : public VmAddressRegionOrMapping,
-                        public fbl::DoublyLinkedListable<VmMapping*> {
+class VmMapping final : public VmAddressRegionOrMapping {
  public:
   // Accessors for VMO-mapping state
   // These can be read under either lock (both locks being held for writing), so we provide two
@@ -982,10 +1021,10 @@ class VmMapping final : public VmAddressRegionOrMapping,
     return size_;
   }
 
-  Lock<CriticalMutex>* object_lock() const TA_RET_CAP(object_->lock()) TA_REQ(lock()) {
+  Lock<VmoLockType>* object_lock() const TA_RET_CAP(object_->lock()) TA_REQ(lock()) {
     return object_->lock();
   }
-  Lock<CriticalMutex>& object_lock_ref() const TA_RET_CAP(object_->lock()) TA_REQ(lock()) {
+  Lock<VmoLockType>& object_lock_ref() const TA_RET_CAP(object_->lock()) TA_REQ(lock()) {
     return object_->lock_ref();
   }
 
@@ -1019,11 +1058,23 @@ class VmMapping final : public VmAddressRegionOrMapping,
 
   void DumpLocked(uint depth, bool verbose) const TA_REQ(lock()) override;
 
-  // Page fault in an address within the mapping. The requested address must be paged aligned.
+  // Page fault in an address within the mapping. The requested address must be paged aligned. If
+  // |additional_pages| is non-zero, then up to that many additional pages may be resolved using the
+  // same |pf_flags|. It is not an error for the |additional_pages| to span beyond the mapping or
+  // underlying VMO, although the range will get truncated internally. As such only the page
+  // containing va is required to be resolved, and this method may return ZX_OK if any number,
+  // including zero, of the additional pages are resolved.
+  // As the |additional_pages| are resolved with the same |pf_flags| they may trigger copy-on-write
+  // or other allocations in the underlying VMO.
   // If this returns ZX_ERR_SHOULD_WAIT, then the caller should wait on |page_request|
-  // and try again.
-  zx_status_t PageFaultLocked(vaddr_t va, uint pf_flags, MultiPageRequest* page_request)
-      TA_REQ(lock());
+  // and try again. In addition to a status this returns how many pages got mapped in.
+  // If ZX_OK is returned then the number of pages mapped in is guaranteed to be >0.
+  // If |additional_pages| was non-zero, then the maximum number of pages that will be mapped is
+  // |additional_pages + 1|. Otherwise the maximum number of pages that will be mapped is
+  // kPageFaultMaxOptimisticPages.
+  ktl::pair<zx_status_t, uint32_t> PageFaultLocked(vaddr_t va, uint pf_flags,
+                                                   size_t additional_pages,
+                                                   MultiPageRequest* page_request) TA_REQ(lock());
 
   // Apis intended for use by VmObject
 
@@ -1076,13 +1127,24 @@ class VmMapping final : public VmAddressRegionOrMapping,
   // provided callback is called in virtual address order for each protection type. ZX_ERR_NEXT
   // and ZX_ERR_STOP can be used to control iteration, with any other status becoming the return
   // value of this method.
-  zx_status_t EnumerateProtectionRangesLocked(
-      vaddr_t base, size_t size,
-      fit::inline_function<zx_status_t(vaddr_t region_base, size_t region_len, uint mmu_flags)>&&
-          func) const TA_REQ(lock()) __TA_NO_THREAD_SAFETY_ANALYSIS {
+  template <typename F>
+  zx_status_t EnumerateProtectionRangesLocked(vaddr_t base, size_t size, F func) const
+      TA_REQ(lock()) {
     DEBUG_ASSERT(is_in_range_locked(base, size));
-    return ProtectRangesLocked().EnumerateProtectionRanges(base_, size_, base, size,
-                                                           ktl::move(func));
+    return ProtectRangesLocked().EnumerateProtectionRanges(base_, size_, base, size, func);
+  }
+
+  // The maximum number of pages that a page fault can optimistically extend the fault to include.
+  // This is defined and exposed here for the purposes of unittests.
+  static constexpr uint64_t kPageFaultMaxOptimisticPages = 16;
+
+  // WAVL tree key function
+  // For use in WAVL tree code only.
+  VmObject::MappingTreeTraits::Key GetKey() const TA_NO_THREAD_SAFETY_ANALYSIS {
+    return VmObject::MappingTreeTraits::Key{
+        .offset = object_offset_locked_object(),
+        .object = reinterpret_cast<uint64_t>(this),
+    };
   }
 
  protected:
@@ -1168,6 +1230,10 @@ class VmMapping final : public VmAddressRegionOrMapping,
       auto iter = RegionList<>::ChildList::materialize_iterator(*this);
       RegionList<>::Observer::RestoreInvariants(iter);
     }
+    if (size_changed && vmo_mapping_node_.InContainer()) {
+      auto iter = VmObject::MappingTree::materialize_iterator(*this);
+      VmMappingSubtreeState::Observer<VmMapping>::RestoreInvariants(iter);
+    }
   }
 
   // For a VmMapping |state_| is only modified either with the object_ lock held, or if there is no
@@ -1190,6 +1256,12 @@ class VmMapping final : public VmAddressRegionOrMapping,
   // Whether this mapping may be merged with other adjacent mappings. A mergeable mapping is just a
   // region that can be represented by any VmMapping object, not specifically this one.
   Mergeable mergeable_ TA_GUARDED(lock()) = Mergeable::NO;
+
+  fbl::WAVLTreeNodeState<VmMapping*> vmo_mapping_node_ TA_GUARDED(object_->lock());
+  VmMappingSubtreeState mapping_subtree_state_ TA_GUARDED(object_->lock());
+
+  friend VmObject::MappingTreeTraits;
+  friend VmMappingSubtreeState;
 
   // pointer and region of the object we are mapping
   fbl::RefPtr<VmObject> object_ TA_GUARDED(lock());
@@ -1217,21 +1289,27 @@ class VmMapping final : public VmAddressRegionOrMapping,
 };
 
 // Interface for walking a VmAspace-rooted VmAddressRegion/VmMapping tree.
-// Override this class and pass an instance to VmAspace::EnumerateChildren().
+// Override this class and pass an instance to VmAddressRegion::EnumerateChildren().
+// VmAddressRegion::EnumerateChildren() will call the On* methods in depth-first pre-order.
+// ZX_ERR_NEXT and ZX_ERR_STOP can be used to control iteration, with any other status becoming the
+// return value of this method. The root VmAspace's lock is held during the traversal and passed in
+// to the callbacks as |guard|. A callback is permitted to temporarily drop the lock, using
+// |CallUnlocked|, although doing so invalidates the pointers and to use them without the lock held,
+// of after it is reacquired, they should first be turned into a RefPtr, with the caveat that they
+// might now refer to a dead, aka unmapped, object.
 class VmEnumerator {
  public:
-  // VmAspace::EnumerateChildren() will call the On* methods in depth-first
-  // pre-order. If any call returns false, the traversal will stop. The root
-  // VmAspace's lock will be held during the entire traversal.
   // |depth| will be 0 for the root VmAddressRegion.
-  virtual bool OnVmAddressRegion(const VmAddressRegion* vmar, uint depth) TA_REQ(vmar->lock()) {
-    return true;
+  virtual zx_status_t OnVmAddressRegion(VmAddressRegion* vmar, uint depth,
+                                        Guard<CriticalMutex>& guard) TA_REQ(vmar->lock()) {
+    return ZX_ERR_NEXT;
   }
 
-  // |vmar| is the parent of |map|. The root VmAspace's lock will be held when this is called.
-  virtual bool OnVmMapping(const VmMapping* map, const VmAddressRegion* vmar, uint depth)
-      TA_REQ(map->lock()) TA_REQ(vmar->lock()) {
-    return true;
+  // |vmar| is the parent of |map|.
+  virtual zx_status_t OnVmMapping(VmMapping* map, VmAddressRegion* vmar, uint depth,
+                                  Guard<CriticalMutex>& guard) TA_REQ(map->lock())
+      TA_REQ(vmar->lock()) {
+    return ZX_ERR_NEXT;
   }
 
  protected:

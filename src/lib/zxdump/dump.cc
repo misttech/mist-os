@@ -1232,34 +1232,43 @@ class ProcessDump::Collector : public CollectorBase<ProcessRemarkClass> {
         }
         Elf::Phdr& segment = phdrs_.back();
 
-        const zx_info_vmo_t& vmo = vmos.at(info.u.mapping.vmo_koid);
-        ZX_DEBUG_ASSERT(vmo.koid == info.u.mapping.vmo_koid);
-
         // The default-constructed state elides the whole segment.
         SegmentDisposition dump;
 
-        // Default choice: dump the whole thing.  But never dump device memory,
-        // which could cause side effects on memory-mapped devices just from
-        // reading the physical address.
-        if (ZX_INFO_VMO_TYPE(vmo.flags) != ZX_INFO_VMO_TYPE_PHYSICAL) {
-          dump.filesz = segment.filesz;
-        }
+        // If the KOID isn't in the ZX_INFO_PROCESS_VMOS list, then it could be
+        // a non-VMO mapping (iob or clock) or it could be an anomaly due to a
+        // sample that's not synchronized with ZX_INFO_PROCESS_MAPS (e.g. if
+        // the process wasn't stopped, or mapping changes were made from
+        // outside the process).  In those cases, just elide the segment since
+        // there's no way to know if it's possible or safe to get its contents.
+        if (auto it = vmos.find(info.u.mapping.vmo_koid); it != vmos.end()) {
+          const auto& [koid, vmo] = *it;
+          ZX_DEBUG_ASSERT(koid == vmo.koid);
+          ZX_DEBUG_ASSERT(vmo.koid == info.u.mapping.vmo_koid);
 
-        // If this mapping covers past the end of the VMO, trim the excess away. Note that we have
-        // to handle overflows because the vmo_offset could be greater than the VMO size.
-        uint64_t vmo_size_after_offset;
-        if (sub_overflow(vmo.size_bytes, info.u.mapping.vmo_offset, &vmo_size_after_offset)) {
-          vmo_size_after_offset = 0;
-        }
-        if (dump.filesz > vmo_size_after_offset) {
-          dump.filesz = vmo_size_after_offset;
-        }
+          // Default choice: dump the whole thing.  But never dump device
+          // memory, which could cause side effects on memory-mapped devices
+          // just from reading the physical address.
+          if (ZX_INFO_VMO_TYPE(vmo.flags) != ZX_INFO_VMO_TYPE_PHYSICAL) {
+            dump.filesz = segment.filesz;
+          }
 
-        // Let the callback decide about this segment.
-        if (auto result = prune_segment(dump, info, vmo); result.is_error()) {
-          return result.take_error();
-        } else {
-          dump = result.value();
+          // If this mapping covers past the end of the VMO, trim the excess
+          // away.  Note that we have to handle overflows because the
+          // vmo_offset could be greater than the VMO size.
+          uint64_t vmo_size_after_offset;
+          if (sub_overflow(vmo.size_bytes, info.u.mapping.vmo_offset, &vmo_size_after_offset)) {
+            dump.filesz = 0;
+          } else {
+            dump.filesz = std::min(vmo_size_after_offset, dump.filesz);
+          }
+
+          // Let the callback decide about this segment.
+          if (auto result = prune_segment(dump, info, vmo); result.is_error()) {
+            return result.take_error();
+          } else {
+            dump = result.value();
+          }
         }
 
         ZX_ASSERT(dump.filesz <= info.size);

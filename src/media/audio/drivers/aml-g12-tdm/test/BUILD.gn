@@ -139,6 +139,9 @@ fuchsia_unittest_package("dai-test-package") {
       max_severity = "ERROR"
     }
   }
+
+  # TODO(https://fxbug.dev/395154788): Fix compatibility with new zxtest runner
+  deprecated_legacy_test_execution = true
 }
 
 fuchsia_unittest_package("composite-test-package") {

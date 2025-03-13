@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use diagnostics_assertions::assert_data_tree;
-use diagnostics_reader::{ArchiveReader, Inspect};
+use diagnostics_reader::ArchiveReader;
 use fidl_test_structuredconfig_receiver::{ConfigReceiverPuppetMarker, ReceiverConfig};
 
 pub async fn run_test_case(inspect_selector: &str) {
@@ -36,9 +36,9 @@ pub async fn run_test_case(inspect_selector: &str) {
 
     assert_eq!(observed, expected, "child must receive expected configuration");
 
-    let inspector = ArchiveReader::new()
+    let inspector = ArchiveReader::inspect()
         .add_selector(inspect_selector)
-        .snapshot::<Inspect>()
+        .snapshot()
         .await
         .unwrap()
         .into_iter()

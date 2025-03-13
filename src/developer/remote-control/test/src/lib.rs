@@ -134,7 +134,7 @@ async fn test_fdomain_socket() {
     let ns = client.namespace().await.unwrap();
     let ns = fio::DirectoryProxy::from_channel(ns);
     let (rcs_client, server_end) = client.create_proxy::<rcs::RemoteControlMarker>();
-    ns.open3(
+    ns.open(
         rcs::RemoteControlMarker::DEBUG_NAME,
         fio::Flags::PROTOCOL_SERVICE,
         &fio::Options::default(),

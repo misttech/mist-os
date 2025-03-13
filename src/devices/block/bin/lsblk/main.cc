@@ -22,7 +22,6 @@
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
 
-#include <memory>
 #include <string>
 
 #include <fbl/unique_fd.h>
@@ -31,8 +30,6 @@
 #include <pretty/hexdump.h>
 
 #include "src/lib/fxl/strings/string_printf.h"
-#include "src/storage/lib/block_client/cpp/remote_block_device.h"
-#include "src/storage/lib/storage-metrics/block-metrics.h"
 
 namespace fuchsia_block = fuchsia_hardware_block;
 namespace fuchsia_partition = fuchsia_hardware_block_partition;
@@ -216,150 +213,15 @@ int cmd_list_skip_blk() {
   return 0;
 }
 
-int try_read_skip_blk(const fidl::UnownedClientEnd<fuchsia_skipblock::SkipBlock>& skip_block,
-                      off_t offset, size_t count) {
-  // check that count and offset are aligned to block size
-  const fidl::WireResult result = fidl::WireCall(skip_block)->GetPartitionInfo();
-  if (!result.ok()) {
-    fprintf(stderr, "Failed to get skip block partition info: %s\n",
-            result.FormatDescription().c_str());
-    return -1;
-  }
-  const fidl::WireResponse response = result.value();
-  if (zx_status_t status = response.status; status != ZX_OK) {
-    fprintf(stderr, "Failed to get skip block partition info: %s\n", zx_status_get_string(status));
-    return -1;
-  }
-  uint64_t blksize = response.partition_info.block_size_bytes;
-  if (count % blksize) {
-    fprintf(stderr, "Bytes read must be a multiple of blksize=%" PRIu64 "\n", blksize);
-    return -1;
-  }
-  if (offset % blksize) {
-    fprintf(stderr, "Offset must be a multiple of blksize=%" PRIu64 "\n", blksize);
-    return -1;
-  }
-
-  // allocate and map a buffer to read into
-  zx::vmo vmo;
-  if (zx_status_t status = zx::vmo::create(count, 0, &vmo); status != ZX_OK) {
-    fprintf(stderr, "Failed to create vmo: %s\n", zx_status_get_string(status));
-    return -1;
-  }
-
-  fzl::OwnedVmoMapper mapper;
-  if (zx_status_t status = mapper.Map(std::move(vmo), 0, count, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE);
-      status != ZX_OK) {
-    fprintf(stderr, "Failed to map vmo: %s\n", zx_status_get_string(status));
-    return -1;
-  }
-  zx::vmo dup;
-  if (zx_status_t status = mapper.vmo().duplicate(ZX_RIGHT_SAME_RIGHTS, &dup); status != ZX_OK) {
-    fprintf(stderr, "Failed duplicate handle: %s\n", zx_status_get_string(status));
-    return -1;
-  }
-
-  // read the data
-  const fidl::WireResult read_result =
-      fidl::WireCall(skip_block)
-          ->Read({
-              .vmo = std::move(dup),
-              .vmo_offset = 0,
-              .block = static_cast<uint32_t>(offset / blksize),
-              .block_count = static_cast<uint32_t>(count / blksize),
-          });
-  if (!read_result.ok()) {
-    fprintf(stderr, "Failed to read skip block: %s\n", read_result.FormatDescription().c_str());
-    return -1;
-  }
-  const fidl::WireResponse read_response = read_result.value();
-  if (zx_status_t status = read_response.status; status != ZX_OK) {
-    fprintf(stderr, "Failed to read skip block: %s\n", zx_status_get_string(status));
-    return -1;
-  }
-
-  hexdump8_ex(mapper.start(), count, offset);
-  return 0;
-}
-
-int cmd_read_blk(const char* dev, off_t offset, size_t count) {
-  zx::result block = component::Connect<fuchsia_block::Block>(dev);
-  if (block.is_error()) {
-    fprintf(stderr, "Error connecting to %s: %s\n", dev, block.status_string());
-    return -1;
-  }
-
-  auto buffer = std::make_unique<uint8_t[]>(count);
-  if (zx_status_t status = block_client::SingleReadBytes(*block, buffer.get(), count, offset);
-      status != ZX_OK) {
-    zx::result skip_block = component::Connect<fuchsia_skipblock::SkipBlock>(dev);
-    if (skip_block.is_ok()) {
-      if (try_read_skip_blk(skip_block.value(), offset, count) < 0) {
-        fprintf(stderr, "Error getting block size for %s\n", dev);
-        return -1;
-      }
-      return 0;
-    }
-    fprintf(stderr, "Error readin blocks from device: %s\n", zx_status_get_string(status));
-    return -1;
-  }
-
-  hexdump8_ex(buffer.get(), count, offset);
-  return 0;
-}
-
-int cmd_stats(const char* dev, bool clear) {
-  zx::result block = component::Connect<fuchsia_block::Block>(dev);
-  if (block.is_error()) {
-    fprintf(stderr, "Error connecting to %s: %s\n", dev, block.status_string());
-    return -1;
-  }
-  const fidl::WireResult result = fidl::WireCall(block.value())->GetStats(clear);
-  if (!result.ok()) {
-    fprintf(stderr, "Error getting stats for %s: %s\n", dev, result.FormatDescription().c_str());
-    return -1;
-  }
-  const fit::result response = result.value();
-  if (response.is_error()) {
-    fprintf(stderr, "Error getting stats for %s: %s\n", dev,
-            zx_status_get_string(response.error_value()));
-    return -1;
-  }
-  storage_metrics::BlockDeviceMetrics metrics(&response.value()->stats);
-  metrics.Dump(stdout);
-  return 0;
-}
-
 }  // namespace
 
 int main(int argc, const char** argv) {
-  int rc = 0;
-  const char* cmd = argc > 1 ? argv[1] : nullptr;
-  if (cmd) {
-    if (!strcmp(cmd, "help")) {
-      goto usage;
-    } else if (!strcmp(cmd, "read")) {
-      if (argc < 5)
-        goto usage;
-      rc = cmd_read_blk(argv[2], strtoul(argv[3], nullptr, 10), strtoull(argv[4], nullptr, 10));
-    } else if (!strcmp(cmd, "stats")) {
-      if (argc < 4)
-        goto usage;
-      if (strcmp("true", argv[3]) != 0 && strcmp("false", argv[3]) != 0)
-        goto usage;
-      rc = cmd_stats(argv[2], strcmp("true", argv[3]) == 0);
-    } else {
-      fprintf(stderr, "Unrecognized command %s!\n", cmd);
-      goto usage;
-    }
-  } else {
-    rc = cmd_list_blk() || cmd_list_skip_blk();
+  if (argc > 1) {
+    goto usage;
   }
-  return rc;
+  return cmd_list_blk() || cmd_list_skip_blk();
 usage:
   fprintf(stderr, "Usage:\n");
   fprintf(stderr, "%s\n", argv[0]);
-  fprintf(stderr, "%s read <blkdev> <offset> <count>\n", argv[0]);
-  fprintf(stderr, "%s stats <blkdev> <clear=true|false>\n", argv[0]);
   return 0;
 }

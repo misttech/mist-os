@@ -4,15 +4,16 @@
 
 use crate::test::*;
 use anyhow::*;
+use ffx_executor::FfxExecutor;
 use std::time::Duration;
 
 pub(crate) async fn test_manual_add_get_ssh_address() -> Result<()> {
     let isolate = new_isolate("target-manual-add-get-ssh-address").await?;
     isolate.start_daemon().await?;
 
-    let _ = isolate.ffx(&["target", "add", "--nowait", "[::1]:8022"]).await?;
+    let _ = isolate.exec_ffx(&["target", "add", "--nowait", "[::1]:8022"]).await?;
 
-    let out = isolate.ffx(&["--target", "[::1]:8022", "target", "get-ssh-address"]).await?;
+    let out = isolate.exec_ffx(&["--target", "[::1]:8022", "target", "get-ssh-address"]).await?;
 
     ensure!(out.stdout.contains("[::1]:8022"), "stdout is unexpected: {:?}", out);
     ensure!(out.stderr.lines().count() == 0, "stderr is unexpected: {:?}", out);
@@ -25,12 +26,13 @@ pub(crate) async fn test_manual_add_get_ssh_address_late_add() -> Result<()> {
     let isolate = new_isolate("target-manual-add-get-ssh-address-late-add").await?;
     isolate.start_daemon().await?;
 
-    let task = isolate.ffx(&["--target", "[::1]:8022", "target", "get-ssh-address", "-t", "10"]);
+    let task =
+        isolate.exec_ffx(&["--target", "[::1]:8022", "target", "get-ssh-address", "-t", "10"]);
 
     // The get-ssh-address should pick up targets added after it has started, as well as before.
     fuchsia_async::Timer::new(Duration::from_millis(500)).await;
 
-    let _ = isolate.ffx(&["target", "add", "--nowait", "[::1]:8022"]).await?;
+    let _ = isolate.exec_ffx(&["target", "add", "--nowait", "[::1]:8022"]).await?;
 
     let out = task.await?;
 
@@ -71,7 +73,7 @@ pub mod include_target {
         };
 
         let out = isolate
-            .ffx(&["--target", &target_nodeaddr, "target", "get-ssh-address", "-t", "5"])
+            .exec_ffx(&["--target", &target_nodeaddr, "target", "get-ssh-address", "-t", "5"])
             .await?;
 
         let out_addr = out.stdout.trim();
@@ -94,7 +96,7 @@ pub mod include_target {
 
         let target_nodeaddr = get_target_addr();
 
-        let out = isolate.ffx(&["--target", &target_nodeaddr, "target", "show"]).await?;
+        let out = isolate.exec_ffx(&["--target", &target_nodeaddr, "target", "show"]).await?;
 
         ensure!(out.status.success(), "status is unexpected: {:?}", out);
         ensure!(!out.stdout.is_empty(), "stdout is unexpectedly empty: {:?}", out);

@@ -55,8 +55,9 @@ type EmuStartArgs struct {
 	// If using a custom config, all other fields below should be empty.
 	Config string
 
-	// TODO(https://fxbug.dev/329144967): Add more fields as necessary
-	// to provide as flags to `ffx emu start`.
+	// Extra args to `ffx emu` to be passed during emulator startup
+	ExtraEmuArgs []string
+
 	ProductBundle string
 	KernelArgs    []string
 	Accel         string
@@ -104,7 +105,8 @@ func (f *FFXInstance) EmuStartConsole(ctx context.Context, sdkRoot, name string,
 	if err := f.ConfigSet(ctx, "sdk.root", absPath); err != nil {
 		return nil, err
 	}
-	args := []string{"emu", "start", "--console", "--net", "tap", "--name", name, "-H", "-s", "0"}
+	args := []string{"--console", "--net", "tap", "--name", name, "-H", "-s", "0"}
+	args = append(args, startArgs.ExtraEmuArgs...)
 	if startArgs.Config != "" {
 		args = append(args, "--config", startArgs.Config)
 	} else {
@@ -128,15 +130,19 @@ func (f *FFXInstance) EmuStartConsole(ctx context.Context, sdkRoot, name string,
 		args = append(args, "--engine", engine)
 	}
 	dryRunCommand := append(args, "--dry-run")
-	if err := f.Run(ctx, dryRunCommand...); err != nil {
+	authKeyPath, err := f.GetSshAuthorizedKeys(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := f.EmuStart(authKeyPath, dryRunCommand...).run(ctx); err != nil {
 		logger.Debugf(ctx, "failed to run dry-run command: %s", err)
 	}
-	return f.Command(args...), nil
+	return f.EmuStart(authKeyPath, args...).cmd(), nil
 }
 
 // EmuStop terminates all emulator instances launched by ffx.
-func (f *FFXInstance) EmuStop(ctx context.Context) error {
-	return f.Run(ctx, "emu", "stop", "--all")
+func (f *FFXInstance) EmuStopAll(ctx context.Context) error {
+	return f.EmuStop(ctx, "--all")
 }
 
 // GetEmuDeps returns the list of file dependencies for `ffx emu` to work.

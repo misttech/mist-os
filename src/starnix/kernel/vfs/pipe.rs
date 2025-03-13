@@ -5,6 +5,7 @@
 use crate::mm::{
     read_to_vec, MemoryAccessorExt, NumberOfElementsRead, TaskMemoryAccessor, PAGE_SIZE,
 };
+use crate::security;
 use crate::signals::{send_standard_signal, SignalInfo};
 use crate::task::{CurrentTask, EventHandler, WaitCallback, WaitCanceler, WaitQueue, Waiter};
 use crate::vfs::buffers::{
@@ -182,21 +183,20 @@ impl Pipe {
 
     fn set_capacity(
         &mut self,
-        task: &CurrentTask,
+        current_task: &CurrentTask,
         mut requested_capacity: usize,
     ) -> Result<(), Errno> {
         if requested_capacity > PIPE_MAX_SIZE {
             return error!(EINVAL);
         }
-        if !task.creds().has_capability(CAP_SYS_RESOURCE)
-            && requested_capacity
-                > task
-                    .kernel()
-                    .system_limits
-                    .pipe_max_size
-                    .load(std::sync::atomic::Ordering::Relaxed)
+        if requested_capacity
+            > current_task
+                .kernel()
+                .system_limits
+                .pipe_max_size
+                .load(std::sync::atomic::Ordering::Relaxed)
         {
-            return error!(EPERM);
+            security::check_task_capable(current_task, CAP_SYS_RESOURCE)?;
         }
         let page_size = *PAGE_SIZE as usize;
         if requested_capacity < page_size {
@@ -437,13 +437,18 @@ fn pipe_fs(
     current_task: &CurrentTask,
     _options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
+    struct PipeFsHandle(FileSystemHandle);
+
     let kernel = current_task.kernel();
     Ok(kernel
-        .pipe_fs
+        .expando
         .get_or_init(|| {
-            FileSystem::new(kernel, CacheMode::Uncached, PipeFs, FileSystemOptions::default())
-                .expect("pipefs constructed with valid options")
+            PipeFsHandle(
+                FileSystem::new(kernel, CacheMode::Uncached, PipeFs, FileSystemOptions::default())
+                    .expect("pipefs constructed with valid options"),
+            )
         })
+        .0
         .clone())
 }
 

@@ -19,15 +19,15 @@ ssize_t sys_getrandom(void* buffer, size_t buffer_size, unsigned int flags) {
 }
 
 TEST(GetRandomTest, BasicSuccess) {
-  int64_t buffer_len = 0x1000000ul;
+  ssize_t buffer_len = 0x1000000ul;
   auto buffer = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
       nullptr, buffer_len, PROT_WRITE | PROT_READ, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0));
   EXPECT_EQ(sys_getrandom(buffer.mapping(), buffer_len, 0), buffer_len);
 }
 
 TEST(GetRandomTest, OnlyWritesValidMappedBuffer) {
-  uint64_t page_size = sysconf(_SC_PAGESIZE);
-  int64_t buffer_len = 0x1000000ul;
+  ssize_t page_size = sysconf(_SC_PAGESIZE);
+  ssize_t buffer_len = 0x1000000ul;
 
   // First, map the full buffer we expect plus an additional page.
   auto buffer = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZXTEST_BASE_RUNNER_H_
-#define ZXTEST_BASE_RUNNER_H_
+#ifndef ZIRCON_SYSTEM_ULIB_ZXTEST_INCLUDE_ZXTEST_BASE_RUNNER_H_
+#define ZIRCON_SYSTEM_ULIB_ZXTEST_INCLUDE_ZXTEST_BASE_RUNNER_H_
 
 #include <lib/stdcompat/span.h>
 #include <lib/stdcompat/string_view.h>
@@ -11,6 +11,8 @@
 
 #include <atomic>
 #include <cstdio>
+#include <mutex>
+#include <thread>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/string.h>
@@ -158,6 +160,11 @@ class Runner {
 
     // Whether the test suite should stop running upon encountering the first fatal failure.
     bool break_on_failure = false;
+
+    // If set, output results to this file.
+    // Currently only the format `json:PATH` is supported, where PATH is the location of the file to
+    // be created.
+    fbl::String output_path = "";
   };
 
   // Default Runner options.
@@ -300,13 +307,14 @@ class Runner {
   void DisableAsserts() { return test_driver_.DisableAsserts(); }
 
   void PushTrace(zxtest::Message* trace) { scoped_traces_.push_back(trace); }
-
   void PopTrace() { scoped_traces_.pop_back(); }
 
   cpp20::span<zxtest::Message*> GetScopedTraces() { return scoped_traces_; }
 
  private:
   friend class RunnerTestPeer;
+
+  static thread_local std::vector<zxtest::Message*> scoped_traces_;
 
   TestRef RegisterTest(const fbl::String& test_case_name, const fbl::String& test_name,
                        const SourceLocation& location, internal::TestFactory factory,
@@ -328,9 +336,6 @@ class Runner {
 
   // List of registered test cases.
   fbl::Vector<TestCase> test_cases_;
-
-  // Store the traces coming from the SCOPED_TRACE() macro.
-  std::vector<zxtest::Message*> scoped_traces_;
 
   // Serves as a |LifecycleObserver| list where events are sent to all subscribed observers.
   internal::EventBroadcaster event_broadcaster_;
@@ -358,6 +363,8 @@ class Runner {
   bool should_register_parameterized_tests = true;
 
   bool is_running_ = false;
+
+  std::unique_ptr<internal::JsonReporter> json_reporter_ = nullptr;
 };
 
 // Entry point for C++
@@ -365,4 +372,4 @@ int RunAllTests(int argc, char** argv);
 
 }  // namespace zxtest
 
-#endif  // ZXTEST_BASE_RUNNER_H_
+#endif  // ZIRCON_SYSTEM_ULIB_ZXTEST_INCLUDE_ZXTEST_BASE_RUNNER_H_

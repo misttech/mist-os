@@ -18,6 +18,7 @@ group("tests") {
 }
 
 fuchsia_cc_driver("fake_qmi_driver-driver") {
+  legacy = true
   output_name = "qmi-fake-transport"
   testonly = true
 

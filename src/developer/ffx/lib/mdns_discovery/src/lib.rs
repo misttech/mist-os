@@ -220,7 +220,7 @@ where
                     }
                 }
                 _ => {
-                    tracing::trace!("Got an mdns event, but it wasnt a TargetFound so skipping it");
+                    tracing::warn!("Got an mdns event, but it wasnt a TargetFound so skipping it");
                 }
             },
             Err(e) => {
@@ -616,6 +616,13 @@ fn make_target<B: SplitByteSlice + Copy>(
         };
     }
 
+    tracing::debug!(
+        "Making target from message. nodename: {} address: {:#?} fastboot_interface: {:#?}",
+        nodename,
+        src,
+        fastboot_interface
+    );
+
     if nodename.is_empty() || ttl == 0 {
         return None;
     }
@@ -700,14 +707,21 @@ async fn recv_loop(
             }
         };
 
+        tracing::debug!("Socket: {:#?} received message", sock);
+
         // Only interested in fuchsia services or fastboot.
         if !is_fuchsia_response(&msg) && is_fastboot_response(&msg).is_none() {
+            tracing::debug!(
+                "Socket: {:#?} skipping message: as it is not fuchsia or fastboot",
+                sock
+            );
             continue;
         }
         // Source addresses need to be present in the response, or be a TXT record which
         // contains address information about user mode networking being used by an emulator
         // instance.
         if !contains_source_address(&addr, &msg) && !contains_txt_response(&msg) {
+            tracing::debug!("Socket: {:#?} skipping message as it does not contain source address {} or does not contain txt resposne", sock, addr);
             continue;
         }
 

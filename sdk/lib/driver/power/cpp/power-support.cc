@@ -441,10 +441,10 @@ std::vector<fuchsia_power_broker::PowerLevel> PowerLevelsFromConfig(
 fit::result<Error, TokenMap> GetDependencyTokens(const fdf::Namespace& ns,
                                                  const PowerElementConfiguration& element_config) {
   auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-  zx_status_t result =
-      fdio_open3_at(ns.svc_dir().channel()->get(), ".",
-                    static_cast<uint64_t>(fuchsia_io::wire::Flags::kProtocolDirectory),
-                    server_end.channel().release());
+  zx_status_t result = fdio_open3_at(
+      ns.svc_dir().channel()->get(), ".",
+      uint64_t{fuchsia_io::wire::kPermReadable | fuchsia_io::wire::Flags::kProtocolDirectory},
+      server_end.channel().release());
   if (result != ZX_OK) {
     return fit::error(Error::IO);
   }

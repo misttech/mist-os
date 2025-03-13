@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_async as fasync;
 use futures::channel::mpsc;
 use futures::{FutureExt, Stream, StreamExt};
+use std::sync::{atomic, Arc};
+use {fuchsia_async as fasync, zx};
 
 use crate::sink::UnboundedSink;
 
-pub type ScheduledEvent<E> = (zx::MonotonicInstant, Event<E>);
+pub type ScheduledEvent<E> = (zx::MonotonicInstant, Event<E>, EventHandle);
 pub type EventSender<E> = UnboundedSink<ScheduledEvent<E>>;
 pub type EventStream<E> = mpsc::UnboundedReceiver<ScheduledEvent<E>>;
 pub type EventId = u64;
@@ -24,11 +25,23 @@ pub fn create_timer<E>() -> (Timer<E>, EventStream<E>) {
 pub fn make_async_timed_event_stream<E>(
     time_stream: impl Stream<Item = ScheduledEvent<E>>,
 ) -> impl Stream<Item = Event<E>> {
-    time_stream
-        .map(|(deadline, timed_event)| {
-            fasync::Timer::new(fasync::MonotonicInstant::from_zx(deadline)).map(|_| timed_event)
-        })
-        .buffer_unordered(usize::max_value())
+    // Timer firings are not correctly ordered if we
+    // filter_map before buffered_unordered.
+    Box::pin(
+        time_stream
+            .map(|(deadline, timed_event, handle)| {
+                fasync::Timer::new(fasync::MonotonicInstant::from_zx(deadline))
+                    .map(|_| (timed_event, handle))
+            })
+            .buffer_unordered(usize::max_value())
+            .filter_map(|(timed_event, handle)| async move {
+                if handle.is_active() {
+                    Some(timed_event)
+                } else {
+                    None
+                }
+            }),
+    )
 }
 
 #[derive(Debug)]
@@ -64,18 +77,26 @@ impl<E> Timer<E> {
         fasync::MonotonicInstant::now().into_zx()
     }
 
-    pub fn schedule_at(&mut self, deadline: zx::MonotonicInstant, event: E) -> EventId {
+    pub fn schedule_at(&mut self, deadline: zx::MonotonicInstant, event: E) -> EventHandle {
         let id = self.next_id;
-        self.sender.send((deadline, Event { id, event }));
+        let timer_handle = EventHandle::new(id);
+        let inner_handle = EventHandle {
+            active: Arc::clone(&timer_handle.active),
+            event_id: id,
+            // This field is only used in the timer handle returned by this fn, so the value
+            // here does not matter.
+            cancel_on_drop: true,
+        };
+        self.sender.send((deadline, Event { id, event }, inner_handle));
         self.next_id += 1;
-        id
+        timer_handle
     }
 
-    pub fn schedule_after(&mut self, duration: zx::MonotonicDuration, event: E) -> EventId {
+    pub fn schedule_after(&mut self, duration: zx::MonotonicDuration, event: E) -> EventHandle {
         self.schedule_at(fasync::MonotonicInstant::after(duration).into_zx(), event)
     }
 
-    pub fn schedule<EV>(&mut self, event: EV) -> EventId
+    pub fn schedule<EV>(&mut self, event: EV) -> EventHandle
     where
         EV: TimeoutDuration + Into<E>,
     {
@@ -85,6 +106,53 @@ impl<E> Timer<E> {
 
 pub trait TimeoutDuration {
     fn timeout_duration(&self) -> zx::MonotonicDuration;
+}
+
+/// An EventHandle is used to manage a single scheduled timer. If a handle is
+/// dropped, the corresponding timeout will not fire. This behavior may be
+/// bypassed via `EventHandle::drop_without_cancel`.
+#[derive(Debug)]
+pub struct EventHandle {
+    active: Arc<atomic::AtomicBool>,
+    event_id: EventId,
+    cancel_on_drop: bool,
+}
+
+impl EventHandle {
+    fn new(event_id: EventId) -> Self {
+        Self { active: Arc::new(atomic::AtomicBool::new(true)), event_id, cancel_on_drop: true }
+    }
+
+    /// Helper fn to construct an EventHandle with a specific event ID.
+    /// For tests only.
+    pub fn new_test(event_id: EventId) -> Self {
+        Self::new(event_id)
+    }
+
+    /// Returns true if the event is still scheduled to fire.
+    fn is_active(&self) -> bool {
+        self.active.load(atomic::Ordering::Acquire)
+    }
+
+    /// The unique ID assigned to this event.
+    pub fn id(&self) -> EventId {
+        self.event_id
+    }
+
+    /// Drop this event handle, but still fire the underlying timer when expired.
+    /// If we will never cancel a scheduled timer, this fn can be used to avoid
+    /// unnecessary bookkeeping.
+    pub fn drop_without_cancel(mut self) {
+        self.cancel_on_drop = false;
+    }
+}
+
+impl std::ops::Drop for EventHandle {
+    fn drop(&mut self) {
+        if self.cancel_on_drop {
+            self.active.store(false, atomic::Ordering::Release);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -110,15 +178,17 @@ mod tests {
         let (mut timer, mut time_stream) = create_timer::<TestEvent>();
         let timeout1 = zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(5));
         let timeout2 = zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(10));
-        assert_eq!(timer.schedule_at(timeout1, 7), 0);
-        assert_eq!(timer.schedule_at(timeout2, 9), 1);
+        let event_handle1 = timer.schedule_at(timeout1, 7);
+        let event_handle2 = timer.schedule_at(timeout2, 9);
+        assert_eq!(event_handle1.id(), 0);
+        assert_eq!(event_handle2.id(), 1);
 
-        let (t1, event1) = time_stream.try_next().unwrap().expect("expect time entry");
+        let (t1, event1, _) = time_stream.try_next().unwrap().expect("expect time entry");
         assert_eq!(t1, timeout1);
         assert_eq!(event1.id, 0);
         assert_eq!(event1.event, 7);
 
-        let (t2, event2) = time_stream.try_next().unwrap().expect("expect time entry");
+        let (t2, event2, _) = time_stream.try_next().unwrap().expect("expect time entry");
         assert_eq!(t2, timeout2);
         assert_eq!(event2.id, 1);
         assert_eq!(event2.event, 9);
@@ -134,14 +204,16 @@ mod tests {
         let (mut timer, mut time_stream) = create_timer::<TestEvent>();
         let timeout1 = zx::MonotonicDuration::from_seconds(1000);
         let timeout2 = zx::MonotonicDuration::from_seconds(5);
-        assert_eq!(timer.schedule_after(timeout1, 7), 0);
-        assert_eq!(timer.schedule_after(timeout2, 9), 1);
+        let event_handle1 = timer.schedule_after(timeout1, 7);
+        let event_handle2 = timer.schedule_after(timeout2, 9);
+        assert_eq!(event_handle1.id(), 0);
+        assert_eq!(event_handle2.id(), 1);
 
-        let (t1, event1) = time_stream.try_next().unwrap().expect("expect time entry");
+        let (t1, event1, _) = time_stream.try_next().unwrap().expect("expect time entry");
         assert_eq!(event1.id, 0);
         assert_eq!(event1.event, 7);
 
-        let (t2, event2) = time_stream.try_next().unwrap().expect("expect time entry");
+        let (t2, event2, _) = time_stream.try_next().unwrap().expect("expect time entry");
         assert_eq!(event2.id, 1);
         assert_eq!(event2.event, 9);
 
@@ -160,9 +232,10 @@ mod tests {
         let (mut timer, mut time_stream) = create_timer::<TestEvent>();
         let start = zx::MonotonicInstant::after(zx::MonotonicDuration::from_millis(0));
 
-        assert_eq!(timer.schedule(5u32), 0);
+        let event_handle = timer.schedule(5u32);
+        assert_eq!(event_handle.id(), 0);
 
-        let (t, event) = time_stream.try_next().unwrap().expect("expect time entry");
+        let (t, event, _) = time_stream.try_next().unwrap().expect("expect time entry");
         assert_eq!(event.id, 0);
         assert_eq!(event.event, 5);
         assert!(start + zx::MonotonicDuration::from_seconds(10) <= t);
@@ -175,10 +248,10 @@ mod tests {
             let (timer, time_stream) = mpsc::unbounded::<ScheduledEvent<TestEvent>>();
             let mut timeout_stream = make_async_timed_event_stream(time_stream);
             let now = zx::MonotonicInstant::get();
-            schedule(&timer, now + zx::MonotonicDuration::from_millis(40), 0);
-            schedule(&timer, now + zx::MonotonicDuration::from_millis(10), 1);
-            schedule(&timer, now + zx::MonotonicDuration::from_millis(20), 2);
-            schedule(&timer, now + zx::MonotonicDuration::from_millis(30), 3);
+            let _handle1 = schedule(&timer, now + zx::MonotonicDuration::from_millis(40), 0);
+            let _handle2 = schedule(&timer, now + zx::MonotonicDuration::from_millis(10), 1);
+            let _handle3 = schedule(&timer, now + zx::MonotonicDuration::from_millis(20), 2);
+            let _handle4 = schedule(&timer, now + zx::MonotonicDuration::from_millis(30), 3);
 
             let mut events = vec![];
             for _ in 0u32..4 {
@@ -198,12 +271,56 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_timer_stream_cancel() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        let (mut timer, time_stream) = create_timer::<TestEvent>();
+        let mut timeout_stream = make_async_timed_event_stream(time_stream);
+
+        let deadline = zx::MonotonicInstant::after(zx::Duration::from_seconds(5));
+
+        {
+            // Schedule an event and then drop the handle.
+            let _event_handle = timer.schedule_at(deadline, 0);
+        }
+
+        exec.set_fake_time(deadline.into());
+        let mut next = timeout_stream.next();
+        assert_variant!(exec.run_until_stalled(&mut next), Poll::Pending);
+    }
+
+    #[test]
+    fn test_timer_stream_drop_without_cancel() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        let (mut timer, time_stream) = create_timer::<TestEvent>();
+        let mut timeout_stream = make_async_timed_event_stream(time_stream);
+
+        let deadline = zx::MonotonicInstant::after(zx::Duration::from_seconds(5));
+
+        {
+            // Schedule an event and then drop the handle.
+            timer.schedule_at(deadline, 7357).drop_without_cancel();
+        }
+
+        exec.set_fake_time(deadline.into());
+        let mut next = timeout_stream.next();
+        // The event still appears.
+        let event =
+            assert_variant!(exec.run_until_stalled(&mut next), Poll::Ready(Some(event)) => event);
+        assert_eq!(event.event, 7357);
+    }
+
     fn schedule(
         timer: &UnboundedSender<ScheduledEvent<TestEvent>>,
         deadline: zx::MonotonicInstant,
         event: TestEvent,
-    ) {
-        let entry = (deadline, Event { id: 0, event });
+    ) -> EventHandle {
+        let id = 0;
+        let handle = EventHandle::new(id);
+        let inner_handle =
+            EventHandle { active: Arc::clone(&handle.active), event_id: id, cancel_on_drop: true };
+        let entry = (deadline, Event { id, event }, inner_handle);
         timer.unbounded_send(entry).expect("expect send successful");
+        handle
     }
 }

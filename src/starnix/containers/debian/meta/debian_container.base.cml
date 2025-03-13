@@ -14,7 +14,7 @@
             "enable_suid",
             "framebuffer",
             "io_uring",
-            "magma_supported_vendors:0x13B5,0x8086",
+            "magma_supported_vendors:0x13B5,0x5143,0x8086",
             "test_data",
 
             // keep-sorted end

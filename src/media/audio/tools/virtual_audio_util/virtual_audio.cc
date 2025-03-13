@@ -484,7 +484,7 @@ bool VirtualAudioUtil::WaitForKey() {
 
 bool VirtualAudioUtil::ConnectToController() {
   const std::string kControlNodePath =
-      fxl::Concatenate({"/dev/", fuchsia::virtualaudio::CONTROL_NODE_NAME});
+      fxl::Concatenate({"/dev/", fuchsia::virtualaudio::LEGACY_CONTROL_NODE_NAME});
   zx_status_t status = fdio_service_connect(kControlNodePath.c_str(),
                                             controller_.NewRequest().TakeChannel().release());
   if (status != ZX_OK) {
@@ -527,10 +527,6 @@ bool VirtualAudioUtil::ResetAllConfigurations() {
     return false;
   }
   if (!ResetConfiguration(fuchsia::virtualaudio::DeviceType::CODEC, std::nullopt)) {
-    return false;
-  }
-  // Composite drivers do not have a direction (is_input is undefined); just use `true`.
-  if (!ResetConfiguration(fuchsia::virtualaudio::DeviceType::COMPOSITE, true)) {
     return false;
   }
 

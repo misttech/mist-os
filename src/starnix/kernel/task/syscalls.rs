@@ -28,8 +28,8 @@ use starnix_syscalls::SyscallResult;
 use starnix_types::ownership::WeakRef;
 use starnix_types::time::timeval_from_duration;
 use starnix_uapi::auth::{
-    Capabilities, Credentials, SecureBits, CAP_SETGID, CAP_SETPCAP, CAP_SETUID, CAP_SYS_ADMIN,
-    CAP_SYS_NICE, CAP_SYS_PTRACE, CAP_SYS_RESOURCE, CAP_SYS_TTY_CONFIG,
+    Capabilities, SecureBits, CAP_SETGID, CAP_SETPCAP, CAP_SETUID, CAP_SYS_ADMIN, CAP_SYS_NICE,
+    CAP_SYS_PTRACE, CAP_SYS_RESOURCE, CAP_SYS_TTY_CONFIG,
 };
 use starnix_uapi::errors::{Errno, ENAMETOOLONG};
 use starnix_uapi::file_mode::{Access, AccessCheck, FileMode};
@@ -38,7 +38,9 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::signals::{Signal, UncheckedSignal};
 use starnix_uapi::syslog::SyslogAction;
-use starnix_uapi::user_address::{MultiArchUserRef, UserAddress, UserCString, UserRef};
+use starnix_uapi::user_address::{
+    ArchSpecific, MultiArchUserRef, UserAddress, UserCString, UserCStringPtr, UserRef,
+};
 use starnix_uapi::vfs::ResolveFlags;
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_uapi::{
@@ -153,7 +155,7 @@ pub fn sys_clone3(
 
 fn read_c_string_vector(
     mm: &CurrentTask,
-    user_vector: UserRef<UserCString>,
+    user_vector: UserCStringPtr,
     elem_limit: usize,
     vec_limit: usize,
 ) -> Result<(Vec<CString>, usize), Errno> {
@@ -161,7 +163,7 @@ fn read_c_string_vector(
     let mut vector: Vec<CString> = vec![];
     let mut vec_size: usize = 0;
     loop {
-        let user_string = mm.read_object(user_current)?;
+        let user_string = mm.read_multi_arch_ptr(user_current)?;
         if user_string.is_null() {
             break;
         }
@@ -188,8 +190,8 @@ pub fn sys_execve(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     user_path: UserCString,
-    user_argv: UserRef<UserCString>,
-    user_environ: UserRef<UserCString>,
+    user_argv: UserCStringPtr,
+    user_environ: UserCStringPtr,
 ) -> Result<(), Errno> {
     sys_execveat(locked, current_task, FdNumber::AT_FDCWD, user_path, user_argv, user_environ, 0)
 }
@@ -199,8 +201,8 @@ pub fn sys_execveat(
     current_task: &mut CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
-    user_argv: UserRef<UserCString>,
-    user_environ: UserRef<UserCString>,
+    user_argv: UserCStringPtr,
+    user_environ: UserCStringPtr,
     flags: u32,
 ) -> Result<(), Errno> {
     if flags & !(AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW) != 0 {
@@ -377,11 +379,10 @@ fn get_task_if_owner_or_has_capabilities(
     let weak = current_task.get_task(pid);
     let task_creds = Task::from_weak(&weak)?.creds();
     let current_creds = current_task.creds();
-    if task_creds.euid == current_creds.euid || current_creds.has_capability(capabilities) {
-        Ok(weak)
-    } else {
-        error!(EPERM)
+    if task_creds.euid != current_creds.euid {
+        security::check_task_capable(current_task, capabilities)?;
     }
+    Ok(weak)
 }
 
 fn get_task_or_current(current_task: &CurrentTask, pid: pid_t) -> WeakRef<Task> {
@@ -435,18 +436,18 @@ pub fn sys_setpgid(
 // A non-root process is allowed to set any of its three uids to the value of any other. The
 // CAP_SETUID capability bypasses these checks and allows setting any uid to any integer. Likewise
 // for gids.
-fn new_uid_allowed(creds: &Credentials, uid: uid_t) -> bool {
-    creds.has_capability(CAP_SETUID)
-        || uid == creds.uid
-        || uid == creds.euid
-        || uid == creds.saved_uid
+fn new_uid_allowed(current_task: &CurrentTask, uid: uid_t) -> bool {
+    uid == current_task.creds().uid
+        || uid == current_task.creds().euid
+        || uid == current_task.creds().saved_uid
+        || security::is_task_capable_noaudit(current_task, CAP_SETUID)
 }
 
-fn new_gid_allowed(creds: &Credentials, gid: gid_t) -> bool {
-    creds.has_capability(CAP_SETGID)
-        || gid == creds.gid
-        || gid == creds.egid
-        || gid == creds.saved_gid
+fn new_gid_allowed(current_task: &CurrentTask, gid: gid_t) -> bool {
+    gid == current_task.creds().gid
+        || gid == current_task.creds().egid
+        || gid == current_task.creds().saved_gid
+        || security::is_task_capable_noaudit(current_task, CAP_SETGID)
 }
 
 pub fn sys_getuid(
@@ -472,13 +473,13 @@ pub fn sys_setuid(
     if uid == gid_t::MAX {
         return error!(EINVAL);
     }
-    if !new_uid_allowed(&creds, uid) {
+    if !new_uid_allowed(&current_task, uid) {
         return error!(EPERM);
     }
     let prev = creds.copy_user_credentials();
     creds.euid = uid;
     creds.fsuid = uid;
-    if creds.has_capability(CAP_SETUID) {
+    if security::is_task_capable_noaudit(current_task, CAP_SETUID) {
         creds.uid = uid;
         creds.saved_uid = uid;
     }
@@ -497,12 +498,12 @@ pub fn sys_setgid(
     if gid == gid_t::MAX {
         return error!(EINVAL);
     }
-    if !new_gid_allowed(&creds, gid) {
+    if !new_gid_allowed(&current_task, gid) {
         return error!(EPERM);
     }
     creds.egid = gid;
     creds.fsgid = gid;
-    if creds.has_capability(CAP_SETGID) {
+    if security::is_task_capable_noaudit(current_task, CAP_SETGID) {
         creds.gid = gid;
         creds.saved_gid = gid;
     }
@@ -531,7 +532,7 @@ pub fn sys_setfsuid(
 ) -> Result<uid_t, Errno> {
     let mut creds = current_task.creds();
     let prev = creds.copy_user_credentials();
-    if fsuid != u32::MAX && new_uid_allowed(&creds, fsuid) {
+    if fsuid != u32::MAX && new_uid_allowed(&current_task, fsuid) {
         creds.fsuid = fsuid;
         creds.update_capabilities(prev);
         current_task.set_creds(creds);
@@ -549,7 +550,7 @@ pub fn sys_setfsgid(
     let prev = creds.copy_user_credentials();
     let prev_fsgid = creds.fsgid;
 
-    if fsgid != u32::MAX && new_gid_allowed(&creds, fsgid) {
+    if fsgid != u32::MAX && new_gid_allowed(&current_task, fsgid) {
         creds.fsgid = fsgid;
         creds.update_capabilities(prev);
         current_task.set_creds(creds);
@@ -593,7 +594,7 @@ pub fn sys_setreuid(
     euid: uid_t,
 ) -> Result<(), Errno> {
     let mut creds = current_task.creds();
-    let allowed = |uid| uid == u32::MAX || new_uid_allowed(&creds, uid);
+    let allowed = |uid| uid == u32::MAX || new_uid_allowed(&current_task, uid);
     if !allowed(ruid) || !allowed(euid) {
         return error!(EPERM);
     }
@@ -625,7 +626,7 @@ pub fn sys_setregid(
     egid: gid_t,
 ) -> Result<(), Errno> {
     let mut creds = current_task.creds();
-    let allowed = |gid| gid == u32::MAX || new_gid_allowed(&creds, gid);
+    let allowed = |gid| gid == u32::MAX || new_gid_allowed(&current_task, gid);
     if !allowed(rgid) || !allowed(egid) {
         return error!(EPERM);
     }
@@ -656,7 +657,7 @@ pub fn sys_setresuid(
     suid: uid_t,
 ) -> Result<(), Errno> {
     let mut creds = current_task.creds();
-    let allowed = |uid| uid == u32::MAX || new_uid_allowed(&creds, uid);
+    let allowed = |uid| uid == u32::MAX || new_uid_allowed(&current_task, uid);
     if !allowed(ruid) || !allowed(euid) || !allowed(suid) {
         return error!(EPERM);
     }
@@ -685,7 +686,7 @@ pub fn sys_setresgid(
     sgid: gid_t,
 ) -> Result<(), Errno> {
     let mut creds = current_task.creds();
-    let allowed = |gid| gid == u32::MAX || new_gid_allowed(&creds, gid);
+    let allowed = |gid| gid == u32::MAX || new_gid_allowed(&current_task, gid);
     if !allowed(rgid) || !allowed(egid) || !allowed(sgid) {
         return error!(EPERM);
     }
@@ -762,19 +763,46 @@ pub fn sys_sched_setscheduler(
     Ok(())
 }
 
-type CpuAffinityMask = u64;
-const CPU_AFFINITY_MASK_SIZE: u32 = std::mem::size_of::<CpuAffinityMask>() as u32;
-const NUM_CPUS_MAX: u32 = CPU_AFFINITY_MASK_SIZE * 8;
+const CPU_SET_SIZE: usize = 128;
 
-fn get_default_cpumask() -> CpuAffinityMask {
-    match zx::system_get_num_cpus() {
-        num_cpus if num_cpus > NUM_CPUS_MAX => {
-            log_error!("num_cpus={}, greater than the {} max supported.", num_cpus, NUM_CPUS_MAX);
-            CpuAffinityMask::MAX
-        }
-        NUM_CPUS_MAX => CpuAffinityMask::MAX,
-        num_cpus => (1 << num_cpus) - 1,
+#[repr(C)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct CpuSet {
+    bits: [u8; CPU_SET_SIZE],
+}
+
+impl Default for CpuSet {
+    fn default() -> Self {
+        Self { bits: [0; CPU_SET_SIZE] }
     }
+}
+
+fn check_cpu_set_alignment(current_task: &CurrentTask, cpusetsize: u32) -> Result<(), Errno> {
+    let alignment = if current_task.is_arch32() { 4 } else { 8 };
+    if cpusetsize < alignment || cpusetsize % alignment != 0 {
+        return error!(EINVAL);
+    }
+    Ok(())
+}
+
+fn get_default_cpu_set() -> CpuSet {
+    let mut result = CpuSet::default();
+    let mut cpus_count = zx::system_get_num_cpus();
+    let cpus_count_max = (CPU_SET_SIZE * 8) as u32;
+    if cpus_count > cpus_count_max {
+        log_error!("cpus_count={cpus_count}, greater than the {cpus_count_max} max supported.");
+        cpus_count = cpus_count_max;
+    }
+    let mut index = 0;
+    while cpus_count > 0 {
+        let count = std::cmp::min(cpus_count, 8);
+        let (shl, overflow) = 1_u8.overflowing_shl(count);
+        let mask = if overflow { u8::max_value() } else { shl - 1 };
+        result.bits[index] = mask;
+        index += 1;
+        cpus_count -= count;
+    }
+    result
 }
 
 pub fn sys_sched_getaffinity(
@@ -787,20 +815,18 @@ pub fn sys_sched_getaffinity(
     if pid < 0 {
         return error!(EINVAL);
     }
-    if cpusetsize < CPU_AFFINITY_MASK_SIZE
-        || cpusetsize % (std::mem::size_of::<usize>() as u32) != 0
-    {
-        return error!(EINVAL);
-    }
+
+    check_cpu_set_alignment(current_task, cpusetsize)?;
 
     let weak = get_task_or_current(current_task, pid);
     let _task = Task::from_weak(&weak)?;
 
     // sched_setaffinity() is not implemented. Fake affinity mask based on the number of CPUs.
-    let mask = get_default_cpumask();
-    current_task.write_memory(user_mask, &mask.to_ne_bytes())?;
+    let mask = get_default_cpu_set();
+    let mask_size = std::cmp::min(cpusetsize as usize, CPU_SET_SIZE);
+    current_task.write_memory(user_mask, &mask.bits[..mask_size])?;
     track_stub!(TODO("https://fxbug.dev/322874659"), "sched_getaffinity");
-    Ok(CPU_AFFINITY_MASK_SIZE as usize)
+    Ok(mask_size)
 }
 
 pub fn sys_sched_setaffinity(
@@ -810,23 +836,26 @@ pub fn sys_sched_setaffinity(
     cpusetsize: u32,
     user_mask: UserAddress,
 ) -> Result<(), Errno> {
-    if !current_task.creds().has_capability(CAP_SYS_NICE) {
-        return error!(EPERM);
-    }
+    security::check_task_capable(current_task, CAP_SYS_NICE)?;
     if pid < 0 {
         return error!(EINVAL);
     }
     let weak = get_task_or_current(current_task, pid);
     let _task = Task::from_weak(&weak)?;
 
-    if cpusetsize < CPU_AFFINITY_MASK_SIZE {
-        return error!(EINVAL);
-    }
+    check_cpu_set_alignment(current_task, cpusetsize)?;
 
-    let mask = current_task.read_object::<CpuAffinityMask>(user_mask.into())?;
+    let mask_size = std::cmp::min(cpusetsize as usize, CPU_SET_SIZE);
+    let mut mask = CpuSet::default();
+    current_task.read_memory_to_slice(user_mask, &mut mask.bits[..mask_size])?;
 
     // Specified mask must include at least one valid CPU.
-    if mask & get_default_cpumask() == 0 {
+    let max_mask = get_default_cpu_set();
+    let mut has_valid_cpu_in_mask = false;
+    for (l1, l2) in std::iter::zip(max_mask.bits, mask.bits) {
+        has_valid_cpu_in_mask = has_valid_cpu_in_mask || (l1 & l2 > 0);
+    }
+    if !has_valid_cpu_in_mask {
         return error!(EINVAL);
     }
 
@@ -925,7 +954,7 @@ pub fn sys_prctl(
             let name = if name_addr.is_null() {
                 None
             } else {
-                let name = UserCString::new(UserAddress::from(arg5));
+                let name = UserCString::new(current_task, UserAddress::from(arg5));
                 let name = current_task.read_c_string_to_vec(name, 256).map_err(|e| {
                     // An overly long name produces EINVAL and not ENAMETOOLONG in Linux 5.15.
                     if e.code == ENAMETOOLONG {
@@ -1070,9 +1099,7 @@ pub fn sys_prctl(
         PR_SET_SECUREBITS => {
             // TODO(security): This does not yet respect locked flags.
             let mut creds = current_task.creds();
-            if !creds.has_capability(CAP_SETPCAP) {
-                return error!(EPERM);
-            }
+            security::check_task_capable(current_task, CAP_SETPCAP)?;
 
             let securebits = SecureBits::from_bits(arg2 as u32).ok_or_else(|| {
                 track_stub!(TODO("https://fxbug.dev/322875244"), "PR_SET_SECUREBITS", arg2);
@@ -1088,9 +1115,7 @@ pub fn sys_prctl(
         }
         PR_CAPBSET_DROP => {
             let mut creds = current_task.creds();
-            if !creds.has_capability(CAP_SETPCAP) {
-                return error!(EPERM);
-            }
+            security::check_task_capable(current_task, CAP_SETPCAP)?;
 
             creds.cap_bounding.remove(Capabilities::try_from(arg2)?);
             current_task.set_creds(creds);
@@ -1214,47 +1239,66 @@ pub fn sys_getrlimit(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     resource: u32,
-    user_rlimit: UserRef<rlimit>,
+    user_rlimit: PrLimitRef,
 ) -> Result<(), Errno> {
-    do_prlimit64(locked, current_task, 0, resource, Default::default(), user_rlimit.into())
+    do_prlimit64(locked, current_task, 0, resource, PrLimitRef::null(current_task), user_rlimit)
 }
 
 pub fn sys_setrlimit(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     resource: u32,
-    user_rlimit: UserRef<rlimit>,
+    user_rlimit: PrLimitRef,
 ) -> Result<(), Errno> {
-    do_prlimit64(locked, current_task, 0, resource, user_rlimit.into(), Default::default())
+    do_prlimit64(locked, current_task, 0, resource, user_rlimit, PrLimitRef::null(current_task))
 }
 
-pub fn do_prlimit64(
+pub fn sys_prlimit64(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    pid: pid_t,
+    user_resource: u32,
+    new_limit_ref: UserRef<uapi::rlimit>,
+    old_limit_ref: UserRef<uapi::rlimit>,
+) -> Result<(), Errno> {
+    do_prlimit64::<uapi::rlimit>(
+        locked,
+        current_task,
+        pid,
+        user_resource,
+        new_limit_ref.into(),
+        old_limit_ref.into(),
+    )
+}
+
+pub fn do_prlimit64<T>(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
     user_resource: u32,
-    new_limit_ref: PrLimitRef,
-    old_limit_ref: PrLimitRef,
-) -> Result<(), Errno> {
+    new_limit_ref: MultiArchUserRef<uapi::rlimit, T>,
+    old_limit_ref: MultiArchUserRef<uapi::rlimit, T>,
+) -> Result<(), Errno>
+where
+    T: FromBytes + IntoBytes + Immutable + From<uapi::rlimit> + Into<uapi::rlimit>,
+{
     let weak = get_task_or_current(current_task, pid);
     let target_task = Task::from_weak(&weak)?;
 
     // To get or set the resource of a process other than itself, the caller must have either:
-    // * the CAP_SYS_RESOURCE
     // * the same `uid`, `euid`, `saved_uid`, `gid`, `egid`, `saved_gid` as the target.
+    // * the CAP_SYS_RESOURCE
     if current_task.get_pid() != target_task.get_pid() {
         let current_creds = current_task.creds();
-        if !current_creds.has_capability(CAP_SYS_RESOURCE) {
-            let target_creds = target_task.creds();
-            let creds_match = current_creds.uid == target_creds.uid
-                && current_creds.euid == target_creds.euid
-                && current_creds.saved_uid == target_creds.saved_uid
-                && current_creds.gid == target_creds.gid
-                && current_creds.egid == target_creds.egid
-                && current_creds.saved_gid == target_creds.saved_gid;
-            if !creds_match {
-                return error!(EPERM);
-            }
+        let target_creds = target_task.creds();
+        if current_creds.uid != target_creds.uid
+            || current_creds.euid != target_creds.euid
+            || current_creds.saved_uid != target_creds.saved_uid
+            || current_creds.gid != target_creds.gid
+            || current_creds.egid != target_creds.egid
+            || current_creds.saved_gid != target_creds.saved_gid
+        {
+            security::check_task_capable(current_task, CAP_SYS_RESOURCE)?;
         }
         security::task_prlimit(
             current_task,
@@ -1299,24 +1343,6 @@ pub fn do_prlimit64(
         current_task.write_multi_arch_object(old_limit_ref, old_limit)?;
     }
     Ok(())
-}
-
-pub fn sys_prlimit64(
-    locked: &mut Locked<'_, Unlocked>,
-    current_task: &CurrentTask,
-    pid: pid_t,
-    user_resource: u32,
-    user_new_limit: UserRef<rlimit>,
-    user_old_limit: UserRef<rlimit>,
-) -> Result<(), Errno> {
-    do_prlimit64(
-        locked,
-        current_task,
-        pid,
-        user_resource,
-        user_new_limit.into(),
-        user_old_limit.into(),
-    )
 }
 
 pub fn sys_quotactl(
@@ -1435,10 +1461,8 @@ pub fn sys_capset(
     let mut creds = target_task.creds();
     {
         log_trace!("Capabilities({{permitted={:?} from {:?}, effective={:?} from {:?}, inheritable={:?} from {:?}}}, bounding={:?})", new_permitted, creds.cap_permitted, new_effective, creds.cap_effective, new_inheritable, creds.cap_inheritable, creds.cap_bounding);
-        if !creds.has_capability(CAP_SETPCAP)
-            && !creds.cap_inheritable.union(creds.cap_permitted).contains(new_inheritable)
-        {
-            return error!(EPERM);
+        if !creds.cap_inheritable.union(creds.cap_permitted).contains(new_inheritable) {
+            security::check_task_capable(current_task, CAP_SETPCAP)?;
         }
 
         if !creds.cap_inheritable.union(creds.cap_bounding).contains(new_inheritable) {
@@ -1499,10 +1523,9 @@ pub fn sys_seccomp(
             let code: Vec<sock_filter> =
                 current_task.read_objects_to_vec(fprog.filter.into(), fprog.len as usize)?;
 
-            if !current_task.read().no_new_privs()
-                && !current_task.creds().has_capability(CAP_SYS_ADMIN)
-            {
-                return error!(EACCES);
+            if !current_task.read().no_new_privs() {
+                security::check_task_capable(current_task, CAP_SYS_ADMIN)
+                    .map_err(|_| errno!(EACCES))?;
             }
             current_task.add_seccomp_filter(code, flags)
         }
@@ -1573,6 +1596,8 @@ pub fn sys_setsid(
     Ok(current_task.get_pid())
 }
 
+// Note the asymmetry with sys_setpriority: this returns what Starnix calls a "raw" priority, which
+// ranges from 1 (weakest) to 40 (strongest).
 pub fn sys_getpriority(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
@@ -1590,6 +1615,9 @@ pub fn sys_getpriority(
     Ok(state.scheduler_policy.raw_priority())
 }
 
+// Note the asymmetry with sys_getpriority: the `priority` parameter is what Starnix calls a
+// "user space" priority, which ranges from -20 (strongest) to 19 (weakest) (other values can be
+// passed and are clamped to that range and interpretation).
 pub fn sys_setpriority(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
@@ -1601,21 +1629,30 @@ pub fn sys_setpriority(
         PRIO_PROCESS => {}
         _ => return error!(EINVAL),
     }
-    track_stub!(TODO("https://fxbug.dev/322894197"), "setpriority permissions");
+
     let weak = get_task_or_current(current_task, who);
     let target_task = Task::from_weak(&weak)?;
+    const MIN_RAW_PRIORITY: i32 = 1;
+    const MID_RAW_PRIORITY: i32 = 20;
+    const MAX_RAW_PRIORITY: i32 = 40;
+    let new_raw_priority =
+        (MID_RAW_PRIORITY).saturating_sub(priority).clamp(MIN_RAW_PRIORITY, MAX_RAW_PRIORITY) as u8;
+    let friendly = current_task.creds().euid == target_task.creds().euid
+        || current_task.creds().euid == target_task.creds().uid;
+    let strengthening = target_task.read().scheduler_policy.raw_priority() < new_raw_priority;
+    let allowed_so_far_as_rlimit_is_concerned = !strengthening
+        || new_raw_priority as u64 <= target_task.thread_group.get_rlimit(Resource::NICE);
+    if !(friendly && allowed_so_far_as_rlimit_is_concerned) {
+        security::check_task_capable(current_task, CAP_SYS_NICE)?;
+    }
+
+    // TODO: https://fxbug.dev/392615438 - this check_setsched_access is probably partially-correct
+    // for now; for the SELinux story we probably want to be more sure about the sys_nice capability
+    // check and also condition this setsched check on only happening for cross-process calls. See
+    // https://fxbug.dev/322894197#comment2.
     security::check_setsched_access(current_task, &target_task)?;
-    // The priority passed into setpriority is actually in the -19...20 range and is not
-    // transformed into the 1...40 range. The man page is lying. (I sent a patch, so it might not
-    // be lying anymore by the time you read this.)
-    const MIN_PRIORITY: u8 = 1;
-    const MID_PRIORITY: u8 = 20;
-    const MAX_PRIORITY: u8 = 40;
-    let priority = (MID_PRIORITY as i32).saturating_sub(priority);
-    let max_priority =
-        std::cmp::min(MAX_PRIORITY as u64, target_task.thread_group.get_rlimit(Resource::NICE));
-    target_task
-        .update_scheduler_nice(priority.clamp(MIN_PRIORITY as i32, max_priority as i32) as u8)?;
+
+    target_task.update_scheduler_nice(new_raw_priority)?;
     Ok(())
 }
 
@@ -1630,9 +1667,7 @@ pub fn sys_setns(
     // From man pages this is not quite right because some namespace types require more capabilities
     // or require this capability in multiple namespaces, but it should cover our current test
     // cases and we can make this more nuanced once more namespace types are supported.
-    if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
-        return error!(EPERM);
-    }
+    security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
 
     if let Some(mount_ns) = file_handle.downcast_file::<MountNamespaceFile>() {
         if !(ns_type == 0 || ns_type == CLONE_NEWNS as i32) {
@@ -1675,16 +1710,12 @@ pub fn sys_unshare(
     }
 
     if (flags & CLONE_NEWNS) != 0 {
-        if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
-            return error!(EPERM);
-        }
+        security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
         current_task.fs().unshare_namespace();
     }
 
     if (flags & CLONE_NEWUTS) != 0 {
-        if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
-            return error!(EPERM);
-        }
+        security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
         // Fork the UTS namespace.
         let mut task_state = current_task.write();
         let new_uts_ns = task_state.uts_ns.read().clone();
@@ -1702,9 +1733,7 @@ pub fn sys_swapon(
 ) -> Result<(), Errno> {
     const MAX_SWAPFILES: usize = 30; // See https://man7.org/linux/man-pages/man2/swapon.2.html
 
-    if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
-        return error!(EPERM);
-    }
+    security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
 
     track_stub!(TODO("https://fxbug.dev/322893905"), "swapon validate flags");
 
@@ -1748,9 +1777,7 @@ pub fn sys_swapoff(
     current_task: &CurrentTask,
     user_path: UserCString,
 ) -> Result<(), Errno> {
-    if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
-        return error!(EPERM);
-    }
+    security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
 
     let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
     let file = current_task.open_file(locked, path.as_ref(), OpenFlags::RDWR)?;
@@ -1912,9 +1939,7 @@ pub fn sys_vhangup(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
 ) -> Result<(), Errno> {
-    if !current_task.creds().has_capability(CAP_SYS_TTY_CONFIG) {
-        return error!(EPERM);
-    }
+    security::check_task_capable(current_task, CAP_SYS_TTY_CONFIG)?;
     track_stub!(TODO("https://fxbug.dev/324079257"), "vhangup");
     Ok(())
 }
@@ -1922,43 +1947,16 @@ pub fn sys_vhangup(
 // Syscalls for arch32 usage
 #[cfg(feature = "arch32")]
 mod arch32 {
-    use crate::task::syscalls::{do_prlimit64, PrLimitRef};
-    use crate::task::CurrentTask;
-    use starnix_sync::{Locked, Unlocked};
-    use starnix_uapi::errors::Errno;
-    use starnix_uapi::uapi;
-    use starnix_uapi::user_address::UserRef;
-
-    pub fn sys_arch32_ugetrlimit(
-        locked: &mut Locked<'_, Unlocked>,
-        current_task: &CurrentTask,
-        resource: u32,
-        user_rlimit: UserRef<uapi::arch32::rlimit>,
-    ) -> Result<(), Errno> {
-        do_prlimit64(
-            locked,
-            current_task,
-            0,
-            resource,
-            Default::default(),
-            PrLimitRef::from_32(user_rlimit),
-        )
-    }
-    pub fn sys_arch32_setrlimit(
-        locked: &mut Locked<'_, Unlocked>,
-        current_task: &CurrentTask,
-        resource: u32,
-        user_rlimit: UserRef<uapi::arch32::rlimit>,
-    ) -> Result<(), Errno> {
-        do_prlimit64(
-            locked,
-            current_task,
-            0,
-            resource,
-            PrLimitRef::from_32(user_rlimit),
-            Default::default(),
-        )
-    }
+    pub use super::{
+        sys_execve as sys_arch32_execve, sys_geteuid as sys_arch32_geteuid32,
+        sys_getresgid as sys_arch32_getresgid32, sys_getresuid as sys_arch32_getresuid32,
+        sys_getrlimit as sys_arch32_ugetrlimit, sys_getuid as sys_arch32_getuid32,
+        sys_sched_getaffinity as sys_arch32_sched_getaffinity,
+        sys_sched_setaffinity as sys_arch32_sched_setaffinity,
+        sys_setgroups as sys_arch32_setgroups32, sys_setpriority as sys_arch32_setpriority,
+        sys_setresgid as sys_arch32_setresgid32, sys_setresuid as sys_arch32_setresuid32,
+        sys_setrlimit as sys_arch32_setrlimit, sys_syslog as sys_arch32_syslog,
+    };
 }
 
 #[cfg(feature = "arch32")]
@@ -1970,8 +1968,8 @@ mod tests {
     use crate::mm::syscalls::sys_munmap;
     use crate::testing::*;
     use starnix_syscalls::SUCCESS;
+    use starnix_uapi::auth::Credentials;
     use starnix_uapi::{SCHED_FIFO, SCHED_NORMAL};
-    use std::{mem, u64};
 
     #[::fuchsia::test]
     async fn test_prctl_set_vma_anon_name() {
@@ -2176,7 +2174,11 @@ mod tests {
         let pid = current_task.get_pid();
         assert_eq!(
             sys_sched_getaffinity(&mut locked, &current_task, pid, 16, mapped_address),
-            Ok(std::mem::size_of::<u64>())
+            Ok(16)
+        );
+        assert_eq!(
+            sys_sched_getaffinity(&mut locked, &current_task, pid, 1024, mapped_address),
+            Ok(std::mem::size_of::<CpuSet>())
         );
         assert_eq!(
             sys_sched_getaffinity(&mut locked, &current_task, pid, 1, mapped_address),
@@ -2196,7 +2198,13 @@ mod tests {
         current_task.write_memory(mapped_address, &[0xffu8]).expect("failed to cpumask");
         let pid = current_task.get_pid();
         assert_eq!(
-            sys_sched_setaffinity(&mut locked, &current_task, pid, u32::MAX, mapped_address),
+            sys_sched_setaffinity(
+                &mut locked,
+                &current_task,
+                pid,
+                *PAGE_SIZE as u32,
+                mapped_address
+            ),
             Ok(())
         );
         assert_eq!(
@@ -2369,24 +2377,26 @@ mod tests {
         let arg_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let arg = b"test-arg\0";
         current_task.write_memory(arg_addr, arg).expect("failed to write test arg");
-        let arg_usercstr = UserCString::new(arg_addr);
-        let null_usercstr = UserCString::default();
+        let arg_usercstr = UserCString::new(&current_task, arg_addr);
+        let null_usercstr = UserCString::null(&current_task);
 
-        let argv_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+        let argv_addr = UserCStringPtr::new(
+            &current_task,
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE),
+        );
         current_task
-            .write_object(argv_addr.into(), &arg_usercstr)
+            .write_multi_arch_ptr(argv_addr.addr(), arg_usercstr)
             .expect("failed to write UserCString");
         current_task
-            .write_object((argv_addr + mem::size_of::<UserCString>()).into(), &null_usercstr)
+            .write_multi_arch_ptr(argv_addr.next().addr(), null_usercstr)
             .expect("failed to write UserCString");
-        let argv_userref = UserRef::new(argv_addr);
 
         // The arguments size limit should include the null terminator.
-        assert!(read_c_string_vector(&current_task, argv_userref, 100, arg.len()).is_ok());
+        assert!(read_c_string_vector(&current_task, argv_addr, 100, arg.len()).is_ok());
         assert_eq!(
             read_c_string_vector(
                 &current_task,
-                argv_userref,
+                argv_addr,
                 100,
                 std::str::from_utf8(arg).unwrap().trim_matches('\0').len()
             ),

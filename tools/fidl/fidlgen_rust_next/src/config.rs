@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 pub struct Config {
+    pub emit_compat: bool,
     pub emit_debug_impls: bool,
     pub resource_bindings: ResourceBindings,
 }
@@ -22,9 +23,9 @@ impl Default for ResourceBindings {
     fn default() -> Self {
         Self {
             handle: ResourceBinding {
-                wire_path: "::fidl_next::WireHandle".to_string(),
-                optional_wire_path: "::fidl_next::WireOptionalHandle".to_string(),
-                natural_path: "::fidl_next::zx::Handle".to_string(),
+                wire_path: "::fidl_next::fuchsia::WireHandle".to_string(),
+                optional_wire_path: "::fidl_next::fuchsia::WireOptionalHandle".to_string(),
+                natural_path: "::fidl_next::fuchsia::zx::Handle".to_string(),
             },
         }
     }

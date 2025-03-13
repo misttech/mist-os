@@ -329,7 +329,7 @@ impl LogsArtifactsContainer {
 
     /// Updates log stats in inspect and push the message onto the container's buffer.
     pub fn ingest_message(&self, message: StoredMessage) {
-        self.stats.ingest_message(&message);
+        self.stats.ingest_message(message.size(), message.severity());
         self.buffer.push_back(message.bytes());
     }
 

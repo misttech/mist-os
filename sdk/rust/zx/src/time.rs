@@ -4,10 +4,14 @@
 
 //! Type-safe bindings for Zircon timer objects.
 
-use crate::{ok, sys, AsHandleRef, Handle, HandleBased, HandleRef, Status};
+use crate::{
+    object_get_info_single, ok, sys, AsHandleRef, Handle, HandleBased, HandleRef, ObjectQuery,
+    Status, Topic,
+};
 use std::cmp::{Eq, Ord, PartialEq, PartialOrd};
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 use std::{ops, time as stdtime};
+use zerocopy::{FromBytes, Immutable, IntoBytes};
 
 /// A timestamp from the monontonic clock. Does not advance while the system is suspended.
 pub type MonotonicInstant = Instant<MonotonicTimeline, NsUnit>;
@@ -45,46 +49,11 @@ pub type MonotonicDurationTicks = Duration<MonotonicTimeline, TicksUnit>;
 pub type BootDurationTicks = Duration<BootTimeline, TicksUnit>;
 
 /// A timestamp from the kernel. Generic over both the timeline and the units it is measured in.
+#[derive(
+    Clone, Copy, Default, Hash, PartialEq, Eq, PartialOrd, Ord, FromBytes, IntoBytes, Immutable,
+)]
 #[repr(transparent)]
 pub struct Instant<T, U = NsUnit>(sys::zx_time_t, std::marker::PhantomData<(T, U)>);
-
-impl<T, U> Clone for Instant<T, U> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<T, U> Copy for Instant<T, U> {}
-
-impl<T, U> Default for Instant<T, U> {
-    fn default() -> Self {
-        Instant(0, std::marker::PhantomData)
-    }
-}
-
-impl<T, U> Hash for Instant<T, U> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.hash(state);
-    }
-}
-
-impl<T, U> PartialEq for Instant<T, U> {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
-    }
-}
-impl<T, U> Eq for Instant<T, U> {}
-
-impl<T, U> PartialOrd for Instant<T, U> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.0.partial_cmp(&other.0)
-    }
-}
-impl<T, U> Ord for Instant<T, U> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.0.cmp(&other.0)
-    }
-}
 
 impl<T, U> std::fmt::Debug for Instant<T, U> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -245,7 +214,7 @@ impl<T: Timeline, U: TimeUnit> ops::SubAssign<Duration<T, U>> for Instant<T, U> 
 }
 
 /// A marker trait for times to prevent accidental comparison between different timelines.
-pub trait Timeline {}
+pub trait Timeline: Default + Copy + Clone + PartialEq + Eq {}
 
 /// A marker type for the system's monotonic timeline which pauses during suspend.
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -275,7 +244,20 @@ impl TimeUnit for NsUnit {}
 pub struct TicksUnit;
 impl TimeUnit for TicksUnit {}
 
-#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(
+    Debug,
+    Default,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    FromBytes,
+    IntoBytes,
+    Immutable,
+)]
 #[repr(transparent)]
 pub struct Duration<T, U = NsUnit>(sys::zx_duration_t, std::marker::PhantomData<(T, U)>);
 
@@ -435,11 +417,59 @@ impl MonotonicDuration {
 // TODO(https://fxbug.dev/361661898) remove default type when FIDL understands mono vs. boot timers
 pub struct Timer<T = MonotonicTimeline>(Handle, std::marker::PhantomData<T>);
 
+#[repr(C)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, FromBytes, Immutable)]
+pub struct TimerInfo<T: Timeline> {
+    pub options: u32,
+    // NB: Currently, this field is irrelevant, because the clock ID will always match the timeline
+    // of the Timer which is represented by this TimerInfo.  For example, with a MonotonicTimer,
+    // clock_id is always 0 (ZX_CLOCK_MONOTONIC).  If the timer syscalls eventually allow arbitrary
+    // clock IDs, we can make this field public.
+    clock_id: u32,
+    pub deadline: Instant<T>,
+    pub slack: Duration<T>,
+}
+
+pub type MonotonicTimerInfo = TimerInfo<MonotonicTimeline>;
+pub type BootTimerInfo = TimerInfo<BootTimeline>;
+pub type SyntheticTimerInfo = TimerInfo<SyntheticTimeline>;
+
+static_assertions::assert_eq_size!(MonotonicTimerInfo, sys::zx_info_timer_t);
+static_assertions::assert_eq_size!(BootTimerInfo, sys::zx_info_timer_t);
+static_assertions::assert_eq_size!(SyntheticTimerInfo, sys::zx_info_timer_t);
+
+impl<T: Timeline> Default for TimerInfo<T> {
+    fn default() -> Self {
+        Self::from_raw(sys::zx_info_timer_t::default())
+    }
+}
+
+impl<T: Timeline> TimerInfo<T> {
+    fn from_raw(info: sys::zx_info_timer_t) -> Self {
+        zerocopy::transmute!(info)
+    }
+}
+
+struct TimerInfoQuery;
+unsafe impl ObjectQuery for TimerInfoQuery {
+    const TOPIC: Topic = Topic::TIMER;
+    type InfoTy = sys::zx_info_timer_t;
+}
+
 /// A timer that measures its deadlines against the monotonic clock.
 pub type MonotonicTimer = Timer<MonotonicTimeline>;
 
 /// A timer that measures its deadlines against the boot clock.
 pub type BootTimer = Timer<BootTimeline>;
+
+impl<T: Timeline> Timer<T> {
+    /// Wraps the
+    /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
+    /// syscall for the ZX_INFO_TIMER_T topic.
+    pub fn info(&self) -> Result<TimerInfo<T>, Status> {
+        Ok(TimerInfo::from_raw(object_get_info_single::<TimerInfoQuery>(self.as_handle_ref())?))
+    }
+}
 
 impl Timer<MonotonicTimeline> {
     /// Create a timer, an object that can signal when a specified point on the monotonic clock has
@@ -454,9 +484,7 @@ impl Timer<MonotonicTimeline> {
     pub fn create() -> Self {
         let mut out = 0;
         let opts = 0;
-        let status = unsafe {
-            sys::zx_timer_create(opts, 0 /*ZX_CLOCK_MONOTONIC*/, &mut out)
-        };
+        let status = unsafe { sys::zx_timer_create(opts, sys::ZX_CLOCK_MONOTONIC, &mut out) };
         ok(status)
             .expect("timer creation always succeeds except with OOM or when job policy denies it");
         unsafe { Self::from(Handle::from_raw(out)) }
@@ -478,9 +506,7 @@ impl Timer<BootTimeline> {
     pub fn create() -> Self {
         let mut out = 0;
         let opts = 0;
-        let status = unsafe {
-            sys::zx_timer_create(opts, 1 /*ZX_CLOCK_BOOT*/, &mut out)
-        };
+        let status = unsafe { sys::zx_timer_create(opts, sys::ZX_CLOCK_BOOT, &mut out) };
         ok(status)
             .expect("timer creation always succeeds except with OOM or when job policy denies it");
         unsafe { Self::from(Handle::from_raw(out)) }
@@ -619,13 +645,18 @@ mod tests {
     }
 
     #[test]
-    fn timer_basic() {
+    fn monotonic_timer_basic() {
         let slack = Duration::from_millis(0);
         let ten_ms = Duration::from_millis(10);
         let five_secs = Duration::from_seconds(5);
 
         // Create a timer
         let timer = MonotonicTimer::create();
+
+        let info = timer.info().expect("info() failed");
+        assert_eq!(info.clock_id, sys::ZX_CLOCK_MONOTONIC);
+        assert_eq!(info.deadline, Instant::ZERO);
+        // NB: We don't check slack, because the kernel can change it based on its own policies.
 
         // Should not signal yet.
         assert_eq!(
@@ -634,11 +665,14 @@ mod tests {
         );
 
         // Set it, and soon it should signal.
-        assert_eq!(timer.set(MonotonicInstant::after(five_secs), slack), Ok(()));
+        let instant = MonotonicInstant::after(five_secs);
+        assert_eq!(timer.set(instant, slack), Ok(()));
         assert_eq!(
             timer.wait_handle(Signals::TIMER_SIGNALED, Instant::INFINITE),
             Ok(Signals::TIMER_SIGNALED)
         );
+        // Once the timer has fired, its deadline is reset to zero.
+        assert_eq!(timer.info().expect("info() failed").deadline, Instant::ZERO);
 
         // Cancel it, and it should stop signalling.
         assert_eq!(timer.cancel(), Ok(()));
@@ -646,6 +680,10 @@ mod tests {
             timer.wait_handle(Signals::TIMER_SIGNALED, MonotonicInstant::after(ten_ms)),
             Err(Status::TIMED_OUT)
         );
+        assert_eq!(timer.info().expect("info() failed").deadline, Instant::ZERO);
+
+        assert_eq!(timer.set(Instant::INFINITE, slack), Ok(()));
+        assert_eq!(timer.info().expect("info() failed").deadline, Instant::INFINITE);
     }
 
     #[test]
@@ -657,6 +695,11 @@ mod tests {
         // Create a timer
         let timer = BootTimer::create();
 
+        let info = timer.info().expect("info() failed");
+        assert_eq!(info.clock_id, sys::ZX_CLOCK_BOOT);
+        assert_eq!(info.deadline, Instant::ZERO);
+        // NB: We don't check slack, because the kernel can change it based on its own policies.
+
         // Should not signal yet.
         assert_eq!(
             timer.wait_handle(Signals::TIMER_SIGNALED, MonotonicInstant::after(ten_ms)),
@@ -664,11 +707,14 @@ mod tests {
         );
 
         // Set it, and soon it should signal.
-        assert_eq!(timer.set(BootInstant::get() + five_secs, slack), Ok(()));
+        let instant = BootInstant::after(five_secs);
+        assert_eq!(timer.set(instant, slack), Ok(()));
         assert_eq!(
             timer.wait_handle(Signals::TIMER_SIGNALED, Instant::INFINITE),
             Ok(Signals::TIMER_SIGNALED)
         );
+        // Once the timer has fired, its deadline is reset to zero.
+        assert_eq!(timer.info().expect("info() failed").deadline, Instant::ZERO);
 
         // Cancel it, and it should stop signalling.
         assert_eq!(timer.cancel(), Ok(()));
@@ -676,6 +722,10 @@ mod tests {
             timer.wait_handle(Signals::TIMER_SIGNALED, MonotonicInstant::after(ten_ms)),
             Err(Status::TIMED_OUT)
         );
+        assert_eq!(timer.info().expect("info() failed").deadline, Instant::ZERO);
+
+        assert_eq!(timer.set(Instant::INFINITE, slack), Ok(()));
+        assert_eq!(timer.info().expect("info() failed").deadline, Instant::INFINITE);
     }
 
     #[test]

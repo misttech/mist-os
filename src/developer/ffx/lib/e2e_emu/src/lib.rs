@@ -5,34 +5,29 @@
 use anyhow::{ensure, Context as _};
 use async_stream::stream;
 use diagnostics_data::LogsData;
-use ffx_config::{EnvironmentContext, TestEnv};
+use ffx_config::environment::ExecutableKind;
+use ffx_config::{ConfigMap, EnvironmentContext};
+use ffx_executor::FfxExecutor;
 use ffx_isolate::Isolate;
-use fuchsia_async::TimeoutExt;
 use futures::channel::mpsc::TrySendError;
 use futures::{Stream, StreamExt};
 use serde::Deserialize;
+use std::env;
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
-use std::time::Duration;
 use tempfile::TempDir;
 use tracing::info;
-
-struct EmuState {
-    emu: std::process::Child,
-}
 
 /// An isolated environment for testing ffx against a running emulator.
 pub struct IsolatedEmulator {
     emu_name: String,
     package_server_name: String,
     ffx_isolate: Isolate,
-    emu_state: Mutex<Option<EmuState>>,
     children: Mutex<Vec<std::process::Child>>,
 
     // We need to hold the below variables but not interact with them.
     _temp_dir: TempDir,
-    _test_env: TestEnv,
 }
 
 impl IsolatedEmulator {
@@ -53,7 +48,16 @@ impl IsolatedEmulator {
 
         info!(%name, "making ffx isolate");
         let temp_dir = tempfile::TempDir::new().context("making temp dir")?;
-        let test_env = ffx_config::test_init().await.context("setting up ffx test config")?;
+
+        // Start with the non-isolated environment context - then build the isolate.
+        let env_context = EnvironmentContext::detect(
+            ExecutableKind::Test,
+            ConfigMap::new(),
+            &env::current_dir().expect("current directory"),
+            None,
+            false,
+        )
+        .expect("new detected context");
 
         // Create paths to the files to hold the ssh key pair.
         // The key is not generated here, since ffx will generate the
@@ -63,7 +67,7 @@ impl IsolatedEmulator {
         let ssh_priv_key = temp_dir.path().join("ssh_private_key");
         let ssh_pub_key = temp_dir.path().join("ssh_public_key");
 
-        let ffx_isolate = Isolate::new_in_test(name, ssh_priv_key.clone(), &test_env.context)
+        let ffx_isolate = Isolate::new_in_test(name, ssh_priv_key.clone(), &env_context)
             .await
             .context("creating ffx isolate")?;
 
@@ -73,8 +77,6 @@ impl IsolatedEmulator {
             package_server_name,
             ffx_isolate,
             _temp_dir: temp_dir,
-            _test_env: test_env,
-            emu_state: Mutex::new(None),
             children: Mutex::new(vec![]),
         };
 
@@ -95,40 +97,32 @@ impl IsolatedEmulator {
         let emulator_log = this.ffx_isolate.log_dir().join("emulator.log").display().to_string();
         let product_bundle_path = std::env::var("PRODUCT_BUNDLE_PATH")
             .expect("PRODUCT_BUNDLE_PATH env var must be set -- run this test with 'fx test'");
-        let mut emulator_cmd = this
-            .ffx_isolate
-            .ffx_cmd(&[
-                "emu",
-                "start",
-                "--headless",
-                "--net",
-                "user",
-                "--name",
-                &this.emu_name,
-                "--log",
-                &*emulator_log,
-                "--startup-timeout",
-                "120",
-                "--kernel-args",
-                "TERM=dumb",
-                &product_bundle_path,
-            ])
-            .await
-            .context("creating emulator command")?;
 
-        let emu = emulator_cmd.spawn().context("spawning emulator command")?;
-
-        this.ffx(&["target", "wait"])
-            .on_timeout(Duration::from_secs(120), || anyhow::bail!("emulator never started"))
-            .await?;
-
-        *this.emu_state.lock().unwrap() = Some(EmuState { emu });
+        // start the emulator. The start command returns when the emulator has started and an RCS connection
+        // can be made, or when the timeout was reached.
+        this.ffx(&[
+            "emu",
+            "start",
+            "--headless",
+            "--net",
+            "user",
+            "--name",
+            &this.emu_name,
+            "--log",
+            &*emulator_log,
+            "--startup-timeout",
+            "120",
+            "--kernel-args",
+            "TERM=dumb",
+            &product_bundle_path,
+        ])
+        .await
+        .context("running emulator command")?;
 
         info!("streaming system logs to output directory");
         let mut system_logs_command = this
             .ffx_isolate
-            .ffx_cmd(&this.make_args(&["log", "--severity", "TRACE", "--no-color"]))
-            .await
+            .make_ffx_cmd(&this.make_args(&["log", "--severity", "TRACE", "--no-color"]))
             .context("creating log streaming command")?;
 
         let emulator_system_log =
@@ -136,8 +130,10 @@ impl IsolatedEmulator {
                 .context("creating system log file")?;
         system_logs_command.stdout(emulator_system_log);
 
-        // ffx log prints lots of warnings about symbolization
-        system_logs_command.stderr(std::process::Stdio::null());
+        let emulator_stderr_log =
+            std::fs::File::create(this.ffx_isolate.log_dir().join("system_err.log"))
+                .context("creating system stderr log file")?;
+        system_logs_command.stderr(emulator_stderr_log);
 
         this.children
             .lock()
@@ -204,8 +200,8 @@ impl IsolatedEmulator {
 
     /// Run an ffx command, logging stdout & stderr as INFO messages.
     pub async fn ffx(&self, args: &[&str]) -> anyhow::Result<()> {
-        info!("running `ffx {args:?}`");
-        let output = self.ffx_isolate.ffx(&self.make_args(args)).await.context("running ffx")?;
+        let output =
+            self.ffx_isolate.exec_ffx(&self.make_args(args)).await.context("ffx() running ffx")?;
         if !output.stdout.is_empty() {
             info!("stdout:\n{}", output.stdout);
         }
@@ -218,8 +214,11 @@ impl IsolatedEmulator {
 
     /// Run an ffx command, returning stdout and logging stderr as an INFO message.
     pub async fn ffx_output(&self, args: &[&str]) -> anyhow::Result<String> {
-        info!("running `ffx {args:?}`");
-        let output = self.ffx_isolate.ffx(&self.make_args(args)).await.context("running ffx")?;
+        let output = self
+            .ffx_isolate
+            .exec_ffx(&self.make_args(args))
+            .await
+            .context("ffx_output() running ffx")?;
         if !output.stderr.is_empty() {
             info!("stderr:\n{}", output.stderr);
         }
@@ -233,8 +232,10 @@ impl IsolatedEmulator {
 
     /// Create an ffx command, which allows for streaming stdout/stderr.
     pub async fn ffx_cmd_capture(&self, args: &[&str]) -> anyhow::Result<Command> {
-        let mut cmd =
-            self.ffx_isolate.ffx_cmd(&self.make_args(args)).await.context("running ffx")?;
+        let mut cmd = self
+            .ffx_isolate
+            .make_ffx_cmd(&self.make_args(args))
+            .context("ffx_cmd_capture() running ffx")?;
         cmd.stdout(Stdio::piped());
         Ok(cmd)
     }
@@ -341,14 +342,17 @@ impl IsolatedEmulator {
     }
 
     pub async fn stop(&self) {
+        match self.ffx(&["repository", "server", "stop", &self.package_server_name]).await {
+            Ok(_) => (),
+            Err(e) => {
+                tracing::error!("Error stopping repo server {}: {e}.", self.package_server_name)
+            }
+        };
+
         match self.ffx(&["emu", "stop", &self.emu_name]).await {
             Ok(()) => return,
             Err(e) => {
-                tracing::error!("Error stopping {}: {e}. Cleaning up manually.", self.emu_name);
-                let mut emu = self.emu_state.lock().unwrap();
-                if let Some(ref mut c) = emu.as_mut() {
-                    c.emu.kill().ok();
-                }
+                tracing::error!("Error stopping {}: {e}.", self.emu_name);
             }
         }
     }
@@ -363,11 +367,6 @@ impl Drop for IsolatedEmulator {
             for child in children.iter_mut() {
                 child.kill().ok();
             }
-        }
-
-        let mut emu = self.emu_state.lock().unwrap();
-        if let Some(ref mut c) = emu.take() {
-            c.emu.kill().ok();
         }
 
         info!(

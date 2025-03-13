@@ -18,6 +18,7 @@ if (is_fuchsia) {
   import("//build/drivers.gni")
 
   fuchsia_cc_driver("usb-peripheral-test-driver") {
+    legacy = true
     output_name = "usb-peripheral-test"
     configs += [
       "//build/config:all_source",

@@ -16,10 +16,6 @@ declare_args() {
   # Configs that are added when targeting this board.
   board_configs = []
 
-  # A list of package labels to include in the 'base' package set. Used by the
-  # board definition rather than the product definition.
-  board_package_labels = []
-
   # A list of paths to the unlock credentials file necessary to unlock this
   # board's fastboot protocol.
   board_fastboot_unlock_credentials = []

@@ -24,6 +24,6 @@ executable("bin") {
   ]
 }
 
-fuchsia_shell_package("audio-capture-timestamp-validator") {
+fuchsia_package("audio-capture-timestamp-validator") {
   deps = [ ":bin" ]
 }

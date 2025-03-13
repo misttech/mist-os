@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{test_topology, utils};
-use diagnostics_data::Logs;
 use diagnostics_reader::{ArchiveReader, RetryConfig};
 use futures::StreamExt;
 use std::collections::VecDeque;
@@ -45,16 +44,16 @@ async fn test_budget() {
         .expect("emitted log");
 
     let accessor = utils::connect_accessor(&realm_proxy, utils::ALL_PIPELINE).await;
-    let mut log_reader = ArchiveReader::new();
+    let mut log_reader = ArchiveReader::logs();
     log_reader
         .with_archive(accessor)
         .with_minimum_schema_count(0) // we want this to return even when no log messages
         .retry(RetryConfig::never());
 
     let (mut observed_logs, _errors) =
-        log_reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
+        log_reader.snapshot_then_subscribe().unwrap().split_streams();
     let (mut observed_logs_2, _errors) =
-        log_reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
+        log_reader.snapshot_then_subscribe().unwrap().split_streams();
 
     let msg_a = observed_logs.next().await.unwrap();
     let msg_a_2 = observed_logs_2.next().await.unwrap();
@@ -92,7 +91,7 @@ async fn test_budget() {
     // We observe some logs were rolled out.
     while observed_logs_2.next().await.unwrap().rolled_out_logs().is_none() {}
 
-    let mut observed_logs = log_reader.snapshot::<Logs>().await.unwrap().into_iter();
+    let mut observed_logs = log_reader.snapshot().await.unwrap().into_iter();
     let msg_b = observed_logs.next().unwrap();
     assert!(!msg_b.moniker.to_string().contains("puppet-victim"));
 

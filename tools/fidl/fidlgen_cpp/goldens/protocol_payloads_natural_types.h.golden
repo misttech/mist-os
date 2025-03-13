@@ -923,7 +923,7 @@ inline LocalStructPayload::LocalStructPayload(uint32_t a, uint32_t b) noexcept
     : storage_({.a = std::move(a),
                 .b = std::move(b)}) {}
 inline LocalStructPayload::LocalStructPayload(const ::test_protocolpayloads::LocalStructPayload& other) noexcept : ::test_protocolpayloads::LocalStructPayload(other.CloneStorage_()) {}
-inline LocalStructPayload& ::test_protocolpayloads::LocalStructPayload::operator=(const ::test_protocolpayloads::LocalStructPayload & other) noexcept {
+inline LocalStructPayload& ::test_protocolpayloads::LocalStructPayload::operator=(const ::test_protocolpayloads::LocalStructPayload& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -946,7 +946,7 @@ inline MainProtocolOneWayAnonRequest::MainProtocolOneWayAnonRequest(uint32_t a, 
     : storage_({.a = std::move(a),
                 .b = std::move(b)}) {}
 inline MainProtocolOneWayAnonRequest::MainProtocolOneWayAnonRequest(const ::test_protocolpayloads::MainProtocolOneWayAnonRequest& other) noexcept : ::test_protocolpayloads::MainProtocolOneWayAnonRequest(other.CloneStorage_()) {}
-inline MainProtocolOneWayAnonRequest& ::test_protocolpayloads::MainProtocolOneWayAnonRequest::operator=(const ::test_protocolpayloads::MainProtocolOneWayAnonRequest & other) noexcept {
+inline MainProtocolOneWayAnonRequest& ::test_protocolpayloads::MainProtocolOneWayAnonRequest::operator=(const ::test_protocolpayloads::MainProtocolOneWayAnonRequest& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -969,7 +969,7 @@ inline MainProtocolTwoWayAnonRequest::MainProtocolTwoWayAnonRequest(uint32_t a, 
     : storage_({.a = std::move(a),
                 .b = std::move(b)}) {}
 inline MainProtocolTwoWayAnonRequest::MainProtocolTwoWayAnonRequest(const ::test_protocolpayloads::MainProtocolTwoWayAnonRequest& other) noexcept : ::test_protocolpayloads::MainProtocolTwoWayAnonRequest(other.CloneStorage_()) {}
-inline MainProtocolTwoWayAnonRequest& ::test_protocolpayloads::MainProtocolTwoWayAnonRequest::operator=(const ::test_protocolpayloads::MainProtocolTwoWayAnonRequest & other) noexcept {
+inline MainProtocolTwoWayAnonRequest& ::test_protocolpayloads::MainProtocolTwoWayAnonRequest::operator=(const ::test_protocolpayloads::MainProtocolTwoWayAnonRequest& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -992,7 +992,7 @@ inline MainProtocolTwoWayAnonResponse::MainProtocolTwoWayAnonResponse(uint32_t a
     : storage_({.a = std::move(a),
                 .b = std::move(b)}) {}
 inline MainProtocolTwoWayAnonResponse::MainProtocolTwoWayAnonResponse(const ::test_protocolpayloads::MainProtocolTwoWayAnonResponse& other) noexcept : ::test_protocolpayloads::MainProtocolTwoWayAnonResponse(other.CloneStorage_()) {}
-inline MainProtocolTwoWayAnonResponse& ::test_protocolpayloads::MainProtocolTwoWayAnonResponse::operator=(const ::test_protocolpayloads::MainProtocolTwoWayAnonResponse & other) noexcept {
+inline MainProtocolTwoWayAnonResponse& ::test_protocolpayloads::MainProtocolTwoWayAnonResponse::operator=(const ::test_protocolpayloads::MainProtocolTwoWayAnonResponse& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1015,7 +1015,7 @@ inline MainProtocolTwoWayAnonWithErrorRequest::MainProtocolTwoWayAnonWithErrorRe
     : storage_({.a = std::move(a),
                 .b = std::move(b)}) {}
 inline MainProtocolTwoWayAnonWithErrorRequest::MainProtocolTwoWayAnonWithErrorRequest(const ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRequest& other) noexcept : ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRequest(other.CloneStorage_()) {}
-inline MainProtocolTwoWayAnonWithErrorRequest& ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRequest::operator=(const ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRequest & other) noexcept {
+inline MainProtocolTwoWayAnonWithErrorRequest& ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRequest::operator=(const ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRequest& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1038,7 +1038,7 @@ inline MainProtocolTwoWayAnonWithErrorResponse::MainProtocolTwoWayAnonWithErrorR
     : storage_({.a = std::move(a),
                 .b = std::move(b)}) {}
 inline MainProtocolTwoWayAnonWithErrorResponse::MainProtocolTwoWayAnonWithErrorResponse(const ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse& other) noexcept : ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse(other.CloneStorage_()) {}
-inline MainProtocolTwoWayAnonWithErrorResponse& ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse::operator=(const ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse & other) noexcept {
+inline MainProtocolTwoWayAnonWithErrorResponse& ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse::operator=(const ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1061,7 +1061,7 @@ inline MainProtocolOnAnonRequest::MainProtocolOnAnonRequest(uint32_t a, uint32_t
     : storage_({.a = std::move(a),
                 .b = std::move(b)}) {}
 inline MainProtocolOnAnonRequest::MainProtocolOnAnonRequest(const ::test_protocolpayloads::MainProtocolOnAnonRequest& other) noexcept : ::test_protocolpayloads::MainProtocolOnAnonRequest(other.CloneStorage_()) {}
-inline MainProtocolOnAnonRequest& ::test_protocolpayloads::MainProtocolOnAnonRequest::operator=(const ::test_protocolpayloads::MainProtocolOnAnonRequest & other) noexcept {
+inline MainProtocolOnAnonRequest& ::test_protocolpayloads::MainProtocolOnAnonRequest::operator=(const ::test_protocolpayloads::MainProtocolOnAnonRequest& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1083,7 +1083,7 @@ inline MainProtocolOnAnonRequest& MainProtocolOnAnonRequest::b(uint32_t value) {
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_protocolpayloads::LocalStructPayload> : public std::true_type{};
+struct IsFidlType<::test_protocolpayloads::LocalStructPayload> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_protocolpayloads::LocalStructPayload> {
@@ -1095,14 +1095,14 @@ struct TypeTraits<::test_protocolpayloads::LocalStructPayload> {
 };
 
 template <>
-struct IsStruct<::test_protocolpayloads::LocalStructPayload> : public std::true_type{};
+struct IsStruct<::test_protocolpayloads::LocalStructPayload> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::LocalStructPayload, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::LocalStructPayload, 8> {};
 
 template <>
-struct IsFidlType<::test_protocolpayloads::MainProtocolOneWayAnonRequest> : public std::true_type{};
+struct IsFidlType<::test_protocolpayloads::MainProtocolOneWayAnonRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_protocolpayloads::MainProtocolOneWayAnonRequest> {
@@ -1114,14 +1114,14 @@ struct TypeTraits<::test_protocolpayloads::MainProtocolOneWayAnonRequest> {
 };
 
 template <>
-struct IsStruct<::test_protocolpayloads::MainProtocolOneWayAnonRequest> : public std::true_type{};
+struct IsStruct<::test_protocolpayloads::MainProtocolOneWayAnonRequest> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolOneWayAnonRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolOneWayAnonRequest, 8> {};
 
 template <>
-struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayAnonRequest> : public std::true_type{};
+struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayAnonRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_protocolpayloads::MainProtocolTwoWayAnonRequest> {
@@ -1133,14 +1133,14 @@ struct TypeTraits<::test_protocolpayloads::MainProtocolTwoWayAnonRequest> {
 };
 
 template <>
-struct IsStruct<::test_protocolpayloads::MainProtocolTwoWayAnonRequest> : public std::true_type{};
+struct IsStruct<::test_protocolpayloads::MainProtocolTwoWayAnonRequest> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonRequest, 8> {};
 
 template <>
-struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayAnonResponse> : public std::true_type{};
+struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayAnonResponse> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_protocolpayloads::MainProtocolTwoWayAnonResponse> {
@@ -1152,14 +1152,14 @@ struct TypeTraits<::test_protocolpayloads::MainProtocolTwoWayAnonResponse> {
 };
 
 template <>
-struct IsStruct<::test_protocolpayloads::MainProtocolTwoWayAnonResponse> : public std::true_type{};
+struct IsStruct<::test_protocolpayloads::MainProtocolTwoWayAnonResponse> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonResponse, 8> {};
 
 template <>
-struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRequest> : public std::true_type{};
+struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRequest> {
@@ -1171,14 +1171,14 @@ struct TypeTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorReques
 };
 
 template <>
-struct IsStruct<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRequest> : public std::true_type{};
+struct IsStruct<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRequest> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRequest, 8> {};
 
 template <>
-struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse> : public std::true_type{};
+struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse> {
@@ -1190,14 +1190,14 @@ struct TypeTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRespon
 };
 
 template <>
-struct IsStruct<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse> : public std::true_type{};
+struct IsStruct<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse, 8> {};
 
 template <>
-struct IsFidlType<::test_protocolpayloads::MainProtocolOnAnonRequest> : public std::true_type{};
+struct IsFidlType<::test_protocolpayloads::MainProtocolOnAnonRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_protocolpayloads::MainProtocolOnAnonRequest> {
@@ -1209,14 +1209,14 @@ struct TypeTraits<::test_protocolpayloads::MainProtocolOnAnonRequest> {
 };
 
 template <>
-struct IsStruct<::test_protocolpayloads::MainProtocolOnAnonRequest> : public std::true_type{};
+struct IsStruct<::test_protocolpayloads::MainProtocolOnAnonRequest> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolOnAnonRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolOnAnonRequest, 8> {};
 
 template <>
-struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult> : public std::true_type{};
+struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult> {
@@ -1228,14 +1228,14 @@ struct TypeTraits<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResul
 };
 
 template <>
-struct IsUnion<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult> : public std::true_type{};
+struct IsUnion<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult> {};
 
 template <>
-struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult> : public std::true_type{};
+struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult> {
@@ -1247,14 +1247,14 @@ struct TypeTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult
 };
 
 template <>
-struct IsUnion<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult> : public std::true_type{};
+struct IsUnion<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult> {};
 
 template <>
-struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult> : public std::true_type{};
+struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult> {
@@ -1266,7 +1266,7 @@ struct TypeTraits<::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResu
 };
 
 template <>
-struct IsUnion<::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult> : public std::true_type{};
+struct IsUnion<::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult, ::fidl::internal::NaturalCodingConstraintEmpty> final

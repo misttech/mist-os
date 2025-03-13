@@ -12,7 +12,6 @@ static_library("journal") {
   public = [
     "background_executor.h",
     "data_streamer.h",
-    "disk_struct.h",
     "format.h",
     "header_view.h",
     "initializer.h",
@@ -41,21 +40,12 @@ static_library("journal") {
   configs += [ "//build/config:all_source" ]
 
   if (is_fuchsia) {
-    public += [
-      "inspector_journal.h",
-      "inspector_parser.h",
-    ]
     sources += [
       "background_executor.cc",
       "data_streamer.cc",
-      "disk_struct.cc",
       "entry_view.cc",
       "entry_view.h",
       "format_assertions.h",
-      "inspector_journal.cc",
-      "inspector_journal_entries.cc",
-      "inspector_journal_entries.h",
-      "inspector_parser.cc",
       "journal.cc",
       "journal_writer.cc",
       "replay.cc",
@@ -64,7 +54,6 @@ static_library("journal") {
       "superblock.cc",
     ]
     public_deps += [
-      "//src/storage/lib/disk_inspector",
       "//zircon/system/ulib/range",
       "//zircon/system/ulib/storage/buffer",
       "//zircon/system/ulib/storage/operation",
@@ -73,7 +62,6 @@ static_library("journal") {
     deps += [
       "//sdk/lib/fdio",
       "//sdk/lib/syslog/cpp",
-      "//src/storage/lib/disk_inspector",
       "//zircon/system/ulib/fbl",
       "//zircon/system/ulib/range",
       "//zircon/system/ulib/storage/buffer",
@@ -103,11 +91,8 @@ test("journal-unit") {
   sources = [
     "background_executor_test.cc",
     "data_streamer_test.cc",
-    "disk_struct_test.cc",
     "entry_view_test.cc",
     "header_view_test.cc",
-    "inspector_parser_test.cc",
-    "inspector_test.cc",
     "journal_test.cc",
     "replay_test.cc",
     "replay_tree_test.cc",

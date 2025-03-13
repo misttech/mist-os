@@ -41,7 +41,7 @@ impl<'a, P: fidl::endpoints::DiscoverableProtocolMarker> net_cli::ServiceConnect
 
 async fn run_command(realm: &netemul::TestRealm<'_>, args: &[&'static str]) -> Result<()> {
     net_cli::do_root(
-        ffx_writer::MachineWriter::new(None),
+        writer::JsonWriter::new(None),
         net_cli::Command::from_args(&["net"], &[&["filter"], args].concat())
             .expect("should parse args successfully"),
         &TestRealmConnector { realm },

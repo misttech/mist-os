@@ -4,26 +4,19 @@
 
 assert(is_fuchsia, "This can only be included in default_toolchain contexts")
 
-# This was moved here from //bundles:tools
+# This group is for tools in packages that should be compiled for Fuchsia
 group("tools") {
   testonly = true
   public_deps = [
     "//src/camera:tools",
     "//src/connectivity/bluetooth/tools",
     "//src/developer/debug/debug_agent",
-    "//src/developer/debug/zxdb:zxdb_host",
     "//src/developer/fastboot",
     "//src/devices/bundles:tools",
-    "//src/devices/lib/bind",
     "//src/graphics/display:tools",
     "//src/graphics/lib/magma:magma-tools",
-    "//src/lib/chunked-compression:chunked-compress-host-tool",
-    "//src/lib/icu:tools",
-    "//src/media/bundles:tools",
-    "//src/performance/lib/trace_processing:run_cpu_breakdown",
     "//src/performance/trace",
     "//src/recovery/factory_reset:tools",
-    "//src/security/lib/scrutiny",
     "//src/storage:tools",
     "//src/sys/pkg/bin/far",
     "//src/sys/tools/activity-ctl",
@@ -35,31 +28,32 @@ group("tools") {
     "//third_party/openssh-portable:scp-shell-pkg",
     "//third_party/openssh-portable:ssh-keygen-shell-pkg",
     "//third_party/openssh-portable:ssh-shell-pkg",
-    "//tools",
-
-    # Tools that are included via the host_toolchain are in a separate group for
-    # clarity.
-    ":host_tools",
   ]
   deps = [ "//build/validate:non_production_tag" ]
+
+  # These are libraries that were being included in tools?
+  # "//src/security/lib/scrutiny",
 }
 
-# These are the known host_toolchain-compiled tools that are in this
-# entry-point.
-#
-# These should be migrated to a host_toolchain-included context such as
-# //bundles/tools/host.  However, the above group _also_ includes numerous tools
-# that are in the host_toolchain, but are included transitively through its
-# direct deps.  Those should be pulled out into this group, instead.
+# This group is for host tools.
+_host_tools = [
+  "//build/tools/formatjson5:install",
+  "//src/developer/debug/zxdb:zxdb",
+  "//src/diagnostics/triage:install",
+  "//src/lib/chunked-compression:chunked-compress-host-tool",
+  "//src/lib/icu/tools/extractor:host",
+  "//src/performance/lib/trace_processing:run_cpu_breakdown",
+  "//src/performance/trace2json",
+  "//src/storage:host_tools",
+  "//src/sys/pkg/bin/far:host",
+  "//tools",
+  "//tools/check-licenses:host",
+  "//tools/whereiscl:host",
+]
 group("host_tools") {
-  visibility = [ ":*" ]
   testonly = true
-  public_deps = [
-    "//build/tools/formatjson5:install($host_toolchain)",
-    "//src/diagnostics/triage:install($host_toolchain)",
-    "//src/performance/trace2json($host_toolchain)",
-    "//src/sys/pkg/bin/far:host($host_toolchain)",
-    "//tools/check-licenses:host($host_toolchain)",
-    "//tools/whereiscl:host($host_toolchain)",
-  ]
+  public_deps = []
+  foreach(dep, _host_tools) {
+    public_deps += [ "${dep}($host_toolchain)" ]
+  }
 }

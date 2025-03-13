@@ -316,6 +316,7 @@ while [[ $# -ne 0 ]]; do
       # LINT.IfChange
       export FUCHSIA_NODENAME="$1"
       # LINT.ThenChange(/src/developer/ffx/data/config.json)
+      _check_default_target="true"
       ;;
     -i)
       declare iterative=1
@@ -360,6 +361,12 @@ if [[ $# -lt 1 ]]; then
   usage
   fx-error "Missing command name"
   exit 1
+fi
+
+# Check that the $FUCHSIA_NODENAME applied by `-d` is not overridden by ffx
+# user-level configuration.
+if [[ "$_check_default_target" == "true" ]]; then
+  fx-build-dir-if-present && fx-check-default-target || exit 1
 fi
 
 command_name="$1"

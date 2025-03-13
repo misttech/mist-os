@@ -62,11 +62,11 @@ struct TypeTraits<::test_drivertwoway::wire::TwoWayAddRequest> {
 };
 
 template <>
-struct IsFidlType<::test_drivertwoway::wire::TwoWayAddRequest> : public std::true_type{};
+struct IsFidlType<::test_drivertwoway::wire::TwoWayAddRequest> : public std::true_type {};
 template <>
-struct IsWire<::test_drivertwoway::wire::TwoWayAddRequest> : public std::true_type{};
+struct IsWire<::test_drivertwoway::wire::TwoWayAddRequest> : public std::true_type {};
 template <>
-struct IsStruct<::test_drivertwoway::wire::TwoWayAddRequest> : public std::true_type{};
+struct IsStruct<::test_drivertwoway::wire::TwoWayAddRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_drivertwoway::wire::TwoWayAddRequest>);
 static_assert(offsetof(::test_drivertwoway::wire::TwoWayAddRequest, addend1) == 0);
 static_assert(offsetof(::test_drivertwoway::wire::TwoWayAddRequest, addend2) == 2);
@@ -112,11 +112,11 @@ struct TypeTraits<::test_drivertwoway::wire::TwoWayAddResponse> {
 };
 
 template <>
-struct IsFidlType<::test_drivertwoway::wire::TwoWayAddResponse> : public std::true_type{};
+struct IsFidlType<::test_drivertwoway::wire::TwoWayAddResponse> : public std::true_type {};
 template <>
-struct IsWire<::test_drivertwoway::wire::TwoWayAddResponse> : public std::true_type{};
+struct IsWire<::test_drivertwoway::wire::TwoWayAddResponse> : public std::true_type {};
 template <>
-struct IsStruct<::test_drivertwoway::wire::TwoWayAddResponse> : public std::true_type{};
+struct IsStruct<::test_drivertwoway::wire::TwoWayAddResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_drivertwoway::wire::TwoWayAddResponse>);
 static_assert(offsetof(::test_drivertwoway::wire::TwoWayAddResponse, sum) == 0);
 static_assert(sizeof(::test_drivertwoway::wire::TwoWayAddResponse) == TypeTraits<::test_drivertwoway::wire::TwoWayAddResponse>::kPrimarySize);

@@ -29,10 +29,10 @@ rustc_library("loop") {
     "//sdk/rust/zx",
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/kernel:starnix_logging",
-    "//src/starnix/lib/starnix-sync",
-    "//src/starnix/lib/starnix-syscalls",
-    "//src/starnix/lib/starnix-types",
-    "//src/starnix/lib/starnix-uapi",
+    "//src/starnix/lib/starnix_sync",
+    "//src/starnix/lib/starnix_syscalls",
+    "//src/starnix/lib/starnix_types",
+    "//src/starnix/lib/starnix_uapi",
     "//third_party/rust_crates:bitflags",
   ]
 
@@ -46,7 +46,7 @@ rustc_library("loop") {
 }
 
 fuchsia_unittest_package("starnix-loop-tests") {
-  manifest = "meta/starnix-loop-tests.cml"
+  manifest = "meta/starnix_loop_tests.cml"
   deps = [
     ":loop_test",
     "//src/starnix/kernel:starnix-test-files",

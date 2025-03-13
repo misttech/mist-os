@@ -21,11 +21,13 @@ use fidl_fuchsia_fxfs::{
     ProjectIdRequestStream, ProjectIterToken,
 };
 use fs_inspect::{FsInspectVolume, VolumeData};
+use fuchsia_sync::Mutex;
 use futures::channel::oneshot;
 use futures::stream::{self, FusedStream, Stream};
 use futures::{FutureExt, StreamExt, TryStreamExt};
 use fxfs::errors::FxfsError;
 use fxfs::filesystem::{self, SyncOptions};
+use fxfs::future_with_guard::FutureWithGuard;
 use fxfs::log::*;
 use fxfs::object_store::directory::Directory;
 use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
@@ -34,7 +36,7 @@ use std::future::Future;
 use std::pin::pin;
 #[cfg(any(test, feature = "testing"))]
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Weak};
 use std::time::Duration;
 use vfs::directory::entry::DirectoryEntry;
 use vfs::directory::entry_container::Directory as VfsDirectory;
@@ -43,8 +45,8 @@ use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 // LINT.IfChange
 // TODO:(b/299919008) Fix this number to something reasonable, or maybe just for fxblob.
-const DIRENT_CACHE_LIMIT: usize = 8000;
-// LINT.ThenChange(src/storage/stressor/src/aggressive.rs)
+const DIRENT_CACHE_LIMIT: usize = 2000;
+// LINT.ThenChange(//src/storage/stressor/src/aggressive.rs)
 
 const PROFILE_DIRECTORY: &str = "profiles";
 
@@ -183,7 +185,7 @@ impl FxVolume {
 
     /// Stop profiling, recover resources from it and finalize recordings.
     pub async fn stop_profile_tasks(self: &Arc<Self>) {
-        let Some(mut state) = self.profile_state.lock().unwrap().take() else { return };
+        let Some(mut state) = self.profile_state.lock().take() else { return };
         state.wait_for_replay_to_finish().await;
         self.pager.set_recorder(None);
         let _ = state.wait_for_recording_to_finish().await;
@@ -244,7 +246,7 @@ impl FxVolume {
             None
         };
 
-        let mut profile_state = self.profile_state.lock().unwrap();
+        let mut profile_state = self.profile_state.lock();
 
         info!("Recording new profile '{name}' for volume object {}", self.store.store_object_id());
         // Begin recording first to ensure that we capture any activity from the replay.
@@ -289,7 +291,7 @@ impl FxVolume {
         self.dirent_cache.clear();
 
         self.store.filesystem().graveyard().flush().await;
-        let task = std::mem::replace(&mut *self.background_task.lock().unwrap(), None);
+        let task = std::mem::replace(&mut *self.background_task.lock(), None);
         if let Some((task, terminate)) = task {
             let _ = terminate.send(());
             task.await;
@@ -394,7 +396,7 @@ impl FxVolume {
         config: MemoryPressureConfig,
         mem_monitor: Option<&MemoryPressureMonitor>,
     ) {
-        let mut background_task = self.background_task.lock().unwrap();
+        let mut background_task = self.background_task.lock();
         if background_task.is_none() {
             let (tx, rx) = oneshot::channel();
 
@@ -527,11 +529,7 @@ impl FxVolume {
 
     /// Spawns a short term task for the volume that includes a guard that will prevent termination.
     pub fn spawn(&self, task: impl Future<Output = ()> + Send + 'static) {
-        let guard = self.scope().active_guard();
-        self.executor.spawn_detached(async move {
-            task.await;
-            std::mem::drop(guard);
-        });
+        self.executor.spawn_detached(FutureWithGuard::new(self.scope.active_guard(), task));
     }
 
     /// Tries to unwrap this volume.  If it fails, it will poison the volume so that when it is
@@ -549,8 +547,8 @@ impl FxVolume {
                 info!(
                     "background_task: {}, profile_state: {}, dirent_cache count: {}, \
                      pager strong file refs={}, no tasks={}",
-                    this.background_task.lock().unwrap().is_some(),
-                    this.profile_state.lock().unwrap().is_some(),
+                    this.background_task.lock().is_some(),
+                    this.profile_state.lock().is_some(),
                     this.dirent_cache.len(),
                     crate::pager::STRONG_FILE_REFS.load(Ordering::Relaxed),
                     {
@@ -604,9 +602,6 @@ pub trait RootDir: FxNode + DirectoryEntry {
 
     fn as_node(self: Arc<Self>) -> Arc<dyn FxNode>;
 
-    /// An optional callback invoked when the volume is opened.
-    fn on_open(self: Arc<Self>) {}
-
     async fn handle_blob_creator_requests(self: Arc<Self>, _requests: BlobCreatorRequestStream) {}
     async fn handle_blob_reader_requests(self: Arc<Self>, _requests: BlobReaderRequestStream) {}
 }
@@ -627,7 +622,6 @@ impl FxVolumeAndRoot {
         let root_object_id = volume.store().root_directory_object_id();
         let root_dir = Directory::open(&volume, root_object_id).await?;
         let root = Arc::<T>::new(root_dir.into()) as Arc<dyn RootDir>;
-        root.clone().on_open();
         volume
             .cache
             .get_or_reserve(root_object_id)
@@ -818,7 +812,6 @@ mod tests {
     };
     use crate::fuchsia::volumes_directory::VolumesDirectory;
     use delivery_blob::CompressionMode;
-    use fidl::endpoints::ServerEnd;
     use fidl_fuchsia_fs_startup::VolumeMarker;
     use fidl_fuchsia_fxfs::{BytesAndNodes, ProjectIdMarker};
     use fuchsia_component::client::connect_to_protocol_at_dir_svc;
@@ -829,7 +822,7 @@ mod tests {
     use fxfs::object_store::directory::replace_child;
     use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
     use fxfs::object_store::volume::root_volume;
-    use fxfs::object_store::{HandleOptions, ObjectDescriptor, ObjectStore};
+    use fxfs::object_store::{HandleOptions, ObjectDescriptor, ObjectStore, NO_OWNER};
     use fxfs_insecure_crypto::InsecureCrypt;
     use std::sync::{Arc, Weak};
     use std::time::Duration;
@@ -850,28 +843,31 @@ mod tests {
 
         let src = open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
         let dst = open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
             "bar",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
         let f = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY,
             "foo/a",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         close_file_checked(f).await;
@@ -884,7 +880,7 @@ mod tests {
             .expect("rename failed");
 
         assert_eq!(
-            open_file(&root, fio::OpenFlags::NOT_DIRECTORY, "foo/a")
+            open_file(&root, "foo/a", fio::Flags::PROTOCOL_FILE, &Default::default())
                 .await
                 .expect_err("Open succeeded")
                 .root_cause()
@@ -892,7 +888,8 @@ mod tests {
                 .expect("No status"),
             &Status::NOT_FOUND,
         );
-        let f = open_file_checked(&root, fio::OpenFlags::NOT_DIRECTORY, "bar/b").await;
+        let f =
+            open_file_checked(&root, "bar/b", fio::Flags::PROTOCOL_FILE, &Default::default()).await;
         close_file_checked(f).await;
 
         close_dir_checked(dst).await;
@@ -908,18 +905,20 @@ mod tests {
 
         let src = open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
         let f = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY,
             "foo/a",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         close_file_checked(f).await;
@@ -932,7 +931,7 @@ mod tests {
             .expect("rename failed");
 
         assert_eq!(
-            open_file(&root, fio::OpenFlags::NOT_DIRECTORY, "foo/a")
+            open_file(&root, "foo/a", fio::Flags::PROTOCOL_FILE, &Default::default())
                 .await
                 .expect_err("Open succeeded")
                 .root_cause()
@@ -940,7 +939,8 @@ mod tests {
                 .expect("No status"),
             &Status::NOT_FOUND,
         );
-        let f = open_file_checked(&root, fio::OpenFlags::NOT_DIRECTORY, "foo/b").await;
+        let f =
+            open_file_checked(&root, "foo/b", fio::Flags::PROTOCOL_FILE, &Default::default()).await;
         close_file_checked(f).await;
 
         close_dir_checked(src).await;
@@ -955,29 +955,35 @@ mod tests {
 
         let src = open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
         let dst = open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
             "bar",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
         // The src file is non-empty.
         let src_file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::NOT_DIRECTORY,
             "foo/a",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         let buf = vec![0xaa as u8; 8192];
@@ -987,8 +993,9 @@ mod tests {
         // The dst file is empty (so we can distinguish it).
         let f = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY,
             "bar/b",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         close_file_checked(f).await;
@@ -1001,7 +1008,7 @@ mod tests {
             .expect("rename failed");
 
         assert_eq!(
-            open_file(&root, fio::OpenFlags::NOT_DIRECTORY, "foo/a")
+            open_file(&root, "foo/a", fio::Flags::PROTOCOL_FILE, &Default::default())
                 .await
                 .expect_err("Open succeeded")
                 .root_cause()
@@ -1011,8 +1018,9 @@ mod tests {
         );
         let file = open_file_checked(
             &root,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
             "bar/b",
+            fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         let buf = file::read(&file).await.expect("read file failed");
@@ -1032,38 +1040,48 @@ mod tests {
 
         let src = open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
         let dst = open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
             "bar",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
         // The src dir is non-empty.
         open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
             "foo/a",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
         open_file_checked(
             &root,
-            fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY,
             "foo/a/file",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
-        open_dir_checked(&root, fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY, "bar/b").await;
+        open_dir_checked(
+            &root,
+            "bar/b",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
+        )
+        .await;
 
         let (status, dst_token) = dst.get_token().await.expect("FIDL call failed");
         Status::ok(status).expect("get_token failed");
@@ -1073,7 +1091,7 @@ mod tests {
             .expect("rename failed");
 
         assert_eq!(
-            open_dir(&root, fio::OpenFlags::DIRECTORY, "foo/a")
+            open_dir(&root, "foo/a", fio::Flags::PROTOCOL_DIRECTORY, &Default::default())
                 .await
                 .expect_err("Open succeeded")
                 .root_cause()
@@ -1081,7 +1099,9 @@ mod tests {
                 .expect("No status"),
             &Status::NOT_FOUND,
         );
-        let f = open_file_checked(&root, fio::OpenFlags::NOT_DIRECTORY, "bar/b/file").await;
+        let f =
+            open_file_checked(&root, "bar/b/file", fio::Flags::PROTOCOL_FILE, &Default::default())
+                .await;
         close_file_checked(f).await;
 
         close_dir_checked(dst).await;
@@ -1098,8 +1118,10 @@ mod tests {
         let filesystem = FxFilesystem::new_empty(device).await.unwrap();
         {
             let root_volume = root_volume(filesystem.clone()).await.unwrap();
-            let volume =
-                root_volume.new_volume("vol", Some(Arc::new(InsecureCrypt::new()))).await.unwrap();
+            let volume = root_volume
+                .new_volume("vol", NO_OWNER, Some(Arc::new(InsecureCrypt::new())))
+                .await
+                .unwrap();
             let mut transaction = filesystem
                 .clone()
                 .new_transaction(lock_keys![], Options::default())
@@ -1109,7 +1131,6 @@ mod tests {
                 &volume,
                 &mut transaction,
                 HandleOptions::default(),
-                None,
                 None,
             )
             .await
@@ -1190,8 +1211,10 @@ mod tests {
         let filesystem = FxFilesystem::new_empty(device).await.unwrap();
         {
             let root_volume = root_volume(filesystem.clone()).await.unwrap();
-            let volume =
-                root_volume.new_volume("vol", Some(Arc::new(InsecureCrypt::new()))).await.unwrap();
+            let volume = root_volume
+                .new_volume("vol", NO_OWNER, Some(Arc::new(InsecureCrypt::new())))
+                .await
+                .unwrap();
             let mut transaction = filesystem
                 .clone()
                 .new_transaction(lock_keys![], Options::default())
@@ -1201,7 +1224,6 @@ mod tests {
                 &volume,
                 &mut transaction,
                 HandleOptions::default(),
-                None,
                 None,
             )
             .await
@@ -1303,8 +1325,10 @@ mod tests {
         let filesystem = FxFilesystem::new_empty(device).await.unwrap();
         {
             let root_volume = root_volume(filesystem.clone()).await.unwrap();
-            let volume =
-                root_volume.new_volume("vol", Some(Arc::new(InsecureCrypt::new()))).await.unwrap();
+            let volume = root_volume
+                .new_volume("vol", NO_OWNER, Some(Arc::new(InsecureCrypt::new())))
+                .await
+                .unwrap();
             let mut transaction = filesystem
                 .clone()
                 .new_transaction(lock_keys![], Options::default())
@@ -1314,7 +1338,6 @@ mod tests {
                 &volume,
                 &mut transaction,
                 HandleOptions::default(),
-                None,
                 None,
             )
             .await
@@ -1436,6 +1459,7 @@ mod tests {
                 .expect("create unencrypted volume failed");
             volume_store_id = volume_and_root.volume().store().store_object_id();
 
+            // TODO(https://fxbug.dev/378924259): Migrate to open3.
             let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
             volumes_directory.directory_node().clone().open(
                 ExecutionScope::new(),
@@ -1477,22 +1501,21 @@ mod tests {
                     fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                 volume_dir_proxy
                     .open(
-                        fio::OpenFlags::RIGHT_READABLE
-                            | fio::OpenFlags::RIGHT_WRITABLE
-                            | fio::OpenFlags::DIRECTORY,
-                        fio::ModeType::empty(),
                         "root",
-                        ServerEnd::new(root_server_end.into_channel()),
+                        fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                        &Default::default(),
+                        root_server_end.into_channel(),
                     )
                     .expect("Failed to open volume root");
 
                 open_file_checked(
                     &root_proxy,
-                    fio::OpenFlags::CREATE
-                        | fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::RIGHT_WRITABLE
-                        | fio::OpenFlags::NOT_DIRECTORY,
                     FILE_NAME,
+                    fio::Flags::FLAG_MAYBE_CREATE
+                        | fio::PERM_READABLE
+                        | fio::PERM_WRITABLE
+                        | fio::Flags::PROTOCOL_FILE,
+                    &Default::default(),
                 )
                 .await
             };
@@ -1551,6 +1574,7 @@ mod tests {
                 .mount_volume(VOLUME_NAME, None, false)
                 .await
                 .expect("mount unencrypted volume failed");
+            // TODO(https://fxbug.dev/378924259): Migrate to open3.
             let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
             volumes_directory.directory_node().clone().open(
                 ExecutionScope::new(),
@@ -1671,6 +1695,7 @@ mod tests {
                 .expect("create unencrypted volume failed");
             volume_store_id = volume_and_root.volume().store().store_object_id();
 
+            // TODO(https://fxbug.dev/378924259): Migrate to open3.
             let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
             volumes_directory.directory_node().clone().open(
                 ExecutionScope::new(),
@@ -1706,19 +1731,18 @@ mod tests {
                     fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                 volume_dir_proxy
                     .open(
-                        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                        fio::ModeType::empty(),
                         "root",
-                        ServerEnd::new(root_server_end.into_channel()),
+                        fio::PERM_READABLE | fio::PERM_WRITABLE,
+                        &Default::default(),
+                        root_server_end.into_channel(),
                     )
                     .expect("Failed to open volume root");
 
                 open_file_checked(
                     &root_proxy,
-                    fio::OpenFlags::CREATE
-                        | fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::RIGHT_WRITABLE,
                     FILE_NAME,
+                    fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_READABLE | fio::PERM_WRITABLE,
+                    &Default::default(),
                 )
                 .await
             };
@@ -1801,6 +1825,8 @@ mod tests {
                 .mount_volume(VOLUME_NAME, Some(Arc::new(InsecureCrypt::new())), false)
                 .await
                 .expect("mount unencrypted volume failed");
+
+            // TODO(https://fxbug.dev/378924259): Migrate to open3.
             let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
             volumes_directory.directory_node().clone().open(
                 ExecutionScope::new(),
@@ -1820,10 +1846,10 @@ mod tests {
                     fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                 volume_dir_proxy
                     .open(
-                        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                        fio::ModeType::empty(),
                         "root",
-                        ServerEnd::new(root_server_end.into_channel()),
+                        fio::PERM_READABLE | fio::PERM_WRITABLE,
+                        &Default::default(),
+                        root_server_end.into_channel(),
                     )
                     .expect("Failed to open volume root");
                 let project_proxy = {
@@ -1864,10 +1890,9 @@ mod tests {
 
             let file_proxy = open_file_checked(
                 &root_proxy,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE,
                 FILE_NAME,
+                fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_READABLE | fio::PERM_WRITABLE,
+                &Default::default(),
             )
             .await;
 
@@ -1971,6 +1996,7 @@ mod tests {
                 .expect("create unencrypted volume failed");
             volume_store_id = volume_and_root.volume().store().store_object_id();
 
+            // TODO(https://fxbug.dev/378924259): Migrate to open3.
             let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
             volumes_directory.directory_node().clone().open(
                 ExecutionScope::new(),
@@ -2000,20 +2026,21 @@ mod tests {
                     fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                 volume_dir_proxy
                     .open(
-                        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                        fio::ModeType::empty(),
                         "root",
-                        ServerEnd::new(root_server_end.into_channel()),
+                        fio::PERM_READABLE | fio::PERM_WRITABLE,
+                        &Default::default(),
+                        root_server_end.into_channel(),
                     )
                     .expect("Failed to open volume root");
 
                 open_dir_checked(
                     &root_proxy,
-                    fio::OpenFlags::CREATE
-                        | fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::RIGHT_WRITABLE
-                        | fio::OpenFlags::DIRECTORY,
                     DIR_NAME,
+                    fio::Flags::FLAG_MAYBE_CREATE
+                        | fio::PERM_READABLE
+                        | fio::PERM_WRITABLE
+                        | fio::Flags::PROTOCOL_DIRECTORY,
+                    Default::default(),
                 )
                 .await
             };
@@ -2028,11 +2055,12 @@ mod tests {
 
             let subdir_proxy = open_dir_checked(
                 &dir_proxy,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 SUBDIR_NAME,
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
             .await;
             {
@@ -2049,14 +2077,36 @@ mod tests {
 
             let file_proxy = open_file_checked(
                 &subdir_proxy,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE,
                 FILE_NAME,
+                fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_READABLE | fio::PERM_WRITABLE,
+                &Default::default(),
             )
             .await;
             {
                 let node_id = file_proxy.get_attr().await.unwrap().1.id;
+                assert_eq!(
+                    project_proxy
+                        .get_for_node(node_id)
+                        .await
+                        .unwrap()
+                        .expect("Setting project on node"),
+                    PROJECT_ID
+                );
+            }
+
+            // An unnamed temporary file is created slightly differently to a regular file object.
+            // Just in case, check that it inherits project ID as well.
+            let tmpfile_proxy = open_file_checked(
+                &subdir_proxy,
+                ".",
+                fio::Flags::PROTOCOL_FILE
+                    | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
+                    | fio::PERM_READABLE,
+                &fio::Options::default(),
+            )
+            .await;
+            {
+                let node_id = tmpfile_proxy.get_attr().await.unwrap().1.id;
                 assert_eq!(
                     project_proxy
                         .get_for_node(node_id)
@@ -2107,6 +2157,8 @@ mod tests {
                 .await
                 .expect("create unencrypted volume failed");
             volume_store_id = volume_and_root.volume().store().store_object_id();
+
+            // TODO(https://fxbug.dev/378924259): Migrate to open3.
             let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
             volumes_directory.directory_node().clone().open(
                 ExecutionScope::new(),
@@ -2137,19 +2189,18 @@ mod tests {
                     fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                 volume_dir_proxy
                     .open(
-                        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                        fio::ModeType::empty(),
                         "root",
-                        ServerEnd::new(root_server_end.into_channel()),
+                        fio::PERM_READABLE | fio::PERM_WRITABLE,
+                        &Default::default(),
+                        root_server_end.into_channel(),
                     )
                     .expect("Failed to open volume root");
 
                 open_file_checked(
                     &root_proxy,
-                    fio::OpenFlags::CREATE
-                        | fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::RIGHT_WRITABLE,
                     FILE_NAME,
+                    fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_READABLE | fio::PERM_WRITABLE,
+                    &Default::default(),
                 )
                 .await
             };
@@ -2487,9 +2538,13 @@ mod tests {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
 
-        let f =
-            open_file_checked(&root, fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY, "foo")
-                .await;
+        let f = open_file_checked(
+            &root,
+            "foo",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
+        )
+        .await;
         close_file_checked(f).await;
 
         fixture.close().await;

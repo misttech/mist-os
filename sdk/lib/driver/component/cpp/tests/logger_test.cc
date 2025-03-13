@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.component.runner/cpp/wire_types.h>
 #include <fidl/fuchsia.logger/cpp/wire.h>
 #include <fuchsia/io/cpp/fidl.h>
 #include <fuchsia/logger/cpp/fidl_test_base.h>

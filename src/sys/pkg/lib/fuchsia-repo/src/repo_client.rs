@@ -199,7 +199,8 @@ where
         self.tuf_client
             .remote_repo()
             .blob_modification_time(&path)
-            .await?
+            .await
+            .with_context(|| format!("could not get modtime for {path}"))?
             .map(|x| -> anyhow::Result<u64> {
                 Ok(x.duration_since(SystemTime::UNIX_EPOCH)?.as_secs())
             })
@@ -269,12 +270,16 @@ where
                 )
             })?;
 
-            let meta_far_hash = Hash::try_from(meta_far_hash_str)?;
+            let meta_far_hash = Hash::try_from(meta_far_hash_str)
+                .context("failed hash from {meta_far_hash_str}")?;
 
             packages.push(RepositoryPackage {
                 name: package_name.to_string(),
                 hash: meta_far_hash,
-                modified: self.blob_modification_time_secs(&meta_far_hash).await?,
+                modified: self
+                    .blob_modification_time_secs(&meta_far_hash)
+                    .await
+                    .context("getting blob_modification_time_secs")?,
             });
         }
 

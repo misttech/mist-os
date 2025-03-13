@@ -206,12 +206,12 @@ pub mod executor {
     /// The current implementation of Executor does not isolate work (as the underlying executor is
     /// not yet capable of this).
     pub struct SendExecutor {
-        num_threads: usize,
+        num_threads: u8,
     }
 
     impl SendExecutor {
         /// Create a new executor running with actual time.
-        pub fn new(num_threads: usize) -> Self {
+        pub fn new(num_threads: u8) -> Self {
             Self { num_threads }
         }
 
@@ -222,7 +222,7 @@ pub mod executor {
             F::Output: Send + 'static,
         {
             let rt = tokio::runtime::Builder::new_multi_thread()
-                .worker_threads(self.num_threads)
+                .worker_threads(self.num_threads as usize)
                 .enable_time()
                 .enable_io()
                 .build()

@@ -68,6 +68,12 @@ pub enum RouterResponse<T: CapabilityBound> {
     Debug(Data),
 }
 
+impl<T: CapabilityBound> From<T> for RouterResponse<T> {
+    fn from(val: T) -> Self {
+        Self::Capability(val)
+    }
+}
+
 /// A [`Router`] is a capability that lets the holder obtain other capabilities
 /// asynchronously. [`Router`] is the object capability representation of
 /// [`Routable`].

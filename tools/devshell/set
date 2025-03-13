@@ -129,7 +129,7 @@
 ##                         provided delimited by commas or the --with-host
 ##                         argument can be provided multiple times.
 ##   --cargo-toml-gen      Enable generation of Cargo.toml files.
-##   --include_clippy      Run clippy as part of `fx build` (defaults to `true`)
+##   --include-clippy      Run clippy as part of `fx build` (defaults to `true`)
 ##   --fint-params-path    Used to specify a path to a fint parameters file, as
 ##                         selected by `fx repro`. If set, no other flags that
 ##                         influence the build configuration should be set.
@@ -172,8 +172,7 @@ function main {
   done
 
   if [[ "$(uname)" == [Dd]arwin ]]; then
-    fx-warn "Support for building Fuchsia on macOS will be removed soon."
-    fx-warn "This warning will soon become an error."
+    fx-warn "Building Fuchsia on macOS is not officially supported."
     fx-warn "Please see http://go/local-platform-support-prd for details."
   fi
 

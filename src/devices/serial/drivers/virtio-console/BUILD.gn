@@ -21,6 +21,7 @@ group("tests") {
   deps = [ ":virtio_console_bind_test" ]
 }
 fuchsia_cc_driver("virtio_console-driver") {
+  legacy = true
   output_name = "virtio_console"
   configs += [
     "//build/config:all_source",
@@ -33,7 +34,7 @@ fuchsia_cc_driver("virtio_console-driver") {
   deps = [
     ":virtio_console_bind",
     "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty_cpp",
-    "//src/devices/bus/lib/virtio",
+    "//src/devices/bus/lib/virtio:virtio-dfv1",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddktl",

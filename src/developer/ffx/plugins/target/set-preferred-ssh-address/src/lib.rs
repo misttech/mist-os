@@ -5,7 +5,8 @@
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use ffx_target_set_preferred_ssh_address_args::SetPreferredSshAddressCommand;
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool};
 use target_holders::TargetProxyHolder;
 use {fidl_fuchsia_developer_ffx as ffx, fidl_fuchsia_net as fnet};
 

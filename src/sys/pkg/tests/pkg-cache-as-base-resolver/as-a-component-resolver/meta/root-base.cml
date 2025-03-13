@@ -64,17 +64,6 @@
             to: "#fake_dependencies",
         },
         {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#fake_dependencies",
-                "#integration_test",
-                "#pkg-cache",
-                "#pkg-cache-config",
-                "#subpackage_exposer",
-            ],
-        },
-        {
             dictionary: "diagnostics",
             from: "parent",
             to: [

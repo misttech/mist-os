@@ -26,7 +26,7 @@ size_checker_input = {
         "cobalt",
         "cobalt_system_metrics",
       ]
-      limit = 3268608  # 3.117 MiB
+      limit = 3424256  # 3.266 MiB
       creep_limit = 40960  # 40.0 KiB
     },
 
@@ -44,7 +44,7 @@ size_checker_input = {
       ]
 
       # [START_EXCLUDE]
-      limit = 2146836  # 2.047 MiB
+      limit = 3502512  # 3.340 MiB
       creep_limit = 204800  # 200.0 KiB
 
       # [END_EXCLUDE]
@@ -60,13 +60,13 @@ size_checker_input = {
         "bt-rfcomm",
         "bt-snoop",
       ]
-      limit = 4928592  # 4.7 MiB
+      limit = 6284368  # 5.993 MiB
       creep_limit = 81920  # 80.0 KiB
     },
     {
       component = "Connectivity/Location"
       pkgs = [ "regulatory_region" ]
-      limit = 1843360  # 1.758 MiB
+      limit = 3199136  # 3.050 MiB
       creep_limit = 24576  # 24.0 KiB
     },
     {
@@ -91,7 +91,7 @@ size_checker_input = {
         "network",
         "reachability",
       ]
-      limit = 9047099  # 8.628 MiB
+      limit = 10402875  # 9.920 MiB
       creep_limit = 81920  # 80.0 KiB
     },
     {
@@ -104,7 +104,7 @@ size_checker_input = {
         "wlanphy",
         "wlan",
       ]
-      limit = 4276224  # 4.078 MiB
+      limit = 5632000  # 5.371 MiB
       creep_limit = 81920  # 80.0 KiB
     },
     {
@@ -117,7 +117,7 @@ size_checker_input = {
         "sampler",
         "triage-detect",
       ]
-      limit = 3145728  # 3 MiB
+      limit = 4501504  # 4.293 MiB
       creep_limit = 49152  # 48.0 KiB
     },
     {
@@ -128,7 +128,7 @@ size_checker_input = {
         "open-fonts-collection.asset-provider.package",
         "small-open-fonts-collection.asset-provider.package",
       ]
-      limit = 10485760  # 10.000 MiB
+      limit = 11841536  # 11.293 MiB
       creep_limit = 2097152  # 200.000 KiB
     },
     {
@@ -161,7 +161,7 @@ size_checker_input = {
         "mediasession",
         "soundplayer",
       ]
-      limit = 17825792  # 17 MiB
+      limit = 19181568  # 18.293 MiB
       creep_limit = 428032  # 418.0 KiB
     },
     {
@@ -171,13 +171,13 @@ size_checker_input = {
         "memory_sampler",
         "memory_pressure_signaler",
       ]
-      limit = 2519040  # 2.4 MiB
+      limit = 3874816  # 3.695 MiB
       creep_limit = 102400  # 100 KiB
     },
     {
       component = "SetUI"
       pkgs = [ "setui_service" ]
-      limit = 8978432  # 8.563 MiB
+      limit = 10334208  # 9.855 MiB
       creep_limit = 65536  # 64.0 KiB
     },
     {
@@ -192,7 +192,7 @@ size_checker_input = {
         "update-bin",
         "base",
       ]
-      limit = 8552106  # 8.155 MiB
+      limit = 9907882  # 9.449 MiB
       creep_limit = 81920  # 80.0 KiB
     },
     {
@@ -235,7 +235,7 @@ size_checker_input = {
         "httpsdate-time-source-pull",
         "timekeeper",
       ]
-      limit = 3006464  # 2.87 MiB
+      limit = 4362240  # 4.160 MiB
       creep_limit = 24576  # 24.0 KiB
     },
     {
@@ -249,19 +249,19 @@ size_checker_input = {
       pkgs = [
         "audio-capture-timestamp-validator",
         "audio_ffx_daemon",
-        "virtual_audio",
-        "virtual-audio-dfv2",
         "audio-codec-ctl",
         "audio-effects-ctl",
         "audio_listener",
         "dsputil",
         "signal_generator",
         "virtual_audio_util",
+        "virtual-audio",
+        "virtual-audio-legacy",
         "vol",
         "wav_player",
         "wav_recorder",
       ]
-      limit = 3670016  # 3.5 MiB
+      limit = 5138000  # 4.900 MiB
       creep_limit = 24576  # 24.0 KiB
     },
     {
@@ -290,7 +290,7 @@ size_checker_input = {
         "sockscripter",
         "tcpdump",
       ]
-      limit = 4194304  # 4.0 MiB
+      limit = 5550080  # 5.293 MiB
       creep_limit = 49152  # 48.0 KiB
     },
   ]

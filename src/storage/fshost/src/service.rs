@@ -10,7 +10,8 @@ use crate::device::constants::{
 };
 use crate::device::{BlockDevice, Device, DeviceTag};
 use crate::environment::{
-    Container, Environment, FilesystemLauncher, FxfsContainer, ServeFilesystemStatus,
+    self, Container, Environment, FilesystemLauncher, FvmContainer, FxfsContainer,
+    ServeFilesystemStatus,
 };
 use anyhow::{anyhow, ensure, Context, Error};
 use device_watcher::recursive_wait_and_open;
@@ -26,7 +27,7 @@ use fs_management::format::{detect_disk_format, DiskFormat};
 use fs_management::partition::{
     find_partition, fvm_allocate_partition, partition_matches_with_proxy, PartitionMatcher,
 };
-use fs_management::{filesystem, Blobfs, F2fs, Fxfs, Minfs};
+use fs_management::{filesystem, Blobfs, F2fs, Fvm, Fxfs, Minfs};
 use fuchsia_async::TimeoutExt as _;
 use fuchsia_component::client::connect_to_protocol_at_dir_root;
 use fuchsia_fs::directory::clone_onto;
@@ -63,6 +64,7 @@ impl FshostShutdownResponder {
 }
 
 const FIND_PARTITION_DURATION: MonotonicDuration = MonotonicDuration::from_seconds(20);
+const STARNIX_TEST_VOLUME_NAME: &str = "starnix_test_volume";
 
 fn data_partition_names() -> Vec<String> {
     vec![DATA_PARTITION_LABEL.to_string(), LEGACY_DATA_PARTITION_LABEL.to_string()]
@@ -130,19 +132,14 @@ async fn find_data_partition(ramdisk_prefix: Option<String>) -> Result<Controlle
     Err(anyhow!("Data partition not found"))
 }
 
-async fn mount_starnix_volume(
+async fn mount_main_starnix_volume(
     environment: &Arc<Mutex<dyn Environment>>,
-    config: &fshost_config::Config,
+    starnix_volume_name: String,
     crypt: ClientEnd<CryptMarker>,
     exposed_dir: ServerEnd<fio::DirectoryMarker>,
 ) -> Result<(), Error> {
-    ensure!(
-        !config.starnix_volume_name.is_empty(),
-        "mount_starnix_volume called without the starnix_volume_name config set"
-    );
     let mut env = environment.lock().await;
     if let Some(multi_vol_fs) = env.get_container() {
-        let starnix_volume_name = config.starnix_volume_name.clone();
         let mounted_vol = if multi_vol_fs.has_volume(&starnix_volume_name).await? {
             multi_vol_fs
                 .open_volume(
@@ -166,21 +163,72 @@ async fn mount_starnix_volume(
     }
 }
 
+async fn mount_test_starnix_volume(
+    environment: &Arc<Mutex<dyn Environment>>,
+    crypt: ClientEnd<CryptMarker>,
+    exposed_dir: ServerEnd<fio::DirectoryMarker>,
+) -> Result<(), Error> {
+    let mut env = environment.lock().await;
+    if let Some(multi_vol_fs) = env.get_container() {
+        // If the test starnix volume already exists, unmount if mounted and then remove.
+        if multi_vol_fs.has_volume(STARNIX_TEST_VOLUME_NAME).await? {
+            if let Some(_) = multi_vol_fs.volume(STARNIX_TEST_VOLUME_NAME) {
+                log::warn!(
+                    "WARNING: Unmounting the Starnix test volume. Either the prior system
+                        test did not unmount on exit or a concurrent system test is running!"
+                );
+                multi_vol_fs.shutdown_volume(STARNIX_TEST_VOLUME_NAME).await?;
+            }
+            multi_vol_fs.remove_volume(STARNIX_TEST_VOLUME_NAME).await?;
+        }
+        let mounted_vol = multi_vol_fs
+            .create_volume(
+                STARNIX_TEST_VOLUME_NAME,
+                CreateOptions::default(),
+                MountOptions { crypt: Some(crypt), ..MountOptions::default() },
+            )
+            .await?;
+        mounted_vol.exposed_dir().clone(exposed_dir.into_channel().into())?;
+        Ok(())
+    } else {
+        Err(anyhow!("Tried to mount starnix volume without container set"))
+    }
+}
+
+async fn mount_starnix_volume(
+    environment: &Arc<Mutex<dyn Environment>>,
+    config: &fshost_config::Config,
+    crypt: ClientEnd<CryptMarker>,
+    exposed_dir: ServerEnd<fio::DirectoryMarker>,
+) -> Result<(), Error> {
+    if config.starnix_volume_name.is_empty() {
+        mount_test_starnix_volume(environment, crypt, exposed_dir).await
+    } else {
+        mount_main_starnix_volume(
+            environment,
+            config.starnix_volume_name.clone(),
+            crypt,
+            exposed_dir,
+        )
+        .await
+    }
+}
+
 async fn unmount_starnix_volume(
     environment: &Arc<Mutex<dyn Environment>>,
     config: &fshost_config::Config,
 ) -> Result<(), Error> {
-    ensure!(
-        !config.starnix_volume_name.is_empty(),
-        "unmount_starnix_volume called without the starnix_volume_name config set"
-    );
-    let starnix_volume_name = config.starnix_volume_name.clone();
+    let starnix_volume_name = if !config.starnix_volume_name.is_empty() {
+        &config.starnix_volume_name
+    } else {
+        STARNIX_TEST_VOLUME_NAME
+    };
     let mut env = environment.lock().await;
     let fs = env.get_container().ok_or_else(|| {
         log::error!("Tried to unmount starnix volume without container set");
         zx::Status::NOT_FOUND
     })?;
-    fs.shutdown_volume(&starnix_volume_name).await
+    fs.shutdown_volume(starnix_volume_name).await
 }
 
 async fn wipe_storage(
@@ -200,7 +248,8 @@ async fn wipe_storage(
         // devices that we need to mark as accounted for for the block watcher.
         wipe_storage_fxblob(environment, blobfs_root, blob_creator).await
     } else {
-        wipe_storage_fvm(config, environment, launcher, matcher_lock, blobfs_root).await
+        wipe_storage_fvm(config, environment, launcher, matcher_lock, blobfs_root, blob_creator)
+            .await
     }
 }
 
@@ -257,13 +306,16 @@ async fn wipe_storage_fxblob(
         .context("making blob volume")?;
     clone_onto(blob_volume.root(), blobfs_root)?;
     blob_volume.exposed_dir().open(
-        fio::OpenFlags::empty(),
-        fio::ModeType::empty(),
         "svc/fuchsia.fxfs.BlobCreator",
-        blob_creator.into_channel().into(),
+        fio::Flags::PROTOCOL_SERVICE,
+        &fio::Options::default(),
+        blob_creator.into_channel(),
     )?;
-    // Prevent fs_management from shutting down the filesystem when it's dropped.
-    let _ = serving_fxfs.take_exposed_dir();
+    environment.lock().await.register_filesystem(environment::Filesystem::ServingMultiVolume(
+        None,
+        serving_fxfs,
+        String::new(),
+    ));
     Ok(())
 }
 
@@ -286,6 +338,7 @@ async fn wipe_storage_fvm(
     launcher: &FilesystemLauncher,
     matcher_lock: &Arc<Mutex<HashSet<String>>>,
     blobfs_root: Option<ServerEnd<DirectoryMarker>>,
+    blob_creator: Option<ServerEnd<fidl_fuchsia_fxfs::BlobCreatorMarker>>,
 ) -> Result<(), Error> {
     log::info!("Searching for FVM block device");
     let registered_devices = environment.lock().await.registered_devices().clone();
@@ -385,8 +438,15 @@ async fn wipe_storage_fvm(
     blobfs.format().await.context("Failed to format blobfs")?;
     let started_blobfs = blobfs.serve().await.context("serving blobfs")?;
     clone_onto(started_blobfs.root(), blobfs_root)?;
-    // Prevent fs_management from shutting down the filesystem when it's dropped.
-    let _ = started_blobfs.take_exposed_dir();
+    if let Some(blob_creator) = blob_creator {
+        started_blobfs.exposed_dir().open(
+            "fuchsia.fxfs.BlobCreator",
+            fio::Flags::PROTOCOL_SERVICE,
+            &fio::Options::default(),
+            blob_creator.into_channel(),
+        )?;
+    }
+    environment.lock().await.register_filesystem(environment::Filesystem::Serving(started_blobfs));
     Ok(())
 }
 
@@ -416,7 +476,7 @@ async fn write_data_file(
     let content_size =
         usize::try_from(content_size).context("Failed to convert u64 content_size to usize")?;
 
-    let (mut filesystem, mut data) = if config.fxfs_blob {
+    let (mut filesystem, mut data) = if config.fxfs_blob || config.storage_host {
         // Find the device via our own matcher.
         let registered_devices = environment.lock().await.registered_devices().clone();
         let block_connector = registered_devices
@@ -426,12 +486,22 @@ async fn write_data_file(
             })
             .await
             .context("failed to get block connector for fxfs partition")?;
-        let mut container = Box::new(FxfsContainer::new(
-            launcher
-                .serve_fxblob(block_connector, Box::new(Fxfs::dynamic_child()))
-                .await
-                .context("serving Fxblob")?,
-        ));
+        let mut container: Box<dyn Container> = if config.fxfs_blob {
+            Box::new(FxfsContainer::new(
+                launcher
+                    .serve_fxblob(block_connector, Box::new(Fxfs::dynamic_child()))
+                    .await
+                    .context("serving Fxblob")?,
+            ))
+        } else {
+            Box::new(FvmContainer::new(
+                launcher
+                    .serve_fvm(block_connector, Box::new(Fvm::dynamic_child()))
+                    .await
+                    .context("serving Fvm")?,
+                false,
+            ))
+        };
         let data = container.serve_data(&launcher).await.context("serving data from Fxblob")?;
 
         (Some(container.into_fs()), data)

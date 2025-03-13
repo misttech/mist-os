@@ -20,10 +20,11 @@ impl FilesystemConfig for F2fs {
     ) -> FsManagementFilesystemInstance {
         let block_device = block_device_factory
             .create_block_device(&BlockDeviceConfig {
+                requires_fvm: true,
                 use_zxcrypt: true,
                 // f2fs requires a minimum of 100MiB volume for fsync test (rounded up to FVM's
                 // slice size)
-                fvm_volume_size: Some(104 * 1024 * 1024),
+                volume_size: Some(104 * 1024 * 1024),
             })
             .await;
         FsManagementFilesystemInstance::new(

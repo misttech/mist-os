@@ -5,7 +5,8 @@
 use anyhow::{format_err, Result};
 use async_trait::async_trait;
 use ffx_setui_keyboard_args::Keyboard;
-use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{AvailabilityFlag, FfxMain, FfxTool};
 use fidl_fuchsia_settings::{KeyboardProxy, KeyboardSettings};
 use target_holders::moniker;
 use utils::{handle_mixed_result, Either, WatchOrSetResult};

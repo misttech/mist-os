@@ -128,6 +128,10 @@ group("minimal_vim3_staging_tests") {
 # starnix.arm64
 # Note: This will be run on internal *.arm64 builder, hence using `starnix` here
 # instead of internal `<PRODUCT>` name.
+#
+# Tests should be included in this list if they are stable and can run on
+# userdebug products. If the test should only run on eng products use the _eng
+# group below.
 group_with_no_dir_target_deps("starnix_arm64_stable_tests") {
   testonly = true
   public_deps = [
@@ -136,6 +140,9 @@ group_with_no_dir_target_deps("starnix_arm64_stable_tests") {
   ]
 }
 
+# Tests should be included in this list if they are unstable and can run on
+# userdebug products. If the test should only run on eng products use the _eng
+# group below.
 group_with_no_dir_target_deps("starnix_arm64_unstable_tests") {
   testonly = true
   public_deps =
@@ -148,5 +155,24 @@ group("starnix_arm64_staging_tests") {
     ":starnix_arm64_stable_tests",
     ":starnix_arm64_unstable_tests",
   ]
+}
+
+# This group includes a subset of tests that are depended on in vendor/google.
+#
+# Tests should be included in this list if they are stable but should only be
+# ran on eng products
+group_with_no_dir_target_deps("starnix_arm64_stable_eng_tests") {
+  testonly = true
+  public_deps = []
+}
+
+# This group includes a subset of tests that are depended on in vendor/google.
+#
+# Tests should be included in this list if they are unstable and should only be
+# ran on eng products
+group_with_no_dir_target_deps("starnix_arm64_unstable_eng_tests") {
+  testonly = true
+  public_deps =
+      [ "//src/performance/memory/attribution/monitor/tests/e2e:tests" ]
 }
 ############################## Test groups - End ###############################

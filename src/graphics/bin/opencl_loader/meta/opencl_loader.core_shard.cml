@@ -11,11 +11,13 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
+            dictionary: "diagnostics",
             from: "parent",
             to: [ "#opencl_loader" ],
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-gpu",
@@ -23,11 +25,25 @@
             subdir: "gpu",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.gpu.magma.Service",
+            from: "parent",
+            to: [ "#opencl_loader" ],
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-gpu-dependency-injection",
             to: "#opencl_loader",
             subdir: "gpu-dependency-injection",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.gpu.magma.DependencyInjectionService",
+            from: "parent",
+            to: "#opencl_loader",
         },
         {
             protocol: "fuchsia.memorypressure.Provider",

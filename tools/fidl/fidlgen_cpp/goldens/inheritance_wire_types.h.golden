@@ -59,11 +59,11 @@ struct TypeTraits<::test_inheritance::wire::SuperFooRequest> {
 };
 
 template <>
-struct IsFidlType<::test_inheritance::wire::SuperFooRequest> : public std::true_type{};
+struct IsFidlType<::test_inheritance::wire::SuperFooRequest> : public std::true_type {};
 template <>
-struct IsWire<::test_inheritance::wire::SuperFooRequest> : public std::true_type{};
+struct IsWire<::test_inheritance::wire::SuperFooRequest> : public std::true_type {};
 template <>
-struct IsStruct<::test_inheritance::wire::SuperFooRequest> : public std::true_type{};
+struct IsStruct<::test_inheritance::wire::SuperFooRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_inheritance::wire::SuperFooRequest>);
 static_assert(offsetof(::test_inheritance::wire::SuperFooRequest, s) == 0);
 static_assert(sizeof(::test_inheritance::wire::SuperFooRequest) == TypeTraits<::test_inheritance::wire::SuperFooRequest>::kPrimarySize);
@@ -105,11 +105,11 @@ struct TypeTraits<::test_inheritance::wire::SuperFooResponse> {
 };
 
 template <>
-struct IsFidlType<::test_inheritance::wire::SuperFooResponse> : public std::true_type{};
+struct IsFidlType<::test_inheritance::wire::SuperFooResponse> : public std::true_type {};
 template <>
-struct IsWire<::test_inheritance::wire::SuperFooResponse> : public std::true_type{};
+struct IsWire<::test_inheritance::wire::SuperFooResponse> : public std::true_type {};
 template <>
-struct IsStruct<::test_inheritance::wire::SuperFooResponse> : public std::true_type{};
+struct IsStruct<::test_inheritance::wire::SuperFooResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_inheritance::wire::SuperFooResponse>);
 static_assert(offsetof(::test_inheritance::wire::SuperFooResponse, y) == 0);
 static_assert(sizeof(::test_inheritance::wire::SuperFooResponse) == TypeTraits<::test_inheritance::wire::SuperFooResponse>::kPrimarySize);

@@ -5,29 +5,6 @@
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 
-# Test binary responsible for readings
-# and validating all client configurations
-# listed in the "production sampler" sampler_configuration.
-rustc_test("config-validation") {
-  edition = "2021"
-  testonly = true
-  name = "config_validation_test"
-  deps = [
-    "//src/diagnostics/lib/sampler-config",
-    "//src/lib/fuchsia",
-  ]
-
-  source_root = "config_validation.rs"
-  sources = [ "config_validation.rs" ]
-
-  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
-}
-
-# Test component for config validation.
-fuchsia_unittest_component("config-validation-test") {
-  deps = [ ":config-validation" ]
-}
-
 # Integration test binary for sampler service.
 rustc_test("integration-bin") {
   edition = "2021"
@@ -75,44 +52,13 @@ fuchsia_package("sampler-test-suite") {
   deps = [ ":sampler-test-suite-component" ]
 }
 
-fuchsia_structured_config_values("sampler-test-config") {
-  values_source = "component_configs/integration-test.json5"
-  component_name = "sampler"
-  cm_label = "//src/diagnostics/sampler:sampler-manifest"
-}
-
-resource("validation-sampler-resources") {
-  sources = [
-    "configs/reboot_required_config.json",
-    "configs/test_config.json",
-  ]
-  outputs = [ "data/config/metrics/any_name/{{source_file_part}}" ]
-}
-
-resource("validation-fire-components") {
-  sources = [ "configs/components.json5" ]
-  outputs = [ "data/config/fire/any_name/{{source_file_part}}" ]
-}
-
-resource("validation-fire-projects") {
-  sources = [
-    "configs/fire_1.json5",
-    "configs/fire_2.json5",
-    "configs/fire_3.json5",
-  ]
-  outputs = [ "data/config/fire/any_name/projects/{{source_file_part}}" ]
-}
-
 fuchsia_component("sampler-test-root") {
   testonly = true
   manifest = "meta/test-root.cml"
 }
 
 fuchsia_test_package("sampler-integration-tests") {
-  test_components = [
-    ":config-validation-test",
-    ":sampler-test-root",
-  ]
+  test_components = [ ":sampler-test-root" ]
   subpackages = [
     "../testing/realm-factory",
     ":sampler-test-suite",

@@ -39,6 +39,7 @@ class DeveloperOverridesFromGN:
     platform: dict = field(default_factory=dict)  # type: ignore
     product: dict = field(default_factory=dict)  # type: ignore
     board: dict = field(default_factory=dict)  # type: ignore
+    bootfs_files_package: Optional[str] = field(default=None)
 
     # Packages we need to copy, so we'll need real types for those
     packages: List[PackageDetails] = field(default_factory=list)
@@ -85,6 +86,7 @@ class DeveloperOverridesForAssembly:
     platform: dict = field(default_factory=dict)  # type: ignore
     product: dict = field(default_factory=dict)  # type: ignore
     board: dict = field(default_factory=dict)  # type: ignore
+    bootfs_files_package: Optional[str] = field(default=None)
 
     # Packages we need to copy, so we'll need real types for those
     packages: List[PackageDetails] = field(default_factory=list)
@@ -146,6 +148,7 @@ def main() -> int:
         platform=overrides_from_gn.platform,
         product=overrides_from_gn.product,
         board=overrides_from_gn.board,
+        bootfs_files_package=overrides_from_gn.bootfs_files_package,
     )
 
     overrides_for_assembly.shell_commands = {}

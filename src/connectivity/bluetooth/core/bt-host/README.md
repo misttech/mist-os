@@ -28,6 +28,12 @@ do `fx fuzz $package/$fuzzer` where `$package` and `$fuzzer` match those reporte
 See the [fuzzing documentation](https://fuchsia.dev/fuchsia-src/development/testing/fuzzing/overview?hl=en)
 for a more in depth guide.
 
+## Logging
+
+By default, bt-host logs at the INFO severity. To enable verbose logging, run:
+
+`ffx log --severity TRACE --set-severity core/bluetooth-core/bt-host-collection:*#TRACE`
+
 ## Inspect
 
 ### Usage

@@ -228,13 +228,10 @@ fn create_tee_clients(
             // For each key in config data, add the file at the path of the value to config data
             let package_name = component_url.package_url().name();
 
-            for (key, value) in config_data {
+            for (key, value) in &config_data.files {
                 builder
                     .package(package_name.as_ref())
-                    .config_data(FileEntry {
-                        source: value.as_utf8_pathbuf().clone(),
-                        destination: key.into(),
-                    })
+                    .config_data(FileEntry { source: value.clone(), destination: key.into() })
                     .context(format!(
                         "Adding config data file {} to package {}",
                         key, package_name
@@ -326,8 +323,8 @@ fn create_tee_clients(
 mod tests {
     use super::*;
     use crate::subsystems::ConfigurationBuilderImpl;
-    use assembly_config_schema::product_config::TeeClientFeatures;
-    use assembly_file_relative_path::FileRelativePathBuf;
+    use assembly_config_schema::product_config::{TeeClientConfigData, TeeClientFeatures};
+    use camino::Utf8PathBuf;
     use std::collections::BTreeMap;
 
     #[test]
@@ -353,7 +350,7 @@ mod tests {
             .unwrap();
 
         // Verify that we created tee-clients correctly
-        let shard: FileRelativePathBuf;
+        let shard: Utf8PathBuf;
         if let CompiledPackageDefinition {
             name: CompiledPackageDestination::Blob(BlobfsCompiledPackageDestination::TeeClients),
             components,
@@ -370,7 +367,7 @@ mod tests {
             assert_eq!(component.component_name, "tee-clients");
             assert_eq!(component.shards.len(), 1);
 
-            shard = component.shards[0].clone();
+            shard = component.shards[0].clone().into();
         } else {
             panic!("unexpected compiled package definition: {:#?}", compiled_package);
         }
@@ -516,7 +513,7 @@ mod tests {
             .unwrap();
 
         // Verify that we created tee_manager correctly
-        let shard: FileRelativePathBuf;
+        let shard: Utf8PathBuf;
         if let CompiledPackageDefinition {
             name: CompiledPackageDestination::Blob(BlobfsCompiledPackageDestination::TeeManager),
             components,
@@ -533,7 +530,7 @@ mod tests {
             assert_eq!(component.component_name, "tee_manager");
             assert_eq!(component.shards.len(), 1);
 
-            shard = component.shards[0].clone();
+            shard = component.shards[0].clone().into();
         } else {
             panic!("unexpected compiled package definition: {:#?}", compiled_package);
         }
@@ -585,10 +582,12 @@ mod tests {
             guids: vec!["1234".to_string(), "5678".to_string()],
             additional_required_protocols: vec!["fuchsia.foo.bar".to_string()],
             capabilities: vec!["fuchsia.baz.bang".to_string()],
-            config_data: Some(BTreeMap::from([
-                ("foo".to_string(), FileRelativePathBuf::FileRelative("bar".into())),
-                ("baz".to_string(), FileRelativePathBuf::FileRelative("qux".into())),
-            ])),
+            config_data: Some(TeeClientConfigData {
+                files: BTreeMap::from([
+                    ("foo".to_string(), "bar".into()),
+                    ("baz".to_string(), "qux".into()),
+                ]),
+            }),
             additional_required_features: TeeClientFeatures {
                 tmp_storage: true,
                 persistent_storage: true,

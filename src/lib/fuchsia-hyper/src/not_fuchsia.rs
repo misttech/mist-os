@@ -98,11 +98,11 @@ impl HyperConnector {
 
         let host = match dst.host() {
             Some(host) => host,
-            _ => return Err(io::Error::new(io::ErrorKind::Other, "missing host in Uri")),
+            _ => return Err(io::Error::other("missing host in Uri")),
         };
 
         let addr = parse_ip_addr(host, port, |_| async {
-            Err(io::Error::new(io::ErrorKind::Other, "does not yet support non-integer zone ids"))
+            Err(io::Error::other("does not yet support non-integer zone ids"))
         })
         .await?;
 
@@ -140,7 +140,7 @@ async fn resolve_host_port(host: &str, port: u16) -> Result<net::TcpStream, io::
     if let Some(err) = last_err {
         Err(err)
     } else {
-        Err(io::Error::new(io::ErrorKind::Other, "destination resolved to no address"))
+        Err(io::Error::other("destination resolved to no address"))
     }
 }
 

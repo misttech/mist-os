@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::socket_tunnel_file::SocketTunnelFile;
+use crate::socket_tunnel_file::SocketTunnelSysfsFile;
 use starnix_core::device::kobject::Device;
 use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::task::CurrentTask;
@@ -99,63 +99,63 @@ impl FsNodeOps for NanohubCommsDirectory {
         match &**name {
             b"display_panel_name" => Ok(node.fs().create_node(
                 current_task,
-                SocketTunnelFile::new(
+                SocketTunnelSysfsFile::new(
                     b"/sys/devices/virtual/nanohub/nanohub_comms/display_panel_name".into(),
                 ),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o440), FsCred::root()),
             )),
             b"display_select" => Ok(node.fs().create_node(
                 current_task,
-                SocketTunnelFile::new(
+                SocketTunnelSysfsFile::new(
                     b"/sys/devices/virtual/nanohub/nanohub_comms/display_select".into(),
                 ),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o660), FsCred::root()),
             )),
             b"display_state" => Ok(node.fs().create_node(
                 current_task,
-                SocketTunnelFile::new(
+                SocketTunnelSysfsFile::new(
                     b"/sys/devices/virtual/nanohub/nanohub_comms/display_state".into(),
                 ),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o440), FsCred::root()),
             )),
             b"download_firmware" => Ok(node.fs().create_node(
                 current_task,
-                SocketTunnelFile::new(
+                SocketTunnelSysfsFile::new(
                     b"/sys/devices/virtual/nanohub/nanohub_comms/download_firmware".into(),
                 ),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o220), FsCred::root()),
             )),
             b"firmware_name" => Ok(node.fs().create_node(
                 current_task,
-                SocketTunnelFile::new(
+                SocketTunnelSysfsFile::new(
                     b"/sys/devices/virtual/nanohub/nanohub_comms/firmware_name".into(),
                 ),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o440), FsCred::root()),
             )),
             b"firmware_version" => Ok(node.fs().create_node(
                 current_task,
-                SocketTunnelFile::new(
+                SocketTunnelSysfsFile::new(
                     b"/sys/devices/virtual/nanohub/nanohub_comms/firmware_version".into(),
                 ),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o440), FsCred::root()),
             )),
             b"hw_reset" => Ok(node.fs().create_node(
                 current_task,
-                SocketTunnelFile::new(
+                SocketTunnelSysfsFile::new(
                     b"/sys/devices/virtual/nanohub/nanohub_comms/hw_reset".into(),
                 ),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o220), FsCred::root()),
             )),
             b"wakeup_event_msec" => Ok(node.fs().create_node(
                 current_task,
-                SocketTunnelFile::new(
+                SocketTunnelSysfsFile::new(
                     b"/sys/devices/virtual/nanohub/nanohub_comms/wakeup_event_msec".into(),
                 ),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o660), FsCred::root()),
             )),
             b"wake_lock" => Ok(node.fs().create_node(
                 current_task,
-                SocketTunnelFile::new(
+                SocketTunnelSysfsFile::new(
                     b"/sys/devices/virtual/nanohub/nanohub_comms/wake_lock".into(),
                 ),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o440), FsCred::root()),

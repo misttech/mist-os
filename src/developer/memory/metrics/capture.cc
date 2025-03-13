@@ -39,7 +39,7 @@ class OSImpl : public OS, public TaskEnumerator {
   }
 
   zx_handle_t ProcessSelf() override { return zx_process_self(); }
-  zx_time_t GetMonotonic() override { return zx_clock_get_monotonic(); }
+  zx_instant_boot_t GetBoot() override { return zx_clock_get_boot(); }
 
   zx_status_t GetProcesses(
       fit::function<zx_status_t(int, zx::handle, zx_koid_t, zx_koid_t)> cb) override {
@@ -206,7 +206,7 @@ CaptureMaker::CaptureMaker(fidl::WireSyncClient<fuchsia_kernel::Stats> stats_cli
 zx_status_t CaptureMaker::GetCapture(Capture* capture, CaptureLevel level,
                                      const std::vector<std::string>& rooted_vmo_names) {
   TRACE_DURATION("memory_metrics", "Capture::GetCapture");
-  capture->time_ = os_->GetMonotonic();
+  capture->time_ = os_->GetBoot();
 
   // Capture level KMEM only queries ZX_INFO_KMEM_STATS, as opposed to ZX_INFO_KMEM_STATS_EXTENDED
   // which queries a more detailed set of kernel metrics. KMEM capture level is used to poll the
@@ -270,8 +270,7 @@ zx_status_t CaptureMaker::GetCapture(Capture* capture, CaptureLevel level,
   return err;
 }
 
-fit::result<zx_status_t, std::unique_ptr<CaptureMaker>> CaptureMaker::Create(
-    std::unique_ptr<OS> os) {
+fit::result<zx_status_t, CaptureMaker> CaptureMaker::Create(std::unique_ptr<OS> os) {
   TRACE_DURATION("memory_metrics", "Capture::GetCaptureState");
   fidl::WireSyncClient<fuchsia_kernel::Stats> stats_client;
 
@@ -280,8 +279,7 @@ fit::result<zx_status_t, std::unique_ptr<CaptureMaker>> CaptureMaker::Create(
     return fit::error(err);
   }
 
-  return fit::ok(
-      std::unique_ptr<CaptureMaker>(new CaptureMaker{std::move(stats_client), std::move(os)}));
+  return fit::ok(CaptureMaker{std::move(stats_client), std::move(os)});
 }
 
 // Descendents of this vmo will have their allocated_bytes treated as an allocation of their

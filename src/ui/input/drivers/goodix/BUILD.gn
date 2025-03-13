@@ -24,6 +24,7 @@ astro_firmware_path =
     "gt9293-astro/GT9293_6105(6E43)_Official_Release_20180917.bin"
 
 fuchsia_cc_driver("goodix-module-driver") {
+  legacy = true
   output_name = "goodix"
   configs += [
     "//build/config:all_source",

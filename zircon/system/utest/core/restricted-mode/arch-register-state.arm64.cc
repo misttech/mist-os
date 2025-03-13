@@ -4,6 +4,10 @@
 
 #include "arch-register-state.h"
 
+#include <zircon/features.h>
+#include <zircon/syscalls.h>
+#include <zircon/types.h>
+
 #include <zxtest/zxtest.h>
 
 struct TlsStorage {
@@ -155,6 +159,16 @@ class Arch32RegisterState : public ArchRegisterState {
   void InitializeRegisters(TlsStorage* tls_storage) override {
     ArchRegisterState::InitializeRegisters(tls_storage);
     state_.cpsr = 0x10;
+  }
+
+  bool ArchSupported() const override {
+    uint32_t features;
+    zx_status_t status = zx_system_get_features(ZX_FEATURE_KIND_CPU, &features);
+    if (status != ZX_OK) {
+      ADD_FAILURE() << "zx_system_get_features(ZX_FEATURE_KIND_CPU) failed: " << status;
+      return false;
+    }
+    return (features & ZX_ARM64_FEATURE_ISA_ARM32) != 0;
   }
 
   void InitializeFromThreadState(const zx_thread_state_general_regs_t& regs) override {

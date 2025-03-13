@@ -6,7 +6,6 @@ use anyhow::{anyhow, Result};
 use async_lock::Mutex;
 use fidl::endpoints::{create_proxy, DiscoverableProtocolMarker};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
-use fidl_fuchsia_io::OpenFlags;
 use fidl_test_proxy_stress::{StressorMarker, StressorProxy};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -48,14 +47,31 @@ impl LaunchedComponentConnector {
         moniker: &str,
     ) -> Result<StressorProxy> {
         loop {
-            let (proxy, server_end) = create_proxy::<StressorMarker>();
+            // Try to connect via fuchsia.developer.remotecontrol/RemoteControl.ConnectCapability.
+            let (proxy, server) = create_proxy::<StressorMarker>();
+            if let Ok(response) = rcs_proxy
+                .connect_capability(
+                    &moniker,
+                    fsys::OpenDirType::ExposedDir,
+                    StressorMarker::PROTOCOL_NAME,
+                    server.into_channel(),
+                )
+                .await
+            {
+                if response.is_ok() {
+                    return Ok(proxy);
+                }
+            }
+            // Fallback to fuchsia.developer.remotecontrol/RemoteControl.DeprecatedOpenCapability.
+            // This can be removed once we drop support for API level 27.
+            let (proxy, server) = create_proxy::<StressorMarker>();
             match rcs_proxy
                 .deprecated_open_capability(
                     &moniker,
                     fsys::OpenDirType::ExposedDir,
                     StressorMarker::PROTOCOL_NAME,
-                    server_end.into_channel(),
-                    OpenFlags::empty(),
+                    server.into_channel(),
+                    Default::default(),
                 )
                 .await
             {

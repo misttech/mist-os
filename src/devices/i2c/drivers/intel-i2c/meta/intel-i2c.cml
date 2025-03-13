@@ -15,14 +15,20 @@
     },
     capabilities: [
         { service: "fuchsia.hardware.i2cimpl.Service" },
+        { service: "fuchsia.hardware.i2c.businfo.I2CBusMetadata" },
     ],
     use: [
         { service: "fuchsia.hardware.acpi.Service" },
         { service: "fuchsia.hardware.pci.Service" },
+        { service: "fuchsia.hardware.i2c.businfo.I2CBusMetadata" },
     ],
     expose: [
         {
             service: "fuchsia.hardware.i2cimpl.Service",
+            from: "self",
+        },
+        {
+            service: "fuchsia.hardware.i2c.businfo.I2CBusMetadata",
             from: "self",
         },
     ],

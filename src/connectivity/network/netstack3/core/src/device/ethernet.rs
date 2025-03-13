@@ -6,7 +6,7 @@
 //! in the ethernet module.
 
 use alloc::vec::Vec;
-use lock_order::lock::{LockLevelFor, UnlockedAccessMarkerFor};
+use lock_order::lock::LockLevelFor;
 use lock_order::relation::LockBefore;
 
 use log::debug;
@@ -16,9 +16,9 @@ use net_types::{SpecifiedAddr, UnicastAddr, Witness};
 use netstack3_base::socket::SocketIpAddr;
 use netstack3_base::{CoreTimerContext, CounterContext, DeviceIdContext, SendFrameError};
 use netstack3_device::ethernet::{
-    self, DynamicEthernetDeviceState, EthernetDeviceCounters, EthernetDeviceId,
-    EthernetIpLinkDeviceDynamicStateContext, EthernetIpLinkDeviceStaticStateContext,
-    EthernetLinkDevice, EthernetTimerId, EthernetWeakDeviceId, StaticEthernetDeviceState,
+    self, DynamicEthernetDeviceState, EthernetDeviceId, EthernetIpLinkDeviceDynamicStateContext,
+    EthernetIpLinkDeviceStaticStateContext, EthernetLinkDevice, EthernetTimerId,
+    EthernetWeakDeviceId, StaticEthernetDeviceState,
 };
 use netstack3_device::queue::{
     BufVecU8Allocator, DequeueState, TransmitDequeueContext, TransmitQueueCommon,
@@ -35,7 +35,7 @@ use netstack3_ip::nud::{
     DelegateNudContext, NudConfigContext, NudContext, NudIcmpContext, NudSenderContext, NudState,
     NudUserConfig, UseDelegateNudContext,
 };
-use netstack3_ip::IpDeviceEgressStateContext;
+use netstack3_ip::{IpDeviceEgressStateContext, Marks};
 use packet::{Buf, BufferMut, InnerPacketBuilder as _, Serializer};
 use packet_formats::ethernet::EtherType;
 use packet_formats::icmp::ndp::options::NdpOptionBuilder;
@@ -68,7 +68,7 @@ impl<BC: BindingsContext, L> EthernetIpLinkDeviceStaticStateContext for CoreCtx<
         cb: F,
     ) -> O {
         let state = integration::device_state(self, device_id);
-        cb(state.unlocked_access::<crate::lock_ordering::EthernetDeviceStaticState>())
+        cb(&state.unlocked_access::<crate::lock_ordering::UnlockedState>().link.static_state)
     }
 }
 
@@ -87,7 +87,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetDeviceDyna
         let (dynamic_state, locked) =
             state.read_lock_and::<crate::lock_ordering::EthernetDeviceDynamicState>();
         cb(
-            &locked.unlocked_access::<crate::lock_ordering::EthernetDeviceStaticState>(),
+            &locked.unlocked_access::<crate::lock_ordering::UnlockedState>().link.static_state,
             &dynamic_state,
         )
     }
@@ -104,7 +104,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetDeviceDyna
         let (mut dynamic_state, locked) =
             state.write_lock_and::<crate::lock_ordering::EthernetDeviceDynamicState>();
         cb(
-            &locked.unlocked_access::<crate::lock_ordering::EthernetDeviceStaticState>(),
+            &locked.unlocked_access::<crate::lock_ordering::UnlockedState>().link.static_state,
             &mut dynamic_state,
         )
     }
@@ -199,9 +199,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<Ipv6>>
 
         let mac = ethernet::get_mac(self, device_id);
 
-        <Self as CounterContext<NdpCounters>>::increment(self, |counters| {
-            &counters.tx.neighbor_solicitation
-        });
+        CounterContext::<NdpCounters>::counters(self).tx.neighbor_solicitation.increment();
         debug!("sending NDP solicitation for {lookup_addr} to {dst_ip}");
         // TODO(https://fxbug.dev/42165912): Either panic or guarantee that this error
         // can't happen statically.
@@ -245,6 +243,12 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
             original_src_ip,
             original_dst_ip,
             frame,
+            // TODO(https://fxbug.dev/400977853): The pending frame this ICMP message is
+            // responding to can either be generated from ourselves or being forwarded.
+            // In the former case, the marks are irrelevant because this message will end
+            // up being delivered locally. For the later case, we need to make sure the
+            // marks are stored with the pending frames.
+            &Marks::default(),
         );
     }
 }
@@ -412,6 +416,12 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
             frame,
             header_len,
             fragment_type,
+            // TODO(https://fxbug.dev/400977853): The pending frame this ICMP message is
+            // responding to can either be generated from ourselves or being forwarded.
+            // In the former case, the marks are irrelevant because this message will end
+            // up being delivered locally. For the later case, we need to make sure the
+            // marks are stored with the pending frames.
+            &Marks::default(),
         );
     }
 }
@@ -541,24 +551,6 @@ impl<I: Ip, BT: BindingsTypes> LockLevelFor<IpLinkDeviceState<EthernetLinkDevice
     for crate::lock_ordering::NudConfig<I>
 {
     type Data = IpMarked<I, NudUserConfig>;
-}
-
-impl<BT: BindingsTypes> UnlockedAccessMarkerFor<IpLinkDeviceState<EthernetLinkDevice, BT>>
-    for crate::lock_ordering::EthernetDeviceStaticState
-{
-    type Data = StaticEthernetDeviceState;
-    fn unlocked_access(t: &IpLinkDeviceState<EthernetLinkDevice, BT>) -> &Self::Data {
-        &t.link.static_state
-    }
-}
-
-impl<BT: BindingsTypes> UnlockedAccessMarkerFor<IpLinkDeviceState<EthernetLinkDevice, BT>>
-    for crate::lock_ordering::EthernetDeviceCounters
-{
-    type Data = EthernetDeviceCounters;
-    fn unlocked_access(t: &IpLinkDeviceState<EthernetLinkDevice, BT>) -> &Self::Data {
-        &t.link.counters
-    }
 }
 
 impl<BT: BindingsTypes> LockLevelFor<IpLinkDeviceState<EthernetLinkDevice, BT>>

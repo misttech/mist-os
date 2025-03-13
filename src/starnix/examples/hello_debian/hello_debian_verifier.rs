@@ -6,7 +6,7 @@ use argh::FromArgs;
 use assert_matches::assert_matches;
 use component_events::events::{EventStream, ExitStatus, Stopped, StoppedPayload};
 use component_events::matcher::EventMatcher;
-use diagnostics_reader::{ArchiveReader, Logs};
+use diagnostics_reader::ArchiveReader;
 use fuchsia_component_test::ScopedInstance;
 use futures::StreamExt;
 use log::info;
@@ -38,7 +38,7 @@ async fn main() {
     let Options { collection, child_name, child_url, expected_log } = argh::from_env();
     let moniker = format!("{collection}:{child_name}");
 
-    let mut logs = ArchiveReader::new().snapshot_then_subscribe::<Logs>().unwrap();
+    let mut logs = ArchiveReader::logs().snapshot_then_subscribe().unwrap();
 
     let _instance =
         ScopedInstance::new_with_name(child_name.clone(), collection.clone(), child_url.clone())

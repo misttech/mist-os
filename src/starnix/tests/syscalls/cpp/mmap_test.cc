@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <inttypes.h>
 #include <lib/fit/defer.h>
 #include <lib/stdcompat/string_view.h>
 #include <string.h>
@@ -218,7 +219,7 @@ class MMapProcTest : public ProcTestBase {};
 
 TEST_F(MMapProcTest, CommonMappingsHavePathnames) {
   uintptr_t stack_addr = reinterpret_cast<uintptr_t>(__builtin_frame_address(0));
-  uintptr_t vdso_addr = reinterpret_cast<uintptr_t>(getauxval(AT_SYSINFO_EHDR));
+  uintptr_t vdso_addr = static_cast<uintptr_t>(getauxval(AT_SYSINFO_EHDR));
 
   std::string maps;
   ASSERT_TRUE(files::ReadFileToString(proc_path() + "/self/maps", &maps));
@@ -242,7 +243,7 @@ TEST_F(MMapProcTest, MapFileWithNewlineInName) {
   ASSERT_TRUE(fd);
   SAFE_SYSCALL(ftruncate(fd.get(), page_size));
   void* p = mmap(nullptr, page_size, PROT_READ, MAP_SHARED, fd.get(), 0);
-  std::string address_formatted = fxl::StringPrintf("%8lx", (uintptr_t)p);
+  std::string address_formatted = fxl::StringPrintf("%8" PRIxPTR, (uintptr_t)p);
 
   std::string maps;
   ASSERT_TRUE(files::ReadFileToString(proc_path() + "/self/maps", &maps));
@@ -263,7 +264,7 @@ TEST_F(MMapProcTest, MapDeletedField) {
   ASSERT_TRUE(fd);
   SAFE_SYSCALL(ftruncate(fd.get(), page_size));
   void* p = mmap(nullptr, page_size, PROT_READ, MAP_SHARED, fd.get(), 0);
-  std::string address_formatted = fxl::StringPrintf("%8lx", (uintptr_t)p);
+  std::string address_formatted = fxl::StringPrintf("%8" PRIxPTR, (uintptr_t)p);
   fd.reset();
   unlink(path.c_str());
 
@@ -1388,6 +1389,23 @@ TEST(Mmap, HintedAddressTooLow) {
   ASSERT_NE(addr, MAP_FAILED);
   ASSERT_NE(addr, low_addr);
   ASSERT_EQ(munmap(addr, page_size), 0);
+}
+
+TEST(Madvise, MadvRemoveZeroesMemory) {
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  std::vector<char> test_data(page_size, 'a');
+  std::vector<char> zero_data(page_size, '\0');
+
+  int fd = SAFE_SYSCALL(test_helper::MemFdCreate("madv_remove", 0));
+  SAFE_SYSCALL(write(fd, test_data.data(), test_data.size()));
+
+  void* addr = mmap(nullptr, page_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  ASSERT_NE(addr, MAP_FAILED);
+  close(fd);
+
+  EXPECT_THAT(madvise(addr, page_size, MADV_REMOVE), SyscallSucceeds());
+  EXPECT_EQ(memcmp(addr, zero_data.data(), zero_data.size()), 0);
+  SAFE_SYSCALL(munmap(addr, page_size));
 }
 
 }  // namespace

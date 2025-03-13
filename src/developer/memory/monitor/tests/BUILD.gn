@@ -20,12 +20,12 @@ cc_test_executable("memory_monitor_unittests") {
 
   sources = [
     "high_water_unittest.cc",
+    "logger_unittest.cc",
     "metrics_unittest.cc",
     "monitor_fidl_unittest.cc",
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.hardware.ram.metrics:fuchsia.hardware.ram.metrics_hlcpp",
     "//sdk/lib/inspect/testing/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
     "//src/cobalt/bin/testing:stub_metric_event_logger_lib",
@@ -54,7 +54,6 @@ executable("bin-monitor") {
     "//sdk/lib/sys/cpp",
     "//src/developer/memory/metrics/tests:utils",
     "//src/developer/memory/monitor:lib",
-    "//src/lib/fxl:fxl_cli",
   ]
 }
 

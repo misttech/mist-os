@@ -19,18 +19,20 @@ rustc_library("fshost_test_fixture") {
   ]
   deps = [
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
-    "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
+    "//sdk/fidl/fuchsia.component.test:fuchsia.component.test_rust",
+    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_rust",
     "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_rust",
-    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
     "//sdk/fidl/fuchsia.hardware.ramdisk:fuchsia.hardware.ramdisk_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
     "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
     "//sdk/fidl/fuchsia.storage.partitions:fuchsia.storage.partitions_rust",
-    "//sdk/lib/device-watcher/rust",
+    "//sdk/lib/driver_test_realm/realm_builder/rust",
     "//sdk/rust/zx",
+    "//src/devices/bind/fuchsia.platform:fuchsia.platform_rust",
+    "//src/devices/bus/drivers/platform",
     "//src/lib/diagnostics/reader/rust",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fidl/rust/fidl",
@@ -38,18 +40,23 @@ rustc_library("fshost_test_fixture") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
     "//src/lib/fuchsia-fs",
-    "//src/lib/fuchsia-runtime",
     "//src/storage/blobfs/bin:blobfs-component",
+    "//src/storage/crypt/policy",
+    "//src/storage/crypt/zxcrypt",
     "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_rust",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
+    "//src/storage/gpt/component:lib",
+    "//src/storage/gpt/rust",
     "//src/storage/lib/blob_writer:blob-writer",
     "//src/storage/lib/block_client/rust",
+    "//src/storage/lib/block_server:fake_block_server",
     "//src/storage/lib/delivery_blob",
     "//src/storage/lib/fs_management/rust:fs_management",
     "//src/storage/lib/key-bag",
     "//src/storage/lib/ramdevice_client/rust",
     "//src/storage/lib/vfs/rust:vfs",
     "//src/storage/minfs/bin:minfs-component",
+    "//src/storage/testing:storage_drivers",
     "//src/storage/testing/rust:storage-isolated-driver-manager",
     "//src/sys/lib/cm_rust",
     "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_rust",
@@ -58,7 +65,6 @@ rustc_library("fshost_test_fixture") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:gpt",
     "//third_party/rust_crates:log",
     "//third_party/rust_crates:uuid",
     "//third_party/rust_crates:zerocopy",
@@ -120,6 +126,12 @@ template("fshost_integration_test_component") {
     ]
     if (defined(invoker.deps)) {
       deps += invoker.deps
+    }
+
+    # TODO(https://fxbug.dev/390250858): Re-enable when lld issue is fixed.
+    exclude_toolchain_tags = [ "profile" ]
+    if (defined(invoker.exclude_toolchain_tags)) {
+      exclude_toolchain_tags += invoker.exclude_toolchain_tags
     }
   }
 
@@ -212,6 +224,11 @@ template("fshost_integration_test_package") {
   }
   if (!defined(invoker.allow_error_severity_logs)) {
     invoker.allow_error_severity_logs = false
+  }
+  if (!defined(fshost_options.data_filesystem_format)) {
+    # data_filesystem_format is implied from fxblob.
+    assert(!(defined(fshost_options.fxfs_blob) && !fshost_options.fxfs_blob))
+    fshost_options.data_filesystem_format = "fxfs"
   }
 
   _fshost_target = "test-fshost-${target_name}"
@@ -359,7 +376,6 @@ template("fshost_integration_test_package") {
 
       deps = [
         ":$_fshost_target",
-        "//src/storage/testing:storage_driver_test_realm",
 
         # We need to make sure we have all the filesystems available in the package for various
         # tests of the migration paths.
@@ -389,7 +405,6 @@ template("fshost_integration_test_package") {
 
     deps = [
       ":$_fshost_target",
-      "//src/storage/testing:storage_driver_test_realm",
 
       # We need to make sure we have all the filesystems available in the package for various tests
       # of the migration paths.
@@ -410,8 +425,6 @@ fshost_integration_test_package("fshost_integration_tests_fxfs") {
   enable_migration_tests = false
   data_filesystem_variant = "fxblob"
   options = {
-    data_filesystem_format = "fxfs"
-    use_disk_migration = false
   }
   extra_deps = [
     "//src/storage/lib/blob_writer:blob-writer",
@@ -426,7 +439,6 @@ fshost_integration_test_package("fshost_integration_tests_storage_host_fxfs") {
   allow_error_severity_logs = true
   data_filesystem_variant = "fxblob"
   options = {
-    data_filesystem_format = "fxfs"
     use_disk_migration = false
     storage_host = true
   }
@@ -442,7 +454,6 @@ fshost_integration_test_package(
   # TODO(https://fxbug.dev/339491886): Support these components in storage-host
   enable_migration_tests = false
   enable_wipe_storage_tests = false
-  enable_write_data_file_tests = false
 
   # TODO(https://fxbug.dev/391891190): Enable failing on error logs when errors are fixed.
   allow_error_severity_logs = true
@@ -463,7 +474,6 @@ fshost_integration_test_package(
   # TODO(https://fxbug.dev/339491886): Support these components in storage-host
   enable_migration_tests = false
   enable_wipe_storage_tests = false
-  enable_write_data_file_tests = false
 
   # TODO(https://fxbug.dev/391891190): Enable failing on error logs when errors are fixed.
   allow_error_severity_logs = true

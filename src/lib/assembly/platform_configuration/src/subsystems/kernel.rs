@@ -10,7 +10,6 @@ use assembly_config_schema::platform_config::kernel_config::{
     PlatformKernelConfig,
 };
 use assembly_constants::{BootfsDestination, FileEntry, KernelArg};
-use camino::Utf8PathBuf;
 pub(crate) struct KernelSubsystem;
 
 impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
@@ -43,6 +42,15 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
                 builder.platform_bundle("kernel_serial_legacy")
             }
         }
+
+        if let Some(serial) = &context.board_info.kernel.serial {
+            if context.build_type == &BuildType::Eng {
+                builder.kernel_arg(KernelArg::Serial(serial.to_string()));
+            } else {
+                println!("'kernel.serial' can only be enabled in 'eng' builds. Not enabling.")
+            }
+        }
+
         if kernel_config.lru_memory_compression && !kernel_config.memory_compression {
             anyhow::bail!("'lru_memory_compression' can only be enabled with 'memory_compression'");
         }
@@ -91,14 +99,6 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
                 "'quiet_early_boot' can only be enabled in 'eng' builds"
             );
             builder.kernel_arg(KernelArg::PhysVerbose(false))
-        }
-
-        if let Some(serial) = &context.board_info.kernel.serial {
-            anyhow::ensure!(
-                context.build_type == &BuildType::Eng,
-                "'kernel.serial' can only be enabled in 'eng' builds"
-            );
-            builder.kernel_arg(KernelArg::Serial(serial.to_string()));
         }
 
         if let Some(oom) = &context.board_info.kernel.oom {
@@ -182,7 +182,6 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
 
         for thread_roles_file in &context.board_info.configuration.thread_roles {
             let filename = thread_roles_file
-                .as_utf8_pathbuf()
                 .file_name()
                 .ok_or_else(|| {
                     anyhow!("Thread roles file doesn't have a filename: {}", thread_roles_file)
@@ -191,7 +190,7 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
             builder
                 .bootfs()
                 .file(FileEntry {
-                    source: Utf8PathBuf::from(thread_roles_file.clone()),
+                    source: thread_roles_file.clone(),
                     destination: BootfsDestination::ThreadRoles(filename),
                 })
                 .with_context(|| format!("Adding thread roles file: {}", thread_roles_file))?;

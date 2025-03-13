@@ -1143,17 +1143,16 @@ void LogicalBufferCollection::FailNode(NodeProperties* member_node, Error error)
 }
 
 namespace {
-// This function just adds a bit of indirection to allow us to construct a va_list with one entry.
-// Format should always be "%s".
-void LogErrorInternal(Location location, const char* format, ...) {
+
+void Log(fuchsia_logging::LogSeverity log_severity, Location location, const char* format, ...) {
   va_list args;
   va_start(args, format);
 
-  vLog(fuchsia_logging::LogSeverity::Error, location.file(), location.line(), nullptr, format,
-       args);
+  vLog(log_severity, location.file(), location.line(), nullptr, format, args);
 
   va_end(args);
 }
+
 }  // namespace
 
 void LogicalBufferCollection::LogInfo(Location location, const char* format, ...) const {
@@ -1184,13 +1183,39 @@ void LogicalBufferCollection::LogErrorStatic(Location location,
 
     formatted = fbl::String::Concat({formatted, client_name});
   }
-  LogErrorInternal(location, "%s", formatted.c_str());
+  Log(fuchsia_logging::LogSeverity::Error, location, "%s", formatted.c_str());
   va_end(args);
 }
 
-void LogicalBufferCollection::VLogClient(bool is_error, Location location,
-                                         const NodeProperties* node_properties, const char* format,
-                                         va_list args) const {
+fuchsia_logging::LogSeverity LogicalBufferCollection::LogSeverityToFuchsiaLogSeverity(
+    LogicalBufferCollection::LogSeverity log_severity) const {
+  // This intentionally lacks a default case so we'll get a compiler warning if another value is
+  // added to LogicalBufferCollection::LogSeverity.
+  switch (log_severity) {
+    case LogSeverity::Trace:
+      return fuchsia_logging::LogSeverity::Trace;
+    case LogSeverity::Debug:
+      return fuchsia_logging::LogSeverity::Debug;
+    case LogSeverity::InfoOrDebug:
+      if (is_verbose_logging()) {
+        return fuchsia_logging::LogSeverity::Info;
+      } else {
+        return fuchsia_logging::LogSeverity::Debug;
+      }
+    case LogSeverity::Info:
+      return fuchsia_logging::LogSeverity::Info;
+    case LogSeverity::Warn:
+      return fuchsia_logging::LogSeverity::Warn;
+    case LogSeverity::Error:
+      return fuchsia_logging::LogSeverity::Error;
+    case LogSeverity::Fatal:
+      return fuchsia_logging::LogSeverity::Fatal;
+  }
+}
+
+void LogicalBufferCollection::VLogClient(LogicalBufferCollection::LogSeverity log_severity,
+                                         Location location, const NodeProperties* node_properties,
+                                         const char* format, va_list args) const {
   const char* collection_name = name_.has_value() ? name_->name.c_str() : "Unknown";
   fbl::String formatted = fbl::StringVPrintf(format, args);
   if (node_properties && !node_properties->client_debug_info().name.empty()) {
@@ -1205,11 +1230,9 @@ void LogicalBufferCollection::VLogClient(bool is_error, Location location,
     formatted = fbl::String::Concat({formatted, client_name});
   }
 
-  if (is_error) {
-    LogErrorInternal(location, "%s", formatted.c_str());
-  } else {
-    LogInfo(location, "%s", formatted.c_str());
-  }
+  auto fuchsia_log_severity = LogSeverityToFuchsiaLogSeverity(log_severity);
+
+  Log(fuchsia_log_severity, location, "%s", formatted.c_str());
 }
 
 void LogicalBufferCollection::LogClientInfo(Location location,
@@ -1218,6 +1241,15 @@ void LogicalBufferCollection::LogClientInfo(Location location,
   va_list args;
   va_start(args, format);
   VLogClientInfo(location, node_properties, format, args);
+  va_end(args);
+}
+
+void LogicalBufferCollection::LogClientWarn(Location location,
+                                            const NodeProperties* node_properties,
+                                            const char* format, ...) const {
+  va_list args;
+  va_start(args, format);
+  VLogClientWarn(location, node_properties, format, args);
   va_end(args);
 }
 
@@ -1233,13 +1265,26 @@ void LogicalBufferCollection::LogClientError(Location location,
 void LogicalBufferCollection::VLogClientInfo(Location location,
                                              const NodeProperties* node_properties,
                                              const char* format, va_list args) const {
-  VLogClient(/*is_error=*/false, location, node_properties, format, args);
+  VLogClient(LogSeverity::InfoOrDebug, location, node_properties, format, args);
+}
+
+void LogicalBufferCollection::VLogClientWarn(Location location,
+                                             const NodeProperties* node_properties,
+                                             const char* format, va_list args) const {
+  VLogClient(LogSeverity::Warn, location, node_properties, format, args);
 }
 
 void LogicalBufferCollection::VLogClientError(Location location,
                                               const NodeProperties* node_properties,
                                               const char* format, va_list args) const {
-  VLogClient(/*is_error=*/true, location, node_properties, format, args);
+  VLogClient(LogSeverity::Error, location, node_properties, format, args);
+}
+
+void LogicalBufferCollection::LogWarn(Location location, const char* format, ...) const {
+  va_list args;
+  va_start(args, format);
+  VLogWarn(location, format, args);
+  va_end(args);
 }
 
 void LogicalBufferCollection::LogError(Location location, const char* format, ...) const {
@@ -1247,6 +1292,10 @@ void LogicalBufferCollection::LogError(Location location, const char* format, ..
   va_start(args, format);
   VLogError(location, format, args);
   va_end(args);
+}
+
+void LogicalBufferCollection::VLogWarn(Location location, const char* format, va_list args) const {
+  VLogClientWarn(location, current_node_properties_, format, args);
 }
 
 void LogicalBufferCollection::VLogError(Location location, const char* format, va_list args) const {
@@ -3321,7 +3370,7 @@ bool LogicalBufferCollection::AccumulateConstraintImageFormats(
     // It's only when the count becomes non-zero then drops back to zero
     // (checked here), or if we end up with no image format constraints and
     // no buffer constraints (checked in ::Allocate()), that we care.
-    LogError(FROM_HERE, "all pixel_format(s) eliminated");
+    LogWarn(FROM_HERE, "all pixel_format(s) eliminated");
     return false;
   }
 

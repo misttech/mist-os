@@ -5,7 +5,7 @@
 use crate::logs::utils::Listener;
 use crate::puppet::PuppetProxyExt;
 use crate::{test_topology, utils};
-use diagnostics_reader::{ArchiveReader, Logs};
+use diagnostics_reader::ArchiveReader;
 use fidl_fuchsia_diagnostics::Severity;
 use fidl_fuchsia_logger::{LogFilterOptions, LogLevelFilter, LogMarker, LogMessage, LogProxy};
 use futures::channel::mpsc;
@@ -107,9 +107,9 @@ async fn listen_for_syslog_routed_stdio() {
     .unwrap();
 
     let accessor = utils::connect_accessor(&realm_proxy, utils::ALL_PIPELINE).await;
-    let mut reader = ArchiveReader::new();
+    let mut reader = ArchiveReader::logs();
     reader.with_archive(accessor);
-    let (mut logs, mut errors) = reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
+    let (mut logs, mut errors) = reader.snapshot_then_subscribe().unwrap().split_streams();
     let _errors = fasync::Task::spawn(async move {
         if let Some(e) = errors.next().await {
             panic!("error in subscription: {e}");

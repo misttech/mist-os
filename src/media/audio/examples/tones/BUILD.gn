@@ -33,6 +33,6 @@ executable("bin") {
   ]
 }
 
-fuchsia_shell_package("tones") {
+fuchsia_package("tones") {
   deps = [ ":bin" ]
 }

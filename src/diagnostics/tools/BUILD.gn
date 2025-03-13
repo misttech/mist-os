@@ -3,7 +3,10 @@
 # found in the LICENSE file.
 
 group("tools") {
-  deps = [ "inspect-hierarchy-analyzer($host_toolchain)" ]
+  deps = [
+    "inspect-hierarchy-analyzer($host_toolchain)",
+    "merge_sampler_configs($host_toolchain)",
+  ]
 }
 
 group("tests") {

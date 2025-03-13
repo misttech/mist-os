@@ -8,6 +8,7 @@ block-core
 ?boot-shell-commands
 ?bootstrap
 bt-transport-usb
+?bus-kpci
 ?bus-pci
 buttons
 clock
@@ -18,6 +19,7 @@ clock
 critical-services
 ?debug-dash-launcher
 devfs
+devfs-driver
 device-name-provider
 display-coordinator
 driver-index

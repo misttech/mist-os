@@ -37,6 +37,7 @@ source_set("common") {
 }
 
 fuchsia_cc_driver("nand-driver") {
+  legacy = true
   output_name = "nand"
   deps = [
     ":common",

@@ -143,6 +143,7 @@ fn to_type_path(ty: &syn::Type) -> Result<syn::TypePath, Error> {
     }
 }
 
+#[allow(clippy::large_enum_variant)] // TODO(https://fxbug.dev/401087606)
 enum FieldAttrArg {
     Ident(syn::Ident),
     NameValue(syn::MetaNameValue),

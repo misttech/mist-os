@@ -21,6 +21,7 @@ constexpr int kForceAllTypes = 1;
 constexpr int kRawOutput = 2;
 constexpr int kVerboseBacktrace = 3;
 constexpr int kForceRefresh = 4;
+constexpr int kForceRemoteUnwind = 5;
 
 const char kBacktraceShortHelp[] = "backtrace / bt: Print a backtrace.";
 const char kBacktraceUsage[] = "backtrace / bt";
@@ -33,8 +34,15 @@ Arguments
 
   -f
   --force
-      Force an update to the stack. This will always request the latest stack
-      frames from the target and re-evaluate all symbol information.
+      Force an update to the stack when listing stack frames. This will always
+      reevaluate the complete call stack based on the current stop location. Use
+      --force-remote-unwind to unwind completely on the target.
+
+  --force-remote-unwind
+      Force the unwinding operation to happen from the target backend. Note that
+      this may result in different results than the default due to less metadata
+      availability on the target compared to the default option. Implies
+      --force.
 
   -r
   --raw
@@ -90,12 +98,13 @@ void RunVerbBacktrace(const Command& cmd, fxl::RefPtr<CommandContext> cmd_contex
     FX_DCHECK(cmd.target()->GetProcess());
 
     cmd_context->Output(
-        FormatAllThreadStacks(cmd.target()->GetProcess()->GetThreads(), true, opts, cmd_context));
+        FormatAllThreadStacks(cmd.target()->GetProcess()->GetThreads(), opts, cmd_context));
     return;
   }
 
-  bool force_update = cmd.HasSwitch(kForceRefresh);
-  cmd_context->Output(FormatStack(cmd.thread(), force_update, opts));
+  opts.sync_options.force_update = cmd.HasSwitch(kForceRefresh);
+  opts.sync_options.remote_unwind = cmd.HasSwitch(kForceRemoteUnwind);
+  cmd_context->Output(FormatStack(cmd.thread(), opts));
 }
 
 }  // namespace
@@ -107,6 +116,7 @@ VerbRecord GetBacktraceVerbRecord() {
   SwitchRecord raw(kRawOutput, false, "raw", 'r');
   SwitchRecord verbose(kVerboseBacktrace, false, "verbose", 'v');
   SwitchRecord force_refresh(kForceRefresh, false, "force", 'f');
+  SwitchRecord force_remote_unwind(kForceRemoteUnwind, false, "force-remote-unwind");
   backtrace.switches = {force_types, raw, verbose, force_refresh};
 
   return backtrace;

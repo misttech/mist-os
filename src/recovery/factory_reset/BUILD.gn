@@ -46,7 +46,11 @@ executable("bin") {
 
   sources = [ "main.cc" ]
 
-  deps = [ ":factory_reset_config" ]
+  deps = [
+    ":factory_reset_config",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/lib/fdio",
+  ]
   public_deps = [
     ":lib",
     "//sdk/lib/async-loop:async-loop-cpp",

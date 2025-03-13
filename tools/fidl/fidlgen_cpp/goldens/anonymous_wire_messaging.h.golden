@@ -26,14 +26,9 @@ namespace test_anonymous {
 
 class SomeProtocol;
 
-}  // namespace test_anonymous
-
-template <>
-struct ::fidl::internal::WireOrdinal<::test_anonymous::SomeProtocol::SomeMethod> final {
-  static constexpr uint64_t value = 2515914517457749720lu;
-};
-
 #ifdef __Fuchsia__
+
+}  // namespace test_anonymous
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_anonymous::SomeProtocol::SomeMethod> {
@@ -54,21 +49,12 @@ struct ::fidl::internal::WireMethodTypes<::test_anonymous::SomeProtocol::SomeMet
           ::fidl::internal::TransactionalRequest<::test_anonymous::SomeProtocol::SomeMethod>, ::fidl::internal::ChannelTransport>>;
 };
 
-#endif  // __Fuchsia__
-
 namespace test_anonymous {
 
-}  // namespace test_anonymous
-
-#ifdef __Fuchsia__
-
-template <>
-struct ::fidl::internal::ProtocolDetails<::test_anonymous::SomeProtocol> {
-};
-
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
+}  // namespace test_anonymous
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_anonymous::SomeProtocol> final {
@@ -86,8 +72,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_anonymous::SomeProtocol> fi
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
+namespace test_anonymous {
 
 #endif  // __Fuchsia__
+}  // namespace test_anonymous
 
 #ifdef __Fuchsia__
 template <>
@@ -190,9 +178,9 @@ namespace fidl {
 
 #ifdef __Fuchsia__
 template <>
-struct IsFidlType<::fidl::internal::TransactionalRequest<::test_anonymous::SomeProtocol::SomeMethod>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalRequest<::test_anonymous::SomeProtocol::SomeMethod>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_anonymous::SomeProtocol::SomeMethod>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_anonymous::SomeProtocol::SomeMethod>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_anonymous::SomeProtocol::SomeMethod>> {
@@ -216,11 +204,11 @@ static_assert(offsetof(::test_anonymous::wire::SomeProtocolSomeMethodRequest, ta
 #endif  // __Fuchsia__
 
 template <>
-struct IsFidlType<::fidl::internal::TransactionalResponse<::test_anonymous::SomeProtocol::SomeMethod>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalResponse<::test_anonymous::SomeProtocol::SomeMethod>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalResponse<::test_anonymous::SomeProtocol::SomeMethod>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalResponse<::test_anonymous::SomeProtocol::SomeMethod>> : public std::true_type {};
 template <>
-struct IsFidlType<::fidl::WireResponse<::test_anonymous::SomeProtocol::SomeMethod>> : public std::true_type{};
+struct IsFidlType<::fidl::WireResponse<::test_anonymous::SomeProtocol::SomeMethod>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_anonymous::SomeProtocol::SomeMethod>> {

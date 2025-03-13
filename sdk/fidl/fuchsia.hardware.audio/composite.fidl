@@ -60,6 +60,9 @@ type CompositeProperties = table {
 /// by the `StreamConfig`, `Dai` and `Codec` FIDL interfaces. The `Composite` interface is more
 /// generic and provides more flexible routing within audio subsystems. Also see
 /// [Audio Driver Composite](https://fuchsia.dev/fuchsia-src/development/audio/drivers/composite.md)
+/// The hardware abstracted by the Composite protocol will be turned off (placed in its lowest
+/// supported power state) until a call to any APIs that requires the hardware to be turned on
+/// (placed in a higher power state).
 closed protocol Composite {
     /// Allows providing driver health state.
     compose Health;

@@ -15,6 +15,7 @@ driver_bind_rules("ddk-fallback-test-bind") {
 }
 
 fuchsia_cc_driver("ddk-fallback-test-driver") {
+  legacy = true
   output_name = "ddk-fallback-test"
   configs += [
     "//build/config:all_source",
@@ -40,6 +41,7 @@ fuchsia_driver_component("ddk-fallback-test") {
 }
 
 fuchsia_cc_driver("ddk-not-fallback-test-driver") {
+  legacy = true
   output_name = "ddk-not-fallback-test"
   configs += [
     "//build/config:all_source",

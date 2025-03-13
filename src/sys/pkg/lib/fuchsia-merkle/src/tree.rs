@@ -158,7 +158,7 @@ mod tests {
                     buf[0] = 0;
                     Ok(1)
                 } else {
-                    Err(io::Error::new(io::ErrorKind::Other, CUSTOM_ERROR_MESSAGE))
+                    Err(io::Error::other(CUSTOM_ERROR_MESSAGE))
                 }
             }
         }

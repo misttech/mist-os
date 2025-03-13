@@ -20,6 +20,7 @@ ffx_plugin("ffx_profile_memory_components") {
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/target/holders:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//src/lib/fidl/rust/fidl",
     "//src/performance/memory/attribution/processing",
     "//third_party/rust_crates:anyhow",

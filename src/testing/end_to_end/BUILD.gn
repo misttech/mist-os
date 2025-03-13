@@ -25,13 +25,13 @@
 #
 # Note: Each entry in test group should refer to a test case along with its
 # dependencies (if any). For example,
-#   * `src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_session:test_session`
+#   * `//src/testing/end_to_end/honeydew/honeydew/transports/ffx/tests/functional_tests:test_ffx_on_vim3`
 #     is a group that contains
-#     `src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_session:session_test`
+#     `//src/testing/end_to_end/honeydew/honeydew/transports/ffx/tests/functional_tests:ffx_test_on_vim3`
 #      test and its dependencies
-#     `src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_session:packages`.
+#     `//src/testing/end_to_end/honeydew/honeydew/transports/ffx/tests/functional_tests:packages`.
 #     So include this group name (not the test name)
-#   * `src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_rtc:rtc_test`
+#   * `//src/testing/end_to_end/honeydew/honeydew/affordances/rtc/tests/functional_tests:rtc_test`
 #     is a test and it does not have any dependencies. So you can include this test name directly
 #
 # Note - Except in `Staging` groups, please refrain from referencing one group
@@ -67,7 +67,13 @@ group_with_no_dir_target_deps("core_x64_stable_tests") {
     "examples/test_power_cycle:power_cycle_test($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test.hermetic($host_toolchain)",
-    "honeydew/tests/functional_tests:core_x64_stable_tests",
+    "honeydew/honeydew/affordances/tracing/tests/functional_tests:tracing_test($host_toolchain)",
+    "honeydew/honeydew/auxiliary_devices/power_switch/tests/functional_tests:power_switch_dmc_test($host_toolchain)",
+    "honeydew/honeydew/fuchsia_device/tests/functional_tests:x64_emu_test($host_toolchain)",
+    "honeydew/honeydew/fuchsia_device/tests/functional_tests:x64_nuc_test($host_toolchain)",
+    "honeydew/honeydew/transports/ffx/tests/functional_tests:ffx_wait_for_rcs_disconnection_test($host_toolchain)",
+    "honeydew/honeydew/transports/ffx/tests/functional_tests:test_ffx_on_x64",
+    "honeydew/honeydew/transports/serial/tests/functional_tests:serial_test($host_toolchain)",
   ]
 }
 
@@ -78,7 +84,7 @@ group_with_no_dir_target_deps("core_x64_unstable_sl4f_tests") {
 
 group_with_no_dir_target_deps("core_x64_unstable_tests") {
   testonly = true
-  public_deps = [ "honeydew/tests/functional_tests:core_x64_unstable_tests" ]
+  public_deps = []
 }
 
 group("core_x64_staging_sl4f_tests") {
@@ -107,14 +113,24 @@ group_with_no_dir_target_deps("workbench_x64_stable_tests") {
     "examples/test_power_cycle:power_cycle_test($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test.hermetic($host_toolchain)",
-    "honeydew/tests/functional_tests:workbench_x64_stable_tests",
+    "honeydew/honeydew/affordances/connectivity/netstack/tests/functional_tests:netstack_test($host_toolchain)",
+    "honeydew/honeydew/affordances/location/tests/functional_tests:location_test($host_toolchain)",
+    "honeydew/honeydew/affordances/session/tests/functional_tests:test_session",
+    "honeydew/honeydew/affordances/tracing/tests/functional_tests:tracing_test($host_toolchain)",
+    "honeydew/honeydew/affordances/ui/screenshot/tests/functional_tests:test_screenshot",
+    "honeydew/honeydew/affordances/ui/user_input/tests/functional_tests:test_user_input",
+    "honeydew/honeydew/auxiliary_devices/power_switch/tests/functional_tests:power_switch_dmc_test($host_toolchain)",
+    "honeydew/honeydew/fuchsia_device/tests/functional_tests:x64_emu_test($host_toolchain)",
+    "honeydew/honeydew/fuchsia_device/tests/functional_tests:x64_nuc_test($host_toolchain)",
+    "honeydew/honeydew/transports/ffx/tests/functional_tests:ffx_wait_for_rcs_disconnection_test($host_toolchain)",
+    "honeydew/honeydew/transports/ffx/tests/functional_tests:test_ffx_on_x64",
+    "honeydew/honeydew/transports/serial/tests/functional_tests:serial_test($host_toolchain)",
   ]
 }
 
 group_with_no_dir_target_deps("workbench_x64_unstable_tests") {
   testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:workbench_x64_unstable_tests" ]
+  public_deps = []
 }
 
 group("workbench_x64_staging_tests") {
@@ -131,20 +147,24 @@ group_with_no_dir_target_deps("core_vim3_stable_tests") {
   public_deps = [
     "examples/test_case_revive_example:run_wo_test_case_revive($host_toolchain)",
     "examples/test_case_revive_example:test_case_revive_with_hard_reboot($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_soft_reboot($host_toolchain)",
     "examples/test_power_cycle:power_cycle_test($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test.hermetic($host_toolchain)",
     "honeydew/honeydew/affordances/power/system_power_state_controller/tests/functional_tests/test_system_power_state_controller:system_power_state_controller_test_on_non_starnix($host_toolchain)",
-    "honeydew/tests/functional_tests:core_vim3_stable_tests",
+    "honeydew/honeydew/affordances/tracing/tests/functional_tests:tracing_test($host_toolchain)",
+    "honeydew/honeydew/auxiliary_devices/power_switch/tests/functional_tests:power_switch_dmc_test($host_toolchain)",
+    "honeydew/honeydew/fuchsia_device/tests/functional_tests:vim3_test($host_toolchain)",
+    "honeydew/honeydew/transports/fastboot/tests/functional_tests:fastboot_using_serial_test($host_toolchain)",
+    "honeydew/honeydew/transports/ffx/tests/functional_tests:ffx_wait_for_rcs_disconnection_test($host_toolchain)",
+    "honeydew/honeydew/transports/ffx/tests/functional_tests:test_ffx_on_vim3",
+    "honeydew/honeydew/transports/serial/tests/functional_tests:serial_test($host_toolchain)",
   ]
 }
 
 group_with_no_dir_target_deps("core_vim3_unstable_tests") {
   testonly = true
-  public_deps = [
-    "examples/test_case_revive_example:test_case_revive_with_soft_reboot($host_toolchain)",
-    "honeydew/tests/functional_tests:core_vim3_unstable_tests",
-  ]
+  public_deps = [ "honeydew/honeydew/transports/fastboot/tests/functional_tests:fastboot_test($host_toolchain)" ]
 }
 
 group("core_vim3_staging_tests") {
@@ -165,15 +185,26 @@ group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
     "examples/test_power_cycle:power_cycle_test($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test.hermetic($host_toolchain)",
+    "honeydew/honeydew/affordances/connectivity/netstack/tests/functional_tests:netstack_test($host_toolchain)",
+    "honeydew/honeydew/affordances/location/tests/functional_tests:location_test($host_toolchain)",
     "honeydew/honeydew/affordances/power/system_power_state_controller/tests/functional_tests/test_system_power_state_controller:system_power_state_controller_test_on_non_starnix($host_toolchain)",
-    "honeydew/tests/functional_tests:workbench_vim3_stable_tests",
+    "honeydew/honeydew/affordances/rtc/tests/functional_tests:rtc_test($host_toolchain)",
+    "honeydew/honeydew/affordances/session/tests/functional_tests:test_session",
+    "honeydew/honeydew/affordances/tracing/tests/functional_tests:tracing_test($host_toolchain)",
+    "honeydew/honeydew/affordances/ui/screenshot/tests/functional_tests:test_screenshot",
+    "honeydew/honeydew/affordances/ui/user_input/tests/functional_tests:test_user_input",
+    "honeydew/honeydew/auxiliary_devices/power_switch/tests/functional_tests:power_switch_dmc_test($host_toolchain)",
+    "honeydew/honeydew/fuchsia_device/tests/functional_tests:vim3_test($host_toolchain)",
+    "honeydew/honeydew/transports/fastboot/tests/functional_tests:fastboot_using_serial_test($host_toolchain)",
+    "honeydew/honeydew/transports/ffx/tests/functional_tests:ffx_wait_for_rcs_disconnection_test($host_toolchain)",
+    "honeydew/honeydew/transports/ffx/tests/functional_tests:test_ffx_on_vim3",
+    "honeydew/honeydew/transports/serial/tests/functional_tests:serial_test($host_toolchain)",
   ]
 }
 
 group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
   testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:workbench_vim3_unstable_tests" ]
+  public_deps = [ "honeydew/honeydew/transports/fastboot/tests/functional_tests:fastboot_test($host_toolchain)" ]
 }
 
 group("workbench_vim3_staging_tests") {
@@ -187,6 +218,10 @@ group("workbench_vim3_staging_tests") {
 # starnix.arm64
 # Note: This will be run on internal *.arm64 builder, hence using `starnix` here
 # instead of internal `<PRODUCT>` name.
+#
+# Tests should be included in this list if they are stable and can run on
+# userdebug products. If the test should only run on eng products use the _eng
+# group below.
 group_with_no_dir_target_deps("starnix_arm64_stable_tests") {
   testonly = true
   public_deps = [
@@ -196,14 +231,27 @@ group_with_no_dir_target_deps("starnix_arm64_stable_tests") {
     "examples/test_power_cycle:power_cycle_test($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test.hermetic($host_toolchain)",
-    "honeydew/tests/functional_tests:starnix_arm64_stable_tests",
+    "honeydew/honeydew/affordances/connectivity/netstack/tests/functional_tests:netstack_test($host_toolchain)",
+    "honeydew/honeydew/auxiliary_devices/power_switch/tests/functional_tests:power_switch_dmc_test($host_toolchain)",
+    "honeydew/honeydew/fuchsia_device/tests/functional_tests:vim3_test($host_toolchain)",
+    "honeydew/honeydew/transports/fastboot/tests/functional_tests:fastboot_test($host_toolchain)",
+    "honeydew/honeydew/transports/fastboot/tests/functional_tests:fastboot_using_serial_test($host_toolchain)",
+    "honeydew/honeydew/transports/ffx/tests/functional_tests:ffx_wait_for_rcs_disconnection_test($host_toolchain)",
+    "honeydew/honeydew/transports/serial/tests/functional_tests:serial_test($host_toolchain)",
   ]
 }
 
+# Tests should be included in this list if they are unstable and can run on
+# userdebug products. If the test should only run on eng products use the _eng
+# group below.
 group_with_no_dir_target_deps("starnix_arm64_unstable_tests") {
   testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:starnix_arm64_unstable_tests" ]
+  public_deps = [
+    "honeydew/honeydew/affordances/rtc/tests/functional_tests:rtc_test($host_toolchain)",
+
+    # TODO(https://fxbug.dev/393370031): Move it to CQ, once the flake is fixed.
+    "honeydew/honeydew/transports/ffx/tests/functional_tests:test_ffx_on_vim3",
+  ]
 }
 
 group("starnix_arm64_staging_tests") {
@@ -214,21 +262,52 @@ group("starnix_arm64_staging_tests") {
   ]
 }
 
+# This group includes a subset of tests that are depended on in vendor/google.
+#
+# Tests should be included in this list if they are stable but should only be
+# ran on eng products.
+group_with_no_dir_target_deps("starnix_arm64_stable_eng_tests") {
+  testonly = true
+  public_deps = []
+}
+
+# This group includes a subset of tests that are depended on in vendor/google.
+#
+# Tests should be included in this list if they are unstable and should only be
+# ran on eng products.
+group_with_no_dir_target_deps("starnix_arm64_unstable_eng_tests") {
+  testonly = true
+  public_deps = [
+    # TODO(https://fxbug.dev/392638610): Enable when flake is fixed.
+    # "honeydew/affordances/session/tests/functional_tests:test_session",
+    "honeydew/honeydew/affordances/tracing/tests/functional_tests:tracing_test($host_toolchain)",
+    "honeydew/honeydew/affordances/ui/screenshot/tests/functional_tests:test_screenshot",
+    "honeydew/honeydew/affordances/ui/user_input/tests/functional_tests:test_user_input",
+  ]
+}
+
 # smart_display.nelson
 group_with_no_dir_target_deps("smart_display_nelson_stable_tests") {
   testonly = true
   public_deps = [
     "examples/test_power_cycle:power_cycle_test($host_toolchain)",
-    "honeydew/tests/functional_tests:smart_display_nelson_stable_tests",
+    "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
+    "honeydew/honeydew/affordances/connectivity/netstack/tests/functional_tests:netstack_test($host_toolchain)",
+    "honeydew/honeydew/affordances/location/tests/functional_tests:location_test($host_toolchain)",
+    "honeydew/honeydew/affordances/session/tests/functional_tests:test_session",
+    "honeydew/honeydew/affordances/ui/screenshot/tests/functional_tests:test_screenshot",
+    "honeydew/honeydew/auxiliary_devices/power_switch/tests/functional_tests:power_switch_dmc_test($host_toolchain)",
+    "honeydew/honeydew/fuchsia_device/tests/functional_tests:nelson_test($host_toolchain)",
+    "honeydew/honeydew/transports/fastboot/tests/functional_tests:fastboot_test($host_toolchain)",
+    "honeydew/honeydew/transports/fastboot/tests/functional_tests:fastboot_using_serial_test($host_toolchain)",
+    "honeydew/honeydew/transports/ffx/tests/functional_tests:ffx_wait_for_rcs_disconnection_test($host_toolchain)",
+    "honeydew/honeydew/transports/ffx/tests/functional_tests:test_ffx_on_nelson",
   ]
 }
 
 group_with_no_dir_target_deps("smart_display_nelson_unstable_tests") {
   testonly = true
-  public_deps = [
-    "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
-    "honeydew/tests/functional_tests:smart_display_nelson_unstable_tests",
-  ]
+  public_deps = [ "honeydew/honeydew/affordances/tracing/tests/functional_tests:tracing_test($host_toolchain)" ]
 }
 
 group("smart_display_nelson_staging_tests") {

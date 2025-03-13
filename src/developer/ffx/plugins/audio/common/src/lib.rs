@@ -10,7 +10,7 @@ use fidl_fuchsia_audio_controller as fac;
 use futures::future::Either;
 use futures::{AsyncReadExt, AsyncWrite, FutureExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
-use std::io::{BufRead, ErrorKind};
+use std::io::BufRead;
 
 #[derive(Debug, Serialize, PartialEq, Deserialize)]
 pub struct PlayResult {
@@ -127,10 +127,8 @@ pub async fn cancel_on_keypress(
 
     if let Either::Right(_) = futures::future::select(closed_fut, input_waiter).await {
         match proxy.cancel().await {
-            Err(e) => return Err(std::io::Error::new(ErrorKind::Other, format!("FIDL error {e}"))),
-            Ok(Err(e)) => {
-                return Err(std::io::Error::new(ErrorKind::Other, format!("Canceler error {e}")))
-            }
+            Err(e) => return Err(std::io::Error::other(format!("FIDL error {e}"))),
+            Ok(Err(e)) => return Err(std::io::Error::other(format!("Canceler error {e}"))),
             Ok(_res) => return Ok(()),
         };
     };

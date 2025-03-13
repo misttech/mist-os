@@ -20,9 +20,9 @@
 #include "src/graphics/display/drivers/intel-display/registers-transcoder.h"
 #include "src/graphics/display/drivers/intel-display/registers.h"
 #include "src/graphics/display/drivers/intel-display/tiling.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 
 namespace intel_display {
@@ -57,7 +57,7 @@ bool DisplayDevice::Init() {
 
   Pipe* pipe = controller_->pipe_manager()->RequestPipe(*this);
   if (!pipe) {
-    FDF_LOG(ERROR, "Cannot request a new pipe!");
+    fdf::error("Cannot request a new pipe!");
     return false;
   }
   set_pipe(pipe);
@@ -76,7 +76,7 @@ bool DisplayDevice::Init() {
 bool DisplayDevice::InitWithDdiPllConfig(const DdiPllConfig& pll_config) {
   Pipe* pipe = controller_->pipe_manager()->RequestPipeFromHardwareState(*this, mmio_space());
   if (!pipe) {
-    FDF_LOG(ERROR, "Failed loading pipe from register!");
+    fdf::error("Failed loading pipe from register!");
     return false;
   }
   set_pipe(pipe);
@@ -104,7 +104,7 @@ void DisplayDevice::LoadActiveMode() {
   const int32_t pixel_clock_frequency_khz =
       LoadPixelRateForTranscoderKhz(pipe_->connected_transcoder_id());
   info_.pixel_clock_frequency_hz = int64_t{pixel_clock_frequency_khz} * 1'000;
-  FDF_LOG(INFO, "Active pixel clock: %" PRId64 " Hz", info_.pixel_clock_frequency_hz);
+  fdf::info("Active pixel clock: {} Hz", info_.pixel_clock_frequency_hz);
 }
 
 bool DisplayDevice::CheckNeedsModeset(const display::DisplayTiming& mode) {
@@ -117,7 +117,7 @@ bool DisplayDevice::CheckNeedsModeset(const display::DisplayTiming& mode) {
   mode_without_clock_or_flags.vblank_alternates = info_.vblank_alternates;
   if (mode_without_clock_or_flags != info_) {
     // Modeset is necessary if display params other than the clock frequency differ
-    FDF_LOG(DEBUG, "Modeset necessary for display params");
+    fdf::debug("Modeset necessary for display params");
     return true;
   }
 
@@ -126,7 +126,7 @@ bool DisplayDevice::CheckNeedsModeset(const display::DisplayTiming& mode) {
   // don't include that in the check for already initialized displays. Once we're better at
   // initializing displays, merge the flags check back into the above memcmp.
   if (mode.fields_per_frame != info_.fields_per_frame) {
-    FDF_LOG(DEBUG, "Modeset necessary for display flags");
+    fdf::debug("Modeset necessary for display flags");
     return true;
   }
 
@@ -147,7 +147,7 @@ bool DisplayDevice::CheckNeedsModeset(const display::DisplayTiming& mode) {
 }
 
 void DisplayDevice::ApplyConfiguration(const display_config_t* banjo_display_config,
-                                       display::ConfigStamp config_stamp) {
+                                       display::DriverConfigStamp config_stamp) {
   ZX_ASSERT(banjo_display_config);
 
   const display::DisplayTiming display_timing_params =
@@ -158,25 +158,25 @@ void DisplayDevice::ApplyConfiguration(const display_config_t* banjo_display_con
       // following error conditions, we should reset the DDI, pipe and transcoder
       // so that they can be possibly reused.
       if (!DdiModeset(display_timing_params)) {
-        FDF_LOG(ERROR, "Display %lu: Modeset failed; ApplyConfiguration() aborted.", id().value());
+        fdf::error("Display {}: Modeset failed; ApplyConfiguration() aborted.", id().value());
         return;
       }
 
       if (!PipeConfigPreamble(display_timing_params, pipe_->pipe_id(),
                               pipe_->connected_transcoder_id())) {
-        FDF_LOG(ERROR,
-                "Display %lu: Transcoder configuration failed before pipe setup; "
-                "ApplyConfiguration() aborted.",
-                id().value());
+        fdf::error(
+            "Display %lu: Transcoder configuration failed before pipe setup; "
+            "ApplyConfiguration() aborted.",
+            id().value());
         return;
       }
       pipe_->ApplyModeConfig(display_timing_params);
       if (!PipeConfigEpilogue(display_timing_params, pipe_->pipe_id(),
                               pipe_->connected_transcoder_id())) {
-        FDF_LOG(ERROR,
-                "Display %lu: Transcoder configuration failed after pipe setup; "
-                "ApplyConfiguration() aborted.",
-                id().value());
+        fdf::error(
+            "Display %lu: Transcoder configuration failed after pipe setup; "
+            "ApplyConfiguration() aborted.",
+            id().value());
         return;
       }
     }

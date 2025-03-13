@@ -25,6 +25,14 @@ open protocol UsbDci {
         interface client_end:UsbDciInterface;
     }) -> () error zx.Status;
 
+    /// Start running in peripheral mode. Connects the device to the host. Usually called when all
+    /// functions are ready.
+    flexible StartController() -> () error zx.Status;
+
+    /// Stop running in peripheral mode. Disconnects the device from the host. Usually called when
+    /// a function is cleared.
+    flexible StopController() -> () error zx.Status;
+
     /// Configure and endpoint with the given configuration.
     ///
     /// See usb20 9.6.6

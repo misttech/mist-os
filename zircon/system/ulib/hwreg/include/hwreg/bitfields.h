@@ -174,7 +174,7 @@ class RegisterBase {
   SelfType& WriteTo(T* reg_io) {
     internal::Visit(
         [this](auto&& io) {
-          io.template Write(static_cast<IntType>(reg_value_ & ~params_.rsvdz_mask), reg_addr_);
+          io.Write(static_cast<IntType>(reg_value_ & ~params_.rsvdz_mask), reg_addr_);
         },
         *reg_io);
     return *static_cast<SelfType*>(this);
@@ -321,7 +321,7 @@ class BitfieldRef {
                 "Upper bit is out of range");                                                      \
   /* NOLINTBEGIN(misc-non-private-member-variables-in-classes) */                                  \
   __NO_UNIQUE_ADDRESS struct {                                                                     \
-    struct NAME##Marker{};                                                                         \
+    struct NAME##Marker {};                                                                        \
     __NO_UNIQUE_ADDRESS hwreg::internal::Field<SelfType, NAME##Marker, (COND)> field;              \
   } HWREG_INTERNAL_MEMBER_NAME(NAME) = {{&this->params(), #NAME, (BIT_HIGH), (BIT_LOW)}};          \
   /* NOLINTEND(misc-non-private-member-variables-in-classes) */                                    \
@@ -350,7 +350,7 @@ class BitfieldRef {
                 "Upper bit is out of range");                                                      \
   /* NOLINTBEGIN(misc-non-private-member-variables-in-classes) */                                  \
   __NO_UNIQUE_ADDRESS struct {                                                                     \
-    struct NAME##Marker{};                                                                         \
+    struct NAME##Marker {};                                                                        \
     __NO_UNIQUE_ADDRESS hwreg::internal::Field<SelfType, NAME##Marker, (COND)> field;              \
   } HWREG_INTERNAL_MEMBER_NAME(NAME) = {{&this->params(), #NAME, (BIT_HIGH), (BIT_LOW)}};          \
   /* NOLINTEND(misc-non-private-member-variables-in-classes) */                                    \
@@ -381,7 +381,7 @@ class BitfieldRef {
   static_assert(std::is_enum_v<ENUM_TYPE>, "Field type is not an enum");                           \
   /* NOLINTBEGIN(misc-non-private-member-variables-in-classes) */                                  \
   __NO_UNIQUE_ADDRESS struct {                                                                     \
-    struct NAME##Marker{};                                                                         \
+    struct NAME##Marker {};                                                                        \
     __NO_UNIQUE_ADDRESS hwreg::internal::Field<SelfType, NAME##Marker, (COND)> field;              \
   } HWREG_INTERNAL_MEMBER_NAME(NAME) = {{&this->params(), #NAME, (BIT_HIGH), (BIT_LOW)}};          \
   /* NOLINTEND(misc-non-private-member-variables-in-classes) */                                    \

@@ -1,0 +1,40 @@
+// Copyright 2021 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    collections: [
+        {
+            name: "fxfs-crypt",
+            durability: "transient",
+        },
+    ],
+    use: [
+        {
+            protocol: "fuchsia.fs.startup.Startup",
+            from: "#fxfs",
+            path: "/fxfs/svc/fuchsia.fs.startup.Startup",
+        },
+        {
+            protocol: "fuchsia.component.Realm",
+            from: "framework",
+        },
+    ],
+    offer: [
+        {
+            protocol: "fuchsia.memorypressure.Provider",
+            from: "parent",
+            to: "#fxfs",
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.scheduler.RoleManager",
+            from: "parent",
+            to: "#fxfs",
+        },
+        {
+            service: "fuchsia.fxfs.CryptService",
+            from: "#fxfs-crypt",
+            to: "#fxfs",
+        },
+    ],
+}

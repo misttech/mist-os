@@ -198,9 +198,9 @@ class PrimaryLayer : public VirtualLayer {
 
   bool alt_image_ = false;
   Image* images_[2];
-  fuchsia_hardware_display_types::wire::ConfigStamp image_config_stamps_[2] = {
-      {.value = fuchsia_hardware_display_types::wire::kInvalidConfigStampValue},
-      {.value = fuchsia_hardware_display_types::wire::kInvalidConfigStampValue}};
+  fuchsia_hardware_display::wire::ConfigStamp image_config_stamps_[2] = {
+      {.value = fuchsia_hardware_display::wire::kInvalidConfigStampValue},
+      {.value = fuchsia_hardware_display::wire::kInvalidConfigStampValue}};
 };
 
 class ColorLayer : public VirtualLayer {

@@ -4,11 +4,11 @@
 
 """Fuchsia platform shortcuts."""
 
-# TODO document
+# The following struct contains a list of platforms that are supported by the rules.
 fuchsia_platforms = struct(
-    arm64 = "@fuchsia_sdk//fuchsia/constraints/platforms:fuchsia_arm64",
-    riscv64 = "@fuchsia_sdk//fuchsia/constraints/platforms:fuchsia_riscv64",
-    x64 = "@fuchsia_sdk//fuchsia/constraints/platforms:fuchsia_x64",
+    arm64 = "//fuchsia/constraints/platforms:fuchsia_arm64",
+    riscv64 = "//fuchsia/constraints/platforms:fuchsia_riscv64",
+    x64 = "//fuchsia/constraints/platforms:fuchsia_x64",
 )
 
 # The list of supported Fuchsia platforms

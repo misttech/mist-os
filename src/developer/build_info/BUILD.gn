@@ -50,7 +50,7 @@ fuchsia_package("build-info-service") {
   deps = [ ":build-info" ]
 }
 
-fuchsia_shell_package("build-info-shell") {
+fuchsia_package_with_single_component("build-info-shell") {
   manifest = "meta/build_info_shell.cml"
   deps = [ ":shell_bin" ]
 }

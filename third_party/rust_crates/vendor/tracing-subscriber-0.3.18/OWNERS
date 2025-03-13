@@ -2,18 +2,6 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /src/connectivity/lib/packet-formats/OWNERS
-include /src/connectivity/network/dhcpv4/OWNERS
-include /src/connectivity/network/net-cli/OWNERS
-include /src/connectivity/network/OWNERS
 include /src/developer/ffx/OWNERS
-include /src/diagnostics/OWNERS
-include /src/lib/diagnostics/OWNERS
-include /src/security/OWNERS
-include /src/sys/component_manager/OWNERS
 include /third_party/rust_crates/vendor/loom-0.7.1/OWNERS
-include /tools/auto_owners/OWNERS
-include /tools/clidoc/OWNERS
-include /tools/fidl/fidldoc/OWNERS
 include /tools/funnel/OWNERS
-include /tools/testgen/OWNERS

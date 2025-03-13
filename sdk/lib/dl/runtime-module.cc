@@ -4,6 +4,9 @@
 
 #include "runtime-module.h"
 
+#include <lib/ld/decoded-module.h>
+#include <lib/ld/dl-phdr-info.h>
+
 namespace dl {
 
 bool RuntimeModule::ReifyModuleTree(Diagnostics& diag) {
@@ -67,6 +70,12 @@ void RuntimeModule::Initialize() {
   }
   initialized_ = true;
   module().init.CallInit(load_bias());
+}
+
+dl_phdr_info RuntimeModule::MakeDlPhdrInfo(ld::DlPhdrInfoCounts counts) const {
+  // TODO(https://fxbug.dev/331421403): Include TLS data when supported.
+  void* tls_data = nullptr;
+  return ld::MakeDlPhdrInfo(module(), tls_data, counts);
 }
 
 }  // namespace dl

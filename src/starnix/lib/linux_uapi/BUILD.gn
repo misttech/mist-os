@@ -29,6 +29,10 @@ rustc_library("linux_uapi") {
     assert(false, "Need uapi definition for the '$current_cpu` architecture")
   }
 
+  if (!starnix_enable_arch32) {
+    sources += [ "src/arch32_stub.rs" ]
+  }
+
   features = []
   if (starnix_enable_arch32) {
     features += [ "arch32" ]

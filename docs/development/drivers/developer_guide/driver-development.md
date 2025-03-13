@@ -265,8 +265,7 @@ Messages for each device class are defined in the
 [FIDL](/docs/development/languages/fidl/README.md) language. Each device
 implements zero or more FIDL protocols, multiplexed over a single channel per
 client. The driver is given the opportunity to interpret FIDL messages through
-the `message()` hook. These are only accessible to non-driver components by
-means of devfs.
+the `message()` hook.
 
 ## Drivers in other processes
 

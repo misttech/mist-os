@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use once_cell::sync::Lazy;
 use scrutiny_utils::artifact::{ArtifactReader, BlobFsArtifactReader, CompoundArtifactReader};
 use std::path::PathBuf;
 
@@ -14,7 +13,7 @@ const BETA_BYTES: &[u8] = include_bytes!("../testdata/beta");
 const GAMMA_BYTES: &[u8] = include_bytes!("../testdata/gamma");
 const DELTA_BYTES: &[u8] = include_bytes!("../testdata/delta");
 
-const BLOBFS_PATHS: Lazy<BlobfsPaths> = Lazy::new(|| BlobfsPaths {
+static BLOBFS_PATHS: std::sync::LazyLock<BlobfsPaths> = std::sync::LazyLock::new(|| BlobfsPaths {
     alpha: merkle_as_path_buf(ALPHA_BYTES),
     beta: merkle_as_path_buf(BETA_BYTES),
     gamma: merkle_as_path_buf(GAMMA_BYTES),
@@ -42,7 +41,7 @@ fn test_blobfs() {
         testdata_dir.join(ALPHA_BETA_BLOBFS_FILE).as_path(),
     )
     .unwrap();
-    let paths = BLOBFS_PATHS;
+    let paths = &*BLOBFS_PATHS;
     assert!(blobfs_artifact_reader.read_bytes(&paths.alpha).is_ok());
     assert!(blobfs_artifact_reader.read_bytes(&paths.beta).is_ok());
     assert!(blobfs_artifact_reader.read_bytes(&paths.gamma).is_err());
@@ -68,7 +67,7 @@ fn test_compound_blobfs() {
         Box::new(alpha_beta_artifact_reader),
         Box::new(beta_gamma_artifact_reader),
     ]);
-    let paths = BLOBFS_PATHS;
+    let paths = &*BLOBFS_PATHS;
     assert!(compound_artifact_reader.read_bytes(&paths.alpha).is_ok());
     assert!(compound_artifact_reader.read_bytes(&paths.beta).is_ok());
     assert!(compound_artifact_reader.read_bytes(&paths.gamma).is_ok());

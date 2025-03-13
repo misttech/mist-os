@@ -522,7 +522,7 @@ class PathRewriter(object):
                 sysroot_rewriter.path_list_inplace(values["headers"])
                 sysroot_rewriter.path_list_inplace(values["link_libs"])
 
-            for arch, version in meta["versions"].items():
+            for arch, version in meta.get("versions", {}).items():
                 sysroot_rewriter.path_list_inplace(version["debug_libs"])
                 sysroot_rewriter.path_list_inplace(version["dist_libs"])
                 sysroot_rewriter.path_list_inplace(version["headers"])

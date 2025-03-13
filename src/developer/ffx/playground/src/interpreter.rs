@@ -74,7 +74,7 @@ pub enum FSError {
     FSRootNotHandle,
     #[error("'$fs_root' is not a directory")]
     FSRootNotDirectory,
-    #[error("Opening path {0} yielded an OnOpen event, which is not a correct response to Open3")]
+    #[error("Opening path {0} yielded an OnOpen event, which is not a correct response to Open")]
     UnexpectedOnOpenEvent(String),
     #[error("Opening path {0} yielded an event with ordinal {1} before OnRepresentation")]
     UnexpectedEventInsteadOfRepresentation(String, u64),
@@ -424,6 +424,7 @@ impl InterpreterInner {
         }
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255249)
     /// Helper for [`InterpreterInner::open`] that sends a request given a value
     /// of $fs_root and a path.
     fn send_open_request(
@@ -455,13 +456,13 @@ impl InterpreterInner {
             self.lib_namespace(),
             0,
             fio::DIRECTORY_PROTOCOL_NAME,
-            "Open3",
+            "Open",
             request,
         )
         .map_err(|e| {
             MessageError::EncodeRequestFailed(
                 fio::DIRECTORY_PROTOCOL_NAME.to_owned(),
-                "Open3".to_owned(),
+                "Open".to_owned(),
                 Arc::new(e),
             )
         })?;
@@ -1120,6 +1121,7 @@ impl Interpreter {
     }
 }
 
+#[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255249)
 /// Turn a path into a dotless, absolute form.
 pub fn canonicalize_path(path: String, pwd: Value) -> Result<String> {
     let Value::String(pwd) = pwd else {

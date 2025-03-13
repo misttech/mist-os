@@ -7,7 +7,7 @@
 
 #include <memory>
 
-#include "src/media/audio/audio_core/shared/stream_usage.h"
+#include "src/media/audio/audio_core/stream_usage.h"
 #include "src/media/audio/audio_core/testing/integration/hermetic_audio_test.h"
 #include "src/media/audio/lib/test/constants.h"
 #include "src/media/audio/lib/test/test_fixture.h"

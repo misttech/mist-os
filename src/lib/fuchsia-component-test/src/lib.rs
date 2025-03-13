@@ -107,6 +107,7 @@ impl Ref {
         Ref { value: RefInner::Void, scope: None }
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401254890)
     fn check_scope(&self, realm_scope: &Vec<String>) -> Result<(), Error> {
         if let Some(ref_scope) = self.scope.as_ref() {
             if ref_scope != realm_scope {
@@ -205,6 +206,7 @@ impl ChildRef {
         ChildRef { name, scope: Some(scope) }
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401254890)
     fn check_scope(&self, realm_scope: &Vec<String>) -> Result<(), Error> {
         if let Some(ref_scope) = self.scope.as_ref() {
             if ref_scope != realm_scope {
@@ -1067,6 +1069,7 @@ impl RealmBuilder {
         )
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401254890)
     fn build_struct(
         component_realm_proxy: fcomponent::RealmProxy,
         realm_proxy: ftest::RealmProxy,
@@ -2061,12 +2064,7 @@ impl ScopedInstance {
         server_end: zx::Channel,
     ) -> Result<(), anyhow::Error> {
         self.exposed_dir
-            .open(
-                fio::OpenFlags::NOT_DIRECTORY,
-                fio::ModeType::empty(),
-                protocol_name,
-                ServerEnd::new(server_end),
-            )
+            .open(protocol_name, fio::Flags::PROTOCOL_SERVICE, &Default::default(), server_end)
             .map_err(Into::into)
     }
 

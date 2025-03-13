@@ -22,7 +22,7 @@ void ExceptionDecoder::Decode() {
   if (thread->GetStack().has_all_frames()) {
     Decoded();
   } else {
-    thread->GetStack().SyncFrames(false, [this](const zxdb::Err& /*err*/) { Decoded(); });
+    thread->GetStack().SyncFrames({}, [this](const zxdb::Err& /*err*/) { Decoded(); });
   }
 }
 

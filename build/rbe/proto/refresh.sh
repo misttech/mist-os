@@ -39,10 +39,6 @@ This populates the Fuchsia source tree with the following (gitignore'd) files:
     go/api/command/command.proto
     go/api/command/command_pb2.py
     and more...
-  third_party/protobuf/python/:
-    timestamp_pb2.py
-    descriptor_pb2.py
-    and more...
 EOF
 }
 
@@ -155,16 +151,17 @@ curl https://raw.githubusercontent.com/bazelbuild/remote-apis-sdks/master/go/api
 cd "$project_root"
 # Disable build metrics to avoid upload_reproxy_logs.sh before it is usable.
 protoc=(env FX_REMOTE_BUILD_METRICS=0 fx host-tool protoc)
+
 echo "Compiling protobufs with protoc: ${protoc[@]}"
-# TODO(fangism): provide prebuilt
 # Caveat: if fx build-metrics is already enabled with RBE, this fx build may
 # attempt to process and upload metrics before it is ready, and fail.
 
 # relative to $project_root:
 readonly PROTOBUF_SRC=third_party/protobuf/src
-readonly PROTOBUF_DEST=third_party/protobuf/python
+# This is where the prebuilt protobuf python wheel is installed.
+readonly PROTOBUF_WHEEL=prebuilt/third_party/protobuf-py3
 
-# Walk the proto imports recursive to find what needs to be compiled.
+# Walk the proto imports recursively to find what needs to be compiled.
 function walk_proto_imports() {
   echo "$1"
   local this="$1"
@@ -187,12 +184,7 @@ _proto_compile_list=(
   $(walk_proto_imports api/log/log.proto)
 )
 popd
-pushd "$PROTOBUF_SRC"
-# Just build all of these instead of trying to infer the minimal set.
-_proto_compile_list+=( google/protobuf/*.proto )
-popd
 
-# Subset of these protos are in third_party/protobuf/src.
 proto_compile_list=(
   $(echo "${_proto_compile_list[@]}" | tr ' ' '\n' | sort -u)
 )
@@ -203,17 +195,15 @@ echo "Compiling $DESTDIR protos to Python"
 for proto in "${proto_compile_list[@]}"
 do
   case "$proto" in
-    google/protobuf/*unittest*.proto) ;; # ignore
     google/protobuf/*)
-      # Generate third_party/protobuf/src -> third_party/protobuf/python.
-      echo "  $proto (to $PROTOBUF_DEST) ..."
-      "${protoc[@]}" \
-        -I="$PROTOBUF_SRC" \
-        -I="$PROTOBUF_DEST" \
-        --python_out="$PROTOBUF_DEST" \
-        "$PROTOBUF_SRC"/"$proto"
+      # Don't compile.
+      # These compiled protos live in $PROTOBUF_WHEEL.
+      echo "  $proto (expected in $PROTOBUF_SRC) ..."
+      [[ -f "$PROTOBUF_SRC/$proto" ]] || {
+        echo "  WARNING: $PROTOBUF_SRC/$proto should exist, but is missing."
+      }
       ;;
-    *)  # Everything else expected to be found in-place
+    *)  # Everything else expected to be built in-place
       echo "  $proto (to $DESTDIR) ..."
       "${protoc[@]}" \
         -I="$DESTDIR" \
@@ -223,10 +213,6 @@ do
       ;;
   esac
 done
-
-# TODO(fangism): provide prebuilt package with protos already compiled.
-# Placing these in "$DESTDIR" doesn't work, because imports get confused with
-# the path to one of two locations with 'google.protobuf'.
 
 echo "Done."
 

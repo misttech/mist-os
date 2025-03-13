@@ -338,7 +338,7 @@ namespace fidl {
 
 #ifdef __Fuchsia__
 template <>
-struct IsResource<::test_driverhandle::wire::ClientEndWrapper> : public std::true_type{};
+struct IsResource<::test_driverhandle::wire::ClientEndWrapper> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_driverhandle::wire::ClientEndWrapper> {
@@ -352,11 +352,11 @@ struct TypeTraits<::test_driverhandle::wire::ClientEndWrapper> {
 };
 
 template <>
-struct IsFidlType<::test_driverhandle::wire::ClientEndWrapper> : public std::true_type{};
+struct IsFidlType<::test_driverhandle::wire::ClientEndWrapper> : public std::true_type {};
 template <>
-struct IsWire<::test_driverhandle::wire::ClientEndWrapper> : public std::true_type{};
+struct IsWire<::test_driverhandle::wire::ClientEndWrapper> : public std::true_type {};
 template <>
-struct IsStruct<::test_driverhandle::wire::ClientEndWrapper> : public std::true_type{};
+struct IsStruct<::test_driverhandle::wire::ClientEndWrapper> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_driverhandle::wire::ClientEndWrapper>);
 static_assert(offsetof(::test_driverhandle::wire::ClientEndWrapper, value) == 0);
 static_assert(sizeof(::test_driverhandle::wire::ClientEndWrapper) == TypeTraits<::test_driverhandle::wire::ClientEndWrapper>::kPrimarySize);
@@ -390,7 +390,7 @@ struct ::fidl::internal::WireCodingTraits<::test_driverhandle::wire::ClientEndWr
 
 #ifdef __Fuchsia__
 template <>
-struct IsResource<::test_driverhandle::wire::ServerEndWrapper> : public std::true_type{};
+struct IsResource<::test_driverhandle::wire::ServerEndWrapper> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_driverhandle::wire::ServerEndWrapper> {
@@ -404,11 +404,11 @@ struct TypeTraits<::test_driverhandle::wire::ServerEndWrapper> {
 };
 
 template <>
-struct IsFidlType<::test_driverhandle::wire::ServerEndWrapper> : public std::true_type{};
+struct IsFidlType<::test_driverhandle::wire::ServerEndWrapper> : public std::true_type {};
 template <>
-struct IsWire<::test_driverhandle::wire::ServerEndWrapper> : public std::true_type{};
+struct IsWire<::test_driverhandle::wire::ServerEndWrapper> : public std::true_type {};
 template <>
-struct IsStruct<::test_driverhandle::wire::ServerEndWrapper> : public std::true_type{};
+struct IsStruct<::test_driverhandle::wire::ServerEndWrapper> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_driverhandle::wire::ServerEndWrapper>);
 static_assert(offsetof(::test_driverhandle::wire::ServerEndWrapper, value) == 0);
 static_assert(sizeof(::test_driverhandle::wire::ServerEndWrapper) == TypeTraits<::test_driverhandle::wire::ServerEndWrapper>::kPrimarySize);
@@ -442,7 +442,7 @@ struct ::fidl::internal::WireCodingTraits<::test_driverhandle::wire::ServerEndWr
 
 #ifdef __Fuchsia__
 template <>
-struct IsResource<::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest> : public std::true_type{};
+struct IsResource<::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest> {
@@ -456,11 +456,11 @@ struct TypeTraits<::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest
 };
 
 template <>
-struct IsFidlType<::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest> : public std::true_type{};
+struct IsFidlType<::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest> : public std::true_type {};
 template <>
-struct IsWire<::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest> : public std::true_type{};
+struct IsWire<::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest> : public std::true_type {};
 template <>
-struct IsStruct<::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest> : public std::true_type{};
+struct IsStruct<::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest>);
 static_assert(offsetof(::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest, t) == 0);
 static_assert(sizeof(::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest) == TypeTraits<::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest>::kPrimarySize);
@@ -494,7 +494,7 @@ struct ::fidl::internal::WireCodingTraits<::test_driverhandle::wire::HandlesInPr
 
 #ifdef __Fuchsia__
 template <>
-struct IsResource<::test_driverhandle::wire::T> : public std::true_type{};
+struct IsResource<::test_driverhandle::wire::T> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_driverhandle::wire::T> {
@@ -508,11 +508,11 @@ struct TypeTraits<::test_driverhandle::wire::T> {
 };
 
 template <>
-struct IsFidlType<::test_driverhandle::wire::T> : public std::true_type{};
+struct IsFidlType<::test_driverhandle::wire::T> : public std::true_type {};
 template <>
-struct IsWire<::test_driverhandle::wire::T> : public std::true_type{};
+struct IsWire<::test_driverhandle::wire::T> : public std::true_type {};
 template <>
-struct IsTable<::test_driverhandle::wire::T> : public std::true_type{};
+struct IsTable<::test_driverhandle::wire::T> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_driverhandle::wire::T>);
 
 template <bool IsRecursive>

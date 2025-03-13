@@ -279,9 +279,6 @@ template("go_build") {
     if (defined(invoker.lib_dirs)) {
       lib_dirs = rebase_path(invoker.lib_dirs, root_build_dir)
     }
-    lib_dirs += [ rebase_path(
-            get_label_info(":anything($shlib_toolchain)", "root_out_dir"),
-            root_build_dir) ]
 
     if (!defined(invoker.cgo) || invoker.cgo) {
       args += [ "--cgo" ]
@@ -302,11 +299,9 @@ template("go_build") {
           _fdio_label_with_toolchain,
         ]
 
-        if (_fdio_toolchain != current_toolchain + "-shared") {
-          lib_dirs += [ rebase_path(
-                  get_label_info(_fdio_label_with_toolchain, "root_out_dir"),
-                  root_build_dir) ]
-        }
+        lib_dirs += [ rebase_path(
+                get_label_info(_fdio_label_with_toolchain, "root_out_dir"),
+                root_build_dir) ]
 
         include_dirs +=
             [ rebase_path("//sdk/lib/fdio/include", root_build_dir) ]

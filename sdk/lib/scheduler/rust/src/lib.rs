@@ -9,7 +9,7 @@ use fidl_fuchsia_scheduler::{
 use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_sync::RwLock;
 use std::sync::Arc;
-use zx::{HandleBased, MonotonicInstant, Rights, Status, Thread};
+use zx::{HandleBased, MonotonicInstant, Rights, Status, Thread, Vmar};
 
 static ROLE_MANAGER: RwLock<Option<Arc<RoleManagerSynchronousProxy>>> = RwLock::new(None);
 
@@ -38,13 +38,10 @@ fn disconnect() {
     *proxy = None;
 }
 
-pub fn set_role_for_thread(thread: &Thread, role_name: &str) -> Result<(), Error> {
+fn set_role_for_target(target: RoleTarget, role_name: &str) -> Result<(), Error> {
     let role_manager = connect()?;
-    let thread = thread
-        .duplicate_handle(Rights::SAME_RIGHTS)
-        .context("Failed to duplicate thread handle")?;
     let request = RoleManagerSetRoleRequest {
-        target: Some(RoleTarget::Thread(thread)),
+        target: Some(target),
         role: Some(RoleName { role: role_name.to_string() }),
         ..Default::default()
     };
@@ -70,6 +67,23 @@ pub fn set_role_for_thread(thread: &Thread, role_name: &str) -> Result<(), Error
     Ok(())
 }
 
+pub fn set_role_for_thread(thread: &Thread, role_name: &str) -> Result<(), Error> {
+    let thread = thread
+        .duplicate_handle(Rights::SAME_RIGHTS)
+        .context("Failed to duplicate thread handle")?;
+    set_role_for_target(RoleTarget::Thread(thread), role_name)
+}
+
 pub fn set_role_for_this_thread(role_name: &str) -> Result<(), Error> {
     set_role_for_thread(&fuchsia_runtime::thread_self(), role_name)
+}
+
+pub fn set_role_for_vmar(vmar: &Vmar, role_name: &str) -> Result<(), Error> {
+    let vmar =
+        vmar.duplicate_handle(Rights::SAME_RIGHTS).context("Failed to duplicate vmar handle")?;
+    set_role_for_target(RoleTarget::Vmar(vmar), role_name)
+}
+
+pub fn set_role_for_root_vmar(role_name: &str) -> Result<(), Error> {
+    set_role_for_vmar(&fuchsia_runtime::vmar_root_self(), role_name)
 }

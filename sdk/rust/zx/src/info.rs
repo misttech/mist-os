@@ -63,6 +63,7 @@ assoc_values!(Topic, [
     BTI = sys::ZX_INFO_BTI;
     PROCESS_HANDLE_STATS = sys::ZX_INFO_PROCESS_HANDLE_STATS;
     SOCKET = sys::ZX_INFO_SOCKET;
+    TIMER = sys::ZX_INFO_TIMER;
     VMO = sys::ZX_INFO_VMO;
     JOB = sys::ZX_INFO_JOB;
     IOB = sys::ZX_INFO_IOB;

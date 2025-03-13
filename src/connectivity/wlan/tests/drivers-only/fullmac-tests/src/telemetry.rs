@@ -15,12 +15,17 @@ async fn test_get_iface_counter_stats() {
     let telemetry_proxy = sme_helpers::get_telemetry(&fullmac_driver.generic_sme_proxy).await;
     let telemetry_fut = telemetry_proxy.get_counter_stats();
 
-    let driver_counter_stats = fidl_stats::IfaceCounterStats {
+    let driver_connection_counters = fidl_stats::ConnectionCounters {
+        connection_id: Some(rand::thread_rng().gen()),
         rx_unicast_total: Some(rand::thread_rng().gen()),
         rx_unicast_drop: Some(rand::thread_rng().gen()),
         rx_multicast: Some(rand::thread_rng().gen()),
         tx_total: Some(rand::thread_rng().gen()),
         tx_drop: Some(rand::thread_rng().gen()),
+        ..Default::default()
+    };
+    let driver_counter_stats = fidl_stats::IfaceCounterStats {
+        connection_counters: Some(driver_connection_counters.clone()),
         ..Default::default()
     };
 
@@ -39,11 +44,7 @@ async fn test_get_iface_counter_stats() {
     assert_eq!(
         sme_counter_stats,
         fidl_stats::IfaceCounterStats {
-            rx_unicast_total: driver_counter_stats.rx_unicast_total,
-            rx_unicast_drop: driver_counter_stats.rx_unicast_drop,
-            rx_multicast: driver_counter_stats.rx_multicast,
-            tx_total: driver_counter_stats.tx_total,
-            tx_drop: driver_counter_stats.tx_drop,
+            connection_counters: Some(driver_connection_counters),
             ..Default::default()
         }
     );

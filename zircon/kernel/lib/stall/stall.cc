@@ -10,8 +10,6 @@
 #include <kernel/percpu.h>
 #include <lk/init.h>
 
-static constexpr zx_duration_mono_t kSampleInterval = ZX_MSEC(10);
-
 StallAggregator StallAggregator::singleton_;
 
 void StallAccumulator::UpdateWithIrqDisabled(int op_contributors_progressing,
@@ -119,9 +117,71 @@ void StallAccumulator::ApplyContextSwitch(Thread *current_thread, Thread *next_t
   }
 }
 
+zx::result<ktl::unique_ptr<StallObserver>> StallObserver::Create(zx_duration_mono_t threshold,
+                                                                 zx_duration_mono_t window,
+                                                                 EventReceiver *event_receiver) {
+  if (window <= 0 || threshold <= 0 || threshold > window) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  size_t samples_size = (window + kStallSampleInterval - 1) / kStallSampleInterval;
+
+  fbl::AllocChecker ac;
+  fbl::Array<zx_duration_mono_t> samples = fbl::MakeArray<zx_duration_mono_t>(&ac, samples_size);
+  if (!ac.check()) {
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
+  ktl::unique_ptr<StallObserver> result{
+      new (&ac) StallObserver(threshold, event_receiver, ktl::move(samples))};
+  if (!ac.check()) {
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
+  return zx::ok(ktl::move(result));
+}
+
+StallObserver::StallObserver(zx_duration_mono_t threshold, EventReceiver *event_receiver,
+                             fbl::Array<zx_duration_mono_t> samples)
+    : threshold_(threshold), event_receiver_(event_receiver), samples_(ktl::move(samples)) {}
+
+void StallObserver::PushSample(zx_duration_mono_t sample) {
+  samples_sum_ += sample - samples_[samples_pos_];
+  samples_[samples_pos_++] = sample;
+  if (samples_pos_ == samples_.size()) {
+    samples_pos_ = 0;
+  }
+
+  if (samples_sum_ >= threshold_) {
+    event_receiver_->OnAboveThreshold();
+  } else {
+    event_receiver_->OnBelowThreshold();
+  }
+}
+
 StallAggregator::Stats StallAggregator::ReadStats() const {
   Guard<CriticalMutex> guard{&stats_lock_};
   return stats_;
+}
+
+void StallAggregator::AddObserverSome(StallObserver *observer) {
+  Guard<CriticalMutex> guard{&observers_lock_};
+  observers_some_.push_back(observer);
+}
+
+void StallAggregator::RemoveObserverSome(StallObserver *observer) {
+  Guard<CriticalMutex> guard{&observers_lock_};
+  observers_some_.erase(*observer);
+}
+
+void StallAggregator::AddObserverFull(StallObserver *observer) {
+  Guard<CriticalMutex> guard{&observers_lock_};
+  observers_full_.push_back(observer);
+}
+
+void StallAggregator::RemoveObserverFull(StallObserver *observer) {
+  Guard<CriticalMutex> guard{&observers_lock_};
+  observers_full_.erase(*observer);
 }
 
 void StallAggregator::SampleOnce(
@@ -154,6 +214,17 @@ void StallAggregator::SampleOnce(
     stats_.stalled_time_some += delta_some;
     stats_.stalled_time_full += delta_full;
   }
+
+  // Notify observers.
+  {
+    Guard<CriticalMutex> guard{&observers_lock_};
+    for (StallObserver &observer : observers_some_) {
+      observer.PushSample(delta_some);
+    }
+    for (StallObserver &observer : observers_full_) {
+      observer.PushSample(delta_full);
+    }
+  }
 }
 
 void StallAggregator::IteratePerCpuStats(PerCpuStatsCallback callback) {
@@ -172,7 +243,7 @@ void StallAggregator::StartSamplingThread(uint level) {
     for (;;) {
       aggregator->SampleOnce();
 
-      deadline += kSampleInterval;
+      deadline += kStallSampleInterval;
       Thread::Current::Sleep(deadline);
     }
 

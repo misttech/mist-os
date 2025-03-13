@@ -17,6 +17,8 @@ namespace starnix_sync {
 
 template <typename Data>
 class MutexGuard;
+template <typename Data>
+class MappedMutexGuard;
 
 template <typename Data>
 class Mutex : public fbl::RefCountedUpgradeable<Mutex<Data>> {
@@ -31,6 +33,7 @@ class Mutex : public fbl::RefCountedUpgradeable<Mutex<Data>> {
   DISALLOW_COPY_ASSIGN_AND_MOVE(Mutex);
 
   friend class MutexGuard<Data>;
+  friend class MappedMutexGuard<Data>;
 
   DECLARE_MUTEX(Mutex) lock_;
   Data data_ __TA_GUARDED(lock_);
@@ -42,87 +45,111 @@ class Mutex : public fbl::RefCountedUpgradeable<Mutex<Data>> {
 /// An RAII mutex guard returned by `MutexGuard::map`, which can point to a
 /// subfield of the protected data.
 template <typename Data>
-class MappedMutexGuard : public Guard<::Mutex> {
+class MappedMutexGuard {
  public:
-  __WARN_UNUSED_CONSTRUCTOR explicit MappedMutexGuard(Guard<::Mutex>&& adopt, Data* data)
-      __TA_ACQUIRE(adopt.lock())
-      : Guard{AdoptLock, ktl::move(adopt)}, data_{data} {}
+  MappedMutexGuard() = default;
+  ~MappedMutexGuard() {}
+  MappedMutexGuard(Data* ptr) : ptr_(ptr) {}
+  MappedMutexGuard(MappedMutexGuard&& other) : ptr_(other.ptr_) { other.ptr_ = nullptr; }
 
-  MappedMutexGuard(MappedMutexGuard&& other)
-      : Guard{AdoptLock, ktl::move(other)}, data_{other.data_} {
-    other.data_ = nullptr;
-  }
-
-  MappedMutexGuard& operator=(MappedMutexGuard&& other) {
-    if (this != &other) {
-      // Guard::operator=(ktl::move(other.take()));
-      data_ = other.data_;
-      other.data_ = nullptr;
+  /*
+    MappedMutexGuard& operator=(MappedMutexGuard&& other) {
+      guard_ = ktl::move(other.guard_);
+      mtx_ = other.mtx_;
+      other.mtx_ = nullptr;
+      return *this;
     }
-    return *this;
-  }
+  */
 
-  Data* operator->() const { return data_; }
-  Data* operator->() { return data_; }
+  Data* operator->() const {
+    ZX_ASSERT(ptr_);
+    return ptr_;
+  }
+  Data* operator->() {
+    ZX_ASSERT(ptr_);
+    return ptr_;
+  }
 
   Data& operator*() const {
-    DEBUG_ASSERT(data_ != nullptr);
-    return *data_;
+    ZX_ASSERT(ptr_);
+    return *ptr_;
   }
   Data& operator*() {
-    DEBUG_ASSERT(data_ != nullptr);
-    return *data_;
+    ZX_ASSERT(ptr_);
+    return *ptr_;
   }
-
-  ~MappedMutexGuard() = default;
 
  private:
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(MappedMutexGuard);
-  Data* data_;
+  Data* ptr_ = nullptr;
 };
 
 template <typename Data>
-class MutexGuard : public Guard<::Mutex> {
+class MutexGuard {
  public:
-  __WARN_UNUSED_CONSTRUCTOR explicit MutexGuard(Mutex<Data>* mtx)
-      : Guard{&mtx->lock_}, data_{&mtx->data_} {}
+  MutexGuard() = default;
+  ~MutexGuard() { release(); }
+  MutexGuard(MutexGuard&& other) : mtx_(other.mtx_), lock_(other.take_lock()) {}
+  MutexGuard(Mutex<Data>* mtx) : mtx_(mtx), lock_(Guard<::Mutex>(&mtx->lock_).take()) {}
 
-  MutexGuard(MutexGuard&& other) : Guard{AdoptLock, ktl::move(other)}, data_{other.data_} {
-    other.data_ = nullptr;
+  // Take both the pointer and the lock, leaving the MutexGuard empty. Caller must take ownership
+  // of the returned lock and release it.
+  ktl::pair<Mutex<Data>*, Guard<::Mutex>::Adoptable> take() {
+    Mutex<Data>* ret = mtx_;
+    return {ret, take_lock()};
+  }
+
+  // Release the lock, returning the underlying pointer.
+  Mutex<Data>* release() {
+    auto [ret, lock] = take();
+    if (ret) {
+      Guard<::Mutex> guard{AdoptLock, &ret->lock_, ktl::move(lock)};
+    }
+    return ret;
   }
 
   MutexGuard& operator=(MutexGuard&& other) {
     if (this != &other) {
-      // Guard::operator=(ktl::move(other.take()));
-      data_ = other.data_;
-      other.data_ = nullptr;
-      return *this;
+      mtx_ = other.mtx_;
+      lock_ = ktl::move(other.take_lock());
     }
+    return *this;
   }
 
   template <typename U, typename F>
   static MappedMutexGuard<U> map(MutexGuard&& self, F&& f) __TA_NO_THREAD_SAFETY_ANALYSIS {
-    auto* data = f(self.data_);
-    return MappedMutexGuard<U>(ktl::move(self), data);
+    auto* data = f(&self.mtx_->data_);
+    return MappedMutexGuard<U>(data);
   }
 
-  Data* operator->() const { return data_; }
-  Data* operator->() { return data_; }
+  Data* operator->() const {
+    ZX_ASSERT(mtx_);
+    return &mtx_->data_;
+  }
+  Data* operator->() {
+    ZX_ASSERT(mtx_);
+    return &mtx_->data_;
+  }
 
   Data& operator*() const {
-    DEBUG_ASSERT(data_ != nullptr);
-    return *data_;
+    ZX_ASSERT(mtx_);
+    return mtx_->data_;
   }
   Data& operator*() {
-    DEBUG_ASSERT(data_ != nullptr);
-    return *data_;
+    ZX_ASSERT(mtx_);
+    return mtx_->data_;
   }
 
-  ~MutexGuard() = default;
-
  private:
+  // Helper for moving out the lock_ and clearing the data_ at the same time.
+  Guard<::Mutex>::Adoptable&& take_lock() {
+    mtx_ = nullptr;
+    return ktl::move(lock_);
+  }
+
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(MutexGuard);
-  Data* data_;
+  Mutex<Data>* mtx_ = nullptr;
+  Guard<::Mutex>::Adoptable lock_;
 };
 
 template <typename Data, typename Option>
@@ -147,21 +174,29 @@ class RwLock {
   friend class RwLockGuard<Data, BrwLockPi::Reader>;
   friend class RwLockGuard<Data, BrwLockPi::Writer>;
 
-  mutable DECLARE_BRWLOCK_PI(RwLock, lockdep::LockFlagsNone) lock_;
+  mutable DECLARE_BRWLOCK_PI(RwLock) lock_;
   Data data_ __TA_GUARDED(lock_);
 };
 
 template <typename Data, typename Option>
-class RwLockGuard : public Guard<BrwLockPi, Option> {
+class RwLockGuard {
  public:
-  __WARN_UNUSED_CONSTRUCTOR explicit RwLockGuard(
-      std::conditional_t<std::is_same_v<Option, BrwLockPi::Reader>, const RwLock<Data>*,
-                         RwLock<Data>*>
-          mtx)
-      : Guard<BrwLockPi, Option>(&mtx->lock_), mtx_(mtx) {}
+  RwLockGuard(std::conditional_t<std::is_same_v<Option, BrwLockPi::Reader>, const RwLock<Data>*,
+                                 RwLock<Data>*>
+                  mtx)
+      : guard_(&mtx->lock_), mtx_(mtx) {}
 
+  template <typename T = Option>
   RwLockGuard(RwLockGuard&& other) noexcept
-      : Guard<BrwLockPi, Option>(AdoptLock, ktl::move(other)), mtx_(other.mtx_) {
+    requires std::is_same_v<T, BrwLockPi::Writer>
+      : guard_(AdoptLock, &other.mtx_->lock_, other.guard_.take()), mtx_(other.mtx_) {
+    other.mtx_ = nullptr;
+  }
+
+  template <typename T = Option>
+  RwLockGuard(RwLockGuard&& other) noexcept
+    requires std::is_same_v<T, BrwLockPi::Reader>
+      : guard_(&other.mtx_->lock_), mtx_(other.mtx_) {
     other.mtx_ = nullptr;
   }
 
@@ -178,6 +213,7 @@ class RwLockGuard : public Guard<BrwLockPi, Option> {
 
  private:
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(RwLockGuard);
+  Guard<BrwLockPi, Option> guard_;
   std::conditional_t<std::is_same_v<Option, BrwLockPi::Reader>, const RwLock<Data>*, RwLock<Data>*>
       mtx_;
 };

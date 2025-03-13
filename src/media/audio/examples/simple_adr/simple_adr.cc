@@ -111,12 +111,6 @@ inline std::ostream& operator<<(std::ostream& out,
       return (out << "kCodec");
     case fuchsia_audio_device::DeviceType::kComposite:
       return (out << "kComposite");
-    case fuchsia_audio_device::DeviceType::kDai:
-      return (out << "kDai");
-    case fuchsia_audio_device::DeviceType::kInput:
-      return (out << "kInput");
-    case fuchsia_audio_device::DeviceType::kOutput:
-      return (out << "kOutput");
     default:
       return (out << "unknown DeviceType enum");
   }
@@ -176,15 +170,6 @@ void MediaApp::WaitForFirstAudioDevice() {
         // ring_buffer with the first supported ring_buffer_format.
         for (const auto& device : *result->devices()) {
           device_token_id_ = *device.token_id();
-          if (device.gain_caps().has_value()) {
-            if (device.gain_caps()->max_gain_db().has_value()) {
-              max_gain_db_ = *device.gain_caps()->max_gain_db();  // This example chooses
-              max_gain_db_ = std::min(max_gain_db_, 0.0f);        // not to exceed 0 dB.
-            }
-            if (device.gain_caps()->min_gain_db().has_value()) {
-              min_gain_db_ = *device.gain_caps()->min_gain_db();
-            }
-          }
 
           if constexpr (kLogDeviceInfo) {
             std::cout << "Connecting to audio device:" << '\n';
@@ -275,39 +260,6 @@ void MediaApp::WaitForFirstAudioDevice() {
               std::cout << "    is_input                  UNSPECIFIED" << '\n';
             }
 
-            if (device.gain_caps().has_value()) {
-              std::cout << "    gain_caps" << '\n';
-              std::cout << "        min_gain_db           "
-                        << (device.gain_caps()->min_gain_db()
-                                ? std::to_string(*device.gain_caps()->min_gain_db()) + " dB"
-                                : "NONE (non-compliant)")
-                        << '\n';
-              std::cout << "        max_gain_db           "
-                        << (device.gain_caps()->max_gain_db()
-                                ? std::to_string(*device.gain_caps()->max_gain_db()) + " dB"
-                                : "NONE (non-compliant)")
-                        << '\n';
-              std::cout << "        gain_step_db          "
-                        << (device.gain_caps()->gain_step_db()
-                                ? std::to_string(*device.gain_caps()->gain_step_db()) + " dB"
-                                : "NONE (non-compliant)")
-                        << '\n';
-              if (device.gain_caps()->can_mute()) {
-                std::cout << "        can_mute              "
-                          << (*device.gain_caps()->can_mute() ? "TRUE" : "FALSE") << '\n';
-              } else {
-                std::cout << "        can_mute              NONE (FALSE)" << '\n';
-              }
-              if (device.gain_caps()->can_agc()) {
-                std::cout << "        can_agc               "
-                          << (*device.gain_caps()->can_agc() ? "TRUE" : "FALSE") << '\n';
-              } else {
-                std::cout << "        can_agc               NONE (FALSE)" << '\n';
-              }
-            } else {
-              std::cout << "    gain_caps                 NONE" << '\n';
-            }
-
             std::cout << "    plug_caps                 " << device.plug_detect_caps() << '\n';
 
             std::string clk_domain_str;
@@ -339,68 +291,64 @@ void MediaApp::WaitForFirstAudioDevice() {
             }
           }
 
-          if (*device.device_type() == fuchsia_audio_device::DeviceType::kOutput) {
-            // Now determine the format we will use, and connect more deeply to the device.
-            if (!device.ring_buffer_format_sets() || device.ring_buffer_format_sets()->empty() ||
-                !device.ring_buffer_format_sets()->front().format_sets() ||
-                device.ring_buffer_format_sets()->front().format_sets()->empty() ||
-                !device.ring_buffer_format_sets()->front().format_sets()->front().channel_sets() ||
-                device.ring_buffer_format_sets()
-                    ->front()
-                    .format_sets()
-                    ->front()
-                    .channel_sets()
-                    ->empty() ||
-                !device.ring_buffer_format_sets()
-                     ->front()
-                     .format_sets()
-                     ->front()
-                     .channel_sets()
-                     ->front()
-                     .attributes() ||
-                device.ring_buffer_format_sets()
-                    ->front()
-                    .format_sets()
-                    ->front()
-                    .channel_sets()
-                    ->front()
-                    .attributes()
-                    ->empty()) {
-              std::cout
-                  << "Cannot determine a channel-count from ring_buffer_format_sets (missing/empty)"
-                  << '\n';
-              Shutdown();
-              return;
-            }
-            // For convenience, just use the first channel configuration that the device listed.
-            channels_per_frame_ = device.ring_buffer_format_sets()
-                                      ->front()
-                                      .format_sets()
-                                      ->front()
-                                      .channel_sets()
-                                      ->front()
-                                      .attributes()
-                                      ->size();
+          // Now determine the format we will use, and connect more deeply to the device.
+          if (!device.ring_buffer_format_sets() || device.ring_buffer_format_sets()->empty() ||
+              !device.ring_buffer_format_sets()->front().format_sets() ||
+              device.ring_buffer_format_sets()->front().format_sets()->empty() ||
+              !device.ring_buffer_format_sets()->front().format_sets()->front().channel_sets() ||
+              device.ring_buffer_format_sets()
+                  ->front()
+                  .format_sets()
+                  ->front()
+                  .channel_sets()
+                  ->empty() ||
+              !device.ring_buffer_format_sets()
+                   ->front()
+                   .format_sets()
+                   ->front()
+                   .channel_sets()
+                   ->front()
+                   .attributes() ||
+              device.ring_buffer_format_sets()
+                  ->front()
+                  .format_sets()
+                  ->front()
+                  .channel_sets()
+                  ->front()
+                  .attributes()
+                  ->empty()) {
+            std::cout
+                << "Cannot determine a channel-count from ring_buffer_format_sets (missing/empty)"
+                << '\n';
+            Shutdown();
+            return;
+          }
+          // For convenience, just use the first channel configuration that the device listed.
+          channels_per_frame_ = device.ring_buffer_format_sets()
+                                    ->front()
+                                    .format_sets()
+                                    ->front()
+                                    .channel_sets()
+                                    ->front()
+                                    .attributes()
+                                    ->size();
 
-            // If we didn't get a valid overall format, then we shouldn't continue onward.
-            if (!channels_per_frame_) {
-              return;
-            }
-
-            ObserveStreamOutput();
-            ConnectToControlCreator();
-            if (ConnectToControl()) {
-              ConnectToRingBuffer();
-            }
-            break;  // Only do this for the first device found.
+          // If we didn't get a valid overall format, then we shouldn't continue onward.
+          if (!channels_per_frame_) {
+            return;
           }
 
-          // If the device is not one of these types, keep looking....
+          ObserveDevice();
+          ConnectToControlCreator();
+          if (ConnectToControl()) {
+            ConnectToRingBuffer();
+          }
+          break;  // Only do this for the first device found.
         }
       });
 }
 
-void MediaApp::ObserveStreamOutput() {
+void MediaApp::ObserveDevice() {
   if (!registry_client_.has_value()) {
     Shutdown();
     return;
@@ -424,33 +372,6 @@ void MediaApp::ObserveStreamOutput() {
           return;
         }
 
-        observer_client_->WatchGainState().Then(
-            [this](fidl::Result<fuchsia_audio_device::Observer::WatchGainState>& result) {
-              if (!result.is_ok()) {
-                std::cout << "Observer/WatchGainState error: "
-                          << result.error_value().FormatDescription() << '\n';
-                Shutdown();
-              }
-
-              std::cout << "GainState" << '\n';
-              std::cout << "    gain_db:                  "
-                        << (result->state()->gain_db()
-                                ? std::to_string(*result->state()->gain_db()) + " dB"
-                                : "NONE (non-compliant)")
-                        << '\n';
-              if (result->state()->muted().has_value()) {
-                std::cout << "    muted:                    "
-                          << (*result->state()->muted() ? "TRUE" : "FALSE") << '\n';
-              } else {
-                std::cout << "    muted:                    NONE (FALSE)" << '\n';
-              }
-              if (result->state()->agc_enabled().has_value()) {
-                std::cout << "    agc_enabled:              "
-                          << (*result->state()->agc_enabled() ? "TRUE" : "FALSE") << '\n';
-              } else {
-                std::cout << "    agc_enabled:              NONE (FALSE)" << '\n';
-              }
-            });
         observer_client_->WatchPlugState().Then(
             [this](fidl::Result<fuchsia_audio_device::Observer::WatchPlugState>& result) {
               if (!result.is_ok()) {
@@ -679,29 +600,6 @@ void MediaApp::StartRingBuffer() {
           return;
         }
         std::cout << "RingBuffer/Start is_ok, playback has begun" << '\n';
-        // Stair-step the device gain from -15 dB to 0 dB, over 30 iterations of 0.1s.
-        ChangeGainByDbAfter(1.0f, zx::msec(200), 15);
-      });
-}
-
-void MediaApp::ChangeGainByDbAfter(float change_db, zx::duration wait_duration,
-                                   int32_t iterations) {
-  auto gain_db =
-      std::max(min_gain_db_, max_gain_db_ - (change_db * static_cast<float>(iterations)));
-  std::cout << "Setting device gain to " << gain_db << " dB" << '\n';
-
-  control_client_
-      ->SetGain({{fuchsia_audio_device::GainState{{
-          .gain_db = gain_db,
-      }}}})
-      .Then([this, change_db, wait_duration,
-             iterations](fidl::Result<fuchsia_audio_device::Control::SetGain>&) {
-        zx::nanosleep(zx::deadline_after(wait_duration));
-        if (!iterations) {
-          StopRingBuffer();
-          return;
-        }
-        ChangeGainByDbAfter(change_db, wait_duration, iterations - 1);
       });
 }
 

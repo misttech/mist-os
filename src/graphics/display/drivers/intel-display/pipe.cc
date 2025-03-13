@@ -22,9 +22,9 @@
 #include "src/graphics/display/drivers/intel-display/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-display/registers-transcoder.h"
 #include "src/graphics/display/drivers/intel-display/tiling.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/driver-utils/poll-until.h"
 
 namespace {
@@ -121,26 +121,25 @@ void Pipe::ResetTranscoder(TranscoderId transcoder_id, registers::Platform platf
   if (transcoder_config.enabled()) {
     transcoder_config.set_enabled_target(false).WriteTo(mmio_space);
   } else {
-    FDF_LOG(TRACE, "ResetTranscoder() skipping already-disabled control for transcoder %d",
-            transcoder_id);
-    FDF_LOG(TRACE, "Transcoder %d control register: %x", transcoder_id,
-            transcoder_config.reg_value());
+    fdf::trace("ResetTranscoder() skipping already-disabled control for transcoder {}",
+               transcoder_id);
+    fdf::trace("Transcoder {} control register: {:x}", transcoder_id,
+               transcoder_config.reg_value());
   }
 
   if (platform == registers::Platform::kTigerLake) {
     auto transcoder_chicken = transcoder_regs.Chicken().ReadFrom(mmio_space);
-    FDF_LOG(TRACE, "ResetTranscoder() - Transcoder %d chicken register: %x", transcoder_id,
-            transcoder_chicken.reg_value());
+    fdf::trace("ResetTranscoder() - Transcoder {} chicken register: {:x}", transcoder_id,
+               transcoder_chicken.reg_value());
     if (transcoder_chicken.override_forward_error_correction_tiger_lake()) {
-      FDF_LOG(INFO, "Disabling FEC override chicken bit for transcoder %d", transcoder_id);
+      fdf::info("Disabling FEC override chicken bit for transcoder {}", transcoder_id);
       transcoder_chicken.set_override_forward_error_correction_tiger_lake(false).WriteTo(
           mmio_space);
 
       // TODO(https://fxbug.dev/42061773): Remove this warning once we support DisplayPort
       // MST (Multi-Stream).
-      FDF_LOG(WARNING,
-              "Transcoder %d was using a DisplayPort MST feature. Reset may be incomplete.",
-              transcoder_id);
+      fdf::warn("Transcoder {} was using a DisplayPort MST feature. Reset may be incomplete.",
+                transcoder_id);
     }
   }
 
@@ -152,17 +151,17 @@ void Pipe::ResetTranscoder(TranscoderId transcoder_id, registers::Platform platf
                           zx::msec(1), kTransConfStatusWaitTimeoutMs)) {
     // Because this is a logical "reset", we only log failures rather than
     // crashing the driver.
-    FDF_LOG(WARNING, "Failed to reset transcoder");
+    fdf::warn("Failed to reset transcoder");
     return;
   }
 
   if (platform == registers::Platform::kTigerLake) {
     auto transcoder_variable_rate_refresh_control =
         transcoder_regs.VariableRateRefreshControl().ReadFrom(mmio_space);
-    FDF_LOG(TRACE, "ResetTranscoder() - Transcoder %d VRR register: %x", transcoder_id,
-            transcoder_variable_rate_refresh_control.reg_value());
+    fdf::trace("ResetTranscoder() - Transcoder {} VRR register: {:x}", transcoder_id,
+               transcoder_variable_rate_refresh_control.reg_value());
     if (transcoder_variable_rate_refresh_control.enabled()) {
-      FDF_LOG(INFO, "Disabling VRR (Variable Refresh Rate) for transcoder %d", transcoder_id);
+      fdf::info("Disabling VRR (Variable Refresh Rate) for transcoder {}", transcoder_id);
       transcoder_variable_rate_refresh_control.set_enabled(false).WriteTo(mmio_space);
     }
   }
@@ -184,11 +183,10 @@ void Pipe::ResetTranscoder(TranscoderId transcoder_id, registers::Platform platf
     // reserved to be zero, so it is safe to set the whole field to zero.
     transcoder_ddi_control.set_enabled(false).set_ddi_tiger_lake(std::nullopt).WriteTo(mmio_space);
   } else {
-    FDF_LOG(TRACE,
-            "ResetTranscoder() skipping already-disabled DDI functionality for transcoder %d",
-            transcoder_id);
-    FDF_LOG(TRACE, "Transcoder %d DDI functionality control register: %x", transcoder_id,
-            transcoder_ddi_control.reg_value());
+    fdf::trace("ResetTranscoder() skipping already-disabled DDI functionality for transcoder {}",
+               transcoder_id);
+    fdf::trace("Transcoder {} DDI functionality control register: {:x}", transcoder_id,
+               transcoder_ddi_control.reg_value());
   }
 
   if (transcoder_id != TranscoderId::TRANSCODER_EDP) {
@@ -255,7 +253,7 @@ void Pipe::ResetPlanes() {
 void Pipe::ResetActiveTranscoder() {
   if (in_use()) {
     ResetTranscoder(connected_transcoder_id(), platform_, mmio_space_);
-    FDF_LOG(DEBUG, "Reset active transcoder %d for pipe %d", connected_transcoder_id(), pipe_id());
+    fdf::debug("Reset active transcoder {} for pipe {}", connected_transcoder_id(), pipe_id());
   }
 }
 
@@ -389,11 +387,11 @@ void Pipe::LoadActiveMode(display::DisplayTiming* mode) {
 }
 
 void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
-                              display::ConfigStamp config_stamp,
+                              display::DriverConfigStamp config_stamp,
                               const SetupGttImageFunc& get_gtt_region_fn,
                               const GetImagePixelFormatFunc& get_pixel_format) {
   ZX_ASSERT(banjo_display_config);
-  ZX_ASSERT(config_stamp != display::kInvalidConfigStamp);
+  ZX_ASSERT(config_stamp != display::kInvalidDriverConfigStamp);
 
   // The values of the config stamps in `pending_eviction_config_stamps_` must
   // be strictly increasing.
@@ -469,7 +467,7 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
     }
     config_stamp_with_color_layer_ = config_stamp;
   } else {
-    config_stamp_with_color_layer_ = display::kInvalidConfigStamp;
+    config_stamp_with_color_layer_ = display::kInvalidDriverConfigStamp;
   }
 
   regs.pipe_bottom_color = bottom_color.reg_value();
@@ -512,7 +510,7 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
 
 void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const layer_t* primary, bool enable_csc,
                                  bool* scaler_1_claimed, registers::pipe_arming_regs_t* regs,
-                                 display::ConfigStamp config_stamp,
+                                 display::DriverConfigStamp config_stamp,
                                  const SetupGttImageFunc& setup_gtt_image,
                                  const GetImagePixelFormatFunc& get_pixel_format) {
   registers::PipeRegs pipe_regs(pipe_id());
@@ -706,7 +704,7 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const layer_t* primary, boo
     ZX_ASSERT(image_metadata.tiling_type == IMAGE_TILING_TYPE_YF_TILED);
     if (platform_ == registers::Platform::kTigerLake) {
       // TODO(https://fxbug.dev/42062668): Remove this warning or turn it into an error.
-      FDF_LOG(ERROR, "The Tiger Lake display engine may not support YF tiling.");
+      fdf::error("The Tiger Lake display engine may not support YF tiling.");
     }
     plane_ctrl.set_surface_tiling(registers::PlaneControl::SurfaceTiling::kTilingYFKabyLake);
   }
@@ -730,7 +728,7 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const layer_t* primary, boo
 }
 
 void Pipe::DisableCursorPlane(registers::pipe_arming_regs* regs,
-                              display::ConfigStamp config_stamp) {
+                              display::DriverConfigStamp config_stamp) {
   registers::PipeRegs pipe_regs(pipe_id());
 
   auto cursor_ctrl = pipe_regs.CursorCtrl().ReadFrom(mmio_space_);
@@ -738,10 +736,10 @@ void Pipe::DisableCursorPlane(registers::pipe_arming_regs* regs,
   regs->cur_base = regs->cur_pos = 0;
 }
 
-display::ConfigStamp Pipe::GetVsyncConfigStamp(const std::vector<uint64_t>& image_handles) {
-  display::ConfigStamp oldest_config_stamp = display::kInvalidConfigStamp;
+display::DriverConfigStamp Pipe::GetVsyncConfigStamp(const std::vector<uint64_t>& image_handles) {
+  display::DriverConfigStamp oldest_config_stamp = display::kInvalidDriverConfigStamp;
 
-  if (config_stamp_with_color_layer_ != display::kInvalidConfigStamp) {
+  if (config_stamp_with_color_layer_ != display::kInvalidDriverConfigStamp) {
     oldest_config_stamp = config_stamp_with_color_layer_;
   }
   for (const uint64_t handle : image_handles) {
@@ -750,32 +748,32 @@ display::ConfigStamp Pipe::GetVsyncConfigStamp(const std::vector<uint64_t>& imag
       continue;
     }
 
-    if (oldest_config_stamp != display::kInvalidConfigStamp) {
+    if (oldest_config_stamp != display::kInvalidDriverConfigStamp) {
       oldest_config_stamp = std::min(oldest_config_stamp, config_it->second);
     } else {
       oldest_config_stamp = config_it->second;
     }
   }
 
-  if (oldest_config_stamp == display::kInvalidConfigStamp) {
+  if (oldest_config_stamp == display::kInvalidDriverConfigStamp) {
     // Display device may carry garbage contents in the registers, for example
     // if the driver restarted. In that case none of the images stored in the
     // device register will be recognized by the driver, so we just return a
     // null config stamp to ignore it.
-    FDF_LOG(DEBUG, "%s: NO valid images for the display.", __func__);
-    return display::kInvalidConfigStamp;
+    fdf::debug("{}: NO valid images for the display.", __func__);
+    return display::kInvalidDriverConfigStamp;
   }
   if (pending_eviction_config_stamps_.empty()) {
     // Vsync signals could be sent to the driver before the first
     // ApplyConfiguration() is called. In that case the Vsync signal should be
     // just ignored by the driver, so we return a null config stamp.
-    FDF_LOG(DEBUG, "%s: No config has been applied.", __func__);
-    return display::kInvalidConfigStamp;
+    fdf::debug("{}: No config has been applied.", __func__);
+    return display::kInvalidDriverConfigStamp;
   }
   if (pending_eviction_config_stamps_.front() > oldest_config_stamp) {
-    FDF_LOG(ERROR, "%s: Device returns a config (%lu) that is already evicted.", __func__,
-            oldest_config_stamp.value());
-    return display::kInvalidConfigStamp;
+    fdf::error("{}: Device returns a config ({}) that is already evicted.", __func__,
+               oldest_config_stamp.value());
+    return display::kInvalidDriverConfigStamp;
   }
 
   // Evict all pending config stamps older than the current one from Vsync.

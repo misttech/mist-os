@@ -11,7 +11,7 @@ use block_client::{
     BlockClient, BufferSlice, MutableBufferSlice, RemoteBlockClient, VmoId, WriteOptions,
 };
 use block_server::async_interface::{Interface, SessionManager};
-use block_server::{BlockServer, PartitionInfo};
+use block_server::{BlockServer, DeviceInfo, PartitionInfo};
 use device::Device;
 use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, ServerEnd};
 use fidl_fuchsia_fs::{AdminMarker, AdminRequest, AdminRequestStream};
@@ -38,6 +38,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::fmt::Formatter;
 use std::future::Future;
 use std::marker::PhantomData;
+use std::num::NonZero;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -234,7 +235,7 @@ impl Metadata {
             .skip(1) // The first partition is unused.
             .filter_map(|(index, e)| {
                 let partition = PartitionEntry::read_from_bytes(e).unwrap();
-                partition.is_allocated().then(|| (index as u16, partition))
+                partition.is_allocated().then_some((index as u16, partition))
             })
             .collect();
         let allocations: Vec<_> = if allocation_size < std::mem::size_of::<SliceEntry>() {
@@ -463,6 +464,7 @@ impl Fvm {
         partition_index: u16,
         device_block_offset: u64,
         block_count: u32,
+        trace_flow_id: u64,
     ) -> Result<(), Error> {
         let inner = self.inner.read().await;
         let Some(PartitionState { mappings, .. }) = inner.partition_state.get(&partition_index)
@@ -506,7 +508,7 @@ impl Fvm {
             let physical_offset =
                 data_start + mapping.to * slice_size + (offset - mapping.from.start * slice_size);
 
-            io.add_op(physical_offset, len).await?;
+            io.add_op(physical_offset, len, trace_flow_id).await?;
             offset += len;
             total_len -= len;
         }
@@ -679,9 +681,18 @@ impl Fvm {
 // Trait to abstract over the difference between reads and writes.
 trait IoTrait {
     // Called to get the future that performs the read or write.
-    fn add_op(&mut self, offset: u64, len: u64) -> impl Future<Output = Result<(), zx::Status>>;
+    fn add_op(
+        &mut self,
+        offset: u64,
+        len: u64,
+        trace_flow_id: u64,
+    ) -> impl Future<Output = Result<(), zx::Status>>;
 
     fn flush(&mut self) -> impl Future<Output = Result<(), zx::Status>>;
+}
+
+fn trace_id(trace_flow_id: Option<NonZero<u64>>) -> u64 {
+    trace_flow_id.map(|v| v.get()).unwrap_or_default()
 }
 
 struct Read<'a> {
@@ -692,10 +703,16 @@ struct Read<'a> {
 }
 
 impl IoTrait for Read<'_> {
-    async fn add_op(&mut self, offset: u64, len: u64) -> Result<(), zx::Status> {
-        self.ops.push(Box::pin(self.device.read_at(
+    async fn add_op(
+        &mut self,
+        offset: u64,
+        len: u64,
+        trace_flow_id: u64,
+    ) -> Result<(), zx::Status> {
+        self.ops.push(Box::pin(self.device.read_at_traced(
             MutableBufferSlice::new_with_vmo_id(self.vmo_id, self.vmo_offset, len),
             offset,
+            trace_flow_id,
         )));
         self.vmo_offset += len;
         Ok(())
@@ -720,11 +737,16 @@ impl<'a> ReadToMem<'a> {
 }
 
 impl IoTrait for ReadToMem<'_> {
-    async fn add_op(&mut self, offset: u64, len: u64) -> Result<(), zx::Status> {
+    async fn add_op(
+        &mut self,
+        offset: u64,
+        len: u64,
+        trace_flow_id: u64,
+    ) -> Result<(), zx::Status> {
         // We don't care about performance, so we issue the operation immediately.
         let (head, tail) = std::mem::take(&mut self.buffer).split_at_mut(len as usize);
         self.buffer = tail;
-        self.device.read_at(MutableBufferSlice::Memory(head), offset).await?;
+        self.device.read_at_traced(MutableBufferSlice::Memory(head), offset, trace_flow_id).await?;
         Ok(())
     }
 
@@ -742,11 +764,17 @@ struct Write<'a> {
 }
 
 impl IoTrait for Write<'_> {
-    async fn add_op(&mut self, offset: u64, len: u64) -> Result<(), zx::Status> {
-        self.ops.push(Box::pin(self.device.write_at_with_opts(
+    async fn add_op(
+        &mut self,
+        offset: u64,
+        len: u64,
+        trace_flow_id: u64,
+    ) -> Result<(), zx::Status> {
+        self.ops.push(Box::pin(self.device.write_at_with_opts_traced(
             BufferSlice::new_with_vmo_id(self.vmo_id, self.vmo_offset, len),
             offset,
             self.options,
+            trace_flow_id,
         )));
         self.vmo_offset += len;
         Ok(())
@@ -771,15 +799,49 @@ impl<'a> WriteFromMem<'a> {
 }
 
 impl IoTrait for WriteFromMem<'_> {
-    async fn add_op(&mut self, offset: u64, len: u64) -> Result<(), zx::Status> {
+    async fn add_op(
+        &mut self,
+        offset: u64,
+        len: u64,
+        trace_flow_id: u64,
+    ) -> Result<(), zx::Status> {
         // We don't care about performance, so we issue the operation immediately.
         let (head, tail) = self.buffer.split_at(len as usize);
         self.buffer = tail;
-        self.device.write_at(BufferSlice::Memory(head), offset).await?;
+        self.device
+            .write_at_with_opts_traced(
+                BufferSlice::Memory(head),
+                offset,
+                WriteOptions::empty(),
+                trace_flow_id,
+            )
+            .await?;
         Ok(())
     }
 
     async fn flush(&mut self) -> Result<(), zx::Status> {
+        Ok(())
+    }
+}
+
+struct Trim<'a> {
+    device: &'a Device,
+    ops: FuturesUnordered<BoxFuture<'a, Result<(), zx::Status>>>,
+}
+
+impl IoTrait for Trim<'_> {
+    async fn add_op(
+        &mut self,
+        offset: u64,
+        len: u64,
+        trace_flow_id: u64,
+    ) -> Result<(), zx::Status> {
+        self.ops.push(Box::pin(self.device.trim_traced(offset..offset + len, trace_flow_id)));
+        Ok(())
+    }
+
+    async fn flush(&mut self) -> Result<(), zx::Status> {
+        while self.ops.try_next().await?.is_some() {}
         Ok(())
     }
 }
@@ -1053,17 +1115,18 @@ impl Component {
         format: bool,
     ) -> Result<(), Error> {
         let fvm = self.fvm();
-        let partition_info = {
+        let device_info = {
             let inner = fvm.inner.read().await;
             let partition =
                 &inner.metadata.partitions.get(&partition_index).ok_or(zx::Status::INTERNAL)?;
-            PartitionInfo {
+            DeviceInfo::Partition(PartitionInfo {
+                device_flags: fvm.device.block_flags(),
                 block_range: None, // Supplied via `get_volume_info`.
                 type_guid: partition.type_guid,
                 instance_guid: partition.guid,
-                name: Some(partition.name().to_string()),
+                name: partition.name().to_string(),
                 flags: 0,
-            }
+            })
         };
 
         let key = if let Some(crypt) = options.crypt {
@@ -1079,7 +1142,7 @@ impl Component {
 
         let block_server = BlockServer::new(
             fvm.block_size(),
-            Arc::new(PartitionInterface { partition_index, partition_info, key, fvm: fvm.clone() }),
+            Arc::new(PartitionInterface { partition_index, device_info, key, fvm: fvm.clone() }),
         );
 
         let server_end = server_end.into_channel();
@@ -1151,7 +1214,7 @@ impl Component {
             let (svc_proxy, svc_server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             outgoing_dir.add_entry("svc", vfs::remote::remote_dir(svc_proxy))?;
-            exposed_dir.open3(
+            exposed_dir.open(
                 ".",
                 fio::PERM_READABLE
                     | fio::Flags::PERM_INHERIT_EXECUTE
@@ -1162,7 +1225,7 @@ impl Component {
             let (root_proxy, root_server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             outgoing_dir.add_entry("root", vfs::remote::remote_dir(root_proxy))?;
-            exposed_dir.open3(
+            exposed_dir.open(
                 "root",
                 fio::PERM_READABLE
                     | fio::Flags::PERM_INHERIT_EXECUTE
@@ -1245,11 +1308,16 @@ impl Component {
         let slices = match create_options.initial_size {
             Some(x) => {
                 if x % inner.metadata.header.slice_size > 0 {
-                    return Err(anyhow!(zx::Status::INVALID_ARGS).context("Invalid volume size"));
+                    return Err(anyhow!(zx::Status::INVALID_ARGS)).with_context(|| {
+                        format!(
+                            "Invalid volume size: size {} not a multiple of slice size {}",
+                            x, inner.metadata.header.slice_size
+                        )
+                    });
                 }
-                (x / inner.metadata.header.slice_size)
-                    .try_into()
-                    .map_err(|_| anyhow!(zx::Status::INVALID_ARGS).context("Invalid volume size"))?
+                (x / inner.metadata.header.slice_size).try_into().map_err(|_| {
+                    anyhow!(zx::Status::INVALID_ARGS).context("Invalid volume size: too large")
+                })?
             }
             None => 1,
         };
@@ -1337,7 +1405,7 @@ impl Component {
 
 struct PartitionInterface {
     partition_index: u16,
-    partition_info: PartitionInfo,
+    device_info: DeviceInfo,
     key: Option<zxcrypt::Key>,
     fvm: Arc<Fvm>,
 }
@@ -1351,8 +1419,8 @@ impl Interface for PartitionInterface {
         self.fvm.device.detach_vmo(vmo);
     }
 
-    async fn get_info(&self) -> Result<Cow<'_, PartitionInfo>, zx::Status> {
-        Ok(Cow::Borrowed(&self.partition_info))
+    async fn get_info(&self) -> Result<Cow<'_, DeviceInfo>, zx::Status> {
+        Ok(Cow::Borrowed(&self.device_info))
     }
 
     async fn read(
@@ -1361,6 +1429,7 @@ impl Interface for PartitionInterface {
         block_count: u32,
         vmo: &Arc<zx::Vmo>,
         vmo_offset: u64,
+        trace_flow_id: Option<NonZero<u64>>,
     ) -> Result<(), zx::Status> {
         debug!(
             "read {}: @{device_block_offset}, count={block_count}, vmo_offset={vmo_offset}",
@@ -1384,6 +1453,7 @@ impl Interface for PartitionInterface {
                     self.partition_index,
                     device_block_offset,
                     block_count,
+                    trace_id(trace_flow_id),
                 )
                 .await
         } else {
@@ -1398,6 +1468,7 @@ impl Interface for PartitionInterface {
                     self.partition_index,
                     device_block_offset,
                     block_count,
+                    trace_id(trace_flow_id),
                 )
                 .await
         }
@@ -1414,6 +1485,7 @@ impl Interface for PartitionInterface {
         vmo: &Arc<zx::Vmo>,
         vmo_offset: u64,
         options: WriteOptions,
+        trace_flow_id: Option<NonZero<u64>>,
     ) -> Result<(), zx::Status> {
         debug!(
             "write {}: @{device_block_offset}, count={block_count}, vmo_offset={vmo_offset}",
@@ -1438,6 +1510,7 @@ impl Interface for PartitionInterface {
                     self.partition_index,
                     device_block_offset,
                     block_count,
+                    trace_id(trace_flow_id),
                 )
                 .await
         } else {
@@ -1454,6 +1527,7 @@ impl Interface for PartitionInterface {
                     self.partition_index,
                     device_block_offset,
                     block_count,
+                    trace_id(trace_flow_id),
                 )
                 .await
         }
@@ -1463,12 +1537,30 @@ impl Interface for PartitionInterface {
         })
     }
 
-    async fn flush(&self) -> Result<(), zx::Status> {
-        self.fvm.device.flush().await
+    async fn flush(&self, trace_flow_id: Option<NonZero<u64>>) -> Result<(), zx::Status> {
+        self.fvm.device.flush_traced(trace_id(trace_flow_id)).await
     }
 
-    async fn trim(&self, _device_block_offset: u64, _block_count: u32) -> Result<(), zx::Status> {
-        todo!();
+    async fn trim(
+        &self,
+        device_block_offset: u64,
+        block_count: u32,
+        trace_flow_id: Option<NonZero<u64>>,
+    ) -> Result<(), zx::Status> {
+        let device = &self.fvm.device;
+        self.fvm
+            .do_io(
+                Trim { device, ops: FuturesUnordered::new() },
+                self.partition_index,
+                device_block_offset,
+                block_count,
+                trace_id(trace_flow_id),
+            )
+            .await
+            .map_err(|error| {
+                warn!(error:?; "Trim failed");
+                map_to_status(error)
+            })
     }
 
     async fn get_volume_info(
@@ -1806,6 +1898,7 @@ mod tests {
         StartOptions, StartupMarker, VolumeMarker, VolumesMarker,
     };
     use fidl_fuchsia_hardware_block::BlockMarker;
+    use fs_management::DATA_TYPE_GUID;
     use fuchsia_component::client::{
         connect_to_named_protocol_at_dir_root, connect_to_protocol_at_dir_svc,
     };
@@ -1814,8 +1907,8 @@ mod tests {
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use {
-        fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio,
-        fuchsia_async as fasync,
+        fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume,
+        fidl_fuchsia_io as fio, fuchsia_async as fasync,
     };
 
     struct Fixture {
@@ -2970,5 +3063,106 @@ mod tests {
             connect_to_protocol_at_dir_svc::<AdminMarker>(&fixture.outgoing_dir).unwrap();
         admin_proxy.shutdown().await.unwrap();
         fixture.component.scope.wait().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_trim() {
+        let trim_called = Arc::new(AtomicBool::new(false));
+
+        struct Observer(Arc<AtomicBool>);
+
+        impl fake_block_server::Observer for Observer {
+            fn trim(&self, _device_block_offset: u64, _block_count: u32) {
+                self.0.store(true, Ordering::Relaxed)
+            }
+        }
+
+        let contents = std::fs::read("/pkg/data/golden-fvm.blk").unwrap();
+        let fake_server = Arc::new(
+            FakeServerOptions {
+                block_count: Some(contents.len() as u64 / BLOCK_SIZE as u64),
+                block_size: BLOCK_SIZE,
+                initial_content: Some(&contents),
+                observer: Some(Box::new(Observer(trim_called.clone()))),
+                ..Default::default()
+            }
+            .into(),
+        );
+
+        let fixture = Fixture::from_fake_server(fake_server).await;
+
+        let volume_proxy = connect_to_named_protocol_at_dir_root::<VolumeMarker>(
+            &fixture.outgoing_dir,
+            "volumes/data",
+        )
+        .unwrap();
+
+        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+        volume_proxy
+            .mount(dir_server_end, MountOptions::default())
+            .await
+            .expect("mount failed (FIDL)")
+            .expect("mount failed");
+
+        let client = RemoteBlockClient::new(
+            &connect_to_protocol_at_dir_svc::<fvolume::VolumeMarker>(&dir_proxy).unwrap(),
+        )
+        .await
+        .unwrap();
+
+        client.trim(0..8192).await.unwrap();
+
+        assert!(trim_called.load(Ordering::Relaxed));
+    }
+
+    #[fuchsia::test]
+    async fn test_volume_info() {
+        let contents = std::fs::read("/pkg/data/golden-fvm.blk").unwrap();
+        let fake_server = Arc::new(
+            FakeServerOptions {
+                flags: fblock::Flag::READONLY,
+                block_count: Some(contents.len() as u64 / BLOCK_SIZE as u64),
+                block_size: BLOCK_SIZE,
+                initial_content: Some(&contents),
+                ..Default::default()
+            }
+            .into(),
+        );
+
+        let fixture = Fixture::from_fake_server(fake_server).await;
+
+        let volume_proxy = connect_to_named_protocol_at_dir_root::<VolumeMarker>(
+            &fixture.outgoing_dir,
+            "volumes/data",
+        )
+        .unwrap();
+
+        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+        volume_proxy
+            .mount(dir_server_end, MountOptions::default())
+            .await
+            .expect("mount failed (FIDL)")
+            .expect("mount failed");
+
+        let proxy = connect_to_protocol_at_dir_svc::<fvolume::VolumeMarker>(&dir_proxy).unwrap();
+        let info = proxy.get_info().await.expect("FIDL error").expect("get_info failed");
+        assert_eq!(info.block_count, 16448);
+        assert_eq!(info.block_size, 512);
+        assert_eq!(info.flags, fblock::Flag::READONLY);
+
+        let partition_metadata =
+            proxy.get_metadata().await.expect("FIDL error").expect("get_metadata failed");
+        assert_eq!(partition_metadata.name, Some("data".to_string()));
+        assert_eq!(partition_metadata.type_guid.unwrap().value, DATA_TYPE_GUID);
+        assert_eq!(partition_metadata.instance_guid.unwrap().value, [0u8; 16]);
+        assert_eq!(partition_metadata.start_block_offset, None);
+        assert_eq!(partition_metadata.num_blocks, None);
+        assert_eq!(partition_metadata.flags, Some(0));
+
+        let (status, _, volume_info) = proxy.get_volume_info().await.expect("FIDL error");
+        assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
+        let volume_info = volume_info.unwrap();
+        assert_eq!(volume_info.partition_slice_count, 257);
+        assert_eq!(volume_info.slice_limit, 0);
     }
 }

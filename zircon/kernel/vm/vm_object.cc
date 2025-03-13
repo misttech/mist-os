@@ -30,6 +30,10 @@
 
 #define LOCAL_TRACE VM_GLOBAL_TRACE(0)
 
+fbl::WAVLTreeNodeState<VmMapping*>& VmObject::MappingTreeTraits::node_state(VmMapping& mapping) {
+  return mapping.vmo_mapping_node_;
+}
+
 VmObject::GlobalList VmObject::all_vmos_ = {};
 
 VmObject::VmObject(VMOType type, fbl::RefPtr<VmHierarchyState> hierarchy_state_ptr)
@@ -81,7 +85,7 @@ uint64_t VmObject::user_id() const {
 
 void VmObject::AddMappingLocked(VmMapping* r) {
   canary_.Assert();
-  mapping_list_.push_front(r);
+  mapping_list_.insert(r);
   mapping_list_len_++;
 }
 
@@ -94,13 +98,13 @@ void VmObject::RemoveMappingLocked(VmMapping* r) {
 
 uint32_t VmObject::num_mappings() const {
   canary_.Assert();
-  Guard<CriticalMutex> guard{lock()};
-  return mapping_list_len_;
+  Guard<VmoLockType> guard{lock()};
+  return num_mappings_locked();
 }
 
 bool VmObject::IsMappedByUser() const {
   canary_.Assert();
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
   return ktl::any_of(mapping_list_.cbegin(), mapping_list_.cend(),
                      [](const VmMapping& m) -> bool { return m.aspace()->is_user(); });
 }
@@ -108,7 +112,7 @@ bool VmObject::IsMappedByUser() const {
 uint32_t VmObject::share_count() const {
   canary_.Assert();
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
   if (mapping_list_len_ < 2) {
     return 1;
   }
@@ -239,6 +243,11 @@ bool VmObject::AddChildLocked(VmObject* child) {
   return children_list_len_ == 1;
 }
 
+bool VmObject::AddChild(VmObject* child) {
+  Guard<CriticalMutex> guard{ChildListLock::Get()};
+  return AddChildLocked(child);
+}
+
 void VmObject::DropChildLocked(VmObject* c) {
   canary_.Assert();
   DEBUG_ASSERT(children_list_len_ > 0);
@@ -254,7 +263,8 @@ void VmObject::RemoveChild(VmObject* o, Guard<CriticalMutex>::Adoptable adopt) {
   // otherwise we have lock ordering issue, since we already allow the shared lock to be acquired
   // whilst holding the child_observer_lock.
   {
-    Guard<CriticalMutex> guard{AdoptLock, lock(), ktl::move(adopt)};
+    Guard<CriticalMutex> guard{AdoptLock, ChildListLock::Get(), ktl::move(adopt)};
+    AssertHeld(*ChildListLock::Get());
     DropChildLocked(o);
 
     if (children_list_len_ != 0) {
@@ -274,7 +284,7 @@ void VmObject::RemoveChild(VmObject* o, Guard<CriticalMutex>::Adoptable adopt) {
 
 uint32_t VmObject::num_children() const {
   canary_.Assert();
-  Guard<CriticalMutex> guard{lock()};
+  Guard<CriticalMutex> guard{ChildListLock::Get()};
   return children_list_len_;
 }
 
@@ -327,24 +337,78 @@ void VmObject::RangeChangeUpdateMappingsLocked(uint64_t offset, uint64_t len, Ra
   DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
   DEBUG_ASSERT(IS_PAGE_ALIGNED(len));
 
-  for (auto& m : mapping_list_) {
-    m.assert_object_lock();
-    if (op == RangeChangeOp::Unmap) {
-      m.AspaceUnmapLockedObject(offset, len, false);
-    } else if (op == RangeChangeOp::UnmapZeroPage) {
-      m.AspaceUnmapLockedObject(offset, len, true);
-    } else if (op == RangeChangeOp::RemoveWrite) {
-      m.AspaceRemoveWriteLockedObject(offset, len);
-    } else if (op == RangeChangeOp::DebugUnpin) {
-      m.AspaceDebugUnpinLockedObject(offset, len);
-    } else {
-      panic("Unknown RangeChangeOp %d\n", static_cast<int>(op));
+  const uint64_t last_offset = offset + (len - 1);
+
+  // We are going to end up visited nodes in (key) order, and to achieve this walk without a stack
+  // we record the key of the nodes as we visit them. This has no effect beyond allowing us to
+  // encode a tree walk with constant storage.
+  MappingTreeTraits::Key largest_visited = MappingTreeTraits::Key::Min();
+  // Begin our search at the root of the tree.
+  MappingTree::iterator node = mapping_list_.root();
+  using Observer = VmMappingSubtreeState::Observer<VmMapping>;
+  while (node) {
+    if (MappingTree::iterator left = node.left(); left) {
+      // If the left node contains any offsets below the start of our search range, then we need
+      // to walk into it. As we do not know the min offset in the left tree we could walk the
+      // entire left side of the tree redundantly, but that is just O(log n) nodes which is fine.
+      // The largest_visited is compared against to make sure we did not already visit this
+      // node/subtree.
+      if (Observer::MaxLastOffset(left) >= offset &&
+          KeyTraits::LessThan(largest_visited, KeyTraits::GetKey(*left))) {
+        node = left;
+        continue;
+      }
     }
+
+    // Check if this node has been visited yet. This avoids a second visit as we walk back up the
+    // tree.
+    if (KeyTraits::LessThan(largest_visited, KeyTraits::GetKey(*node))) {
+      // Node might be a viable candidate, perform the range update. The mapping will itself check
+      // for the precise intersection, if any, first and so it would be duplicate work to precisely
+      // check for overlap here.
+      VmMapping& m = *node;
+      m.assert_object_lock();
+      if (op == RangeChangeOp::Unmap) {
+        m.AspaceUnmapLockedObject(offset, len, false);
+      } else if (op == RangeChangeOp::UnmapZeroPage) {
+        m.AspaceUnmapLockedObject(offset, len, true);
+      } else if (op == RangeChangeOp::RemoveWrite) {
+        m.AspaceRemoveWriteLockedObject(offset, len);
+      } else if (op == RangeChangeOp::DebugUnpin) {
+        m.AspaceDebugUnpinLockedObject(offset, len);
+      } else {
+        panic("Unknown RangeChangeOp %d\n", static_cast<int>(op));
+      }
+      // Record the visit.
+      largest_visited = KeyTraits::GetKey(*node);
+    }
+
+    if (MappingTree::iterator right = node.right(); right) {
+      // By WAVL tree invariant we know that every node in the right subtree has a greater (or
+      // equal) offset to the offset in this node. If the first offset of this node is already
+      // beyond the range we are updating then, since every node to the right has an even greater
+      // offset, that the right tree does not need visiting. Otherwise there might be an
+      // overlapping node, and so we search into it, as long as the max offset of the tree is
+      // within range.
+      // Similar to the left node check, the largest_visisted is just avoiding walking into the
+      // node twice.
+      if (Observer::FirstOffset(node) <= last_offset && Observer::MaxLastOffset(right) >= offset &&
+          KeyTraits::LessThan(largest_visited, KeyTraits::GetKey(*right))) {
+        node = right;
+        continue;
+      }
+    }
+    // Attempted to visit all sub-trees, return to the parent.
+    node = node.parent();
   }
 }
 
+#if VMO_USE_SHARED_LOCK
 VmHierarchyBase::VmHierarchyBase(fbl::RefPtr<VmHierarchyState> state)
     : hierarchy_state_ptr_(ktl::move(state)) {}
+#else
+VmHierarchyBase::VmHierarchyBase(fbl::RefPtr<VmHierarchyState> state) { DEBUG_ASSERT(!state); }
+#endif
 
 static int cmd_vm_object(int argc, const cmd_args* argv, uint32_t flags) {
   if (argc < 2) {

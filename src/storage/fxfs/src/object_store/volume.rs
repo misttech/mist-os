@@ -8,11 +8,11 @@ use crate::object_store::directory::Directory;
 use crate::object_store::transaction::{lock_keys, Options, Transaction};
 use crate::object_store::tree_cache::TreeCache;
 use crate::object_store::{
-    load_store_info, LockKey, NewChildStoreOptions, ObjectDescriptor, ObjectStore,
+    load_store_info, LockKey, NewChildStoreOptions, ObjectDescriptor, ObjectStore, StoreOwner,
 };
 use anyhow::{anyhow, bail, ensure, Context, Error};
 use fxfs_crypto::Crypt;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 // Volumes are a grouping of an object store and a root directory within this object store. They
 // model a hierarchical tree of objects within a single store.
@@ -38,6 +38,7 @@ impl RootVolume {
     pub async fn new_volume(
         &self,
         volume_name: &str,
+        owner: Weak<dyn StoreOwner>,
         crypt: Option<Arc<dyn Crypt>>,
     ) -> Result<Arc<ObjectStore>, Error> {
         let root_store = self.filesystem.root_store();
@@ -61,7 +62,7 @@ impl RootVolume {
         store = root_store
             .new_child_store(
                 &mut transaction,
-                NewChildStoreOptions { crypt, ..Default::default() },
+                NewChildStoreOptions { owner, crypt, ..Default::default() },
                 Box::new(TreeCache::new()),
             )
             .await?;
@@ -96,6 +97,7 @@ impl RootVolume {
     pub async fn volume(
         &self,
         volume_name: &str,
+        owner: Weak<dyn StoreOwner>,
         crypt: Option<Arc<dyn Crypt>>,
     ) -> Result<Arc<ObjectStore>, Error> {
         self.volume_from_id(
@@ -103,6 +105,7 @@ impl RootVolume {
                 (object_id, ObjectDescriptor::Volume) => object_id,
                 _ => bail!(anyhow!(FxfsError::Inconsistent).context("Expected volume")),
             },
+            owner,
             crypt,
         )
         .await
@@ -112,13 +115,14 @@ impl RootVolume {
     pub async fn volume_from_id(
         &self,
         store_object_id: u64,
+        owner: Weak<dyn StoreOwner>,
         crypt: Option<Arc<dyn Crypt>>,
     ) -> Result<Arc<ObjectStore>, Error> {
         let store =
             self.filesystem.object_manager().store(store_object_id).ok_or(FxfsError::NotFound)?;
         store.set_trace(self.filesystem.trace());
         if let Some(crypt) = crypt {
-            store.unlock(crypt).await.context("Failed to unlock volume")?;
+            store.unlock(owner, crypt).await.context("Failed to unlock volume")?;
         } else if store.is_locked() {
             bail!(FxfsError::AccessDenied);
         }
@@ -191,7 +195,7 @@ mod tests {
     use crate::object_handle::{ObjectHandle, WriteObjectHandle};
     use crate::object_store::directory::Directory;
     use crate::object_store::transaction::{lock_keys, Options};
-    use crate::object_store::LockKey;
+    use crate::object_store::{LockKey, NO_OWNER};
     use fxfs_insecure_crypto::InsecureCrypt;
     use std::sync::Arc;
     use storage_device::fake_device::FakeDevice;
@@ -203,7 +207,7 @@ mod tests {
         let filesystem = FxFilesystem::new_empty(device).await.expect("new_empty failed");
         let root_volume = root_volume(filesystem.clone()).await.expect("root_volume failed");
         root_volume
-            .volume("vol", Some(Arc::new(InsecureCrypt::new())))
+            .volume("vol", NO_OWNER, Some(Arc::new(InsecureCrypt::new())))
             .await
             .err()
             .expect("Volume shouldn't exist");
@@ -218,7 +222,7 @@ mod tests {
         {
             let root_volume = root_volume(filesystem.clone()).await.expect("root_volume failed");
             let store = root_volume
-                .new_volume("vol", Some(crypt.clone()))
+                .new_volume("vol", NO_OWNER, Some(crypt.clone()))
                 .await
                 .expect("new_volume failed");
             let mut transaction = filesystem
@@ -248,7 +252,8 @@ mod tests {
             device.reopen(false);
             let filesystem = FxFilesystem::open(device).await.expect("open failed");
             let root_volume = root_volume(filesystem.clone()).await.expect("root_volume failed");
-            let volume = root_volume.volume("vol", Some(crypt)).await.expect("volume failed");
+            let volume =
+                root_volume.volume("vol", NO_OWNER, Some(crypt)).await.expect("volume failed");
             let root_directory = Directory::open(&volume, volume.root_directory_object_id())
                 .await
                 .expect("open failed");
@@ -268,7 +273,7 @@ mod tests {
         {
             let root_volume = root_volume(filesystem.clone()).await.expect("root_volume failed");
             let store = root_volume
-                .new_volume("vol", Some(crypt.clone()))
+                .new_volume("vol", NO_OWNER, Some(crypt.clone()))
                 .await
                 .expect("new_volume failed");
             store_object_id = store.store_object_id();
@@ -338,7 +343,7 @@ mod tests {
             );
             // Confirm volume entry is gone.
             root_volume
-                .volume("vol", Some(crypt.clone()))
+                .volume("vol", NO_OWNER, Some(crypt.clone()))
                 .await
                 .err()
                 .expect("volume shouldn't exist anymore.");

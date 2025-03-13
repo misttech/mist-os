@@ -84,9 +84,11 @@ build_api_module("api") {
   data_keys = [ "build_api_modules" ]
   deps = [
     ":args",
-    ":tests",
+
+    #":tests",
     ":tool_paths",
-    "//build/rbe:rbe_settings.json",
+
+    #"//build/rbe:rbe_settings.json",
   ]
 }
 
@@ -171,10 +173,12 @@ build_api_module("args") {
 #     - Optional: the timeout in seconds for the test.
 #     - Type: int
 #
-build_api_module("tests") {
+generated_file("tests_from_metadata") {
   testonly = true
   data_keys = [ "tests" ]
   walk_keys = [ "tests_barrier" ]
+  outputs = [ "${root_build_dir}/tests_from_metadata.json" ]
+  output_conversion = "json"
   deps = [
     # Pull in tests from host_labels.  This is deprecated, and tests should be
     # in //:host_tests instead.
@@ -441,7 +445,7 @@ group("default") {
     #"//zircon/tools:tests",
 
     # Generate ZBIs used to run on target
-    "//build/images/mistos",
+    #"//build/images/mistos",
 
     # Starnix Examples
     "//src/starnix/examples",
@@ -486,8 +490,6 @@ group("host") {
   # TODO(https://fxbug.dev/42160904) investigate removing testonly here
   testonly = true
   public_deps = [
-    #"//build/input/product:host($host_toolchain)",
-
     # Static analysis tools used by shac should always be built so that
     # `fx format-code` and other static analysis entrypoints can be run on any
     # build configuration.
@@ -499,6 +501,8 @@ group("host") {
     # Tools & tests added by the developer
     ":developer_host_tools",
   ]
+
+  #public_deps += [ "//bundles/tools:host_tools" ]
 }
 
 # WARNING: Known to infrastructure

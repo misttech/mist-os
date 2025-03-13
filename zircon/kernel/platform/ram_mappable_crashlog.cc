@@ -116,9 +116,10 @@ size_t RamMappableCrashlog::Recover(FILE* tgt) {
   // into string form.  This includes:
   //
   // 1) The uptime estimate
-  // 2) The "software" reboot reason.
-  // 3) The "hardware" reboot reason (only if given to us by the bootloader).
-  // 4) The payload damage indicator (only if there was potential damage to the
+  // 2) The runtime estimate
+  // 3) The "software" reboot reason.
+  // 4) The "hardware" reboot reason (only if given to us by the bootloader).
+  // 5) The payload damage indicator (only if there was potential damage to the
   //    payload)
   //
   // The first few lines of text need to be structured so that they can be
@@ -183,6 +184,9 @@ size_t RamMappableCrashlog::Recover(FILE* tgt) {
 
   // Uptime estimate comes next with a newline between the tag and the actual number
   written += fprintf(tgt, "UPTIME (ms)\n%ld\n", rlog.uptime / ZX_MSEC(1));
+
+  // Runtime estimate comes next with a newline between the tag and the actual number.
+  written += fprintf(tgt, "RUNTIME (ms)\n%ld\n", rlog.runtime / ZX_MSEC(1));
 
   // After this, we are basically just free form text.
   if (str_hw_reason != nullptr) {

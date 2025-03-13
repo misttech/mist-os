@@ -604,11 +604,11 @@ void Driver::PrepareStop(fdf::PrepareStopCompleter completer) {
 zx::result<> Driver::LoadDriver(std::string_view module_name, zx::vmo driver_vmo) {
   std::string_view url_str = url().value();
 
-  auto result = driver_symbols::FindRestrictedSymbols(driver_vmo, url_str);
+  auto result = driver_symbols::FindRestrictedSymbols(zx::unowned(driver_vmo), url_str);
   if (result.is_error()) {
     logger_->log(fdf::WARN, "Driver '{}' failed to validate as ELF: {}", url_str,
                  result.status_value());
-  } else if (result->size() > 0) {
+  } else if (!result->empty()) {
     logger_->log(fdf::ERROR, "Driver '{}' referenced {} restricted libc symbols: ", url_str,
                  result->size());
     for (auto& str : *result) {

@@ -20,6 +20,7 @@
 #include "src/graphics/display/drivers/amlogic-display/dsi.h"
 #include "src/graphics/display/drivers/amlogic-display/fixed-point-util.h"
 #include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
+#include "src/graphics/display/drivers/amlogic-display/pll-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 
@@ -66,23 +67,33 @@ zx::result<> Clock::WaitForHdmiPllToLock() {
 
   constexpr int kMaxPllLockAttempt = 3;
   for (int lock_attempts = 0; lock_attempts < kMaxPllLockAttempt; lock_attempts++) {
-    FDF_LOG(TRACE, "Waiting for PLL Lock: (%d/3).", lock_attempts + 1);
+    fdf::trace("Waiting for PLL Lock: ({}/3).", lock_attempts + 1);
 
     // The configurations used in retries are from Amlogic-provided code which
     // is undocumented.
     if (lock_attempts == 1) {
-      hhi_mmio_.Write32(
-          SetFieldValue32(hhi_mmio_.Read32(HHI_HDMI_PLL_CNTL3), /*field_begin_bit=*/31,
-                          /*field_size_bits=*/1, /*field_value=*/1),
-          HHI_HDMI_PLL_CNTL3);
+      HdmiPllControl3::Get().ReadFrom(&hhi_mmio_).set_afc_bypass(true).WriteTo(&hhi_mmio_);
     } else if (lock_attempts == 2) {
-      hhi_mmio_.Write32(0x55540000, HHI_HDMI_PLL_CNTL6);  // more magic
+      auto control6 = HdmiPllControl6::Get()
+                          .FromValue(0)
+                          .set_afc_hold_t(1)
+                          .set_lkw_sel(1)
+                          .set_dco_sdm_clk_sel(1)
+                          .set_afc_in(1)
+                          .set_afc_nt(1)
+                          .set_vc_in(1)
+                          .set_lock_long(1)
+                          .set_freq_shift_v(0)
+                          .set_data_sel(0)
+                          .set_sdmnc_ulms(0)
+                          .set_sdmnc_power(0)
+                          .WriteTo(&hhi_mmio_);
+      ZX_DEBUG_ASSERT_MSG(control6.reg_value() == 0x55540000,
+                          "HDMI PLL Control Register 6 value (0x%08x)", control6.reg_value());
     }
 
     int retries = 1000;
-    while ((pll_lock = GetFieldValue32(hhi_mmio_.Read32(HHI_HDMI_PLL_CNTL0),
-                                       /*field_begin_bit=*/LCD_PLL_LOCK_HPLL_G12A,
-                                       /*field_size_bits=*/1)) != 1 &&
+    while ((pll_lock = HdmiPllControl0::Get().ReadFrom(&hhi_mmio_).is_locked()) != true &&
            retries--) {
       zx_nanosleep(zx_deadline_after(ZX_USEC(50)));
     }
@@ -91,7 +102,7 @@ zx::result<> Clock::WaitForHdmiPllToLock() {
     }
   }
 
-  FDF_LOG(ERROR, "Failed to lock HDMI PLL after %d attempts.", kMaxPllLockAttempt);
+  fdf::error("Failed to lock HDMI PLL after {} attempts.", kMaxPllLockAttempt);
   return zx::error(ZX_ERR_UNAVAILABLE);
 }
 
@@ -101,7 +112,7 @@ zx::result<HdmiPllConfigForMipiDsi> Clock::GenerateHPLL(
   HdmiPllConfigForMipiDsi pll_cfg;
   // Requested Pixel clock
   if (pixel_clock_frequency_hz > kMaxPixelClockFrequencyHz) {
-    FDF_LOG(ERROR, "Pixel clock out of range (%" PRId64 " Hz)", pixel_clock_frequency_hz);
+    fdf::error("Pixel clock out of range ({} Hz)", pixel_clock_frequency_hz);
     return zx::error(ZX_ERR_OUT_OF_RANGE);
   }
 
@@ -127,7 +138,7 @@ zx::result<HdmiPllConfigForMipiDsi> Clock::GenerateHPLL(
         dphy_data_lane_bit_rate_max_hz - pixel_clock_frequency_hz;
     if ((requested_pll_frequency_hz < dphy_data_lane_bit_rate_min_hz) ||
         (requested_pll_frequency_hz > dphy_data_lane_bit_rate_max_hz)) {
-      FDF_LOG(TRACE, "Calculated clocks out of range for xd = %u, skipped", clock_factor);
+      fdf::trace("Calculated clocks out of range for xd = {}, skipped", clock_factor);
       continue;
     }
 
@@ -160,13 +171,12 @@ zx::result<HdmiPllConfigForMipiDsi> Clock::GenerateHPLL(
               (voltage_controlled_oscillator_output_frequency_hz <=
                kMaxVoltageControlledOscillatorFrequencyHz)) {
             // within range!
-            pll_cfg.output_divider1_selection = output_divider1 >> 1;
-            pll_cfg.output_divider2_selection = output_divider2 >> 1;
-            pll_cfg.output_divider3_selection = output_divider3 >> 1;
+            pll_cfg.output_divider1 = output_divider1;
+            pll_cfg.output_divider2 = output_divider2;
+            pll_cfg.output_divider3 = output_divider3;
             pll_cfg.pll_frequency_hz = requested_pll_frequency_hz;
-            FDF_LOG(TRACE, "od1=%d, od2=%d, od3=%d", (output_divider1 >> 1), (output_divider2 >> 1),
-                    (output_divider3 >> 1));
-            FDF_LOG(TRACE, "pll_fvco=%" PRId64, voltage_controlled_oscillator_output_frequency_hz);
+            fdf::trace("od1={}, od2={}, od3={}", output_divider1, output_divider2, output_divider3);
+            fdf::trace("pll_fvco={}", voltage_controlled_oscillator_output_frequency_hz);
             pll_cfg.pll_voltage_controlled_oscillator_output_frequency_hz =
                 voltage_controlled_oscillator_output_frequency_hz;
 
@@ -182,8 +192,8 @@ zx::result<HdmiPllConfigForMipiDsi> Clock::GenerateHPLL(
                                                kExternalOscillatorFrequencyHz) *
                                               PLL_FRAC_RANGE / kExternalOscillatorFrequencyHz;
 
-            FDF_LOG(TRACE, "m=%d, n=%d, frac=0x%x", pll_cfg.pll_multiplier_integer,
-                    pll_cfg.pll_divider, pll_cfg.pll_multiplier_fraction);
+            fdf::trace("m={}, n={}, frac=0x{:x}", pll_cfg.pll_multiplier_integer,
+                       pll_cfg.pll_divider, pll_cfg.pll_multiplier_fraction);
             pll_cfg.dphy_data_lane_bits_per_second = pll_cfg.pll_frequency_hz;  // Hz
 
             return zx::ok(std::move(pll_cfg));
@@ -196,10 +206,9 @@ zx::result<HdmiPllConfigForMipiDsi> Clock::GenerateHPLL(
     }
   }
 
-  FDF_LOG(ERROR, "Could not generate correct PLL values for: ");
-  FDF_LOG(ERROR, "  pixel_clock_frequency_hz = %" PRId64, pixel_clock_frequency_hz);
-  FDF_LOG(ERROR, "  max_per_data_lane_bit_rate_hz = %" PRId64,
-          maximum_per_data_lane_bit_per_second);
+  fdf::error("Could not generate correct PLL values for: ");
+  fdf::error("  pixel_clock_frequency_hz = {}", pixel_clock_frequency_hz);
+  fdf::error("  max_per_data_lane_bit_rate_hz = {}", maximum_per_data_lane_bit_per_second);
   return zx::error(ZX_ERR_INTERNAL);
 }
 
@@ -224,10 +233,7 @@ void Clock::Disable() {
   VideoClock2Control::Get().ReadFrom(&hhi_mmio_).set_clock_enabled(false).WriteTo(&hhi_mmio_);
 
   // disable pll
-  hhi_mmio_.Write32(SetFieldValue32(hhi_mmio_.Read32(HHI_HDMI_PLL_CNTL0),
-                                    /*field_begin_bit=*/LCD_PLL_EN_HPLL_G12A,
-                                    /*field_size_bits=*/1, /*field_value=*/0),
-                    HHI_HDMI_PLL_CNTL0);
+  HdmiPllControl0::Get().ReadFrom(&hhi_mmio_).set_pll_enabled(false).WriteTo(&hhi_mmio_);
   clock_enabled_ = false;
 }
 
@@ -242,48 +248,132 @@ zx::result<> Clock::Enable(const PanelConfig& panel_config) {
       GenerateHPLL(panel_config.display_timing.pixel_clock_frequency_hz,
                    panel_config.maximum_per_data_lane_bit_per_second());
   if (pll_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to generate HDMI PLL and Video clock tree configuration: %s",
-            pll_result.status_string());
+    fdf::error("Failed to generate HDMI PLL and Video clock tree configuration: {}", pll_result);
     return pll_result.take_error();
   }
   pll_cfg_ = std::move(pll_result).value();
 
-  uint32_t regVal;
-  bool useFrac = pll_cfg_.pll_multiplier_fraction != 0;
+  const bool use_fraction = pll_cfg_.pll_multiplier_fraction != 0;
 
-  regVal = ((1 << LCD_PLL_EN_HPLL_G12A) | (1 << LCD_PLL_OUT_GATE_CTRL_G12A) |  // clk out gate
-            (pll_cfg_.pll_divider << LCD_PLL_N_HPLL_G12A) |
-            (pll_cfg_.pll_multiplier_integer << LCD_PLL_M_HPLL_G12A) |
-            (pll_cfg_.output_divider1_selection << LCD_PLL_OD1_HPLL_G12A) |
-            (pll_cfg_.output_divider2_selection << LCD_PLL_OD2_HPLL_G12A) |
-            (pll_cfg_.output_divider3_selection << LCD_PLL_OD3_HPLL_G12A) |
-            (useFrac ? (1 << 27) : (0 << 27)));
-  hhi_mmio_.Write32(regVal, HHI_HDMI_PLL_CNTL0);
+  HdmiPllControl0::Get()
+      .FromValue(0)
+      .set_pll_enabled(true)
+      .set_hdmi_clock_out2_enabled(true)
+      .SetDenominator(pll_cfg_.pll_divider)
+      .SetNumeratorInteger(pll_cfg_.pll_multiplier_integer)
+      .SetOutputDivider1(pll_cfg_.output_divider1)
+      .SetOutputDivider2(pll_cfg_.output_divider2)
+      .SetOutputDivider3(pll_cfg_.output_divider3)
+      .set_numerator_fraction_enabled(use_fraction)
+      .WriteTo(&hhi_mmio_);
 
-  hhi_mmio_.Write32(pll_cfg_.pll_multiplier_fraction, HHI_HDMI_PLL_CNTL1);
-  hhi_mmio_.Write32(0x00, HHI_HDMI_PLL_CNTL2);
-  // Magic numbers from U-Boot.
-  hhi_mmio_.Write32(useFrac ? 0x6a285c00 : 0x48681c00, HHI_HDMI_PLL_CNTL3);
-  hhi_mmio_.Write32(useFrac ? 0x65771290 : 0x33771290, HHI_HDMI_PLL_CNTL4);
-  hhi_mmio_.Write32(0x39272000, HHI_HDMI_PLL_CNTL5);
-  hhi_mmio_.Write32(useFrac ? 0x56540000 : 0x56540000, HHI_HDMI_PLL_CNTL6);
+  HdmiPllControl1::Get()
+      .FromValue(0)
+      .set_numerator_fraction_is_negative(false)
+      .set_numerator_fraction_u1_17(pll_cfg_.pll_multiplier_fraction)
+      .WriteTo(&hhi_mmio_);
+
+  // The HdmiPllControl{2-6} register values are from Amlogic-provided code.
+  auto control2 = HdmiPllControl2::Get()
+                      .FromValue(0)
+                      .set_reference_frequency_selection(0)
+                      .set_os_ssc(0)
+                      .set_spread_range_multiplier(0)
+                      .set_spread_spectrum_clocking_enabled(false)
+                      .set_spread_range_selection(0)
+                      .set_spread_spectrum_mode(0)
+                      .WriteTo(&hhi_mmio_);
+  ZX_DEBUG_ASSERT_MSG(control2.reg_value() == 0x00000000,
+                      "HDMI PLL Control Register 2 value (0x%08x)", control2.reg_value());
+
+  auto control3 = HdmiPllControl3::Get()
+                      .FromValue(0)
+                      .set_afc_bypass(false)
+                      .set_afc_clock_selection(1)
+                      .set_code_new(false)
+                      .set_dco_numerator_enabled(false)
+                      .set_dco_sigma_delta_modulator_enabled(true)
+                      .set_div_mode(0)
+                      .set_div2(false)
+                      .set_fast_lock(false)
+                      .set_fb_pre_div(false)
+                      .set_filter_mode(1)
+                      .set_fix_enabled(true)
+                      .set_freq_shift_enabled(false)
+                      .set_load(true)
+                      .set_load_enabled(false)
+                      .set_lock_f(false)
+                      .set_pulse_width_enabled(false)
+                      .set_sdmnc_enabled(false)
+                      .set_sdmnc_mode(0)
+                      .set_sdmnc_range(0)
+                      .set_tdc_enabled(true)
+                      .set_tdc_mode_selection(1)
+                      .set_wait_enabled(true);
+  auto control4 = HdmiPllControl4::Get()
+                      .FromValue(0)
+                      .set_alpha(3)
+                      .set_rho(3)
+                      .set_lambda1(7)
+                      .set_lambda0(7)
+                      .set_acq_gain(1)
+                      .set_filter_pvt2(2)
+                      .set_filter_pvt1(9)
+                      .set_pfd_gain(0);
+
+  if (use_fraction) {
+    control3.set_code_new(true).set_div_mode(1).set_filter_mode(0).set_sdmnc_mode(1);
+    ZX_DEBUG_ASSERT_MSG(control3.reg_value() == 0x6a285c00,
+                        "HDMI PLL Control Register 3 value (0x%08x)", control3.reg_value());
+    control4.set_alpha(6).set_rho(5);
+    ZX_DEBUG_ASSERT_MSG(control4.reg_value() == 0x65771290,
+                        "HDMI PLL Control Register 4 value (0x%08x)", control4.reg_value());
+  } else {
+    ZX_DEBUG_ASSERT_MSG(control3.reg_value() == 0x48681c00,
+                        "HDMI PLL Control Register 3 value (0x%08x)", control3.reg_value());
+    ZX_DEBUG_ASSERT_MSG(control4.reg_value() == 0x33771290,
+                        "HDMI PLL Control Register 4 value (0x%08x)", control4.reg_value());
+  }
+  control3.WriteTo(&hhi_mmio_);
+  control4.WriteTo(&hhi_mmio_);
+
+  auto control5 = HdmiPllControl5::Get()
+                      .FromValue(0)
+                      .set_adj_vco_ldo(0x3)
+                      .set_lm_w(0x9)
+                      .set_lm_s(0x27)
+                      .set_reve(0x2000)
+                      .WriteTo(&hhi_mmio_);
+  ZX_DEBUG_ASSERT_MSG(control5.reg_value() == 0x39272000,
+                      "HDMI PLL Control Register 5 value (0x%08x)", control5.reg_value());
+
+  auto control6 = HdmiPllControl6::Get()
+                      .FromValue(0)
+                      .set_afc_hold_t(1)
+                      .set_lkw_sel(1)
+                      .set_dco_sdm_clk_sel(1)
+                      .set_afc_in(2)
+                      .set_afc_nt(1)
+                      .set_vc_in(1)
+                      .set_lock_long(1)
+                      .set_freq_shift_v(0)
+                      .set_data_sel(0)
+                      .set_sdmnc_ulms(0)
+                      .set_sdmnc_power(0)
+                      .WriteTo(&hhi_mmio_);
+  ZX_DEBUG_ASSERT_MSG(control6.reg_value() == 0x56540000,
+                      "HDMI PLL Control Register 6 value (0x%08x)", control6.reg_value());
 
   // reset dpll
-  hhi_mmio_.Write32(SetFieldValue32(hhi_mmio_.Read32(HHI_HDMI_PLL_CNTL0),
-                                    /*field_begin_bit=*/LCD_PLL_RST_HPLL_G12A,
-                                    /*field_size_bits=*/1, /*field_value=*/1),
-                    HHI_HDMI_PLL_CNTL0);
+  HdmiPllControl0::Get().ReadFrom(&hhi_mmio_).set_reset(true).WriteTo(&hhi_mmio_);
   zx_nanosleep(zx_deadline_after(ZX_USEC(100)));
   // release from reset
-  hhi_mmio_.Write32(SetFieldValue32(hhi_mmio_.Read32(HHI_HDMI_PLL_CNTL0),
-                                    /*field_begin_bit=*/LCD_PLL_RST_HPLL_G12A,
-                                    /*field_size_bits=*/1, /*field_value=*/0),
-                    HHI_HDMI_PLL_CNTL0);
+  HdmiPllControl0::Get().ReadFrom(&hhi_mmio_).set_reset(false).WriteTo(&hhi_mmio_);
 
   zx_nanosleep(zx_deadline_after(ZX_USEC(50)));
   zx::result<> wait_for_pll_lock_result = WaitForHdmiPllToLock();
   if (!wait_for_pll_lock_result.is_ok()) {
-    FDF_LOG(ERROR, "Failed to lock HDMI PLL: %s", wait_for_pll_lock_result.status_string());
+    fdf::error("Failed to lock HDMI PLL: {}", wait_for_pll_lock_result);
     return wait_for_pll_lock_result.take_error();
   }
 
@@ -451,7 +541,7 @@ zx::result<std::unique_ptr<Clock>> Clock::Create(
       fbl::make_unique_checked<Clock>(&alloc_checker, std::move(vpu_mmio), std::move(hhi_mmio),
                                       /*clock_enabled=*/already_enabled);
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for Clock");
+    fdf::error("Failed to allocate memory for Clock");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 

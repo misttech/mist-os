@@ -90,7 +90,6 @@ def main(argv: Sequence[str]) -> int:
     logs_dir = topdir / "logs"
 
     host_tag = workspace_utils.get_host_tag()
-    host_tag_alt = host_tag.replace("-", "_")
 
     workspace_dir = topdir / "workspace"
     workspace_dir.mkdir(parents=True, exist_ok=True)
@@ -176,7 +175,7 @@ build --host_platform=//build/bazel/platforms:{host_platform}
 import remote_services.bazelrc
 """.format(
         default_platform="common",  # see build/bazel/platforms/BUILD.bazel
-        host_platform=host_tag_alt,
+        host_platform="host",
     )
 
     bazelrc_dest = workspace_dir / ".bazelrc"

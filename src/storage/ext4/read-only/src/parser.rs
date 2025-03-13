@@ -333,7 +333,7 @@ impl Parser {
                     self.reader.read(next_level_offset, data.as_mut_slice())?;
 
                     let next_level_node = ExtentTreeNode::parse(data.as_slice())
-                        .ok_or_else(|| ParsingError::InvalidExtent(next_level_offset))?;
+                        .ok_or(ParsingError::InvalidExtent(next_level_offset))?;
 
                     self.iterate_extents_in_tree(&next_level_node, extent_handler)?;
                 }

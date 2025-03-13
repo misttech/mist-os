@@ -3,10 +3,10 @@
 # found in the LICENSE file.
 """Session affordance implementation using ffx."""
 
-from honeydew import errors
 from honeydew.affordances.session import errors as session_errors
 from honeydew.affordances.session import session
-from honeydew.transports import ffx as ffx_transport
+from honeydew.transports.ffx import errors as ffx_errors
+from honeydew.transports.ffx import ffx as ffx_transport
 
 
 class SessionUsingFfx(session.Session):
@@ -34,7 +34,7 @@ class SessionUsingFfx(session.Session):
 
         try:
             self._ffx.run(["session", "start"])
-        except errors.FfxCommandError as err:
+        except ffx_errors.FfxCommandError as err:
             raise session_errors.SessionError(err)
 
         self._started = True
@@ -53,7 +53,7 @@ class SessionUsingFfx(session.Session):
 
         try:
             self._ffx.run(["session", "add", url])
-        except errors.FfxCommandError as err:
+        except ffx_errors.FfxCommandError as err:
             raise session_errors.SessionError(err)
 
     def stop(self) -> None:
@@ -65,6 +65,6 @@ class SessionUsingFfx(session.Session):
 
         try:
             self._ffx.run(["session", "stop"])
-        except errors.FfxCommandError as err:
+        except ffx_errors.FfxCommandError as err:
             raise session_errors.SessionError(err)
         self._started = False

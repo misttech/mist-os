@@ -8,8 +8,15 @@ import json
 import struct
 import subprocess
 import sys
-import tempfile
 from typing import Iterable, Optional, TypeVar
+
+DEFAULT_CONFIGS = [
+    "--no-environment",
+    "--config",
+    "daemon.autostart=false",
+    "--config",
+    "log.enabled=false",
+]
 
 
 def parse_args() -> argparse.Namespace:
@@ -18,11 +25,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--meta_far",
         help="Path to the meta.far file",
-        required=True,
-    )
-    parser.add_argument(
-        "--far",
-        help="Path to the far tool",
         required=True,
     )
     parser.add_argument(
@@ -109,13 +111,15 @@ def dest_merkle_pair_for_blobs(blobs: list[str], ffx: str) -> list[str]:
     if len(blobs) == 0:
         return []
 
-    temp_dir = tempfile.TemporaryDirectory()
-
     srcs = [blob.split("=")[1] for blob in blobs]
     merkles = [
         v.split(" ")[0].strip()
         for v in run(
-            ffx, "--isolate-dir", temp_dir.name, "package", "file-hash", *srcs
+            ffx,
+            *DEFAULT_CONFIGS,
+            "package",
+            "file-hash",
+            *srcs,
         ).split("\n")
     ]
 
@@ -130,9 +134,12 @@ def dest_merkle_pair_for_blobs(blobs: list[str], ffx: str) -> list[str]:
 def list_contents(args: argparse.Namespace) -> list[str]:
     """Lists the contents of the meta.far file"""
     return run(
-        args.far,
+        args.ffx,
+        *DEFAULT_CONFIGS,
+        "package",
+        "archive",
         "list",
-        "--archive=" + args.meta_far,
+        args.meta_far,
     ).split("\n")
 
 
@@ -145,10 +152,13 @@ def list_subpackage_names(args: argparse.Namespace) -> list[str]:
     return (
         json.loads(
             run(
-                args.far,
+                args.ffx,
+                *DEFAULT_CONFIGS,
+                "package",
+                "archive",
                 "cat",
-                f"--archive={args.meta_far}",
-                "--file=meta/fuchsia.pkg/subpackages",
+                args.meta_far,
+                "meta/fuchsia.pkg/subpackages",
             )
         )["subpackages"].keys()
         if "meta/fuchsia.pkg/subpackages" in list_contents(args)
@@ -200,10 +210,13 @@ def check_contents_for_bind_bytecode(
 def check_for_abi_revision(args: argparse.Namespace) -> None:
     abi_stamp_contents = subprocess.check_output(
         [
-            args.far,
+            args.ffx,
+            *DEFAULT_CONFIGS,
+            "package",
+            "archive",
             "cat",
-            f"--archive={args.meta_far}",
-            "--file=meta/fuchsia.abi/abi-revision",
+            args.meta_far,
+            "meta/fuchsia.abi/abi-revision",
         ]
     )
 
@@ -215,7 +228,13 @@ def check_for_abi_revision(args: argparse.Namespace) -> None:
 def check_package_name(args: argparse.Namespace) -> None:
     contents = json.loads(
         run(
-            args.far, "cat", "--archive=" + args.meta_far, "--file=meta/package"
+            args.ffx,
+            *DEFAULT_CONFIGS,
+            "package",
+            "archive",
+            "cat",
+            args.meta_far,
+            "meta/package",
         )
     )
 
@@ -228,7 +247,13 @@ def check_package_has_all_blobs(args: argparse.Namespace) -> None:
     dest_to_merkle = dest_merkle_pair_for_blobs(args.blobs, args.ffx)
 
     contents_str = run(
-        args.far, "cat", "--archive=" + args.meta_far, "--file=meta/contents"
+        args.ffx,
+        *DEFAULT_CONFIGS,
+        "package",
+        "archive",
+        "cat",
+        args.meta_far,
+        "meta/contents",
     )
 
     contents = contents_str.split("\n") if contents_str else []

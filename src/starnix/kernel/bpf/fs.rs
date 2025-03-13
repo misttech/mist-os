@@ -201,17 +201,15 @@ impl FileOps for BpfHandle {
         events: FdEvents,
         handler: EventHandler,
     ) -> Option<WaitCanceler> {
-        if !events.contains(FdEvents::POLLIN) {
-            return None;
-        }
-
         let Ok((vmo, schema)) = self.get_map_vmo() else {
-            return None;
+            return Some(WaitCanceler::new_noop());
         };
 
-        // Only ringbuffers can be polled.
-        if schema.map_type != bpf_map_type_BPF_MAP_TYPE_RINGBUF {
-            return None;
+        // Only ringbuffers can be polled for POLLIN.
+        if schema.map_type != bpf_map_type_BPF_MAP_TYPE_RINGBUF
+            || !events.contains(FdEvents::POLLIN)
+        {
+            return Some(WaitCanceler::new_noop());
         }
 
         let handler = SignalHandler {
@@ -245,14 +243,15 @@ impl FileOps for BpfHandle {
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
         match self {
-            Self::Map(map) if map.schema.map_type == bpf_map_type_BPF_MAP_TYPE_RINGBUF => {
-                if map.can_read() {
-                    Ok(FdEvents::POLLIN)
-                } else {
-                    Ok(FdEvents::empty())
-                }
+            Self::Map(map) => {
+                let events = match map.can_read() {
+                    Some(true) => FdEvents::POLLIN,
+                    Some(false) => FdEvents::empty(),
+                    None => FdEvents::POLLERR,
+                };
+                Ok(events)
             }
-            _ => error!(ENODEV),
+            _ => error!(EPERM),
         }
     }
 }

@@ -15,10 +15,11 @@ use crate::object_handle::{ReadObjectHandle, WriteBytes};
 use crate::serialized_types::{Version, LATEST_VERSION};
 use anyhow::Error;
 use cache::{ObjectCache, ObjectCacheResult};
+use fuchsia_sync::{Mutex, RwLock};
 use persistent_layer::{PersistentLayer, PersistentLayerWriter};
 use skip_list_layer::SkipListLayer;
 use std::fmt;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::Arc;
 use types::{
     Item, ItemRef, Key, Layer, LayerIterator, LayerKey, LayerWriter, MergeableKey, OrdLowerBound,
     Value,
@@ -116,7 +117,7 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
 
     /// Replaces the immutable layers.
     pub fn set_layers(&self, layers: Vec<Arc<dyn Layer<K, V>>>) {
-        self.data.write().unwrap().layers = layers;
+        self.data.write().layers = layers;
     }
 
     /// Appends to the given layers at the end i.e. they should be base layers.  This is supposed
@@ -126,27 +127,27 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
         handles: impl IntoIterator<Item = impl ReadObjectHandle + 'static>,
     ) -> Result<(), Error> {
         let mut layers = layers_from_handles(handles).await?;
-        self.data.write().unwrap().layers.append(&mut layers);
+        self.data.write().layers.append(&mut layers);
         Ok(())
     }
 
     /// Resets the immutable layers.
     pub fn reset_immutable_layers(&self) {
-        self.data.write().unwrap().layers = Vec::new();
+        self.data.write().layers = Vec::new();
     }
 
     /// Seals the current mutable layer and creates a new one.
     pub fn seal(&self) {
         // We need to be sure there are no mutations currently in-progress.  This is currently
         // guaranteed by ensuring that all mutations take a read lock on `data`.
-        let mut data = self.data.write().unwrap();
+        let mut data = self.data.write();
         let layer = std::mem::replace(&mut data.mutable_layer, Self::new_mutable_layer());
         data.layers.insert(0, layer);
     }
 
     /// Resets the tree to an empty state.
     pub fn reset(&self) {
-        let mut data = self.data.write().unwrap();
+        let mut data = self.data.write();
         data.layers = Vec::new();
         data.mutable_layer = Self::new_mutable_layer();
     }
@@ -177,7 +178,7 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
 
     /// Adds all the layers (including the mutable layer) to `layer_set`.
     pub fn add_all_layers_to_layer_set(&self, layer_set: &mut LayerSet<K, V>) {
-        let data = self.data.read().unwrap();
+        let data = self.data.read();
         layer_set.layers.reserve_exact(data.layers.len() + 1);
         layer_set
             .layers
@@ -199,7 +200,7 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
     /// compacting).  Since these layers are immutable, getting an iterator should not block
     /// anything else.
     pub fn immutable_layer_set(&self) -> LayerSet<K, V> {
-        let data = self.data.read().unwrap();
+        let data = self.data.read();
         let mut layers = Vec::with_capacity(data.layers.len());
         for layer in &data.layers {
             layers.push(layer.clone().into());
@@ -214,7 +215,7 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
         let val = if item.value == V::DELETED_MARKER { None } else { Some(item.value.clone()) };
         {
             // `seal` below relies on us holding a read lock whilst we do the mutation.
-            let data = self.data.read().unwrap();
+            let data = self.data.read();
             if let Some(mutation_callback) = data.mutation_callback.as_ref() {
                 mutation_callback(Operation::Insert, &item);
             }
@@ -230,7 +231,7 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
         let val = if item.value == V::DELETED_MARKER { None } else { Some(item.value.clone()) };
         {
             // `seal` below relies on us holding a read lock whilst we do the mutation.
-            let data = self.data.read().unwrap();
+            let data = self.data.read();
             if let Some(mutation_callback) = data.mutation_callback.as_ref() {
                 mutation_callback(Operation::ReplaceOrInsert, &item);
             }
@@ -244,7 +245,7 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
         let key = item.key.clone();
         {
             // `seal` below relies on us holding a read lock whilst we do the mutation.
-            let data = self.data.read().unwrap();
+            let data = self.data.read();
             if let Some(mutation_callback) = data.mutation_callback.as_ref() {
                 mutation_callback(Operation::MergeInto, &item);
             }
@@ -290,14 +291,14 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
     }
 
     pub fn mutable_layer(&self) -> Arc<SkipListLayer<K, V>> {
-        self.data.read().unwrap().mutable_layer.clone()
+        self.data.read().mutable_layer.clone()
     }
 
     /// Sets a mutation callback which is a callback that is triggered whenever any mutations are
     /// applied to the tree.  This might be useful for tests that want to record the precise
     /// sequence of mutations that are applied to the tree.
     pub fn set_mutation_callback(&self, mutation_callback: MutationCallback<K, V>) {
-        self.data.write().unwrap().mutation_callback = mutation_callback;
+        self.data.write().mutation_callback = mutation_callback;
     }
 
     /// Returns the earliest version used by a layer in the tree.
@@ -319,7 +320,7 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
 
     /// Replaces the mutable layer.
     pub fn set_mutable_layer(&self, layer: Arc<SkipListLayer<K, V>>) {
-        self.data.write().unwrap().mutable_layer = layer;
+        self.data.write().mutable_layer = layer;
     }
 
     /// Records inspect data for the LSM tree into `node`.  Called lazily when inspect is queried.
@@ -335,7 +336,7 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
             }
         });
         {
-            let counters = self.counters.lock().unwrap();
+            let counters = self.counters.lock();
             root.record_uint("num_seeks", counters.num_seeks as u64);
             root.record_uint(
                 "bloom_filter_success_percent",
@@ -444,11 +445,12 @@ mod tests {
     use anyhow::{anyhow, Error};
     use async_trait::async_trait;
     use fprint::TypeFingerprint;
+    use fuchsia_sync::Mutex;
     use fxfs_macros::FuzzyHash;
     use rand::seq::SliceRandom;
     use rand::thread_rng;
     use std::hash::Hash;
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
 
     #[derive(
         Clone,
@@ -725,15 +727,15 @@ mod tests {
 
     impl<V: Value> ObjectCachePlaceholder<V> for AuditPlaceholder<'_, V> {
         fn complete(self: Box<Self>, _: Option<&V>) {
-            self.inner.lock().unwrap().completions += 1;
-            *self.completed.lock().unwrap() = true;
+            self.inner.lock().completions += 1;
+            *self.completed.lock() = true;
         }
     }
 
     impl<V: Value> Drop for AuditPlaceholder<'_, V> {
         fn drop(&mut self) {
-            if !*self.completed.lock().unwrap() {
-                self.inner.lock().unwrap().drops += 1;
+            if !*self.completed.lock() {
+                self.inner.lock().drops += 1;
             }
         }
     }
@@ -741,7 +743,7 @@ mod tests {
     impl<K: Key + std::cmp::PartialEq, V: Value> ObjectCache<K, V> for AuditCache<'_, V> {
         fn lookup_or_reserve(&self, _key: &K) -> ObjectCacheResult<'_, V> {
             {
-                let mut inner = self.inner.lock().unwrap();
+                let mut inner = self.inner.lock();
                 inner.lookups += 1;
                 if inner.result.is_some() {
                     return std::mem::take(&mut inner.result).unwrap();
@@ -754,7 +756,7 @@ mod tests {
         }
 
         fn invalidate(&self, _key: K, _value: Option<V>) {
-            self.inner.lock().unwrap().invalidations += 1;
+            self.inner.lock().invalidations += 1;
         }
     }
 
@@ -766,26 +768,26 @@ mod tests {
         let a = LSMTree::new(emit_left_merge_fn, cache);
 
         // Zero counters.
-        assert_eq!(inner.lock().unwrap().stats(), (0, 0, 0, 0));
+        assert_eq!(inner.lock().stats(), (0, 0, 0, 0));
 
         // Look for an item, but don't find it. So no insertion. It is dropped.
         assert!(a.find(&item.key).await.expect("Failed find").is_none());
-        assert_eq!(inner.lock().unwrap().stats(), (1, 0, 0, 1));
+        assert_eq!(inner.lock().stats(), (1, 0, 0, 1));
 
         // Insert attempts to invalidate.
         let _ = a.insert(item.clone());
-        assert_eq!(inner.lock().unwrap().stats(), (1, 0, 1, 1));
+        assert_eq!(inner.lock().stats(), (1, 0, 1, 1));
 
         // Look for item, find it and insert into the cache.
         assert_eq!(
             a.find(&item.key).await.expect("Failed find").expect("Item should be found.").value,
             item.value
         );
-        assert_eq!(inner.lock().unwrap().stats(), (2, 1, 1, 1));
+        assert_eq!(inner.lock().stats(), (2, 1, 1, 1));
 
         // Insert or replace attempts to invalidate as well.
         a.replace_or_insert(item.clone());
-        assert_eq!(inner.lock().unwrap().stats(), (2, 1, 2, 1));
+        assert_eq!(inner.lock().stats(), (2, 1, 2, 1));
     }
 
     #[fuchsia::test]
@@ -796,21 +798,21 @@ mod tests {
         let a = LSMTree::new(emit_left_merge_fn, cache);
 
         // Zero counters.
-        assert_eq!(inner.lock().unwrap().stats(), (0, 0, 0, 0));
+        assert_eq!(inner.lock().stats(), (0, 0, 0, 0));
 
         // Insert attempts to invalidate.
         let _ = a.insert(item.clone());
-        assert_eq!(inner.lock().unwrap().stats(), (0, 0, 1, 0));
+        assert_eq!(inner.lock().stats(), (0, 0, 1, 0));
 
         // Set up the item to find in the cache.
-        inner.lock().unwrap().result = Some(ObjectCacheResult::Value(item.value.clone()));
+        inner.lock().result = Some(ObjectCacheResult::Value(item.value.clone()));
 
         // Look for item, find it in cache, so no insert.
         assert_eq!(
             a.find(&item.key).await.expect("Failed find").expect("Item should be found.").value,
             item.value
         );
-        assert_eq!(inner.lock().unwrap().stats(), (1, 0, 1, 0));
+        assert_eq!(inner.lock().stats(), (1, 0, 1, 0));
     }
 
     #[fuchsia::test]
@@ -822,17 +824,17 @@ mod tests {
         let _ = a.insert(item.clone());
 
         // One invalidation from the insert.
-        assert_eq!(inner.lock().unwrap().stats(), (0, 0, 1, 0));
+        assert_eq!(inner.lock().stats(), (0, 0, 1, 0));
 
         // Set up the NoCache response to find in the cache.
-        inner.lock().unwrap().result = Some(ObjectCacheResult::NoCache);
+        inner.lock().result = Some(ObjectCacheResult::NoCache);
 
         // Look for item, it is uncacheable, so no insert.
         assert_eq!(
             a.find(&item.key).await.expect("Failed find").expect("Should find item").value,
             item.value
         );
-        assert_eq!(inner.lock().unwrap().stats(), (1, 0, 1, 0));
+        assert_eq!(inner.lock().stats(), (1, 0, 1, 0));
     }
 
     struct FailLayer {
@@ -855,7 +857,7 @@ mod tests {
         }
 
         fn lock(&self) -> Option<Arc<DropEvent>> {
-            self.drop_event.lock().unwrap().clone()
+            self.drop_event.lock().clone()
         }
 
         fn estimated_len(&self) -> ItemCount {
@@ -863,7 +865,7 @@ mod tests {
         }
 
         async fn close(&self) {
-            let listener = match std::mem::replace(&mut (*self.drop_event.lock().unwrap()), None) {
+            let listener = match std::mem::replace(&mut (*self.drop_event.lock()), None) {
                 Some(drop_event) => drop_event.listen(),
                 None => return,
             };
@@ -883,11 +885,11 @@ mod tests {
         a.set_layers(vec![Arc::new(FailLayer::new())]);
 
         // Zero counters.
-        assert_eq!(inner.lock().unwrap().stats(), (0, 0, 0, 0));
+        assert_eq!(inner.lock().stats(), (0, 0, 0, 0));
 
         // Lookup should fail and drop the placeholder.
         assert!(a.find(&TestKey(1..1)).await.is_err());
-        assert_eq!(inner.lock().unwrap().stats(), (1, 0, 0, 1));
+        assert_eq!(inner.lock().stats(), (1, 0, 0, 1));
     }
 }
 

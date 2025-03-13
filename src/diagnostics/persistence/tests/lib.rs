@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use diagnostics_reader::{ArchiveReader, Inspect, RetryConfig};
+use diagnostics_reader::{ArchiveReader, RetryConfig};
 use fidl_fuchsia_component::BinderMarker;
 use fidl_fuchsia_diagnostics_persist::{
     DataPersistenceMarker, DataPersistenceProxy, PersistResult,
@@ -258,7 +258,7 @@ async fn diagnostics_persistence_integration() {
 /// some time after the FIDL call that woke it up has returned. This function verifies that
 /// the Inspect source is actually publishing data to avoid a race condition.
 async fn wait_for_inspect_source() {
-    let mut inspect_fetcher = ArchiveReader::new();
+    let mut inspect_fetcher = ArchiveReader::inspect();
     inspect_fetcher.retry(RetryConfig::never());
     inspect_fetcher.add_selector("realm_builder*/single_counter:root");
     let start_time = MonotonicInstant::get();
@@ -269,7 +269,7 @@ async fn wait_for_inspect_source() {
                 > MonotonicInstant::get()
         );
         let published_inspect =
-            inspect_fetcher.snapshot_raw::<Inspect, serde_json::Value>().await.unwrap().to_string();
+            inspect_fetcher.snapshot_raw::<serde_json::Value>().await.unwrap().to_string();
         if published_inspect.contains(KEY_FROM_INSPECT_SOURCE) {
             return;
         }
@@ -561,13 +561,13 @@ fn collapse_realm_builder_strings(data: &str) -> String {
 
 /// Verify that the expected data is published by Persistence in its Inspect hierarchy.
 async fn verify_diagnostics_persistence_publication(published: Published) {
-    let mut inspect_fetcher = ArchiveReader::new();
+    let mut inspect_fetcher = ArchiveReader::inspect();
     inspect_fetcher.retry(RetryConfig::never());
     inspect_fetcher.add_selector("realm_builder*/persistence:root");
     loop {
         thread::sleep(time::Duration::from_millis(100));
         let published_inspect =
-            inspect_fetcher.snapshot_raw::<Inspect, serde_json::Value>().await.unwrap().to_string();
+            inspect_fetcher.snapshot_raw::<serde_json::Value>().await.unwrap().to_string();
         if matches!(published, Published::Waiting)
             && published_inspect.contains(r#""status":"STARTING_UP""#)
         {

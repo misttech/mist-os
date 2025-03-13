@@ -13,4 +13,7 @@
         },
         "test.core.b": { "priority": 25 },
     },
+    "memory": {
+        "test.core.a.memory": { "priority": 24 },
+    },
 }

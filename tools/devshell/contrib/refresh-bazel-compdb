@@ -29,6 +29,7 @@ BAZEL_EXE="$(fx-get-bazel)"
   --bazel $BAZEL_EXE \
   --optimization "${optimization}" \
   --build-dir "${FUCHSIA_BUILD_DIR}" \
+  --target-cpu "$FUCHSIA_ARCH" \
   "$@"
 
 

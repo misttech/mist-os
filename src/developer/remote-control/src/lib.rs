@@ -6,7 +6,6 @@ use crate::host_identifier::{DefaultIdentifier, HostIdentifier, Identifier};
 use anyhow::{Context as _, Result};
 use component_debug::dirs::*;
 use component_debug::lifecycle::*;
-use fidl::endpoints::ServerEnd;
 use fuchsia_component::client::connect_to_protocol_at_path;
 use futures::prelude::*;
 use log::*;
@@ -119,12 +118,11 @@ impl RemoteControlService {
                 self.clone().identify_host(responder).await?;
                 Ok(())
             }
-            rcs::RemoteControlRequest::DeprecatedOpenCapability {
+            rcs::RemoteControlRequest::ConnectCapability {
                 moniker,
                 capability_set,
                 capability_name,
                 server_channel,
-                flags: _,
                 responder,
             } => {
                 responder.send(
@@ -134,11 +132,12 @@ impl RemoteControlService {
                 )?;
                 Ok(())
             }
-            rcs::RemoteControlRequest::ConnectCapability {
+            rcs::RemoteControlRequest::DeprecatedOpenCapability {
                 moniker,
                 capability_set,
                 capability_name,
                 server_channel,
+                flags: _,
                 responder,
             } => {
                 responder.send(
@@ -333,11 +332,10 @@ impl RemoteControlService {
         })
         .await?;
 
-        dir.open(fio::OpenFlags::RIGHT_READABLE, fio::ModeType::empty(), "svc", server_end.into())
-            .map_err(|err| {
-                error!(err:?; "error opening svc dir in toolbox");
-                rcs::ConnectCapabilityError::CapabilityConnectFailed
-            })?;
+        dir.open("svc", io::PERM_READABLE, &Default::default(), server_end).map_err(|err| {
+            error!(err:?; "error opening svc dir in toolbox");
+            rcs::ConnectCapabilityError::CapabilityConnectFailed
+        })?;
         Ok(())
     }
 }
@@ -382,18 +380,13 @@ async fn connect_to_capability_in_dir(
     server_end: zx::Channel,
 ) -> Result<(), rcs::ConnectCapabilityError> {
     check_entry_exists(dir, capability_name).await?;
-
     // Connect to the capability
-    dir.open(
-        io::OpenFlags::empty(),
-        io::ModeType::empty(),
-        capability_name,
-        ServerEnd::new(server_end),
+    dir.open(capability_name, io::Flags::PROTOCOL_SERVICE, &Default::default(), server_end).map_err(
+        |err| {
+            error!(err:%; "error opening capability from exposed dir");
+            rcs::ConnectCapabilityError::CapabilityConnectFailed
+        },
     )
-    .map_err(|err| {
-        error!(err:%; "error opening capability from exposed dir");
-        rcs::ConnectCapabilityError::CapabilityConnectFailed
-    })
 }
 
 // Checks that the given directory contains an entry with the given name.
@@ -432,6 +425,7 @@ async fn check_entry_exists(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fidl::endpoints::ServerEnd;
     use fuchsia_component::server::ServiceFs;
     use {
         fidl_fuchsia_buildinfo as buildinfo, fidl_fuchsia_developer_remotecontrol as rcs,

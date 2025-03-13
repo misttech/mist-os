@@ -3,9 +3,10 @@
 // found in the LICENSE file.
 
 use crate::args::{EfiCommand, EfiSubCommand};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use errors::ffx_bail;
+use sdk_metadata::CpuArchitecture;
 use std::cmp::max;
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
@@ -21,10 +22,21 @@ pub struct Efi {
 
 #[async_trait(?Send)]
 impl fho::FfxMain for Efi {
-    type Writer = fho::SimpleWriter;
+    type Writer = ffx_writer::SimpleWriter;
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
         command(self.cmd).await.map_err(|e| e.into())
     }
+}
+
+fn boot_path_from_arch(arch: CpuArchitecture) -> Result<String> {
+    Ok(format!(
+        "EFI/BOOT/{}",
+        match arch {
+            CpuArchitecture::X64 => "BOOTX64.EFI",
+            CpuArchitecture::Arm64 => "BOOTAA64.EFI",
+            a @ _ => return Err(anyhow!("arch {:?} EFI boot loader is not supported yet", a)),
+        }
+    ))
 }
 
 fn format(volume: &File, size: u64) -> Result<()> {
@@ -98,18 +110,18 @@ fn load_files<'a>(
     Ok(())
 }
 
-pub async fn command(cmd: EfiCommand) -> Result<()> {
+async fn command(cmd: EfiCommand) -> Result<()> {
     match &cmd.subcommand {
         EfiSubCommand::Create(create) => {
             let output_path = Path::new(&create.output);
-
             let mut names = HashMap::new();
             let mut maybe_insert = |dest_path: &str, value: &Option<String>| {
                 value.as_ref().map(|v| names.insert(String::from(dest_path), String::from(v)));
             };
+            let efi_path = boot_path_from_arch(create.arch)?;
             maybe_insert("zircon.bin", &create.zircon);
             maybe_insert("bootdata.bin", &create.bootdata);
-            maybe_insert("EFI/BOOT/BOOTX64.EFI", &create.efi_bootloader);
+            maybe_insert(&efi_path, &create.efi_bootloader);
             maybe_insert("zedboot.bin", &create.zedboot);
             maybe_insert("cmdline", &create.cmdline);
 
@@ -118,8 +130,10 @@ pub async fn command(cmd: EfiCommand) -> Result<()> {
 
             // Some arguments require special handling: cmdline, efi_bootloader
             if create.efi_bootloader.is_some() {
-                files
-                    .insert("EFI/Google/GSetup/Boot", "efi\\boot\\bootx64.efi".as_bytes().to_vec());
+                files.insert(
+                    "EFI/Google/GSetup/Boot",
+                    efi_path.replace("/", "\\").as_bytes().to_vec(),
+                );
             }
 
             let size = compute_size(&files);
@@ -159,7 +173,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_create_empty() -> Result<()> {
         let tmpdir = tempdir()?;
         let output = tmpdir.path().join("test_output").to_str().unwrap().to_string();
@@ -169,6 +183,7 @@ mod test {
                 output: output.clone(),
                 cmdline: None,
                 bootdata: None,
+                arch: CpuArchitecture::X64,
                 efi_bootloader: None,
                 zircon: None,
                 zedboot: None,
@@ -179,8 +194,8 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_create() -> Result<()> {
+    #[fuchsia::test]
+    async fn test_create_arm64() -> Result<()> {
         let tmpdir = tempdir()?;
         let tmppath = |name| tmpdir.path().join(name).to_str().unwrap().to_string();
 
@@ -207,6 +222,60 @@ mod test {
                 output: output.clone(),
                 cmdline: Some(cmdline),
                 bootdata: Some(bootdata),
+                arch: CpuArchitecture::Arm64,
+                efi_bootloader: Some(bootloader),
+                zircon: Some(zircon),
+                zedboot: Some(zedboot),
+            }),
+        })
+        .await;
+        assert!(result.is_ok());
+
+        check_file_content(&output, "EFI/BOOT/BOOTAA64.EFI", &bootloader_content)?;
+        check_file_content(&output, "cmdline", cmdline_content)?;
+        check_file_content(&output, "bootdata.bin", bootdata_content)?;
+        check_file_content(&output, "zircon.bin", zircon_content)?;
+        check_file_content(&output, "zedboot.bin", zedboot_content)?;
+        let output_size = metadata(output)?.len();
+
+        // Check that produced image is at least 1MiB
+        assert!(output_size >= 1024 * 1024, "size = {}", output_size);
+
+        // Check that the image is aligned to legacy track size.
+        assert_eq!(output_size % 63 * 512, 0);
+
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_create_x64() -> Result<()> {
+        let tmpdir = tempdir()?;
+        let tmppath = |name| tmpdir.path().join(name).to_str().unwrap().to_string();
+
+        let cmdline = tmppath("test_cmdline");
+        let cmdline_content = "cmdline content";
+        let output = tmppath("test_output");
+        let bootloader = tmppath("test_bootloader");
+        let bootloader_content = "bootloader content".repeat(100);
+        let bootdata = tmppath("test_bootdata");
+        let bootdata_content = "bootdata content";
+        let zircon = tmppath("test_zircon");
+        let zircon_content = "zircon content";
+        let zedboot = tmppath("test_zedboot");
+        let zedboot_content = "zedboot content";
+
+        set_file_content(&cmdline, cmdline_content)?;
+        set_file_content(&bootloader, &bootloader_content)?;
+        set_file_content(&bootdata, bootdata_content)?;
+        set_file_content(&zircon, zircon_content)?;
+        set_file_content(&zedboot, zedboot_content)?;
+
+        let result = command(EfiCommand {
+            subcommand: EfiSubCommand::Create(CreateCommand {
+                output: output.clone(),
+                cmdline: Some(cmdline),
+                bootdata: Some(bootdata),
+                arch: CpuArchitecture::X64,
                 efi_bootloader: Some(bootloader),
                 zircon: Some(zircon),
                 zedboot: Some(zedboot),
@@ -231,7 +300,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_create_worst_case_reservation() -> Result<()> {
         let tmpdir = tempdir()?;
         let tmppath = |name| tmpdir.path().join(name).to_str().unwrap().to_string();
@@ -249,6 +318,7 @@ mod test {
                 output: output.clone(),
                 cmdline: None,
                 bootdata: None,
+                arch: CpuArchitecture::X64,
                 efi_bootloader: Some(bootloader),
                 zircon: None,
                 zedboot: None,
@@ -285,6 +355,7 @@ mod test {
                 output: output.clone(),
                 cmdline: None,
                 bootdata: None,
+                arch: CpuArchitecture::X64,
                 efi_bootloader: Some(bootloader),
                 zircon: None,
                 zedboot: None,
@@ -301,28 +372,28 @@ mod test {
         Ok((fat_type, output_size))
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_create_16mib() {
         let (fat_type, size) = create_image_with_payload(16 * 1024 * 1024).await.unwrap();
         assert_eq!(fat_type, fatfs::FatType::Fat16);
         assert!(size >= 16 * 1024 * 1024);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_create_20mib() {
         let (fat_type, size) = create_image_with_payload(20 * 1024 * 1024).await.unwrap();
         assert_eq!(fat_type, fatfs::FatType::Fat16);
         assert!(size >= 20 * 1024 * 1024);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_create_24mib() {
         let (fat_type, size) = create_image_with_payload(24 * 1024 * 1024).await.unwrap();
         assert_eq!(fat_type, fatfs::FatType::Fat16);
         assert!(size >= 24 * 1024 * 1024);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_create_28mib() {
         let (fat_type, size) = create_image_with_payload(28 * 1024 * 1024).await.unwrap();
         assert_eq!(fat_type, fatfs::FatType::Fat16);
@@ -331,14 +402,14 @@ mod test {
 
     // Empirically this is roughly where images switch over to FAT32.  By the spec, FAT32 images
     // must have at least 65525 clusters, which at 512 bytes per cluster is 33,548,800 bytes.
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_create_30mib() {
         let (fat_type, size) = create_image_with_payload(30 * 1024 * 1024).await.unwrap();
         assert_eq!(fat_type, fatfs::FatType::Fat32);
         assert!(size >= 30 * 1024 * 1024);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_create_32mib() {
         let (fat_type, size) = create_image_with_payload(32 * 1024 * 1024).await.unwrap();
         assert_eq!(fat_type, fatfs::FatType::Fat32);

@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 load(
-    "@fuchsia_sdk//fuchsia:assembly.bzl",
+    "@rules_fuchsia//fuchsia:assembly.bzl",
     "PARTITION_TYPE",
     "SLOT",
     "fuchsia_board_configuration",
@@ -29,7 +29,7 @@ load(
     "tuf_repo_root",
 )
 load(
-    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "@rules_fuchsia//fuchsia:defs.bzl",
     "fuchsia_component",
     "fuchsia_component_manifest",
     "fuchsia_package",
@@ -126,8 +126,8 @@ fuchsia_board_configuration(
     },
     post_processing_script = ":post_processing_script",
     tee_trusted_app_guids = [
-        "ta_1",
-        "ta_2",
+        "67e55044-10b1-426f-9247-bb680e5fe0c8",
+        "67e55044-10b1-426f-9247-bb680e5fe0c8",
     ],
 )
 
@@ -146,6 +146,7 @@ fuchsia_post_processing_script(
     post_processing_script_inputs = {
         "test_data/fake_dep": "fake_dep",
         "test_data/test.dtb": "test.dtb",
+        "test_data/zbi_signing_script": "zbi_signing_script",
     },
     post_processing_script_path = "zbi_signing_script",
 )
@@ -266,15 +267,12 @@ fuchsia_prebuilt_product_configuration(
     name = "prebuilt_product_config",
     build_type = "userdebug",
     product_config_dir = "test_data/prebuilt_product_config",
-    product_config_filename = "prebuilt_product_config.json",
 )
 
 fuchsia_hybrid_product_configuration(
     name = "hybrid_product_config",
+    packages = [":prebuilt_ams_light"],
     product_configuration = ":prebuilt_product_config",
-    replace_packages = {
-        ":prebuilt_ams_light": "prebuilt_ams_light_fuchsia_package_expanded",
-    },
 )
 
 fuchsia_product_configuration_test(

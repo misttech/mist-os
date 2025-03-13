@@ -44,6 +44,16 @@ enum class ElfData : uint8_t {
       }()
 };
 
+constexpr std::string_view ElfDataName(ElfData data, bool upper = false) {
+  using namespace std::literals;
+  switch (data) {
+    case ElfData::k2Lsb:
+      return upper ? "LE"sv : "le"sv;
+    case ElfData::k2Msb:
+      return upper ? "BE"sv : "be"sv;
+  }
+}
+
 // This is just a fixed constant that cannot vary.
 enum class ElfVersion : uint8_t { kCurrent = 1 };
 
@@ -254,6 +264,27 @@ constexpr std::string_view ElfMachineName(ElfMachine machine) {
       return "EM_RISCV";
   }
   return "<unknown>";
+}
+
+// This can be used to assemble a file name or the like using the string that
+// the GN build system uses as $current_cpu when building modules of this sort.
+constexpr std::string_view ElfMachineFileName(ElfMachine machine = ElfMachine::kNative,
+                                              ElfClass elfclass = ElfClass::kNative) {
+  switch (machine) {
+    case ElfMachine::kNone:
+      return "none";
+    case ElfMachine::k386:
+      return "x86";
+    case ElfMachine::kArm:
+      return "arm";
+    case ElfMachine::kX86_64:
+      return "x64";
+    case ElfMachine::kAarch64:
+      return "arm64";
+    case ElfMachine::kRiscv:
+      return elfclass == ElfClass::k32 ? "riscv" : "riscv64";
+  }
+  return "unknown-cpu";
 }
 
 // These are types used in notes.  Other types might appear in note headers.

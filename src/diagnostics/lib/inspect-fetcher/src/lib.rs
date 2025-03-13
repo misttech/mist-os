@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::{bail, Error};
-use diagnostics_reader::{ArchiveReader, Inspect, RetryConfig};
-use log::*;
+use diagnostics_reader::{ArchiveReader, InspectArchiveReader, RetryConfig};
+use log::warn;
 
 // Selectors for Inspect data must start with this exact string.
 const INSPECT_PREFIX: &str = "INSPECT:";
@@ -13,7 +13,7 @@ const INSPECT_PREFIX: &str = "INSPECT:";
 pub struct InspectFetcher {
     // If we have no selectors, we don't want to actually fetch anything.
     // (Fetching with no selectors fetches all Inspect data.)
-    reader: Option<ArchiveReader>,
+    reader: Option<InspectArchiveReader>,
 }
 
 impl std::fmt::Debug for InspectFetcher {
@@ -39,7 +39,7 @@ impl InspectFetcher {
             Ok(proxy) => proxy,
             Err(e) => bail!("Failed to connect to Inspect reader: {}", e),
         };
-        let mut reader = ArchiveReader::new();
+        let mut reader = ArchiveReader::inspect();
         reader
             .with_archive(proxy)
             .retry(RetryConfig::never())
@@ -54,7 +54,7 @@ impl InspectFetcher {
             None => Ok("[]".to_string()),
             Some(reader) => {
                 // TODO(https://fxbug.dev/42140879): Make TriageLib accept structured data
-                Ok(reader.snapshot_raw::<Inspect, serde_json::Value>().await?.to_string())
+                Ok(reader.snapshot_raw::<serde_json::Value>().await?.to_string())
             }
         }
     }

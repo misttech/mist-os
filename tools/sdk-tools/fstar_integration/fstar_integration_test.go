@@ -113,7 +113,7 @@ func setUp(t *testing.T) (toolsPath, error) {
 	testOutDir := filepath.Join(t.TempDir(), "fssh_test")
 
 	// Create a new isolated ffx instance.
-	tools.ffxInstance, err = ffxutil.NewFFXInstance(context.Background(), tools.ffxPath, "", os.Environ(), os.Getenv(constants.NodenameEnvKey), os.Getenv(constants.SSHKeyEnvKey), testOutDir)
+	tools.ffxInstance, err = ffxutil.NewFFXInstance(context.Background(), tools.ffxPath, "", os.Environ(), os.Getenv(constants.NodenameEnvKey), os.Getenv(constants.SSHKeyEnvKey), testOutDir, ffxutil.UseFFXLegacy)
 	if err != nil {
 		return tools, fmt.Errorf("unable to create new ffx instance %w", err)
 	}

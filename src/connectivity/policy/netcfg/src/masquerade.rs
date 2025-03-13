@@ -251,8 +251,7 @@ impl MasqueradeHandler {
         filter_enabled_state: &mut FilterEnabledState,
         interface_states: &HashMap<InterfaceId, InterfaceState>,
     ) -> Result<bool, Error> {
-        let state =
-            self.active_controllers.get_mut(&config).ok_or_else(|| Error::InvalidArguments)?;
+        let state = self.active_controllers.get_mut(&config).ok_or(Error::InvalidArguments)?;
 
         let original_state = state.filter_state.is_active();
         if original_state == enabled {

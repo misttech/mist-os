@@ -216,11 +216,11 @@ config("fidl-wire-deprecated-mutable-tables") {
 
     #------------------
     #------------------
-    "//src/media/audio/audio_core/v1:audio_core_lib",
+    "//src/media/audio/audio_core:audio_core_lib",
 
     #------------------
     #------------------
-    "//src/media/audio/audio_core/v1:unittest_bin",
+    "//src/media/audio/audio_core:unittest_bin",
 
     #------------------
     #------------------
@@ -280,7 +280,7 @@ config("fidl-wire-deprecated-mutable-tables") {
 
     #------------------
     #------------------
-    "//src/media/audio/drivers/virtual_audio:virtual_audio_driver-driver",
+    "//src/media/audio/drivers/virtual-audio-legacy:virtual-audio-legacy-driver",
 
     #------------------
     #------------------

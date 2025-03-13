@@ -18,6 +18,7 @@ driver_bind_rules("virtio_input_bind") {
 }
 
 fuchsia_cc_driver("virtio_input-driver") {
+  legacy = true
   output_name = "virtio_input"
   configs += [
     "//build/config:all_source",
@@ -33,7 +34,7 @@ fuchsia_cc_driver("virtio_input-driver") {
   deps = [
     ":virtio_input_bind",
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp",
-    "//src/devices/bus/lib/virtio",
+    "//src/devices/bus/lib/virtio:virtio-dfv1",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddktl",
@@ -72,12 +73,14 @@ test("virtio-input-test") {
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/async_patterns/testing/cpp",
-    "//src/devices/bus/lib/virtio",
+    "//src/devices/bus/lib/virtio:virtio-dfv1",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/no_ddk",
+    "//src/lib/ddktl",
     "//src/ui/input/lib/hid-input-report",
     "//src/ui/input/lib/hid-parser",
     "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zxtest",
   ]
 

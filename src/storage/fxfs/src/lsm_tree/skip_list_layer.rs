@@ -15,12 +15,13 @@ use crate::lsm_tree::types::{
 use crate::serialized_types::{Version, LATEST_VERSION};
 use anyhow::{bail, Error};
 use async_trait::async_trait;
+use fuchsia_sync::{Mutex, MutexGuard};
 use std::cell::UnsafeCell;
 use std::cmp::{min, Ordering};
 use std::collections::BTreeMap;
 use std::ops::{Bound, Range};
 use std::sync::atomic::{self, AtomicPtr, AtomicU32};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::Arc;
 
 // Each skip list node contains a variable sized pointer list. The head pointers also exist in the
 // form of a pointer list. Index 0 in the pointer list is the chain with the most elements i.e.
@@ -165,7 +166,7 @@ impl<K, V> SkipListLayer<K, V> {
     }
 
     pub fn len(&self) -> usize {
-        self.inner.lock().unwrap().item_count
+        self.inner.lock().item_count
     }
 
     fn alloc_node(&self, item: Item<K, V>, pointer_count: usize) -> Box<SkipListNode<K, V>> {
@@ -252,16 +253,15 @@ impl<K: Key, V: LayerValue> Layer<K, V> for SkipListLayer<K, V> {
     }
 
     fn lock(&self) -> Option<Arc<DropEvent>> {
-        self.close_event.lock().unwrap().clone()
+        self.close_event.lock().clone()
     }
 
     fn estimated_len(&self) -> ItemCount {
-        ItemCount::Precise(self.inner.lock().unwrap().item_count)
+        ItemCount::Precise(self.inner.lock().item_count)
     }
 
     async fn close(&self) {
-        let listener =
-            self.close_event.lock().unwrap().take().expect("close already called").listen();
+        let listener = self.close_event.lock().take().expect("close already called").listen();
         listener.await;
     }
 
@@ -273,7 +273,7 @@ impl<K: Key, V: LayerValue> Layer<K, V> for SkipListLayer<K, V> {
 
     fn record_inspect_data(self: Arc<Self>, node: &fuchsia_inspect::Node) {
         node.record_bool("persistent", false);
-        node.record_uint("num_items", self.inner.lock().unwrap().item_count as u64);
+        node.record_uint("num_items", self.inner.lock().item_count as u64);
     }
 }
 
@@ -292,7 +292,7 @@ struct SkipListLayerIter<'a, K, V> {
 impl<'a, K: OrdUpperBound, V> SkipListLayerIter<'a, K, V> {
     fn new(skip_list: &'a SkipListLayer<K, V>, bound: Bound<&K>) -> Self {
         let epoch = {
-            let mut inner = skip_list.inner.lock().unwrap();
+            let mut inner = skip_list.inner.lock();
             inner.current_count += 1;
             inner.epoch
         };
@@ -331,7 +331,7 @@ impl<'a, K: OrdUpperBound, V> SkipListLayerIter<'a, K, V> {
 
 impl<K, V> Drop for SkipListLayerIter<'_, K, V> {
     fn drop(&mut self) {
-        let mut inner = self.skip_list.inner.lock().unwrap();
+        let mut inner = self.skip_list.inner.lock();
         if self.epoch == inner.epoch {
             inner.current_count -= 1;
         } else {
@@ -402,7 +402,7 @@ pub struct SkipListLayerIterMut<'a, K: Key, V: LayerValue> {
 
 impl<'a, K: Key, V: LayerValue> SkipListLayerIterMut<'a, K, V> {
     pub fn new(skip_list: &'a SkipListLayer<K, V>, bound: std::ops::Bound<&K>) -> Self {
-        let write_guard = skip_list.write_lock.lock().unwrap();
+        let write_guard = skip_list.write_lock.lock();
         let len = skip_list.pointers.len();
 
         // Start by setting all the previous pointers to the head.
@@ -571,7 +571,7 @@ impl<K: Key, V: LayerValue> LayerIteratorMut<K, V> for SkipListLayerIterMut<'_, 
         }
 
         // Switch the epoch so that we can track when existing readers have finished.
-        let mut inner = self.skip_list.inner.lock().unwrap();
+        let mut inner = self.skip_list.inner.lock();
         inner.item_count = inner.item_count.checked_add_signed(self.item_delta).unwrap();
         if let Some(start) = maybe_erase {
             let end = self.prev_pointers[0].get_ptr(0);
@@ -860,7 +860,7 @@ mod tests {
     ) -> MergeResult<TestKey, i32> {
         MergeResult::Other {
             emit: None,
-            left: Replace(Item::new((*left.key()).clone(), *left.value() + *right.value())),
+            left: Replace(Item::new((*left.key()).clone(), *left.value() + *right.value()).boxed()),
             right: Discard,
         }
     }

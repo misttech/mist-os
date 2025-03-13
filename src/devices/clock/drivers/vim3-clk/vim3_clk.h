@@ -5,10 +5,8 @@
 #ifndef SRC_DEVICES_CLOCK_DRIVERS_VIM3_CLK_VIM3_CLK_H_
 #define SRC_DEVICES_CLOCK_DRIVERS_VIM3_CLK_VIM3_CLK_H_
 
-#include <fidl/fuchsia.driver.compat/cpp/wire.h>
 #include <fidl/fuchsia.hardware.clockimpl/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
-#include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
 #include <lib/driver/metadata/cpp/metadata_server.h>
@@ -68,9 +66,6 @@ class Vim3Clock final : public fdf::DriverBase,
   void InitGates();
   void InitHiu();
   void InitCpuClks();
-
-  // Required for maintaining the topological path.
-  compat::SyncInitializedDeviceServer compat_server_;
 
   // Client for controller the child node.
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> child_controller_;

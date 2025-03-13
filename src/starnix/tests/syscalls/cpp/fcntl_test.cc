@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <stdio.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
@@ -239,6 +240,49 @@ TEST(FcntlTest, NoatimePermission) {
     ASSERT_LT(fcntl(fd, F_SETFL, O_NOATIME), 0);
     ASSERT_EQ(errno, EPERM);
   });
+}
+
+TEST(FcntlTest, RenameExchangeLockOrdering) {
+  char *tmp = getenv("TEST_TMPDIR");
+  std::string root_dir = tmp == nullptr ? "/tmp" : std::string(tmp);
+
+  // This test exercises a niche lock ordering bug. In essence, the rename_exchange
+  // operation can muddle with the lock orderning in DirEntry due to the reparenting
+  // of nodes. See the following bug for a more detailed description:
+  // https://buganizer.corp.google.com/issues/387576826
+  std::string first_parent_dir = root_dir + "/first_parent_dir";
+  std::string second_parent_dir = root_dir + "/second_parent_dir";
+  std::string file = second_parent_dir + "/file";
+
+  // Set up the initial folder and file structure.
+  ASSERT_THAT(mkdir(first_parent_dir.c_str(), 0700), SyscallSucceeds());
+  ASSERT_THAT(mkdir(second_parent_dir.c_str(), 0700), SyscallSucceeds());
+  ASSERT_THAT(open(file.c_str(), O_CREAT | O_WRONLY, 0600), SyscallSucceeds());
+
+  // The rename operation here is irrelevant, except in that it establishes
+  // the lock ordering for the parent directories. In other words, the lock
+  // ordering is set as first locking the children of "first_parent_dir,"
+  // followed by locking the children of "second_parent_dir."
+  std::string dummy_first_parent_child = first_parent_dir + "/dummy_file.txt";
+  std::string dummy_second_parent_child = second_parent_dir + "/dummy_file.txt";
+  // Since these files don't exist, we expect the rename to fail. Once again,
+  // we are only doing this to establish the lock ordering for the directories.
+  ASSERT_THAT(rename(dummy_first_parent_child.c_str(), dummy_second_parent_child.c_str()),
+              SyscallFails());
+
+  // Next, we'll do the rename_exchange operation. This will exchange the nested
+  // file with a higher-level directory, which can potentially pollute the
+  // lock tracing state of the directory hierarchy.
+  ASSERT_THAT(renameat2(0, file.c_str(), 0, first_parent_dir.c_str(), RENAME_EXCHANGE),
+              SyscallSucceeds());
+
+  // Lastly, we'll attempt to touch the "first_parent_dir," which we've just
+  // exchanged to be nested under "second_parent_dir." This will cause the
+  // "second_parent_dir" children to be locked, followed by the "first_parent_dir"
+  // that's now nested under it. This could potentially trip our lock ordering
+  // which we established in the first rename operation of this test.
+  std::string newly_exchanged_node = second_parent_dir + "/file";
+  ASSERT_THAT(rmdir(newly_exchanged_node.c_str()), SyscallSucceeds());
 }
 
 }  // namespace

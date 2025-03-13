@@ -393,7 +393,7 @@ fn netstack_test_inner(
 
     // Pass the test name as the first argument, and keep other arguments
     // in the generated function which will be passed to the original function.
-    let skip = test_name.then(|| 1).unwrap_or(0);
+    let skip = test_name.then_some(1).unwrap_or(0);
     let impl_inputs = inputs.iter().skip(skip).cloned().collect::<Vec<_>>();
 
     let mut args = Vec::new();

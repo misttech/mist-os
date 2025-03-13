@@ -42,11 +42,9 @@
             subdir: "memory_monitor",
         },
         {
-            directory: "dev-class",
+            service: "fuchsia.hardware.ram.metrics.Service",
             from: "parent",
-            as: "dev-aml-ram",
             to: "#memory_monitor",
-            subdir: "aml-ram",
         },
         {
             storage: "cache",

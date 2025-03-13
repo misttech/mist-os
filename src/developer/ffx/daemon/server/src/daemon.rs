@@ -23,7 +23,6 @@ use fidl_fuchsia_developer_ffx::{
     RepositoryRegistryMarker, TargetCollectionMarker, VersionInfo,
 };
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
-use fidl_fuchsia_io::OpenFlags;
 use fidl_fuchsia_overnet_protocol::NodeId;
 use fidl_fuchsia_sys2 as fsys;
 use fuchsia_async::{Task, TimeoutExt, Timer};
@@ -119,9 +118,14 @@ impl DaemonEventHandler {
             &[
                 TargetUpdateFilter::Ids(identify.ids.as_deref().unwrap_or(&[])),
                 TargetUpdateFilter::NetAddrs(&addrs),
+                TargetUpdateFilter::LegacyNodeName(&nodename),
             ],
             update.build(),
-            false,
+            // It was never made clear why we don't want to make a new target here, which is what
+            // this flag represents. This was previously set to false, but this no longer applies
+            // to the structure of overnet in a world with USB, which doesn't rely on an underlying
+            // host_pipe/fidl_pipe connection.
+            true,
         ) {
             // Print out better Peer information in logs
             0 => {
@@ -228,24 +232,41 @@ impl DaemonProtocolProvider for Daemon {
             .rcs()
             .ok_or_else(|| anyhow!("rcs disconnected after event fired"))
             .context("getting rcs instance")?;
-        let (server, client) = fidl::Channel::create();
-
-        // TODO(awdavies): Handle these errors properly so the client knows what happened.
+        // Try to connect via fuchsia.developer.remotecontrol/RemoteControl.ConnectCapability.
+        let (client, server) = fidl::Channel::create();
+        if let Ok(response) = rcs
+            .proxy
+            .connect_capability(moniker, fsys::OpenDirType::ExposedDir, capability_name, server)
+            .await
+        {
+            response.map_err(|e| {
+                anyhow!("Failed to connect to {capability_name} in {moniker}: {e:?}")
+            })?;
+            tracing::debug!(
+                "Returning target and proxy for {}@{}",
+                target.nodename_str(),
+                target.id()
+            );
+            return Ok((target.as_ref().into(), client));
+        }
+        // Fallback to fuchsia.developer.remotecontrol/RemoteControl.DeprecatedOpenCapability.
+        // This can be removed once we drop support for API level 27.
+        let (client, server) = fidl::Channel::create();
         rcs.proxy
             .deprecated_open_capability(
                 moniker,
                 fsys::OpenDirType::ExposedDir,
                 capability_name,
                 server,
-                OpenFlags::empty(),
+                Default::default(),
             )
             .await
-            .context("FIDL connection")?
+            .context("transport error")?
             .map_err(|e| anyhow!("{:#?}", e))
-            .context("proxy connect")?;
+            .context("DeprecatedOpenCapability")?;
 
         tracing::debug!("Returning target and proxy for {}@{}", target.nodename_str(), target.id());
-        Ok((target.as_ref().into(), client))
+        return Ok((target.as_ref().into(), client));
     }
 
     async fn get_target_info(
@@ -921,6 +942,10 @@ mod test {
     use chrono::Utc;
     use ffx_daemon_target::target::{TargetAddrEntry, TargetAddrStatus};
     use fidl_fuchsia_developer_ffx::DaemonProxy;
+    use fidl_fuchsia_developer_remotecontrol::{
+        IdentifyHostResponse, RemoteControlRequest, RemoteControlRequestStream,
+    };
+    use futures::StreamExt;
     use std::cell::RefCell;
     use std::collections::BTreeSet;
     use std::str::FromStr;
@@ -954,7 +979,7 @@ mod test {
         (proxy, d, task)
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_open_rcs_on_fastboot_error() {
         let (_proxy, daemon, _task) = spawn_test_daemon();
         let target = Target::new_for_usb("abc");
@@ -963,7 +988,7 @@ mod test {
         assert!(result.is_err());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_open_rcs_on_zedboot_error() {
         let (_proxy, daemon, _task) = spawn_test_daemon();
         let target = Target::new_with_netsvc_addrs(
@@ -975,7 +1000,7 @@ mod test {
         assert!(result.is_err());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_get_target_empty() {
         let tempdir = tempfile::tempdir().expect("Creating tempdir");
         let socket_path = tempdir.path().join("ascendd.sock");
@@ -986,7 +1011,7 @@ mod test {
         assert_eq!(nodename, d.get_target(None).await.unwrap().nodename().unwrap());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_get_target_query() {
         let tempdir = tempfile::tempdir().expect("Creating tempdir");
         let socket_path = tempdir.path().join("ascendd.sock");
@@ -1000,7 +1025,7 @@ mod test {
         );
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_get_target_collection_empty_error() {
         let tempdir = tempfile::tempdir().expect("Creating tempdir");
         let socket_path = tempdir.path().join("ascendd.sock");
@@ -1008,7 +1033,7 @@ mod test {
         assert_eq!(DaemonError::TargetCacheEmpty, d.get_target(None).await.unwrap_err());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_get_target_ambiguous() {
         let tempdir = tempfile::tempdir().expect("Creating tempdir");
         let socket_path = tempdir.path().join("ascendd.sock");
@@ -1020,7 +1045,7 @@ mod test {
         assert_eq!(DaemonError::TargetAmbiguous, d.get_target(None).await.unwrap_err());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_expiry() {
         let local_node = overnet_core::Router::new(None).unwrap();
         let tempdir = tempfile::tempdir().expect("Creating tempdir");
@@ -1042,7 +1067,7 @@ mod test {
         assert_eq!(TargetConnectionState::Disconnected, target.get_connection_state());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_ephemeral_target_expiry() {
         let local_node = overnet_core::Router::new(None).unwrap();
         let tempdir = tempfile::tempdir().expect("Creating tempdir");
@@ -1111,7 +1136,7 @@ mod test {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_handle_overnet_peers_known_peer_exclusion() {
         let queue = events::Queue::<DaemonEvent>::new(&Rc::new(NullDaemonEventSynthesizer {}));
         let mut known_peers: HashSet<PeerSetElement> = Default::default();
@@ -1143,7 +1168,7 @@ mod test {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_handle_overnet_peer_leave_and_return() {
         let queue = events::Queue::<DaemonEvent>::new(&Rc::new(NullDaemonEventSynthesizer {}));
         let mut known_peers: HashSet<PeerSetElement> = Default::default();
@@ -1220,5 +1245,50 @@ mod test {
         assert_eq!(event_log.borrow().len(), 2);
         assert_matches!(event_log.borrow()[0], DaemonEvent::OvernetPeer(_));
         assert_matches!(event_log.borrow()[1], DaemonEvent::OvernetPeer(_));
+    }
+
+    #[fuchsia::test]
+    async fn test_daemon_event_handler_merges_peers_by_node() {
+        const NODE_NAME: &str = "teletecternicon";
+        let local_node = overnet_core::Router::new(None).unwrap();
+        let target_collection = Rc::new(TargetCollection::new());
+
+        local_node
+            .register_service(RemoteControlMarker::PROTOCOL_NAME.to_string(), |ch| {
+                let mut stream = RemoteControlRequestStream::from_channel(
+                    fuchsia_async::Channel::from_channel(ch),
+                );
+
+                fuchsia_async::Task::spawn(async move {
+                    while let Some(Ok(event)) = stream.next().await {
+                        match event {
+                            RemoteControlRequest::IdentifyHost { responder } => responder
+                                .send(Ok(&IdentifyHostResponse {
+                                    nodename: Some(NODE_NAME.to_owned()),
+                                    product_config: Some("gShoe".to_owned()),
+                                    ..IdentifyHostResponse::default()
+                                }))
+                                .unwrap(),
+                            other => panic!("Unexpected RCS request: {other:?}"),
+                        }
+                    }
+                })
+                .detach();
+
+                Ok(())
+            })
+            .await
+            .unwrap();
+
+        target_collection.merge_insert(Target::new_named(NODE_NAME));
+        let event = DaemonEventHandler::new(local_node.clone(), target_collection.clone());
+        event.handle_overnet_peer(local_node.node_id().0).await;
+
+        let mut targets = target_collection.targets(None);
+        let target = targets.pop().unwrap();
+        assert!(targets.is_empty());
+
+        assert_eq!(NODE_NAME, target.nodename.as_ref().unwrap());
+        assert_eq!("gShoe", target.product_config.as_ref().unwrap());
     }
 }

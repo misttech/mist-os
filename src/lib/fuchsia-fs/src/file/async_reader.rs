@@ -96,10 +96,7 @@ impl AsyncRead for AsyncReader {
                         }
                         Err(e) => {
                             self.state = State::Empty;
-                            return Poll::Ready(Err(std::io::Error::new(
-                                std::io::ErrorKind::Other,
-                                e,
-                            )));
+                            return Poll::Ready(Err(std::io::Error::other(e)));
                         }
                     }
                 }

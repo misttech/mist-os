@@ -2,7 +2,6 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /src/security/lib/scrutiny/OWNERS
+include /src/connectivity/bluetooth/OWNERS
 include /src/starnix/OWNERS
-include /src/sys/component_manager/OWNERS
 include /third_party/rust_crates/vendor/schemars-0.8.10/OWNERS

@@ -269,8 +269,14 @@ impl<I: IpExt + IpSockAddrExt> worker::SocketWorkerHandler for BindingData<I> {
                 __source_breaking: _,
             }) => {
                 let Self { id, .. } = self;
-                for fposix_socket::Marks { domain, mark } in marks.iter().flatten() {
-                    ctx.api().tcp().set_mark(&id, (*domain).into_core(), (*mark).into_core());
+                for (domain, mark) in
+                    marks.into_iter().map(fidl_fuchsia_net_ext::Marks::from).flatten()
+                {
+                    ctx.api().tcp().set_mark(
+                        &id,
+                        domain.into_core(),
+                        netstack3_core::ip::Mark(Some(mark)),
+                    );
                 }
             }
             InitialSocketState::Connected => {
@@ -407,6 +413,8 @@ impl IntoErrno for ConnectionError {
             ConnectionError::SourceRouteFailed => fposix::Errno::Eopnotsupp,
             ConnectionError::SourceHostIsolated => fposix::Errno::Enonet,
             ConnectionError::TimedOut => fposix::Errno::Etimedout,
+            ConnectionError::PermissionDenied => fposix::Errno::Eacces,
+            ConnectionError::ProtocolError => fposix::Errno::Eproto,
         }
     }
 }

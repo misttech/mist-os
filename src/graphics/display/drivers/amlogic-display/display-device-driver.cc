@@ -17,7 +17,6 @@
 #include <lib/zx/bti.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
-#include <zircon/status.h>
 
 #include <cinttypes>
 #include <cstdint>
@@ -44,8 +43,7 @@ DisplayDeviceDriver::CreateComponentInspector(inspect::Inspector inspector) {
   zx::result<fidl::ClientEnd<fuchsia_inspect::InspectSink>> inspect_sink_connect_result =
       incoming()->Connect<fuchsia_inspect::InspectSink>();
   if (inspect_sink_connect_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to connect to InspectSink protocol: %s",
-            inspect_sink_connect_result.status_string());
+    fdf::error("Failed to connect to InspectSink protocol: {}", inspect_sink_connect_result);
     return inspect_sink_connect_result.take_error();
   }
 
@@ -55,7 +53,7 @@ DisplayDeviceDriver::CreateComponentInspector(inspect::Inspector inspector) {
       inspect::PublishOptions{.inspector = std::move(inspector),
                               .client_end = std::move(inspect_sink_connect_result).value()});
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for ComponentInspector");
+    fdf::error("Failed to allocate memory for ComponentInspector");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
   return zx::ok(std::move(component_inspector));
@@ -67,8 +65,7 @@ zx::result<> DisplayDeviceDriver::Start() {
   zx::result<std::unique_ptr<DisplayEngine>> create_display_engine_result =
       DisplayEngine::Create(incoming(), config);
   if (create_display_engine_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to create DisplayEngine: %s",
-            create_display_engine_result.status_string());
+    fdf::error("Failed to create DisplayEngine: {}", create_display_engine_result);
     return create_display_engine_result.take_error();
   }
   display_engine_ = std::move(create_display_engine_result).value();
@@ -99,7 +96,7 @@ zx::result<> DisplayDeviceDriver::Start() {
   zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> controller_client_result =
       AddChild(name(), node_properties, node_offers);
   if (controller_client_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to add child node: %s", controller_client_result.status_string());
+    fdf::error("Failed to add child node: {}", controller_client_result);
     return controller_client_result.take_error();
   }
   controller_ = fidl::WireSyncClient(std::move(controller_client_result).value());

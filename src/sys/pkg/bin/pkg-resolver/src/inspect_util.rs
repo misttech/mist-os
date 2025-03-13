@@ -3,8 +3,9 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_pkg_ext::{MirrorConfig, RepositoryConfig};
-use fuchsia_inspect::{self as inspect, NumericProperty, StringReference};
+use fuchsia_inspect::{self as inspect, NumericProperty};
 use fuchsia_inspect_contrib::inspectable::{Inspectable, Watch};
+use std::borrow::Cow;
 use std::sync::Arc;
 
 pub type InspectableRepositoryConfig =
@@ -22,7 +23,7 @@ impl Watch<Arc<RepositoryConfig>> for InspectableRepositoryConfigWatcher {
     fn new<'a>(
         config: &Arc<RepositoryConfig>,
         node: &inspect::Node,
-        name: impl Into<StringReference>,
+        name: impl Into<Cow<'a, str>>,
     ) -> Self {
         let repo_config_node = node.create_child(name);
         let mut ret = Self {

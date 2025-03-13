@@ -29,17 +29,18 @@
 }
 
 impl ::fidl_next::Encodable for {{ name }} {
-    type Encoded<'buf> = {{ wire_name }};
+    type Encoded = {{ wire_name }};
 }
 
 impl<___E> ::fidl_next::Encode<___E> for {{ name }}
 where
     ___E: ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let {{ wire_name }} { mut value } = slot);
         *value = {{ wire_subtype }}::from(self.bits());
@@ -54,7 +55,8 @@ impl ::core::convert::From<{{ wire_name }}> for {{ name }} {
 }
 
 impl ::fidl_next::TakeFrom<{{ wire_name }}> for {{ name }} {
-    fn take_from(from: &mut {{ wire_name }}) -> Self {
+    #[inline]
+    fn take_from(from: &{{ wire_name }}) -> Self {
         Self::from(*from)
     }
 }

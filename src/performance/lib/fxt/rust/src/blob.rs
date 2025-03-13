@@ -14,6 +14,7 @@ use crate::{
 use flyweights::FlyStr;
 use nom::combinator::all_consuming;
 use nom::number::complete::le_u64;
+use nom::Parser;
 
 const BLOB_TYPE_DATA: u8 = 0x01;
 const BLOB_TYPE_LAST_BRANCH: u8 = 0x02;
@@ -144,7 +145,7 @@ impl<'a> RawLargeBlobRecord<'a> {
         let ty = BlobType::from(header.blob_format_type());
         let (rem, payload) = header.take_payload(buf)?;
         let (payload, format_header) =
-            nom::combinator::map(le_u64, LargeBlobFormatHeader)(payload)?;
+            nom::combinator::map(le_u64, LargeBlobFormatHeader).parse(payload)?;
         let (payload, category) = StringRef::parse(format_header.category_ref(), payload)?;
         let (payload, name) = StringRef::parse(format_header.name_ref(), payload)?;
         let (payload, metadata) = match header.large_record_type() {
@@ -168,7 +169,8 @@ impl<'a> RawLargeBlobRecord<'a> {
         };
         let (payload, blob_size) = le_u64(payload)?;
 
-        let (empty, bytes) = all_consuming(|p| take_n_padded(blob_size as usize, p))(payload)?;
+        let (empty, bytes) =
+            all_consuming(|p| take_n_padded(blob_size as usize, p)).parse(payload)?;
         assert_eq!(empty, [] as [u8; 0], "all_consuming must not return any trailing bytes");
 
         let payload = if let Some(metadata) = metadata {

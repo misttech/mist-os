@@ -6,7 +6,10 @@ import("//build/assembly/board_input_bundle.gni")
 import("//build/bazel/assembly/bazel_board_configuration.gni")
 
 group("bazel_inputs") {
-  deps = [ "//src/devices/misc/drivers/virtio-socket:package.bazel_input" ]
+  deps = [
+    "//src/devices/misc/drivers/virtio-pmem:package.bazel_input",
+    "//src/devices/misc/drivers/virtio-socket:package.bazel_input",
+  ]
   if (target_cpu == "x64") {
     deps += [ "//src/devices/board/drivers/x86:package.bazel_input" ]
   } else if (target_cpu == "arm64") {

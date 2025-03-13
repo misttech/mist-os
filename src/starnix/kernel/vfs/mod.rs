@@ -14,7 +14,7 @@ mod file_system;
 mod file_write_guard;
 mod fs_context;
 mod fs_node;
-mod memory_file;
+mod memory_regular;
 mod namespace;
 mod record_locks;
 mod simple_file;
@@ -30,7 +30,6 @@ mod xattr;
 pub mod aio;
 pub mod buffers;
 pub mod crypt_service;
-pub mod directory_file;
 pub mod eventfd;
 pub mod file_server;
 pub mod fs_args;
@@ -38,6 +37,7 @@ pub mod fs_registry;
 pub mod fsverity;
 pub mod inotify;
 pub mod io_uring;
+pub mod memory_directory;
 pub mod path;
 pub mod pidfd;
 pub mod pipe;
@@ -49,7 +49,6 @@ pub mod timer;
 pub use anon_node::*;
 pub use buffers::*;
 pub use dir_entry::*;
-pub use directory_file::*;
 pub use dirent_sink::*;
 pub use dynamic_file::*;
 pub use epoll::*;
@@ -60,7 +59,8 @@ pub use file_system::*;
 pub use file_write_guard::*;
 pub use fs_context::*;
 pub use fs_node::*;
-pub use memory_file::*;
+pub use memory_directory::*;
+pub use memory_regular::*;
 pub use namespace::*;
 pub use path::*;
 pub use pidfd::*;
@@ -96,7 +96,7 @@ use std::sync::Arc;
 //     RELEASERS.with(|cell| {
 //         cell.borrow_mut()
 //             .as_mut()
-//             .expect("not finalized")
+//             .expect("...")
 //             .releasables
 //             .push(Box::new(Some(to_release)));
 //     });
@@ -227,7 +227,12 @@ impl DelayedReleaser {
     ) {
         loop {
             let releasers = RELEASERS.with(|cell| {
-                std::mem::take(cell.borrow_mut().as_mut().expect("not finalized").deref_mut())
+                std::mem::take(
+                    cell.borrow_mut()
+                        .as_mut()
+                        .expect("DelayedReleaser hasn't been finalized yet")
+                        .deref_mut(),
+                )
             });
             if releasers.is_empty() {
                 return;
@@ -243,7 +248,11 @@ impl DelayedReleaser {
     /// releasables for the last time.
     pub fn finalize() {
         RELEASERS.with(|cell| {
-            assert!(cell.borrow().as_ref().expect("not finalized").is_empty());
+            assert!(cell
+                .borrow()
+                .as_ref()
+                .expect("DelayedReleaser hasn't been finalized yet")
+                .is_empty());
             *cell.borrow_mut() = None;
         });
     }

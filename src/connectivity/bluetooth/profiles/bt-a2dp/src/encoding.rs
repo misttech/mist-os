@@ -170,14 +170,14 @@ struct SilenceStream {
     pcm_format: PcmFormat,
     next_frame_timer: Pin<Box<fasync::Timer>>,
     /// the last time we delivered frames.
-    last_frame_time: Option<zx::MonotonicInstant>,
+    last_frame_time: Option<fasync::MonotonicInstant>,
 }
 
 impl futures::Stream for SilenceStream {
     type Item = fuchsia_audio_device::Result<Vec<u8>>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let now = zx::MonotonicInstant::get();
+        let now = fasync::MonotonicInstant::now();
         if self.last_frame_time.is_none() {
             self.last_frame_time = Some(now - zx::MonotonicDuration::from_seconds(1));
         }
@@ -186,9 +186,10 @@ impl futures::Stream for SilenceStream {
         if repeats == 0 {
             self.next_frame_timer =
                 Box::pin(fasync::Timer::new(last_time + zx::MonotonicDuration::from_seconds(1)));
-            let poll = self.next_frame_timer.poll_unpin(cx);
-            assert_eq!(Poll::Pending, poll);
-            return Poll::Pending;
+            match self.next_frame_timer.poll_unpin(cx) {
+                Poll::Pending => return Poll::Pending,
+                Poll::Ready(_) => {} // Raced to the next second, continue to generate.
+            }
         }
         // Generate one second of silence.
         let pcm_frame_size = self.pcm_format.channel_map.len() * PCM_SAMPLE_SIZE;
@@ -377,6 +378,31 @@ mod tests {
             Poll::Ready(Some(Ok(data))) => assert_eq!(vec![0, 3], data),
             x => panic!("Expected ready poll, got {:?}", x),
         };
+    }
+
+    #[test]
+    fn silence_stream_racing_timer() {
+        let mut exec = fasync::TestExecutor::new();
+        let mut silence_stream = SilenceStream::build(PcmFormat {
+            pcm_mode: fidl_fuchsia_media::AudioPcmMode::Linear,
+            bits_per_sample: 16,
+            frames_per_second: 48000,
+            channel_map: vec![fidl_fuchsia_media::AudioChannelId::Cf],
+        });
+        // Poll once to produce the first second of audio, which should need more audio at 10s.
+        let Poll::Ready(_) = exec.run_until_stalled(&mut silence_stream.next()) else {
+            panic!("Should have been ready on first poll");
+        };
+        let deadline_time = silence_stream.last_frame_time.clone().unwrap()
+            + fasync::MonotonicDuration::from_nanos(900_000_000);
+        // Wait for barely before the next second.
+        exec.run_singlethreaded(fasync::Timer::new(deadline_time));
+        log::info!("Starting racing loop");
+        loop {
+            if let Poll::Ready(_) = exec.run_until_stalled(&mut silence_stream.next()) {
+                break;
+            }
+        }
     }
 }
 

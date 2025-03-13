@@ -131,10 +131,6 @@ static Thread _init_thread[SMP_MAX_CPUS - 1];
 // one for each secondary CPU, indexed by (cpu_num - 1).
 arm64_sp_info_t arm64_secondary_sp_list[SMP_MAX_CPUS - 1];
 
-extern uint64_t arch_boot_el;  // Defined in start.S.
-
-uint64_t arm64_get_boot_el() { return arch_boot_el >> 2; }
-
 zx_status_t arm64_create_secondary_stack(cpu_num_t cpu_num, uint64_t mpid) {
   // Allocate a stack, indexed by CPU num so that |arm64_secondary_entry| can find it.
   DEBUG_ASSERT_MSG(cpu_num > 0 && cpu_num < SMP_MAX_CPUS, "cpu_num: %u", cpu_num);
@@ -312,6 +308,13 @@ static void arm64_cpu_early_init() {
 
   // Save all of the features of the cpu.
   arm64_feature_init();
+
+  // If FEAT_MOPS is available, enable it for EL0.
+  if (arm64_isa_features & ZX_ARM64_FEATURE_ISA_MOPS) {
+    sctlr.set_mscen(true);
+    arch::ArmSctlrEl1::Write(sctlr);
+    __isb(ARM_MB_SY);
+  }
 
   // Check for TCR2 and SCTLR2 and zero since none of their features are used.
   auto mmfr3 = arch::ArmIdAa64Mmfr3El1::Read();

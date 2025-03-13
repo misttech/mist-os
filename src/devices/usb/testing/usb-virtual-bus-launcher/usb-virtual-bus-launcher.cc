@@ -7,7 +7,9 @@
 #include <fidl/fuchsia.driver.test/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/loop.h>
+#include <lib/component/incoming/cpp/directory.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/component/incoming/cpp/service_member_watcher.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/driver_test_realm/realm_builder/cpp/lib.h>
@@ -28,6 +30,11 @@ zx::result<BusLauncher> BusLauncher::Create() {
   auto realm_builder = component_testing::RealmBuilder::Create();
   driver_test_realm::Setup(realm_builder);
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  std::vector<fuchsia_component_test::Capability> exposes = {{
+      fuchsia_component_test::Capability::WithService(
+          fuchsia_component_test::Service{{.name = "fuchsia.hardware.usb.peripheral.Service"}}),
+  }};
+  driver_test_realm::AddDtrExposes(realm_builder, exposes);
   auto realm = realm_builder.Build(loop.dispatcher());
 
   auto client = realm.component().Connect<fuchsia_driver_test::Realm>();
@@ -39,6 +46,7 @@ zx::result<BusLauncher> BusLauncher::Create() {
 
   auto realm_args = fuchsia_driver_test::RealmArgs();
   realm_args.root_driver("fuchsia-boot:///dtr#meta/usb-virtual-bus.cm");
+  realm_args.dtr_exposes(exposes);
   fidl::Result result = fidl::Call(*client)->Start(std::move(realm_args));
   if (result.is_error()) {
     std::cerr << "Failed to connect to start driver test realm: " << result.error_value() << '\n';
@@ -52,7 +60,7 @@ zx::result<BusLauncher> BusLauncher::Create() {
 
   // Open dev.
   auto [dev_client, dev_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-  zx_status_t status = realm.component().exposed()->Open3(
+  zx_status_t status = realm.component().exposed()->Open(
       "dev-topological", fuchsia::io::PERM_READABLE, {}, dev_server.TakeChannel());
   if (status != ZX_OK) {
     std::cerr << "Failed to open dev-topological: " << zx_status_get_string(status) << '\n';
@@ -101,24 +109,12 @@ zx::result<BusLauncher> BusLauncher::Create() {
     std::cerr << "virtual_bus_->Enable(): " << zx_status_get_string(status) << '\n';
     return zx::error(status);
   }
-
-  zx::result directory_result =
-      component::ConnectAt<fuchsia_io::Directory>(caller.directory(), "class/usb-peripheral");
-  if (directory_result.is_error()) {
-    std::cerr << "component::ConnectAt(): " << directory_result.status_string() << '\n';
-    return directory_result.take_error();
-  }
-  auto& directory = directory_result.value();
-  zx::result watch_result = device_watcher::WatchDirectoryForItems<
-      zx::result<fidl::ClientEnd<fuchsia_hardware_usb_peripheral::Device>>>(
-      directory, [&directory](std::string_view devpath) {
-        return component::ConnectAt<fuchsia_hardware_usb_peripheral::Device>(directory, devpath);
-      });
-  if (watch_result.is_error()) {
-    std::cerr << "WatchDirectoryForItems(): " << watch_result.status_string() << '\n';
-    return watch_result.take_error();
-  }
-  auto& peripheral = watch_result.value();
+  fidl::UnownedClientEnd<fuchsia_io::Directory> svc = launcher.GetExposedDir();
+  component::SyncServiceMemberWatcher<fuchsia_hardware_usb_peripheral::Service::Device> watcher(
+      svc);
+  // Wait indefinitely until a service instance appears in the service directory
+  zx::result<fidl::ClientEnd<fuchsia_hardware_usb_peripheral::Device>> peripheral =
+      watcher.GetNextInstance(false);
   if (peripheral.is_error()) {
     std::cerr << "Failed to get USB peripheral service: " << peripheral.status_string() << '\n';
     return peripheral.take_error();
@@ -184,6 +180,9 @@ zx_status_t BusLauncher::SetupPeripheralDevice(DeviceDescriptor&& device_desc,
 }
 
 zx_status_t BusLauncher::ClearPeripheralDeviceFunctions() {
+  if (!peripheral_.is_valid()) {
+    return ZX_ERR_INTERNAL;
+  }
   auto [client, server] = fidl::Endpoints<fuchsia_hardware_usb_peripheral::Events>::Create();
 
   if (const fidl::Status result = peripheral_->SetStateChangeListener(std::move(client));
@@ -213,6 +212,11 @@ zx_status_t BusLauncher::ClearPeripheralDeviceFunctions() {
 }
 
 int BusLauncher::GetRootFd() { return devfs_root_.get(); }
+
+fidl::UnownedClientEnd<fuchsia_io::Directory> BusLauncher::GetExposedDir() {
+  return fidl::UnownedClientEnd<fuchsia_io::Directory>(
+      realm_.component().exposed().unowned_channel()->get());
+}
 
 zx_status_t BusLauncher::Disable() {
   auto result = virtual_bus_->Disable();

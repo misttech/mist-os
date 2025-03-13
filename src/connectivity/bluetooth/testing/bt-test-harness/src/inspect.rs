@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Error};
-use diagnostics_reader::{ArchiveReader, ComponentSelector, DiagnosticsHierarchy, Inspect};
+use diagnostics_reader::{ArchiveReader, ComponentSelector, DiagnosticsHierarchy};
 use fidl_fuchsia_bluetooth_sys::{AccessMarker, AccessProxy};
 use fuchsia_async::DurationExt;
 use fuchsia_bluetooth::expectation::asynchronous::{
@@ -83,14 +83,10 @@ impl DerefMut for InspectHarness {
 pub async fn handle_inspect_updates(harness: InspectHarness) -> Result<(), Error> {
     loop {
         if harness.read().moniker_to_track.len() > 0 {
-            let mut reader = ArchiveReader::new();
+            let mut reader = ArchiveReader::inspect();
             let _ = reader.add_selector(harness.get_component_selector());
-            harness.write_state().hierarchies = reader
-                .snapshot::<Inspect>()
-                .await?
-                .into_iter()
-                .flat_map(|result| result.payload)
-                .collect();
+            harness.write_state().hierarchies =
+                reader.snapshot().await?.into_iter().flat_map(|result| result.payload).collect();
             harness.notify_state_changed();
         }
         fuchsia_async::Timer::new(SNAPSHOT_INSPECT_EVERY_N_SECONDS.after_now()).await;

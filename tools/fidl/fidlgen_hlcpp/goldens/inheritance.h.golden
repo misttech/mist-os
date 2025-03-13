@@ -139,7 +139,7 @@ struct CodingTraits<::test::inheritance::SuperFooRequest>
     : public EncodableCodingTraits<::test::inheritance::SuperFooRequest, 16> {};
 
 template <>
-struct HasPadding<::test::inheritance::SuperFooRequest> : public std::true_type{};
+struct HasPadding<::test::inheritance::SuperFooRequest> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::inheritance::SuperFooRequest> : public internal::BoolConstant<

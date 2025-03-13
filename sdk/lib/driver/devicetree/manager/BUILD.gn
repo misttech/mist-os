@@ -61,7 +61,10 @@ sdk_source_set("manager") {
   public_deps = [ ":headers" ]
 }
 
-source_set("manager-test-helper") {
+sdk_source_set("manager-test-helper") {
+  sdk_name = "devicetree_manager_test_helper"
+  category = "internal"
+  include_base = "//sdk"
   sources = [
     "manager-test-helper.cc",
     "manager-test-helper.h",
@@ -70,13 +73,12 @@ source_set("manager-test-helper") {
   public_deps = [
     ":headers",
     ":manager",
-    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/async_patterns/cpp",
     "//sdk/lib/driver/testing/cpp",
     "//sdk/lib/driver/testing/cpp:scoped_global_logger",
     "//sdk/lib/syslog/cpp",
     "//src/devices/bin/driver_runtime",
   ]
-  testonly = true
 }
 
 test("devicetree-manager-test") {

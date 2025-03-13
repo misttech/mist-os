@@ -285,7 +285,6 @@ group("uses-outline-atomics-fxbug98632") {
     "//third_party/ffmpeg:*",
     "//third_party/icu/default:*",
     "//third_party/icu/latest:*",
-    "//third_party/icu/stable:*",
   ]
   if (current_cpu == "arm64" && is_fuchsia) {
     deps = [ "//src/zircon/lib/zircon" ]

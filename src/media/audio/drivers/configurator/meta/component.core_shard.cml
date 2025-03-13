@@ -11,7 +11,7 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
+            dictionary: "diagnostics",
             from: "parent",
             to: [ "#configurator" ],
         },
@@ -22,6 +22,7 @@
             source_availability: "unknown", // audio_core may not be available on all products
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-codec",
@@ -29,11 +30,24 @@
             subdir: "codec",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.audio.CodecConnectorService",
+            from: "parent",
+            to: [ "#configurator" ],
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-dai",
             to: [ "#configurator" ],
             subdir: "dai",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.audio.DaiConnectorService",
+            from: "parent",
+            to: [ "#configurator" ],
         },
     ],
 }

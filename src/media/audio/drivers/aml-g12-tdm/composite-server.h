@@ -10,6 +10,7 @@
 #include <fidl/fuchsia.hardware.gpio/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.pin/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
+#include <lib/fit/defer.h>
 #include <lib/fzl/pinned-vmo.h>
 #include <lib/trace/event.h>
 #include <lib/zx/result.h>
@@ -184,6 +185,18 @@ class AudioCompositeServer final
                            metadata::AmlVersion aml_version);
   zx_status_t StartSocPower(bool wait_for_completion);
   zx_status_t StopSocPower();
+  auto TemporarilyStartSocPower() {
+    bool last_soc_power_stopped = false;
+    if (!soc_power_started_) {
+      last_soc_power_stopped = true;
+      [[maybe_unused]] zx_status_t status = StartSocPower(/*wait_for_completion*/ true);
+    }
+    return fit::defer([last_soc_power_stopped, this]() {
+      if (last_soc_power_stopped) {
+        StopSocPower();
+      }
+    });
+  }
 
   async_dispatcher_t* dispatcher_;
   zx::bti bti_;
@@ -205,7 +218,6 @@ class AudioCompositeServer final
   fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_;
   fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_;
   std::vector<SclkPin> sclk_clients_;
-  bool first_ring_buffer_has_been_created_ = false;
   bool soc_power_started_ = false;
   zx::time last_started_time_;
   zx::time last_stopped_time_;

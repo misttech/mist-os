@@ -45,6 +45,7 @@ source_set("common") {
 }
 
 fuchsia_cc_driver("usb-virtual-bus-driver") {
+  legacy = true
   output_name = "usb-virtual-bus"
   deps = [
     ":common",
@@ -78,6 +79,7 @@ fidl("fuchsia.hardware.usb.virtualbustest") {
 }
 
 fuchsia_cc_driver("virtual-bus-tester-driver") {
+  legacy = true
   testonly = true
   output_name = "virtual-bus-tester"
   configs += [
@@ -119,6 +121,7 @@ driver_bind_rules("usb-virtual-bus-tester-function-bind") {
 }
 
 fuchsia_cc_driver("virtual-bus-tester-function-driver") {
+  legacy = true
   testonly = true
   output_name = "virtual-bus-tester-function"
   configs += [

@@ -125,6 +125,12 @@ pub type LongName = BoundedName<MAX_LONG_NAME_LENGTH>;
 #[derive(Serialize, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BoundedName<const N: usize>(FlyStr);
 
+impl Name {
+    pub fn to_long(self) -> LongName {
+        BoundedName(self.0)
+    }
+}
+
 impl<const N: usize> BoundedName<N> {
     /// Creates a `BoundedName` from a `String`, returning an `Err` if the string
     /// fails validation. The string must be non-empty, no more than `N`

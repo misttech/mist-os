@@ -26,6 +26,7 @@ rustc_library("netstack_testing_common") {
     "//sdk/fidl/fuchsia.net.masquerade:fuchsia.net.masquerade_rust",
     "//sdk/fidl/fuchsia.net.multicast.admin:fuchsia.net.multicast.admin_rust",
     "//sdk/fidl/fuchsia.net.name:fuchsia.net.name_rust",
+    "//sdk/fidl/fuchsia.net.ndp:fuchsia.net.ndp_rust",
     "//sdk/fidl/fuchsia.net.neighbor:fuchsia.net.neighbor_rust",
     "//sdk/fidl/fuchsia.net.reachability:fuchsia.net.reachability_rust",
     "//sdk/fidl/fuchsia.net.root:fuchsia.net.root_rust",
@@ -57,6 +58,7 @@ rustc_library("netstack_testing_common") {
     "//src/lib/fuchsia-component",
     "//src/lib/network/fidl_fuchsia_net_interfaces_ext",
     "//src/lib/network/packet",
+    "//src/sys/lib/cm_rust",
     "//src/sys/lib/component-events",
     "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_rust",
     "//third_party/rust_crates:anyhow",
@@ -64,7 +66,6 @@ rustc_library("netstack_testing_common") {
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:itertools",
-    "//third_party/rust_crates:zerocopy",
   ]
   sources = [
     "src/constants.rs",

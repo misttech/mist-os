@@ -31,8 +31,8 @@ source_set("common_base") {
     "//src/lib/files",
     "//src/lib/fxl",
     "//third_party/glm",
-    "//third_party/glslang:glslang_default_resource_limits_sources",
-    "//third_party/glslang:glslang_sources",
+    "//third_party/glslang/src:glslang_default_resource_limits_sources",
+    "//third_party/glslang/src:glslang_sources",
   ]
   public_deps = [ ":headers" ]
   libs = [

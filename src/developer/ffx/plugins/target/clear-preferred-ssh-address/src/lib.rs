@@ -4,7 +4,8 @@
 
 use async_trait::async_trait;
 use ffx_target_clear_preferred_ssh_address_args::ClearPreferredSshAddressCommand;
-use fho::{FfxContext, FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxContext, FfxMain, FfxTool};
 use fidl_fuchsia_developer_ffx as ffx;
 use target_holders::TargetProxyHolder;
 

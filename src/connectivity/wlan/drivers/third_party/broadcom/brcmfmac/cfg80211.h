@@ -79,6 +79,8 @@ namespace fuchsia_wlan_phyimpl_wire = fuchsia_wlan_phyimpl::wire;
 
 // WME error threshold to trigger a deauth.
 #define BRCMF_WME_BAD_PKT_THRESHOLD       (0.4)   // 40% of rx packets.
+// WME error threshold to trigger logging error counter 
+#define BRCMF_WME_BAD_PKT_LOG_THRESHOLD       (0.1)   // 10% of rx packets.
 
 #define WL_ESCAN_ACTION_START      1
 #define WL_ESCAN_ACTION_CONTINUE   2
@@ -629,6 +631,9 @@ void brcmf_if_query_security_support(net_device* ndev,
                                      fuchsia_wlan_common::wire::SecuritySupport* resp);
 void brcmf_if_query_spectrum_management_support(
     net_device* ndev, fuchsia_wlan_common::wire::SpectrumManagementSupport* resp);
+void brcmf_if_query_telemetry_support(net_device* ndev,
+                                      fuchsia_wlan_stats::wire::TelemetrySupport* resp,
+                                      fidl::AnyArena& arena);
 void brcmf_if_start_scan(net_device* ndev,
                          const fuchsia_wlan_fullmac_wire::WlanFullmacImplStartScanRequest* req);
 void brcmf_if_connect_req(net_device* ndev,

@@ -6,6 +6,7 @@
 
 #include <lib/arch/ticks.h>
 #include <lib/boot-options/boot-options.h>
+#include <lib/code-patching/self-test.h>
 #include <lib/counters.h>
 #include <lib/zbitl/view.h>
 #include <platform.h>
@@ -35,6 +36,8 @@ namespace {
 // we can store in gBootOptions.  For now, handoff only provides temporary
 // pointers that we must copy out of.
 BootOptions gBootOptionsInstance;
+
+paddr_t gKernelPhysicalLoadAddress;
 
 // When using physboot, other samples are available in the handoff data too.
 //
@@ -157,16 +160,26 @@ void* PhysHandoffPtrImportPhysAddr<PhysHandoffPtrEncoding::PhysAddr>(uintptr_t p
   return paddr_to_physmap(ptr);
 }
 
+// This function is called first thing on kernel entry, so it should be
+// careful on what it assumes is present.
 void HandoffFromPhys(paddr_t handoff_paddr) {
+  // This serves as a verification that code-patching was performed before
+  // the kernel was booted; if unpatched, we would trap here and halt.
+  CodePatchingNopTest();
+
   gPhysHandoff = static_cast<PhysHandoff*>(paddr_to_physmap(handoff_paddr));
 
   gBootOptionsInstance = *gPhysHandoff->boot_options;
   gBootOptions = &gBootOptionsInstance;
 
+  gKernelPhysicalLoadAddress = gPhysHandoff->kernel_physical_load_address;
+
   if (gPhysHandoff->reboot_reason) {
     platform_set_hw_reboot_reason(gPhysHandoff->reboot_reason.value());
   }
 }
+
+paddr_t KernelPhysicalLoadAddress() { return gKernelPhysicalLoadAddress; }
 
 HandoffEnd EndHandoff() {
   HandoffEnd end{

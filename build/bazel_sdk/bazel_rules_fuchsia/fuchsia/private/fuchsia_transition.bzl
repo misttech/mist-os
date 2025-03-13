@@ -30,7 +30,7 @@ CPU_MAP = {
     fuchsia_platforms.riscv64: "riscv64",
 }
 
-_REPO_DEFAULT_API_LEVEL_TARGET_NAME = "@fuchsia_sdk//fuchsia:repository_default_fuchsia_api_level"
+_REPO_DEFAULT_API_LEVEL_TARGET_NAME = "@fuchsia_sdk//flags:repository_default_fuchsia_api_level"
 
 def _fuchsia_api_level_in_effect(settings, attr):
     # The logic for determining what API level to use.
@@ -91,7 +91,7 @@ def _fuchsia_transition_impl(settings, attr):
 
     # allow for a soft transition
     if fuchsia_platform == None:
-        fuchsia_platform = "@fuchsia_sdk//fuchsia/constraints/platforms:" + FUCHSIA_PLATFORMS_MAP[output_cpu]
+        fuchsia_platform = "//fuchsia/constraints/platforms:" + FUCHSIA_PLATFORMS_MAP[output_cpu]
 
     copt = settings["//command_line_option:copt"] + (
         [] if "--debug" in settings["//command_line_option:copt"] else ["--debug"]

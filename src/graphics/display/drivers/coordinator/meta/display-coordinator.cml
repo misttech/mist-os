@@ -20,9 +20,6 @@
             service: [ "fuchsia.hardware.display.engine.Service" ],
             availability: "optional",
         },
-        {
-            protocol: [ "fuchsia.scheduler.RoleManager" ],
-        },
         { protocol: "fuchsia.boot.Arguments" },
     ],
 }

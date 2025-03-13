@@ -33,4 +33,6 @@ void* PhysHandoffPtrImportPhysAddr<PhysHandoffPtrEncoding::PhysAddr>(uintptr_t p
 void __zx_panic(const char* format, ...) { __builtin_trap(); }
 
 // This is what libc++ headers call.
-[[noreturn]] void std::__libcpp_verbose_abort(const char* format, ...) { __builtin_trap(); }
+[[noreturn]] void std::__libcpp_verbose_abort(const char* format, ...) noexcept {
+  __builtin_trap();
+}

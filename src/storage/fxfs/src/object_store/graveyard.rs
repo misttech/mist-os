@@ -16,10 +16,11 @@ use crate::object_store::transaction::{Mutation, Options, Transaction};
 use crate::object_store::ObjectStore;
 use anyhow::{anyhow, bail, Context, Error};
 use fuchsia_async::{self as fasync};
+use fuchsia_sync::Mutex;
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures::channel::oneshot;
 use futures::StreamExt;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 enum ReaperTask {
     None,
@@ -93,7 +94,7 @@ impl Graveyard {
     /// If a task is already started, this has no effect, even if that task was targeting an older
     /// |journal_offset|.
     pub fn reap_async(self: Arc<Self>) {
-        let mut reaper_task = self.reaper_task.lock().unwrap();
+        let mut reaper_task = self.reaper_task.lock();
         if let ReaperTask::Pending(_) = &*reaper_task {
             if let ReaperTask::Pending(receiver) =
                 std::mem::replace(&mut *reaper_task, ReaperTask::None)
@@ -109,7 +110,7 @@ impl Graveyard {
     /// Returns a future which completes when the ongoing reap task (if it exists) completes.
     pub async fn wait_for_reap(&self) {
         self.channel.close_channel();
-        let task = std::mem::replace(&mut *self.reaper_task.lock().unwrap(), ReaperTask::None);
+        let task = std::mem::replace(&mut *self.reaper_task.lock(), ReaperTask::None);
         if let ReaperTask::Running(task) = task {
             task.await;
         }
@@ -502,7 +503,6 @@ mod tests {
             &mut transaction,
             HandleOptions::default(),
             None,
-            None,
         )
         .await
         .expect("failed to create object");
@@ -572,7 +572,6 @@ mod tests {
             &root_store,
             &mut transaction,
             HandleOptions::default(),
-            None,
             None,
         )
         .await
@@ -649,7 +648,6 @@ mod tests {
             &root_store,
             &mut transaction,
             HandleOptions::default(),
-            None,
             None,
         )
         .await

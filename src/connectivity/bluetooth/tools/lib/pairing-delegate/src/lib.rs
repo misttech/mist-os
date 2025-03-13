@@ -39,6 +39,8 @@ fn handle_confirm(val: char) -> bool {
 // until the user enters one of the characters in |allowed|.
 fn prompt_for_char(msg: &str, allowed: &[char]) -> Result<char, Error> {
     print_and_flush!("{}: ", msg);
+
+    #[allow(clippy::unbuffered_bytes)]
     while let Some(input) = io::stdin().bytes().next() {
         match input {
             Ok(input) => {
@@ -82,6 +84,8 @@ fn prompt_for_remote_input(passkey: u32) -> bool {
 fn prompt_for_local_input() -> Option<u32> {
     print_and_flush!("Enter the passkey displayed on the peer (or nothing to reject): ");
     let mut passphrase = String::new();
+
+    #[allow(clippy::unbuffered_bytes)]
     while let Some(input) = io::stdin().bytes().next() {
         match input {
             Ok(input) => {

@@ -12,4 +12,5 @@ libsyslog.so
 libtee-client-api.so
 libtrace-engine.so
 libvfs_internal.so
+libvfs_rust.so
 libzircon.so

@@ -194,6 +194,7 @@ fuchsia_component("component") {
 # List of shared libraries used by drivers.
 group("driver_shared_libraries") {
   deps = [
+    "//build/toolchain/runtime:shared-rust-libstd-deps",
     "//sdk/lib/async-default",
     "//sdk/lib/fdio",
     "//sdk/lib/svc",
@@ -201,11 +202,18 @@ group("driver_shared_libraries") {
     "//src/devices/bin/driver_runtime",
     "//src/devices/lib/driver",
     "//src/security/lib/tee/tee-client-api",
+    "//src/storage/lib/vfs/rust:vfs",
     "//third_party/boringssl:crypto-shared",
     "//third_party/boringssl:ssl-shared",
     "//zircon/system/ulib/syslog",
     "//zircon/system/ulib/trace-engine",
   ]
+
+  metadata = {
+    # Prevent Rust auxiliary targets from collecting dependencies from runtime
+    # deps.
+    rust_barrier = []
+  }
 }
 
 fuchsia_package("package") {

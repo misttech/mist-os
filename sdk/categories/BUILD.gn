@@ -2,16 +2,15 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/fidl/toolchain.gni")
 import("//sdk/categories/compatibility.gni")
 
 visibility = []
 
 # These markers are used to ensure all FIDL dependencies of host tools in the
 # SDK are available and stable. FIDL-related targets and ffx tools and plugins
-# take dependencies on the marker targets, and the host tools `assert_no_deps`
-# on the markers for incompatible categories.
-# However, note that not everything in those categories is stable.
-# TODO(https://fxbug.dev/314822328): Reframe the markers in terms of stability.
+# take dependencies on the marker targets, and the host tools and host tests
+# `assert_no_deps` on the markers for incompatible categories.
 #
 # Assign the incompatible category lists from `compatibility.gni` to
 # `assert_no_deps`, and never specify a toolchain for markers in
@@ -32,11 +31,12 @@ idk_category_marker_template("not-in-idk") {
   visibility += [ "*" ]
 }
 
-idk_category_marker_template("cts") {
-  # "cts" should not be used until implemented. See https://fxbug.dev/367760026.
-  # TODO(https://fxbug.dev/367760026): Add an appropriate pattern when the
-  # category is implemented.
-  visibility = []
+idk_category_marker_template("compat_test") {
+  visibility = [
+    "//sdk/ctf/tests/fidl/*",
+    "//sdk/fidl/*",
+    "//src/*",
+  ]
 }
 
 idk_category_marker_template("partner_internal") {
@@ -47,12 +47,7 @@ idk_category_marker_template("partner") {
   visibility = [ "*" ]
 }
 
-idk_category_marker_template("public") {
-  # The public IDK does not yet exist, so "public" should not be used.
-  visibility = []
-}
-
-if (is_host) {
+if (is_host || is_fidl_toolchain) {
   # Currently, depending on these markers just has the effect of not depending
   # on one of the SDK category markers above. Nothing asserts on them.
   # TODO(https://fxbug.dev/314822328): Only exclude checks when appropriate.
@@ -66,9 +61,26 @@ if (is_host) {
     visibility = []
     foreach(target, ffx_subtool_fidl_allowlist) {
       visibility += [
+        "${target}_compile_fidlc",
         "${target}_fdomain.actual",
+        "${target}_ir_root",
+        "${target}_lint",
         "${target}_rust.actual",
+        "${target}_rust_common.actual",
       ]
+    }
+
+    # FIDL libraries in an SDK category are compiled for each frozen API level,
+    # so those targets must be allowed too.
+    import("//build/config/fuchsia/platform_version.gni")
+    foreach(target, ffx_subtool_fidl_partner_unstable_allowlist) {
+      foreach(level,
+              platform_version.frozen_api_levels + [
+                    "NEXT",
+                    "HEAD",
+                  ]) {
+        visibility += [ "${target}_compile_${level}_fidlc" ]
+      }
     }
   }
 
@@ -89,7 +101,7 @@ if (is_host) {
 group("marker_allowlist") {
   visibility = all_idk_category_markers_targets
 
-  if (is_host) {
+  if (is_host || is_fidl_toolchain) {
     visibility += [
       ":marker-allowed-for-ffx-subtool",
       ":marker-allowed-for-host-test",
@@ -118,7 +130,7 @@ group("test_all_marker_lists") {
 
   assert(markers_partner_idk_prebuilts_must_not_depend_on == [
                "//sdk/categories:marker-not-in-idk",
-               "//sdk/categories:marker-cts",
+               "//sdk/categories:marker-compat_test",
              ],
          "${markers_partner_idk_prebuilts_must_not_depend_on}")
 }

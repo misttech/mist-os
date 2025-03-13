@@ -11,8 +11,8 @@ rustc_library("bitflags-serde-legacy") {
   sources = [ "src/lib.rs" ]
   test_deps = [
     "//third_party/rust_crates:bitflags",
+    "//third_party/rust_crates:ciborium",
     "//third_party/rust_crates:serde",
-    "//third_party/rust_crates:serde_cbor",
     "//third_party/rust_crates:serde_json",
   ]
   visibility = [

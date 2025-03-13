@@ -4,9 +4,8 @@
 
 use anyhow::Context as _;
 use camino::{Utf8Path, Utf8PathBuf};
-use fho::{
-    return_user_error, user_error, Error, FfxMain, FfxTool, Result, ToolIO, VerifiedMachineWriter,
-};
+use ffx_writer::{ToolIO, VerifiedMachineWriter};
+use fho::{return_user_error, user_error, Error, FfxMain, FfxTool, Result};
 use rayon::prelude::*;
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -143,7 +142,7 @@ mod tests {
         let paths = test_data.iter().map(|(name, _)| dir_path.join(name)).collect();
 
         let cmd = DecompressCommand { paths, output: dir_path.join("decompressed") };
-        let buffers = fho::TestBuffers::default();
+        let buffers = ffx_writer::TestBuffers::default();
         let writer = <DecompressTool as FfxMain>::Writer::new_test(None, &buffers);
         DecompressTool { cmd }.main(writer).await.expect("success");
 
@@ -175,7 +174,7 @@ mod tests {
         std::fs::create_dir(&out_dir).unwrap();
 
         let cmd = DecompressCommand { paths, output: out_dir.clone() };
-        let buffers = fho::TestBuffers::default();
+        let buffers = ffx_writer::TestBuffers::default();
         let writer = <DecompressTool as FfxMain>::Writer::new_test(None, &buffers);
         DecompressTool { cmd }.main(writer).await.expect("success");
 
@@ -213,9 +212,9 @@ mod tests {
         std::fs::create_dir(&out_dir).unwrap();
 
         let cmd = DecompressCommand { paths, output: out_dir.clone() };
-        let buffers = fho::TestBuffers::default();
+        let buffers = ffx_writer::TestBuffers::default();
         let writer =
-            <DecompressTool as FfxMain>::Writer::new_test(Some(fho::Format::Json), &buffers);
+            <DecompressTool as FfxMain>::Writer::new_test(Some(ffx_writer::Format::Json), &buffers);
         DecompressTool { cmd }.main(writer).await.expect("success");
 
         let (out, err) = &buffers.into_strings();
@@ -245,7 +244,7 @@ mod tests {
         const NAME: &str = "filename_that_does_not_exist";
 
         let cmd = DecompressCommand { paths: vec![NAME.into()], output: ".".into() };
-        let buffers = fho::TestBuffers::default();
+        let buffers = ffx_writer::TestBuffers::default();
         let writer = <DecompressTool as FfxMain>::Writer::new_test(None, &buffers);
 
         DecompressTool { cmd }.main(writer).await.expect("success");
@@ -262,9 +261,9 @@ mod tests {
         const NAME: &str = "filename_that_does_not_exist";
 
         let cmd = DecompressCommand { paths: vec![NAME.into()], output: ".".into() };
-        let buffers = fho::TestBuffers::default();
+        let buffers = ffx_writer::TestBuffers::default();
         let writer =
-            <DecompressTool as FfxMain>::Writer::new_test(Some(fho::Format::Json), &buffers);
+            <DecompressTool as FfxMain>::Writer::new_test(Some(ffx_writer::Format::Json), &buffers);
 
         assert_matches!(DecompressTool { cmd }.main(writer).await, Err(fho::Error::User(_)));
         let (out, err) = buffers.into_strings();

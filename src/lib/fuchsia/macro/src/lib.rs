@@ -12,7 +12,9 @@ use transformer::Transformer;
 /// If an async function is provided, a fuchsia-async Executor will be used to execute it.
 ///
 /// Arguments:
-///  - `threads` - integer worker thread count for the component. Must be >0. Default 1.
+///  - `threads` - worker thread count for a multi-threaded executor. Must be >1 if provided.
+///                Defaults to creating a single-threaded executor if omitted.
+///  - `thread_role` - name of a scheduler profile for current thread and any async worker threads.
 ///  - `logging` - boolean toggle for whether to initialize logging (or not). Default true.
 ///  - `logging_tags` - optional list of string to be used as tags for logs. Default: None.
 ///  - `logging_minimum_severity` - optional minimum severity to be set for logs. Default: None,
@@ -32,7 +34,8 @@ pub fn main(args: TokenStream, input: TokenStream) -> TokenStream {
 /// If an async function is provided, a fuchsia-async Executor will be used to execute it.
 ///
 /// Arguments:
-///  - `threads`       - integer worker thread count for the test. Must be >0. Default 1.
+///  - `threads` - worker thread count for a multi-threaded executor. Must be >1 if provided.
+///                Defaults to creating a single-threaded executor if omitted.
 ///  - `logging`       - boolean toggle for whether to initialize logging (or not). Default true.
 ///                      This currently does nothing on host. On Fuchsia fuchsia-syslog is used.
 ///  - `logging_tags` - optional list of string to be used as tags for logs. Default: None.

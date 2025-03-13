@@ -319,7 +319,7 @@ such as when declaring children through [Realm Builder] APIs. For example:
 [capability routing]: /docs/concepts/components/v2/topology.md#capability-routing
 [directory capabilities]: /docs/concepts/components/v2/capabilities/directory.md
 [hierarchy-of-nested-components]: /docs/concepts/components/v2/components_as_classes.md#component-manifests-as-classes
-[principle of least privilege]: /docs/get-started/sdk/learn/intro/sandboxing.md
+[principle of least privilege]: /docs/get-started/learn/intro/sandboxing.md
 [relative component URL]: /docs/reference/components/url.md#relative-path-urls-to-subpackaged-components
 [glossary.abi]: /docs/glossary/README.md#abi
 [glossary.subpackage]: /docs/glossary/README.md#subpackage

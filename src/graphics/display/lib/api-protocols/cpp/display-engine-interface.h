@@ -12,12 +12,13 @@
 #include <cstdint>
 
 #include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
+#include "src/graphics/display/lib/api-types/cpp/engine-info.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types/cpp/layer-composition-operations.h"
@@ -42,7 +43,8 @@ class DisplayEngineInterface {
   DisplayEngineInterface& operator=(const DisplayEngineInterface&) = delete;
   DisplayEngineInterface& operator=(DisplayEngineInterface&&) = delete;
 
-  virtual void OnCoordinatorConnected() = 0;
+  // The engine listener is connected when this method is called.
+  virtual EngineInfo CompleteCoordinatorConnection() = 0;
 
   virtual zx::result<> ImportBufferCollection(
       display::DriverBufferCollectionId buffer_collection_id,
@@ -66,19 +68,24 @@ class DisplayEngineInterface {
 
   virtual void ApplyConfiguration(display::DisplayId display_id, display::ModeId display_mode_id,
                                   cpp20::span<const display::DriverLayer> layers,
-                                  display::ConfigStamp config_stamp) = 0;
+                                  display::DriverConfigStamp driver_config_stamp) = 0;
 
   virtual zx::result<> SetBufferCollectionConstraints(
       const display::ImageBufferUsage& image_buffer_usage,
       display::DriverBufferCollectionId buffer_collection_id) = 0;
 
-  virtual zx::result<> SetDisplayPower(display::DisplayId display_id, bool power_on) = 0;
+  // OOT drivers must use the default implementation for power management.
+  // The interface is not stabilized and will change.
+  virtual zx::result<> SetDisplayPower(display::DisplayId display_id, bool power_on);
 
-  virtual bool IsCaptureSupported() = 0;
-  virtual zx::result<> StartCapture(display::DriverCaptureImageId capture_image_id) = 0;
-  virtual zx::result<> ReleaseCapture(display::DriverCaptureImageId capture_image_id) = 0;
+  // OOT drivers must use the default implementation for the capture interface.
+  // The interface is not stabilized and will change.
+  virtual zx::result<> StartCapture(display::DriverCaptureImageId capture_image_id);
+  virtual zx::result<> ReleaseCapture(display::DriverCaptureImageId capture_image_id);
 
-  virtual zx::result<> SetMinimumRgb(uint8_t minimum_rgb) = 0;
+  // OOT drivers must use the default implementation for SetMinimumRgb().
+  // The interface is not stabilized and will change.
+  virtual zx::result<> SetMinimumRgb(uint8_t minimum_rgb);
 
  protected:
   // Destruction via base class pointer is not supported intentionally.

@@ -37,32 +37,80 @@
             to: [ "#vulkan_loader" ],
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-gpu",
             from: "#test_lib_provider",
             to: [ "#vulkan_loader" ],
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.gpu.magma.Service",
+            from: "#test_lib_provider",
+            to: [ "#vulkan_loader" ],
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-goldfish-pipe",
             from: "#test_lib_provider",
             to: [ "#vulkan_loader" ],
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.goldfish.ControllerService",
+            from: "#test_lib_provider",
+            to: [ "#vulkan_loader" ],
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-goldfish-control",
             from: "#test_lib_provider",
             to: [ "#vulkan_loader" ],
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.goldfish.ControlService",
+            from: "#test_lib_provider",
+            to: [ "#vulkan_loader" ],
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-goldfish-address-space",
             from: "#test_lib_provider",
             to: [ "#vulkan_loader" ],
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.goldfish.AddressSpaceService",
+            from: "#test_lib_provider",
+            to: [ "#vulkan_loader" ],
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-goldfish-sync",
             from: "#test_lib_provider",
             to: [ "#vulkan_loader" ],
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.goldfish.SyncService",
+            from: "#test_lib_provider",
+            to: [ "#vulkan_loader" ],
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-gpu-dependency-injection",
+            from: "#test_lib_provider",
+            to: [ "#vulkan_loader" ],
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.gpu.magma.DependencyInjectionService",
             from: "#test_lib_provider",
             to: [ "#vulkan_loader" ],
         },

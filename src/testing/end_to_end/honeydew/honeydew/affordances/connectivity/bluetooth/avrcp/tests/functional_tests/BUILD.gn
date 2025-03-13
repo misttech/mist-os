@@ -27,7 +27,7 @@ group("test_bluetooth_avrcp_sl4f") {
   testonly = true
   public_deps = [
     ":bluetooth_avrcp_test_sl4f($host_toolchain)",
-    "../../../../:sl4f_packages",
+    "../../../../../../..:sl4f_packages",
   ]
 }
 

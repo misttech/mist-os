@@ -133,16 +133,16 @@ constexpr inline auto ToUnderlying(::test_consts::EnumType value) -> int32_t {
 }
 
 template <>
-struct IsFidlType<::test_consts::BitsType> : public std::true_type{};
+struct IsFidlType<::test_consts::BitsType> : public std::true_type {};
 template <>
-struct ContainsHandle<::test_consts::BitsType> : public std::false_type{};
+struct ContainsHandle<::test_consts::BitsType> : public std::false_type {};
 static_assert(std::is_standard_layout_v<::test_consts::BitsType>);
 static_assert(sizeof(::test_consts::BitsType) == sizeof(uint32_t));
 
 template <>
-struct IsFidlType<::test_consts::EnumType> : public std::true_type{};
+struct IsFidlType<::test_consts::EnumType> : public std::true_type {};
 template <>
-struct ContainsHandle<::test_consts::EnumType> : public std::false_type{};
+struct ContainsHandle<::test_consts::EnumType> : public std::false_type {};
 
 #pragma clang diagnostic pop
 

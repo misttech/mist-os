@@ -38,10 +38,9 @@ class FakeDevice : public ddk::UsbDciProtocol<FakeDevice, ddk::base_protocol>,
   FakeDevice() : proto_({&usb_dci_protocol_ops_, this}) {}
 
   fdci::UsbDciService::InstanceHandler GetHandler() {
-    return fdci::UsbDciService::InstanceHandler({
-        .device = bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                          fidl::kIgnoreBindingClosure)
-    });
+    return fdci::UsbDciService::InstanceHandler(
+        {.device = bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                           fidl::kIgnoreBindingClosure)});
   }
 
   // USB DCI protocol implementation (No longer used).
@@ -66,12 +65,19 @@ class FakeDevice : public ddk::UsbDciProtocol<FakeDevice, ddk::base_protocol>,
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 
-  void SetInterface(SetInterfaceRequestView req,
-                    SetInterfaceCompleter::Sync& completer) override {
+  void SetInterface(SetInterfaceRequestView req, SetInterfaceCompleter::Sync& completer) override {
     fidl::Arena arena;
     client_.Bind(std::move(req->interface));
     completer.buffer(arena).ReplySuccess();
     sync_completion_signal(&set_interface_called_);
+  }
+
+  void StartController(StartControllerCompleter::Sync& completer) override {
+    completer.ReplySuccess();
+  }
+
+  void StopController(StopControllerCompleter::Sync& completer) override {
+    completer.ReplySuccess();
   }
 
   void ConfigureEndpoint(ConfigureEndpointRequestView req,
@@ -98,9 +104,8 @@ class FakeDevice : public ddk::UsbDciProtocol<FakeDevice, ddk::base_protocol>,
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 
-  void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_hardware_usb_dci::UsbDci> metadata,
-      fidl::UnknownMethodCompleter::Sync& completer) override {}
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_usb_dci::UsbDci> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
 
   usb_dci_protocol_t* proto() { return &proto_; }
 
@@ -140,9 +145,7 @@ class UsbPeripheralHarness : public zxtest::Test {
     ASSERT_EQ(1, root_device_->child_count());
     mock_dev_ = root_device_->GetLatestChild();
 
-    namespace_.SyncCall([&](Namespace* ns) {
-      client_.Bind(ns->dci.client().TakeClientEnd());
-    });
+    namespace_.SyncCall([&](Namespace* ns) { client_.Bind(ns->dci.client().TakeClientEnd()); });
     ASSERT_TRUE(client_.is_valid());
   }
 
@@ -168,8 +171,8 @@ class UsbPeripheralHarness : public zxtest::Test {
   fdf::UnownedSynchronizedDispatcher dispatcher_{
       fdf_testing::DriverRuntime::GetInstance()->StartBackgroundDispatcher()};
 
-  async_patterns::TestDispatcherBound<Namespace> namespace_{
-      dispatcher_->async_dispatcher(), std::in_place};
+  async_patterns::TestDispatcherBound<Namespace> namespace_{dispatcher_->async_dispatcher(),
+                                                            std::in_place};
 
   static constexpr char kSerialNumber[] = "Test serial number";
 
@@ -186,8 +189,8 @@ TEST_F(UsbPeripheralHarness, AddsCorrectSerialNumberMetadata) {
   fidl::Arena arena;
   RunSyncClientTask([&]() {
     std::vector<uint8_t> unused;
-    auto result = client_.buffer(arena)->Control(
-        setup, fidl::VectorView<uint8_t>::FromExternal(unused));
+    auto result =
+        client_.buffer(arena)->Control(setup, fidl::VectorView<uint8_t>::FromExternal(unused));
 
     ASSERT_TRUE(result->is_ok());
 
@@ -211,8 +214,8 @@ TEST_F(UsbPeripheralHarness, WorksWithVendorSpecificCommandWhenConfigurationIsZe
   fidl::Arena arena;
   RunSyncClientTask([&]() {
     std::vector<uint8_t> unused;
-    auto result = client_.buffer(arena)->Control(
-        setup, fidl::VectorView<uint8_t>::FromExternal(unused));
+    auto result =
+        client_.buffer(arena)->Control(setup, fidl::VectorView<uint8_t>::FromExternal(unused));
     ASSERT_TRUE(result->is_error());
     ASSERT_EQ(ZX_ERR_BAD_STATE, result->error_value());
   });

@@ -26,6 +26,7 @@
 #include "src/graphics/display/drivers/coordinator/engine-driver-client.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace display_coordinator {
@@ -105,7 +106,7 @@ class CoordinatorClientWithListenerTest : public ::testing::Test {
 TEST_F(CoordinatorClientWithListenerTest, ClientVSyncOk) {
   fdf_testing::DriverRuntime driver_runtime;
 
-  constexpr display::ConfigStamp kControllerStampValue(1);
+  constexpr display::DriverConfigStamp kDriverStampValue(1);
   constexpr display::ConfigStamp kClientStampValue(2);
 
   auto [coordinator_client_end, coordinator_server_end] =
@@ -128,11 +129,11 @@ TEST_F(CoordinatorClientWithListenerTest, ClientVSyncOk) {
   clientproxy.SetVsyncEventDelivery(true);
   fbl::AutoLock lock(controller.mtx());
   clientproxy.UpdateConfigStampMapping({
-      .controller_stamp = kControllerStampValue,
+      .driver_stamp = kDriverStampValue,
       .client_stamp = kClientStampValue,
   });
 
-  EXPECT_OK(clientproxy.OnDisplayVsync(display::kInvalidDisplayId, 0, kControllerStampValue));
+  EXPECT_OK(clientproxy.OnDisplayVsync(display::kInvalidDisplayId, 0, kDriverStampValue));
 
   MockCoordinatorListener mock_coordinator_listener;
   fidl::ServerBindingRef<fuchsia_hardware_display::CoordinatorListener> listener_server_binding =
@@ -171,8 +172,8 @@ TEST_F(CoordinatorClientWithListenerTest, ClientVSyncPeerClosed) {
   clientproxy.SetVsyncEventDelivery(true);
   fbl::AutoLock lock(controller.mtx());
   listener_client_end.reset();
-  EXPECT_OK(
-      clientproxy.OnDisplayVsync(display::kInvalidDisplayId, 0, display::kInvalidConfigStamp));
+  EXPECT_OK(clientproxy.OnDisplayVsync(display::kInvalidDisplayId, 0,
+                                       display::kInvalidDriverConfigStamp));
   clientproxy.CloseForTesting();
 
   dispatcher.ShutdownAsync();
@@ -200,8 +201,9 @@ TEST_F(CoordinatorClientWithListenerTest, ClientVSyncNotSupported) {
                                        std::move(listener_client_end)));
 
   fbl::AutoLock lock(controller.mtx());
-  EXPECT_STATUS(ZX_ERR_NOT_SUPPORTED, clientproxy.OnDisplayVsync(display::kInvalidDisplayId, 0,
-                                                                 display::kInvalidConfigStamp));
+  EXPECT_STATUS(ZX_ERR_NOT_SUPPORTED,
+                clientproxy.OnDisplayVsync(display::kInvalidDisplayId, 0,
+                                           display::kInvalidDriverConfigStamp));
   clientproxy.CloseForTesting();
 
   dispatcher.ShutdownAsync();
@@ -212,7 +214,7 @@ TEST_F(CoordinatorClientWithListenerTest, ClientMustDrainPendingStamps) {
   fdf_testing::DriverRuntime driver_runtime;
 
   constexpr size_t kNumPendingStamps = 5;
-  constexpr std::array<uint64_t, kNumPendingStamps> kControllerStampValues = {1u, 2u, 3u, 4u, 5u};
+  constexpr std::array<uint64_t, kNumPendingStamps> kDriverStampValues = {1u, 2u, 3u, 4u, 5u};
   constexpr std::array<uint64_t, kNumPendingStamps> kClientStampValues = {2u, 3u, 4u, 5u, 6u};
 
   auto [coordinator_client_end, coordinator_server_end] =
@@ -236,20 +238,20 @@ TEST_F(CoordinatorClientWithListenerTest, ClientMustDrainPendingStamps) {
   fbl::AutoLock lock(controller.mtx());
   for (size_t i = 0; i < kNumPendingStamps; i++) {
     clientproxy.UpdateConfigStampMapping({
-        .controller_stamp = display::ConfigStamp(kControllerStampValues[i]),
+        .driver_stamp = display::DriverConfigStamp(kDriverStampValues[i]),
         .client_stamp = display::ConfigStamp(kClientStampValues[i]),
     });
   }
 
   EXPECT_STATUS(ZX_ERR_NOT_SUPPORTED,
                 clientproxy.OnDisplayVsync(display::kInvalidDisplayId, 0,
-                                           display::ConfigStamp(kControllerStampValues.back())));
+                                           display::DriverConfigStamp(kDriverStampValues.back())));
 
   // Even if Vsync is disabled, ClientProxy should always drain pending
   // controller stamps.
   EXPECT_EQ(clientproxy.pending_applied_config_stamps().size(), 1u);
-  EXPECT_EQ(clientproxy.pending_applied_config_stamps().front().controller_stamp,
-            display::ConfigStamp(kControllerStampValues.back()));
+  EXPECT_EQ(clientproxy.pending_applied_config_stamps().front().driver_stamp,
+            display::DriverConfigStamp(kDriverStampValues.back()));
 
   clientproxy.CloseForTesting();
 

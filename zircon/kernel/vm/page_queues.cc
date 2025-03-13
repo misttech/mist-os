@@ -17,7 +17,6 @@
 #include <vm/page_queues.h>
 #include <vm/pmm.h>
 #include <vm/scanner.h>
-#include <vm/stack_owned_loaned_pages_interval.h>
 #include <vm/vm_cow_pages.h>
 
 namespace {
@@ -538,9 +537,6 @@ void PageQueues::Dump() {
 // This runs the aging thread. Aging, unlike lru processing, scanning or eviction, requires very
 // little work and is more about coordination. As such this thread is heavy on checks and signalling
 // but generally only needs to hold any locks for the briefest of times.
-// There is, currently, one exception to that, which is the calls to scanner_wait_for_accessed_scan.
-// The scanner will, eventually, be a separate thread that is synchronized with, but presently
-// a full scan may happen inline in that method call, and get attributed directly to this thread.
 void PageQueues::MruThread() {
   // Pretend that aging happens during startup to simplify the rest of the loop logic.
   last_age_time_ = current_mono_time();
@@ -608,14 +604,6 @@ void PageQueues::MruThread() {
     aging_token_.Wait();
     DeferPendingSignals dps{*this};
     dps.Pend(PendingSignal::AgingToken);
-
-    // Make sure the accessed information has been harvested since the last time we aged, otherwise
-    // we are deliberately making the age information coarser, by effectively not using one of the
-    // queues, at which point we might as well not have bothered rotating.
-    // Currently this is redundant since we will explicitly harvest just after aging, however once
-    // there are additional aging triggers and harvesting is more asynchronous, this will serve as
-    // a synchronization point.
-    scanner_wait_for_accessed_scan(last_age_time_, true);
 
     RotateReclaimQueues(age_reason);
 
@@ -1304,7 +1292,7 @@ void PageQueues::RemoveLocked(vm_page_t* page, DeferPendingSignals& dps) {
   DEBUG_ASSERT(old_queue != PageQueueNone);
   page_queue_counts_[old_queue].fetch_sub(1, ktl::memory_order_relaxed);
   UpdateActiveInactiveLocked((PageQueue)old_queue, PageQueueNone, dps);
-  page->object.clear_object();
+  page->object.set_object(nullptr);
   page->object.set_page_offset(0);
   list_delete(&page->queue_node);
 }
@@ -1618,25 +1606,16 @@ void PageQueues::EnableAnonymousReclaim(bool zero_forks) {
 
 ktl::optional<PageQueues::VmoBacklink> PageQueues::GetCowForLoanedPage(vm_page_t* page) {
   DEBUG_ASSERT(page->is_loaned());
-  // Must hold the page queues lock to ensure we can safely read the object reference and
-  // perform the refptr upgrade.
-  Guard<SpinLock, IrqSave> guard{&lock_};
   vm_page_state state = page->state();
   switch (state) {
     case vm_page_state::FREE_LOANED:
       // Page is not owned by the page queues, so no cow pages to lookup.
       return ktl::nullopt;
     case vm_page_state::OBJECT: {
-      // Reading the object here is technically racy, as if the page is *not* in the page queues
-      // then the page state could be racily changing out from under us. For this reason the
-      // potential states a loaned page may be in are not allowed to have fields at this offset
-      // for their variants. See comments on the vm_page_t, and specifically the free/alloc
-      // union variants for more information.
-      // Due to the restriction on the vm_page_t state, and the fact that object backlinks are only
-      // modified under lock_ that we currently hold, even if the page state is changing we know
-      // that if read a non-null object here, that the page is still in the object state and we have
-      // read a correct pointer. If we read null then the page may not be in the object state, but
-      // this is fine as we do not need to use the value anyhow.
+      // Delaying the lock acquisition and then reading the object field here is safe since the
+      // caller has guaranteed that the page state is not changing, and then the  object field is
+      // only modified under lock_, which we will be holding.
+      Guard<SpinLock, IrqSave> guard{&lock_};
       VmCowPages* cow = reinterpret_cast<VmCowPages*>(page->object.get_object());
       if (!cow) {
         // Our examination of the state was racy and this page may or may not be owned by a VMO, but

@@ -14,6 +14,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
+	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 )
 
 const validLog = `2020/03/20 22:47:38 Attempting to powercycle device upper-bacon-clock-snort
@@ -95,23 +97,23 @@ func TestSplitLogByTest(t *testing.T) {
 			input:      validLog,
 			inputTests: validLogTests,
 			expectedOutput: []TestLog{
-				{"Test/1", []byte("Test/1 output line 1\n" +
+				{"Test/1", "Test/1", []byte("Test/1 output line 1\n" +
 					"Test/1 output line 2\n" +
 					"ok 1 Test/1 (12.6s)\n"), "", 222},
-				{"Test2", []byte("not ok 2 Test2 (44.511025786s)\n"), "", 284},
-				{"Test3", []byte("Test3 output line 1\n" +
+				{"Test2", "Test2", []byte("not ok 2 Test2 (44.511025786s)\n"), "", 284},
+				{"Test3", "Test3", []byte("Test3 output line 1\n" +
 					"Test3 output line 2\n" +
 					"ok 3 fakeTest (1)\n" +
 					"Tests took 41 seconds.\n" +
 					"ok 3 Test3 (27.90584341s)\n"), "", 315},
-				{"Test4", []byte("Test4 output line 1\n" +
+				{"Test4", "Test4", []byte("Test4 output line 1\n" +
 					"Test4 output line 2\n" +
 					"Test4 output mixed with testrunner output not ok 4 Test4 (88.8s)\n"), "", 422},
-				{"Test5", []byte("Test5 output line 1\n" +
+				{"Test5", "Test5", []byte("Test5 output line 1\n" +
 					"fail message\n" +
 					"Test5 failed\n" +
 					"not ok 5 Test5 (27.90584341s)\n"), "", 527},
-				{"Test5", []byte("Test5 output\n" +
+				{"Test5", "Test5", []byte("Test5 output\n" +
 					"2020/03/20 22:57:53.569095 botanist attempting to close SSH session due to: context canceled\n" +
 					"ok 6 Test5 (9s)\n"), "", 603},
 			},
@@ -120,36 +122,36 @@ func TestSplitLogByTest(t *testing.T) {
 			input:      validFFXLog,
 			inputTests: []string{"ffxTest1", "ffxTest2", "v1Test3", "hostTest4", "test5"},
 			expectedOutput: []TestLog{
-				{"ffxTest1", []byte("testrunner output\n" +
+				{"ffxTest1", "ffxTest1", []byte("testrunner output\n" +
 					"Running test 'ffxTest1'\n" +
 					"ffxTest1 output line 1\n" +
 					"Running test 'ffxTest1.testcase1'\n" +
 					"ffxTest1 output line 2\n" +
 					"ffxTest1 completed with result: PASSED\n"), "", 222},
-				{"ffxTest2", []byte("Running test 'ffxTest2'\n" +
+				{"ffxTest2", "ffxTest2", []byte("Running test 'ffxTest2'\n" +
 					"ffxTest2 completed with result: FAILED\n" +
 					"ok 1 ffxTest1 (12.6s)\n" +
 					"not ok 2 ffxTest2 (44.511025786s)\n"), "", 383},
-				{"v1Test3", []byte("testrunner output\n" +
+				{"v1Test3", "v1Test3", []byte("testrunner output\n" +
 					"Running test 'v1Test3'\n" +
 					"v1Test3 output line 1\n" +
 					"ok 3 fakelog\n" +
 					"v1Test3 output line 2\n" +
 					"Tests took 41 seconds.\n" +
 					"ok 3 v1Test3 (27.90584341s)\n"), "", 502},
-				{"hostTest4", []byte("hostTest4 output line 1\n" +
+				{"hostTest4", "hostTest4", []byte("hostTest4 output line 1\n" +
 					"hostTest4 output line 2\n" +
 					"Running test 'test5' inside host test\n" +
 					"test5 completed with result: PASSED\n" +
 					"hostTest4 output mixed with testrunner output not ok 4 hostTest4 (88.8s)\n"), "", 651},
-				{"test5", []byte("Running test 'test5'\n" +
+				{"test5", "test5", []byte("Running test 'test5'\n" +
 					"ok 5 test5 (7s)\n"), "", 846},
 			},
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			output, err := splitLogByTest([]byte(tc.input), tc.inputTests)
+			output, err := splitLogByTest([]byte(tc.input), testDetailsForTests(tc.inputTests))
 			if err != nil {
 				t.Fatal("splitLogByTest() returned unexpected error:", err)
 			}
@@ -158,6 +160,14 @@ func TestSplitLogByTest(t *testing.T) {
 			}
 		})
 	}
+}
+
+func testDetailsForTests(tests []string) []runtests.TestDetails {
+	var testDetails []runtests.TestDetails
+	for _, testName := range tests {
+		testDetails = append(testDetails, runtests.TestDetails{Name: testName, OutputDir: testName})
+	}
+	return testDetails
 }
 
 const truncatedLog = `TAP version 13
@@ -176,12 +186,12 @@ foo`
 
 func TestSplitTruncatedLog(t *testing.T) {
 	input := []byte(truncatedLog)
-	output, err := splitLogByTest(input, []string{"Test1", "Test2"})
+	output, err := splitLogByTest(input, testDetailsForTests([]string{"Test1", "Test2"}))
 	if err != nil {
 		t.Fatal("splitLogByTest() returned unexpected error:", err)
 	}
 	wantOutput := []TestLog{
-		0: {"Test1", []byte("Test1 output line 1\n" +
+		0: {"Test1", "Test1", []byte("Test1 output line 1\n" +
 			"ok 1 Test1 (12.6s)\n"), "", 20},
 	}
 	if diff := cmp.Diff(wantOutput, output); diff != "" {
@@ -195,7 +205,7 @@ func TestSplitNonTAPLog(t *testing.T) {
 	for i := 0; i < 200; i++ {
 		input = append(input, []byte("foo\n")...)
 	}
-	output, err := splitLogByTest(input, []string{"foo"})
+	output, err := splitLogByTest(input, testDetailsForTests([]string{"foo"}))
 	if err != nil {
 		t.Fatal("splitLogByTest() returned unexpected error:", err)
 	}
@@ -220,7 +230,7 @@ func TestSplitTestLogs(t *testing.T) {
 	}
 
 	const baseName = "valid.txt"
-	testLogs, err := SplitTestLogs([]byte(validLog), baseName, logDir, validLogTests)
+	testLogs, err := SplitTestLogs([]byte(validLog), baseName, logDir, testDetailsForTests(validLogTests))
 	if err != nil {
 		t.Fatal("SplitTestLogs() failed:", err)
 	}

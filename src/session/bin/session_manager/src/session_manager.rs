@@ -640,7 +640,7 @@ mod tests {
             .lock()
             .unwrap()
             .exposed_dir
-            .open(flags, fio::ModeType::empty(), path, server_end)
+            .deprecated_open(flags, fio::ModeType::empty(), path, server_end)
             .unwrap();
     }
 
@@ -954,7 +954,7 @@ mod tests {
         let (path_sender, mut path_receiver) = mpsc::channel(1);
 
         let session_exposed_dir_handler = move |directory_request| match directory_request {
-            fio::DirectoryRequest::Open { path, .. } => {
+            fio::DirectoryRequest::DeprecatedOpen { path, .. } => {
                 let mut path_sender = path_sender.clone();
                 path_sender.try_send(path).unwrap();
             }
@@ -1015,7 +1015,7 @@ mod tests {
         let (path_sender, mut path_receiver) = mpsc::channel(1);
 
         let session_exposed_dir_handler = move |directory_request| match directory_request {
-            fio::DirectoryRequest::Open { path, .. } => {
+            fio::DirectoryRequest::DeprecatedOpen { path, .. } => {
                 let mut path_sender = path_sender.clone();
                 path_sender.try_send(path).unwrap();
             }

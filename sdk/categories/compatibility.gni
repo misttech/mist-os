@@ -5,19 +5,16 @@
 _all_idk_categories = [
   # A fake category used only for markers to represent targets that do not have
   # a category and thus are not included in the IDK.
+  # Also used for unstable APIs in other categories.
   "not-in-idk",
 
   # The categories supported by `sdk_atom()`.
-  "cts",
+  "compat_test",
   "partner_internal",
   "partner",
-  "public",
 ]
 
-_categories_partner_sources_may_depend_on = [
-  "partner",
-  "public",
-]
+_categories_partner_sources_may_depend_on = [ "partner" ]
 
 _categories_partner_prebuilts_may_depend_on =
     _categories_partner_sources_may_depend_on + [ "partner_internal" ]
@@ -45,12 +42,6 @@ foreach(category, _all_idk_categories) {
 # is explicitly specified in the entry. This is important because the markers
 # may be applied on any toolchain. Thus, it is critical that no toolchain be
 # specified in these lists.
-#
-# Note: Currently, only some FIDL-related targets and ffx tools and plugins take
-# dependencies on markers, so such `assert_no_deps` does not guarantee that
-# there are no, for example, uses of FIDL libraries from incompatible SDK
-# categories in the target's dependency tree
-# TODO(https://fxbug.dev/314822328): Increase coverage.
 #
 # For each category:
 # 1. Initialize marker incompatibility lists to all markers.

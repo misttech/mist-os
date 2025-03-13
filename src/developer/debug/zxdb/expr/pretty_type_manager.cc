@@ -8,6 +8,7 @@
 
 #include <limits>
 
+#include "src/developer/debug/shared/logging/logging.h"
 #include "src/developer/debug/zxdb/common/string_util.h"
 #include "src/developer/debug/zxdb/expr/format_node.h"
 #include "src/developer/debug/zxdb/expr/pretty_rust_tuple.h"
@@ -148,7 +149,7 @@ void PrettyTypeManager::AddDefaultCppPrettyTypes() {
   // result in errors but it will be better than misleading results.
   cpp_.emplace_back(
       InternalGlob("std::__2::vector<*>"),
-      std::make_unique<PrettyArray>("__begin_", "__end_ - __begin_",
+      std::make_unique<PrettyArray>("__begin_", "__end_ - __begin_", "",
                                     GetterList{{"size", "__end_ - __begin_"},
                                                {"capacity", "__end_cap_.__value_ - __begin_"},
                                                {"data", "__begin_"},
@@ -157,7 +158,7 @@ void PrettyTypeManager::AddDefaultCppPrettyTypes() {
                                                {"back", "__begin_[__end_ - __begin_ - 1]"}}));
   cpp_.emplace_back(InternalGlob("std::__2::vector<bool, *>"),
                     std::make_unique<PrettyArray>("vector_bool_printer_not_implemented_yet",
-                                                  "vector_bool_printer_not_implemented_yet"));
+                                                  "vector_bool_printer_not_implemented_yet", ""));
   cpp_.emplace_back(InternalGlob("std::__2::vector<*>::iterator"),
                     std::make_unique<PrettyIterator>("*__i_"));
 
@@ -380,25 +381,38 @@ void PrettyTypeManager::AddDefaultRustPrettyTypes() {
   // Owned version of String, OsString and Vec.
   rust_.emplace_back(InternalGlob("alloc::string::String"),
                      std::make_unique<PrettyHeapString>(
-                         "vec.buf.ptr.pointer.pointer as *u8", "vec.len",
+                         "vec.buf.inner.ptr.pointer.pointer as *u8", "vec.len",
                          GetterList{{"as_ptr", "vec.buf.ptr.pointer.pointer as *u8"},
                                     {"as_mut_ptr", "vec.buf.ptr.pointer.pointer as *u8"},
                                     {"len", "vec.len"},
-                                    {"capacity", "vec.buf.cap"},
+                                    {"capacity", "vec.buf.inner.cap"},
                                     {"is_empty", "vec.len == 0"}}));
   rust_.emplace_back(InternalGlob("std::ffi::os_str::OsString"),
                      std::make_unique<PrettyHeapString>(
-                         "inner.inner.buf.ptr.pointer.pointer as *u8", "inner.inner.len",
+                         "inner.inner.inner.buf.ptr.pointer.pointer as *u8", "inner.inner.inner.len",
                          GetterList{{"as_ptr", "inner.inner.buf.ptr.pointer.pointer as *u8"},
                                     {"as_mut_ptr", "inner.inner.buf.ptr.pointer.pointer as *u8"},
                                     {"len", "inner.inner.len"},
                                     {"capacity", "inner.inner.buf.cap"},
                                     {"is_empty", "inner.inner.len == 0"}}));
+  // The RawVec implementation only stores a pointer to a u8 which contains the data and only upon
+  // use does it convert those bytes to the correct type. The original type is kept in a PhantomData
+  // marker member, so we have to use that to correctly calculate the size of the array when doing
+  // memory fetches.
+  //
+  // The reason we point to the PhantomData type is because there's no way in the expression system
+  // to say "template parameter N". Concretely, the type that we know we want to use is the first
+  // template parameter, e.g. we want the T from Vec<T>, but the concrete type of Vec is actually
+  // Vec<T, A> where A is an allocator to use. By default this is filled in with the global
+  // allocator and not required by the user, but the debug info for this type contains the full
+  // template information for all instances. We could hardcode the first template parameter in the
+  // type resolution code, but that's more brittle than pointing to the unambiguous PhantomData that
+  // only has one template parameter.
   rust_.emplace_back(
       InternalGlob("alloc::vec::Vec<*>"),
-      std::make_unique<PrettyArray>("buf.ptr.pointer.pointer", "len",
-                                    GetterList{{"as_ptr", "buf.ptr.pointer.pointer"},
-                                               {"as_mut_ptr", "buf.ptr.pointer.pointer"},
+      std::make_unique<PrettyArray>("buf.inner.ptr.pointer.pointer", "len", "buf._marker",
+                                    GetterList{{"as_ptr", "buf.inner.ptr.pointer.pointer"},
+                                               {"as_mut_ptr", "buf.inner.ptr.pointer.pointer"},
                                                {"len", "len"},
                                                {"capacity", "buf.cap"},
                                                {"is_empty", "len == 0"}}));
@@ -409,11 +423,12 @@ void PrettyTypeManager::AddDefaultRustPrettyTypes() {
                      std::make_unique<PrettyStruct>(GetterList{{"capacity", "cap"}}));
 
   // A BinaryHeap is a wrapper around a "Vec" named "data".
-  rust_.emplace_back(InternalGlob("alloc::collections::binary_heap::BinaryHeap<*>"),
-                     std::make_unique<PrettyArray>("data.buf.ptr.pointer.pointer", "data.len",
-                                                   GetterList{{"len", "data.len"},
-                                                              {"capacity", "data.buf.cap"},
-                                                              {"is_empty", "data.len == 0"}}));
+  rust_.emplace_back(
+      InternalGlob("alloc::collections::binary_heap::BinaryHeap<*>"),
+      std::make_unique<PrettyArray>(
+          "data.buf.inner.ptr.pointer.pointer", "data.len", "data.buf._marker",
+          GetterList{
+              {"len", "data.len"}, {"capacity", "data.buf.cap"}, {"is_empty", "data.len == 0"}}));
 
   // Smart pointers.
   rust_.emplace_back(
@@ -473,10 +488,10 @@ void PrettyTypeManager::AddDefaultFuchsiaCppPrettyTypes() {
                                                     {"empty", "!" FBL_STRING_LENGTH_EXPRESSION}}));
   cpp_.emplace_back(InternalGlob("cpp20::span<*>"),
                     std::make_unique<PrettyArray>(
-                        "ptr_", "size_",
+                        "ptr_", "size_", "",
                         GetterList{{"size", "size_"}, {"data", "ptr_"}, {"empty", "size_ == 0"}}));
   cpp_.emplace_back(InternalGlob("fbl::Vector<*>"),
-                    std::make_unique<PrettyArray>("ptr_", "size_",
+                    std::make_unique<PrettyArray>("ptr_", "size_", "",
                                                   GetterList{{"size", "size_"},
                                                              {"get", "ptr_"},
                                                              {"capacity", "capacity_"},

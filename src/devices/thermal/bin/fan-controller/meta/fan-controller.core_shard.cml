@@ -12,11 +12,9 @@
     ],
     offer: [
         {
-            directory: "dev-class",
+            service: "fuchsia.hardware.fan.Service",
             from: "parent",
-            as: "dev-fan",
             to: "#fan-controller",
-            subdir: "fan",
         },
         {
             protocol: "fuchsia.thermal.ClientStateConnector",

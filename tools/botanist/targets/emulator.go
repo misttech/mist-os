@@ -77,6 +77,17 @@ type EmulatorConfig struct {
 	// This option should be used judiciously, as it can slow the process down.
 	Serial bool `json:"serial"`
 
+	// Uefi specifies whether the emulator creates and boots into a full disk GPT
+	// image instead of booting the kernel directly. If this is set to true,
+	// paths to the vbmeta signing key and its metadata must be provided as well.
+	Uefi bool `json:"uefi,omitempty"`
+
+	// Path to the vbmeta signing key. Required if 'uefi' is true.
+	VbmetaKey string `json:"vbmeta_key,omitempty"`
+
+	// Path to the vbmeta signing key metadata. Required if 'uefi' is true.
+	VbmetaMetadata string `json:"vbmeta_metadata,omitempty"`
+
 	// Logfile saves emulator standard output to a file if set.
 	Logfile string `json:"logfile"`
 
@@ -251,6 +262,15 @@ func (t *Emulator) Start(ctx context.Context, images []bootserver.Image, args []
 		KernelArgs:    allKernelArgs,
 		Device:        t.config.VirtualDeviceSpec,
 	}
+	if t.config.Uefi {
+		startArgs.ExtraEmuArgs = []string{
+			"--uefi",
+			"--vbmeta-key",
+			t.config.VbmetaKey,
+			"--vbmeta-key-metadata",
+			t.config.VbmetaMetadata,
+		}
+	}
 	if t.config.KVM {
 		startArgs.Accel = "hyper"
 	} else {
@@ -334,7 +354,7 @@ func (t *Emulator) Start(ctx context.Context, images []bootserver.Image, args []
 // Stop stops the emulator target.
 func (t *Emulator) Stop() error {
 	var err error
-	if err = t.ffx.EmuStop(context.Background()); err != nil {
+	if err = t.ffx.EmuStopAll(context.Background()); err != nil {
 		logger.Debugf(t.targetCtx, "failed to stop emulator: %s", err)
 		if t.process == nil {
 			return fmt.Errorf("%s target has not yet been started", t.binary)

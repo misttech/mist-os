@@ -193,8 +193,8 @@ impl SerializedVmo {
             Format::Json => {
                 serde_json::to_writer(batch_writer, source).map_err(AccessorError::Serialization)?
             }
-            Format::Cbor => serde_cbor::to_writer(batch_writer, source)
-                .map_err(AccessorError::CborSerialization)?,
+            Format::Cbor => ciborium::into_writer(source, batch_writer)
+                .map_err(|err| AccessorError::CborSerialization(err.into()))?,
             Format::Text => unreachable!("We'll never get Text"),
         }
         // Safe to unwrap we should always be able to take the vmo here.

@@ -463,6 +463,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.feedback/LastReboot.runtime",
+        "ordinal": "5",
+        "type": "int64"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.feedback/LastReboot.uptime",
         "ordinal": "3",
         "type": "int64"

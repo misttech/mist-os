@@ -13,7 +13,7 @@
 
 #include <memory>
 
-#include "manager.h"
+#include "lib/driver/devicetree/manager/manager.h"
 
 namespace fdf_devicetree::testing {
 

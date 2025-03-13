@@ -16,9 +16,9 @@ include /src/lib/diagnostics/hierarchy/rust/OWNERS
 include /src/lib/diagnostics/inspect/format/rust/OWNERS
 include /src/lib/fuchsia-runtime/OWNERS
 include /src/lib/process_builder/OWNERS
-include /src/security/OWNERS
 include /src/starnix/OWNERS
 include /src/sys/lib/fuchsia-zbi/OWNERS
+include /src/tee/OWNERS
 include /src/testing/sl4f/OWNERS
 include /src/virtualization/OWNERS
 include /tools/zedmon/OWNERS

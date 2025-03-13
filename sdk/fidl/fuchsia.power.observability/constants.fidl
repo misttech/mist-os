@@ -25,6 +25,38 @@ const SUSPEND_STATS_NODE string = "suspend_stats";
 
 // Lifecycle.
 
+/// Timestamp in nanos for when at least one suspend blocker is acquired.
+/// This occurs when an internal procedure needs to prevent suspension.
+/// For example, when servicing a wake lease request, system-activity-governor
+///  will acquire a suspend blocker for the lifetime of the wake lease token.
+/// This prevents suspension even while the underlying power broker lease is
+/// pending.
+const SUSPEND_BLOCKER_ACQUIRED_AT string = "suspend_blocker_acquired_at_ns";
+
+/// Timestamp in nanos for when the last suspend blocker is dropped.
+const SUSPEND_BLOCKER_DROPPED_AT string = "suspend_blocker_dropped_at_ns";
+
+/// Timestamp in nanos for when a wake lease was created.
+const WAKE_LEASE_CREATED_AT string = "wake_lease_created_at_ns";
+
+/// Timestamp in nanos for when a wake lease failed to be satisfied by power broker.
+const WAKE_LEASE_SATISFACTION_FAILED_AT string = "wake_lease_satisfaction_failed_at_ns";
+
+/// Timestamp in nanos for when a wake lease is satisfaction with power broker.
+const WAKE_LEASE_SATISFIED_AT string = "wake_lease_satisfied_at_ns";
+
+/// Timestamp in nanos for a wake lease is dropped.
+const WAKE_LEASE_DROPPED_AT string = "wake_lease_dropped_at_ns";
+
+/// Timestamp in nanos for when suspend requests will be blocked because a
+/// suspend lock is acquired. This event occurs right before a request to the
+/// suspend HAL is made.
+const SUSPEND_LOCK_ACQUIRED_AT string = "suspend_lock_acquired_at_ns";
+
+/// Timestamp in nanos for when a suspend lock is dropped. This event occurs
+/// after a response from the suspend HAL is received and handled by SAG.
+const SUSPEND_LOCK_DROPPED_AT string = "suspend_lock_dropped_at_ns";
+
 /// Timestamp in nanos at which suspend was attempted.
 const SUSPEND_ATTEMPTED_AT string = "attempted_at_ns";
 
@@ -33,6 +65,11 @@ const SUSPEND_RESUMED_AT string = "resumed_at_ns";
 
 /// Timestamp in nanos for resume, after an unsuccessful suspend.
 const SUSPEND_FAILED_AT string = "failed_at_ns";
+
+/// Timestamp in nanos for when a suspend attempt was blocked internally.
+/// Suspend may be repeatedly blocked until all suspend locks and suspend
+/// blockers have been dropped.
+const SUSPEND_ATTEMPT_BLOCKED_AT string = "attempt_blocked_at_ns";
 
 /// The duration of time last spent in suspend.
 const SUSPEND_LAST_TIMESTAMP string = "last_time_in_suspend_ns";
@@ -59,3 +96,48 @@ const SUSPEND_SUCCESS_COUNT string = "success_count";
 
 /// The number of failed suspends.
 const SUSPEND_FAIL_COUNT string = "fail_count";
+
+// System Activity Governor (SAG)
+
+// // Wake leases
+
+/// The current state of wake leases, as tracked by SAG.
+/// The wake lease event history is tracked separately in SUSPEND_EVENTS_NODE.
+const WAKE_LEASES_NODE string = "wake_leases";
+
+/// The name of the wake lease as requested by the client.
+const WAKE_LEASE_ITEM_NAME string = "wake_lease_name";
+
+/// The time since boot when the wake lease was created in nanoseconds.
+const WAKE_LEASE_ITEM_NODE_CREATED_AT string = "wake_lease_created_at";
+
+/// The type of wake lease.
+const WAKE_LEASE_ITEM_TYPE string = "wake_lease_type";
+
+/// Lease that blocks suspension of the hardware platform.
+const WAKE_LEASE_ITEM_TYPE_WAKE string = "wake";
+
+/// Lease that blocks the system from dropping below the Application Activity
+/// 'Active' state.
+const WAKE_LEASE_ITEM_TYPE_APPLICATION_ACTIVITY string = "application_activity";
+
+/// The kernel object ID of the token vended to the client.
+const WAKE_LEASE_ITEM_CLIENT_TOKEN_KOID string = "wake_lease_client_token_koid";
+
+/// The status of the wake lease.
+const WAKE_LEASE_ITEM_STATUS string = "wake_lease_status";
+
+/// Lease requested in power broker is awaiting satisfaction in the power
+/// topology.
+const WAKE_LEASE_ITEM_STATUS_AWAITING_SATISFACTION string = "pending";
+
+/// Lease requested in power broker is satisfied by the current state of the
+/// power topology.
+const WAKE_LEASE_ITEM_STATUS_SATISFIED string = "satisfied";
+
+/// Lease requested in power broker failed to be satisfied.
+const WAKE_LEASE_ITEM_STATUS_FAILED_SATISFACTION string = "failed";
+
+/// The error message. For example, if the underlying power broker lease failed
+/// to be satisfied.
+const WAKE_LEASE_ITEM_ERROR string = "error";

@@ -6,6 +6,7 @@
 
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_args", "get_ffx_assembly_inputs")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 load(
     ":providers.bzl",
     "FuchsiaPartitionsConfigInfo",
@@ -13,7 +14,6 @@ load(
     "FuchsiaUpdatePackageInfo",
 )
 load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")
-load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def _fuchsia_update_package_impl(ctx):
     fuchsia_toolchain = get_fuchsia_sdk_toolchain(ctx)
@@ -65,6 +65,7 @@ def _fuchsia_update_package_impl(ctx):
         inputs = inputs,
         outputs = outputs,
         command = script,
+        mnemonic = "AssemblyCreateUpdate",
         progress_message = "Create update package for %s" % ctx.label.name,
         **LOCAL_ONLY_ACTION_KWARGS
     )

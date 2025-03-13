@@ -6,10 +6,7 @@ import("//build/components.gni")
 
 source_set("testing") {
   testonly = true
-  visibility = [
-    "//src/media/audio/audio_core/v2/*",
-    "//src/media/audio/services/*",
-  ]
+  visibility = [ "//src/media/audio/services/*" ]
 
   sources = [
     "test_fence.h",

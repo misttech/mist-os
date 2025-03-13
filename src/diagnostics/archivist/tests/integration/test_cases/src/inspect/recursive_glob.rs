@@ -4,7 +4,7 @@
 
 use crate::{test_topology, utils};
 use diagnostics_assertions::{assert_data_tree, AnyProperty};
-use diagnostics_reader::{ArchiveReader, Inspect};
+use diagnostics_reader::ArchiveReader;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_archivist_test as ftest;
 use realm_proxy_client::RealmProxyClient;
@@ -53,11 +53,11 @@ async fn read_components_recursive_glob() {
     exposed_inspect.push(expose_nested_inspect(&realm_proxy, "child_b", "nested_two").await);
 
     let accessor = utils::connect_accessor(&realm_proxy, utils::ALL_PIPELINE).await;
-    let data_vec = ArchiveReader::new()
+    let data_vec = ArchiveReader::inspect()
         .add_selector("child_a/**:root")
         .with_archive(accessor)
         .with_minimum_schema_count(expected_monikers.len())
-        .snapshot::<Inspect>()
+        .snapshot()
         .await
         .expect("got inspect data");
 
@@ -119,12 +119,12 @@ async fn read_components_subtree_with_recursive_glob() {
     ]);
 
     let accessor = utils::connect_accessor(&realm_proxy, utils::ALL_PIPELINE).await;
-    let data_vec = ArchiveReader::new()
+    let data_vec = ArchiveReader::inspect()
         .add_selector("child_a/**:root")
         .add_selector("child_a:root")
         .with_archive(accessor)
         .with_minimum_schema_count(expected_monikers.len())
-        .snapshot::<Inspect>()
+        .snapshot()
         .await
         .expect("got inspect data");
 

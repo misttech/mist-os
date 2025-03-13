@@ -486,6 +486,34 @@ class Device : public ::ddk::internal::base_device<D, Mixins...> {
     device_async_remove(dev);
   }
 
+  // AddService allows a driver to advertise a FIDL service.
+  // The intended use is for drivers to use this to advertise services to non-drivers.
+  // It is only really supported in the compat shim, where it adds the service to the outgoing
+  // directory that the compat shim maintains.
+  // The service is added to the outgoing directory of the parent device, which
+  // for compat drivers will always exist.
+  // |handler| is the handler for the service.
+  template <typename Service, typename = std::enable_if_t<fidl::IsServiceV<Service>>>
+  zx::result<> DdkAddService(
+      fidl::ServiceInstanceHandler<fidl::internal::ChannelTransport> handler) {
+    constexpr char kInstanceName[] = "default";
+    auto handlers = handler.TakeMemberHandlers();
+    if (handlers.empty()) {
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+    std::string service_name = Service::Name;
+
+    for (auto& [member_name, member_handler] : handlers) {
+      zx_status_t status =
+          device_register_service_member(this->parent_, static_cast<void*>(&member_handler),
+                                         service_name.c_str(), kInstanceName, member_name.c_str());
+      if (status != ZX_OK) {
+        return zx::make_result(status);
+      }
+    }
+    return zx::ok();
+  }
+
   zx_status_t DdkGetMetadataSize(uint32_t type, size_t* out_size) {
     // Uses parent() instead of zxdev() as metadata is usually checked
     // before DdkAdd(). There are few use cases to actually call it on self.

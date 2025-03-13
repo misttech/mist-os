@@ -19,6 +19,7 @@ import (
 
 	"go.fuchsia.dev/fuchsia/tools/build"
 	fintpb "go.fuchsia.dev/fuchsia/tools/integration/fint/proto"
+	"go.fuchsia.dev/fuchsia/tools/lib/jsonutil"
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 )
 
@@ -156,6 +157,14 @@ func (s *Shard) CreatePackageRepo(buildDir string, globalRepoMetadata string, ca
 		var pkgManifests []string
 		for _, t := range s.Tests {
 			pkgManifests = append(pkgManifests, t.PackageManifests...)
+			if t.PackageManifestDepsFile != "" {
+				var pkgManifestDeps []string
+				if err := jsonutil.ReadFromFile(filepath.Join(buildDir, t.PackageManifestDepsFile), &pkgManifestDeps); err != nil {
+					return err
+				} else {
+					pkgManifests = append(pkgManifests, pkgManifestDeps...)
+				}
+			}
 		}
 
 		// Use delivery blobs if the config exists.
@@ -435,6 +444,10 @@ func environmentName(env build.Environment) string {
 		addToken(env.VirtualDeviceSpec.EnvName)
 	} else if env.VirtualDeviceSpec.Name != "" {
 		addToken(env.VirtualDeviceSpec.Name)
+	}
+	if env.GptUefiDisk.Name != "" {
+		addToken("uefi")
+		addToken(env.GptUefiDisk.Name)
 	}
 	return strings.Join(tokens, "-")
 }

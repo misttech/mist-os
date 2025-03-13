@@ -196,7 +196,6 @@ impl Actor {
                 slots,
                 value_type,
             }) => {
-                let name: StringReference = name.into();
                 self.properties.insert(
                     id,
                     match value_type {
@@ -224,7 +223,6 @@ impl Actor {
                     (Property::UintArray(p), Value::UintT(v)) => p.set(index as usize, v),
                     (Property::DoubleArray(p), Value::DoubleT(v)) => p.set(index as usize, v),
                     (Property::StringArray(p), Value::StringT(v)) => {
-                        let v: StringReference = v.into();
                         p.set(index as usize, v);
                     }
                     unexpected => {

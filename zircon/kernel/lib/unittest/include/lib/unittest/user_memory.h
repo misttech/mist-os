@@ -35,6 +35,9 @@ class UserMemory {
   static ktl::unique_ptr<UserMemory> CreateInAspace(fbl::RefPtr<VmObject> vmo,
                                                     fbl::RefPtr<VmAspace>& aspace, uint8_t tag = 0,
                                                     uint8_t align_pow2 = 0);
+  static ktl::unique_ptr<UserMemory> CreateInVmar(fbl::RefPtr<VmObject> vmo,
+                                                  fbl::RefPtr<VmAddressRegion>& vmar,
+                                                  uint8_t tag = 0, uint8_t align_pow2 = 0);
   virtual ~UserMemory();
 
   vaddr_t base() const {

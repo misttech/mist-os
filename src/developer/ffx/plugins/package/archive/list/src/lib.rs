@@ -5,7 +5,8 @@
 use anyhow::{Context, Result};
 use ffx_package_archive_list_args::ListCommand;
 use ffx_package_archive_utils::{read_file_entries, ArchiveEntry, FarArchiveReader, FarListReader};
-use fho::{FfxMain, FfxTool, MachineWriter, ToolIO};
+use ffx_writer::{MachineWriter, ToolIO as _};
+use fho::{FfxMain, FfxTool};
 use humansize::{file_size_opts, FileSize as _};
 use prettytable::format::FormatBuilder;
 use prettytable::{cell, row, Row, Table};
@@ -99,7 +100,7 @@ mod test {
     use super::*;
     use ffx_package_archive_utils::test_utils::create_mockreader;
     use ffx_package_archive_utils::MockFarListReader;
-    use fho::{Format, TestBuffers};
+    use ffx_writer::{Format, TestBuffers};
     use std::collections::HashMap;
     use std::path::PathBuf;
 

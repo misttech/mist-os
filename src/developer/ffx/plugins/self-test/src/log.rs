@@ -4,6 +4,7 @@
 
 use crate::test::*;
 use anyhow::{ensure, Context, Result};
+use ffx_executor::FfxExecutor;
 use std::fs::{create_dir_all, File};
 use std::io::Write;
 use std::path::Path;
@@ -76,8 +77,7 @@ pub mod include_log {
         }
         config.push_str(&format!(",proactive_log.enabled={}", enable_proactive_logger));
         let mut child = isolate
-            .ffx_cmd(&["--target", &target, "--config", &config, "log"])
-            .await?
+            .make_ffx_cmd(&["--target", &target, "--config", &config, "log"])?
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())

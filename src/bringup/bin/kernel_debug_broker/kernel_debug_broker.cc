@@ -12,7 +12,6 @@
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/kcounter/provider.h>
 #include <lib/kernel-debug/kernel-debug.h>
-#include <lib/ktrace/ktrace.h>
 #include <lib/svc/outgoing.h>
 #include <lib/zx/job.h>
 #include <lib/zx/result.h>
@@ -155,10 +154,6 @@ int main(int argc, char** argv) {
       {
           .provider = kernel_debug_get_service_provider(),
           .ctx = reinterpret_cast<void*>(static_cast<uintptr_t>(debug_resource.get())),
-      },
-      {
-          .provider = ktrace_get_service_provider(),
-          .ctx = reinterpret_cast<void*>(static_cast<uintptr_t>(debug_resource.release())),
       },
       {
           .provider = kcounter_get_service_provider(),

@@ -103,6 +103,7 @@
     "files.associations": {
       "*.cml": "json5",
       "*.inc": "cpp",
+      "*.profiles": "json5",
 
       // Golden files
       "*.c.golden": "c",

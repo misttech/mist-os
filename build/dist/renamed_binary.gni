@@ -30,44 +30,6 @@ import("//build/dist/resource.gni")
 # This can be overridden by setting `keep_original` to true, in at least
 # one of the renamed_binary() targets that use it.
 #
-# Optionally, one can also declare that the binary should be
-# available in the shell, when a given package depends on this
-# target. This is useful when fuchsia_shell_package() cannot be
-# used directly, which happens when one does not want _all_ binaries
-# in the packages to be made visible to shell users (including
-# the original one, which is often undesirable).
-#
-# In other words:
-#
-#   renamed_binary("my-binary") {
-#     dest = "bin/foo"
-#     source = "$root_out_dir/original_binary"
-#     source_deps = ...
-#   }
-#
-#   fuchsia_shell_package("my-package") {
-#     ...
-#     deps = [ ":my-binary" ]
-#   }
-#
-# Will make both 'foo' and 'original_binary' available to the
-# shell, while:
-#
-#   renamed_binary("my-binary") {
-#     dest = "bin/foo"
-#     source = "$root_out_dir/original_binary"
-#     source_deps = ...
-#     fuchsia_shell_package_name = "my-package"
-#   }
-#
-#   fuchsia_package_with_single_component("my-package") {
-#     ...
-#     deps = [ ":my-binary" ]
-#   }
-#
-# Will only make 'foo' available to the shell, which is
-# generally better.
-#
 # Finally, it is not possible to mix resource() and renamed_binary()
 # targets that use the same source path. This will be detected as a
 # conflict during the build, and an error message will be printed
@@ -87,14 +49,6 @@ import("//build/dist/resource.gni")
 #     [list of labels] A list of dependencies required to build
 #     the source file.
 #
-#   fuchsia_shell_package_name (optional)
-#     [string] If defined, must be a package name, and this template
-#     will ensure that the renamed binary will be available from the shell
-#     when said package depends on this target. Note that the
-#     original source binary, while also installed in the package,
-#     will _not_ be made visible to the shell through this target,
-#     only the renamed one.
-#
 #   keep_original (optional)
 #     [boolean] Set this to true to keep the original binary in the
 #     package as well. By default, it will be removed, replaced by
@@ -105,36 +59,6 @@ import("//build/dist/resource.gni")
 #
 template("renamed_binary") {
   main_target_name = target_name
-
-  if (defined(invoker.fuchsia_shell_package_name)) {
-    # Generate a shell wrapper for the renamed binary.
-    # Do not use shell_command() here because it will create one wrapper for
-    # every executable() in the dependency tree rooted at source_deps, including
-    # one for the source binary. When the same source binary is used by several
-    # renamed_binary() targets, this creates a conflict late in the build!
-    _shell_package_name = invoker.fuchsia_shell_package_name
-    _shell_file = target_gen_dir + "/" + invoker.dest + ".shell"
-    _shell_file_target = "${main_target_name}.shell_file"
-    generated_file(_shell_file_target) {
-      outputs = [ _shell_file ]
-      contents = [ "#!resolve fuchsia-pkg://fuchsia.com/${_shell_package_name}#${invoker.dest}" ]
-      metadata = {
-        # Used by the assembly tool to generate a shell_commands package from binaries that are
-        # marked as shell commands. Handles the edge case where only a subset of the binaries in
-        # a package are to be included in the shell_commands package under a specific name
-        # (often the original package name).
-        shell_binary_entries = [
-          {
-            source = rebase_path(_shell_file, root_build_dir)
-            destination = invoker.dest
-            label =
-                get_label_info(":${main_target_name}", "label_with_toolchain")
-          },
-        ]
-        shell_binary_barrier = []
-      }
-    }
-  }
 
   group(main_target_name) {
     forward_variables_from(invoker,
@@ -153,10 +77,6 @@ template("renamed_binary") {
     # are also properly installed, because the resource() target
     # will actually block metadata collection for these.
     deps += invoker.source_deps
-
-    if (defined(_shell_file_target)) {
-      deps += [ ":${_shell_file_target}" ]
-    }
 
     _rebased_source = rebase_path(invoker.source, root_build_dir)
 

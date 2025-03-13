@@ -82,9 +82,9 @@ struct Listener {
 impl Listener {
     async fn new(realm_proxy: &RealmProxyClient) -> Self {
         let accessor = utils::connect_accessor(realm_proxy, utils::ALL_PIPELINE).await;
-        let stream = ArchiveReader::new()
+        let stream = ArchiveReader::logs()
             .with_archive(accessor)
-            .snapshot_then_subscribe::<Logs>()
+            .snapshot_then_subscribe()
             .expect("snapshot then subscribe");
         Self { stream }
     }
@@ -111,7 +111,7 @@ async fn check_log_snapshot(
     expected_dump: &[(i64, ExtendedMoniker)],
 ) {
     let accessor = utils::connect_accessor(realm_proxy, utils::ALL_PIPELINE).await;
-    let logs = ArchiveReader::new().with_archive(accessor).snapshot::<Logs>().await.unwrap();
+    let logs = ArchiveReader::logs().with_archive(accessor).snapshot().await.unwrap();
     let result = logs
         .into_iter()
         .map(|log| (log.metadata.timestamp.into_nanos(), log.moniker.clone()))

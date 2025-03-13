@@ -6,7 +6,6 @@
 
 #ifndef ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_PCI_INTERRUPT_DISPATCHER_H_
 #define ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_PCI_INTERRUPT_DISPATCHER_H_
-#if WITH_KERNEL_PCIE
 
 #include <sys/types.h>
 
@@ -47,7 +46,5 @@ class PciInterruptDispatcher final : public InterruptDispatcher {
   const uint32_t vector_;
   const bool maskable_;
 };
-
-#endif  // if WITH_KERNEL_PCIE
 
 #endif  // ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_PCI_INTERRUPT_DISPATCHER_H_

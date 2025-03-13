@@ -9,6 +9,7 @@
 //! fuchsia.netpol.socketproxy.FuchsiaNetworks, and
 //! fuchsia.netpol.socketproxy.DnsServerWatcher.
 
+use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_posix_socket::{self as fposix_socket, OptionalUint32};
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use fuchsia_inspect::health::Reporter;
@@ -29,12 +30,17 @@ struct SocketMarks {
     mark_2: OptionalUint32,
 }
 
-impl From<SocketMarks> for Vec<fposix_socket::Marks> {
+impl From<SocketMarks> for fnet::Marks {
     fn from(SocketMarks { mark_1, mark_2 }: SocketMarks) -> Self {
-        vec![
-            fposix_socket::Marks { domain: fposix_socket::MarkDomain::Mark1, mark: mark_1 },
-            fposix_socket::Marks { domain: fposix_socket::MarkDomain::Mark2, mark: mark_2 },
-        ]
+        let into_option_u32 = |opt| match opt {
+            OptionalUint32::Unset(fposix_socket::Empty) => None,
+            OptionalUint32::Value(val) => Some(val),
+        };
+        Self {
+            mark_1: into_option_u32(mark_1),
+            mark_2: into_option_u32(mark_2),
+            __source_breaking: fidl::marker::SourceBreaking,
+        }
     }
 }
 

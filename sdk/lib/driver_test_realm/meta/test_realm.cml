@@ -140,7 +140,10 @@
             to: "#driver_manager",
         },
         {
-            config: [ "fuchsia.usb.PeripheralConfig.Functions" ],
+            config: [
+                "fuchsia.power.SuspendEnabled",
+                "fuchsia.usb.PeripheralConfig.Functions",
+            ],
             from: "void",
             to: "#boot-drivers",
             availability: "optional",

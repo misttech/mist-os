@@ -7,7 +7,6 @@ library fuchsia.component.test;
 using fuchsia.component;
 using fuchsia.component.decl;
 using fuchsia.component.runner;
-using fuchsia.component.types;
 using fuchsia.data;
 using fuchsia.mem;
 using fuchsia.io;
@@ -165,7 +164,7 @@ closed protocol Builder {
     strict Build(resource struct {
         runner client_end:fuchsia.component.runner.ComponentRunner;
     }) -> (struct {
-        root_component_url string:fuchsia.component.types.MAX_URL_LENGTH;
+        root_component_url string:fuchsia.url.MAX_URL_LENGTH;
     }) error RealmBuilderError;
 };
 

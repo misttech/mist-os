@@ -10,8 +10,6 @@
 #![allow(non_snake_case)]
 #![allow(unused_variables)]
 
-use crate::props::is_propset_pseudo_handle;
-use crate::{context, mem, storage, time};
 use num_traits::FromPrimitive;
 use tee_internal::binding::{
     TEE_Attribute, TEE_BigInt, TEE_BigIntFMM, TEE_BigIntFMMContext, TEE_Identity,
@@ -20,10 +18,13 @@ use tee_internal::binding::{
     TEE_Time, TEE_Whence, TEE_SUCCESS, TEE_UUID,
 };
 use tee_internal::{
-    to_tee_result, Algorithm, Attribute, AttributeId, Error, HandleFlags, Mode, ObjectEnumHandle,
-    ObjectHandle, OperationHandle, PropSetHandle, Result as TeeResult, Storage as TeeStorage, Type,
-    Usage, ValueFields, Whence, OBJECT_ID_MAX_LEN,
+    to_tee_result, Algorithm, Attribute, AttributeId, EccCurve, Error, HandleFlags, Mode,
+    ObjectEnumHandle, ObjectHandle, OperationHandle, PropSetHandle, Result as TeeResult,
+    Storage as TeeStorage, Type, Usage, ValueFields, Whence, OBJECT_ID_MAX_LEN,
 };
+
+use crate::props::is_propset_pseudo_handle;
+use crate::{context, crypto, mem, storage, time, ErrorWithSize};
 
 // This function returns a list of the C entry point that we want to expose from
 // this program. They need to be referenced from main to ensure that the linker
@@ -303,6 +304,18 @@ fn slice_from_raw_parts<'a, Input, Output>(data: *const Input, size: usize) -> &
     }
 }
 
+fn buffers_overlap<Input>(a: *const Input, a_len: usize, b: *const Input, b_len: usize) -> bool {
+    let a = a.addr();
+    let a_end = a + a_len * size_of::<Input>();
+    let b = b.addr();
+    let b_end = b + b_len * size_of::<Input>();
+    if a < b {
+        a_end > b
+    } else {
+        b_end > a
+    }
+}
+
 // Returns None if a Utf8Error is encountered.
 fn c_str_to_str<'a>(name: *const ::std::os::raw::c_char) -> Option<&'a str> {
     assert!(!name.is_null());
@@ -320,7 +333,7 @@ fn c_str_to_str<'a>(name: *const ::std::os::raw::c_char) -> Option<&'a str> {
     name_cstr.to_str().ok()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_GetPropertyAsString(
     propsetOrEnumerator: TEE_PropSetHandle,
     name: *mut ::std::os::raw::c_char,
@@ -372,7 +385,7 @@ extern "C" fn TEE_GetPropertyAsString(
     })())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_GetPropertyAsBool(
     propsetOrEnumerator: TEE_PropSetHandle,
     name: *mut ::std::os::raw::c_char,
@@ -399,7 +412,7 @@ extern "C" fn TEE_GetPropertyAsBool(
     })())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_GetPropertyAsU32(
     propsetOrEnumerator: TEE_PropSetHandle,
     name: *mut ::std::os::raw::c_char,
@@ -426,7 +439,7 @@ extern "C" fn TEE_GetPropertyAsU32(
     })())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_GetPropertyAsU64(
     propsetOrEnumerator: TEE_PropSetHandle,
     name: *mut ::std::os::raw::c_char,
@@ -453,7 +466,7 @@ extern "C" fn TEE_GetPropertyAsU64(
     })())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_GetPropertyAsBinaryBlock(
     propsetOrEnumerator: TEE_PropSetHandle,
     name: *mut ::std::os::raw::c_char,
@@ -502,7 +515,7 @@ extern "C" fn TEE_GetPropertyAsBinaryBlock(
     })())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_GetPropertyAsUUID(
     propsetOrEnumerator: TEE_PropSetHandle,
     name: *mut ::std::os::raw::c_char,
@@ -529,7 +542,7 @@ extern "C" fn TEE_GetPropertyAsUUID(
     })())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_GetPropertyAsIdentity(
     propsetOrEnumerator: TEE_PropSetHandle,
     name: *mut ::std::os::raw::c_char,
@@ -557,7 +570,7 @@ extern "C" fn TEE_GetPropertyAsIdentity(
     })())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_AllocatePropertyEnumerator(enumerator: *mut TEE_PropSetHandle) -> TEE_Result {
     assert!(!enumerator.is_null());
     assert!(enumerator.is_aligned());
@@ -571,14 +584,14 @@ extern "C" fn TEE_AllocatePropertyEnumerator(enumerator: *mut TEE_PropSetHandle)
     TEE_SUCCESS
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_FreePropertyEnumerator(enumerator: TEE_PropSetHandle) {
     context::with_current_mut(|context| {
         context.properties.free_property_enumerator(*PropSetHandle::from_binding(&enumerator))
     });
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_StartPropertyEnumerator(
     enumerator: TEE_PropSetHandle,
     propSet: TEE_PropSetHandle,
@@ -591,14 +604,14 @@ extern "C" fn TEE_StartPropertyEnumerator(
     });
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_ResetPropertyEnumerator(enumerator: TEE_PropSetHandle) {
     context::with_current_mut(|context| {
         context.properties.reset_property_enumerator(*PropSetHandle::from_binding(&enumerator))
     });
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_GetPropertyName(
     enumerator: TEE_PropSetHandle,
     nameBuffer: *mut ::std::os::raw::c_void,
@@ -646,7 +659,7 @@ extern "C" fn TEE_GetPropertyName(
     })())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_GetNextProperty(enumerator: TEE_PropSetHandle) -> TEE_Result {
     to_tee_result((|| -> TeeResult {
         context::with_current_mut(|context| {
@@ -655,12 +668,12 @@ extern "C" fn TEE_GetNextProperty(enumerator: TEE_PropSetHandle) -> TEE_Result {
     })())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn TEE_Panic(code: u32) {
     crate::panic(code)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_OpenTASession(
     destination: *mut TEE_UUID,
     cancellationRequestTimeout: u32,
@@ -672,12 +685,12 @@ extern "C" fn TEE_OpenTASession(
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_CloseTASession(session: TEE_TASessionHandle) {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_InvokeTACommand(
     session: TEE_TASessionHandle,
     cancellationRequestTimeout: u32,
@@ -689,37 +702,44 @@ extern "C" fn TEE_InvokeTACommand(
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_GetCancellationFlag() -> bool {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_UnmaskCancellation() -> bool {
     // TODO(https://fxbug.dev/370103570): Implement Cancellation APIs.
     return true;
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_MaskCancellation() -> bool {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_CheckMemoryAccessRights(
     accessFlags: u32,
     buffer: *mut ::std::os::raw::c_void,
     size: usize,
 ) -> TEE_Result {
-    unimplemented!()
+    context::with_current(|context| {
+        mem::check_memory_access_rights(
+            accessFlags,
+            buffer.addr(),
+            size,
+            &context.mapped_param_ranges,
+        )
+    })
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_Malloc(size: usize, hint: u32) -> *mut ::std::os::raw::c_void {
     mem::malloc(size, hint)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_Realloc(
     buffer: *mut ::std::os::raw::c_void,
     newSize: usize,
@@ -727,12 +747,12 @@ extern "C" fn TEE_Realloc(
     unsafe { mem::realloc(buffer, newSize) }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_Free(buffer: *mut ::std::os::raw::c_void) {
     unsafe { mem::free(buffer) }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_MemMove(
     dest: *mut ::std::os::raw::c_void,
     src: *mut ::std::os::raw::c_void,
@@ -741,7 +761,7 @@ extern "C" fn TEE_MemMove(
     mem::mem_move(dest, src, size)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_MemCompare(
     buffer1: *mut ::std::os::raw::c_void,
     buffer2: *mut ::std::os::raw::c_void,
@@ -750,22 +770,22 @@ extern "C" fn TEE_MemCompare(
     mem::mem_compare(buffer1, buffer2, size)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_MemFill(buffer: *mut ::std::os::raw::c_void, x: u8, size: usize) {
     mem::mem_fill(buffer, x, size)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_SetInstanceData(instanceData: *mut ::std::os::raw::c_void) {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_GetInstanceData() -> *mut ::std::os::raw::c_void {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_GetObjectInfo1(
     object: TEE_ObjectHandle,
     objectInfo: *mut TEE_ObjectInfo,
@@ -782,12 +802,12 @@ extern "C" fn TEE_GetObjectInfo1(
     }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_GetObjectInfo(object: TEE_ObjectHandle, objectInfo: *mut TEE_ObjectInfo) {
     assert_eq!(TEE_GetObjectInfo1(object, objectInfo), TEE_SUCCESS);
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_RestrictObjectUsage1(object: TEE_ObjectHandle, objectUsage: u32) -> TEE_Result {
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
@@ -797,12 +817,12 @@ extern "C" fn TEE_RestrictObjectUsage1(object: TEE_ObjectHandle, objectUsage: u3
     }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_RestrictObjectUsage(object: TEE_ObjectHandle, objectUsage: u32) {
     assert_eq!(TEE_RestrictObjectUsage1(object, objectUsage), TEE_SUCCESS);
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_GetObjectBufferAttribute(
     object: TEE_ObjectHandle,
     attributeID: u32,
@@ -820,10 +840,10 @@ extern "C" fn TEE_GetObjectBufferAttribute(
             context.storage.get_object_buffer_attribute(object, id, buffer)
         }) {
             Ok(written) => {
-                debug_assert!(written.len() <= initial_size);
-                (written.len(), Ok(()))
+                debug_assert!(written <= initial_size);
+                (written, Ok(()))
             }
-            Err(err) => (err.actual_size, Err(err.error)),
+            Err(err) => (err.size, Err(err.error)),
         };
         // SAFETY: `size` nullity checked above.
         unsafe {
@@ -833,7 +853,7 @@ extern "C" fn TEE_GetObjectBufferAttribute(
     }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_GetObjectValueAttribute(
     object: TEE_ObjectHandle,
     attributeID: u32,
@@ -856,13 +876,13 @@ extern "C" fn TEE_GetObjectValueAttribute(
     }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_CloseObject(object: TEE_ObjectHandle) {
     let object = *ObjectHandle::from_binding(&object);
     context::with_current_mut(|context| context.storage.close_object(object));
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_AllocateTransientObject(
     objectType: u32,
     maxObjectSize: u32,
@@ -882,19 +902,19 @@ extern "C" fn TEE_AllocateTransientObject(
     }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_FreeTransientObject(object: TEE_ObjectHandle) {
     let object = *ObjectHandle::from_binding(&object);
     context::with_current_mut(|context| context.storage.free_transient_object(object));
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_ResetTransientObject(object: TEE_ObjectHandle) {
     let object = *ObjectHandle::from_binding(&object);
     context::with_current_mut(|context| context.storage.reset_transient_object(object));
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_PopulateTransientObject(
     object: TEE_ObjectHandle,
     attrs: *mut TEE_Attribute,
@@ -917,7 +937,7 @@ extern "C" fn TEE_PopulateTransientObject(
     }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_InitRefAttribute(
     attr: *mut TEE_Attribute,
     attributeID: u32,
@@ -932,7 +952,7 @@ extern "C" fn TEE_InitRefAttribute(
     unsafe { *attr = *attribute.to_binding() };
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_InitValueAttribute(attr: *mut TEE_Attribute, attributeID: u32, a: u32, b: u32) {
     assert!(!attr.is_null());
     let id = AttributeId::from_u32(attributeID).unwrap();
@@ -941,7 +961,7 @@ extern "C" fn TEE_InitValueAttribute(attr: *mut TEE_Attribute, attributeID: u32,
     unsafe { *attr = *attribute.to_binding() };
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_CopyObjectAttributes1(
     destObject: TEE_ObjectHandle,
     srcObject: TEE_ObjectHandle,
@@ -953,12 +973,12 @@ extern "C" fn TEE_CopyObjectAttributes1(
     }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_CopyObjectAttributes(destObject: TEE_ObjectHandle, srcObject: TEE_ObjectHandle) {
     assert_eq!(TEE_CopyObjectAttributes1(destObject, srcObject), TEE_SUCCESS);
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_GenerateKey(
     object: TEE_ObjectHandle,
     keySize: u32,
@@ -972,7 +992,7 @@ extern "C" fn TEE_GenerateKey(
     }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_OpenPersistentObject(
     storageID: u32,
     objectID: *mut ::std::os::raw::c_void,
@@ -996,7 +1016,7 @@ extern "C" fn TEE_OpenPersistentObject(
     }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_CreatePersistentObject(
     storageID: u32,
     objectID: *mut ::std::os::raw::c_void,
@@ -1035,7 +1055,7 @@ extern "C" fn TEE_CreatePersistentObject(
     }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_CloseAndDeletePersistentObject1(object: TEE_ObjectHandle) -> TEE_Result {
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
@@ -1045,12 +1065,12 @@ extern "C" fn TEE_CloseAndDeletePersistentObject1(object: TEE_ObjectHandle) -> T
     }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_CloseAndDeletePersistentObject(object: TEE_ObjectHandle) {
     assert_eq!(TEE_CloseAndDeletePersistentObject1(object), TEE_SUCCESS);
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_RenamePersistentObject(
     object: TEE_ObjectHandle,
     newObjectID: *mut ::std::os::raw::c_void,
@@ -1065,7 +1085,7 @@ extern "C" fn TEE_RenamePersistentObject(
     }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_AllocatePersistentObjectEnumerator(
     objectEnumerator: *mut TEE_ObjectEnumHandle,
 ) -> TEE_Result {
@@ -1082,7 +1102,7 @@ extern "C" fn TEE_AllocatePersistentObjectEnumerator(
     }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_FreePersistentObjectEnumerator(objectEnumerator: TEE_ObjectEnumHandle) {
     let enumerator = *ObjectEnumHandle::from_binding(&objectEnumerator);
     context::with_current_mut(|context| {
@@ -1090,7 +1110,7 @@ extern "C" fn TEE_FreePersistentObjectEnumerator(objectEnumerator: TEE_ObjectEnu
     });
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_ResetPersistentObjectEnumerator(objectEnumerator: TEE_ObjectEnumHandle) {
     let enumerator = *ObjectEnumHandle::from_binding(&objectEnumerator);
     context::with_current_mut(|context| {
@@ -1098,7 +1118,7 @@ extern "C" fn TEE_ResetPersistentObjectEnumerator(objectEnumerator: TEE_ObjectEn
     });
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_StartPersistentObjectEnumerator(
     objectEnumerator: TEE_ObjectEnumHandle,
     storageID: u32,
@@ -1112,7 +1132,7 @@ extern "C" fn TEE_StartPersistentObjectEnumerator(
     }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_GetNextPersistentObject(
     objectEnumerator: TEE_ObjectEnumHandle,
     objectInfo: *mut TEE_ObjectInfo,
@@ -1141,7 +1161,7 @@ extern "C" fn TEE_GetNextPersistentObject(
     }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_ReadObjectData(
     object: TEE_ObjectHandle,
     buffer: *mut ::std::os::raw::c_void,
@@ -1162,7 +1182,7 @@ extern "C" fn TEE_ReadObjectData(
     }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_WriteObjectData(
     object: TEE_ObjectHandle,
     buffer: *mut ::std::os::raw::c_void,
@@ -1175,7 +1195,7 @@ extern "C" fn TEE_WriteObjectData(
     }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_TruncateObjectData(object: TEE_ObjectHandle, size: usize) -> TEE_Result {
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
@@ -1183,7 +1203,7 @@ extern "C" fn TEE_TruncateObjectData(object: TEE_ObjectHandle, size: usize) -> T
     }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_SeekObjectData(
     object: TEE_ObjectHandle,
     offset: std::os::raw::c_long,
@@ -1198,7 +1218,7 @@ extern "C" fn TEE_SeekObjectData(
     }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_AllocateOperation(
     operation: *mut TEE_OperationHandle,
     algorithm: u32,
@@ -1218,14 +1238,14 @@ extern "C" fn TEE_AllocateOperation(
     }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_FreeOperation(operation: TEE_OperationHandle) {
     context::with_current_mut(|context| {
         context.operations.free(*OperationHandle::from_binding(&operation))
     });
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_GetOperationInfo(
     operation: TEE_OperationHandle,
     operationInfo: *mut TEE_OperationInfo,
@@ -1233,7 +1253,7 @@ extern "C" fn TEE_GetOperationInfo(
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_GetOperationInfoMultiple(
     operation: TEE_OperationHandle,
     operationInfoMultiple: *mut TEE_OperationInfoMultiple,
@@ -1242,12 +1262,15 @@ extern "C" fn TEE_GetOperationInfoMultiple(
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_ResetOperation(operation: TEE_OperationHandle) {
-    unimplemented!()
+    context::with_current_mut(|context| {
+        let operation = *OperationHandle::from_binding(&operation);
+        context.operations.reset(operation)
+    })
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_SetOperationKey(
     operation: TEE_OperationHandle,
     key: TEE_ObjectHandle,
@@ -1266,7 +1289,7 @@ extern "C" fn TEE_SetOperationKey(
     }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_SetOperationKey2(
     operation: TEE_OperationHandle,
     key1: TEE_ObjectHandle,
@@ -1275,7 +1298,7 @@ extern "C" fn TEE_SetOperationKey2(
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_CopyOperation(
     dstOperation: TEE_OperationHandle,
     srcOperation: TEE_OperationHandle,
@@ -1283,50 +1306,98 @@ extern "C" fn TEE_CopyOperation(
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_IsAlgorithmSupported(algId: u32, element: u32) -> TEE_Result {
-    unimplemented!()
+    to_tee_result(|| -> TeeResult {
+        let alg = Algorithm::from_u32(algId).ok_or(Error::NotSupported)?;
+        let element = EccCurve::from_u32(algId).ok_or(Error::NotSupported)?;
+        if crypto::is_algorithm_supported(alg, element) {
+            Ok(())
+        } else {
+            Err(Error::NotSupported)
+        }
+    }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_DigestUpdate(
     operation: TEE_OperationHandle,
-    chunk: *mut ::std::os::raw::c_void,
+    chunk: *const ::std::os::raw::c_void,
     chunkSize: usize,
 ) {
-    unimplemented!()
+    let operation = *OperationHandle::from_binding(&operation);
+    let chunk = slice_from_raw_parts(chunk, chunkSize);
+    context::with_current_mut(|context| context.operations.update_digest(operation, chunk))
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_DigestDoFinal(
     operation: TEE_OperationHandle,
-    chunk: *mut ::std::os::raw::c_void,
+    chunk: *const ::std::os::raw::c_void,
     chunkLen: usize,
     hash: *mut ::std::os::raw::c_void,
     hashLen: *mut usize,
 ) -> TEE_Result {
-    unimplemented!()
+    to_tee_result(|| -> TeeResult {
+        assert!(!hashLen.is_null());
+
+        // SAFETY: hashLen checked as non-null above.
+        let initialHashLen = unsafe { *hashLen };
+
+        // This is a precondition to being to reinterpret `hash` as a mutable
+        // slice.
+        assert!(!buffers_overlap(chunk, chunkLen, hash, initialHashLen));
+
+        let operation = *OperationHandle::from_binding(&operation);
+        let chunk = slice_from_raw_parts(chunk, chunkLen);
+        let hash = slice_from_raw_parts_mut(hash, initialHashLen);
+        context::with_current_mut(|context| {
+            context.operations.update_and_finalize_digest_into(operation, chunk, hash).map_err(
+                |ErrorWithSize { error, size }| {
+                    debug_assert_eq!(error, Error::ShortBuffer);
+                    // SAFETY: hashLen checked as non-null above.
+                    unsafe { *hashLen = size };
+                    error
+                },
+            )
+        })
+    }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_DigestExtract(
     operation: TEE_OperationHandle,
     hash: *mut ::std::os::raw::c_void,
     hashLen: *mut usize,
 ) -> TEE_Result {
-    unimplemented!()
+    to_tee_result(|| -> TeeResult {
+        let operation = *OperationHandle::from_binding(&operation);
+        assert!(!hashLen.is_null());
+        // SAFETY: hashLen checked as non-null above.
+        let hash = slice_from_raw_parts_mut(hash, unsafe { *hashLen });
+        context::with_current_mut(|context| {
+            let written = context.operations.extract_digest(operation, hash);
+            // SAFETY: hashLen checked as non-null above.
+            unsafe {
+                *hashLen -= written;
+            }
+        });
+        Ok(())
+    }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_CipherInit(
     operation: TEE_OperationHandle,
     IV: *mut ::std::os::raw::c_void,
     IVLen: usize,
 ) {
-    unimplemented!()
+    let operation = *OperationHandle::from_binding(&operation);
+    let iv = slice_from_raw_parts(IV, IVLen);
+    context::with_current_mut(|context| context.operations.init_cipher(operation, iv));
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_CipherUpdate(
     operation: TEE_OperationHandle,
     srcData: *mut ::std::os::raw::c_void,
@@ -1334,10 +1405,36 @@ extern "C" fn TEE_CipherUpdate(
     destData: *mut ::std::os::raw::c_void,
     destLen: *mut usize,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(!destLen.is_null());
+
+    to_tee_result(|| -> TeeResult {
+        let operation = *OperationHandle::from_binding(&operation);
+
+        // SAFETY: `destLen` checked as non-null above.
+        let initialDestLen = unsafe { *destLen };
+
+        context::with_current_mut(|context| {
+            let dest = slice_from_raw_parts_mut(destData, initialDestLen);
+
+            if buffers_overlap(srcData, srcLen, destData, initialDestLen) {
+                assert_eq!(srcData, destData);
+                context.operations.update_cipher_in_place(operation, dest);
+                return Ok(());
+            }
+            let src = slice_from_raw_parts(srcData, srcLen);
+            context.operations.update_cipher(operation, src, dest).map_err(
+                |ErrorWithSize { error, size }| {
+                    debug_assert_eq!(error, Error::ShortBuffer);
+                    // SAFETY: destLen checked as non-null above.
+                    unsafe { *destLen = size };
+                    error
+                },
+            )
+        })
+    }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_CipherDoFinal(
     operation: TEE_OperationHandle,
     srcData: *mut ::std::os::raw::c_void,
@@ -1345,28 +1442,58 @@ extern "C" fn TEE_CipherDoFinal(
     destData: *mut ::std::os::raw::c_void,
     destLen: *mut usize,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(!destLen.is_null());
+
+    to_tee_result(|| -> TeeResult {
+        let operation = *OperationHandle::from_binding(&operation);
+
+        // SAFETY: `destLen` checked as non-null above.
+        let initialDestLen = unsafe { *destLen };
+
+        context::with_current_mut(|context| {
+            let dest = slice_from_raw_parts_mut(destData, initialDestLen);
+
+            if buffers_overlap(srcData, srcLen, destData, initialDestLen) {
+                assert_eq!(srcData, destData);
+                context.operations.finalize_cipher_in_place(operation, dest);
+                return Ok(());
+            }
+            let src = slice_from_raw_parts(srcData, srcLen);
+            context.operations.finalize_cipher(operation, src, dest).map_err(
+                |ErrorWithSize { error, size }| {
+                    debug_assert_eq!(error, Error::ShortBuffer);
+                    // SAFETY: destLen checked as non-null above.
+                    unsafe { *destLen = size };
+                    error
+                },
+            )
+        })
+    }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_MACInit(
     operation: TEE_OperationHandle,
     IV: *mut ::std::os::raw::c_void,
     IVLen: usize,
 ) {
-    unimplemented!()
+    let operation = *OperationHandle::from_binding(&operation);
+    let iv = slice_from_raw_parts(IV, IVLen);
+    context::with_current_mut(|context| context.operations.init_mac(operation, iv));
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_MACUpdate(
     operation: TEE_OperationHandle,
     chunk: *mut ::std::os::raw::c_void,
     chunkSize: usize,
 ) {
-    unimplemented!()
+    let operation = *OperationHandle::from_binding(&operation);
+    let chunk = slice_from_raw_parts(chunk, chunkSize);
+    context::with_current_mut(|context| context.operations.update_mac(operation, chunk));
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_MACComputeFinal(
     operation: TEE_OperationHandle,
     message: *mut ::std::os::raw::c_void,
@@ -1374,10 +1501,34 @@ extern "C" fn TEE_MACComputeFinal(
     mac: *mut ::std::os::raw::c_void,
     macLen: *mut usize,
 ) -> TEE_Result {
-    unimplemented!()
+    to_tee_result(|| -> TeeResult {
+        assert!(!macLen.is_null());
+
+        // SAFETY: macLen checked as non-null above.
+        let initialMacLen = unsafe { *macLen };
+
+        // This is a precondition to being able to reinterpret `mac` as a
+        // mutable slice.
+        assert!(!buffers_overlap(message, messageLen, mac, initialMacLen));
+
+        let operation = *OperationHandle::from_binding(&operation);
+        let message = slice_from_raw_parts(message, messageLen);
+        let mac = slice_from_raw_parts_mut(mac, initialMacLen);
+
+        context::with_current_mut(|context| {
+            context.operations.compute_final_mac(operation, message, mac).map_err(
+                |ErrorWithSize { error, size }| {
+                    debug_assert_eq!(error, Error::ShortBuffer);
+                    // SAFETY: macLen checked as non-null above.
+                    unsafe { *macLen = size };
+                    error
+                },
+            )
+        })
+    }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_MACCompareFinal(
     operation: TEE_OperationHandle,
     message: *mut ::std::os::raw::c_void,
@@ -1388,7 +1539,7 @@ extern "C" fn TEE_MACCompareFinal(
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_AEInit(
     operation: TEE_OperationHandle,
     nonce: *mut ::std::os::raw::c_void,
@@ -1400,7 +1551,7 @@ extern "C" fn TEE_AEInit(
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_AEUpdateAAD(
     operation: TEE_OperationHandle,
     AADdata: *mut ::std::os::raw::c_void,
@@ -1409,7 +1560,7 @@ extern "C" fn TEE_AEUpdateAAD(
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_AEUpdate(
     operation: TEE_OperationHandle,
     srcData: *mut ::std::os::raw::c_void,
@@ -1420,7 +1571,7 @@ extern "C" fn TEE_AEUpdate(
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_AEEncryptFinal(
     operation: TEE_OperationHandle,
     srcData: *mut ::std::os::raw::c_void,
@@ -1433,7 +1584,7 @@ extern "C" fn TEE_AEEncryptFinal(
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_AEDecryptFinal(
     operation: TEE_OperationHandle,
     srcData: *mut ::std::os::raw::c_void,
@@ -1446,7 +1597,7 @@ extern "C" fn TEE_AEDecryptFinal(
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_AsymmetricEncrypt(
     operation: TEE_OperationHandle,
     params: *mut TEE_Attribute,
@@ -1459,7 +1610,7 @@ extern "C" fn TEE_AsymmetricEncrypt(
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_AsymmetricDecrypt(
     operation: TEE_OperationHandle,
     params: *mut TEE_Attribute,
@@ -1469,10 +1620,38 @@ extern "C" fn TEE_AsymmetricDecrypt(
     destData: *mut ::std::os::raw::c_void,
     destLen: *mut usize,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(!destLen.is_null());
+
+    to_tee_result(|| -> TeeResult {
+        // SAFETY: destLen checked as non-null above.
+        let initialDestLen = unsafe { *destLen };
+
+        // This is a precondition to being able to reinterpret `destData` as a
+        // mutable slice.
+        assert!(!buffers_overlap(srcData, srcLen, destData, initialDestLen));
+
+        let params = slice_from_raw_parts(params, paramCount as usize);
+        let src = slice_from_raw_parts(srcData, srcLen);
+        let dest = slice_from_raw_parts_mut(destData, initialDestLen);
+        let operation = *OperationHandle::from_binding(&operation);
+
+        context::with_current_mut(|context| {
+            let (output_size, result) =
+                match context.operations.asymmetric_decrypt(operation, params, src, dest) {
+                    Ok(written) => {
+                        debug_assert!(written <= dest.len());
+                        (written, Ok(()))
+                    }
+                    Err(err) => (err.size, Err(err.error)),
+                };
+            // SAFETY: destLen checked as non-null above.
+            unsafe { *destLen = output_size };
+            result
+        })
+    }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_AsymmetricSignDigest(
     operation: TEE_OperationHandle,
     params: *mut TEE_Attribute,
@@ -1482,10 +1661,40 @@ extern "C" fn TEE_AsymmetricSignDigest(
     signature: *mut ::std::os::raw::c_void,
     signatureLen: *mut usize,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(!signatureLen.is_null());
+
+    to_tee_result(|| -> TeeResult {
+        // SAFETY: signatureLen checked as non-null above.
+        let initialSignatureLen = unsafe { *signatureLen };
+
+        // This is a precondition to being anble to reinterpret `signature` as
+        // a mutable slice.
+        assert!(!buffers_overlap(digest, digestLen, signature, initialSignatureLen));
+
+        let params = slice_from_raw_parts(params, paramCount as usize);
+        let digest = slice_from_raw_parts(digest, digestLen);
+        let signature = slice_from_raw_parts_mut(signature, initialSignatureLen);
+        let operation = *OperationHandle::from_binding(&operation);
+
+        context::with_current_mut(|context| {
+            let (output_size, result) = match context
+                .operations
+                .asymmetric_sign_digest(operation, params, digest, signature)
+            {
+                Ok(written) => {
+                    debug_assert!(written <= signature.len());
+                    (written, Ok(()))
+                }
+                Err(err) => (err.size, Err(err.error)),
+            };
+            // SAFETY: signatureLen checked as non-null above.
+            unsafe { *signatureLen = output_size };
+            result
+        })
+    }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_AsymmetricVerifyDigest(
     operation: TEE_OperationHandle,
     params: *mut TEE_Attribute,
@@ -1498,7 +1707,7 @@ extern "C" fn TEE_AsymmetricVerifyDigest(
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_DeriveKey(
     operation: TEE_OperationHandle,
     params: *mut TEE_Attribute,
@@ -1508,7 +1717,7 @@ extern "C" fn TEE_DeriveKey(
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_GenerateRandom(
     randomBuffer: *mut ::std::os::raw::c_void,
     randomBufferLen: usize,
@@ -1517,7 +1726,7 @@ extern "C" fn TEE_GenerateRandom(
     zx::cprng_draw(dest_slice);
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_GetSystemTime(time: *mut TEE_Time) {
     assert!(!time.is_null());
     let now = time::get_system_time();
@@ -1526,12 +1735,12 @@ extern "C" fn TEE_GetSystemTime(time: *mut TEE_Time) {
     unsafe { *time = now };
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_Wait(timeout: u32) -> TEE_Result {
     to_tee_result(time::wait(timeout))
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_GetTAPersistentTime(time: *mut TEE_Time) -> TEE_Result {
     assert!(!time.is_null());
     to_tee_result(|| -> TeeResult {
@@ -1543,7 +1752,7 @@ extern "C" fn TEE_GetTAPersistentTime(time: *mut TEE_Time) -> TEE_Result {
     }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_SetTAPersistentTime(time: *mut TEE_Time) -> TEE_Result {
     assert!(!time.is_null());
     to_tee_result(|| -> TeeResult {
@@ -1554,7 +1763,7 @@ extern "C" fn TEE_SetTAPersistentTime(time: *mut TEE_Time) -> TEE_Result {
     }())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_GetREETime(time: *mut TEE_Time) {
     assert!(!time.is_null());
     let now = time::get_ree_time();
@@ -1563,22 +1772,22 @@ extern "C" fn TEE_GetREETime(time: *mut TEE_Time) {
     unsafe { *time = now };
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntFMMContextSizeInU32(modulusSizeInBits: usize) -> usize {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntFMMSizeInU32(modulusSizeInBits: usize) -> usize {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntInit(bigInt: *mut TEE_BigInt, len: usize) {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntInitFMMContext1(
     context: *mut TEE_BigIntFMMContext,
     len: usize,
@@ -1587,7 +1796,7 @@ extern "C" fn TEE_BigIntInitFMMContext1(
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntInitFMMContext(
     context: *mut TEE_BigIntFMMContext,
     len: usize,
@@ -1596,12 +1805,12 @@ extern "C" fn TEE_BigIntInitFMMContext(
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntInitFMM(bigIntFMM: *mut TEE_BigIntFMM, len: usize) {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntConvertFromOctetString(
     dest: *mut TEE_BigInt,
     buffer: *mut u8,
@@ -1611,7 +1820,7 @@ extern "C" fn TEE_BigIntConvertFromOctetString(
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntConvertToOctetString(
     buffer: *mut ::std::os::raw::c_void,
     bufferLen: *mut usize,
@@ -1620,82 +1829,82 @@ extern "C" fn TEE_BigIntConvertToOctetString(
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntConvertFromS32(dest: *mut TEE_BigInt, shortVal: i32) {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntConvertToS32(dest: *mut i32, src: *mut TEE_BigInt) -> TEE_Result {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntCmp(op1: *mut TEE_BigInt, op2: *mut TEE_BigInt) -> i32 {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntCmpS32(op: *mut TEE_BigInt, shortVal: i32) -> i32 {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntShiftRight(dest: *mut TEE_BigInt, op: *mut TEE_BigInt, bits: usize) {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntGetBit(src: *mut TEE_BigInt, bitIndex: u32) -> bool {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntGetBitCount(src: *mut TEE_BigInt) -> u32 {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntSetBit(op: *mut TEE_BigInt, bitIndex: u32, value: bool) -> TEE_Result {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntAssign(dest: *mut TEE_BigInt, src: *mut TEE_BigInt) -> TEE_Result {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntAbs(dest: *mut TEE_BigInt, src: *mut TEE_BigInt) -> TEE_Result {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntAdd(dest: *mut TEE_BigInt, op1: *mut TEE_BigInt, op2: *mut TEE_BigInt) {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntSub(dest: *mut TEE_BigInt, op1: *mut TEE_BigInt, op2: *mut TEE_BigInt) {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntNeg(dest: *mut TEE_BigInt, op: *mut TEE_BigInt) {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntMul(dest: *mut TEE_BigInt, op1: *mut TEE_BigInt, op2: *mut TEE_BigInt) {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntSquare(dest: *mut TEE_BigInt, op: *mut TEE_BigInt) {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntDiv(
     dest_q: *mut TEE_BigInt,
     dest_r: *mut TEE_BigInt,
@@ -1705,12 +1914,12 @@ extern "C" fn TEE_BigIntDiv(
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntMod(dest: *mut TEE_BigInt, op: *mut TEE_BigInt, n: *mut TEE_BigInt) {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntAddMod(
     dest: *mut TEE_BigInt,
     op1: *mut TEE_BigInt,
@@ -1720,7 +1929,7 @@ extern "C" fn TEE_BigIntAddMod(
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntSubMod(
     dest: *mut TEE_BigInt,
     op1: *mut TEE_BigInt,
@@ -1730,7 +1939,7 @@ extern "C" fn TEE_BigIntSubMod(
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntMulMod(
     dest: *mut TEE_BigInt,
     op1: *mut TEE_BigInt,
@@ -1740,17 +1949,17 @@ extern "C" fn TEE_BigIntMulMod(
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntSquareMod(dest: *mut TEE_BigInt, op: *mut TEE_BigInt, n: *mut TEE_BigInt) {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntInvMod(dest: *mut TEE_BigInt, op: *mut TEE_BigInt, n: *mut TEE_BigInt) {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntExpMod(
     dest: *mut TEE_BigInt,
     op1: *mut TEE_BigInt,
@@ -1761,12 +1970,12 @@ extern "C" fn TEE_BigIntExpMod(
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntRelativePrime(op1: *mut TEE_BigInt, op2: *mut TEE_BigInt) -> bool {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntComputeExtendedGcd(
     gcd: *mut TEE_BigInt,
     u: *mut TEE_BigInt,
@@ -1777,12 +1986,12 @@ extern "C" fn TEE_BigIntComputeExtendedGcd(
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntIsProbablePrime(op: *mut TEE_BigInt, confidenceLevel: u32) -> i32 {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntConvertToFMM(
     dest: *mut TEE_BigIntFMM,
     src: *mut TEE_BigInt,
@@ -1792,7 +2001,7 @@ extern "C" fn TEE_BigIntConvertToFMM(
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntConvertFromFMM(
     dest: *mut TEE_BigInt,
     src: *mut TEE_BigIntFMM,
@@ -1802,7 +2011,7 @@ extern "C" fn TEE_BigIntConvertFromFMM(
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn TEE_BigIntComputeFMM(
     dest: *mut TEE_BigIntFMM,
     op1: *mut TEE_BigIntFMM,

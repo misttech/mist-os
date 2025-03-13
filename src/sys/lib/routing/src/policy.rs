@@ -271,7 +271,7 @@ impl GlobalPolicyChecker {
             .reboot_on_terminate
             .iter()
             .any(|entry| entry.matches(&target_moniker))
-            .then(|| ())
+            .then_some(())
             .ok_or_else(|| PolicyError::ChildPolicyDisallowed {
                 policy: "reboot_on_terminate".to_owned(),
                 moniker: target_moniker.to_owned(),
@@ -304,7 +304,7 @@ impl ScopedPolicyChecker {
             .ambient_mark_vmo_exec
             .iter()
             .any(|entry| entry.matches(&self.scope))
-            .then(|| ())
+            .then_some(())
             .ok_or_else(|| PolicyError::JobPolicyDisallowed {
                 policy: "ambient_mark_vmo_exec".to_owned(),
                 moniker: self.scope.to_owned(),
@@ -317,7 +317,7 @@ impl ScopedPolicyChecker {
             .main_process_critical
             .iter()
             .any(|entry| entry.matches(&self.scope))
-            .then(|| ())
+            .then_some(())
             .ok_or_else(|| PolicyError::JobPolicyDisallowed {
                 policy: "main_process_critical".to_owned(),
                 moniker: self.scope.to_owned(),
@@ -330,7 +330,7 @@ impl ScopedPolicyChecker {
             .create_raw_processes
             .iter()
             .any(|entry| entry.matches(&self.scope))
-            .then(|| ())
+            .then_some(())
             .ok_or_else(|| PolicyError::JobPolicyDisallowed {
                 policy: "create_raw_processes".to_owned(),
                 moniker: self.scope.to_owned(),

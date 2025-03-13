@@ -680,7 +680,7 @@ void Session::DispatchNotifyException(const debug_ipc::NotifyException& notify, 
     thread->process()->SyncThreads([weak_this, notify, settings, thread]() {
       if (weak_this && thread) {
         thread->GetStack().SyncFrames(
-            true, [weak_this, notify, settings, thread](const Err& err) mutable {
+            {.force_update = true}, [weak_this, notify, settings, thread](const Err& err) mutable {
               if (weak_this && thread) {
                 // Make sure we don't set the thread's stack to that from the exception
                 // notification, which will not contain the same amount of information that we just

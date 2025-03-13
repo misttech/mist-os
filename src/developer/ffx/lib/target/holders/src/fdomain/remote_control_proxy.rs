@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::init_daemon_behavior;
+use crate::init_connection_behavior;
 use async_trait::async_trait;
 use errors::FfxError;
 use fdomain_client::fidl::{
     DiscoverableProtocolMarker as FDiscoverableProtocolMarker, Proxy as FProxy,
 };
 use fdomain_fuchsia_developer_remotecontrol::RemoteControlProxy;
-use ffx_command_error::{Error, FfxContext as _, Result};
+use ffx_command_error::{FfxContext as _, Result};
 use fho::{bug, FhoConnectionBehavior, FhoEnvironment, TryFromEnv};
 use std::ops::Deref;
 use std::sync::Arc;
@@ -38,7 +38,7 @@ impl TryFromEnv for RemoteControlProxyHolder {
         let behavior = if let Some(behavior) = env.behavior().await {
             behavior
         } else {
-            let b = init_daemon_behavior(env.environment_context()).await?;
+            let b = init_connection_behavior(env.environment_context()).await?;
             env.set_behavior(b.clone()).await;
             b
         };
@@ -81,21 +81,17 @@ where
     P: FProxy + 'static,
     P::Protocol: FDiscoverableProtocolMarker,
 {
-    let (proxy, server_end) =
-        rcs.client().map_err(|e| Error::Unexpected(e.into()))?.create_proxy::<P::Protocol>();
     rcs_fdomain::open_with_timeout::<P::Protocol>(
         timeout,
         moniker,
         capability_set,
         rcs,
-        server_end.into_channel(),
     )
     .await
     .with_user_message(|| {
         let protocol_name = P::Protocol::PROTOCOL_NAME;
         format!("Failed to connect to protocol '{protocol_name}' at moniker '{moniker}' within {} seconds", timeout.as_secs_f64())
-    })?;
-    Ok(proxy)
+    })
 }
 
 /// Sets up a fake FDomain proxy of type `T` handing requests to the given
@@ -103,7 +99,7 @@ where
 ///
 /// This is basically the same thing as `ffx_plugin` used to generate for
 /// each proxy argument, but uses a generic instead of text replacement.
-pub async fn fake_proxy_f<T: fdomain_client::fidl::Proxy>(
+pub async fn fake_proxy<T: fdomain_client::fidl::Proxy>(
     client: Arc<fdomain_client::Client>,
     mut handle_request: impl FnMut(fdomain_client::fidl::Request<T::Protocol>) + 'static,
 ) -> T {

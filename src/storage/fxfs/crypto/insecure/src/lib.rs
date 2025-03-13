@@ -5,13 +5,13 @@
 use aes_gcm_siv::aead::Aead;
 use aes_gcm_siv::{Aes256GcmSiv, Key, KeyInit as _, Nonce};
 use async_trait::async_trait;
+use fuchsia_sync::Mutex;
 use fxfs_crypto::{Crypt, KeyPurpose, UnwrappedKey, WrappedKey, WrappedKeyBytes};
 use log::error;
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
 use rustc_hash::FxHashMap as HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Mutex;
 use zx_status as zx;
 
 pub const DATA_KEY: [u8; 32] = [
@@ -52,14 +52,11 @@ impl InsecureCrypt {
     }
 
     pub fn add_wrapping_key(&self, id: u128, key: [u8; 32]) {
-        self.ciphers
-            .lock()
-            .unwrap()
-            .insert(id, Aes256GcmSiv::new(Key::<Aes256GcmSiv>::from_slice(&key)));
+        self.ciphers.lock().insert(id, Aes256GcmSiv::new(Key::<Aes256GcmSiv>::from_slice(&key)));
     }
 
     pub fn remove_wrapping_key(&self, id: u128) {
-        let _key = self.ciphers.lock().unwrap().remove(&id);
+        let _key = self.ciphers.lock().remove(&id);
     }
 }
 
@@ -79,7 +76,7 @@ impl Crypt for InsecureCrypt {
             KeyPurpose::Metadata => self.active_metadata_key.as_ref(),
         }
         .ok_or(zx::Status::INVALID_ARGS)?;
-        let ciphers = self.ciphers.lock().unwrap();
+        let ciphers = self.ciphers.lock();
         let cipher = ciphers.get(wrapping_key_id).ok_or(zx::Status::NOT_FOUND)?;
         let mut nonce = Nonce::default();
         nonce.as_mut_slice()[..8].copy_from_slice(&owner.to_le_bytes());
@@ -104,7 +101,7 @@ impl Crypt for InsecureCrypt {
             error!("Crypt was shut down");
             return Err(zx::Status::INTERNAL);
         }
-        let ciphers = self.ciphers.lock().unwrap();
+        let ciphers = self.ciphers.lock();
         let cipher = ciphers.get(&(wrapping_key_id as u128)).ok_or(zx::Status::NOT_FOUND)?;
         let mut nonce = Nonce::default();
         nonce.as_mut_slice()[..8].copy_from_slice(&owner.to_le_bytes());
@@ -131,7 +128,7 @@ impl Crypt for InsecureCrypt {
             error!("Crypt was shut down");
             return Err(zx::Status::INTERNAL);
         }
-        let ciphers = self.ciphers.lock().unwrap();
+        let ciphers = self.ciphers.lock();
         let cipher = ciphers.get(&wrapped_key.wrapping_key_id).ok_or(zx::Status::NOT_FOUND)?;
         let mut nonce = Nonce::default();
         nonce.as_mut_slice()[..8].copy_from_slice(&owner.to_le_bytes());

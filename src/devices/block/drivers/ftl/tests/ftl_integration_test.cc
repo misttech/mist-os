@@ -34,9 +34,10 @@ TEST(FtlTest, IoCheck) {
 
 void ConnectToConfiguration(fidl::WireSyncClient<fsftl::Configuration>* out_client) {
   auto [service_client, service_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-  ASSERT_EQ(fdio_service_connect("/driver_exposed/fuchsia.storage.ftl.Service",
-                                 service_server.channel().release()),
-            ZX_OK);
+  ASSERT_EQ(
+      fdio_open3("/driver_exposed/fuchsia.storage.ftl.Service",
+                 uint64_t{fuchsia_io::wire::kPermReadable}, service_server.channel().release()),
+      ZX_OK);
 
   // The service will be a random instance name string, find it in the listing. This would be racy
   // if the test environment didn't begin by waiting for the block device to be available, which
@@ -55,11 +56,12 @@ void ConnectToConfiguration(fidl::WireSyncClient<fsftl::Configuration>* out_clie
     name[dirent.name_length] = '\0';
   }
 
-  // Connect to the child randomly named instance.
+  // Open the randomly named child instance.
   auto [instance_client, instance_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-  ASSERT_EQ(fdio_service_connect_at(service_client.channel().get(), name,
-                                    instance_server.channel().release()),
-            ZX_OK);
+  ASSERT_EQ(
+      fdio_open3_at(service_client.channel().get(), name, uint64_t{fuchsia_io::wire::kPermReadable},
+                    instance_server.channel().release()),
+      ZX_OK);
 
   // Connect to the Configuration protocol inside the service.
   auto [config_client, config_server] = fidl::Endpoints<fsftl::Configuration>::Create();

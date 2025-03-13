@@ -14,21 +14,33 @@ If you use `bash` or `zsh` as a shell, it is strongly recommended to run
 This setup is tested and regularly used with `bash` and `zsh`, and
 it may also work for other compatible shells.
 
-```none {:.devsite-disable-click-to-copy}
-# In your fuchsia checkout:
-$ cd fuchsia
-# Add a configuration to your shell to include fx-env.sh
-$ echo "source \"$PWD/scripts/fx-env.sh\"" >> "$HOME/.$(basename "$SHELL")rc"
-# If you would like additional convenience tools from the Fuchsia scripts, also
-# optionally run the following:
-$ echo "fx-update-path" >> "$HOME/.$(basename "$SHELL")rc"
-# Restart your shell
-$ exec "$SHELL"
-```
+1. Navigate to your Fuchsia checkout, for example:
 
-The above method provides the most well defined feature set, and should be
-generally non-invasive. If it causes bugs in your shell environment, please
-file project bugs.
+   ```posix-terminal
+   cd ~/Fuchsia
+   ```
+1. Add a configuration to your shell to include `fx-env.sh`:
+
+   ```posix-terminal
+   echo "source \"$PWD/scripts/fx-env.sh\"" >> "$HOME/.$(basename "$SHELL")rc"
+   ```
+
+1. (Optional) If you would like additional convenience tools from the Fuchsia
+   scripts, run:
+
+   ```posix-terminal
+   echo "fx-update-path" >> "$HOME/.$(basename "$SHELL")rc"
+   ```
+
+1. Restart your shell:
+
+   ```posix-terminal
+   exec "$SHELL"
+   ```
+
+These steps provides the most well defined feature set, and should be generally
+non-invasive. If it causes bugs in your shell environment, please file project
+bugs.
 
 If for some reason you need to work with multiple Fuchsia checkouts
 (recommended workflows below should obviate such a need), then you may want
@@ -55,7 +67,7 @@ with this:
 
 * `fx set` [configure a build](#configure-a-build)
 * `fx build` [execute a build](#execute-a-build)
-* `fx flash ; fx mkzedboot` [flash a target; or prepare a zedboot USB key](#flash-a-board-and-prepare-zedboot)
+* `fx mkzedboot` [Prepare a Zedboot USB drive](#prepare-zedboot)
 * `fx serve` [serve a build](#serve-a-build)
 * `fx publish cache` [iterate on cache packages](#iterate-cache-packages)
 * `fx ota` [update a target](#update-a-target-device)
@@ -104,8 +116,7 @@ graph.
   will most likely need to give `fx set` the specific board, when building to an
   `arm64` architecture. Run `fx list-boards` for a list of known board
   configurations.)
-* You are ephemerally building `tests` as part of the `universe` package set,
-  not as a part of the [paving](#what-is-paving) images.
+* You are ephemerally building `tests` as part of the `universe` package set.
 
 ### Package deployment options
 
@@ -122,21 +133,19 @@ repositories). The build is parameterized to determine which dependencies
 (mostly packages) are added to which output artifacts (images or package
 repositories). The three axes are called "base", "cache", and "universe":
 
-* *Base*: Packages that are added to base are included in
-  [paving](#what-is-paving) images produced by the build. They are included in
-  over-the-air updates, and are always updated as a single unit. Packages in
-  base can not be evicted from a device at runtime - they encode the
-  minimum possible size of a configuration.
-* *Cache*: Packages in cache are included in
-  [paving](#what-is-paving) images, but they are not included in over-the-air
-  system updates, and are allowed to be evicted from the system in response to
-  resource demands, such as disk-space pressure. Packages in cache can be
-  updated at any time that updates are available, and each of these packages
-  may be updated independently. This is software that is "optional", but is
-  good to have available instantly "out of the box".
+* *Base*: Packages that are added to base are included in system images
+  produced by the build. They are included in over-the-air updates, and are
+  always updated as a single unit. Packages in base can not be evicted from a
+  device at runtime - they encode the minimum possible size of a
+  configuration.
+* *Cache*: Packages in cache are included in system images, but they are not
+  included in over-the-air system updates, and are allowed to be evicted from
+  the system in response to resource demands, such as disk-space pressure.
+  Packages in cache can be updated at any time that updates are available, and
+  each of these packages may be updated independently. This is software that
+  is "optional", but is good to have available instantly "out of the box".
 * *Universe*: Packages in universe are additional optional packages that can be
-  fetched and run on-demand, but are not pre-baked into any
-  [paving](#what-is-paving) images.
+  fetched and run on-demand, but are not pre-baked into any system images.
 
 The "board" and "product" configurations pick a predefined set of members for
 each of these package sets. Most commonly the board configurations specify a
@@ -159,11 +168,11 @@ important configurations to be familiar with:
 * `bringup` is a minimal feature set product that is focused on being very
   simple and very lean. It exists to provide fast builds and small images
   (primarily used in a [netboot](#what-is-netbooting) rather than
-  [paved](#what-is-paving) fashion), and is great for working on very
-  low-level facilities, such as the Zircon kernel or board-specific drivers
-  and configurations. It lacks most network capabilities, and therefore is
-  not able to add new software at runtime or upgrade itself. This also means
-  some `fx` commands such as <code>[fx serve](#serve-a-build)</code> and
+  fashion), and is great for working on very low-level facilities, such as
+  the Zircon kernel or board-specific drivers and configurations. It lacks
+  most network capabilities, and therefore is not able to add new software
+  at runtime or upgrade itself. This also means some `fx` commands such as
+  <code>[fx serve](#serve-a-build)</code> and
   <code>[fx shell](#connect-to-a-target-shell)</code> cannot be used with
   the `bringup` product.
 * `core` is a minimal feature set that can install additional software (such as
@@ -177,7 +186,7 @@ important configurations to be familiar with:
 ### Key additional build targets {#key-bundles}
 
 The `--with` flag for `fx set` takes in arbitrary
-[build targets](/docs/development/build/build_system/fuchsia_build_system_overview.md#build_targets).
+[build targets](/docs/development/build/build_system/fuchsia_build_system_overview.md#build-targets).
 For convenience, a number of bundles are defined, which include a variety of
 commonly used build targets. It is important to be familiarized with the
 following bundles:
@@ -217,6 +226,7 @@ problem and any diagnostics such as build logs. Then use these commands to recov
 
 * `fx clean` will clear out all build artifacts.
 * `fx clean-build` is equivalent to `fx clean`, then `fx build`.
+* `fx cleandead-build` is equivalent to `fx cleandead`, then `fx build`
 
 If you find yourself changing configurations and cleaning your output directory
 often then consider using `fx set --auto-dir` instead. In this mode, `fx set` will
@@ -234,18 +244,13 @@ all ephemeral (universe) packages.
 You can enable incremental rebuilds by adding `export FUCHSIA_DISABLED_incremental=0`
 to your `~/.bashrc` or equivalent. This change results in the following:
 
-* `pm` (and by consequence `fx serve`) watches for packages before they are
-  created. When a package is created or modified, `pm` auto-publishes that package,
-  so you can keep `fx serve` running from an empty tree and it will publish
-  incrementally as you go.
+* (`fx serve`)[fx-serve-ref] watches for packages that are created or modified
+  in your Fuchsia build and automatically publishes them. This allows you to
+  keep `fx serve` running from an empty tree and it will publish changes
+  incrementally as you work.
 
 * `fx test` only builds the minimal targets required for running. For component tests,
   that's the package, its GN dependencies and `//zircon`.
-
-* `fx serve` does not pave or flash.
-
-* `fx pave` by default exits after paving a single time. Use `--keep-running` to
-  override.
 
 Note that the behavior of `fx build` remains unchanged.
 
@@ -343,16 +348,11 @@ fx create-pb-zip -o <path-to-pb-zip>
 This command creates a zip file containing the product bundle in the
 path you specified.
 
-## Flash a board and prepare Zedboot {#flash-a-board-and-prepare-zedboot}
+## Prepare a Zedboot USB drive {#prepare-zedboot}
 
-The exact preparation required to put Fuchsia onto a target device varies by
-specific device, but there are two general groups in common use today, made
-convenient behind `fx` commands:
-
-* `fx flash` is used with most `arm64` devices to perform a raw write of
-  Zedboot to the device, preparing it for [Paving](#what-is-paving).
-* `fx mkzedboot` is used with most `x64` devices to prepare a bootable USB key
-  that boots into Zedboot, preparing the device for [Paving](#what-is-paving).
+The exact preparation required to flash Fuchsia onto a target device varies by
+specific device, but you can use `fx mkzedboot` prepare a bootable USB driven
+for `x64` devices that boots into Zedboot.
 
 ### What is Zedboot? {#what-is-zedboot}
 
@@ -374,21 +374,6 @@ system, execute `fx list-usb-disks`). Remove the USB key after completion,
 insert it to the target device, and reboot the target device, selecting "Boot
 from USB" from the boot options, or in the device BIOS.
 
-### What is Paving? {#what-is-paving}
-
-Paving is in many ways similar to "flashing" from other worlds, however, it
-has some differences. Specifically, paving refers to a group of processes and
-protocols in Fuchsia to transfer a set of artifacts to a target system that
-will be written into various partitions on a target system. By contrast, the
-process of "flashing" is more of a raw process of writing a raw data stream
-to a raw disk device, and not strictly partition-oriented.
-
-Users can start a paving process by first flashing Zedboot using `fx flash`,
-or by booting a Zedboot USB key made by `fx mkzedboot`, then executing `fx pave`
-on the host system. In general most users actually will want to use `fx serve`
-instead of `fx pave`. `fx serve` is covered in the [serve a build](#serve-a-build)
-section.
-
 ### What is Netbooting? {#what-is-netbooting}
 
 In Fuchsia, "netboot" refers to sending a set of artifacts to a Zedboot
@@ -409,21 +394,19 @@ configurations, a user can optionally build the netboot artifacts using
 
 A lot of build configurations for Fuchsia include software that is not
 immediately included in the base images that a build produces, that are
-written to devices during paving. Such software is instead made available to
+written to devices during flashing. Such software is instead made available to
 target devices on-demand, which is often colloquially referred to as
 "ephemeral software".
 
 The command `fx serve` performs two functions internally:
 
-* `fx pave` start a paving server, used for "fresh installs" of a Fuchsia
-  device from a Zedboot state.
-* `fx serve` start a package repository server, used for dynamic
+* Start a package repository server, used for dynamic
   installation of software at runtime, as well as whole-system updates.
 
-Internally the `fx serve` command also searches for a device to configure, and
-upon discovery (which may be restricted/modulated with `fx set-device` or `fx
--d`) the target device is configured to use the repository server as a source of
-dynamic packages and system updates.
+Internally the [`fx serve`][fx-serve-ref] command also searches for a device to
+configure, and upon discovery (which may be restricted/modulated with
+`fx set-device` or `fx -d`) the target device is configured to use the
+repository server as a source of dynamic packages and system updates.
 
 ## Update a target device {#update-a-target-device}
 
@@ -441,7 +424,7 @@ updating a target device is `fx ota`. The `fx ota` command first
 updates "base" and "cache" software, and then reboots the target device
 when it is complete. The end result of this process should be
 indistinguishable in terms of software versions from performing a fresh
-pave of a device.
+flash of a device.
 
 As the `fx ota` process causes a device reboot, it is sometimes not the
 most efficient process for diagnosis, debugging or other non-testing based
@@ -595,29 +578,8 @@ On some devices (most arm64 devices at present) there are also some useful flags
 
 ### Determine a CL's status {#determine-a-cls-status}
 
-`fx whereiscl <query>`
-
-This command tells whether the given change is merged, and if so whether it passed
-Global Integration. The query can be either a Gerrit review URL, a change number, a
-`Change-Id`, or a git revision.
-
-```none {:.devsite-disable-click-to-copy}
-$ fx whereiscl fxr/286748
-CL status: MERGED
-GI status: PASSED
-
-$ fx whereiscl
-https://fuchsia-review.googlesource.com/c/fuchsia/+/287311/1/garnet/go/src/amber/source/source.go
-CL status: NEW
-
-$ fx whereiscl I94c56fa4e59842d398bfa90a48c45b388f095184
-CL status: MERGED
-GI status: PASSED
-
-$ fx whereiscl 6575aee
-CL status: MERGED
-GI status: PENDING
-```
+You can use the `fx cl` command to open your current CL in Gerrit using a new
+browser tab.
 
 ### Debugging and developing `fx` commands {#debugging-and-developing-fx-commands}
 
@@ -694,8 +656,9 @@ To suppress the inclusion of `local/args.gn`, run `fx set ... --skip-local-args`
 [build-overview]: /docs/development/build/build_system/fuchsia_build_system_overview.md
 [build-with-labels]: /docs/development/build/build_with_labels.md
 [executing-tests]: /docs/development/testing/run_fuchsia_tests.md
-[ffx-target-flash]: https://fuchsia.dev/reference/tools/sdk/ffx#flash
+[ffx-target-flash]: /reference/tools/sdk/ffx.md#flash
 [fxb94507]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=94507
 [fuchsia-gi-repo]: https://fuchsia.googlesource.com/integration/
-[fx-sync-to-ref]: https://fuchsia.dev/reference/tools/fx/cmd/sync-to
+[fx-sync-to-ref]: /reference/tools/fx/cmd/sync-to.md
+[fx-serve-ref]: /reference/tools/fx/cmd/serve.md
 [fx-create-pb-zip]: https://fuchsia.dev/reference/tools/fx/cmd/create-pb-zip

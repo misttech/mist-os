@@ -18,7 +18,6 @@ executable("kernel_debug_broker") {
     "//src/sys/lib/stdout-to-debuglog/cpp",
     "//zircon/system/ulib/kcounter",
     "//zircon/system/ulib/kernel-debug",
-    "//zircon/system/ulib/ktrace",
     "//zircon/system/ulib/svc",
     "//zircon/system/ulib/zx",
   ]

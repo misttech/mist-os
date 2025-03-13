@@ -31,6 +31,7 @@ test_handles_HandlesInLine {
     fifo_handle flags[fidl_handle_presence, int32]
     guest_handle flags[fidl_handle_presence, int32]
     interrupt_handle flags[fidl_handle_presence, int32]
+    iob_handle flags[fidl_handle_presence, int32]
     iommu_handle flags[fidl_handle_presence, int32]
     job_handle flags[fidl_handle_presence, int32]
     msi_handle flags[fidl_handle_presence, int32]
@@ -70,6 +71,7 @@ test_handles_HandlesHandles {
     fifo_handle zx_fifo
     guest_handle zx_guest
     interrupt_handle zx_interrupt
+    iob_handle zx_iob
     iommu_handle zx_iommu
     job_handle zx_job
     msi_handle zx_msi

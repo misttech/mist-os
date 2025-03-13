@@ -9,16 +9,17 @@ use crate::fuchsia::profile::Recorder;
 use anyhow::Error;
 use bitflags::bitflags;
 use fuchsia_async as fasync;
+use fuchsia_sync::{Mutex, MutexGuard};
+use fxfs::future_with_guard::FutureWithGuard;
 use fxfs::log::*;
 use fxfs::range::RangeExt;
 use fxfs::round::{round_down, round_up};
-use once_cell::sync::Lazy;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::ops::Range;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard, Weak};
+use std::sync::{Arc, Weak};
 use storage_device::buffer;
 use vfs::execution_scope::ExecutionScope;
 use zx::sys::zx_page_request_command_t::{ZX_PAGER_VMO_DIRTY, ZX_PAGER_VMO_READ};
@@ -51,7 +52,7 @@ impl<T: PagerBacked> PagerPacketReceiver<T> {
     /// `Pager::watch_for_zero_children` was called. This should only be used when forcibly dropping
     /// the file object. Calls `on_zero_children` if the strong reference was held.
     pub fn stop_watching_for_zero_children(&self) {
-        let mut file = self.file.lock().unwrap();
+        let mut file = self.file.lock();
         if let FileHolder::Strong(strong) = &*file {
             let weak = FileHolder::Weak(Arc::downgrade(&strong));
             let FileHolder::Strong(strong) = std::mem::replace(&mut *file, weak) else {
@@ -68,7 +69,7 @@ impl<T: PagerBacked> PagerPacketReceiver<T> {
             return;
         }
 
-        let file = match &*self.file.lock().unwrap() {
+        let file = match &*self.file.lock() {
             FileHolder::Strong(file) => file.clone(),
             FileHolder::Weak(file) => {
                 if let Some(file) = file.upgrade() {
@@ -103,7 +104,7 @@ impl<T: PagerBacked> PagerPacketReceiver<T> {
         // so, replace the strong reference with a weak one and call on_zero_children on the node.
         // If the file does have children, this asks the kernel to send us the ON_ZERO_CHILDREN
         // notification for the file.
-        let mut file = self.file.lock().unwrap();
+        let mut file = self.file.lock();
         if let FileHolder::Strong(strong) = &*file {
             // If the last strong reference to the Arc is dropped here, then FxVolume's shutdown
             // won't wait for the inner node object to be dropped. Taking an active guard around
@@ -189,27 +190,23 @@ impl Pager {
 
     /// Spawns a short term task for the pager that includes a guard that will prevent termination.
     fn spawn(&self, task: impl Future<Output = ()> + Send + 'static) {
-        let guard = self.scope.active_guard();
-        self.executor.spawn_detached(async move {
-            task.await;
-            std::mem::drop(guard);
-        });
+        self.executor.spawn_detached(FutureWithGuard::new(self.scope.active_guard(), task));
     }
 
     /// Set the current profile recorder, or set to None to not record.
     pub fn set_recorder(&self, recorder: Option<Box<dyn Recorder>>) {
         // Drop the old one outside of the lock.
-        let _old = std::mem::replace(&mut (*self.recorder.lock().unwrap()), recorder);
+        let _old = std::mem::replace(&mut (*self.recorder.lock()), recorder);
     }
 
     /// Borrow the profile recorder. Used to record file opens.
     pub fn recorder(&self) -> MutexGuard<'_, Option<Box<dyn Recorder>>> {
-        self.recorder.lock().unwrap()
+        self.recorder.lock()
     }
 
     /// Record a range into a profile if one is being recorded.
     pub fn record_page_in<P: PagerBacked>(&self, node: Arc<P>, range: Range<u64>) {
-        let mut recorder_holder = self.recorder.lock().unwrap();
+        let mut recorder_holder = self.recorder.lock();
         if let Some(recorder) = &mut (*recorder_holder) {
             // If the message fails to send, so will all the rest.
             if let Err(_) = recorder.record(node, range.start) {
@@ -241,7 +238,7 @@ impl Pager {
 
     /// Registers a file with the pager.
     pub fn register_file(&self, file: &Arc<impl PagerBacked>) {
-        *file.pager_packet_receiver_registration().file.lock().unwrap() =
+        *file.pager_packet_receiver_registration().file.lock() =
             FileHolder::Weak(Arc::downgrade(file));
     }
 
@@ -249,7 +246,7 @@ impl Pager {
     /// signal is already being watched for. When the pager receives the `VMO_ZERO_CHILDREN` signal
     /// [`PagerBacked::on_zero_children`] will be called.
     pub fn watch_for_zero_children(&self, file: &impl PagerBacked) -> Result<bool, Error> {
-        let mut file = file.pager_packet_receiver_registration().file.lock().unwrap();
+        let mut file = file.pager_packet_receiver_registration().file.lock();
 
         match &*file {
             FileHolder::Weak(weak) => {
@@ -445,6 +442,15 @@ pub trait PagerBacked: FxNode + Sync + Send + Sized + 'static {
     ) -> impl Future<Output = Result<buffer::Buffer<'_>, Error>> + Send;
 }
 
+/// Returns the size of reads with read-ahead that will be issued by `default_page_in`.
+pub fn default_read_size(read_alignment: u64) -> u64 {
+    if read_alignment > READ_AHEAD_SIZE {
+        read_alignment
+    } else {
+        round_down(READ_AHEAD_SIZE, read_alignment)
+    }
+}
+
 /// A generic page_in implementation that supplies pages using block-aligned reads.
 pub fn default_page_in<P: PagerBacked>(this: Arc<P>, pager_range: PageInRange<P>) {
     fxfs_trace::duration!(
@@ -458,16 +464,12 @@ pub fn default_page_in<P: PagerBacked>(this: Arc<P>, pager_range: PageInRange<P>
     let ref_guard = pager.epochs.add_ref();
 
     const ZERO_VMO_SIZE: u64 = 1_048_576;
-    static ZERO_VMO: Lazy<zx::Vmo> = Lazy::new(|| zx::Vmo::create(ZERO_VMO_SIZE).unwrap());
+    static ZERO_VMO: std::sync::LazyLock<zx::Vmo> =
+        std::sync::LazyLock::new(|| zx::Vmo::create(ZERO_VMO_SIZE).unwrap());
 
     assert!(pager_range.end() < i64::MAX as u64);
 
-    let read_alignment = this.read_alignment();
-    let readahead_alignment = if read_alignment > READ_AHEAD_SIZE {
-        read_alignment
-    } else {
-        round_down(READ_AHEAD_SIZE, read_alignment)
-    };
+    let readahead_alignment = default_read_size(this.read_alignment());
 
     // Two important subtleties to consider in this space:
     //
@@ -870,9 +872,9 @@ mod tests {
         // Returns the page_in requests received for this file.
         fn pager_requests(&self, reset: bool) -> Vec<PagerRequest> {
             if reset {
-                std::mem::take(&mut *self.pager_requests.lock().unwrap())
+                std::mem::take(&mut *self.pager_requests.lock())
             } else {
-                self.pager_requests.lock().unwrap().clone()
+                self.pager_requests.lock().clone()
             }
         }
     }
@@ -918,12 +920,12 @@ mod tests {
 
         fn page_in(self: Arc<Self>, range: PageInRange<Self>) {
             let aux_vmo = zx::Vmo::create(range.len()).unwrap();
-            self.pager_requests.lock().unwrap().push(PagerRequest::PageIn(range.range()));
+            self.pager_requests.lock().push(PagerRequest::PageIn(range.range()));
             range.supply_pages(&aux_vmo, 0);
         }
 
         fn mark_dirty(self: Arc<Self>, range: MarkDirtyRange<Self>) {
-            self.pager_requests.lock().unwrap().push(PagerRequest::Dirty(range.range()));
+            self.pager_requests.lock().push(PagerRequest::Dirty(range.range()));
             range.dirty_pages();
         }
 
@@ -1007,7 +1009,7 @@ mod tests {
         }
 
         fn on_zero_children(self: Arc<Self>) {
-            self.sender.lock().unwrap().unbounded_send(()).unwrap();
+            self.sender.lock().unbounded_send(()).unwrap();
         }
         fn byte_size(&self) -> u64 {
             unreachable!();
@@ -1129,7 +1131,7 @@ mod tests {
             }
 
             fn page_in(self: Arc<Self>, range: PageInRange<Self>) {
-                range.report_failure(*self.status_code.lock().unwrap());
+                range.report_failure(*self.status_code.lock());
             }
 
             fn mark_dirty(self: Arc<Self>, _range: MarkDirtyRange<Self>) {
@@ -1172,7 +1174,7 @@ mod tests {
             expected_code: zx::Status,
         ) {
             {
-                *file.status_code.lock().unwrap() = failure_code;
+                *file.status_code.lock() = failure_code;
             }
             let mut buf = [0u8; 8];
             assert_eq!(file.vmo().read(&mut buf, 0).unwrap_err(), expected_code);
@@ -1886,5 +1888,16 @@ mod tests {
         );
 
         scope.wait().await;
+    }
+
+    #[fuchsia::test]
+    fn test_default_read_size() {
+        assert_eq!(default_read_size(4 * 1024), READ_AHEAD_SIZE);
+        assert_eq!(default_read_size(8 * 1024), READ_AHEAD_SIZE);
+        assert_eq!(default_read_size(32 * 1024), READ_AHEAD_SIZE);
+        assert_eq!(default_read_size(40 * 1024), 120 * 1024);
+        assert_eq!(default_read_size(64 * 1024), READ_AHEAD_SIZE);
+        assert_eq!(default_read_size(88 * 1024), 88 * 1024);
+        assert_eq!(default_read_size(132 * 1024), 132 * 1024);
     }
 }

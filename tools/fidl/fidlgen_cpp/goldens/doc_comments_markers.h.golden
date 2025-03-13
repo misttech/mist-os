@@ -36,6 +36,8 @@ class Interface final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5017051197196532121;
   };
   /// event comment #1
   ///
@@ -53,6 +55,8 @@ class Interface final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 28780186509098736;
   };
 };
 
@@ -60,6 +64,6 @@ class Interface final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_doccomments::Interface> : public std::true_type{};
+struct IsProtocol<::test_doccomments::Interface> : public std::true_type {};
 
 }  // namespace fidl

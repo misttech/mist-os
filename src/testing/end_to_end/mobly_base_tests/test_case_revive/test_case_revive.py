@@ -11,13 +11,15 @@ from collections.abc import Callable
 from typing import Any
 
 from fuchsia_base_test import fuchsia_base_test
-from honeydew.interfaces.auxiliary_devices import power_switch
+from honeydew.auxiliary_devices.power_switch import power_switch
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-_DMC_MODULE: str = "honeydew.auxiliary_devices.power_switch_dmc"
-_DMC_CLASS: str = "PowerSwitchDmc"
+_DMC_MODULE: str = (
+    "honeydew.auxiliary_devices.power_switch.power_switch_using_dmc"
+)
+_DMC_CLASS: str = "PowerSwitchUsingDmc"
 
 
 # pylint: disable=protected-access

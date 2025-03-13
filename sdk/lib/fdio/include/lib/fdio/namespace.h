@@ -168,9 +168,9 @@ zx_status_t fdio_ns_export_root(fdio_flat_namespace_t** out) ZX_AVAILABLE_SINCE(
 //   * `ZX_ERR_INVALID_ARGS`: `path` is invalid.
 //
 //   * `ZX_ERR_NOT_FOUND`: A prefix of `path` cannot be found in `ns`.
-// TODO(https://fxbug.dev/348698584): Migrate callers to fdio_ns_open3 and mark as deprecated.
+// TODO(https://fxbug.dev/376575307): Mark this function as removed once we ship API level 27.
 zx_status_t fdio_ns_open(fdio_ns_t* ns, const char* path, uint32_t flags, zx_handle_t request)
-    ZX_AVAILABLE_SINCE(8);
+    ZX_DEPRECATED_SINCE(8, NEXT, "Use fdio_ns_open3 instead.");
 
 // Opens an object at `path` relative to the root of `ns` with `flags` asynchronously.
 //
@@ -192,6 +192,7 @@ zx_status_t fdio_ns_open(fdio_ns_t* ns, const char* path, uint32_t flags, zx_han
 //   * `ZX_ERR_INVALID_ARGS`: `path` is invalid.
 //
 //   * `ZX_ERR_NOT_FOUND`: A prefix of `path` cannot be found in `ns`.
+// TODO(https://fxbug.dev/376575307): Rename to fdio_ns_open when possible.
 zx_status_t fdio_ns_open3(fdio_ns_t* ns, const char* path, uint64_t flags, zx_handle_t request)
     ZX_AVAILABLE_SINCE(16);
 

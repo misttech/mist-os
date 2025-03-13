@@ -73,6 +73,7 @@ extern ElfW(Dyn) _DYNAMIC[] ATTR_LIBC_VISIBILITY;
 
 void _dl_log_unlogged(void) ATTR_LIBC_VISIBILITY;
 void _dl_log_write(const char* buffer, size_t len) ATTR_LIBC_VISIBILITY;
+void _dl_log_write_preinit(void) ATTR_LIBC_VISIBILITY;
 void _dl_log_write_init(zx_handle_t handle, uint32_t info) ATTR_LIBC_VISIBILITY;
 void _dl_log_write_init_fallback(void) ATTR_LIBC_VISIBILITY;
 

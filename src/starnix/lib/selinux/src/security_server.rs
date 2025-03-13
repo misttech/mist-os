@@ -11,7 +11,7 @@ use crate::policy::metadata::HandleUnknown;
 use crate::policy::parser::ByValue;
 use crate::policy::{
     parse_policy_by_value, AccessDecision, AccessVector, AccessVectorComputer, ClassId,
-    FsUseLabelAndType, FsUseType, Policy,
+    ClassPermissionId, FsUseLabelAndType, FsUseType, Policy,
 };
 use crate::sid_table::SidTable;
 use crate::sync::Mutex;
@@ -21,6 +21,7 @@ use crate::{
     SeLinuxStatusPublisher, SecurityId,
 };
 
+use crate::FileSystemMountSids;
 use anyhow::Context as _;
 use std::collections::HashMap;
 use std::ops::DerefMut;
@@ -316,8 +317,13 @@ impl SecurityServer {
             .class_id)
     }
 
-    /// Returns the class identifier of a class, if it exists.
-    pub fn class_permissions_by_name(&self, name: &str) -> Result<Vec<(u32, Vec<u8>)>, ()> {
+    /// Returns the set of permissions associated with a class. Each permission
+    /// is represented as a tuple of the permission ID (in the scope of its
+    /// associated class) and the permission name.
+    pub fn class_permissions_by_name(
+        &self,
+        name: &str,
+    ) -> Result<Vec<(ClassPermissionId, Vec<u8>)>, ()> {
         let locked_state = self.state.lock();
         locked_state.expect_active_policy().parsed.find_class_permissions_by_name(name)
     }
@@ -333,22 +339,20 @@ impl SecurityServer {
         let mut locked_state = self.state.lock();
         let active_policy = locked_state.expect_active_policy_mut();
 
-        let mountpoint_sid_from_mount_option =
-            sid_from_mount_option(active_policy, &mount_options.context);
-        let fs_sid_from_mount_option =
-            sid_from_mount_option(active_policy, &mount_options.fs_context);
-        let def_sid_from_mount_option =
-            sid_from_mount_option(active_policy, &mount_options.def_context);
-        let root_sid_from_mount_option =
-            sid_from_mount_option(active_policy, &mount_options.root_context);
-
-        if let Some(mountpoint_sid) = mountpoint_sid_from_mount_option {
+        let mount_sids = FileSystemMountSids {
+            context: sid_from_mount_option(active_policy, &mount_options.context),
+            fs_context: sid_from_mount_option(active_policy, &mount_options.fs_context),
+            def_context: sid_from_mount_option(active_policy, &mount_options.def_context),
+            root_context: sid_from_mount_option(active_policy, &mount_options.root_context),
+        };
+        if let Some(mountpoint_sid) = mount_sids.context {
             // `mount_options` has `context` set, so the file-system and the nodes it contains are
             // labeled with that value, which is not modifiable. The `fs_context` option, if set,
             // overrides the file-system label.
             FileSystemLabel {
-                sid: fs_sid_from_mount_option.unwrap_or(mountpoint_sid),
+                sid: mount_sids.fs_context.unwrap_or(mountpoint_sid),
                 scheme: FileSystemLabelingScheme::Mountpoint { sid: mountpoint_sid },
+                mount_sids,
             }
         } else if let Some(FsUseLabelAndType { context, use_type }) =
             active_policy.parsed.fs_use_label_and_type(fs_type)
@@ -356,23 +360,24 @@ impl SecurityServer {
             // There is an `fs_use` statement for this file-system type in the policy.
             let fs_sid_from_policy =
                 active_policy.sid_table.security_context_to_sid(&context).unwrap();
-            let fs_sid = fs_sid_from_mount_option.unwrap_or(fs_sid_from_policy);
+            let fs_sid = mount_sids.fs_context.unwrap_or(fs_sid_from_policy);
             FileSystemLabel {
                 sid: fs_sid,
                 scheme: FileSystemLabelingScheme::FsUse {
                     fs_use_type: use_type,
-                    def_sid: def_sid_from_mount_option
+                    computed_def_sid: mount_sids
+                        .def_context
                         .unwrap_or_else(|| SecurityId::initial(InitialSid::File)),
-                    root_sid: root_sid_from_mount_option,
                 },
+                mount_sids,
             }
         } else if let Some(context) =
             active_policy.parsed.genfscon_label_for_fs_and_path(fs_type, ROOT_PATH.into(), None)
         {
             // There is a `genfscon` statement for this file-system type in the policy.
             let genfscon_sid = active_policy.sid_table.security_context_to_sid(&context).unwrap();
-            let fs_sid = fs_sid_from_mount_option.unwrap_or(genfscon_sid);
-            FileSystemLabel { sid: fs_sid, scheme: FileSystemLabelingScheme::GenFsCon }
+            let fs_sid = mount_sids.fs_context.unwrap_or(genfscon_sid);
+            FileSystemLabel { sid: fs_sid, scheme: FileSystemLabelingScheme::GenFsCon, mount_sids }
         } else {
             // The name of the filesystem type was not recognized.
             //
@@ -381,12 +386,14 @@ impl SecurityServer {
             let unrecognized_filesystem_type_fs_use_type = FsUseType::Xattr;
 
             FileSystemLabel {
-                sid: fs_sid_from_mount_option.unwrap_or(unrecognized_filesystem_type_sid),
+                sid: mount_sids.fs_context.unwrap_or(unrecognized_filesystem_type_sid),
                 scheme: FileSystemLabelingScheme::FsUse {
                     fs_use_type: unrecognized_filesystem_type_fs_use_type,
-                    def_sid: def_sid_from_mount_option.unwrap_or(unrecognized_filesystem_type_sid),
-                    root_sid: root_sid_from_mount_option,
+                    computed_def_sid: mount_sids
+                        .def_context
+                        .unwrap_or(unrecognized_filesystem_type_sid),
                 },
+                mount_sids,
             }
         }
     }
@@ -515,16 +522,12 @@ impl Query for SecurityServer {
         let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
         let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
 
-        // Access decisions are currently based solely on explicit "allow" rules.
-        // TODO: https://fxbug.dev/372400976 - Include permissions from matched "constraints"
-        // rules in the policy.
-        // TODO: https://fxbug.dev/372400419 - Validate that "neverallow" rules are respected.
         match target_class {
             AbstractObjectClass::System(target_class) => {
-                let mut decision = active_policy.parsed.compute_explicitly_allowed(
-                    source_context.type_(),
-                    target_context.type_(),
-                    target_class,
+                let mut decision = active_policy.parsed.compute_access_decision(
+                    &source_context,
+                    &target_context,
+                    &target_class,
                 );
                 decision.todo_bug = active_policy.exceptions.lookup(
                     source_context.type_(),
@@ -533,13 +536,9 @@ impl Query for SecurityServer {
                 );
                 decision
             }
-            AbstractObjectClass::Custom(target_class) => {
-                active_policy.parsed.compute_explicitly_allowed_custom(
-                    source_context.type_(),
-                    target_context.type_(),
-                    &target_class,
-                )
-            }
+            AbstractObjectClass::Custom(target_class) => active_policy
+                .parsed
+                .compute_access_decision_custom(&source_context, &target_context, &target_class),
             // No meaningful policy can be determined without target class.
             _ => AccessDecision::allow(AccessVector::NONE),
         }
@@ -635,7 +634,7 @@ fn sid_from_mount_option(
 mod tests {
     use super::*;
     use crate::permission_check::PermissionCheckResult;
-    use crate::{CommonFilePermission, FilePermission, ProcessPermission};
+    use crate::{CommonFsNodePermission, DirPermission, FilePermission, ProcessPermission};
     use std::num::NonZeroU64;
 
     const TESTSUITE_BINARY_POLICY: &[u8] = include_bytes!("../testdata/policies/selinux_testsuite");
@@ -1229,7 +1228,7 @@ mod tests {
             permission_check.has_permission(
                 sid,
                 sid,
-                CommonFilePermission::GetAttr.for_class(FileClass::Block)
+                CommonFsNodePermission::GetAttr.for_class(FileClass::Block)
             ),
             PermissionCheckResult { permit: true, audit: true, todo_bug: None }
         );
@@ -1264,7 +1263,7 @@ mod tests {
             permission_check.has_permission(
                 sid,
                 sid,
-                CommonFilePermission::GetAttr.for_class(FileClass::Block)
+                CommonFsNodePermission::GetAttr.for_class(FileClass::Block)
             ),
             PermissionCheckResult { permit: false, audit: true, todo_bug: None }
         );
@@ -1330,7 +1329,7 @@ mod tests {
             permission_check.has_permission(
                 permissive_sid,
                 non_permissive_sid,
-                CommonFilePermission::GetAttr.for_class(FileClass::Block)
+                CommonFsNodePermission::GetAttr.for_class(FileClass::Block)
             ),
             PermissionCheckResult { permit: true, audit: true, todo_bug: None }
         );
@@ -1338,7 +1337,7 @@ mod tests {
             permission_check.has_permission(
                 non_permissive_sid,
                 non_permissive_sid,
-                CommonFilePermission::GetAttr.for_class(FileClass::Block)
+                CommonFsNodePermission::GetAttr.for_class(FileClass::Block)
             ),
             PermissionCheckResult { permit: false, audit: true, todo_bug: None }
         );
@@ -1456,7 +1455,7 @@ mod tests {
             permission_check.has_permission(
                 other_sid,
                 target_sid,
-                CommonFilePermission::Read.for_class(FileClass::Character)
+                CommonFsNodePermission::Read.for_class(FileClass::Character)
             ),
             PermissionCheckResult {
                 permit: true,
@@ -1481,6 +1480,78 @@ mod tests {
         assert_eq!(
             permission_check.has_permission(permissive_sid, target_sid, FilePermission::Entrypoint),
             PermissionCheckResult { permit: true, audit: true, todo_bug: None }
+        );
+    }
+
+    #[test]
+    fn handle_unknown() {
+        let security_server = security_server_with_tests_policy();
+
+        let sid = security_server
+            .security_context_to_sid("user0:object_r:type0:s0".into())
+            .expect("Resolve Context to SID");
+
+        // Load a policy that is missing some elements, and marked handle_unknown=reject.
+        // The policy should be rejected, since not all classes/permissions are defined.
+        // Rejecting policy is not controlled by permissive vs enforcing.
+        const REJECT_POLICY: &[u8] = include_bytes!(
+            "../testdata/composite_policies/compiled/handle_unknown_policy-reject.pp"
+        );
+        assert!(security_server.load_policy(REJECT_POLICY.to_vec()).is_err());
+
+        security_server.set_enforcing(true);
+
+        // Load a policy that is missing some elements, and marked handle_unknown=deny.
+        const DENY_POLICY: &[u8] =
+            include_bytes!("../testdata/composite_policies/compiled/handle_unknown_policy-deny.pp");
+        assert!(security_server.load_policy(DENY_POLICY.to_vec()).is_ok());
+        let permission_check = security_server.as_permission_check();
+
+        // Check against undefined classes or permissions should deny access and audit.
+        assert_eq!(
+            permission_check.has_permission(sid, sid, ProcessPermission::GetSched),
+            PermissionCheckResult { permit: false, audit: true, todo_bug: None }
+        );
+        assert_eq!(
+            permission_check.has_permission(sid, sid, DirPermission::AddName),
+            PermissionCheckResult { permit: false, audit: true, todo_bug: None }
+        );
+
+        // Check that permissions that are defined are unaffected by handle-unknown.
+        assert_eq!(
+            permission_check.has_permission(sid, sid, DirPermission::Search),
+            PermissionCheckResult { permit: true, audit: false, todo_bug: None }
+        );
+        assert_eq!(
+            permission_check.has_permission(sid, sid, DirPermission::Reparent),
+            PermissionCheckResult { permit: false, audit: true, todo_bug: None }
+        );
+
+        // Load a policy that is missing some elements, and marked handle_unknown=allow.
+        const ALLOW_POLICY: &[u8] = include_bytes!(
+            "../testdata/composite_policies/compiled/handle_unknown_policy-allow.pp"
+        );
+        assert!(security_server.load_policy(ALLOW_POLICY.to_vec()).is_ok());
+        let permission_check = security_server.as_permission_check();
+
+        // Check against undefined classes or permissions should grant access without audit.
+        assert_eq!(
+            permission_check.has_permission(sid, sid, ProcessPermission::GetSched),
+            PermissionCheckResult { permit: true, audit: false, todo_bug: None }
+        );
+        assert_eq!(
+            permission_check.has_permission(sid, sid, DirPermission::AddName),
+            PermissionCheckResult { permit: true, audit: false, todo_bug: None }
+        );
+
+        // Check that permissions that are defined are unaffected by handle-unknown.
+        assert_eq!(
+            permission_check.has_permission(sid, sid, DirPermission::Search),
+            PermissionCheckResult { permit: true, audit: false, todo_bug: None }
+        );
+        assert_eq!(
+            permission_check.has_permission(sid, sid, DirPermission::Reparent),
+            PermissionCheckResult { permit: false, audit: true, todo_bug: None }
         );
     }
 }

@@ -30,4 +30,12 @@ open protocol PsiProvider {
         /// Stats about time spent with all threads stalling.
         2: full PsiStats;
     }) error zx.Status;
+
+    flexible WatchMemoryStall(table {
+        1: kind uint32;
+        2: threshold zx.Duration;
+        3: window zx.Duration;
+    }) -> (resource table {
+        1: event zx.Handle:EVENT;
+    }) error zx.Status;
 };

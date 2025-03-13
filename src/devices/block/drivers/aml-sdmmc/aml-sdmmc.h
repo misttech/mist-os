@@ -243,7 +243,8 @@ class AmlSdmmc : public fdf::DriverBase,
   static uint32_t DistanceToFailingPoint(TuneSettings point,
                                          cpp20::span<const TuneResults> adj_delay_results);
 
-  zx::result<> InitResources(fidl::ClientEnd<fuchsia_hardware_platform_device::Device> pdev_client);
+  zx::result<> InitResources(
+      fidl::ClientEnd<fuchsia_hardware_platform_device::Device> pdev_client_end);
   // TODO(b/309152899): Once fuchsia.power.SuspendEnabled config cap is available, have this method
   // return failure if power management could not be configured. Use fuchsia.power.SuspendEnabled to
   // ignore this failure when expected.
@@ -318,8 +319,6 @@ class AmlSdmmc : public fdf::DriverBase,
 
   // Serves requests that were delayed because they were received during suspended state.
   void ServeDelayedRequests() __TA_REQUIRES(tuning_lock_, lock_);
-
-  zx_status_t InitMetadataServer(fdf::PDev& pdev);
 
   std::optional<fdf::MmioBuffer> mmio_ __TA_GUARDED(lock_);
 

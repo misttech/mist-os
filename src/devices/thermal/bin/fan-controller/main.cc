@@ -26,7 +26,13 @@ int main(int argc, const char* argv[], char* envp[]) {
   }
 
   async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
-  fan_controller::FanController controller(loop.dispatcher(), std::move(*result));
+  zx::result svc_root = component::OpenServiceRoot();
+  if (svc_root.is_error()) {
+    FX_LOGS(ERROR) << "Could not open /svc " << svc_root.status_string();
+    return svc_root.error_value();
+  }
+  fan_controller::FanController controller(loop.dispatcher(), std::move(*result),
+                                           std::move(*svc_root));
 
   loop.Run();
 

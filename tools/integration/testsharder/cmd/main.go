@@ -37,6 +37,7 @@ Shards tests produced by a build.
 
 type testsharderFlags struct {
 	buildDir                 string
+	checkoutDir              string
 	outputFile               string
 	modifiersPath            string
 	affectedTestsPath        string
@@ -50,6 +51,7 @@ type testsharderFlags struct {
 func parseFlags() testsharderFlags {
 	var flags testsharderFlags
 	flag.StringVar(&flags.buildDir, "build-dir", "", "path to the fuchsia build directory root (required)")
+	flag.StringVar(&flags.checkoutDir, "checkout-dir", "", "path to the fuchsia checkout directory root")
 	flag.StringVar(&flags.outputFile, "output-file", "", "path to a file which will contain the shards as JSON, default is stdout")
 	flag.StringVar(&flags.modifiersPath, "modifiers", "", "path to the json manifest containing tests to modify")
 	flag.StringVar(&flags.affectedTestsPath, "affected-tests", "", "path to a file containing names of tests affected by the change being tested. One test name per line.")
@@ -115,7 +117,7 @@ func mainImpl(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return execute(ctx, flags, params, m)
+	return execute(ctx, flags, params, flags.checkoutDir, m)
 }
 
 type buildModules interface {
@@ -138,7 +140,7 @@ var getHostPlatform = func() (string, error) {
 	return hostplatform.Name()
 }
 
-func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, m buildModules) error {
+func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, checkoutDir string, m buildModules) error {
 	if flags.depsFile != "" && flags.outputFile == "" {
 		return fmt.Errorf("output-file needs to be set if deps-file is set")
 	}
@@ -208,10 +210,17 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 	testDurations := testsharder.NewTestDurationsMap(m.TestDurations())
 	shards = testsharder.AddExpectedDurationTags(shards, testDurations)
 
+	hasAffectedModifiers := false
 	if flags.modifiersPath != "" {
 		modifiers, err := testsharder.LoadTestModifiers(ctx, m.TestSpecs(), flags.modifiersPath)
 		if err != nil {
 			return err
+		}
+		for _, mod := range modifiers {
+			if mod.Modifier.Affected {
+				hasAffectedModifiers = true
+				break
+			}
 		}
 		// Apply user-defined modifiers.
 		shards, err = testsharder.ApplyModifiers(shards, modifiers)
@@ -257,7 +266,7 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 		if err != nil {
 			return err
 		}
-	} else {
+	} else if !hasAffectedModifiers {
 		// If no affected-tests file was provided, we don't know which tests
 		// were affected, so run all tests.
 		flags.skipUnaffected = false
@@ -275,12 +284,9 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 		affected := func(t testsharder.Test) bool {
 			return t.Affected
 		}
-		affectedShards, unaffectedShards := testsharder.PartitionShards(nonMultipliedShards, affected, testsharder.AffectedShardPrefix)
+		// Since we're only running affected shards, we don't need to add a prefix to the shard name.
+		affectedShards, _ := testsharder.PartitionShards(nonMultipliedShards, affected, "")
 		shards = affectedShards
-		skippedShards, err = testsharder.MarkShardsSkipped(unaffectedShards)
-		if err != nil {
-			return err
-		}
 	} else {
 		// Filter out the affected, hermetic shards from the non-multiplied shards.
 		hermeticAndAffected := func(t testsharder.Test) bool {

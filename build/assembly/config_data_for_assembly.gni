@@ -76,11 +76,12 @@ template("config_data_for_assembly") {
   }
 
   generated_file(target_name) {
-    forward_variables_from(invoker, [ "testonly" ])
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "deps",
+                           ])
 
-    assert(
-        !defined(invoker.deps),
-        "The config_data_for_assembly() template does not support dependencies")
     assert(
         !defined(invoker.data_deps),
         "The config_data_for_assembly() template does not support dependencies")

@@ -32,21 +32,21 @@ impl DefineSubsystemConfiguration<SetUiConfig> for SetUiSubsystem {
 
             if let Some(display) = &config.display {
                 builder.package("setui_service").config_data(FileEntry {
-                    source: display.clone().into(),
+                    source: display.clone(),
                     destination: "display_configuration.json".into(),
                 })?;
             }
 
             if let Some(interface) = &config.interface {
                 builder.package("setui_service").config_data(FileEntry {
-                    source: interface.clone().into(),
+                    source: interface.clone(),
                     destination: "interface_configuration.json".into(),
                 })?;
             }
 
             if let Some(agent) = &config.agent {
                 builder.package("setui_service").config_data(FileEntry {
-                    source: agent.clone().into(),
+                    source: agent.clone(),
                     destination: "agent_configuration.json".into(),
                 })?;
             }
@@ -83,7 +83,7 @@ impl DefineSubsystemConfiguration<SetUiConfig> for SetUiSubsystem {
                 builder
                     .package("setui_service")
                     .config_data(FileEntry {
-                        source: input_device_config.clone().to_utf8_pathbuf(),
+                        source: input_device_config.clone(),
                         destination: "input_device_config.json".into(),
                     })
                     .context("Adding input_device_config.json")?;
@@ -93,7 +93,7 @@ impl DefineSubsystemConfiguration<SetUiConfig> for SetUiSubsystem {
                 builder
                     .package("setui_service")
                     .config_data(FileEntry {
-                        source: light_hardware_config.clone().to_utf8_pathbuf(),
+                        source: light_hardware_config.clone(),
                         destination: "light_hardware_config.json".into(),
                     })
                     .context("Adding light_hardware_config.json")?;

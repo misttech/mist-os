@@ -147,7 +147,7 @@ void SyscallDecoder::Decode() {
     return;
   }
   if (dispatcher_->decode_options().stack_level >= kFullStack) {
-    thread->GetStack().SyncFrames(false, [this](const zxdb::Err& /*err*/) { DoDecode(); });
+    thread->GetStack().SyncFrames({}, [this](const zxdb::Err& /*err*/) { DoDecode(); });
   } else {
     DoDecode();
   }

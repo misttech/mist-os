@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/config/profile/config.gni")
 import("//build/rust/rustc_artifact.gni")
 import("//build/rust/rustc_test.gni")
 
@@ -24,6 +23,9 @@ import("//build/rust/rustc_test.gni")
 #
 #   configs (optional)
 #     A list of config labels applying to this target.
+#
+#   public_configs (optional)
+#     A list of public config labels applying to this target.
 #
 #   enforce_source_listing (optional)
 #     When true, enforces that any source files used by the Rust compiler are
@@ -196,14 +198,26 @@ template("rustc_library") {
       forward_variables_from(invoker,
                              "*",
                              [
-                               "name",
                                "assert_no_deps",
                                "disable_rustdoc",
-                               "test_disable_rbe",
+                               "name",
                                "non_test_deps",
+                               "output_name",
+                               "public_configs",
+                               "test_disable_rbe",
                              ])
       if (defined(invoker.test_disable_rbe)) {
         disable_rbe = invoker.test_disable_rbe
+      }
+
+      # Make sure any public configs on the library are applied to the test as
+      # well, though no need at this time to forward them as public configs on
+      # the test itself.
+      if (defined(invoker.public_configs)) {
+        if (!defined(configs)) {
+          configs = []
+        }
+        configs += invoker.public_configs
       }
     }
   }
@@ -235,18 +249,9 @@ template("rustc_library") {
                              ])
 
       # TODO: maybe just use target_name instead?
-      output_name = _crate_name
-    }
-
-    inputs = []
-    if (defined(invoker.inputs)) {
-      inputs = invoker.inputs
-    }
-
-    # When building with profile data, add the profile path to
-    # the inputs to conform with the input verifier.
-    if (pgo_profile_path != "") {
-      inputs += [ pgo_profile_path ]
+      if (!defined(output_name)) {
+        output_name = crate_name
+      }
     }
 
     deps = []
@@ -277,7 +282,9 @@ template("rustc_library") {
                              "enforce_source_listing",
                              "define_rustdoc_test_override",
                              "features",
+                             "inputs",
                              "pool",
+                             "public_configs",
                              "public_deps",
                              "quiet_clippy",
                              "rustdoc_args",

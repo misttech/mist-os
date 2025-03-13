@@ -4,14 +4,14 @@
 
 use crate::mm::PAGE_SIZE;
 use crate::task::{CurrentTask, Kernel};
-use crate::vfs::directory_file::MemoryDirectoryFile;
+use crate::vfs::memory_directory::MemoryDirectoryFile;
 use crate::vfs::{
     fs_args, fs_node_impl_not_dir, fs_node_impl_xattr_delegate, CacheMode, FileOps, FileSystem,
     FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
-    FsNodeOps, FsStr, MemoryFileNode, MemoryXattrStorage, SymlinkNode, XattrStorage as _,
+    FsNodeOps, FsStr, MemoryRegularNode, MemoryXattrStorage, SymlinkNode, XattrStorage as _,
 };
 use starnix_logging::{log_warn, track_stub};
-use starnix_sync::{FileOpsCore, Locked, Mutex, MutexGuard, Unlocked};
+use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_types::vfs::default_statfs;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
@@ -20,6 +20,7 @@ use starnix_uapi::file_mode::{mode, FileMode};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::seal_flags::SealFlags;
 use starnix_uapi::{error, gid_t, statfs, uid_t, TMPFS_MAGIC};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 pub struct TmpFs(&'static FsStr);
@@ -55,23 +56,23 @@ impl FileSystemOps for Arc<TmpFs> {
         renamed: &FsNodeHandle,
         replaced: Option<&FsNodeHandle>,
     ) -> Result<(), Errno> {
-        fn child_count(node: &FsNodeHandle) -> MutexGuard<'_, u32> {
+        fn child_count(node: &FsNodeHandle) -> &AtomicU32 {
             // The following cast are safe, unless something is seriously wrong:
             // - The filesystem should not be asked to rename node that it doesn't handle.
             // - Parents in a rename operation need to be directories.
             // - TmpfsDirectory is the ops for directories in this filesystem.
-            node.downcast_ops::<TmpfsDirectory>().unwrap().child_count.lock()
+            &node.downcast_ops::<TmpfsDirectory>().unwrap().child_count
         }
         if let Some(replaced) = replaced {
             if replaced.is_dir() {
                 // Ensures that replaces is empty.
-                if *child_count(replaced) != 0 {
+                if child_count(replaced).load(Ordering::Acquire) != 0 {
                     return error!(ENOTEMPTY);
                 }
             }
         }
-        *child_count(old_parent) -= 1;
-        *child_count(new_parent) += 1;
+        child_count(old_parent).fetch_sub(1, Ordering::Release);
+        child_count(new_parent).fetch_add(1, Ordering::Release);
         if renamed.is_dir() {
             old_parent.update_info(|info| {
                 info.link_count -= 1;
@@ -88,7 +89,7 @@ impl FileSystemOps for Arc<TmpFs> {
                     info.link_count -= 1;
                 });
             }
-            *child_count(new_parent) -= 1;
+            child_count(new_parent).fetch_sub(1, Ordering::Release);
         }
         Ok(())
     }
@@ -194,12 +195,12 @@ impl TmpFs {
 
 pub struct TmpfsDirectory {
     xattrs: MemoryXattrStorage,
-    child_count: Mutex<u32>,
+    child_count: AtomicU32,
 }
 
 impl TmpfsDirectory {
     pub fn new() -> Self {
-        Self { xattrs: MemoryXattrStorage::default(), child_count: Mutex::new(0) }
+        Self { xattrs: MemoryXattrStorage::default(), child_count: AtomicU32::new(0) }
     }
 }
 
@@ -211,7 +212,7 @@ fn create_child_node(
     owner: FsCred,
 ) -> Result<FsNodeHandle, Errno> {
     let ops: Box<dyn FsNodeOps> = match mode.fmt() {
-        FileMode::IFREG => Box::new(MemoryFileNode::new()?),
+        FileMode::IFREG => Box::new(MemoryRegularNode::new()?),
         FileMode::IFIFO | FileMode::IFBLK | FileMode::IFCHR | FileMode::IFSOCK => {
             Box::new(TmpfsSpecialNode::new())
         }
@@ -256,7 +257,7 @@ impl FsNodeOps for TmpfsDirectory {
         node.update_info(|info| {
             info.link_count += 1;
         });
-        *self.child_count.lock() += 1;
+        self.child_count.fetch_add(1, Ordering::Release);
         Ok(node.fs().create_node(
             current_task,
             TmpfsDirectory::new(),
@@ -275,7 +276,7 @@ impl FsNodeOps for TmpfsDirectory {
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         let child = create_child_node(current_task, node, mode, dev, owner)?;
-        *self.child_count.lock() += 1;
+        self.child_count.fetch_add(1, Ordering::Release);
         Ok(child)
     }
 
@@ -288,7 +289,7 @@ impl FsNodeOps for TmpfsDirectory {
         target: &FsStr,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        *self.child_count.lock() += 1;
+        self.child_count.fetch_add(1, Ordering::Release);
         let (link, info) = SymlinkNode::new(target, owner);
         Ok(node.fs().create_node(current_task, link, info))
     }
@@ -315,7 +316,7 @@ impl FsNodeOps for TmpfsDirectory {
         child.update_info(|info| {
             info.link_count += 1;
         });
-        *self.child_count.lock() += 1;
+        self.child_count.fetch_add(1, Ordering::Release);
         Ok(())
     }
 
@@ -325,17 +326,27 @@ impl FsNodeOps for TmpfsDirectory {
         node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
-        child: &FsNodeHandle,
+        child_to_unlink: &FsNodeHandle,
     ) -> Result<(), Errno> {
-        if child.is_dir() {
+        if child_to_unlink.is_dir() {
+            // The following cast is safe, unless something is seriously wrong:
+            // - The filesystem should not be asked to unlink a node that it doesn't handle.
+            // - The child has already been determined to be a directory.
+            // - TmpfsDirectory is the ops for directories in this filesystem.
+            let child_count =
+                &child_to_unlink.downcast_ops::<TmpfsDirectory>().unwrap().child_count;
+            if child_count.load(Ordering::Relaxed) != 0 {
+                return error!(ENOTEMPTY);
+            }
+
             node.update_info(|info| {
                 info.link_count -= 1;
             });
         }
-        child.update_info(|info| {
+        child_to_unlink.update_info(|info| {
             info.link_count -= 1;
         });
-        *self.child_count.lock() -= 1;
+        self.child_count.fetch_sub(1, Ordering::Release);
         Ok(())
     }
 }

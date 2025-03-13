@@ -70,6 +70,7 @@ if (is_host && has_board) {
 
   _common_deps = [
     "//src/developer/ffx/config:lib",
+    "//src/developer/ffx/lib/executor:lib",
     "//src/developer/ffx/lib/isolate:lib",
     "//src/lib/diagnostics/data/rust",
     "//src/lib/fuchsia-async",

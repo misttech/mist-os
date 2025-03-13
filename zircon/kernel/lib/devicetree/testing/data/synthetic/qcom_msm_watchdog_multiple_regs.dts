@@ -6,10 +6,10 @@
 
 / {
     #size-cells = <0x01>;
-	#address-cells = <0x01>;
-	a {
-		compatible = "foo";
-	};
+    #address-cells = <0x01>;
+    a {
+        compatible = "foo";
+    };
     b {
         #interrupt-cells=<0x02>;
         interrupt-controller;

@@ -15,4 +15,5 @@ fidl("fuchsia.unknown") {
 
   enable_banjo = true
   enable_hlcpp = true
+  enable_rust_next = true
 }

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 mod convert;
-pub mod experiment;
 mod inspect_time_series;
 mod windowed_stats;
 
@@ -28,7 +27,6 @@ use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use fuchsia_inspect_contrib::{inspect_insert, inspect_log, make_inspect_loggable};
 use fuchsia_sync::Mutex;
 use futures::channel::{mpsc, oneshot};
-use futures::future::LocalBoxFuture;
 use futures::{select, Future, FutureExt, StreamExt};
 use ieee80211::OuiFmt;
 use log::{error, info, warn};
@@ -325,11 +323,6 @@ pub enum TelemetryEvent {
     StopAp {
         enabled_duration: zx::MonotonicDuration,
     },
-    /// Notify telemetry that its experiment group has changed and that a new metrics logger must
-    /// be created.
-    UpdateExperiment {
-        experiment: experiment::ExperimentUpdate,
-    },
     /// Notify telemetry of the result of a create iface request.
     IfaceCreationResult(Result<(), ()>),
     /// Notify telemetry of the result of destroying an interface.
@@ -493,15 +486,6 @@ pub enum TimeoutSource {
 
 pub type RecoveryOutcome = metrics::ConnectivityWlanMetricDimensionResult;
 
-pub type CreateMetricsLoggerFn = Box<
-    dyn Fn(
-        Vec<u32>,
-    ) -> LocalBoxFuture<
-        'static,
-        Result<fidl_fuchsia_metrics::MetricEventLoggerProxy, anyhow::Error>,
-    >,
->;
-
 /// Capacity of "first come, first serve" slots available to clients of
 /// the mpsc::Sender<TelemetryEvent>.
 const TELEMETRY_EVENT_BUFFER_SIZE: usize = 100;
@@ -516,7 +500,6 @@ const TELEMETRY_QUERY_INTERVAL: zx::MonotonicDuration = zx::MonotonicDuration::f
 pub fn serve_telemetry(
     monitor_svc_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
     cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
-    new_cobalt_1dot1_proxy: CreateMetricsLoggerFn,
     inspect_node: InspectNode,
     external_inspect_node: InspectNode,
     persistence_req_sender: auto_persist::PersistenceReqSender,
@@ -538,7 +521,6 @@ pub fn serve_telemetry(
             cloned_sender,
             monitor_svc_proxy,
             cobalt_1dot1_proxy,
-            new_cobalt_1dot1_proxy,
             inspect_node,
             external_inspect_node,
             persistence_req_sender,
@@ -599,7 +581,7 @@ struct ConnectedState {
     /// Time when the user manually initiates connecting to another network via the
     /// Policy ClientController::Connect FIDL call.
     new_connect_start_time: Option<fasync::MonotonicInstant>,
-    prev_counters: Option<fidl_fuchsia_wlan_stats::IfaceCounterStats>,
+    prev_connection_counters: Option<fidl_fuchsia_wlan_stats::ConnectionCounters>,
     multiple_bss_candidates: bool,
     ap_state: client::types::ApState,
     network_is_likely_hidden: bool,
@@ -936,7 +918,6 @@ const UNRESPONSIVE_FLAG_MIN_DURATION: zx::MonotonicDuration =
 
 pub struct Telemetry {
     monitor_svc_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
-    new_cobalt_1dot1_proxy: CreateMetricsLoggerFn,
     connection_state: ConnectionState,
     last_checked_connection_state: fasync::MonotonicInstant,
     stats_logger: StatsLogger,
@@ -951,9 +932,6 @@ pub struct Telemetry {
 
     // Auto-persistence on various client stats counters
     auto_persist_client_stats_counters: AutoPersist<()>,
-
-    // Storage for recalling what experiments are currently active.
-    experiments: experiment::Experiments,
 
     // For keeping track of how long client connections were enabled when turning client
     // connections on and off.
@@ -971,7 +949,6 @@ impl Telemetry {
         telemetry_sender: TelemetrySender,
         monitor_svc_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
         cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
-        new_cobalt_1dot1_proxy: CreateMetricsLoggerFn,
         inspect_node: InspectNode,
         external_inspect_node: InspectNode,
         persistence_req_sender: auto_persist::PersistenceReqSender,
@@ -991,7 +968,6 @@ impl Telemetry {
         );
         Self {
             monitor_svc_proxy,
-            new_cobalt_1dot1_proxy,
             connection_state: ConnectionState::Idle(IdleState { connect_start_time: None }),
             last_checked_connection_state: fasync::MonotonicInstant::now(),
             stats_logger,
@@ -1018,7 +994,6 @@ impl Telemetry {
                 "wlancfg-client-stats-counters",
                 persistence_req_sender,
             ),
-            experiments: experiment::Experiments::new(),
             last_enabled_client_connections: None,
             last_disabled_client_connections: None,
             defect_sender,
@@ -1057,16 +1032,22 @@ impl Telemetry {
                     {
                         Ok(Ok(stats)) => {
                             *state.num_consecutive_get_counter_stats_failures.get_mut() = 0;
-                            if let Some(prev_counters) = state.prev_counters.as_ref() {
-                                diff_and_log_counters(
+                            if let (
+                                Some(prev_connection_counters),
+                                Some(current_connection_counters),
+                            ) = (
+                                state.prev_connection_counters.as_ref(),
+                                stats.connection_counters.as_ref(),
+                            ) {
+                                diff_and_log_connection_counters(
                                     &mut self.stats_logger,
-                                    prev_counters,
-                                    &stats,
+                                    prev_connection_counters,
+                                    current_connection_counters,
                                     duration,
                                 )
                                 .await;
                             }
-                            let _prev = state.prev_counters.replace(stats);
+                            state.prev_connection_counters = stats.connection_counters;
                         }
                         error => {
                             info!("Failed to get interface stats: {:?}", error);
@@ -1082,7 +1063,7 @@ impl Telemetry {
                                         .unwrap(),
                                 )
                                 .await;
-                            let _ = state.prev_counters.take();
+                            let _ = state.prev_connection_counters.take();
                         }
                     }
                 }
@@ -1272,7 +1253,7 @@ impl Telemetry {
                     self.connection_state = ConnectionState::Connected(ConnectedState {
                         iface_id,
                         new_connect_start_time: None,
-                        prev_counters: None,
+                        prev_connection_counters: None,
                         multiple_bss_candidates,
                         ap_state,
                         network_is_likely_hidden,
@@ -1320,7 +1301,7 @@ impl Telemetry {
                             self.connection_state = ConnectionState::Connected(ConnectedState {
                                 iface_id,
                                 new_connect_start_time: None,
-                                prev_counters: None,
+                                prev_connection_counters: None,
                                 multiple_bss_candidates: state.multiple_bss_candidates,
                                 ap_state,
                                 network_is_likely_hidden: state.network_is_likely_hidden,
@@ -1508,19 +1489,6 @@ impl Telemetry {
 
                 // Any completed SME operation tells us the SME is operational.
                 self.report_sme_timeout_resolved().await;
-            }
-            TelemetryEvent::UpdateExperiment { experiment } => {
-                self.experiments.update_experiment(experiment);
-                let active_experiments = self.experiments.get_experiment_ids();
-                let cobalt_1dot1_proxy =
-                    match (self.new_cobalt_1dot1_proxy)(active_experiments).await {
-                        Ok(proxy) => proxy,
-                        Err(e) => {
-                            warn!("{}", e);
-                            return;
-                        }
-                    };
-                self.stats_logger.replace_cobalt_proxy(cobalt_1dot1_proxy);
             }
             TelemetryEvent::IfaceCreationResult(result) => {
                 self.stats_logger.log_iface_creation_result(result).await;
@@ -1721,7 +1689,6 @@ pub async fn connect_to_metrics_logger_factory(
 // the caller.
 pub async fn create_metrics_logger(
     factory_proxy: &fidl_fuchsia_metrics::MetricEventLoggerFactoryProxy,
-    experiment_ids: Option<Vec<u32>>,
 ) -> Result<fidl_fuchsia_metrics::MetricEventLoggerProxy, Error> {
     let (cobalt_1dot1_proxy, cobalt_1dot1_server) =
         fidl::endpoints::create_proxy::<fidl_fuchsia_metrics::MetricEventLoggerMarker>();
@@ -1732,17 +1699,8 @@ pub async fn create_metrics_logger(
         ..Default::default()
     };
 
-    let experiment_ids = match experiment_ids {
-        Some(experiment_ids) => experiment_ids,
-        None => experiment::default_experiments(),
-    };
-
     let status = factory_proxy
-        .create_metric_event_logger_with_experiments(
-            &project_spec,
-            &experiment_ids,
-            cobalt_1dot1_server,
-        )
+        .create_metric_event_logger(&project_spec, cobalt_1dot1_server)
         .await
         .context("failed to create metrics event logger")?;
 
@@ -1757,10 +1715,10 @@ const VERY_HIGH_PACKET_DROP_RATE_THRESHOLD: f64 = 0.05;
 
 const DEVICE_LOW_CONNECTION_SUCCESS_RATE_THRESHOLD: f64 = 0.1;
 
-async fn diff_and_log_counters(
+async fn diff_and_log_connection_counters(
     stats_logger: &mut StatsLogger,
-    prev: &fidl_fuchsia_wlan_stats::IfaceCounterStats,
-    current: &fidl_fuchsia_wlan_stats::IfaceCounterStats,
+    prev: &fidl_fuchsia_wlan_stats::ConnectionCounters,
+    current: &fidl_fuchsia_wlan_stats::ConnectionCounters,
     duration: zx::MonotonicDuration,
 ) {
     diff_and_log_rx_counters(stats_logger, prev, current, duration).await;
@@ -1769,8 +1727,8 @@ async fn diff_and_log_counters(
 
 async fn diff_and_log_rx_counters(
     stats_logger: &mut StatsLogger,
-    prev: &fidl_fuchsia_wlan_stats::IfaceCounterStats,
-    current: &fidl_fuchsia_wlan_stats::IfaceCounterStats,
+    prev: &fidl_fuchsia_wlan_stats::ConnectionCounters,
+    current: &fidl_fuchsia_wlan_stats::ConnectionCounters,
     duration: zx::MonotonicDuration,
 ) {
     let (current_rx_unicast_total, prev_rx_unicast_total) =
@@ -1808,8 +1766,8 @@ async fn diff_and_log_rx_counters(
 
 async fn diff_and_log_tx_counters(
     stats_logger: &mut StatsLogger,
-    prev: &fidl_fuchsia_wlan_stats::IfaceCounterStats,
-    current: &fidl_fuchsia_wlan_stats::IfaceCounterStats,
+    prev: &fidl_fuchsia_wlan_stats::ConnectionCounters,
+    current: &fidl_fuchsia_wlan_stats::ConnectionCounters,
     duration: zx::MonotonicDuration,
 ) {
     let (current_tx_total, prev_tx_total) = match (current.tx_total, prev.tx_total) {
@@ -1901,15 +1859,6 @@ impl StatsLogger {
             _7d_counters_inspect_node,
             _time_series_inspect_node,
         }
-    }
-
-    /// Replace Cobalt proxy with a new one. Used when the Cobalt proxy instance has to
-    /// be recreated to update an experiment.
-    pub fn replace_cobalt_proxy(
-        &mut self,
-        cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
-    ) {
-        self.cobalt_1dot1_proxy = cobalt_1dot1_proxy;
     }
 
     async fn log_stat(&mut self, stat_op: StatOp) {
@@ -2128,7 +2077,7 @@ impl StatsLogger {
         let roam_dpdc_ratio = c.roaming_disconnect_count as f64 / connected_dur_in_day;
         if roam_dpdc_ratio.is_finite() {
             metric_events.push(MetricEvent {
-                metric_id: metrics::ROAMING_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID,
+                metric_id: metrics::POLICY_ROAM_DISCONNECT_COUNT_PER_DAY_CONNECTED_METRIC_ID,
                 event_codes: vec![],
                 payload: MetricEventPayload::IntegerValue(float_to_ten_thousandth(roam_dpdc_ratio)),
             });
@@ -2137,7 +2086,7 @@ impl StatsLogger {
         let non_roam_dpdc_ratio = c.non_roaming_disconnect_count as f64 / connected_dur_in_day;
         if non_roam_dpdc_ratio.is_finite() {
             metric_events.push(MetricEvent {
-                metric_id: metrics::NON_ROAMING_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID,
+                metric_id: metrics::NON_ROAM_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID,
                 event_codes: vec![],
                 payload: MetricEventPayload::IntegerValue(float_to_ten_thousandth(
                     non_roam_dpdc_ratio,
@@ -2575,24 +2524,25 @@ impl StatsLogger {
             // if it is another user reason such as an unsaved network.
             if is_roam_disconnect(reason) {
                 metric_events.push(MetricEvent {
-                    metric_id: metrics::CONNECTED_DURATION_BEFORE_ROAMING_DISCONNECT_METRIC_ID,
+                    metric_id:
+                        metrics::POLICY_ROAM_CONNECTED_DURATION_BEFORE_ROAM_ATTEMPT_METRIC_ID,
                     event_codes: vec![],
                     payload: MetricEventPayload::IntegerValue(duration_minutes),
                 });
                 metric_events.push(MetricEvent {
-                    metric_id: metrics::NETWORK_ROAMING_DISCONNECT_COUNTS_METRIC_ID,
+                    metric_id: metrics::POLICY_ROAM_DISCONNECT_COUNT_METRIC_ID,
                     event_codes: vec![],
                     payload: MetricEventPayload::Count(1),
                 });
             }
         } else {
             metric_events.push(MetricEvent {
-                metric_id: metrics::CONNECTED_DURATION_BEFORE_NON_ROAMING_DISCONNECT_METRIC_ID,
+                metric_id: metrics::CONNECTED_DURATION_BEFORE_NON_ROAM_DISCONNECT_METRIC_ID,
                 event_codes: vec![],
                 payload: MetricEventPayload::IntegerValue(duration_minutes),
             });
             metric_events.push(MetricEvent {
-                metric_id: metrics::NETWORK_NON_ROAMING_DISCONNECT_COUNTS_METRIC_ID,
+                metric_id: metrics::NON_ROAM_DISCONNECT_COUNTS_METRIC_ID,
                 event_codes: vec![],
                 payload: MetricEventPayload::Count(1),
             });
@@ -2962,7 +2912,7 @@ impl StatsLogger {
         if let fidl_sme::DisconnectSource::User(reason) = disconnect_reason {
             if is_roam_disconnect(reason) {
                 metric_events.push(MetricEvent {
-                    metric_id: metrics::ROAMING_RECONNECT_DURATION_METRIC_ID,
+                    metric_id: metrics::POLICY_ROAM_RECONNECT_DURATION_METRIC_ID,
                     event_codes: vec![],
                     payload: MetricEventPayload::IntegerValue(reconnect_duration.into_micros()),
                 });
@@ -2970,7 +2920,7 @@ impl StatsLogger {
         } else {
             // The other disconnect sources are AP and MLME, which are all considered unexpected.
             metric_events.push(MetricEvent {
-                metric_id: metrics::NON_ROAMING_RECONNECT_DURATION_METRIC_ID,
+                metric_id: metrics::NON_ROAM_RECONNECT_DURATION_METRIC_ID,
                 event_codes: vec![],
                 payload: MetricEventPayload::IntegerValue(reconnect_duration.into_micros()),
             });
@@ -3100,7 +3050,7 @@ impl StatsLogger {
         self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
             self.cobalt_1dot1_proxy,
             log_occurrence,
-            metrics::POLICY_PROACTIVE_ROAMING_SCAN_COUNTS_METRIC_ID,
+            metrics::POLICY_ROAM_SCAN_COUNT_METRIC_ID,
             1,
             &[],
         ));
@@ -3113,7 +3063,7 @@ impl StatsLogger {
         self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
             self.cobalt_1dot1_proxy,
             log_occurrence,
-            metrics::NETWORK_ROAMING_DISCONNECT_COUNTS_METRIC_ID,
+            metrics::POLICY_ROAM_DISCONNECT_COUNT_METRIC_ID,
             1,
             &[],
         ));
@@ -4483,7 +4433,6 @@ mod tests {
     };
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_metrics::{MetricEvent, MetricEventLoggerRequest, MetricEventPayload};
-    use fidl_fuchsia_wlan_common as fidl_common;
     use fuchsia_inspect::reader;
     use futures::stream::FusedStream;
     use futures::task::Poll;
@@ -4661,10 +4610,6 @@ mod tests {
             TelemetrySender::new(sender),
             monitor_svc_proxy,
             cobalt_1dot1_proxy.clone(),
-            Box::new(move |_experiments| {
-                let cobalt_1dot1_proxy = cobalt_1dot1_proxy.clone();
-                async move { Ok(cobalt_1dot1_proxy) }.boxed()
-            }),
             inspect_node,
             external_inspect_node,
             persistence_req_sender,
@@ -4681,7 +4626,7 @@ mod tests {
 
             // The rest of the fields don't matter for this test case.
             new_connect_start_time: None,
-            prev_counters: None,
+            prev_connection_counters: None,
             multiple_bss_candidates: false,
             network_is_likely_hidden: false,
             last_signal_report: fasync::MonotonicInstant::now(),
@@ -5029,33 +4974,6 @@ mod tests {
         let total_duration_sec: Vec<_> =
             time_series.lock().total_duration_sec.minutely_iter().copied().collect();
         assert_eq!(total_duration_sec, vec![30]);
-    }
-
-    /// This test is to verify that after a `TelemetryEvent::UpdateExperiment`,
-    /// the `1d_counters` and `7d_counters` in Inspect LazyNode are still valid,
-    /// ensuring that the regression from https://fxbug.dev/42071769 is not introduced
-    #[fuchsia::test]
-    fn test_counters_after_update_experiment() {
-        let (mut test_helper, mut test_fut) = setup_test();
-
-        test_helper.telemetry_sender.send(TelemetryEvent::UpdateExperiment {
-            experiment: experiment::ExperimentUpdate::Power(
-                fidl_common::PowerSaveType::PsModeLowPower,
-            ),
-        });
-        assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
-
-        test_helper.advance_by(zx::MonotonicDuration::from_minutes(1), test_fut.as_mut());
-        assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
-            stats: contains {
-                "1d_counters": contains {
-                    total_duration: zx::MonotonicDuration::from_minutes(1).into_nanos(),
-                },
-                "7d_counters": contains {
-                    total_duration: zx::MonotonicDuration::from_minutes(1).into_nanos(),
-                },
-            }
-        });
     }
 
     #[fuchsia::test]
@@ -5618,9 +5536,12 @@ mod tests {
         test_helper.set_counter_stats_resp(Box::new(|| {
             let seed = fasync::MonotonicInstant::now().into_nanos() as u64;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                tx_total: Some(10 * seed),
-                tx_drop: Some(3 * seed),
-                ..fake_iface_counter_stats(seed)
+                connection_counters: Some(fidl_fuchsia_wlan_stats::ConnectionCounters {
+                    tx_total: Some(10 * seed),
+                    tx_drop: Some(3 * seed),
+                    ..fake_connection_counters(seed)
+                }),
+                ..Default::default()
             })
         }));
 
@@ -5657,9 +5578,12 @@ mod tests {
         test_helper.set_counter_stats_resp(Box::new(|| {
             let seed = fasync::MonotonicInstant::now().into_nanos() as u64;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                rx_unicast_total: Some(10 * seed),
-                rx_unicast_drop: Some(3 * seed),
-                ..fake_iface_counter_stats(seed)
+                connection_counters: Some(fidl_fuchsia_wlan_stats::ConnectionCounters {
+                    rx_unicast_total: Some(10 * seed),
+                    rx_unicast_drop: Some(3 * seed),
+                    ..fake_connection_counters(seed)
+                }),
+                ..Default::default()
             })
         }));
 
@@ -5696,12 +5620,15 @@ mod tests {
         test_helper.set_counter_stats_resp(Box::new(|| {
             let seed = fasync::MonotonicInstant::now().into_nanos() as u64;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                // 3% drop rate would be high, but not very high
-                rx_unicast_total: Some(100 * seed),
-                rx_unicast_drop: Some(3 * seed),
-                tx_total: Some(100 * seed),
-                tx_drop: Some(3 * seed),
-                ..fake_iface_counter_stats(seed)
+                connection_counters: Some(fidl_fuchsia_wlan_stats::ConnectionCounters {
+                    // 3% drop rate would be high, but not very high
+                    rx_unicast_total: Some(100 * seed),
+                    rx_unicast_drop: Some(3 * seed),
+                    tx_total: Some(100 * seed),
+                    tx_drop: Some(3 * seed),
+                    ..fake_connection_counters(seed)
+                }),
+                ..Default::default()
             })
         }));
 
@@ -5741,11 +5668,14 @@ mod tests {
                 - fasync::MonotonicInstant::from_nanos(0i64))
             .into_seconds() as u64;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                rx_unicast_total: Some(100 * seed),
-                rx_unicast_drop: Some(3 * seed),
-                tx_total: Some(10 * seed),
-                tx_drop: Some(2 * seed),
-                ..fake_iface_counter_stats(seed)
+                connection_counters: Some(fidl_fuchsia_wlan_stats::ConnectionCounters {
+                    rx_unicast_total: Some(100 * seed),
+                    rx_unicast_drop: Some(3 * seed),
+                    tx_total: Some(10 * seed),
+                    tx_drop: Some(2 * seed),
+                    ..fake_connection_counters(seed)
+                }),
+                ..Default::default()
             })
         }));
 
@@ -5781,8 +5711,11 @@ mod tests {
         test_helper.set_counter_stats_resp(Box::new(|| {
             let seed = fasync::MonotonicInstant::now().into_nanos() as u64;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                rx_unicast_total: Some(10),
-                ..fake_iface_counter_stats(seed)
+                connection_counters: Some(fidl_fuchsia_wlan_stats::ConnectionCounters {
+                    rx_unicast_total: Some(10),
+                    ..fake_connection_counters(seed)
+                }),
+                ..Default::default()
             })
         }));
 
@@ -5819,8 +5752,11 @@ mod tests {
         test_helper.set_counter_stats_resp(Box::new(|| {
             let seed = fasync::MonotonicInstant::now().into_nanos() as u64;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                rx_unicast_total: Some(10),
-                ..fake_iface_counter_stats(seed)
+                connection_counters: Some(fidl_fuchsia_wlan_stats::ConnectionCounters {
+                    rx_unicast_total: Some(10),
+                    ..fake_connection_counters(seed)
+                }),
+                ..Default::default()
             })
         }));
 
@@ -5984,12 +5920,12 @@ mod tests {
 
         // 1 roaming disconnect, 0.5 day connected => 2 roaming disconnects per day connected
         let non_roam_dpdc_ratios = test_helper
-            .get_logged_metrics(metrics::NON_ROAMING_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID);
+            .get_logged_metrics(metrics::NON_ROAM_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID);
         assert_eq!(non_roam_dpdc_ratios.len(), 1);
         assert_eq!(non_roam_dpdc_ratios[0].payload, MetricEventPayload::IntegerValue(20_000));
 
-        let roam_dpdc_ratios =
-            test_helper.get_logged_metrics(metrics::ROAMING_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID);
+        let roam_dpdc_ratios = test_helper
+            .get_logged_metrics(metrics::POLICY_ROAM_DISCONNECT_COUNT_PER_DAY_CONNECTED_METRIC_ID);
         assert_eq!(roam_dpdc_ratios.len(), 1);
         assert_eq!(roam_dpdc_ratios[0].payload, MetricEventPayload::IntegerValue(20_000));
 
@@ -6014,7 +5950,7 @@ mod tests {
         assert_eq!(dpdc_ratios[0].payload, MetricEventPayload::IntegerValue(0));
 
         let non_roam_dpdc_ratios = test_helper
-            .get_logged_metrics(metrics::NON_ROAMING_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID);
+            .get_logged_metrics(metrics::NON_ROAM_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID);
         assert_eq!(non_roam_dpdc_ratios.len(), 1);
         assert_eq!(non_roam_dpdc_ratios[0].payload, MetricEventPayload::IntegerValue(0));
 
@@ -6025,8 +5961,8 @@ mod tests {
         // (which equals 20,000 in TenThousandth unit)
         assert_eq!(dpdc_ratios_7d[0].payload, MetricEventPayload::IntegerValue(20_000));
 
-        let roam_dpdc_ratios =
-            test_helper.get_logged_metrics(metrics::ROAMING_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID);
+        let roam_dpdc_ratios = test_helper
+            .get_logged_metrics(metrics::POLICY_ROAM_DISCONNECT_COUNT_PER_DAY_CONNECTED_METRIC_ID);
         assert_eq!(roam_dpdc_ratios.len(), 1);
         assert_eq!(roam_dpdc_ratios[0].payload, MetricEventPayload::IntegerValue(0));
     }
@@ -6060,12 +5996,12 @@ mod tests {
         assert_eq!(dpdc_ratios[0].payload, MetricEventPayload::IntegerValue(20_000));
 
         let non_roam_dpdc_ratios = test_helper
-            .get_logged_metrics(metrics::NON_ROAMING_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID);
+            .get_logged_metrics(metrics::NON_ROAM_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID);
         assert_eq!(non_roam_dpdc_ratios.len(), 1);
         assert_eq!(non_roam_dpdc_ratios[0].payload, MetricEventPayload::IntegerValue(0));
 
-        let roam_dpdc_ratios =
-            test_helper.get_logged_metrics(metrics::ROAMING_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID);
+        let roam_dpdc_ratios = test_helper
+            .get_logged_metrics(metrics::POLICY_ROAM_DISCONNECT_COUNT_PER_DAY_CONNECTED_METRIC_ID);
         assert_eq!(roam_dpdc_ratios.len(), 1);
         assert_eq!(roam_dpdc_ratios[0].payload, MetricEventPayload::IntegerValue(20_000));
     }
@@ -6092,30 +6028,33 @@ mod tests {
         test_helper.set_counter_stats_resp(Box::new(|| {
             let seed = fasync::MonotonicInstant::now().into_nanos() as u64 / 1_000_000_000;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                tx_total: Some(10 * seed),
-                // TX drop rate stops increasing at 1 hour + TELEMETRY_QUERY_INTERVAL mark.
-                // Because the first TELEMETRY_QUERY_INTERVAL doesn't count when
-                // computing counters, this leads to 3 hour of high TX drop rate.
-                tx_drop: Some(
-                    3 * min(
-                        seed,
-                        (zx::MonotonicDuration::from_hours(3) + TELEMETRY_QUERY_INTERVAL)
-                            .into_seconds() as u64,
+                connection_counters: Some(fidl_fuchsia_wlan_stats::ConnectionCounters {
+                    tx_total: Some(10 * seed),
+                    // TX drop rate stops increasing at 1 hour + TELEMETRY_QUERY_INTERVAL mark.
+                    // Because the first TELEMETRY_QUERY_INTERVAL doesn't count when
+                    // computing counters, this leads to 3 hour of high TX drop rate.
+                    tx_drop: Some(
+                        3 * min(
+                            seed,
+                            (zx::MonotonicDuration::from_hours(3) + TELEMETRY_QUERY_INTERVAL)
+                                .into_seconds() as u64,
+                        ),
                     ),
-                ),
-                // RX total stops increasing at 23 hour mark
-                rx_unicast_total: Some(
-                    10 * min(seed, zx::MonotonicDuration::from_hours(23).into_seconds() as u64),
-                ),
-                // RX drop rate stops increasing at 4 hour + TELEMETRY_QUERY_INTERVAL mark.
-                rx_unicast_drop: Some(
-                    3 * min(
-                        seed,
-                        (zx::MonotonicDuration::from_hours(4) + TELEMETRY_QUERY_INTERVAL)
-                            .into_seconds() as u64,
+                    // RX total stops increasing at 23 hour mark
+                    rx_unicast_total: Some(
+                        10 * min(seed, zx::MonotonicDuration::from_hours(23).into_seconds() as u64),
                     ),
-                ),
-                ..fake_iface_counter_stats(seed)
+                    // RX drop rate stops increasing at 4 hour + TELEMETRY_QUERY_INTERVAL mark.
+                    rx_unicast_drop: Some(
+                        3 * min(
+                            seed,
+                            (zx::MonotonicDuration::from_hours(4) + TELEMETRY_QUERY_INTERVAL)
+                                .into_seconds() as u64,
+                        ),
+                    ),
+                    ..fake_connection_counters(seed)
+                }),
+                ..Default::default()
             })
         }));
 
@@ -6297,30 +6236,36 @@ mod tests {
         test_helper.set_counter_stats_resp(Box::new(|| {
             let seed = fasync::MonotonicInstant::now().into_nanos() as u64 / 1_000_000_000;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                tx_total: Some(10 * seed),
-                // TX drop rate stops increasing at 10 min + TELEMETRY_QUERY_INTERVAL mark.
-                // Because the first TELEMETRY_QUERY_INTERVAL doesn't count when
-                // computing counters, this leads to 10 min of high TX drop rate.
-                tx_drop: Some(
-                    3 * min(
-                        seed,
-                        (zx::MonotonicDuration::from_minutes(10) + TELEMETRY_QUERY_INTERVAL)
-                            .into_seconds() as u64,
+                connection_counters: Some(fidl_fuchsia_wlan_stats::ConnectionCounters {
+                    tx_total: Some(10 * seed),
+                    // TX drop rate stops increasing at 10 min + TELEMETRY_QUERY_INTERVAL mark.
+                    // Because the first TELEMETRY_QUERY_INTERVAL doesn't count when
+                    // computing counters, this leads to 10 min of high TX drop rate.
+                    tx_drop: Some(
+                        3 * min(
+                            seed,
+                            (zx::MonotonicDuration::from_minutes(10) + TELEMETRY_QUERY_INTERVAL)
+                                .into_seconds() as u64,
+                        ),
                     ),
-                ),
-                // RX total stops increasing at 45 min mark
-                rx_unicast_total: Some(
-                    10 * min(seed, zx::MonotonicDuration::from_minutes(45).into_seconds() as u64),
-                ),
-                // RX drop rate stops increasing at 20 min + TELEMETRY_QUERY_INTERVAL mark.
-                rx_unicast_drop: Some(
-                    3 * min(
-                        seed,
-                        (zx::MonotonicDuration::from_minutes(20) + TELEMETRY_QUERY_INTERVAL)
-                            .into_seconds() as u64,
+                    // RX total stops increasing at 45 min mark
+                    rx_unicast_total: Some(
+                        10 * min(
+                            seed,
+                            zx::MonotonicDuration::from_minutes(45).into_seconds() as u64,
+                        ),
                     ),
-                ),
-                ..fake_iface_counter_stats(seed)
+                    // RX drop rate stops increasing at 20 min + TELEMETRY_QUERY_INTERVAL mark.
+                    rx_unicast_drop: Some(
+                        3 * min(
+                            seed,
+                            (zx::MonotonicDuration::from_minutes(20) + TELEMETRY_QUERY_INTERVAL)
+                                .into_seconds() as u64,
+                        ),
+                    ),
+                    ..fake_connection_counters(seed)
+                }),
+                ..Default::default()
             })
         }));
 
@@ -6736,13 +6681,13 @@ mod tests {
         assert_eq!(breakdowns_by_security_type[0].payload, MetricEventPayload::Count(1));
 
         // Check that non-roaming and total disconnects are logged but not a roaming disconnect.
-        let roam_connected_duration = test_helper
-            .get_logged_metrics(metrics::CONNECTED_DURATION_BEFORE_ROAMING_DISCONNECT_METRIC_ID);
+        let roam_connected_duration = test_helper.get_logged_metrics(
+            metrics::POLICY_ROAM_CONNECTED_DURATION_BEFORE_ROAM_ATTEMPT_METRIC_ID,
+        );
         assert_eq!(roam_connected_duration.len(), 0);
 
-        let non_roam_connected_duration = test_helper.get_logged_metrics(
-            metrics::CONNECTED_DURATION_BEFORE_NON_ROAMING_DISCONNECT_METRIC_ID,
-        );
+        let non_roam_connected_duration = test_helper
+            .get_logged_metrics(metrics::CONNECTED_DURATION_BEFORE_NON_ROAM_DISCONNECT_METRIC_ID);
         assert_eq!(non_roam_connected_duration.len(), 1);
         assert_eq!(non_roam_connected_duration[0].payload, MetricEventPayload::IntegerValue(300));
 
@@ -6756,11 +6701,11 @@ mod tests {
         assert!(user_network_change_counts.is_empty());
 
         let roam_disconnect_counts =
-            test_helper.get_logged_metrics(metrics::NETWORK_ROAMING_DISCONNECT_COUNTS_METRIC_ID);
+            test_helper.get_logged_metrics(metrics::POLICY_ROAM_DISCONNECT_COUNT_METRIC_ID);
         assert!(roam_disconnect_counts.is_empty());
 
-        let non_roam_disconnect_counts = test_helper
-            .get_logged_metrics(metrics::NETWORK_NON_ROAMING_DISCONNECT_COUNTS_METRIC_ID);
+        let non_roam_disconnect_counts =
+            test_helper.get_logged_metrics(metrics::NON_ROAM_DISCONNECT_COUNTS_METRIC_ID);
         assert_eq!(non_roam_disconnect_counts.len(), 1);
         assert_eq!(non_roam_disconnect_counts[0].payload, MetricEventPayload::Count(1));
 
@@ -6795,14 +6740,14 @@ mod tests {
 
         // Check that connected durations for roam and total disconnects are logged, and not for
         // a non-roaming disconnect.
-        let roam_connected_duration = test_helper
-            .get_logged_metrics(metrics::CONNECTED_DURATION_BEFORE_ROAMING_DISCONNECT_METRIC_ID);
+        let roam_connected_duration = test_helper.get_logged_metrics(
+            metrics::POLICY_ROAM_CONNECTED_DURATION_BEFORE_ROAM_ATTEMPT_METRIC_ID,
+        );
         assert_eq!(roam_connected_duration.len(), 1);
         assert_eq!(roam_connected_duration[0].payload, MetricEventPayload::IntegerValue(DUR_MIN));
 
-        let non_roam_connected_duration = test_helper.get_logged_metrics(
-            metrics::CONNECTED_DURATION_BEFORE_NON_ROAMING_DISCONNECT_METRIC_ID,
-        );
+        let non_roam_connected_duration = test_helper
+            .get_logged_metrics(metrics::CONNECTED_DURATION_BEFORE_NON_ROAM_DISCONNECT_METRIC_ID);
         assert_eq!(non_roam_connected_duration.len(), 0);
 
         let total_connected_duration =
@@ -6817,12 +6762,12 @@ mod tests {
 
         // Check that a roam and total disconnect is logged, and not a non-roaming disconnect.
         let roam_disconnect_counts =
-            test_helper.get_logged_metrics(metrics::NETWORK_ROAMING_DISCONNECT_COUNTS_METRIC_ID);
+            test_helper.get_logged_metrics(metrics::POLICY_ROAM_DISCONNECT_COUNT_METRIC_ID);
         assert_eq!(roam_disconnect_counts.len(), 1);
         assert_eq!(roam_disconnect_counts[0].payload, MetricEventPayload::Count(1));
 
-        let non_roam_disconnect_counts = test_helper
-            .get_logged_metrics(metrics::NETWORK_NON_ROAMING_DISCONNECT_COUNTS_METRIC_ID);
+        let non_roam_disconnect_counts =
+            test_helper.get_logged_metrics(metrics::NON_ROAM_DISCONNECT_COUNTS_METRIC_ID);
         assert!(non_roam_disconnect_counts.is_empty());
 
         let total_disconnect_counts =
@@ -6861,21 +6806,21 @@ mod tests {
         assert_eq!(user_network_change_counts[0].payload, MetricEventPayload::Count(1));
 
         // Check that nothing was logged for roaming and non-roaming disconnects.
-        let roam_connected_duration = test_helper
-            .get_logged_metrics(metrics::CONNECTED_DURATION_BEFORE_ROAMING_DISCONNECT_METRIC_ID);
+        let roam_connected_duration = test_helper.get_logged_metrics(
+            metrics::POLICY_ROAM_CONNECTED_DURATION_BEFORE_ROAM_ATTEMPT_METRIC_ID,
+        );
         assert_eq!(roam_connected_duration.len(), 0);
 
-        let non_roam_connected_duration = test_helper.get_logged_metrics(
-            metrics::CONNECTED_DURATION_BEFORE_NON_ROAMING_DISCONNECT_METRIC_ID,
-        );
+        let non_roam_connected_duration = test_helper
+            .get_logged_metrics(metrics::CONNECTED_DURATION_BEFORE_NON_ROAM_DISCONNECT_METRIC_ID);
         assert_eq!(non_roam_connected_duration.len(), 0);
 
         let roam_disconnect_counts =
-            test_helper.get_logged_metrics(metrics::NETWORK_ROAMING_DISCONNECT_COUNTS_METRIC_ID);
+            test_helper.get_logged_metrics(metrics::POLICY_ROAM_DISCONNECT_COUNT_METRIC_ID);
         assert!(roam_disconnect_counts.is_empty());
 
-        let non_roam_disconnect_counts = test_helper
-            .get_logged_metrics(metrics::NETWORK_NON_ROAMING_DISCONNECT_COUNTS_METRIC_ID);
+        let non_roam_disconnect_counts =
+            test_helper.get_logged_metrics(metrics::NON_ROAM_DISCONNECT_COUNTS_METRIC_ID);
         assert!(non_roam_disconnect_counts.is_empty());
 
         // Check that a connected duration and a count were logged for overall disconnects.
@@ -7574,11 +7519,11 @@ mod tests {
         // Verify the reconnect duration was logged for an unexpected disconnect and not a roam.
         // 3 seconds would be sent as 3,000,000 microseconds.
         let metrics =
-            test_helper.get_logged_metrics(metrics::NON_ROAMING_RECONNECT_DURATION_METRIC_ID);
+            test_helper.get_logged_metrics(metrics::NON_ROAM_RECONNECT_DURATION_METRIC_ID);
         assert_eq!(metrics.len(), 1);
         assert_eq!(metrics[0].payload, MetricEventPayload::IntegerValue(3_000_000));
         assert_eq!(
-            test_helper.get_logged_metrics(metrics::ROAMING_RECONNECT_DURATION_METRIC_ID).len(),
+            test_helper.get_logged_metrics(metrics::POLICY_ROAM_RECONNECT_DURATION_METRIC_ID).len(),
             0
         );
 
@@ -7602,11 +7547,11 @@ mod tests {
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         test_helper.drain_cobalt_events(&mut test_fut);
         let roam_reconnect =
-            test_helper.get_logged_metrics(metrics::ROAMING_RECONNECT_DURATION_METRIC_ID);
+            test_helper.get_logged_metrics(metrics::POLICY_ROAM_RECONNECT_DURATION_METRIC_ID);
         assert_eq!(roam_reconnect.len(), 1);
         assert_eq!(roam_reconnect[0].payload, MetricEventPayload::IntegerValue(downtime));
         let non_roam_reconnect =
-            test_helper.get_logged_metrics(metrics::NON_ROAMING_RECONNECT_DURATION_METRIC_ID);
+            test_helper.get_logged_metrics(metrics::NON_ROAM_RECONNECT_DURATION_METRIC_ID);
         assert_eq!(non_roam_reconnect.len(), 0);
     }
 
@@ -7908,8 +7853,7 @@ mod tests {
         test_helper.drain_cobalt_events(&mut test_fut);
 
         // Check that the event was logged to cobalt.
-        let metrics =
-            test_helper.get_logged_metrics(metrics::POLICY_PROACTIVE_ROAMING_SCAN_COUNTS_METRIC_ID);
+        let metrics = test_helper.get_logged_metrics(metrics::POLICY_ROAM_SCAN_COUNT_METRIC_ID);
         assert_eq!(metrics.len(), 1);
         assert_eq!(metrics[0].payload, MetricEventPayload::Count(1));
     }
@@ -8067,23 +8011,17 @@ mod tests {
         ApiFailure,
     }
 
-    #[test_case(None, CreateMetricsLoggerFailureMode::None)]
-    #[test_case(None, CreateMetricsLoggerFailureMode::FactoryRequest)]
-    #[test_case(None, CreateMetricsLoggerFailureMode::ApiFailure)]
-    #[test_case(Some(vec![123]), CreateMetricsLoggerFailureMode::None)]
-    #[test_case(Some(vec![123]), CreateMetricsLoggerFailureMode::FactoryRequest)]
-    #[test_case(Some(vec![123]), CreateMetricsLoggerFailureMode::ApiFailure)]
+    #[test_case(CreateMetricsLoggerFailureMode::None)]
+    #[test_case(CreateMetricsLoggerFailureMode::FactoryRequest)]
+    #[test_case(CreateMetricsLoggerFailureMode::ApiFailure)]
     #[fuchsia::test]
-    fn test_create_metrics_logger(
-        experiment_id: Option<Vec<u32>>,
-        failure_mode: CreateMetricsLoggerFailureMode,
-    ) {
+    fn test_create_metrics_logger(failure_mode: CreateMetricsLoggerFailureMode) {
         let mut exec = fasync::TestExecutor::new();
         let (factory_proxy, mut factory_stream) = fidl::endpoints::create_proxy_and_stream::<
             fidl_fuchsia_metrics::MetricEventLoggerFactoryMarker,
         >();
 
-        let fut = create_metrics_logger(&factory_proxy, experiment_id.clone());
+        let fut = create_metrics_logger(&factory_proxy);
         let mut fut = pin!(fut);
 
         // First, test the case where the factory service cannot be reached and expect an error.
@@ -8097,26 +8035,18 @@ mod tests {
         // request future until stalled.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
-        // Depending on whether or not we specified an experiment ID, we expect different API
-        // requests.
         let request = exec.run_until_stalled(&mut factory_stream.next());
-        let expected_experiments = match experiment_id {
-            Some(experiment_ids) => experiment_ids,
-            None => experiment::default_experiments(),
-        };
         assert_variant!(
             request,
-            Poll::Ready(Some(Ok(fidl_fuchsia_metrics::MetricEventLoggerFactoryRequest::CreateMetricEventLoggerWithExperiments {
+            Poll::Ready(Some(Ok(fidl_fuchsia_metrics::MetricEventLoggerFactoryRequest::CreateMetricEventLogger {
                 project_spec: fidl_fuchsia_metrics::ProjectSpec {
                     customer_id: None,
                     project_id: Some(metrics::PROJECT_ID),
                     ..
                 },
-                experiment_ids,
                 responder,
                 ..
             }))) => {
-                assert_eq!(experiment_ids, expected_experiments);
                 match failure_mode {
                     CreateMetricsLoggerFailureMode::FactoryRequest => panic!("The factory request failure should have been handled already."),
                     CreateMetricsLoggerFailureMode::None => responder.send(Ok(())).expect("failed to send response"),
@@ -10035,7 +9965,10 @@ mod tests {
                         Some(get_resp) => get_resp(),
                         None => {
                             let seed = fasync::MonotonicInstant::now().into_nanos() as u64;
-                            Ok(fake_iface_counter_stats(seed))
+                            Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
+                                connection_counters: Some(fake_connection_counters(seed)),
+                                ..Default::default()
+                            })
                         }
                     };
                     responder
@@ -10189,10 +10122,6 @@ mod tests {
         let (telemetry_sender, test_fut) = serve_telemetry(
             monitor_svc_proxy,
             cobalt_1dot1_proxy.clone(),
-            Box::new(move |_experiments| {
-                let cobalt_1dot1_proxy = cobalt_1dot1_proxy.clone();
-                async move { Ok(cobalt_1dot1_proxy) }.boxed()
-            }),
             inspect_node,
             external_inspect_node.create_child("stats"),
             persistence_req_sender,
@@ -10218,8 +10147,9 @@ mod tests {
         (test_helper, test_fut)
     }
 
-    fn fake_iface_counter_stats(nth_req: u64) -> fidl_fuchsia_wlan_stats::IfaceCounterStats {
-        fidl_fuchsia_wlan_stats::IfaceCounterStats {
+    fn fake_connection_counters(nth_req: u64) -> fidl_fuchsia_wlan_stats::ConnectionCounters {
+        fidl_fuchsia_wlan_stats::ConnectionCounters {
+            connection_id: Some(1),
             rx_unicast_total: Some(nth_req),
             rx_unicast_drop: Some(0),
             rx_multicast: Some(2 * nth_req),

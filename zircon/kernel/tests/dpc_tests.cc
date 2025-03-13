@@ -9,6 +9,7 @@
 #include <arch/arch_ops.h>
 #include <arch/mp.h>
 #include <fbl/alloc_checker.h>
+#include <fbl/array.h>
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/cpu.h>
 #include <kernel/dpc.h>
@@ -21,58 +22,54 @@
 
 #include <ktl/enforce.h>
 
-struct event_signal_from_dpc_context {
-  Dpc dpc;
-  Event event;
-  ktl::atomic<cpu_num_t> expected_cpu;
-  ktl::atomic<bool> dpc_started;
-};
-
-static void event_signal_from_dpc_check_cpu(Dpc* dpc) {
-  auto* const context = dpc->arg<event_signal_from_dpc_context>();
-  context->dpc_started = true;
-
-  // DPCs allow interrupts and blocking.
-  DEBUG_ASSERT(!arch_ints_disabled());
-  DEBUG_ASSERT(!arch_blocking_disallowed());
-  DEBUG_ASSERT(context->expected_cpu == arch_curr_cpu_num());
-
-  context->event.Signal();
-}
-
 static bool test_dpc_queue() {
   BEGIN_TEST;
+
+  struct Context {
+    Context() : dpc(&SignalEvent, &dpc) {}
+
+    static void SignalEvent(Dpc* dpc) {
+      auto* const context = dpc->arg<Context>();
+      context->dpc_started = true;
+
+      // DPCs allow interrupts and blocking.
+      DEBUG_ASSERT(!arch_ints_disabled());
+      DEBUG_ASSERT(!arch_blocking_disallowed());
+      DEBUG_ASSERT(context->expected_cpu == arch_curr_cpu_num());
+
+      context->event.Signal();
+    }
+
+    Dpc dpc;
+    Event event;
+    ktl::atomic<cpu_num_t> expected_cpu;
+    ktl::atomic<bool> dpc_started;
+  };
 
   static constexpr int kNumDPCs = 72;
 
   fbl::AllocChecker ac;
-  auto context = ktl::make_unique<ktl::array<event_signal_from_dpc_context, kNumDPCs>>(&ac);
+  auto context = fbl::MakeArray<Context>(&ac, kNumDPCs);
   ASSERT_TRUE(ac.check());
 
   // Init all the DPCs and supporting context.
   for (int i = 0; i < kNumDPCs; i++) {
-    (*context)[i].dpc_started = false;
+    context[i].dpc_started = false;
   }
 
   // Fire off DPCs.
   for (int i = 0; i < kNumDPCs; i++) {
     AutoPreemptDisabler preempt_disable;
-    (*context)[i].dpc =
-        Dpc{&event_signal_from_dpc_check_cpu, reinterpret_cast<void*>(&(*context)[i])};
     interrupt_saved_state_t int_state = arch_interrupt_save();
-    (*context)[i].expected_cpu = arch_curr_cpu_num();
-    (*context)[i].dpc.Queue();
+    context[i].expected_cpu = arch_curr_cpu_num();
+    // Use a mix of both general and low-latency.
+    const DpcRunner::QueueType type =
+        (i % 2) ? DpcRunner::QueueType::General : DpcRunner::QueueType::LowLatency;
+    DpcRunner::Enqueue(context[i].dpc, type);
     arch_interrupt_restore(int_state);
   }
   for (int i = 0; i < kNumDPCs; i++) {
-    if ((*context)[i].dpc_started) {
-      // Once the DPC has started executing, we can reclaim the submitted Dpc. Zero it to
-      // try to check this.
-      (*context)[i].dpc = Dpc();
-    }
-  }
-  for (int i = 0; i < kNumDPCs; i++) {
-    (*context)[i].event.Wait();
+    context[i].event.Wait();
   }
 
   END_TEST;
@@ -98,7 +95,7 @@ static bool test_dpc_requeue() {
   for (unsigned i = 0; i < kNumIterations; ++i) {
     // If we queue faster than the DPC worker thread can dequeue, the call may fail with
     // ZX_ERR_ALREADY_EXISTS.  That's OK, we just won't increment |expected_count| in that case.
-    zx_status_t status = dpc_increment.Queue();
+    zx_status_t status = DpcRunner::Enqueue(dpc_increment);
     if (status == ZX_OK) {
       ++expected_count;
     } else {
@@ -109,7 +106,7 @@ static bool test_dpc_requeue() {
   // There might still be one DPC queued up for execution.  Wait for it to "flush" the queue.
   Event event_flush;
   Dpc dpc_flush([](Dpc* d) { d->arg<Event>()->Signal(); }, &event_flush);
-  dpc_flush.Queue();
+  DpcRunner::Enqueue(dpc_flush);
   event_flush.Wait(Deadline::no_slack(ZX_TIME_INFINITE));
 
   ASSERT_EQ(actual_count.load(), expected_count);
@@ -118,6 +115,6 @@ static bool test_dpc_requeue() {
 }
 
 UNITTEST_START_TESTCASE(dpc_tests)
-UNITTEST("basic test of dpc_queue", test_dpc_queue)
+UNITTEST("basic test of Dpc::Queue", test_dpc_queue)
 UNITTEST("repeatedly queue the same dpc", test_dpc_requeue)
 UNITTEST_END_TESTCASE(dpc_tests, "dpc_tests", "Tests of DPCs")

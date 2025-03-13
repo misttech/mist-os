@@ -646,7 +646,7 @@ fn cmd_stream(
                 .edit_mode(EditMode::Emacs)
                 .build();
             let c = CmdHelper::new(state);
-            let mut rl: Editor<CmdHelper, _> = Editor::with_config(config)?;
+            let mut rl: Editor<CmdHelper> = Editor::with_config(config);
             rl.set_helper(Some(c));
             loop {
                 let readline = rl.readline(PROMPT);

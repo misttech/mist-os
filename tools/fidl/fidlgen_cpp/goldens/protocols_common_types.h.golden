@@ -36,9 +36,9 @@ constexpr inline auto ToUnderlying(::test_protocols::ErrorEnum value) -> uint32_
 }
 
 template <>
-struct IsFidlType<::test_protocols::ErrorEnum> : public std::true_type{};
+struct IsFidlType<::test_protocols::ErrorEnum> : public std::true_type {};
 template <>
-struct ContainsHandle<::test_protocols::ErrorEnum> : public std::false_type{};
+struct ContainsHandle<::test_protocols::ErrorEnum> : public std::false_type {};
 
 #pragma clang diagnostic pop
 

@@ -10,7 +10,7 @@
 #include "src/__support/common.h"
 #include "src/unistd/_exit.h"
 
-namespace LIBC_NAMESPACE {
+namespace LIBC_NAMESPACE_DECL {
 namespace {
 
 [[noreturn]] void Exit(int status) noexcept {
@@ -35,4 +35,4 @@ LLVM_LIBC_FUNCTION(void, _Exit, (int status)) { Exit(status); }
 
 LLVM_LIBC_FUNCTION(void, _exit, (int status)) { Exit(status); }
 
-}  // namespace LIBC_NAMESPACE
+}  // namespace LIBC_NAMESPACE_DECL

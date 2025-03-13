@@ -37,7 +37,6 @@
 #include <fbl/macros.h>
 
 #include "src/storage/lib/vfs/cpp/inspect/node_operations.h"
-#include "src/storage/lib/vfs/cpp/journal/inspector_journal.h"
 #include "src/storage/lib/vfs/cpp/transaction/transaction_handler.h"
 #include "src/storage/lib/vfs/cpp/vfs.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
@@ -348,9 +347,6 @@ class Minfs final : public TransactionalFs {
   // Gets an immutable copy of offsets_.
   BlockOffsets GetBlockOffsets() const { return offsets_; }
 #endif
-
-  // Used by the disk inspector.
-  zx_status_t ReadBlock(blk_t start_block_num, void* out_data) const;
 
   const TransactionLimits& Limits() const { return limits_; }
 

@@ -50,11 +50,11 @@ TEST_F(TimerTest, Lambda) {
   sync_completion_t completion;
   Timer timer(dispatcher_loop_->dispatcher(), [&] { sync_completion_signal(&completion); });
 
-  constexpr zx_duration_t kDelay = ZX_MSEC(3);
-  zx_time_t start = zx_clock_get_monotonic();
+  constexpr zx_duration_mono_t kDelay = ZX_MSEC(3);
+  zx_instant_mono_t start = zx_clock_get_monotonic();
   timer.StartOneshot(kDelay);
   ASSERT_OK(sync_completion_wait(&completion, ZX_TIME_INFINITE));
-  zx_time_t end = zx_clock_get_monotonic();
+  zx_instant_mono_t end = zx_clock_get_monotonic();
 
   // Ensure that at least the specified amount of time has passed.
   ASSERT_GE(end - start, kDelay);
@@ -68,13 +68,13 @@ TEST_F(TimerTest, OneShot) {
 
   CreateTimer(callback);
 
-  zx_time_t start = zx_clock_get_monotonic();
-  constexpr zx_duration_t kDelay = ZX_MSEC(5);
+  zx_instant_mono_t start = zx_clock_get_monotonic();
+  constexpr zx_duration_mono_t kDelay = ZX_MSEC(5);
   ASSERT_OK(timer_info_->timer.StartOneshot(kDelay));
 
   // Ensure that the timer calls its callback.
   ASSERT_OK(sync_completion_wait(&timer_info_->completion, ZX_TIME_INFINITE));
-  zx_time_t end = zx_clock_get_monotonic();
+  zx_instant_mono_t end = zx_clock_get_monotonic();
   // Ensure that at least the specified amount of time has passed.
   ASSERT_GE(end - start, kDelay);
 
@@ -93,13 +93,13 @@ TEST_F(TimerTest, Periodic) {
 
   CreateTimer(callback);
 
-  constexpr zx_duration_t kInterval = ZX_MSEC(3);
+  constexpr zx_duration_mono_t kInterval = ZX_MSEC(3);
 
-  zx_time_t start = zx_clock_get_monotonic();
+  zx_instant_mono_t start = zx_clock_get_monotonic();
   ASSERT_OK(timer_info_->timer.StartPeriodic(kInterval));
   // Ensure completion of periodic timer
   ASSERT_OK(sync_completion_wait(&timer_info_->completion, ZX_TIME_INFINITE));
-  zx_time_t end = zx_clock_get_monotonic();
+  zx_instant_mono_t end = zx_clock_get_monotonic();
 
   ASSERT_OK(timer_info_->timer.Stop());
 
@@ -108,7 +108,7 @@ TEST_F(TimerTest, Periodic) {
 }
 
 TEST_F(TimerTest, StartTimerInCallback) {
-  constexpr zx_duration_t kDelay = ZX_MSEC(4);
+  constexpr zx_duration_mono_t kDelay = ZX_MSEC(4);
 
   auto callback = [](void* context) {
     auto info = static_cast<TimerInfo*>(context);
@@ -122,11 +122,11 @@ TEST_F(TimerTest, StartTimerInCallback) {
 
   CreateTimer(callback);
 
-  zx_time_t start = zx_clock_get_monotonic();
+  zx_instant_mono_t start = zx_clock_get_monotonic();
   ASSERT_OK(timer_info_->timer.StartOneshot(kDelay));
   // Ensure the completion is signaled
   ASSERT_OK(sync_completion_wait(&timer_info_->completion, ZX_TIME_INFINITE));
-  zx_time_t end = zx_clock_get_monotonic();
+  zx_instant_mono_t end = zx_clock_get_monotonic();
 
   // The nested timer waited twice as long, ensure the total wait is at least three times the delay.
   ASSERT_GE(end - start, 3 * kDelay);
@@ -144,12 +144,12 @@ TEST_F(TimerTest, StopTimerInCallback) {
 
   CreateTimer(callback);
 
-  constexpr zx_duration_t interval = ZX_MSEC(2);
-  zx_time_t start = zx_clock_get_monotonic();
+  constexpr zx_duration_mono_t interval = ZX_MSEC(2);
+  zx_instant_mono_t start = zx_clock_get_monotonic();
   ASSERT_OK(timer_info_->timer.StartPeriodic(interval));
   // Ensure the completion is signaled
   ASSERT_OK(sync_completion_wait(&timer_info_->completion, ZX_TIME_INFINITE));
-  zx_time_t end = zx_clock_get_monotonic();
+  zx_instant_mono_t end = zx_clock_get_monotonic();
 
   // The callback signaled on the second call, two intervals should have elapsed.
   ASSERT_GE(end - start, 2 * interval);
@@ -205,12 +205,12 @@ TEST_F(TimerTest, MultiThreadedDispatcher) {
 
   CreateTimer(callback);
 
-  constexpr zx_duration_t kInterval = ZX_MSEC(1);
-  zx_time_t start = zx_clock_get_monotonic();
+  constexpr zx_duration_mono_t kInterval = ZX_MSEC(1);
+  zx_instant_mono_t start = zx_clock_get_monotonic();
   ASSERT_OK(timer_info_->timer.StartPeriodic(kInterval));
 
   ASSERT_OK(sync_completion_wait(&timer_info_->completion, ZX_TIME_INFINITE));
-  zx_time_t end = zx_clock_get_monotonic();
+  zx_instant_mono_t end = zx_clock_get_monotonic();
 
   // The callback signaled on the second call, two intervals should have elapsed.
   ASSERT_GE(end - start, kIterations * kInterval);

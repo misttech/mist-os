@@ -19,7 +19,7 @@ use windowed_stats::experimental::series::interpolation::{Constant, LastSample};
 use windowed_stats::experimental::series::metadata::{BitSetMap, BitSetNode};
 use windowed_stats::experimental::series::statistic::Union;
 use windowed_stats::experimental::series::{SamplingProfile, TimeMatrix};
-use windowed_stats::experimental::serve::{InspectedTimeMatrix, TimeMatrixClient};
+use windowed_stats::experimental::serve::{InspectSender, InspectedTimeMatrix};
 use wlan_common::bss::BssDescription;
 use wlan_common::channel::Channel;
 use {
@@ -139,6 +139,7 @@ impl From<&fidl_sme::DisconnectSource> for InspectDisconnectSource {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct DisconnectInfo {
+    pub iface_id: u16,
     pub connected_duration: zx::MonotonicDuration,
     pub is_sme_reconnecting: bool,
     pub disconnect_source: fidl_sme::DisconnectSource,
@@ -158,29 +159,13 @@ pub struct ConnectDisconnectLogger {
 }
 
 impl ConnectDisconnectLogger {
-    pub fn new(
+    pub fn new<S: InspectSender>(
         cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
         inspect_node: &InspectNode,
         inspect_metadata_node: &InspectNode,
         inspect_metadata_path: &str,
         persistence_req_sender: auto_persist::PersistenceReqSender,
-        time_matrix_client: &TimeMatrixClient,
-    ) -> Self {
-        Self::new_helper(
-            cobalt_1dot1_proxy,
-            inspect_node,
-            inspect_metadata_node,
-            persistence_req_sender,
-            ConnectDisconnectTimeSeries::new(time_matrix_client, inspect_metadata_path),
-        )
-    }
-
-    fn new_helper(
-        cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
-        inspect_node: &InspectNode,
-        inspect_metadata_node: &InspectNode,
-        persistence_req_sender: auto_persist::PersistenceReqSender,
-        time_series_stats: ConnectDisconnectTimeSeries,
+        time_matrix_client: &S,
     ) -> Self {
         let connect_events = inspect_node.create_child("connect_events");
         let disconnect_events = inspect_node.create_child("disconnect_events");
@@ -198,7 +183,10 @@ impl ConnectDisconnectLogger {
                 persistence_req_sender,
             )),
             inspect_metadata_node: Mutex::new(InspectMetadataNode::new(inspect_metadata_node)),
-            time_series_stats,
+            time_series_stats: ConnectDisconnectTimeSeries::new(
+                time_matrix_client,
+                inspect_metadata_path,
+            ),
         };
         this.log_connection_state();
         this
@@ -313,7 +301,7 @@ struct ConnectDisconnectTimeSeries {
 }
 
 impl ConnectDisconnectTimeSeries {
-    pub fn new(client: &TimeMatrixClient, inspect_metadata_path: &str) -> Self {
+    pub fn new<S: InspectSender>(client: &S, inspect_metadata_path: &str) -> Self {
         let wlan_connectivity_states = client.inspect_time_matrix_with_metadata(
             "wlan_connectivity_states",
             TimeMatrix::<Union<u64>, LastSample>::new(
@@ -394,7 +382,7 @@ mod tests {
     use rand::Rng;
     use std::pin::pin;
     use windowed_stats::experimental::serve;
-    use windowed_stats::experimental::testing::{MockTimeMatrix, TimeMatrixCall};
+    use windowed_stats::experimental::testing::TimeMatrixCall;
     use wlan_common::channel::{Cbw, Channel};
     use wlan_common::{fake_bss_description, random_bss_description};
 
@@ -468,13 +456,13 @@ mod tests {
     #[fuchsia::test]
     fn test_log_connect_attempt_inspect() {
         let mut test_helper = setup_test();
-        let time_series = MockConnectDisconnectTimeSeries::default();
-        let logger = ConnectDisconnectLogger::new_helper(
+        let logger = ConnectDisconnectLogger::new(
             test_helper.cobalt_1dot1_proxy.clone(),
             &test_helper.inspect_node,
             &test_helper.inspect_metadata_node,
+            &test_helper.inspect_metadata_path,
             test_helper.persistence_sender.clone(),
-            time_series.build(),
+            &test_helper.mock_time_matrix_client,
         );
 
         // Log the event
@@ -510,29 +498,27 @@ mod tests {
             }
         });
 
+        let mut time_matrix_calls = test_helper.mock_time_matrix_client.drain_calls();
         assert_eq!(
-            &time_series.wlan_connectivity_states.drain_calls()[..],
+            &time_matrix_calls.drain::<u64>("wlan_connectivity_states")[..],
             &[TimeMatrixCall::Fold(Timed::now(1 << 0)), TimeMatrixCall::Fold(Timed::now(1 << 2)),]
         );
         assert_eq!(
-            &time_series.connected_networks.drain_calls()[..],
-            &[TimeMatrixCall::Fold(Timed::now(1 << 0)),]
+            &time_matrix_calls.drain::<u64>("connected_networks")[..],
+            &[TimeMatrixCall::Fold(Timed::now(1 << 0))]
         );
     }
 
     #[fuchsia::test]
     fn test_log_connect_attempt_cobalt() {
         let mut test_helper = setup_test();
-        let (time_matrix_client, _fut) = serve::serve_time_matrix_inspection(
-            test_helper.inspect_node.create_child("time_series"),
-        );
         let logger = ConnectDisconnectLogger::new(
             test_helper.cobalt_1dot1_proxy.clone(),
             &test_helper.inspect_node,
             &test_helper.inspect_metadata_node,
             &test_helper.inspect_metadata_path,
             test_helper.persistence_sender.clone(),
-            &time_matrix_client,
+            &test_helper.mock_time_matrix_client,
         );
 
         // Generate BSS Description
@@ -563,19 +549,20 @@ mod tests {
     #[fuchsia::test]
     fn test_log_disconnect_inspect() {
         let mut test_helper = setup_test();
-        let time_series = MockConnectDisconnectTimeSeries::default();
-        let logger = ConnectDisconnectLogger::new_helper(
+        let logger = ConnectDisconnectLogger::new(
             test_helper.cobalt_1dot1_proxy.clone(),
             &test_helper.inspect_node,
             &test_helper.inspect_metadata_node,
+            &test_helper.inspect_metadata_path,
             test_helper.persistence_sender.clone(),
-            time_series.build(),
+            &test_helper.mock_time_matrix_client,
         );
 
         // Log the event
         let bss_description = fake_bss_description!(Open);
         let channel = bss_description.channel;
         let disconnect_info = DisconnectInfo {
+            iface_id: 32,
             connected_duration: zx::MonotonicDuration::from_seconds(30),
             is_sme_reconnecting: false,
             disconnect_source: fidl_sme::DisconnectSource::Ap(fidl_sme::DisconnectCause {
@@ -636,40 +623,19 @@ mod tests {
                 }
             }
         });
+
+        let mut time_matrix_calls = test_helper.mock_time_matrix_client.drain_calls();
         assert_eq!(
-            &time_series.wlan_connectivity_states.drain_calls()[..],
+            &time_matrix_calls.drain::<u64>("wlan_connectivity_states")[..],
             &[TimeMatrixCall::Fold(Timed::now(1 << 0)), TimeMatrixCall::Fold(Timed::now(1 << 1)),]
         );
         assert_eq!(
-            &time_series.disconnected_networks.drain_calls()[..],
-            &[TimeMatrixCall::Fold(Timed::now(1 << 0)),]
+            &time_matrix_calls.drain::<u64>("disconnected_networks")[..],
+            &[TimeMatrixCall::Fold(Timed::now(1 << 0))]
         );
         assert_eq!(
-            &time_series.disconnect_sources.drain_calls()[..],
-            &[TimeMatrixCall::Fold(Timed::now(1 << 0)),]
+            &time_matrix_calls.drain::<u64>("disconnect_sources")[..],
+            &[TimeMatrixCall::Fold(Timed::now(1 << 0))]
         );
-    }
-
-    #[derive(Debug, Default)]
-    struct MockConnectDisconnectTimeSeries {
-        wlan_connectivity_states: MockTimeMatrix<u64>,
-        connected_networks: MockTimeMatrix<u64>,
-        disconnected_networks: MockTimeMatrix<u64>,
-        disconnect_sources: MockTimeMatrix<u64>,
-    }
-
-    impl MockConnectDisconnectTimeSeries {
-        fn build(&self) -> ConnectDisconnectTimeSeries {
-            ConnectDisconnectTimeSeries {
-                wlan_connectivity_states: self
-                    .wlan_connectivity_states
-                    .build_ref("wlan_connectivity_states"),
-                connected_networks: self.connected_networks.build_ref("connected_networks"),
-                disconnected_networks: self
-                    .disconnected_networks
-                    .build_ref("disconnected_networks"),
-                disconnect_sources: self.disconnect_sources.build_ref("disconnect_sources"),
-            }
-        }
     }
 }

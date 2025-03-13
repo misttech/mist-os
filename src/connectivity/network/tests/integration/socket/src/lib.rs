@@ -4,9 +4,11 @@
 
 #![cfg(test)]
 
+use std::fmt::Debug;
+use std::marker::PhantomData;
 use std::num::{NonZeroU16, NonZeroU64};
 use std::ops::RangeInclusive;
-use std::os::fd::AsFd;
+use std::os::fd::{AsFd as _, AsRawFd as _};
 use std::pin::pin;
 use std::task::Poll;
 
@@ -20,9 +22,10 @@ use fuchsia_async::{self as fasync, DurationExt, TimeoutExt as _};
 use futures::future::{self, LocalBoxFuture};
 use futures::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use futures::{Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
+use heck::ToSnakeCase as _;
 use net_declare::{
     fidl_ip_v4, fidl_ip_v6, fidl_mac, fidl_socket_addr, fidl_subnet, net_addr_subnet, net_ip_v4,
-    net_subnet_v4, net_subnet_v6, std_ip, std_ip_v4, std_socket_addr,
+    net_ip_v6, net_subnet_v4, net_subnet_v6, std_ip, std_ip_v4, std_socket_addr,
 };
 use net_types::ethernet::Mac;
 use net_types::ip::{
@@ -46,18 +49,22 @@ use netstack_testing_macros::netstack_test;
 use packet::{InnerPacketBuilder as _, ParsablePacket as _, Serializer as _};
 use packet_formats::arp::{ArpOp, ArpPacketBuilder};
 use packet_formats::ethernet::{
-    EtherType, EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG,
+    EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck,
+    ETHERNET_MIN_BODY_LEN_NO_TAG,
 };
 use packet_formats::icmp::ndp::options::{NdpOptionBuilder, PrefixInformation};
 use packet_formats::icmp::ndp::NeighborAdvertisement;
 use packet_formats::icmp::{
-    IcmpDestUnreachable, IcmpEchoRequest, IcmpPacketBuilder, IcmpZeroCode,
-    Icmpv4DestUnreachableCode, Icmpv4Packet, Icmpv6DestUnreachableCode, Icmpv6Packet, MessageBody,
+    IcmpDestUnreachable, IcmpEchoRequest, IcmpMessage, IcmpPacketBuilder, IcmpTimeExceeded,
+    IcmpZeroCode, Icmpv4DestUnreachableCode, Icmpv4Packet, Icmpv4ParameterProblem,
+    Icmpv4ParameterProblemCode, Icmpv4TimeExceededCode, Icmpv6DestUnreachableCode, Icmpv6Packet,
+    Icmpv6ParameterProblem, Icmpv6ParameterProblemCode, Icmpv6TimeExceededCode, MessageBody,
 };
 use packet_formats::igmp::messages::IgmpPacket;
-use packet_formats::ip::{IpProto, Ipv4Proto, Ipv6Proto};
+use packet_formats::ip::{IpPacketBuilder as _, IpProto, Ipv4Proto, Ipv6Proto};
 use packet_formats::ipv4::{Ipv4Header as _, Ipv4Packet, Ipv4PacketBuilder};
 use packet_formats::ipv6::{Ipv6Header, Ipv6Packet, Ipv6PacketBuilder};
+use packet_formats::tcp::{TcpParseArgs, TcpSegment, TcpSegmentBuilder};
 use packet_formats::udp::UdpPacketBuilder;
 use sockaddr::{IntoSockAddr as _, PureIpSockaddr, TryToSockaddrLl};
 use socket2::{InterfaceIndexOrAddress, SockRef};
@@ -1466,22 +1473,28 @@ async fn run_tcp_socket_test(
     let ((), ()) = futures::future::join(client_fut, server_fut).await;
 }
 
-trait TestIpExt: Ip {
+trait TestIpExt: packet_formats::ip::IpExt {
     const DOMAIN: fposix_socket::Domain;
     const CLIENT_SUBNET: fnet::Subnet;
     const SERVER_SUBNET: fnet::Subnet;
+    const CLIENT_ADDR: Self::Addr;
+    const SERVER_ADDR: Self::Addr;
 }
 
 impl TestIpExt for Ipv4 {
     const DOMAIN: fposix_socket::Domain = fposix_socket::Domain::Ipv4;
     const CLIENT_SUBNET: fnet::Subnet = fidl_subnet!("192.168.0.2/24");
     const SERVER_SUBNET: fnet::Subnet = fidl_subnet!("192.168.0.1/24");
+    const CLIENT_ADDR: Ipv4Addr = net_ip_v4!("192.168.0.2");
+    const SERVER_ADDR: Ipv4Addr = net_ip_v4!("192.168.0.1");
 }
 
 impl TestIpExt for Ipv6 {
     const DOMAIN: fposix_socket::Domain = fposix_socket::Domain::Ipv6;
     const CLIENT_SUBNET: fnet::Subnet = fidl_subnet!("2001:0db8:85a3::8a2e:0370:7334/64");
     const SERVER_SUBNET: fnet::Subnet = fidl_subnet!("2001:0db8:85a3::8a2e:0370:7335/64");
+    const CLIENT_ADDR: Ipv6Addr = net_ip_v6!("2001:0db8:85a3::8a2e:0370:7334");
+    const SERVER_ADDR: Ipv6Addr = net_ip_v6!("2001:0db8:85a3::8a2e:0370:7335");
 }
 
 // Note: This methods returns the two end of the established connection through
@@ -3532,40 +3545,158 @@ async fn zx_socket_rights<N: Netstack>(name: &str, protocol: ProtocolWithZirconS
 
 #[netstack_test]
 #[variant(N, Netstack)]
-#[test_case(Icmpv4DestUnreachableCode::DestNetworkUnreachable => libc::ENETUNREACH)]
-#[test_case(Icmpv4DestUnreachableCode::DestHostUnreachable => libc::EHOSTUNREACH)]
-#[test_case(Icmpv4DestUnreachableCode::DestProtocolUnreachable => libc::ENOPROTOOPT)]
-#[test_case(Icmpv4DestUnreachableCode::DestPortUnreachable => libc::ECONNREFUSED)]
-#[test_case(Icmpv4DestUnreachableCode::SourceRouteFailed => libc::EOPNOTSUPP)]
-#[test_case(Icmpv4DestUnreachableCode::DestNetworkUnknown => libc::ENETUNREACH)]
-#[test_case(Icmpv4DestUnreachableCode::DestHostUnknown => libc::EHOSTDOWN)]
-#[test_case(Icmpv4DestUnreachableCode::SourceHostIsolated => libc::ENONET)]
-#[test_case(Icmpv4DestUnreachableCode::NetworkAdministrativelyProhibited => libc::ENETUNREACH)]
-#[test_case(Icmpv4DestUnreachableCode::HostAdministrativelyProhibited => libc::EHOSTUNREACH)]
-#[test_case(Icmpv4DestUnreachableCode::NetworkUnreachableForToS => libc::ENETUNREACH)]
-#[test_case(Icmpv4DestUnreachableCode::HostUnreachableForToS => libc::EHOSTUNREACH)]
-#[test_case(Icmpv4DestUnreachableCode::CommAdministrativelyProhibited => libc::EHOSTUNREACH)]
-#[test_case(Icmpv4DestUnreachableCode::HostPrecedenceViolation => libc::EHOSTUNREACH)]
-#[test_case(Icmpv4DestUnreachableCode::PrecedenceCutoffInEffect => libc::EHOSTUNREACH)]
-async fn tcp_icmp_error_v4<N: Netstack>(name: &str, code: Icmpv4DestUnreachableCode) -> i32 {
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::DestNetworkUnreachable => libc::ENETUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::DestHostUnreachable => libc::EHOSTUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::DestProtocolUnreachable => libc::ENOPROTOOPT
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::DestPortUnreachable => libc::ECONNREFUSED
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::SourceRouteFailed => libc::EOPNOTSUPP
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::DestNetworkUnknown => libc::ENETUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::DestHostUnknown => libc::EHOSTDOWN
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::SourceHostIsolated => libc::ENONET
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::NetworkAdministrativelyProhibited => libc::ENETUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::HostAdministrativelyProhibited => libc::EHOSTUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::NetworkUnreachableForToS => libc::ENETUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::HostUnreachableForToS => libc::EHOSTUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::CommAdministrativelyProhibited => libc::EHOSTUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::HostPrecedenceViolation => libc::EHOSTUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::PrecedenceCutoffInEffect => libc::EHOSTUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv4>, Icmpv4ParameterProblem::new(0),
+    Icmpv4ParameterProblemCode::PointerIndicatesError => libc::EPROTO
+)]
+#[test_case(
+    PhantomData::<Ipv4>, Icmpv4ParameterProblem::new(0),
+    Icmpv4ParameterProblemCode::MissingRequiredOption => libc::EPROTO
+)]
+#[test_case(
+    PhantomData::<Ipv4>, Icmpv4ParameterProblem::new(0),
+    Icmpv4ParameterProblemCode::BadLength => libc::EPROTO
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpTimeExceeded::default(),
+    Icmpv4TimeExceededCode::TtlExpired => libc::EHOSTUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpTimeExceeded::default(),
+    Icmpv4TimeExceededCode::FragmentReassemblyTimeExceeded => libc::ETIMEDOUT
+)]
+#[test_case(
+    PhantomData::<Ipv6>, IcmpDestUnreachable::default(),
+    Icmpv6DestUnreachableCode::NoRoute => libc::ENETUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv6>, IcmpDestUnreachable::default(),
+    Icmpv6DestUnreachableCode::CommAdministrativelyProhibited => libc::EACCES
+)]
+#[test_case(
+    PhantomData::<Ipv6>, IcmpDestUnreachable::default(),
+    Icmpv6DestUnreachableCode::BeyondScope => libc::EHOSTUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv6>, IcmpDestUnreachable::default(),
+    Icmpv6DestUnreachableCode::AddrUnreachable => libc::EHOSTUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv6>, IcmpDestUnreachable::default(),
+    Icmpv6DestUnreachableCode::PortUnreachable => libc::ECONNREFUSED
+)]
+#[test_case(
+    PhantomData::<Ipv6>, IcmpDestUnreachable::default(),
+    Icmpv6DestUnreachableCode::SrcAddrFailedPolicy => libc::EACCES
+)]
+#[test_case(
+    PhantomData::<Ipv6>, IcmpDestUnreachable::default(),
+    Icmpv6DestUnreachableCode::RejectRoute => libc::EACCES
+)]
+#[test_case(
+    PhantomData::<Ipv6>, Icmpv6ParameterProblem::new(0),
+    Icmpv6ParameterProblemCode::ErroneousHeaderField => libc::EPROTO
+)]
+#[test_case(
+    PhantomData::<Ipv6>, Icmpv6ParameterProblem::new(0),
+    Icmpv6ParameterProblemCode::UnrecognizedNextHeaderType => libc::EPROTO
+)]
+#[test_case(
+    PhantomData::<Ipv6>, Icmpv6ParameterProblem::new(0),
+    Icmpv6ParameterProblemCode::UnrecognizedIpv6Option => libc::EPROTO
+)]
+#[test_case(
+    PhantomData::<Ipv6>, IcmpTimeExceeded::default(),
+    Icmpv6TimeExceededCode::HopLimitExceeded => libc::EHOSTUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv6>, IcmpTimeExceeded::default(),
+    Icmpv6TimeExceededCode::FragmentReassemblyTimeExceeded => libc::EHOSTUNREACH
+)]
+async fn tcp_connect_icmp_error<N: Netstack, I: TestIpExt, M: IcmpMessage<I> + Debug>(
+    name: &str,
+    _ip_version: PhantomData<I>,
+    message: M,
+    code: M::Code,
+) -> i32 {
+    use packet_formats::ip::IpPacket as _;
+
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
     let fake_ep = net.create_fake_endpoint().expect("failed to create fake endpoint");
     let fake_ep = &fake_ep;
 
     let client = sandbox
-        .create_netstack_realm::<N, _>(format!("{}_client", name))
+        .create_netstack_realm::<N, _>(format!("{name}_{}", format!("{code:?}").to_snake_case()))
         .expect("failed to create client realm");
     let client_interface =
         client.join_network(&net, "client-ep").await.expect("failed to join network in realm");
     client_interface
-        .add_address_and_subnet_route(Ipv4::CLIENT_SUBNET)
+        .add_address_and_subnet_route(I::CLIENT_SUBNET)
         .await
         .expect("configure address");
     client_interface.apply_nud_flake_workaround().await.expect("nud flake workaround");
 
-    let fnet_ext::IpAddress(server_ip) = Ipv4::SERVER_SUBNET.addr.into();
-    let fnet_ext::IpAddress(client_ip) = Ipv4::CLIENT_SUBNET.addr.into();
     let server_mac = Mac::new(SERVER_MAC.octets);
     let fake_ep_loop = async move {
         fake_ep
@@ -3580,50 +3711,67 @@ async fn tcp_icmp_error_v4<N: Netstack>(name: &str, code: Icmpv4DestUnreachableC
                 .expect("error parsing ethernet frame");
 
                 let mut frame_body = eth.body();
-                let v4_packet = match Ipv4Packet::parse(&mut frame_body, ()) {
-                    Ok(v4_packet) if v4_packet.proto() == IpProto::Tcp.into() => v4_packet,
+                let ip = match I::Packet::parse(&mut frame_body, ()) {
+                    Ok(ip) if ip.proto() == IpProto::Tcp.into() => ip,
                     _ => {
-                        let arp = ArpPacketBuilder::<Mac, Ipv4Addr>::new(
-                            ArpOp::Response,
-                            server_mac,
-                            assert_matches!(server_ip, std::net::IpAddr::V4(addr) => addr).into(),
-                            eth.src_mac(),
-                            assert_matches!(client_ip, std::net::IpAddr::V4(addr) => addr).into(),
-                        )
-                        .into_serializer()
-                        .encapsulate(EthernetFrameBuilder::new(
-                            server_mac,
-                            eth.src_mac(),
-                            EtherType::Arp,
-                            ETHERNET_MIN_BODY_LEN_NO_TAG,
-                        ))
-                        .serialize_vec_outer()
-                        .expect("failed to serialize ARP response")
-                        .unwrap_b();
-                        return fake_ep
-                            .write(arp.as_ref())
+                        let confirmation = I::map_ip_in(
+                            (I::CLIENT_ADDR, I::SERVER_ADDR),
+                            |(client_addr, server_addr)| {
+                                ArpPacketBuilder::<_, Ipv4Addr>::new(
+                                    ArpOp::Response,
+                                    server_mac,
+                                    server_addr,
+                                    eth.src_mac(),
+                                    client_addr,
+                                )
+                                .into_serializer()
+                                .encapsulate(EthernetFrameBuilder::new(
+                                    server_mac,
+                                    eth.src_mac(),
+                                    EtherType::Arp,
+                                    ETHERNET_MIN_BODY_LEN_NO_TAG,
+                                ))
+                                .serialize_vec_outer()
+                                .expect("serialize ARP response")
+                                .unwrap_b()
+                            },
+                            |(client_addr, server_addr)| {
+                                ndp::create_message(
+                                    server_mac,
+                                    eth.src_mac(),
+                                    server_addr,
+                                    client_addr,
+                                    NeighborAdvertisement::new(false, true, false, server_addr),
+                                    &[NdpOptionBuilder::TargetLinkLayerAddress(&SERVER_MAC.octets)],
+                                )
+                                .expect("serialize NDP message")
+                            },
+                        );
+                        fake_ep
+                            .write(confirmation.as_ref())
                             .await
                             .expect("failed to write ARP response");
+                        return;
                     }
                 };
                 let mut body = eth.body().to_vec();
                 let icmp_error = packet::Buf::new(&mut body, ..)
-                    .encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
-                        v4_packet.dst_ip(),
-                        v4_packet.src_ip(),
+                    .encapsulate(IcmpPacketBuilder::<I, _>::new(
+                        ip.dst_ip(),
+                        ip.src_ip(),
                         code,
-                        IcmpDestUnreachable::default(),
+                        message,
                     ))
-                    .encapsulate(Ipv4PacketBuilder::new(
-                        v4_packet.dst_ip(),
-                        v4_packet.src_ip(),
+                    .encapsulate(I::PacketBuilder::new(
+                        ip.dst_ip(),
+                        ip.src_ip(),
                         u8::MAX,
-                        Ipv4Proto::Icmp.into(),
+                        I::map_ip_out((), |()| Ipv4Proto::Icmp, |()| Ipv6Proto::Icmpv6),
                     ))
                     .encapsulate(EthernetFrameBuilder::new(
                         eth.dst_mac(),
                         eth.src_mac(),
-                        EtherType::Ipv4,
+                        I::map_ip_in((), |()| EtherType::Ipv4, |()| EtherType::Ipv6),
                         ETHERNET_MIN_BODY_LEN_NO_TAG,
                     ))
                     .serialize_vec_outer()
@@ -3634,7 +3782,8 @@ async fn tcp_icmp_error_v4<N: Netstack>(name: &str, code: Icmpv4DestUnreachableC
             .await;
     };
 
-    let server_addr = std::net::SocketAddr::new(server_ip, 8080);
+    let server_addr: net_types::ip::IpAddr = I::SERVER_ADDR.into();
+    let server_addr = std::net::SocketAddr::new(server_addr.into(), 8080);
 
     let connect = async move {
         let error = fasync::net::TcpStream::connect_in_realm(&client, server_addr)
@@ -3652,105 +3801,321 @@ async fn tcp_icmp_error_v4<N: Netstack>(name: &str, code: Icmpv4DestUnreachableC
 
 #[netstack_test]
 #[variant(N, Netstack)]
-#[test_case(Icmpv6DestUnreachableCode::NoRoute => libc::ENETUNREACH)]
-#[test_case(Icmpv6DestUnreachableCode::PortUnreachable => libc::ECONNREFUSED)]
-// TODO(https://fxbug.dev/42076684): Test against all possible codes once we can
-// timeout in handshake states.
-async fn tcp_icmp_error_v6<N: Netstack>(name: &str, code: Icmpv6DestUnreachableCode) -> i32 {
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::DestNetworkUnreachable => libc::ENETUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::DestHostUnreachable => libc::EHOSTUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::DestProtocolUnreachable => libc::ENOPROTOOPT
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::DestPortUnreachable => libc::ECONNREFUSED
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::SourceRouteFailed => libc::EOPNOTSUPP
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::DestNetworkUnknown => libc::ENETUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::DestHostUnknown => libc::EHOSTDOWN
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::SourceHostIsolated => libc::ENONET
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::NetworkAdministrativelyProhibited => libc::ENETUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::HostAdministrativelyProhibited => libc::EHOSTUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::NetworkUnreachableForToS => libc::ENETUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::HostUnreachableForToS => libc::EHOSTUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::CommAdministrativelyProhibited => libc::EHOSTUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::HostPrecedenceViolation => libc::EHOSTUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::PrecedenceCutoffInEffect => libc::EHOSTUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv4>, Icmpv4ParameterProblem::new(0),
+    Icmpv4ParameterProblemCode::PointerIndicatesError => libc::EPROTO
+)]
+#[test_case(
+    PhantomData::<Ipv4>, Icmpv4ParameterProblem::new(0),
+    Icmpv4ParameterProblemCode::MissingRequiredOption => libc::EPROTO
+)]
+#[test_case(
+    PhantomData::<Ipv4>, Icmpv4ParameterProblem::new(0),
+    Icmpv4ParameterProblemCode::BadLength => libc::EPROTO
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpTimeExceeded::default(),
+    Icmpv4TimeExceededCode::TtlExpired => libc::EHOSTUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpTimeExceeded::default(),
+    Icmpv4TimeExceededCode::FragmentReassemblyTimeExceeded => libc::ETIMEDOUT
+)]
+#[test_case(
+    PhantomData::<Ipv6>, IcmpDestUnreachable::default(),
+    Icmpv6DestUnreachableCode::NoRoute => libc::ENETUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv6>, IcmpDestUnreachable::default(),
+    Icmpv6DestUnreachableCode::CommAdministrativelyProhibited => libc::EACCES
+)]
+#[test_case(
+    PhantomData::<Ipv6>, IcmpDestUnreachable::default(),
+    Icmpv6DestUnreachableCode::BeyondScope => libc::EHOSTUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv6>, IcmpDestUnreachable::default(),
+    Icmpv6DestUnreachableCode::AddrUnreachable => libc::EHOSTUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv6>, IcmpDestUnreachable::default(),
+    Icmpv6DestUnreachableCode::PortUnreachable => libc::ECONNREFUSED
+)]
+#[test_case(
+    PhantomData::<Ipv6>, IcmpDestUnreachable::default(),
+    Icmpv6DestUnreachableCode::SrcAddrFailedPolicy => libc::EACCES
+)]
+#[test_case(
+    PhantomData::<Ipv6>, IcmpDestUnreachable::default(),
+    Icmpv6DestUnreachableCode::RejectRoute => libc::EACCES
+)]
+#[test_case(
+    PhantomData::<Ipv6>, Icmpv6ParameterProblem::new(0),
+    Icmpv6ParameterProblemCode::ErroneousHeaderField => libc::EPROTO
+)]
+#[test_case(
+    PhantomData::<Ipv6>, Icmpv6ParameterProblem::new(0),
+    Icmpv6ParameterProblemCode::UnrecognizedNextHeaderType => libc::EPROTO
+)]
+#[test_case(
+    PhantomData::<Ipv6>, Icmpv6ParameterProblem::new(0),
+    Icmpv6ParameterProblemCode::UnrecognizedIpv6Option => libc::EPROTO
+)]
+#[test_case(
+    PhantomData::<Ipv6>, IcmpTimeExceeded::default(),
+    Icmpv6TimeExceededCode::HopLimitExceeded => libc::EHOSTUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv6>, IcmpTimeExceeded::default(),
+    Icmpv6TimeExceededCode::FragmentReassemblyTimeExceeded => libc::EHOSTUNREACH
+)]
+async fn tcp_established_icmp_error<N: Netstack, I: TestIpExt, M: IcmpMessage<I> + Debug>(
+    name: &str,
+    _ip_version: PhantomData<I>,
+    message: M,
+    code: M::Code,
+) -> i32 {
+    use packet_formats::ip::IpPacket as _;
+
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
     let fake_ep = net.create_fake_endpoint().expect("failed to create fake endpoint");
-    let fake_ep = &fake_ep;
 
     let client = sandbox
-        .create_netstack_realm::<N, _>(format!("{}_client", name))
+        .create_netstack_realm::<N, _>(format!("{name}_{}", format!("{code:?}").to_snake_case()))
         .expect("failed to create client realm");
     let client_interface =
         client.join_network(&net, "client-ep").await.expect("failed to join network in realm");
     client_interface
-        .add_address_and_subnet_route(Ipv6::CLIENT_SUBNET)
+        .add_address_and_subnet_route(I::CLIENT_SUBNET)
         .await
         .expect("configure address");
     client_interface.apply_nud_flake_workaround().await.expect("nud flake workaround");
 
-    let fnet_ext::IpAddress(server_ip) = Ipv6::SERVER_SUBNET.addr.into();
-    let fnet_ext::IpAddress(client_ip) = Ipv6::CLIENT_SUBNET.addr.into();
     let server_mac = Mac::new(SERVER_MAC.octets);
-    let fake_ep_loop = async move {
-        fake_ep
-            .frame_stream()
-            .map(|r| r.expect("failed to read frame"))
-            .for_each(|(frame, _dropped)| async move {
-                let mut frame = &frame[..];
-                let eth = packet_formats::ethernet::EthernetFrame::parse(
-                    &mut frame,
-                    packet_formats::ethernet::EthernetFrameLengthCheck::NoCheck,
-                )
-                .expect("error parsing ethernet frame");
-                let server_ip: net_types::ip::Ipv6Addr =
-                    assert_matches!(server_ip, std::net::IpAddr::V6(addr) => addr).into();
-                let client_ip: net_types::ip::Ipv6Addr =
-                    assert_matches!(client_ip, std::net::IpAddr::V6(addr) => addr).into();
-                let mut frame_body = eth.body();
-                let v6_packet = match Ipv6Packet::parse(&mut frame_body, ()) {
-                    Ok(v6_packet) if v6_packet.proto() == IpProto::Tcp.into() => v6_packet,
-                    _ => {
-                        let options =
-                            &[NdpOptionBuilder::TargetLinkLayerAddress(&SERVER_MAC.octets)];
-                        return ndp::write_message::<&[u8], _>(
-                            server_mac,
-                            eth.src_mac(),
-                            server_ip,
-                            client_ip,
-                            NeighborAdvertisement::new(false, true, false, server_ip),
-                            options,
-                            fake_ep,
-                        )
+
+    // Filter frames observed on the fake endpoint to just those containing a TCP
+    // segment in an IP packet, responding to other frames with neighbor
+    // confirmations to allow neighbor resolution to succeed.
+    let fake_ep = &fake_ep;
+    let mut frames = fake_ep.frame_stream().filter_map(|result| {
+        Box::pin(async {
+            let (frame, dropped) = result.unwrap();
+            assert_eq!(dropped, 0);
+
+            let eth = EthernetFrame::parse(&mut &frame[..], EthernetFrameLengthCheck::NoCheck)
+                .expect("valid ethernet frame");
+            let ip = match I::Packet::parse(&mut eth.body(), ()) {
+                Ok(ip) if ip.proto() == IpProto::Tcp.into() => ip,
+                _ => {
+                    let confirmation = I::map_ip_in(
+                        (I::CLIENT_ADDR, I::SERVER_ADDR),
+                        |(client_addr, server_addr)| {
+                            ArpPacketBuilder::<_, Ipv4Addr>::new(
+                                ArpOp::Response,
+                                server_mac,
+                                server_addr,
+                                eth.src_mac(),
+                                client_addr,
+                            )
+                            .into_serializer()
+                            .encapsulate(EthernetFrameBuilder::new(
+                                server_mac,
+                                eth.src_mac(),
+                                EtherType::Arp,
+                                ETHERNET_MIN_BODY_LEN_NO_TAG,
+                            ))
+                            .serialize_vec_outer()
+                            .expect("serialize ARP response")
+                            .unwrap_b()
+                        },
+                        |(client_addr, server_addr)| {
+                            ndp::create_message(
+                                server_mac,
+                                eth.src_mac(),
+                                server_addr,
+                                client_addr,
+                                NeighborAdvertisement::new(false, true, false, server_addr),
+                                &[NdpOptionBuilder::TargetLinkLayerAddress(&SERVER_MAC.octets)],
+                            )
+                            .expect("serialize NDP message")
+                        },
+                    );
+                    fake_ep
+                        .write(confirmation.as_ref())
                         .await
-                        .expect("failed to send neighbor advertisement");
-                    }
-                };
-                let mut body = eth.body().to_vec();
-                let icmp_error = packet::Buf::new(&mut body, ..)
-                    .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
-                        v6_packet.dst_ip(),
-                        v6_packet.src_ip(),
-                        code,
-                        IcmpDestUnreachable::default(),
-                    ))
-                    .encapsulate(packet_formats::ipv6::Ipv6PacketBuilder::new(
-                        v6_packet.dst_ip(),
-                        v6_packet.src_ip(),
-                        ipv6_consts::DEFAULT_HOP_LIMIT,
-                        Ipv6Proto::Icmpv6.into(),
-                    ))
-                    .encapsulate(EthernetFrameBuilder::new(
-                        eth.dst_mac(),
-                        eth.src_mac(),
-                        EtherType::Ipv6,
-                        ETHERNET_MIN_BODY_LEN_NO_TAG,
-                    ))
-                    .serialize_vec_outer()
-                    .expect("failed to serialize")
-                    .unwrap_b();
-                fake_ep.write(icmp_error.as_ref()).await.expect("failed to write to fake ep");
-            })
-            .await;
+                        .expect("failed to write ARP response");
+                    return None;
+                }
+            };
+            let tcp =
+                TcpSegment::parse(&mut ip.body(), TcpParseArgs::new(ip.src_ip(), ip.dst_ip()))
+                    .expect("valid TCP segment");
+
+            Some((
+                eth.builder(),
+                ip.builder(),
+                tcp.builder(ip.src_ip(), ip.dst_ip()).prefix_builder().clone(),
+            ))
+        })
+    });
+
+    let server = async {
+        // Wait for an incoming TCP connection.
+        let (eth, ip, tcp) = frames.next().await.unwrap();
+        assert!(tcp.syn_set());
+
+        // Send a SYN/ACK in response and wait for the ACK response.
+        let ethernet_builder = EthernetFrameBuilder::new(
+            eth.dst_mac(),
+            eth.src_mac(),
+            I::map_ip_in((), |()| EtherType::Ipv4, |()| EtherType::Ipv6),
+            ETHERNET_MIN_BODY_LEN_NO_TAG,
+        );
+        let mut syn_ack = TcpSegmentBuilder::new(
+            ip.dst_ip(),
+            ip.src_ip(),
+            tcp.dst_port().unwrap(),
+            tcp.src_port().unwrap(),
+            tcp.seq_num(),
+            Some(tcp.seq_num() + 1),
+            tcp.window_size(),
+        );
+        syn_ack.syn(true);
+        let frame = packet::Buf::new([], ..)
+            .encapsulate(syn_ack)
+            .encapsulate(I::PacketBuilder::new(
+                ip.dst_ip(),
+                ip.src_ip(),
+                u8::MAX,
+                IpProto::Tcp.into(),
+            ))
+            .encapsulate(ethernet_builder.clone())
+            .serialize_vec_outer()
+            .expect("serialize SYN/ACK")
+            .unwrap_b();
+        fake_ep.write(frame.as_ref()).await.expect("write SYN/ACK");
+        let _ack = frames.next().await.unwrap();
+
+        // Now that the connection is established, respond to the next packet with an
+        // ICMP error to cause a soft error on the connection.
+        let (_eth, ip, tcp) = frames.next().await.unwrap();
+        let mut body = packet::Buf::new([], ..)
+            .encapsulate(tcp)
+            .encapsulate(ip.clone())
+            .serialize_vec_outer()
+            .expect("serialize IP packet")
+            .unwrap_b();
+        let icmp_error = packet::Buf::new(&mut body, ..)
+            .encapsulate(IcmpPacketBuilder::<I, _>::new(ip.dst_ip(), ip.src_ip(), code, message))
+            .encapsulate(I::PacketBuilder::new(
+                ip.dst_ip(),
+                ip.src_ip(),
+                u8::MAX,
+                I::map_ip_out((), |()| Ipv4Proto::Icmp, |()| Ipv6Proto::Icmpv6),
+            ))
+            .encapsulate(ethernet_builder)
+            .serialize_vec_outer()
+            .expect("serialize ICMP error")
+            .unwrap_b();
+        fake_ep.write(icmp_error.as_ref()).await.expect("write ICMP error");
     };
 
-    let server_addr = std::net::SocketAddr::new(server_ip, 8080);
-    let connect = async move {
-        let error = fasync::net::TcpStream::connect_in_realm(&client, server_addr)
+    let client = async {
+        let server_addr: net_types::ip::IpAddr = I::SERVER_ADDR.into();
+        let server_addr = std::net::SocketAddr::new(server_addr.into(), 8080);
+        let mut socket = fasync::net::TcpStream::connect_in_realm(&client, server_addr)
             .await
-            .expect_err("connect should fail");
-        let error = error.downcast::<std::io::Error>().expect("failed to cast to std::io::Result");
-        error.raw_os_error()
+            .expect("connect to server");
+        socket.write_all(b"hello").await.unwrap();
+
+        // We have to check SO_ERROR in a retry loop because there is no mechanism to
+        // subscribe to be notified when a soft error occurs on a socket; they are not
+        // signaled the way hard errors are.
+        loop {
+            fasync::Timer::new(std::time::Duration::from_millis(50)).await;
+
+            // SAFETY: `getsockopt` does not retain memory passed to it.
+            let mut value = 0i32;
+            let mut value_size = std::mem::size_of_val(&value) as libc::socklen_t;
+            let result = unsafe {
+                libc::getsockopt(
+                    socket.as_raw_fd(),
+                    libc::SOL_SOCKET,
+                    libc::SO_ERROR,
+                    &mut value as *mut _ as *mut libc::c_void,
+                    &mut value_size,
+                )
+            };
+            assert_eq!(result, 0);
+            if value != 0 {
+                break value;
+            }
+        }
     };
 
-    futures::select! {
-        () = fake_ep_loop.fuse() => unreachable!("should never finish"),
-        errno = connect.fuse() => return errno.expect("must have an errno"),
-    }
+    let (error, ()) = future::join(client, server).await;
+    error
 }
 
 /// Tests that a connection pending in an accept queue can be accepted and
@@ -4812,7 +5177,7 @@ async fn tos_tclass_send<
         IpVersion::V4 => unsafe {
             let v = traffic_class as libc::c_int;
             libc::setsockopt(
-                std::os::fd::AsRawFd::as_raw_fd(&socket),
+                socket.as_raw_fd(),
                 libc::IPPROTO_IP,
                 libc::IP_TOS,
                 &v as *const libc::c_int as *const libc::c_void,
@@ -4822,7 +5187,7 @@ async fn tos_tclass_send<
         IpVersion::V6 => unsafe {
             let v = traffic_class as libc::c_int;
             libc::setsockopt(
-                std::os::fd::AsRawFd::as_raw_fd(&socket),
+                socket.as_raw_fd(),
                 libc::IPPROTO_IPV6,
                 libc::IPV6_TCLASS,
                 &v as *const libc::c_int as *const libc::c_void,
@@ -4877,7 +5242,7 @@ async fn tos_tclass_send<
 #[test_matrix(
     [fposix_socket::Domain::Ipv4, fposix_socket::Domain::Ipv6],
     [fposix_socket::DatagramSocketProtocol::Udp, fposix_socket::DatagramSocketProtocol::IcmpEcho],
-    [fposix_socket::MarkDomain::Mark1, fposix_socket::MarkDomain::Mark2],
+    [fnet::MarkDomain::Mark1, fnet::MarkDomain::Mark2],
     [
         fposix_socket::OptionalUint32::Unset(fposix_socket::Empty),
         fposix_socket::OptionalUint32::Value(0)
@@ -4887,7 +5252,7 @@ async fn datagram_socket_mark(
     name: &str,
     domain: fposix_socket::Domain,
     proto: fposix_socket::DatagramSocketProtocol,
-    mark_domain: fposix_socket::MarkDomain,
+    mark_domain: fnet::MarkDomain,
     mark: fposix_socket::OptionalUint32,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
@@ -4904,7 +5269,7 @@ async fn datagram_socket_mark(
 #[netstack_test]
 #[test_matrix(
     [fposix_socket::Domain::Ipv4, fposix_socket::Domain::Ipv6],
-    [fposix_socket::MarkDomain::Mark1, fposix_socket::MarkDomain::Mark2],
+    [fnet::MarkDomain::Mark1, fnet::MarkDomain::Mark2],
     [
         fposix_socket::OptionalUint32::Unset(fposix_socket::Empty),
         fposix_socket::OptionalUint32::Value(0)
@@ -4913,7 +5278,7 @@ async fn datagram_socket_mark(
 async fn stream_socket_mark(
     name: &str,
     domain: fposix_socket::Domain,
-    mark_domain: fposix_socket::MarkDomain,
+    mark_domain: fnet::MarkDomain,
     mark: fposix_socket::OptionalUint32,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
@@ -4936,7 +5301,7 @@ async fn stream_socket_mark(
         fposix_socket_raw::ProtocolAssociation::Unassociated(fposix_socket_raw::Empty),
         fposix_socket_raw::ProtocolAssociation::Associated(0)
     ],
-    [fposix_socket::MarkDomain::Mark1, fposix_socket::MarkDomain::Mark2],
+    [fnet::MarkDomain::Mark1, fnet::MarkDomain::Mark2],
     [
         fposix_socket::OptionalUint32::Unset(fposix_socket::Empty),
         fposix_socket::OptionalUint32::Value(0)
@@ -4946,7 +5311,7 @@ async fn raw_socket_mark(
     name: &str,
     domain: fposix_socket::Domain,
     proto: fposix_socket_raw::ProtocolAssociation,
-    mark_domain: fposix_socket::MarkDomain,
+    mark_domain: fnet::MarkDomain,
     mark: fposix_socket::OptionalUint32,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");

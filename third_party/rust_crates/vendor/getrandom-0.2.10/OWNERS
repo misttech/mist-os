@@ -2,7 +2,8 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /third_party/rust_crates/vendor/ahash-0.8.6/OWNERS
-include /third_party/rust_crates/vendor/rand_core-0.6.3/OWNERS
+include /third_party/rust_crates/forks/ring-0.17.8/OWNERS
+include /third_party/rust_crates/vendor/ahash-0.8.11/OWNERS
+include /third_party/rust_crates/vendor/rand_core-0.6.4/OWNERS
 include /third_party/rust_crates/vendor/uuid-0.8.2/OWNERS
 include /third_party/rust_crates/vendor/uuid-1.1.2/OWNERS

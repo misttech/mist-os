@@ -54,6 +54,7 @@ enum class HandleSubtype : uint32_t {
   kBti = 24,
   kChannel = 4,
   kClock = 30,
+  kCounter = 34,
   kDebugLog = 12,
   kEvent = 5,
   kEventpair = 16,

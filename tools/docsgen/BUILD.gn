@@ -120,6 +120,7 @@ action("invoke_clidoc") {
   script = "clidoc_run.py"
   depfile = "$target_out_dir/$target_name.d"
   deps = [
+    "//src/developer/ffx:ffx_build_dir_config_file",
     "//src/developer/ffx:tool_manifest($host_toolchain)",
     "//src/developer/ffx/frontends/ffx:ffx_bin_unversioned($host_toolchain)",
     "//tools/clidoc:clidoc_bin($host_toolchain)",
@@ -143,6 +144,7 @@ action("invoke_clidoc") {
   inputs = [
     _clidoc_path,
     "${root_out_dir}/ffx_tools.json",
+    "${root_out_dir}/ffx-config.json",
     _sdk_host_tools_for_single_toolchain_manifest,
   ]
   outputs = [ clidoc_tarfile ]
@@ -155,10 +157,6 @@ action("invoke_clidoc") {
     rebase_path(clidoc_tarfile, root_build_dir),
     "--depfile",
     rebase_path(depfile, root_build_dir),
-    "--sdk-root",
-    rebase_path(root_build_dir, root_build_dir),
-    "--sdk-manifest",
-    rebase_path(_sdk_host_tools_for_single_toolchain_manifest, root_build_dir),
     "--isolate-dir",
     rebase_path(target_gen_dir, root_build_dir),
     "--subtool-manifest",

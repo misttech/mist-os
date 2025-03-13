@@ -13,8 +13,8 @@ use crate::model::context::ModelContext;
 use crate::model::environment::Environment;
 use crate::model::escrow::{self, EscrowedState};
 use crate::model::namespace::create_namespace;
+use crate::model::routing::aggregate_router::AggregateRouter;
 use crate::model::routing::legacy::RouteRequestExt;
-use crate::model::routing::service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute};
 use crate::model::routing::{self, RoutingFailureErrorReporter};
 use crate::model::start::Start;
 use crate::model::storage::build_storage_admin_dictionary;
@@ -343,9 +343,6 @@ pub struct ResolvedInstanceState {
     /// URL, or (with a package context) a relative path URL.
     address: ComponentAddress,
 
-    /// Anonymized service directories aggregated from collections and children.
-    pub anonymized_services: HashMap<AnonymizedServiceRoute, Arc<AnonymizedAggregateServiceDir>>,
-
     /// The sandbox holds all dictionaries involved in capability routing.
     pub sandbox: ComponentSandbox,
 
@@ -405,8 +402,11 @@ impl ResolvedInstanceState {
         }
 
         let program_escrow = if decl.get_runner().is_some() {
-            let escrow =
-                escrow::Actor::new(&component.nonblocking_task_group(), component.as_weak());
+            let escrow = escrow::Actor::new(
+                component.moniker.clone(),
+                &component.nonblocking_task_group(),
+                component.as_weak(),
+            );
             Some(escrow)
         } else {
             None
@@ -425,7 +425,6 @@ impl ResolvedInstanceState {
             exposed_dir: Once::default(),
             dynamic_offers: vec![],
             address,
-            anonymized_services: HashMap::new(),
             sandbox: Default::default(),
             program_escrow,
         };
@@ -479,6 +478,7 @@ impl ResolvedInstanceState {
             build_storage_admin_dictionary(component, &decl),
             declared_dictionaries,
             RoutingFailureErrorReporter::new(component.as_weak()),
+            &AggregateRouter::new,
         );
         Self::extend_program_input_namespace_with_legacy(
             &component,
@@ -738,7 +738,7 @@ impl ResolvedInstanceState {
         let create_exposed_dict = async {
             let component = self.weak_component.upgrade().unwrap();
             let dict = Dict::new();
-            for (key, value) in self.sandbox.component_output_dict.enumerate() {
+            for (key, value) in self.sandbox.component_output.capabilities().enumerate() {
                 let Ok(value) = value else {
                     // This capability is not cloneable. Skip it.
                     warn!(moniker:% = self.moniker(), key:%;
@@ -924,6 +924,7 @@ impl ResolvedInstanceState {
         if !dynamic_offers.is_empty() {
             extend_dict_with_offers(
                 &component,
+                &self.decl().offers,
                 &child_component_output_dictionary_routers,
                 &self.sandbox.component_input,
                 &dynamic_offers,
@@ -932,6 +933,7 @@ impl ResolvedInstanceState {
                 &self.sandbox.capability_sourced_capabilities_dict,
                 &child_input,
                 RoutingFailureErrorReporter::new(component.as_weak()),
+                &AggregateRouter::new,
             );
         }
 
@@ -970,6 +972,7 @@ impl ResolvedInstanceState {
         Ok(child)
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401254441)
     fn add_target_dynamic_offers(
         &self,
         mut dynamic_offers: Vec<fdecl::Offer>,
@@ -1010,6 +1013,7 @@ impl ResolvedInstanceState {
         Ok(dynamic_offers)
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401254441)
     fn validate_dynamic_component(
         &self,
         all_dynamic_children: Vec<(&str, &str)>,
@@ -1046,6 +1050,7 @@ impl ResolvedInstanceState {
         Ok(())
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401254441)
     pub fn validate_and_convert_dynamic_component(
         &self,
         dynamic_offers: Option<Vec<fdecl::Offer>>,

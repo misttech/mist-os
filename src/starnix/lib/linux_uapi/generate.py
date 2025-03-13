@@ -204,6 +204,10 @@ AUTO_DERIVE_TRAITS = [
     (r"ip6?t_entry", ["IntoBytes", "FromBytes", "KnownLayout", "Immutable"]),
     (r"ip6?t_get_entries", ["KnownLayout", "FromBytes", "Immutable"]),
     (r"ip6?t_replace", ["IntoBytes", "FromBytes", "KnownLayout", "Immutable"]),
+    (
+        r"__kernel_sigaction.*",
+        ["IntoBytes", "FromBytes", "KnownLayout", "Immutable"],
+    ),
     (r"nf_conntrack_man_proto", ["KnownLayout", "FromBytes", "Immutable"]),
     (r"nf_inet_addr", ["KnownLayout", "FromBytes", "Immutable"]),
     (
@@ -290,10 +294,14 @@ ARCH32_REPLACEMENTS_PTR = [
     # padding.
     (r"\*mut crate::types::arch32::c_void", "crate::uaddr32"),
     (
-        r'::std::option::Option<unsafe extern "C" fn\([a-zA-Z_0-9: ]*\)>',
+        r'::std::option::Option<\s*unsafe extern "C" fn\([*a-zA-Z_0-9,:\s]*\),?\s*>',
         "crate::uaddr32",
     ),
     (r"([:=]) \*(const|mut) ([a-z_][a-zA-Z_0-9:]*)", "\\1 crate::uref32<\\3>"),
+    (
+        r"pub _u: __kernel_sigaction__bindgen_ty_1,",
+        "pub sa_handler: __sighandler_t,",
+    ),
 ]
 
 

@@ -2,6 +2,16 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+group("integration") {
+  testonly = true
+
+  deps = [
+    ":hermetic_audio_test",
+    ":hermetic_pipeline_test",
+    ":hermetic_pipeline_test_main",
+  ]
+}
+
 source_set("hermetic_audio_test") {
   testonly = true
 
@@ -22,7 +32,6 @@ source_set("hermetic_audio_test") {
   public_deps = [
     "//sdk/fidl/fuchsia.audio.effects:fuchsia.audio.effects_hlcpp",
     "//sdk/fidl/fuchsia.media:fuchsia.media_hlcpp",
-    "//sdk/fidl/fuchsia.media:fuchsia.media_hlcpp",
     "//sdk/fidl/fuchsia.media.audio:fuchsia.media.audio_hlcpp",
     "//sdk/fidl/fuchsia.ultrasound:fuchsia.ultrasound_hlcpp",
     "//sdk/fidl/fuchsia.virtualaudio:fuchsia.virtualaudio_hlcpp",
@@ -31,12 +40,10 @@ source_set("hermetic_audio_test") {
     "//sdk/lib/sys/component/cpp/testing:cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
-    "//sdk/lib/syslog/cpp",
-    "//src/media/audio/audio_core/v1:audio_core_lib",
+    "//src/media/audio/audio_core:audio_core_lib",
     "//src/media/audio/effects/test_effects:test_effects_v2",
     "//src/media/audio/lib/analysis",
     "//src/media/audio/lib/clock",
-    "//src/media/audio/lib/format",
     "//src/media/audio/lib/format",
     "//src/media/audio/lib/processing",
     "//src/media/audio/lib/processing:prebuilt_coefficient_tables",

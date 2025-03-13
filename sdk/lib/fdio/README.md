@@ -90,10 +90,10 @@ client end as a file descriptor in the current process.
   * [fdio_service_connect()]
   * [fdio_service_connect_at()]
   * [fdio_service_connect_by_name()]
-  * [fdio_open()]
-  * [fdio_open_at()]
-  * [fdio_open_fd()]
-  * [fdio_open_fd_at()]
+  * [fdio_open3()]
+  * [fdio_open3_at()]
+  * [fdio_open3_fd()]
+  * [fdio_open3_fd_at()]
 
 ### Namespaces
 
@@ -119,7 +119,6 @@ the basis for higher-level functions in FDIO like the directory functions:
 
   * [fdio_ns_opendir()]
   * [fdio_ns_chdir()]
-  * [fdio_ns_open()]
   * [fdio_ns_open3()]
   * [fdio_ns_service_connect()]
 

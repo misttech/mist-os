@@ -31,11 +31,11 @@ use netstack3_base::socket::{
 use netstack3_base::sync::{self, RwLock};
 use netstack3_base::{
     AnyDevice, BidirectionalConverter, ContextPair, CoreTxMetadataContext, DeviceIdContext,
-    DeviceIdentifier, EitherDeviceId, ExistsError, Inspector, InspectorDeviceExt, IpDeviceAddr,
-    LocalAddressError, NotFoundError, OwnedOrRefsBidirectionalConverter, ReferenceNotifiers,
-    ReferenceNotifiersExt, RemoteAddressError, RemoveResourceResultWithContext, RngContext,
-    SocketError, StrongDeviceIdentifier as _, TxMetadataBindingsTypes, WeakDeviceIdentifier,
-    ZonedAddressError,
+    DeviceIdentifier, EitherDeviceId, ExistsError, Inspector, InspectorDeviceExt,
+    InspectorExt as _, IpDeviceAddr, LocalAddressError, Mark, MarkDomain, NotFoundError,
+    OwnedOrRefsBidirectionalConverter, ReferenceNotifiers, ReferenceNotifiersExt,
+    RemoteAddressError, RemoveResourceResultWithContext, RngContext, SocketError,
+    StrongDeviceIdentifier as _, TxMetadataBindingsTypes, WeakDeviceIdentifier, ZonedAddressError,
 };
 use netstack3_filter::TransportPacketSerializer;
 use netstack3_ip::socket::{
@@ -44,8 +44,8 @@ use netstack3_ip::socket::{
     SendOneShotIpPacketError, SendOptions, SocketHopLimits,
 };
 use netstack3_ip::{
-    BaseTransportIpContext, HopLimits, Mark, MarkDomain, Marks, MulticastMembershipHandler,
-    ResolveRouteError, TransportIpContext,
+    BaseTransportIpContext, HopLimits, Marks, MulticastMembershipHandler, ResolveRouteError,
+    TransportIpContext,
 };
 use packet::BufferMut;
 use packet_formats::ip::{DscpAndEcn, IpProtoExt};
@@ -710,9 +710,9 @@ impl<A: Eq + Hash, D: WeakDeviceIdentifier> MulticastMemberships<A, D> {
 
         let Self(map) = self;
         if want_membership {
-            map.insert((address, device)).then(|| MulticastMembershipChange::Join)
+            map.insert((address, device)).then_some(MulticastMembershipChange::Join)
         } else {
-            map.remove(&(address, device)).then(|| MulticastMembershipChange::Leave)
+            map.remove(&(address, device)).then_some(MulticastMembershipChange::Leave)
         }
     }
 }

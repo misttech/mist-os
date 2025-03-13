@@ -9,6 +9,10 @@ fuchsia_package_with_single_component("sockettunnel") {
   manifest = "meta/sockettunnel.cml"
 }
 
+fuchsia_package_with_single_component("google_nanohub") {
+  manifest = "meta/nanohub.cml"
+}
+
 rustc_library("nanohub") {
   name = "starnix-modules-nanohub"
   edition = "2021"
@@ -19,6 +23,7 @@ rustc_library("nanohub") {
     "lib.rs",
     "nanohub.rs",
     "nanohub_comms_directory.rs",
+    "nanohub_socket_file.rs",
     "socket_tunnel_file.rs",
   ]
 
@@ -27,7 +32,8 @@ rustc_library("nanohub") {
     "//sdk/rust/zx",
     "//src/lib/fuchsia-component",
     "//src/starnix/kernel:starnix_core",
-    "//src/starnix/lib/starnix-sync",
-    "//src/starnix/lib/starnix-uapi",
+    "//src/starnix/lib/starnix_sync",
+    "//src/starnix/lib/starnix_syscalls",
+    "//src/starnix/lib/starnix_uapi",
   ]
 }

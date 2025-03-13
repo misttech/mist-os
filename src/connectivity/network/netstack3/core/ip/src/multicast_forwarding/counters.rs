@@ -5,7 +5,7 @@
 //! Declares counters for observability/debugging of multicast forwarding.
 
 use net_types::ip::{Ip, IpVersionMarker};
-use netstack3_base::{Counter, Inspectable, Inspector};
+use netstack3_base::{Counter, Inspectable, Inspector, InspectorExt as _};
 
 /// Multicast Forwarding counters.
 #[derive(Default)]

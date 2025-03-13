@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/elfldltl/phdr.h>
 #include <lib/elfldltl/vmo.h>
 #include <lib/elfldltl/zircon.h>
 #include <lib/ld/fuchsia-debugdata.h>
@@ -48,6 +49,7 @@ using InitialExecAllocator = decltype(MakeStartupInitialExecAllocator(SystemPage
 
 struct LoadExecutableResult : public StartupLoadResult {
   StartupModule* module = nullptr;
+  std::string_view interp;
 };
 
 LoadExecutableResult LoadExecutable(Diagnostics& diag, StartupData& startup,
@@ -61,9 +63,20 @@ LoadExecutableResult LoadExecutable(Diagnostics& diag, StartupData& startup,
   } else {
     elfldltl::UnownedVmoFile file{vmo.borrow(), diag};
     Elf::size_type max_tls_modid = 0;
-    static_cast<StartupLoadResult&>(result) =
-        result.module->Load(diag, initial_exec, file, 0, max_tls_modid);
+    std::optional<Elf::Phdr> interp;
+    static_cast<StartupLoadResult&>(result) = result.module->Load(
+        diag, initial_exec, file, 0, max_tls_modid, elfldltl::PhdrInterpObserver<Elf>(interp));
     assert(max_tls_modid <= 1);
+
+    // Extract the PT_INTERP string.
+    if (interp) [[likely]] {
+      if (auto interp_cstr = result.module->memory().ReadArray<char>(  //
+              interp->vaddr, interp->filesz)) [[likely]] {
+        if (interp_cstr->back() == '\0') [[likely]] {
+          result.interp = {interp_cstr->data(), interp_cstr->size() - 1};
+        }
+      }
+    }
   }
   return result;
 }
@@ -174,12 +187,27 @@ extern "C" StartLdResult StartLd(zx_handle_t handle, void* vdso) {
   auto scratch = MakeStartupScratchAllocator(system_page_allocator);
   auto initial_exec = MakeStartupInitialExecAllocator(system_page_allocator);
 
-  // TODO(https://fxbug.dev/42084623): We should be making an ldsvc.Config call
-  // here to get the correct shared objects.
-
   // Load the main executable.
   LoadExecutableResult main =
       LoadExecutable(diag, startup, scratch, initial_exec, std::move(startup.executable_vmo));
+
+  // It doesn't matter whether or how this dynamic linker binary itself is
+  // instrumented.  It's only the executable's instrumentation details that
+  // affect what DT_NEEDED libraries it wants to select.  This is indicated by
+  // a PT_INTERP that usually selects the dynamic linker binary to use with
+  // that executable, but the actual dynamic linker binary itself may or may
+  // not be instrumented in similar ways as the executable and what it expects
+  // of its DT_NEEDED dependencies.
+  //
+  // If the PT_INTERP has a prefix before a slash and the standard PT_INTERP
+  // string, then the prefix is a fuchsia.ldsvc.Loader/Config argument to send.
+  constexpr size_t kSuffixLen = abi::kInterp.size() + 1;
+  if (main.interp.size() > kSuffixLen && main.interp.ends_with(abi::kInterp) &&
+      main.interp[main.interp.size() - kSuffixLen] == '/') {
+    std::string_view config = main.interp;
+    config.remove_suffix(kSuffixLen);
+    startup.ConfigLdsvc(diag, config);
+  }
 
   auto get_vmo_file = [&diag,
                        &startup](const elfldltl::Soname<>& soname) -> std::optional<VmoFile> {

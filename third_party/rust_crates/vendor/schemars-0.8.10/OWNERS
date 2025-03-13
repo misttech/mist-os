@@ -2,3 +2,22 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
+include /src/developer/ffx/OWNERS
+include /src/developer/ffx/lib/emulator_instance/OWNERS
+include /src/developer/ffx/lib/pkg/OWNERS
+include /src/developer/ffx/plugins/component/OWNERS
+include /src/developer/ffx/plugins/emulator/OWNERS
+include /src/developer/ffx/plugins/package/OWNERS
+include /src/developer/ffx/plugins/product/OWNERS
+include /src/developer/ffx/plugins/repository/OWNERS
+include /src/developer/ffx/plugins/target/repository/OWNERS
+include /src/developer/ffx/plugins/target/screenshot/OWNERS
+include /src/developer/ffx/plugins/target/snapshot/OWNERS
+include /src/developer/ffx/tools/profiler/OWNERS
+include /src/lib/assembly/OWNERS
+include /src/lib/diagnostics/OWNERS
+include /src/sys/lib/component_debug/OWNERS
+include /src/sys/lib/fidl-fuchsia-pkg-ext/OWNERS
+include /src/sys/lib/moniker/OWNERS
+include /src/ui/lib/input-device-constants/OWNERS
+include /tools/lib/OWNERS

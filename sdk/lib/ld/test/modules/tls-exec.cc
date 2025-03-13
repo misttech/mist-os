@@ -9,7 +9,7 @@
 
 #include "test-start.h"
 
-[[gnu::used, gnu::retain]] alignas(64) thread_local int tls_data = 1;
+[[gnu::used, gnu::retain]] alignas(64) constinit thread_local int tls_data = 1;
 
 extern "C" int64_t TestStart() {
   const auto modules = ld::AbiLoadedModules(ld::abi::_ld_abi);

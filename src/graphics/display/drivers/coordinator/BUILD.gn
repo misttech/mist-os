@@ -47,6 +47,8 @@ source_set("shared") {
     "./*",
   ]
   sources = [
+    "added-display-info.cc",
+    "added-display-info.h",
     "capture-image.cc",
     "capture-image.h",
     "client-id.h",
@@ -67,10 +69,10 @@ source_set("shared") {
     "image.h",
     "layer.cc",
     "layer.h",
-    "migration-util.cc",
-    "migration-util.h",
     "vsync-monitor.cc",
     "vsync-monitor.h",
+    "waiting-image-list.cc",
+    "waiting-image-list.h",
   ]
   public_deps = [
     ":coordinator_bind",
@@ -115,6 +117,7 @@ source_set("preferred-scanout-image-type") {
 
 test("display-coordinator-unittests") {
   sources = [
+    "added-display-info-test.cc",
     "display-info-test.cc",
     "display-test.cc",
     "fence-test.cc",
@@ -122,6 +125,7 @@ test("display-coordinator-unittests") {
     "inspect-test.cc",
     "integration-test.cc",
     "layer-test.cc",
+    "waiting-image-list-test.cc",
   ]
   deps = [
     ":testing",
@@ -136,6 +140,7 @@ test("display-coordinator-unittests") {
     "//src/graphics/display/lib/edid-values",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
+    "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/sync:sync-cpp",

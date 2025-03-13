@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_SYSTEM_ULIB_MINI_PROCESS_PROCESS_H_
-#define ZIRCON_SYSTEM_ULIB_MINI_PROCESS_PROCESS_H_
+#ifndef ZIRCON_SYSTEM_ULIB_MINI_PROCESS_INCLUDE_MINI_PROCESS_MINI_PROCESS_H_
+#define ZIRCON_SYSTEM_ULIB_MINI_PROCESS_INCLUDE_MINI_PROCESS_MINI_PROCESS_H_
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -68,6 +68,17 @@ __BEGIN_CDECLS
 // The process just calls zx_thread_exit() immediately without replying.
 // The return value upon success is ZX_ERR_PEER_CLOSED.
 #define MINIP_CMD_THREAD_EXIT (1 << 19)
+// The process attempts to read from the user address passed in via the |data| argument.
+#define MINIP_CMD_READ_FROM_USER_ADDR (1 << 20)
+// The process attempts to read from the passed in VMO |handle|. The address of an optional
+// destination user buffer can be specified via the |data| argument.
+#define MINIP_CMD_VMO_READ (1 << 21)
+// The process attempts to write to the passed in VMO |handle|. The address of an optional source
+// user buffer can be specified via the |data| argument.
+#define MINIP_CMD_VMO_WRITE (1 << 22)
+// The process queries the ZX_INFO_VMO topic on the passed in VMO |handle|. The address of an
+// optional destination user buffer can be specified via the |data| argument.
+#define MINIP_CMD_VMO_GET_INFO (1 << 23)
 #define MINIP_THREAD_POINTER_CHECK_VALUE (0xdeadbeeffeedfaceUL)
 
 // Create and run a minimal process with one thread that blocks forever.
@@ -109,16 +120,19 @@ zx_status_t mini_process_wait_for_ack(zx_handle_t cntrl_channel);
 // Execute in the mini process any set of the MINIP_CMD_ commands above.
 // The |cntrl_channel| should be the same as the one returned by
 // start_mini_process_etc().  The |handle| is an in/out parameter
-// dependent on the command.
-zx_status_t mini_process_cmd(zx_handle_t cntrl_channel, uint32_t what, zx_handle_t* handle);
+// dependent on the command.  |data| allows the caller to send in
+// any optional data that might be required for the command.
+zx_status_t mini_process_cmd(zx_handle_t cntrl_channel, uint32_t what, zx_handle_t* handle,
+                             uint64_t data = 0u);
 
 // The following pair of functions is equivalent to mini_process_cmd(), but
 // they allow sending the request and receiving the reply to be done
 // separately.  This allows handling the case where the mini process gets
-// suspended as a result of executing the command.
-zx_status_t mini_process_cmd_send(zx_handle_t cntrl_channel, uint32_t what);
+// suspended or blocks as a result of executing the command.
+zx_status_t mini_process_cmd_send(zx_handle_t cntrl_channel, uint32_t what,
+                                  zx_handle_t handle = ZX_HANDLE_INVALID, uint64_t data = 0u);
 zx_status_t mini_process_cmd_read_reply(zx_handle_t cntrl_channel, zx_handle_t* handle);
 
 __END_CDECLS
 
-#endif  // ZIRCON_SYSTEM_ULIB_MINI_PROCESS_PROCESS_H_
+#endif  // ZIRCON_SYSTEM_ULIB_MINI_PROCESS_INCLUDE_MINI_PROCESS_MINI_PROCESS_H_

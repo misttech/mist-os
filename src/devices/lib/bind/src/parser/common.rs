@@ -13,8 +13,8 @@ use nom::character::complete::{
 use nom::combinator::{map, map_res, opt, value};
 use nom::error::{ErrorKind, ParseError};
 use nom::multi::{many0, separated_list1};
-use nom::sequence::{delimited, preceded, tuple};
-use nom::{IResult, Parser, Slice};
+use nom::sequence::{delimited, preceded};
+use nom::{IResult, Input, Parser};
 use nom_locate::LocatedSpan;
 use regex::Regex;
 use std::fmt;
@@ -150,9 +150,8 @@ impl ParseError<NomSpan<'_>> for BindParserError {
 pub fn string_literal(input: NomSpan) -> IResult<NomSpan, String, BindParserError> {
     let escapable = escaped(is_not(r#"\""#), '\\', one_of(r#"\""#));
     let literal = delimited(char('"'), escapable, char('"'));
-    map_err(map(literal, |s: NomSpan| s.fragment().to_string()), BindParserError::StringLiteral)(
-        input,
-    )
+    map_err(map(literal, |s: NomSpan| s.fragment().to_string()), BindParserError::StringLiteral)
+        .parse(input)
 }
 
 pub fn numeric_literal(input: NomSpan) -> IResult<NomSpan, u64, BindParserError> {
@@ -161,13 +160,13 @@ pub fn numeric_literal(input: NomSpan) -> IResult<NomSpan, u64, BindParserError>
         u64::from_str_radix(s.fragment(), 16)
     });
     // Note: When the base16 parser fails but input starts with '0x' this will succeed and return 0.
-    map_err(alt((base16, base10)), BindParserError::NumericLiteral)(input)
+    map_err(alt((base16, base10)), BindParserError::NumericLiteral).parse(input)
 }
 
 pub fn bool_literal(input: NomSpan) -> IResult<NomSpan, bool, BindParserError> {
     let true_ = value(true, tag("true"));
     let false_ = value(false, tag("false"));
-    map_err(alt((true_, false_)), BindParserError::BoolLiteral)(input)
+    map_err(alt((true_, false_)), BindParserError::BoolLiteral).parse(input)
 }
 
 pub fn identifier(input: NomSpan) -> IResult<NomSpan, String, BindParserError> {
@@ -175,7 +174,10 @@ pub fn identifier(input: NomSpan) -> IResult<NomSpan, String, BindParserError> {
         static ref RE: Regex = Regex::new(r"^[a-zA-Z]([a-zA-Z0-9_]*[a-zA-Z0-9])?").unwrap();
     }
     if let Some(mat) = RE.find(input.fragment()) {
-        Ok((input.slice(mat.end()..), input.slice(mat.start()..mat.end()).fragment().to_string()))
+        Ok((
+            input.take_from(mat.end()),
+            input.take(mat.end()).take_from(mat.start()).fragment().to_string(),
+        ))
     } else {
         Err(nom::Err::Error(BindParserError::Identifier(input.fragment().to_string())))
     }
@@ -184,7 +186,7 @@ pub fn identifier(input: NomSpan) -> IResult<NomSpan, String, BindParserError> {
 pub fn compound_identifier(
     input: NomSpan,
 ) -> IResult<NomSpan, CompoundIdentifier, BindParserError> {
-    let (input, mut segments) = separated_list1(tag("."), identifier)(input)?;
+    let (input, mut segments) = separated_list1(tag("."), identifier).parse(input)?;
     // Segments must be nonempty, so it's safe to pop off the name.
     let name = segments.pop().unwrap();
     Ok((input, CompoundIdentifier { namespace: segments, name }))
@@ -196,14 +198,15 @@ pub fn condition_value(input: NomSpan) -> IResult<NomSpan, Value, BindParserErro
     let boolean = map(ws(bool_literal), Value::BoolLiteral);
     let identifer = map(ws(compound_identifier), Value::Identifier);
 
-    alt((string, number, boolean, identifer))(input)
+    alt((string, number, boolean, identifer))
+        .parse(input)
         .or_else(|_| Err(nom::Err::Error(BindParserError::ConditionValue(input.to_string()))))
 }
 
 pub fn using(input: NomSpan) -> IResult<NomSpan, Include, BindParserError> {
     let as_keyword = ws(map_err(tag("as"), BindParserError::AsKeyword));
-    let (input, name) = ws(compound_identifier)(input)?;
-    let (input, alias) = opt(preceded(as_keyword, ws(identifier)))(input)?;
+    let (input, name) = ws(compound_identifier).parse(input)?;
+    let (input, alias) = opt(preceded(as_keyword, ws(identifier))).parse(input)?;
     Ok((input, Include { name, alias }))
 }
 
@@ -211,7 +214,7 @@ pub fn using_list(input: NomSpan) -> IResult<NomSpan, Vec<Include>, BindParserEr
     let using_keyword = ws(map_err(tag("using"), BindParserError::UsingKeyword));
     let terminator = ws(map_err(tag(";"), BindParserError::Semicolon));
     let using = delimited(using_keyword, ws(using), terminator);
-    many0(ws(using))(input)
+    many0(ws(using)).parse(input)
 }
 
 /// Applies the parser `f` until reaching the end of the input. `f` must always make progress (i.e.
@@ -219,9 +222,9 @@ pub fn using_list(input: NomSpan) -> IResult<NomSpan, Vec<Include>, BindParserEr
 /// the results of `f` in a Vec.
 pub fn many_until_eof<'a, O, F>(
     mut f: F,
-) -> impl FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, Vec<O>, BindParserError>
+) -> impl Parser<NomSpan<'a>, Output = Vec<O>, Error = BindParserError>
 where
-    F: Parser<NomSpan<'a>, O, BindParserError>,
+    F: Parser<NomSpan<'a>, Output = O, Error = BindParserError>,
 {
     move |mut input: NomSpan<'a>| {
         let mut result = vec![];
@@ -244,9 +247,9 @@ where
 /// Wraps a parser |f| and discards zero or more whitespace characters or comments before it.
 /// Doesn't discard whitespace after the parser, since this would make it difficult to ensure that
 /// the AST spans contain no trailing whitespace.
-pub fn ws<'a, O, F>(f: F) -> impl FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, O, BindParserError>
+pub fn ws<'a, O, F>(f: F) -> impl Parser<NomSpan<'a>, Output = O, Error = BindParserError>
 where
-    F: Parser<NomSpan<'a>, O, BindParserError>,
+    F: Parser<NomSpan<'a>, Output = O, Error = BindParserError>,
 {
     preceded(comment_or_whitespace, f)
 }
@@ -258,12 +261,12 @@ pub fn skip_ws(input: NomSpan) -> Result<NomSpan, nom::Err<BindParserError>> {
 
 fn comment_or_whitespace(input: NomSpan) -> IResult<NomSpan, (), BindParserError> {
     let multispace = value((), multispace1);
-    value((), many0(alt((multispace, multiline_comment, singleline_comment))))(input)
+    value((), many0(alt((multispace, multiline_comment, singleline_comment)))).parse(input)
 }
 
 /// Parser that matches a multiline comment, e.g. "/* comment */". Comments may be nested.
 fn multiline_comment(input: NomSpan) -> IResult<NomSpan, (), BindParserError> {
-    let (input, _) = tag("/*")(input)?;
+    let (input, _) = tag("/*").parse(input)?;
     let mut iter = input.fragment().char_indices().peekable();
     let mut stack = 1;
     while let (Some((_, first)), Some((_, second))) = (iter.next(), iter.peek()) {
@@ -283,25 +286,25 @@ fn multiline_comment(input: NomSpan) -> IResult<NomSpan, (), BindParserError> {
     }
 
     let consumed = if let Some((index, _)) = iter.peek() { *index } else { input.fragment().len() };
-    Ok((input.slice(consumed..), ()))
+    Ok((input.take_from(consumed), ()))
 }
 
 /// Parser that matches a single line comment, e.g. "// comment\n".
 fn singleline_comment(input: NomSpan) -> IResult<NomSpan, (), BindParserError> {
-    value((), tuple((tag("//"), not_line_ending, line_ending)))(input)
+    value((), (tag("//"), not_line_ending, line_ending)).parse(input)
 }
 
 // Wraps a parser and replaces its error.
 pub fn map_err<'a, O, P, G>(
     mut parser: P,
     f: G,
-) -> impl FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, O, BindParserError>
+) -> impl Parser<NomSpan<'a>, Output = O, Error = BindParserError>
 where
-    P: FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, O, (NomSpan<'a>, ErrorKind)>,
+    P: Parser<NomSpan<'a>, Output = O, Error = (NomSpan<'a>, ErrorKind)>,
     G: Fn(String) -> BindParserError,
 {
-    move |input: NomSpan| {
-        parser(input).map_err(|e| match e {
+    move |input: NomSpan<'a>| {
+        parser.parse(input).map_err(|e| match e {
             nom::Err::Error((i, _)) => nom::Err::Error(f(i.to_string())),
             nom::Err::Failure((i, _)) => nom::Err::Failure(f(i.to_string())),
             nom::Err::Incomplete(_) => {
@@ -755,23 +758,23 @@ pub mod test {
         #[test]
         fn whitespace() {
             let test = || map(tag("test"), |s: NomSpan| s.fragment().to_string());
-            check_result(ws(test())(NomSpan::new("test")), "", "test".to_string());
+            check_result(ws(test()).parse(NomSpan::new("test")), "", "test".to_string());
 
-            check_result(ws(test())(NomSpan::new(" \n\t\r\ntest")), "", "test".to_string());
+            check_result(ws(test()).parse(NomSpan::new(" \n\t\r\ntest")), "", "test".to_string());
             check_result(
-                ws(test())(NomSpan::new("test \n\t\r\n")),
+                ws(test()).parse(NomSpan::new("test \n\t\r\n")),
                 " \n\t\r\n",
                 "test".to_string(),
             );
 
             check_result(
-                ws(test())(NomSpan::new(" // test \n test // test \n ")),
+                ws(test()).parse(NomSpan::new(" // test \n test // test \n ")),
                 " // test \n ",
                 "test".to_string(),
             );
 
             check_result(
-                ws(test())(NomSpan::new(" /* test */ test /* test */ ")),
+                ws(test()).parse(NomSpan::new(" /* test */ test /* test */ ")),
                 " /* test */ ",
                 "test".to_string(),
             );

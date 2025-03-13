@@ -117,12 +117,11 @@ pub fn setup_fake_rcs(components: Vec<&str>) -> RemoteControlProxy {
         let querier = Rc::new(mock_realm_query);
         while let Ok(Some(req)) = stream.try_next().await {
             match req {
-                RemoteControlRequest::DeprecatedOpenCapability {
+                RemoteControlRequest::ConnectCapability {
                     moniker,
                     capability_set,
                     capability_name,
                     server_channel,
-                    flags: _,
                     responder,
                 } => {
                     assert_eq!(moniker, "toolbox");

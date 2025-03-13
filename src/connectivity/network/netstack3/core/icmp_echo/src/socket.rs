@@ -28,9 +28,9 @@ use netstack3_base::socketmap::{IterShadows as _, SocketMap};
 use netstack3_base::sync::{RwLock, StrongRc};
 use netstack3_base::{
     AnyDevice, ContextPair, CoreTxMetadataContext, CounterContext, DeviceIdContext, IcmpIpExt,
-    Inspector, InspectorDeviceExt, LocalAddressError, PortAllocImpl, ReferenceNotifiers,
-    RemoveResourceResultWithContext, RngContext, SocketError, StrongDeviceIdentifier,
-    UninstantiableWrapper, WeakDeviceIdentifier,
+    Inspector, InspectorDeviceExt, LocalAddressError, Mark, MarkDomain, PortAllocImpl,
+    ReferenceNotifiers, RemoveResourceResultWithContext, RngContext, SocketError,
+    StrongDeviceIdentifier, UninstantiableWrapper, WeakDeviceIdentifier,
 };
 use netstack3_datagram::{
     self as datagram, DatagramApi, DatagramBindingsTypes, DatagramFlowId, DatagramSocketMapSpec,
@@ -41,8 +41,8 @@ use netstack3_datagram::{
 use netstack3_ip::icmp::{EchoTransportContextMarker, IcmpRxCounters};
 use netstack3_ip::socket::SocketHopLimits;
 use netstack3_ip::{
-    IpHeaderInfo, IpTransportContext, LocalDeliveryPacketInfo, Mark, MarkDomain,
-    MulticastMembershipHandler, ReceiveIpPacketMeta, TransportIpContext, TransportReceiveError,
+    IpHeaderInfo, IpTransportContext, LocalDeliveryPacketInfo, MulticastMembershipHandler,
+    ReceiveIpPacketMeta, TransportIpContext, TransportReceiveError,
 };
 use packet::{BufferMut, ParsablePacket as _, ParseBuffer as _, Serializer};
 use packet_formats::icmp::{IcmpEchoReply, IcmpEchoRequest, IcmpPacketBuilder, IcmpPacketRaw};
@@ -393,6 +393,11 @@ impl<BT: IcmpEchoBindingsTypes> DatagramSocketSpec for Icmp<BT> {
         let ConnIpAddr { local: (local_ip, id), remote: (remote_ip, ()) } = addr;
         let icmp_echo: packet_formats::icmp::IcmpPacketRaw<I, &[u8], IcmpEchoRequest> =
             body.parse()?;
+        debug!(
+            "preparing ICMP echo request {local_ip} to {remote_ip}: id={}, seq={}",
+            id,
+            icmp_echo.message().seq()
+        );
         let icmp_builder = IcmpPacketBuilder::<I, _>::new(
             local_ip.addr(),
             remote_ip.addr(),
@@ -1071,8 +1076,9 @@ impl<
                     "ICMP received ICMP error {:?} from {:?}, to {:?} on socket {:?}",
                     err, original_dst_ip, original_src_ip, conn
                 );
-                core_ctx
-                    .increment(|counters: &IcmpRxCounters<I>| &counters.error_delivered_to_socket)
+                CounterContext::<IcmpRxCounters<I>>::counters(core_ctx)
+                    .error_delivered_to_socket
+                    .increment()
             } else {
                 trace!(
                     "IcmpIpTransportContext::receive_icmp_error: Got ICMP error message for \
@@ -1092,7 +1098,7 @@ impl<
         mut buffer: B,
         info: &LocalDeliveryPacketInfo<I, H>,
     ) -> Result<(), (B, TransportReceiveError)> {
-        let LocalDeliveryPacketInfo { meta, header_info: _ } = info;
+        let LocalDeliveryPacketInfo { meta, header_info: _, marks: _ } = info;
         let ReceiveIpPacketMeta { broadcast: _, transparent_override } = meta;
         if let Some(delivery) = transparent_override.as_ref() {
             unreachable!(
@@ -1285,8 +1291,8 @@ mod tests {
     impl<I: IpExt> IcmpEchoContextMarker for FakeIcmpCoreCtx<I> {}
 
     impl<I: IpExt> CounterContext<IcmpRxCounters<I>> for FakeIcmpCoreCtxState<I> {
-        fn with_counters<O, F: FnOnce(&IcmpRxCounters<I>) -> O>(&self, cb: F) -> O {
-            cb(&self.rx_counters)
+        fn counters(&self) -> &IcmpRxCounters<I> {
+            &self.rx_counters
         }
     }
 

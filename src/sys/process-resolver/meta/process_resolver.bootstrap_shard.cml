@@ -10,11 +10,6 @@
     ],
     offer: [
         {
-            protocol: "fuchsia.logger.LogSink",
-            from: "#archivist",
-            to: "#process_resolver",
-        },
-        {
             protocol: "fuchsia.pkg.PackageResolver-boot",
             from: "parent",
             to: "#process_resolver",

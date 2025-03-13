@@ -282,14 +282,11 @@ fn moniker_contains_in_last_segment(moniker: &ExtendedMoniker, query_tag: &str) 
 mod test {
     use diagnostics_data::{ExtendedMoniker, Timestamp};
     use selectors::parse_log_interest_selector;
-    use std::time::Duration;
 
     use crate::log_socket_stream::OneOrMany;
     use crate::{DumpCommand, LogSubCommand};
 
     use super::*;
-
-    const DEFAULT_TS_NANOS: u64 = 1615535969000000000;
 
     fn empty_dump_command() -> LogCommand {
         LogCommand {
@@ -298,15 +295,8 @@ mod test {
         }
     }
 
-    fn default_ts() -> Duration {
-        Duration::from_nanos(DEFAULT_TS_NANOS)
-    }
-
     fn make_log_entry(log_data: LogData) -> LogEntry {
-        LogEntry {
-            timestamp: Timestamp::from_nanos(default_ts().as_nanos() as i64),
-            data: log_data,
-        }
+        LogEntry { data: log_data }
     }
 
     #[fuchsia::test]

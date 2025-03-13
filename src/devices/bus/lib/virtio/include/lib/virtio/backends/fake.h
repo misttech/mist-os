@@ -149,6 +149,8 @@ class FakeBackend : public Backend {
       registers16_.insert({kISRStatus + 1 + offset, value});
     } else if constexpr (sizeof(T) == 4) {
       registers32_.insert({kISRStatus + 1 + offset, value});
+    } else {
+      static_assert(false, "Not implemented");
     }
   }
 
@@ -160,6 +162,8 @@ class FakeBackend : public Backend {
       registers16_[offset] = value;
     } else if constexpr (sizeof(T) == 4) {
       registers32_[offset] = value;
+    } else {
+      static_assert(false, "Not implemented");
     }
   }
 
@@ -176,6 +180,8 @@ class FakeBackend : public Backend {
       *output = registers16_.find(offset)->second;
     } else if constexpr (sizeof(T) == 4) {
       *output = registers32_.find(offset)->second;
+    } else {
+      static_assert(false, "Not implemented");
     }
   }
 

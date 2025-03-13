@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 #[serde(default, deny_unknown_fields)]
 pub struct UsbConfig {
     /// Set this if the platform has a USB peripheral device that needs to be configured.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub peripheral: UsbPeripheralConfig,
 }
 
@@ -20,6 +21,7 @@ pub struct UsbPeripheralConfig {
     /// Optional list of functions that will be published by the USB peripheral driver.
     /// See |UsbPeripheralFunction| for the list of supported functions.
     /// If this is `None`, |UsbPeripheralFunction::Cdc| shall be set as the default.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub functions: Option<Vec<UsbPeripheralFunction>>,
 }
 

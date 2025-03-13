@@ -37,7 +37,6 @@ group("tests") {
     "inspect:tests",
     "inspector:tests",
     "io-scheduler:tests",
-    "ktrace:tests",
     "lazy_init:tests",
     "ldmsg:tests",
     "lockdep:tests",

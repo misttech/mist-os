@@ -63,12 +63,9 @@ VmObjectPaged::~VmObjectPaged() {
 
   LTRACEF("%p\n", this);
 
-  if (!cow_pages_) {
-    // Initialization didn't finish. This is not in the global list and any complex destruction can
-    // all be skipped.
-    DEBUG_ASSERT(!InGlobalList());
-    return;
-  }
+  // VmObjectPaged initialize must always complete and is not allowed to fail, as such it should
+  // always end up in the global list.
+  DEBUG_ASSERT(InGlobalList());
 
   DestructorHelper();
 }
@@ -80,86 +77,98 @@ void VmObjectPaged::DestructorHelper() {
     Unpin(0, size());
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  fbl::RefPtr<VmCowPages> deferred;
+  {
+    Guard<VmoLockType> guard{lock()};
 
-  // Only clear the backlink if we are not a reference. A reference does not "own" the VmCowPages,
-  // so in the typical case, the VmCowPages will not have its backlink set to a reference. There
-  // does exist an edge case where the backlink can be a reference, which is handled by the else
-  // block below.
-  if (!is_reference()) {
-    cow_pages_locked()->set_paged_backlink_locked(nullptr);
-  } else {
-    // If this is a reference, we need to remove it from the original (parent) VMO's reference list.
-    VmObjectPaged* root_ref = cow_pages_locked()->get_paged_backlink_locked();
-    // The VmCowPages will have a valid backlink, either to the original VmObjectPaged or a
-    // reference VmObjectPaged, as long as there is a reference that is alive. We know that this is
-    // a reference.
-    DEBUG_ASSERT(root_ref);
-    if (likely(root_ref != this)) {
-      AssertHeld(root_ref->lock_ref());
-      VmObjectPaged* removed = root_ref->reference_list_.erase(*this);
-      DEBUG_ASSERT(removed == this);
-    } else {
-      // It is possible for the backlink to point to |this| if the original parent went away at some
-      // point and the rest of the reference list had to be re-homed to |this|, and the backlink set
-      // to |this|.
-      // The VmCowPages was pointing to us, so clear the backlink. The backlink will get reset below
-      // if other references remain.
+    // Only clear the backlink if we are not a reference. A reference does not "own" the VmCowPages,
+    // so in the typical case, the VmCowPages will not have its backlink set to a reference. There
+    // does exist an edge case where the backlink can be a reference, which is handled by the else
+    // block below.
+    if (!is_reference()) {
       cow_pages_locked()->set_paged_backlink_locked(nullptr);
+    } else {
+      // If this is a reference, we need to remove it from the original (parent) VMO's reference
+      // list.
+      VmObjectPaged* root_ref = cow_pages_locked()->get_paged_backlink_locked();
+      // The VmCowPages will have a valid backlink, either to the original VmObjectPaged or a
+      // reference VmObjectPaged, as long as there is a reference that is alive. We know that this
+      // is a reference.
+      DEBUG_ASSERT(root_ref);
+      if (likely(root_ref != this)) {
+        AssertHeld(root_ref->lock_ref());
+        VmObjectPaged* removed = root_ref->reference_list_.erase(*this);
+        DEBUG_ASSERT(removed == this);
+      } else {
+        // It is possible for the backlink to point to |this| if the original parent went away at
+        // some point and the rest of the reference list had to be re-homed to |this|, and the
+        // backlink set to |this|. The VmCowPages was pointing to us, so clear the backlink. The
+        // backlink will get reset below if other references remain.
+        cow_pages_locked()->set_paged_backlink_locked(nullptr);
+      }
     }
+
+    // If this VMO had references, pick one of the references as the paged backlink from the shared
+    // VmCowPages. Also, move the remainder of the reference list to the chosen reference. Note that
+    // we're only moving the reference list over without adding the references to the children list;
+    // we do not want these references to be counted as children of the chosen VMO. We simply want a
+    // safe way to propagate mapping updates and VmCowPages changes on hidden node addition.
+    if (!reference_list_.is_empty()) {
+      // We should only be attempting to reset the backlink if the owner is going away and has reset
+      // the backlink above.
+      DEBUG_ASSERT(cow_pages_locked()->get_paged_backlink_locked() == nullptr);
+      VmObjectPaged* paged_backlink = reference_list_.pop_front();
+      cow_pages_locked()->set_paged_backlink_locked(paged_backlink);
+      AssertHeld(paged_backlink->lock_ref());
+      paged_backlink->reference_list_.splice(paged_backlink->reference_list_.end(),
+                                             reference_list_);
+    }
+    DEBUG_ASSERT(reference_list_.is_empty());
+    deferred = cow_pages_locked()->MaybeDeadTransitionLocked(guard);
+  }
+  while (deferred) {
+    deferred = deferred->MaybeDeadTransition();
   }
 
-  // If this VMO had references, pick one of the references as the paged backlink from the shared
-  // VmCowPages. Also, move the remainder of the reference list to the chosen reference. Note that
-  // we're only moving the reference list over without adding the references to the children list;
-  // we do not want these references to be counted as children of the chosen VMO. We simply want a
-  // safe way to propagate mapping updates and VmCowPages changes on hidden node addition.
-  if (!reference_list_.is_empty()) {
-    // We should only be attempting to reset the backlink if the owner is going away and has reset
-    // the backlink above.
-    DEBUG_ASSERT(cow_pages_locked()->get_paged_backlink_locked() == nullptr);
-    VmObjectPaged* paged_backlink = reference_list_.pop_front();
-    cow_pages_locked()->set_paged_backlink_locked(paged_backlink);
-    AssertHeld(paged_backlink->lock_ref());
-    paged_backlink->reference_list_.splice(paged_backlink->reference_list_.end(), reference_list_);
-  }
-  DEBUG_ASSERT(reference_list_.is_empty());
-  cow_pages_locked()->MaybeDeadTransitionLocked(guard);
+  fbl::RefPtr<VmObjectPaged> maybe_parent;
 
   // Re-home all our children with any parent that we have.
-  while (!children_list_.is_empty()) {
-    VmObject* c = &children_list_.front();
-    children_list_.pop_front();
-    VmObjectPaged* child = reinterpret_cast<VmObjectPaged*>(c);
-    AssertHeld(child->lock_ref());
-    child->parent_ = parent_;
+  {
+    Guard<CriticalMutex> child_guard{ChildListLock::Get()};
+    while (!children_list_.is_empty()) {
+      VmObject* c = &children_list_.front();
+      children_list_.pop_front();
+      VmObjectPaged* child = reinterpret_cast<VmObjectPaged*>(c);
+      child->parent_ = parent_;
+      if (parent_) {
+        // Ignore the return since 'this' is a child so we know we are not transitioning from 0->1
+        // children.
+        [[maybe_unused]] bool notify = parent_->AddChildLocked(child);
+        DEBUG_ASSERT(!notify);
+      }
+    }
+
     if (parent_) {
-      AssertHeld(parent_->lock_ref());
-      // Ignore the return since 'this' is a child so we know we are not transitioning from 0->1
-      // children.
-      [[maybe_unused]] bool notify = parent_->AddChildLocked(child);
-      DEBUG_ASSERT(!notify);
+      // As parent_ is a raw pointer we must ensure that if we call a method on it that it lives
+      // long enough. To do so we attempt to upgrade it to a refptr, which could fail if it's
+      // already slated for deletion.
+      maybe_parent = fbl::MakeRefPtrUpgradeFromRaw(parent_, child_guard);
+      if (maybe_parent) {
+        // Holding refptr, can safely pass in the guard to RemoveChild.
+        parent_->RemoveChild(this, child_guard.take());
+      } else {
+        // parent is up for deletion and so there's no need to use RemoveChild since there is no
+        // user dispatcher to notify anyway and so just drop ourselves to keep the hierarchy
+        // correct.
+        parent_->DropChildLocked(this);
+      }
     }
   }
-
-  if (parent_) {
-    AssertHeld(parent_->lock_ref());
-    // As parent_ is a raw pointer we must ensure that if we call a method on it that it lives long
-    // enough. To do so we attempt to upgrade it to a refptr, which could fail if it's already
-    // slated for deletion.
-    fbl::RefPtr<VmObjectPaged> parent = fbl::MakeRefPtrUpgradeFromRaw(parent_, guard);
-    if (parent) {
-      // Holding refptr, can safely pass in the guard to RemoveChild.
-      parent_->RemoveChild(this, guard.take());
-      // As we constructed a RefPtr to our parent, and we are in our own destructor, there is now
-      // the potential for recursive destruction if we need to delete the parent due to holding the
-      // last ref, hit this same path, etc.
-      VmDeferredDeleter<VmObjectPaged>::DoDeferredDelete(ktl::move(parent));
-    } else {
-      // parent is up for deletion and so there's no need to use RemoveChild since there is no
-      // user dispatcher to notify anyway and so just drop ourselves to keep the hierarchy correct.
-      parent_->DropChildLocked(this);
-    }
+  if (maybe_parent) {
+    // As we constructed a RefPtr to our parent, and we are in our own destructor, there is now
+    // the potential for recursive destruction if we need to delete the parent due to holding the
+    // last ref, hit this same path, etc.
+    VmDeferredDeleter<VmObjectPaged>::DoDeferredDelete(ktl::move(maybe_parent));
   }
 }
 
@@ -170,7 +179,7 @@ zx_status_t VmObjectPaged::HintRange(uint64_t offset, uint64_t len, EvictionHint
     lockdep::AssertNoLocksHeld();
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
 
   // Ignore hints for non user-pager-backed VMOs. We choose to silently ignore hints for
   // incompatible combinations instead of failing. This is because the kernel does not make any
@@ -202,7 +211,7 @@ zx_status_t VmObjectPaged::HintRange(uint64_t offset, uint64_t len, EvictionHint
 }
 
 zx_status_t VmObjectPaged::PrefetchRangeLocked(uint64_t offset, uint64_t len,
-                                               Guard<CriticalMutex>* guard) {
+                                               Guard<VmoLockType>* guard) {
   auto cow_range = GetCowRangeSizeCheckLocked(offset, len);
   if (!cow_range) {
     return ZX_ERR_OUT_OF_RANGE;
@@ -227,7 +236,7 @@ zx_status_t VmObjectPaged::PrefetchRange(uint64_t offset, uint64_t len) {
   if (can_block_on_page_requests()) {
     lockdep::AssertNoLocksHeld();
   }
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
 
   // Round offset and len to be page aligned. Use a sub-scope to validate that temporary end
   // calculations cannot be accidentally used later on.
@@ -249,7 +258,7 @@ zx_status_t VmObjectPaged::PrefetchRange(uint64_t offset, uint64_t len) {
 }
 
 void VmObjectPaged::CommitHighPriorityPages(uint64_t offset, uint64_t len) {
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
   if (!cow_pages_locked()->is_high_memory_priority_locked()) {
     return;
   }
@@ -291,9 +300,12 @@ zx_status_t VmObjectPaged::CreateCommon(uint32_t pmm_alloc_flags, uint32_t optio
   }
 
   fbl::AllocChecker ac;
-  auto state = fbl::MakeRefCountedChecked<VmHierarchyState>(&ac);
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
+  fbl::RefPtr<VmHierarchyState> state;
+  if constexpr (VMO_USE_SHARED_LOCK) {
+    state = fbl::MakeRefCountedChecked<VmHierarchyState>(&ac);
+    if (!ac.check()) {
+      return ZX_ERR_NO_MEMORY;
+    }
   }
 
   ktl::unique_ptr<DiscardableVmoTracker> discardable = nullptr;
@@ -323,7 +335,7 @@ zx_status_t VmObjectPaged::CreateCommon(uint32_t pmm_alloc_flags, uint32_t optio
     if (status != ZX_OK) {
       return status;
     }
-    Guard<CriticalMutex> guard{cow_pages->lock()};
+    Guard<VmoLockType> guard{cow_pages->lock()};
     // Add all the preallocated pages to the object, this takes ownership of all pages regardless
     // of the outcome. This is a new VMO, but this call could fail due to OOM.
     status = cow_pages->AddNewPagesLocked(0, &prealloc_pages, VmCowPages::CanOverwriteContent::Zero,
@@ -340,7 +352,7 @@ zx_status_t VmObjectPaged::CreateCommon(uint32_t pmm_alloc_flags, uint32_t optio
       new (&ac) VmObjectPaged(options, ktl::move(state), ktl::move(cow_pages)));
   if (!ac.check()) {
     if (options & kAlwaysPinned) {
-      Guard<CriticalMutex> guard{cow_pages->lock()};
+      Guard<VmoLockType> guard{cow_pages->lock()};
       cow_pages->UnpinLocked(VmCowRange(0, size));
     }
     return ZX_ERR_NO_MEMORY;
@@ -348,7 +360,7 @@ zx_status_t VmObjectPaged::CreateCommon(uint32_t pmm_alloc_flags, uint32_t optio
 
   // This creation has succeeded. Must wire up the cow pages and *then* place in the globals list.
   {
-    Guard<CriticalMutex> guard{vmo->lock()};
+    Guard<VmoLockType> guard{vmo->lock()};
     vmo->cow_pages_locked()->set_paged_backlink_locked(vmo.get());
     vmo->cow_pages_locked()->TransitionToAliveLocked();
   }
@@ -422,7 +434,7 @@ zx_status_t VmObjectPaged::CreateContiguous(uint32_t pmm_alloc_flags, uint64_t s
     LTRACEF("failed to allocate enough pages (asked for %zu)\n", num_pages);
     return ZX_ERR_NO_MEMORY;
   }
-  Guard<CriticalMutex> guard{vmo->lock()};
+  Guard<VmoLockType> guard{vmo->lock()};
   // Add them to the appropriate range of the object, this takes ownership of all the pages
   // regardless of outcome.
   // This is a newly created VMO with a page source, so we don't expect to be overwriting anything
@@ -464,7 +476,7 @@ zx_status_t VmObjectPaged::CreateFromWiredPages(const void* data, size_t size, b
     paddr_t start_paddr = vaddr_to_paddr(data);
     ASSERT(start_paddr != 0);
 
-    Guard<CriticalMutex> guard{vmo->lock()};
+    Guard<VmoLockType> guard{vmo->lock()};
 
     for (size_t count = 0; count < size / PAGE_SIZE; count++) {
       paddr_t pa = start_paddr + count * PAGE_SIZE;
@@ -539,9 +551,12 @@ zx_status_t VmObjectPaged::CreateWithSourceCommon(fbl::RefPtr<PageSource> src,
   DEBUG_ASSERT(!(options & kAlwaysPinned));
 
   fbl::AllocChecker ac;
-  auto state = fbl::AdoptRef<VmHierarchyState>(new (&ac) VmHierarchyState);
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
+  fbl::RefPtr<VmHierarchyState> state;
+  if constexpr (VMO_USE_SHARED_LOCK) {
+    state = fbl::MakeRefCountedChecked<VmHierarchyState>(&ac);
+    if (!ac.check()) {
+      return ZX_ERR_NO_MEMORY;
+    }
   }
 
   // The cow pages will have a page source, so blocking is always possible.
@@ -577,7 +592,7 @@ zx_status_t VmObjectPaged::CreateWithSourceCommon(fbl::RefPtr<PageSource> src,
 
   // This creation has succeeded. Must wire up the cow pages and *then* place in the globals list.
   {
-    Guard<CriticalMutex> guard{vmo->lock()};
+    Guard<VmoLockType> guard{vmo->lock()};
     vmo->cow_pages_locked()->set_paged_backlink_locked(vmo.get());
     vmo->cow_pages_locked()->TransitionToAliveLocked();
   }
@@ -611,7 +626,7 @@ zx_status_t VmObjectPaged::CreateChildSlice(uint64_t offset, uint64_t size, bool
   // acquisition is correct as we must drop the lock in order to perform the allocations.
   VmCowRange range;
   {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
     auto cow_range = GetCowRangeSizeCheckLocked(offset, size);
     if (!cow_range) {
       return ZX_ERR_INVALID_ARGS;
@@ -691,27 +706,36 @@ zx_status_t VmObjectPaged::CreateChildReferenceCommon(uint32_t options, VmCowRan
   }
 
   // Reference shares the same VmCowPages as the parent.
-
-  fbl::AllocChecker ac;
-  auto vmo = fbl::AdoptRef<VmObjectPaged>(
-      new (&ac) VmObjectPaged(options, hierarchy_state_ptr_, cow_pages_, range));
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
-
+  fbl::RefPtr<VmObjectPaged> vmo;
   {
-    Guard<CriticalMutex> guard{lock()};
-    AssertHeld(vmo->lock_ref());
+    Guard<VmoLockType> guard{lock()};
 
     // We know that we are not contiguous so we should not be uncached either.
     if (cache_policy_ != ARCH_MMU_FLAG_CACHED && !allow_uncached) {
       return ZX_ERR_BAD_STATE;
     }
+
+    // Once all fallible checks are performed, construct the VmObjectPaged.
+    fbl::AllocChecker ac;
+    fbl::RefPtr<VmHierarchyState> state;
+#if VMO_USE_SHARED_LOCK
+    state = hierarchy_state_ptr_;
+#endif
+    vmo = fbl::AdoptRef<VmObjectPaged>(
+        new (&ac) VmObjectPaged(options, ktl::move(state), cow_pages_, range));
+    if (!ac.check()) {
+      return ZX_ERR_NO_MEMORY;
+    }
+    AssertHeld(vmo->lock_ref());
+
     vmo->cache_policy_ = cache_policy_;
-    vmo->parent_ = this;
-    const bool first = AddChildLocked(vmo.get());
-    if (first_child) {
-      *first_child = first;
+    {
+      Guard<CriticalMutex> child_guard{ChildListLock::Get()};
+      vmo->parent_ = this;
+      const bool first = AddChildLocked(vmo.get());
+      if (first_child) {
+        *first_child = first;
+      }
     }
 
     // Also insert into the reference list. The reference should only be inserted in the list of the
@@ -743,7 +767,7 @@ zx_status_t VmObjectPaged::CreateChildReferenceCommon(uint32_t options, VmCowRan
   return ZX_OK;
 }
 
-zx_status_t VmObjectPaged::CreateClone(Resizability resizable, CloneType type, uint64_t offset,
+zx_status_t VmObjectPaged::CreateClone(Resizability resizable, SnapshotType type, uint64_t offset,
                                        uint64_t size, bool copy_name,
                                        fbl::RefPtr<VmObject>* child_vmo) {
   LTRACEF("vmo %p offset %#" PRIx64 " size %#" PRIx64 "\n", this, offset, size);
@@ -775,10 +799,7 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, CloneType type, u
   fbl::RefPtr<VmObjectPaged> vmo;
 
   {
-    // Declare these prior to the guard so that any failure paths destroy these without holding
-    // the lock.
-    fbl::RefPtr<VmCowPages> clone_cow_pages;
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
     // check that we're not uncached in some way
     if (cache_policy_ != ARCH_MMU_FLAG_CACHED) {
       return ZX_ERR_BAD_STATE;
@@ -786,11 +807,10 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, CloneType type, u
 
     // If we are a slice we require a unidirection clone, as performing a bi-directional clone
     // through a slice does not yet have defined semantics.
-    bool require_unidirection = is_slice();
-    zx_status_t status = cow_pages_locked()->CreateCloneLocked(type, require_unidirection,
-                                                               *cow_range, &clone_cow_pages);
-    if (status != ZX_OK) {
-      return status;
+    const bool require_unidirection = is_slice();
+    auto result = cow_pages_locked()->CreateCloneLocked(type, require_unidirection, *cow_range);
+    if (result.is_error()) {
+      return result.error_value();
     }
 
     uint32_t options = 0;
@@ -801,13 +821,17 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, CloneType type, u
       options |= kCanBlockOnPageRequests;
     }
     fbl::AllocChecker ac;
+    fbl::RefPtr<VmHierarchyState> state;
+#if VMO_USE_SHARED_LOCK
+    state = hierarchy_state_ptr_;
+#endif
+    auto [child, child_lock] = (*result).take();
     vmo = fbl::AdoptRef<VmObjectPaged>(
-        new (&ac) VmObjectPaged(options, hierarchy_state_ptr_, ktl::move(clone_cow_pages)));
+        new (&ac) VmObjectPaged(options, ktl::move(state), ktl::move(child)));
     if (!ac.check()) {
       return ZX_ERR_NO_MEMORY;
     }
-
-    AssertHeld(vmo->lock_ref());
+    Guard<VmoLockType> child_guard{AdoptLock, vmo->lock(), ktl::move(child_lock)};
     DEBUG_ASSERT(vmo->cache_policy_ == ARCH_MMU_FLAG_CACHED);
 
     // Now that everything has succeeded we can wire up cow pages references. VMO will be placed in
@@ -816,11 +840,14 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, CloneType type, u
     vmo->cow_pages_locked()->TransitionToAliveLocked();
 
     // Install the parent.
-    vmo->parent_ = this;
+    {
+      Guard<CriticalMutex> list_guard{ChildListLock::Get()};
+      vmo->parent_ = this;
 
-    // add the new vmo as a child before we do anything, since its
-    // dtor expects to find it in its parent's child list
-    AddChildLocked(vmo.get());
+      // add the new vmo as a child before we do anything, since its
+      // dtor expects to find it in its parent's child list
+      AddChildLocked(vmo.get());
+    }
 
     if (copy_name) {
       vmo->name_ = name_;
@@ -839,15 +866,22 @@ void VmObjectPaged::DumpLocked(uint depth, bool verbose) const {
   canary_.Assert();
 
   uint64_t parent_id = 0;
-  if (parent_) {
-    parent_id = parent_->user_id();
+  // Cache the parent value as a void* as it's not safe to dereference once the ChildListLock is
+  // dropped, but we can still print out its value.
+  void* parent;
+  {
+    Guard<CriticalMutex> guard{ChildListLock::Get()};
+    parent = parent_;
+    if (parent_) {
+      parent_id = parent_->user_id();
+    }
   }
 
   for (uint i = 0; i < depth; ++i) {
     printf("  ");
   }
   printf("vmo %p/k%" PRIu64 " ref %d parent %p/k%" PRIu64 "\n", this, user_id_.load(),
-         ref_count_debug(), parent_, parent_id);
+         ref_count_debug(), parent, parent_id);
 
   char name[ZX_MAX_NAME_LEN];
   get_name(name, sizeof(name));
@@ -895,7 +929,7 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
   // We only expect write to be set if this a pin. All non-pin commits are reads.
   DEBUG_ASSERT(!write || pin);
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
 
   // Child slices of VMOs are currently not resizable, nor can they be made
   // from resizable parents.  If this ever changes, the logic surrounding what
@@ -1033,40 +1067,6 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
       return commit_status;
     }
 
-    // Handle the contiguous case separately because most of the following code (replacing with
-    // non-loaned pages and dirtying pages) does not apply to contiguous VMOs anyway. More
-    // importantly that code will cancel page requests if required. Contiguous VMOs are backed by a
-    // physical page provider which does not handle page request cancelation well, more specifically
-    // a page request regeneration after cancelation breaks the assumption of all processed page
-    // requests being unique. So avoid cancelation altogether, which is not needed for contiguous
-    // VMOs anyway, as the only page request type we can encounter here are read page requests. More
-    // details can be found in https://fxbug.dev/42080926.
-    if (is_contiguous()) {
-      // Pages owned by contiguous VMOs are by definition non-loaned, so we can directly pin any
-      // committed pages.
-      if (pin && committed_len > 0) {
-        // Verify that we are starting the pin after the previously pinned range, as we do not want
-        // to repeatedly pin the same pages.
-        ASSERT(pinned_end_offset == offset);
-        zx_status_t pin_status =
-            cow_pages_locked()->PinRangeLocked(*GetCowRange(offset, committed_len));
-        if (pin_status != ZX_OK) {
-          return pin_status;
-        }
-        pinned_end_offset = offset + committed_len;
-      }
-      // Update how much was committed, and then wait on the page request (if any).
-      zx_status_t wait_status = advance_processed_range(
-          committed_len, /*wait_on_page_request=*/commit_status == ZX_ERR_SHOULD_WAIT);
-      if (wait_status != ZX_OK) {
-        return wait_status;
-      }
-      // Continue to the top of the while loop.
-      continue;
-    }
-
-    // We've already handled the contiguous case above.
-    DEBUG_ASSERT(!is_contiguous());
     // If we're required to pin, try to pin the committed range before waiting on the page_request,
     // which has been populated to request pages beyond the committed range.
     // Even though the page_request has already been initialized, we choose to first completely
@@ -1075,24 +1075,33 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
     // pages before trying to fault in further pages, thereby preventing the already committed (and
     // pinned) pages from being evicted while we wait with the lock dropped.
     if (pin && committed_len > 0) {
-      // We need to replace any loaned pages in the committed range with non-loaned pages first,
-      // since pinning expects all pages to be non-loaned. Replacing loaned pages requires a page
-      // request too. At any time we'll only be able to wait on a single page request, and after the
-      // wait the conditions that resulted in the previous request might have changed, so we can
-      // just cancel and reuse the existing page_request.
-      // TODO: consider not canceling this and the other request below. The issue with not
-      // canceling is that without early wake support, i.e. being able to reinitialize an existing
-      // initialized request, I think this code will not work without canceling.
-      page_request.CancelRequests();
-
       uint64_t non_loaned_len = 0;
-      zx_status_t replace_status = cow_pages_locked()->ReplacePagesWithNonLoanedLocked(
-          *GetCowRange(offset, committed_len), page_request.GetAnonymous(), &non_loaned_len);
-      DEBUG_ASSERT(non_loaned_len <= committed_len);
-      if (replace_status == ZX_OK) {
-        DEBUG_ASSERT(non_loaned_len == committed_len);
-      } else if (replace_status != ZX_ERR_SHOULD_WAIT) {
-        return replace_status;
+      zx_status_t replace_status = ZX_OK;
+      if (cow_pages_locked()->can_borrow_locked()) {
+        // We need to replace any loaned pages in the committed range with non-loaned pages first,
+        // since pinning expects all pages to be non-loaned. Replacing loaned pages requires a page
+        // request too. At any time we'll only be able to wait on a single page request, and after
+        // the wait the conditions that resulted in the previous request might have changed, so we
+        // can just cancel and reuse the existing page_request.
+        // TODO: consider not canceling this and the other request below. The issue with not
+        // canceling is that without early wake support, i.e. being able to reinitialize an existing
+        // initialized request, I think this code will not work without canceling.
+        page_request.CancelRequests();
+        replace_status = cow_pages_locked()->ReplacePagesWithNonLoanedLocked(
+            *GetCowRange(offset, committed_len), page_request.GetAnonymous(), &non_loaned_len);
+        DEBUG_ASSERT(non_loaned_len <= committed_len);
+        if (replace_status == ZX_OK) {
+          DEBUG_ASSERT(non_loaned_len == committed_len);
+        } else if (replace_status != ZX_ERR_SHOULD_WAIT) {
+          return replace_status;
+        }
+      } else {
+        // Borrowing not available so we know there are no loaned pages.
+        non_loaned_len = committed_len;
+        // As we have not canceled the page_request in this branch, duplicate the commit_status into
+        // the replace_status so that later code knows whether there is still a page_request to wait
+        // on or not.
+        replace_status = commit_status;
       }
 
       // We can safely pin the non-loaned range before waiting on the page request.
@@ -1202,7 +1211,7 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
 zx_status_t VmObjectPaged::DecommitRange(uint64_t offset, uint64_t len) {
   canary_.Assert();
   LTRACEF("offset %#" PRIx64 ", len %#" PRIx64 "\n", offset, len);
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
   if (is_contiguous() && !pmm_physical_page_borrowing_config()->is_loaning_enabled()) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -1226,7 +1235,7 @@ zx_status_t VmObjectPaged::DecommitRangeLocked(uint64_t offset, uint64_t len) {
 zx_status_t VmObjectPaged::ZeroPartialPageLocked(uint64_t page_base_offset,
                                                  uint64_t zero_start_offset,
                                                  uint64_t zero_end_offset,
-                                                 Guard<CriticalMutex>* guard) {
+                                                 Guard<VmoLockType>* guard) {
   DEBUG_ASSERT(zero_start_offset <= zero_end_offset);
   DEBUG_ASSERT(zero_end_offset <= PAGE_SIZE);
   DEBUG_ASSERT(IS_PAGE_ALIGNED(page_base_offset));
@@ -1257,7 +1266,7 @@ zx_status_t VmObjectPaged::ZeroRangeInternal(uint64_t offset, uint64_t len, bool
   if (can_block_on_page_requests()) {
     lockdep::AssertNoLocksHeld();
   }
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
 
   // Zeroing a range behaves as if it were an efficient zx_vmo_write. As we cannot write to uncached
   // vmo, we also cannot zero an uncahced vmo.
@@ -1395,7 +1404,7 @@ zx_status_t VmObjectPaged::Resize(uint64_t s) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
 
   zx_status_t status = cow_pages_locked()->ResizeLocked(s);
   if (status != ZX_OK) {
@@ -1408,14 +1417,14 @@ zx_status_t VmObjectPaged::Resize(uint64_t s) {
 
 // perform some sort of copy in/out on a range of the object using a passed in lambda for the copy
 // routine. The copy routine has the expected type signature of: (uint64_t src_offset, uint64_t
-// dest_offset, bool write, Guard<CriticalMutex> *guard) -> zx_status_t The passed in guard may have
+// dest_offset, bool write, Guard<VmoLockType> *guard) -> zx_status_t The passed in guard may have
 // its CallUnlocked member used, but if it does then ZX_OK must not be the return value. A return of
 // ZX_ERR_SHOULD_WAIT implies that the attempted copy should be tried again at the exact same
 // offsets.
 template <typename T>
 zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, bool write,
                                                    VmObjectReadWriteOptions options, T copyfunc,
-                                                   Guard<CriticalMutex>* guard) {
+                                                   Guard<VmoLockType>* guard) {
   canary_.Assert();
 
   uint64_t end_offset;
@@ -1622,7 +1631,7 @@ zx_status_t VmObjectPaged::Read(void* _ptr, uint64_t offset, size_t len) {
     lockdep::AssertNoLocksHeld();
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
 
   return ReadWriteInternalLocked(offset, len, false, VmObjectReadWriteOptions::None, read_routine,
                                  &guard);
@@ -1647,7 +1656,7 @@ zx_status_t VmObjectPaged::Write(const void* _ptr, uint64_t offset, size_t len) 
     lockdep::AssertNoLocksHeld();
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
 
   return ReadWriteInternalLocked(offset, len, true, VmObjectReadWriteOptions::None, write_routine,
                                  &guard);
@@ -1659,7 +1668,7 @@ zx_status_t VmObjectPaged::CacheOp(uint64_t offset, uint64_t len, CacheOpType ty
     return ZX_ERR_INVALID_ARGS;
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
 
   // verify that the range is within the object
   auto cow_range = GetCowRangeSizeCheckLocked(offset, len);
@@ -1706,7 +1715,7 @@ zx_status_t VmObjectPaged::Lookup(uint64_t offset, uint64_t len,
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
 
   return cow_pages_locked()->LookupLocked(
       *cow_range, [&lookup_fn, undo_offset = cow_range_.offset](uint64_t offset, paddr_t pa) {
@@ -1725,7 +1734,7 @@ zx_status_t VmObjectPaged::LookupContiguous(uint64_t offset, uint64_t len, paddr
     return ZX_ERR_INVALID_ARGS;
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
 
   auto cow_range = GetCowRangeSizeCheckLocked(offset, len);
   if (!cow_range) {
@@ -1791,7 +1800,7 @@ zx_status_t VmObjectPaged::ReadUser(user_out_ptr<char> ptr, uint64_t offset, siz
     lockdep::AssertNoLocksHeld();
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
 
   return ReadWriteInternalLocked(offset, len, false, options, read_routine, &guard);
 }
@@ -1827,7 +1836,7 @@ zx_status_t VmObjectPaged::WriteUser(user_in_ptr<const char> ptr, uint64_t offse
     lockdep::AssertNoLocksHeld();
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
 
   return ReadWriteInternalLocked(offset, len, true, options, write_routine, &guard);
 }
@@ -1851,7 +1860,7 @@ zx_status_t VmObjectPaged::TakePages(uint64_t offset, uint64_t len, VmPageSplice
 
   __UNINITIALIZED MultiPageRequest page_request;
   while (!range.is_empty()) {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
 
     uint64_t taken_len = 0;
     zx_status_t status =
@@ -1897,7 +1906,7 @@ zx_status_t VmObjectPaged::SupplyPages(uint64_t offset, uint64_t len, VmPageSpli
 
   __UNINITIALIZED MultiPageRequest page_request;
   while (!range.is_empty()) {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
 
     uint64_t supply_len = 0;
     zx_status_t status =
@@ -1937,7 +1946,7 @@ zx_status_t VmObjectPaged::DirtyPages(uint64_t offset, uint64_t len) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
   // Initialize a list of allocated pages that DirtyPagesLocked will allocate any new pages into
   // before inserting them in the VMO. Allocated pages can therefore be shared across multiple calls
   // to DirtyPagesLocked. Instead of having to allocate and free pages in case DirtyPagesLocked
@@ -1969,7 +1978,7 @@ zx_status_t VmObjectPaged::DirtyPages(uint64_t offset, uint64_t len) {
 
 zx_status_t VmObjectPaged::EnumerateDirtyRanges(uint64_t offset, uint64_t len,
                                                 DirtyRangeEnumerateFunction&& dirty_range_fn) {
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
   if (auto cow_range = GetCowRange(offset, len)) {
     // Need to wrap the callback to translate the cow pages offsets back into offsets as seen by
     // this object.
@@ -1988,7 +1997,7 @@ zx_status_t VmObjectPaged::SetMappingCachePolicy(const uint32_t cache_policy) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
 
   // conditions for allowing the cache policy to be set:
   // 1) vmo either has no pages committed currently or is transitioning from being cached
@@ -2014,15 +2023,23 @@ zx_status_t VmObjectPaged::SetMappingCachePolicy(const uint32_t cache_policy) {
     return ZX_ERR_BAD_STATE;
   }
 
-  if (!mapping_list_.is_empty()) {
+  if (self_locked()->num_mappings_locked() != 0) {
     return ZX_ERR_BAD_STATE;
   }
 
-  if (!children_list_.is_empty()) {
-    return ZX_ERR_BAD_STATE;
-  }
-  if (parent_) {
-    return ZX_ERR_BAD_STATE;
+  // The ChildListLock needs to be held to inspect the children/parent pointers, however we do not
+  // need to hold it over the remainder of this method as the main VMO lock is held, and creating a
+  // new child happens under that lock as well since the creation path must, in a single lock
+  // acquisition, be checking the cache_policy_ and creating the child.
+  {
+    Guard<CriticalMutex> child_guard{ChildListLock::Get()};
+
+    if (!children_list_.is_empty()) {
+      return ZX_ERR_BAD_STATE;
+    }
+    if (parent_) {
+      return ZX_ERR_BAD_STATE;
+    }
   }
 
   // Forbid if there are references, or if this object is a reference itself. We do not want cache
@@ -2069,7 +2086,7 @@ void VmObjectPaged::RangeChangeUpdateLocked(VmCowRange range, RangeChangeOp op) 
                    &aligned_len)) {
     // Found the intersection in cow space, convert back to object space.
     aligned_offset -= cow_range_.offset;
-    RangeChangeUpdateMappingsLocked(aligned_offset, aligned_len, op);
+    self_locked()->RangeChangeUpdateMappingsLocked(aligned_offset, aligned_len, op);
   }
 
   // Propagate the change to reference children as well. This is done regardless of intersection as
@@ -2104,7 +2121,7 @@ zx_status_t VmObjectPaged::LockRange(uint64_t offset, uint64_t len,
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
   return cow_pages_locked()->LockRangeLocked(*cow_range, lock_state_out);
 }
 
@@ -2117,7 +2134,7 @@ zx_status_t VmObjectPaged::TryLockRange(uint64_t offset, uint64_t len) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
   return cow_pages_locked()->TryLockRangeLocked(*cow_range);
 }
 
@@ -2130,13 +2147,13 @@ zx_status_t VmObjectPaged::UnlockRange(uint64_t offset, uint64_t len) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
   return cow_pages_locked()->UnlockRangeLocked(*cow_range);
 }
 
 zx_status_t VmObjectPaged::GetPage(uint64_t offset, uint pf_flags, list_node* alloc_list,
                                    MultiPageRequest* page_request, vm_page_t** page, paddr_t* pa) {
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
   const bool write = pf_flags & VMM_PF_FLAG_WRITE;
   zx::result<VmCowPages::LookupCursor> cursor = GetLookupCursorLocked(offset, PAGE_SIZE);
   if (cursor.is_error()) {

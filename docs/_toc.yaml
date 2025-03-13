@@ -10,9 +10,6 @@ toc:
   contents:
     - title: "Overview"
       path: /docs
-    - title: "Fundamentals"
-      path: /docs/get-started/learn-fuchsia.md
-    - include: /docs/get-started/sdk/_toc.yaml
     - include: /docs/get-started/_toc.yaml
     - include: /docs/get-started/learn/_toc.yaml
 - name: "Concepts"

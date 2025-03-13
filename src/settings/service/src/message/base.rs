@@ -47,6 +47,7 @@ pub(super) mod messenger {
     }
 }
 
+#[allow(clippy::large_enum_variant)] // TODO(https://fxbug.dev/401086933)
 /// A MessageEvent defines the data that can be returned through a message
 /// receptor.
 #[derive(Debug, PartialEq)]

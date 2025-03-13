@@ -7,7 +7,6 @@ pub mod get;
 pub mod read;
 
 use anyhow::{Context, Result};
-use fidl::endpoints::Proxy;
 use futures::stream::{Stream, TryStreamExt};
 use std::fmt::{Debug, Display};
 use std::io::Write;
@@ -18,15 +17,15 @@ fn connect_to_input_device(
     dev: &fio::DirectoryProxy,
     device_path: impl AsRef<Path> + Debug,
 ) -> Result<fir::InputDeviceProxy> {
-    let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
+    let (client, server) = fidl::endpoints::create_proxy::<fir::InputDeviceMarker>();
     let device_path = device_path
         .as_ref()
         .as_os_str()
         .to_str()
         .ok_or_else(|| anyhow::anyhow!("Failed to get device path string"))?;
-    dev.open(fio::OpenFlags::empty(), fio::ModeType::empty(), device_path, server)
+    dev.open(device_path, fio::Flags::PROTOCOL_SERVICE, &Default::default(), server.into_channel())
         .context("Failed to open device file")?;
-    Ok(fir::InputDeviceProxy::new(proxy.into_channel().unwrap()))
+    Ok(client)
 }
 
 async fn get_all_input_device_paths(
@@ -34,7 +33,7 @@ async fn get_all_input_device_paths(
 ) -> Result<impl Stream<Item = Result<PathBuf>>> {
     const INPUT_DEVICE_DIR: &str = "class/input-report";
     let input_device_dir =
-        fuchsia_fs::directory::open_directory_async(&dev, INPUT_DEVICE_DIR, fio::Flags::empty())
+        fuchsia_fs::directory::open_directory_async(&dev, INPUT_DEVICE_DIR, fio::PERM_READABLE)
             .with_context(|| format!("Failed to open {}", INPUT_DEVICE_DIR))?;
     let input_device_paths = device_watcher::watch_for_files(&input_device_dir)
         .await

@@ -76,6 +76,7 @@
           "prebuilt/third_party/gn/linux-x64": true,
           "prebuilt/third_party/goldctl": true,
           "prebuilt/third_party/grpcwebproxy/linux-x64": true,
+          "prebuilt/third_party/libsparse": true,
           "prebuilt/third_party/ninja/linux-x64": true,
           "prebuilt/third_party/openssh-portable/linux-arm64": true,
           "prebuilt/third_party/openssh-portable/linux-x64": true,
@@ -201,7 +202,7 @@
           "src/connectivity/wlan/lib/common/cpp/include/wlan/common/mcs_rate_lookup.h": true,
           "src/connectivity/wlan/lib/common/cpp/mcs_rate_lookup.cc": true,
           "src/connectivity/wlan/lib/common/cpp/mcs_rate_lookup_test.cc": true,
-          "src/media/audio/audio_core/shared/schema/make_schema_header.py": true,
+          "src/media/audio/audio_core/schema/make_schema_header.py": true,
           "src/connectivity/network/netstack/dhcp/server.go": true
         }
       },

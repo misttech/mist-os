@@ -271,13 +271,14 @@ macro_rules! assert_json_diff {
         let actual = actual_hierarchy.get_pretty_json();
 
         if actual != expected {
-            panic!("{}", $crate::diff_json(&expected, &actual));
+            panic!("{}", $crate::line_diff(&expected, &actual));
         }
     }}
 }
 
-pub fn diff_json(expected: &str, actual: &str) -> Changeset {
-    Changeset::new(expected, actual, "")
+#[doc(hidden)]
+pub fn line_diff(expected: &str, actual: &str) -> Changeset {
+    Changeset::new(expected, actual, "\n")
 }
 
 /// A difference between expected and actual output.
@@ -822,6 +823,7 @@ impl<T: MulAssign + AddAssign + PartialOrd + Add<Output = T> + Copy + Default + 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Difference::{Add, Rem, Same};
     use diagnostics_hierarchy::testing::CondensableOnDemand;
     use std::sync::LazyLock;
 
@@ -1621,6 +1623,23 @@ mod tests {
         assert_data_tree!(diagnostics_hierarchy, key: {
             value1: vec![1i64, 2],
         });
+    }
+
+    #[test]
+    fn test_line_diff() {
+        let original = "foo\nbar\nbaz";
+        let update = "foo\nbaz\nqux";
+
+        let changeset = line_diff(original, update);
+        assert_eq!(
+            changeset.diffs,
+            vec![
+                Same("foo".to_string()),
+                Rem("bar".to_string()),
+                Same("baz".to_string()),
+                Add("qux".to_string())
+            ]
+        )
     }
 
     fn simple_tree() -> DiagnosticsHierarchy {

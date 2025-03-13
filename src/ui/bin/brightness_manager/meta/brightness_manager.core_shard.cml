@@ -11,7 +11,7 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.ui.display.internal.DisplayPower" ],
+            protocol: [ "fuchsia.ui.display.singleton.DisplayPower" ],
             from: "#ui",
             to: "#brightness_manager",
             dependency: "weak",
@@ -30,6 +30,8 @@
             subdir: "backlight",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-input-report",
@@ -37,13 +39,19 @@
             subdir: "input-report",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.input.report.Service",
             from: "parent",
             to: "#brightness_manager",
+        },
+        {
             config: [
                 "fuchsia.ui.ManageDisplayPower",
                 "fuchsia.ui.PowerOffDelayMillis",
                 "fuchsia.ui.PowerOnDelayMillis",
             ],
+            from: "parent",
+            to: "#brightness_manager",
         },
     ],
 }

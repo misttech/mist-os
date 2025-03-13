@@ -23,8 +23,8 @@
 #include <fbl/mutex.h>
 
 #include "src/graphics/display/drivers/goldfish-display/render_control.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 
 namespace goldfish {
@@ -50,7 +50,10 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
   // Performs initialization that cannot be done in the constructor.
   zx::result<> Initialize();
 
-  // Display controller protocol implementation.
+  // ddk::DisplayEngineProtocol
+  void DisplayEngineCompleteCoordinatorConnection(
+      const display_engine_listener_protocol_t* display_engine_listener,
+      engine_info_t* out_banjo_engine_info);
   void DisplayEngineSetListener(const display_engine_listener_protocol_t* engine_listener);
   void DisplayEngineUnsetListener();
   zx_status_t DisplayEngineImportBufferCollection(uint64_t banjo_driver_buffer_collection_id,
@@ -75,20 +78,9 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
   zx_status_t DisplayEngineSetDisplayPower(uint64_t display_id, bool power_on) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  bool DisplayEngineIsCaptureSupported() { return false; }
   zx_status_t DisplayEngineStartCapture(uint64_t capture_handle) { return ZX_ERR_NOT_SUPPORTED; }
   zx_status_t DisplayEngineReleaseCapture(uint64_t capture_handle) { return ZX_ERR_NOT_SUPPORTED; }
   zx_status_t DisplayEngineSetMinimumRgb(uint8_t minimum_rgb) { return ZX_ERR_NOT_SUPPORTED; }
-
-  // TODO(https://fxbug.dev/42080631): Remove these transitional overloads.
-  config_check_result_t DisplayEngineCheckConfiguration(
-      const display_config_t* banjo_display_configs_array, size_t banjo_display_configs_count,
-      layer_composition_operations_t* out_layer_composition_operations_list,
-      size_t out_layer_composition_operations_size,
-      size_t* out_layer_composition_operations_actual);
-  void DisplayEngineApplyConfiguration(const display_config_t* banjo_display_configs_array,
-                                       size_t banjo_display_configs_count,
-                                       const config_stamp_t* banjo_config_stamp);
 
   void SetupPrimaryDisplayForTesting(int32_t width_px, int32_t height_px, int32_t refresh_rate_hz);
 
@@ -126,7 +118,7 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
 
     // The |config_stamp| value of the ApplyConfiguration() call to which this
     // DisplayConfig corresponds.
-    display::ConfigStamp config_stamp = display::kInvalidConfigStamp;
+    display::DriverConfigStamp config_stamp = display::kInvalidDriverConfigStamp;
   };
 
   // TODO(https://fxbug.dev/335324453): Define DisplayState as a class with
@@ -137,7 +129,7 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
     int32_t refresh_rate_hz = 60;
 
     zx::time expected_next_flush = zx::time::infinite_past();
-    display::ConfigStamp latest_config_stamp = display::kInvalidConfigStamp;
+    display::DriverConfigStamp latest_config_stamp = display::kInvalidDriverConfigStamp;
 
     // The next display config to be posted through renderControl protocol.
     std::optional<DisplayConfig> incoming_config = std::nullopt;

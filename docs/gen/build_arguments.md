@@ -43,7 +43,7 @@ the //:default target
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:138
+From //BUILD.gn:140
 
 ### all_cpu_kernel_boot_tests
 
@@ -52,7 +52,7 @@ for all supported CPUs, not just $target_cpu.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/BUILD.gn:22
+From //zircon/kernel/BUILD.gn:21
 
 ### all_cpu_phys_boot_tests
 
@@ -79,7 +79,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2111
+From //build/config/BUILDCONFIG.gn:2122
 
 ### allowed_test_device_types
 
@@ -136,7 +136,7 @@ The result will be built and uploaded to CIPD by infra.
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:130
+From //BUILD.gn:132
 
 ### assembly_generate_fvm_fastboot
 
@@ -167,7 +167,7 @@ The result will be built and uploaded to CIPD by infra.
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:134
+From //BUILD.gn:136
 
 ### authorized_ssh_keys_label
 
@@ -235,7 +235,7 @@ From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:39
+From //BUILD.gn:41
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -243,7 +243,7 @@ From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:39
+From //BUILD.gn:41
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -251,7 +251,7 @@ From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:39
+From //BUILD.gn:41
 
 ### basic_env_names
 
@@ -313,7 +313,7 @@ From //build/images/args.gni:190
 
 **Current value for `target_cpu = "riscv64"`:** `"riscv64"`
 
-From //boards/riscv64.gni:36
+From //boards/riscv64.gni:34
 
 **Overridden from the default:** `false`
 
@@ -487,7 +487,7 @@ From //boards/arm64.gni:24
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:39
+From //build/board.gni:35
 
 **Current value for `target_cpu = "riscv64"`:** `"//boards/riscv64"`
 
@@ -495,7 +495,7 @@ From //boards/riscv64.gni:24
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:39
+From //build/board.gni:35
 
 **Current value for `target_cpu = "x64"`:** `"//boards/x64"`
 
@@ -503,7 +503,7 @@ From //boards/x64.gni:27
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:39
+From //build/board.gni:35
 
 ### board_description
 
@@ -540,7 +540,7 @@ board's fastboot protocol.
 
 **Current value (from the default):** `[]`
 
-From //build/board.gni:25
+From //build/board.gni:21
 
 ### board_is_emu
 
@@ -554,7 +554,7 @@ From //boards/arm64.gni:31
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:44
+From //build/board.gni:40
 
 **Current value for `target_cpu = "riscv64"`:** `true`
 
@@ -562,7 +562,7 @@ From //boards/riscv64.gni:30
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:44
+From //build/board.gni:40
 
 **Current value for `target_cpu = "x64"`:** `true`
 
@@ -570,7 +570,7 @@ From //boards/x64.gni:31
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:44
+From //build/board.gni:40
 
 ### board_name
 
@@ -600,15 +600,6 @@ From //boards/x64.gni:23
 
 From //build/board.gni:11
 
-### board_package_labels
-
-A list of package labels to include in the 'base' package set. Used by the
-board definition rather than the product definition.
-
-**Current value (from the default):** `[]`
-
-From //build/board.gni:21
-
 ### board_tools
 
 List of paths to board-specific tools to include in the build output.
@@ -623,7 +614,7 @@ any kind of stable contract for users of the archive.
 
 **Current value (from the default):** `[]`
 
-From //build/board.gni:36
+From //build/board.gni:32
 
 ### bootfs_only
 
@@ -731,7 +722,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8723864686794533473"`
+**Current value for `target_cpu = "arm64"`:** `"8720648036170342049"`
 
 From //out/not-default/args.gn:10
 
@@ -739,7 +730,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8723864686794533473"`
+**Current value for `target_cpu = "riscv64"`:** `"8720648036170342049"`
 
 From //out/not-default/args.gn:10
 
@@ -747,7 +738,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8723864686794533473"`
+**Current value for `target_cpu = "x64"`:** `"8720648036170342049"`
 
 From //out/not-default/args.gn:10
 
@@ -770,7 +761,7 @@ From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:146
+From //BUILD.gn:148
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -778,7 +769,7 @@ From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:146
+From //BUILD.gn:148
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -786,7 +777,7 @@ From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:146
+From //BUILD.gn:148
 
 ### build_should_trace_actions
 
@@ -848,7 +839,7 @@ From //out/not-default/args.gn:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:48
+From //BUILD.gn:50
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -856,7 +847,7 @@ From //out/not-default/args.gn:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:48
+From //BUILD.gn:50
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -864,7 +855,7 @@ From //out/not-default/args.gn:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:48
+From //BUILD.gn:50
 
 ### camera_debug
 
@@ -965,7 +956,7 @@ be built, they should be included in the build graph through other means.
 
 **Current value (from the default):** `["//build/images:main_assembly"]`
 
-From //build/product.gni:50
+From //build/product.gni:43
 
 ### clang_embed_bitcode
 
@@ -1027,139 +1018,139 @@ This should never be set as a build argument.
 ```none
 {
   aarch64_unknown_fuchsia = {
-  libclang_rt_profile_a = "lib/clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.profile.a"
+  libclang_rt_profile_a = "lib/clang/21/lib/aarch64-unknown-fuchsia/libclang_rt.profile.a"
   libunwind_so = "lib/aarch64-unknown-fuchsia/libunwind.so.1.0"
-  resource_dir = "lib/clang/20"
+  resource_dir = "lib/clang/21"
   variants = {
   asan = {
   shared = {
-  clang_rt = "lib/clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.asan.so"
+  clang_rt = "lib/clang/21/lib/aarch64-unknown-fuchsia/libclang_rt.asan.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.asan.a"
-  clang_rt_cxx = "lib/clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.asan_cxx.a"
+  clang_rt = "lib/clang/21/lib/aarch64-unknown-fuchsia/libclang_rt.asan.a"
+  clang_rt_cxx = "lib/clang/21/lib/aarch64-unknown-fuchsia/libclang_rt.asan_cxx.a"
 }
 }
   hwasan = {
   shared = {
-  clang_rt = "lib/clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.hwasan.so"
+  clang_rt = "lib/clang/21/lib/aarch64-unknown-fuchsia/libclang_rt.hwasan.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.hwasan.a"
-  clang_rt_cxx = "lib/clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.hwasan_cxx.a"
+  clang_rt = "lib/clang/21/lib/aarch64-unknown-fuchsia/libclang_rt.hwasan.a"
+  clang_rt_cxx = "lib/clang/21/lib/aarch64-unknown-fuchsia/libclang_rt.hwasan_cxx.a"
 }
 }
   lsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.lsan.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.lsan.a"
+  clang_rt = "lib/clang/21/lib/aarch64-unknown-fuchsia/libclang_rt.lsan.a"
   clang_rt_cxx = ""
 }
 }
   tsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
 }
   static = {
-  clang_rt = ""
-  clang_rt_cxx = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.tsan_cxx.a"
 }
 }
   ubsan = {
   shared = {
-  clang_rt = "lib/clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
+  clang_rt = "lib/clang/21/lib/aarch64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.ubsan_standalone.a"
-  clang_rt_cxx = "lib/clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.ubsan_standalone_cxx.a"
+  clang_rt = "lib/clang/21/lib/aarch64-unknown-fuchsia/libclang_rt.ubsan_standalone.a"
+  clang_rt_cxx = "lib/clang/21/lib/aarch64-unknown-fuchsia/libclang_rt.ubsan_standalone_cxx.a"
 }
 }
 }
 }
   aarch64_unknown_linux_gnu = {
-  libclang_rt_profile_a = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.profile.a"
-  libunwind_so = ""
-  resource_dir = "lib/clang/20"
+  libclang_rt_profile_a = "lib/clang/21/lib/aarch64-unknown-linux-gnu/libclang_rt.profile.a"
+  libunwind_so = "../../../../out/not-default/libunwind.so"
+  resource_dir = "lib/clang/21"
   variants = {
   asan = {
   shared = {
-  clang_rt = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.asan.so"
+  clang_rt = "lib/clang/21/lib/aarch64-unknown-linux-gnu/libclang_rt.asan.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.asan.a"
-  clang_rt_cxx = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.asan_cxx.a"
+  clang_rt = "lib/clang/21/lib/aarch64-unknown-linux-gnu/libclang_rt.asan.a"
+  clang_rt_cxx = "lib/clang/21/lib/aarch64-unknown-linux-gnu/libclang_rt.asan_cxx.a"
 }
 }
   hwasan = {
   shared = {
-  clang_rt = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.hwasan.so"
+  clang_rt = "lib/clang/21/lib/aarch64-unknown-linux-gnu/libclang_rt.hwasan.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.hwasan.a"
-  clang_rt_cxx = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.hwasan_cxx.a"
+  clang_rt = "lib/clang/21/lib/aarch64-unknown-linux-gnu/libclang_rt.hwasan.a"
+  clang_rt_cxx = "lib/clang/21/lib/aarch64-unknown-linux-gnu/libclang_rt.hwasan_cxx.a"
 }
 }
   lsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.lsan.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.lsan.a"
-  clang_rt_cxx = ""
+  clang_rt = "lib/clang/21/lib/aarch64-unknown-linux-gnu/libclang_rt.lsan.a"
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.lsan_cxx.a"
 }
 }
   tsan = {
   shared = {
-  clang_rt = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.tsan.so"
+  clang_rt = "lib/clang/21/lib/aarch64-unknown-linux-gnu/libclang_rt.tsan.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.tsan.a"
-  clang_rt_cxx = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.tsan_cxx.a"
+  clang_rt = "lib/clang/21/lib/aarch64-unknown-linux-gnu/libclang_rt.tsan.a"
+  clang_rt_cxx = "lib/clang/21/lib/aarch64-unknown-linux-gnu/libclang_rt.tsan_cxx.a"
 }
 }
   ubsan = {
   shared = {
-  clang_rt = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.ubsan_standalone.so"
+  clang_rt = "lib/clang/21/lib/aarch64-unknown-linux-gnu/libclang_rt.ubsan_standalone.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.ubsan_standalone.a"
-  clang_rt_cxx = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.ubsan_standalone_cxx.a"
+  clang_rt = "lib/clang/21/lib/aarch64-unknown-linux-gnu/libclang_rt.ubsan_standalone.a"
+  clang_rt_cxx = "lib/clang/21/lib/aarch64-unknown-linux-gnu/libclang_rt.ubsan_standalone_cxx.a"
 }
 }
 }
 }
   armv7_unknown_linux_gnueabihf = {
-  libclang_rt_profile_a = "lib/clang/20/lib/armv7-unknown-linux-gnueabihf/libclang_rt.profile.a"
-  libunwind_so = ""
-  resource_dir = "lib/clang/20"
+  libclang_rt_profile_a = "lib/clang/21/lib/armv7-unknown-linux-gnueabihf/libclang_rt.profile.a"
+  libunwind_so = "../../../../out/not-default/libunwind.so"
+  resource_dir = "lib/clang/21"
   variants = {
   asan = {
   shared = {
-  clang_rt = "lib/clang/20/lib/armv7-unknown-linux-gnueabihf/libclang_rt.asan.so"
+  clang_rt = "lib/clang/21/lib/armv7-unknown-linux-gnueabihf/libclang_rt.asan.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/armv7-unknown-linux-gnueabihf/libclang_rt.asan.a"
-  clang_rt_cxx = "lib/clang/20/lib/armv7-unknown-linux-gnueabihf/libclang_rt.asan_cxx.a"
+  clang_rt = "lib/clang/21/lib/armv7-unknown-linux-gnueabihf/libclang_rt.asan.a"
+  clang_rt_cxx = "lib/clang/21/lib/armv7-unknown-linux-gnueabihf/libclang_rt.asan_cxx.a"
 }
 }
   hwasan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.hwasan.so"
 }
   static = {
-  clang_rt = ""
-  clang_rt_cxx = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.hwasan.a"
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.hwasan_cxx.a"
 }
 }
   lsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.lsan.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/armv7-unknown-linux-gnueabihf/libclang_rt.lsan.a"
-  clang_rt_cxx = ""
+  clang_rt = "lib/clang/21/lib/armv7-unknown-linux-gnueabihf/libclang_rt.lsan.a"
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.lsan_cxx.a"
 }
 }
   tsan = {
@@ -1167,127 +1158,127 @@ This should never be set as a build argument.
   clang_rt = ""
 }
   static = {
-  clang_rt = ""
-  clang_rt_cxx = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.tsan_cxx.a"
 }
 }
   ubsan = {
   shared = {
-  clang_rt = "lib/clang/20/lib/armv7-unknown-linux-gnueabihf/libclang_rt.ubsan_standalone.so"
+  clang_rt = "lib/clang/21/lib/armv7-unknown-linux-gnueabihf/libclang_rt.ubsan_standalone.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/armv7-unknown-linux-gnueabihf/libclang_rt.ubsan_standalone.a"
-  clang_rt_cxx = "lib/clang/20/lib/armv7-unknown-linux-gnueabihf/libclang_rt.ubsan_standalone_cxx.a"
+  clang_rt = "lib/clang/21/lib/armv7-unknown-linux-gnueabihf/libclang_rt.ubsan_standalone.a"
+  clang_rt_cxx = "lib/clang/21/lib/armv7-unknown-linux-gnueabihf/libclang_rt.ubsan_standalone_cxx.a"
 }
 }
 }
 }
   fallback = {
   libclang_rt_profile_a = ""
-  libunwind_so = ""
-  resource_dir = "lib/clang/20"
+  libunwind_so = "../../../../out/not-default/libunwind.so"
+  resource_dir = "lib/clang/21"
   variants = { }
 }
   riscv64_unknown_fuchsia = {
-  libclang_rt_profile_a = "lib/clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.profile.a"
+  libclang_rt_profile_a = "lib/clang/21/lib/riscv64-unknown-fuchsia/libclang_rt.profile.a"
   libunwind_so = "lib/riscv64-unknown-fuchsia/libunwind.so.1.0"
-  resource_dir = "lib/clang/20"
+  resource_dir = "lib/clang/21"
   variants = {
   asan = {
   shared = {
-  clang_rt = "lib/clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.asan.so"
+  clang_rt = "lib/clang/21/lib/riscv64-unknown-fuchsia/libclang_rt.asan.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.asan.a"
-  clang_rt_cxx = "lib/clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.asan_cxx.a"
+  clang_rt = "lib/clang/21/lib/riscv64-unknown-fuchsia/libclang_rt.asan.a"
+  clang_rt_cxx = "lib/clang/21/lib/riscv64-unknown-fuchsia/libclang_rt.asan_cxx.a"
 }
 }
   hwasan = {
   shared = {
-  clang_rt = "lib/clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.hwasan.so"
+  clang_rt = "lib/clang/21/lib/riscv64-unknown-fuchsia/libclang_rt.hwasan.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.hwasan.a"
-  clang_rt_cxx = "lib/clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.hwasan_cxx.a"
+  clang_rt = "lib/clang/21/lib/riscv64-unknown-fuchsia/libclang_rt.hwasan.a"
+  clang_rt_cxx = "lib/clang/21/lib/riscv64-unknown-fuchsia/libclang_rt.hwasan_cxx.a"
 }
 }
   lsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.lsan.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.lsan.a"
-  clang_rt_cxx = ""
+  clang_rt = "lib/clang/21/lib/riscv64-unknown-fuchsia/libclang_rt.lsan.a"
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.lsan_cxx.a"
 }
 }
   tsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
 }
   static = {
-  clang_rt = ""
-  clang_rt_cxx = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.tsan_cxx.a"
 }
 }
   ubsan = {
   shared = {
-  clang_rt = "lib/clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
+  clang_rt = "lib/clang/21/lib/riscv64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.ubsan_standalone.a"
-  clang_rt_cxx = "lib/clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.ubsan_standalone_cxx.a"
+  clang_rt = "lib/clang/21/lib/riscv64-unknown-fuchsia/libclang_rt.ubsan_standalone.a"
+  clang_rt_cxx = "lib/clang/21/lib/riscv64-unknown-fuchsia/libclang_rt.ubsan_standalone_cxx.a"
 }
 }
 }
 }
   riscv64_unknown_linux_gnu = {
-  libclang_rt_profile_a = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.profile.a"
-  libunwind_so = ""
-  resource_dir = "lib/clang/20"
+  libclang_rt_profile_a = "lib/clang/21/lib/riscv64-unknown-linux-gnu/libclang_rt.profile.a"
+  libunwind_so = "../../../../out/not-default/libunwind.so"
+  resource_dir = "lib/clang/21"
   variants = {
   asan = {
   shared = {
-  clang_rt = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.asan.so"
+  clang_rt = "lib/clang/21/lib/riscv64-unknown-linux-gnu/libclang_rt.asan.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.asan.a"
-  clang_rt_cxx = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.asan_cxx.a"
+  clang_rt = "lib/clang/21/lib/riscv64-unknown-linux-gnu/libclang_rt.asan.a"
+  clang_rt_cxx = "lib/clang/21/lib/riscv64-unknown-linux-gnu/libclang_rt.asan_cxx.a"
 }
 }
   hwasan = {
   shared = {
-  clang_rt = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.hwasan.so"
+  clang_rt = "lib/clang/21/lib/riscv64-unknown-linux-gnu/libclang_rt.hwasan.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.hwasan.a"
-  clang_rt_cxx = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.hwasan_cxx.a"
+  clang_rt = "lib/clang/21/lib/riscv64-unknown-linux-gnu/libclang_rt.hwasan.a"
+  clang_rt_cxx = "lib/clang/21/lib/riscv64-unknown-linux-gnu/libclang_rt.hwasan_cxx.a"
 }
 }
   lsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.lsan.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.lsan.a"
-  clang_rt_cxx = ""
+  clang_rt = "lib/clang/21/lib/riscv64-unknown-linux-gnu/libclang_rt.lsan.a"
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.lsan_cxx.a"
 }
 }
   tsan = {
   shared = {
-  clang_rt = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.tsan.so"
+  clang_rt = "lib/clang/21/lib/riscv64-unknown-linux-gnu/libclang_rt.tsan.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.tsan.a"
-  clang_rt_cxx = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.tsan_cxx.a"
+  clang_rt = "lib/clang/21/lib/riscv64-unknown-linux-gnu/libclang_rt.tsan.a"
+  clang_rt_cxx = "lib/clang/21/lib/riscv64-unknown-linux-gnu/libclang_rt.tsan_cxx.a"
 }
 }
   ubsan = {
   shared = {
-  clang_rt = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.ubsan_standalone.so"
+  clang_rt = "lib/clang/21/lib/riscv64-unknown-linux-gnu/libclang_rt.ubsan_standalone.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.ubsan_standalone.a"
-  clang_rt_cxx = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.ubsan_standalone_cxx.a"
+  clang_rt = "lib/clang/21/lib/riscv64-unknown-linux-gnu/libclang_rt.ubsan_standalone.a"
+  clang_rt_cxx = "lib/clang/21/lib/riscv64-unknown-linux-gnu/libclang_rt.ubsan_standalone_cxx.a"
 }
 }
 }
@@ -1296,20 +1287,20 @@ This should never be set as a build argument.
   cflags = []
   ldflags = []
   runtime = [{
-  breakpad = "debug/.build-id/67/0452a91275a5d569ecd4808265347c934d80da.sym"
-  debug = "debug/.build-id/67/0452a91275a5d569ecd4808265347c934d80da.debug"
+  breakpad = "debug/.build-id/67/098d2b5544e441811c7327c47a385dfe99fc30.sym"
+  debug = "debug/.build-id/67/098d2b5544e441811c7327c47a385dfe99fc30.debug"
   dist = "aarch64-unknown-fuchsia/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  breakpad = "debug/.build-id/c9/ef4f7717a1fc06e8b1fbbf029935ddb69c6f95.sym"
-  debug = "debug/.build-id/c9/ef4f7717a1fc06e8b1fbbf029935ddb69c6f95.debug"
+  breakpad = "debug/.build-id/99/4a02e8ad8c55ada654cfd7a15f30bb60ce88ad.sym"
+  debug = "debug/.build-id/99/4a02e8ad8c55ada654cfd7a15f30bb60ce88ad.debug"
   dist = "aarch64-unknown-fuchsia/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  breakpad = "debug/.build-id/c1/b637ea09260aa022071f850e293bb59c059ddc.sym"
-  debug = "debug/.build-id/c1/b637ea09260aa022071f850e293bb59c059ddc.debug"
+  breakpad = "debug/.build-id/92/882334401f44bb618953b412292ea9a1cf5efa.sym"
+  debug = "debug/.build-id/92/882334401f44bb618953b412292ea9a1cf5efa.debug"
   dist = "aarch64-unknown-fuchsia/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1319,25 +1310,25 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=address"]
   ldflags = []
   runtime = [{
-  breakpad = "debug/.build-id/51/28949c7e244bbb1a06bace9cf8faa1b9dab281.sym"
-  debug = "debug/.build-id/51/28949c7e244bbb1a06bace9cf8faa1b9dab281.debug"
-  dist = "clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.asan.so"
+  breakpad = "debug/.build-id/fb/b1ddca7070daa2b3a47c52aa78ddf85c588086.sym"
+  debug = "debug/.build-id/fb/b1ddca7070daa2b3a47c52aa78ddf85c588086.debug"
+  dist = "clang/21/lib/aarch64-unknown-fuchsia/libclang_rt.asan.so"
   soname = "libclang_rt.asan.so"
 }, {
-  breakpad = "debug/.build-id/68/31fdddf58e819bc9793c4ab9bd8d92ffc73fb8.sym"
-  debug = "debug/.build-id/68/31fdddf58e819bc9793c4ab9bd8d92ffc73fb8.debug"
+  breakpad = "debug/.build-id/ec/bba758f38873503c695527b51741c7838b23ad.sym"
+  debug = "debug/.build-id/ec/bba758f38873503c695527b51741c7838b23ad.debug"
   dist = "aarch64-unknown-fuchsia/asan/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  breakpad = "debug/.build-id/19/a0521bacda22ba6a02611dc3698561655eb422.sym"
-  debug = "debug/.build-id/19/a0521bacda22ba6a02611dc3698561655eb422.debug"
+  breakpad = "debug/.build-id/17/bd152e787139d6de349d806b981befe832b2cc.sym"
+  debug = "debug/.build-id/17/bd152e787139d6de349d806b981befe832b2cc.debug"
   dist = "aarch64-unknown-fuchsia/asan/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  breakpad = "debug/.build-id/fc/e5178a6f1df173079747bbc6e0e9a67457275c.sym"
-  debug = "debug/.build-id/fc/e5178a6f1df173079747bbc6e0e9a67457275c.debug"
+  breakpad = "debug/.build-id/7a/f9caa4e4d312cd03d161f3b5e64ba3e6577e78.sym"
+  debug = "debug/.build-id/7a/f9caa4e4d312cd03d161f3b5e64ba3e6577e78.debug"
   dist = "aarch64-unknown-fuchsia/asan/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1347,25 +1338,25 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=undefined"]
   ldflags = []
   runtime = [{
-  breakpad = "debug/.build-id/a8/76eeaedee8b8aae38cf3a2b5a817ec377d43d1.sym"
-  debug = "debug/.build-id/a8/76eeaedee8b8aae38cf3a2b5a817ec377d43d1.debug"
-  dist = "clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
+  breakpad = "debug/.build-id/26/b8cf1f9a7183970a4b1347d6f24dddc2f62352.sym"
+  debug = "debug/.build-id/26/b8cf1f9a7183970a4b1347d6f24dddc2f62352.debug"
+  dist = "clang/21/lib/aarch64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
   soname = "libclang_rt.ubsan_standalone.so"
 }, {
-  breakpad = "debug/.build-id/67/0452a91275a5d569ecd4808265347c934d80da.sym"
-  debug = "debug/.build-id/67/0452a91275a5d569ecd4808265347c934d80da.debug"
+  breakpad = "debug/.build-id/67/098d2b5544e441811c7327c47a385dfe99fc30.sym"
+  debug = "debug/.build-id/67/098d2b5544e441811c7327c47a385dfe99fc30.debug"
   dist = "aarch64-unknown-fuchsia/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  breakpad = "debug/.build-id/c9/ef4f7717a1fc06e8b1fbbf029935ddb69c6f95.sym"
-  debug = "debug/.build-id/c9/ef4f7717a1fc06e8b1fbbf029935ddb69c6f95.debug"
+  breakpad = "debug/.build-id/99/4a02e8ad8c55ada654cfd7a15f30bb60ce88ad.sym"
+  debug = "debug/.build-id/99/4a02e8ad8c55ada654cfd7a15f30bb60ce88ad.debug"
   dist = "aarch64-unknown-fuchsia/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  breakpad = "debug/.build-id/c1/b637ea09260aa022071f850e293bb59c059ddc.sym"
-  debug = "debug/.build-id/c1/b637ea09260aa022071f850e293bb59c059ddc.debug"
+  breakpad = "debug/.build-id/92/882334401f44bb618953b412292ea9a1cf5efa.sym"
+  debug = "debug/.build-id/92/882334401f44bb618953b412292ea9a1cf5efa.debug"
   dist = "aarch64-unknown-fuchsia/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1375,25 +1366,25 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=hwaddress"]
   ldflags = []
   runtime = [{
-  breakpad = "debug/.build-id/07/0d57669bd13dfb9d57f7493e8f1e5636a00fa3.sym"
-  debug = "debug/.build-id/07/0d57669bd13dfb9d57f7493e8f1e5636a00fa3.debug"
-  dist = "clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.hwasan.so"
+  breakpad = "debug/.build-id/d8/5a303d6056996f1553a201e24c9c40d2bb7edb.sym"
+  debug = "debug/.build-id/d8/5a303d6056996f1553a201e24c9c40d2bb7edb.debug"
+  dist = "clang/21/lib/aarch64-unknown-fuchsia/libclang_rt.hwasan.so"
   soname = "libclang_rt.hwasan.so"
 }, {
-  breakpad = "debug/.build-id/c9/6a0feb39d8354fbfd4ef274a9aa84997b9dd80.sym"
-  debug = "debug/.build-id/c9/6a0feb39d8354fbfd4ef274a9aa84997b9dd80.debug"
+  breakpad = "debug/.build-id/1d/61848424947d98b0f8dde93e176b58ec0308ad.sym"
+  debug = "debug/.build-id/1d/61848424947d98b0f8dde93e176b58ec0308ad.debug"
   dist = "aarch64-unknown-fuchsia/hwasan/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  breakpad = "debug/.build-id/36/c1ddc8cef71e3d8c845ea8e0aab59d3f38a577.sym"
-  debug = "debug/.build-id/36/c1ddc8cef71e3d8c845ea8e0aab59d3f38a577.debug"
+  breakpad = "debug/.build-id/9a/abade020129c0392017df27167aa8d3394d8cc.sym"
+  debug = "debug/.build-id/9a/abade020129c0392017df27167aa8d3394d8cc.debug"
   dist = "aarch64-unknown-fuchsia/hwasan/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  breakpad = "debug/.build-id/53/3fd58dd6846586af1f5bee6c6e68ee149996fd.sym"
-  debug = "debug/.build-id/53/3fd58dd6846586af1f5bee6c6e68ee149996fd.debug"
+  breakpad = "debug/.build-id/69/23a72a14c1138055ebf196a476b17a90cbc03c.sym"
+  debug = "debug/.build-id/69/23a72a14c1138055ebf196a476b17a90cbc03c.debug"
   dist = "aarch64-unknown-fuchsia/hwasan/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1408,25 +1399,25 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=address"]
   ldflags = ["-static-libstdc++"]
   runtime = [{
-  breakpad = "debug/.build-id/51/28949c7e244bbb1a06bace9cf8faa1b9dab281.sym"
-  debug = "debug/.build-id/51/28949c7e244bbb1a06bace9cf8faa1b9dab281.debug"
-  dist = "clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.asan.so"
+  breakpad = "debug/.build-id/fb/b1ddca7070daa2b3a47c52aa78ddf85c588086.sym"
+  debug = "debug/.build-id/fb/b1ddca7070daa2b3a47c52aa78ddf85c588086.debug"
+  dist = "clang/21/lib/aarch64-unknown-fuchsia/libclang_rt.asan.so"
   soname = "libclang_rt.asan.so"
 }, {
-  breakpad = "debug/.build-id/68/31fdddf58e819bc9793c4ab9bd8d92ffc73fb8.sym"
-  debug = "debug/.build-id/68/31fdddf58e819bc9793c4ab9bd8d92ffc73fb8.debug"
+  breakpad = "debug/.build-id/ec/bba758f38873503c695527b51741c7838b23ad.sym"
+  debug = "debug/.build-id/ec/bba758f38873503c695527b51741c7838b23ad.debug"
   dist = "aarch64-unknown-fuchsia/asan/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  breakpad = "debug/.build-id/19/a0521bacda22ba6a02611dc3698561655eb422.sym"
-  debug = "debug/.build-id/19/a0521bacda22ba6a02611dc3698561655eb422.debug"
+  breakpad = "debug/.build-id/17/bd152e787139d6de349d806b981befe832b2cc.sym"
+  debug = "debug/.build-id/17/bd152e787139d6de349d806b981befe832b2cc.debug"
   dist = "aarch64-unknown-fuchsia/asan/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  breakpad = "debug/.build-id/fc/e5178a6f1df173079747bbc6e0e9a67457275c.sym"
-  debug = "debug/.build-id/fc/e5178a6f1df173079747bbc6e0e9a67457275c.debug"
+  breakpad = "debug/.build-id/7a/f9caa4e4d312cd03d161f3b5e64ba3e6577e78.sym"
+  debug = "debug/.build-id/7a/f9caa4e4d312cd03d161f3b5e64ba3e6577e78.debug"
   dist = "aarch64-unknown-fuchsia/asan/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1436,25 +1427,25 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=undefined"]
   ldflags = ["-static-libstdc++"]
   runtime = [{
-  breakpad = "debug/.build-id/a8/76eeaedee8b8aae38cf3a2b5a817ec377d43d1.sym"
-  debug = "debug/.build-id/a8/76eeaedee8b8aae38cf3a2b5a817ec377d43d1.debug"
-  dist = "clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
+  breakpad = "debug/.build-id/26/b8cf1f9a7183970a4b1347d6f24dddc2f62352.sym"
+  debug = "debug/.build-id/26/b8cf1f9a7183970a4b1347d6f24dddc2f62352.debug"
+  dist = "clang/21/lib/aarch64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
   soname = "libclang_rt.ubsan_standalone.so"
 }, {
-  breakpad = "debug/.build-id/67/0452a91275a5d569ecd4808265347c934d80da.sym"
-  debug = "debug/.build-id/67/0452a91275a5d569ecd4808265347c934d80da.debug"
+  breakpad = "debug/.build-id/67/098d2b5544e441811c7327c47a385dfe99fc30.sym"
+  debug = "debug/.build-id/67/098d2b5544e441811c7327c47a385dfe99fc30.debug"
   dist = "aarch64-unknown-fuchsia/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  breakpad = "debug/.build-id/c9/ef4f7717a1fc06e8b1fbbf029935ddb69c6f95.sym"
-  debug = "debug/.build-id/c9/ef4f7717a1fc06e8b1fbbf029935ddb69c6f95.debug"
+  breakpad = "debug/.build-id/99/4a02e8ad8c55ada654cfd7a15f30bb60ce88ad.sym"
+  debug = "debug/.build-id/99/4a02e8ad8c55ada654cfd7a15f30bb60ce88ad.debug"
   dist = "aarch64-unknown-fuchsia/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  breakpad = "debug/.build-id/c1/b637ea09260aa022071f850e293bb59c059ddc.sym"
-  debug = "debug/.build-id/c1/b637ea09260aa022071f850e293bb59c059ddc.debug"
+  breakpad = "debug/.build-id/92/882334401f44bb618953b412292ea9a1cf5efa.sym"
+  debug = "debug/.build-id/92/882334401f44bb618953b412292ea9a1cf5efa.debug"
   dist = "aarch64-unknown-fuchsia/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1464,25 +1455,25 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=hwaddress"]
   ldflags = ["-static-libstdc++"]
   runtime = [{
-  breakpad = "debug/.build-id/07/0d57669bd13dfb9d57f7493e8f1e5636a00fa3.sym"
-  debug = "debug/.build-id/07/0d57669bd13dfb9d57f7493e8f1e5636a00fa3.debug"
-  dist = "clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.hwasan.so"
+  breakpad = "debug/.build-id/d8/5a303d6056996f1553a201e24c9c40d2bb7edb.sym"
+  debug = "debug/.build-id/d8/5a303d6056996f1553a201e24c9c40d2bb7edb.debug"
+  dist = "clang/21/lib/aarch64-unknown-fuchsia/libclang_rt.hwasan.so"
   soname = "libclang_rt.hwasan.so"
 }, {
-  breakpad = "debug/.build-id/c9/6a0feb39d8354fbfd4ef274a9aa84997b9dd80.sym"
-  debug = "debug/.build-id/c9/6a0feb39d8354fbfd4ef274a9aa84997b9dd80.debug"
+  breakpad = "debug/.build-id/1d/61848424947d98b0f8dde93e176b58ec0308ad.sym"
+  debug = "debug/.build-id/1d/61848424947d98b0f8dde93e176b58ec0308ad.debug"
   dist = "aarch64-unknown-fuchsia/hwasan/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  breakpad = "debug/.build-id/36/c1ddc8cef71e3d8c845ea8e0aab59d3f38a577.sym"
-  debug = "debug/.build-id/36/c1ddc8cef71e3d8c845ea8e0aab59d3f38a577.debug"
+  breakpad = "debug/.build-id/9a/abade020129c0392017df27167aa8d3394d8cc.sym"
+  debug = "debug/.build-id/9a/abade020129c0392017df27167aa8d3394d8cc.debug"
   dist = "aarch64-unknown-fuchsia/hwasan/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  breakpad = "debug/.build-id/53/3fd58dd6846586af1f5bee6c6e68ee149996fd.sym"
-  debug = "debug/.build-id/53/3fd58dd6846586af1f5bee6c6e68ee149996fd.debug"
+  breakpad = "debug/.build-id/69/23a72a14c1138055ebf196a476b17a90cbc03c.sym"
+  debug = "debug/.build-id/69/23a72a14c1138055ebf196a476b17a90cbc03c.debug"
   dist = "aarch64-unknown-fuchsia/hwasan/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1492,17 +1483,17 @@ This should never be set as a build argument.
   cflags = []
   ldflags = []
   runtime = [{
-  debug = "debug/.build-id/b3/ad089bcb7a9719115c0a15fb32ac8bc017e937.debug"
+  debug = "debug/.build-id/20/fd162bb26177cc1d27b33f6f8cca601d7c3257.debug"
   dist = "riscv64-unknown-fuchsia/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  debug = "debug/.build-id/ca/7b75de111320efec1c17df60ee6e7ebdc01452.debug"
+  debug = "debug/.build-id/3c/8993f1d524edf37dac3db06c85524e3d2f8878.debug"
   dist = "riscv64-unknown-fuchsia/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  debug = "debug/.build-id/dd/15a7759f9f2c961b1f837ff64f9618dbe14113.debug"
+  debug = "debug/.build-id/ec/c36a006c5b8441ff85d8ec28ac8778e5b8b4bc.debug"
   dist = "riscv64-unknown-fuchsia/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1512,21 +1503,21 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=address"]
   ldflags = []
   runtime = [{
-  debug = "debug/.build-id/4f/6ff7258920f9f032a90a2ca83ac3aac67fdf05.debug"
-  dist = "clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.asan.so"
+  debug = "debug/.build-id/78/1b8d33a77bdd5e2aabeac729762ae6761e9462.debug"
+  dist = "clang/21/lib/riscv64-unknown-fuchsia/libclang_rt.asan.so"
   soname = "libclang_rt.asan.so"
 }, {
-  debug = "debug/.build-id/04/f8fcdbc6f830b292e87f285a15f024bf5685f3.debug"
+  debug = "debug/.build-id/f2/f76b36216bb48f8b3a40f9e6ddb9d6f9ad4695.debug"
   dist = "riscv64-unknown-fuchsia/asan/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  debug = "debug/.build-id/c6/2451ae9c6fdc9ffbdcdbf778f6a15ca2099ebd.debug"
+  debug = "debug/.build-id/62/32edb347b39281c0703461d3909fd768ed118b.debug"
   dist = "riscv64-unknown-fuchsia/asan/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  debug = "debug/.build-id/a9/bf620d03e8cdb81f48ee62c1c0032d08bc77ae.debug"
+  debug = "debug/.build-id/9b/6ce41b8dcc422793cc993043fefd60b9f8d550.debug"
   dist = "riscv64-unknown-fuchsia/asan/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1536,21 +1527,21 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=undefined"]
   ldflags = []
   runtime = [{
-  debug = "debug/.build-id/bf/fe4883d75a535a6c5aac2f2f2c33ee6d9d9871.debug"
-  dist = "clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
+  debug = "debug/.build-id/58/65e3ef33b0f83fd2898d0bc48a1660a034640c.debug"
+  dist = "clang/21/lib/riscv64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
   soname = "libclang_rt.ubsan_standalone.so"
 }, {
-  debug = "debug/.build-id/b3/ad089bcb7a9719115c0a15fb32ac8bc017e937.debug"
+  debug = "debug/.build-id/20/fd162bb26177cc1d27b33f6f8cca601d7c3257.debug"
   dist = "riscv64-unknown-fuchsia/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  debug = "debug/.build-id/ca/7b75de111320efec1c17df60ee6e7ebdc01452.debug"
+  debug = "debug/.build-id/3c/8993f1d524edf37dac3db06c85524e3d2f8878.debug"
   dist = "riscv64-unknown-fuchsia/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  debug = "debug/.build-id/dd/15a7759f9f2c961b1f837ff64f9618dbe14113.debug"
+  debug = "debug/.build-id/ec/c36a006c5b8441ff85d8ec28ac8778e5b8b4bc.debug"
   dist = "riscv64-unknown-fuchsia/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1560,21 +1551,21 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=hwaddress"]
   ldflags = []
   runtime = [{
-  debug = "debug/.build-id/95/f19580cf8e44355462ffc4ed0f4c1ff02c6896.debug"
-  dist = "clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.hwasan.so"
+  debug = "debug/.build-id/87/3effc9bcfdd3c0f7793da37fb8a62ffac83511.debug"
+  dist = "clang/21/lib/riscv64-unknown-fuchsia/libclang_rt.hwasan.so"
   soname = "libclang_rt.hwasan.so"
 }, {
-  debug = "debug/.build-id/b3/ad089bcb7a9719115c0a15fb32ac8bc017e937.debug"
+  debug = "debug/.build-id/20/fd162bb26177cc1d27b33f6f8cca601d7c3257.debug"
   dist = "riscv64-unknown-fuchsia/hwasan/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  debug = "debug/.build-id/ca/7b75de111320efec1c17df60ee6e7ebdc01452.debug"
+  debug = "debug/.build-id/3c/8993f1d524edf37dac3db06c85524e3d2f8878.debug"
   dist = "riscv64-unknown-fuchsia/hwasan/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  debug = "debug/.build-id/5b/101c3326960cac0500a64363fbac1b21405d2a.debug"
+  debug = "debug/.build-id/19/1a289efe0eb8b8a1c18bc53fc43d78999f1012.debug"
   dist = "riscv64-unknown-fuchsia/hwasan/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1589,21 +1580,21 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=address"]
   ldflags = ["-static-libstdc++"]
   runtime = [{
-  debug = "debug/.build-id/4f/6ff7258920f9f032a90a2ca83ac3aac67fdf05.debug"
-  dist = "clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.asan.so"
+  debug = "debug/.build-id/78/1b8d33a77bdd5e2aabeac729762ae6761e9462.debug"
+  dist = "clang/21/lib/riscv64-unknown-fuchsia/libclang_rt.asan.so"
   soname = "libclang_rt.asan.so"
 }, {
-  debug = "debug/.build-id/04/f8fcdbc6f830b292e87f285a15f024bf5685f3.debug"
+  debug = "debug/.build-id/f2/f76b36216bb48f8b3a40f9e6ddb9d6f9ad4695.debug"
   dist = "riscv64-unknown-fuchsia/asan/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  debug = "debug/.build-id/c6/2451ae9c6fdc9ffbdcdbf778f6a15ca2099ebd.debug"
+  debug = "debug/.build-id/62/32edb347b39281c0703461d3909fd768ed118b.debug"
   dist = "riscv64-unknown-fuchsia/asan/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  debug = "debug/.build-id/a9/bf620d03e8cdb81f48ee62c1c0032d08bc77ae.debug"
+  debug = "debug/.build-id/9b/6ce41b8dcc422793cc993043fefd60b9f8d550.debug"
   dist = "riscv64-unknown-fuchsia/asan/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1613,21 +1604,21 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=undefined"]
   ldflags = ["-static-libstdc++"]
   runtime = [{
-  debug = "debug/.build-id/bf/fe4883d75a535a6c5aac2f2f2c33ee6d9d9871.debug"
-  dist = "clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
+  debug = "debug/.build-id/58/65e3ef33b0f83fd2898d0bc48a1660a034640c.debug"
+  dist = "clang/21/lib/riscv64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
   soname = "libclang_rt.ubsan_standalone.so"
 }, {
-  debug = "debug/.build-id/b3/ad089bcb7a9719115c0a15fb32ac8bc017e937.debug"
+  debug = "debug/.build-id/20/fd162bb26177cc1d27b33f6f8cca601d7c3257.debug"
   dist = "riscv64-unknown-fuchsia/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  debug = "debug/.build-id/ca/7b75de111320efec1c17df60ee6e7ebdc01452.debug"
+  debug = "debug/.build-id/3c/8993f1d524edf37dac3db06c85524e3d2f8878.debug"
   dist = "riscv64-unknown-fuchsia/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  debug = "debug/.build-id/dd/15a7759f9f2c961b1f837ff64f9618dbe14113.debug"
+  debug = "debug/.build-id/ec/c36a006c5b8441ff85d8ec28ac8778e5b8b4bc.debug"
   dist = "riscv64-unknown-fuchsia/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1637,21 +1628,21 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=hwaddress"]
   ldflags = ["-static-libstdc++"]
   runtime = [{
-  debug = "debug/.build-id/95/f19580cf8e44355462ffc4ed0f4c1ff02c6896.debug"
-  dist = "clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.hwasan.so"
+  debug = "debug/.build-id/87/3effc9bcfdd3c0f7793da37fb8a62ffac83511.debug"
+  dist = "clang/21/lib/riscv64-unknown-fuchsia/libclang_rt.hwasan.so"
   soname = "libclang_rt.hwasan.so"
 }, {
-  debug = "debug/.build-id/b3/ad089bcb7a9719115c0a15fb32ac8bc017e937.debug"
+  debug = "debug/.build-id/20/fd162bb26177cc1d27b33f6f8cca601d7c3257.debug"
   dist = "riscv64-unknown-fuchsia/hwasan/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  debug = "debug/.build-id/ca/7b75de111320efec1c17df60ee6e7ebdc01452.debug"
+  debug = "debug/.build-id/3c/8993f1d524edf37dac3db06c85524e3d2f8878.debug"
   dist = "riscv64-unknown-fuchsia/hwasan/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  debug = "debug/.build-id/5b/101c3326960cac0500a64363fbac1b21405d2a.debug"
+  debug = "debug/.build-id/19/1a289efe0eb8b8a1c18bc53fc43d78999f1012.debug"
   dist = "riscv64-unknown-fuchsia/hwasan/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1661,20 +1652,20 @@ This should never be set as a build argument.
   cflags = []
   ldflags = []
   runtime = [{
-  breakpad = "debug/.build-id/bb/72c0c73c0bb3aee8ad05aaf7df44d9229821e5.sym"
-  debug = "debug/.build-id/bb/72c0c73c0bb3aee8ad05aaf7df44d9229821e5.debug"
+  breakpad = "debug/.build-id/72/8c2a355209ecbab28ead8b1cee32a36fa76b3b.sym"
+  debug = "debug/.build-id/72/8c2a355209ecbab28ead8b1cee32a36fa76b3b.debug"
   dist = "x86_64-unknown-fuchsia/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  breakpad = "debug/.build-id/fc/0ff1bf330b3d1b77feb3a2aaaca77f30e7e982.sym"
-  debug = "debug/.build-id/fc/0ff1bf330b3d1b77feb3a2aaaca77f30e7e982.debug"
+  breakpad = "debug/.build-id/2d/c86ee58ab1e0127284b349fab5d1ed11221115.sym"
+  debug = "debug/.build-id/2d/c86ee58ab1e0127284b349fab5d1ed11221115.debug"
   dist = "x86_64-unknown-fuchsia/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  breakpad = "debug/.build-id/14/f192090ad8327994b6601b98cdad612b8401de.sym"
-  debug = "debug/.build-id/14/f192090ad8327994b6601b98cdad612b8401de.debug"
+  breakpad = "debug/.build-id/05/8c0101c14ce7614e97d9e867f68884b1cca4f0.sym"
+  debug = "debug/.build-id/05/8c0101c14ce7614e97d9e867f68884b1cca4f0.debug"
   dist = "x86_64-unknown-fuchsia/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1684,25 +1675,25 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=address"]
   ldflags = []
   runtime = [{
-  breakpad = "debug/.build-id/56/62ab4a28d34d6acef4c2eb7d6eca8ef566c5c5.sym"
-  debug = "debug/.build-id/56/62ab4a28d34d6acef4c2eb7d6eca8ef566c5c5.debug"
-  dist = "clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.asan.so"
+  breakpad = "debug/.build-id/86/db77fbbed697296ff144b08cfac45ebd8010ca.sym"
+  debug = "debug/.build-id/86/db77fbbed697296ff144b08cfac45ebd8010ca.debug"
+  dist = "clang/21/lib/x86_64-unknown-fuchsia/libclang_rt.asan.so"
   soname = "libclang_rt.asan.so"
 }, {
-  breakpad = "debug/.build-id/af/7a4e3d3227e073cfa8f33762be84dfbb165cf6.sym"
-  debug = "debug/.build-id/af/7a4e3d3227e073cfa8f33762be84dfbb165cf6.debug"
+  breakpad = "debug/.build-id/4c/9a442d9ab07a7a3a6b9045c1dd38356cd7bbd3.sym"
+  debug = "debug/.build-id/4c/9a442d9ab07a7a3a6b9045c1dd38356cd7bbd3.debug"
   dist = "x86_64-unknown-fuchsia/asan/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  breakpad = "debug/.build-id/fd/51aa37a274b658c95c2c0c5ee5f13f6239b29c.sym"
-  debug = "debug/.build-id/fd/51aa37a274b658c95c2c0c5ee5f13f6239b29c.debug"
+  breakpad = "debug/.build-id/f4/02f87095ee019ec7c94878a10bf7440ef2f9a2.sym"
+  debug = "debug/.build-id/f4/02f87095ee019ec7c94878a10bf7440ef2f9a2.debug"
   dist = "x86_64-unknown-fuchsia/asan/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  breakpad = "debug/.build-id/bb/d7440d2d8b3df8fa40ddd362916a88520484e7.sym"
-  debug = "debug/.build-id/bb/d7440d2d8b3df8fa40ddd362916a88520484e7.debug"
+  breakpad = "debug/.build-id/ee/11dce8dccd34941247931491df5bf4f8501251.sym"
+  debug = "debug/.build-id/ee/11dce8dccd34941247931491df5bf4f8501251.debug"
   dist = "x86_64-unknown-fuchsia/asan/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1712,25 +1703,25 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=undefined"]
   ldflags = []
   runtime = [{
-  breakpad = "debug/.build-id/15/de2f635f92c84c5645207e2bdeeb06c5187857.sym"
-  debug = "debug/.build-id/15/de2f635f92c84c5645207e2bdeeb06c5187857.debug"
-  dist = "clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
+  breakpad = "debug/.build-id/10/77f3992a8db47f942d8be19d53404f2c0040a4.sym"
+  debug = "debug/.build-id/10/77f3992a8db47f942d8be19d53404f2c0040a4.debug"
+  dist = "clang/21/lib/x86_64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
   soname = "libclang_rt.ubsan_standalone.so"
 }, {
-  breakpad = "debug/.build-id/bb/72c0c73c0bb3aee8ad05aaf7df44d9229821e5.sym"
-  debug = "debug/.build-id/bb/72c0c73c0bb3aee8ad05aaf7df44d9229821e5.debug"
+  breakpad = "debug/.build-id/72/8c2a355209ecbab28ead8b1cee32a36fa76b3b.sym"
+  debug = "debug/.build-id/72/8c2a355209ecbab28ead8b1cee32a36fa76b3b.debug"
   dist = "x86_64-unknown-fuchsia/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  breakpad = "debug/.build-id/fc/0ff1bf330b3d1b77feb3a2aaaca77f30e7e982.sym"
-  debug = "debug/.build-id/fc/0ff1bf330b3d1b77feb3a2aaaca77f30e7e982.debug"
+  breakpad = "debug/.build-id/2d/c86ee58ab1e0127284b349fab5d1ed11221115.sym"
+  debug = "debug/.build-id/2d/c86ee58ab1e0127284b349fab5d1ed11221115.debug"
   dist = "x86_64-unknown-fuchsia/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  breakpad = "debug/.build-id/14/f192090ad8327994b6601b98cdad612b8401de.sym"
-  debug = "debug/.build-id/14/f192090ad8327994b6601b98cdad612b8401de.debug"
+  breakpad = "debug/.build-id/05/8c0101c14ce7614e97d9e867f68884b1cca4f0.sym"
+  debug = "debug/.build-id/05/8c0101c14ce7614e97d9e867f68884b1cca4f0.debug"
   dist = "x86_64-unknown-fuchsia/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1745,25 +1736,25 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=address"]
   ldflags = ["-static-libstdc++"]
   runtime = [{
-  breakpad = "debug/.build-id/56/62ab4a28d34d6acef4c2eb7d6eca8ef566c5c5.sym"
-  debug = "debug/.build-id/56/62ab4a28d34d6acef4c2eb7d6eca8ef566c5c5.debug"
-  dist = "clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.asan.so"
+  breakpad = "debug/.build-id/86/db77fbbed697296ff144b08cfac45ebd8010ca.sym"
+  debug = "debug/.build-id/86/db77fbbed697296ff144b08cfac45ebd8010ca.debug"
+  dist = "clang/21/lib/x86_64-unknown-fuchsia/libclang_rt.asan.so"
   soname = "libclang_rt.asan.so"
 }, {
-  breakpad = "debug/.build-id/af/7a4e3d3227e073cfa8f33762be84dfbb165cf6.sym"
-  debug = "debug/.build-id/af/7a4e3d3227e073cfa8f33762be84dfbb165cf6.debug"
+  breakpad = "debug/.build-id/4c/9a442d9ab07a7a3a6b9045c1dd38356cd7bbd3.sym"
+  debug = "debug/.build-id/4c/9a442d9ab07a7a3a6b9045c1dd38356cd7bbd3.debug"
   dist = "x86_64-unknown-fuchsia/asan/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  breakpad = "debug/.build-id/fd/51aa37a274b658c95c2c0c5ee5f13f6239b29c.sym"
-  debug = "debug/.build-id/fd/51aa37a274b658c95c2c0c5ee5f13f6239b29c.debug"
+  breakpad = "debug/.build-id/f4/02f87095ee019ec7c94878a10bf7440ef2f9a2.sym"
+  debug = "debug/.build-id/f4/02f87095ee019ec7c94878a10bf7440ef2f9a2.debug"
   dist = "x86_64-unknown-fuchsia/asan/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  breakpad = "debug/.build-id/bb/d7440d2d8b3df8fa40ddd362916a88520484e7.sym"
-  debug = "debug/.build-id/bb/d7440d2d8b3df8fa40ddd362916a88520484e7.debug"
+  breakpad = "debug/.build-id/ee/11dce8dccd34941247931491df5bf4f8501251.sym"
+  debug = "debug/.build-id/ee/11dce8dccd34941247931491df5bf4f8501251.debug"
   dist = "x86_64-unknown-fuchsia/asan/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1773,25 +1764,25 @@ This should never be set as a build argument.
   cflags = ["-fsanitize=undefined"]
   ldflags = ["-static-libstdc++"]
   runtime = [{
-  breakpad = "debug/.build-id/15/de2f635f92c84c5645207e2bdeeb06c5187857.sym"
-  debug = "debug/.build-id/15/de2f635f92c84c5645207e2bdeeb06c5187857.debug"
-  dist = "clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
+  breakpad = "debug/.build-id/10/77f3992a8db47f942d8be19d53404f2c0040a4.sym"
+  debug = "debug/.build-id/10/77f3992a8db47f942d8be19d53404f2c0040a4.debug"
+  dist = "clang/21/lib/x86_64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
   soname = "libclang_rt.ubsan_standalone.so"
 }, {
-  breakpad = "debug/.build-id/bb/72c0c73c0bb3aee8ad05aaf7df44d9229821e5.sym"
-  debug = "debug/.build-id/bb/72c0c73c0bb3aee8ad05aaf7df44d9229821e5.debug"
+  breakpad = "debug/.build-id/72/8c2a355209ecbab28ead8b1cee32a36fa76b3b.sym"
+  debug = "debug/.build-id/72/8c2a355209ecbab28ead8b1cee32a36fa76b3b.debug"
   dist = "x86_64-unknown-fuchsia/libc++.so.2"
   name = "libc++"
   soname = "libc++.so.2"
 }, {
-  breakpad = "debug/.build-id/fc/0ff1bf330b3d1b77feb3a2aaaca77f30e7e982.sym"
-  debug = "debug/.build-id/fc/0ff1bf330b3d1b77feb3a2aaaca77f30e7e982.debug"
+  breakpad = "debug/.build-id/2d/c86ee58ab1e0127284b349fab5d1ed11221115.sym"
+  debug = "debug/.build-id/2d/c86ee58ab1e0127284b349fab5d1ed11221115.debug"
   dist = "x86_64-unknown-fuchsia/libc++abi.so.1"
   name = "libc++abi"
   soname = "libc++abi.so.1"
 }, {
-  breakpad = "debug/.build-id/14/f192090ad8327994b6601b98cdad612b8401de.sym"
-  debug = "debug/.build-id/14/f192090ad8327994b6601b98cdad612b8401de.debug"
+  breakpad = "debug/.build-id/05/8c0101c14ce7614e97d9e867f68884b1cca4f0.sym"
+  debug = "debug/.build-id/05/8c0101c14ce7614e97d9e867f68884b1cca4f0.debug"
   dist = "x86_64-unknown-fuchsia/libunwind.so.1"
   name = "libunwind"
   soname = "libunwind.so.1"
@@ -1799,111 +1790,111 @@ This should never be set as a build argument.
   target = ["x86_64-unknown-fuchsia", "x86_64-fuchsia"]
 }]
   x86_64_pc_windows_msvc = {
-  libclang_rt_profile_a = ""
-  libunwind_so = ""
-  resource_dir = "lib/clang/20"
+  libclang_rt_profile_a = "../../../../out/not-default/libclang_rt.profile.lib"
+  libunwind_so = "../../../../out/not-default/libunwind.dll"
+  resource_dir = "lib/clang/21"
   variants = { }
 }
   x86_64_unknown_fuchsia = {
-  libclang_rt_profile_a = "lib/clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.profile.a"
+  libclang_rt_profile_a = "lib/clang/21/lib/x86_64-unknown-fuchsia/libclang_rt.profile.a"
   libunwind_so = "lib/x86_64-unknown-fuchsia/libunwind.so.1.0"
-  resource_dir = "lib/clang/20"
+  resource_dir = "lib/clang/21"
   variants = {
   asan = {
   shared = {
-  clang_rt = "lib/clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.asan.so"
+  clang_rt = "lib/clang/21/lib/x86_64-unknown-fuchsia/libclang_rt.asan.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.asan.a"
-  clang_rt_cxx = "lib/clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.asan_cxx.a"
+  clang_rt = "lib/clang/21/lib/x86_64-unknown-fuchsia/libclang_rt.asan.a"
+  clang_rt_cxx = "lib/clang/21/lib/x86_64-unknown-fuchsia/libclang_rt.asan_cxx.a"
 }
 }
   hwasan = {
   shared = {
-  clang_rt = "lib/clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.hwasan.so"
+  clang_rt = "lib/clang/21/lib/x86_64-unknown-fuchsia/libclang_rt.hwasan.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.hwasan.a"
-  clang_rt_cxx = "lib/clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.hwasan_cxx.a"
+  clang_rt = "lib/clang/21/lib/x86_64-unknown-fuchsia/libclang_rt.hwasan.a"
+  clang_rt_cxx = "lib/clang/21/lib/x86_64-unknown-fuchsia/libclang_rt.hwasan_cxx.a"
 }
 }
   lsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.lsan.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.lsan.a"
-  clang_rt_cxx = ""
+  clang_rt = "lib/clang/21/lib/x86_64-unknown-fuchsia/libclang_rt.lsan.a"
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.lsan_cxx.a"
 }
 }
   tsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
 }
   static = {
-  clang_rt = ""
-  clang_rt_cxx = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.tsan_cxx.a"
 }
 }
   ubsan = {
   shared = {
-  clang_rt = "lib/clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
+  clang_rt = "lib/clang/21/lib/x86_64-unknown-fuchsia/libclang_rt.ubsan_standalone.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.ubsan_standalone.a"
-  clang_rt_cxx = "lib/clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.ubsan_standalone_cxx.a"
+  clang_rt = "lib/clang/21/lib/x86_64-unknown-fuchsia/libclang_rt.ubsan_standalone.a"
+  clang_rt_cxx = "lib/clang/21/lib/x86_64-unknown-fuchsia/libclang_rt.ubsan_standalone_cxx.a"
 }
 }
 }
 }
   x86_64_unknown_linux_gnu = {
-  libclang_rt_profile_a = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.profile.a"
-  libunwind_so = ""
-  resource_dir = "lib/clang/20"
+  libclang_rt_profile_a = "lib/clang/21/lib/x86_64-unknown-linux-gnu/libclang_rt.profile.a"
+  libunwind_so = "../../../../out/not-default/libunwind.so"
+  resource_dir = "lib/clang/21"
   variants = {
   asan = {
   shared = {
-  clang_rt = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so"
+  clang_rt = "lib/clang/21/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.a"
-  clang_rt_cxx = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.asan_cxx.a"
+  clang_rt = "lib/clang/21/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.a"
+  clang_rt_cxx = "lib/clang/21/lib/x86_64-unknown-linux-gnu/libclang_rt.asan_cxx.a"
 }
 }
   hwasan = {
   shared = {
-  clang_rt = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.hwasan.so"
+  clang_rt = "lib/clang/21/lib/x86_64-unknown-linux-gnu/libclang_rt.hwasan.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.hwasan.a"
-  clang_rt_cxx = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.hwasan_cxx.a"
+  clang_rt = "lib/clang/21/lib/x86_64-unknown-linux-gnu/libclang_rt.hwasan.a"
+  clang_rt_cxx = "lib/clang/21/lib/x86_64-unknown-linux-gnu/libclang_rt.hwasan_cxx.a"
 }
 }
   lsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.lsan.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.lsan.a"
-  clang_rt_cxx = ""
+  clang_rt = "lib/clang/21/lib/x86_64-unknown-linux-gnu/libclang_rt.lsan.a"
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.lsan_cxx.a"
 }
 }
   tsan = {
   shared = {
-  clang_rt = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.tsan.so"
+  clang_rt = "lib/clang/21/lib/x86_64-unknown-linux-gnu/libclang_rt.tsan.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.tsan.a"
-  clang_rt_cxx = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.tsan_cxx.a"
+  clang_rt = "lib/clang/21/lib/x86_64-unknown-linux-gnu/libclang_rt.tsan.a"
+  clang_rt_cxx = "lib/clang/21/lib/x86_64-unknown-linux-gnu/libclang_rt.tsan_cxx.a"
 }
 }
   ubsan = {
   shared = {
-  clang_rt = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.ubsan_standalone.so"
+  clang_rt = "lib/clang/21/lib/x86_64-unknown-linux-gnu/libclang_rt.ubsan_standalone.so"
 }
   static = {
-  clang_rt = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.ubsan_standalone.a"
-  clang_rt_cxx = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.ubsan_standalone_cxx.a"
+  clang_rt = "lib/clang/21/lib/x86_64-unknown-linux-gnu/libclang_rt.ubsan_standalone.a"
+  clang_rt_cxx = "lib/clang/21/lib/x86_64-unknown-linux-gnu/libclang_rt.ubsan_standalone_cxx.a"
 }
 }
 }
@@ -2172,7 +2163,7 @@ From //build/images/custom_signing.gni:26
 
 **Current value (from the default):** `""`
 
-From //third_party/Vulkan-Loader/BUILD.gn:21
+From //third_party/Vulkan-Loader/src/BUILD.gn:20
 
 ### cxx_rbe_check
 
@@ -2334,7 +2325,7 @@ From //out/not-default/args.gn:27
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:109
+From //BUILD.gn:111
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -2342,7 +2333,7 @@ From //out/not-default/args.gn:27
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:109
+From //BUILD.gn:111
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -2350,7 +2341,7 @@ From //out/not-default/args.gn:27
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:109
+From //BUILD.gn:111
 
 ### disable_boot_tests
 
@@ -2368,7 +2359,7 @@ TODO(https://fxbug.dev/320511796): Cleanup when no longer necessary.
 
 **Current value (from the default):** `false`
 
-From //build/testing/boot_tests/kernel_zbi_test.gni:21
+From //build/testing/boot_tests/kernel_zbi_test.gni:22
 
 ### disable_elf_checks
 
@@ -2378,15 +2369,6 @@ Disables ELF checks for packages.
 
 From //build/dist/verify_manifest_elf_binaries.gni:10
 
-### disable_kernel_pci
-
-Disable kernel PCI driver support. A counterpart of the build
-flag platform_enable_user_pci in //src/devices/bus/drivers/pci/pci.gni.
-
-**Current value (from the default):** `false`
-
-From //zircon/kernel/params.gni:82
-
 ### discoverable_package_labels
 
 If you add package labels to this variable, the packages will be included in
@@ -2395,43 +2377,23 @@ https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0212_package_sets
 
 They will be compiled, and published, but not added as dependencies of the
 assembled images, and so will not be able to cause the inclusion of
-'config_data' or 'shell_command' entries.
+entries to the legacy bundle.
 
 As these cannot be part of the legacy AIB for a product, there is no
 "legacy" version of this argument.
 
-**Current value for `target_cpu = "arm64"`:** `["//bundles/tools"]`
+**Current value (from the default):** `[]`
 
-From //products/core.gni:29
-
-**Overridden from the default:** `[]`
-
-From //BUILD.gn:69
-
-**Current value for `target_cpu = "riscv64"`:** `["//src/developer/debug/debug_agent"]`
-
-From //products/minimal.gni:36
-
-**Overridden from the default:** `[]`
-
-From //BUILD.gn:69
-
-**Current value for `target_cpu = "x64"`:** `["//bundles/tools"]`
-
-From //products/core.gni:29
-
-**Overridden from the default:** `[]`
-
-From //BUILD.gn:69
+From //BUILD.gn:71
 
 ### dont_profile_source_files
 
-List of GN paths to source files to NOT instrument by `profile` variants.
+List of paths to source files to NOT instrument by `profile` variants.
 These take precedence over `profile_source_files`.
 
 **Current value (from the default):** `["//prebuilt/*"]`
 
-From //build/config/profile/config.gni:15
+From //build/config/profile/config.gni:18
 
 ### dwarf_version
 
@@ -2452,7 +2414,7 @@ From //out/not-default/args.gn:23
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:98
+From //BUILD.gn:100
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -2460,7 +2422,7 @@ From //out/not-default/args.gn:23
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:98
+From //BUILD.gn:100
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -2468,13 +2430,13 @@ From //out/not-default/args.gn:23
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:98
+From //BUILD.gn:100
 
 ### emu_window_size_height
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:42
+From //build/product.gni:35
 
 ### emu_window_size_width
 
@@ -2482,7 +2444,7 @@ Configuration to override the default window size for the virtual device in pixe
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:41
+From //build/product.gni:34
 
 ### enable_bazel_remote_rbe
 
@@ -2554,7 +2516,7 @@ disabled.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:136
+From //zircon/kernel/params.gni:132
 
 ### enable_mdns_trace
 
@@ -2842,7 +2804,7 @@ Include a mechanism for the kernel to sample threads and write the results to a 
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:128
+From //zircon/kernel/params.gni:124
 
 ### exported_package_labels
 
@@ -2861,7 +2823,7 @@ packages instead of explicitly adding the labels of the
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:83
+From //BUILD.gn:85
 
 ### extra_bazel_assembly_targets
 
@@ -2885,7 +2847,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1891
+From //build/config/BUILDCONFIG.gn:1902
 
 ### fastboot_product
 
@@ -2992,7 +2954,7 @@ TODO(https://fxbug.dev/42161120) move this to a toolchain to allow multiple prod
 
 **Current value (from the default):** `true`
 
-From //build/product.gni:23
+From //build/product.gni:16
 
 ### fuchsia_product_assembly_config_label
 
@@ -3007,11 +2969,11 @@ From //products/core.gni:26
 
 **Overridden from the default:** `false`
 
-From //build/product.gni:29
+From //build/product.gni:22
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:29
+From //build/product.gni:22
 
 ### fuchsia_sdk_root
 
@@ -3076,7 +3038,7 @@ which is a full system image generated for exfiltrating instrumentation data fro
 
 **Current value (from the default):** `false`
 
-From //build/testing/boot_tests/kernel_zbi_test.gni:17
+From //build/testing/boot_tests/kernel_zbi_test.gni:18
 
 ### generate_licenses_spdx_stubs
 
@@ -3169,7 +3131,7 @@ From //out/not-default/args.gn:21
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:90
+From //BUILD.gn:92
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -3177,7 +3139,7 @@ From //out/not-default/args.gn:21
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:90
+From //BUILD.gn:92
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -3185,7 +3147,7 @@ From //out/not-default/args.gn:21
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:90
+From //BUILD.gn:92
 
 ### host_byteorder
 
@@ -3211,7 +3173,7 @@ From //out/not-default/args.gn:11
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:116
+From //BUILD.gn:118
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -3219,7 +3181,7 @@ From //out/not-default/args.gn:11
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:116
+From //BUILD.gn:118
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -3227,7 +3189,7 @@ From //out/not-default/args.gn:11
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:116
+From //BUILD.gn:118
 
 ### host_os
 
@@ -3246,7 +3208,7 @@ From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:104
+From //BUILD.gn:106
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -3254,7 +3216,7 @@ From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:104
+From //BUILD.gn:106
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -3262,7 +3224,7 @@ From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:104
+From //BUILD.gn:106
 
 ### host_tools_base_path_override
 
@@ -3315,7 +3277,7 @@ TODO(https://fxbug.dev/42162166): remove once we have a better way to manage ACP
 
 **Current value (from the default):** `false`
 
-From //src/devices/board/lib/acpi/BUILD.gn:12
+From //src/devices/board/lib/acpi/BUILD.gn:10
 
 ### ice_detection
 
@@ -3514,7 +3476,7 @@ and the analysis overhead turned off by default.
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:27
+From //build/config/BUILDCONFIG.gn:28
 
 ### is_debug
 
@@ -3523,6 +3485,12 @@ Debug build.
 **Current value (from the default):** `""`
 
 From //build/config/compilation_modes.gni:54
+
+### is_multi_product_build
+
+**Current value (from the default):** `false`
+
+From //build/images/args.gni:238
 
 ### is_perfetto_build_generator
 
@@ -3556,31 +3524,31 @@ value regardless of whether persistent tracing is enabled or not.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:118
+From //zircon/kernel/params.gni:114
 
 ### jtrace_last_entry_storage
 
 **Current value (from the default):** `0`
 
-From //zircon/kernel/params.gni:119
+From //zircon/kernel/params.gni:115
 
 ### jtrace_target_buffer_size
 
 **Current value (from the default):** `"auto"`
 
-From //zircon/kernel/params.gni:120
+From //zircon/kernel/params.gni:116
 
 ### jtrace_use_large_entries
 
 **Current value (from the default):** `"auto"`
 
-From //zircon/kernel/params.gni:121
+From //zircon/kernel/params.gni:117
 
 ### jtrace_use_mono_timestamps
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:122
+From //zircon/kernel/params.gni:118
 
 ### kernel_base
 
@@ -3601,7 +3569,7 @@ the two and set kernel_debug_level independently.
 
 **Current value (from the default):** `2`
 
-From //zircon/kernel/params.gni:94
+From //zircon/kernel/params.gni:90
 
 ### kernel_debug_print_level
 
@@ -3613,7 +3581,7 @@ the more dprintf messages emitted. Valid values are 0-2 (inclusive):
 
 **Current value (from the default):** `2`
 
-From //zircon/kernel/params.gni:101
+From //zircon/kernel/params.gni:97
 
 ### kernel_extra_defines
 
@@ -3622,7 +3590,7 @@ Extra macro definitions for kernel code, e.g. "DISABLE_KASLR",
 
 **Current value (from the default):** `[]`
 
-From //zircon/kernel/params.gni:86
+From //zircon/kernel/params.gni:82
 
 ### kernel_extra_deps
 
@@ -3633,7 +3601,7 @@ injecting new instances of subsystems that the kernel has defined modularly
 
 **Current value (from the default):** `[]`
 
-From //zircon/kernel/BUILD.gn:38
+From //zircon/kernel/BUILD.gn:37
 
 ### kernel_no_userabi
 
@@ -3641,7 +3609,7 @@ Build a kernel with no user-space support, for development only.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:125
+From //zircon/kernel/params.gni:121
 
 ### kernel_version_string
 
@@ -3666,7 +3634,7 @@ the like can be listed here to be used as a ZBI-to-ZBI boot shim
 
 **Current value (from the default):** `[]`
 
-From //zircon/kernel/BUILD.gn:32
+From //zircon/kernel/BUILD.gn:31
 
 ### known_variants
 
@@ -3772,6 +3740,12 @@ Each element of the list is one variant, which is a scope defining:
   configs = ["//build/config/profile:profile-rust"]
   tags = ["debugdata", "instrumented", "llvm-profdata", "needs-writable-globals", "profile"]
 }, {
+  configs = ["//build/config/profile:profile-use"]
+  tags = ["instrumented"]
+}, {
+  configs = ["//build/config/profile:profile-use-rust"]
+  tags = ["instrumented"]
+}, {
   configs = ["//build/config/sanitizers:tsan"]
   tags = ["tsan", "instrumentation-runtime", "instrumented", "needs-compiler-abi", "needs-writable-globals", "uses-shadow", "kernel-excluded"]
 }, {
@@ -3860,19 +3834,19 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1687
+From //build/config/BUILDCONFIG.gn:1688
 
 ### legacy_base_package_labels
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:40
+From //BUILD.gn:42
 
 ### legacy_cache_package_labels
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:49
+From //BUILD.gn:51
 
 ### link_rbe_check
 
@@ -4707,7 +4681,7 @@ Sets if we should output breakpad symbols for Fuchsia binaries.
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:30
+From //build/config/BUILDCONFIG.gn:31
 
 ### output_gsym
 
@@ -4715,7 +4689,7 @@ Controls whether we should output GSYM files for Fuchsia binaries.
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:33
+From //build/config/BUILDCONFIG.gn:34
 
 ### override_idk_buildable_api_levels
 
@@ -4808,23 +4782,23 @@ From //boards/arm64.gni:42
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:48
+From //build/board.gni:44
 
 **Current value for `target_cpu = "riscv64"`:** `"//boards/partitions:riscv64"`
 
-From //boards/riscv64.gni:34
+From //boards/riscv64.gni:32
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:48
+From //build/board.gni:44
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
-From //boards/x64.gni:38
+From //boards/x64.gni:34
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:48
+From //build/board.gni:44
 
 ### perfetto_build_with_android
 
@@ -4920,7 +4894,7 @@ cacheline size of the target architecture.
 
 **Current value (from the default):** `128`
 
-From //zircon/kernel/params.gni:108
+From //zircon/kernel/params.gni:104
 
 ### pgo_profile_path
 
@@ -4928,13 +4902,7 @@ Profile data path that is used by PGO.
 
 **Current value (from the default):** `""`
 
-From //build/config/profile/config.gni:29
-
-### platform_enable_user_pci
-
-**Current value (from the default):** `false`
-
-From //src/devices/bus/drivers/pci/pci.gni:10
+From //build/config/profile/config.gni:45
 
 ### pre_erase_flash
 
@@ -4990,7 +4958,7 @@ From //out/not-default/args.gn:29
 
 **Overridden from the default:** `[]`
 
-From //build/assembly/developer_overrides.gni:400
+From //build/assembly/developer_overrides.gni:429
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -4998,7 +4966,7 @@ From //out/not-default/args.gn:29
 
 **Overridden from the default:** `[]`
 
-From //build/assembly/developer_overrides.gni:400
+From //build/assembly/developer_overrides.gni:429
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -5006,7 +4974,7 @@ From //out/not-default/args.gn:29
 
 **Overridden from the default:** `[]`
 
-From //build/assembly/developer_overrides.gni:400
+From //build/assembly/developer_overrides.gni:429
 
 ### product_assembly_overrides_contents
 
@@ -5022,7 +4990,7 @@ for the "main" product assembly as if the following were set:
 
 **Current value (from the default):** `false`
 
-From //build/assembly/developer_overrides.gni:416
+From //build/assembly/developer_overrides.gni:445
 
 ### product_assembly_overrides_label
 
@@ -5032,16 +5000,7 @@ assembly defined, then a GN error will be generated.
 
 **Current value (from the default):** `false`
 
-From //build/assembly/developer_overrides.gni:405
-
-### product_bootfs_packages
-
-A list of packages to be included in the bootfs as
-meta.fars and content-id'd blobs.
-
-**Current value (from the default):** `[]`
-
-From //build/product.gni:15
+From //build/assembly/developer_overrides.gni:434
 
 ### product_bundle_labels
 
@@ -5049,21 +5008,23 @@ Labels for product bundles to assemble in addition to the main product bundle.
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:149
+From //BUILD.gn:151
+
+### product_bundle_test_groups
+
+List of product_bundle_test_group() targets.
+We declare them in the top-level BUILD.gn so that the generated_file()s
+within get resolved at gn-gen time.
+
+**Current value (from the default):** `[]`
+
+From //build/product.gni:48
 
 ### product_description
 
 A human readable product description.
 
 **Current value (from the default):** `""`
-
-From //build/product.gni:18
-
-### product_host_labels
-
-A list of binary host tool labels to also build.
-
-**Current value (from the default):** `[]`
 
 From //build/product.gni:11
 
@@ -5072,26 +5033,34 @@ From //build/product.gni:11
 Skip generating a UEFI disk for a product whose board defines
 `build_uefi_disk`
 
-**Current value (from the default):** `false`
+**Current value for `target_cpu = "arm64"`:** `false`
+
+From //products/core.gni:28
+
+**Overridden from the default:** `true`
+
+From //build/images/args.gni:30
+
+**Current value (from the default):** `true`
 
 From //build/images/args.gni:30
 
 ### profile_source_files
 
-List of GN paths to source files to be instrumented by `profile` variants.
+List of paths to source files to be instrumented by `profile` variants.
 
 **Current value (from the default):** `["//*"]`
 
-From //build/config/profile/config.gni:7
+From //build/config/profile/config.gni:10
 
 ### profile_source_files_list_files
 
-List GN path to files in Clang's `-fprofile-list` format describing files
+List of paths to files in Clang's `-fprofile-list` format describing files
 and functions to be instrumented by `profile` variants.
 
 **Current value (from the default):** `[]`
 
-From //build/config/profile/config.gni:26
+From //build/config/profile/config.gni:42
 
 ### proprietary_codecs
 
@@ -5162,7 +5131,7 @@ provided value for 'board_configuration_label'
 
 **Current value (from the default):** `"//boards/arm64"`
 
-From //build/board.gni:57
+From //build/board.gni:53
 
 ### recovery_label
 
@@ -5302,7 +5271,7 @@ Enable the rust parallel front-end with N threads
 
 **Current value (from the default):** `false`
 
-From //build/config/rust/BUILD.gn:29
+From //build/config/rust/BUILD.gn:30
 
 ### rust_rbe_check
 
@@ -5388,7 +5357,7 @@ Controls whether the rust compiler uses v0 symbol mangling scheme
 
 **Current value (from the default):** `true`
 
-From //build/config/rust/BUILD.gn:26
+From //build/config/rust/BUILD.gn:27
 
 ### rustc_prefix
 
@@ -5439,7 +5408,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"fk7e1EWro1qluL58YPArkkTYO1ym9a5d6gesU_Sw94IC"`
+**Current value (from the default):** `"8mnLlRMzmf2kuuAMl7YmrCJUSdEB_3_8eb0aZq6ON8cC"`
 
 From //build/rust/config.gni:42
 
@@ -5538,7 +5507,7 @@ extension mechanism for IDK bits outside of the main repository.
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:126
+From //BUILD.gn:128
 
 ### sdk_cross_compile_host_tools
 
@@ -5691,7 +5660,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2101
+From //build/config/BUILDCONFIG.gn:2112
 
 ### select_variant_canonical
 
@@ -5701,7 +5670,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2106
+From //build/config/BUILDCONFIG.gn:2117
 
 ### select_variant_shortcuts
 
@@ -5766,7 +5735,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1898
+From //build/config/BUILDCONFIG.gn:1909
 
 ### size_checker_input
 
@@ -5980,6 +5949,14 @@ Whether or not unified address spaces are leveraged.
 
 From //src/starnix/kernel/args.gni:29
 
+### starnix_use_cowmap
+
+Whether to use CowMap instead of BTreeMap to back RangeMap.
+
+**Current value (from the default):** `false`
+
+From //src/starnix/lib/range_map/BUILD.gn:7
+
 ### sysmem_contiguous_guard_page_count
 
 **Current value (from the default):** `-1`
@@ -6131,7 +6108,7 @@ afterwards.
 
 **Current value (from the default):** `""`
 
-From //BUILD.gn:122
+From //BUILD.gn:124
 
 ### test_package_labels
 
@@ -6144,7 +6121,7 @@ From //out/not-default/args.gn:22
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:94
+From //BUILD.gn:96
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -6152,7 +6129,7 @@ From //out/not-default/args.gn:22
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:94
+From //BUILD.gn:96
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -6160,7 +6137,7 @@ From //out/not-default/args.gn:22
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:94
+From //BUILD.gn:96
 
 ### testonly_in_containers
 
@@ -6220,7 +6197,7 @@ for details and documentation for each field.
 }
 ```
 
-From //build/config/BUILDCONFIG.gn:99
+From //build/config/BUILDCONFIG.gn:100
 
 ### truncate_build_info_commit_date
 
@@ -6284,7 +6261,7 @@ From //out/not-default/args.gn:17
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:57
+From //BUILD.gn:59
 
 **Current value for `target_cpu = "riscv64"`:** `["//bundles/buildbot/minimal"]`
 
@@ -6292,7 +6269,7 @@ From //out/not-default/args.gn:17
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:57
+From //BUILD.gn:59
 
 **Current value for `target_cpu = "x64"`:** `["//bundles/kitchen_sink"]`
 
@@ -6300,7 +6277,7 @@ From //out/not-default/args.gn:17
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:57
+From //BUILD.gn:59
 
 ### update_goldens
 
@@ -6621,7 +6598,7 @@ between similar virtual device's using different configuration's such as
 
 **Current value (from the default):** `""`
 
-From //build/product.gni:38
+From //build/product.gni:31
 
 ### vm_tracing_level
 
@@ -6705,11 +6682,11 @@ From //products/core.gni:27
 
 **Overridden from the default:** `false`
 
-From //build/product.gni:32
+From //build/product.gni:25
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:32
+From //build/product.gni:25
 
 ### zircon_a_partition
 
@@ -6787,7 +6764,7 @@ This allows testing for a Zircon-specific toolchain with:
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:116
+From //build/config/BUILDCONFIG.gn:117
 
 ### zircon_tracelog
 
@@ -6831,6 +6808,14 @@ test ICD is being used instead.
 **Current value (from the default):** `false`
 
 From //src/graphics/drivers/arm-mali/icd/prebuilt_arm_mali.gni:8
+
+### qemu_arm64_enable_user_pci
+
+Enable user space PCI stack in the qemu-arm64 board driver.
+
+**Current value (from the default):** `false`
+
+From //src/devices/board/drivers/qemu-arm64/pci.gni:7
 
 ## `target_cpu = "arm64", target_cpu = "x64"`
 
@@ -6990,845 +6975,869 @@ From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:47
 
 From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:48
 
+### dir_pw_atomic
+
+**Current value (from the default):** `"//third_party/pigweed/src/pw_atomic"`
+
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:49
+
 ### dir_pw_base64
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_base64"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:49
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:50
 
 ### dir_pw_bloat
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_bloat"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:50
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:51
 
 ### dir_pw_blob_store
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_blob_store"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:51
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:52
 
 ### dir_pw_bluetooth
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_bluetooth"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:52
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:53
 
 ### dir_pw_bluetooth_hci
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_bluetooth_hci"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:53
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:54
 
 ### dir_pw_bluetooth_profiles
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_bluetooth_profiles"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:55
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:56
 
 ### dir_pw_bluetooth_proxy
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_bluetooth_proxy"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:56
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:57
 
 ### dir_pw_bluetooth_sapphire
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_bluetooth_sapphire"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:58
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:59
 
 ### dir_pw_boot
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_boot"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:59
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:60
 
 ### dir_pw_boot_cortex_m
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_boot_cortex_m"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:60
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:61
 
 ### dir_pw_build
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_build"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:61
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:62
 
 ### dir_pw_build_android
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_build_android"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:62
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:63
 
 ### dir_pw_build_info
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_build_info"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:63
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:64
 
 ### dir_pw_build_mcuxpresso
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_build_mcuxpresso"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:64
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:65
 
 ### dir_pw_bytes
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_bytes"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:65
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:66
 
 ### dir_pw_channel
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_channel"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:66
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:67
 
 ### dir_pw_checksum
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_checksum"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:67
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:68
 
 ### dir_pw_chre
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_chre"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:68
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:69
 
 ### dir_pw_chrono
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_chrono"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:69
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:70
 
 ### dir_pw_chrono_embos
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_chrono_embos"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:70
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:71
 
 ### dir_pw_chrono_freertos
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_chrono_freertos"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:71
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:72
 
 ### dir_pw_chrono_rp2040
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_chrono_rp2040"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:72
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:73
 
 ### dir_pw_chrono_stl
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_chrono_stl"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:73
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:74
 
 ### dir_pw_chrono_threadx
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_chrono_threadx"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:74
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:75
 
 ### dir_pw_chrono_zephyr
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_chrono_zephyr"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:75
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:76
 
 ### dir_pw_cli
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_cli"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:76
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:77
 
 ### dir_pw_cli_analytics
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_cli_analytics"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:77
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:78
 
 ### dir_pw_clock_tree
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_clock_tree"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:78
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:79
 
 ### dir_pw_clock_tree_mcuxpresso
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_clock_tree_mcuxpresso"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:80
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:81
 
 ### dir_pw_compilation_testing
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_compilation_testing"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:82
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:83
 
 ### dir_pw_config_loader
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_config_loader"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:83
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:84
 
 ### dir_pw_console
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_console"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:84
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:85
 
 ### dir_pw_containers
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_containers"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:85
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:86
 
 ### dir_pw_cpu_exception
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_cpu_exception"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:86
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:87
 
 ### dir_pw_cpu_exception_cortex_m
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_cpu_exception_cortex_m"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:88
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:89
 
 ### dir_pw_cpu_exception_risc_v
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_cpu_exception_risc_v"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:90
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:91
 
 ### dir_pw_crypto
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_crypto"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:91
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:92
 
 ### dir_pw_digital_io
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_digital_io"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:92
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:93
 
 ### dir_pw_digital_io_linux
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_digital_io_linux"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:93
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:94
 
 ### dir_pw_digital_io_mcuxpresso
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_digital_io_mcuxpresso"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:95
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:96
 
 ### dir_pw_digital_io_rp2040
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_digital_io_rp2040"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:96
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:97
 
 ### dir_pw_display
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_display"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:97
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:98
 
 ### dir_pw_dma_mcuxpresso
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_dma_mcuxpresso"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:98
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:99
 
 ### dir_pw_docgen
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_docgen"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:99
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:100
 
 ### dir_pw_doctor
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_doctor"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:100
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:101
 
 ### dir_pw_elf
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_elf"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:101
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:102
 
 ### dir_pw_emu
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_emu"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:102
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:103
 
 ### dir_pw_env_setup
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_env_setup"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:103
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:104
 
 ### dir_pw_env_setup_zephyr
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_env_setup_zephyr"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:104
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:105
 
 ### dir_pw_file
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_file"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:105
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:106
+
+### dir_pw_flatbuffers
+
+**Current value (from the default):** `"//third_party/pigweed/src/pw_flatbuffers"`
+
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:107
 
 ### dir_pw_format
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_format"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:106
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:108
 
 ### dir_pw_function
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_function"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:107
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:109
 
 ### dir_pw_fuzzer
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_fuzzer"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:108
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:110
 
 ### dir_pw_grpc
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_grpc"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:109
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:111
 
 ### dir_pw_hdlc
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_hdlc"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:110
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:112
 
 ### dir_pw_hex_dump
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_hex_dump"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:111
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:113
 
 ### dir_pw_i2c
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_i2c"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:112
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:114
 
 ### dir_pw_i2c_linux
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_i2c_linux"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:113
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:115
 
 ### dir_pw_i2c_mcuxpresso
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_i2c_mcuxpresso"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:114
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:116
 
 ### dir_pw_i2c_rp2040
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_i2c_rp2040"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:115
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:117
 
 ### dir_pw_ide
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_ide"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:116
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:118
 
 ### dir_pw_interrupt
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_interrupt"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:117
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:119
 
 ### dir_pw_interrupt_cortex_m
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_interrupt_cortex_m"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:119
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:121
+
+### dir_pw_interrupt_freertos
+
+**Current value (from the default):** `"//third_party/pigweed/src/pw_interrupt_freertos"`
+
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:123
 
 ### dir_pw_interrupt_xtensa
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_interrupt_xtensa"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:120
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:124
 
 ### dir_pw_interrupt_zephyr
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_interrupt_zephyr"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:121
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:125
 
 ### dir_pw_intrusive_ptr
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_intrusive_ptr"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:122
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:126
 
 ### dir_pw_json
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_json"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:123
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:127
+
+### dir_pw_kernel
+
+**Current value (from the default):** `"//third_party/pigweed/src/pw_kernel"`
+
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:128
 
 ### dir_pw_kvs
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_kvs"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:124
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:129
 
 ### dir_pw_libc
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_libc"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:125
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:130
 
 ### dir_pw_libcxx
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_libcxx"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:126
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:131
 
 ### dir_pw_log
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_log"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:127
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:132
 
 ### dir_pw_log_android
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_log_android"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:128
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:133
 
 ### dir_pw_log_basic
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_log_basic"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:129
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:134
 
 ### dir_pw_log_fuchsia
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_log_fuchsia"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:130
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:135
 
 ### dir_pw_log_null
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_log_null"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:131
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:136
 
 ### dir_pw_log_rpc
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_log_rpc"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:132
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:137
 
 ### dir_pw_log_string
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_log_string"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:133
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:138
 
 ### dir_pw_log_tokenized
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_log_tokenized"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:134
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:139
 
 ### dir_pw_log_zephyr
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_log_zephyr"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:135
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:140
 
 ### dir_pw_malloc
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_malloc"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:136
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:141
 
 ### dir_pw_malloc_freelist
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_malloc_freelist"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:137
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:142
 
 ### dir_pw_malloc_freertos
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_malloc_freertos"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:138
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:143
 
 ### dir_pw_metric
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_metric"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:139
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:144
 
 ### dir_pw_minimal_cpp_stdlib
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_minimal_cpp_stdlib"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:141
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:146
 
 ### dir_pw_module
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_module"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:142
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:147
 
 ### dir_pw_multibuf
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_multibuf"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:143
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:148
 
 ### dir_pw_multisink
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_multisink"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:144
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:149
 
 ### dir_pw_numeric
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_numeric"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:145
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:150
 
 ### dir_pw_package
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_package"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:146
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:151
 
 ### dir_pw_perf_test
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_perf_test"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:147
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:152
 
 ### dir_pw_persistent_ram
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_persistent_ram"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:148
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:153
 
 ### dir_pw_polyfill
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_polyfill"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:149
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:154
 
 ### dir_pw_preprocessor
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_preprocessor"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:150
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:155
 
 ### dir_pw_presubmit
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_presubmit"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:151
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:156
 
 ### dir_pw_protobuf
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_protobuf"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:152
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:157
 
 ### dir_pw_protobuf_compiler
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_protobuf_compiler"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:153
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:158
 
 ### dir_pw_random
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_random"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:154
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:159
 
 ### dir_pw_random_fuchsia
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_random_fuchsia"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:155
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:160
 
 ### dir_pw_result
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_result"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:156
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:161
 
 ### dir_pw_ring_buffer
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_ring_buffer"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:157
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:162
 
 ### dir_pw_router
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_router"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:158
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:163
 
 ### dir_pw_rpc
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_rpc"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:159
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:164
 
 ### dir_pw_rpc_transport
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_rpc_transport"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:160
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:165
 
 ### dir_pw_rust
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_rust"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:161
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:166
 
 ### dir_pw_sensor
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_sensor"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:162
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:167
 
 ### dir_pw_snapshot
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_snapshot"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:163
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:168
 
 ### dir_pw_software_update
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_software_update"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:164
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:169
 
 ### dir_pw_span
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_span"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:165
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:170
 
 ### dir_pw_spi
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_spi"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:166
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:171
 
 ### dir_pw_spi_linux
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_spi_linux"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:167
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:172
 
 ### dir_pw_spi_mcuxpresso
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_spi_mcuxpresso"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:168
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:173
 
 ### dir_pw_spi_rp2040
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_spi_rp2040"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:169
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:174
 
 ### dir_pw_status
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_status"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:170
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:175
 
 ### dir_pw_stm32cube_build
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_stm32cube_build"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:171
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:176
 
 ### dir_pw_stream
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_stream"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:172
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:177
 
 ### dir_pw_stream_shmem_mcuxpresso
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_stream_shmem_mcuxpresso"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:174
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:179
 
 ### dir_pw_stream_uart_linux
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_stream_uart_linux"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:175
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:180
 
 ### dir_pw_stream_uart_mcuxpresso
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_stream_uart_mcuxpresso"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:177
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:182
 
 ### dir_pw_string
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_string"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:178
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:183
 
 ### dir_pw_symbolizer
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_symbolizer"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:179
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:184
 
 ### dir_pw_sync
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_sync"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:180
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:185
 
 ### dir_pw_sync_baremetal
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_sync_baremetal"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:181
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:186
 
 ### dir_pw_sync_embos
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_sync_embos"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:182
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:187
 
 ### dir_pw_sync_freertos
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_sync_freertos"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:183
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:188
 
 ### dir_pw_sync_stl
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_sync_stl"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:184
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:189
 
 ### dir_pw_sync_threadx
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_sync_threadx"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:185
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:190
 
 ### dir_pw_sync_zephyr
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_sync_zephyr"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:186
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:191
 
 ### dir_pw_sys_io
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_sys_io"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:187
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:192
 
 ### dir_pw_sys_io_ambiq_sdk
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_sys_io_ambiq_sdk"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:188
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:193
 
 ### dir_pw_sys_io_arduino
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_sys_io_arduino"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:189
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:194
 
 ### dir_pw_sys_io_baremetal_lm3s6965evb
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_sys_io_baremetal_lm3s6965evb"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:191
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:196
 
 ### dir_pw_sys_io_baremetal_stm32f429
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_sys_io_baremetal_stm32f429"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:193
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:198
 
 ### dir_pw_sys_io_emcraft_sf2
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_sys_io_emcraft_sf2"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:195
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:200
 
 ### dir_pw_sys_io_mcuxpresso
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_sys_io_mcuxpresso"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:196
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:201
 
 ### dir_pw_sys_io_rp2040
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_sys_io_rp2040"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:197
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:202
 
 ### dir_pw_sys_io_stdio
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_sys_io_stdio"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:198
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:203
 
 ### dir_pw_sys_io_stm32cube
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_sys_io_stm32cube"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:199
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:204
 
 ### dir_pw_sys_io_zephyr
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_sys_io_zephyr"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:200
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:205
 
 ### dir_pw_system
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_system"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:201
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:206
 
 ### dir_pw_target_runner
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_target_runner"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:202
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:207
 
 ### dir_pw_third_party
 
@@ -7914,11 +7923,12 @@ From //third_party/pigweed/src/third_party/fuchsia/fuchsia.gni:20
 
 If compiling tests with googletest, this variable is set to the path to the
 googletest installation. When set, a pw_source_set for the googletest
-library is created at "$dir_pw_third_party/googletest".
+library is created at "$dir_pw_third_party/googletest". Incompatible
+with pw_third_party_googletest_ALIAS definition.
 
 **Current value (from the default):** `""`
 
-From //third_party/pigweed/src/third_party/googletest/googletest.gni:19
+From //third_party/pigweed/src/third_party/googletest/googletest.gni:20
 
 ### dir_pw_third_party_mbedtls
 
@@ -7944,139 +7954,133 @@ From //third_party/pigweed/src/third_party/nanopb/nanopb.gni:22
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_thread"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:203
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:208
 
 ### dir_pw_thread_embos
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_thread_embos"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:204
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:209
 
 ### dir_pw_thread_freertos
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_thread_freertos"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:205
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:210
 
 ### dir_pw_thread_stl
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_thread_stl"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:206
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:211
 
 ### dir_pw_thread_threadx
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_thread_threadx"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:207
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:212
 
 ### dir_pw_thread_zephyr
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_thread_zephyr"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:208
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:213
 
 ### dir_pw_tls_client
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_tls_client"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:209
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:214
 
 ### dir_pw_tls_client_boringssl
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_tls_client_boringssl"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:211
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:216
 
 ### dir_pw_tls_client_mbedtls
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_tls_client_mbedtls"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:213
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:218
 
 ### dir_pw_tokenizer
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_tokenizer"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:214
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:219
 
 ### dir_pw_toolchain
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_toolchain"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:215
-
-### dir_pw_toolchain_bazel
-
-**Current value (from the default):** `"//third_party/pigweed/src/pw_toolchain_bazel"`
-
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:216
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:220
 
 ### dir_pw_trace
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_trace"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:217
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:221
 
 ### dir_pw_trace_tokenized
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_trace_tokenized"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:218
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:222
 
 ### dir_pw_transfer
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_transfer"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:219
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:223
 
 ### dir_pw_uart
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_uart"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:220
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:224
 
 ### dir_pw_uart_mcuxpresso
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_uart_mcuxpresso"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:221
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:225
 
 ### dir_pw_unit_test
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_unit_test"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:222
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:226
 
 ### dir_pw_unit_test_zephyr
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_unit_test_zephyr"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:223
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:227
 
 ### dir_pw_varint
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_varint"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:224
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:228
 
 ### dir_pw_watch
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_watch"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:225
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:229
 
 ### dir_pw_web
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_web"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:226
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:230
 
 ### dir_pw_work_queue
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_work_queue"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:227
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:231
 
 ### enable_grpc_ares
 
@@ -8294,12 +8298,6 @@ precommitted (which is not done by default).
 **Current value (from the default):** `false`
 
 From //src/graphics/drivers/msd-arm-mali/src/BUILD.gn:23
-
-### msd_intel_gen_enable_hardware_unit_tests
-
-**Current value (from the default):** `false`
-
-From //src/graphics/drivers/msd-intel-gen/tests/integration/BUILD.gn:9
 
 ### msd_vsi_vip_enable_suspend
 
@@ -8961,25 +8959,25 @@ From //third_party/pigweed/src/pw_log/BUILD.gn:33
 
 A list with all Pigweed modules docs groups. DO NOT SET THIS BUILD ARGUMENT!
 
-**Current value (from the default):** `["//third_party/pigweed/src/docker:docs", "//third_party/pigweed/src/pw_alignment:docs", "//third_party/pigweed/src/pw_allocator:docs", "//third_party/pigweed/src/pw_analog:docs", "//third_party/pigweed/src/pw_android_toolchain:docs", "//third_party/pigweed/src/pw_arduino_build:docs", "//third_party/pigweed/src/pw_assert:docs", "//third_party/pigweed/src/pw_assert_basic:docs", "//third_party/pigweed/src/pw_assert_fuchsia:docs", "//third_party/pigweed/src/pw_assert_log:docs", "//third_party/pigweed/src/pw_assert_tokenized:docs", "//third_party/pigweed/src/pw_assert_trap:docs", "//third_party/pigweed/src/pw_assert_zephyr:docs", "//third_party/pigweed/src/pw_async:docs", "//third_party/pigweed/src/pw_async2:docs", "//third_party/pigweed/src/pw_async2_basic:docs", "//third_party/pigweed/src/pw_async2_epoll:docs", "//third_party/pigweed/src/pw_async_basic:docs", "//third_party/pigweed/src/pw_async_fuchsia:docs", "//third_party/pigweed/src/pw_base64:docs", "//third_party/pigweed/src/pw_bloat:docs", "//third_party/pigweed/src/pw_blob_store:docs", "//third_party/pigweed/src/pw_bluetooth:docs", "//third_party/pigweed/src/pw_bluetooth_hci:docs", "//third_party/pigweed/src/pw_bluetooth_profiles:docs", "//third_party/pigweed/src/pw_bluetooth_proxy:docs", "//third_party/pigweed/src/pw_bluetooth_sapphire:docs", "//third_party/pigweed/src/pw_boot:docs", "//third_party/pigweed/src/pw_boot_cortex_m:docs", "//third_party/pigweed/src/pw_build:docs", "//third_party/pigweed/src/pw_build_android:docs", "//third_party/pigweed/src/pw_build_info:docs", "//third_party/pigweed/src/pw_build_mcuxpresso:docs", "//third_party/pigweed/src/pw_bytes:docs", "//third_party/pigweed/src/pw_channel:docs", "//third_party/pigweed/src/pw_checksum:docs", "//third_party/pigweed/src/pw_chre:docs", "//third_party/pigweed/src/pw_chrono:docs", "//third_party/pigweed/src/pw_chrono_embos:docs", "//third_party/pigweed/src/pw_chrono_freertos:docs", "//third_party/pigweed/src/pw_chrono_rp2040:docs", "//third_party/pigweed/src/pw_chrono_stl:docs", "//third_party/pigweed/src/pw_chrono_threadx:docs", "//third_party/pigweed/src/pw_chrono_zephyr:docs", "//third_party/pigweed/src/pw_cli:docs", "//third_party/pigweed/src/pw_cli_analytics:docs", "//third_party/pigweed/src/pw_clock_tree:docs", "//third_party/pigweed/src/pw_clock_tree_mcuxpresso:docs", "//third_party/pigweed/src/pw_compilation_testing:docs", "//third_party/pigweed/src/pw_config_loader:docs", "//third_party/pigweed/src/pw_console:docs", "//third_party/pigweed/src/pw_containers:docs", "//third_party/pigweed/src/pw_cpu_exception:docs", "//third_party/pigweed/src/pw_cpu_exception_cortex_m:docs", "//third_party/pigweed/src/pw_cpu_exception_risc_v:docs", "//third_party/pigweed/src/pw_crypto:docs", "//third_party/pigweed/src/pw_digital_io:docs", "//third_party/pigweed/src/pw_digital_io_linux:docs", "//third_party/pigweed/src/pw_digital_io_mcuxpresso:docs", "//third_party/pigweed/src/pw_digital_io_rp2040:docs", "//third_party/pigweed/src/pw_display:docs", "//third_party/pigweed/src/pw_dma_mcuxpresso:docs", "//third_party/pigweed/src/pw_docgen:docs", "//third_party/pigweed/src/pw_doctor:docs", "//third_party/pigweed/src/pw_elf:docs", "//third_party/pigweed/src/pw_emu:docs", "//third_party/pigweed/src/pw_env_setup:docs", "//third_party/pigweed/src/pw_env_setup_zephyr:docs", "//third_party/pigweed/src/pw_file:docs", "//third_party/pigweed/src/pw_format:docs", "//third_party/pigweed/src/pw_function:docs", "//third_party/pigweed/src/pw_fuzzer:docs", "//third_party/pigweed/src/pw_grpc:docs", "//third_party/pigweed/src/pw_hdlc:docs", "//third_party/pigweed/src/pw_hex_dump:docs", "//third_party/pigweed/src/pw_i2c:docs", "//third_party/pigweed/src/pw_i2c_linux:docs", "//third_party/pigweed/src/pw_i2c_mcuxpresso:docs", "//third_party/pigweed/src/pw_i2c_rp2040:docs", "//third_party/pigweed/src/pw_ide:docs", "//third_party/pigweed/src/pw_interrupt:docs", "//third_party/pigweed/src/pw_interrupt_cortex_m:docs", "//third_party/pigweed/src/pw_interrupt_xtensa:docs", "//third_party/pigweed/src/pw_interrupt_zephyr:docs", "//third_party/pigweed/src/pw_intrusive_ptr:docs", "//third_party/pigweed/src/pw_json:docs", "//third_party/pigweed/src/pw_kvs:docs", "//third_party/pigweed/src/pw_libc:docs", "//third_party/pigweed/src/pw_libcxx:docs", "//third_party/pigweed/src/pw_log:docs", "//third_party/pigweed/src/pw_log_android:docs", "//third_party/pigweed/src/pw_log_basic:docs", "//third_party/pigweed/src/pw_log_fuchsia:docs", "//third_party/pigweed/src/pw_log_null:docs", "//third_party/pigweed/src/pw_log_rpc:docs", "//third_party/pigweed/src/pw_log_string:docs", "//third_party/pigweed/src/pw_log_tokenized:docs", "//third_party/pigweed/src/pw_log_zephyr:docs", "//third_party/pigweed/src/pw_malloc:docs", "//third_party/pigweed/src/pw_malloc_freelist:docs", "//third_party/pigweed/src/pw_malloc_freertos:docs", "//third_party/pigweed/src/pw_metric:docs", "//third_party/pigweed/src/pw_minimal_cpp_stdlib:docs", "//third_party/pigweed/src/pw_module:docs", "//third_party/pigweed/src/pw_multibuf:docs", "//third_party/pigweed/src/pw_multisink:docs", "//third_party/pigweed/src/pw_numeric:docs", "//third_party/pigweed/src/pw_package:docs", "//third_party/pigweed/src/pw_perf_test:docs", "//third_party/pigweed/src/pw_persistent_ram:docs", "//third_party/pigweed/src/pw_polyfill:docs", "//third_party/pigweed/src/pw_preprocessor:docs", "//third_party/pigweed/src/pw_presubmit:docs", "//third_party/pigweed/src/pw_protobuf:docs", "//third_party/pigweed/src/pw_protobuf_compiler:docs", "//third_party/pigweed/src/pw_random:docs", "//third_party/pigweed/src/pw_random_fuchsia:docs", "//third_party/pigweed/src/pw_result:docs", "//third_party/pigweed/src/pw_ring_buffer:docs", "//third_party/pigweed/src/pw_router:docs", "//third_party/pigweed/src/pw_rpc:docs", "//third_party/pigweed/src/pw_rpc_transport:docs", "//third_party/pigweed/src/pw_rust:docs", "//third_party/pigweed/src/pw_sensor:docs", "//third_party/pigweed/src/pw_snapshot:docs", "//third_party/pigweed/src/pw_software_update:docs", "//third_party/pigweed/src/pw_span:docs", "//third_party/pigweed/src/pw_spi:docs", "//third_party/pigweed/src/pw_spi_linux:docs", "//third_party/pigweed/src/pw_spi_mcuxpresso:docs", "//third_party/pigweed/src/pw_spi_rp2040:docs", "//third_party/pigweed/src/pw_status:docs", "//third_party/pigweed/src/pw_stm32cube_build:docs", "//third_party/pigweed/src/pw_stream:docs", "//third_party/pigweed/src/pw_stream_shmem_mcuxpresso:docs", "//third_party/pigweed/src/pw_stream_uart_linux:docs", "//third_party/pigweed/src/pw_stream_uart_mcuxpresso:docs", "//third_party/pigweed/src/pw_string:docs", "//third_party/pigweed/src/pw_symbolizer:docs", "//third_party/pigweed/src/pw_sync:docs", "//third_party/pigweed/src/pw_sync_baremetal:docs", "//third_party/pigweed/src/pw_sync_embos:docs", "//third_party/pigweed/src/pw_sync_freertos:docs", "//third_party/pigweed/src/pw_sync_stl:docs", "//third_party/pigweed/src/pw_sync_threadx:docs", "//third_party/pigweed/src/pw_sync_zephyr:docs", "//third_party/pigweed/src/pw_sys_io:docs", "//third_party/pigweed/src/pw_sys_io_ambiq_sdk:docs", "//third_party/pigweed/src/pw_sys_io_arduino:docs", "//third_party/pigweed/src/pw_sys_io_baremetal_lm3s6965evb:docs", "//third_party/pigweed/src/pw_sys_io_baremetal_stm32f429:docs", "//third_party/pigweed/src/pw_sys_io_emcraft_sf2:docs", "//third_party/pigweed/src/pw_sys_io_mcuxpresso:docs", "//third_party/pigweed/src/pw_sys_io_rp2040:docs", "//third_party/pigweed/src/pw_sys_io_stdio:docs", "//third_party/pigweed/src/pw_sys_io_stm32cube:docs", "//third_party/pigweed/src/pw_sys_io_zephyr:docs", "//third_party/pigweed/src/pw_system:docs", "//third_party/pigweed/src/pw_target_runner:docs", "//third_party/pigweed/src/pw_thread:docs", "//third_party/pigweed/src/pw_thread_embos:docs", "//third_party/pigweed/src/pw_thread_freertos:docs", "//third_party/pigweed/src/pw_thread_stl:docs", "//third_party/pigweed/src/pw_thread_threadx:docs", "//third_party/pigweed/src/pw_thread_zephyr:docs", "//third_party/pigweed/src/pw_tls_client:docs", "//third_party/pigweed/src/pw_tls_client_boringssl:docs", "//third_party/pigweed/src/pw_tls_client_mbedtls:docs", "//third_party/pigweed/src/pw_tokenizer:docs", "//third_party/pigweed/src/pw_toolchain:docs", "//third_party/pigweed/src/pw_toolchain_bazel:docs", "//third_party/pigweed/src/pw_trace:docs", "//third_party/pigweed/src/pw_trace_tokenized:docs", "//third_party/pigweed/src/pw_transfer:docs", "//third_party/pigweed/src/pw_uart:docs", "//third_party/pigweed/src/pw_uart_mcuxpresso:docs", "//third_party/pigweed/src/pw_unit_test:docs", "//third_party/pigweed/src/pw_unit_test_zephyr:docs", "//third_party/pigweed/src/pw_varint:docs", "//third_party/pigweed/src/pw_watch:docs", "//third_party/pigweed/src/pw_web:docs", "//third_party/pigweed/src/pw_work_queue:docs"]`
+**Current value (from the default):** `["//third_party/pigweed/src/docker:docs", "//third_party/pigweed/src/pw_alignment:docs", "//third_party/pigweed/src/pw_allocator:docs", "//third_party/pigweed/src/pw_analog:docs", "//third_party/pigweed/src/pw_android_toolchain:docs", "//third_party/pigweed/src/pw_arduino_build:docs", "//third_party/pigweed/src/pw_assert:docs", "//third_party/pigweed/src/pw_assert_basic:docs", "//third_party/pigweed/src/pw_assert_fuchsia:docs", "//third_party/pigweed/src/pw_assert_log:docs", "//third_party/pigweed/src/pw_assert_tokenized:docs", "//third_party/pigweed/src/pw_assert_trap:docs", "//third_party/pigweed/src/pw_assert_zephyr:docs", "//third_party/pigweed/src/pw_async:docs", "//third_party/pigweed/src/pw_async2:docs", "//third_party/pigweed/src/pw_async2_basic:docs", "//third_party/pigweed/src/pw_async2_epoll:docs", "//third_party/pigweed/src/pw_async_basic:docs", "//third_party/pigweed/src/pw_async_fuchsia:docs", "//third_party/pigweed/src/pw_atomic:docs", "//third_party/pigweed/src/pw_base64:docs", "//third_party/pigweed/src/pw_bloat:docs", "//third_party/pigweed/src/pw_blob_store:docs", "//third_party/pigweed/src/pw_bluetooth:docs", "//third_party/pigweed/src/pw_bluetooth_hci:docs", "//third_party/pigweed/src/pw_bluetooth_profiles:docs", "//third_party/pigweed/src/pw_bluetooth_proxy:docs", "//third_party/pigweed/src/pw_bluetooth_sapphire:docs", "//third_party/pigweed/src/pw_boot:docs", "//third_party/pigweed/src/pw_boot_cortex_m:docs", "//third_party/pigweed/src/pw_build:docs", "//third_party/pigweed/src/pw_build_android:docs", "//third_party/pigweed/src/pw_build_info:docs", "//third_party/pigweed/src/pw_build_mcuxpresso:docs", "//third_party/pigweed/src/pw_bytes:docs", "//third_party/pigweed/src/pw_channel:docs", "//third_party/pigweed/src/pw_checksum:docs", "//third_party/pigweed/src/pw_chre:docs", "//third_party/pigweed/src/pw_chrono:docs", "//third_party/pigweed/src/pw_chrono_embos:docs", "//third_party/pigweed/src/pw_chrono_freertos:docs", "//third_party/pigweed/src/pw_chrono_rp2040:docs", "//third_party/pigweed/src/pw_chrono_stl:docs", "//third_party/pigweed/src/pw_chrono_threadx:docs", "//third_party/pigweed/src/pw_chrono_zephyr:docs", "//third_party/pigweed/src/pw_cli:docs", "//third_party/pigweed/src/pw_cli_analytics:docs", "//third_party/pigweed/src/pw_clock_tree:docs", "//third_party/pigweed/src/pw_clock_tree_mcuxpresso:docs", "//third_party/pigweed/src/pw_compilation_testing:docs", "//third_party/pigweed/src/pw_config_loader:docs", "//third_party/pigweed/src/pw_console:docs", "//third_party/pigweed/src/pw_containers:docs", "//third_party/pigweed/src/pw_cpu_exception:docs", "//third_party/pigweed/src/pw_cpu_exception_cortex_m:docs", "//third_party/pigweed/src/pw_cpu_exception_risc_v:docs", "//third_party/pigweed/src/pw_crypto:docs", "//third_party/pigweed/src/pw_digital_io:docs", "//third_party/pigweed/src/pw_digital_io_linux:docs", "//third_party/pigweed/src/pw_digital_io_mcuxpresso:docs", "//third_party/pigweed/src/pw_digital_io_rp2040:docs", "//third_party/pigweed/src/pw_display:docs", "//third_party/pigweed/src/pw_dma_mcuxpresso:docs", "//third_party/pigweed/src/pw_docgen:docs", "//third_party/pigweed/src/pw_doctor:docs", "//third_party/pigweed/src/pw_elf:docs", "//third_party/pigweed/src/pw_emu:docs", "//third_party/pigweed/src/pw_env_setup:docs", "//third_party/pigweed/src/pw_env_setup_zephyr:docs", "//third_party/pigweed/src/pw_file:docs", "//third_party/pigweed/src/pw_flatbuffers:docs", "//third_party/pigweed/src/pw_format:docs", "//third_party/pigweed/src/pw_function:docs", "//third_party/pigweed/src/pw_fuzzer:docs", "//third_party/pigweed/src/pw_grpc:docs", "//third_party/pigweed/src/pw_hdlc:docs", "//third_party/pigweed/src/pw_hex_dump:docs", "//third_party/pigweed/src/pw_i2c:docs", "//third_party/pigweed/src/pw_i2c_linux:docs", "//third_party/pigweed/src/pw_i2c_mcuxpresso:docs", "//third_party/pigweed/src/pw_i2c_rp2040:docs", "//third_party/pigweed/src/pw_ide:docs", "//third_party/pigweed/src/pw_interrupt:docs", "//third_party/pigweed/src/pw_interrupt_cortex_m:docs", "//third_party/pigweed/src/pw_interrupt_freertos:docs", "//third_party/pigweed/src/pw_interrupt_xtensa:docs", "//third_party/pigweed/src/pw_interrupt_zephyr:docs", "//third_party/pigweed/src/pw_intrusive_ptr:docs", "//third_party/pigweed/src/pw_json:docs", "//third_party/pigweed/src/pw_kernel:docs", "//third_party/pigweed/src/pw_kvs:docs", "//third_party/pigweed/src/pw_libc:docs", "//third_party/pigweed/src/pw_libcxx:docs", "//third_party/pigweed/src/pw_log:docs", "//third_party/pigweed/src/pw_log_android:docs", "//third_party/pigweed/src/pw_log_basic:docs", "//third_party/pigweed/src/pw_log_fuchsia:docs", "//third_party/pigweed/src/pw_log_null:docs", "//third_party/pigweed/src/pw_log_rpc:docs", "//third_party/pigweed/src/pw_log_string:docs", "//third_party/pigweed/src/pw_log_tokenized:docs", "//third_party/pigweed/src/pw_log_zephyr:docs", "//third_party/pigweed/src/pw_malloc:docs", "//third_party/pigweed/src/pw_malloc_freelist:docs", "//third_party/pigweed/src/pw_malloc_freertos:docs", "//third_party/pigweed/src/pw_metric:docs", "//third_party/pigweed/src/pw_minimal_cpp_stdlib:docs", "//third_party/pigweed/src/pw_module:docs", "//third_party/pigweed/src/pw_multibuf:docs", "//third_party/pigweed/src/pw_multisink:docs", "//third_party/pigweed/src/pw_numeric:docs", "//third_party/pigweed/src/pw_package:docs", "//third_party/pigweed/src/pw_perf_test:docs", "//third_party/pigweed/src/pw_persistent_ram:docs", "//third_party/pigweed/src/pw_polyfill:docs", "//third_party/pigweed/src/pw_preprocessor:docs", "//third_party/pigweed/src/pw_presubmit:docs", "//third_party/pigweed/src/pw_protobuf:docs", "//third_party/pigweed/src/pw_protobuf_compiler:docs", "//third_party/pigweed/src/pw_random:docs", "//third_party/pigweed/src/pw_random_fuchsia:docs", "//third_party/pigweed/src/pw_result:docs", "//third_party/pigweed/src/pw_ring_buffer:docs", "//third_party/pigweed/src/pw_router:docs", "//third_party/pigweed/src/pw_rpc:docs", "//third_party/pigweed/src/pw_rpc_transport:docs", "//third_party/pigweed/src/pw_rust:docs", "//third_party/pigweed/src/pw_sensor:docs", "//third_party/pigweed/src/pw_snapshot:docs", "//third_party/pigweed/src/pw_software_update:docs", "//third_party/pigweed/src/pw_span:docs", "//third_party/pigweed/src/pw_spi:docs", "//third_party/pigweed/src/pw_spi_linux:docs", "//third_party/pigweed/src/pw_spi_mcuxpresso:docs", "//third_party/pigweed/src/pw_spi_rp2040:docs", "//third_party/pigweed/src/pw_status:docs", "//third_party/pigweed/src/pw_stm32cube_build:docs", "//third_party/pigweed/src/pw_stream:docs", "//third_party/pigweed/src/pw_stream_shmem_mcuxpresso:docs", "//third_party/pigweed/src/pw_stream_uart_linux:docs", "//third_party/pigweed/src/pw_stream_uart_mcuxpresso:docs", "//third_party/pigweed/src/pw_string:docs", "//third_party/pigweed/src/pw_symbolizer:docs", "//third_party/pigweed/src/pw_sync:docs", "//third_party/pigweed/src/pw_sync_baremetal:docs", "//third_party/pigweed/src/pw_sync_embos:docs", "//third_party/pigweed/src/pw_sync_freertos:docs", "//third_party/pigweed/src/pw_sync_stl:docs", "//third_party/pigweed/src/pw_sync_threadx:docs", "//third_party/pigweed/src/pw_sync_zephyr:docs", "//third_party/pigweed/src/pw_sys_io:docs", "//third_party/pigweed/src/pw_sys_io_ambiq_sdk:docs", "//third_party/pigweed/src/pw_sys_io_arduino:docs", "//third_party/pigweed/src/pw_sys_io_baremetal_lm3s6965evb:docs", "//third_party/pigweed/src/pw_sys_io_baremetal_stm32f429:docs", "//third_party/pigweed/src/pw_sys_io_emcraft_sf2:docs", "//third_party/pigweed/src/pw_sys_io_mcuxpresso:docs", "//third_party/pigweed/src/pw_sys_io_rp2040:docs", "//third_party/pigweed/src/pw_sys_io_stdio:docs", "//third_party/pigweed/src/pw_sys_io_stm32cube:docs", "//third_party/pigweed/src/pw_sys_io_zephyr:docs", "//third_party/pigweed/src/pw_system:docs", "//third_party/pigweed/src/pw_target_runner:docs", "//third_party/pigweed/src/pw_thread:docs", "//third_party/pigweed/src/pw_thread_embos:docs", "//third_party/pigweed/src/pw_thread_freertos:docs", "//third_party/pigweed/src/pw_thread_stl:docs", "//third_party/pigweed/src/pw_thread_threadx:docs", "//third_party/pigweed/src/pw_thread_zephyr:docs", "//third_party/pigweed/src/pw_tls_client:docs", "//third_party/pigweed/src/pw_tls_client_boringssl:docs", "//third_party/pigweed/src/pw_tls_client_mbedtls:docs", "//third_party/pigweed/src/pw_tokenizer:docs", "//third_party/pigweed/src/pw_toolchain:docs", "//third_party/pigweed/src/pw_trace:docs", "//third_party/pigweed/src/pw_trace_tokenized:docs", "//third_party/pigweed/src/pw_transfer:docs", "//third_party/pigweed/src/pw_uart:docs", "//third_party/pigweed/src/pw_uart_mcuxpresso:docs", "//third_party/pigweed/src/pw_unit_test:docs", "//third_party/pigweed/src/pw_unit_test_zephyr:docs", "//third_party/pigweed/src/pw_varint:docs", "//third_party/pigweed/src/pw_watch:docs", "//third_party/pigweed/src/pw_web:docs", "//third_party/pigweed/src/pw_work_queue:docs"]`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:606
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:616
 
 ### pw_module_tests
 
 A list with all Pigweed module test groups. DO NOT SET THIS BUILD ARGUMENT!
 
-**Current value (from the default):** `["//third_party/pigweed/src/docker:tests", "//third_party/pigweed/src/pw_alignment:tests", "//third_party/pigweed/src/pw_allocator:tests", "//third_party/pigweed/src/pw_analog:tests", "//third_party/pigweed/src/pw_android_toolchain:tests", "//third_party/pigweed/src/pw_arduino_build:tests", "//third_party/pigweed/src/pw_assert:tests", "//third_party/pigweed/src/pw_assert_basic:tests", "//third_party/pigweed/src/pw_assert_fuchsia:tests", "//third_party/pigweed/src/pw_assert_log:tests", "//third_party/pigweed/src/pw_assert_tokenized:tests", "//third_party/pigweed/src/pw_assert_trap:tests", "//third_party/pigweed/src/pw_assert_zephyr:tests", "//third_party/pigweed/src/pw_async:tests", "//third_party/pigweed/src/pw_async2:tests", "//third_party/pigweed/src/pw_async2_basic:tests", "//third_party/pigweed/src/pw_async2_epoll:tests", "//third_party/pigweed/src/pw_async_basic:tests", "//third_party/pigweed/src/pw_async_fuchsia:tests", "//third_party/pigweed/src/pw_base64:tests", "//third_party/pigweed/src/pw_bloat:tests", "//third_party/pigweed/src/pw_blob_store:tests", "//third_party/pigweed/src/pw_bluetooth:tests", "//third_party/pigweed/src/pw_bluetooth_hci:tests", "//third_party/pigweed/src/pw_bluetooth_profiles:tests", "//third_party/pigweed/src/pw_bluetooth_proxy:tests", "//third_party/pigweed/src/pw_bluetooth_sapphire:tests", "//third_party/pigweed/src/pw_boot:tests", "//third_party/pigweed/src/pw_boot_cortex_m:tests", "//third_party/pigweed/src/pw_build:tests", "//third_party/pigweed/src/pw_build_android:tests", "//third_party/pigweed/src/pw_build_info:tests", "//third_party/pigweed/src/pw_build_mcuxpresso:tests", "//third_party/pigweed/src/pw_bytes:tests", "//third_party/pigweed/src/pw_channel:tests", "//third_party/pigweed/src/pw_checksum:tests", "//third_party/pigweed/src/pw_chre:tests", "//third_party/pigweed/src/pw_chrono:tests", "//third_party/pigweed/src/pw_chrono_embos:tests", "//third_party/pigweed/src/pw_chrono_freertos:tests", "//third_party/pigweed/src/pw_chrono_rp2040:tests", "//third_party/pigweed/src/pw_chrono_stl:tests", "//third_party/pigweed/src/pw_chrono_threadx:tests", "//third_party/pigweed/src/pw_chrono_zephyr:tests", "//third_party/pigweed/src/pw_cli:tests", "//third_party/pigweed/src/pw_cli_analytics:tests", "//third_party/pigweed/src/pw_clock_tree:tests", "//third_party/pigweed/src/pw_clock_tree_mcuxpresso:tests", "//third_party/pigweed/src/pw_compilation_testing:tests", "//third_party/pigweed/src/pw_config_loader:tests", "//third_party/pigweed/src/pw_console:tests", "//third_party/pigweed/src/pw_containers:tests", "//third_party/pigweed/src/pw_cpu_exception:tests", "//third_party/pigweed/src/pw_cpu_exception_cortex_m:tests", "//third_party/pigweed/src/pw_cpu_exception_risc_v:tests", "//third_party/pigweed/src/pw_crypto:tests", "//third_party/pigweed/src/pw_digital_io:tests", "//third_party/pigweed/src/pw_digital_io_linux:tests", "//third_party/pigweed/src/pw_digital_io_mcuxpresso:tests", "//third_party/pigweed/src/pw_digital_io_rp2040:tests", "//third_party/pigweed/src/pw_display:tests", "//third_party/pigweed/src/pw_dma_mcuxpresso:tests", "//third_party/pigweed/src/pw_docgen:tests", "//third_party/pigweed/src/pw_doctor:tests", "//third_party/pigweed/src/pw_elf:tests", "//third_party/pigweed/src/pw_emu:tests", "//third_party/pigweed/src/pw_env_setup:tests", "//third_party/pigweed/src/pw_env_setup_zephyr:tests", "//third_party/pigweed/src/pw_file:tests", "//third_party/pigweed/src/pw_format:tests", "//third_party/pigweed/src/pw_function:tests", "//third_party/pigweed/src/pw_fuzzer:tests", "//third_party/pigweed/src/pw_grpc:tests", "//third_party/pigweed/src/pw_hdlc:tests", "//third_party/pigweed/src/pw_hex_dump:tests", "//third_party/pigweed/src/pw_i2c:tests", "//third_party/pigweed/src/pw_i2c_linux:tests", "//third_party/pigweed/src/pw_i2c_mcuxpresso:tests", "//third_party/pigweed/src/pw_i2c_rp2040:tests", "//third_party/pigweed/src/pw_ide:tests", "//third_party/pigweed/src/pw_interrupt:tests", "//third_party/pigweed/src/pw_interrupt_cortex_m:tests", "//third_party/pigweed/src/pw_interrupt_xtensa:tests", "//third_party/pigweed/src/pw_interrupt_zephyr:tests", "//third_party/pigweed/src/pw_intrusive_ptr:tests", "//third_party/pigweed/src/pw_json:tests", "//third_party/pigweed/src/pw_kvs:tests", "//third_party/pigweed/src/pw_libc:tests", "//third_party/pigweed/src/pw_libcxx:tests", "//third_party/pigweed/src/pw_log:tests", "//third_party/pigweed/src/pw_log_android:tests", "//third_party/pigweed/src/pw_log_basic:tests", "//third_party/pigweed/src/pw_log_fuchsia:tests", "//third_party/pigweed/src/pw_log_null:tests", "//third_party/pigweed/src/pw_log_rpc:tests", "//third_party/pigweed/src/pw_log_string:tests", "//third_party/pigweed/src/pw_log_tokenized:tests", "//third_party/pigweed/src/pw_log_zephyr:tests", "//third_party/pigweed/src/pw_malloc:tests", "//third_party/pigweed/src/pw_malloc_freelist:tests", "//third_party/pigweed/src/pw_malloc_freertos:tests", "//third_party/pigweed/src/pw_metric:tests", "//third_party/pigweed/src/pw_minimal_cpp_stdlib:tests", "//third_party/pigweed/src/pw_module:tests", "//third_party/pigweed/src/pw_multibuf:tests", "//third_party/pigweed/src/pw_multisink:tests", "//third_party/pigweed/src/pw_numeric:tests", "//third_party/pigweed/src/pw_package:tests", "//third_party/pigweed/src/pw_perf_test:tests", "//third_party/pigweed/src/pw_persistent_ram:tests", "//third_party/pigweed/src/pw_polyfill:tests", "//third_party/pigweed/src/pw_preprocessor:tests", "//third_party/pigweed/src/pw_presubmit:tests", "//third_party/pigweed/src/pw_protobuf:tests", "//third_party/pigweed/src/pw_protobuf_compiler:tests", "//third_party/pigweed/src/pw_random:tests", "//third_party/pigweed/src/pw_random_fuchsia:tests", "//third_party/pigweed/src/pw_result:tests", "//third_party/pigweed/src/pw_ring_buffer:tests", "//third_party/pigweed/src/pw_router:tests", "//third_party/pigweed/src/pw_rpc:tests", "//third_party/pigweed/src/pw_rpc_transport:tests", "//third_party/pigweed/src/pw_rust:tests", "//third_party/pigweed/src/pw_sensor:tests", "//third_party/pigweed/src/pw_snapshot:tests", "//third_party/pigweed/src/pw_software_update:tests", "//third_party/pigweed/src/pw_span:tests", "//third_party/pigweed/src/pw_spi:tests", "//third_party/pigweed/src/pw_spi_linux:tests", "//third_party/pigweed/src/pw_spi_mcuxpresso:tests", "//third_party/pigweed/src/pw_spi_rp2040:tests", "//third_party/pigweed/src/pw_status:tests", "//third_party/pigweed/src/pw_stm32cube_build:tests", "//third_party/pigweed/src/pw_stream:tests", "//third_party/pigweed/src/pw_stream_shmem_mcuxpresso:tests", "//third_party/pigweed/src/pw_stream_uart_linux:tests", "//third_party/pigweed/src/pw_stream_uart_mcuxpresso:tests", "//third_party/pigweed/src/pw_string:tests", "//third_party/pigweed/src/pw_symbolizer:tests", "//third_party/pigweed/src/pw_sync:tests", "//third_party/pigweed/src/pw_sync_baremetal:tests", "//third_party/pigweed/src/pw_sync_embos:tests", "//third_party/pigweed/src/pw_sync_freertos:tests", "//third_party/pigweed/src/pw_sync_stl:tests", "//third_party/pigweed/src/pw_sync_threadx:tests", "//third_party/pigweed/src/pw_sync_zephyr:tests", "//third_party/pigweed/src/pw_sys_io:tests", "//third_party/pigweed/src/pw_sys_io_ambiq_sdk:tests", "//third_party/pigweed/src/pw_sys_io_arduino:tests", "//third_party/pigweed/src/pw_sys_io_baremetal_lm3s6965evb:tests", "//third_party/pigweed/src/pw_sys_io_baremetal_stm32f429:tests", "//third_party/pigweed/src/pw_sys_io_emcraft_sf2:tests", "//third_party/pigweed/src/pw_sys_io_mcuxpresso:tests", "//third_party/pigweed/src/pw_sys_io_rp2040:tests", "//third_party/pigweed/src/pw_sys_io_stdio:tests", "//third_party/pigweed/src/pw_sys_io_stm32cube:tests", "//third_party/pigweed/src/pw_sys_io_zephyr:tests", "//third_party/pigweed/src/pw_system:tests", "//third_party/pigweed/src/pw_target_runner:tests", "//third_party/pigweed/src/pw_thread:tests", "//third_party/pigweed/src/pw_thread_embos:tests", "//third_party/pigweed/src/pw_thread_freertos:tests", "//third_party/pigweed/src/pw_thread_stl:tests", "//third_party/pigweed/src/pw_thread_threadx:tests", "//third_party/pigweed/src/pw_thread_zephyr:tests", "//third_party/pigweed/src/pw_tls_client:tests", "//third_party/pigweed/src/pw_tls_client_boringssl:tests", "//third_party/pigweed/src/pw_tls_client_mbedtls:tests", "//third_party/pigweed/src/pw_tokenizer:tests", "//third_party/pigweed/src/pw_toolchain:tests", "//third_party/pigweed/src/pw_toolchain_bazel:tests", "//third_party/pigweed/src/pw_trace:tests", "//third_party/pigweed/src/pw_trace_tokenized:tests", "//third_party/pigweed/src/pw_transfer:tests", "//third_party/pigweed/src/pw_uart:tests", "//third_party/pigweed/src/pw_uart_mcuxpresso:tests", "//third_party/pigweed/src/pw_unit_test:tests", "//third_party/pigweed/src/pw_unit_test_zephyr:tests", "//third_party/pigweed/src/pw_varint:tests", "//third_party/pigweed/src/pw_watch:tests", "//third_party/pigweed/src/pw_web:tests", "//third_party/pigweed/src/pw_work_queue:tests"]`
+**Current value (from the default):** `["//third_party/pigweed/src/docker:tests", "//third_party/pigweed/src/pw_alignment:tests", "//third_party/pigweed/src/pw_allocator:tests", "//third_party/pigweed/src/pw_analog:tests", "//third_party/pigweed/src/pw_android_toolchain:tests", "//third_party/pigweed/src/pw_arduino_build:tests", "//third_party/pigweed/src/pw_assert:tests", "//third_party/pigweed/src/pw_assert_basic:tests", "//third_party/pigweed/src/pw_assert_fuchsia:tests", "//third_party/pigweed/src/pw_assert_log:tests", "//third_party/pigweed/src/pw_assert_tokenized:tests", "//third_party/pigweed/src/pw_assert_trap:tests", "//third_party/pigweed/src/pw_assert_zephyr:tests", "//third_party/pigweed/src/pw_async:tests", "//third_party/pigweed/src/pw_async2:tests", "//third_party/pigweed/src/pw_async2_basic:tests", "//third_party/pigweed/src/pw_async2_epoll:tests", "//third_party/pigweed/src/pw_async_basic:tests", "//third_party/pigweed/src/pw_async_fuchsia:tests", "//third_party/pigweed/src/pw_atomic:tests", "//third_party/pigweed/src/pw_base64:tests", "//third_party/pigweed/src/pw_bloat:tests", "//third_party/pigweed/src/pw_blob_store:tests", "//third_party/pigweed/src/pw_bluetooth:tests", "//third_party/pigweed/src/pw_bluetooth_hci:tests", "//third_party/pigweed/src/pw_bluetooth_profiles:tests", "//third_party/pigweed/src/pw_bluetooth_proxy:tests", "//third_party/pigweed/src/pw_bluetooth_sapphire:tests", "//third_party/pigweed/src/pw_boot:tests", "//third_party/pigweed/src/pw_boot_cortex_m:tests", "//third_party/pigweed/src/pw_build:tests", "//third_party/pigweed/src/pw_build_android:tests", "//third_party/pigweed/src/pw_build_info:tests", "//third_party/pigweed/src/pw_build_mcuxpresso:tests", "//third_party/pigweed/src/pw_bytes:tests", "//third_party/pigweed/src/pw_channel:tests", "//third_party/pigweed/src/pw_checksum:tests", "//third_party/pigweed/src/pw_chre:tests", "//third_party/pigweed/src/pw_chrono:tests", "//third_party/pigweed/src/pw_chrono_embos:tests", "//third_party/pigweed/src/pw_chrono_freertos:tests", "//third_party/pigweed/src/pw_chrono_rp2040:tests", "//third_party/pigweed/src/pw_chrono_stl:tests", "//third_party/pigweed/src/pw_chrono_threadx:tests", "//third_party/pigweed/src/pw_chrono_zephyr:tests", "//third_party/pigweed/src/pw_cli:tests", "//third_party/pigweed/src/pw_cli_analytics:tests", "//third_party/pigweed/src/pw_clock_tree:tests", "//third_party/pigweed/src/pw_clock_tree_mcuxpresso:tests", "//third_party/pigweed/src/pw_compilation_testing:tests", "//third_party/pigweed/src/pw_config_loader:tests", "//third_party/pigweed/src/pw_console:tests", "//third_party/pigweed/src/pw_containers:tests", "//third_party/pigweed/src/pw_cpu_exception:tests", "//third_party/pigweed/src/pw_cpu_exception_cortex_m:tests", "//third_party/pigweed/src/pw_cpu_exception_risc_v:tests", "//third_party/pigweed/src/pw_crypto:tests", "//third_party/pigweed/src/pw_digital_io:tests", "//third_party/pigweed/src/pw_digital_io_linux:tests", "//third_party/pigweed/src/pw_digital_io_mcuxpresso:tests", "//third_party/pigweed/src/pw_digital_io_rp2040:tests", "//third_party/pigweed/src/pw_display:tests", "//third_party/pigweed/src/pw_dma_mcuxpresso:tests", "//third_party/pigweed/src/pw_docgen:tests", "//third_party/pigweed/src/pw_doctor:tests", "//third_party/pigweed/src/pw_elf:tests", "//third_party/pigweed/src/pw_emu:tests", "//third_party/pigweed/src/pw_env_setup:tests", "//third_party/pigweed/src/pw_env_setup_zephyr:tests", "//third_party/pigweed/src/pw_file:tests", "//third_party/pigweed/src/pw_flatbuffers:tests", "//third_party/pigweed/src/pw_format:tests", "//third_party/pigweed/src/pw_function:tests", "//third_party/pigweed/src/pw_fuzzer:tests", "//third_party/pigweed/src/pw_grpc:tests", "//third_party/pigweed/src/pw_hdlc:tests", "//third_party/pigweed/src/pw_hex_dump:tests", "//third_party/pigweed/src/pw_i2c:tests", "//third_party/pigweed/src/pw_i2c_linux:tests", "//third_party/pigweed/src/pw_i2c_mcuxpresso:tests", "//third_party/pigweed/src/pw_i2c_rp2040:tests", "//third_party/pigweed/src/pw_ide:tests", "//third_party/pigweed/src/pw_interrupt:tests", "//third_party/pigweed/src/pw_interrupt_cortex_m:tests", "//third_party/pigweed/src/pw_interrupt_freertos:tests", "//third_party/pigweed/src/pw_interrupt_xtensa:tests", "//third_party/pigweed/src/pw_interrupt_zephyr:tests", "//third_party/pigweed/src/pw_intrusive_ptr:tests", "//third_party/pigweed/src/pw_json:tests", "//third_party/pigweed/src/pw_kernel:tests", "//third_party/pigweed/src/pw_kvs:tests", "//third_party/pigweed/src/pw_libc:tests", "//third_party/pigweed/src/pw_libcxx:tests", "//third_party/pigweed/src/pw_log:tests", "//third_party/pigweed/src/pw_log_android:tests", "//third_party/pigweed/src/pw_log_basic:tests", "//third_party/pigweed/src/pw_log_fuchsia:tests", "//third_party/pigweed/src/pw_log_null:tests", "//third_party/pigweed/src/pw_log_rpc:tests", "//third_party/pigweed/src/pw_log_string:tests", "//third_party/pigweed/src/pw_log_tokenized:tests", "//third_party/pigweed/src/pw_log_zephyr:tests", "//third_party/pigweed/src/pw_malloc:tests", "//third_party/pigweed/src/pw_malloc_freelist:tests", "//third_party/pigweed/src/pw_malloc_freertos:tests", "//third_party/pigweed/src/pw_metric:tests", "//third_party/pigweed/src/pw_minimal_cpp_stdlib:tests", "//third_party/pigweed/src/pw_module:tests", "//third_party/pigweed/src/pw_multibuf:tests", "//third_party/pigweed/src/pw_multisink:tests", "//third_party/pigweed/src/pw_numeric:tests", "//third_party/pigweed/src/pw_package:tests", "//third_party/pigweed/src/pw_perf_test:tests", "//third_party/pigweed/src/pw_persistent_ram:tests", "//third_party/pigweed/src/pw_polyfill:tests", "//third_party/pigweed/src/pw_preprocessor:tests", "//third_party/pigweed/src/pw_presubmit:tests", "//third_party/pigweed/src/pw_protobuf:tests", "//third_party/pigweed/src/pw_protobuf_compiler:tests", "//third_party/pigweed/src/pw_random:tests", "//third_party/pigweed/src/pw_random_fuchsia:tests", "//third_party/pigweed/src/pw_result:tests", "//third_party/pigweed/src/pw_ring_buffer:tests", "//third_party/pigweed/src/pw_router:tests", "//third_party/pigweed/src/pw_rpc:tests", "//third_party/pigweed/src/pw_rpc_transport:tests", "//third_party/pigweed/src/pw_rust:tests", "//third_party/pigweed/src/pw_sensor:tests", "//third_party/pigweed/src/pw_snapshot:tests", "//third_party/pigweed/src/pw_software_update:tests", "//third_party/pigweed/src/pw_span:tests", "//third_party/pigweed/src/pw_spi:tests", "//third_party/pigweed/src/pw_spi_linux:tests", "//third_party/pigweed/src/pw_spi_mcuxpresso:tests", "//third_party/pigweed/src/pw_spi_rp2040:tests", "//third_party/pigweed/src/pw_status:tests", "//third_party/pigweed/src/pw_stm32cube_build:tests", "//third_party/pigweed/src/pw_stream:tests", "//third_party/pigweed/src/pw_stream_shmem_mcuxpresso:tests", "//third_party/pigweed/src/pw_stream_uart_linux:tests", "//third_party/pigweed/src/pw_stream_uart_mcuxpresso:tests", "//third_party/pigweed/src/pw_string:tests", "//third_party/pigweed/src/pw_symbolizer:tests", "//third_party/pigweed/src/pw_sync:tests", "//third_party/pigweed/src/pw_sync_baremetal:tests", "//third_party/pigweed/src/pw_sync_embos:tests", "//third_party/pigweed/src/pw_sync_freertos:tests", "//third_party/pigweed/src/pw_sync_stl:tests", "//third_party/pigweed/src/pw_sync_threadx:tests", "//third_party/pigweed/src/pw_sync_zephyr:tests", "//third_party/pigweed/src/pw_sys_io:tests", "//third_party/pigweed/src/pw_sys_io_ambiq_sdk:tests", "//third_party/pigweed/src/pw_sys_io_arduino:tests", "//third_party/pigweed/src/pw_sys_io_baremetal_lm3s6965evb:tests", "//third_party/pigweed/src/pw_sys_io_baremetal_stm32f429:tests", "//third_party/pigweed/src/pw_sys_io_emcraft_sf2:tests", "//third_party/pigweed/src/pw_sys_io_mcuxpresso:tests", "//third_party/pigweed/src/pw_sys_io_rp2040:tests", "//third_party/pigweed/src/pw_sys_io_stdio:tests", "//third_party/pigweed/src/pw_sys_io_stm32cube:tests", "//third_party/pigweed/src/pw_sys_io_zephyr:tests", "//third_party/pigweed/src/pw_system:tests", "//third_party/pigweed/src/pw_target_runner:tests", "//third_party/pigweed/src/pw_thread:tests", "//third_party/pigweed/src/pw_thread_embos:tests", "//third_party/pigweed/src/pw_thread_freertos:tests", "//third_party/pigweed/src/pw_thread_stl:tests", "//third_party/pigweed/src/pw_thread_threadx:tests", "//third_party/pigweed/src/pw_thread_zephyr:tests", "//third_party/pigweed/src/pw_tls_client:tests", "//third_party/pigweed/src/pw_tls_client_boringssl:tests", "//third_party/pigweed/src/pw_tls_client_mbedtls:tests", "//third_party/pigweed/src/pw_tokenizer:tests", "//third_party/pigweed/src/pw_toolchain:tests", "//third_party/pigweed/src/pw_trace:tests", "//third_party/pigweed/src/pw_trace_tokenized:tests", "//third_party/pigweed/src/pw_transfer:tests", "//third_party/pigweed/src/pw_uart:tests", "//third_party/pigweed/src/pw_uart_mcuxpresso:tests", "//third_party/pigweed/src/pw_unit_test:tests", "//third_party/pigweed/src/pw_unit_test_zephyr:tests", "//third_party/pigweed/src/pw_varint:tests", "//third_party/pigweed/src/pw_watch:tests", "//third_party/pigweed/src/pw_web:tests", "//third_party/pigweed/src/pw_work_queue:tests"]`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:420
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:427
 
 ### pw_modules
 
 A list with paths to all Pigweed module. DO NOT SET THIS BUILD ARGUMENT!
 
-**Current value (from the default):** `["//third_party/pigweed/src/docker", "//third_party/pigweed/src/pw_alignment", "//third_party/pigweed/src/pw_allocator", "//third_party/pigweed/src/pw_analog", "//third_party/pigweed/src/pw_android_toolchain", "//third_party/pigweed/src/pw_arduino_build", "//third_party/pigweed/src/pw_assert", "//third_party/pigweed/src/pw_assert_basic", "//third_party/pigweed/src/pw_assert_fuchsia", "//third_party/pigweed/src/pw_assert_log", "//third_party/pigweed/src/pw_assert_tokenized", "//third_party/pigweed/src/pw_assert_trap", "//third_party/pigweed/src/pw_assert_zephyr", "//third_party/pigweed/src/pw_async", "//third_party/pigweed/src/pw_async2", "//third_party/pigweed/src/pw_async2_basic", "//third_party/pigweed/src/pw_async2_epoll", "//third_party/pigweed/src/pw_async_basic", "//third_party/pigweed/src/pw_async_fuchsia", "//third_party/pigweed/src/pw_base64", "//third_party/pigweed/src/pw_bloat", "//third_party/pigweed/src/pw_blob_store", "//third_party/pigweed/src/pw_bluetooth", "//third_party/pigweed/src/pw_bluetooth_hci", "//third_party/pigweed/src/pw_bluetooth_profiles", "//third_party/pigweed/src/pw_bluetooth_proxy", "//third_party/pigweed/src/pw_bluetooth_sapphire", "//third_party/pigweed/src/pw_boot", "//third_party/pigweed/src/pw_boot_cortex_m", "//third_party/pigweed/src/pw_build", "//third_party/pigweed/src/pw_build_android", "//third_party/pigweed/src/pw_build_info", "//third_party/pigweed/src/pw_build_mcuxpresso", "//third_party/pigweed/src/pw_bytes", "//third_party/pigweed/src/pw_channel", "//third_party/pigweed/src/pw_checksum", "//third_party/pigweed/src/pw_chre", "//third_party/pigweed/src/pw_chrono", "//third_party/pigweed/src/pw_chrono_embos", "//third_party/pigweed/src/pw_chrono_freertos", "//third_party/pigweed/src/pw_chrono_rp2040", "//third_party/pigweed/src/pw_chrono_stl", "//third_party/pigweed/src/pw_chrono_threadx", "//third_party/pigweed/src/pw_chrono_zephyr", "//third_party/pigweed/src/pw_cli", "//third_party/pigweed/src/pw_cli_analytics", "//third_party/pigweed/src/pw_clock_tree", "//third_party/pigweed/src/pw_clock_tree_mcuxpresso", "//third_party/pigweed/src/pw_compilation_testing", "//third_party/pigweed/src/pw_config_loader", "//third_party/pigweed/src/pw_console", "//third_party/pigweed/src/pw_containers", "//third_party/pigweed/src/pw_cpu_exception", "//third_party/pigweed/src/pw_cpu_exception_cortex_m", "//third_party/pigweed/src/pw_cpu_exception_risc_v", "//third_party/pigweed/src/pw_crypto", "//third_party/pigweed/src/pw_digital_io", "//third_party/pigweed/src/pw_digital_io_linux", "//third_party/pigweed/src/pw_digital_io_mcuxpresso", "//third_party/pigweed/src/pw_digital_io_rp2040", "//third_party/pigweed/src/pw_display", "//third_party/pigweed/src/pw_dma_mcuxpresso", "//third_party/pigweed/src/pw_docgen", "//third_party/pigweed/src/pw_doctor", "//third_party/pigweed/src/pw_elf", "//third_party/pigweed/src/pw_emu", "//third_party/pigweed/src/pw_env_setup", "//third_party/pigweed/src/pw_env_setup_zephyr", "//third_party/pigweed/src/pw_file", "//third_party/pigweed/src/pw_format", "//third_party/pigweed/src/pw_function", "//third_party/pigweed/src/pw_fuzzer", "//third_party/pigweed/src/pw_grpc", "//third_party/pigweed/src/pw_hdlc", "//third_party/pigweed/src/pw_hex_dump", "//third_party/pigweed/src/pw_i2c", "//third_party/pigweed/src/pw_i2c_linux", "//third_party/pigweed/src/pw_i2c_mcuxpresso", "//third_party/pigweed/src/pw_i2c_rp2040", "//third_party/pigweed/src/pw_ide", "//third_party/pigweed/src/pw_interrupt", "//third_party/pigweed/src/pw_interrupt_cortex_m", "//third_party/pigweed/src/pw_interrupt_xtensa", "//third_party/pigweed/src/pw_interrupt_zephyr", "//third_party/pigweed/src/pw_intrusive_ptr", "//third_party/pigweed/src/pw_json", "//third_party/pigweed/src/pw_kvs", "//third_party/pigweed/src/pw_libc", "//third_party/pigweed/src/pw_libcxx", "//third_party/pigweed/src/pw_log", "//third_party/pigweed/src/pw_log_android", "//third_party/pigweed/src/pw_log_basic", "//third_party/pigweed/src/pw_log_fuchsia", "//third_party/pigweed/src/pw_log_null", "//third_party/pigweed/src/pw_log_rpc", "//third_party/pigweed/src/pw_log_string", "//third_party/pigweed/src/pw_log_tokenized", "//third_party/pigweed/src/pw_log_zephyr", "//third_party/pigweed/src/pw_malloc", "//third_party/pigweed/src/pw_malloc_freelist", "//third_party/pigweed/src/pw_malloc_freertos", "//third_party/pigweed/src/pw_metric", "//third_party/pigweed/src/pw_minimal_cpp_stdlib", "//third_party/pigweed/src/pw_module", "//third_party/pigweed/src/pw_multibuf", "//third_party/pigweed/src/pw_multisink", "//third_party/pigweed/src/pw_numeric", "//third_party/pigweed/src/pw_package", "//third_party/pigweed/src/pw_perf_test", "//third_party/pigweed/src/pw_persistent_ram", "//third_party/pigweed/src/pw_polyfill", "//third_party/pigweed/src/pw_preprocessor", "//third_party/pigweed/src/pw_presubmit", "//third_party/pigweed/src/pw_protobuf", "//third_party/pigweed/src/pw_protobuf_compiler", "//third_party/pigweed/src/pw_random", "//third_party/pigweed/src/pw_random_fuchsia", "//third_party/pigweed/src/pw_result", "//third_party/pigweed/src/pw_ring_buffer", "//third_party/pigweed/src/pw_router", "//third_party/pigweed/src/pw_rpc", "//third_party/pigweed/src/pw_rpc_transport", "//third_party/pigweed/src/pw_rust", "//third_party/pigweed/src/pw_sensor", "//third_party/pigweed/src/pw_snapshot", "//third_party/pigweed/src/pw_software_update", "//third_party/pigweed/src/pw_span", "//third_party/pigweed/src/pw_spi", "//third_party/pigweed/src/pw_spi_linux", "//third_party/pigweed/src/pw_spi_mcuxpresso", "//third_party/pigweed/src/pw_spi_rp2040", "//third_party/pigweed/src/pw_status", "//third_party/pigweed/src/pw_stm32cube_build", "//third_party/pigweed/src/pw_stream", "//third_party/pigweed/src/pw_stream_shmem_mcuxpresso", "//third_party/pigweed/src/pw_stream_uart_linux", "//third_party/pigweed/src/pw_stream_uart_mcuxpresso", "//third_party/pigweed/src/pw_string", "//third_party/pigweed/src/pw_symbolizer", "//third_party/pigweed/src/pw_sync", "//third_party/pigweed/src/pw_sync_baremetal", "//third_party/pigweed/src/pw_sync_embos", "//third_party/pigweed/src/pw_sync_freertos", "//third_party/pigweed/src/pw_sync_stl", "//third_party/pigweed/src/pw_sync_threadx", "//third_party/pigweed/src/pw_sync_zephyr", "//third_party/pigweed/src/pw_sys_io", "//third_party/pigweed/src/pw_sys_io_ambiq_sdk", "//third_party/pigweed/src/pw_sys_io_arduino", "//third_party/pigweed/src/pw_sys_io_baremetal_lm3s6965evb", "//third_party/pigweed/src/pw_sys_io_baremetal_stm32f429", "//third_party/pigweed/src/pw_sys_io_emcraft_sf2", "//third_party/pigweed/src/pw_sys_io_mcuxpresso", "//third_party/pigweed/src/pw_sys_io_rp2040", "//third_party/pigweed/src/pw_sys_io_stdio", "//third_party/pigweed/src/pw_sys_io_stm32cube", "//third_party/pigweed/src/pw_sys_io_zephyr", "//third_party/pigweed/src/pw_system", "//third_party/pigweed/src/pw_target_runner", "//third_party/pigweed/src/pw_thread", "//third_party/pigweed/src/pw_thread_embos", "//third_party/pigweed/src/pw_thread_freertos", "//third_party/pigweed/src/pw_thread_stl", "//third_party/pigweed/src/pw_thread_threadx", "//third_party/pigweed/src/pw_thread_zephyr", "//third_party/pigweed/src/pw_tls_client", "//third_party/pigweed/src/pw_tls_client_boringssl", "//third_party/pigweed/src/pw_tls_client_mbedtls", "//third_party/pigweed/src/pw_tokenizer", "//third_party/pigweed/src/pw_toolchain", "//third_party/pigweed/src/pw_toolchain_bazel", "//third_party/pigweed/src/pw_trace", "//third_party/pigweed/src/pw_trace_tokenized", "//third_party/pigweed/src/pw_transfer", "//third_party/pigweed/src/pw_uart", "//third_party/pigweed/src/pw_uart_mcuxpresso", "//third_party/pigweed/src/pw_unit_test", "//third_party/pigweed/src/pw_unit_test_zephyr", "//third_party/pigweed/src/pw_varint", "//third_party/pigweed/src/pw_watch", "//third_party/pigweed/src/pw_web", "//third_party/pigweed/src/pw_work_queue"]`
+**Current value (from the default):** `["//third_party/pigweed/src/docker", "//third_party/pigweed/src/pw_alignment", "//third_party/pigweed/src/pw_allocator", "//third_party/pigweed/src/pw_analog", "//third_party/pigweed/src/pw_android_toolchain", "//third_party/pigweed/src/pw_arduino_build", "//third_party/pigweed/src/pw_assert", "//third_party/pigweed/src/pw_assert_basic", "//third_party/pigweed/src/pw_assert_fuchsia", "//third_party/pigweed/src/pw_assert_log", "//third_party/pigweed/src/pw_assert_tokenized", "//third_party/pigweed/src/pw_assert_trap", "//third_party/pigweed/src/pw_assert_zephyr", "//third_party/pigweed/src/pw_async", "//third_party/pigweed/src/pw_async2", "//third_party/pigweed/src/pw_async2_basic", "//third_party/pigweed/src/pw_async2_epoll", "//third_party/pigweed/src/pw_async_basic", "//third_party/pigweed/src/pw_async_fuchsia", "//third_party/pigweed/src/pw_atomic", "//third_party/pigweed/src/pw_base64", "//third_party/pigweed/src/pw_bloat", "//third_party/pigweed/src/pw_blob_store", "//third_party/pigweed/src/pw_bluetooth", "//third_party/pigweed/src/pw_bluetooth_hci", "//third_party/pigweed/src/pw_bluetooth_profiles", "//third_party/pigweed/src/pw_bluetooth_proxy", "//third_party/pigweed/src/pw_bluetooth_sapphire", "//third_party/pigweed/src/pw_boot", "//third_party/pigweed/src/pw_boot_cortex_m", "//third_party/pigweed/src/pw_build", "//third_party/pigweed/src/pw_build_android", "//third_party/pigweed/src/pw_build_info", "//third_party/pigweed/src/pw_build_mcuxpresso", "//third_party/pigweed/src/pw_bytes", "//third_party/pigweed/src/pw_channel", "//third_party/pigweed/src/pw_checksum", "//third_party/pigweed/src/pw_chre", "//third_party/pigweed/src/pw_chrono", "//third_party/pigweed/src/pw_chrono_embos", "//third_party/pigweed/src/pw_chrono_freertos", "//third_party/pigweed/src/pw_chrono_rp2040", "//third_party/pigweed/src/pw_chrono_stl", "//third_party/pigweed/src/pw_chrono_threadx", "//third_party/pigweed/src/pw_chrono_zephyr", "//third_party/pigweed/src/pw_cli", "//third_party/pigweed/src/pw_cli_analytics", "//third_party/pigweed/src/pw_clock_tree", "//third_party/pigweed/src/pw_clock_tree_mcuxpresso", "//third_party/pigweed/src/pw_compilation_testing", "//third_party/pigweed/src/pw_config_loader", "//third_party/pigweed/src/pw_console", "//third_party/pigweed/src/pw_containers", "//third_party/pigweed/src/pw_cpu_exception", "//third_party/pigweed/src/pw_cpu_exception_cortex_m", "//third_party/pigweed/src/pw_cpu_exception_risc_v", "//third_party/pigweed/src/pw_crypto", "//third_party/pigweed/src/pw_digital_io", "//third_party/pigweed/src/pw_digital_io_linux", "//third_party/pigweed/src/pw_digital_io_mcuxpresso", "//third_party/pigweed/src/pw_digital_io_rp2040", "//third_party/pigweed/src/pw_display", "//third_party/pigweed/src/pw_dma_mcuxpresso", "//third_party/pigweed/src/pw_docgen", "//third_party/pigweed/src/pw_doctor", "//third_party/pigweed/src/pw_elf", "//third_party/pigweed/src/pw_emu", "//third_party/pigweed/src/pw_env_setup", "//third_party/pigweed/src/pw_env_setup_zephyr", "//third_party/pigweed/src/pw_file", "//third_party/pigweed/src/pw_flatbuffers", "//third_party/pigweed/src/pw_format", "//third_party/pigweed/src/pw_function", "//third_party/pigweed/src/pw_fuzzer", "//third_party/pigweed/src/pw_grpc", "//third_party/pigweed/src/pw_hdlc", "//third_party/pigweed/src/pw_hex_dump", "//third_party/pigweed/src/pw_i2c", "//third_party/pigweed/src/pw_i2c_linux", "//third_party/pigweed/src/pw_i2c_mcuxpresso", "//third_party/pigweed/src/pw_i2c_rp2040", "//third_party/pigweed/src/pw_ide", "//third_party/pigweed/src/pw_interrupt", "//third_party/pigweed/src/pw_interrupt_cortex_m", "//third_party/pigweed/src/pw_interrupt_freertos", "//third_party/pigweed/src/pw_interrupt_xtensa", "//third_party/pigweed/src/pw_interrupt_zephyr", "//third_party/pigweed/src/pw_intrusive_ptr", "//third_party/pigweed/src/pw_json", "//third_party/pigweed/src/pw_kernel", "//third_party/pigweed/src/pw_kvs", "//third_party/pigweed/src/pw_libc", "//third_party/pigweed/src/pw_libcxx", "//third_party/pigweed/src/pw_log", "//third_party/pigweed/src/pw_log_android", "//third_party/pigweed/src/pw_log_basic", "//third_party/pigweed/src/pw_log_fuchsia", "//third_party/pigweed/src/pw_log_null", "//third_party/pigweed/src/pw_log_rpc", "//third_party/pigweed/src/pw_log_string", "//third_party/pigweed/src/pw_log_tokenized", "//third_party/pigweed/src/pw_log_zephyr", "//third_party/pigweed/src/pw_malloc", "//third_party/pigweed/src/pw_malloc_freelist", "//third_party/pigweed/src/pw_malloc_freertos", "//third_party/pigweed/src/pw_metric", "//third_party/pigweed/src/pw_minimal_cpp_stdlib", "//third_party/pigweed/src/pw_module", "//third_party/pigweed/src/pw_multibuf", "//third_party/pigweed/src/pw_multisink", "//third_party/pigweed/src/pw_numeric", "//third_party/pigweed/src/pw_package", "//third_party/pigweed/src/pw_perf_test", "//third_party/pigweed/src/pw_persistent_ram", "//third_party/pigweed/src/pw_polyfill", "//third_party/pigweed/src/pw_preprocessor", "//third_party/pigweed/src/pw_presubmit", "//third_party/pigweed/src/pw_protobuf", "//third_party/pigweed/src/pw_protobuf_compiler", "//third_party/pigweed/src/pw_random", "//third_party/pigweed/src/pw_random_fuchsia", "//third_party/pigweed/src/pw_result", "//third_party/pigweed/src/pw_ring_buffer", "//third_party/pigweed/src/pw_router", "//third_party/pigweed/src/pw_rpc", "//third_party/pigweed/src/pw_rpc_transport", "//third_party/pigweed/src/pw_rust", "//third_party/pigweed/src/pw_sensor", "//third_party/pigweed/src/pw_snapshot", "//third_party/pigweed/src/pw_software_update", "//third_party/pigweed/src/pw_span", "//third_party/pigweed/src/pw_spi", "//third_party/pigweed/src/pw_spi_linux", "//third_party/pigweed/src/pw_spi_mcuxpresso", "//third_party/pigweed/src/pw_spi_rp2040", "//third_party/pigweed/src/pw_status", "//third_party/pigweed/src/pw_stm32cube_build", "//third_party/pigweed/src/pw_stream", "//third_party/pigweed/src/pw_stream_shmem_mcuxpresso", "//third_party/pigweed/src/pw_stream_uart_linux", "//third_party/pigweed/src/pw_stream_uart_mcuxpresso", "//third_party/pigweed/src/pw_string", "//third_party/pigweed/src/pw_symbolizer", "//third_party/pigweed/src/pw_sync", "//third_party/pigweed/src/pw_sync_baremetal", "//third_party/pigweed/src/pw_sync_embos", "//third_party/pigweed/src/pw_sync_freertos", "//third_party/pigweed/src/pw_sync_stl", "//third_party/pigweed/src/pw_sync_threadx", "//third_party/pigweed/src/pw_sync_zephyr", "//third_party/pigweed/src/pw_sys_io", "//third_party/pigweed/src/pw_sys_io_ambiq_sdk", "//third_party/pigweed/src/pw_sys_io_arduino", "//third_party/pigweed/src/pw_sys_io_baremetal_lm3s6965evb", "//third_party/pigweed/src/pw_sys_io_baremetal_stm32f429", "//third_party/pigweed/src/pw_sys_io_emcraft_sf2", "//third_party/pigweed/src/pw_sys_io_mcuxpresso", "//third_party/pigweed/src/pw_sys_io_rp2040", "//third_party/pigweed/src/pw_sys_io_stdio", "//third_party/pigweed/src/pw_sys_io_stm32cube", "//third_party/pigweed/src/pw_sys_io_zephyr", "//third_party/pigweed/src/pw_system", "//third_party/pigweed/src/pw_target_runner", "//third_party/pigweed/src/pw_thread", "//third_party/pigweed/src/pw_thread_embos", "//third_party/pigweed/src/pw_thread_freertos", "//third_party/pigweed/src/pw_thread_stl", "//third_party/pigweed/src/pw_thread_threadx", "//third_party/pigweed/src/pw_thread_zephyr", "//third_party/pigweed/src/pw_tls_client", "//third_party/pigweed/src/pw_tls_client_boringssl", "//third_party/pigweed/src/pw_tls_client_mbedtls", "//third_party/pigweed/src/pw_tokenizer", "//third_party/pigweed/src/pw_toolchain", "//third_party/pigweed/src/pw_trace", "//third_party/pigweed/src/pw_trace_tokenized", "//third_party/pigweed/src/pw_transfer", "//third_party/pigweed/src/pw_uart", "//third_party/pigweed/src/pw_uart_mcuxpresso", "//third_party/pigweed/src/pw_unit_test", "//third_party/pigweed/src/pw_unit_test_zephyr", "//third_party/pigweed/src/pw_varint", "//third_party/pigweed/src/pw_watch", "//third_party/pigweed/src/pw_web", "//third_party/pigweed/src/pw_work_queue"]`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:234
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:238
 
 ### pw_preprocessor_CONFIG
 
@@ -9001,6 +8999,14 @@ b/266298474
 **Current value (from the default):** `false`
 
 From //third_party/pigweed/src/pw_protobuf_compiler/toolchain.gni:28
+
+### pw_protobuf_compiler_GENERATE_PROTOS_ARGS
+
+Args for generate_protos.py
+
+**Current value (from the default):** `""`
+
+From //third_party/pigweed/src/pw_protobuf_compiler/toolchain.gni:43
 
 ### pw_protobuf_compiler_GENERATE_PYTHON_TYPE_HINTS
 
@@ -9342,6 +9348,27 @@ From //third_party/pigweed/src/third_party/boringssl/boringssl.gni:25
 
 From //third_party/pigweed/src/third_party/emboss/emboss.gni:24
 
+### pw_third_party_googletest_ALIAS
+
+If compiling with a custom googletest target, set this variable to point
+to its label. Incompatible with dir_pw_third_party_googletest definition.
+
+**Current value for `target_cpu = "arm64"`:** `"//third_party/googletest:gmock_no_testonly"`
+
+From //.gn:147
+
+**Overridden from the default:** `""`
+
+From //third_party/pigweed/src/third_party/googletest/googletest.gni:24
+
+**Current value for `target_cpu = "x64"`:** `"//third_party/googletest:gmock_no_testonly"`
+
+From //.gn:147
+
+**Overridden from the default:** `""`
+
+From //third_party/pigweed/src/third_party/googletest/googletest.gni:24
+
 ### pw_third_party_mbedtls_CONFIG_HEADER
 
 **Current value (from the default):** `"//third_party/pigweed/src/third_party/mbedtls/configs/config_default.h"`
@@ -9378,7 +9405,7 @@ Backend for the pw_thread module's pw::Thread::id.
 
 **Current value (from the default):** `""`
 
-From //third_party/pigweed/src/pw_thread/backend.gni:17
+From //third_party/pigweed/src/pw_thread/backend.gni:19
 
 ### pw_thread_OVERRIDE_SYSTEM_CLOCK_BACKEND_CHECK
 
@@ -9388,7 +9415,7 @@ Set to true to disable the asserts.
 
 **Current value (from the default):** `false`
 
-From //third_party/pigweed/src/pw_thread/backend.gni:34
+From //third_party/pigweed/src/pw_thread/backend.gni:42
 
 ### pw_thread_SLEEP_BACKEND
 
@@ -9400,7 +9427,7 @@ From //.gn:77
 
 **Overridden from the default:** `""`
 
-From //third_party/pigweed/src/pw_thread/backend.gni:20
+From //third_party/pigweed/src/pw_thread/backend.gni:22
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_thread_stl:sleep"`
 
@@ -9408,7 +9435,7 @@ From //.gn:77
 
 **Overridden from the default:** `""`
 
-From //third_party/pigweed/src/pw_thread/backend.gni:20
+From //third_party/pigweed/src/pw_thread/backend.gni:22
 
 ### pw_thread_TEST_THREAD_CONTEXT_BACKEND
 
@@ -9416,7 +9443,7 @@ Backend for the pw_thread module's pw::thread::test_thread_context.
 
 **Current value (from the default):** `""`
 
-From //third_party/pigweed/src/pw_thread/backend.gni:29
+From //third_party/pigweed/src/pw_thread/backend.gni:37
 
 ### pw_thread_THREAD_BACKEND
 
@@ -9424,7 +9451,13 @@ Backend for the pw_thread module's pw::Thread to create threads.
 
 **Current value (from the default):** `""`
 
-From //third_party/pigweed/src/pw_thread/backend.gni:23
+From //third_party/pigweed/src/pw_thread/backend.gni:25
+
+### pw_thread_THREAD_CREATION_BACKEND
+
+**Current value (from the default):** `"//third_party/pigweed/src/pw_thread:generic_thread_creation_unsupported"`
+
+From //third_party/pigweed/src/pw_thread/backend.gni:31
 
 ### pw_thread_THREAD_ITERATION_BACKEND
 
@@ -9432,7 +9465,7 @@ Backend for the pw_thread module's pw::thread::thread_iteration.
 
 **Current value (from the default):** `""`
 
-From //third_party/pigweed/src/pw_thread/backend.gni:37
+From //third_party/pigweed/src/pw_thread/backend.gni:45
 
 ### pw_thread_YIELD_BACKEND
 
@@ -9440,7 +9473,7 @@ Backend for the pw_thread module's pw::thread::yield.
 
 **Current value (from the default):** `""`
 
-From //third_party/pigweed/src/pw_thread/backend.gni:26
+From //third_party/pigweed/src/pw_thread/backend.gni:34
 
 ### pw_toolchain_CLANG_PREFIX
 
@@ -9614,7 +9647,7 @@ Usage: toolchain-controlled only
 
 **Current value (from the default):** `""`
 
-From //third_party/pigweed/src/pw_unit_test/test.gni:63
+From //third_party/pigweed/src/pw_unit_test/test.gni:53
 
 ### pw_unit_test_AUTOMATIC_RUNNER_ARGS
 
@@ -9625,7 +9658,7 @@ Usage: toolchain-controlled only
 
 **Current value (from the default):** `[]`
 
-From //third_party/pigweed/src/pw_unit_test/test.gni:69
+From //third_party/pigweed/src/pw_unit_test/test.gni:59
 
 ### pw_unit_test_AUTOMATIC_RUNNER_TIMEOUT
 
@@ -9634,7 +9667,7 @@ Timeout is in seconds. Defaults to empty which means no timeout.
 
 **Current value (from the default):** `""`
 
-From //third_party/pigweed/src/pw_unit_test/test.gni:73
+From //third_party/pigweed/src/pw_unit_test/test.gni:63
 
 ### pw_unit_test_BACKEND
 
@@ -9680,7 +9713,7 @@ Usage: toolchain-controlled only
 
 **Current value (from the default):** `"pw_executable"`
 
-From //third_party/pigweed/src/pw_unit_test/test.gni:102
+From //third_party/pigweed/src/pw_unit_test/test.gni:92
 
 ### pw_unit_test_EXECUTABLE_TARGET_TYPE_FILE
 
@@ -9695,34 +9728,7 @@ Usage: toolchain-controlled only
 
 **Current value (from the default):** `""`
 
-From //third_party/pigweed/src/pw_unit_test/test.gni:112
-
-### pw_unit_test_GOOGLETEST_BACKEND
-
-The GoogleTest library target. This is not a pw_unit_test backend (anymore).
-Use this to depend on the GoogleTest library directly *WITHOUT* using the
-pw_unit_test facade. The //pw_unit_test:googletest backend depends on this
-library target.
-Defaults to //third_party/googletest.
-
-Type: string (GN path to a source set)
-Usage: toolchain-controlled only
-
-**Current value for `target_cpu = "arm64"`:** `"//third_party/googletest:gmock_no_testonly"`
-
-From //.gn:141
-
-**Overridden from the default:** `"//third_party/pigweed/src/third_party/googletest"`
-
-From //third_party/pigweed/src/pw_unit_test/test.gni:41
-
-**Current value for `target_cpu = "x64"`:** `"//third_party/googletest:gmock_no_testonly"`
-
-From //.gn:141
-
-**Overridden from the default:** `"//third_party/pigweed/src/third_party/googletest"`
-
-From //third_party/pigweed/src/pw_unit_test/test.gni:41
+From //third_party/pigweed/src/pw_unit_test/test.gni:102
 
 ### pw_unit_test_MAIN
 
@@ -9738,7 +9744,7 @@ From //.gn:140
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_unit_test:simple_printing_main"`
 
-From //third_party/pigweed/src/pw_unit_test/test.gni:48
+From //third_party/pigweed/src/pw_unit_test/test.gni:38
 
 **Current value for `target_cpu = "x64"`:** `"//src/lib/fxl/test:gtest_main"`
 
@@ -9746,7 +9752,7 @@ From //.gn:140
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_unit_test:simple_printing_main"`
 
-From //third_party/pigweed/src/pw_unit_test/test.gni:48
+From //third_party/pigweed/src/pw_unit_test/test.gni:38
 
 ### pw_unit_test_POOL_DEPTH
 
@@ -9764,7 +9770,7 @@ Usage: toolchain-controlled only
 
 **Current value (from the default):** `0`
 
-From //third_party/pigweed/src/pw_unit_test/test.gni:86
+From //third_party/pigweed/src/pw_unit_test/test.gni:76
 
 ### pw_unit_test_POOL_TOOLCHAIN
 
@@ -9779,7 +9785,7 @@ Usage: toolchain-controlled only
 
 **Current value (from the default):** `""`
 
-From //third_party/pigweed/src/pw_unit_test/test.gni:96
+From //third_party/pigweed/src/pw_unit_test/test.gni:86
 
 ### pw_unit_test_TESTONLY
 
@@ -9793,7 +9799,7 @@ From //.gn:143
 
 **Overridden from the default:** `false`
 
-From //third_party/pigweed/src/pw_unit_test/test.gni:117
+From //third_party/pigweed/src/pw_unit_test/test.gni:107
 
 **Current value for `target_cpu = "x64"`:** `true`
 
@@ -9801,13 +9807,13 @@ From //.gn:143
 
 **Overridden from the default:** `false`
 
-From //third_party/pigweed/src/pw_unit_test/test.gni:117
+From //third_party/pigweed/src/pw_unit_test/test.gni:107
 
 ### remove_default_configs
 
 **Current value for `target_cpu = "arm64"`:** `["//third_party/pigweed/src/pw_build:reduced_size"]`
 
-From //.gn:152
+From //.gn:156
 
 **Overridden from the default:** `[]`
 
@@ -9815,7 +9821,7 @@ From //third_party/pigweed/src/pw_build/gn_internal/defaults.gni:36
 
 **Current value for `target_cpu = "x64"`:** `["//third_party/pigweed/src/pw_build:reduced_size"]`
 
-From //.gn:152
+From //.gn:156
 
 **Overridden from the default:** `[]`
 

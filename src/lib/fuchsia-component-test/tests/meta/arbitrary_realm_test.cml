@@ -24,6 +24,5 @@
             protocol: "fuchsia.component.Realm",
             from: "#child_realm",
         },
-        { protocol: "fuchsia.logger.LogSink" },
     ],
 }

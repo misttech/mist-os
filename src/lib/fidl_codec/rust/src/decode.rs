@@ -6,8 +6,8 @@ use fidl::encoding::{TransactionHeader, ALLOC_PRESENT_U32, ALLOC_PRESENT_U64};
 use nom::bytes::complete::take;
 use nom::combinator::{map, value, verify};
 use nom::multi::count;
-use nom::sequence::{pair, preceded, terminated, tuple};
-use nom::IResult;
+use nom::sequence::{pair, preceded, terminated};
+use nom::{IResult, Parser};
 
 use crate::error::{Error, Result};
 use crate::library;
@@ -61,87 +61,87 @@ impl<'d> From<Value> for Defer<'d> {
 }
 
 fn take_u8(data: &[u8]) -> DResult<'_, u8> {
-    map(take(1usize), |x: &[u8]| x[0])(data)
+    map(take(1usize), |x: &[u8]| x[0]).parse(data)
 }
 
 fn value_u8(data: &[u8]) -> DResult<'_, Value> {
-    map(take_u8, Value::U8)(data)
+    map(take_u8, Value::U8).parse(data)
 }
 
 fn value_bool(data: &[u8]) -> DResult<'_, Value> {
-    map(verify(take_u8, |&x| x == 0 || x == 1), |x| Value::Bool(x != 0))(data)
+    map(verify(take_u8, |&x| x == 0 || x == 1), |x| Value::Bool(x != 0)).parse(data)
 }
 
 fn take_u16(data: &[u8]) -> DResult<'_, u16> {
-    map(take(2usize), |x: &[u8]| u16::from_le_bytes(x.try_into().unwrap()))(data)
+    map(take(2usize), |x: &[u8]| u16::from_le_bytes(x.try_into().unwrap())).parse(data)
 }
 
 fn value_u16(data: &[u8]) -> DResult<'_, Value> {
-    map(take_u16, Value::U16)(data)
+    map(take_u16, Value::U16).parse(data)
 }
 
 fn take_u32(data: &[u8]) -> DResult<'_, u32> {
-    map(take(4usize), |x: &[u8]| u32::from_le_bytes(x.try_into().unwrap()))(data)
+    map(take(4usize), |x: &[u8]| u32::from_le_bytes(x.try_into().unwrap())).parse(data)
 }
 
 fn value_u32(data: &[u8]) -> DResult<'_, Value> {
-    map(take_u32, Value::U32)(data)
+    map(take_u32, Value::U32).parse(data)
 }
 
 fn take_u64(data: &[u8]) -> DResult<'_, u64> {
-    map(take(8usize), |x: &[u8]| u64::from_le_bytes(x.try_into().unwrap()))(data)
+    map(take(8usize), |x: &[u8]| u64::from_le_bytes(x.try_into().unwrap())).parse(data)
 }
 
 fn value_u64(data: &[u8]) -> DResult<'_, Value> {
-    map(take_u64, Value::U64)(data)
+    map(take_u64, Value::U64).parse(data)
 }
 
 fn take_i8(data: &[u8]) -> DResult<'_, i8> {
-    map(take(1usize), |x: &[u8]| i8::from_le_bytes([x[0]]))(data)
+    map(take(1usize), |x: &[u8]| i8::from_le_bytes([x[0]])).parse(data)
 }
 
 fn value_i8(data: &[u8]) -> DResult<'_, Value> {
-    map(take_i8, Value::I8)(data)
+    map(take_i8, Value::I8).parse(data)
 }
 
 fn take_i16(data: &[u8]) -> DResult<'_, i16> {
-    map(take(2usize), |x: &[u8]| i16::from_le_bytes(x.try_into().unwrap()))(data)
+    map(take(2usize), |x: &[u8]| i16::from_le_bytes(x.try_into().unwrap())).parse(data)
 }
 
 fn value_i16(data: &[u8]) -> DResult<'_, Value> {
-    map(take_i16, Value::I16)(data)
+    map(take_i16, Value::I16).parse(data)
 }
 
 fn take_i32(data: &[u8]) -> DResult<'_, i32> {
-    map(take(4usize), |x: &[u8]| i32::from_le_bytes(x.try_into().unwrap()))(data)
+    map(take(4usize), |x: &[u8]| i32::from_le_bytes(x.try_into().unwrap())).parse(data)
 }
 
 fn value_i32(data: &[u8]) -> DResult<'_, Value> {
-    map(take_i32, Value::I32)(data)
+    map(take_i32, Value::I32).parse(data)
 }
 
 fn take_i64(data: &[u8]) -> DResult<'_, i64> {
-    map(take(8usize), |x: &[u8]| i64::from_le_bytes(x.try_into().unwrap()))(data)
+    map(take(8usize), |x: &[u8]| i64::from_le_bytes(x.try_into().unwrap())).parse(data)
 }
 
 fn value_i64(data: &[u8]) -> DResult<'_, Value> {
-    map(take_i64, Value::I64)(data)
+    map(take_i64, Value::I64).parse(data)
 }
 
 fn take_f32(data: &[u8]) -> DResult<'_, f32> {
-    map(take(4usize), |x: &[u8]| f32::from_le_bytes(x.try_into().unwrap()))(data)
+    map(take(4usize), |x: &[u8]| f32::from_le_bytes(x.try_into().unwrap())).parse(data)
 }
 
 fn value_f32(data: &[u8]) -> DResult<'_, Value> {
-    map(take_f32, Value::F32)(data)
+    map(take_f32, Value::F32).parse(data)
 }
 
 fn take_f64(data: &[u8]) -> DResult<'_, f64> {
-    map(take(8usize), |x: &[u8]| f64::from_le_bytes(x.try_into().unwrap()))(data)
+    map(take(8usize), |x: &[u8]| f64::from_le_bytes(x.try_into().unwrap())).parse(data)
 }
 
 fn value_f64(data: &[u8]) -> DResult<'_, Value> {
-    map(take_f64, Value::F64)(data)
+    map(take_f64, Value::F64).parse(data)
 }
 
 fn transaction_header(data: &[u8]) -> DResult<'_, TransactionHeader> {
@@ -151,7 +151,7 @@ fn transaction_header(data: &[u8]) -> DResult<'_, TransactionHeader> {
 }
 
 fn take_padding(amount: usize) -> impl Fn(&[u8]) -> DResult<'_, ()> {
-    move |bytes| value((), verify(take(amount), |x: &[u8]| x.iter().all(|&x| x == 0)))(bytes)
+    move |bytes| value((), verify(take(amount), |x: &[u8]| x.iter().all(|&x| x == 0))).parse(bytes)
 }
 
 fn decode_struct<'s>(
@@ -161,7 +161,7 @@ fn decode_struct<'s>(
 ) -> impl Fn(&[u8]) -> DResult<'_, Defer<'s>> {
     move |bytes: &[u8]| {
         if !nullable {
-            return decode_struct_nonnull(ns, st)(bytes);
+            return decode_struct_nonnull(ns, st).parse(bytes);
         }
 
         let (bytes, presence) = take_u64(bytes)?;
@@ -180,7 +180,8 @@ fn decode_struct<'s>(
                         let counter = counter.next()?;
                         let align = alignment_padding_for_size(st.size);
                         let (bytes, defer) =
-                            terminated(decode_struct_nonnull(ns, st), take_padding(align))(bytes)?;
+                            terminated(decode_struct_nonnull(ns, st), take_padding(align))
+                                .parse(bytes)?;
                         defer.complete(bytes, handles, counter)
                     },
                 )),
@@ -199,14 +200,15 @@ fn decode_struct_nonnull<'s>(
 
         for member in &st.members {
             let (remaining, result) =
-                preceded(take_padding(member.offset - offset), decode_type(ns, &member.ty))(bytes)?;
+                preceded(take_padding(member.offset - offset), decode_type(ns, &member.ty))
+                    .parse(bytes)?;
             fields.push((member.name.clone(), result));
             bytes = remaining;
             offset = member.offset + member.ty.inline_size(ns)?;
         }
 
         if offset < st.size {
-            let (remaining, _) = take_padding(st.size - offset)(bytes)?;
+            let (remaining, _) = take_padding(st.size - offset).parse(bytes)?;
             bytes = remaining;
         }
 
@@ -249,25 +251,25 @@ fn decode_type<'t>(
             Type::I64 => value_i64(b),
             Type::F32 => value_f32(b),
             Type::F64 => value_f64(b),
-            Type::Array(ty, size) => return decode_array(ns, ty, *size)(b),
+            Type::Array(ty, size) => return decode_array(ns, ty, *size).parse(b),
             Type::Vector { ty, nullable, element_count } => {
-                return decode_vector(ns, ty, *nullable, *element_count)(b)
+                return decode_vector(ns, ty, *nullable, *element_count).parse(b)
             }
             Type::String { nullable, byte_count } => {
-                return decode_string(*nullable, *byte_count)(b)
+                return decode_string(*nullable, *byte_count).parse(b)
             }
             Type::Identifier { name, nullable } => {
-                return decode_identifier(ns, name, *nullable)(b)
+                return decode_identifier(ns, name, *nullable).parse(b)
             }
             Type::Handle { object_type, nullable, rights } => {
-                return decode_handle(*object_type, *nullable, *rights)(b)
+                return decode_handle(*object_type, *nullable, *rights).parse(b)
             }
             Type::Endpoint { protocol, rights, nullable, role } => match role {
                 library::EndpointRole::Client => {
-                    return decode_client_end(protocol.clone(), *nullable, *rights)(b)
+                    return decode_client_end(protocol.clone(), *nullable, *rights).parse(b)
                 }
                 library::EndpointRole::Server => {
-                    return decode_server_end(protocol.clone(), *nullable, *rights)(b)
+                    return decode_server_end(protocol.clone(), *nullable, *rights).parse(b)
                 }
             },
             Type::UnknownString(s) => {
@@ -280,7 +282,7 @@ fn decode_type<'t>(
                 ))
                 .into())
             }
-            Type::FrameworkError => map(take_u32, |_| Value::Null)(b),
+            Type::FrameworkError => map(take_u32, |_| Value::Null).parse(b),
         }
         .map(|(x, y)| (x, Defer::Complete(y)))
     }
@@ -311,7 +313,7 @@ fn decode_array<'t>(
     size: usize,
 ) -> impl Fn(&[u8]) -> DResult<'_, Defer<'t>> {
     move |bytes: &[u8]| {
-        let (bytes, defers) = count(decode_type(ns, ty), size)(bytes)?;
+        let (bytes, defers) = count(decode_type(ns, ty), size).parse(bytes)?;
 
         Ok((
             bytes,
@@ -333,7 +335,7 @@ fn decode_vector<'t>(
     element_count: Option<usize>,
 ) -> impl Fn(&[u8]) -> DResult<'_, Defer<'t>> {
     move |bytes: &[u8]| {
-        let (bytes, (size, presence)) = pair(take_u64, take_u64)(bytes)?;
+        let (bytes, (size, presence)) = pair(take_u64, take_u64).parse(bytes)?;
         let size = size as usize;
         let align = alignment_padding_for_size(size * ty.inline_size(ns)?);
 
@@ -359,10 +361,9 @@ fn decode_vector<'t>(
                           handles: &mut Vec<fidl::HandleInfo>,
                           counter: RecursionCounter| {
                         let counter = counter.next()?;
-                        let (bytes, defers) = terminated(
-                            count(decode_type(ns, ty), size),
-                            take_padding(align),
-                        )(bytes)?;
+                        let (bytes, defers) =
+                            terminated(count(decode_type(ns, ty), size), take_padding(align))
+                                .parse(bytes)?;
 
                         complete_deferred_list(bytes, handles, defers, counter)
                     },
@@ -377,7 +378,7 @@ fn decode_string(
     byte_count: Option<usize>,
 ) -> impl Fn(&[u8]) -> DResult<'_, Defer<'static>> {
     move |bytes: &[u8]| {
-        let (bytes, (size, presence)) = pair(take_u64, take_u64)(bytes)?;
+        let (bytes, (size, presence)) = pair(take_u64, take_u64).parse(bytes)?;
         let size = size as usize;
         let align = alignment_padding_for_size(size);
 
@@ -403,7 +404,8 @@ fn decode_string(
                           _: &mut Vec<fidl::HandleInfo>,
                           counter: RecursionCounter| {
                         let _counter = counter.next()?;
-                        let (bytes, data) = terminated(take(size), take_padding(align))(bytes)?;
+                        let (bytes, data) =
+                            terminated(take(size), take_padding(align)).parse(bytes)?;
 
                         match str::from_utf8(data) {
                             Ok(x) => Ok((bytes, Value::String(x.to_owned()))),
@@ -510,7 +512,7 @@ fn decode_enum<'e>(
     en: &'e library::Enum,
 ) -> impl Fn(&[u8]) -> DResult<'_, Defer<'e>> {
     move |bytes: &[u8]| {
-        let (bytes, defer) = decode_type(ns, &en.ty)(bytes)?;
+        let (bytes, defer) = decode_type(ns, &en.ty).parse(bytes)?;
         Ok((
             bytes,
             Defer::Action(Box::new(
@@ -541,7 +543,7 @@ fn decode_bits<'b>(
     bits: &'b library::Bits,
 ) -> impl Fn(&[u8]) -> DResult<'_, Defer<'b>> {
     move |bytes: &[u8]| {
-        let (bytes, defer) = decode_type(ns, &bits.ty)(bytes)?;
+        let (bytes, defer) = decode_type(ns, &bits.ty).parse(bytes)?;
         Ok((
             bytes,
             Defer::Action(Box::new(
@@ -611,8 +613,8 @@ impl Envelope {
         } else if !ty.is_resolved(ns) {
             Ok(self.skip())
         } else if let Envelope::Inline { bytes, handles } = self {
-            let (padding, ret) = decode_type(ns, ty)(bytes)?;
-            take_padding(padding.len())(padding)?;
+            let (padding, ret) = decode_type(ns, ty).parse(bytes)?;
+            take_padding(padding.len()).parse(padding)?;
             let expect_handles = *handles as usize;
             Ok(Defer::Action(Box::new(
                 move |bytes: &[u8],
@@ -644,7 +646,7 @@ impl Envelope {
                     let bytes_start = bytes.len();
                     let align = alignment_padding_for_size(ty.inline_size(ns)?);
                     let (bytes, defer) =
-                        terminated(decode_type(ns, ty), take_padding(align))(bytes)?;
+                        terminated(decode_type(ns, ty), take_padding(align)).parse(bytes)?;
 
                     let handle_count = handles.len();
                     let (bytes, value) = defer.complete(bytes, handles, counter)?;
@@ -667,7 +669,7 @@ impl Envelope {
     fn take<'a>(empty_ok: bool) -> impl Fn(&'a [u8]) -> DResult<'a, Envelope> {
         move |bytes: &[u8]| {
             let (bytes, (envelope_bytes, envelope_handles, envelope_flags)) =
-                tuple((take_u32, take_u16, take_u16))(bytes)?;
+                (take_u32, take_u16, take_u16).parse(bytes)?;
 
             if envelope_bytes == 0 && envelope_handles == 0 && envelope_flags == 0 {
                 if !empty_ok {
@@ -698,7 +700,7 @@ fn decode_union<'u>(
     nullable: bool,
 ) -> impl Fn(&[u8]) -> DResult<'_, Defer<'u>> {
     move |bytes: &[u8]| {
-        let (bytes, (ordinal, envelope)) = tuple((take_u64, Envelope::take(nullable)))(bytes)?;
+        let (bytes, (ordinal, envelope)) = (take_u64, Envelope::take(nullable)).parse(bytes)?;
 
         match (ordinal, &envelope) {
             (0, Envelope::Empty) => return Ok((bytes, envelope.skip())),
@@ -740,7 +742,7 @@ fn decode_table<'t>(
     table: &'t library::TableOrUnion,
 ) -> impl Fn(&[u8]) -> DResult<'_, Defer<'t>> {
     move |bytes: &[u8]| {
-        let (bytes, (size, data_ptr)) = pair(take_u64, take_u64)(bytes)?;
+        let (bytes, (size, data_ptr)) = pair(take_u64, take_u64).parse(bytes)?;
 
         if data_ptr != ALLOC_PRESENT_U64 {
             return Err(Error::DecodeError("Bad presence indicator.".to_owned()).into());
@@ -753,7 +755,8 @@ fn decode_table<'t>(
                       handles: &mut Vec<fidl::HandleInfo>,
                       counter: RecursionCounter| {
                     let counter = counter.next()?;
-                    let (mut bytes, envelopes) = count(Envelope::take(true), size as usize)(bytes)?;
+                    let (mut bytes, envelopes) =
+                        count(Envelope::take(true), size as usize).parse(bytes)?;
 
                     let mut result = Vec::new();
                     let mut expect_ord = 1u64;
@@ -789,11 +792,11 @@ fn decode_identifier<'s>(
     nullable: bool,
 ) -> impl Fn(&[u8]) -> DResult<'_, Defer<'s>> {
     move |bytes: &[u8]| match ns.lookup(name)? {
-        library::LookupResult::Bits(b) => decode_bits(ns, b)(bytes),
-        library::LookupResult::Enum(e) => decode_enum(ns, e)(bytes),
-        library::LookupResult::Struct(s) => decode_struct(ns, s, nullable)(bytes),
-        library::LookupResult::Union(u) => decode_union(ns, u, nullable)(bytes),
-        library::LookupResult::Table(t) => decode_table(ns, t)(bytes),
+        library::LookupResult::Bits(b) => decode_bits(ns, b).parse(bytes),
+        library::LookupResult::Enum(e) => decode_enum(ns, e).parse(bytes),
+        library::LookupResult::Struct(s) => decode_struct(ns, s, nullable).parse(bytes),
+        library::LookupResult::Union(u) => decode_union(ns, u, nullable).parse(bytes),
+        library::LookupResult::Table(t) => decode_table(ns, t).parse(bytes),
         library::LookupResult::Protocol(_) => Err(Error::DecodeError(format!(
             "Protocol names cannot be used as identifiers: {}",
             name
@@ -819,7 +822,7 @@ fn decode_message<'a>(
     };
 
     if let Some(message) = message {
-        let (bytes, defer) = decode_type(ns, message)(bytes)?;
+        let (bytes, defer) = decode_type(ns, message).parse(bytes)?;
         let (bytes, value) = defer.complete(bytes, &mut handles, RecursionCounter::new())?;
 
         if !bytes.is_empty() && (bytes.len() >= 8 || bytes.iter().any(|x| *x != 0)) {
@@ -868,9 +871,9 @@ pub fn decode<'a>(
     if bytes.len() % 8 != 0 {
         return Err(Error::DecodeError("Unaligned encoded object".to_owned()));
     }
-    let (bytes, defer) = decode_identifier(ns, ty, false)(bytes)?;
+    let (bytes, defer) = decode_identifier(ns, ty, false).parse(bytes)?;
     let (bytes, value) = defer.complete(bytes, &mut handles, RecursionCounter::new())?;
-    take_padding(bytes.len())(bytes)?;
+    take_padding(bytes.len()).parse(bytes)?;
 
     if !bytes.is_empty() && (bytes.len() >= 8 || bytes.iter().any(|x| *x != 0)) {
         Err(Error::DecodeError(format!("{} bytes left over.", bytes.len())))

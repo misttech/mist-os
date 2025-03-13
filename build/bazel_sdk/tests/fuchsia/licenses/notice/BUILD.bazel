@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
-load("@fuchsia_sdk//fuchsia:licenses.bzl", "fuchsia_licenses_notice")
+load("@rules_fuchsia//fuchsia:licenses.bzl", "fuchsia_licenses_notice")
 
 fuchsia_licenses_notice(
     name = "actual_notice.txt",

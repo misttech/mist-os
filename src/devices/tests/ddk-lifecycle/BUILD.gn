@@ -21,6 +21,7 @@ driver_bind_rules("test-lifecycle-bind") {
 }
 
 fuchsia_cc_driver("ddk-lifecycle-test-driver") {
+  legacy = true
   testonly = true
   output_name = "ddk-lifecycle-test"
   configs += [

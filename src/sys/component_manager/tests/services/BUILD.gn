@@ -53,6 +53,7 @@ rustc_test("service-routing-test-bin") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
     "//src/lib/fuchsia-fs",
+    "//src/storage/lib/vfs/rust:vfs",
     "//src/sys/component_manager/tests/fidl:components_rust",
     "//src/sys/component_manager/tests/services/src/fidl:fuchsia.examples_rust",
     "//src/sys/lib/cm_rust",

@@ -207,10 +207,10 @@ fit::result<debug::Status, TestRealmAndOffers> GetTestRealmAndOffers(
 
   auto [realm_client_end, realm_server_end] = fidl::Endpoints<fuchsia_component::Realm>::Create();
   auto realm_connect_result =
-      directory->Open3({fidl::DiscoverableProtocolName<fuchsia_component::Realm>,
-                        fuchsia_io::Flags::kProtocolService,
-                        {},
-                        realm_server_end.TakeChannel()});
+      directory->Open({fidl::DiscoverableProtocolName<fuchsia_component::Realm>,
+                       fuchsia_io::Flags::kProtocolService,
+                       {},
+                       realm_server_end.TakeChannel()});
   if (realm_connect_result.is_error()) {
     return fit::error(debug::ZxStatus(realm_connect_result.error_value().status()));
   }

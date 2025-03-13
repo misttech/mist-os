@@ -4,6 +4,7 @@
 
 import("//build/python/python_action.gni")
 import("//build/python/python_binary.gni")
+import("//build/python/python_library.gni")
 import("//build/testing/golden_files.gni")
 import("../libc.gni")
 import("libc_headers.gni")
@@ -33,10 +34,31 @@ import("libc_headers.gni")
 # API summary files for the SDK, for a change that go through API review.
 llvm_libc_soft_transition = false
 
+# When the llvm-libc hdrgen sources change incompatibly, then a more thorough
+# kind of soft transition is required.  In that case, there's no way to do any
+# header generation.  So even libc's own code has to use the llvm-libc-golden
+# files instead of "current" files.  This scenario is much more rare than the
+# generic llvm_libc_soft_transition scenario.
+llvm_libc_hdrgen_transition = false
+
+# Files generated from "$llvm_libc/include/*.yaml" files.  This list drives the
+# generation work done here, including regenerating llvm-libc-generated.json
+# using the golden_files() mechanism.  However, the golden JSON file in the
+# source tree is what drives the libc_headers.gni lists that everything else
+# uses.  After changing this list, the next build with update_goldens=true will
+# update the JSON file in the sources; that will necessitate another build to
+# pick up the new lists and complete the update of llvm-libc-golden files.
+llvm_libc_generated_headers = [
+  "fenv.h",
+  "malloc.h",
+]
+
 # Generated headers go into this directory, always the same in every toolchain.
-gen_dir =
-    get_label_info("//third_party/llvm-libc/src/include($default_toolchain)",
-                   "target_gen_dir")
+if (!llvm_libc_hdrgen_transition) {
+  gen_dir =
+      get_label_info("//third_party/llvm-libc/src/include($default_toolchain)",
+                     "target_gen_dir")
+}
 
 # This target is in an sdk.deps list in sysroot_entries, to ensure that the
 # llvm-libc-golden copies are up to date.  It does nothing during a soft
@@ -44,24 +66,25 @@ gen_dir =
 # checking only happens in the $default_toolchain and is not repeated
 # elsewhere.
 group("include") {
-  if (!llvm_libc_soft_transition) {
-    public_deps = [ ":check-llvm-libc-golden($default_toolchain)" ]
+  if (!llvm_libc_hdrgen_transition) {
+    public_deps = [ ":check-llvm-libc-json($default_toolchain)" ]
+  }
+  if (!llvm_libc_soft_transition && !llvm_libc_hdrgen_transition) {
+    public_deps += [ ":check-llvm-libc-golden($default_toolchain)" ]
   }
 }
 
-if (current_toolchain == default_toolchain) {
+if (current_toolchain == default_toolchain && !llvm_libc_hdrgen_transition) {
   # If the comparisons list goes directly into golden_files() as a list of
   # scopes, then each golden file will be an input and Ninja will insist that
-  # it already exist before running anything.  With the list it in a JSON file,
+  # it already exist before running anything.  With the list in a JSON file,
   # the golden_files() action gets a chance to run and create new files.
   generated_file("check-llvm-libc-golden.manifest") {
     visibility = [ ":check-llvm-libc-golden" ]
     outputs = [ "$target_gen_dir/$target_name" ]
     output_conversion = "json"
     contents = []
-    foreach(file,
-            libc_headers.llvm_libc_public_headers +
-                libc_headers.llvm_libc_impl_headers) {
+    foreach(file, libc_headers.llvm_libc_impl_headers) {
       contents += [
         {
           candidate = rebase_path(file, root_build_dir, "$llvm_libc/include")
@@ -69,7 +92,7 @@ if (current_toolchain == default_toolchain) {
         },
       ]
     }
-    foreach(file, libc_headers.llvm_libc_generated_headers) {
+    foreach(file, llvm_libc_generated_headers) {
       contents += [
         {
           candidate = rebase_path(file, root_build_dir, gen_dir)
@@ -101,7 +124,7 @@ if (current_toolchain == default_toolchain) {
 
     sources = []
     generated_headers = []
-    foreach(header, libc_headers.llvm_libc_generated_headers) {
+    foreach(header, llvm_libc_generated_headers) {
       header_dir = get_path_info(header, "dir")
       header_name = get_path_info(header, "name")
       if (header_dir == ".") {
@@ -141,6 +164,44 @@ if (current_toolchain == default_toolchain) {
       # present for analysis.
       generated_sources = rebase_path(generated_headers, root_build_dir)
     }
+  }
+
+  python_action("llvm-libc-json") {
+    visibility = [ ":*" ]
+    binary_label = ":hdrgen"
+
+    sources = []
+    foreach(header, llvm_libc_generated_headers) {
+      header_dir = get_path_info(header, "dir")
+      header_name = get_path_info(header, "name")
+      if (header_dir == ".") {
+        header_dir = ""
+      } else {
+        header_dir += "/"
+      }
+      sources += [ "$llvm_libc/include/$header_dir$header_name.yaml" ]
+    }
+
+    outputs = [ "$target_gen_dir/llvm-libc-generated.json" ]
+    depfile = "${outputs[0]}.d"
+    args = [
+             "--output=" + rebase_path(outputs[0], root_build_dir),
+             "--depfile=" + rebase_path(depfile, root_build_dir),
+             "--write-if-changed",
+             "--json",
+           ] + rebase_path(sources, root_build_dir)
+  }
+
+  golden_files("check-llvm-libc-json") {
+    visibility = [ ":*" ]
+    deps = [ ":llvm-libc-json" ]
+    _json_outputs = get_target_outputs(deps[0])
+    comparisons = [
+      {
+        golden = libc_headers.llvm_libc_json_file
+        candidate = _json_outputs[0]
+      },
+    ]
   }
 }
 
@@ -183,16 +244,25 @@ basic_source_set("headers") {
     public += [ "${libc_headers.musl_dir}/$file" ]
   }
 
-  foreach(file,
-          libc_headers.llvm_libc_public_headers +
-              libc_headers.llvm_libc_impl_headers) {
-    public += [ "$llvm_libc/include/$file" ]
-  }
+  if (llvm_libc_hdrgen_transition) {
+    # When hdrgen is not available, libc code will use the llvm-libc-golden
+    # files that everything else is using via the sysroot, rather than the
+    # $llvm_libc/include and generated files, but directly and still not via
+    # the sysroot.
+    foreach(file,
+            libc_headers.llvm_libc_impl_headers + llvm_libc_generated_headers) {
+      public += [ "llvm-libc-golden/$file" ]
+    }
+  } else {
+    foreach(file, libc_headers.llvm_libc_impl_headers) {
+      public += [ "$llvm_libc/include/$file" ]
+    }
 
-  foreach(file, libc_headers.llvm_libc_generated_headers) {
-    public += [ "$gen_dir/$file" ]
+    foreach(file, llvm_libc_generated_headers) {
+      public += [ "$gen_dir/$file" ]
+    }
+    public_deps += [ ":llvm-libc-generated-headers($default_toolchain)" ]
   }
-  public_deps += [ ":llvm-libc-generated-headers($default_toolchain)" ]
 
   public_deps += [ "//zircon/system/public" ]
 }
@@ -200,13 +270,19 @@ basic_source_set("headers") {
 config("headers.config") {
   visibility = [ ":*" ]
   cflags = []
-  foreach(dir,
-          [
-            ".",
-            libc_headers.musl_dir,
-            gen_dir,
-            "$llvm_libc/include",
-          ]) {
+  dirs = [
+    ".",
+    libc_headers.musl_dir,
+  ]
+  if (llvm_libc_hdrgen_transition) {
+    dirs += [ "llvm-libc-golden" ]
+  } else {
+    dirs += [
+      gen_dir,
+      "$llvm_libc/include",
+    ]
+  }
+  foreach(dir, dirs) {
     cflags += [
       "-idirafter",
       rebase_path(dir, root_build_dir),
@@ -215,24 +291,39 @@ config("headers.config") {
   asmflags = cflags
 }
 
-python_binary("hdrgen") {
-  visibility = [ ":*" ]
-
+if (!llvm_libc_hdrgen_transition) {
   hdrgen_dir = "$llvm_libc/utils/hdrgen"
-  main_source = "$hdrgen_dir/main.py"
-  sources = [
-    "$hdrgen_dir/enumeration.py",
-    "$hdrgen_dir/function.py",
-    "$hdrgen_dir/gpu_headers.py",
-    "$hdrgen_dir/header.py",
-    "$hdrgen_dir/macro.py",
-    "$hdrgen_dir/object.py",
-    "$hdrgen_dir/type.py",
-    "$hdrgen_dir/yaml_to_classes.py",
-  ]
-  deps = [ "//third_party/pyyaml:yaml" ]
 
-  enable_mypy = false
+  python_binary("hdrgen") {
+    visibility = [ ":*" ]
+
+    main_source = "$hdrgen_dir/main.py"
+    deps = [ ":hdrgen.library" ]
+
+    enable_mypy = false
+  }
+
+  python_library("hdrgen.library") {
+    visibility = [ ":*" ]
+
+    library_name = "hdrgen"
+    source_root = "$hdrgen_dir/hdrgen"
+    sources = [
+      "__init__.py",
+      "enumeration.py",
+      "function.py",
+      "gpu_headers.py",
+      "header.py",
+      "macro.py",
+      "main.py",
+      "object.py",
+      "type.py",
+      "yaml_to_classes.py",
+    ]
+    library_deps = [ "//third_party/pyyaml:yaml" ]
+
+    enable_mypy = false
+  }
 }
 
 # Generate standlaone "#include <foo.h>" compile-time tests for each public
@@ -343,26 +434,47 @@ foreach(version, header_test_stdcxx) {
             "c",
             "gnu",
           ]) {
-    unittest_deps += [ ":header-tests.${prefix}xx$version" ]
-    libc_test("header-tests.${prefix}xx$version") {
-      sources = header_test_cxx_sources
-      deps = header_test_cxx_deps
+    # libc++ provides wrapper headers that interpose on various libc headers.
+    # Those will be found implicitly in preference to the libc headers, unless
+    # -nostdinc++ is used.  The libc headers should be usable and warning-clean
+    # when used in C++ language modes directly without the libc++ wrappers;
+    # they won't be standard C++ library compatible with `std::` namespace
+    # declarations and such, but they should not get compilation errors.
+    #
+    # The libc headers should also be usable (and warning-clean) when used via
+    # libc++'s wrapper headers.  So test both ways.
+    foreach(libcxx,
+            [
+              "",
+              "-libcxx",
+            ]) {
+      unittest_deps += [ ":header-tests.${prefix}xx$version$libcxx" ]
+      libc_test("header-tests.${prefix}xx$version$libcxx") {
+        sources = header_test_cxx_sources
+        deps = header_test_cxx_deps
 
-      # The <zircon/*.h> headers (and their transitive dependencies on syscall
-      # headers) don't need to support C++ < 17.
-      if (version != "03" && version >= 17) {
-        sources += header_test_zircon_cxx_sources
-        deps += header_test_zircon_cxx_deps
+        # The <zircon/*.h> headers (and their transitive dependencies on
+        # syscall headers) don't need to support C++ < 17.
+        if (version != "03" && version >= 17) {
+          sources += header_test_zircon_cxx_sources
+          deps += header_test_zircon_cxx_deps
+        }
+
+        deps += [ ":headers" ]
+        configs = [ ":test.$prefix++$version" ]
+        if (libcxx == "") {
+          # Don't use the libc++ headers.
+          configs += [ "//build/config:no-libc++-include" ]
+          remove_configs = [ "//build/config:libc++-include" ]
+
+          # The libc++ headers are not warning-clean, and instead rely on the
+          # system-headers exemption from warnings.  This is an unfortunate and
+          # counterproductive choice by the libc++ maintainers and it should be
+          # changed, but it is unlikely to change soon.  If it ever does
+          # change, then this should be added unconditionally.
+          configs += [ "//build/config:Wsystem-headers" ]
+        }
       }
-
-      deps += [ ":headers" ]
-      configs = [
-        ":test.$prefix++$version",
-        "//build/config:Wsystem-headers",
-
-        # libc++ headers are not warning-clean.
-        "//build/config:Wno-conversion",
-      ]
     }
 
     config("test.$prefix++$version") {

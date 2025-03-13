@@ -129,7 +129,7 @@ class ComponentContextStaticConstructorTest : public gtest::RealLoopFixture {
     // Allow the run loop to drain so that any messages that constructor_helper_proc
     // sent are processed.
     RunLoopUntilIdle();
-    return process_info.return_code;
+    return static_cast<int>(process_info.return_code);
   }
 
   void TearDown() override {

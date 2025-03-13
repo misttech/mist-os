@@ -228,7 +228,13 @@ TEST(TransactionElimination, ForeignQueueSysmem) {
                                      VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME,
                                  })
                                  .Build());
+#if VK_HEADER_VERSION < 301
+  // TODO(https://fxbug.dev/379153784): Delete this once the migration is done.
   vk::DispatchLoaderDynamic loader;
+#else   // VK_HEADER_VERSION >= 301
+  vk::detail::DispatchLoaderDynamic loader;
+#endif  // VK_HEADER_VERSION < 301
+
   loader.init(vkp_instance.get(), vkGetInstanceProcAddr);
 
   vkp::DebugUtilsMessenger vkp_debug_messenger(vkp_instance.shared());

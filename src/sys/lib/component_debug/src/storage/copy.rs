@@ -106,7 +106,7 @@ mod test {
             // Serve the root directory
             // Rewind on root directory should succeed
             let request = root_dir.try_next().await;
-            if let Ok(Some(fio::DirectoryRequest::Open3 { path, flags, object, .. })) = request {
+            if let Ok(Some(fio::DirectoryRequest::Open { path, flags, object, .. })) = request {
                 if path == "from_local" {
                     assert!(flags.intersects(fio::Flags::FLAG_MAYBE_CREATE));
                     setup_fake_file_from_local(node_to_file(object.into()));

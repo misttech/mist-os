@@ -178,6 +178,10 @@ typedef uint32_t zx_signals_t;
 // IOBuffer
 #define ZX_IOB_PEER_CLOSED          __ZX_OBJECT_PEER_CLOSED
 
+// Counter
+#define ZX_COUNTER_POSITIVE          __ZX_OBJECT_SIGNAL_4
+#define ZX_COUNTER_NON_POSITIVE      __ZX_OBJECT_SIGNAL_5
+
 // global kernel object id.
 // Note: kernel object ids use 63 bits, with the most significant bit being zero.
 // The remaining values (msb==1) are for use by programs and tools that wish to
@@ -476,7 +480,8 @@ typedef uint32_t zx_obj_type_t;
 #define ZX_OBJ_TYPE_STREAM          ((zx_obj_type_t)31u)
 #define ZX_OBJ_TYPE_MSI             ((zx_obj_type_t)32u)
 #define ZX_OBJ_TYPE_IOB             ((zx_obj_type_t)33u)
-#define ZX_OBJ_TYPE_STRANIX_TASK    ((zx_obj_type_t)34u)
+#define ZX_OBJ_TYPE_COUNTER         ((zx_obj_type_t)34u)
+#define ZX_OBJ_TYPE_STRANIX_TASK    ((zx_obj_type_t)35u)
 
 // For backwards compatibility.
 #define ZX_OBJ_TYPE_LOG             ZX_OBJ_TYPE_DEBUGLOG

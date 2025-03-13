@@ -27,6 +27,8 @@
 #include <zircon/status.h>
 #include <zircon/threads.h>
 
+#include "src/connectivity/bluetooth/hci/vendor/broadcom/packets.h"
+
 namespace bt_hci_broadcom {
 namespace fhbt = fuchsia_hardware_bluetooth;
 namespace fhsi = fuchsia_hardware_serialimpl::wire;
@@ -332,6 +334,25 @@ fpromise::promise<void, zx_status_t> BtHciBroadcom::SetBdaddr(
   return SendCommand(&command.header, sizeof(command)).and_then([](std::vector<uint8_t>&) {});
 }
 
+fpromise::promise<void, zx_status_t> BtHciBroadcom::SetDefaultPowerCaps() {
+  if (serial_pid_ != PDEV_PID_BCM4381A1) {
+    return fpromise::make_promise(
+        []() { return fpromise::make_result_promise<void, zx_status_t>(fpromise::ok()); });
+  }
+  return SendCommand(&kDefaultPowerCapCmd, sizeof(kDefaultPowerCapCmd))
+      .and_then([](std::vector<uint8_t>& cmd_complete) {
+        if (sizeof(HciCommandComplete) <= cmd_complete.size()) {
+          HciCommandComplete event;
+          std::memcpy(&event, cmd_complete.data(), sizeof(event));
+          if (event.return_code == 0x00) {
+            FDF_LOG(INFO, "set default power caps");
+          } else {
+            FDF_LOG(WARNING, "failed to set default power caps: 0x%02x", event.return_code);
+          }
+        }
+      });
+}
+
 fpromise::result<std::array<uint8_t, kMacAddrLen>, zx_status_t>
 BtHciBroadcom::GetBdaddrFromBootloader() {
   std::array<uint8_t, kMacAddrLen> mac_addr;
@@ -397,6 +418,7 @@ fpromise::promise<void, zx_status_t> BtHciBroadcom::LoadFirmware() {
   zx::vmo fw_vmo;
   size_t fw_size;
 
+
   // If there's no firmware for this PID, we don't expect the bind to happen without a
   // corresponding entry in the firmware table. Please double-check the PID value and add an entry
   // to the firmware table if it's valid.
@@ -404,7 +426,7 @@ fpromise::promise<void, zx_status_t> BtHciBroadcom::LoadFirmware() {
                 serial_pid_);
 
   std::string full_filename = "/pkg/lib/firmware/";
-  full_filename.append(kFirmwareMap.at(serial_pid_).c_str());
+  full_filename.append(kFirmwareMap.at(serial_pid_));
 
   auto client = incoming()->Open<fuchsia_io::File>(full_filename.c_str(), kOpenFlags);
   if (client.is_error()) {
@@ -597,6 +619,7 @@ fpromise::promise<void, zx_status_t> BtHciBroadcom::Initialize() {
         // send Set BDADDR command
         return SetBdaddr(bdaddr.value());
       })
+      .and_then([this]() { return SetDefaultPowerCaps(); })
       .and_then([this]() { return AddNode(); })
       .then([this](fpromise::result<void, zx_status_t>& result) {
         zx_status_t status = result.is_ok() ? ZX_OK : result.error();

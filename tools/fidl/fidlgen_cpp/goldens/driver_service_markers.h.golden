@@ -22,6 +22,6 @@ class SomeDriverProtocol final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_driverservice::SomeDriverProtocol> : public std::true_type{};
+struct IsProtocol<::test_driverservice::SomeDriverProtocol> : public std::true_type {};
 
 }  // namespace fidl

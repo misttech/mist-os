@@ -310,10 +310,7 @@ impl TryFrom<fidl_sme::Incompatible> for Incompatible {
         {
             Ok(converted_security_protocols) => {
                 Incompatible::try_from_features(description.clone(), converted_security_protocols)
-                    .ok_or_else(|| fidl_sme::Incompatible {
-                        description,
-                        disjoint_security_protocols,
-                    })
+                    .ok_or(fidl_sme::Incompatible { description, disjoint_security_protocols })
             }
             Err(_) => Err(fidl_sme::Incompatible { description, disjoint_security_protocols }),
         }

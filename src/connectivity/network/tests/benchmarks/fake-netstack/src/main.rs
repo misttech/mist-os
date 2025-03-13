@@ -688,6 +688,13 @@ async fn handle_datagram_request(
                 .send(Ok((from, &data, &Default::default(), truncated.try_into().unwrap())))
                 .context("send RecvMsg response")?;
         }
+        fposix_socket::SynchronousDatagramSocketRequest::SetMark {
+            domain: _,
+            mark: _,
+            responder,
+        } => {
+            responder.send(Ok(())).context("send SetMark response")?;
+        }
         other => error!("got unexpected datagram socket request: {:#?}", other),
     }
     Ok(())
@@ -796,6 +803,9 @@ async fn handle_stream_request(
         }
         fposix_socket::StreamSocketRequest::SetTcpQuickAck { value: _, responder } => {
             responder.send(Ok(())).context("send SetTcpQuickAck response")?;
+        }
+        fposix_socket::StreamSocketRequest::SetMark { domain: _, mark: _, responder } => {
+            responder.send(Ok(())).context("send SetMark response")?;
         }
         other => {
             error!("got unexpected stream socket request: {:#?}", other);

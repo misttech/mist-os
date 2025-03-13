@@ -6,9 +6,15 @@ use addr::TargetAddr;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
+use discovery::events::TargetEvent;
+use discovery::{
+    DiscoveryBuilder, FastbootConnectionState, TargetDiscovery, TargetHandle, TargetState,
+};
 use errors::ffx_bail;
+use fastboot_file_discovery::FASTBOOT_FILE_PATH;
 use ffx_bootloader_args::SubCommand::{Boot, Info, Lock, Unlock};
 use ffx_bootloader_args::{BootCommand, BootloaderCommand, UnlockCommand};
+use ffx_config::EnvironmentContext;
 use ffx_fastboot::boot::boot;
 use ffx_fastboot::common::fastboot::{
     tcp_proxy, udp_proxy, usb_proxy, FastbootNetworkConnectionConfig,
@@ -20,19 +26,25 @@ use ffx_fastboot::lock::lock;
 use ffx_fastboot::unlock::unlock;
 use ffx_fastboot::util::{Event, UnlockEvent};
 use ffx_fastboot_interface::fastboot_interface::{FastbootInterface, UploadProgress, Variable};
-use fho::{FfxContext, FfxMain, FfxTool, VerifiedMachineWriter};
-use fidl_fuchsia_developer_ffx::{
-    FastbootInterface as FidlFastbootInterface, TargetInfo, TargetRebootState, TargetState,
+use ffx_writer::VerifiedMachineWriter;
+use fho::{
+    deferred, return_bug, return_user_error, user_error, FfxContext, FfxMain, FfxTool,
+    FhoTargetInfo,
 };
-use fuchsia_async::{MonotonicInstant, Timer};
-use futures::try_join;
+use fidl::Error;
+use fidl_fuchsia_developer_ffx::TargetState as FidlTargetState;
+use fidl_fuchsia_hardware_power_statecontrol::AdminProxy;
+use fidl_fuchsia_hwinfo::DeviceProxy;
+use futures::{try_join, FutureExt, StreamExt};
 use schemars::JsonSchema;
 use serde::Serialize;
+use std::cell::RefCell;
+use std::collections::HashSet;
 use std::io::{stdin, Write};
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::sync::Once;
-use target_holders::TargetProxyHolder;
+use std::rc::Rc;
+use target_holders::{moniker, TargetInfoHolder};
 use termion::{color, style};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Receiver;
@@ -42,13 +54,16 @@ const MISSING_ZBI: &str = "Error: vbmeta parameter must be used with zbi paramet
 const WARNING: &str = "WARNING: ALL SETTINGS USER CONTENT WILL BE ERASED!\n\
                         Do you want to continue? [yN]";
 
-const WAIT_WARN_SECS: u64 = 20;
-
 #[derive(FfxTool)]
 pub struct BootloaderTool {
     #[command]
     cmd: BootloaderCommand,
-    target_proxy: TargetProxyHolder,
+    target_info: TargetInfoHolder,
+    ctx: EnvironmentContext,
+    #[with(deferred(moniker("/bootstrap/shutdown_shim")))]
+    power_proxy: fho::Deferred<AdminProxy>,
+    #[with(deferred(moniker("/core/hwinfo")))]
+    device_proxy: fho::Deferred<DeviceProxy>,
 }
 
 fho::embedded_plugin!(BootloaderTool);
@@ -88,153 +103,249 @@ impl FfxMain for BootloaderTool {
     type Writer = VerifiedMachineWriter<BootloaderToolMessage>;
 
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
-        let mut info = self.target_proxy.identity().await.map_err(|e| anyhow!(e))?;
-
-        fn display_name(info: &TargetInfo) -> &str {
-            info.nodename.as_deref().or(info.serial_number.as_deref()).unwrap_or("<unknown>")
-        }
-
-        match info.target_state {
-            Some(TargetState::Fastboot) => {
+        let target_state = match &self.target_info.target_state {
+            Some(FidlTargetState::Fastboot) => {
                 // Nothing to do
                 tracing::debug!("Target already in Fastboot state");
+
+                let s: discovery::TargetHandle = (*self.target_info).clone().try_into()?;
+                s.state
             }
-            Some(TargetState::Disconnected) => {
-                // Nothing to do, for a slightly different reason.
-                // Since there's no knowledge about the state of the target, assume the
-                // target is in Fastboot.
-                tracing::info!("Target not connected, assuming Fastboot state");
-            }
-            Some(mode) => {
+            Some(FidlTargetState::Product) => {
+                if self.ctx.is_strict() {
+                    return_user_error!(
+                        r"
+When running in strict mode, this tool does not support Targets in Product mode.
+Reboot the Target to the bootloader and re-run this command."
+                    );
+                }
                 // Wait to allow the Target to fully cycle to the bootloader
-                writeln!(writer, "Waiting for Target to reboot to bootloader")
+                writeln!(writer, "Rebooting Target to bootloader")
                     .user_message("Error writing user message")?;
                 writer.flush().user_message("Error flushing writer buffer")?;
 
+                // Should probably get the serial number of the target just in case
+                let device = self.device_proxy.await.bug_context("Initializing device proxy")?;
+                let info = device.get_info().await.bug_context("Getting target device info")?;
+
                 // Tell the target to reboot to the bootloader
-                tracing::debug!("Target in {:#?} state. Rebooting to bootloader...", mode);
-                self.target_proxy
-                    .reboot(TargetRebootState::Bootloader)
-                    .await
-                    .user_message("Got error rebooting")?
-                    .map_err(|e| anyhow!("Got error rebooting target: {:#?}", e))
-                    .user_message("Got an error rebooting")?;
+                tracing::debug!("Target in Product state. Rebooting to bootloader...",);
 
-                let wait_duration = Duration::seconds(1)
-                    .to_std()
-                    .user_message("Error converting 1 seconds to Duration")?;
+                let p_proxy = self.power_proxy.await?;
 
-                let once = Once::new();
-                let start = MonotonicInstant::now();
-                loop {
-                    // Get the info again since the target changed state
-                    info = self
-                        .target_proxy
-                        .identity()
-                        .await
-                        .user_message("Error getting the target's identity")?;
+                // These calls erroring is fine...
+                match p_proxy.reboot_to_bootloader().await {
+                    Ok(_) => {}
+                    Err(e) => handle_fidl_connection_err(e)?,
+                };
 
-                    if matches!(info.target_state, Some(TargetState::Fastboot)) {
-                        break;
-                    }
+                // Do discovery of the target... and try to find it again then
+                // return the appropriate information
+                let emulator_instance_root: PathBuf = self
+                    .ctx
+                    .get("emu.instance_dir")
+                    .map_err(|e| user_error!("Unable to get config value: {:#?}", e))?;
+                let fastboot_file_path: PathBuf = self
+                    .ctx
+                    .get(FASTBOOT_FILE_PATH)
+                    .map_err(|e| user_error!("Unable to get config value: {:#?}", e))?;
+                let disco = DiscoveryBuilder::default()
+                    .notify_removed(false)
+                    .with_emulator_instance_root(emulator_instance_root)
+                    .with_fastboot_devices_file_path(fastboot_file_path)
+                    .build();
 
-                    if MonotonicInstant::now() - start
-                        > fuchsia_async::MonotonicDuration::from_secs(WAIT_WARN_SECS)
-                    {
-                        once.call_once(|| {
-                            let _ = writeln!(
-                                writer,
-                                "Have been waiting for Target \
-                                                {} to reboot to bootloader for \
-                                                more than {} seconds but still \
-                                                have not rediscovered it. You \
-                                                may want to cancel this \
-                                                operation and check your \
-                                                connection to the target",
-                                display_name(&info),
-                                WAIT_WARN_SECS
-                            );
-                        });
-                    }
-
-                    tracing::debug!("Target was requested to reboot to the bootloader, but was found in {:#?} state. Waiting 1 second.", info.target_state);
-                    Timer::new(wait_duration).await;
+                #[derive(Clone)]
+                struct Criteria {
+                    serial: Option<String>,
                 }
+
+                let criteria = Criteria { serial: info.serial_number.clone() };
+                let c_clone = criteria.clone();
+
+                let filter_target = move |handle: &TargetHandle| {
+                    tracing::debug!("Considering handle: {:#?}", handle);
+                    match &handle.state {
+                        discovery::TargetState::Fastboot(fts)
+                            if Some(fts.serial_number.clone()) == c_clone.serial =>
+                        {
+                            true
+                        }
+                        _ => {
+                            tracing::debug!("Skipping handle: {:#?}", handle);
+                            false
+                        }
+                    }
+                };
+
+                let stream = disco.discover_devices(filter_target).await?;
+                let timer =
+                    fuchsia_async::Timer::new(std::time::Duration::from_millis(100000)).fuse();
+                let found_target_event = async_utils::event::Event::new();
+                let found_it = found_target_event.wait().fuse();
+                let seen = Rc::new(RefCell::new(HashSet::new()));
+                let discovered_devices_stream = stream
+                    .filter_map(move |ev| {
+                        let c_clone = criteria.clone();
+                        let found_ev = found_target_event.clone();
+                        let seen = seen.clone();
+                        async move {
+                            match ev {
+                                Ok(TargetEvent::Added(ref h)) => {
+                                    if seen.borrow().contains(h) {
+                                        None
+                                    } else {
+                                        match &h.state {
+                                            discovery::TargetState::Fastboot(fts) => {
+                                                match c_clone.serial {
+                                                    Some(c) if c == fts.serial_number => {
+                                                        tracing::debug!(
+                                                            "Found the target, firing signal"
+                                                        );
+                                                        found_ev.signal();
+                                                    }
+                                                    _ => {}
+                                                }
+                                            }
+                                            _ => {}
+                                        }
+                                        seen.borrow_mut().insert(h.clone());
+                                        Some(Ok((*h).clone()))
+                                    }
+                                }
+                                // We've only asked for Added events
+                                Ok(_) => unreachable!(),
+                                Err(e) => Some(Err(e)),
+                            }
+                        }
+                    })
+                    .take_until(futures_lite::future::race(timer, found_it));
+
+                let mut discovered_devices =
+                    discovered_devices_stream.collect::<Vec<Result<_, _>>>().await;
+
+                assert!(discovered_devices.len() == 1);
+                let device_res = discovered_devices.pop().unwrap();
+                (device_res?).state
+            }
+            Some(FidlTargetState::Unknown) => {
+                ffx_bail!("Target is in an Unknown state.");
+            }
+            Some(FidlTargetState::Zedboot) => {
+                ffx_bail!("Bootloader operations not supported with Zedboot");
+            }
+            Some(FidlTargetState::Disconnected) => {
+                tracing::info!("Target: {:#?} not connected bailing", self.target_info);
+                ffx_bail!("Target is disconnected...");
             }
             None => {
                 ffx_bail!("Target had an unknown, non-existant state")
             }
         };
-        match info.fastboot_interface {
-            None => {
-                ffx_bail!("Could not connect to {}: Target not in fastboot", display_name(&info))
-            }
-            Some(FidlFastbootInterface::Usb) => {
-                let serial_num = info.serial_number.ok_or_else(|| {
-                    anyhow!("Target was detected in Fastboot USB but did not have a serial number")
-                })?;
-                let proxy = usb_proxy(serial_num).await?;
-                bootloader_impl(proxy, self.cmd, &mut writer).await
-            }
-            Some(FidlFastbootInterface::Udp) => {
-                // We take the first address as when a target is in Fastboot mode and over
-                // UDP it only exposes one address
-                if let Some(addr) = info.addresses.unwrap().into_iter().take(1).next() {
-                    let target_addr: TargetAddr = addr.into();
-                    let socket_addr: SocketAddr = target_addr.into();
-                    let target_name = if let Some(nodename) = info.nodename {
-                        nodename
-                    } else {
-                        tracing::debug!(
-                            r"
-Warning: the target does not have a node name and is in UDP fastboot mode.
-Rediscovering the target after bootloader reboot will be impossible.
-Using address {} as node name",
-                            socket_addr.to_string()
-                        );
-                        socket_addr.to_string()
-                    };
-                    let config = FastbootNetworkConnectionConfig::new_udp().await;
-                    let fastboot_device_file_path: Option<PathBuf> =
-                        ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).ok();
-                    let proxy =
-                        udp_proxy(target_name, fastboot_device_file_path, &socket_addr, config)
+
+        match target_state {
+            TargetState::Fastboot(fastboot_state) => {
+                match fastboot_state.connection_state {
+                    FastbootConnectionState::Usb => {
+                        let proxy = usb_proxy(fastboot_state.serial_number).await?;
+                        bootloader_impl(proxy, self.cmd, &mut writer).await
+                    }
+                    FastbootConnectionState::Tcp(addrs) => {
+                        // We take the first address as when a target is in Fastboot mode and over
+                        // TCP it only exposes one address
+                        if let Some(addr) = addrs.into_iter().take(1).next() {
+                            let target_addr: TargetAddr = addr.into();
+                            let socket_addr: SocketAddr = target_addr.into();
+                            let target_name = if let Some(nodename) = self.target_info.nodename() {
+                                nodename
+                            } else {
+                                tracing::debug!(
+                                    r"
+            Warning: the target does not have a node name and is in TCP fastboot mode.
+            Rediscovering the target after bootloader reboot will be impossible.
+            Using address {} as node name
+            ",
+                                    socket_addr.to_string()
+                                );
+                                socket_addr.to_string()
+                            };
+                            let config = FastbootNetworkConnectionConfig::new_tcp().await;
+                            let fastboot_device_file_path: Option<PathBuf> =
+                                ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).ok();
+                            let proxy = tcp_proxy(
+                                target_name.to_string(),
+                                fastboot_device_file_path,
+                                &socket_addr,
+                                config,
+                            )
                             .await?;
-                    bootloader_impl(proxy, self.cmd, &mut writer).await
-                } else {
-                    ffx_bail!("Could not get a valid address for target");
+                            bootloader_impl(proxy, self.cmd, &mut writer).await
+                        } else {
+                            ffx_bail!("Could not get a valid address for target");
+                        }
+                    }
+                    FastbootConnectionState::Udp(addrs) => {
+                        // We take the first address as when a target is in Fastboot mode and over
+                        // UDP it only exposes one address
+                        if let Some(addr) = addrs.into_iter().take(1).next() {
+                            let target_addr: TargetAddr = addr.into();
+                            let socket_addr: SocketAddr = target_addr.into();
+                            let target_name = if let Some(nodename) = self.target_info.nodename() {
+                                nodename.to_string()
+                            } else {
+                                tracing::debug!(
+                                    r"
+        Warning: the target does not have a node name and is in UDP fastboot mode.
+        Rediscovering the target after bootloader reboot will be impossible.
+        Using address {} as node name",
+                                    socket_addr.to_string()
+                                );
+                                socket_addr.to_string()
+                            };
+                            let config = FastbootNetworkConnectionConfig::new_udp().await;
+                            let fastboot_device_file_path: Option<PathBuf> =
+                                ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).ok();
+                            let proxy = udp_proxy(
+                                target_name,
+                                fastboot_device_file_path,
+                                &socket_addr,
+                                config,
+                            )
+                            .await?;
+                            bootloader_impl(proxy, self.cmd, &mut writer).await
+                        } else {
+                            ffx_bail!("Could not get a valid address for target");
+                        }
+                    }
                 }
             }
-            Some(FidlFastbootInterface::Tcp) => {
-                // We take the first address as when a target is in Fastboot mode and over
-                // TCP it only exposes one address
-                if let Some(addr) = info.addresses.unwrap().into_iter().take(1).next() {
-                    let target_addr: TargetAddr = addr.into();
-                    let socket_addr: SocketAddr = target_addr.into();
-                    let target_name = if let Some(nodename) = info.nodename {
-                        nodename
-                    } else {
-                        tracing::debug!(
-                            r"
-Warning: the target does not have a node name and is in TCP fastboot mode.
-Rediscovering the target after bootloader reboot will be impossible.
-Using address {} as node name
-",
-                            socket_addr.to_string()
-                        );
-                        socket_addr.to_string()
-                    };
-                    let config = FastbootNetworkConnectionConfig::new_tcp().await;
-                    let fastboot_device_file_path: Option<PathBuf> =
-                        ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).ok();
-                    let proxy =
-                        tcp_proxy(target_name, fastboot_device_file_path, &socket_addr, config)
-                            .await?;
-                    bootloader_impl(proxy, self.cmd, &mut writer).await
-                } else {
-                    ffx_bail!("Could not get a valid address for target");
-                }
+            _ => {
+                ffx_bail!("This is unsupported")
             }
+        }
+    }
+}
+
+fn handle_fidl_connection_err(e: Error) -> fho::Result<()> {
+    match e {
+        Error::ClientChannelClosed { protocol_name, .. } => {
+            // Changing this to an info from warn since reboot has succeeded The assumption that
+            // reboot has succeeded is correct since we received a ClientChannelClosed
+            // successfully. So let's just make the message clearer to the user.
+            //
+            // Check the 'protocol_name' and if it is 'fuchsia.hardware.power.statecontrol.Admin'
+            // then we can be more confident that target reboot/shutdown has succeeded.
+            if protocol_name == "fuchsia.hardware.power.statecontrol.Admin" {
+                tracing::info!("Target reboot succeeded.");
+            } else {
+                tracing::info!("Assuming target reboot succeeded. Client received a PEER_CLOSED from '{protocol_name}'");
+            }
+            tracing::debug!("{:?}", e);
+            Ok(())
+        }
+        _ => {
+            tracing::error!("Target communication error: {:?}", e);
+            return_bug!("Target communication error: {:?}", e)
         }
     }
 }
@@ -498,7 +609,7 @@ mod test {
     use ffx_bootloader_args::LockCommand;
     use ffx_fastboot::common::vars::LOCKED_VAR;
     use ffx_fastboot::test::setup;
-    use fho::Format;
+    use ffx_writer::Format;
     use tempfile::NamedTempFile;
 
     #[fuchsia_async::run_singlethreaded(test)]

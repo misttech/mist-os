@@ -23,7 +23,7 @@ test("virtio-netdevice-test") {
     ":virtio_netdevice_lib",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
-    "//src/devices/bus/lib/virtio",
+    "//src/devices/bus/lib/virtio:virtio-dfv1",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/mock-ddk",
     "//src/lib/fxl",
@@ -45,7 +45,7 @@ source_set("virtio_netdevice_lib") {
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_cpp",
     "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_banjo_cpp",
     "//src/connectivity/network/drivers/network-device/device:shared_lock",
-    "//src/devices/bus/lib/virtio",
+    "//src/devices/bus/lib/virtio:virtio-dfv1",
     "//src/devices/lib/dev-operation",
     "//src/lib/ddktl",
     "//src/lib/vmo_store",
@@ -53,6 +53,7 @@ source_set("virtio_netdevice_lib") {
 }
 
 fuchsia_cc_driver("virtio_netdevice-driver") {
+  legacy = true
   output_name = "virtio_netdevice"
   sources = [ "netdevice_driver.cc" ]
   deps = [

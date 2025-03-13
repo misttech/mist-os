@@ -13,14 +13,18 @@
                     "-p",
                     "fuchsia-vendored-python"
                 ],
-                "board_script_path": "scripts/zbi_signing_script"
+                "board_script_path": "filesystems/zbi/postprocessing_script/zbi_signing_script",
+                "inputs": {
+                    "fake_dep": "filesystems/zbi/postprocessing_script/fake_dep",
+                    "test.dtb": "filesystems/zbi/postprocessing_script/test.dtb"
+                }
             }
         }
     },
-    "input_bundles": [
-        "input_bundles/testing_board_input_bundle",
-        "input_bundles/empty_bib"
-    ],
+    "input_bundles": {
+        "testing_board_input_bundle": "input_bundles/testing_board_input_bundle",
+        "empty_bib": "input_bundles/empty_bib"
+    },
     "kernel": {
         "contiguous_physical_pages": true
     },
@@ -35,7 +39,6 @@
             "enable_debug_access_port_for_soc": "amlogic-a311d"
         },
         "sysmem_defaults": {
-            "contiguous_guard_pages_unused": false,
             "contiguous_memory_size": {
                 "fixed": 209715200
             },
@@ -44,9 +47,8 @@
             }
         }
     },
-    "provided_features": [],
     "tee_trusted_app_guids": [
-        "ta_1",
-        "ta_2"
+        "67e55044-10b1-426f-9247-bb680e5fe0c8",
+        "67e55044-10b1-426f-9247-bb680e5fe0c8"
     ]
 }

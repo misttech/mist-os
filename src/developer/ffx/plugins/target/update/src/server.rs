@@ -3,17 +3,12 @@
 // found in the LICENSE file.
 
 use ffx_config::EnvironmentContext;
-use fho::{
-    bug, return_bug, return_user_error, user_error, Deferred, FfxMain, Result,
-    VerifiedMachineWriter,
-};
+use ffx_writer::VerifiedMachineWriter;
+use fho::{bug, return_bug, return_user_error, user_error, FfxMain, Result};
 use fidl::endpoints::DiscoverableProtocolMarker;
-use fidl_fuchsia_developer_ffx::{
-    RepositoryRegistrationAliasConflictMode, RepositoryRegistryProxy,
-};
-use fidl_fuchsia_io::OpenFlags;
-use fidl_fuchsia_pkg::RepositoryManagerProxy;
-use fidl_fuchsia_pkg_rewrite::EngineProxy;
+use fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode;
+use fidl_fuchsia_pkg::RepositoryManagerMarker;
+use fidl_fuchsia_pkg_rewrite::{EngineMarker, EngineProxy};
 use fidl_fuchsia_pkg_rewrite_ext::{do_transaction, Rule};
 use fidl_fuchsia_sys2::OpenDirType;
 use fuchsia_async::{Task, Timer};
@@ -63,7 +58,6 @@ pub(crate) struct PackageServerTask {
 pub(crate) async fn package_server_task(
     target_proxy_connector: Connector<TargetProxyHolder>,
     rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
-    repos: Deferred<RepositoryRegistryProxy>,
     context: EnvironmentContext,
     product_bundle: PathBuf,
     repo_port: u16,
@@ -91,7 +85,6 @@ pub(crate) async fn package_server_task(
 
         // These are defaults, nothing special needed.
         background: false,
-        daemon: false,
         disconnected: false,
         trusted_root: None,
         repo_path: None,
@@ -122,7 +115,6 @@ pub(crate) async fn package_server_task(
     let task = fuchsia_async::Task::local(async move {
         let tool = ffx_repository_server_start::ServerStartTool {
             cmd,
-            repos,
             context,
             target_proxy_connector: target_proxy_connector.clone(),
             rcs_proxy_connector: connector.clone(),
@@ -178,20 +170,27 @@ pub(crate) async fn unregister_pb_repo_server(
 ) -> Result<()> {
     let mut retry = true;
 
-    let mut repo_manager_proxy =
-        match get_repo_manager_proxy(rcs_proxy_connector.clone(), Duration::from_secs(500)).await {
-            Ok(proxy) => proxy,
-            Err(err) => {
-                tracing::info!("repo manager proxy closed, retrying");
-                if retry {
-                    fuchsia_async::Timer::new(std::time::Duration::from_secs(1)).await;
-                    get_repo_manager_proxy(rcs_proxy_connector.clone(), Duration::from_secs(500))
-                        .await?
-                } else {
-                    return_bug!("Could not list servers on device: {err}")
-                }
+    let mut repo_manager_proxy = match connect_to_capability::<RepositoryManagerMarker>(
+        rcs_proxy_connector.clone(),
+        Duration::from_secs(500),
+    )
+    .await
+    {
+        Ok(proxy) => proxy,
+        Err(err) => {
+            tracing::info!("repo manager proxy closed, retrying");
+            if retry {
+                fuchsia_async::Timer::new(std::time::Duration::from_secs(1)).await;
+                connect_to_capability::<RepositoryManagerMarker>(
+                    rcs_proxy_connector.clone(),
+                    Duration::from_secs(500),
+                )
+                .await?
+            } else {
+                return_bug!("Could not list servers on device: {err}")
             }
-        };
+        }
+    };
 
     let mut names: Vec<String> = vec![];
 
@@ -225,7 +224,7 @@ pub(crate) async fn unregister_pb_repo_server(
                     tracing::info!("repo manager proxy closed, retrying");
                     if retry {
                         retry = false;
-                        repo_manager_proxy = get_repo_manager_proxy(
+                        repo_manager_proxy = connect_to_capability::<RepositoryManagerMarker>(
                             rcs_proxy_connector.clone(),
                             Duration::from_secs(500),
                         )
@@ -250,7 +249,8 @@ async fn is_server_registered(
     rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
     time_to_wait: Duration,
 ) -> Result<bool> {
-    let repo_manager_proxy = get_repo_manager_proxy(rcs_proxy_connector, time_to_wait).await?;
+    let repo_manager_proxy =
+        connect_to_capability::<RepositoryManagerMarker>(rcs_proxy_connector, time_to_wait).await?;
 
     let (repo_iterator, repo_iterator_server) = fidl::endpoints::create_proxy();
     repo_manager_proxy.list(repo_iterator_server).map_err(|e| bug!(e))?;
@@ -284,15 +284,23 @@ async fn deregister_standalone(
     };
     tracing::info!("Removing server {repo_url}");
 
-    let repo_proxy: RepositoryManagerProxy =
-        match get_repo_manager_proxy(rcs_proxy_connector.clone(), time_to_wait).await {
-            Ok(proxy) => proxy,
-            Err(e) => {
-                tracing::warn!("Got error getting repo_manager_proxy: {e}, retrying");
-                Timer::new(Duration::from_secs(1)).await;
-                get_repo_manager_proxy(rcs_proxy_connector.clone(), time_to_wait).await?
-            }
-        };
+    let repo_proxy = match connect_to_capability::<RepositoryManagerMarker>(
+        rcs_proxy_connector.clone(),
+        time_to_wait,
+    )
+    .await
+    {
+        Ok(proxy) => proxy,
+        Err(e) => {
+            tracing::warn!("Got error getting repo_manager_proxy: {e}, retrying");
+            Timer::new(Duration::from_secs(1)).await;
+            connect_to_capability::<RepositoryManagerMarker>(
+                rcs_proxy_connector.clone(),
+                time_to_wait,
+            )
+            .await?
+        }
+    };
 
     match repo_proxy.remove(repo_url).await {
         Ok(Ok(())) => (),
@@ -317,15 +325,19 @@ async fn deregister_standalone(
         }
     };
     // Remove any alias rules.
-    let rewrite_proxy: EngineProxy =
-        match get_rewrite_proxy(rcs_proxy_connector.clone(), time_to_wait).await {
-            Ok(proxy) => proxy,
-            Err(e) => {
-                tracing::warn!("Got error getting rewrite_proxy: {e}, retrying");
-                Timer::new(Duration::from_secs(1)).await;
-                get_rewrite_proxy(rcs_proxy_connector.clone(), time_to_wait).await?
-            }
-        };
+    let rewrite_proxy = match connect_to_capability::<EngineMarker>(
+        rcs_proxy_connector.clone(),
+        time_to_wait,
+    )
+    .await
+    {
+        Ok(proxy) => proxy,
+        Err(e) => {
+            tracing::warn!("Got error getting rewrite_proxy: {e}, retrying");
+            Timer::new(Duration::from_secs(1)).await;
+            connect_to_capability::<EngineMarker>(rcs_proxy_connector.clone(), time_to_wait).await?
+        }
+    };
 
     remove_aliases(repo_name, rewrite_proxy).await
 }
@@ -363,21 +375,39 @@ async fn remove_aliases(repo_url: &str, rewrite_proxy: EngineProxy) -> Result<()
     Ok(())
 }
 
-async fn get_rewrite_proxy(
+async fn connect_to_capability<T: DiscoverableProtocolMarker>(
     rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
     time_to_wait: Duration,
-) -> Result<EngineProxy> {
+) -> Result<T::Proxy> {
     let rcs_proxy = try_rcs_proxy_connection(rcs_proxy_connector, time_to_wait).await?;
-
-    let (rewrite_proxy, rewrite_server) =
-        fidl::endpoints::create_proxy::<<EngineProxy as fidl::endpoints::Proxy>::Protocol>();
+    // Try to connect via fuchsia.developer.remotecontrol/RemoteControl.ConnectCapability.
+    let (proxy, server) = fidl::endpoints::create_proxy::<T>();
+    if let Ok(response) = rcs_proxy
+        .connect_capability(
+            &REPOSITORY_MANAGER_MONIKER,
+            OpenDirType::ExposedDir,
+            T::PROTOCOL_NAME,
+            server.into_channel(),
+        )
+        .await
+    {
+        response.map_err(|err| {
+            bug!(
+                "Attempting to connect to moniker {REPOSITORY_MANAGER_MONIKER} failed with {err:?}",
+            )
+        })?;
+        return Ok(proxy);
+    }
+    // Fallback to fuchsia.developer.remotecontrol/RemoteControl.DeprecatedOpenCapability.
+    // This can be removed once we drop support for API level 27.
+    let (proxy, server) = fidl::endpoints::create_proxy::<T>();
     rcs_proxy
         .deprecated_open_capability(
             &REPOSITORY_MANAGER_MONIKER,
             OpenDirType::ExposedDir,
-            fidl_fuchsia_pkg_rewrite::EngineMarker::PROTOCOL_NAME,
-            rewrite_server.into_channel(),
-            OpenFlags::empty(),
+            T::PROTOCOL_NAME,
+            server.into_channel(),
+            Default::default(),
         )
         .await
         .map_err(|e| bug!(e))?
@@ -386,34 +416,7 @@ async fn get_rewrite_proxy(
                 "Attempting to connect to moniker {REPOSITORY_MANAGER_MONIKER} failed with {err:?}",
             )
         })?;
-
-    Ok(rewrite_proxy)
-}
-
-async fn get_repo_manager_proxy(
-    rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
-    time_to_wait: Duration,
-) -> Result<RepositoryManagerProxy> {
-    let rcs_proxy = try_rcs_proxy_connection(rcs_proxy_connector, time_to_wait).await?;
-    let (repo_manager_proxy, repo_manager_server) = fidl::endpoints::create_proxy::<
-        <RepositoryManagerProxy as fidl::endpoints::Proxy>::Protocol,
-    >();
-    rcs_proxy
-        .deprecated_open_capability(
-            &REPOSITORY_MANAGER_MONIKER,
-            OpenDirType::ExposedDir,
-            fidl_fuchsia_pkg::RepositoryManagerMarker::PROTOCOL_NAME,
-            repo_manager_server.into_channel(),
-            OpenFlags::empty(),
-        )
-        .await
-        .map_err(|e| bug!(e))?
-        .map_err(|err| {
-            bug!(
-                "Attempting to connect to moniker {REPOSITORY_MANAGER_MONIKER} failed with {err:?}",
-            )
-        })?;
-    Ok(repo_manager_proxy)
+    return Ok(proxy);
 }
 
 async fn try_rcs_proxy_connection(
@@ -466,7 +469,6 @@ mod tests {
         pub context: EnvironmentContext,
         pub rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
         pub target_proxy_connector: Connector<TargetProxyHolder>,
-        pub repo_proxy: Deferred<RepositoryRegistryProxy>,
     }
 
     impl FakeTestEnv {
@@ -475,9 +477,6 @@ mod tests {
                 fake_proxy(move |req| handle_rcs_proxy_request(req));
             let fake_target_proxy: TargetProxy =
                 fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
-            let fake_repo_proxy = Deferred::from_output(Ok(fake_proxy(move |req| {
-                panic!("Unexpected request: {:?}", req)
-            })));
             let fake_injector = FakeInjector {
                 remote_factory_closure: Box::new(move || {
                     let value = fake_rcs_proxy.clone();
@@ -499,12 +498,7 @@ mod tests {
                 .expect("Could not make target proxy test connector");
             let rcs_proxy_connector =
                 Connector::try_from_env(&fho_env).await.expect("Could not make RCS test connector");
-            Self {
-                context: test_env.context.clone(),
-                rcs_proxy_connector,
-                target_proxy_connector,
-                repo_proxy: fake_repo_proxy,
-            }
+            Self { context: test_env.context.clone(), rcs_proxy_connector, target_proxy_connector }
         }
     }
 
@@ -642,7 +636,7 @@ mod tests {
         let (repo_manager, _) = FakeRepositoryManager::new();
         let (engine, _) = FakeEngine::new();
         match req {
-            RemoteControlRequest::DeprecatedOpenCapability {
+            RemoteControlRequest::ConnectCapability {
                 capability_name,
                 server_channel,
                 responder,
@@ -684,7 +678,6 @@ mod tests {
         let result = package_server_task(
             fake_env.target_proxy_connector,
             fake_env.rcs_proxy_connector,
-            fake_env.repo_proxy,
             fake_env.context,
             product_bundle,
             0,

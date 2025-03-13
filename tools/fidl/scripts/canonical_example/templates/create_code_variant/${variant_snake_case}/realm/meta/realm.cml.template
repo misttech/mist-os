@@ -22,7 +22,7 @@
 
         // Route logging support to all children.
         {
-            protocol: "fuchsia.logger.LogSink",
+            dictionary: "diagnostics",
             from: "parent",
             to: [
                 "#client",

@@ -90,15 +90,15 @@ impl<
                     // there are no resources to GC now.
                     MulticastForwardingState::Disabled => {}
                     MulticastForwardingState::Enabled(state) => {
-                        ctx.increment(|counters: &MulticastForwardingCounters<I>| {
-                            &counters.pending_table_gc
-                        });
+                        CounterContext::<MulticastForwardingCounters<I>>::counters(ctx)
+                            .pending_table_gc
+                            .increment();
                         let removed_count = ctx.with_pending_table_mut(state, |pending_table| {
                             pending_table.run_garbage_collection(bindings_ctx)
                         });
-                        ctx.add(removed_count, |counters: &MulticastForwardingCounters<I>| {
-                            &counters.pending_packet_drops_gc
-                        });
+                        CounterContext::<MulticastForwardingCounters<I>>::counters(ctx)
+                            .pending_packet_drops_gc
+                            .add(removed_count);
                     }
                 })
             }
@@ -204,25 +204,28 @@ where
         + CounterContext<MulticastForwardingCounters<I>>,
     BC: MulticastForwardingBindingsContext<I, CC::DeviceId>,
 {
-    core_ctx.increment(|counters: &MulticastForwardingCounters<I>| &counters.rx);
+    CounterContext::<MulticastForwardingCounters<I>>::counters(core_ctx).rx.increment();
     // Short circuit if the packet's addresses don't constitute a valid
     // multicast route key (e.g. src is not unicast, or dst is not multicast).
     let key = MulticastRouteKey::new(packet.src_ip(), packet.dst_ip())?;
-    core_ctx.increment(|counters: &MulticastForwardingCounters<I>| &counters.no_tx_invalid_key);
+    CounterContext::<MulticastForwardingCounters<I>>::counters(core_ctx)
+        .no_tx_invalid_key
+        .increment();
 
     // Short circuit if the device has forwarding disabled.
     if !core_ctx.is_device_multicast_forwarding_enabled(dev) {
-        core_ctx
-            .increment(|counters: &MulticastForwardingCounters<I>| &counters.no_tx_disabled_dev);
+        CounterContext::<MulticastForwardingCounters<I>>::counters(core_ctx)
+            .no_tx_disabled_dev
+            .increment();
         return None;
     }
 
     core_ctx.with_state(|state, ctx| {
         // Short circuit if forwarding is disabled stack-wide.
         let Some(state) = state.enabled() else {
-            ctx.increment(|counters: &MulticastForwardingCounters<I>| {
-                &counters.no_tx_disabled_stack_wide
-            });
+            CounterContext::<MulticastForwardingCounters<I>>::counters(ctx)
+                .no_tx_disabled_stack_wide
+                .increment();
             return None;
         };
         ctx.with_route_table(state, |route_table, ctx| {
@@ -232,9 +235,9 @@ where
             }) = route_table.get(&key)
             {
                 if dev != input_interface {
-                    ctx.increment(|counters: &MulticastForwardingCounters<I>| {
-                        &counters.no_tx_wrong_dev
-                    });
+                    CounterContext::<MulticastForwardingCounters<I>>::counters(ctx)
+                        .no_tx_wrong_dev
+                        .increment();
                     bindings_ctx.on_event(
                         MulticastForwardingEvent::WrongInputInterface {
                             key,
@@ -250,12 +253,16 @@ where
 
                 match action {
                     Action::Forward(targets) => {
-                        ctx.increment(|counters: &MulticastForwardingCounters<I>| &counters.tx);
+                        CounterContext::<MulticastForwardingCounters<I>>::counters(ctx)
+                            .tx
+                            .increment();
                         return Some(targets.clone());
                     }
                 }
             }
-            ctx.increment(|counters: &MulticastForwardingCounters<I>| &counters.pending_packets);
+            CounterContext::<MulticastForwardingCounters<I>>::counters(ctx)
+                .pending_packets
+                .increment();
             match ctx.with_pending_table_mut(state, |pending_table| {
                 pending_table.try_queue_packet(bindings_ctx, key.clone(), packet, dev, frame_dst)
             }) {
@@ -270,9 +277,9 @@ where
                 }
                 QueuePacketOutcome::QueuedInExistingQueue => {}
                 QueuePacketOutcome::ExistingQueueFull => {
-                    ctx.increment(|counters: &MulticastForwardingCounters<I>| {
-                        &counters.pending_packet_drops_queue_full
-                    });
+                    CounterContext::<MulticastForwardingCounters<I>>::counters(ctx)
+                        .pending_packet_drops_queue_full
+                        .increment();
                 }
             }
             return None;
@@ -301,6 +308,7 @@ mod testutil {
     use crate::device::IpDeviceSendContext;
     use crate::internal::base::DeviceIpLayerMetadata;
     use crate::internal::icmp::{IcmpErrorHandler, IcmpHandlerIpExt};
+    use crate::internal::routing::rules::Marks;
     use crate::multicast_forwarding::{
         MulticastForwardingApi, MulticastForwardingEnabledState, MulticastForwardingPendingPackets,
         MulticastForwardingPendingPacketsContext, MulticastForwardingState, MulticastRouteTable,
@@ -384,16 +392,16 @@ mod testutil {
     impl<I: IpLayerIpExt, D: FakeStrongDeviceId> CounterContext<IpCounters<I>>
         for FakeCoreCtxState<I, D>
     {
-        fn with_counters<O, F: FnOnce(&IpCounters<I>) -> O>(&self, cb: F) -> O {
-            cb(&self.counters)
+        fn counters(&self) -> &IpCounters<I> {
+            &self.counters
         }
     }
 
     impl<I: IpLayerIpExt, D: FakeStrongDeviceId> CounterContext<MulticastForwardingCounters<I>>
         for FakeCoreCtxState<I, D>
     {
-        fn with_counters<O, F: FnOnce(&MulticastForwardingCounters<I>) -> O>(&self, cb: F) -> O {
-            cb(&self.multicast_forwarding_counters)
+        fn counters(&self) -> &MulticastForwardingCounters<I> {
+            &self.multicast_forwarding_counters
         }
     }
 
@@ -554,6 +562,7 @@ mod testutil {
             _dst_ip: SpecifiedAddr<I::Addr>,
             _original_packet: B,
             _error: I::IcmpError,
+            _marks: &Marks,
         ) {
             unimplemented!()
         }
@@ -714,14 +723,13 @@ mod tests {
         }
 
         // Verify that counters are updated.
-        api.core_ctx().with_counters(|counters: &MulticastForwardingCounters<I>| {
-            assert_eq!(counters.rx.get(), 1);
-            assert_eq!(counters.tx.get(), if lookup_succeeded { 1 } else { 0 });
-            assert_eq!(counters.no_tx_disabled_dev.get(), if dev_enabled { 0 } else { 1 });
-            assert_eq!(counters.no_tx_disabled_stack_wide.get(), if enabled { 0 } else { 1 });
-            assert_eq!(counters.no_tx_wrong_dev.get(), if right_dev { 0 } else { 1 });
-            assert_eq!(counters.pending_packets.get(), if right_key { 0 } else { 1 });
-        });
+        let counters: &MulticastForwardingCounters<I> = api.core_ctx().counters();
+        assert_eq!(counters.rx.get(), 1);
+        assert_eq!(counters.tx.get(), if lookup_succeeded { 1 } else { 0 });
+        assert_eq!(counters.no_tx_disabled_dev.get(), if dev_enabled { 0 } else { 1 });
+        assert_eq!(counters.no_tx_disabled_stack_wide.get(), if enabled { 0 } else { 1 });
+        assert_eq!(counters.no_tx_wrong_dev.get(), if right_dev { 0 } else { 1 });
+        assert_eq!(counters.pending_packets.get(), if right_key { 0 } else { 1 });
 
         lookup_succeeded
     }

@@ -2,6 +2,4 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /src/developer/ffx/plugins/target/screenshot/OWNERS
-include /src/graphics/display/OWNERS
 include /src/lib/ui/carnelian/OWNERS

@@ -12,9 +12,14 @@
     ],
     offer: [
         {
+            config: [ "fuchsia.power.SuspendEnabled" ],
             from: "parent",
             to: "#ui",
-            config: [ "fuchsia.power.SuspendEnabled" ],
+        },
+        {
+            protocol: [ "fuchsia.scheduler.RoleManager" ],
+            from: "parent",
+            to: "#ui",
         },
 
         // Routes from optional shards.

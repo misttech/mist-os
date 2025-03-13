@@ -152,7 +152,10 @@ zx_status_t ExceptionDispatcher::WaitForHandleClose() {
     // Continue to wait for the exception response if we get suspended.
     // Both the suspension and the exception need to be closed out before
     // the thread can resume.
-    status = response_event_.WaitWithMask(THREAD_SIGNAL_SUSPEND);
+    // The THREAD_SIGNAL_SUSPEND signal_mask checks for a suspend signal that might have come in
+    // before the Wait() call. And the status check for ZX_ERR_INTERNAL_INTR_RETRY in the while loop
+    // checks for a suspend that gets signaled while the wait is ongoing.
+    status = response_event_.Wait(Deadline::infinite(), THREAD_SIGNAL_SUSPEND);
   } while (status == ZX_ERR_INTERNAL_INTR_RETRY);
 
   if (status == ZX_ERR_INTERNAL_INTR_KILLED) {

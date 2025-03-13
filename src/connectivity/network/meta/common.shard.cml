@@ -85,9 +85,13 @@
             availability: "same_as_target",
         },
         {
-            protocol: "fuchsia.net.filter.Control",
+            protocol: [
+                "fuchsia.net.filter.Control",
+                "fuchsia.net.ndp.RouterAdvertisementOptionWatcherProvider",
+            ],
 
-            // NS2 will not implement fuchsia.net.filter, mark as optional.
+            // NS2 will not implement fuchsia.net.filter or fuchsia.net.ndp,
+            // mark as optional.
             from: "#netstack",
             to: "#netcfg",
             availability: "same_as_target",
@@ -153,7 +157,15 @@
             to: [ "#reachability" ],
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class-network",
+            from: "parent",
+            to: [ "#netcfg" ],
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.network.Service",
             from: "parent",
             to: [ "#netcfg" ],
         },
@@ -229,7 +241,6 @@
                 // TODO(https://fxbug.dev/42175379): once product assembly supports product-specific
                 // components running in the network realm, remove this.
                 "fuchsia.posix.socket.raw.Provider",
-                "fuchsia.update.verify.ComponentOtaHealthCheck",
 
                 // TODO(https://fxbug.dev/42061698): make it possible to put this
                 // standalone import in its own paragraph without format-code

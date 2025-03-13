@@ -6,7 +6,7 @@
 
 load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts")
 load(
-    "@fuchsia_sdk//fuchsia:private_defs.bzl",
+    "@rules_fuchsia//fuchsia:private_defs.bzl",
     "FuchsiaDebugSymbolInfo",
     "fuchsia_collect_all_debug_symbols_infos_aspect",
     "fuchsia_debug_symbols",

@@ -11,6 +11,7 @@ use crate::thread::{ProcessKoid, ProcessRef, ThreadKoid, ThreadRef};
 use crate::{trace_header, ParseResult, Provider, EVENT_RECORD_TYPE};
 use flyweights::FlyStr;
 use nom::number::complete::le_u64;
+use nom::Parser;
 
 pub(crate) const INSTANT_EVENT_TYPE: u8 = 0;
 pub(crate) const COUNTER_EVENT_TYPE: u8 = 1;
@@ -241,20 +242,21 @@ impl EventPayload<Ticks> {
         use nom::combinator::map;
         match event_type {
             INSTANT_EVENT_TYPE => Ok((buf, EventPayload::Instant)),
-            COUNTER_EVENT_TYPE => map(le_u64, |id| EventPayload::Counter { id })(buf),
+            COUNTER_EVENT_TYPE => map(le_u64, |id| EventPayload::Counter { id }).parse(buf),
             DURATION_BEGIN_EVENT_TYPE => Ok((buf, EventPayload::DurationBegin)),
             DURATION_END_EVENT_TYPE => Ok((buf, EventPayload::DurationEnd)),
             DURATION_COMPLETE_EVENT_TYPE => {
-                map(Ticks::parse, |end_timestamp| EventPayload::DurationComplete { end_timestamp })(
-                    buf,
-                )
+                map(Ticks::parse, |end_timestamp| EventPayload::DurationComplete { end_timestamp })
+                    .parse(buf)
             }
-            ASYNC_BEGIN_EVENT_TYPE => map(le_u64, |id| EventPayload::AsyncBegin { id })(buf),
-            ASYNC_INSTANT_EVENT_TYPE => map(le_u64, |id| EventPayload::AsyncInstant { id })(buf),
-            ASYNC_END_EVENT_TYPE => map(le_u64, |id| EventPayload::AsyncEnd { id })(buf),
-            FLOW_BEGIN_EVENT_TYPE => map(le_u64, |id| EventPayload::FlowBegin { id })(buf),
-            FLOW_STEP_EVENT_TYPE => map(le_u64, |id| EventPayload::FlowStep { id })(buf),
-            FLOW_END_EVENT_TYPE => map(le_u64, |id| EventPayload::FlowEnd { id })(buf),
+            ASYNC_BEGIN_EVENT_TYPE => map(le_u64, |id| EventPayload::AsyncBegin { id }).parse(buf),
+            ASYNC_INSTANT_EVENT_TYPE => {
+                map(le_u64, |id| EventPayload::AsyncInstant { id }).parse(buf)
+            }
+            ASYNC_END_EVENT_TYPE => map(le_u64, |id| EventPayload::AsyncEnd { id }).parse(buf),
+            FLOW_BEGIN_EVENT_TYPE => map(le_u64, |id| EventPayload::FlowBegin { id }).parse(buf),
+            FLOW_STEP_EVENT_TYPE => map(le_u64, |id| EventPayload::FlowStep { id }).parse(buf),
+            FLOW_END_EVENT_TYPE => map(le_u64, |id| EventPayload::FlowEnd { id }).parse(buf),
             unknown => {
                 Ok((&[][..], EventPayload::Unknown { raw_type: unknown, bytes: buf.to_vec() }))
             }

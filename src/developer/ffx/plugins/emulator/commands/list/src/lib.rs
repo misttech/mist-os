@@ -7,8 +7,10 @@ use emulator_instance::{
     EmulatorInstanceData, EmulatorInstanceInfo, EmulatorInstances, EngineState,
 };
 use ffx_emulator_list_args::ListCommand;
-use fho::{bug, FfxContext, FfxMain, FfxTool, MachineWriter, ToolIO, TryFromEnv, TryFromEnvWith};
-use serde::Serialize;
+use ffx_emulator_list_command_output::EmuListItem;
+use ffx_writer::{ToolIO as _, VerifiedMachineWriter};
+use fho::{bug, FfxContext, FfxMain, FfxTool, TryFromEnv, TryFromEnvWith};
+use std::io::Write;
 use std::marker::PhantomData;
 use std::path::PathBuf;
 
@@ -63,18 +65,11 @@ impl<T: Instances> TryFromEnvWith for WithInstances<T> {
 
 /// Sub-sub tool for `emu list`
 #[derive(FfxTool)]
+#[no_target]
 pub struct EmuListTool<T: Instances> {
     #[command]
     cmd: ListCommand,
     instances: T,
-}
-
-/// This is the item representing the output for a single
-/// emulator instance.
-#[derive(Serialize)]
-pub struct EmuListItem {
-    pub name: String,
-    pub state: EngineState,
 }
 
 // Since this is a part of a legacy plugin, add
@@ -85,31 +80,38 @@ fho::embedded_plugin!(EmuListTool<InstanceData>);
 
 #[async_trait(?Send)]
 impl<T: Instances> FfxMain for EmuListTool<T> {
-    type Writer = MachineWriter<EmuListItem>;
-    async fn main(self, mut writer: MachineWriter<EmuListItem>) -> fho::Result<()> {
+    type Writer = VerifiedMachineWriter<Vec<EmuListItem>>;
+    async fn main(self, mut writer: VerifiedMachineWriter<Vec<EmuListItem>>) -> fho::Result<()> {
         let instance_list: Vec<EmulatorInstanceData> = self
             .instances
             .get_all_instances()
             .await
             .user_message("Error encountered looking up emulator instances")?;
-        let mut broken = false;
-        for instance in instance_list {
-            let name = instance.get_name();
-            let engine_state = instance.get_engine_state();
-
-            let item = EmuListItem { name: name.into(), state: engine_state };
-            if self.cmd.only_running && !instance.is_running() {
-                continue;
-            } else {
-                writer.machine_or_else(&item, || {
-                    let state = format!("[{}]", engine_state);
-                    format!("{:16}{}", state, item.name)
-                })?;
+        let items = instance_list
+            .into_iter()
+            .filter(|m| !(self.cmd.only_running && !m.is_running()))
+            .map(|m| EmuListItem { name: m.get_name().into(), state: m.get_engine_state() })
+            .collect::<Vec<_>>();
+        if writer.is_machine() {
+            writer.machine(&items)?;
+        } else if !items.is_empty() {
+            // If we use `writer.line()` on an empty list we get an unwanted '\n'. Hence the above
+            // check. The same issue is why we can't use the `machine_or*` functions, as they
+            // always print even if there's an empty string.
+            let mut broken = false;
+            let output = items
+                .iter()
+                .map(|instance| {
+                    broken = broken || instance.state == EngineState::Error;
+                    let engine_state_display_formatted = format!("[{}]", instance.state);
+                    format!("{:16}{}", engine_state_display_formatted, instance.name)
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            writer.line(output)?;
+            if broken {
+                writeln!(writer.stderr(), "{}", BROKEN_MESSAGE).bug()?;
             }
-            broken = broken || engine_state == EngineState::Error;
-        }
-        if broken {
-            writeln!(writer.stderr(), "{}", BROKEN_MESSAGE).bug()?;
         }
         Ok(())
     }
@@ -135,7 +137,7 @@ mod tests {
         let mut tool = EmuListTool { cmd, instances: MockInstances::new() };
         // Text based writer
         let test_buffers = TestBuffers::default();
-        let writer: MachineWriter<EmuListItem> = MachineWriter::new_test(None, &test_buffers);
+        let writer = VerifiedMachineWriter::<Vec<EmuListItem>>::new_test(None, &test_buffers);
 
         // Mock the return data
         let mock_return = || Ok(vec![]);
@@ -162,8 +164,10 @@ mod tests {
 
         // JSON based writer
         let machine_buffers = TestBuffers::default();
-        let machine_writer: MachineWriter<EmuListItem> =
-            MachineWriter::new_test(Some(Format::Json), &machine_buffers);
+        let machine_writer = VerifiedMachineWriter::<Vec<EmuListItem>>::new_test(
+            Some(Format::Json),
+            &machine_buffers,
+        );
 
         // Mock the return data
         let mock_return = || Ok(vec![]);
@@ -174,9 +178,17 @@ mod tests {
         tool.main(machine_writer).await?;
 
         let (stdout, stderr) = machine_buffers.into_strings();
-        assert_eq!(stdout, "");
+        assert_eq!(stdout, "[]\n");
         assert_eq!(stderr, "");
-        Ok(())
+        let data = serde_json::from_str(&stdout).bug()?;
+        assert!(
+            matches!(data, serde_json::Value::Array(_)),
+            "unexpected data. Expected array: {data:?}"
+        );
+        match VerifiedMachineWriter::<Vec<EmuListItem>>::verify_schema(&data) {
+            Ok(_) => Ok(()),
+            Err(e) => fho::return_bug!("Error verifying schema of {data:?}: {e}"),
+        }
     }
 
     #[fuchsia::test]
@@ -186,7 +198,7 @@ mod tests {
         let mut tool = EmuListTool { cmd, instances: MockInstances::new() };
 
         let test_buffers = TestBuffers::default();
-        let writer: MachineWriter<EmuListItem> = MachineWriter::new_test(None, &test_buffers);
+        let writer = VerifiedMachineWriter::<Vec<EmuListItem>>::new_test(None, &test_buffers);
 
         let mock_return =
             || Ok(vec![EmulatorInstanceData::new_with_state("notrunning_emu", EngineState::New)]);
@@ -199,7 +211,7 @@ mod tests {
         let (stdout, stderr) = test_buffers.into_strings();
         let stdout_expected = "[new]           notrunning_emu\n";
         assert_eq!(stdout, stdout_expected);
-        assert!(stderr.is_empty());
+        assert!(stderr.is_empty(), "stderr should be empty. Got: {:?}", stderr);
 
         Ok(())
     }
@@ -211,8 +223,10 @@ mod tests {
         let mut tool = EmuListTool { cmd, instances: MockInstances::new() };
 
         let machine_buffers = TestBuffers::default();
-        let machine_writer: MachineWriter<EmuListItem> =
-            MachineWriter::new_test(Some(Format::Json), &machine_buffers);
+        let machine_writer = VerifiedMachineWriter::<Vec<EmuListItem>>::new_test(
+            Some(Format::Json),
+            &machine_buffers,
+        );
 
         let mock_return =
             || Ok(vec![EmulatorInstanceData::new_with_state("notrunning_emu", EngineState::New)]);
@@ -223,11 +237,18 @@ mod tests {
         tool.main(machine_writer).await?;
 
         let (stdout, stderr) = machine_buffers.into_strings();
-        let stdout_expected = format!("{}\n", r#"{"name":"notrunning_emu","state":"new"}"#);
+        let stdout_expected = format!("[{}]\n", r#"{"name":"notrunning_emu","state":"new"}"#);
         assert_eq!(stdout, stdout_expected);
-        assert!(stderr.is_empty());
-
-        Ok(())
+        assert!(stderr.is_empty(), "stderr should be empty. Got: {:?}", stderr);
+        let data = serde_json::from_str(&stdout).bug()?;
+        assert!(
+            matches!(data, serde_json::Value::Array(_)),
+            "unexpected data. Expected array: {data:?}"
+        );
+        match VerifiedMachineWriter::<Vec<EmuListItem>>::verify_schema(&data) {
+            Ok(_) => Ok(()),
+            Err(e) => fho::return_bug!("Error verifying schema of {data:?}: {e}"),
+        }
     }
 
     #[fuchsia::test]
@@ -237,7 +258,7 @@ mod tests {
         let mut tool = EmuListTool { cmd, instances: MockInstances::new() };
 
         let test_buffers = TestBuffers::default();
-        let writer: MachineWriter<EmuListItem> = MachineWriter::new_test(None, &test_buffers);
+        let writer = VerifiedMachineWriter::<Vec<EmuListItem>>::new_test(None, &test_buffers);
 
         let mock_return = || {
             Ok(vec![EmulatorInstanceData::new_with_state(
@@ -254,7 +275,7 @@ mod tests {
         let (stdout, stderr) = test_buffers.into_strings();
         let stdout_expected = "[configured]    notrunning_config_emu\n";
         assert_eq!(stdout, stdout_expected);
-        assert!(stderr.is_empty());
+        assert!(stderr.is_empty(), "stderr should be empty. Got: {:?}", stderr);
 
         Ok(())
     }
@@ -266,8 +287,10 @@ mod tests {
         let mut tool = EmuListTool { cmd, instances: MockInstances::new() };
 
         let machine_buffers = TestBuffers::default();
-        let machine_writer: MachineWriter<EmuListItem> =
-            MachineWriter::new_test(Some(Format::Json), &machine_buffers);
+        let machine_writer = VerifiedMachineWriter::<Vec<EmuListItem>>::new_test(
+            Some(Format::Json),
+            &machine_buffers,
+        );
 
         let mock_return = || {
             Ok(vec![EmulatorInstanceData::new_with_state(
@@ -283,11 +306,18 @@ mod tests {
 
         let (stdout, stderr) = machine_buffers.into_strings();
         let stdout_expected =
-            format!("{}\n", r#"{"name":"notrunning_config_emu","state":"configured"}"#);
+            format!("[{}]\n", r#"{"name":"notrunning_config_emu","state":"configured"}"#);
         assert_eq!(stdout, stdout_expected);
-        assert!(stderr.is_empty());
-
-        Ok(())
+        assert!(stderr.is_empty(), "stderr should be empty. Got: {:?}", stderr);
+        let data = serde_json::from_str(&stdout).bug()?;
+        assert!(
+            matches!(data, serde_json::Value::Array(_)),
+            "unexpected data. Expected array: {data:?}"
+        );
+        match VerifiedMachineWriter::<Vec<EmuListItem>>::verify_schema(&data) {
+            Ok(_) => Ok(()),
+            Err(e) => fho::return_bug!("Error verifying schema of {data:?}: {e}"),
+        }
     }
 
     #[fuchsia::test]
@@ -297,7 +327,7 @@ mod tests {
         let mut tool = EmuListTool { cmd, instances: MockInstances::new() };
 
         let test_buffers = TestBuffers::default();
-        let writer: MachineWriter<EmuListItem> = MachineWriter::new_test(None, &test_buffers);
+        let writer = VerifiedMachineWriter::<Vec<EmuListItem>>::new_test(None, &test_buffers);
 
         let mock_return = || {
             Ok(vec![EmulatorInstanceData::new_with_state("notrunning_emu", EngineState::Staged)])
@@ -311,7 +341,7 @@ mod tests {
         let (stdout, stderr) = test_buffers.into_strings();
         let stdout_expected = "[staged]        notrunning_emu\n";
         assert_eq!(stdout, stdout_expected);
-        assert!(stderr.is_empty());
+        assert!(stderr.is_empty(), "stderr should be empty. Got: {:?}", stderr);
 
         Ok(())
     }
@@ -323,8 +353,10 @@ mod tests {
         let mut tool = EmuListTool { cmd, instances: MockInstances::new() };
 
         let machine_buffers = TestBuffers::default();
-        let machine_writer: MachineWriter<EmuListItem> =
-            MachineWriter::new_test(Some(Format::Json), &machine_buffers);
+        let machine_writer = VerifiedMachineWriter::<Vec<EmuListItem>>::new_test(
+            Some(Format::Json),
+            &machine_buffers,
+        );
 
         let mock_return = || {
             Ok(vec![EmulatorInstanceData::new_with_state("notrunning_emu", EngineState::Staged)])
@@ -336,11 +368,18 @@ mod tests {
         tool.main(machine_writer).await?;
 
         let (stdout, stderr) = machine_buffers.into_strings();
-        let stdout_expected = format!("{}\n", r#"{"name":"notrunning_emu","state":"staged"}"#);
+        let stdout_expected = format!("[{}]\n", r#"{"name":"notrunning_emu","state":"staged"}"#);
         assert_eq!(stdout, stdout_expected);
-        assert!(stderr.is_empty());
-
-        Ok(())
+        assert!(stderr.is_empty(), "stderr should be empty. Got: {:?}", stderr);
+        let data = serde_json::from_str(&stdout).bug()?;
+        assert!(
+            matches!(data, serde_json::Value::Array(_)),
+            "unexpected data. Expected array: {data:?}"
+        );
+        match VerifiedMachineWriter::<Vec<EmuListItem>>::verify_schema(&data) {
+            Ok(_) => Ok(()),
+            Err(e) => fho::return_bug!("Error verifying schema of {data:?}: {e}"),
+        }
     }
 
     #[fuchsia::test]
@@ -350,7 +389,7 @@ mod tests {
         let mut tool = EmuListTool { cmd, instances: MockInstances::new() };
 
         let test_buffers = TestBuffers::default();
-        let writer: MachineWriter<EmuListItem> = MachineWriter::new_test(None, &test_buffers);
+        let writer = VerifiedMachineWriter::<Vec<EmuListItem>>::new_test(None, &test_buffers);
 
         let mock_return = || {
             let mut running =
@@ -367,7 +406,7 @@ mod tests {
         let (stdout, stderr) = test_buffers.into_strings();
         let stdout_expected = "[running]       running_emu\n";
         assert_eq!(stdout, stdout_expected);
-        assert!(stderr.is_empty());
+        assert!(stderr.is_empty(), "stderr should be empty. Got: {:?}", stderr);
 
         Ok(())
     }
@@ -379,8 +418,10 @@ mod tests {
         let mut tool = EmuListTool { cmd, instances: MockInstances::new() };
 
         let machine_buffers = TestBuffers::default();
-        let machine_writer: MachineWriter<EmuListItem> =
-            MachineWriter::new_test(Some(Format::Json), &machine_buffers);
+        let machine_writer = VerifiedMachineWriter::<Vec<EmuListItem>>::new_test(
+            Some(Format::Json),
+            &machine_buffers,
+        );
 
         let mock_return = || {
             let mut running =
@@ -395,11 +436,18 @@ mod tests {
         tool.main(machine_writer).await?;
 
         let (stdout, stderr) = machine_buffers.into_strings();
-        let stdout_expected = format!("{}\n", r#"{"name":"running_emu","state":"running"}"#);
+        let stdout_expected = format!("[{}]\n", r#"{"name":"running_emu","state":"running"}"#);
         assert_eq!(stdout, stdout_expected);
-        assert!(stderr.is_empty());
-
-        Ok(())
+        assert!(stderr.is_empty(), "stderr should be empty. Got: {:?}", stderr);
+        let data = serde_json::from_str(&stdout).bug()?;
+        assert!(
+            matches!(data, serde_json::Value::Array(_)),
+            "unexpected data. Expected array: {data:?}"
+        );
+        match VerifiedMachineWriter::<Vec<EmuListItem>>::verify_schema(&data) {
+            Ok(_) => Ok(()),
+            Err(e) => fho::return_bug!("Error verifying schema of {data:?}: {e}"),
+        }
     }
 
     #[fuchsia::test]
@@ -409,7 +457,7 @@ mod tests {
         let mut tool = EmuListTool { cmd, instances: MockInstances::new() };
 
         let test_buffers = TestBuffers::default();
-        let writer: MachineWriter<EmuListItem> = MachineWriter::new_test(None, &test_buffers);
+        let writer = VerifiedMachineWriter::<Vec<EmuListItem>>::new_test(None, &test_buffers);
 
         let mock_return = || {
             let mut running =
@@ -432,7 +480,7 @@ mod tests {
         let (stdout, stderr) = test_buffers.into_strings();
         let stdout_expected = "[running]       running_emu\n";
         assert_eq!(stdout, stdout_expected);
-        assert!(stderr.is_empty());
+        assert!(stderr.is_empty(), "stderr should be empty. Got: {:?}", stderr);
         Ok(())
     }
 
@@ -443,8 +491,10 @@ mod tests {
         let mut tool = EmuListTool { cmd, instances: MockInstances::new() };
 
         let machine_buffers = TestBuffers::default();
-        let machine_writer: MachineWriter<EmuListItem> =
-            MachineWriter::new_test(Some(Format::Json), &machine_buffers);
+        let machine_writer = VerifiedMachineWriter::<Vec<EmuListItem>>::new_test(
+            Some(Format::Json),
+            &machine_buffers,
+        );
 
         let mock_return = || {
             let mut running =
@@ -465,10 +515,18 @@ mod tests {
         tool.main(machine_writer).await?;
 
         let (stdout, stderr) = machine_buffers.into_strings();
-        let stdout_expected = format!("{}\n", r#"{"name":"running_emu","state":"running"}"#);
+        let stdout_expected = format!("[{}]\n", r#"{"name":"running_emu","state":"running"}"#);
         assert_eq!(stdout, stdout_expected);
-        assert!(stderr.is_empty());
-        Ok(())
+        assert!(stderr.is_empty(), "stderr should be empty. Got: {:?}", stderr);
+        let data = serde_json::from_str(&stdout).bug()?;
+        assert!(
+            matches!(data, serde_json::Value::Array(_)),
+            "unexpected data. Expected array: {data:?}"
+        );
+        match VerifiedMachineWriter::<Vec<EmuListItem>>::verify_schema(&data) {
+            Ok(_) => Ok(()),
+            Err(e) => fho::return_bug!("Error verifying schema of {data:?}: {e}"),
+        }
     }
 
     #[fuchsia::test]
@@ -478,7 +536,7 @@ mod tests {
         let mut tool = EmuListTool { cmd, instances: MockInstances::new() };
 
         let test_buffers = TestBuffers::default();
-        let writer: MachineWriter<EmuListItem> = MachineWriter::new_test(None, &test_buffers);
+        let writer = VerifiedMachineWriter::<Vec<EmuListItem>>::new_test(None, &test_buffers);
 
         let mock_return = || {
             let mut running =
@@ -520,8 +578,10 @@ mod tests {
         let mut tool = EmuListTool { cmd, instances: MockInstances::new() };
 
         let machine_buffers = TestBuffers::default();
-        let machine_writer: MachineWriter<EmuListItem> =
-            MachineWriter::new_test(Some(Format::Json), &machine_buffers);
+        let machine_writer = VerifiedMachineWriter::<Vec<EmuListItem>>::new_test(
+            Some(Format::Json),
+            &machine_buffers,
+        );
 
         let mock_return = || {
             let mut running =
@@ -549,15 +609,18 @@ mod tests {
             r#"{"name":"error_emu","state":"error"}"#,
         ];
 
-        let (stdout, stderr) = machine_buffers.into_strings();
-        let stdout_expected = format!("{}\n", expected_json.join("\n"));
+        let (stdout, _stderr) = machine_buffers.into_strings();
+        let stdout_expected = format!("[{}]\n", expected_json.join(","));
         assert_eq!(stdout, stdout_expected);
-        assert_eq!(
-            stderr,
-            format!("{BROKEN_MESSAGE}\n"),
-            "Expected `BROKEN_MESSAGE` in stderr, got {stderr:?}"
+        let data = serde_json::from_str(&stdout).bug()?;
+        assert!(
+            matches!(data, serde_json::Value::Array(_)),
+            "unexpected data. Expected array: {data:?}"
         );
-        Ok(())
+        match VerifiedMachineWriter::<Vec<EmuListItem>>::verify_schema(&data) {
+            Ok(_) => Ok(()),
+            Err(e) => fho::return_bug!("Error verifying schema of {data:?}: {e}"),
+        }
     }
 
     #[fuchsia::test]
@@ -567,7 +630,7 @@ mod tests {
         let mut tool = EmuListTool { cmd, instances: MockInstances::new() };
 
         let test_buffers = TestBuffers::default();
-        let writer: MachineWriter<EmuListItem> = MachineWriter::new_test(None, &test_buffers);
+        let writer = VerifiedMachineWriter::<Vec<EmuListItem>>::new_test(None, &test_buffers);
 
         let mock_return = || {
             Ok(vec![EmulatorInstanceData::new_with_state(
@@ -595,8 +658,10 @@ mod tests {
         let mut tool = EmuListTool { cmd, instances: MockInstances::new() };
 
         let machine_buffers = TestBuffers::default();
-        let machine_writer: MachineWriter<EmuListItem> =
-            MachineWriter::new_test(Some(Format::Json), &machine_buffers);
+        let machine_writer = VerifiedMachineWriter::<Vec<EmuListItem>>::new_test(
+            Some(Format::Json),
+            &machine_buffers,
+        );
 
         let mock_return = || {
             Ok(vec![EmulatorInstanceData::new_with_state(
@@ -610,10 +675,18 @@ mod tests {
 
         tool.main(machine_writer).await?;
 
-        let (stdout, stderr) = machine_buffers.into_strings();
-        let stdout_expected = format!("{}\n", r#"{"name":"error_emu_error_list","state":"error"}"#);
+        let (stdout, _stderr) = machine_buffers.into_strings();
+        let stdout_expected =
+            format!("[{}]\n", r#"{"name":"error_emu_error_list","state":"error"}"#);
         assert_eq!(stdout, stdout_expected);
-        assert_eq!(stderr, format!("{}\n", BROKEN_MESSAGE));
-        Ok(())
+        let data = serde_json::from_str(&stdout).bug()?;
+        assert!(
+            matches!(data, serde_json::Value::Array(_)),
+            "unexpected data. Expected array: {data:?}"
+        );
+        match VerifiedMachineWriter::<Vec<EmuListItem>>::verify_schema(&data) {
+            Ok(_) => Ok(()),
+            Err(e) => fho::return_bug!("Error verifying schema of {data:?}: {e}"),
+        }
     }
 }

@@ -2,29 +2,31 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /src/developer/ffx/daemon/protocols/repo/OWNERS
+include /src/connectivity/policy/OWNERS
 include /src/developer/ffx/lib/pbms/OWNERS
+include /src/developer/ffx/lib/pkg/OWNERS
 include /src/developer/ffx/plugins/assembly/OWNERS
 include /src/developer/ffx/plugins/fuzz/OWNERS
 include /src/developer/ffx/plugins/product/OWNERS
 include /src/developer/ffx/plugins/repository/OWNERS
-include /src/devices/OWNERS
+include /src/devices/bin/OWNERS
 include /src/devices/lib/OWNERS
-include /src/lib/analytics/OWNERS
+include /src/lib/assembly/OWNERS
 include /src/lib/fuchsia-component-test/OWNERS
 include /src/lib/fuchsia-url/OWNERS
 include /src/lib/gcs/OWNERS
 include /src/lib/rust_url/OWNERS
+include /src/recovery/system/OWNERS
 include /src/security/lib/scrutiny/OWNERS
+include /src/sys/OWNERS
 include /src/sys/fuzzing/OWNERS
 include /src/sys/lib/cm_fidl_validator/OWNERS
 include /src/sys/lib/cm_types/OWNERS
 include /src/sys/lib/component_debug/OWNERS
 include /src/sys/lib/routing/OWNERS
 include /src/sys/pkg/OWNERS
-include /src/sys/pkg/lib/omaha-client/OWNERS
 include /third_party/rust_crates/vendor/publicsuffix-1.5.4/OWNERS
 include /third_party/rust_crates/vendor/trust-dns-proto-0.22.0/OWNERS
-include /third_party/rust_crates/vendor/tuf-0.3.0-beta11/OWNERS
+include /third_party/rust_crates/vendor/tuf-0.3.0-beta13/OWNERS
 include /tools/doc_checker/OWNERS
 include /tools/lib/cm_fidl_analyzer/OWNERS

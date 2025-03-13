@@ -85,10 +85,9 @@ class HandoffPrep {
   // off to the kernel; in particular, state has already been captured from
   // `uart` so no additional printing should be done at this stage.  Init()
   // must have been called first.
-  [[noreturn]] void DoHandoff(UartDriver& uart, ktl::span<ktl::byte> zbi,
+  [[noreturn]] void DoHandoff(const ElfImage& kernel, UartDriver& uart, ktl::span<ktl::byte> zbi,
                               const KernelStorage::Bootfs& kernel_package,
-                              const ArchPatchInfo& patch_info,
-                              fit::inline_function<void(PhysHandoff*)> boot);
+                              const ArchPatchInfo& patch_info);
 
   // Add an additonal, generic VMO to be simply published to userland.  The
   // kernel proper won't ever look at it.
@@ -194,6 +193,8 @@ class HandoffPrep {
   //
   // This must be the very last set-up routine called within DoHandoff().
   void SetMemory();
+
+  void ConstructKernelAddressSpace(const ElfImage& kernel);
 
   PhysHandoff* handoff_ = nullptr;
   zbitl::Image<Allocation> mexec_image_;

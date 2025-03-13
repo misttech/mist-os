@@ -16,22 +16,33 @@ _coverage_common_flags = [
 
 _profile_source_files_lines = []
 foreach(file, dont_profile_source_files) {
-  # Escape "/" and "." since this is parsed as a regex.
-  # Note that the compiler internally expands "*" into ".*".
-  # See: https://clang.llvm.org/docs/SanitizerSpecialCaseList.html
   file = rebase_path(file, root_build_dir)
-  file = string_replace(file, "/", "\/")
-  file = string_replace(file, ".", "\.")
-  _profile_source_files_lines += [ "!src:$file" ]
+
+  # See https://clang.llvm.org/docs/UsersManual.html#cmdoption-fprofile-list
+  # for supported prefixes and categories.
+
+  # When the "source:path=skip" format is used, Clang excludes the files that are
+  # under the provided path from instrumentation and adds the `skipprofile`
+  # attribute, which only prevents instrumentation, but does not restrict inlining
+  # between functions in the same way that the `noprofile` attribute does.
+
+  # Clang uses a glob pattern matcher described in:
+  # https://llvm.org/doxygen/classllvm_1_1GlobPattern.html
+  _profile_source_files_lines += [ "source:$file=skip" ]
 }
 foreach(file, profile_source_files) {
-  # Escape "/" and "." since this is parsed as a regex.
-  # Note that the compiler internally expands "*" into ".*".
-  # See: https://clang.llvm.org/docs/SanitizerSpecialCaseList.html
   file = rebase_path(file, root_build_dir)
-  file = string_replace(file, "/", "\/")
-  file = string_replace(file, ".", "\.")
-  _profile_source_files_lines += [ "src:$file" ]
+
+  # See https://clang.llvm.org/docs/UsersManual.html#cmdoption-fprofile-list
+  # for supported prefixes and categories.
+
+  # When the "source:path" format is used without any of the supported categories
+  # (`allow`, `skip`, and `forbid`), Clang chooses the `allow` category as default
+  # to instrument the files that are under the provided path.
+
+  # Clang uses a glob pattern matcher described in:
+  # https://llvm.org/doxygen/classllvm_1_1GlobPattern.html
+  _profile_source_files_lines += [ "source:$file" ]
 }
 
 # This can't use a generated_file() target because there's no way to
@@ -58,20 +69,36 @@ _has_compiler_abi = toolchain_variant.tags + [ "no-compiler-abi" ] -
                     [ "no-compiler-abi" ] == toolchain_variant.tags
 _fuchsia_prebuilt_runtime = _has_compiler_abi && (is_fuchsia || is_mistos) && !is_kernel
 
-variant("coverage") {
-  common_flags = _coverage_common_flags
-  inputs = _coverage_inputs
+config("variant-libprefix") {
+  visibility = [ ":*" ]
+
+  # Even specialized environments that don't use the prebuilt runtime still
+  # expect to use the libprefix-based placement of shared libraries.
+  if (is_fuchsia && !is_kernel) {
+    dynamic_linker_flags =
+        "-dynamic-linker=${toolchain_variant.libprefix}ld.so.1"
+    ldflags = [ "-Wl,$dynamic_linker_flags" ]
+    rustflags = [ "-Clink-arg=$dynamic_linker_flags" ]
+  }
+}
+
+group("runtime-deps") {
+  visibility = [ ":*" ]
 
   if (_fuchsia_prebuilt_runtime) {
     # The statically-linked profiling runtime depends on libzircon.
     # TODO(https://fxbug.dev/42139818): Ensure this works with
     # shared_library() instances too!
     deps = [ "//src/zircon/lib/zircon" ]
-
-    dynamic_linker_flags = "-dynamic-linker=coverage/ld.so.1"
-    ldflags = [ "-Wl,$dynamic_linker_flags" ]
-    rustflags = [ "-Clink-arg=$dynamic_linker_flags" ]
   }
+}
+
+variant("coverage") {
+  configs = [ ":variant-libprefix" ]
+  deps = [ ":runtime-deps" ]
+
+  common_flags = _coverage_common_flags
+  inputs = _coverage_inputs
 
   cflags = [
     # Enable binary profile correlation.
@@ -120,22 +147,15 @@ config("no-coverage") {
 # This variant is similar to `coverage` but only instruments sources that are
 # interesting for measuring CTS coverage.
 variant("coverage-cts") {
+  configs = [ ":variant-libprefix" ]
+  deps = [ ":runtime-deps" ]
+
   common_flags = _coverage_common_flags
   inputs = _coverage_inputs
 
   common_flags +=
       [ "-fprofile-list=" + rebase_path("profile-cts.list", root_build_dir) ]
   inputs += [ "profile-cts.list" ]
-
-  if (_fuchsia_prebuilt_runtime) {
-    # The statically-linked profiling runtime depends on libzircon.
-    # TODO(https://fxbug.dev/42139818): Ensure this works with shared_library() instances too!
-    deps = [ "//src/zircon/lib/zircon" ]
-
-    dynamic_linker_flags = "-dynamic-linker=coverage-cts/ld.so.1"
-    ldflags = [ "-Wl,$dynamic_linker_flags" ]
-    rustflags = [ "-Clink-arg=$dynamic_linker_flags" ]
-  }
 
   cflags = [
     # Enable binary profile correlation.
@@ -170,26 +190,26 @@ variant("coverage-cts") {
 # DO NOT NAME THIS WITH PREFIX `rust-`. The prefix will be stripped in some cases, and fail to
 # work with other cases that do not expect the stripped prefix.
 variant("coverage-rust") {
+  configs = [ ":variant-libprefix" ]
+  deps = [ ":runtime-deps" ]
+
   rustflags = [ "-Cinstrument-coverage" ]
 
-  if (_fuchsia_prebuilt_runtime) {
-    # The statically-linked profiling runtime depends on libzircon.
-    # TODO(https://fxbug.dev/42139818): Ensure this works with shared_library() instances too!
-    deps = [ "//src/zircon/lib/zircon" ]
-
-    dynamic_linker_flags = "-dynamic-linker=coverage-rust/ld.so.1"
-    ldflags = [ "-Wl,$dynamic_linker_flags" ]
-    rustflags += [ "-Clink-arg=$dynamic_linker_flags" ]
-
+  if (is_fuchsia) {
     # TODO(https://fxbug.dev/42077482): Ensure this works for no_coverage Rust cases.
     libs = [ "./llvm_profile_counter_bias.ld" ]
-  } else if (is_linux) {
+  }
+
+  if (is_linux) {
     rustflags += [ "-Cllvm-args=-runtime-counter-relocation" ]
   }
 }
 
 # Enable PGO instrumentation to collect profiles.
 variant("profile") {
+  configs = [ ":variant-libprefix" ]
+  deps = [ ":runtime-deps" ]
+
   common_flags = [ "-fprofile-generate" ]
 
   rustflags = []
@@ -204,16 +224,6 @@ variant("profile") {
 
   # LINT.ThenChange(//build/config/clang/generate_config_json.py)
 
-  if (_fuchsia_prebuilt_runtime) {
-    # The statically-linked profiling runtime depends on libzircon.
-    # TODO(https://fxbug.dev/42139818): Ensure this works with shared_library() instances too!
-    deps = [ "//src/zircon/lib/zircon" ]
-
-    dynamic_linker_flags = "-dynamic-linker=profile/ld.so.1"
-    ldflags = [ "-Wl,$dynamic_linker_flags" ]
-    rustflags += [ "-Clink-arg=$dynamic_linker_flags" ]
-  }
-
   if ((is_fuchsia || is_mistos) || is_kernel) {
     # TODO(https://fxbug.dev/42053322): Value profiling isn't supported by the runtime.
     cflags = [
@@ -225,24 +235,20 @@ variant("profile") {
 
 # Enable PGO instrumentation to collect profiles for Rust.
 variant("profile-rust") {
-  rustflags = [ "-Cprofile-generate" ]
-  if (_fuchsia_prebuilt_runtime) {
-    # The statically-linked profiling runtime depends on libzircon.
-    # TODO(https://fxbug.dev/42139818): Ensure this works with shared_library() instances too!
-    deps = [ "//src/zircon/lib/zircon" ]
+  configs = [ ":variant-libprefix" ]
+  deps = [ ":runtime-deps" ]
 
-    dynamic_linker_flags = "-dynamic-linker=profile-rust/ld.so.1"
-    ldflags = [ "-Wl,$dynamic_linker_flags" ]
-    rustflags += [ "-Clink-arg=$dynamic_linker_flags" ]
-  }
+  rustflags = [ "-Cprofile-generate" ]
+
   if (is_fuchsia || is_kernel) {
     # TODO(https://fxbug.dev/42053322): Value profiling isn't supported by the runtime.
     rustflags += [ "-Cllvm-args=-disable-vp" ]
   }
 }
 
-# PGO-optimized build that uses collected profiles.
-config("profile-use") {
+# Enable PGO-optimized build that uses a profile.
+variant("profile-use") {
+  configs = [ ":variant-libprefix" ]
   if (pgo_profile_path != "") {
     cflags =
         [ "-fprofile-use=" + rebase_path(pgo_profile_path, root_build_dir) ]
@@ -250,7 +256,13 @@ config("profile-use") {
     # TODO(https://fxbug.dev/336358027): Suppress the following warning in PGO
     # optimized build: "Function control flow change detected (hash mismatch)"
     cflags += [ "-Wno-backend-plugin" ]
+  }
+}
 
+# Enable PGO-optimized build that uses a profile collected for Rust.
+variant("profile-use-rust") {
+  configs = [ ":variant-libprefix" ]
+  if (pgo_profile_path != "") {
     rustflags =
         [ "-Cprofile-use=" + rebase_path(pgo_profile_path, root_build_dir) ]
   }

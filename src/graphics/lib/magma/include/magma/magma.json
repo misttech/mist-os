@@ -421,6 +421,36 @@
                 "name": "magma_connection_execute_immediate_commands",
                 "type": "magma_status_t",
                 "description": "Submits a series of commands for execution on the hardware without using a command buffer.",
+                "attributes": "MAGMA_DEPRECATED_SINCE(1, NEXT, \"use magma_connection_execute_inline_commands\")",
+                "arguments": [
+                    {
+                        "name": "connection",
+                        "type": "magma_connection_t",
+                        "description": "An open connection."
+                    },
+                    {
+                        "name": "context_id",
+                        "type": "uint32_t",
+                        "description": "A valid context ID."
+                    },
+                    {
+                        "name": "command_count",
+                        "type": "uint64_t",
+                        "description": "The number of commands in the provided buffer."
+                    },
+                    {
+                        "name": "command_buffers",
+                        "type": "magma_inline_command_buffer_t*",
+                        "description": "An array of command_count magma_inline_command_buffer structs."
+                    }
+                ]
+            },
+            {
+                "ordinal": 34,
+                "name": "magma_connection_execute_inline_commands",
+                "type": "magma_status_t",
+                "description": "Submits a series of commands for execution on the hardware without using a command buffer.",
+                "attributes": "MAGMA_AVAILABLE_SINCE(NEXT)",
                 "arguments": [
                     {
                         "name": "connection",

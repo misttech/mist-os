@@ -47,6 +47,27 @@ pub fn get_str_value_from_dict(dict: &fdata::Dictionary, name: &str) -> Result<S
     }
 }
 
+fn take_value<'a>(dict: &mut fdata::Dictionary, key: &str) -> Option<fdata::DictionaryValue> {
+    let entries = dict.entries.as_mut()?;
+    for i in 0..entries.len() {
+        if entries[i].key == key {
+            return entries.remove(i).value.map(|b| *b);
+        }
+    }
+    None
+}
+
+pub fn take_opt_str_value_from_dict(
+    dict: &mut fdata::Dictionary,
+    name: &str,
+) -> Result<Option<String>, Error> {
+    match take_value(dict, name) {
+        Some(fdata::DictionaryValue::Str(value)) => Ok(Some(value.clone())),
+        Some(_) => Err(anyhow!("{} must a string", name)),
+        _ => Ok(None),
+    }
+}
+
 pub async fn run_starnix_benchmark(
     test: ftest::Invocation,
     mut start_info: frunner::ComponentStartInfo,
@@ -63,8 +84,9 @@ pub async fn run_starnix_benchmark(
     run_listener_proxy.on_test_case_started(&test, std_handles, case_listener)?;
 
     debug!("getting test suite label");
-    let program = start_info.program.as_ref().context("No program")?;
-    let test_suite = get_str_value_from_dict(program, "test_suite_label")?;
+    let program = start_info.program.as_mut().context("No program")?;
+    let test_suite = take_opt_str_value_from_dict(program, "test_suite_label")?
+        .ok_or_else(|| anyhow!("missing test suite label"))?;
 
     // Save the custom_artifacts DirectoryProxy for result reporting.
     let custom_artifacts =

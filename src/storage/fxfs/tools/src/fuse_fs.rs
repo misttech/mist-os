@@ -13,7 +13,7 @@ use fxfs::object_handle::ObjectProperties;
 use fxfs::object_store::volume::root_volume;
 use fxfs::object_store::{
     DataObjectHandle, Directory, HandleOptions, ObjectDescriptor, ObjectKey, ObjectKind,
-    ObjectStore, ObjectValue, Timestamp,
+    ObjectStore, ObjectValue, Timestamp, NO_OWNER,
 };
 use fxfs_crypto::Crypt;
 use once_cell::sync::OnceCell;
@@ -115,11 +115,11 @@ impl FuseFs {
         let fs = FxFilesystem::new_empty(device).await.expect("fxfs new_empty failed");
         let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
         root_volume
-            .new_volume(DEFAULT_VOLUME_NAME, crypt.clone())
+            .new_volume(DEFAULT_VOLUME_NAME, NO_OWNER, crypt.clone())
             .await
             .expect("new_volume failed");
         let default_store = root_volume
-            .volume(DEFAULT_VOLUME_NAME, crypt.clone())
+            .volume(DEFAULT_VOLUME_NAME, NO_OWNER, crypt.clone())
             .await
             .expect("failed to open default store");
 
@@ -140,7 +140,7 @@ impl FuseFs {
         let fs = FxFilesystem::open(device).await.expect("new_empty failed");
         let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
         let default_store = root_volume
-            .volume(DEFAULT_VOLUME_NAME, crypt.clone())
+            .volume(DEFAULT_VOLUME_NAME, NO_OWNER, crypt.clone())
             .await
             .expect("failed to open default store");
 

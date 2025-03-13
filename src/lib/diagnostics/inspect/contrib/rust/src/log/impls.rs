@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use super::WriteInspect;
-use fuchsia_inspect::{Node, StringReference};
+use fuchsia_inspect::Node;
+use std::borrow::Cow;
 
 // --- Utility macros to help with implementing WriteInspect ---
 
@@ -11,7 +12,7 @@ macro_rules! impl_write_inspect {
     ($inspect_value_type:ident, $_self:ident => $self_expr:expr, $($ty:ty),+) => {
         $(
             impl WriteInspect for $ty {
-                fn write_inspect(&$_self, writer: &Node, key: impl Into<StringReference>) {
+                fn write_inspect<'a>(&$_self, writer: &Node, key: impl Into<Cow<'a, str>>) {
                     write_inspect_value!($inspect_value_type, writer, key, $self_expr);
                 }
             }
@@ -53,7 +54,7 @@ impl_write_inspect!(Double, self => *self, f64);
 impl_write_inspect!(Bool, self => *self, bool);
 
 impl<V: WriteInspect + ?Sized> WriteInspect for &V {
-    fn write_inspect(&self, writer: &Node, key: impl Into<StringReference>) {
+    fn write_inspect<'a>(&self, writer: &Node, key: impl Into<Cow<'a, str>>) {
         (*self).write_inspect(writer, key)
     }
 }

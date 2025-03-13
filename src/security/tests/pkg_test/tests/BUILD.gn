@@ -45,9 +45,8 @@ if (is_fuchsia) {
   }
 
   access_ota_blob_as_executable("core_access_ota_blob_as_executable") {
-    base_packages = [
-      "//src/security/tests/pkg_test/config:pkg_resolver_repository_config",
-    ]
+    tuf_repo_configs =
+        [ "//src/security/tests/pkg_test/config/repositories/core.json" ]
 
     use_fxfs_blob = false
 
@@ -63,9 +62,8 @@ if (is_fuchsia) {
   }
 
   bad_signature_update("core_bad_signature_update") {
-    base_packages = [
-      "//src/security/tests/pkg_test/config:pkg_resolver_repository_config",
-    ]
+    tuf_repo_configs =
+        [ "//src/security/tests/pkg_test/config/repositories/core.json" ]
 
     use_fxfs_blob = false
 
@@ -81,9 +79,8 @@ if (is_fuchsia) {
   }
 
   access_ota_blob_as_executable("core_access_ota_blob_as_executable_fxblob") {
-    base_packages = [
-      "//src/security/tests/pkg_test/config:pkg_resolver_repository_config",
-    ]
+    tuf_repo_configs =
+        [ "//src/security/tests/pkg_test/config/repositories/core.json" ]
 
     use_fxfs_blob = true
 
@@ -99,9 +96,8 @@ if (is_fuchsia) {
   }
 
   bad_signature_update("core_bad_signature_update_fxblob") {
-    base_packages = [
-      "//src/security/tests/pkg_test/config:pkg_resolver_repository_config",
-    ]
+    tuf_repo_configs =
+        [ "//src/security/tests/pkg_test/config/repositories/core.json" ]
 
     use_fxfs_blob = true
 

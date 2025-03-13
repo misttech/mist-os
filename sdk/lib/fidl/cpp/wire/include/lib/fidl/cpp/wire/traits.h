@@ -52,9 +52,6 @@ template <> struct IsPrimitive<float> : public std::true_type {};
 template <> struct IsPrimitive<double> : public std::true_type {};
 // clang-format on
 
-template <typename Protocol>
-struct ProtocolDetails;
-
 }  // namespace internal
 
 // A type trait that indicates whether the given type is a request/response type

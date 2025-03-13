@@ -7,7 +7,7 @@ use crate::fidl::registry;
 use crate::{Connector, ConversionError, DirEntry, RemotableCapability};
 use fidl::handle::{Channel, Status};
 use std::sync::Arc;
-use vfs::directory::entry::{DirectoryEntry, OpenRequest};
+use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
 use vfs::execution_scope::ExecutionScope;
 use vfs::ToObjectRequest;
 use {fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio};
@@ -17,7 +17,7 @@ impl RemotableCapability for DirEntry {
         self,
         _scope: ExecutionScope,
     ) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
-        Ok(self.entry)
+        Ok(self.to_directory_entry())
     }
 }
 
@@ -45,10 +45,26 @@ impl Connectable for DirEntry {
     }
 }
 
+impl GetEntryInfo for DirEntry {
+    fn entry_info(&self) -> EntryInfo {
+        self.entry.entry_info()
+    }
+}
+
+impl DirectoryEntry for DirEntry {
+    fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
+        self.entry.clone().open_entry(request)
+    }
+}
+
 impl DirEntry {
     /// Creates a [DirEntry] capability from a [vfs::directory::entry::DirectoryEntry].
     pub fn new(entry: Arc<dyn DirectoryEntry>) -> Self {
         Self { entry }
+    }
+
+    pub fn to_directory_entry(self) -> Arc<dyn DirectoryEntry> {
+        self.entry
     }
 
     /// Opens the corresponding entry.

@@ -136,9 +136,11 @@ pub struct DirEntry {
     ///
     /// This is separated from the DirEntryState for lock ordering. rename needs to lock the source
     /// parent, the target parent, the source, and the target - four (4) DirEntries in total.
-    /// Getting the ordering right on these is nearly impossible. However, we only need to lock the
-    /// children map on the two parents and we don't need to lock the children map on the two
-    /// children. So splitting the children out into its own lock resolves this.
+    //
+    // FIXME(b/379929394): The lock ordering here assumes parent-to-child lock acquisition, which
+    // a number of algorithms in the DirEntry operations also assume. This assumption can be broken
+    // by the rename operation, which can move nodes around the hierarchy. See the referenced bug
+    // for more details, the current mitigations, and potentials for long-term solutions.
     children: RwLock<DirEntryChildren>,
 }
 type DirEntryChildren = BTreeMap<FsString, Weak<DirEntry>>;
@@ -471,15 +473,12 @@ impl DirEntry {
     {
         assert!(!DirEntry::is_reserved_name(name));
 
-        // child *must* be dropped after self_children and child_children below (even in the error
-        // paths).
-        let child;
+        // child_to_unlink *must* be dropped after self_children (even in the error paths).
+        let child_to_unlink;
 
         let mut self_children = self.lock_children();
-        child = self_children.component_lookup(locked, current_task, mount, name)?;
-        let child_children = child.children.read();
-
-        child.require_no_mounts(mount)?;
+        child_to_unlink = self_children.component_lookup(locked, current_task, mount, name)?;
+        child_to_unlink.require_no_mounts(mount)?;
 
         // Check that this filesystem entry must be a directory. This can
         // happen if the path terminates with a trailing slash.
@@ -487,36 +486,28 @@ impl DirEntry {
         // Example: If we're unlinking a symlink `/foo/bar/`, this would
         // result in `ENOTDIR` because of the trailing slash, even if
         // `UnlinkKind::NonDirectory` was used.
-        if must_be_directory && !child.node.is_dir() {
+        if must_be_directory && !child_to_unlink.node.is_dir() {
             return error!(ENOTDIR);
         }
 
         match kind {
             UnlinkKind::Directory => {
-                if !child.node.is_dir() {
+                if !child_to_unlink.node.is_dir() {
                     return error!(ENOTDIR);
-                }
-                // This check only covers whether the cache is non-empty.
-                // We actually need to check whether the underlying directory is
-                // empty by asking the node via remove below.
-                if !child_children.is_empty() {
-                    return error!(ENOTEMPTY);
                 }
             }
             UnlinkKind::NonDirectory => {
-                if child.node.is_dir() {
+                if child_to_unlink.node.is_dir() {
                     return error!(EISDIR);
                 }
             }
         }
 
-        self.node.unlink(locked, current_task, mount, name, &child.node)?;
+        self.node.unlink(locked, current_task, mount, name, &child_to_unlink.node)?;
         self_children.children.remove(name);
 
-        std::mem::drop(child_children);
         std::mem::drop(self_children);
-
-        child.destroy(&current_task.kernel().mounts);
+        child_to_unlink.destroy(&current_task.kernel().mounts);
 
         Ok(())
     }

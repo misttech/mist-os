@@ -1,0 +1,20 @@
+/// Compatibility shims which mimic some API surfaces of the current Rust bindings.
+pub mod compat {
+    {% for ident in context.schema.declaration_order %}
+        {% match context.schema.declarations[ident] %}
+            {% when DeclType::Protocol %}
+                {% let protocol = context.schema.protocol_declarations[ident] %}
+                {% let protocol_name = filters::ident(protocol.name.decl_name().camel())? %}
+                {% let proxy_name = format!("{}Proxy", protocol.name.decl_name().camel()) %}
+
+                #[cfg(target_os = "fuchsia")]
+                /// An alias for a client sender over `zx::Channel` for the `{{ protocol_name }}`
+                /// protocol.
+                pub type {{ proxy_name }} = ::fidl_next::ClientSender<
+                    ::fidl_next::fuchsia::zx::Channel,
+                    crate::{{ protocol_name }},
+                >;
+            {% else %}
+        {% endmatch %}
+    {% endfor %}
+}

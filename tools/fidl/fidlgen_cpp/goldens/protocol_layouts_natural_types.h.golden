@@ -987,7 +987,7 @@ class MainProtocolOnAnonRequest {
 
 inline LocalTablePayload::LocalTablePayload(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline LocalTablePayload::LocalTablePayload(const ::test_protocollayouts::LocalTablePayload& other) noexcept : LocalTablePayload(other.CloneStorage_()) {}
-inline LocalTablePayload& ::test_protocollayouts::LocalTablePayload::operator=(const LocalTablePayload & other) noexcept {
+inline LocalTablePayload& ::test_protocollayouts::LocalTablePayload::operator=(const LocalTablePayload& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1000,7 +1000,7 @@ inline LocalTablePayload& LocalTablePayload::a(std::optional<uint16_t> value) {
 
 inline MainProtocolOneWayAnonRequest::MainProtocolOneWayAnonRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline MainProtocolOneWayAnonRequest::MainProtocolOneWayAnonRequest(const ::test_protocollayouts::MainProtocolOneWayAnonRequest& other) noexcept : MainProtocolOneWayAnonRequest(other.CloneStorage_()) {}
-inline MainProtocolOneWayAnonRequest& ::test_protocollayouts::MainProtocolOneWayAnonRequest::operator=(const MainProtocolOneWayAnonRequest & other) noexcept {
+inline MainProtocolOneWayAnonRequest& ::test_protocollayouts::MainProtocolOneWayAnonRequest::operator=(const MainProtocolOneWayAnonRequest& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1013,7 +1013,7 @@ inline MainProtocolOneWayAnonRequest& MainProtocolOneWayAnonRequest::a(std::opti
 
 inline MainProtocolTwoWayAnonResponse::MainProtocolTwoWayAnonResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline MainProtocolTwoWayAnonResponse::MainProtocolTwoWayAnonResponse(const ::test_protocollayouts::MainProtocolTwoWayAnonResponse& other) noexcept : MainProtocolTwoWayAnonResponse(other.CloneStorage_()) {}
-inline MainProtocolTwoWayAnonResponse& ::test_protocollayouts::MainProtocolTwoWayAnonResponse::operator=(const MainProtocolTwoWayAnonResponse & other) noexcept {
+inline MainProtocolTwoWayAnonResponse& ::test_protocollayouts::MainProtocolTwoWayAnonResponse::operator=(const MainProtocolTwoWayAnonResponse& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1026,7 +1026,7 @@ inline MainProtocolTwoWayAnonResponse& MainProtocolTwoWayAnonResponse::a(std::op
 
 inline MainProtocolTwoWayAnonWithErrorRequest::MainProtocolTwoWayAnonWithErrorRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline MainProtocolTwoWayAnonWithErrorRequest::MainProtocolTwoWayAnonWithErrorRequest(const ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorRequest& other) noexcept : MainProtocolTwoWayAnonWithErrorRequest(other.CloneStorage_()) {}
-inline MainProtocolTwoWayAnonWithErrorRequest& ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorRequest::operator=(const MainProtocolTwoWayAnonWithErrorRequest & other) noexcept {
+inline MainProtocolTwoWayAnonWithErrorRequest& ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorRequest::operator=(const MainProtocolTwoWayAnonWithErrorRequest& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -1041,7 +1041,7 @@ inline MainProtocolTwoWayAnonWithErrorRequest& MainProtocolTwoWayAnonWithErrorRe
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_protocollayouts::LocalTablePayload> : public std::true_type{};
+struct IsFidlType<::test_protocollayouts::LocalTablePayload> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_protocollayouts::LocalTablePayload> {
@@ -1053,13 +1053,13 @@ struct TypeTraits<::test_protocollayouts::LocalTablePayload> {
 };
 
 template <>
-struct IsTable<::test_protocollayouts::LocalTablePayload> : public std::true_type{};
+struct IsTable<::test_protocollayouts::LocalTablePayload> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocollayouts::LocalTablePayload, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_protocollayouts::LocalTablePayload> {};
 
 template <>
-struct IsFidlType<::test_protocollayouts::MainProtocolOneWayAnonRequest> : public std::true_type{};
+struct IsFidlType<::test_protocollayouts::MainProtocolOneWayAnonRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_protocollayouts::MainProtocolOneWayAnonRequest> {
@@ -1071,13 +1071,13 @@ struct TypeTraits<::test_protocollayouts::MainProtocolOneWayAnonRequest> {
 };
 
 template <>
-struct IsTable<::test_protocollayouts::MainProtocolOneWayAnonRequest> : public std::true_type{};
+struct IsTable<::test_protocollayouts::MainProtocolOneWayAnonRequest> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocollayouts::MainProtocolOneWayAnonRequest, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_protocollayouts::MainProtocolOneWayAnonRequest> {};
 
 template <>
-struct IsFidlType<::test_protocollayouts::MainProtocolTwoWayAnonResponse> : public std::true_type{};
+struct IsFidlType<::test_protocollayouts::MainProtocolTwoWayAnonResponse> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_protocollayouts::MainProtocolTwoWayAnonResponse> {
@@ -1089,13 +1089,13 @@ struct TypeTraits<::test_protocollayouts::MainProtocolTwoWayAnonResponse> {
 };
 
 template <>
-struct IsTable<::test_protocollayouts::MainProtocolTwoWayAnonResponse> : public std::true_type{};
+struct IsTable<::test_protocollayouts::MainProtocolTwoWayAnonResponse> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocollayouts::MainProtocolTwoWayAnonResponse, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_protocollayouts::MainProtocolTwoWayAnonResponse> {};
 
 template <>
-struct IsFidlType<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorRequest> : public std::true_type{};
+struct IsFidlType<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorRequest> {
@@ -1107,13 +1107,13 @@ struct TypeTraits<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorRequest
 };
 
 template <>
-struct IsTable<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorRequest> : public std::true_type{};
+struct IsTable<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorRequest> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorRequest, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorRequest> {};
 
 template <>
-struct IsFidlType<::test_protocollayouts::LocalUnionPayload> : public std::true_type{};
+struct IsFidlType<::test_protocollayouts::LocalUnionPayload> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_protocollayouts::LocalUnionPayload> {
@@ -1125,14 +1125,14 @@ struct TypeTraits<::test_protocollayouts::LocalUnionPayload> {
 };
 
 template <>
-struct IsUnion<::test_protocollayouts::LocalUnionPayload> : public std::true_type{};
+struct IsUnion<::test_protocollayouts::LocalUnionPayload> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocollayouts::LocalUnionPayload, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocollayouts::LocalUnionPayload> {};
 
 template <>
-struct IsFidlType<::test_protocollayouts::MainProtocolTwoWayImportWithErrorResult> : public std::true_type{};
+struct IsFidlType<::test_protocollayouts::MainProtocolTwoWayImportWithErrorResult> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_protocollayouts::MainProtocolTwoWayImportWithErrorResult> {
@@ -1144,14 +1144,14 @@ struct TypeTraits<::test_protocollayouts::MainProtocolTwoWayImportWithErrorResul
 };
 
 template <>
-struct IsUnion<::test_protocollayouts::MainProtocolTwoWayImportWithErrorResult> : public std::true_type{};
+struct IsUnion<::test_protocollayouts::MainProtocolTwoWayImportWithErrorResult> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocollayouts::MainProtocolTwoWayImportWithErrorResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocollayouts::MainProtocolTwoWayImportWithErrorResult> {};
 
 template <>
-struct IsFidlType<::test_protocollayouts::MainProtocolTwoWayLocalWithErrorResult> : public std::true_type{};
+struct IsFidlType<::test_protocollayouts::MainProtocolTwoWayLocalWithErrorResult> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_protocollayouts::MainProtocolTwoWayLocalWithErrorResult> {
@@ -1163,14 +1163,14 @@ struct TypeTraits<::test_protocollayouts::MainProtocolTwoWayLocalWithErrorResult
 };
 
 template <>
-struct IsUnion<::test_protocollayouts::MainProtocolTwoWayLocalWithErrorResult> : public std::true_type{};
+struct IsUnion<::test_protocollayouts::MainProtocolTwoWayLocalWithErrorResult> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocollayouts::MainProtocolTwoWayLocalWithErrorResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocollayouts::MainProtocolTwoWayLocalWithErrorResult> {};
 
 template <>
-struct IsFidlType<::test_protocollayouts::MainProtocolTwoWayAnonRequest> : public std::true_type{};
+struct IsFidlType<::test_protocollayouts::MainProtocolTwoWayAnonRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_protocollayouts::MainProtocolTwoWayAnonRequest> {
@@ -1182,14 +1182,14 @@ struct TypeTraits<::test_protocollayouts::MainProtocolTwoWayAnonRequest> {
 };
 
 template <>
-struct IsUnion<::test_protocollayouts::MainProtocolTwoWayAnonRequest> : public std::true_type{};
+struct IsUnion<::test_protocollayouts::MainProtocolTwoWayAnonRequest> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocollayouts::MainProtocolTwoWayAnonRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocollayouts::MainProtocolTwoWayAnonRequest> {};
 
 template <>
-struct IsFidlType<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorResponse> : public std::true_type{};
+struct IsFidlType<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorResponse> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorResponse> {
@@ -1201,14 +1201,14 @@ struct TypeTraits<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorRespons
 };
 
 template <>
-struct IsUnion<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorResponse> : public std::true_type{};
+struct IsUnion<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorResponse> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorResponse> {};
 
 template <>
-struct IsFidlType<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorResult> : public std::true_type{};
+struct IsFidlType<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorResult> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorResult> {
@@ -1220,14 +1220,14 @@ struct TypeTraits<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorResult>
 };
 
 template <>
-struct IsUnion<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorResult> : public std::true_type{};
+struct IsUnion<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorResult> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocollayouts::MainProtocolTwoWayAnonWithErrorResult> {};
 
 template <>
-struct IsFidlType<::test_protocollayouts::MainProtocolOnAnonRequest> : public std::true_type{};
+struct IsFidlType<::test_protocollayouts::MainProtocolOnAnonRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_protocollayouts::MainProtocolOnAnonRequest> {
@@ -1239,7 +1239,7 @@ struct TypeTraits<::test_protocollayouts::MainProtocolOnAnonRequest> {
 };
 
 template <>
-struct IsUnion<::test_protocollayouts::MainProtocolOnAnonRequest> : public std::true_type{};
+struct IsUnion<::test_protocollayouts::MainProtocolOnAnonRequest> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocollayouts::MainProtocolOnAnonRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final

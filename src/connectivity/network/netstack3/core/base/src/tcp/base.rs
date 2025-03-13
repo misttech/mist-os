@@ -79,6 +79,12 @@ impl From<Mss> for u32 {
     }
 }
 
+impl From<Mss> for usize {
+    fn from(Mss(mss): Mss) -> Self {
+        usize::from(mss.get())
+    }
+}
+
 /// An implementation of [`Payload`] backed by up to `N` byte slices.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct FragmentedPayload<'a, const N: usize> {

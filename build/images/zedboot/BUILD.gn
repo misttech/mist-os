@@ -25,7 +25,6 @@ assembled_system("zedboot_assembly") {
   testonly = true
   output_dir = root_build_dir
   image_name = "zedboot"
-  include_shell_commands = false
   generate_vbmeta = use_vbmeta
   use_bringup_platform_bundles_only = true
   product_assembly_config_label = _product_config
@@ -36,29 +35,9 @@ assembled_system("zedboot_assembly") {
 
   # Bazel assembly should not depend on any targets from GN assembly other
   # than the legacy AIB.
-  include_legacy_bundle = true
-  legacy_bundle_only = use_bazel_images_only
+  include_legacy_bundle = false
 
   base_packages = []
-
-  additional_boot_args = [
-    "netsvc.all-features=true",
-    "netsvc.netboot=true",
-  ]
-
-  cmdline = [
-    "virtcon.colorscheme=special",
-    "virtcon.dpi=160,240,360,480",
-  ]
-
-  bootfs_labels = []
-
-  # For debugging.
-  bootfs_labels += [
-    "//src/devices/nand/drivers/broker:nand-broker",
-    "//src/storage/bin/umount",
-    "//src/storage/tools/logs/run-with-logs",
-  ]
 
   # zbi arguments
   if (custom_signing_script != "") {

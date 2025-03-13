@@ -28,16 +28,27 @@ build --experimental_output_directory_naming_scheme=diff_against_baseline
 cquery --experimental_output_directory_naming_scheme=diff_against_baseline
 aquery --experimental_output_directory_naming_scheme=diff_against_baseline
 
+# Ensure local build actions never inherit the user's LD_LIBRARY_PATH
+# to improve hermeticity and caching.
+build --incompatible_strict_action_env=true
+
+# Do not create runfiles symlink forests for external repositories
+# under .runfiles/_main/external/repo in addition to .runfiles/repo.
+#
+# This is the default behavior in Bazel 8.0 but not in Bazel 7.x,
+# though `bazel test` implicitly disables the behavior since  Bazel 7.1
+build --legacy_external_runfiles=false
+
 # Setup the default platform.
 # We need to set them for cqueries and aqueries as well as build (and
 # everything else that inherits from it). Alas, setting them in `common`
 # breaks other things.
-cquery --platforms=//build/bazel/platforms:{default_platform}
-cquery --host_platform=//build/bazel/platforms:{host_platform}
-aquery --platforms=//build/bazel/platforms:{default_platform}
-aquery --host_platform=//build/bazel/platforms:{host_platform}
-build --platforms=//build/bazel/platforms:{default_platform}
-build --host_platform=//build/bazel/platforms:{host_platform}
+cquery --platforms=//build/bazel/platforms:default
+cquery --host_platform=//build/bazel/platforms:host
+aquery --platforms=//build/bazel/platforms:default
+aquery --host_platform=//build/bazel/platforms:host
+build --platforms=//build/bazel/platforms:default
+build --host_platform=//build/bazel/platforms:host
 
 # Save workspace rule events to a log file for later analysis.
 common --experimental_workspace_rules_log_file={workspace_log_file}
@@ -57,17 +68,7 @@ common:exec_log --experimental_enable_execution_graph_log
 common --experimental_downloader_config=build/bazel/config/no_downloads_allowed.config
 
 # Pass local developer overrides for assembly to Bazel
-# For now, this needs to set the label_flag() in both @rules_fuchsia
-# and @fuchsia_sdk to ensure that all fuchsia_product() definitions
-# correctly support this feature. The @fuchsia_sdk one may be
-# removed when the fuchsia.git and vendor/*.git repositories no
-# longer include rules from @fuchsia_sdk.
-common --@fuchsia_sdk//fuchsia:assembly_developer_overrides_list=@assembly_developer_overrides//:in-tree_developer_overrides_list
 common --@rules_fuchsia//fuchsia:assembly_developer_overrides_list=@assembly_developer_overrides//:in-tree_developer_overrides_list
-
-# TODO(http://b/319377689#comment5): Remove this flag when the linked issue is
-# fixed upstream.
-build --sandbox_add_mount_pair=/tmp
 
 # Disable verbose Bazel output with --config=quiet
 # Note that --show_result=0 is not supported by `bazel query`.
@@ -109,4 +110,13 @@ common:no_sdk \
   --override_repository=fuchsia_internal_idk=build/bazel/local_repositories/empty \
   --override_repository=fuchsia_sdk=build/bazel/local_repositories/empty_fuchsia_sdk \
   --override_repository=fuchsia_clang=build/bazel/local_repositories/empty_fuchsia_clang \
-  --platforms=//build/bazel/platforms:{host_platform}
+  --platforms=//build/bazel/platforms:host
+
+# Link Go binaries with PIE to avoid relocation errors.
+build --@io_bazel_rules_go//go/config:linkmode=pie
+
+# Use --config=no_gn_targets to ensure that the @gn_targets repository is empty.
+# Bazel targets built with this option cannot depend on GN target outputs at all,
+# very intentionally.
+common:no_gn_targets \
+  --override_repository=gn_targets=build/bazel/local_repositories/empty

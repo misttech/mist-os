@@ -62,9 +62,9 @@ class VkRenderer final : public Renderer {
 
   // |Renderer|.
   // Only called from the main thread.
-  void SetColorConversionValues(const std::array<float, 9>& coefficients,
-                                const std::array<float, 3>& preoffsets,
-                                const std::array<float, 3>& postoffsets) override;
+  void SetColorConversionValues(const fidl::Array<float, 9>& coefficients,
+                                const fidl::Array<float, 3>& preoffsets,
+                                const fidl::Array<float, 3>& postoffsets) override;
 
   // |Renderer|.
   // Only called from the main thread.

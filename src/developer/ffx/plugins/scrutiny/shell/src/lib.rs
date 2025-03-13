@@ -4,7 +4,8 @@
 
 use anyhow::{anyhow, bail, Result};
 use ffx_scrutiny_shell_args::ScrutinyShellCommand;
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool};
 use scrutiny_frontend::{
     BlobFsExtractController, FarMetaExtractController, FvmExtractController,
     ZbiExtractBootfsPackageIndex, ZbiExtractCmdlineController, ZbiExtractController,

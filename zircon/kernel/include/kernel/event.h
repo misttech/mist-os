@@ -57,16 +57,17 @@ class Event {
   // Or the |status| which the caller specified in Event::Signal(status)
   zx_status_t Wait(const Deadline& deadline) { return WaitWorker(deadline, Interruptible::Yes, 0); }
 
-  // Same as Wait() but waits forever and gives a mask of signals to ignore.
+  // Same as Wait() but gives a mask of signals to ignore. The signal_mask only applies to existing
+  // signals, not future ones that might be signaled while waiting.
   // The caller must be interruptible.
-  zx_status_t WaitWithMask(uint signal_mask) {
-    return WaitWorker(Deadline::infinite(), Interruptible::Yes, signal_mask);
+  zx_status_t Wait(const Deadline& deadline, uint signal_mask) {
+    return WaitWorker(deadline, Interruptible::Yes, signal_mask);
   }
 
-  // no deadline, non interruptible version of the above.
+  // No deadline, non interruptible version of Wait().
   zx_status_t Wait() { return WaitWorker(Deadline::infinite(), Interruptible::No, 0); }
 
-  // Wait until deadline
+  // Wait until a zx_instant_mono_t deadline.
   // Interruptible arg allows it to return early with ZX_ERR_INTERNAL_INTR_KILLED if thread
   // is signaled for kill or with ZX_ERR_INTERNAL_INTR_RETRY if the thread is suspended.
   zx_status_t WaitDeadline(zx_instant_mono_t deadline, Interruptible interruptible) {

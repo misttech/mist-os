@@ -26,12 +26,6 @@ pub struct StartCommand {
     #[argh(switch)]
     pub background: bool,
 
-    /// run server in as part of the ffx daemon. This switch is mutually exclusive with
-    /// --background and --foreground. The daemon mode is deprecated. If it is used, please file a
-    /// bug at go/ffx-bug describing why daemon mode was needed.
-    #[argh(switch)]
-    pub daemon: bool,
-
     /// run server as a foreground process.  This is the
     /// default mode. This is mutually
     /// exclusive with --daemon and --background.
@@ -74,7 +68,7 @@ pub struct StartCommand {
 
     /// enable persisting this repository across reboots.
     /// Default is `Ephemeral`.
-    #[argh(option, from_str_fn(ffx_repository_serve_args::parse_storage_type))]
+    #[argh(option, from_str_fn(parse_storage_type))]
     pub storage_type: Option<RepositoryStorageType>,
 
     /// resolution mechanism when alias registrations conflict. Must be either

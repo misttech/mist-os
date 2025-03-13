@@ -48,9 +48,9 @@ bool change_ids(uid_t user, gid_t group) {
 
 }  // namespace
 
-class SuidTest : public ::testing::Test, public ::testing::WithParamInterface<uint64_t> {
+class SuidTest : public ::testing::Test, public ::testing::WithParamInterface<unsigned long> {
  public:
-  static uint64_t mount_flags() { return GetParam(); }
+  static unsigned long mount_flags() { return GetParam(); }
 
   std::optional<std::string> MountTmpFs(const std::string &temp_dir) {
     std::string temp = temp_dir + "/tmp";

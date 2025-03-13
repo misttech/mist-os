@@ -4,7 +4,7 @@
 
 use component_events::events::{EventStream, ExitStatus, Stopped};
 use component_events::matcher::EventMatcher;
-use diagnostics_reader::{ArchiveReader, Inspect};
+use diagnostics_reader::ArchiveReader;
 use fidl_fuchsia_component::BinderMarker;
 use fuchsia_component::client::connect_to_protocol;
 use self_profiles_report::SelfProfilesReport;
@@ -21,7 +21,7 @@ async fn main() {
         run_pipe_writer(&mut event_stream).await;
     }
 
-    let first_snapshot = ArchiveReader::new().snapshot::<Inspect>().await.unwrap();
+    let first_snapshot = ArchiveReader::inspect().snapshot().await.unwrap();
     let first_summaries = SelfProfilesReport::from_snapshot(&first_snapshot).unwrap();
     assert_ne!(first_summaries, &[], "summaries should not be empty");
     let first_summary = &first_summaries[0];
@@ -33,7 +33,7 @@ async fn main() {
         run_pipe_writer(&mut event_stream).await;
     }
 
-    let second_snapshot = ArchiveReader::new().snapshot::<Inspect>().await.unwrap();
+    let second_snapshot = ArchiveReader::inspect().snapshot().await.unwrap();
     let second_summaries = SelfProfilesReport::from_snapshot(&second_snapshot).unwrap();
     assert_ne!(second_summaries, &[], "summaries should not be empty");
 

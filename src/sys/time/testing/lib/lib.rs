@@ -223,6 +223,16 @@ impl NestedTimekeeper {
             .await
             .unwrap();
 
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::configuration("fuchsia.time.config.WritableUTCTime"))
+                    .from(Ref::parent())
+                    .to(&timekeeper),
+            )
+            .await
+            .unwrap();
+
         let rtc_updates = setup_rtc(rtc_options, &builder, &timekeeper).await;
         let realm_instance = builder.build().await.unwrap();
 
@@ -618,6 +628,11 @@ async fn serve_fake_rtc(
                 log::debug!("serve_fake_rtc: DeviceRequest::Set");
                 rtc_updates.0.lock().push(rtc);
                 responder.send(zx::Status::OK.into_raw()).unwrap();
+            }
+            DeviceRequest::Set2 { rtc, responder } => {
+                log::debug!("serve_fake_rtc: DeviceRequest::Set2");
+                rtc_updates.0.lock().push(rtc);
+                responder.send(Ok(())).unwrap();
             }
             DeviceRequest::_UnknownMethod { .. } => {}
         }

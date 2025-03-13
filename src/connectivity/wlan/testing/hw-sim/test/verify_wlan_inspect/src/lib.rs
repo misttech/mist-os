@@ -5,7 +5,7 @@
 use anyhow::{format_err, Error};
 use diagnostics_assertions::{assert_data_tree, AnyProperty};
 use diagnostics_hierarchy::DiagnosticsHierarchy;
-use diagnostics_reader::{ArchiveReader, ComponentSelector, Inspect};
+use diagnostics_reader::{ArchiveReader, ComponentSelector};
 use fidl_fuchsia_wlan_policy as fidl_policy;
 use fidl_test_wlan_realm::WlanConfig;
 use ieee80211::Bssid;
@@ -248,9 +248,9 @@ async fn verify_wlan_inspect() {
 }
 
 async fn get_inspect_hierarchy(component: &str) -> Result<DiagnosticsHierarchy, Error> {
-    ArchiveReader::new()
+    ArchiveReader::inspect()
         .add_selector(ComponentSelector::new(vec![component.to_string()]))
-        .snapshot::<Inspect>()
+        .snapshot()
         .await?
         .into_iter()
         .next()

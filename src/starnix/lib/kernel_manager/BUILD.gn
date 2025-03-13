@@ -17,6 +17,7 @@ rustc_library("kernel_manager") {
   sources = [
     "src/kernels.rs",
     "src/lib.rs",
+    "src/suspend.rs",
   ]
   with_unit_tests = true
 
@@ -28,6 +29,7 @@ rustc_library("kernel_manager") {
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
     "//sdk/fidl/fuchsia.starnix.container:fuchsia.starnix.container_rust",
     "//sdk/fidl/fuchsia.starnix.runner:fuchsia.starnix.runner_rust",
+    "//sdk/lib/scheduler/rust",
     "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
@@ -49,5 +51,5 @@ rustc_library("kernel_manager") {
 
 fuchsia_unittest_package("starnix_kernel_manager-tests") {
   deps = [ ":kernel_manager_test" ]
-  manifest = "meta/kernel_manager-tests.cml"
+  manifest = "meta/kernel_manager_tests.cml"
 }

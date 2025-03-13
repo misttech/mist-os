@@ -38,8 +38,8 @@ TEST_F(DeviceControllerFidl, ControllerTest) {
   {
     zx::channel dev_client, dev_server;
     ASSERT_EQ(zx::channel::create({}, &dev_client, &dev_server), ZX_OK);
-    ASSERT_EQ(realm.component().exposed()->Open3("dev-topological", fuchsia::io::PERM_READABLE, {},
-                                                 std::move(dev_server)),
+    ASSERT_EQ(realm.component().exposed()->Open("dev-topological", fuchsia::io::PERM_READABLE, {},
+                                                std::move(dev_server)),
               ZX_OK);
     ASSERT_EQ(fdio_fd_create(dev_client.release(), dev_topo_fd.reset_and_get_address()), ZX_OK);
   }

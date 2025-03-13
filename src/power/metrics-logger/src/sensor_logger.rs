@@ -498,7 +498,7 @@ impl<T: Sensor<T>> SensorLogger<T> {
 
                     let mut samples = tracker.samples[index].clone();
                     // f32 doesn't support Ord, so can't use samples.sort().
-                    samples.sort_by(|x, y| x.partial_cmp(y).unwrap_or_else(|| Ordering::Less));
+                    samples.sort_by(|x, y| x.partial_cmp(y).unwrap_or(Ordering::Less));
                     let med = samples[samples.len() / 2];
 
                     self.inspect.log_statistics(

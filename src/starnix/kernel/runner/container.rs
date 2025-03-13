@@ -21,19 +21,18 @@ use fasync::OnSignals;
 use fidl::endpoints::{ControlHandle, RequestStream, ServerEnd};
 use fidl_fuchsia_component_runner::{TaskProviderRequest, TaskProviderRequestStream};
 use fidl_fuchsia_feedback::CrashReporterMarker;
-use fidl_fuchsia_scheduler::RoleManagerMarker;
 use fuchsia_async::DurationExt;
-use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_sync};
+use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
 use futures::channel::oneshot;
 use futures::{FutureExt, StreamExt, TryStreamExt};
-use runner::{get_program_string, get_program_strvec};
+use serde::Deserialize;
 use starnix_core::container_namespace::ContainerNamespace;
 use starnix_core::execution::execute_task_with_prerun_result;
 use starnix_core::fs::fuchsia::create_remotefs_filesystem;
 use starnix_core::fs::tmpfs::TmpFs;
 use starnix_core::security;
-use starnix_core::task::{set_thread_role, CurrentTask, ExitStatus, Kernel, Task};
+use starnix_core::task::{CurrentTask, ExitStatus, Kernel, RoleOverrides, SchedulerManager, Task};
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_core::time::utc::update_utc_clock;
 use starnix_core::vfs::{
@@ -156,30 +155,8 @@ fn attribution_info_for_kernel(
 }
 
 pub struct Config {
-    /// The features enabled for this container.
-    pub features: Vec<String>,
-
-    /// The command line for the initial process for this container.
-    init: Vec<String>,
-
-    /// The command line for the kernel.
-    kernel_cmdline: String,
-
-    /// The specifications for the file system mounts for this container.
-    mounts: Vec<String>,
-
-    /// The resource limits to apply to this container.
-    rlimits: Vec<String>,
-
-    /// The name of this container.
-    name: String,
-
-    /// The path that the container will wait until exists before considering itself to have started.
-    startup_file_path: String,
-
-    #[cfg(not(feature = "starnix_lite"))]
-    /// The remote block devices to use for the container.
-    remote_block_devices: Vec<String>,
+    /// Configuration specified by the component's `program` block.
+    pub program: ContainerProgram,
 
     /// The outgoing directory of the container, used to serve protocols on behalf of the container.
     /// For example, the starnix_kernel serves a component runner in the containers' outgoing
@@ -193,51 +170,96 @@ pub struct Config {
     /// The runtime directory of the container, used to provide CF introspection.
     runtime_dir: Option<ServerEnd<fio::DirectoryMarker>>,
 
-    /// The default seclabel that is applied to components that are instantiated in this container.
-    ///
-    /// Components can override this by setting the `seclabel` field in their program block.
-    pub default_seclabel: Option<String>,
-
-    /// The default fsseclabel that is applied to components that are instantiated in this container.
-    ///
-    /// Components can override this by setting the `fsseclabel` field in their program block.
-    pub default_fsseclabel: Option<String>,
-
-    /// The default uid that is applied to components that are instantiated in this container.
-    ///
-    /// Components can override this by setting the `uid` field in their program block.
-    pub default_uid: u32,
-
     /// Component moniker token for the container component. This token is used in various protocols
     /// to uniquely identify a component.
     component_instance: Option<zx::Event>,
 }
 
-fn get_config_from_component_start_info(mut start_info: frunner::ComponentStartInfo) -> Config {
-    let get_strvec = |key| {
-        get_program_strvec(&start_info, key)
-            .unwrap_or_default()
-            .map(|value| value.to_owned())
-            .unwrap_or_default()
-    };
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ContainerProgram {
+    /// The name of this container.
+    name: String,
 
-    let get_string = |key| get_program_string(&start_info, key).unwrap_or_default().to_owned();
+    /// The command line for the initial process for this container.
+    init: Vec<String>,
 
-    let default_uid = get_program_string(&start_info, "default_uid")
-        .map(|s| s.parse().expect("container default uid"))
-        .unwrap_or(42);
-    let default_seclabel = get_program_string(&start_info, "default_seclabel").map(|s| s.into());
-    let default_fsseclabel =
-        get_program_string(&start_info, "default_fsseclabel").map(|s| s.into());
-    let features = get_strvec("features");
-    let init = get_strvec("init");
-    let kernel_cmdline = get_string("kernel_cmdline");
-    let mounts = get_strvec("mounts");
-    let name = get_string("name");
+    /// The command line for the kernel.
+    #[serde(default)]
+    kernel_cmdline: String,
+
+    /// The specifications for the file system mounts for this container.
+    #[serde(default)]
+    mounts: Vec<String>,
+
+    /// The features enabled for this container.
+    #[serde(default)]
+    pub features: Vec<String>,
+
+    /// The resource limits to apply to this container.
+    #[serde(default)]
+    rlimits: Vec<String>,
+
+    /// The path that the container will wait until exists before considering itself to have started.
+    #[serde(default)]
+    startup_file_path: String,
+
     #[cfg(not(feature = "starnix_lite"))]
-    let remote_block_devices = get_strvec("remote_block_devices");
-    let rlimits = get_strvec("rlimits");
-    let startup_file_path = get_string("startup_file_path");
+    /// The remote block devices to use for the container.
+    #[serde(default)]
+    remote_block_devices: Vec<String>,
+
+    /// The default seclabel that is applied to components that are instantiated in this container.
+    ///
+    /// Components can override this by setting the `seclabel` field in their program block.
+    #[serde(default)]
+    pub default_seclabel: Option<String>,
+
+    /// The default uid that is applied to components that are instantiated in this container.
+    ///
+    /// Components can override this by setting the `uid` field in their program block.
+    #[serde(default = "default_uid")]
+    pub default_uid: runner::serde::StoreAsString<u32>,
+
+    /// The default mount options to use when mounting directories from a component's namespace.
+    ///
+    /// The string is expected to follow the format: "<namespace_path>:<mount_options".
+    /// string.
+    pub default_ns_mount_options: Option<Vec<String>>,
+
+    /// Specifies role names to use for "realtime" tasks based on their process & thread names.
+    ///
+    /// Zircon's scheduler doesn't support configuring tasks to always preempt non-"realtime"
+    /// tasks without specifying a constant bandwidth profile. These profiles specify the period and
+    /// expected runtime of a "realtime" task, bounding the amount of work it is allowed to perform
+    /// at an elevated "realtime" priority.
+    ///
+    /// Because constant bandwidth profiles require workload-specific tuning, we can't uniformly
+    /// apply a single profile for all "realtime" tasks. Instead, this container configuration
+    /// allows us to specify different constant bandwidth profiles for different workloads.
+    #[serde(default)]
+    rt_role_overrides: Vec<RealtimeSchedulerMapping>,
+}
+
+/// Specifies a role override for a class of tasks whose process and thread names match provided
+/// patterns.
+#[derive(Debug, Default, Deserialize)]
+struct RealtimeSchedulerMapping {
+    /// The role name to use for tasks matching the provided patterns.
+    role: String,
+    /// A regular expression that will be matched against the process' command.
+    process: String,
+    /// A regular expression that will be matched against the thread's command.
+    thread: String,
+}
+
+fn default_uid() -> runner::serde::StoreAsString<u32> {
+    runner::serde::StoreAsString(42)
+}
+
+fn get_config_from_component_start_info(mut start_info: frunner::ComponentStartInfo) -> Config {
+    let program = start_info.program.as_ref().expect("must specify a program block");
+    let program: ContainerProgram = runner::serde::deserialize_program(&program).unwrap();
     let ns = start_info.ns.take().expect("Unable to access container namespace!");
     let container_namespace = ContainerNamespace::from(ns);
 
@@ -245,18 +267,7 @@ fn get_config_from_component_start_info(mut start_info: frunner::ComponentStartI
     let component_instance = start_info.component_instance;
 
     Config {
-        default_uid,
-        default_seclabel,
-        default_fsseclabel,
-        features,
-        init,
-        kernel_cmdline,
-        mounts,
-        rlimits,
-        name,
-        startup_file_path,
-        #[cfg(not(feature = "starnix_lite"))]
-        remote_block_devices,
+        program,
         outgoing_dir,
         container_namespace,
         component_instance,
@@ -442,7 +453,9 @@ pub async fn create_component_from_stream(
                 let (sender, receiver) = oneshot::channel::<TaskResult>();
                 let container = create_container(&mut config, sender, structured_config)
                     .await
-                    .with_source_context(|| format!("creating container \"{}\"", &config.name))?;
+                    .with_source_context(|| {
+                        format!("creating container \"{}\"", &config.program.name)
+                    })?;
                 let service_config = ContainerServiceConfig { config, request_stream, receiver };
 
                 #[cfg(not(feature = "starnix_lite"))]
@@ -478,13 +491,14 @@ async fn create_container(
     trace_duration!(CATEGORY_STARNIX, NAME_CREATE_CONTAINER);
     const DEFAULT_INIT: &str = "/container/init";
 
+    log_info!("Creating container {:#?}, {:#?}", config.program, structured_config);
     let pkg_channel = config.container_namespace.get_namespace_channel("/pkg").unwrap();
     let pkg_dir_proxy = fio::DirectorySynchronousProxy::new(pkg_channel);
 
     let features = parse_features(&config, structured_config)?;
 
     #[cfg(not(feature = "starnix_lite"))]
-    let mut kernel_cmdline = BString::from(config.kernel_cmdline.as_bytes());
+    let mut kernel_cmdline = BString::from(config.program.kernel_cmdline.as_bytes());
     #[cfg(feature = "starnix_lite")]
     let kernel_cmdline = BString::from(config.kernel_cmdline.as_bytes());
 
@@ -514,16 +528,12 @@ async fn create_container(
 
     // Check whether we actually have access to a role manager by trying to set our own
     // thread's role.
-    let role_manager = connect_to_protocol_sync::<RoleManagerMarker>().unwrap();
-    let role_manager = if let Err(e) =
-        set_thread_role(&role_manager, &*fuchsia_runtime::thread_self(), Default::default())
-    {
-        log_warn!("Setting thread role failed ({e:?}), will not set thread priority.");
-        None
-    } else {
-        log_info!("Thread role set successfully.");
-        Some(role_manager)
-    };
+    let mut rt_mappings = RoleOverrides::new();
+    for m in &config.program.rt_role_overrides {
+        rt_mappings.add(m.process.clone(), m.thread.clone(), m.role.clone());
+    }
+    let rt_mappings = rt_mappings.build().context("adding custom realtime task role")?;
+    let scheduler_manager = SchedulerManager::new(rt_mappings);
 
     let crash_reporter = connect_to_protocol::<CrashReporterMarker>().unwrap();
 
@@ -544,7 +554,7 @@ async fn create_container(
                 let flags = fio::Flags::PERM_READ | fio::Flags::PROTOCOL_FILE;
 
                 pkg_dir_proxy
-                    .open3(&file_path, flags, &fio::Options::default(), server_end.into_channel())
+                    .open(&file_path, flags, &fio::Options::default(), server_end.into_channel())
                     .expect("failed to open security exception file");
 
                 let contents =
@@ -560,7 +570,7 @@ async fn create_container(
         kernel_cmdline,
         features.kernel.clone(),
         config.container_namespace.try_clone()?,
-        role_manager,
+        scheduler_manager,
         Some(crash_reporter),
         kernel_node,
         #[cfg(not(feature = "starnix_lite"))]
@@ -568,7 +578,7 @@ async fn create_container(
         security_state,
         procfs_device_tree_setup,
     )
-    .with_source_context(|| format!("creating Kernel: {}", &config.name))?;
+    .with_source_context(|| format!("creating Kernel: {}", &config.program.name))?;
     let fs_context = create_fs_context(
         kernel.kthreads.unlocked_for_async().deref_mut(),
         &kernel,
@@ -598,7 +608,7 @@ async fn create_container(
 
     kernel
         .hrtimer_manager
-        .init(system_task, None)
+        .init(system_task, None, None)
         .source_context("initializing HrTimer manager")?;
 
     if let Err(e) = kernel.suspend_resume_manager.init(&system_task) {
@@ -640,11 +650,14 @@ async fn create_container(
     // startup_file_path to be created. The task struct is still used
     // to initialize the system up until this point, regardless of whether
     // or not there is an actual init to be run.
-    let argv =
-        if config.init.is_empty() { vec![DEFAULT_INIT.to_string()] } else { config.init.clone() }
-            .iter()
-            .map(|s| to_cstr(s))
-            .collect::<Vec<_>>();
+    let argv = if config.program.init.is_empty() {
+        vec![DEFAULT_INIT.to_string()]
+    } else {
+        config.program.init.clone()
+    }
+    .iter()
+    .map(|s| to_cstr(s))
+    .collect::<Vec<_>>();
 
     let executable = system_task
         .open_file(
@@ -654,13 +667,13 @@ async fn create_container(
         )
         .with_source_context(|| format!("opening init: {:?}", &argv[0]))?;
 
-    let initial_name = if config.init.is_empty() {
+    let initial_name = if config.program.init.is_empty() {
         CString::default()
     } else {
-        CString::new(config.init[0].clone())?
+        CString::new(config.program.init[0].clone())?
     };
 
-    let rlimits = parse_rlimits(&config.rlimits)?;
+    let rlimits = parse_rlimits(&config.program.rlimits)?;
     let init_task = CurrentTask::create_init_process(
         kernel.kthreads.unlocked_for_async().deref_mut(),
         &kernel,
@@ -669,7 +682,7 @@ async fn create_container(
         Arc::clone(&fs_context),
         &rlimits,
     )
-    .with_source_context(|| format!("creating init task: {:?}", &config.init))?;
+    .with_source_context(|| format!("creating init task: {:?}", &config.program.init))?;
 
     execute_task_with_prerun_result(
         kernel.kthreads.unlocked_for_async().deref_mut(),
@@ -685,8 +698,8 @@ async fn create_container(
         None,
     )?;
 
-    if !config.startup_file_path.is_empty() {
-        wait_for_init_file(&config.startup_file_path, &system_task, init_pid).await?;
+    if !config.program.startup_file_path.is_empty() {
+        wait_for_init_file(&config.program.startup_file_path, &system_task, init_pid).await?;
     };
 
     let memory_attribution_manager = ContainerMemoryAttributionManager::new(
@@ -717,7 +730,7 @@ fn create_fs_context(
     // The mounts are applied in the order listed. Mounting will fail if the designated mount
     // point doesn't exist in a previous mount. The root must be first so other mounts can be
     // applied on top of it.
-    let mut mounts_iter = config.mounts.iter();
+    let mut mounts_iter = config.program.mounts.iter();
     let mut root = MountAction::new_for_root(
         locked,
         kernel,
@@ -807,7 +820,7 @@ fn mount_filesystems(
     config: &Config,
     pkg_dir_proxy: &fio::DirectorySynchronousProxy,
 ) -> Result<(), Error> {
-    let mut mounts_iter = config.mounts.iter();
+    let mut mounts_iter = config.program.mounts.iter();
     // Skip the first mount, that was used to create the root filesystem.
     let _ = mounts_iter.next();
     for mount_spec in mounts_iter {
@@ -827,7 +840,7 @@ fn init_remote_block_devices(
     system_task: &CurrentTask,
     config: &Config,
 ) -> Result<(), Error> {
-    let devices_iter = config.remote_block_devices.iter();
+    let devices_iter = config.program.remote_block_devices.iter();
     for device_spec in devices_iter {
         create_remote_block_device_from_spec(locked, system_task, device_spec)
             .with_source_context(|| format!("creating remoteblk from spec: {}", &device_spec))?;

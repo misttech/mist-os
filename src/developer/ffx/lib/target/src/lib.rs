@@ -584,7 +584,7 @@ mod test {
         assert!(res.is_err());
     }
 
-    #[fuchsia::test(threads = 1)]
+    #[fuchsia::test]
     async fn test_get_empty_default_target() {
         let env = test_init().await.unwrap();
         // Just in case, we need to remove the env variables mentioned

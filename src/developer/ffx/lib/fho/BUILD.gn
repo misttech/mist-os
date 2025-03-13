@@ -4,6 +4,8 @@
 
 import("//build/rust/rustc_library.gni")
 
+assert(is_host, "The fho framework is for host tools only")
+
 rustc_library("lib") {
   name = "fho"
   version = "0.1.0"
@@ -16,17 +18,15 @@ rustc_library("lib") {
     "//src/developer/ffx/command/error:lib",
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/core:lib",
-    "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/fho/metadata:lib",
     "//src/developer/ffx/lib/target:lib",
-    "//src/developer/ffx/lib/writer:lib",
+    "//src/developer/lib/writer:lib",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:async-lock",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:mockall",
-    "//third_party/rust_crates:schemars",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tracing",

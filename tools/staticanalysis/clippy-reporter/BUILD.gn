@@ -15,7 +15,7 @@ if (is_host) {
 
     deps = [
       "//third_party/golibs:github.com/google/go-cmp",
-      "//third_party/golibs:golang.org/x/exp",
+      "//third_party/golibs:golang.org/x/exp/maps",
       "//tools/build",
       "//tools/lib/jsonutil",
       "//tools/lib/logger",

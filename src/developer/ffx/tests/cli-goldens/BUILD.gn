@@ -19,15 +19,7 @@ if (has_board) {
     output_name = "ffx_cli_goldens"
     sources = [ "src/main.rs" ]
     deps = [
-      # Directly depend on the SDK here. This binary
-      # runs ffx from the sdk to build files read
-      # by the build, and without this it
-      # would run a stale version of ffx, causing
-      # golden file mismatches.
-      ":sdk_exported_for_ffx",
       "//src/developer/ffx/command:lib",
-      "//src/developer/ffx/config:lib",
-      "//src/developer/ffx/lib/isolate:lib",
       "//src/lib/fuchsia",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:argh",
@@ -36,16 +28,10 @@ if (has_board) {
     ]
   }
 
-  # Exported SDK with ffx binary.
-  _sdk_label = "//sdk:exported_idk_for_ffx_tests($default_toolchain)"
-  _sdk_outdir = get_label_info(_sdk_label, "root_out_dir")
-  _sdk_path = _sdk_outdir + "/sdk/exported/core"
-
-  host_test_data("sdk_exported_for_ffx") {
-    sources = [ _sdk_path ]
-    deps = [ _sdk_label ]
-  }
-
+  # manifest of ffx subtools including sdk-category information.
+  _tool_list_label = "//src/developer/ffx:tool_manifest"
+  _tool_list = "${root_build_dir}/ffx_tools.json"
+  _ffx_path = "${host_tools_dir}/ffx"
   _golden_dir = "${target_out_dir}/goldens"
 
   # This breaks up the comparisons of the command lines into a
@@ -74,6 +60,12 @@ if (has_board) {
   compiled_action("generate_ffx_command_list") {
     testonly = true
     visibility = [ ":*" ]
+    depfile = "${target_out_dir}/$target_name.d"
+    inputs = [
+      "$root_build_dir/ffx-config.json",
+      _tool_list,
+      _ffx_path,
+    ]
 
     # Avoid using the host tool coming from previous builds.
     can_use_previously_built_tool = false
@@ -84,13 +76,18 @@ if (has_board) {
       "--commandlist-only",
       "--command-list",
       rebase_path(_command_list, root_build_dir),
-      "--sdk-root",
-      rebase_path(_sdk_path, root_build_dir),
+      "--ffx-path",
+      rebase_path(_ffx_path, root_build_dir),
+      "--tool-list",
+      rebase_path(_tool_list, root_build_dir),
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
     ]
-
-    # Add a dependency on the SDK so ffx is up to
-    # date within the SDK.
-    deps = [ ":sdk_exported_for_ffx" ]
+    deps = [
+      "//src/developer/ffx:ffx_build_dir_config_file($default_toolchain)",
+      "//src/developer/ffx:host(//build/toolchain:host_x64)",
+      _tool_list_label,
+    ]
   }
 
   command_test_deps = []
@@ -99,16 +96,16 @@ if (has_board) {
     golden_source_dir = "goldens"
     command_name = "ffx"
     golden_processor_tool = ":ffx_cli_goldens"
-    sdk_path = _sdk_path
     visible_label =
         get_label_info(":ffx-golden-command-list", "label_no_toolchain")
+    ffx_path = _ffx_path
+    tool_list = _tool_list
 
     # Depend on generating the top level command list
-    # and the SDK so the command list represents the
-    # latest ffx commands.
+    # and the tool_list represents the latest ffx commands.
     deps = [
       ":generate_ffx_command_list",
-      ":sdk_exported_for_ffx",
+      _tool_list_label,
     ]
   }
 
@@ -120,7 +117,8 @@ if (has_board) {
       golden_source_dir = "goldens"
       command_name = c
       golden_processor_tool = ":ffx_cli_goldens"
-      sdk_path = _sdk_path
+      ffx_path = _ffx_path
+      tool_list = _tool_list
       visible_label =
           get_label_info(":ffx-golden-command-list", "label_no_toolchain")
 
@@ -129,7 +127,7 @@ if (has_board) {
       # so if the list changes, the targets change.
       deps = [
         ":generate_ffx_command_list",
-        ":sdk_exported_for_ffx",
+        _tool_list_label,
       ]
     }
     command_test_deps += [ ":${c}_ffx_command_golden_file_test" ]
@@ -142,15 +140,8 @@ if (has_board) {
     # For now, just test on linux.
     # Also check for has_board, since this test cannot run on a configuration without a
     # board.
-    # TODO(b/287779902) Also check that dual mode as subtools aren't enabled,
-    # because that produces an incomplete SDK.
     if (is_linux) {
-      if (!ffx_build_dual_mode_plugins_as_subtools) {
-        deps = [ ":ffx-golden-command-list" ] + command_test_deps
-      } else {
-        print(
-            "Warning! ffx command golden file tests are disabled because this build has ffx_build_dual_mode_plugins_as_subtools = true.")
-      }
+      deps = [ ":ffx-golden-command-list" ] + command_test_deps
     }
   }
 } else {

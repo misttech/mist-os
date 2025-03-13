@@ -295,7 +295,7 @@ inline ExampleProtocolMethodRequest::ExampleProtocolMethodRequest(Storage_ stora
 inline ExampleProtocolMethodRequest::ExampleProtocolMethodRequest(::test_exampleusing::Empty arg) noexcept
     : storage_({.arg = std::move(arg)}) {}
 inline ExampleProtocolMethodRequest::ExampleProtocolMethodRequest(const ::test_placementofattributes::ExampleProtocolMethodRequest& other) noexcept : ::test_placementofattributes::ExampleProtocolMethodRequest(other.CloneStorage_()) {}
-inline ExampleProtocolMethodRequest& ::test_placementofattributes::ExampleProtocolMethodRequest::operator=(const ::test_placementofattributes::ExampleProtocolMethodRequest & other) noexcept {
+inline ExampleProtocolMethodRequest& ::test_placementofattributes::ExampleProtocolMethodRequest::operator=(const ::test_placementofattributes::ExampleProtocolMethodRequest& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -312,7 +312,7 @@ inline ExampleStruct::ExampleStruct(Storage_ storage) noexcept : storage_(std::m
 inline ExampleStruct::ExampleStruct(uint32_t member) noexcept
     : storage_({.member = std::move(member)}) {}
 inline ExampleStruct::ExampleStruct(const ::test_placementofattributes::ExampleStruct& other) noexcept : ::test_placementofattributes::ExampleStruct(other.CloneStorage_()) {}
-inline ExampleStruct& ::test_placementofattributes::ExampleStruct::operator=(const ::test_placementofattributes::ExampleStruct & other) noexcept {
+inline ExampleStruct& ::test_placementofattributes::ExampleStruct::operator=(const ::test_placementofattributes::ExampleStruct& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -327,7 +327,7 @@ inline ExampleStruct& ExampleStruct::member(uint32_t value) {
 
 inline ExampleTable::ExampleTable(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline ExampleTable::ExampleTable(const ::test_placementofattributes::ExampleTable& other) noexcept : ExampleTable(other.CloneStorage_()) {}
-inline ExampleTable& ::test_placementofattributes::ExampleTable::operator=(const ExampleTable & other) noexcept {
+inline ExampleTable& ::test_placementofattributes::ExampleTable::operator=(const ExampleTable& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -342,7 +342,7 @@ inline ExampleTable& ExampleTable::member(std::optional<uint32_t> value) {
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_placementofattributes::ExampleProtocolMethodRequest> : public std::true_type{};
+struct IsFidlType<::test_placementofattributes::ExampleProtocolMethodRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_placementofattributes::ExampleProtocolMethodRequest> {
@@ -354,14 +354,14 @@ struct TypeTraits<::test_placementofattributes::ExampleProtocolMethodRequest> {
 };
 
 template <>
-struct IsStruct<::test_placementofattributes::ExampleProtocolMethodRequest> : public std::true_type{};
+struct IsStruct<::test_placementofattributes::ExampleProtocolMethodRequest> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_placementofattributes::ExampleProtocolMethodRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_placementofattributes::ExampleProtocolMethodRequest, 1> {};
 
 template <>
-struct IsFidlType<::test_placementofattributes::ExampleStruct> : public std::true_type{};
+struct IsFidlType<::test_placementofattributes::ExampleStruct> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_placementofattributes::ExampleStruct> {
@@ -373,14 +373,14 @@ struct TypeTraits<::test_placementofattributes::ExampleStruct> {
 };
 
 template <>
-struct IsStruct<::test_placementofattributes::ExampleStruct> : public std::true_type{};
+struct IsStruct<::test_placementofattributes::ExampleStruct> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_placementofattributes::ExampleStruct, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_placementofattributes::ExampleStruct, 4> {};
 
 template <>
-struct IsFidlType<::test_placementofattributes::ExampleTable> : public std::true_type{};
+struct IsFidlType<::test_placementofattributes::ExampleTable> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_placementofattributes::ExampleTable> {
@@ -392,13 +392,13 @@ struct TypeTraits<::test_placementofattributes::ExampleTable> {
 };
 
 template <>
-struct IsTable<::test_placementofattributes::ExampleTable> : public std::true_type{};
+struct IsTable<::test_placementofattributes::ExampleTable> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_placementofattributes::ExampleTable, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_placementofattributes::ExampleTable> {};
 
 template <>
-struct IsFidlType<::test_placementofattributes::ExampleUnion> : public std::true_type{};
+struct IsFidlType<::test_placementofattributes::ExampleUnion> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_placementofattributes::ExampleUnion> {
@@ -410,7 +410,7 @@ struct TypeTraits<::test_placementofattributes::ExampleUnion> {
 };
 
 template <>
-struct IsUnion<::test_placementofattributes::ExampleUnion> : public std::true_type{};
+struct IsUnion<::test_placementofattributes::ExampleUnion> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_placementofattributes::ExampleUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final

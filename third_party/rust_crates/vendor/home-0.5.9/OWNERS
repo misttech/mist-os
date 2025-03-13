@@ -6,3 +6,4 @@ include /src/developer/ffx/OWNERS
 include /src/developer/ffx/lib/symbol-index/OWNERS
 include /src/developer/lib/credentials/OWNERS
 include /src/lib/analytics/OWNERS
+include /tools/funnel/OWNERS

@@ -7,13 +7,20 @@
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/prctl.h>
 #include <sys/ptrace.h>
 #include <sys/uio.h>
 #include <sys/user.h>
+#include <sys/wait.h>
 #include <syscall.h>
 #include <time.h>
 #include <unistd.h>
 
+#include <atomic>
+#include <latch>
+#include <thread>
+
+#include <linux/prctl.h>
 #include <linux/sched.h>
 
 #ifdef __riscv
@@ -921,4 +928,142 @@ TEST(PtraceTest, GrandchildWithSigsuspend) {
   ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGCHLD)
       << WIFSTOPPED(status) << " " << WSTOPSIG(status);
   ASSERT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, SIGCHLD));
+}
+
+TEST(PtraceTest, ExitKill) {
+  test_helper::ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
+  helper.RunInForkedProcess([]() {
+    // Test that the PtraceOExitKill works as expected.
+    // Set ourselves as the subreaper.
+    SAFE_SYSCALL(prctl(PR_SET_CHILD_SUBREAPER, 1));
+
+    pid_t tracer_pid = SAFE_SYSCALL(fork());
+    if (tracer_pid == 0) {
+      // We are the tracer. Spawn the tracee.
+      pid_t tracee_pid = SAFE_SYSCALL(fork());
+      if (tracee_pid == 0) {
+        ASSERT_THAT(ptrace(PTRACE_TRACEME, 0, nullptr, nullptr), SyscallSucceeds());
+        SAFE_SYSCALL(raise(SIGSTOP));
+        _exit(EXIT_FAILURE);
+      }
+      int status;
+      SAFE_SYSCALL(waitpid(tracee_pid, &status, 0));
+      ASSERT_TRUE(WIFSTOPPED(status));
+      EXPECT_THAT(ptrace(PTRACE_SETOPTIONS, tracee_pid, nullptr, PTRACE_O_EXITKILL),
+                  SyscallSucceeds());
+      // With this exit, the kernel will send a sigkill to the tracee.
+      _exit(EXIT_SUCCESS);
+    }
+
+    int status;
+    pid_t pid = SAFE_SYSCALL(waitpid(tracer_pid, &status, 0));
+    EXPECT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0);
+
+    pid = SAFE_SYSCALL(waitpid(-1, &status, 0));
+    EXPECT_NE(pid, tracer_pid);
+    EXPECT_TRUE(WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL);
+  });
+
+  EXPECT_TRUE(helper.WaitForChildren());
+}
+
+TEST(PtraceTest, ExitKillFromThread) {
+  test_helper::ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
+  helper.RunInForkedProcess([]() {
+    // Test that the PtraceOExitKill works as expected.
+    // Set ourselves as the subreaper.
+    SAFE_SYSCALL(prctl(PR_SET_CHILD_SUBREAPER, 1));
+
+    pid_t tgl_pid = SAFE_SYSCALL(fork());
+    if (tgl_pid == 0) {
+      // We are the thread-group leader. Create a thread that will be the ptracer.
+      std::atomic<pid_t> tracee_pid;
+      std::thread ptracer([&tracee_pid]() {
+        pid_t pid = SAFE_SYSCALL(fork());
+        if (pid == 0) {
+          ASSERT_THAT(ptrace(PTRACE_TRACEME, 0, nullptr, nullptr), SyscallSucceeds());
+          SAFE_SYSCALL(raise(SIGSTOP));
+          _exit(EXIT_FAILURE);
+        }
+        tracee_pid.store(pid);
+
+        int status;
+        SAFE_SYSCALL(waitpid(pid, &status, 0));
+        ASSERT_TRUE(WIFSTOPPED(status));
+        EXPECT_THAT(ptrace(PTRACE_SETOPTIONS, pid, nullptr, PTRACE_O_EXITKILL), SyscallSucceeds());
+      });
+
+      ptracer.join();
+
+      // Tracee should exit once the thread that spawned it exited.
+      int status;
+      SAFE_SYSCALL(waitpid(tracee_pid.load(), &status, 0));
+      EXPECT_TRUE(WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL);
+      _exit(EXIT_SUCCESS);
+    }
+
+    int status;
+    SAFE_SYSCALL(waitpid(tgl_pid, &status, 0));
+    EXPECT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0);
+  });
+
+  EXPECT_TRUE(helper.WaitForChildren());
+}
+
+TEST(PtraceTest, PtraceAttachesToParentThread) {
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([]() {
+    SAFE_SYSCALL(prctl(PR_SET_CHILD_SUBREAPER, 1));
+    std::latch fork_done(1);
+    std::latch should_exit(1);
+    std::atomic<pid_t> tracee_pid;
+
+    std::thread ptracer([&tracee_pid, &fork_done, &should_exit]() {
+      pid_t pid = SAFE_SYSCALL(fork());
+      if (pid == 0) {
+        ASSERT_THAT(ptrace(PTRACE_TRACEME, 0, nullptr, nullptr), SyscallSucceeds());
+        // Can be controlled by the thread that spawned it.
+        SAFE_SYSCALL(raise(SIGSTOP));
+
+        // But no one else can make it continue.
+        SAFE_SYSCALL(raise(SIGSTOP));
+      }
+
+      int status;
+      SAFE_SYSCALL(waitpid(pid, &status, 0));
+      ASSERT_TRUE(WIFSTOPPED(status));
+      EXPECT_THAT(ptrace(PTRACE_SETOPTIONS, pid, nullptr, PTRACE_O_EXITKILL), SyscallSucceeds());
+      EXPECT_THAT(ptrace(PTRACE_CONT, pid, nullptr, nullptr), SyscallSucceeds());
+
+      tracee_pid.store(pid);
+      fork_done.count_down();
+      should_exit.wait();
+    });
+
+    fork_done.wait();
+
+    std::thread another_thread([&tracee_pid]() {
+      int status;
+      SAFE_SYSCALL(waitpid(tracee_pid.load(), &status, 0));
+      ASSERT_TRUE(WIFSTOPPED(status));
+      EXPECT_THAT(ptrace(PTRACE_CONT, tracee_pid.load(), nullptr, nullptr),
+                  SyscallFailsWithErrno(ESRCH));
+    });
+    another_thread.join();
+
+    int status;
+    // tracee is stopped, we know because of the waitpid in another_thread.
+    EXPECT_THAT(ptrace(PTRACE_CONT, tracee_pid.load(), nullptr, nullptr),
+                SyscallFailsWithErrno(ESRCH));
+
+    should_exit.count_down();
+    ptracer.join();
+
+    SAFE_SYSCALL(waitpid(tracee_pid.load(), &status, 0));
+    EXPECT_TRUE(WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL);
+  });
+
+  EXPECT_TRUE(helper.WaitForChildren());
 }

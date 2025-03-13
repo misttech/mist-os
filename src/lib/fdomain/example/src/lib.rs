@@ -153,7 +153,7 @@ async fn server_is_fidl_in_ns() {
         fdomain_client::fidl::ClientEnd::<fio::DirectoryMarker>::new(namespace).into_proxy();
     let (echo_client, echo_server) = client.create_channel();
     namespace
-        .open3("echo", fio::Flags::PROTOCOL_SERVICE, &fio::Options::default(), echo_server)
+        .open("echo", fio::Flags::PROTOCOL_SERVICE, &fio::Options::default(), echo_server)
         .unwrap();
     test_clients_with_server(&client, echo_client).await.unwrap();
 }

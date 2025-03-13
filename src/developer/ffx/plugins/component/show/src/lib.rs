@@ -5,10 +5,11 @@
 use async_trait::async_trait;
 use component_debug::cli::show::ShowCmdInstance;
 use component_debug::cli::{show_cmd_print, show_cmd_serialized};
-use errors::FfxError;
+use errors::ffx_error;
 use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_show_args::ComponentShowCommand;
-use fho::{FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
+use ffx_writer::{ToolIO as _, VerifiedMachineWriter};
+use fho::{FfxMain, FfxTool};
 use target_holders::RemoteControlProxyHolder;
 #[derive(FfxTool)]
 pub struct ShowTool {
@@ -30,13 +31,13 @@ impl FfxMain for ShowTool {
         if writer.is_machine() {
             let output = show_cmd_serialized(self.cmd.query, realm_query)
                 .await
-                .map_err(|e| FfxError::Error(e, 1))?;
+                .map_err(|e| ffx_error!(e))?;
             writer.machine(&output)?;
         } else {
             let with_style = termion::is_tty(&std::io::stdout());
             show_cmd_print(self.cmd.query, realm_query, writer, with_style)
                 .await
-                .map_err(|e| FfxError::Error(e, 1))?;
+                .map_err(|e| ffx_error!(e))?;
         }
         Ok(())
     }

@@ -66,6 +66,7 @@ source_set("common") {
 }
 
 fuchsia_cc_driver("aml-securemem-driver") {
+  legacy = true
   output_name = "aml-securemem"
   deps = [
     ":aml-securemem-bind",

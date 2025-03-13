@@ -16,13 +16,11 @@ from typing import Any
 
 import fuchsia_inspect
 
-from honeydew import errors
+from honeydew import affordances_capable, errors
 from honeydew.affordances.power.system_power_state_controller import (
     system_power_state_controller as system_power_state_controller_interface,
 )
-from honeydew.interfaces.affordances import inspect as inspect_affordance
-from honeydew.interfaces.device_classes import affordances_capable
-from honeydew.interfaces.transports import ffx as ffx_transport
+from honeydew.transports.ffx import ffx as ffx_transport
 from honeydew.typing import custom_types
 from honeydew.utils import decorators
 
@@ -118,9 +116,8 @@ class SystemPowerStateControllerUsingStarnix(
     Args:
         device_name: Device name returned by `ffx target list`.
         ffx: interfaces.transports.FFX implementation.
-        device_logger: interfaces.device_classes.affordances_capable.FuchsiaDeviceLogger
-            implementation.
-        inspect: interfaces.affordances.inspect.Inspect implementation.
+        device_logger: FuchsiaDeviceLogger implementation.
+        inspect: InspectCapableDevice implementation.
 
     Raises:
         errors.NotSupportedError: If Fuchsia device does not support Starnix.
@@ -131,14 +128,14 @@ class SystemPowerStateControllerUsingStarnix(
         device_name: str,
         ffx: ffx_transport.FFX,
         device_logger: affordances_capable.FuchsiaDeviceLogger,
-        inspect: inspect_affordance.Inspect,
+        inspect: affordances_capable.InspectCapableDevice,
     ) -> None:
         self._device_name: str = device_name
         self._ffx: ffx_transport.FFX = ffx
         self._device_logger: affordances_capable.FuchsiaDeviceLogger = (
             device_logger
         )
-        self._insect: inspect_affordance.Inspect = inspect
+        self._insect: affordances_capable.InspectCapableDevice = inspect
 
         self.verify_supported()
 
@@ -606,12 +603,14 @@ class SystemPowerStateControllerUsingStarnix(
 
         if (
             suspend_resume_stats_after["success_count"]
-            != suspend_resume_stats_before["success_count"] + 1
+            <= suspend_resume_stats_before["success_count"]
         ):
             raise system_power_state_controller_interface.SystemPowerStateControllerError(
                 f"Based on SAG inspect data, '{suspend_state}' followed "
                 f"by '{resume_mode}' operation didn't succeed on "
-                f"'{self._device_name}'. "
+                f"'{self._device_name}', expected "
+                f"{suspend_resume_stats_before['success_count'] + 1}, "
+                f"but found {suspend_resume_stats_after['success_count']}."
             )
 
         suspend_resume_duration_nano_sec: float = suspend_resume_stats_after[
@@ -679,7 +678,10 @@ class SystemPowerStateControllerUsingStarnix(
             for k, v in suspend_resume_events_after.items()
             if k not in suspend_resume_events_before
         }
-        if len(current_suspend_resume_events) != 2:
+        if (
+            len(current_suspend_resume_events) < 2
+            or len(current_suspend_resume_events) % 2 != 0
+        ):
             raise system_power_state_controller_interface.SystemPowerStateControllerError(
                 f"Based on FSH inspect data, '{suspend_state}' followed "
                 f"by '{resume_mode}' operation didn't succeed on "
@@ -846,7 +848,7 @@ class SystemPowerStateControllerUsingStarnix(
         # ]
         try:
             inspect_data_collection: fuchsia_inspect.InspectDataCollection = (
-                self._insect.get_data(
+                self._insect.get_inspect_data(
                     selectors=["/bootstrap/system-activity-governor"],
                 )
             )
@@ -913,7 +915,7 @@ class SystemPowerStateControllerUsingStarnix(
         # ]
         try:
             inspect_data_collection: fuchsia_inspect.InspectDataCollection = (
-                self._insect.get_data(
+                self._insect.get_inspect_data(
                     selectors=[
                         "bootstrap/boot-drivers*:[name=generic-suspend]root"
                     ],

@@ -49,7 +49,7 @@ class Timer : private async_task_t {
   // only the one sequenced last will have its parameters used for the timer. The timer will not
   // trigger twice. Negative intervals are not supported but a zero interval is OK (but probably not
   // advisable).
-  zx_status_t StartPeriodic(zx_duration_t interval);
+  zx_status_t StartPeriodic(zx_duration_mono_t interval);
   // Start a oneshot timer that will trigger after the specified delay. StartOneshot is threadsafe
   // and can be called from the callback or elsewhere. Calling StartOneshot on a running timer is
   // perfectly fine and will stop the existing timer and start it again with new parameters. If two
@@ -57,7 +57,7 @@ class Timer : private async_task_t {
   // will appear as if one of them was made before the other. This means they will both succeed but
   // only the one sequenced last will have its parameters used for the timer. The timer will not
   // trigger twice. Negative delays are not supported but zero delay is OK.
-  zx_status_t StartOneshot(zx_duration_t delay);
+  zx_status_t StartOneshot(zx_duration_mono_t delay);
 
   // Stop the timer if possible. If the timer has not yet triggered it will be stopped without any
   // calls to callback. If the timer is in the process of triggering there may still be a call to
@@ -66,7 +66,7 @@ class Timer : private async_task_t {
   zx_status_t Stop();
 
  private:
-  zx_status_t Start(zx_duration_t interval, bool periodic);
+  zx_status_t Start(zx_duration_mono_t interval, bool periodic);
   static void Handler(async_dispatcher_t* dispatcher, async_task_t* task, zx_status_t status);
 
   async_dispatcher_t* dispatcher_ = nullptr;
@@ -79,7 +79,7 @@ class Timer : private async_task_t {
   std::recursive_mutex handler_mutex_;
   bool scheduled_ = false;
   bool is_periodic_ = false;
-  zx_duration_t interval_ = 0;
+  zx_duration_mono_t interval_ = 0;
   sync_completion_t finished_;
 
   std::function<void()> callback_;

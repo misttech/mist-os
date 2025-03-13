@@ -17,7 +17,8 @@ use ffx_ssh::{SshKeyErrorKind, SshKeyFiles};
 use ffx_target::get_target_specifier;
 use ffx_target_show::ShowTool;
 use ffx_target_show_args::TargetShow;
-use fho::{FfxMain, FfxTool, FhoEnvironment, SimpleWriter, VerifiedMachineWriter};
+use ffx_writer::{SimpleWriter, VerifiedMachineWriter};
+use fho::{FfxMain, FfxTool, FhoEnvironment};
 use fidl::endpoints::create_proxy;
 use fidl::prelude::*;
 use fidl_fuchsia_developer_ffx::{
@@ -234,7 +235,7 @@ impl ShowToolWrapper {
     /// two steps in the process for running an invocation of `ffx target show`.
     async fn run(&mut self) -> fho::Result<(String, String)> {
         let tool = self.inner.take().unwrap();
-        let buffers = fho::TestBuffers::default();
+        let buffers = ffx_writer::TestBuffers::default();
         match tool.main(VerifiedMachineWriter::new_test(None, &buffers)).await {
             Ok(_) => Ok(buffers.into_strings()),
             Err(e) => Err(fho::user_error!("{}\n\tstderr: {}", e, buffers.into_stderr_str())),
@@ -984,35 +985,39 @@ async fn doctor_summary<W: Write>(
                 LedgerOutcome::Success,
                 format!("{path} locked by {lock}", path=file.display(), lock=lockfile.display()),
             ),
-            Err(LockfileCreateError {
-                kind: LockfileCreateErrorKind::TimedOut,
-                lock_path,
-                owner,
-                ..
-            }) => {
-                let mut msg = format!(
-                    "Lockfile `{lockfile}` was owned by another process that didn't release it in our timeout.",
-                    lockfile=lock_path.display(),
-                );
+            Err(err) => {
+                match *err {
+                    LockfileCreateError {
+                        kind: LockfileCreateErrorKind::TimedOut,
+                        lock_path,
+                        owner,
+                        ..
+                    } => {
+                        let mut msg = format!(
+                            "Lockfile `{lockfile}` was owned by another process that didn't release it in our timeout.",
+                            lockfile=lock_path.display(),
+                        );
 
-                if let Some(owner) = owner {
-                    msg = format!("{msg} Check that it's running? Pid {pid}", pid=owner.pid);
+                        if let Some(owner) = owner {
+                            msg = format!("{msg} Check that it's running? Pid {pid}", pid=owner.pid);
+                        }
+
+                        (LedgerOutcome::Failure, msg)
+                    }
+                    LockfileCreateError {
+                        kind: LockfileCreateErrorKind::Io(error),
+                        lock_path,
+                        ..
+                    } => {
+                        (
+                            LedgerOutcome::Failure,
+                            format!(
+                                "Could not open lockfile `{lockfile}` due to error: {error:?}. Check permissions on the directory.",
+                                lockfile=lock_path.display(),
+                            ),
+                        )
+                    }
                 }
-
-                (LedgerOutcome::Failure, msg)
-            }
-            Err(LockfileCreateError {
-                kind: LockfileCreateErrorKind::Io(error),
-                lock_path,
-                ..
-            }) => {
-                (
-                    LedgerOutcome::Failure,
-                    format!(
-                        "Could not open lockfile `{lockfile}` due to error: {error:?}. Check permissions on the directory.",
-                        lockfile=lock_path.display(),
-                    ),
-                )
             }
         };
         let node = ledger.add_node(&description, LedgerMode::Automatic)?;

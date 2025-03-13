@@ -39,6 +39,17 @@ zx_status_t StmMcu::Create(void* ctx, zx_device_t* parent) {
 
   device->Init();
 
+  zx::result result = device->DdkAddService<fuchsia_hardware_fan::Service>(
+      fuchsia_hardware_fan::Service::InstanceHandler({
+          .device = device->bindings_.CreateHandler(
+              device.get(), fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+              fidl::kIgnoreBindingClosure),
+      }));
+  if (result.is_error()) {
+    zxlogf(ERROR, "DdkAddService failed");
+    return result.status_value();
+  }
+
   if (zx_status_t status =
           device->DdkAdd(ddk::DeviceAddArgs("vim3-mcu").set_inspect_vmo(device->inspect_vmo()));
       status != ZX_OK) {

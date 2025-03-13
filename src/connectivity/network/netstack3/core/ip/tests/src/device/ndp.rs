@@ -11,7 +11,6 @@ use core::num::{NonZeroU16, NonZeroU8};
 use core::time::Duration;
 
 use assert_matches::assert_matches;
-
 use log::trace;
 use net_declare::net::{mac, subnet_v6};
 use net_types::ethernet::Mac;
@@ -31,6 +30,7 @@ use packet_formats::testutil::{
 };
 use packet_formats::utils::NonZeroDuration;
 use rand::Rng;
+use test_case::test_case;
 use zerocopy::SplitByteSlice;
 
 use netstack3_base::testutil::{
@@ -51,36 +51,38 @@ use netstack3_core::testutil::{
 };
 use netstack3_core::{BindingsTypes, Instant, TimerId};
 use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
-use netstack3_ip::device::testutil::with_assigned_ipv6_addr_subnets;
+use netstack3_ip::device::testutil::{calculate_slaac_addr_sub, with_assigned_ipv6_addr_subnets};
 use netstack3_ip::device::{
-    get_ipv6_hop_limit, InnerSlaacTimerId, IpDeviceBindingsContext, IpDeviceConfigurationUpdate,
-    IpDeviceStateContext, Ipv4DeviceConfigurationUpdate, Ipv6AddrConfig, Ipv6AddrSlaacConfig,
-    Ipv6AddressFlags, Ipv6AddressState, Ipv6DeviceConfigurationContext,
-    Ipv6DeviceConfigurationUpdate, Ipv6DeviceHandler, Ipv6DeviceTimerId, Lifetime, OpaqueIid,
-    OpaqueIidNonce, PreferredLifetime, SlaacBindingsContext, SlaacConfig, SlaacConfigurationUpdate,
-    SlaacContext, SlaacTimerId, TemporarySlaacAddressConfiguration, TemporarySlaacConfig,
+    get_ipv6_hop_limit, IidGenerationConfiguration, InnerSlaacTimerId, IpDeviceBindingsContext,
+    IpDeviceConfigurationUpdate, IpDeviceStateContext, Ipv4DeviceConfigurationUpdate,
+    Ipv6AddrConfig, Ipv6AddrSlaacConfig, Ipv6AddressFlags, Ipv6AddressState,
+    Ipv6DeviceConfigurationContext, Ipv6DeviceConfigurationUpdate, Ipv6DeviceHandler,
+    Ipv6DeviceTimerId, Lifetime, OpaqueIid, OpaqueIidNonce, PreferredLifetime,
+    SlaacBindingsContext, SlaacConfig, SlaacConfigurationUpdate, SlaacContext, SlaacTimerId,
+    StableSlaacAddressConfiguration, TemporarySlaacAddressConfiguration, TemporarySlaacConfig,
     MAX_RTR_SOLICITATION_DELAY, RTR_SOLICITATION_INTERVAL,
 };
 use netstack3_ip::icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT;
 use netstack3_ip::{self as ip, IpPacketDestination, SendIpPacketMeta};
 
 #[derive(Debug, PartialEq, Copy, Clone)]
-struct GlobalIpv6Addr<I> {
+struct SlaacAddr<I> {
     addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
     flags: Ipv6AddressFlags,
     config: Ipv6AddrConfig<I>,
 }
 
-impl<I> GlobalIpv6Addr<I> {
+impl<I> SlaacAddr<I> {
     fn addr_sub(&self) -> &AddrSubnet<Ipv6Addr, Ipv6DeviceAddr> {
         &self.addr_sub
     }
 }
 
-fn get_global_ipv6_addrs(
+fn get_slaac_addrs(
     ctx: &FakeCtx,
     device_id: &DeviceId<FakeBindingsCtx>,
-) -> Vec<GlobalIpv6Addr<FakeInstant>> {
+    scope: Option<Ipv6Scope>,
+) -> Vec<SlaacAddr<FakeInstant>> {
     ip::device::IpDeviceStateContext::<Ipv6, _>::with_address_ids(
         &mut ctx.core_ctx(),
         device_id,
@@ -88,29 +90,28 @@ fn get_global_ipv6_addrs(
             addrs
                 .filter_map(|addr_id| {
                     let addr_sub = addr_id.addr_sub();
+                    if scope.map(|scope| scope != addr_sub.addr().scope()).unwrap_or(false) {
+                        return None;
+                    }
                     ip::device::IpDeviceAddressContext::<Ipv6, _>::with_ip_address_state(
                         core_ctx,
                         device_id,
                         &addr_id,
-                        |Ipv6AddressState { flags, config }| match addr_sub.addr().scope() {
-                            Ipv6Scope::Global => Some(GlobalIpv6Addr {
-                                addr_sub,
-                                flags: *flags,
-                                config: config.unwrap(),
-                            }),
-                            Ipv6Scope::InterfaceLocal
-                            | Ipv6Scope::LinkLocal
-                            | Ipv6Scope::AdminLocal
-                            | Ipv6Scope::SiteLocal
-                            | Ipv6Scope::OrganizationLocal
-                            | Ipv6Scope::Reserved(_)
-                            | Ipv6Scope::Unassigned(_) => None,
+                        |Ipv6AddressState { flags, config }| {
+                            Some(SlaacAddr { addr_sub, flags: *flags, config: config.unwrap() })
                         },
                     )
                 })
                 .collect()
         },
     )
+}
+
+fn get_global_ipv6_addrs(
+    ctx: &FakeCtx,
+    device_id: &DeviceId<FakeBindingsCtx>,
+) -> Vec<SlaacAddr<FakeInstant>> {
+    get_slaac_addrs(ctx, device_id, Some(Ipv6Scope::Global))
 }
 
 // TODO(https://github.com/rust-lang/rust/issues/67441): Make these constants once const
@@ -156,7 +157,9 @@ fn setup_net() -> (
         Ipv4DeviceConfigurationUpdate::default(),
         Ipv6DeviceConfigurationUpdate {
             slaac_config: SlaacConfigurationUpdate {
-                enable_stable_addresses: Some(true),
+                stable_address_configuration: Some(
+                    StableSlaacAddressConfiguration::ENABLED_WITH_EUI64,
+                ),
                 ..Default::default()
             },
             ..Default::default()
@@ -168,7 +171,9 @@ fn setup_net() -> (
         Ipv4DeviceConfigurationUpdate::default(),
         Ipv6DeviceConfigurationUpdate {
             slaac_config: SlaacConfigurationUpdate {
-                enable_stable_addresses: Some(true),
+                stable_address_configuration: Some(
+                    StableSlaacAddressConfiguration::ENABLED_WITH_EUI64,
+                ),
                 ..Default::default()
             },
             ..Default::default()
@@ -343,7 +348,7 @@ fn test_dad_duplicate_address_detected_solicitation() {
         // Doesn't matter as long as we perform DAD.
         dad_transmits: Some(NonZeroU16::new(1)),
         slaac_config: SlaacConfigurationUpdate {
-            enable_stable_addresses: Some(true),
+            stable_address_configuration: Some(StableSlaacAddressConfiguration::ENABLED_WITH_EUI64),
             ..Default::default()
         },
         ip_config: IpDeviceConfigurationUpdate { ip_enabled: Some(true), ..Default::default() },
@@ -1184,7 +1189,9 @@ fn test_host_send_router_solicitations() {
                 // Test expects to send 3 RSs.
                 max_router_solicitations: Some(NonZeroU8::new(3)),
                 slaac_config: SlaacConfigurationUpdate {
-                    enable_stable_addresses: Some(true),
+                    stable_address_configuration: Some(
+                        StableSlaacAddressConfiguration::ENABLED_WITH_EUI64,
+                    ),
                     ..Default::default()
                 },
                 ip_config: IpDeviceConfigurationUpdate {
@@ -1291,7 +1298,9 @@ fn test_host_send_router_solicitations() {
             Ipv6DeviceConfigurationUpdate {
                 max_router_solicitations: Some(NonZeroU8::new(2)),
                 slaac_config: SlaacConfigurationUpdate {
-                    enable_stable_addresses: Some(true),
+                    stable_address_configuration: Some(
+                        StableSlaacAddressConfiguration::ENABLED_WITH_EUI64,
+                    ),
                     ..Default::default()
                 },
                 ip_config: IpDeviceConfigurationUpdate {
@@ -1505,8 +1514,6 @@ fn test_router_stateless_address_autoconfiguration() {
     let src_ip = src_mac.to_ipv6_link_local().addr().get();
     let prefix = Ipv6Addr::from([1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0]);
     let prefix_length = 64;
-    let mut expected_addr = [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0];
-    expected_addr[8..].copy_from_slice(&src_mac.to_eui64()[..]);
 
     // Receive a new RA with new prefix (autonomous).
     //
@@ -1558,7 +1565,7 @@ impl TestSlaacPrefix {
 }
 
 fn slaac_address<I: Instant>(
-    entry: GlobalIpv6Addr<I>,
+    entry: SlaacAddr<I>,
 ) -> Option<(UnicastAddr<Ipv6Addr>, SlaacConfig<I>)> {
     match entry.config {
         Ipv6AddrConfig::Manual(_manual_config) => None,
@@ -1645,7 +1652,9 @@ fn test_host_stateless_address_autoconfiguration_multiple_prefixes() {
             &device,
             Ipv6DeviceConfigurationUpdate {
                 slaac_config: SlaacConfigurationUpdate {
-                    enable_stable_addresses: Some(true),
+                    stable_address_configuration: Some(
+                        StableSlaacAddressConfiguration::ENABLED_WITH_EUI64,
+                    ),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -1676,10 +1685,17 @@ fn test_host_stateless_address_autoconfiguration_multiple_prefixes() {
 
         let now = ctx.bindings_ctx.now();
         let prefix1_valid_until = prefix1.valid_until(now);
-        assert_matches!(stable_address, (_addr,
-        SlaacConfig::Stable { valid_until }) => {
-            assert_eq!(valid_until, Lifetime::Finite(prefix1_valid_until))
-        });
+        assert_matches!(
+            stable_address,
+            (_addr, SlaacConfig::Stable {
+                valid_until,
+                creation_time: _,
+                regen_counter: _,
+                dad_counter: _,
+            }) => {
+                assert_eq!(valid_until, Lifetime::Finite(prefix1_valid_until))
+            }
+        );
         assert_matches!(temporary_address, (_addr,
             SlaacConfig::Temporary(TemporarySlaacConfig {
                 valid_until,
@@ -1706,16 +1722,27 @@ fn test_host_stateless_address_autoconfiguration_multiple_prefixes() {
 
         let now = ctx.bindings_ctx.now();
         let prefix1_valid_until = prefix1.valid_until(now);
-        assert_matches!(stable_address, (addr, SlaacConfig::Stable { valid_until }) => {
-            assert_eq!(addr, prefix_1_stable);
-            assert_eq!(valid_until, Lifetime::Finite(prefix1_valid_until));
-        });
-        assert_matches!(temporary_address,
-        (addr, SlaacConfig::Temporary(TemporarySlaacConfig { valid_until, creation_time, desync_factor: _, dad_counter: 0 })) => {
-            assert_eq!(addr, prefix_1_temporary);
-            assert_eq!(creation_time, now);
-            assert_eq!(valid_until, prefix1_valid_until);
-        });
+        assert_matches!(
+            stable_address,
+            (addr, SlaacConfig::Stable {
+                valid_until,
+                creation_time: _,
+                regen_counter: _,
+                dad_counter: _,
+            }) => {
+                assert_eq!(addr, prefix_1_stable);
+                assert_eq!(valid_until, Lifetime::Finite(prefix1_valid_until));
+            }
+        );
+        assert_matches!(
+            temporary_address,
+            (addr, SlaacConfig::Temporary(TemporarySlaacConfig {
+                valid_until, creation_time, desync_factor: _, dad_counter: 0 })) => {
+                assert_eq!(addr, prefix_1_temporary);
+                assert_eq!(creation_time, now);
+                assert_eq!(valid_until, prefix1_valid_until);
+            }
+        );
     }
     {
         // Check prefix 2 addresses.
@@ -1727,15 +1754,25 @@ fn test_host_stateless_address_autoconfiguration_multiple_prefixes() {
 
         let now = ctx.bindings_ctx.now();
         let prefix2_valid_until = prefix2.valid_until(now);
-        assert_matches!(stable_address, (_, SlaacConfig::Stable { valid_until }) => {
-            assert_eq!(valid_until, Lifetime::Finite(prefix2_valid_until))
-        });
-        assert_matches!(temporary_address,
-        (_, SlaacConfig::Temporary(TemporarySlaacConfig {
-            valid_until, creation_time, desync_factor: _, dad_counter: 0 })) => {
-            assert_eq!(creation_time, now);
-            assert_eq!(valid_until, prefix2_valid_until);
-        });
+        assert_matches!(
+            stable_address,
+            (_, SlaacConfig::Stable {
+                valid_until,
+                creation_time: _,
+                regen_counter: _,
+                dad_counter: _,
+            }) => {
+                assert_eq!(valid_until, Lifetime::Finite(prefix2_valid_until))
+            }
+        );
+        assert_matches!(
+            temporary_address,
+            (_, SlaacConfig::Temporary(TemporarySlaacConfig {
+                valid_until, creation_time, desync_factor: _, dad_counter: 0 })) => {
+                assert_eq!(creation_time, now);
+                assert_eq!(valid_until, prefix2_valid_until);
+            }
+        );
     }
 
     // Clean up device references.
@@ -1757,7 +1794,7 @@ fn test_host_generate_temporary_slaac_address(
                 temp_preferred_lifetime: _,
                 temp_idgen_retries: _,
             }),
-            enable_stable_addresses: _,
+            stable_address_configuration: _,
         } => temp_valid_lifetime.get()
     );
     let config = Ipv6::TEST_ADDRS;
@@ -1767,7 +1804,7 @@ fn test_host_generate_temporary_slaac_address(
     let subnet = subnet_v6!("0102:0304:0506:0708::/64");
     let interface_identifier = OpaqueIid::new(
         subnet,
-        &config.local_mac.to_eui64()[..],
+        &*config.local_mac,
         None::<[_; 0]>,
         // Clone the RNG so we can see what the next value (which will be
         // used to generate the temporary address) will be.
@@ -2012,11 +2049,7 @@ fn test_host_slaac_address_deprecate_while_tentative() {
     let src_mac = config.remote_mac;
     let src_ip = src_mac.to_ipv6_link_local().addr().get();
     let prefix = subnet_v6!("0102:0304:0506:0708::/64");
-    let mut expected_addr = [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0];
-    expected_addr[8..].copy_from_slice(&config.local_mac.to_eui64()[..]);
-    let expected_addr =
-        NonMappedAddr::new(UnicastAddr::new(Ipv6Addr::from(expected_addr)).unwrap()).unwrap();
-    let expected_addr_sub = AddrSubnet::from_witness(expected_addr, prefix.prefix()).unwrap();
+    let expected_addr_sub = calculate_slaac_addr_sub(prefix, config.local_mac.to_eui64());
 
     // Have no addresses yet.
     assert_empty(get_global_ipv6_addrs(&ctx, &device));
@@ -2030,7 +2063,9 @@ fn test_host_slaac_address_deprecate_while_tentative() {
                 // Doesn't matter as long as we perform DAD.
                 dad_transmits: Some(NonZeroU16::new(1)),
                 slaac_config: SlaacConfigurationUpdate {
-                    enable_stable_addresses: Some(true),
+                    stable_address_configuration: Some(
+                        StableSlaacAddressConfiguration::ENABLED_WITH_EUI64,
+                    ),
                     ..Default::default()
                 },
                 ip_config: IpDeviceConfigurationUpdate {
@@ -2066,26 +2101,34 @@ fn test_host_slaac_address_deprecate_while_tentative() {
     let valid_until = now + Duration::from_secs(valid_lifetime.into());
     let preferred_until = now + Duration::from_secs(preferred_lifetime.into());
     let expected_address_entry_config = Ipv6AddrSlaacConfig {
-        inner: SlaacConfig::Stable { valid_until: Lifetime::Finite(valid_until) },
+        inner: SlaacConfig::Stable {
+            valid_until: Lifetime::Finite(valid_until),
+            creation_time: now,
+            regen_counter: 0,
+            dad_counter: 0,
+        },
         preferred_lifetime: PreferredLifetime::preferred_until(preferred_until),
     };
-    let expected_address_entry = GlobalIpv6Addr {
+    let expected_address_entry = SlaacAddr {
         addr_sub: expected_addr_sub,
         config: Ipv6AddrConfig::Slaac(expected_address_entry_config),
         flags: Ipv6AddressFlags { assigned: false },
     };
     assert_eq!(get_global_ipv6_addrs(&ctx, &device), [expected_address_entry]);
 
-    // Make sure deprecate and invalidation timers are set.
+    // Make sure deprecation and invalidation timers are set.
     assert_slaac_timers_integration(
         &mut ctx.core_ctx(),
         &device,
         [
             (
-                InnerSlaacTimerId::DeprecateSlaacAddress { addr: expected_addr },
+                InnerSlaacTimerId::DeprecateSlaacAddress { addr: expected_addr_sub.addr() },
                 now + Duration::from_secs(preferred_lifetime.into()),
             ),
-            (InnerSlaacTimerId::InvalidateSlaacAddress { addr: expected_addr }, valid_until),
+            (
+                InnerSlaacTimerId::InvalidateSlaacAddress { addr: expected_addr_sub.addr() },
+                valid_until,
+            ),
         ],
     );
 
@@ -2093,7 +2136,7 @@ fn test_host_slaac_address_deprecate_while_tentative() {
     assert_eq!(ctx.trigger_next_timer().unwrap(), new_slaac_timer_id(&device));
     assert_eq!(
         get_global_ipv6_addrs(&ctx, &device),
-        [GlobalIpv6Addr {
+        [SlaacAddr {
             config: Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig {
                 preferred_lifetime: PreferredLifetime::Deprecated,
                 ..expected_address_entry_config
@@ -2134,19 +2177,19 @@ fn receive_prefix_update(
     );
 }
 
-fn get_matching_slaac_address_entries<F: FnMut(&GlobalIpv6Addr<FakeInstant>) -> bool>(
+fn get_matching_slaac_address_entries<F: FnMut(&SlaacAddr<FakeInstant>) -> bool>(
     ctx: &FakeCtx,
     device: &DeviceId<FakeBindingsCtx>,
     filter: F,
-) -> impl Iterator<Item = GlobalIpv6Addr<FakeInstant>> {
-    get_global_ipv6_addrs(ctx, device).into_iter().filter(filter)
+) -> impl Iterator<Item = SlaacAddr<FakeInstant>> {
+    get_slaac_addrs(ctx, device, None).into_iter().filter(filter)
 }
 
-fn get_matching_slaac_address_entry<F: FnMut(&GlobalIpv6Addr<FakeInstant>) -> bool>(
+fn get_matching_slaac_address_entry<F: FnMut(&SlaacAddr<FakeInstant>) -> bool>(
     ctx: &FakeCtx,
     device: &DeviceId<FakeBindingsCtx>,
     filter: F,
-) -> Option<GlobalIpv6Addr<FakeInstant>> {
+) -> Option<SlaacAddr<FakeInstant>> {
     let mut matching_addrs = get_matching_slaac_address_entries(ctx, device, filter);
     let entry = matching_addrs.next();
     assert_eq!(matching_addrs.next(), None);
@@ -2157,8 +2200,8 @@ fn get_slaac_address_entry(
     ctx: &FakeCtx,
     device: &DeviceId<FakeBindingsCtx>,
     addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
-) -> Option<GlobalIpv6Addr<FakeInstant>> {
-    let mut matching_addrs = get_global_ipv6_addrs(ctx, device)
+) -> Option<SlaacAddr<FakeInstant>> {
+    let mut matching_addrs = get_slaac_addrs(ctx, device, None)
         .into_iter()
         .filter(|entry| *entry.addr_sub() == addr_sub);
     let entry = matching_addrs.next();
@@ -2169,7 +2212,7 @@ fn get_slaac_address_entry(
 fn assert_slaac_lifetimes_enforced(
     ctx: &mut FakeCtx,
     device: &DeviceId<FakeBindingsCtx>,
-    entry: GlobalIpv6Addr<FakeInstant>,
+    entry: SlaacAddr<FakeInstant>,
     valid_until: FakeInstant,
     preferred_until: FakeInstant,
 ) {
@@ -2240,7 +2283,9 @@ fn test_host_stable_slaac_valid_lifetime_updates() {
             &device,
             Ipv6DeviceConfigurationUpdate {
                 slaac_config: SlaacConfigurationUpdate {
-                    enable_stable_addresses: Some(true),
+                    stable_address_configuration: Some(
+                        StableSlaacAddressConfiguration::ENABLED_WITH_EUI64,
+                    ),
                     ..Default::default()
                 },
                 ip_config: IpDeviceConfigurationUpdate {
@@ -2257,11 +2302,7 @@ fn test_host_stable_slaac_valid_lifetime_updates() {
     let prefix = Ipv6Addr::from([1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0]);
     let prefix_length = 64;
     let subnet = Subnet::new(prefix, prefix_length).unwrap();
-    let mut expected_addr = [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0];
-    expected_addr[8..].copy_from_slice(&config.local_mac.to_eui64()[..]);
-    let expected_addr =
-        NonMappedAddr::new(UnicastAddr::new(Ipv6Addr::from(expected_addr)).unwrap()).unwrap();
-    let expected_addr_sub = AddrSubnet::from_witness(expected_addr, prefix_length).unwrap();
+    let expected_addr_sub = calculate_slaac_addr_sub(subnet, config.local_mac.to_eui64());
 
     // Have no addresses yet.
     assert_empty(get_global_ipv6_addrs(&ctx, &device));
@@ -2318,10 +2359,104 @@ fn test_host_stable_slaac_valid_lifetime_updates() {
     ctx.core_api().device().remove_device(device.unwrap_ethernet()).into_removed();
 }
 
-#[test]
-fn test_host_temporary_slaac_regenerates_address_on_dad_failure() {
-    // Check that when a tentative temporary address is detected as a
-    // duplicate, a new address gets created.
+enum SlaacType {
+    LinkLocal,
+    GlobalTemporary,
+    GlobalStable,
+}
+
+impl SlaacType {
+    const MAX_VALID_LIFETIME: Duration = Duration::from_secs(15000);
+    const MAX_PREFERRED_LIFETIME: Duration = Duration::from_secs(5000);
+    const IDGEN_RETRIES: u8 = 3;
+
+    fn config_update(&self) -> SlaacConfigurationUpdate {
+        match self {
+            Self::LinkLocal | Self::GlobalStable => SlaacConfigurationUpdate {
+                stable_address_configuration: Some(StableSlaacAddressConfiguration::Enabled {
+                    iid_generation: IidGenerationConfiguration::Opaque {
+                        idgen_retries: Self::IDGEN_RETRIES,
+                    },
+                }),
+                ..Default::default()
+            },
+            Self::GlobalTemporary => SlaacConfigurationUpdate {
+                temporary_address_configuration: Some(
+                    TemporarySlaacAddressConfiguration::Enabled {
+                        temp_valid_lifetime: NonZeroDuration::new(Self::MAX_VALID_LIFETIME)
+                            .unwrap(),
+                        temp_preferred_lifetime: NonZeroDuration::new(Self::MAX_PREFERRED_LIFETIME)
+                            .unwrap(),
+                        temp_idgen_retries: Self::IDGEN_RETRIES,
+                    },
+                ),
+                ..Default::default()
+            },
+        }
+    }
+
+    fn maybe_advertise_prefix(
+        &self,
+        ctx: &mut FakeCtx,
+        device: &DeviceId<FakeBindingsCtx>,
+    ) -> Subnet<Ipv6Addr> {
+        match self {
+            Self::LinkLocal => Subnet::new(Ipv6::LINK_LOCAL_UNICAST_SUBNET.network(), 64).unwrap(),
+            Self::GlobalStable | Self::GlobalTemporary => {
+                let router_mac = Ipv6::TEST_ADDRS.remote_mac;
+                let router_ip = router_mac.to_ipv6_link_local().addr().get();
+                let prefix = Ipv6Addr::from([1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0]);
+                let prefix_length = 64;
+                let subnet = Subnet::new(prefix, prefix_length).unwrap();
+
+                // Send an update with lifetimes that are smaller than the ones specified in the
+                // preferences.
+                let valid_lifetime = 10000;
+                let preferred_lifetime = 4000;
+
+                receive_prefix_update(
+                    ctx,
+                    device,
+                    router_ip,
+                    subnet,
+                    preferred_lifetime,
+                    valid_lifetime,
+                );
+
+                subnet
+            }
+        }
+    }
+
+    fn matches_config_and_scope<Instant>(
+        &self,
+        config: &Ipv6AddrConfig<Instant>,
+        scope: Ipv6Scope,
+    ) -> bool {
+        let config = match config {
+            Ipv6AddrConfig::Manual(_) => return false,
+            Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { inner, .. }) => inner,
+        };
+        match (self, config) {
+            (Self::LinkLocal | Self::GlobalStable, SlaacConfig::Stable { .. }) => {}
+            (Self::GlobalTemporary, SlaacConfig::Temporary(_)) => {}
+            _ => return false,
+        }
+        match (self, scope) {
+            (Self::LinkLocal, Ipv6Scope::LinkLocal) => {}
+            (Self::GlobalStable | Self::GlobalTemporary, Ipv6Scope::Global) => {}
+            _ => return false,
+        }
+        true
+    }
+}
+
+#[test_case(SlaacType::LinkLocal; "link-local")]
+#[test_case(SlaacType::GlobalTemporary; "temporary")]
+#[test_case(SlaacType::GlobalStable; "stable")]
+fn test_host_slaac_regenerates_address_on_dad_failure(slaac_type: SlaacType) {
+    // Check that when a SLAAC address is detected as a duplicate, a new address
+    // gets created.
     set_logger_for_test();
     let config = Ipv6::TEST_ADDRS;
     let mut ctx = FakeCtx::default();
@@ -2337,26 +2472,6 @@ fn test_host_temporary_slaac_regenerates_address_on_dad_failure() {
         )
         .into();
 
-    let router_mac = config.remote_mac;
-    let router_ip = router_mac.to_ipv6_link_local().addr().get();
-    let prefix = Ipv6Addr::from([1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0]);
-    let prefix_length = 64;
-    let subnet = Subnet::new(prefix, prefix_length).unwrap();
-
-    const MAX_VALID_LIFETIME: Duration = Duration::from_secs(15000);
-    const MAX_PREFERRED_LIFETIME: Duration = Duration::from_secs(5000);
-
-    let idgen_retries = 3;
-
-    let slaac_config = SlaacConfigurationUpdate {
-        temporary_address_configuration: Some(TemporarySlaacAddressConfiguration::Enabled {
-            temp_valid_lifetime: NonZeroDuration::new(MAX_VALID_LIFETIME).unwrap(),
-            temp_preferred_lifetime: NonZeroDuration::new(MAX_PREFERRED_LIFETIME).unwrap(),
-            temp_idgen_retries: idgen_retries,
-        }),
-        ..Default::default()
-    };
-
     let _: Ipv6DeviceConfigurationUpdate = ctx
         .core_api()
         .device_ip::<Ipv6>()
@@ -2365,7 +2480,7 @@ fn test_host_temporary_slaac_regenerates_address_on_dad_failure() {
             Ipv6DeviceConfigurationUpdate {
                 // Doesn't matter as long as we perform DAD.
                 dad_transmits: Some(NonZeroU16::new(1)),
-                slaac_config,
+                slaac_config: slaac_type.config_update(),
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
                     ..Default::default()
@@ -2375,13 +2490,11 @@ fn test_host_temporary_slaac_regenerates_address_on_dad_failure() {
         )
         .unwrap();
 
-    // Send an update with lifetimes that are smaller than the ones specified in the preferences.
-    let valid_lifetime = 10000;
-    let preferred_lifetime = 4000;
-    receive_prefix_update(&mut ctx, &device, router_ip, subnet, preferred_lifetime, valid_lifetime);
+    let subnet = slaac_type.maybe_advertise_prefix(&mut ctx, &device);
 
     let first_addr_entry = get_matching_slaac_address_entry(&ctx, &device, |entry| {
-        entry.addr_sub().subnet() == subnet && is_temporary_slaac_addr(&entry.config)
+        entry.addr_sub().subnet() == subnet
+            && slaac_type.matches_config_and_scope(&entry.config, entry.addr_sub().addr().scope())
     })
     .unwrap();
     assert!(!first_addr_entry.flags.assigned);
@@ -2395,34 +2508,43 @@ fn test_host_temporary_slaac_regenerates_address_on_dad_failure() {
     // In response to the advertisement with the duplicate address, a
     // different address should be selected.
     let second_addr_entry = get_matching_slaac_address_entry(&ctx, &device, |entry| {
-        entry.addr_sub().subnet() == subnet && is_temporary_slaac_addr(&entry.config)
+        entry.addr_sub().subnet() == subnet
+            && slaac_type.matches_config_and_scope(&entry.config, entry.addr_sub().addr().scope())
     })
     .unwrap();
-    let first_addr_entry_valid = assert_matches!(first_addr_entry.config,
-            Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig {
-                inner: SlaacConfig::Temporary(TemporarySlaacConfig {
-                    valid_until,
-                    creation_time: _,
-                    desync_factor: _,
-                    dad_counter: 0,
-                }),
-                ..
-            }) => valid_until);
     let first_addr_sub = first_addr_entry.addr_sub();
     let second_addr_sub = second_addr_entry.addr_sub();
     assert_eq!(first_addr_sub.subnet(), second_addr_sub.subnet());
     assert_ne!(first_addr_sub.addr(), second_addr_sub.addr());
 
-    assert_matches!(second_addr_entry.config, Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig {
-        inner: SlaacConfig::Temporary(TemporarySlaacConfig {
-            valid_until,
-            creation_time,
-            desync_factor: _,
-            dad_counter: 1,
-        }), .. }) => {
-            assert_eq!(creation_time, ctx.bindings_ctx.now());
-            assert_eq!(valid_until, first_addr_entry_valid);
-    });
+    let (first_addr_valid, dad_counter) = match first_addr_entry.config {
+        Ipv6AddrConfig::Manual(_) => panic!("found manual addr instead of SLAAC"),
+        Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { inner, .. }) => match inner {
+            SlaacConfig::Temporary(TemporarySlaacConfig { valid_until, dad_counter, .. }) => {
+                (Lifetime::Finite(valid_until), dad_counter)
+            }
+            SlaacConfig::Stable { valid_until, dad_counter, .. } => (valid_until, dad_counter),
+        },
+    };
+    assert_eq!(dad_counter, 0);
+
+    let (valid_until, dad_counter, creation_time) = match second_addr_entry.config {
+        Ipv6AddrConfig::Manual(_) => panic!("found manual addr instead of SLAAC"),
+        Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { inner, .. }) => match inner {
+            SlaacConfig::Temporary(TemporarySlaacConfig {
+                valid_until,
+                creation_time,
+                dad_counter,
+                ..
+            }) => (Lifetime::Finite(valid_until), dad_counter, creation_time),
+            SlaacConfig::Stable { valid_until, creation_time, dad_counter, .. } => {
+                (valid_until, dad_counter, creation_time)
+            }
+        },
+    };
+    assert_eq!(dad_counter, 1);
+    assert_eq!(valid_until, first_addr_valid);
+    assert_eq!(creation_time, ctx.bindings_ctx.now());
 
     // Clean up device references.
     ctx.core_api().device().remove_device(device.unwrap_ethernet()).into_removed();
@@ -2453,10 +2575,12 @@ fn receive_neighbor_advertisement_for_duplicate_address(
     )
 }
 
-#[test]
-fn test_host_temporary_slaac_gives_up_after_dad_failures() {
-    // Check that when the chosen tentative temporary addresses are detected
-    // as duplicates enough times, the system gives up.
+#[test_case(SlaacType::LinkLocal; "link-local")]
+#[test_case(SlaacType::GlobalTemporary; "temporary")]
+#[test_case(SlaacType::GlobalStable; "stable")]
+fn test_host_slaac_gives_up_after_dad_failures(slaac_type: SlaacType) {
+    // Check that when the chosen tentative SLAAC addresses are detected as
+    // duplicates enough times, the system gives up.
     set_logger_for_test();
     let config = Ipv6::TEST_ADDRS;
     let mut ctx = FakeCtx::default();
@@ -2472,25 +2596,6 @@ fn test_host_temporary_slaac_gives_up_after_dad_failures() {
         )
         .into();
 
-    let router_mac = config.remote_mac;
-    let router_ip = router_mac.to_ipv6_link_local().addr().get();
-    let prefix = Ipv6Addr::from([1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0]);
-    let prefix_length = 64;
-    let subnet = Subnet::new(prefix, prefix_length).unwrap();
-
-    const MAX_VALID_LIFETIME: Duration = Duration::from_secs(15000);
-    const MAX_PREFERRED_LIFETIME: Duration = Duration::from_secs(5000);
-
-    let idgen_retries = 3;
-    let slaac_config = SlaacConfigurationUpdate {
-        temporary_address_configuration: Some(TemporarySlaacAddressConfiguration::Enabled {
-            temp_valid_lifetime: NonZeroDuration::new(MAX_VALID_LIFETIME).unwrap(),
-            temp_preferred_lifetime: NonZeroDuration::new(MAX_PREFERRED_LIFETIME).unwrap(),
-            temp_idgen_retries: idgen_retries,
-        }),
-        ..Default::default()
-    };
-
     let _: Ipv6DeviceConfigurationUpdate = ctx
         .core_api()
         .device_ip::<Ipv6>()
@@ -2499,7 +2604,7 @@ fn test_host_temporary_slaac_gives_up_after_dad_failures() {
             Ipv6DeviceConfigurationUpdate {
                 // Doesn't matter as long as we perform DAD.
                 dad_transmits: Some(NonZeroU16::new(1)),
-                slaac_config,
+                slaac_config: slaac_type.config_update(),
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
                     ..Default::default()
@@ -2509,27 +2614,23 @@ fn test_host_temporary_slaac_gives_up_after_dad_failures() {
         )
         .unwrap();
 
-    receive_prefix_update(
-        &mut ctx,
-        &device,
-        router_ip,
-        subnet,
-        MAX_PREFERRED_LIFETIME.as_secs() as u32,
-        MAX_VALID_LIFETIME.as_secs() as u32,
-    );
-    let match_temporary_address = |entry: &GlobalIpv6Addr<FakeInstant>| {
-        entry.addr_sub().subnet() == subnet && is_temporary_slaac_addr(&entry.config)
+    let subnet = slaac_type.maybe_advertise_prefix(&mut ctx, &device);
+
+    let match_slaac_prefix_and_type = |entry: &SlaacAddr<FakeInstant>| {
+        entry.addr_sub().subnet() == subnet
+            && slaac_type.matches_config_and_scope(&entry.config, entry.addr_sub().addr().scope())
     };
 
     // The system should try several (1 initial + # retries) times to
     // generate an address. In the loop below, each generated address is
     // detected as a duplicate.
-    let attempted_addresses: Vec<_> = (0..=idgen_retries)
+    let attempted_addresses: Vec<_> = (0..=SlaacType::IDGEN_RETRIES)
         .map(|_| {
             // An address should be selected. This must be checked using DAD
             // against other hosts on the network.
             let addr_entry =
-                get_matching_slaac_address_entry(&ctx, &device, match_temporary_address).unwrap();
+                get_matching_slaac_address_entry(&ctx, &device, match_slaac_prefix_and_type)
+                    .unwrap();
             assert!(!addr_entry.flags.assigned);
 
             // A response is received to the DAD request indicating that it
@@ -2547,14 +2648,14 @@ fn test_host_temporary_slaac_gives_up_after_dad_failures() {
         .collect();
 
     // After the last failed try, the system should have given up, and there
-    // should be no temporary address for the subnet.
-    assert_eq!(get_matching_slaac_address_entry(&ctx, &device, match_temporary_address), None);
+    // should be no matching SLAAC address for the subnet.
+    assert_eq!(get_matching_slaac_address_entry(&ctx, &device, match_slaac_prefix_and_type), None);
 
     // All the attempted addresses should be unique.
     let unique_addresses = attempted_addresses.iter().collect::<HashSet<_>>();
     assert_eq!(
         unique_addresses.len(),
-        usize::from(1 + idgen_retries),
+        usize::from(1 + SlaacType::IDGEN_RETRIES),
         "not all addresses are unique: {attempted_addresses:?}"
     );
 }
@@ -2921,7 +3022,7 @@ fn test_host_temporary_slaac_lifetime_updates_respect_max() {
                 temp_preferred_lifetime,
                 temp_idgen_retries: _,
             }),
-            enable_stable_addresses: _,
+            stable_address_configuration: _,
         } => (
             temp_valid_lifetime,
             temp_preferred_lifetime,
@@ -2932,7 +3033,7 @@ fn test_host_temporary_slaac_lifetime_updates_respect_max() {
 
     let interface_identifier = OpaqueIid::new(
         subnet,
-        &Ipv6::TEST_ADDRS.local_mac.to_eui64()[..],
+        &*Ipv6::TEST_ADDRS.local_mac,
         None::<[_; 0]>,
         // Clone the RNG so we can see what the next value (which will be
         // used to generate the temporary address) will be.
@@ -3079,7 +3180,9 @@ fn test_remove_stable_slaac_address() {
             &device,
             Ipv6DeviceConfigurationUpdate {
                 slaac_config: SlaacConfigurationUpdate {
-                    enable_stable_addresses: Some(true),
+                    stable_address_configuration: Some(
+                        StableSlaacAddressConfiguration::ENABLED_WITH_EUI64,
+                    ),
                     ..Default::default()
                 },
                 ip_config: IpDeviceConfigurationUpdate {
@@ -3095,10 +3198,8 @@ fn test_remove_stable_slaac_address() {
     let src_ip = src_mac.to_ipv6_link_local().addr().get();
     let prefix = Ipv6Addr::from([1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0]);
     let prefix_length = 64;
-    let mut expected_addr = [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0];
-    expected_addr[8..].copy_from_slice(&config.local_mac.to_eui64()[..]);
-    let expected_addr =
-        NonMappedAddr::new(UnicastAddr::new(Ipv6Addr::from(expected_addr)).unwrap()).unwrap();
+    let subnet = Subnet::new(prefix, prefix_length).unwrap();
+    let expected_addr = calculate_slaac_addr_sub(subnet, config.local_mac.to_eui64()).addr();
 
     // Receive a new RA with new prefix (autonomous).
     //
@@ -3127,10 +3228,15 @@ fn test_remove_stable_slaac_address() {
     let now = ctx.bindings_ctx.now();
     let valid_until = now + Duration::from_secs(VALID_LIFETIME_SECS.into());
     let preferred_until = now + Duration::from_secs(PREFERRED_LIFETIME_SECS.into());
-    let expected_address_entry = GlobalIpv6Addr {
+    let expected_address_entry = SlaacAddr {
         addr_sub: AddrSubnet::<Ipv6Addr, _>::new(expected_addr.into(), prefix_length).unwrap(),
         config: Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig {
-            inner: SlaacConfig::Stable { valid_until: Lifetime::Finite(valid_until) },
+            inner: SlaacConfig::Stable {
+                valid_until: Lifetime::Finite(valid_until),
+                creation_time: now,
+                regen_counter: 0,
+                dad_counter: 0,
+            },
             preferred_lifetime: PreferredLifetime::preferred_until(preferred_until),
         }),
         flags: Ipv6AddressFlags { assigned: true },
@@ -3184,7 +3290,13 @@ fn test_remove_temporary_slaac_address() {
     assert_empty(get_global_ipv6_addrs(&ctx, &device).into_iter().filter(|e| match e.config {
         Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { inner: SlaacConfig::Temporary(_), .. }) => true,
         Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig {
-            inner: SlaacConfig::Stable { valid_until: _ },
+            inner:
+                SlaacConfig::Stable {
+                    valid_until: _,
+                    creation_time: _,
+                    regen_counter: _,
+                    dad_counter: _,
+                },
             ..
         }) => false,
         Ipv6AddrConfig::Manual(_manual_config) => false,

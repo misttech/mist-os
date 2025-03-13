@@ -25,7 +25,7 @@ guest_package("zircon_guest") {
   deps = [ "//build/images/guest" ]
   zircon = guest_image_dir + "/guest/fuchsia.zbi"
 
-  cmdline = "console.device_topological_suffix=/virtio-console"
+  cmdline = "console.use_virtio_console=true"
   cmdline += " console.shell=true"
 
   disk_filename = "filesystem.fvm"

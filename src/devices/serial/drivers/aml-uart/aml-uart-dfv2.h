@@ -5,9 +5,11 @@
 #ifndef SRC_DEVICES_SERIAL_DRIVERS_AML_UART_AML_UART_DFV2_H_
 #define SRC_DEVICES_SERIAL_DRIVERS_AML_UART_AML_UART_DFV2_H_
 
+#include <fidl/fuchsia.boot.metadata/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.serialimpl/cpp/driver/fidl.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/metadata/cpp/metadata_server.h>
 
 #include "src/devices/serial/drivers/aml-uart/aml-uart.h"
 #include "src/devices/serial/drivers/aml-uart/aml_uart_config.h"
@@ -43,6 +45,9 @@ class AmlUartV2 : public fdf::DriverBase {
   fdf::ServerBindingGroup<fuchsia_hardware_serialimpl::Device> serial_impl_bindings_;
 
   aml_uart_config::Config driver_config_;
+
+  fdf_metadata::MetadataServer<fuchsia_boot_metadata::MacAddressMetadata>
+      mac_address_metadata_server_;
 };
 
 }  // namespace serial

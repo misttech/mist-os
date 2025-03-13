@@ -47,44 +47,6 @@ void vm_page::add_to_initial_count(vm_page_state state, uint64_t n) {
       [&state, &n](percpu* p) { p->vm_page_counts.by_state[VmPageStateIndex(state)] += n; });
 }
 
-ktl::optional<vm_page::object_t::TrySetHasWaiterResult> vm_page::object_t::try_set_has_waiter() {
-  TrySetHasWaiterResult result;
-  uintptr_t value = object_or_stack_owner.get().load(ktl::memory_order_acquire);
-  while (true) {
-    if (!(value & kObjectOrStackOwnerIsStackOwnerFlag)) {
-      return ktl::nullopt;
-    }
-    if (value & kObjectOrStackOwnerHasWaiter) {
-      // We rely on the current thread holding the StackOwnedLoanedPagesInterval
-      // lock to know that the first thread which set
-      // kObjectOrStackOwnerHasWaiter on this page has also already returned
-      // from PrepareForWaiter() and released the lock.
-      result.first_setter = false;
-      result.stack_owner = &stack_owner();
-      return result;
-    }
-    if (!object_or_stack_owner.get().compare_exchange_weak(
-            value, value | kObjectOrStackOwnerHasWaiter, ktl::memory_order_acq_rel,
-            ktl::memory_order_acquire)) {
-      continue;
-    }
-    break;
-  }
-
-  // We now know that we hold the SOLPI lock, and kObjectOrStackOwnerHasWaiter
-  // is set, which means the StackOwnedLoanedPagesInterval can't be removed from
-  // the page or start deleting until the lock is released and all waiters have
-  // been woken.  We know this is the first thread to set
-  // kObjectOrStackOwnerHasWaiter on this page, and we know that other threads
-  // trying to call try_set_has_waiter() on this page will block until this
-  // thread releases the lock, so we know that those threads won't return from
-  // this method until after this thread returns from PrepareForWaiter() and
-  // releases the lock.
-  result.first_setter = true;
-  result.stack_owner = &stack_owner();
-  return result;
-}
-
 static int cmd_vm_page(int argc, const cmd_args* argv, uint32_t flags) {
   if (argc < 2) {
   notenoughargs:

@@ -39,6 +39,7 @@ common_deps = [
 ]
 
 fuchsia_cc_driver("driver") {
+  legacy = true
   output_name = "chromiumos-ec-lpc"
   sources = [ "chromiumos_ec_lpc.cc" ]
   deps = common_deps

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
+use anyhow::anyhow;
 use assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueType};
 use assembly_config_schema::platform_config::driver_framework_config::{
     DriverFrameworkConfig, TestFuzzingConfig,
@@ -134,6 +135,8 @@ impl DefineSubsystemConfiguration<(&DriverFrameworkConfig, &StorageConfig)>
         {
             software_names.push("virtual-audio");
             software_ids.push(bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_VIRTUAL_AUDIO);
+            software_names.push("virtual-audio-legacy");
+            software_ids.push(bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_VIRTUAL_AUDIO_LEGACY);
         }
 
         if context.board_info.provides_feature("fuchsia::fake_battery")
@@ -167,9 +170,25 @@ impl DefineSubsystemConfiguration<(&DriverFrameworkConfig, &StorageConfig)>
             ),
         )?;
 
-        // Include bus-pci driver through a platform AIB.
-        if context.board_info.provides_feature("fuchsia::bus_pci") {
+        // Include bus-pci or bus-kpci driver through platform AIBs.
+        let bus_pci = context.board_info.provides_feature("fuchsia::bus_pci");
+        let bus_kpci = context.board_info.provides_feature("fuchsia::bus_kpci");
+
+        if bus_pci && bus_kpci {
+            return Err(anyhow!(
+                "Cannot enable both bus_pci and bus_kpci features in the same configuration."
+            ));
+        }
+        if bus_pci {
             builder.platform_bundle("bus_pci_driver");
+            // In engineering builds, include the lspci tool whenever the pci
+            // bus feature is enabled.
+            if context.build_type == &BuildType::Eng {
+                builder.platform_bundle("lspci");
+            }
+        }
+        if bus_kpci {
+            builder.platform_bundle("bus_kpci_driver");
         }
 
         Ok(())

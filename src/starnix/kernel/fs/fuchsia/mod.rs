@@ -12,6 +12,7 @@ mod remote;
 mod remote_bundle;
 #[cfg(not(feature = "starnix_lite"))]
 qmod remote_unix_domain_socket;
+mod remote_volume;
 mod syslog;
 mod timer;
 
@@ -22,6 +23,7 @@ pub use remote::*;
 pub use remote_bundle::RemoteBundle;
 #[cfg(not(feature = "starnix_lite"))]
 pub use remote_unix_domain_socket::*;
+pub use remote_volume::*;
 pub use syslog::*;
 pub use timer::*;
 

@@ -41,6 +41,10 @@ test("biotime-test") {
 
 storage_driver_test_realm_v2_component("biotime-test-component") {
   deps = [ ":biotime-test" ]
+
+  # This test overrides main to implement new command line flags
+  # unknown to gtest, so it needs to use the ELF test runner.
+  deprecated_legacy_test_execution = true
 }
 
 fuchsia_test_package("biotime-tests") {

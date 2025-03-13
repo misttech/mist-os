@@ -7,7 +7,7 @@ use crate::blob_benchmarks::{
     OpenAndGetVmoMetaFileWarm, PageInBlobRandomCompressed, PageInBlobSequentialCompressed,
     PageInBlobSequentialUncompressed, WriteBlob, WriteRealisticBlobs,
 };
-use fuchsia_storage_benchmarks::block_devices::FvmInstance;
+use fuchsia_storage_benchmarks::block_devices::BenchmarkVolumeFactory;
 use fuchsia_storage_benchmarks::filesystems::{
     Blobfs, F2fs, Fxblob, Fxfs, Memfs, Minfs, PkgDirTest,
 };
@@ -161,7 +161,8 @@ async fn main() {
     filter.case_insensitive(true);
     let filter = filter.build().unwrap();
 
-    let fvm_instance = FvmInstance::from_config(config.storage_host, config.fxfs_blob).await;
+    let fvm_instance =
+        BenchmarkVolumeFactory::from_config(config.storage_host, config.fxfs_blob).await;
     let mut benchmark_set = BenchmarkSet::new();
     add_io_benchmarks(&mut benchmark_set);
     add_directory_benchmarks(&mut benchmark_set);

@@ -29,6 +29,7 @@ driver_bind_rules("ddk-firmware-test-bind") {
 }
 
 fuchsia_cc_driver("ddk-firmware-test") {
+  legacy = true
   testonly = true
   configs += [
     "//build/config:all_source",

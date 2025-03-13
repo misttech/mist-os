@@ -17,7 +17,7 @@ use net_types::ip::{
 use net_types::{
     LinkLocalAddress, LinkLocalUnicastAddr, MulticastAddress, SpecifiedAddr, UnicastAddr, Witness,
 };
-use netstack3_base::socket::{AddrIsMappedError, SocketIpAddr};
+use netstack3_base::socket::{AddrIsMappedError, SocketIpAddr, SocketIpAddrExt as _};
 use netstack3_base::sync::Mutex;
 use netstack3_base::{
     AnyDevice, Counter, CounterContext, DeviceIdContext, EitherDeviceId, FrameDestination,
@@ -53,12 +53,15 @@ use crate::internal::base::{
 };
 use crate::internal::device::nud::{ConfirmationFlags, NudIpHandler};
 use crate::internal::device::route_discovery::Ipv6DiscoveredRoute;
-use crate::internal::device::{IpAddressState, IpDeviceHandler, Ipv6DeviceHandler};
+use crate::internal::device::{
+    IpAddressState, IpDeviceHandler, Ipv6DeviceHandler, Ipv6LinkLayerAddr,
+};
 use crate::internal::local_delivery::{IpHeaderInfo, LocalDeliveryPacketInfo, ReceiveIpPacketMeta};
 use crate::internal::path_mtu::PmtuHandler;
+use crate::internal::routing::rules::Marks;
 use crate::internal::socket::{
-    DefaultIpSocketOptions, DelegatedRouteResolutionOptions, DelegatedSendOptions, IpSocketHandler,
-    OptionDelegationMarker,
+    DelegatedRouteResolutionOptions, DelegatedSendOptions, IpSocketHandler, OptionDelegationMarker,
+    RouteResolutionOptions, SendOptions,
 };
 
 /// The IP packet hop limit for all NDP packets.
@@ -407,6 +410,7 @@ pub trait IcmpErrorHandler<I: IcmpHandlerIpExt, BC>: DeviceIdContext<AnyDevice> 
         dst_ip: SpecifiedAddr<I::Addr>,
         original_packet: B,
         error: I::IcmpError,
+        marks: &Marks,
     );
 }
 
@@ -424,6 +428,7 @@ impl<
         dst_ip: SpecifiedAddr<Ipv4Addr>,
         original_packet: B,
         Icmpv4Error { kind, header_len }: Icmpv4Error,
+        marks: &Marks,
     ) {
         let src_ip = SocketIpAddr::new_ipv4_specified(src_ip);
         let dst_ip = SocketIpAddr::new_ipv4_specified(dst_ip);
@@ -441,6 +446,7 @@ impl<
                     original_packet,
                     header_len,
                     fragment_type,
+                    marks,
                 )
             }
             Icmpv4ErrorKind::TtlExpired { proto, fragment_type } => send_icmpv4_ttl_expired(
@@ -454,6 +460,7 @@ impl<
                 original_packet,
                 header_len,
                 fragment_type,
+                marks,
             ),
             Icmpv4ErrorKind::NetUnreachable { proto, fragment_type } => {
                 send_icmpv4_net_unreachable(
@@ -467,6 +474,7 @@ impl<
                     original_packet,
                     header_len,
                     fragment_type,
+                    marks,
                 )
             }
             Icmpv4ErrorKind::ProtocolUnreachable => send_icmpv4_protocol_unreachable(
@@ -478,6 +486,7 @@ impl<
                 dst_ip,
                 original_packet,
                 header_len,
+                marks,
             ),
             Icmpv4ErrorKind::PortUnreachable => send_icmpv4_port_unreachable(
                 self,
@@ -488,6 +497,7 @@ impl<
                 dst_ip,
                 original_packet,
                 header_len,
+                marks,
             ),
         }
     }
@@ -507,6 +517,7 @@ impl<
         dst_ip: SpecifiedAddr<Ipv6Addr>,
         original_packet: B,
         error: Icmpv6ErrorKind,
+        marks: &Marks,
     ) {
         let src_ip: SocketIpAddr<Ipv6Addr> = match src_ip.into_specified().try_into() {
             Ok(addr) => addr,
@@ -536,6 +547,7 @@ impl<
                     Icmpv6ParameterProblem::new(pointer),
                     original_packet,
                     allow_dst_multicast,
+                    marks,
                 )
             }
             Icmpv6ErrorKind::TtlExpired { proto, header_len } => send_icmpv6_ttl_expired(
@@ -548,6 +560,7 @@ impl<
                 proto,
                 original_packet,
                 header_len,
+                marks,
             ),
             Icmpv6ErrorKind::NetUnreachable { proto, header_len } => send_icmpv6_net_unreachable(
                 self,
@@ -559,6 +572,7 @@ impl<
                 proto,
                 original_packet,
                 header_len,
+                marks,
             ),
             Icmpv6ErrorKind::PacketTooBig { proto, header_len, mtu } => send_icmpv6_packet_too_big(
                 self,
@@ -571,6 +585,7 @@ impl<
                 mtu,
                 original_packet,
                 header_len,
+                marks,
             ),
             Icmpv6ErrorKind::ProtocolUnreachable { header_len } => {
                 send_icmpv6_protocol_unreachable(
@@ -582,6 +597,7 @@ impl<
                     dst_ip,
                     original_packet,
                     header_len,
+                    marks,
                 )
             }
             Icmpv6ErrorKind::PortUnreachable => send_icmpv6_port_unreachable(
@@ -592,6 +608,7 @@ impl<
                 src_ip,
                 dst_ip,
                 original_packet,
+                marks,
             ),
         }
     }
@@ -718,7 +735,7 @@ macro_rules! try_send_error {
         });
 
         if send {
-            $core_ctx.increment(|counters| &counters.error);
+            $core_ctx.counters().error.increment();
             $e
         } else {
             trace!("ip::icmp::try_send_error!: dropping rate-limited ICMP error message");
@@ -743,7 +760,7 @@ fn receive_ip_transport_icmp_error<
     original_body: &[u8],
     err: I::ErrorCode,
 ) {
-    core_ctx.increment(|counters| &counters.error_delivered_to_transport_layer);
+    core_ctx.counters().error_delivered_to_transport_layer.increment();
     trace!("IcmpIpTransportContext::receive_icmp_error({:?})", err);
 
     let mut parse_body = original_body;
@@ -807,7 +824,7 @@ impl<
         mut buffer: B,
         info: &LocalDeliveryPacketInfo<Ipv4, H>,
     ) -> Result<(), (B, TransportReceiveError)> {
-        let LocalDeliveryPacketInfo { meta, header_info: _ } = info;
+        let LocalDeliveryPacketInfo { meta, header_info: _, marks } = info;
         let ReceiveIpPacketMeta { broadcast: _, transparent_override } = meta;
         if let Some(delivery) = transparent_override {
             unreachable!(
@@ -829,18 +846,22 @@ impl<
 
         match packet {
             Icmpv4Packet::EchoRequest(echo_request) => {
-                core_ctx.increment(|counters: &IcmpRxCounters<Ipv4>| &counters.echo_request);
+                CounterContext::<IcmpRxCounters<Ipv4>>::counters(core_ctx).echo_request.increment();
 
                 if let Some(src_ip) = SpecifiedAddr::new(src_ip) {
                     let req = *echo_request.message();
                     let code = echo_request.code();
                     let (local_ip, remote_ip) = (dst_ip, src_ip);
-                    // TODO(joshlf): Do something if send_icmp_reply returns an
-                    // error?
-                    let _ = send_icmp_reply(
+                    debug!(
+                        "replying to ICMP echo request from {remote_ip} to {local_ip}%{device:?}: \
+                        id={}, seq={}",
+                        req.id(),
+                        req.seq()
+                    );
+                    send_icmp_reply(
                         core_ctx,
                         bindings_ctx,
-                        Some(device),
+                        device,
                         SocketIpAddr::new_ipv4_specified(remote_ip),
                         SocketIpAddr::new_ipv4_specified(local_ip),
                         |src_ip| {
@@ -851,14 +872,21 @@ impl<
                                 req.reply(),
                             ))
                         },
+                        &WithMarks(marks),
                     );
                 } else {
-                    trace!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Received echo request with an unspecified source address");
+                    trace!(
+                        "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: \
+                        Received echo request with an unspecified source address"
+                    );
                 }
             }
             Icmpv4Packet::EchoReply(echo_reply) => {
-                core_ctx.increment(|counters: &IcmpRxCounters<Ipv4>| &counters.echo_reply);
-                trace!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Received an EchoReply message");
+                CounterContext::<IcmpRxCounters<Ipv4>>::counters(core_ctx).echo_reply.increment();
+                trace!(
+                    "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: \
+                    Received an EchoReply message"
+                );
                 let parse_metadata = echo_reply.parse_metadata();
                 buffer.undo_parse(parse_metadata);
                 return <CC::EchoTransportContext
@@ -873,10 +901,15 @@ impl<
                 );
             }
             Icmpv4Packet::TimestampRequest(timestamp_request) => {
-                core_ctx.increment(|counters: &IcmpRxCounters<Ipv4>| &counters.timestamp_request);
+                CounterContext::<IcmpRxCounters<Ipv4>>::counters(core_ctx)
+                    .timestamp_request
+                    .increment();
                 if let Some(src_ip) = SpecifiedAddr::new(src_ip) {
                     if core_ctx.should_send_timestamp_reply() {
-                        trace!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Responding to Timestamp Request message");
+                        trace!(
+                            "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::\
+                            receive_ip_packet: Responding to Timestamp Request message"
+                        );
                         // We're supposed to respond with the time that we
                         // processed this message as measured in milliseconds
                         // since midnight UT. However, that would require that
@@ -905,12 +938,10 @@ impl<
                         // bodies, but until that happens, we need to give it an
                         // empty buffer.
                         buffer.shrink_front_to(0);
-                        // TODO(joshlf): Do something if send_icmp_reply returns
-                        // an error?
-                        let _ = send_icmp_reply(
+                        send_icmp_reply(
                             core_ctx,
                             bindings_ctx,
-                            Some(device),
+                            device,
                             SocketIpAddr::new_ipv4_specified(remote_ip),
                             SocketIpAddr::new_ipv4_specified(local_ip),
                             |src_ip| {
@@ -921,24 +952,38 @@ impl<
                                     reply,
                                 ))
                             },
+                            &WithMarks(marks),
                         );
                     } else {
                         trace!(
-                            "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Silently ignoring Timestamp Request message"
+                            "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::\
+                            receive_ip_packet: Silently ignoring Timestamp Request message"
                         );
                     }
                 } else {
-                    trace!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Received timestamp request with an unspecified source address");
+                    trace!(
+                        "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::\
+                        receive_ip_packet: Received timestamp request with an unspecified source \
+                        address"
+                    );
                 }
             }
             Icmpv4Packet::TimestampReply(_) => {
                 // TODO(joshlf): Support sending Timestamp Requests and
                 // receiving Timestamp Replies?
-                debug!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Received unsolicited Timestamp Reply message");
+                debug!(
+                    "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: \
+                    Received unsolicited Timestamp Reply message"
+                );
             }
             Icmpv4Packet::DestUnreachable(dest_unreachable) => {
-                core_ctx.increment(|counters: &IcmpRxCounters<Ipv4>| &counters.dest_unreachable);
-                trace!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Received a Destination Unreachable message");
+                CounterContext::<IcmpRxCounters<Ipv4>>::counters(core_ctx)
+                    .dest_unreachable
+                    .increment();
+                trace!(
+                    "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: \
+                    Received a Destination Unreachable message"
+                );
 
                 if dest_unreachable.code() == Icmpv4DestUnreachableCode::FragmentationRequired {
                     if let Some(next_hop_mtu) = dest_unreachable.message().next_hop_mtu() {
@@ -990,7 +1035,11 @@ impl<
                             let total_len =
                                 u16::from_be_bytes(original_packet_buf[2..4].try_into().unwrap());
 
-                            trace!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Next-Hop MTU is 0 so using the next best PMTU value from {}", total_len);
+                            trace!(
+                                "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::\
+                                receive_ip_packet: Next-Hop MTU is 0 so using the next best PMTU \
+                                value from {total_len}"
+                            );
 
                             core_ctx.update_pmtu_next_lower(
                                 bindings_ctx,
@@ -1003,7 +1052,11 @@ impl<
                             // to send the original IP packet header + 64 bytes
                             // of the original IP packet's body so the node
                             // itself is already violating the RFC.
-                            trace!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Original packet buf is too small to get original packet len so ignoring");
+                            trace!(
+                                "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::\
+                                receive_ip_packet: Original packet buf is too small to get \
+                                original packet len so ignoring"
+                            );
                         }
                     }
                 }
@@ -1017,8 +1070,13 @@ impl<
                 );
             }
             Icmpv4Packet::TimeExceeded(time_exceeded) => {
-                core_ctx.increment(|counters: &IcmpRxCounters<Ipv4>| &counters.time_exceeded);
-                trace!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Received a Time Exceeded message");
+                CounterContext::<IcmpRxCounters<Ipv4>>::counters(core_ctx)
+                    .time_exceeded
+                    .increment();
+                trace!(
+                    "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: \
+                    Received a Time Exceeded message"
+                );
 
                 receive_icmpv4_error(
                     core_ctx,
@@ -1029,12 +1087,20 @@ impl<
                 );
             }
             // TODO(https://fxbug.dev/323400954): Support ICMP Redirect.
-            Icmpv4Packet::Redirect(_) => debug!(
-                "Unimplemented: <IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet::redirect"
-            ),
+            Icmpv4Packet::Redirect(_) => {
+                debug!(
+                    "Unimplemented: <IcmpIpTransportContext as IpTransportContext<Ipv4>>::\
+                    receive_ip_packet::redirect"
+                )
+            }
             Icmpv4Packet::ParameterProblem(parameter_problem) => {
-                core_ctx.increment(|counters: &IcmpRxCounters<Ipv4>| &counters.parameter_problem);
-                trace!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Received a Parameter Problem message");
+                CounterContext::<IcmpRxCounters<Ipv4>>::counters(core_ctx)
+                    .parameter_problem
+                    .increment();
+                trace!(
+                    "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: \
+                    Received a Parameter Problem message"
+                );
 
                 receive_icmpv4_error(
                     core_ctx,
@@ -1105,7 +1171,7 @@ fn send_neighbor_advertisement<
     device_addr: UnicastAddr<Ipv6Addr>,
     dst_ip: SpecifiedAddr<Ipv6Addr>,
 ) {
-    core_ctx.increment(|counters| &counters.tx.neighbor_advertisement);
+    core_ctx.counters().tx.neighbor_advertisement.increment();
     debug!("send_neighbor_advertisement from {:?} to {:?}", device_addr, dst_ip);
     // We currently only allow the destination address to be:
     // 1) a unicast address.
@@ -1121,7 +1187,7 @@ fn send_neighbor_advertisement<
     // carry that information, but it is not necessary. So it is perfectly valid
     // that trying to send this advertisement will end up triggering a neighbor
     // solicitation to be sent.
-    let src_ll = core_ctx.get_link_layer_addr_bytes(&device_id);
+    let src_ll = core_ctx.get_link_layer_addr(&device_id);
 
     // Nothing reasonable to do with the error.
     let advertisement = NeighborAdvertisement::new(
@@ -1137,7 +1203,11 @@ fn send_neighbor_advertisement<
         Some(device_addr.into_specified()),
         dst_ip,
         OptionSequenceBuilder::new(
-            src_ll.as_ref().map(AsRef::as_ref).map(NdpOptionBuilder::TargetLinkLayerAddress).iter(),
+            src_ll
+                .as_ref()
+                .map(Ipv6LinkLayerAddr::as_bytes)
+                .map(NdpOptionBuilder::TargetLinkLayerAddress)
+                .iter(),
         )
         .into_serializer(),
         IcmpZeroCode,
@@ -1181,7 +1251,7 @@ fn receive_ndp_packet<
                 }
             };
 
-            core_ctx.increment(|counters| &counters.rx.neighbor_solicitation);
+            core_ctx.counters().rx.neighbor_solicitation.increment();
 
             match src_ip {
                 Ipv6SourceAddr::Unspecified => {
@@ -1293,7 +1363,7 @@ fn receive_ndp_packet<
                 }
             };
 
-            core_ctx.increment(|counters| &counters.rx.neighbor_advertisement);
+            core_ctx.counters().rx.neighbor_advertisement.increment();
 
             match Ipv6DeviceHandler::handle_received_neighbor_advertisement(
                 core_ctx,
@@ -1384,7 +1454,7 @@ fn receive_ndp_packet<
 
             let ra = p.message();
             debug!("received router advertisement from {:?}: {:?}", src_ip, ra);
-            core_ctx.increment(|counters| &counters.rx.router_advertisement);
+            core_ctx.counters().rx.router_advertisement.increment();
 
             // As per RFC 4861 section 6.3.4,
             //   The RetransTimer variable SHOULD be copied from the Retrans
@@ -1601,7 +1671,7 @@ impl<
         mut buffer: B,
         info: &LocalDeliveryPacketInfo<Ipv6, H>,
     ) -> Result<(), (B, TransportReceiveError)> {
-        let LocalDeliveryPacketInfo { meta, header_info: _ } = info;
+        let LocalDeliveryPacketInfo { meta, header_info, marks } = info;
         let ReceiveIpPacketMeta { broadcast: _, transparent_override } = meta;
         if let Some(delivery) = transparent_override {
             unreachable!(
@@ -1625,7 +1695,7 @@ impl<
 
         match packet {
             Icmpv6Packet::EchoRequest(echo_request) => {
-                core_ctx.increment(|counters: &IcmpRxCounters<Ipv6>| &counters.echo_request);
+                CounterContext::<IcmpRxCounters<Ipv6>>::counters(core_ctx).echo_request.increment();
 
                 if let Some(src_ip) = SocketIpAddr::new_from_ipv6_source(src_ip) {
                     match SocketIpAddr::try_from(dst_ip) {
@@ -1633,12 +1703,15 @@ impl<
                             let req = *echo_request.message();
                             let code = echo_request.code();
                             let (local_ip, remote_ip) = (dst_ip, src_ip);
-                            // TODO(joshlf): Do something if send_icmp_reply returns an
-                            // error?
-                            let _ = send_icmp_reply(
+                            debug!(
+                                "replying to ICMP echo request from {remote_ip}: id={}, seq={}",
+                                req.id(),
+                                req.seq()
+                            );
+                            send_icmp_reply(
                                 core_ctx,
                                 bindings_ctx,
-                                Some(device),
+                                device,
                                 remote_ip,
                                 local_ip,
                                 |src_ip| {
@@ -1649,6 +1722,7 @@ impl<
                                         req.reply(),
                                     ))
                                 },
+                                &WithMarks(marks),
                             );
                         }
                         Err(AddrIsMappedError {}) => {
@@ -1660,7 +1734,7 @@ impl<
                 }
             }
             Icmpv6Packet::EchoReply(echo_reply) => {
-                core_ctx.increment(|counters: &IcmpRxCounters<Ipv6>| &counters.echo_reply);
+                CounterContext::<IcmpRxCounters<Ipv6>>::counters(core_ctx).echo_reply.increment();
                 trace!("<IcmpIpTransportContext as IpTransportContext<Ipv6>>::receive_ip_packet: Received an EchoReply message");
                 let parse_metadata = echo_reply.parse_metadata();
                 buffer.undo_parse(parse_metadata);
@@ -1679,7 +1753,9 @@ impl<
                 receive_ndp_packet(core_ctx, bindings_ctx, device, src_ip, packet)
             }
             Icmpv6Packet::PacketTooBig(packet_too_big) => {
-                core_ctx.increment(|counters: &IcmpRxCounters<Ipv6>| &counters.packet_too_big);
+                CounterContext::<IcmpRxCounters<Ipv6>>::counters(core_ctx)
+                    .packet_too_big
+                    .increment();
                 trace!("<IcmpIpTransportContext as IpTransportContext<Ipv6>>::receive_ip_packet: Received a Packet Too Big message");
                 if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
                     // We are updating the path MTU from the destination address
@@ -1707,7 +1783,14 @@ impl<
                 );
             }
             Icmpv6Packet::Mld(packet) => {
-                core_ctx.receive_mld_packet(bindings_ctx, &device, src_ip, dst_ip, packet);
+                core_ctx.receive_mld_packet(
+                    bindings_ctx,
+                    &device,
+                    src_ip,
+                    dst_ip,
+                    packet,
+                    header_info,
+                );
             }
             Icmpv6Packet::DestUnreachable(dest_unreachable) => receive_icmpv6_error(
                 core_ctx,
@@ -1736,25 +1819,38 @@ impl<
     }
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+struct WithMarks<'a>(&'a Marks);
+
+impl<'a> OptionDelegationMarker for WithMarks<'a> {}
+
+impl<'a, I: IpExt> DelegatedRouteResolutionOptions<I> for WithMarks<'a> {
+    fn marks(&self) -> &Marks {
+        let Self(marks) = self;
+        marks
+    }
+}
+
+impl<'a, I: IpExt> DelegatedSendOptions<I> for WithMarks<'a> {}
+
 /// Sends an ICMP reply to a remote host.
 ///
 /// `send_icmp_reply` sends a reply to a non-error message (e.g., "echo request"
-/// or "timestamp request" messages). It takes the ingress device, source IP,
-/// and destination IP of the packet *being responded to*. It uses ICMP-specific
-/// logic to figure out whether and how to send an ICMP reply.
+/// or "timestamp request" messages).
 ///
 /// `get_body_from_src_ip` returns a `Serializer` with the bytes of the ICMP
 /// packet, and, when called, is given the source IP address chosen for the
 /// outbound packet. This allows `get_body_from_src_ip` to properly compute the
 /// ICMP checksum, which relies on both the source and destination IP addresses
 /// of the IP packet it's encapsulated in.
-fn send_icmp_reply<I, BC, CC, S, F>(
+fn send_icmp_reply<I, BC, CC, S, F, O>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
-    device: Option<&CC::DeviceId>,
+    device: &CC::DeviceId,
     original_src_ip: SocketIpAddr<I::Addr>,
     original_dst_ip: SocketIpAddr<I::Addr>,
     get_body_from_src_ip: F,
+    ip_options: &O,
 ) where
     I: IpExt,
     CC: IpSocketHandler<I, BC> + DeviceIdContext<AnyDevice> + CounterContext<IcmpTxCounters<I>>,
@@ -1762,18 +1858,27 @@ fn send_icmp_reply<I, BC, CC, S, F>(
     S: TransportPacketSerializer<I>,
     S::Buffer: BufferMut,
     F: FnOnce(SpecifiedAddr<I::Addr>) -> S,
+    O: SendOptions<I> + RouteResolutionOptions<I>,
 {
     trace!("send_icmp_reply({:?}, {}, {})", device, original_src_ip, original_dst_ip);
-    core_ctx.increment(|counters| &counters.reply);
+    core_ctx.counters().reply.increment();
     let tx_metadata: BC::TxMetadata = Default::default();
+
+    // Force the egress device if the original destination is multicast or
+    // requires a zone (i.e. link-local non-loopback), ensuring we pick the
+    // correct return route.
+    let egress_device = (original_dst_ip.as_ref().is_multicast()
+        || original_dst_ip.as_ref().must_have_zone())
+    .then_some(EitherDeviceId::Strong(device));
+
     core_ctx
         .send_oneshot_ip_packet(
             bindings_ctx,
-            None,
+            egress_device,
             IpDeviceAddr::new_from_socket_ip_addr(original_dst_ip),
             original_src_ip,
             I::ICMP_IP_PROTO,
-            &DefaultIpSocketOptions,
+            ip_options,
             tx_metadata,
             |src_ip| get_body_from_src_ip(src_ip.into()),
         )
@@ -1907,10 +2012,9 @@ pub fn send_icmpv4_host_unreachable<
     original_packet: B,
     header_len: usize,
     fragment_type: Ipv4FragmentType,
+    marks: &Marks,
 ) {
-    core_ctx.with_counters(|counters| {
-        counters.address_unreachable.increment();
-    });
+    core_ctx.counters().address_unreachable.increment();
 
     send_icmpv4_dest_unreachable(
         core_ctx,
@@ -1923,6 +2027,7 @@ pub fn send_icmpv4_host_unreachable<
         original_packet,
         header_len,
         fragment_type,
+        marks,
     );
 }
 
@@ -1948,10 +2053,9 @@ pub fn send_icmpv6_address_unreachable<
     src_ip: SocketIpAddr<Ipv6Addr>,
     dst_ip: SocketIpAddr<Ipv6Addr>,
     original_packet: B,
+    marks: &Marks,
 ) {
-    core_ctx.with_counters(|counters| {
-        counters.address_unreachable.increment();
-    });
+    core_ctx.counters().address_unreachable.increment();
 
     send_icmpv6_dest_unreachable(
         core_ctx,
@@ -1962,6 +2066,7 @@ pub fn send_icmpv6_address_unreachable<
         dst_ip,
         Icmpv6DestUnreachableCode::AddrUnreachable,
         original_packet,
+        marks,
     );
 }
 
@@ -1989,8 +2094,9 @@ pub(crate) fn send_icmpv4_protocol_unreachable<
     dst_ip: SocketIpAddr<Ipv4Addr>,
     original_packet: B,
     header_len: usize,
+    marks: &Marks,
 ) {
-    core_ctx.increment(|counters| &counters.protocol_unreachable);
+    core_ctx.counters().protocol_unreachable.increment();
 
     send_icmpv4_dest_unreachable(
         core_ctx,
@@ -2008,6 +2114,7 @@ pub(crate) fn send_icmpv4_protocol_unreachable<
         // different fragments of the same original packet, so we should behave as if we are
         // handling an initial fragment.
         Ipv4FragmentType::InitialFragment,
+        marks,
     );
 }
 
@@ -2033,8 +2140,9 @@ pub(crate) fn send_icmpv6_protocol_unreachable<
     dst_ip: SocketIpAddr<Ipv6Addr>,
     original_packet: B,
     header_len: usize,
+    marks: &Marks,
 ) {
-    core_ctx.increment(|counters| &counters.protocol_unreachable);
+    core_ctx.counters().protocol_unreachable.increment();
 
     send_icmpv6_parameter_problem(
         core_ctx,
@@ -2060,6 +2168,7 @@ pub(crate) fn send_icmpv6_protocol_unreachable<
         Icmpv6ParameterProblem::new(header_len as u32),
         original_packet,
         false,
+        marks,
     );
 }
 
@@ -2087,8 +2196,9 @@ pub(crate) fn send_icmpv4_port_unreachable<
     dst_ip: SocketIpAddr<Ipv4Addr>,
     original_packet: B,
     header_len: usize,
+    marks: &Marks,
 ) {
-    core_ctx.increment(|counters| &counters.port_unreachable);
+    core_ctx.counters().port_unreachable.increment();
 
     send_icmpv4_dest_unreachable(
         core_ctx,
@@ -2106,6 +2216,7 @@ pub(crate) fn send_icmpv4_port_unreachable<
         // of the same original packet, so we should behave as if we are handling an initial
         // fragment.
         Ipv4FragmentType::InitialFragment,
+        marks,
     );
 }
 
@@ -2129,8 +2240,9 @@ pub(crate) fn send_icmpv6_port_unreachable<
     src_ip: SocketIpAddr<Ipv6Addr>,
     dst_ip: SocketIpAddr<Ipv6Addr>,
     original_packet: B,
+    marks: &Marks,
 ) {
-    core_ctx.increment(|counters| &counters.port_unreachable);
+    core_ctx.counters().port_unreachable.increment();
 
     send_icmpv6_dest_unreachable(
         core_ctx,
@@ -2141,6 +2253,7 @@ pub(crate) fn send_icmpv6_port_unreachable<
         dst_ip,
         Icmpv6DestUnreachableCode::PortUnreachable,
         original_packet,
+        marks,
     );
 }
 
@@ -2170,8 +2283,9 @@ pub(crate) fn send_icmpv4_net_unreachable<
     original_packet: B,
     header_len: usize,
     fragment_type: Ipv4FragmentType,
+    marks: &Marks,
 ) {
-    core_ctx.increment(|counters| &counters.net_unreachable);
+    core_ctx.counters().net_unreachable.increment();
 
     // Check whether we MUST NOT send an ICMP error message
     // because the original packet was itself an ICMP error message.
@@ -2190,6 +2304,7 @@ pub(crate) fn send_icmpv4_net_unreachable<
         original_packet,
         header_len,
         fragment_type,
+        marks,
     );
 }
 
@@ -2217,8 +2332,9 @@ pub(crate) fn send_icmpv6_net_unreachable<
     proto: Ipv6Proto,
     original_packet: B,
     header_len: usize,
+    marks: &Marks,
 ) {
-    core_ctx.increment(|counters| &counters.net_unreachable);
+    core_ctx.counters().net_unreachable.increment();
 
     // Check whether we MUST NOT send an ICMP error message
     // because the original packet was itself an ICMP error message.
@@ -2235,6 +2351,7 @@ pub(crate) fn send_icmpv6_net_unreachable<
         dst_ip,
         Icmpv6DestUnreachableCode::NoRoute,
         original_packet,
+        marks,
     );
 }
 
@@ -2264,8 +2381,9 @@ pub(crate) fn send_icmpv4_ttl_expired<
     original_packet: B,
     header_len: usize,
     fragment_type: Ipv4FragmentType,
+    marks: &Marks,
 ) {
-    core_ctx.increment(|counters| &counters.ttl_expired);
+    core_ctx.counters().ttl_expired.increment();
 
     // Check whether we MUST NOT send an ICMP error message because the original
     // packet was itself an ICMP error message.
@@ -2285,6 +2403,7 @@ pub(crate) fn send_icmpv4_ttl_expired<
         original_packet,
         header_len,
         fragment_type,
+        marks,
     )
 }
 
@@ -2312,8 +2431,9 @@ pub(crate) fn send_icmpv6_ttl_expired<
     proto: Ipv6Proto,
     original_packet: B,
     header_len: usize,
+    marks: &Marks,
 ) {
-    core_ctx.increment(|counters| &counters.ttl_expired);
+    core_ctx.counters().ttl_expired.increment();
 
     // Check whether we MUST NOT send an ICMP error message because the
     // original packet was itself an ICMP error message.
@@ -2332,6 +2452,7 @@ pub(crate) fn send_icmpv6_ttl_expired<
         IcmpTimeExceeded::default(),
         original_packet,
         false, /* allow_dst_multicast */
+        marks,
     )
 }
 
@@ -2359,8 +2480,9 @@ pub(crate) fn send_icmpv6_packet_too_big<
     mtu: Mtu,
     original_packet: B,
     header_len: usize,
+    marks: &Marks,
 ) {
-    core_ctx.increment(|counters| &counters.packet_too_big);
+    core_ctx.counters().packet_too_big.increment();
     // Check whether we MUST NOT send an ICMP error message because the
     // original packet was itself an ICMP error message.
     if is_icmp_error_message::<Ipv6>(proto, &original_packet.as_ref()[header_len..]) {
@@ -2396,6 +2518,7 @@ pub(crate) fn send_icmpv6_packet_too_big<
         // Thus, we explicitly allow sending a Packet Too Big error if the
         // destination was a multicast packet.
         true, /* allow_dst_multicast */
+        marks,
     )
 }
 
@@ -2415,8 +2538,9 @@ pub(crate) fn send_icmpv4_parameter_problem<
     original_packet: B,
     header_len: usize,
     fragment_type: Ipv4FragmentType,
+    marks: &Marks,
 ) {
-    core_ctx.increment(|counters| &counters.parameter_problem);
+    core_ctx.counters().parameter_problem.increment();
 
     send_icmpv4_error_message(
         core_ctx,
@@ -2430,6 +2554,7 @@ pub(crate) fn send_icmpv4_parameter_problem<
         original_packet,
         header_len,
         fragment_type,
+        marks,
     )
 }
 
@@ -2458,6 +2583,7 @@ pub(crate) fn send_icmpv6_parameter_problem<
     parameter_problem: Icmpv6ParameterProblem,
     original_packet: B,
     allow_dst_multicast: bool,
+    marks: &Marks,
 ) {
     // Only allow the `allow_dst_multicast` parameter to be set if the code is
     // the unrecognized IPv6 option as that is one of the few exceptions where
@@ -2465,7 +2591,7 @@ pub(crate) fn send_icmpv6_parameter_problem<
     // a multicast address.
     assert!(!allow_dst_multicast || code == Icmpv6ParameterProblemCode::UnrecognizedIpv6Option);
 
-    core_ctx.increment(|counters| &counters.parameter_problem);
+    core_ctx.counters().parameter_problem.increment();
 
     send_icmpv6_error_message(
         core_ctx,
@@ -2478,6 +2604,7 @@ pub(crate) fn send_icmpv6_parameter_problem<
         parameter_problem,
         original_packet,
         allow_dst_multicast,
+        marks,
     )
 }
 
@@ -2496,8 +2623,9 @@ fn send_icmpv4_dest_unreachable<
     original_packet: B,
     header_len: usize,
     fragment_type: Ipv4FragmentType,
+    marks: &Marks,
 ) {
-    core_ctx.increment(|counters| &counters.dest_unreachable);
+    core_ctx.counters().dest_unreachable.increment();
     send_icmpv4_error_message(
         core_ctx,
         bindings_ctx,
@@ -2510,6 +2638,7 @@ fn send_icmpv4_dest_unreachable<
         original_packet,
         header_len,
         fragment_type,
+        marks,
     )
 }
 
@@ -2526,6 +2655,7 @@ fn send_icmpv6_dest_unreachable<
     dst_ip: SocketIpAddr<Ipv6Addr>,
     code: Icmpv6DestUnreachableCode,
     original_packet: B,
+    marks: &Marks,
 ) {
     send_icmpv6_error_message(
         core_ctx,
@@ -2538,6 +2668,7 @@ fn send_icmpv6_dest_unreachable<
         IcmpDestUnreachable::default(),
         original_packet,
         false, /* allow_dst_multicast */
+        marks,
     )
 }
 
@@ -2558,6 +2689,7 @@ fn send_icmpv4_error_message<
     mut original_packet: B,
     header_len: usize,
     fragment_type: Ipv4FragmentType,
+    marks: &Marks,
 ) {
     // TODO(https://fxbug.dev/42177876): Come up with rules for when to send ICMP
     // error messages.
@@ -2587,7 +2719,7 @@ fn send_icmpv4_error_message<
             None,
             original_src_ip,
             Ipv4Proto::Icmp,
-            &DefaultIpSocketOptions,
+            &WithMarks(marks),
             tx_metadata,
             |local_ip| {
                 original_packet.encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
@@ -2617,6 +2749,7 @@ fn send_icmpv6_error_message<
     message: M,
     original_packet: B,
     allow_dst_multicast: bool,
+    marks: &Marks,
 ) {
     // TODO(https://fxbug.dev/42177876): Come up with rules for when to send ICMP
     // error messages.
@@ -2630,14 +2763,19 @@ fn send_icmpv6_error_message<
         return;
     }
 
-    struct RestrictMtu;
-    impl OptionDelegationMarker for RestrictMtu {}
-    impl DelegatedSendOptions<Ipv6> for RestrictMtu {
+    struct Icmpv6ErrorOptions<'a>(&'a Marks);
+    impl<'a> OptionDelegationMarker for Icmpv6ErrorOptions<'a> {}
+    impl<'a> DelegatedSendOptions<Ipv6> for Icmpv6ErrorOptions<'a> {
         fn mtu(&self) -> Mtu {
             Ipv6::MINIMUM_LINK_MTU
         }
     }
-    impl DelegatedRouteResolutionOptions<Ipv6> for RestrictMtu {}
+    impl<'a> DelegatedRouteResolutionOptions<Ipv6> for Icmpv6ErrorOptions<'a> {
+        fn marks(&self) -> &Marks {
+            let Self(marks) = self;
+            marks
+        }
+    }
 
     let tx_metadata: BC::TxMetadata = Default::default();
     // TODO(https://fxbug.dev/42177877): Improve source address selection for ICMP
@@ -2651,7 +2789,7 @@ fn send_icmpv6_error_message<
             None,
             original_src_ip,
             Ipv6Proto::Icmpv6,
-            &RestrictMtu,
+            &Icmpv6ErrorOptions(marks),
             tx_metadata,
             |local_ip| {
                 let icmp_builder = IcmpPacketBuilder::<Ipv6, _>::new(
@@ -2873,7 +3011,7 @@ mod tests {
         set_logger_for_test, FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeInstant,
         FakeTxMetadata, FakeWeakDeviceId, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6,
     };
-    use netstack3_base::CtxPair;
+    use netstack3_base::{CtxPair, Uninstantiable};
     use packet::Buf;
     use packet_formats::icmp::mld::MldPacket;
     use packet_formats::ip::IpProto;
@@ -2957,20 +3095,20 @@ mod tests {
     impl<I: IpExt> IcmpStateContext for InnerIpSocketCtx<I> {}
 
     impl<I: IpExt> CounterContext<IcmpRxCounters<I>> for FakeIcmpCoreCtx<I> {
-        fn with_counters<O, F: FnOnce(&IcmpRxCounters<I>) -> O>(&self, cb: F) -> O {
-            cb(&self.icmp.rx_counters)
+        fn counters(&self) -> &IcmpRxCounters<I> {
+            &self.icmp.rx_counters
         }
     }
 
     impl<I: IpExt> CounterContext<IcmpTxCounters<I>> for FakeIcmpCoreCtx<I> {
-        fn with_counters<O, F: FnOnce(&IcmpTxCounters<I>) -> O>(&self, cb: F) -> O {
-            cb(&self.icmp.tx_counters)
+        fn counters(&self) -> &IcmpTxCounters<I> {
+            &self.icmp.tx_counters
         }
     }
 
     impl<I: IpExt> CounterContext<NdpCounters> for FakeIcmpCoreCtx<I> {
-        fn with_counters<O, F: FnOnce(&NdpCounters) -> O>(&self, cb: F) -> O {
-            cb(&self.icmp.ndp_counters)
+        fn counters(&self) -> &NdpCounters {
+            &self.icmp.ndp_counters
         }
     }
 
@@ -3019,7 +3157,7 @@ mod tests {
             original_body: &[u8],
             err: I::ErrorCode,
         ) {
-            self.increment(|counters: &IcmpRxCounters<I>| &counters.error);
+            CounterContext::<IcmpRxCounters<I>>::counters(self).error.increment();
             self.icmp.receive_icmp_error.push(err);
             if original_proto == I::ICMP_IP_PROTO {
                 receive_ip_transport_icmp_error(
@@ -3384,9 +3522,9 @@ mod tests {
     }
 
     impl Ipv6DeviceHandler<FakeIcmpBindingsCtx<Ipv6>> for FakeIcmpCoreCtx<Ipv6> {
-        type LinkLayerAddr = [u8; 0];
+        type LinkLayerAddr = Uninstantiable;
 
-        fn get_link_layer_addr_bytes(&mut self, _device_id: &Self::DeviceId) -> Option<[u8; 0]> {
+        fn get_link_layer_addr(&mut self, _device_id: &Self::DeviceId) -> Option<Uninstantiable> {
             unimplemented!()
         }
 
@@ -3443,13 +3581,14 @@ mod tests {
             unimplemented!()
         }
 
-        fn receive_mld_packet<B: SplitByteSlice>(
+        fn receive_mld_packet<B: SplitByteSlice, H: IpHeaderInfo<Ipv6>>(
             &mut self,
             _bindings_ctx: &mut FakeIcmpBindingsCtx<Ipv6>,
             _device: &FakeDeviceId,
             _src_ip: Ipv6SourceAddr,
             _dst_ip: SpecifiedAddr<Ipv6Addr>,
             _packet: MldPacket<B>,
+            _header_info: &H,
         ) {
             unimplemented!()
         }
@@ -4013,6 +4152,7 @@ mod tests {
                 Buf::new(&mut [], ..),
                 0,
                 Ipv4FragmentType::InitialFragment,
+                &Default::default(),
             );
         }
 
@@ -4032,6 +4172,7 @@ mod tests {
                 Buf::new(&mut [], ..),
                 0,
                 Ipv4FragmentType::InitialFragment,
+                &Default::default(),
             );
         }
 
@@ -4050,6 +4191,7 @@ mod tests {
                 Buf::new(&mut [], ..),
                 0,
                 Ipv4FragmentType::InitialFragment,
+                &Default::default(),
             );
         }
 
@@ -4067,6 +4209,7 @@ mod tests {
                 IpProto::Udp.into(),
                 Buf::new(&mut [], ..),
                 0,
+                &Default::default(),
             );
         }
 
@@ -4085,6 +4228,7 @@ mod tests {
                 Mtu::new(0),
                 Buf::new(&mut [], ..),
                 0,
+                &Default::default(),
             );
         }
 
@@ -4103,6 +4247,7 @@ mod tests {
                 Icmpv6ParameterProblem::new(0),
                 Buf::new(&mut [], ..),
                 false,
+                &Default::default(),
             );
         }
 
@@ -4119,6 +4264,7 @@ mod tests {
                 TEST_ADDRS_V6.local_ip.try_into().unwrap(),
                 Icmpv6DestUnreachableCode::NoRoute,
                 Buf::new(&mut [], ..),
+                &Default::default(),
             );
         }
 

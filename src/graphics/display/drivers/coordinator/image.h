@@ -9,17 +9,16 @@
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
-#include <atomic>
-
 #include <fbl/intrusive_container_utils.h>
 #include <fbl/intrusive_double_list.h>
+#include <fbl/mutex.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 
 #include "src/graphics/display/drivers/coordinator/client-id.h"
-#include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
@@ -29,22 +28,6 @@ namespace display_coordinator {
 class Controller;
 
 // An Image is a reference to an imported sysmem pixel buffer.
-// and the state machine (hereafter ImageUse) for tracking its use as part of a config.
-//
-// ImageUse can be NOT_READY, READY, ACQUIRED, or PRESENTED.
-//   NOT_READY: initial state, transitions to READY when wait_event is null or signaled.
-//              When returning to NOT_READY via EarlyRetire, the signal_fence will fire.
-//   READY: the related ImageRef is ready for use. Controller::ApplyConfig may request a
-//          move to ACQUIRED (Acquire) or NOT_READY (EarlyRetire) because another ImageUse
-//          was ACQUIRED instead.
-//   ACQUIRED: this image will be used on the next display flip. Transitions to PRESENTED
-//             when the display hardware reports it in OnVsync.
-//   PRESENTED: this image has been observed in OnVsync. Transitions to NOT_READY when
-//              the Controller determines that a new ImageUse has been PRESENTED and
-//              this one can be retired.
-//
-// One special transition exists: upon the owning Client's death/disconnection, the
-// ImageUse will move from ACQUIRED to NOT_READY.
 class Image : public fbl::RefCounted<Image>,
               public IdMappable<fbl::RefPtr<Image>, display::ImageId> {
  private:
@@ -68,8 +51,14 @@ class Image : public fbl::RefCounted<Image>,
                                                  fbl::SizeOrder::N, DefaultDoublyLinkedListTraits>;
 
   // `controller` must be non-null, and must outlive the Image.
-  Image(Controller* controller, const display::ImageMetadata& metadata,
+  Image(Controller* controller, const display::ImageMetadata& metadata, display::ImageId id,
         display::DriverImageId driver_id, inspect::Node* parent_node, ClientId client_id);
+
+  Image(const Image&) = delete;
+  Image(Image&&) = delete;
+  Image& operator=(const Image&) = delete;
+  Image& operator=(Image&&) = delete;
+
   ~Image();
 
   display::DriverImageId driver_id() const { return driver_id_; }
@@ -78,17 +67,25 @@ class Image : public fbl::RefCounted<Image>,
   // The client that owns the image.
   ClientId client_id() const { return client_id_; }
 
-  void set_latest_controller_config_stamp(display::ConfigStamp stamp) {
-    latest_controller_config_stamp_ = stamp;
+  void set_latest_driver_config_stamp(display::DriverConfigStamp driver_config_stamp) {
+    latest_driver_config_stamp_ = driver_config_stamp;
   }
-  display::ConfigStamp latest_controller_config_stamp() const {
-    return latest_controller_config_stamp_;
+  display::DriverConfigStamp latest_driver_config_stamp() const {
+    return latest_driver_config_stamp_;
   }
 
   void set_latest_client_config_stamp(display::ConfigStamp stamp) {
     latest_client_config_stamp_ = stamp;
   }
   display::ConfigStamp latest_client_config_stamp() const { return latest_client_config_stamp_; }
+
+  // Disposed images do not release engine driver-side resources on destruction.
+  //
+  // This state is necessary for safely shutting down an engine driver. When
+  // that happens, the driver may still be presenting some images. We want to
+  // clear out our data structures, but cannot call ReleaseImage() on those
+  // images.
+  void MarkDisposed() { disposed_ = true; }
 
   // Aliases controller_.mtx() for the purpose of thread-safety analysis.
   fbl::Mutex* mtx() const;
@@ -133,8 +130,8 @@ class Image : public fbl::RefCounted<Image>,
   Controller& controller_;
   const ClientId client_id_;
 
-  // Stamp of the latest Controller display configuration that uses this image.
-  display::ConfigStamp latest_controller_config_stamp_ = display::kInvalidConfigStamp;
+  // Stamp of the latest applied display configuration that uses this image.
+  display::DriverConfigStamp latest_driver_config_stamp_ = display::kInvalidDriverConfigStamp;
 
   // Stamp of the latest display configuration in Client (the DisplayController
   // FIDL service) that uses this image.
@@ -144,6 +141,9 @@ class Image : public fbl::RefCounted<Image>,
   // a client configuration sets a new layer image but the new image is not
   // ready yet, so the controller has to keep using the old image.
   display::ConfigStamp latest_client_config_stamp_ = display::kInvalidConfigStamp;
+
+  // If true, ReleaseImage() will not be called on image destruction.
+  bool disposed_ = false;
 
   inspect::Node node_;
   inspect::ValueList properties_;

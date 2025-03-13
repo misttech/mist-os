@@ -209,7 +209,6 @@ def setup_clang_repository(constants):
         name = "cc-linker-prebuilts",
         srcs = [
             "//:bin/clang",
-            "//:bin/clang++",
             "//:bin/ld.lld",
             "//:bin/ld64.lld",
             "//:bin/lld",

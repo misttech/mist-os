@@ -440,7 +440,7 @@ struct Equality<::test::placementofattributes::ExampleTable> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::placementofattributes::ExampleUnion> : public std::true_type{};
+struct IsFidlXUnion<::test::placementofattributes::ExampleUnion> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::placementofattributes::ExampleUnion>

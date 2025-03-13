@@ -22,6 +22,9 @@ tests = [
     err_logs = true
   },
   {
+    label = "ndp"
+  },
+  {
     label = "neighbor"
   },
   {

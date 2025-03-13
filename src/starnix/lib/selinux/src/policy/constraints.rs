@@ -369,6 +369,41 @@ mod tests {
     use super::*;
     use crate::policy::{find_class_by_name, parse_policy_by_reference};
 
+    fn normalize_context_expr(expr: ContextExpression) -> ContextExpression {
+        let (left, right) = match expr.operator {
+            ContextOperator::Dominates | ContextOperator::DominatedBy => (expr.left, expr.right),
+            ContextOperator::Equal | ContextOperator::NotEqual | ContextOperator::Incomparable => {
+                match (&expr.left, &expr.right) {
+                    (ContextOperand::UserId(left), ContextOperand::UserId(right)) => (
+                        ContextOperand::UserId(std::cmp::min(*left, *right)),
+                        ContextOperand::UserId(std::cmp::max(*left, *right)),
+                    ),
+                    (ContextOperand::TypeId(left), ContextOperand::TypeId(right)) => (
+                        ContextOperand::TypeId(std::cmp::min(*left, *right)),
+                        ContextOperand::TypeId(std::cmp::max(*left, *right)),
+                    ),
+                    (ContextOperand::RoleId(left), ContextOperand::RoleId(right)) => (
+                        ContextOperand::RoleId(std::cmp::min(*left, *right)),
+                        ContextOperand::RoleId(std::cmp::max(*left, *right)),
+                    ),
+                    _ => (expr.left, expr.right),
+                }
+            }
+        };
+        ContextExpression { operator: expr.operator, left, right }
+    }
+
+    fn normalize(expr: Vec<ConstraintNode>) -> Vec<ConstraintNode> {
+        expr.into_iter()
+            .map(|node| match node {
+                ConstraintNode::Leaf(context_expr) => {
+                    ConstraintNode::Leaf(normalize_context_expr(context_expr))
+                }
+                ConstraintNode::Branch(_) => node,
+            })
+            .collect()
+    }
+
     #[test]
     fn decode_constraint_expr() {
         let policy_bytes = include_bytes!("../../testdata/micro_policies/constraints_policy.pp");
@@ -395,7 +430,7 @@ mod tests {
             .iter()
             .map(|x| ConstraintNode::try_from_constraint_term(x, &source, &target))
             .collect();
-        assert!(result.is_ok());
+        let constraint_nodes = normalize(result.expect("decode constraint terms"));
         let expected = vec![
             // ( u2 == { user0 user1 } )
             ConstraintNode::Leaf(ContextExpression {
@@ -434,7 +469,7 @@ mod tests {
             ConstraintNode::Branch(BooleanOperator::Or),
         ];
 
-        assert_eq!(result.unwrap(), expected)
+        assert_eq!(constraint_nodes, expected)
     }
 
     #[test]

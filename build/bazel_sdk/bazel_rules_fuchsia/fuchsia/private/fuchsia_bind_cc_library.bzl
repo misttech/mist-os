@@ -7,11 +7,10 @@
 load("@bazel_skylib//lib:paths.bzl", "paths")
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load(":providers.bzl", "FuchsiaBindLibraryInfo")
-load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
+load(":fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def _codegen_impl(ctx):
-    sdk = get_fuchsia_sdk_toolchain(ctx)
-    bindc = sdk.bindc
+    bindc = get_fuchsia_sdk_toolchain(ctx).bindc
     base_path = ctx.attr.name
     name = ctx.attr.library[FuchsiaBindLibraryInfo].name.replace(".", "/").replace("_bindlib", "")
     bind_source = ctx.attr.library[DefaultInfo].files.to_list()[0]
@@ -41,9 +40,6 @@ def _codegen_impl(ctx):
 _codegen = rule(
     implementation = _codegen_impl,
     toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
-    # Files must be generated in genfiles in order for the header to be included
-    # anywhere.
-    output_to_genfiles = True,
     attrs = {
         "library": attr.label(
             doc = "The bind library to generate code for",

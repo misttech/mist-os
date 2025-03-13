@@ -11,11 +11,6 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "#archivist",
-            to: "#tee",
-        },
-        {
             dictionary: "diagnostics",
             from: "self",
             to: "#tee",
@@ -23,6 +18,11 @@
         {
             protocol: [ "fuchsia.vsock.Connector" ],
             from: "#vsock",
+            to: "#tee",
+        },
+        {
+            service: [ "fuchsia.hardware.virtio.pmem.Service" ],
+            from: "#boot-drivers",
             to: "#tee",
         },
     ],

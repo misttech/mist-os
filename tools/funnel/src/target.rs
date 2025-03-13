@@ -65,7 +65,7 @@ impl IntoExitCode for ChooseTargetError {
             Self::OutOfRangeChoice(_) => 83,
             Self::InvalidChoice(_) => 84,
             Self::CollectionError(_) => 85,
-            Self::IoError(e) => e.raw_os_error().unwrap_or_else(|| 86),
+            Self::IoError(e) => e.raw_os_error().unwrap_or(86),
         }
     }
 }
@@ -132,7 +132,7 @@ where
         return Err(ChooseTargetError::OutOfRangeChoice(idx));
     }
 
-    targets.get(idx).ok_or_else(|| ChooseTargetError::CollectionError(idx)).cloned()
+    targets.get(idx).ok_or(ChooseTargetError::CollectionError(idx)).cloned()
 }
 
 #[cfg(test)]

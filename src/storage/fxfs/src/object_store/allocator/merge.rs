@@ -36,13 +36,17 @@ pub fn merge(
             return MergeResult::Other {
                 emit: None,
                 left: Discard,
-                right: Replace(Item {
-                    key: AllocatorKey {
-                        device_range: left.key().device_range.start..right.key().device_range.end,
-                    },
-                    value: left.value().clone(),
-                    sequence: std::cmp::min(left.sequence(), right.sequence()),
-                }),
+                right: Replace(
+                    Item {
+                        key: AllocatorKey {
+                            device_range: left.key().device_range.start
+                                ..right.key().device_range.end,
+                        },
+                        value: left.value().clone(),
+                        sequence: std::cmp::min(left.sequence(), right.sequence()),
+                    }
+                    .boxed(),
+                ),
             };
         } else {
             return MergeResult::EmitLeft;
@@ -62,14 +66,17 @@ pub fn merge(
                     right: if left.key().device_range.end == right.key().device_range.end {
                         Discard
                     } else {
-                        Replace(Item {
-                            key: AllocatorKey {
-                                device_range: left.key().device_range.end
-                                    ..right.key().device_range.end,
-                            },
-                            value: right.value().clone(),
-                            sequence: right.sequence(),
-                        })
+                        Replace(
+                            Item {
+                                key: AllocatorKey {
+                                    device_range: left.key().device_range.end
+                                        ..right.key().device_range.end,
+                                },
+                                value: right.value().clone(),
+                                sequence: right.sequence(),
+                            }
+                            .boxed(),
+                        )
                     },
                 };
             } else {
@@ -89,14 +96,17 @@ pub fn merge(
                     left: if right.key().device_range.end == left.key().device_range.end {
                         Discard
                     } else {
-                        Replace(Item {
-                            key: AllocatorKey {
-                                device_range: right.key().device_range.end
-                                    ..left.key().device_range.end,
-                            },
-                            value: left.value().clone(),
-                            sequence: left.sequence(),
-                        })
+                        Replace(
+                            Item {
+                                key: AllocatorKey {
+                                    device_range: right.key().device_range.end
+                                        ..left.key().device_range.end,
+                                },
+                                value: left.value().clone(),
+                                sequence: left.sequence(),
+                            }
+                            .boxed(),
+                        )
                     },
                     right: Keep,
                 };
@@ -112,20 +122,26 @@ pub fn merge(
      */
     debug_assert!(left.key().device_range.end >= right.key().device_range.start);
     MergeResult::Other {
-        emit: Some(Item {
-            key: AllocatorKey {
-                device_range: left.key().device_range.start..right.key().device_range.start,
-            },
-            value: left.value().clone(),
-            sequence: left.sequence(),
-        }),
-        left: Replace(Item {
-            key: AllocatorKey {
-                device_range: right.key().device_range.start..left.key().device_range.end,
-            },
-            value: left.value().clone(),
-            sequence: left.sequence(),
-        }),
+        emit: Some(
+            Item {
+                key: AllocatorKey {
+                    device_range: left.key().device_range.start..right.key().device_range.start,
+                },
+                value: left.value().clone(),
+                sequence: left.sequence(),
+            }
+            .boxed(),
+        ),
+        left: Replace(
+            Item {
+                key: AllocatorKey {
+                    device_range: right.key().device_range.start..left.key().device_range.end,
+                },
+                value: left.value().clone(),
+                sequence: left.sequence(),
+            }
+            .boxed(),
+        ),
         right: Keep,
     }
 }

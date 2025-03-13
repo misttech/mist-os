@@ -7,7 +7,7 @@
 use anyhow::{anyhow, bail, Result};
 use argh::{ArgsInfo, FromArgs};
 use blocking::Unblock;
-use fho::SimpleWriter;
+use ffx_writer::SimpleWriter;
 use futures::future::FutureExt;
 use futures::join;
 use nix::unistd::dup;

@@ -2,61 +2,129 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <inttypes.h>
 #include <lib/virtio/backends/pci.h>
 #include <zircon/syscalls/types.h>
 
-#include <fbl/auto_lock.h>
+#include <mutex>
+
 #include <virtio/virtio.h>
 
 #include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
+#if defined(__x86_64__) || defined(__i386__)
+static inline uint8_t inp(uint16_t _port) {
+  uint8_t rv;
+  __asm__ __volatile__("inb %1, %0" : "=a"(rv) : "d"(_port));
+  return (rv);
+}
+
+static inline uint16_t inpw(uint16_t _port) {
+  uint16_t rv;
+  __asm__ __volatile__("inw %1, %0" : "=a"(rv) : "d"(_port));
+  return (rv);
+}
+
+static inline uint32_t inpd(uint16_t _port) {
+  uint32_t rv;
+  __asm__ __volatile__("inl %1, %0" : "=a"(rv) : "d"(_port));
+  return (rv);
+}
+
+static inline void outp(uint16_t _port, uint8_t _data) {
+  __asm__ __volatile__("outb %1, %0" : : "d"(_port), "a"(_data));
+}
+
+static inline void outpw(uint16_t _port, uint16_t _data) {
+  __asm__ __volatile__("outw %1, %0" : : "d"(_port), "a"(_data));
+}
+
+static inline void outpd(uint16_t _port, uint32_t _data) {
+  __asm__ __volatile__("outl %1, %0" : : "d"(_port), "a"(_data));
+}
+#else
+static inline uint8_t inp(uint16_t _port) { return 0; }
+static inline uint16_t inpw(uint16_t _port) { return 0; }
+static inline uint32_t inpd(uint16_t _port) { return 0; }
+static inline void outp(uint16_t _port, uint8_t _data) {}
+static inline void outpw(uint16_t _port, uint16_t _data) {}
+static inline void outpd(uint16_t _port, uint32_t _data) {}
+#endif
+
 namespace virtio {
 
+void PciLegacyIoInterface::Read(uint16_t offset, uint8_t* val) const {
+  *val = inp(static_cast<uint16_t>(offset));
+}
+void PciLegacyIoInterface::Read(uint16_t offset, uint16_t* val) const {
+  *val = inpw(static_cast<uint16_t>(offset));
+}
+void PciLegacyIoInterface::Read(uint16_t offset, uint32_t* val) const {
+  *val = inpd(static_cast<uint16_t>(offset));
+}
+void PciLegacyIoInterface::Write(uint16_t offset, uint8_t val) const {
+  outp(static_cast<uint16_t>(offset), val);
+}
+void PciLegacyIoInterface::Write(uint16_t offset, uint16_t val) const {
+  outpw(static_cast<uint16_t>(offset), val);
+}
+void PciLegacyIoInterface::Write(uint16_t offset, uint32_t val) const {
+  outpd(static_cast<uint16_t>(offset), val);
+}
+
 zx_status_t PciLegacyBackend::Init() {
-  fbl::AutoLock guard(&lock());
-  fidl::Arena arena;
-  fuchsia_hardware_pci::wire::Bar bar0;
-  zx_status_t status = pci().GetBar(arena, 0u, &bar0);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: Couldn't get IO bar for device: %s", tag(), zx_status_get_string(status));
-    return status;
+  std::lock_guard guard(lock());
+  fidl::Result result = fidl::Call(pci())->GetBar(0u);
+  if (result.is_error()) {
+    zxlogf(ERROR, "%s: Couldn't get IO bar for device: %s", tag(),
+           result.error_value().FormatDescription().c_str());
+    if (result.error_value().is_domain_error()) {
+      return result.error_value().domain_error();
+    }
+    return result.error_value().framework_error().status();
   }
 
-  if (!bar0.result.is_io()) {
+  auto& bar0 = result->result();
+
+  if (bar0.result().Which() != fuchsia_hardware_pci::BarResult::Tag::kIo) {
     return ZX_ERR_WRONG_TYPE;
   }
 
   bar0_base_ =
-      static_cast<uint16_t>(bar0.result.io().address & std::numeric_limits<uint16_t>::max());
+      static_cast<uint16_t>(bar0.result().io()->address() & std::numeric_limits<uint16_t>::max());
+
+  zx_status_t status = zx_ioports_request(bar0.result().io()->resource().get(), bar0_base_,
+                                          static_cast<uint32_t>(bar0.size()));
+  if (status != ZX_OK) {
+    return status;
+  }
 
   device_cfg_offset_ = bar0_base_ + ((irq_mode() == fuchsia_hardware_pci::InterruptMode::kMsiX)
                                          ? VIRTIO_PCI_CONFIG_OFFSET_MSIX
                                          : VIRTIO_PCI_CONFIG_OFFSET_NOMSIX);
   zxlogf(DEBUG, "%s: using legacy backend (io base = %#04x, io size = %#04zx, device base = %#04x)",
-         tag(), bar0_base_, bar0.size, device_cfg_offset_);
+         tag(), bar0_base_, bar0.size(), device_cfg_offset_);
 
   return ZX_OK;
 }
 
 // value pointers are used to maintain type safety with field width
 void PciLegacyBackend::ReadDeviceConfig(uint16_t offset, uint8_t* value) {
-  fbl::AutoLock guard(&lock());
+  std::lock_guard guard(lock());
   legacy_io_->Read(static_cast<uint16_t>(device_cfg_offset_ + offset), value);
 }
 
 void PciLegacyBackend::ReadDeviceConfig(uint16_t offset, uint16_t* value) {
-  fbl::AutoLock guard(&lock());
+  std::lock_guard guard(lock());
   legacy_io_->Read(static_cast<uint16_t>(device_cfg_offset_ + offset), value);
 }
 
 void PciLegacyBackend::ReadDeviceConfig(uint16_t offset, uint32_t* value) {
-  fbl::AutoLock guard(&lock());
+  std::lock_guard guard(lock());
   legacy_io_->Read(static_cast<uint16_t>(device_cfg_offset_ + offset), value);
 }
 
 void PciLegacyBackend::ReadDeviceConfig(uint16_t offset, uint64_t* value) {
-  fbl::AutoLock guard(&lock());
+  std::lock_guard guard(lock());
   auto val = reinterpret_cast<uint32_t*>(value);
 
   legacy_io_->Read(static_cast<uint16_t>(device_cfg_offset_ + offset), &val[0]);
@@ -64,21 +132,21 @@ void PciLegacyBackend::ReadDeviceConfig(uint16_t offset, uint64_t* value) {
 }
 
 void PciLegacyBackend::WriteDeviceConfig(uint16_t offset, uint8_t value) {
-  fbl::AutoLock guard(&lock());
+  std::lock_guard guard(lock());
   legacy_io_->Write(static_cast<uint16_t>(device_cfg_offset_ + offset), value);
 }
 
 void PciLegacyBackend::WriteDeviceConfig(uint16_t offset, uint16_t value) {
-  fbl::AutoLock guard(&lock());
+  std::lock_guard guard(lock());
   legacy_io_->Write(static_cast<uint16_t>(device_cfg_offset_ + offset), value);
 }
 
 void PciLegacyBackend::WriteDeviceConfig(uint16_t offset, uint32_t value) {
-  fbl::AutoLock guard(&lock());
+  std::lock_guard guard(lock());
   legacy_io_->Write(static_cast<uint16_t>(device_cfg_offset_ + offset), value);
 }
 void PciLegacyBackend::WriteDeviceConfig(uint16_t offset, uint64_t value) {
-  fbl::AutoLock guard(&lock());
+  std::lock_guard guard(lock());
   auto words = reinterpret_cast<uint32_t*>(&value);
   legacy_io_->Write(static_cast<uint16_t>(device_cfg_offset_ + offset), words[0]);
   legacy_io_->Write(static_cast<uint16_t>(device_cfg_offset_ + offset + sizeof(uint32_t)),
@@ -87,7 +155,7 @@ void PciLegacyBackend::WriteDeviceConfig(uint16_t offset, uint64_t value) {
 
 // Get the ring size of a specific index
 uint16_t PciLegacyBackend::GetRingSize(uint16_t index) {
-  fbl::AutoLock guard(&lock());
+  std::lock_guard guard(lock());
   uint16_t val;
   legacy_io_->Write(bar0_base_ + VIRTIO_PCI_QUEUE_SELECT, index);
   legacy_io_->Read(bar0_base_ + VIRTIO_PCI_QUEUE_SIZE, &val);
@@ -98,7 +166,7 @@ uint16_t PciLegacyBackend::GetRingSize(uint16_t index) {
 // Set up ring descriptors with the backend.
 zx_status_t PciLegacyBackend::SetRing(uint16_t index, uint16_t count, zx_paddr_t pa_desc,
                                       zx_paddr_t pa_avail, zx_paddr_t pa_used) {
-  fbl::AutoLock guard(&lock());
+  std::lock_guard guard(lock());
   // Virtio 1.0 section 2.4.2
   legacy_io_->Write(bar0_base_ + VIRTIO_PCI_QUEUE_SELECT, index);
   legacy_io_->Write(bar0_base_ + VIRTIO_PCI_QUEUE_SIZE, count);
@@ -127,13 +195,13 @@ zx_status_t PciLegacyBackend::SetRing(uint16_t index, uint16_t count, zx_paddr_t
 }
 
 void PciLegacyBackend::RingKick(uint16_t ring_index) {
-  fbl::AutoLock guard(&lock());
+  std::lock_guard guard(lock());
   legacy_io_->Write(bar0_base_ + VIRTIO_PCI_QUEUE_NOTIFY, ring_index);
   zxlogf(TRACE, "%s: kicked ring %u", tag(), ring_index);
 }
 
 uint64_t PciLegacyBackend::ReadFeatures() {
-  fbl::AutoLock guard(&lock());
+  std::lock_guard guard(lock());
   uint32_t val;
   legacy_io_->Read(bar0_base_ + VIRTIO_PCI_DEVICE_FEATURES, &val);
   // Legacy PCI back-end can only support one feature word.
@@ -144,7 +212,7 @@ void PciLegacyBackend::SetFeatures(uint64_t bitmap) {
   // Legacy PCI back-end can only support one feature word.
   const uint32_t truncated_bitmap = bitmap & UINT32_MAX;
 
-  fbl::AutoLock guard(&lock());
+  std::lock_guard guard(lock());
   uint32_t val;
   legacy_io_->Read(bar0_base_ + VIRTIO_PCI_DRIVER_FEATURES, &val);
   legacy_io_->Write(bar0_base_ + VIRTIO_PCI_DRIVER_FEATURES, val | truncated_bitmap);
@@ -156,13 +224,13 @@ void PciLegacyBackend::SetFeatures(uint64_t bitmap) {
 zx_status_t PciLegacyBackend::ConfirmFeatures() { return ZX_OK; }
 
 void PciLegacyBackend::DeviceReset() {
-  fbl::AutoLock guard(&lock());
+  std::lock_guard guard(lock());
   legacy_io_->Write(bar0_base_ + VIRTIO_PCI_DEVICE_STATUS, 0u);
   zxlogf(TRACE, "%s: device reset", tag());
 }
 
 void PciLegacyBackend::WaitForDeviceReset() {
-  fbl::AutoLock guard(&lock());
+  std::lock_guard guard(lock());
   uint8_t status = 0xFF;
   while (status != 0) {
     legacy_io_->Read(bar0_base_ + VIRTIO_PCI_DEVICE_STATUS, &status);
@@ -171,7 +239,7 @@ void PciLegacyBackend::WaitForDeviceReset() {
 }
 
 void PciLegacyBackend::SetStatusBits(uint8_t bits) {
-  fbl::AutoLock guard(&lock());
+  std::lock_guard guard(lock());
   uint8_t status;
   legacy_io_->Read(bar0_base_ + VIRTIO_PCI_DEVICE_STATUS, &status);
   legacy_io_->Write(bar0_base_ + VIRTIO_PCI_DEVICE_STATUS, static_cast<uint8_t>(status | bits));
@@ -188,7 +256,7 @@ void PciLegacyBackend::DriverStatusOk() {
 }
 
 uint32_t PciLegacyBackend::IsrStatus() {
-  fbl::AutoLock guard(&lock());
+  std::lock_guard guard(lock());
   uint8_t isr_status;
   legacy_io_->Read(bar0_base_ + VIRTIO_PCI_ISR_STATUS, &isr_status);
   return isr_status & (VIRTIO_ISR_QUEUE_INT | VIRTIO_ISR_DEV_CFG_INT);

@@ -1,8 +1,7 @@
 # escher-flatland
 
 This is a minimal example to demonstrate initializing Escher in a component which uses Flatland to
-display itself.  The use of Flatland and sysmem are encapsulated within the Vulkan swapchain, which
-is provided by the `VK_LAYER_FUCHSIA_imagepipe_swapchain` layer.
+display itself using the [escher_flatland](//src/ui/lib/escher/escher_flatland/README.md) library.
 
 To launch:
 ```

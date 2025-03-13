@@ -248,6 +248,30 @@ def compute_clang_features(host_os, host_cpu, target_os, target_cpu):
         name = "dbg",
     )
 
+    # Ensure clang uses C++ mode when invoked for C++ compilation actions.
+    # This affects various search directories during compilation and linking.
+    # Moreover, this makes libc++ an implicit dependency at link-time.
+    # See https://fxbug.dev/400927814
+    clang_driver_mode_cxx_feature = feature(
+        name = "clang_driver_mode_cxx",
+        enabled = True,
+        flag_sets = [
+            flag_set(
+                # Regretably, Bazel does not differentiate C-only and C++ link
+                # actions, so this flag will be applied to both cases
+                # indiscriminately.
+                actions = _all_cpp_compile_actions + _all_link_actions,
+                flag_groups = [
+                    flag_group(
+                        flags = [
+                            "--driver-mode=g++",
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
+
     static_cpp_standard_library_feature = feature(
         name = "static_cpp_standard_library",
         flag_sets = [
@@ -256,7 +280,6 @@ def compute_clang_features(host_os, host_cpu, target_os, target_cpu):
                 flag_groups = [
                     flag_group(
                         flags = [
-                            "-stdlib=libc++",
                             "-unwindlib=libunwind",
                             "-static-libstdc++",
                             "-static-libgcc",
@@ -274,6 +297,7 @@ def compute_clang_features(host_os, host_cpu, target_os, target_cpu):
         generate_linkmap_feature,
         ml_inliner_feature,
         opt_feature,
+        clang_driver_mode_cxx_feature,
         static_cpp_standard_library_feature,
     ] + sanitizer_features
 
@@ -401,7 +425,7 @@ def _prebuilt_clang_cc_toolchain_config_impl(ctx):
     tool_paths = [
         tool_path(name = "ar", path = "bin/llvm-ar"),
         tool_path(name = "cpp", path = "bin/cpp"),
-        tool_path(name = "gcc", path = "bin/clang++"),
+        tool_path(name = "gcc", path = "bin/clang"),
         tool_path(name = "gcov", path = "/usr/bin/false"),
         tool_path(name = "gcov-tool", path = "/usr/bin/false"),
         tool_path(name = "ld", path = "bin/llvm-ld"),

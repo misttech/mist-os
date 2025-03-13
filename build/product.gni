@@ -7,13 +7,6 @@ declare_args() {
   # one or the bringup one?
   use_bringup_assembly = false
 
-  # A list of binary host tool labels to also build.
-  product_host_labels = []
-
-  # A list of packages to be included in the bootfs as
-  # meta.fars and content-id'd blobs.
-  product_bootfs_packages = []
-
   # A human readable product description.
   product_description = ""
 
@@ -48,4 +41,9 @@ declare_args() {
   # NOTE: These targets are for GN metadata walk only. If the artifacts need to
   # be built, they should be included in the build graph through other means.
   cipd_assembly_artifact_targets = [ "//build/images:main_assembly" ]
+
+  # List of product_bundle_test_group() targets.
+  # We declare them in the top-level BUILD.gn so that the generated_file()s
+  # within get resolved at gn-gen time.
+  product_bundle_test_groups = []
 }

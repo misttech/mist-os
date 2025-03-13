@@ -1127,7 +1127,7 @@ struct Equality<::test::bindingsdenylist::DenyEachBinding_OnlyDenyDart_Response>
   }
 };
 template <>
-struct IsFidlXUnion<::test::bindingsdenylist::DenyEachBinding_OnlyDenyDart_Result> : public std::true_type{};
+struct IsFidlXUnion<::test::bindingsdenylist::DenyEachBinding_OnlyDenyDart_Result> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::bindingsdenylist::DenyEachBinding_OnlyDenyDart_Result>
@@ -1228,7 +1228,7 @@ struct Equality<::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Response> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Result> : public std::true_type{};
+struct IsFidlXUnion<::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Result> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Result>
@@ -1329,7 +1329,7 @@ struct Equality<::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Resp
   }
 };
 template <>
-struct IsFidlXUnion<::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result> : public std::true_type{};
+struct IsFidlXUnion<::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result>
@@ -1430,7 +1430,7 @@ struct Equality<::test::bindingsdenylist::DenyEachBinding_OnlyDenyRust_Response>
   }
 };
 template <>
-struct IsFidlXUnion<::test::bindingsdenylist::DenyEachBinding_OnlyDenyRust_Result> : public std::true_type{};
+struct IsFidlXUnion<::test::bindingsdenylist::DenyEachBinding_OnlyDenyRust_Result> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::bindingsdenylist::DenyEachBinding_OnlyDenyRust_Result>
@@ -1531,7 +1531,7 @@ struct Equality<::test::bindingsdenylist::DenyEachBinding_OnlyDenySyzkaller_Resp
   }
 };
 template <>
-struct IsFidlXUnion<::test::bindingsdenylist::DenyEachBinding_OnlyDenySyzkaller_Result> : public std::true_type{};
+struct IsFidlXUnion<::test::bindingsdenylist::DenyEachBinding_OnlyDenySyzkaller_Result> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::bindingsdenylist::DenyEachBinding_OnlyDenySyzkaller_Result>

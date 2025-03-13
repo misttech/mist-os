@@ -5,6 +5,7 @@
 #![cfg(test)]
 
 use assert_matches::assert_matches;
+use diagnostics_assertions::AnyUintProperty;
 use fidl::endpoints;
 use fidl_fuchsia_net_dhcp::{
     self as fnet_dhcp, ClientEvent, ClientExitReason, ClientMarker, ClientProviderMarker,
@@ -17,7 +18,9 @@ use futures::future::ready;
 use futures::{join, FutureExt, StreamExt, TryStreamExt};
 use netemul::RealmUdpSocket as _;
 use netstack_testing_common::interfaces::TestInterfaceExt as _;
-use netstack_testing_common::realms::{KnownServiceProvider, Netstack, TestSandboxExt as _};
+use netstack_testing_common::realms::{
+    KnownServiceProvider, Netstack, Netstack3, TestSandboxExt as _,
+};
 use netstack_testing_common::{annotate, dhcpv4 as dhcpv4_helper};
 use netstack_testing_macros::netstack_test;
 use std::pin::pin;
@@ -942,6 +945,204 @@ async fn client_handles_address_removal<N: Netstack>(
             prefix_len: dhcpv4_helper::DEFAULT_TEST_ADDRESS_POOL_PREFIX_LENGTH.get(),
         }
     );
+
+    assert_client_shutdown(client, address_state_provider).await;
+}
+
+#[fuchsia::test]
+async fn inspect_with_lease_acquired() {
+    let name = "inspect_with_lease_acquired";
+    let sandbox: netemul::TestSandbox = netemul::TestSandbox::new().unwrap();
+    let test_realm @ DhcpTestRealm {
+        client_realm,
+        client_iface,
+        server_realm: _,
+        server_iface: _,
+        _network: _,
+    } = &create_test_realm::<Netstack3>(&sandbox, name).await;
+
+    test_realm.start_dhcp_server(DhcpServerAddress::Primary).await;
+
+    let provider =
+        client_realm.connect_to_protocol::<ClientProviderMarker>().expect("connect should succeed");
+
+    let client = provider.new_client_ext(
+        client_iface.id().try_into().expect("should be nonzero"),
+        fnet_dhcp_ext::default_new_client_params(),
+    );
+
+    let config_stream = fnet_dhcp_ext::configuration_stream(client.clone()).fuse();
+    let mut config_stream = pin!(config_stream);
+
+    let fnet_dhcp_ext::Configuration { address, dns_servers, routers } = config_stream
+        .try_next()
+        .await
+        .expect("watch configuration should succeed")
+        .expect("configuration stream should not have ended");
+
+    assert_eq!(dns_servers, Vec::new());
+    assert_eq!(routers, Vec::new());
+
+    let fnet_dhcp_ext::Address { address, address_parameters: _, address_state_provider } =
+        address.expect("address should be present in response");
+    assert_eq!(
+        address,
+        fnet::Ipv4AddressWithPrefix {
+            addr: net_types::ip::Ipv4Addr::from(
+                server_test_config(DhcpServerAddress::Primary).managed_addrs.pool_range_start
+            )
+            .into_ext(),
+            prefix_len: dhcpv4_helper::DEFAULT_TEST_ADDRESS_POOL_PREFIX_LENGTH.get(),
+        }
+    );
+
+    let data = netstack_testing_common::get_inspect_data(client_realm, "dhcp-client", "root")
+        .await
+        .expect("should successfully retrieve inspect");
+    // Debug print the tree to make debugging easier in case of failures.
+    println!("Got inspect data: {:#?}", data);
+
+    diagnostics_assertions::assert_data_tree!(data, "root": {
+        Clients: {
+            client_iface.id().to_string() => {
+                InterfaceId: client_iface.id(),
+                Counters: {
+                    Init: {
+                        Entered: 0u64,
+                    },
+                    Selecting: {
+                        DuplicateOption: 0u64,
+                        Entered: 1u64,
+                        IllegallyIncludedOption: 0u64,
+                        MissingRequiredOption: 0u64,
+                        NoServerIdentifier: 0u64,
+                        NotBootReply: 0u64,
+                        NotDhcpOffer: 0u64,
+                        ParserMissingField: 0u64,
+                        RecvFailedDhcpParse: 0u64,
+                        RecvMessage: 1u64,
+                        RecvMessageFatalSocketError: 0u64,
+                        RecvMessageNonFatalSocketError: 0u64,
+                        RecvTimeOut: 0u64,
+                        RecvWrongChaddr: 0u64,
+                        RecvWrongXid: 0u64,
+                        SendMessage: 1u64,
+                        UnspecifiedServerIdentifier: 0u64,
+                        UnspecifiedYiaddr: 0u64,
+                    },
+                    Requesting: {
+                        DuplicateOption: 0u64,
+                        Entered: 1u64,
+                        IllegallyIncludedOption: 0u64,
+                        MissingRequiredOption: 0u64,
+                        NoLeaseTime: 0u64,
+                        NoServerIdentifier: 0u64,
+                        NotBootReply: 0u64,
+                        NotDhcpAckOrNak: 0u64,
+                        ParserMissingField: 0u64,
+                        RecvFailedDhcpParse: 0u64,
+                        RecvMessage: 1u64,
+                        RecvMessageFatalSocketError: 0u64,
+                        RecvMessageNonFatalSocketError: 0u64,
+                        RecvNak: 0u64,
+                        RecvTimeOut: 0u64,
+                        RecvWrongChaddr: 0u64,
+                        RecvWrongXid: 0u64,
+                        SendMessage: 1u64,
+                        UnspecifiedServerIdentifier: 0u64,
+                        UnspecifiedYiaddr: 0u64,
+                    },
+                    Bound: {
+                        Entered: 1u64,
+                    },
+                    Renewing: {
+                        DuplicateOption: 0u64,
+                        Entered: 0u64,
+                        IllegallyIncludedOption: 0u64,
+                        MissingRequiredOption: 0u64,
+                        NoLeaseTime: 0u64,
+                        NoServerIdentifier: 0u64,
+                        NotBootReply: 0u64,
+                        NotDhcpAckOrNak: 0u64,
+                        ParserMissingField: 0u64,
+                        RecvFailedDhcpParse: 0u64,
+                        RecvMessage: 0u64,
+                        RecvMessageFatalSocketError: 0u64,
+                        RecvMessageNonFatalSocketError: 0u64,
+                        RecvNak: 0u64,
+                        RecvTimeOut: 0u64,
+                        RecvWrongChaddr: 0u64,
+                        RecvWrongXid: 0u64,
+                        SendMessage: 0u64,
+                        UnspecifiedServerIdentifier: 0u64,
+                        UnspecifiedYiaddr: 0u64,
+                    },
+                    Rebinding: {
+                        DuplicateOption: 0u64,
+                        Entered: 0u64,
+                        IllegallyIncludedOption: 0u64,
+                        MissingRequiredOption: 0u64,
+                        NoLeaseTime: 0u64,
+                        NoServerIdentifier: 0u64,
+                        NotBootReply: 0u64,
+                        NotDhcpAckOrNak: 0u64,
+                        ParserMissingField: 0u64,
+                        RecvFailedDhcpParse: 0u64,
+                        RecvMessage: 0u64,
+                        RecvMessageFatalSocketError: 0u64,
+                        RecvMessageNonFatalSocketError: 0u64,
+                        RecvNak: 0u64,
+                        RecvTimeOut: 0u64,
+                        RecvWrongChaddr: 0u64,
+                        RecvWrongXid: 0u64,
+                        SendMessage: 0u64,
+                        UnspecifiedServerIdentifier: 0u64,
+                        UnspecifiedYiaddr: 0u64,
+                    },
+                    WaitingToRestart: {
+                        Entered: 0u64,
+                    },
+                },
+                CurrentLease: {
+                    PrefixLen: 25u64,
+                    "Start@time": AnyUintProperty,
+                    Routers: 0u64,
+                    LeaseLengthSecs: 86400u64,
+                    "Renewed@time": "None",
+                    DnsServerCount: 0u64,
+                    IpAddress: "192.168.0.3",
+                },
+                CurrentState: {
+                    "Entered@time": AnyUintProperty,
+                    State: {
+                        Kind: "Bound",
+                        IpAddressLeaseTimeSecs: 86400u64,
+                        ServerIdentifier: "192.168.0.1",
+                        "Start@time": AnyUintProperty,
+                        RenewalTimeSecs: 43200u64,
+                        RebindingTimeSecs: 64800u64,
+                        Xid: AnyUintProperty,
+                        Yiaddr: "192.168.0.3",
+                    }
+                },
+                StateHistory: {
+                    "2": {
+                        "Entered@time": AnyUintProperty,
+                        State: "Requesting",
+                    },
+                    "1": {
+                        "Entered@time": AnyUintProperty,
+                        State: "Selecting",
+                    },
+                    "0": {
+                        "Entered@time": AnyUintProperty,
+                        State: "Init",
+                    },
+                },
+                LeaseHistory: {},
+            }
+        }
+    });
 
     assert_client_shutdown(client, address_state_provider).await;
 }

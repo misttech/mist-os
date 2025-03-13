@@ -261,7 +261,23 @@ MAGMA_EXPORT magma_status_t magma_connection_execute_immediate_commands(
     magma_connection_t connection,
     uint32_t context_id,
     uint64_t command_count,
-    magma_inline_command_buffer_t* command_buffers);
+    magma_inline_command_buffer_t* command_buffers)
+MAGMA_DEPRECATED_SINCE(1, NEXT, "use magma_connection_execute_inline_commands");
+
+///
+/// \brief Submits a series of commands for execution on the hardware without using a command
+///        buffer.
+/// \param connection An open connection.
+/// \param context_id A valid context ID.
+/// \param command_count The number of commands in the provided buffer.
+/// \param command_buffers An array of command_count magma_inline_command_buffer structs.
+///
+MAGMA_EXPORT magma_status_t magma_connection_execute_inline_commands(
+    magma_connection_t connection,
+    uint32_t context_id,
+    uint64_t command_count,
+    magma_inline_command_buffer_t* command_buffers)
+MAGMA_AVAILABLE_SINCE(NEXT);
 
 ///
 /// \brief Incurs a round-trip to the system driver, used to ensure all previous messages have been

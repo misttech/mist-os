@@ -57,7 +57,20 @@ impl<D: Borrow<fio::DirectoryProxy>, P: DiscoverableProtocolMarker> ProtocolConn
     /// Note, this method does not check if the protocol exists. It is up to the
     /// caller to call `exists` to check for existence.
     pub fn connect_with(self, server_end: zx::Channel) -> Result<(), Error> {
-        self.svc_dir
+        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        return self
+            .svc_dir
+            .borrow()
+            .open(
+                P::PROTOCOL_NAME,
+                fio::Flags::PROTOCOL_SERVICE,
+                &fio::Options::default(),
+                server_end.into(),
+            )
+            .context("error connecting to protocol");
+        #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+        return self
+            .svc_dir
             .borrow()
             .open3(
                 P::PROTOCOL_NAME,
@@ -65,7 +78,7 @@ impl<D: Borrow<fio::DirectoryProxy>, P: DiscoverableProtocolMarker> ProtocolConn
                 &fio::Options::default(),
                 server_end.into(),
             )
-            .context("error connecting to protocol")
+            .context("error connecting to protocol");
     }
 
     /// Connect to the FIDL protocol.
@@ -224,7 +237,20 @@ pub struct ServiceInstanceDirectory(pub fio::DirectoryProxy, pub String);
 impl MemberOpener for ServiceInstanceDirectory {
     fn open_member(&self, member: &str, server_end: zx::Channel) -> Result<(), fidl::Error> {
         let Self(directory, _) = self;
-        directory.open3(member, fio::Flags::PROTOCOL_SERVICE, &fio::Options::default(), server_end)
+        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        return directory.open(
+            member,
+            fio::Flags::PROTOCOL_SERVICE,
+            &fio::Options::default(),
+            server_end,
+        );
+        #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+        return directory.open3(
+            member,
+            fio::Flags::PROTOCOL_SERVICE,
+            &fio::Options::default(),
+            server_end,
+        );
     }
     fn instance_name(&self) -> &str {
         let Self(_, instance_name) = self;
@@ -332,7 +358,20 @@ impl<S: ServiceMarker> Service<S> {
         server_end: zx::Channel,
     ) -> Result<(), fidl::Error> {
         let path = format!("{}/{}", instance.as_ref(), member.as_ref());
-        self.dir.open3(&path, fio::Flags::PROTOCOL_SERVICE, &fio::Options::default(), server_end)
+        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        return self.dir.open(
+            &path,
+            fio::Flags::PROTOCOL_SERVICE,
+            &fio::Options::default(),
+            server_end,
+        );
+        #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+        return self.dir.open3(
+            &path,
+            fio::Flags::PROTOCOL_SERVICE,
+            &fio::Options::default(),
+            server_end,
+        );
     }
 
     /// Returns an async stream of service instances that are enumerated within this service

@@ -88,8 +88,7 @@ open protocol RemoteControl {
     ///
     /// Connects a channel to a service, given a moniker and a channel iff the component identified
     /// by the given moniker exposes a capability of the requested name.
-    // TODO(https://fxbug.dev/324081103): Mark this as removed=NEXT once we ship API level 26.
-    @available(added=26, removed=HEAD)
+    @available(added=26, removed=NEXT)
     @selector("OpenCapability")
     flexible DeprecatedOpenCapability(resource struct {
         moniker string:component.MAX_MONIKER_LENGTH;

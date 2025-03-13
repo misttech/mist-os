@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 pub struct ExampleConfig {
     // Whether to include the example AIB in the build.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub include_example_aib: bool,
 }
 

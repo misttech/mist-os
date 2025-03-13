@@ -61,7 +61,14 @@ zx_status_t fdio_ns_open3(fdio_ns_t* ns, const char* path, uint64_t flags, zx_ha
 
 __EXPORT
 zx_status_t fdio_ns_service_connect(fdio_ns_t* ns, const char* path, zx_handle_t request) {
+  // TODO(https://fxbug.dev/376575307): Migrate to fdio_ns_open3 when we no longer have callers of
+  // this method that open directories. Some existing callers of this method assume the availability
+  // of certain operations on the resulting connection that used to be unprivileged. Callers should
+  // use fdio_ns_open3 directly to open directories instead of connect.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   return fdio_ns_open(ns, path, 0, request);
+#pragma clang diagnostic pop
 }
 
 __EXPORT

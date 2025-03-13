@@ -288,7 +288,7 @@ static zx_status_t mp_unplug_cpu_mask_single_locked(cpu_num_t cpu_id, zx_instant
 
   // Wait for |percpu_to_unplug| to complete any in-progress DPCs and terminate its DPC thread.
   // Later, once nothing is running on it, we'll migrate its queued DPCs to another CPU.
-  zx_status_t status = percpu_to_unplug.dpc_queue.Shutdown(deadline);
+  zx_status_t status = percpu_to_unplug.dpc_runner.Shutdown(deadline);
   if (status != ZX_OK) {
     return status;
   }
@@ -305,10 +305,10 @@ static zx_status_t mp_unplug_cpu_mask_single_locked(cpu_num_t cpu_id, zx_instant
   }
 
   // Now that the cpu is no longer processing tasks, migrate
-  // |percpu_to_unplug|'s TimerQueue and DpcQueue to this cpu.
+  // |percpu_to_unplug|'s TimerQueue and DpcRunner to this cpu.
   percpu& current_percpu = percpu::GetCurrent();
   current_percpu.timer_queue.TransitionOffCpu(percpu_to_unplug.timer_queue);
-  current_percpu.dpc_queue.TransitionOffCpu(percpu_to_unplug.dpc_queue);
+  current_percpu.dpc_runner.TransitionOffCpu(percpu_to_unplug.dpc_runner);
 
   return platform_mp_cpu_unplug(cpu_id);
 }

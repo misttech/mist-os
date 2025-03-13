@@ -65,7 +65,7 @@ where
 }
 
 impl<P, C> CounterContext<C> for UninstantiableWrapper<P> {
-    fn with_counters<O, F: FnOnce(&C) -> O>(&self, _cb: F) -> O {
+    fn counters(&self) -> &C {
         self.uninstantiable_unreachable()
     }
 }

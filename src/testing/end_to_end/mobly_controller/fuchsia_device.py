@@ -8,10 +8,8 @@ from copy import deepcopy
 from typing import Any
 
 import honeydew
-from honeydew.interfaces.device_classes import (
-    fuchsia_device as fuchsia_device_interface,
-)
-from honeydew.transports import ffx
+from honeydew.fuchsia_device import fuchsia_device as fuchsia_device_interface
+from honeydew.transports.ffx import config as ffx_config
 from honeydew.typing import custom_types
 from honeydew.utils import properties
 
@@ -19,7 +17,7 @@ MOBLY_CONTROLLER_CONFIG_NAME = "FuchsiaDevice"
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
-_FFX_CONFIG_OBJ: ffx.FfxConfig = ffx.FfxConfig()
+_FFX_CONFIG_OBJ: ffx_config.FfxConfig = ffx_config.FfxConfig()
 
 _FFX_CONFIG_LOGS_LEVEL: str = "debug"
 
@@ -46,7 +44,7 @@ def create(
     )
 
     test_logs_dir: str = _get_log_directory()
-    ffx_config: dict[str, Any] = _get_ffx_config(configs)
+    ffx_config_dict: dict[str, Any] = _get_ffx_config(configs)
 
     # Call `FfxConfig.setup` before calling `create_device` as
     # `create_device` results in calling an FFX command and we
@@ -65,14 +63,14 @@ def create(
     # Right fix for all such cases is to use separate ffx config per device.
     # This support will be added when needed in future.
     _FFX_CONFIG_OBJ.setup(
-        binary_path=ffx_config["path"],
+        binary_path=ffx_config_dict["path"],
         isolate_dir=None,
         logs_dir=f"{test_logs_dir}/ffx/",
-        logs_level=ffx_config["logs_level"],
-        enable_mdns=ffx_config["enable_mdns"],
-        subtools_search_path=ffx_config.get("subtools_search_path"),
-        proxy_timeout_secs=ffx_config["proxy_timeout_secs"],
-        ssh_keepalive_timeout=ffx_config.get("ssh_keepalive_timeout"),
+        logs_level=ffx_config_dict["logs_level"],
+        enable_mdns=ffx_config_dict["enable_mdns"],
+        subtools_search_path=ffx_config_dict.get("subtools_search_path"),
+        proxy_timeout_secs=ffx_config_dict["proxy_timeout_secs"],
+        ssh_keepalive_timeout=ffx_config_dict.get("ssh_keepalive_timeout"),
     )
 
     fuchsia_devices: list[fuchsia_device_interface.FuchsiaDevice] = []
@@ -86,7 +84,7 @@ def create(
                     ip_port=device_config.get("device_ip_port"),
                     serial_socket=device_config.get("serial_socket"),
                 ),
-                ffx_config=_FFX_CONFIG_OBJ.get_config(),
+                ffx_config_data=_FFX_CONFIG_OBJ.get_config(),
                 config=device_config["honeydew_config"],
             )
         )
@@ -266,38 +264,40 @@ def _get_ffx_config(configs: list[dict[str, Any]]) -> dict[str, Any]:
     Returns:
         Dict pointing to FFX configuration.
     """
-    ffx_config: dict[str, Any] = {}
+    ffx_config_dict: dict[str, Any] = {}
 
     # FFX config is currently global and not localized to the individual devices so
     # just return the the first ffx config encountered.
     for config in configs:
         try:
-            ffx_config = deepcopy(
+            ffx_config_dict = deepcopy(
                 config["honeydew_config"]["transports"]["ffx"]
             )
         except KeyError:
             pass
-    if not ffx_config:
+    if not ffx_config_dict:
         raise RuntimeError("No FFX config found in any of the device config")
 
-    if "path" not in ffx_config:
+    if "path" not in ffx_config_dict:
         raise RuntimeError("No FFX path found in device config")
 
-    if "logs_level" not in ffx_config:
-        ffx_config["logs_level"] = _FFX_CONFIG_LOGS_LEVEL
+    if "logs_level" not in ffx_config_dict:
+        ffx_config_dict["logs_level"] = _FFX_CONFIG_LOGS_LEVEL
 
-    if "proxy_timeout_secs" not in ffx_config:
-        ffx_config["proxy_timeout_secs"] = _FFX_CONFIG_PROXY_TIMEOUT_SECS
+    if "proxy_timeout_secs" not in ffx_config_dict:
+        ffx_config_dict["proxy_timeout_secs"] = _FFX_CONFIG_PROXY_TIMEOUT_SECS
 
     for ffx_config_key in ["proxy_timeout_secs", "ssh_keepalive_timeout"]:
-        if ffx_config_key in ffx_config:
+        if ffx_config_key in ffx_config_dict:
             try:
-                ffx_config[ffx_config_key] = int(ffx_config[ffx_config_key])
+                ffx_config_dict[ffx_config_key] = int(
+                    ffx_config_dict[ffx_config_key]
+                )
             except (TypeError, ValueError) as err:
                 raise RuntimeError(
                     f"Invalid value sent in '{ffx_config_key}'. Please pass a int value"
                 ) from err
 
-    ffx_config["enable_mdns"] = _enable_mdns(configs)
+    ffx_config_dict["enable_mdns"] = _enable_mdns(configs)
 
-    return ffx_config
+    return ffx_config_dict

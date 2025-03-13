@@ -6,7 +6,6 @@
 
 #include <fidl/test.anonymous/cpp/markers.h>
 #include <fidl/test.anonymous/cpp/natural_types.h>
-#include <fidl/test.anonymous/cpp/wire_messaging.h>
 #include <lib/fidl/cpp/channel.h>
 #include <lib/fidl/cpp/client.h>
 #include <lib/fidl/cpp/internal/thenable.h>
@@ -30,6 +29,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_anonymous::SomeProtocol::Some
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_anonymous::SomeProtocol::SomeMethod>>;
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_anonymous::SomeProtocol::SomeMethod>&)>;
+  using DomainError = ::test_anonymous::SomeProtocolSomeMethodError;
 };
 
 #ifdef __Fuchsia__

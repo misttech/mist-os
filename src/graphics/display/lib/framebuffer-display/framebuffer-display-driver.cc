@@ -30,23 +30,22 @@ FramebufferDisplayDriver::~FramebufferDisplayDriver() = default;
 zx::result<> FramebufferDisplayDriver::Start() {
   zx::result<> configure_hardware_result = ConfigureHardware();
   if (configure_hardware_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to configure hardware: %s", configure_hardware_result.status_string());
+    fdf::error("Failed to configure hardware: {}", configure_hardware_result);
     return configure_hardware_result.take_error();
   }
 
   zx::result<std::unique_ptr<FramebufferDisplay>> framebuffer_display_result =
       CreateAndInitializeFramebufferDisplay();
   if (framebuffer_display_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to create and initialize FramebufferDisplay: %s",
-            framebuffer_display_result.status_string());
+    fdf::error("Failed to create and initialize FramebufferDisplay: {}",
+               framebuffer_display_result);
     return framebuffer_display_result.take_error();
   }
   framebuffer_display_ = std::move(framebuffer_display_result).value();
 
   zx::result<> add_banjo_server_node_result = InitializeBanjoServerNode();
   if (add_banjo_server_node_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to add banjo server node: %s",
-            add_banjo_server_node_result.status_string());
+    fdf::error("Failed to add banjo server node: {}", add_banjo_server_node_result);
     return add_banjo_server_node_result.take_error();
   }
 
@@ -59,16 +58,14 @@ zx::result<std::unique_ptr<FramebufferDisplay>>
 FramebufferDisplayDriver::CreateAndInitializeFramebufferDisplay() {
   zx::result<fdf::MmioBuffer> frame_buffer_mmio_result = GetFrameBufferMmioBuffer();
   if (frame_buffer_mmio_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to get frame buffer mmio buffer: %s",
-            frame_buffer_mmio_result.status_string());
+    fdf::error("Failed to get frame buffer mmio buffer: {}", frame_buffer_mmio_result);
     return frame_buffer_mmio_result.take_error();
   }
   fdf::MmioBuffer frame_buffer_mmio = std::move(frame_buffer_mmio_result).value();
 
   zx::result<DisplayProperties> display_properties_result = GetDisplayProperties();
   if (display_properties_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to get display properties: %s",
-            display_properties_result.status_string());
+    fdf::error("Failed to get display properties: {}", display_properties_result);
     return display_properties_result.take_error();
   }
   DisplayProperties display_properties = std::move(display_properties_result).value();
@@ -76,8 +73,7 @@ FramebufferDisplayDriver::CreateAndInitializeFramebufferDisplay() {
   zx::result<fidl::ClientEnd<fuchsia_hardware_sysmem::Sysmem>> sysmem_hardware_client_result =
       incoming()->Connect<fuchsia_hardware_sysmem::Sysmem>();
   if (sysmem_hardware_client_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to get hardware sysmem protocol: %s",
-            sysmem_hardware_client_result.status_string());
+    fdf::error("Failed to get hardware sysmem protocol: {}", sysmem_hardware_client_result);
     return sysmem_hardware_client_result.take_error();
   }
   fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem_hardware_client(
@@ -86,8 +82,7 @@ FramebufferDisplayDriver::CreateAndInitializeFramebufferDisplay() {
   zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> sysmem_client_result =
       incoming()->Connect<fuchsia_sysmem2::Allocator>();
   if (sysmem_client_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to get fuchsia.sysmem2.Allocator protocol: %s",
-            sysmem_client_result.status_string());
+    fdf::error("Failed to get fuchsia.sysmem2.Allocator protocol: {}", sysmem_client_result);
     return sysmem_client_result.take_error();
   }
   fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem_client(
@@ -98,8 +93,7 @@ FramebufferDisplayDriver::CreateAndInitializeFramebufferDisplay() {
                                           "framebuffer-display-dispatcher",
                                           [](fdf_dispatcher_t*) {});
   if (create_dispatcher_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to create framebuffer display dispatcher: %s",
-            create_dispatcher_result.status_string());
+    fdf::error("Failed to create framebuffer display dispatcher: {}", create_dispatcher_result);
     return create_dispatcher_result.take_error();
   }
   framebuffer_display_dispatcher_ = std::move(create_dispatcher_result).value();
@@ -110,21 +104,21 @@ FramebufferDisplayDriver::CreateAndInitializeFramebufferDisplay() {
       std::move(frame_buffer_mmio), std::move(display_properties),
       framebuffer_display_dispatcher_.async_dispatcher());
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for FramebufferDisplay");
+    fdf::error("Failed to allocate memory for FramebufferDisplay");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   engine_banjo_adapter_ = fbl::make_unique_checked<display::DisplayEngineBanjoAdapter>(
       &alloc_checker, framebuffer_display.get(), &engine_events_);
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for DisplayEngineBanjoAdapter");
+    fdf::error("Failed to allocate memory for DisplayEngineBanjoAdapter");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   zx::result<> framebuffer_display_initialize_result = framebuffer_display->Initialize();
   if (framebuffer_display_initialize_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to initialize FramebufferDisplay: %s",
-            framebuffer_display_initialize_result.status_string());
+    fdf::error("Failed to initialize FramebufferDisplay: {}",
+               framebuffer_display_initialize_result);
     return framebuffer_display_initialize_result.take_error();
   }
 
@@ -142,8 +136,7 @@ zx::result<> FramebufferDisplayDriver::InitializeBanjoServerNode() {
                                 /*forward_metadata=*/compat::ForwardMetadata::None(),
                                 engine_banjo_adapter_->CreateBanjoConfig());
   if (compat_server_init_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to initialize the compatibility server: %s",
-            compat_server_init_result.status_string());
+    fdf::error("Failed to initialize the compatibility server: {}", compat_server_init_result);
     return compat_server_init_result.take_error();
   }
 
@@ -154,7 +147,7 @@ zx::result<> FramebufferDisplayDriver::InitializeBanjoServerNode() {
   zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>>
       node_controller_client_result = AddChild(name(), node_properties, node_offers);
   if (node_controller_client_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to add child node: %s", node_controller_client_result.status_string());
+    fdf::error("Failed to add child node: {}", node_controller_client_result);
     return node_controller_client_result.take_error();
   }
   node_controller_ = fidl::WireSyncClient(std::move(node_controller_client_result).value());

@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <span>
 
 #include "context_impl.h"
 #include "hash_table.h"
@@ -89,7 +90,7 @@ struct StringEntry : public internal::SinglyLinkedListable<StringEntry> {
   static constexpr uint32_t kCategoryEnabled = 1u << 3;
 
   // The string literal itself.
-  const char* string_literal;
+  const unsigned char* bytes;
 
   // Flags for the string entry.
   uint32_t flags;
@@ -98,8 +99,8 @@ struct StringEntry : public internal::SinglyLinkedListable<StringEntry> {
   trace_string_index_t index;
 
   // Used by the hash table.
-  const char* GetKey() const { return string_literal; }
-  static size_t GetHash(const char* key) { return reinterpret_cast<uintptr_t>(key); }
+  const unsigned char* GetKey() const { return bytes; }
+  static size_t GetHash(const unsigned char* key) { return reinterpret_cast<uintptr_t>(key); }
 };
 
 // A thread table entry.
@@ -138,7 +139,7 @@ struct ContextCache {
   // String table.
   // Provides a limited amount of storage for rapidly looking up string literals
   // registered by this thread.
-  internal::HashTable<const char*, StringEntry> string_table;
+  internal::HashTable<const unsigned char*, StringEntry> string_table;
 
   // Storage for the string entries.
   StringEntry string_entries[kMaxStringEntries];
@@ -174,12 +175,12 @@ ContextCache* GetCurrentContextCache(uint32_t generation) {
   return cache;
 }
 
-StringEntry* CacheStringEntry(uint32_t generation, const char* string_literal) {
+StringEntry* CacheStringEntry(uint32_t generation, const unsigned char* bytes_pointer) {
   ContextCache* cache = GetCurrentContextCache(generation);
   if (unlikely(!cache))
     return nullptr;
 
-  auto ptr = cache->string_table.lookup(string_literal);
+  auto ptr = cache->string_table.lookup(bytes_pointer);
   if (likely(ptr != nullptr)) {
     return ptr;
   }
@@ -189,7 +190,7 @@ StringEntry* CacheStringEntry(uint32_t generation, const char* string_literal) {
     return nullptr;
 
   StringEntry* entry = &cache->string_entries[count];
-  entry->string_literal = string_literal;
+  entry->bytes = bytes_pointer;
   entry->flags = 0u;
   entry->index = 0u;
   cache->string_table.insert(entry);
@@ -217,13 +218,13 @@ ThreadEntry* CacheThreadEntry(uint32_t generation, zx_koid_t thread_koid) {
   return entry;
 }
 
-inline constexpr uint64_t MakeRecordHeader(RecordType type, size_t size) {
+constexpr uint64_t MakeRecordHeader(RecordType type, size_t size) {
   return RecordFields::Type::Make(ToUnderlyingType(type)) |
          RecordFields::RecordSize::Make(size >> 3);
 }
 
-inline constexpr uint64_t MakeArgumentHeader(ArgumentType type, size_t size,
-                                             const trace_string_ref_t* name_ref) {
+constexpr uint64_t MakeArgumentHeader(ArgumentType type, size_t size,
+                                      const trace_string_ref_t* name_ref) {
   return ArgumentFields::Type::Make(ToUnderlyingType(type)) |
          ArgumentFields::ArgumentSize::Make(size >> 3) |
          ArgumentFields::NameRef::Make(name_ref->encoded_value);
@@ -446,14 +447,14 @@ bool CheckCategory(trace_context_t* context, const char* category) {
 
 // Returns true if write succeeded, false otherwise.
 // The write fails if the buffer we use is full.
-
+//
+// string is a non null-terminated span of characters
 bool WriteStringRecord(trace_context_t* context, bool rqst_durable_buffer,
-                       trace_string_index_t index, const char* string, size_t length) {
+                       trace_string_index_t index, std::span<const unsigned char> string) {
   ZX_DEBUG_ASSERT(index != TRACE_ENCODED_STRING_REF_EMPTY);
   ZX_DEBUG_ASSERT(index <= TRACE_ENCODED_STRING_REF_MAX_INDEX);
 
-  if (unlikely(length > TRACE_ENCODED_STRING_REF_MAX_LENGTH))
-    length = TRACE_ENCODED_STRING_REF_MAX_LENGTH;
+  const size_t length = std::min(string.size(), size_t{TRACE_ENCODED_STRING_REF_MAX_LENGTH});
 
   const size_t record_size = sizeof(trace::RecordHeader) + trace::Pad(length);
   Payload payload(context, rqst_durable_buffer, record_size);
@@ -462,7 +463,7 @@ bool WriteStringRecord(trace_context_t* context, bool rqst_durable_buffer,
         .WriteUint64(trace::MakeRecordHeader(trace::RecordType::kString, record_size) |
                      trace::StringRecordFields::StringIndex::Make(index) |
                      trace::StringRecordFields::StringLength::Make(length))
-        .WriteBytes(string, length);
+        .WriteBytes(string.data(), length);
     return true;
   }
   return false;
@@ -501,7 +502,8 @@ bool RegisterString(trace_context_t* context, const char* string_literal, bool c
     return true;
   }
 
-  StringEntry* entry = CacheStringEntry(context->generation(), string_literal);
+  StringEntry* entry = CacheStringEntry(context->generation(),
+                                        reinterpret_cast<const unsigned char*>(string_literal));
   if (likely(entry)) {
     // Fast path: using the thread-local cache.
     if (check_category) {
@@ -527,9 +529,11 @@ bool RegisterString(trace_context_t* context, const char* string_literal, bool c
         // index is lost anyway, but the result won't be half-complete.
         // The subsequent write of the inlined reference will likely
         // also fail, but that's ok.
-        if (likely(context->AllocStringIndex(&entry->index) &&
-                   WriteStringRecord(context, rqst_durable, entry->index, string_literal,
-                                     string_len))) {
+        if (likely(
+                context->AllocStringIndex(&entry->index) &&
+                WriteStringRecord(context, rqst_durable, entry->index,
+                                  std::span{reinterpret_cast<const unsigned char*>(string_literal),
+                                            string_len}))) {
           entry->flags |= StringEntry::kAllocIndexSucceeded;
         }
       }
@@ -555,6 +559,84 @@ bool RegisterString(trace_context_t* context, const char* string_literal, bool c
   return true;
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+// N.B. This may only return false if |check_category| is true.
+bool RegisterByteString(trace_context_t* context, std::span<const unsigned char> bytes,
+                        bool check_category, trace_string_ref_t* out_ref_optional) {
+  if (unlikely(!bytes.data() || bytes.size() == 0)) {
+    if (check_category)
+      return false;  // NULL and empty strings are not valid categories
+    if (out_ref_optional)
+      *out_ref_optional = trace_make_empty_string_ref();
+    return true;
+  }
+
+  // SAFETY: CacheStringEntry does pointer comparison and doesn't require that the bytes are null
+  // terminated.
+  StringEntry* entry = CacheStringEntry(context->generation(), bytes.data());
+  if (likely(entry)) {
+    // Fast path: using the thread-local cache.
+    if (check_category) {
+      if (unlikely(!(entry->flags & StringEntry::kCategoryChecked))) {
+        // NOTE: CheckCategory passes to a function which expects a null terminated string. The
+        // easiest way to get one is to copy the bytes into a std::string.
+        if (CheckCategory(
+                context,
+                std::string{reinterpret_cast<const char*>(bytes.data()), bytes.size()}.c_str())) {
+          entry->flags |= StringEntry::kCategoryChecked | StringEntry::kCategoryEnabled;
+        } else {
+          entry->flags |= StringEntry::kCategoryChecked;
+        }
+      }
+      if (!(entry->flags & StringEntry::kCategoryEnabled)) {
+        return false;  // category disabled
+      }
+    }
+
+    if (out_ref_optional) {
+      if (unlikely(!(entry->flags & StringEntry::kAllocIndexAttempted))) {
+        entry->flags |= StringEntry::kAllocIndexAttempted;
+        bool rqst_durable = true;
+        // If allocating an index succeeds but writing the record
+        // fails, toss the index and return an inline reference. The
+        // index is lost anyway, but the result won't be half-complete.
+        // The subsequent write of the inlined reference will likely
+        // also fail, but that's ok.
+        //
+        // NOTE: WriteStringRecord doesn't expect a null terminator
+        if (likely(context->AllocStringIndex(&entry->index) &&
+                   WriteStringRecord(context, rqst_durable, entry->index, bytes))) {
+          entry->flags |= StringEntry::kAllocIndexSucceeded;
+        }
+      }
+      if (likely(entry->flags & StringEntry::kAllocIndexSucceeded)) {
+        *out_ref_optional = trace_make_indexed_string_ref(entry->index);
+      } else {
+        *out_ref_optional =
+            trace_make_inline_string_ref(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+      }
+    }
+    return true;
+  }
+
+  // Slow path.
+  // TODO(https://fxbug.dev/42105900): Since we can't use the thread-local cache here, cache
+  // this registered string on the trace context structure, guarded by a mutex.
+  // Make sure to assign it a string index if possible instead of inlining.
+  if (check_category &&
+      !CheckCategory(
+          context,
+          std::string{reinterpret_cast<const char*>(bytes.data()), bytes.size()}.c_str())) {
+    return false;  // category disabled
+  }
+  if (out_ref_optional) {
+    *out_ref_optional =
+        trace_make_inline_string_ref(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+  }
+  return true;
+}
+#endif
+
 }  // namespace
 }  // namespace trace
 
@@ -562,6 +644,14 @@ EXPORT bool trace_context_is_category_enabled(trace_context_t* context,
                                               const char* category_literal) {
   return trace::RegisterString(context, category_literal, true, nullptr);
 }
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+EXPORT bool trace_context_is_category_bytestring_enabled(trace_context_t* context,
+                                                         const unsigned char* bytes, size_t len)
+    ZX_AVAILABLE_SINCE(NEXT) {
+  return trace::RegisterByteString(context, std::span{bytes, len}, true, nullptr);
+}
+#endif
 
 EXPORT_NO_DDK void trace_context_register_string_copy(trace_context_t* context, const char* string,
                                                       size_t length, trace_string_ref_t* out_ref) {
@@ -575,7 +665,9 @@ EXPORT_NO_DDK void trace_context_register_string_copy(trace_context_t* context, 
   // The subsequent write of the inlined reference will likely
   // also fail, but that's ok.
   if (likely(context->AllocStringIndex(&index) &&
-             trace::WriteStringRecord(context, rqst_durable, index, string, length))) {
+             trace::WriteStringRecord(
+                 context, rqst_durable, index,
+                 std::span{reinterpret_cast<const unsigned char*>(string), length}))) {
     *out_ref = trace_make_indexed_string_ref(index);
   } else {
     *out_ref = trace_make_inline_string_ref(string, length);
@@ -589,11 +681,30 @@ EXPORT void trace_context_register_string_literal(trace_context_t* context,
   ZX_DEBUG_ASSERT(result);
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+EXPORT void trace_context_register_bytestring(trace_context_t* context, const unsigned char* bytes,
+                                              size_t length, trace_string_ref_t* out_ref)
+    ZX_AVAILABLE_SINCE(NEXT) {
+  bool result = trace::RegisterByteString(context, std::span{bytes, length}, false, out_ref);
+  ZX_DEBUG_ASSERT(result);
+}
+#endif
+
 EXPORT_NO_DDK bool trace_context_register_category_literal(trace_context_t* context,
                                                            const char* category_literal,
                                                            trace_string_ref_t* out_ref) {
   return trace::RegisterString(context, category_literal, true, out_ref);
 }
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+EXPORT_NO_DDK bool trace_context_register_category_bytestring(trace_context_t* context,
+                                                              const unsigned char* bytes,
+                                                              size_t length,
+                                                              trace_string_ref_t* out_ref)
+    ZX_AVAILABLE_SINCE(NEXT) {
+  return trace::RegisterByteString(context, std::span{bytes, length}, true, out_ref);
+}
+#endif
 
 EXPORT void trace_context_register_current_thread(trace_context_t* context,
                                                   trace_thread_ref_t* out_ref) {
@@ -730,6 +841,16 @@ EXPORT void trace_context_write_blob_record(trace_context_t* context, trace_blob
 EXPORT void trace_context_send_alert(trace_context_t* context, const char* alert_name) {
   context->handler()->ops->send_alert(context->handler(), alert_name);
 }
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+EXPORT void trace_context_send_alert_bytestring(trace_context_t* context,
+                                                const unsigned char* alert_name, size_t length)
+    ZX_AVAILABLE_SINCE(NEXT) {
+  // We need to ensure the alert is null terminated. We do this by copying into a string.
+  context->handler()->ops->send_alert(
+      context->handler(), std::string{reinterpret_cast<const char*>(alert_name), length}.c_str());
+}
+#endif
 
 void trace_context_write_kernel_object_record(trace_context_t* context, bool use_durable,
                                               zx_koid_t koid, zx_obj_type_t type,
@@ -1075,7 +1196,9 @@ EXPORT_NO_DDK void trace_context_write_initialization_record(trace_context_t* co
 EXPORT_NO_DDK void trace_context_write_string_record(trace_context_t* context,
                                                      trace_string_index_t index, const char* string,
                                                      size_t length) {
-  if (unlikely(!trace::WriteStringRecord(context, false, index, string, length))) {
+  if (unlikely(!trace::WriteStringRecord(
+          context, false, index,
+          std::span{reinterpret_cast<const unsigned char*>(string), length}))) {
     // The write will fail if the buffer is full. Nothing we can do.
   }
 }
@@ -1100,7 +1223,7 @@ EXPORT_NO_DDK void trace_context_snapshot_buffer_header_internal(
   memcpy(header, ctx->buffer_header(), sizeof(*header));
 }
 
-EXPORT_NO_DDK trace_buffering_mode_t trace_context_get_buffering_mode(
-    const trace_context_t* context) {
+EXPORT_NO_DDK trace_buffering_mode_t
+trace_context_get_buffering_mode(const trace_context_t* context) {
   return context->buffering_mode();
 }

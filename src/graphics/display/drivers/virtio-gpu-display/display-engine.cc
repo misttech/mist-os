@@ -14,7 +14,6 @@
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
-#include <zircon/status.h>
 #include <zircon/time.h>
 #include <zircon/types.h>
 
@@ -27,6 +26,7 @@
 
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
+#include <fbl/string_buffer.h>
 
 #include "src/graphics/display/drivers/virtio-gpu-display/imported-image.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/virtio-gpu-device.h"
@@ -34,12 +34,13 @@
 #include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-interface.h"
 #include "src/graphics/display/lib/api-types/cpp/alpha-mode.h"
 #include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/coordinate-transformation.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
+#include "src/graphics/display/lib/api-types/cpp/engine-info.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types/cpp/image-tiling-type.h"
@@ -55,6 +56,12 @@ namespace virtio_display {
 
 namespace {
 
+constexpr display::EngineInfo kEngineInfo({
+    .max_layer_count = 1,
+    .max_connected_display_count = 1,
+    .is_capture_supported = false,
+});
+
 // TODO(https://fxbug.dev/42073721): Support more formats.
 constexpr display::PixelFormat kSupportedPixelFormat = display::PixelFormat::kB8G8R8A8;
 constexpr uint32_t kRefreshRateHz = 30;
@@ -63,7 +70,7 @@ constexpr display::ModeId kDisplayModeId(1);
 
 }  // namespace
 
-void DisplayEngine::OnCoordinatorConnected() {
+display::EngineInfo DisplayEngine::CompleteCoordinatorConnection() {
   const display::ModeAndId mode_and_id({
       .id = kDisplayModeId,
       .mode = display::Mode({
@@ -75,7 +82,10 @@ void DisplayEngine::OnCoordinatorConnected() {
 
   const cpp20::span<const display::ModeAndId> preferred_modes(&mode_and_id, 1);
   const cpp20::span<const display::PixelFormat> pixel_formats(&kSupportedPixelFormat, 1);
-  engine_events_.OnDisplayAdded(kDisplayId, preferred_modes, pixel_formats);
+  engine_events_.OnDisplayAdded(kDisplayId, preferred_modes, current_display_edid_bytes_,
+                                pixel_formats);
+
+  return kEngineInfo;
 }
 
 zx::result<> DisplayEngine::ImportBufferCollection(
@@ -132,7 +142,7 @@ zx::result<display::DriverImageId> DisplayEngine::ImportImage(
   zx::result<uint32_t> create_resource_result = gpu_device_->Create2DResource(
       image_metadata.width(), image_metadata.height(), sysmem_buffer_info->pixel_format);
   if (create_resource_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to allocate 2D resource: %s", create_resource_result.status_string());
+    fdf::error("Failed to allocate 2D resource: {}", create_resource_result);
     return create_resource_result.take_error();
   }
   imported_image->set_virtio_resource_id(create_resource_result.value());
@@ -140,7 +150,7 @@ zx::result<display::DriverImageId> DisplayEngine::ImportImage(
   zx::result<> attach_result = gpu_device_->AttachResourceBacking(
       imported_image->virtio_resource_id(), imported_image->physical_address(), image_size);
   if (attach_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to attach resource backing store: %s", attach_result.status_string());
+    fdf::error("Failed to attach resource backing store: {}", attach_result);
     return attach_result.take_error();
   }
 
@@ -184,9 +194,9 @@ display::ConfigCheckResult DisplayEngine::CheckConfiguration(
 
   display::ConfigCheckResult result = display::ConfigCheckResult::kOk;
   if (layer.display_destination() != display_area) {
-    // TODO(https://fxbug.dev/388602122): Revise the definition of MERGE_BASE to
+    // TODO(https://fxbug.dev/388602122): Revise the definition of MERGE to
     // include this case, or replace with a different opcode.
-    layer_composition_operations[0] = layer_composition_operations[0].WithMergeBase();
+    layer_composition_operations[0] = layer_composition_operations[0].WithMerge();
     result = display::ConfigCheckResult::kUnsupportedConfig;
   }
   if (layer.image_source() != layer.display_destination()) {
@@ -211,7 +221,7 @@ display::ConfigCheckResult DisplayEngine::CheckConfiguration(
 void DisplayEngine::ApplyConfiguration(display::DisplayId display_id,
                                        display::ModeId display_mode_id,
                                        cpp20::span<const display::DriverLayer> layers,
-                                       display::ConfigStamp config_stamp) {
+                                       display::DriverConfigStamp config_stamp) {
   ZX_DEBUG_ASSERT(display_id == kDisplayId);
   ZX_DEBUG_ASSERT(display_mode_id == kDisplayModeId);
 
@@ -219,7 +229,7 @@ void DisplayEngine::ApplyConfiguration(display::DisplayId display_id,
   const display::DriverImageId image_id = layers[0].image_id();
   const ImportedImage* imported_image = imported_images_.FindImageById(image_id);
   if (imported_image == nullptr) {
-    FDF_LOG(ERROR, "ApplyConfiguration() used invalid image ID");
+    fdf::error("ApplyConfiguration() used invalid image ID");
     return;
   }
 
@@ -236,9 +246,8 @@ zx::result<> DisplayEngine::SetBufferCollectionConstraints(
   ImportedBufferCollection* imported_buffer_collection =
       imported_images_.FindBufferCollectionById(buffer_collection_id);
   if (imported_buffer_collection == nullptr) {
-    FDF_LOG(WARNING,
-            "Rejected request to set constraints on BufferCollection with unknown ID: %" PRIu64,
-            buffer_collection_id.value());
+    fdf::warn("Rejected request to set constraints on BufferCollection with unknown ID: {}",
+              buffer_collection_id.value());
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
@@ -276,14 +285,12 @@ zx::result<> DisplayEngine::SetBufferCollectionConstraints(
               .constraints(buffer_collection_constraints_builder.Build())
               .Build());
   if (!set_constraints_status.ok()) {
-    FDF_LOG(ERROR, "SetConstraints() FIDL call failed: %s", set_constraints_status.status_string());
+    fdf::error("SetConstraints() FIDL call failed: {}", set_constraints_status.status_string());
     return zx::error(set_constraints_status.status());
   }
 
   return zx::ok();
 }
-
-bool DisplayEngine::IsCaptureSupported() { return false; }
 
 zx::result<> DisplayEngine::SetDisplayPower(display::DisplayId display_id, bool power_on) {
   return zx::error(ZX_ERR_NOT_SUPPORTED);
@@ -329,20 +336,20 @@ zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(
   auto gpu_device = fbl::make_unique_checked<VirtioGpuDevice>(
       &alloc_checker, std::move(virtio_device_result).value());
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for VirtioGpuDevice");
+    fdf::error("Failed to allocate memory for VirtioGpuDevice");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   auto display_engine = fbl::make_unique_checked<DisplayEngine>(
       &alloc_checker, engine_events, std::move(sysmem_client), std::move(gpu_device));
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for DisplayEngine");
+    fdf::error("Failed to allocate memory for DisplayEngine");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   zx_status_t status = display_engine->Init();
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to initialize device");
+    fdf::error("Failed to initialize device");
     return zx::error(status);
   }
 
@@ -350,7 +357,7 @@ zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(
 }
 
 void DisplayEngine::virtio_gpu_flusher() {
-  FDF_LOG(TRACE, "Entering VirtioGpuFlusher()");
+  fdf::trace("Entering VirtioGpuFlusher()");
 
   zx_time_t next_deadline = zx_clock_get_monotonic();
   zx_time_t period = ZX_SEC(1) / kRefreshRateHz;
@@ -365,7 +372,7 @@ void DisplayEngine::virtio_gpu_flusher() {
       displayed_config_stamp_ = latest_config_stamp_;
     }
 
-    FDF_LOG(TRACE, "flushing");
+    fdf::trace("flushing");
 
     if (fb_change) {
       uint32_t resource_id = displayed_framebuffer_resource_id_ ? displayed_framebuffer_resource_id_
@@ -374,7 +381,7 @@ void DisplayEngine::virtio_gpu_flusher() {
           current_display_.scanout_id, resource_id, current_display_.scanout_info.geometry.width,
           current_display_.scanout_info.geometry.height);
       if (set_scanout_result.is_error()) {
-        FDF_LOG(ERROR, "Failed to set scanout: %s", set_scanout_result.status_string());
+        fdf::error("Failed to set scanout: {}", set_scanout_result);
         continue;
       }
     }
@@ -384,7 +391,7 @@ void DisplayEngine::virtio_gpu_flusher() {
           displayed_framebuffer_resource_id_, current_display_.scanout_info.geometry.width,
           current_display_.scanout_info.geometry.height);
       if (transfer_result.is_error()) {
-        FDF_LOG(ERROR, "Failed to transfer resource: %s", transfer_result.status_string());
+        fdf::error("Failed to transfer resource: {}", transfer_result);
         continue;
       }
 
@@ -392,7 +399,7 @@ void DisplayEngine::virtio_gpu_flusher() {
           displayed_framebuffer_resource_id_, current_display_.scanout_info.geometry.width,
           current_display_.scanout_info.geometry.height);
       if (flush_result.is_error()) {
-        FDF_LOG(ERROR, "Failed to flush resource: %s", flush_result.status_string());
+        fdf::error("Failed to flush resource: {}", flush_result);
         continue;
       }
     }
@@ -406,35 +413,42 @@ void DisplayEngine::virtio_gpu_flusher() {
 }
 
 zx_status_t DisplayEngine::Start() {
-  FDF_LOG(TRACE, "Start()");
+  fdf::trace("Start()");
 
-  // Get the display info and see if we find a valid pmode
+  // virtio13 5.7.5 "Device Requirements: Device Initialization"
+
   zx::result<fbl::Vector<DisplayInfo>> display_infos_result = gpu_device_->GetDisplayInfo();
   if (display_infos_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to get display info: %s", display_infos_result.status_string());
+    fdf::error("Failed to get display info: {}", display_infos_result);
     return display_infos_result.error_value();
   }
 
   const DisplayInfo* current_display = FirstValidDisplay(display_infos_result.value());
   if (current_display == nullptr) {
-    FDF_LOG(ERROR, "Failed to find a usable display");
+    fdf::error("Failed to find a usable display");
     return ZX_ERR_NOT_FOUND;
   }
   current_display_ = *current_display;
 
-  FDF_LOG(INFO,
-          "Found display at (%" PRIu32 ", %" PRIu32 ") size %" PRIu32 "x%" PRIu32
-          ", flags 0x%08" PRIx32,
-          current_display_.scanout_info.geometry.placement_x,
-          current_display_.scanout_info.geometry.placement_y,
-          current_display_.scanout_info.geometry.width,
-          current_display_.scanout_info.geometry.height, current_display_.scanout_info.flags);
+  zx::result<fbl::Vector<uint8_t>> display_edid_result =
+      gpu_device_->GetDisplayEdid(current_display->scanout_id);
+
+  // EDID support is optional, and the driver can proceed without it.
+  if (display_edid_result.is_ok()) {
+    current_display_edid_bytes_ = std::move(display_edid_result).value();
+  }
+
+  fdf::info("Found display at ({}, {}) size {}x{}, flags 0x{:08x}",
+            current_display_.scanout_info.geometry.x, current_display_.scanout_info.geometry.y,
+            current_display_.scanout_info.geometry.width,
+            current_display_.scanout_info.geometry.height, current_display_.scanout_info.flags);
+  LogEdidBytes();
 
   // Set the mouse cursor position to (0,0); the result is not critical.
   zx::result<uint32_t> move_cursor_result =
-      gpu_device_->SetCursorPosition(current_display_.scanout_id, 0, 0, 0);
+      gpu_device_->SetCursorPosition(current_display_.scanout_id, 0, 0);
   if (move_cursor_result.is_error()) {
-    FDF_LOG(WARNING, "Failed to move cursor: %s", move_cursor_result.status_string());
+    fdf::warn("Failed to move cursor: {}", move_cursor_result);
   }
 
   // Run a worker thread to shove in flush events
@@ -445,7 +459,7 @@ zx_status_t DisplayEngine::Start() {
   thrd_create(&flush_thread_, virtio_gpu_flusher_entry, this);
   thrd_detach(flush_thread_);
 
-  FDF_LOG(TRACE, "Start() completed");
+  fdf::trace("Start() completed");
   return ZX_OK;
 }
 
@@ -454,7 +468,7 @@ const DisplayInfo* DisplayEngine::FirstValidDisplay(cpp20::span<const DisplayInf
 }
 
 zx_status_t DisplayEngine::Init() {
-  FDF_LOG(TRACE, "Init()");
+  fdf::trace("Init()");
 
   zx::result<> imported_images_init_result = imported_images_.Initialize();
   if (imported_images_init_result.is_error()) {
@@ -463,6 +477,48 @@ zx_status_t DisplayEngine::Init() {
   }
 
   return ZX_OK;
+}
+
+void DisplayEngine::LogEdidBytes() {
+  if (current_display_edid_bytes_.is_empty()) {
+    fdf::info("EDID not available");
+    return;
+  }
+
+  if constexpr (ZX_DEBUG_ASSERT_IMPLEMENTED) {
+    std::span<const uint8_t> bytes(current_display_edid_bytes_);
+
+    // The virtio-gpu implementation in QEmu 9.2 reports a zero-padded EDID that
+    // takes up the maximum buffer size in the virtio-gpu 1.3 specification.
+    //
+    // Trimming the trailing zeros significantly reduces the log output size.
+    const size_t original_size = bytes.size();
+    while (!bytes.empty() && bytes.back() == 0) {
+      bytes = bytes.subspan(0, bytes.size() - 1);
+    }
+
+    fdf::info("--- BEGIN EDID DATA: {} BYTES ---", original_size);
+    for (size_t line_start = 0; line_start < bytes.size();) {
+      // The logger truncates lines that exceed 1,024 bytes. We pack the bytes
+      // as compactly as possible, while meeting the constraint of mapping to
+      // the C++ initializer syntax used in our unit tests.
+      static constexpr int kMaxLoggingLineSize = 1020;
+      // Each byte is logged using 6 characters -- "0xcc, ".
+      static constexpr int kByteLoggingSize = 6;
+      static constexpr int kMaxLineBytes = kMaxLoggingLineSize / kByteLoggingSize;
+      const size_t line_byte_count = std::min<size_t>(kMaxLineBytes, bytes.size() - line_start);
+      fbl::StringBuffer<1020> line;
+      for (size_t i = 0; i < line_byte_count; ++i) {
+        line.AppendPrintf("0x%02x, ", bytes[line_start + i]);
+      }
+      fdf::info("{}", line.c_str());
+      line_start += line_byte_count;
+    }
+    fdf::info("--- END EDID DATA: {} BYTES; SKIPPED {} ZERO BYTES ---", original_size,
+              original_size - bytes.size());
+  } else {
+    fdf::info("EDID available, uses {} bytes", current_display_edid_bytes_.size());
+  }
 }
 
 }  // namespace virtio_display

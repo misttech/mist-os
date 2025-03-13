@@ -38,10 +38,7 @@ fn kern_return_check(error: iokit_usb::kern_return_t) -> Result<()> {
     if error == 0 {
         Ok(())
     } else {
-        Err(Error::IOError(IOError::new(
-            std::io::ErrorKind::Other,
-            format!("kern_return_t({error})"),
-        )))
+        Err(Error::IOError(IOError::other(format!("kern_return_t({error})"))))
     }
 }
 
@@ -50,7 +47,7 @@ pub fn ioreturn_check(error: iokit_usb::kern_return_t) -> Result<()> {
     if error == 0 {
         Ok(())
     } else {
-        Err(Error::IOError(IOError::new(std::io::ErrorKind::Other, format!("IOReturn({error})"))))
+        Err(Error::IOError(IOError::other(format!("IOReturn({error})"))))
     }
 }
 
@@ -307,12 +304,10 @@ impl MatchingDict {
         let ptr = unsafe {
             iokit_usb::IOServiceMatching(iokit_usb::kIOUSBDeviceClassName.as_ptr().cast())
         };
-        Ok(MatchingDict(std::ptr::NonNull::new(ptr).ok_or_else(|| {
-            Error::IOError(IOError::new(
-                std::io::ErrorKind::Other,
-                format!("Could not create matching dict"),
-            ))
-        })?))
+        Ok(MatchingDict(
+            std::ptr::NonNull::new(ptr)
+                .ok_or_else(|| Error::IOError(IOError::other("Could not create matching dict")))?,
+        ))
     }
 
     /// Get the raw pointer to the underlying matching dict. Destroys this wrapper object without
@@ -679,10 +674,7 @@ impl PlugInInterface {
         }
 
         if plugin_interface.is_null() {
-            return Err(Error::IOError(IOError::new(
-                std::io::ErrorKind::Other,
-                format!("Could not create plugin interface"),
-            )));
+            return Err(Error::IOError(IOError::other("Could not create plugin interface")));
         }
 
         Ok(PlugInInterface(plugin_interface))
@@ -705,10 +697,9 @@ impl PlugInInterface {
         std::mem::drop(self);
 
         if res != 0 || ptr.is_null() {
-            Err(Error::IOError(IOError::new(
-                std::io::ErrorKind::Other,
-                format!("Could not get CoreFoundation Interface HRESULT: {res}"),
-            )))
+            Err(Error::IOError(IOError::other(format!(
+                "Could not get CoreFoundation Interface HRESULT: {res}"
+            ))))
         } else {
             // SAFETY: As required, this pointer is non-null and returned from QueryInterface.
             unsafe { Ok(T::get(ptr)) }

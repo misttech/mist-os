@@ -93,9 +93,15 @@ import("//build/rust/rustc_test.gni")
 #     The name of the target as it appears in the BUILD file. Enables tooling
 #     to find the template invocation in a BUILD file where this target was defined.
 #
+#   applicable_licenses
+#   rustflags
+#
 # See //examples/rust/dylib/rust-shared/BUILD.gn for an example of using this template.
 #
 template("rustc_dylib") {
+  assert(is_fuchsia,
+         "Rust dylibs are currently only supported when targeting Fuchsia")
+
   if (defined(invoker.original_target_name)) {
     _original_target_name = invoker.original_target_name
   } else {
@@ -111,13 +117,20 @@ template("rustc_dylib") {
         name = invoker.name + "_dylib_test"
       }
       original_target_name = _original_target_name
-      forward_variables_from(invoker, "*", [ "name" ])
+      forward_variables_from(invoker,
+                             "*",
+                             [
+                               "name",
+                               "output_name",
+                               "public_deps",
+                             ])
     }
   }
 
   rustc_artifact(target_name) {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "deps",
                              "disable_clippy",
                              "disable_rbe",
@@ -125,18 +138,23 @@ template("rustc_dylib") {
                              "enforce_source_listing",
                              "features",
                              "inputs",
+                             "output_name",
+                             "public_deps",
+                             "rustflags",
                              "sources",
+                             "testonly",
+                             "visibility",
                            ])
 
     target_type = "shared_library"
     rust_crate_type = "dylib"
     crate_root = "src/lib.rs"
     if (defined(invoker.source_root)) {
-      crate_root = source_root
+      crate_root = invoker.source_root
     }
     crate_name = target_name
     if (defined(invoker.name)) {
-      crate_name = name
+      crate_name = invoker.name
     }
     original_target_name = _original_target_name
 
@@ -146,8 +164,6 @@ template("rustc_dylib") {
                                "data_deps",
                                "exclude_toolchain_tags",
                                "output_dir",
-                               "testonly",
-                               "visibility",
                              ])
 
       # Due to what is arguably a bug in the Rust compiler, if it sees libfoo.so
@@ -162,7 +178,9 @@ template("rustc_dylib") {
           "Specifying root_out_dir as the output_dir of a Rust dylib is unsupported. Choose a directory that won't have libraries of the same name from other languages.")
 
       # TODO: maybe just use target_name instead?
-      output_name = crate_name
+      if (!defined(output_name)) {
+        output_name = crate_name
+      }
       crate_type = "dylib"
     }
 
@@ -171,6 +189,9 @@ template("rustc_dylib") {
 
     # Avoid walking into data_deps when checking component manifest expected includes.
     metadata = {
+      if (defined(invoker.metadata)) {
+        forward_variables_from(invoker.metadata, "*")
+      }
       expect_includes_barrier = deps
     }
   }

@@ -6,31 +6,19 @@ use emulator_instance::{EmulatorInstanceInfo, EmulatorInstances};
 use ffx_config::EnvironmentContext;
 use ffx_emulator_engines::EngineBuilder;
 use ffx_emulator_stop_args::StopCommand;
-use fho::{
-    bug, return_user_error, user_error, Error, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter,
-};
-use schemars::JsonSchema;
-use serde::Serialize;
+use ffx_emulator_stop_command_output::CommandStatus;
+use ffx_writer::{ToolIO as _, VerifiedMachineWriter};
+use fho::{bug, return_user_error, user_error, Error, FfxMain, FfxTool};
 use std::io::Write;
 use std::path::PathBuf;
 
 /// Sub-sub tool for `emu stop`
 #[derive(FfxTool)]
+#[no_target]
 pub struct EmuStopTool {
     #[command]
     cmd: StopCommand,
     context: EnvironmentContext,
-}
-
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum CommandStatus {
-    /// Successful execution with informational strings.
-    Ok { messages: Vec<String> },
-    /// Unexpected error with string.
-    UnexpectedError { message: String },
-    /// A known kind of error that can be reported usefully to the user
-    UserError { message: String },
 }
 
 // Since this is a part of a legacy plugin, add

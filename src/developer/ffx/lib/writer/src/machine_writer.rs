@@ -1,17 +1,16 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{Format, Result, SimpleWriter, TestBuffers, ToolIO};
+use crate::{Result, SimpleWriter, TestBuffers, ToolIO};
+use async_trait::async_trait;
+use fho::{FhoEnvironment, TryFromEnv};
 use serde::Serialize;
 use std::fmt::Display;
 use std::io::Write;
+use writer::{Format, JsonWriter};
 
 /// Type-safe machine output implementation of [`crate::ToolIO`]
-pub struct MachineWriter<T> {
-    format: Option<Format>,
-    simple_writer: SimpleWriter,
-    _p: std::marker::PhantomData<fn(T)>,
-}
+pub struct MachineWriter<T>(JsonWriter<T>);
 
 impl<T> MachineWriter<T> {
     /// Create a new writer that doesn't support machine output at all, with the
@@ -21,18 +20,14 @@ impl<T> MachineWriter<T> {
         O: Write + 'static,
         E: Write + 'static,
     {
-        let simple_writer = SimpleWriter::new_buffers(stdout, stderr);
-        let _p = Default::default();
-        Self { format, simple_writer, _p }
+        Self(JsonWriter::new_buffers(format, stdout, stderr))
     }
 
     /// Create a new Writer with the specified format.
     ///
     /// Passing None for format implies no output via the machine function.
     pub fn new(format: Option<Format>) -> Self {
-        let simple_writer = SimpleWriter::new();
-        let _p = Default::default();
-        Self { format, simple_writer, _p }
+        Self(JsonWriter::new(format))
     }
 
     /// Returns a writer backed by string buffers that can be extracted after
@@ -44,7 +39,7 @@ impl<T> MachineWriter<T> {
     /// Allow using this writer as a SimpleWriter.
     /// This is useful for calling other tools that do not use MachineWriter.
     pub fn simple_writer(self) -> SimpleWriter {
-        self.simple_writer
+        self.0.simple_writer().into()
     }
 }
 
@@ -56,43 +51,26 @@ where
     ///
     /// This is a no-op if `is_machine` returns false.
     pub fn machine_many<I: IntoIterator<Item = T>>(&mut self, output: I) -> Result<()> {
-        if self.is_machine() {
-            for output in output {
-                self.machine(&output)?;
-            }
-        }
-        Ok(())
+        self.0.machine_many(output)
     }
 
     /// Write the item to standard output.
     ///
     /// This is a no-op if `is_machine` returns false.
     pub fn machine(&mut self, output: &T) -> Result<()> {
-        if let Some(format) = self.format {
-            format_output(format, &mut self.simple_writer, output)
-        } else {
-            Ok(())
-        }
+        self.0.machine(output)
     }
 
     /// If this object is outputting machine output, print the item's machine
     /// representation to stdout. Otherwise, print the display item given.
     pub fn machine_or<D: Display>(&mut self, value: &T, or: D) -> Result<()> {
-        match self.format {
-            Some(format) => format_output(format, &mut self.simple_writer, value)?,
-            None => writeln!(self, "{or}")?,
-        }
-        Ok(())
+        self.0.machine_or(value, or)
     }
 
     /// If this object is outputting machine output, print the item's machine
     /// representation to stdout. Otherwise, `write!` the display item given.
     pub fn machine_or_write<D: Display>(&mut self, value: &T, or: D) -> Result<()> {
-        match self.format {
-            Some(format) => format_output(format, &mut self.simple_writer, value)?,
-            None => write!(self, "{or}")?,
-        }
-        Ok(())
+        self.0.machine_or_write(value, or)
     }
 
     /// If this object is outputting machine output, prints the item's machine
@@ -103,37 +81,11 @@ where
         F: FnOnce() -> R,
         R: Display,
     {
-        match self.format {
-            Some(format) => format_output(format, &mut self.simple_writer, value)?,
-            None => writeln!(self, "{}", f())?,
-        }
-        Ok(())
+        self.0.machine_or_else(value, f)
     }
-
-    pub(crate) fn formatted<J: Serialize>(&mut self, output: &J) -> Result<()> {
-        if let Some(format) = self.format {
-            format_output(format, &mut self.simple_writer, output)
-        } else {
-            Ok(())
-        }
+    pub fn formatted<J: Serialize>(&mut self, output: &J) -> Result<()> {
+        self.0.formatted(output)
     }
-}
-
-pub(crate) fn format_output<W: Write, T>(format: Format, mut out: W, output: &T) -> Result<()>
-where
-    T: Serialize,
-{
-    match format {
-        Format::Json => {
-            serde_json::to_writer(&mut out, output)?;
-            writeln!(out)?;
-            out.flush()?;
-        }
-        Format::JsonPretty => {
-            serde_json::to_writer_pretty(&mut out, output)?;
-        }
-    }
-    Ok(())
 }
 
 impl<T> ToolIO for MachineWriter<T>
@@ -147,7 +99,7 @@ where
     }
 
     fn is_machine(&self) -> bool {
-        self.format.is_some()
+        self.0.format().is_some()
     }
 
     fn item(&mut self, value: &T) -> Result<()>
@@ -162,7 +114,7 @@ where
     }
 
     fn stderr(&mut self) -> &'_ mut Box<dyn Write> {
-        self.simple_writer.stderr()
+        self.0.stderr()
     }
 }
 
@@ -174,7 +126,7 @@ where
         if self.is_machine() {
             Ok(buf.len())
         } else {
-            self.simple_writer.write(buf)
+            self.0.write(buf)
         }
     }
 
@@ -182,10 +134,27 @@ where
         if self.is_machine() {
             Ok(())
         } else {
-            self.simple_writer.flush()
+            self.0.flush()
         }
     }
 }
+
+impl<T> Into<JsonWriter<T>> for MachineWriter<T>
+where
+    T: Serialize,
+{
+    fn into(self) -> JsonWriter<T> {
+        self.0
+    }
+}
+
+#[async_trait(?Send)]
+impl<T: serde::Serialize> TryFromEnv for MachineWriter<T> {
+    async fn try_from_env(env: &FhoEnvironment) -> fho::Result<Self> {
+        Ok(MachineWriter::new(env.ffx_command().global.machine))
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

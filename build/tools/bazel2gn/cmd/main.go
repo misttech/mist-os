@@ -6,21 +6,26 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"flag"
 	"fmt"
 	"io"
 	"log"
 	"os"
+	"os/exec"
 	"strings"
 
+	"github.com/google/go-cmp/cmp"
 	"go.fuchsia.dev/fuchsia/build/tools/bazel2gn"
 	"go.starlark.net/starlark"
 	"go.starlark.net/syntax"
 )
 
 var (
+	gnBin          = flag.String("gn_bin", "", "Path to the GN binary.")
 	bazelInputPath = flag.String("bazel_input_path", "", "Path to read the BUILD.bazel file from.")
 	gnOutputPath   = flag.String("gn_output_path", "", "Path to output the converted GN targest to.")
+	checkOnly      = flag.Bool("check_only", false, "When true, compare generated GN content with the input GN file without writing to it")
 )
 
 // bazelBuiltins contains all known Bazel builtin functions. The starlark parser
@@ -73,6 +78,10 @@ func main() {
 		log.Fatal("--gn_output_path is required, see --help")
 	}
 
+	if *gnBin == "" {
+		log.Fatal("--gn_bin is required, see --help")
+	}
+
 	opts := new(syntax.FileOptions)
 	bazelIn, _, err := starlark.SourceProgramOptions(opts, *bazelInputPath, nil, bazelBuiltins.Has)
 	if err != nil {
@@ -99,15 +108,49 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to read GN targets to preserve: %v", err)
 	}
-	finalContent := toPreserve + "\n" + sentinelComment + "\n" + bazel2gnComment + "\n" + strings.Join(finalLines, "\n")
-
-	// Open the GN file again for write.
-	gnOut, err = os.OpenFile(*gnOutputPath, os.O_WRONLY|os.O_TRUNC, 0)
+	finalContent, err := gnFormated(
+		context.Background(),
+		*gnBin,
+		toPreserve+"\n"+sentinelComment+"\n"+bazel2gnComment+"\n"+strings.Join(finalLines, "\n"),
+	)
 	if err != nil {
-		log.Fatalf("Failed to open %s for writing: %v", *gnOutputPath, err)
+		log.Fatalf("Formatting final GN targets: %v", err)
 	}
-	if _, err := io.WriteString(gnOut, finalContent); err != nil {
-		log.Fatalf("Failed to write final GN build file: %v", err)
+
+	if *checkOnly {
+		gnOut, err := os.Open(*gnOutputPath)
+		if err != nil {
+			log.Fatalf("Failed to open %s for reading: %v", *gnOutputPath, err)
+		}
+		actual, err := io.ReadAll(gnOut)
+		if err != nil {
+			log.Fatalf("Failed to read full content of %s", *gnOutputPath)
+		}
+		if diff := cmp.Diff(string(actual), finalContent); diff != "" {
+			log.Fatalf(`
+The following BUILD files are not in sync:
+
+  - %s
+  - %s
+
+Make sure you update the BUILD.bazel file, then run this command to sync BUILD.gn:
+
+  fx bazel2gn
+
+Diff of GN targets (-actual, +expected):
+
+%s`,
+				*bazelInputPath, *gnOutputPath, diff)
+		}
+	} else {
+		// Open the GN file again for write.
+		gnOut, err = os.OpenFile(*gnOutputPath, os.O_WRONLY|os.O_TRUNC, 0)
+		if err != nil {
+			log.Fatalf("Failed to open %s for writing: %v", *gnOutputPath, err)
+		}
+		if _, err := io.WriteString(gnOut, finalContent); err != nil {
+			log.Fatalf("Failed to write final GN build file: %v", err)
+		}
 	}
 }
 
@@ -124,4 +167,23 @@ func gnTargetsToPreserve(r io.Reader) (string, error) {
 		}
 	}
 	return ret.String(), nil
+}
+
+func gnFormated(ctx context.Context, gnBin string, original string) (string, error) {
+	cmd := exec.CommandContext(ctx, gnBin, "format", "--stdin")
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return "", fmt.Errorf("cmd.StdinPipe of `gn format`: %v", err)
+	}
+	if _, err := io.WriteString(stdin, original); err != nil {
+		return "", fmt.Errorf("writing stdin for `gn format`: %v", err)
+	}
+	if err := stdin.Close(); err != nil {
+		return "", fmt.Errorf("closing stdin of `gn format`: %v", err)
+	}
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("`gn format` error: %v\nCombinedOutput:\n%s", err, string(out))
+	}
+	return string(out), nil
 }

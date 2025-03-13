@@ -75,9 +75,6 @@ class PrimaryFidlServer : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
                                         uint64_t length) = 0;
 
     virtual void SetNotificationCallback(msd::NotificationHandler* handler) = 0;
-    virtual magma::Status ExecuteImmediateCommands(uint32_t context_id, uint64_t commands_size,
-                                                   void* commands, uint64_t semaphore_count,
-                                                   uint64_t* semaphore_ids) = 0;
     virtual magma::Status ExecuteInlineCommands(
         uint32_t context_id, std::vector<magma_inline_command_buffer> commands) = 0;
     virtual magma::Status EnablePerformanceCounterAccess(zx::handle access_token) = 0;

@@ -18,7 +18,6 @@ use fuchsia_url::boot_url::BootUrl;
 use fuchsia_url::AbsoluteComponentUrl;
 use log::{error, info, warn};
 use moniker::Moniker;
-use once_cell::sync::Lazy;
 use routing::environment::RunnerRegistry;
 use scrutiny_collection::core::{Components, CoreDataDeps, ManifestData, Manifests};
 use scrutiny_collection::model::DataModel;
@@ -34,7 +33,7 @@ use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_internal as co
 
 // The default root component URL used to identify the root instance of the component model
 // unless the RuntimeConfig specifies a different root URL.
-pub static DEFAULT_ROOT_URL: Lazy<Url> = Lazy::new(|| {
+pub static DEFAULT_ROOT_URL: std::sync::LazyLock<Url> = std::sync::LazyLock::new(|| {
     Url::new(
         &BootUrl::new_resource("/root".to_string(), ROOT_RESOURCE.to_string()).unwrap().to_string(),
     )

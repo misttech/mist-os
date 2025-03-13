@@ -24,11 +24,23 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::AllDeviceSockets>>
     type SocketTablesCoreCtx<'a> =
         CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::AnyDeviceSockets>>;
 
+    fn with_all_device_sockets<
+        F: FnOnce(&AllSockets<Self::WeakDeviceId, BC>, &mut Self::SocketTablesCoreCtx<'_>) -> R,
+        R,
+    >(
+        &mut self,
+        cb: F,
+    ) -> R {
+        let (sockets, mut locked) = self.read_lock_and::<crate::lock_ordering::AllDeviceSockets>();
+        let mut locked = locked.cast_locked::<crate::lock_ordering::AnyDeviceSockets>();
+        cb(&*sockets, &mut locked)
+    }
+
     fn with_all_device_sockets_mut<F: FnOnce(&mut AllSockets<Self::WeakDeviceId, BC>) -> R, R>(
         &mut self,
         cb: F,
     ) -> R {
-        let mut locked = self.lock::<crate::lock_ordering::AllDeviceSockets>();
+        let mut locked = self.write_lock::<crate::lock_ordering::AllDeviceSockets>();
         cb(&mut locked)
     }
 
@@ -62,7 +74,10 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::AllDeviceSockets>>
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSocketState>>
     SocketStateAccessor<BC> for CoreCtx<'_, BC, L>
 {
-    fn with_socket_state<F: FnOnce(&BC::SocketState, &Target<Self::WeakDeviceId>) -> R, R>(
+    fn with_socket_state<
+        F: FnOnce(&BC::SocketState<Self::WeakDeviceId>, &Target<Self::WeakDeviceId>) -> R,
+        R,
+    >(
         &mut self,
         id: &DeviceSocketId<Self::WeakDeviceId, BC>,
         cb: F,
@@ -74,7 +89,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSocketState>
     }
 
     fn with_socket_state_mut<
-        F: FnOnce(&BC::SocketState, &mut Target<Self::WeakDeviceId>) -> R,
+        F: FnOnce(&BC::SocketState<Self::WeakDeviceId>, &mut Target<Self::WeakDeviceId>) -> R,
         R,
     >(
         &mut self,

@@ -83,23 +83,14 @@ class TestFile : public fio::testing::File_TestBase {
 
 class TestDirectory : public fio::testing::Directory_TestBase {
  public:
-  using OpenHandler = fit::function<void(fio::OpenFlags flags, std::string path,
-                                         fidl::InterfaceRequest<fio::Node> object)>;
-  using Open3Handler =
+  using OpenHandler =
       fit::function<void(fio::Flags flags, std::string_view path, zx::channel object)>;
 
   void SetOpenHandler(OpenHandler open_handler) { open_handler_ = std::move(open_handler); }
-  void SetOpen3Handler(Open3Handler open3_handler) { open3_handler_ = std::move(open3_handler); }
 
  private:
-  void Open(fio::OpenFlags flags, fio::ModeType mode, std::string path,
-            fidl::InterfaceRequest<fio::Node> object) override {
-    open_handler_(flags, std::move(path), std::move(object));
-  }
-
-  void Open3(std::string path, fio::Flags flags, fio::Options options,
-             zx::channel object) override {
-    open3_handler_(flags, path, std::move(object));
+  void Open(std::string path, fio::Flags flags, fio::Options options, zx::channel object) override {
+    open_handler_(flags, path, std::move(object));
   }
 
   void NotImplemented_(const std::string& name) override {
@@ -107,7 +98,6 @@ class TestDirectory : public fio::testing::Directory_TestBase {
   }
 
   OpenHandler open_handler_;
-  Open3Handler open3_handler_;
 };
 
 class TestTransaction : public fidl::Transaction {
@@ -165,7 +155,7 @@ class DriverHostTest : public testing::Test {
     TestDirectory pkg_directory;
     fidl::Binding<fio::Directory> pkg_binding(&pkg_directory);
     pkg_binding.Bind(pkg_endpoints.server.TakeChannel(), loop_.dispatcher());
-    pkg_directory.SetOpen3Handler(
+    pkg_directory.SetOpenHandler(
         [this, &file_binding](fio::Flags flags, std::string_view path, zx::channel object) {
           EXPECT_EQ(fio::PERM_READABLE | fio::PERM_EXECUTABLE, flags);
           EXPECT_EQ("driver/library.so", path);
@@ -486,7 +476,7 @@ TEST_F(DriverHostTest, Start_InvalidBinary) {
   TestDirectory pkg_directory;
   fidl::Binding<fio::Directory> pkg_binding(&pkg_directory);
   pkg_binding.Bind(pkg_endpoints.server.TakeChannel(), loop().dispatcher());
-  pkg_directory.SetOpen3Handler(
+  pkg_directory.SetOpenHandler(
       [this, &file_binding](fio::Flags flags, std::string_view path, zx::channel object) {
         EXPECT_EQ(fio::PERM_READABLE | fio::PERM_EXECUTABLE, flags);
         EXPECT_EQ("driver/library.so", path);

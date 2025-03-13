@@ -19,5 +19,5 @@ trackers: {
 }
 
 presubmits: {
-  auto_reviewers: "cflewis@google.com"
+  auto_reviewers: " fuchsia-infra-reviews@google.com"
 }

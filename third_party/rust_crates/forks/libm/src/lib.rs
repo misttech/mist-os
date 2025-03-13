@@ -16,6 +16,9 @@ extern "C" {
     #[link_name = "cbrt"]
     fn cbrt_raw(x: f64) -> f64;
 
+    #[link_name = "exp"]
+    fn exp_raw(x: f64) -> f64;
+
     #[link_name = "frexpf"]
     fn frexpf_raw(x: f32, exp: *mut i32) -> f32;
 
@@ -25,14 +28,26 @@ extern "C" {
     #[link_name = "ldexpf"]
     fn ldexpf_raw(x: f32, n: i32) -> f32;
 
+    #[link_name = "log"]
+    fn log_raw(x: f64) -> f64;
+
     #[link_name = "modf"]
     fn modf_raw(x: f64, integer_part: *mut f64) -> f64;
+
+    #[link_name = "sqrt"]
+    fn sqrt_raw(x: f64) -> f64;
 }
 
 /// Cube root
 #[inline]
 pub fn cbrt(x: f64) -> f64 {
     unsafe { cbrt_raw(x) }
+}
+
+/// Returns 'e' raised to the power `x`.
+#[inline]
+pub fn exp(x: f64) -> f64 {
+    unsafe { exp_raw(x) }
 }
 
 /// Decomposes given floating point value x into a normalized fraction and an integral power of two.
@@ -55,6 +70,12 @@ pub fn ldexpf(x: f32, n: i32) -> f32 {
     unsafe { ldexpf_raw(x, n) }
 }
 
+/// Returns the base-'e' logarithm of the provided number.
+#[inline]
+pub fn log(x: f64) -> f64 {
+    unsafe { log_raw(x) }
+}
+
 /// Returns the fractional and integral parts of an f64. The return ordering `(fractional_part,
 /// integral_part)` is based on the libm crate from crates.io.
 #[inline]
@@ -62,4 +83,10 @@ pub fn modf(x: f64) -> (f64, f64) {
     let mut integral_part = 0.0;
     let fractional_part = unsafe { modf_raw(x, &mut integral_part) };
     (fractional_part, integral_part)
+}
+
+/// Returns the square root of the provided number.
+#[inline]
+pub fn sqrt(x: f64) -> f64 {
+    unsafe { sqrt_raw(x) }
 }

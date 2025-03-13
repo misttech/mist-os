@@ -86,7 +86,8 @@ inline std::string FindInterp(FileArg&& file_arg) {
     return elfldltl::ContainerArrayFromFile<elfldltl::StdContainer<std::vector>::Container<T>>(
         diag, "impossible")(count);
   };
-  EXPECT_TRUE(elfldltl::WithLoadHeadersFromFile(diag, file, phdr_allocator, scan_phdrs));
+  EXPECT_TRUE(elfldltl::WithLoadHeadersFromFile(diag, file, phdr_allocator, scan_phdrs,
+                                                std::nullopt, std::nullopt));
   return result;
 }
 

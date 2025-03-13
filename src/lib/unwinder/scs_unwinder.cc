@@ -4,9 +4,14 @@
 
 #include "src/lib/unwinder/scs_unwinder.h"
 
+#include "src/lib/unwinder/cfi_unwinder.h"
 #include "src/lib/unwinder/registers.h"
 
 namespace unwinder {
+
+Error ShadowCallStackUnwinder::Step(Memory* scs, const Frame& current, Frame& next) {
+  return Step(scs, current.regs, next.regs);
+}
 
 Error ShadowCallStackUnwinder::Step(Memory* scs, const Registers& current, Registers& next) {
   RegisterID scs_reg;

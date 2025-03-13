@@ -1,0 +1,26 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//src/power/system-activity-governor/meta/no-suspender-for-test-sag.shard.cml",
+        "//src/starnix/containers/debian/meta/debian_container_for_test.shard.cml",
+        "//src/starnix/tests/starnix_test.shard.cml",
+    ],
+    program: {
+        binary: "data/tests/vdso_calculate_utc_test-bin",
+        uid: "0",
+        test_type: "gtest",
+    },
+    use: [
+        {
+            storage: "custom_artifacts",
+            rights: [ "rw*" ],
+            path: "/custom_artifacts",
+        },
+        {
+            storage: "data",
+            path: "/data",
+        },
+    ],
+}

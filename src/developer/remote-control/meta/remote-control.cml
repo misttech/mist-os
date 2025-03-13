@@ -22,12 +22,6 @@
             default: false,
         },
         {
-            directory: "dev-overnet-usb",
-            rights: [ "r*" ],
-            path: "/dev/class/overnet-usb",
-            availability: "optional",
-        },
-        {
             protocol: [
                 "fuchsia.boot.Arguments",
                 "fuchsia.sys2.LifecycleController.root",
@@ -49,6 +43,9 @@
                 "fuchsia.test.manager.RunBuilder",
             ],
             availability: "optional",
+        },
+        {
+            service: [ "fuchsia.hardware.overnet.Service" ],
         },
     ],
     expose: [

@@ -2157,12 +2157,13 @@ closed protocol Object {
     /// *buffer* type: `zx_info_memory_stall_t[1]`
     ///
     /// ```c
+    /// // Contains the accumulated stall times since boot.
     /// typedef struct zx_info_memory_stall {
-    ///   // Total monotonic time spent with at least one memory-stalled thread.
-    ///   zx_duration_t stall_time_some;
+    ///   // Total time spent with at least one memory-stalled thread.
+    ///   zx_duration_mono_t stall_time_some;
     ///
-    ///   // Total monotonic time spent with all threads memory-stalled.
-    ///   zx_duration_t stall_time_full;
+    ///   // Total time spent with all threads memory-stalled.
+    ///   zx_duration_mono_t stall_time_full;
     /// } zx_info_memory_stall_t;
     /// ```
     ///

@@ -145,10 +145,10 @@ impl fmt::Display for Address {
 
 #[cfg(target_os = "fuchsia")]
 impl WriteInspect for Address {
-    fn write_inspect(
+    fn write_inspect<'a>(
         &self,
         writer: &fuchsia_inspect::Node,
-        key: impl Into<fuchsia_inspect::StringReference>,
+        key: impl Into<std::borrow::Cow<'a, str>>,
     ) {
         writer.record_string(key, self.to_string());
     }

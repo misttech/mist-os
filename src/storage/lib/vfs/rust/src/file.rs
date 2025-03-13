@@ -56,6 +56,8 @@ pub use vmo::read_only;
 pub struct FileOptions {
     pub rights: fio::Operations,
     pub is_append: bool,
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    pub is_linkable: bool,
 }
 
 impl FileOptions {

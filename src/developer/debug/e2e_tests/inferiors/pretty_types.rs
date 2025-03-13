@@ -10,7 +10,7 @@ extern "C" {
     static p: std::os::raw::c_ulong;
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, PartialOrd, Eq, Ord)]
 struct NestedType {
     #[allow(dead_code)]
     num: u32,
@@ -36,6 +36,19 @@ fn main() {
     v.output.push(NestedType { num: 7 });
     v.output.push(NestedType { num: 8 });
     v.output.push(NestedType { num: 9 });
+
+    let mut heap: std::collections::BinaryHeap<NestedType> = std::collections::BinaryHeap::new();
+    heap.push(NestedType { num: 2 });
+    heap.push(NestedType { num: 4 });
+    heap.push(NestedType { num: 6 });
+    heap.push(NestedType { num: 8 });
+    heap.push(NestedType { num: 10 });
+
+    let s = "hello".to_string();
+
+    let os_str = std::ffi::OsStr::new("osstr");
+
+    println!("{:?} {:?} {:?}", heap.pop(), s, os_str);
 
     // So that the global variable doesn't get optimized away.
     unsafe {

@@ -213,11 +213,12 @@ class StashPublisherBridge : public fidl::testing::WireTestBase<fuchsia_io::Dire
     }
   }
 
-  void Open(OpenRequestView request, OpenCompleter::Sync& completer) final {
+  void DeprecatedOpen(DeprecatedOpenRequestView request,
+                      DeprecatedOpenCompleter::Sync& completer) final {
     HandleOpenRequest(request->path.get(), request->object.TakeChannel());
   }
 
-  void Open3(Open3RequestView request, Open3Completer::Sync& completer) final {
+  void Open(OpenRequestView request, OpenCompleter::Sync& completer) final {
     HandleOpenRequest(request->path.get(), std::move(request->object));
   }
 

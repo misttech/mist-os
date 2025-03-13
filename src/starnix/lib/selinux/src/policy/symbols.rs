@@ -11,9 +11,9 @@ use super::parser::ParseStrategy;
 use super::security_context::{CategoryIterator, Level, SecurityContext};
 use super::{
     array_type, array_type_validate_deref_both, array_type_validate_deref_data,
-    array_type_validate_deref_metadata_data_vec, array_type_validate_deref_none_data_vec, Array,
-    CategoryId, ClassId, Counted, Parse, ParseSlice, RoleId, SensitivityId, TypeId, UserId,
-    Validate, ValidateArray,
+    array_type_validate_deref_metadata_data_vec, array_type_validate_deref_none_data_vec,
+    AccessVector, Array, CategoryId, ClassId, ClassPermissionId, Counted, Parse, ParseSlice,
+    RoleId, SensitivityId, TypeId, UserId, Validate, ValidateArray,
 };
 
 use anyhow::{anyhow, Context as _};
@@ -22,23 +22,21 @@ use std::num::NonZeroU32;
 use std::ops::Deref;
 use zerocopy::{little_endian as le, FromBytes, Immutable, KnownLayout, Unaligned};
 
+/// ** Constraint term types ***
+///
 /// The `constraint_term_type` metadata field value for a [`ConstraintTerm`]
 /// that represents the "not" operator.
 pub(super) const CONSTRAINT_TERM_TYPE_NOT_OPERATOR: u32 = 1;
-
 /// The `constraint_term_type` metadata field value for a [`ConstraintTerm`]
 /// that represents the "and" operator.
 pub(super) const CONSTRAINT_TERM_TYPE_AND_OPERATOR: u32 = 2;
-
 /// The `constraint_term_type` metadata field value for a [`ConstraintTerm`]
 /// that represents the "or" operator.
 pub(super) const CONSTRAINT_TERM_TYPE_OR_OPERATOR: u32 = 3;
-
 /// The `constraint_term_type` metadata field value for a [`ConstraintTerm`]
 /// that represents a boolean expression where both arguments are fields of
 /// a source and/or target security context.
 pub(super) const CONSTRAINT_TERM_TYPE_EXPR: u32 = 4;
-
 /// The `constraint_term_type` metadata field value for a [`ConstraintTerm`]
 /// that represents a boolean expression where:
 ///
@@ -53,6 +51,8 @@ pub(super) const CONSTRAINT_TERM_TYPE_EXPR: u32 = 4;
 /// [`TypeSet`] encoding the corresponding set of types.
 pub(super) const CONSTRAINT_TERM_TYPE_EXPR_WITH_NAMES: u32 = 5;
 
+/// ** Constraint expression operator types ***
+///
 /// Valid `expr_operator_type` metadata field values for a [`ConstraintTerm`]
 /// with `type` equal to `CONSTRAINT_TERM_TYPE_EXPR` or
 /// `CONSTRAINT_TERM_TYPE_EXPR_WITH_NAMES`.
@@ -79,6 +79,13 @@ pub(super) const CONSTRAINT_EXPR_OPERATOR_TYPE_DOMBY: u32 = 4;
 /// Valid for constraints on security levels.
 pub(super) const CONSTRAINT_EXPR_OPERATOR_TYPE_INCOMP: u32 = 5;
 
+/// ** Constraint expression types ***
+///
+/// Although these values each have a single bit set, they appear to be
+/// used as enum values rather than as bit masks: i.e., the policy compiler
+/// does not produce access vector rule structures that have more than
+/// one of these types.
+///
 /// Valid `expr_operand_type` metadata field values for a [`ConstraintTerm`]
 /// with `constraint_term_type` equal to `CONSTRAINT_TERM_TYPE_EXPR` or
 /// `CONSTRAINT_TERM_TYPE_EXPR_WITH_NAMES`.
@@ -97,29 +104,29 @@ pub(super) const CONSTRAINT_EXPR_OPERATOR_TYPE_INCOMP: u32 = 5;
 /// the `expr_operand_type` field is set (--> target) or not (--> source).
 ///
 /// The `expr_operand_type` value for an expression comparing user IDs.
-pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_USER: u32 = 1;
+pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_USER: u32 = 0x1;
 /// The `expr_operand_type` value for an expression comparing role IDs.
-pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_ROLE: u32 = 2;
+pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_ROLE: u32 = 0x2;
 /// The `expr_operand_type` value for an expression comparing type IDs.
-pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_TYPE: u32 = 4;
+pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_TYPE: u32 = 0x4;
 /// The `expr_operand_type` value for an expression comparing the source
 /// context's low security level to the target context's low security level.
-pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_L1_L2: u32 = 32;
+pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_L1_L2: u32 = 0x20;
 /// The `expr_operand_type` value for an expression comparing the source
 /// context's low security level to the target context's high security level.
-pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_L1_H2: u32 = 64;
+pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_L1_H2: u32 = 0x40;
 /// The `expr_operand_type` value for an expression comparing the source
 /// context's high security level to the target context's low security level.
-pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_H1_L2: u32 = 128;
+pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_H1_L2: u32 = 0x80;
 /// The `expr_operand_type` value for an expression comparing the source
 /// context's high security level to the target context's high security level.
-pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_H1_H2: u32 = 256;
+pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_H1_H2: u32 = 0x100;
 /// The `expr_operand_type` value for an expression comparing the source
 /// context's low security level to the source context's high security level.
-pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_L1_H1: u32 = 512;
+pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_L1_H1: u32 = 0x200;
 /// The `expr_operand_type` value for an expression comparing the target
 /// context's low security level to the target context's high security level.
-pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_L2_H2: u32 = 1024;
+pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_L2_H2: u32 = 0x400;
 
 /// For a [`ConstraintTerm`] with `constraint_term_type` equal to
 /// `CONSTRAINT_TERM_TYPE_EXPR_WITH_NAMES` the `expr_operand_type` may have the
@@ -133,7 +140,7 @@ pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_L2_H2: u32 = 1024;
 /// If the bit is not set, then the expression compares the source's
 /// {user,role,type} ID to the set of IDs listed in the [`ConstraintTerm`]'s
 /// `names` field.
-pub(super) const CONSTRAINT_EXPR_WITH_NAMES_OPERAND_TYPE_TARGET_MASK: u32 = 8;
+pub(super) const CONSTRAINT_EXPR_WITH_NAMES_OPERAND_TYPE_TARGET_MASK: u32 = 0x8;
 
 /// Exact value of [`Type`] `properties` when the underlying data refers to an SELinux type.
 ///
@@ -360,8 +367,9 @@ impl<PS: ParseStrategy> Permission<PS> {
         PS::deref_slice(&self.data)
     }
 
-    pub fn id(&self) -> u32 {
-        PS::deref(&self.metadata).id.get()
+    /// Returns the ID of this permission in the scope of its associated class.
+    pub fn id(&self) -> ClassPermissionId {
+        ClassPermissionId(NonZeroU32::new(PS::deref(&self.metadata).id.get()).unwrap())
     }
 }
 
@@ -422,17 +430,15 @@ pub(super) struct Constraint<PS: ParseStrategy>
 where
     ConstraintExpr<PS>: Debug + PartialEq,
 {
-    permission_mask: PS::Output<le::U32>,
+    access_vector: PS::Output<le::U32>,
     constraint_expr: ConstraintExpr<PS>,
 }
 
 impl<PS: ParseStrategy> Constraint<PS> {
-    #[allow(dead_code)]
-    pub(super) fn permission_mask(&self) -> le::U32 {
-        *PS::deref(&self.permission_mask)
+    pub(super) fn access_vector(&self) -> AccessVector {
+        AccessVector((*PS::deref(&self.access_vector)).get())
     }
 
-    #[allow(dead_code)]
     pub(super) fn constraint_expr(&self) -> &ConstraintExpr<PS> {
         &self.constraint_expr
     }
@@ -448,9 +454,9 @@ where
         let tail = bytes;
 
         let num_bytes = tail.len();
-        let (permission_mask, tail) = PS::parse::<le::U32>(tail).ok_or_else(|| {
+        let (access_vector, tail) = PS::parse::<le::U32>(tail).ok_or_else(|| {
             Into::<anyhow::Error>::into(ParseError::MissingData {
-                type_name: "PermissionMask",
+                type_name: "AccessVector",
                 type_size: std::mem::size_of::<le::U32>(),
                 num_bytes,
             })
@@ -459,7 +465,7 @@ where
             .map_err(|error| error.into() as anyhow::Error)
             .context("parsing constraint expression")?;
 
-        Ok((Self { permission_mask, constraint_expr }, tail))
+        Ok((Self { access_vector, constraint_expr }, tail))
     }
 }
 
@@ -486,8 +492,6 @@ impl<PS: ParseStrategy> ValidateArray<ConstraintTermCount, ConstraintTerm<PS>>
 }
 
 impl<PS: ParseStrategy> ConstraintExpr<PS> {
-    // TODO: https://fxbug.dev/372400976 - Remove `dead_code` guard.
-    #[allow(dead_code)]
     pub(super) fn evaluate(
         &self,
         source_context: &SecurityContext,
@@ -696,18 +700,9 @@ fn find_class_by_name_bytes<'a, PS: ParseStrategy>(
     None
 }
 
-/// Locates a class named `name` among `classes`. Returns the first such class found, though policy
-/// validation should ensure that only one such class exists.
-///
-/// TODO: Eliminate `dead_code` guard.
-#[allow(dead_code)]
-pub(super) fn find_common_symbol_by_name<'a, PS: ParseStrategy>(
-    common_symbols: &'a CommonSymbols<PS>,
-    name: &str,
-) -> Option<&'a CommonSymbol<PS>> {
-    find_common_symbol_by_name_bytes(common_symbols, name.as_bytes())
-}
-
+/// Locates a symbol named `name_bytes` among `common_symbols`. Returns
+/// the first such symbol found, though policy validation should ensure
+/// that only one exists.
 pub(super) fn find_common_symbol_by_name_bytes<'a, PS: ParseStrategy>(
     common_symbols: &'a CommonSymbols<PS>,
     name_bytes: &[u8],
@@ -715,63 +710,6 @@ pub(super) fn find_common_symbol_by_name_bytes<'a, PS: ParseStrategy>(
     for common_symbol in common_symbols.into_iter() {
         if common_symbol.name_bytes() == name_bytes {
             return Some(common_symbol);
-        }
-    }
-
-    None
-}
-
-/// Locates a permission named `name` associated with `class`. The policy language supports a
-/// limited form of inheritance. For example:
-///
-/// ```config
-/// common file { ioctl read write create [...] }
-/// class file inherits file { execute_no_trans entrypoint }
-/// ```
-///
-/// Each `class` may inherit from zero or one `common`, in which case the permissions specified in
-/// the denoted `common` are also permissions in `class`. Locating these "common" permissions is the
-/// reason that `common_symbols` is received as a function input.
-pub(super) fn find_class_permission_by_name<'a, PS: ParseStrategy>(
-    common_symbols: &'a CommonSymbols<PS>,
-    class: &'a Class<PS>,
-    name: &'a str,
-) -> Option<&'a Permission<PS>> {
-    let name_bytes = name.as_bytes();
-    if let Some(permission) = find_own_class_permission_by_name_bytes(class, name_bytes) {
-        Some(permission)
-    } else if let Some(common_symbol) =
-        find_common_symbol_by_name_bytes(common_symbols, class.common_name_bytes())
-    {
-        find_common_permission_by_name_bytes(common_symbol, name_bytes)
-    } else {
-        None
-    }
-}
-
-fn find_own_class_permission_by_name_bytes<'a, PS: ParseStrategy>(
-    class: &'a Class<PS>,
-    name_bytes: &'a [u8],
-) -> Option<&'a Permission<PS>> {
-    let own_permissions: &Permissions<PS> = &class.constraints.metadata.data;
-    find_own_permission_by_name_bytes(own_permissions, name_bytes)
-}
-
-fn find_common_permission_by_name_bytes<'a, PS: ParseStrategy>(
-    common_symbol: &'a CommonSymbol<PS>,
-    name_bytes: &'a [u8],
-) -> Option<&'a Permission<PS>> {
-    let own_permissions: &Permissions<PS> = &common_symbol.data;
-    find_own_permission_by_name_bytes(own_permissions, name_bytes)
-}
-
-fn find_own_permission_by_name_bytes<'a, PS: ParseStrategy>(
-    own_permissions: &'a Permissions<PS>,
-    name_bytes: &'a [u8],
-) -> Option<&'a Permission<PS>> {
-    for permission in own_permissions {
-        if permission.name_bytes() == name_bytes {
-            return Some(permission);
         }
     }
 
@@ -834,18 +772,6 @@ impl<PS: ParseStrategy> Class<PS> {
         ClassId(NonZeroU32::new(class_metadata.id.get()).unwrap())
     }
 
-    /// Returns whether this class inherits from a named `common` policy statement. For example,
-    /// `common file { common_file_perm }`, `class file inherits file { file_perm }` yields two
-    /// [`Class`] objects, one that refers to a permission named `"common_file_perm"` permission and
-    /// has `self.has_common() == false`, and another that refers to a permission named
-    /// `"file_perm"` and has `self.has_common() == true`.
-    ///
-    /// TODO: Eliminate `dead_code` guard.
-    #[allow(dead_code)]
-    pub fn has_common(&self) -> bool {
-        self.common_name_bytes().len() != 0
-    }
-
     /// Returns the full listing of permissions used in this policy.
     pub fn permissions(&self) -> &Permissions<PS> {
         &self.constraints.metadata.data
@@ -858,7 +784,6 @@ impl<PS: ParseStrategy> Class<PS> {
     /// The same permission may appear in multiple entries in the returned list.
     // TODO: https://fxbug.dev/372400976 - Is it accurate to change "may be
     // granted to "are granted" above?
-    #[allow(dead_code)]
     pub fn constraints(&self) -> &Vec<Constraint<PS>> {
         &self.constraints.data
     }
@@ -1946,7 +1871,7 @@ mod tests {
             ),
         ];
         for (i, constraint) in constraints.iter().enumerate() {
-            assert_eq!(constraint.permission_mask(), 1, "constraint {}", i);
+            assert_eq!(constraint.access_vector(), AccessVector(1), "constraint {}", i);
             let terms = constraint.constraint_expr().constraint_terms();
             assert_eq!(terms.len(), 1, "constraint {}", i);
             let term = &terms[0];
@@ -1971,7 +1896,7 @@ mod tests {
         let constraints = class.constraints();
         assert_eq!(constraints.len(), 1);
         let constraint = &constraints[0];
-        assert_eq!(constraint.permission_mask(), 1);
+        assert_eq!(constraint.access_vector(), AccessVector(1));
         let terms = constraint.constraint_expr().constraint_terms();
         assert_eq!(terms.len(), 8);
 

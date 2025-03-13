@@ -187,7 +187,7 @@ bool DiscardableVmoTracker::DebugIsInDiscardableListLocked(bool reclaim_candidat
 }
 
 bool DiscardableVmoTracker::DebugIsReclaimable() const {
-  Guard<CriticalMutex> guard{cow_->lock()};
+  Guard<VmoLockType> guard{cow_->lock()};
   if (discardable_state_ != DiscardableState::kReclaimable) {
     return false;
   }
@@ -195,7 +195,7 @@ bool DiscardableVmoTracker::DebugIsReclaimable() const {
 }
 
 bool DiscardableVmoTracker::DebugIsUnreclaimable() const {
-  Guard<CriticalMutex> guard{cow_->lock()};
+  Guard<VmoLockType> guard{cow_->lock()};
   if (discardable_state_ != DiscardableState::kUnreclaimable) {
     return false;
   }
@@ -203,7 +203,7 @@ bool DiscardableVmoTracker::DebugIsUnreclaimable() const {
 }
 
 bool DiscardableVmoTracker::DebugIsDiscarded() const {
-  Guard<CriticalMutex> guard{cow_->lock()};
+  Guard<VmoLockType> guard{cow_->lock()};
   if (discardable_state_ != DiscardableState::kDiscarded) {
     return false;
   }

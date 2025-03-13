@@ -23,7 +23,9 @@ pub mod fidl;
 pub use self::capability::{Capability, CapabilityBound, ConversionError, RemoteError};
 pub use self::connector::{Connectable, Connector, Message};
 pub use self::data::Data;
-pub use self::dict::{Dict, Key as DictKey};
+pub use self::dict::{
+    Dict, EntryUpdate, Key as DictKey, UpdateNotifierFn, UpdateNotifierRetention,
+};
 pub use self::dir_connector::{DirConnectable, DirConnector};
 pub use self::dir_entry::DirEntry;
 pub use self::directory::Directory;

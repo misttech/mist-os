@@ -46,7 +46,7 @@ rustc_binary("criterion_bench_bin") {
   source_root = "examples/main.rs"
 }
 
-fuchsia_shell_package("criterion_bench") {
+fuchsia_package("criterion_bench") {
   deps = [ ":criterion_bench_bin" ]
 }
 

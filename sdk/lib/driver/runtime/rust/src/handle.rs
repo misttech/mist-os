@@ -30,7 +30,8 @@ impl DriverHandle {
     /// The caller is responsible for ensuring that the handle given is a valid driver handle:
     ///
     /// - It has the marker bits set correctly
-    /// - It is not "owned" elsewhere
+    /// - It is not "owned" elsewhere, or that it will not call [`Drop::drop`] on this new
+    /// object if it is.
     pub unsafe fn new_unchecked(handle: NonZero<fdf_handle_t>) -> Self {
         Self(handle)
     }

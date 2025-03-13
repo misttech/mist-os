@@ -20,7 +20,6 @@ if (is_host) {
       "//src/security/lib/scrutiny/utils",
       "//src/sys/pkg/lib/fuchsia-merkle",
       "//third_party/rust_crates:anyhow",
-      "//third_party/rust_crates:once_cell",
       "//third_party/rust_crates:tempfile",
     ]
     non_rust_deps = [ "//src/lib/chunked-compression" ]

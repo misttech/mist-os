@@ -22,6 +22,7 @@ ffx_plugin("ffx_product_list") {
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/pbms:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//src/lib/gcs",
     "//src/lib/structured_ui",
     "//third_party/rust_crates:anyhow",

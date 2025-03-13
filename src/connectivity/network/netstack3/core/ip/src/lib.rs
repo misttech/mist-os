@@ -58,9 +58,10 @@ pub mod device {
         RTR_SOLICITATION_INTERVAL,
     };
     pub use crate::internal::device::slaac::{
-        InnerSlaacTimerId, SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses,
-        SlaacBindingsContext, SlaacConfigAndState, SlaacConfiguration, SlaacConfigurationUpdate,
-        SlaacContext, SlaacCounters, SlaacState, SlaacTimerId, TemporarySlaacAddressConfiguration,
+        IidGenerationConfiguration, InnerSlaacTimerId, SlaacAddressEntry, SlaacAddressEntryMut,
+        SlaacAddresses, SlaacBindingsContext, SlaacConfigAndState, SlaacConfiguration,
+        SlaacConfigurationUpdate, SlaacContext, SlaacCounters, SlaacState, SlaacTimerId,
+        StableSlaacAddressConfiguration, TemporarySlaacAddressConfiguration,
         SLAAC_MIN_REGEN_ADVANCE,
     };
     pub use crate::internal::device::state::{
@@ -82,8 +83,8 @@ pub mod device {
         IpAddressIdSpecContext, IpAddressState, IpDeviceAddressContext, IpDeviceBindingsContext,
         IpDeviceConfigurationContext, IpDeviceEvent, IpDeviceIpExt, IpDeviceSendContext,
         IpDeviceStateContext, IpDeviceTimerId, Ipv4DeviceTimerId, Ipv6DeviceConfigurationContext,
-        Ipv6DeviceContext, Ipv6DeviceHandler, Ipv6DeviceTimerId, WithIpDeviceConfigurationMutInner,
-        WithIpv6DeviceConfigurationMutInner,
+        Ipv6DeviceContext, Ipv6DeviceHandler, Ipv6DeviceTimerId, Ipv6LinkLayerAddr,
+        WithIpDeviceConfigurationMutInner, WithIpv6DeviceConfigurationMutInner,
     };
 
     /// IP device test utilities.
@@ -101,12 +102,12 @@ pub mod device {
 /// Group management protocols.
 pub mod gmp {
     pub use crate::internal::gmp::igmp::{
-        IgmpConfigMode, IgmpContext, IgmpContextMarker, IgmpSendContext, IgmpStateContext,
-        IgmpTimerId, IgmpTypeLayout, IGMP_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
+        IgmpConfigMode, IgmpContext, IgmpContextMarker, IgmpCounters, IgmpSendContext,
+        IgmpStateContext, IgmpTimerId, IgmpTypeLayout, IGMP_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
     };
     pub use crate::internal::gmp::mld::{
-        MldConfigMode, MldContext, MldContextMarker, MldSendContext, MldStateContext, MldTimerId,
-        MldTypeLayout, MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
+        MldConfigMode, MldContext, MldContextMarker, MldCounters, MldSendContext, MldStateContext,
+        MldTimerId, MldTypeLayout, MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
     };
     pub use crate::internal::gmp::{
         GmpGroupState, GmpHandler, GmpQueryHandler, GmpState, GmpStateRef, GmpTimerId, IpExt,
@@ -221,7 +222,7 @@ pub mod raw {
     };
 }
 
-pub use internal::api::{RoutesAnyApi, RoutesApi};
+pub use internal::api::{RouteResolveOptions, RoutesAnyApi, RoutesApi};
 pub use internal::base::{
     gen_ip_packet_id, receive_ipv4_packet, receive_ipv4_packet_action, receive_ipv6_packet,
     receive_ipv6_packet_action, resolve_output_route_to_destination, AddressStatus,
@@ -244,7 +245,7 @@ pub use internal::local_delivery::{
 pub use internal::path_mtu::{PmtuCache, PmtuContext};
 pub use internal::reassembly::{FragmentContext, FragmentTimerId, IpPacketFragmentCache};
 pub use internal::routing::rules::{
-    Mark, MarkDomain, MarkMatcher, MarkMatchers, Marks, Rule, RuleAction, RuleMatcher, RulesTable,
+    MarkMatcher, MarkMatchers, Marks, Rule, RuleAction, RuleMatcher, RulesTable,
     TrafficOriginMatcher,
 };
 pub use internal::routing::{

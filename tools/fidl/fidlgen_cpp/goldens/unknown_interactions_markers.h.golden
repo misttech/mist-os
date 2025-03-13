@@ -30,6 +30,8 @@ class UnknownInteractionsProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5652707722400962470;
   };
   class FlexibleOneWay final {
     FlexibleOneWay() = delete;
@@ -44,6 +46,8 @@ class UnknownInteractionsProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 583422011583300678;
   };
   class StrictTwoWay final {
     StrictTwoWay() = delete;
@@ -58,6 +62,8 @@ class UnknownInteractionsProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 8308184097687583042;
   };
   class StrictTwoWayFields final {
     StrictTwoWayFields() = delete;
@@ -72,6 +78,8 @@ class UnknownInteractionsProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 3697260130745060067;
   };
   class StrictTwoWayUnion final {
     StrictTwoWayUnion() = delete;
@@ -86,6 +94,8 @@ class UnknownInteractionsProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 2455165891480464557;
   };
   class StrictTwoWayTable final {
     StrictTwoWayTable() = delete;
@@ -100,6 +110,8 @@ class UnknownInteractionsProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 8389853739594228663;
   };
   class StrictTwoWayErr final {
     StrictTwoWayErr() = delete;
@@ -114,6 +126,8 @@ class UnknownInteractionsProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 7862264614495172967;
   };
   class StrictTwoWayFieldsErr final {
     StrictTwoWayFieldsErr() = delete;
@@ -128,6 +142,8 @@ class UnknownInteractionsProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 2414673307948662059;
   };
   class StrictTwoWayUnionErr final {
     StrictTwoWayUnionErr() = delete;
@@ -142,6 +158,8 @@ class UnknownInteractionsProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 4988571416540160202;
   };
   class StrictTwoWayTableErr final {
     StrictTwoWayTableErr() = delete;
@@ -156,6 +174,8 @@ class UnknownInteractionsProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5487292735562672344;
   };
   class FlexibleTwoWay final {
     FlexibleTwoWay() = delete;
@@ -170,6 +190,8 @@ class UnknownInteractionsProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = true;
+
+    static constexpr uint64_t kOrdinal = 334879577560091516;
   };
   class FlexibleTwoWayFields final {
     FlexibleTwoWayFields() = delete;
@@ -184,6 +206,8 @@ class UnknownInteractionsProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = true;
+
+    static constexpr uint64_t kOrdinal = 4257018954691721778;
   };
   class FlexibleTwoWayUnion final {
     FlexibleTwoWayUnion() = delete;
@@ -198,6 +222,8 @@ class UnknownInteractionsProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = true;
+
+    static constexpr uint64_t kOrdinal = 4913460516188409782;
   };
   class FlexibleTwoWayTable final {
     FlexibleTwoWayTable() = delete;
@@ -212,6 +238,8 @@ class UnknownInteractionsProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = true;
+
+    static constexpr uint64_t kOrdinal = 9171907422498283911;
   };
   class FlexibleTwoWayErr final {
     FlexibleTwoWayErr() = delete;
@@ -226,6 +254,8 @@ class UnknownInteractionsProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = true;
+
+    static constexpr uint64_t kOrdinal = 6999736795697216519;
   };
   class FlexibleTwoWayFieldsErr final {
     FlexibleTwoWayFieldsErr() = delete;
@@ -240,6 +270,8 @@ class UnknownInteractionsProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = true;
+
+    static constexpr uint64_t kOrdinal = 1093132337162001157;
   };
   class FlexibleTwoWayUnionErr final {
     FlexibleTwoWayUnionErr() = delete;
@@ -254,6 +286,8 @@ class UnknownInteractionsProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = true;
+
+    static constexpr uint64_t kOrdinal = 2410151523245950935;
   };
   class FlexibleTwoWayTableErr final {
     FlexibleTwoWayTableErr() = delete;
@@ -268,6 +302,8 @@ class UnknownInteractionsProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = true;
+
+    static constexpr uint64_t kOrdinal = 7893309626427980786;
   };
   class StrictEvent final {
     StrictEvent() = delete;
@@ -282,6 +318,8 @@ class UnknownInteractionsProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 685715276307386305;
   };
   class StrictEventFields final {
     StrictEventFields() = delete;
@@ -296,6 +334,8 @@ class UnknownInteractionsProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 8896208255987935026;
   };
   class StrictEventUnion final {
     StrictEventUnion() = delete;
@@ -310,6 +350,8 @@ class UnknownInteractionsProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 3919175221694221274;
   };
   class StrictEventTable final {
     StrictEventTable() = delete;
@@ -324,6 +366,8 @@ class UnknownInteractionsProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 2711448698318579984;
   };
   class FlexibleEvent final {
     FlexibleEvent() = delete;
@@ -338,6 +382,8 @@ class UnknownInteractionsProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 7042257263728687206;
   };
   class FlexibleEventFields final {
     FlexibleEventFields() = delete;
@@ -352,6 +398,8 @@ class UnknownInteractionsProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 3613822014516746241;
   };
   class FlexibleEventUnion final {
     FlexibleEventUnion() = delete;
@@ -366,6 +414,8 @@ class UnknownInteractionsProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 2499446536152409191;
   };
   class FlexibleEventTable final {
     FlexibleEventTable() = delete;
@@ -380,6 +430,8 @@ class UnknownInteractionsProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5724881371349617120;
   };
 };
 
@@ -404,6 +456,8 @@ class UnknownInteractionsAjarProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 956561744635167883;
   };
   class FlexibleOneWay final {
     FlexibleOneWay() = delete;
@@ -418,6 +472,8 @@ class UnknownInteractionsAjarProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 2483093178939638607;
   };
   class StrictTwoWay final {
     StrictTwoWay() = delete;
@@ -432,6 +488,8 @@ class UnknownInteractionsAjarProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 364341676962177080;
   };
   class StrictTwoWayFields final {
     StrictTwoWayFields() = delete;
@@ -446,6 +504,8 @@ class UnknownInteractionsAjarProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 1821674633227946298;
   };
   class StrictTwoWayUnion final {
     StrictTwoWayUnion() = delete;
@@ -460,6 +520,8 @@ class UnknownInteractionsAjarProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5870221221557233361;
   };
   class StrictTwoWayTable final {
     StrictTwoWayTable() = delete;
@@ -474,6 +536,8 @@ class UnknownInteractionsAjarProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 8038805778859962068;
   };
   class StrictTwoWayErr final {
     StrictTwoWayErr() = delete;
@@ -488,6 +552,8 @@ class UnknownInteractionsAjarProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 6577335136969723910;
   };
   class StrictTwoWayFieldsErr final {
     StrictTwoWayFieldsErr() = delete;
@@ -502,6 +568,8 @@ class UnknownInteractionsAjarProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 595881957484758745;
   };
   class StrictTwoWayUnionErr final {
     StrictTwoWayUnionErr() = delete;
@@ -516,6 +584,8 @@ class UnknownInteractionsAjarProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 3224530777258896533;
   };
   class StrictTwoWayTableErr final {
     StrictTwoWayTableErr() = delete;
@@ -530,6 +600,8 @@ class UnknownInteractionsAjarProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 3515589146717969463;
   };
   class StrictEvent final {
     StrictEvent() = delete;
@@ -544,6 +616,8 @@ class UnknownInteractionsAjarProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 6927291151663612592;
   };
   class StrictEventFields final {
     StrictEventFields() = delete;
@@ -558,6 +632,8 @@ class UnknownInteractionsAjarProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5838220329633564521;
   };
   class StrictEventUnion final {
     StrictEventUnion() = delete;
@@ -572,6 +648,8 @@ class UnknownInteractionsAjarProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 6303151946645602671;
   };
   class StrictEventTable final {
     StrictEventTable() = delete;
@@ -586,6 +664,8 @@ class UnknownInteractionsAjarProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 659277224687564957;
   };
   class FlexibleEvent final {
     FlexibleEvent() = delete;
@@ -600,6 +680,8 @@ class UnknownInteractionsAjarProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 1281760452005010931;
   };
   class FlexibleEventFields final {
     FlexibleEventFields() = delete;
@@ -614,6 +696,8 @@ class UnknownInteractionsAjarProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 4298964238728681570;
   };
   class FlexibleEventUnion final {
     FlexibleEventUnion() = delete;
@@ -628,6 +712,8 @@ class UnknownInteractionsAjarProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 8950943792372972717;
   };
   class FlexibleEventTable final {
     FlexibleEventTable() = delete;
@@ -642,6 +728,8 @@ class UnknownInteractionsAjarProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 705539350563403440;
   };
 };
 
@@ -666,6 +754,8 @@ class UnknownInteractionsClosedProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 401526495318825508;
   };
   class StrictTwoWay final {
     StrictTwoWay() = delete;
@@ -680,6 +770,8 @@ class UnknownInteractionsClosedProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 6834828562275693047;
   };
   class StrictTwoWayFields final {
     StrictTwoWayFields() = delete;
@@ -694,6 +786,8 @@ class UnknownInteractionsClosedProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 1379139029283639891;
   };
   class StrictTwoWayUnion final {
     StrictTwoWayUnion() = delete;
@@ -708,6 +802,8 @@ class UnknownInteractionsClosedProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 7544414847426850727;
   };
   class StrictTwoWayTable final {
     StrictTwoWayTable() = delete;
@@ -722,6 +818,8 @@ class UnknownInteractionsClosedProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 7947328131967870853;
   };
   class StrictTwoWayErr final {
     StrictTwoWayErr() = delete;
@@ -736,6 +834,8 @@ class UnknownInteractionsClosedProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5738532966428790074;
   };
   class StrictTwoWayFieldsErr final {
     StrictTwoWayFieldsErr() = delete;
@@ -750,6 +850,8 @@ class UnknownInteractionsClosedProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 802395819586836733;
   };
   class StrictTwoWayUnionErr final {
     StrictTwoWayUnionErr() = delete;
@@ -764,6 +866,8 @@ class UnknownInteractionsClosedProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 925029359463709824;
   };
   class StrictTwoWayTableErr final {
     StrictTwoWayTableErr() = delete;
@@ -778,6 +882,8 @@ class UnknownInteractionsClosedProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 1260407702860823440;
   };
   class StrictEvent final {
     StrictEvent() = delete;
@@ -792,6 +898,8 @@ class UnknownInteractionsClosedProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 760799297757210939;
   };
   class StrictEventFields final {
     StrictEventFields() = delete;
@@ -806,6 +914,8 @@ class UnknownInteractionsClosedProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 6736355582617074292;
   };
   class StrictEventUnion final {
     StrictEventUnion() = delete;
@@ -820,6 +930,8 @@ class UnknownInteractionsClosedProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 4288682345454280036;
   };
   class StrictEventTable final {
     StrictEventTable() = delete;
@@ -834,6 +946,8 @@ class UnknownInteractionsClosedProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 2871682464255309246;
   };
 };
 
@@ -858,6 +972,8 @@ class UnknownInteractionsDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 6982839851953080288;
   };
   class FlexibleOneWay final {
     FlexibleOneWay() = delete;
@@ -872,6 +988,8 @@ class UnknownInteractionsDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 1083620022582160398;
   };
   class StrictTwoWay final {
     StrictTwoWay() = delete;
@@ -886,6 +1004,8 @@ class UnknownInteractionsDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 1481114722667499972;
   };
   class StrictTwoWayFields final {
     StrictTwoWayFields() = delete;
@@ -900,6 +1020,8 @@ class UnknownInteractionsDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 6841797014773573215;
   };
   class StrictTwoWayUnion final {
     StrictTwoWayUnion() = delete;
@@ -914,6 +1036,8 @@ class UnknownInteractionsDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 1451514501977162287;
   };
   class StrictTwoWayTable final {
     StrictTwoWayTable() = delete;
@@ -928,6 +1052,8 @@ class UnknownInteractionsDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 3330693085881435529;
   };
   class StrictTwoWayErr final {
     StrictTwoWayErr() = delete;
@@ -942,6 +1068,8 @@ class UnknownInteractionsDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 8222960355260037542;
   };
   class StrictTwoWayFieldsErr final {
     StrictTwoWayFieldsErr() = delete;
@@ -956,6 +1084,8 @@ class UnknownInteractionsDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 225387363174180470;
   };
   class StrictTwoWayUnionErr final {
     StrictTwoWayUnionErr() = delete;
@@ -970,6 +1100,8 @@ class UnknownInteractionsDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 3066880266580913088;
   };
   class StrictTwoWayTableErr final {
     StrictTwoWayTableErr() = delete;
@@ -984,6 +1116,8 @@ class UnknownInteractionsDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 708169949929096689;
   };
   class FlexibleTwoWay final {
     FlexibleTwoWay() = delete;
@@ -998,6 +1132,8 @@ class UnknownInteractionsDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = true;
+
+    static constexpr uint64_t kOrdinal = 2929398860738426482;
   };
   class FlexibleTwoWayFields final {
     FlexibleTwoWayFields() = delete;
@@ -1012,6 +1148,8 @@ class UnknownInteractionsDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = true;
+
+    static constexpr uint64_t kOrdinal = 8423663794424433896;
   };
   class FlexibleTwoWayUnion final {
     FlexibleTwoWayUnion() = delete;
@@ -1026,6 +1164,8 @@ class UnknownInteractionsDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = true;
+
+    static constexpr uint64_t kOrdinal = 8216450897182897849;
   };
   class FlexibleTwoWayTable final {
     FlexibleTwoWayTable() = delete;
@@ -1040,6 +1180,8 @@ class UnknownInteractionsDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = true;
+
+    static constexpr uint64_t kOrdinal = 1049265954148894210;
   };
   class FlexibleTwoWayErr final {
     FlexibleTwoWayErr() = delete;
@@ -1054,6 +1196,8 @@ class UnknownInteractionsDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = true;
+
+    static constexpr uint64_t kOrdinal = 5583489590753947170;
   };
   class FlexibleTwoWayFieldsErr final {
     FlexibleTwoWayFieldsErr() = delete;
@@ -1068,6 +1212,8 @@ class UnknownInteractionsDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = true;
+
+    static constexpr uint64_t kOrdinal = 6033174601748665003;
   };
   class FlexibleTwoWayUnionErr final {
     FlexibleTwoWayUnionErr() = delete;
@@ -1082,6 +1228,8 @@ class UnknownInteractionsDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = true;
+
+    static constexpr uint64_t kOrdinal = 6235121653537390575;
   };
   class FlexibleTwoWayTableErr final {
     FlexibleTwoWayTableErr() = delete;
@@ -1096,6 +1244,8 @@ class UnknownInteractionsDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = true;
+
+    static constexpr uint64_t kOrdinal = 940887795361350656;
   };
 };
 
@@ -1120,6 +1270,8 @@ class UnknownInteractionsAjarDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 200845620698173917;
   };
   class FlexibleOneWay final {
     FlexibleOneWay() = delete;
@@ -1134,6 +1286,8 @@ class UnknownInteractionsAjarDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 3790953144423004126;
   };
   class StrictTwoWay final {
     StrictTwoWay() = delete;
@@ -1148,6 +1302,8 @@ class UnknownInteractionsAjarDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 523076268125513549;
   };
   class StrictTwoWayFields final {
     StrictTwoWayFields() = delete;
@@ -1162,6 +1318,8 @@ class UnknownInteractionsAjarDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 902155904889801604;
   };
   class StrictTwoWayUnion final {
     StrictTwoWayUnion() = delete;
@@ -1176,6 +1334,8 @@ class UnknownInteractionsAjarDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 8952307689721713673;
   };
   class StrictTwoWayTable final {
     StrictTwoWayTable() = delete;
@@ -1190,6 +1350,8 @@ class UnknownInteractionsAjarDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 3114064683372134045;
   };
   class StrictTwoWayErr final {
     StrictTwoWayErr() = delete;
@@ -1204,6 +1366,8 @@ class UnknownInteractionsAjarDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 7057260423103547829;
   };
   class StrictTwoWayFieldsErr final {
     StrictTwoWayFieldsErr() = delete;
@@ -1218,6 +1382,8 @@ class UnknownInteractionsAjarDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 6490530264582540031;
   };
   class StrictTwoWayUnionErr final {
     StrictTwoWayUnionErr() = delete;
@@ -1232,6 +1398,8 @@ class UnknownInteractionsAjarDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 2319476129312263555;
   };
   class StrictTwoWayTableErr final {
     StrictTwoWayTableErr() = delete;
@@ -1246,6 +1414,8 @@ class UnknownInteractionsAjarDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 6883106306697493305;
   };
 };
 
@@ -1270,6 +1440,8 @@ class UnknownInteractionsClosedDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 9111839835597799810;
   };
   class StrictTwoWay final {
     StrictTwoWay() = delete;
@@ -1284,6 +1456,8 @@ class UnknownInteractionsClosedDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 2815690661228737027;
   };
   class StrictTwoWayFields final {
     StrictTwoWayFields() = delete;
@@ -1298,6 +1472,8 @@ class UnknownInteractionsClosedDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5761316743698652038;
   };
   class StrictTwoWayUnion final {
     StrictTwoWayUnion() = delete;
@@ -1312,6 +1488,8 @@ class UnknownInteractionsClosedDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 7235351480214368636;
   };
   class StrictTwoWayTable final {
     StrictTwoWayTable() = delete;
@@ -1326,6 +1504,8 @@ class UnknownInteractionsClosedDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 1839495150551777151;
   };
   class StrictTwoWayErr final {
     StrictTwoWayErr() = delete;
@@ -1340,6 +1520,8 @@ class UnknownInteractionsClosedDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 4350840352076287137;
   };
   class StrictTwoWayFieldsErr final {
     StrictTwoWayFieldsErr() = delete;
@@ -1354,6 +1536,8 @@ class UnknownInteractionsClosedDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 3933117456632607830;
   };
   class StrictTwoWayUnionErr final {
     StrictTwoWayUnionErr() = delete;
@@ -1368,6 +1552,8 @@ class UnknownInteractionsClosedDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 4598950031783776653;
   };
   class StrictTwoWayTableErr final {
     StrictTwoWayTableErr() = delete;
@@ -1382,6 +1568,8 @@ class UnknownInteractionsClosedDriverProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 1456858375973362525;
   };
 };
 
@@ -1389,21 +1577,21 @@ class UnknownInteractionsClosedDriverProtocol final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_unknowninteractions::UnknownInteractionsProtocol> : public std::true_type{};
+struct IsProtocol<::test_unknowninteractions::UnknownInteractionsProtocol> : public std::true_type {};
 
 template <>
-struct IsProtocol<::test_unknowninteractions::UnknownInteractionsAjarProtocol> : public std::true_type{};
+struct IsProtocol<::test_unknowninteractions::UnknownInteractionsAjarProtocol> : public std::true_type {};
 
 template <>
-struct IsProtocol<::test_unknowninteractions::UnknownInteractionsClosedProtocol> : public std::true_type{};
+struct IsProtocol<::test_unknowninteractions::UnknownInteractionsClosedProtocol> : public std::true_type {};
 
 template <>
-struct IsProtocol<::test_unknowninteractions::UnknownInteractionsDriverProtocol> : public std::true_type{};
+struct IsProtocol<::test_unknowninteractions::UnknownInteractionsDriverProtocol> : public std::true_type {};
 
 template <>
-struct IsProtocol<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol> : public std::true_type{};
+struct IsProtocol<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol> : public std::true_type {};
 
 template <>
-struct IsProtocol<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol> : public std::true_type{};
+struct IsProtocol<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol> : public std::true_type {};
 
 }  // namespace fidl

@@ -47,6 +47,5 @@ fuchsia_unittest_package("restart_on_crash_test") {
     ":bin",
     ":drivers",
     "//sdk/lib/driver_test_realm:driver_test_realm_component",
-    "//src/devices/bin/driver_host:component",
   ]
 }

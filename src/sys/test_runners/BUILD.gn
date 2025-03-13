@@ -17,6 +17,7 @@ rustc_library("lib") {
 
   deps = [
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.ldsvc:fuchsia.ldsvc_rust",
@@ -28,6 +29,7 @@ rustc_library("lib") {
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-runtime",
+    "//src/lib/trace/rust:trace",
     "//src/storage/lib/vfs/rust:vfs",
     "//src/sys/lib/library_loader:library_loader",
     "//src/sys/lib/namespace",

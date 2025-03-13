@@ -63,7 +63,7 @@ pub struct RuntimeConfig {
 
     // The number of threads to use for running component_manager's executor.
     // Value defaults to 1.
-    pub num_threads: usize,
+    pub num_threads: u8,
 
     /// The list of capabilities offered from component manager's namespace.
     pub namespace_capabilities: Vec<cm_rust::CapabilityDecl>,
@@ -652,7 +652,7 @@ impl TryFrom<component_internal::Config> for RuntimeConfig {
 
         let list_children_batch_size =
             as_usize_or_default(config.list_children_batch_size, default.list_children_batch_size);
-        let num_threads = as_usize_or_default(config.num_threads, default.num_threads);
+        let num_threads = config.num_threads.unwrap_or(default.num_threads);
 
         let root_component_url = config.root_component_url.map(Url::new).transpose()?;
 

@@ -15,10 +15,10 @@ use net_types::{SpecifiedAddr, ZonedAddr};
 use netstack3_base::socket::{DualStackIpExt, DualStackRemoteIp, SocketZonedAddrExt as _};
 use netstack3_base::sync::{PrimaryRc, StrongRc, WeakRc};
 use netstack3_base::{
-    AnyDevice, ContextPair, DeviceIdContext, Inspector, InspectorDeviceExt, IpDeviceAddr, IpExt,
-    ReferenceNotifiers, ReferenceNotifiersExt as _, RemoveResourceResultWithContext,
-    ResourceCounterContext, StrongDeviceIdentifier, TxMetadataBindingsTypes, WeakDeviceIdentifier,
-    ZonedAddressError,
+    AnyDevice, ContextPair, DeviceIdContext, Inspector, InspectorDeviceExt, InspectorExt,
+    IpDeviceAddr, IpExt, Mark, MarkDomain, ReferenceNotifiers, ReferenceNotifiersExt as _,
+    RemoveResourceResultWithContext, ResourceCounterContext, StrongDeviceIdentifier,
+    TxMetadataBindingsTypes, WeakDeviceIdentifier, ZonedAddressError,
 };
 use netstack3_filter::RawIpBody;
 use packet::{BufferMut, SliceBufViewMut};
@@ -30,7 +30,7 @@ use crate::internal::raw::counters::RawIpSocketCounters;
 use crate::internal::raw::filter::RawIpSocketIcmpFilter;
 use crate::internal::raw::protocol::RawIpSocketProtocol;
 use crate::internal::raw::state::{RawIpSocketLockedState, RawIpSocketState};
-use crate::internal::routing::rules::{Mark, MarkDomain, Marks};
+use crate::internal::routing::rules::Marks;
 use crate::internal::socket::{SendOneShotIpPacketError, SocketHopLimits};
 use crate::socket::{
     IpSockCreateAndSendError, IpSocketHandler, RouteResolutionOptions, SendOptions,
@@ -220,11 +220,12 @@ where
                 })
         });
         match &result {
-            Ok(()) => {
-                core_ctx.increment(&id, |counters: &RawIpSocketCounters<I>| &counters.tx_packets)
-            }
+            Ok(()) => core_ctx
+                .increment_both(&id, |counters: &RawIpSocketCounters<I>| &counters.tx_packets),
             Err(RawIpSocketSendToError::InvalidBody) => core_ctx
-                .increment(&id, |counters: &RawIpSocketCounters<I>| &counters.tx_checksum_errors),
+                .increment_both(&id, |counters: &RawIpSocketCounters<I>| {
+                    &counters.tx_checksum_errors
+                }),
             Err(_) => {}
         }
         result
@@ -700,18 +701,18 @@ where
                     check_packet_for_delivery(packet, device, state)
                 }) {
                     DeliveryOutcome::Deliver => {
-                        core_ctx.increment(&socket, |counters: &RawIpSocketCounters<I>| {
+                        core_ctx.increment_both(&socket, |counters: &RawIpSocketCounters<I>| {
                             &counters.rx_packets
                         });
                         bindings_ctx.receive_packet(socket, packet, device);
                     }
                     DeliveryOutcome::WrongChecksum => {
-                        core_ctx.increment(&socket, |counters: &RawIpSocketCounters<I>| {
+                        core_ctx.increment_both(&socket, |counters: &RawIpSocketCounters<I>| {
                             &counters.rx_checksum_errors
                         });
                     }
                     DeliveryOutcome::WrongIcmpMessageType => {
-                        core_ctx.increment(&socket, |counters: &RawIpSocketCounters<I>| {
+                        core_ctx.increment_both(&socket, |counters: &RawIpSocketCounters<I>| {
                             &counters.rx_icmp_filtered
                         });
                     }
@@ -972,8 +973,8 @@ mod test {
     }
 
     impl<I: IpExt, D: FakeStrongDeviceId> CounterContext<RawIpSocketCounters<I>> for FakeCoreCtx<I, D> {
-        fn with_counters<O, F: FnOnce(&RawIpSocketCounters<I>) -> O>(&self, cb: F) -> O {
-            cb(&self.state.counters)
+        fn counters(&self) -> &RawIpSocketCounters<I> {
+            &self.state.counters
         }
     }
 
@@ -983,12 +984,11 @@ mod test {
             RawIpSocketCounters<I>,
         > for FakeCoreCtx<I, D>
     {
-        fn with_per_resource_counters<O, F: FnOnce(&RawIpSocketCounters<I>) -> O>(
-            &mut self,
-            socket: &RawIpSocketId<I, D::Weak, FakeBindingsCtx<D>>,
-            cb: F,
-        ) -> O {
-            cb(socket.state().counters())
+        fn per_resource_counters<'a>(
+            &'a self,
+            socket: &'a RawIpSocketId<I, D::Weak, FakeBindingsCtx<D>>,
+        ) -> &'a RawIpSocketCounters<I> {
+            socket.state().counters()
         }
     }
 

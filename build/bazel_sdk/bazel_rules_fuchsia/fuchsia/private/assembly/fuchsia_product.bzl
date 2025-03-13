@@ -66,34 +66,18 @@ def _fuchsia_product_assembly_impl(ctx):
         **LOCAL_ONLY_ACTION_KWARGS
     )
 
-    # Calculate the path to the board configuration file, if it's not directly
-    # provided.
-    board_config = ctx.attr.board_config[FuchsiaBoardConfigInfo]
-
-    # Add all files from the `board_config` attribute as inputs
-    board_config_input = board_config.files
-
-    # The path to the json file itself will be in the provider's board_config
-    # field, this needs to be in the arguments to assembly.
-    board_config_file_path = board_config.config
-
     # Invoke Product Assembly
-    # TODO(https://fxbug.dev/391674348): Assembly should take the product config as a directory.
     product_config = ctx.attr.product_config[FuchsiaProductConfigInfo]
-    product_config_file_path = product_config.directory
-    if product_config.config_path:
-        product_config_file_path += "/" + product_config.config_path
-    else:
-        product_config_file_path += "/product_configuration.json"
+    board_config = ctx.attr.board_config[FuchsiaBoardConfigInfo]
 
     build_type = product_config.build_type
     build_id_dirs = []
     build_id_dirs += product_config.build_id_dirs
-    build_id_dirs += ctx.attr.board_config[FuchsiaBoardConfigInfo].build_id_dirs
+    build_id_dirs += board_config.build_id_dirs
 
     ffx_inputs = get_ffx_assembly_inputs(fuchsia_toolchain)
     ffx_inputs += ctx.files.product_config
-    ffx_inputs += board_config_input
+    ffx_inputs += ctx.files.board_config
     ffx_inputs += platform_artifacts.files
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
 
@@ -103,9 +87,9 @@ def _fuchsia_product_assembly_impl(ctx):
         "assembly",
         "product",
         "--product",
-        product_config_file_path,
+        product_config.directory,
         "--board-info",
-        board_config_file_path,
+        board_config.directory,
         "--input-bundles-dir",
         platform_artifacts.root,
         "--outdir",
@@ -118,6 +102,9 @@ def _fuchsia_product_assembly_impl(ctx):
         legacy_bundle = ctx.attr.legacy_bundle[FuchsiaLegacyBundleInfo]
         ffx_invocation.extend(["--legacy-bundle", legacy_bundle.root])
         ffx_inputs += legacy_bundle.files
+
+    if ctx.attr.legacy_bundle_must_be_empty:
+        ffx_invocation.append("--legacy-bundle-must-be-empty")
 
     # Add developer overrides manifest and inputs if necessary.
     overrides_maps = ctx.attr._developer_overrides_list[FuchsiaAssemblyDeveloperOverridesListInfo].maps
@@ -204,6 +191,10 @@ _fuchsia_product_assembly = rule(
         "legacy_bundle": attr.label(
             doc = "Legacy AIB for this product.",
             providers = [FuchsiaLegacyBundleInfo],
+        ),
+        "legacy_bundle_must_be_empty": attr.bool(
+            doc = "The Legacy AIB has been included, but must be empty.",
+            default = False,
         ),
         "platform_artifacts": attr.label(
             doc = "Platform artifacts to use for this product.",
@@ -304,6 +295,7 @@ def fuchsia_product(
         product_config,
         platform_artifacts = None,
         legacy_bundle = None,
+        legacy_bundle_must_be_empty = False,
         package_validation = None,
         **kwargs):
     _fuchsia_product_assembly(
@@ -312,6 +304,7 @@ def fuchsia_product(
         product_config = product_config,
         platform_artifacts = platform_artifacts,
         legacy_bundle = legacy_bundle,
+        legacy_bundle_must_be_empty = legacy_bundle_must_be_empty,
         package_validation = package_validation,
     )
 

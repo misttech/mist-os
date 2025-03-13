@@ -38,7 +38,9 @@ fidl("versioning") {
   excluded_checks = [ "string-bounds-not-specified" ]
 
   # TODO(https://fxbug.dev/328118770): Example libraries should be named
-  # differently to avoid using fake fuchsia API levels.
+  # differently to avoid using fake fuchsia API levels. Rename the test library
+  # and change these values as appropriate. For now, override the default
+  # "unversioned" behavior for test-only libraries.
   versioned = "fuchsia"
   available = [ "fuchsia:HEAD" ]
 }

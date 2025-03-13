@@ -2,41 +2,49 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::DeviceMode;
+use crate::fs::proc::cgroups::cgroups_file;
+use crate::fs::proc::config_gz::ConfigFile;
+use crate::fs::proc::cpuinfo::CpuinfoFile;
+use crate::fs::proc::device_tree::device_tree_directory;
+use crate::fs::proc::devices::DevicesFile;
+use crate::fs::proc::kmsg::kmsg_file;
+use crate::fs::proc::loadavg::LoadavgFile;
+use crate::fs::proc::meminfo::MeminfoFile;
+use crate::fs::proc::misc::MiscFile;
+use crate::fs::proc::mounts_symlink::MountsSymlink;
 use crate::fs::proc::pid_directory::pid_directory;
 use crate::fs::proc::pressure_directory::pressure_directory;
+use crate::fs::proc::self_symlink::SelfSymlink;
+use crate::fs::proc::stat::StatFile;
+use crate::fs::proc::swaps::SwapsFile;
 use crate::fs::proc::sysctl::{net_directory, sysctl_directory};
 use crate::fs::proc::sysrq::SysRqNode;
-use crate::mm::PAGE_SIZE;
-use crate::task::{
-    CurrentTask, EventHandler, Kernel, KernelStats, TaskStateCode, WaitCanceler, Waiter,
-};
-use crate::vfs::buffers::{InputBuffer, OutputBuffer};
+use crate::fs::proc::thread_self::ThreadSelfSymlink;
+use crate::fs::proc::uid_cputime::uid_cputime_directory;
+use crate::fs::proc::uid_io::uid_io_directory;
+use crate::fs::proc::uid_procstat::uid_procstat_directory;
+use crate::fs::proc::uptime::UptimeFile;
+use crate::fs::proc::vmstat::VmStatFile;
+use crate::fs::proc::zoneinfo::ZoneInfoFile;
+use crate::task::CurrentTask;
 use crate::vfs::{
-    emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fileops_impl_seekless,
-    fs_node_impl_dir_readonly, fs_node_impl_symlink, unbounded_seek, BytesFile, BytesFileOps,
-    DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf, DynamicFileSource, FileObject,
-    FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-    SeekTarget, SimpleFileNode, StaticDirectoryBuilder, StubEmptyFile, SymlinkTarget,
+    emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
+    unbounded_seek, BytesFile, DirectoryEntryType, DirentSink, FileObject, FileOps,
+    FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget,
+    SimpleFileNode, StubEmptyFile,
 };
-use fuchsia_component::client::connect_to_protocol_sync;
 
 use maplit::btreemap;
-use starnix_logging::{bug_ref, log_error, track_stub};
+use starnix_logging::{bug_ref, track_stub, BugRef};
 use starnix_sync::{FileOpsCore, Locked};
-use starnix_types::time::duration_to_scheduler_clock;
 use starnix_uapi::auth::FsCred;
-use starnix_uapi::device_type::{DeviceType, MISC_MAJOR};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::version::{KERNEL_RELEASE, KERNEL_VERSION};
-use starnix_uapi::vfs::FdEvents;
-use starnix_uapi::{errno, error, off_t, pid_t};
-use std::borrow::Cow;
+use starnix_uapi::{errno, off_t, pid_t};
 use std::collections::BTreeMap;
-use std::sync::{Arc, LazyLock, Weak};
-use std::time::SystemTime;
+use std::sync::Arc;
 
 /// `ProcDirectory` represents the top-level directory in `procfs`.
 ///
@@ -53,226 +61,109 @@ impl ProcDirectory {
     /// Returns a new `ProcDirectory` exposing information about `kernel`.
     pub fn new(current_task: &CurrentTask, fs: &FileSystemHandle) -> Arc<ProcDirectory> {
         let kernel = current_task.kernel();
-
+        // First add all the nodes that are always present in the top-level proc directory.
         let mut nodes = btreemap! {
-            "cpuinfo".into() => fs.create_node(
-                current_task,
-                CpuinfoFile::new_node(),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
+            "asound".into() => stub_file(current_task, fs, "/proc/asound", bug_ref!("https://fxbug.dev/322893329")),
+            "cgroups".into() => cgroups_file(current_task, fs),
             "cmdline".into() => {
-                let mut cmdline = Vec::from(kernel.cmdline.clone());
+                let mut cmdline = Vec::from(current_task.kernel().cmdline.clone());
                 cmdline.push(b'\n');
-                fs.create_node(
-                    current_task,
-                    BytesFile::new_node(cmdline),
-                    FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-                )
+                read_only_file(current_task, fs, BytesFile::new_node(cmdline))
             },
-            "devices".into() => fs.create_node(
-                current_task,
-                DevicesFile::new_node(),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
-            "device-tree".into() => {
-                    let mut directory = StaticDirectoryBuilder::new(fs);
-                    for setup_function in &kernel.procfs_device_tree_setup {
-                        setup_function(&mut directory, current_task);
-                    }
-                    directory.build(current_task)
-            },
-            "self".into() => SelfSymlink::new_node(current_task, fs),
-            "thread-self".into() => ThreadSelfSymlink::new_node(current_task, fs),
-            "meminfo".into() => fs.create_node(
-                current_task,
-                MeminfoFile::new_node(&kernel.stats),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
-            // Fake kmsg as being empty.
-            "kmsg".into() => fs.create_node(
-                current_task,
-                SimpleFileNode::new(|| Ok(ProcKmsgFile)),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o100), FsCred::root()),
-            ),
-            // Report just enough symbols to allow some tests to run.
-            "kallsyms".into() => fs.create_node(
-                current_task,
-                SimpleFileNode::new(|| {
-                    track_stub!(TODO("https://fxbug.dev/369067922"), "Provide a real /proc/kallsyms");
-                    Ok(BytesFile::new(b"0000000000000000 T security_inode_copy_up".to_vec()))
-                }),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
-            "mounts".into() => MountsSymlink::new_node(current_task, fs),
-            // File must exist to pass the CgroupsAvailable check, which is a little bit optional
-            // for init but not optional for a lot of the system!
-            "cgroups".into() => fs.create_node(
-                current_task,
-                BytesFile::new_node(vec![]),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
-            "stat".into() => fs.create_node(
-                current_task,
-                StatFile::new_node(&kernel.stats),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
-            "swaps".into() => fs.create_node(
-                current_task,
-                SwapsFile::new_node(kernel),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
-            "sys".into() => sysctl_directory(current_task, fs),
+            "config.gz".into() => read_only_file(current_task, fs, ConfigFile::new_node()),
+            "cpuinfo".into() => read_only_file(current_task, fs, CpuinfoFile::new_node()),
+            "devices".into() => read_only_file(current_task, fs, DevicesFile::new_node()),
+            "device-tree".into() => device_tree_directory(current_task, fs),
+            "diskstats".into() => stub_file(current_task, fs, "/proc/diskstats", bug_ref!("https://fxbug.dev/322893370")),
+            "filesystems".into() => bytes_file(current_task, fs, b"fxfs".to_vec()),
+            "kallsyms".into() => read_only_file(current_task, fs, SimpleFileNode::new(|| {
+                track_stub!(TODO("https://fxbug.dev/369067922"), "Provide a real /proc/kallsyms");
+                Ok(BytesFile::new(b"0000000000000000 T security_inode_copy_up".to_vec()))
+            })),
+            "kmsg".into() => kmsg_file(current_task, fs),
+            "loadavg".into() => read_only_file(current_task, fs, LoadavgFile::new_node(kernel)),
+            "meminfo".into() => read_only_file(current_task, fs, MeminfoFile::new_node(&kernel.stats)),
+            "misc".into() => read_only_file(current_task, fs, MiscFile::new_node()),
+            // Starnix does not support dynamically loading modules.
+            // Instead, we pretend to have loaded a single module, ferris (named after
+            // Rust's 🦀), to avoid breaking code that assumes the modules list is
+            // non-empty.
+            "modules".into() => bytes_file(current_task, fs, b"ferris 8192 0 - Live 0x0000000000000000\n".to_vec()),
+            "mounts".into() => symlink_file(current_task, fs, MountsSymlink::new_node()),
             "net".into() => net_directory(current_task, fs),
-            "uptime".into() => fs.create_node(
-                current_task,
-                UptimeFile::new_node(&kernel.stats),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
-            "loadavg".into() => fs.create_node(
-                current_task,
-                LoadavgFile::new_node(kernel),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
-            "config.gz".into() => fs.create_node(
-                current_task,
-                ConfigFile::new_node(),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
-            "sysrq-trigger".into() => fs.create_node(
-                current_task,
-                SysRqNode::new(kernel),
-                // This file is normally writable only by root.
-                // (https://man7.org/linux/man-pages/man5/proc.5.html)
-                FsNodeInfo::new_factory(mode!(IFREG, 0o200), FsCred::root()),
-            ),
-            "asound".into() => fs.create_node(
-                current_task,
-                // Note: this is actually a directory but for now just track when it's opened.
-                StubEmptyFile::new_node("/proc/asound", bug_ref!("https://fxbug.dev/322893329")),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
-            "diskstats".into() => fs.create_node(
-                current_task,
-                StubEmptyFile::new_node("/proc/diskstats", bug_ref!("https://fxbug.dev/322893370")),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
-            "filesystems".into() => fs.create_node(
-                current_task,
-                BytesFile::new_node(b"fxfs".to_vec()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
-            "misc".into() => fs.create_node(
-                current_task,
-                MiscFile::new_node(),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
-            "modules".into() => fs.create_node(
-                current_task,
-                // Starnix does not support dynamically loading modules.
-                // Instead, we pretend to have loaded a single module, ferris (named after
-                // Rust's 🦀), to avoid breaking code that assumes the modules list is
-                // non-empty.
-                BytesFile::new_node(b"ferris 8192 0 - Live 0x0000000000000000\n".to_vec()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
-            "pagetypeinfo".into() => fs.create_node(
-                current_task,
-                StubEmptyFile::new_node(
-                    "/proc/pagetypeinfo",
-                    bug_ref!("https://fxbug.dev/322894315"),
-                ),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
-            "slabinfo".into() => fs.create_node(
-                current_task,
-                StubEmptyFile::new_node("/proc/slabinfo", bug_ref!("https://fxbug.dev/322894195")),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
-            "uid_cputime".into() => {
-                let mut dir = StaticDirectoryBuilder::new(fs);
-                dir.entry(
-                    current_task,
-                    "remove_uid_range",
-                    StubEmptyFile::new_node(
-                        "/proc/uid_cputime/remove_uid_range",
-                        bug_ref!("https://fxbug.dev/322894025"),
-                    ),
-                    mode!(IFREG, 0o222),
-                );
-                dir.entry(
-                    current_task,
-                    "show_uid_stat",
-                    StubEmptyFile::new_node(
-                        "/proc/uid_cputime/show_uid_stat",
-                        bug_ref!("https://fxbug.dev/322893886"),
-                    ),
-                    mode!(IFREG, 0444),
-                );
-                dir.build(current_task)
+            "pagetypeinfo".into() => stub_file(current_task, fs, "/proc/pagetypeinfo", bug_ref!("https://fxbug.dev/322894315")),
+            "self".into() => symlink_file(current_task, fs, SelfSymlink::new_node()),
+            "slabinfo".into() => stub_file(current_task, fs, "/proc/slabinfo", bug_ref!("https://fxbug.dev/322894195")),
+            "stat".into() => read_only_file(current_task, fs, StatFile::new_node(&kernel.stats)),
+            "swaps".into() => read_only_file(current_task, fs, SwapsFile::new_node()),
+            "sys".into() => sysctl_directory(current_task, fs),
+            "sysrq-trigger".into() => root_writable_file(current_task, fs, SysRqNode::new()),
+            "thread-self".into() => symlink_file(current_task, fs, ThreadSelfSymlink::new_node()),
+            "uid_cputime".into() => uid_cputime_directory(current_task, fs),
+            "uid_io".into() => uid_io_directory(current_task, fs),
+            "uid_procstat".into() => uid_procstat_directory(current_task, fs),
+            "uptime".into() => read_only_file(current_task, fs, UptimeFile::new_node(&kernel.stats)),
+            "version".into() => {
+                let release = KERNEL_RELEASE;
+                let user = "build-user@build-host";
+                let toolchain = "clang version HEAD, LLD HEAD";
+                let version = KERNEL_VERSION;
+                let version_string = format!("Linux version {} ({}) ({}) {}\n", release, user, toolchain, version);
+                bytes_file(current_task, fs, version_string.into())
             },
-            "uid_io".into() => {
-                let mut dir = StaticDirectoryBuilder::new(fs);
-                dir.entry(
-                    current_task,
-                    "stats",
-                    StubEmptyFile::new_node(
-                        "/proc/uid_io/stats",
-                        bug_ref!("https://fxbug.dev/322893966"),
-                    ),
-                    mode!(IFREG, 0o444),
-                );
-                dir.build(current_task)
-            },
-            "uid_procstat".into() => {
-                let mut dir = StaticDirectoryBuilder::new(fs);
-                dir.entry(
-                    current_task,
-                    "set",
-                    StubEmptyFile::new_node(
-                        "/proc/uid_procstat/set",
-                        bug_ref!("https://fxbug.dev/322894041"),
-                    ),
-                    mode!(IFREG, 0o222),
-                );
-                dir.build(current_task)
-            },
-            "version".into() => fs.create_node(
-                current_task,
-                BytesFile::new_node(|| {
-                    let release = KERNEL_RELEASE;
-                    let user = "build-user@build-host";
-                    let toolchain = "clang version HEAD, LLD HEAD";
-                    let version = KERNEL_VERSION;
-                    Ok(format!("Linux version {} ({}) ({}) {}\n", release, user, toolchain, version))
-                }),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
-            "vmallocinfo".into() => fs.create_node(
-                current_task,
-                StubEmptyFile::new_node(
-                    "/proc/vmallocinfo",
-                    bug_ref!("https://fxbug.dev/322894183"),
-                ),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
-            "vmstat".into() => fs.create_node(
-                current_task,
-                VmStatFile::new_node(&kernel.stats),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
-            "zoneinfo".into() => fs.create_node(
-                current_task,
-                ZoneInfoFile::new_node(&kernel.stats),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
+            "vmallocinfo".into() => stub_file(current_task, fs, "/proc/vmallocinfo", bug_ref!("https://fxbug.dev/322894183")),
+            "vmstat".into() => read_only_file(current_task, fs, VmStatFile::new_node(&kernel.stats)),
+            "zoneinfo".into() => read_only_file(current_task, fs, ZoneInfoFile::new_node(&kernel.stats)),
         };
 
+        // Then optionally add the nodes that are only present in some configurations.
         if let Some(pressure_directory) = pressure_directory(current_task, fs) {
             nodes.insert("pressure".into(), pressure_directory);
         }
 
         Arc::new(ProcDirectory { nodes })
     }
+}
+
+/// Creates a stub file that logs a message with the associated bug when it is accessed.
+fn stub_file(
+    current_task: &CurrentTask,
+    fs: &FileSystemHandle,
+    name: &'static str,
+    bug: BugRef,
+) -> FsNodeHandle {
+    read_only_file(current_task, fs, StubEmptyFile::new_node(name, bug))
+}
+
+/// Returns a new `BytesFile` containing the provided `bytes`.
+fn bytes_file(current_task: &CurrentTask, fs: &FileSystemHandle, bytes: Vec<u8>) -> FsNodeHandle {
+    read_only_file(current_task, fs, BytesFile::new_node(bytes))
+}
+
+/// Creates a standard read-only file suitable for use in `ProcDirectory`.
+fn read_only_file(
+    current_task: &CurrentTask,
+    fs: &FileSystemHandle,
+    ops: impl Into<Box<dyn FsNodeOps>>,
+) -> FsNodeHandle {
+    fs.create_node(current_task, ops, FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()))
+}
+
+/// Creates a file that is only writable by root.
+fn root_writable_file(
+    current_task: &CurrentTask,
+    fs: &FileSystemHandle,
+    ops: impl Into<Box<dyn FsNodeOps>>,
+) -> FsNodeHandle {
+    fs.create_node(current_task, ops, FsNodeInfo::new_factory(mode!(IFREG, 0o200), FsCred::root()))
+}
+
+fn symlink_file(
+    current_task: &CurrentTask,
+    fs: &FileSystemHandle,
+    ops: impl Into<Box<dyn FsNodeOps>>,
+) -> FsNodeHandle {
+    fs.create_node(current_task, ops, FsNodeInfo::new_factory(mode!(IFLNK, 0o777), FsCred::root()))
 }
 
 impl FsNodeOps for Arc<ProcDirectory> {
@@ -373,572 +264,6 @@ impl FileOps for ProcDirectory {
             }
         }
 
-        Ok(())
-    }
-}
-
-struct ProcKmsgFile;
-
-impl FileOps for ProcKmsgFile {
-    fileops_impl_seekless!();
-    fileops_impl_noop_sync!();
-
-    fn wait_async(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        current_task: &CurrentTask,
-        waiter: &Waiter,
-        events: FdEvents,
-        handler: EventHandler,
-    ) -> Option<WaitCanceler> {
-        let syslog = current_task.kernel().syslog.access(current_task).ok()?;
-        Some(syslog.wait(waiter, events, handler))
-    }
-
-    fn query_events(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        current_task: &CurrentTask,
-    ) -> Result<FdEvents, Errno> {
-        let syslog = current_task.kernel().syslog.access(current_task)?;
-        let mut events = FdEvents::empty();
-        if syslog.size_unread()? > 0 {
-            events |= FdEvents::POLLIN;
-        }
-        Ok(events)
-    }
-
-    fn read(
-        &self,
-        locked: &mut Locked<'_, FileOpsCore>,
-        file: &FileObject,
-        current_task: &CurrentTask,
-        _offset: usize,
-        data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
-        let syslog = current_task.kernel().syslog.access(current_task)?;
-        file.blocking_op(locked, current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, |_| {
-            let bytes_written = syslog.read(data)?;
-            Ok(bytes_written as usize)
-        })
-    }
-
-    fn write(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _offset: usize,
-        _data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        error!(EIO)
-    }
-}
-
-struct DevicesFile;
-impl DevicesFile {
-    pub fn new_node() -> impl FsNodeOps {
-        BytesFile::new_node(Self)
-    }
-}
-impl BytesFileOps for DevicesFile {
-    fn read(&self, current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        let registery = &current_task.kernel().device_registry;
-        let char_devices = registery.list_major_devices(DeviceMode::Char);
-        let block_devices = registery.list_major_devices(DeviceMode::Block);
-        let mut contents = String::new();
-        contents.push_str("Character devices:\n");
-        for (major, name) in char_devices {
-            contents.push_str(&format!("{:3} {}\n", major, name));
-        }
-        contents.push_str("\n");
-        contents.push_str("Block devices:\n");
-        for (major, name) in block_devices {
-            contents.push_str(&format!("{:3} {}\n", major, name));
-        }
-        Ok(contents.into_bytes().into())
-    }
-}
-
-/// A node that represents a symlink to `proc/<pid>` where <pid> is the pid of the task that
-/// reads the `proc/self` symlink.
-struct SelfSymlink;
-
-impl SelfSymlink {
-    fn new_node(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
-        fs.create_node(
-            current_task,
-            Self,
-            FsNodeInfo::new_factory(mode!(IFLNK, 0o777), FsCred::root()),
-        )
-    }
-}
-
-impl FsNodeOps for SelfSymlink {
-    fs_node_impl_symlink!();
-
-    fn readlink(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _node: &FsNode,
-        current_task: &CurrentTask,
-    ) -> Result<SymlinkTarget, Errno> {
-        Ok(SymlinkTarget::Path(current_task.get_pid().to_string().into()))
-    }
-}
-
-/// A node that represents a symlink to `proc/<pid>/task/<tid>` where <pid> and <tid> are derived
-/// from the task reading the symlink.
-struct ThreadSelfSymlink;
-
-impl ThreadSelfSymlink {
-    fn new_node(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
-        fs.create_node(
-            current_task,
-            Self,
-            FsNodeInfo::new_factory(mode!(IFLNK, 0o777), FsCred::root()),
-        )
-    }
-}
-
-impl FsNodeOps for ThreadSelfSymlink {
-    fs_node_impl_symlink!();
-
-    fn readlink(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _node: &FsNode,
-        current_task: &CurrentTask,
-    ) -> Result<SymlinkTarget, Errno> {
-        Ok(SymlinkTarget::Path(
-            format!("{}/task/{}", current_task.get_pid(), current_task.get_tid()).into(),
-        ))
-    }
-}
-
-/// A node that represents a link to `self/mounts`.
-struct MountsSymlink;
-
-impl MountsSymlink {
-    fn new_node(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
-        fs.create_node(
-            current_task,
-            Self,
-            FsNodeInfo::new_factory(mode!(IFLNK, 0o777), FsCred::root()),
-        )
-    }
-}
-
-impl FsNodeOps for MountsSymlink {
-    fs_node_impl_symlink!();
-
-    fn readlink(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-    ) -> Result<SymlinkTarget, Errno> {
-        Ok(SymlinkTarget::Path("self/mounts".into()))
-    }
-}
-
-struct SysInfo {
-    board_name: String,
-}
-
-impl SysInfo {
-    fn is_qemu(&self) -> bool {
-        matches!(
-            self.board_name.as_str(),
-            "Standard PC (Q35 + ICH9, 2009)" | "qemu-arm64" | "qemu-riscv64"
-        )
-    }
-
-    fn fetch() -> Result<SysInfo, anyhow::Error> {
-        let sysinfo = connect_to_protocol_sync::<fidl_fuchsia_sysinfo::SysInfoMarker>()?;
-        let board_name = match sysinfo.get_board_name(zx::MonotonicInstant::INFINITE)? {
-            (zx::sys::ZX_OK, Some(name)) => name,
-            (_, _) => "Unknown".to_string(),
-        };
-        Ok(SysInfo { board_name })
-    }
-}
-
-const SYSINFO: LazyLock<SysInfo> = LazyLock::new(|| {
-    SysInfo::fetch().unwrap_or_else(|e| {
-        log_error!("Failed to fetch sysinfo: {e}");
-        SysInfo { board_name: "Unknown".to_string() }
-    })
-});
-
-#[derive(Clone)]
-struct CpuinfoFile {}
-impl CpuinfoFile {
-    pub fn new_node() -> impl FsNodeOps {
-        DynamicFile::new_node(Self {})
-    }
-}
-impl DynamicFileSource for CpuinfoFile {
-    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let is_qemu = SYSINFO.is_qemu();
-
-        for i in 0..zx::system_get_num_cpus() {
-            writeln!(sink, "processor\t: {}", i)?;
-
-            // Report emulated CPU as "QEMU Virtual CPU". Some LTP tests rely on this to detect
-            // that they running in a VM.
-            if is_qemu {
-                writeln!(sink, "model name\t: QEMU Virtual CPU")?;
-            }
-
-            writeln!(sink)?;
-        }
-        Ok(())
-    }
-}
-
-#[derive(Clone, Debug)]
-struct ConfigFile;
-impl ConfigFile {
-    pub fn new_node() -> impl FsNodeOps {
-        DynamicFile::new_node(Self)
-    }
-}
-impl DynamicFileSource for ConfigFile {
-    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let contents = std::fs::read("/pkg/data/config.gz").map_err(|e| {
-            log_error!("Error reading /pkg/data/config.gz: {e}");
-            errno!(EIO)
-        })?;
-        sink.write(&contents);
-        Ok(())
-    }
-}
-
-#[derive(Clone, Debug)]
-struct MiscFile;
-impl MiscFile {
-    pub fn new_node() -> impl FsNodeOps {
-        BytesFile::new_node(Self)
-    }
-}
-impl BytesFileOps for MiscFile {
-    fn read(&self, current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        let registery = &current_task.kernel().device_registry;
-        let devices = registery.list_minor_devices(
-            DeviceMode::Char,
-            DeviceType::new_range(MISC_MAJOR, DeviceMode::Char.minor_range()),
-        );
-        let mut contents = String::new();
-        for (device_type, name) in devices {
-            contents.push_str(&format!("{:3} {}\n", device_type.minor(), name));
-        }
-        Ok(contents.into_bytes().into())
-    }
-}
-
-#[derive(Clone)]
-struct MeminfoFile {
-    kernel_stats: Arc<KernelStats>,
-}
-impl MeminfoFile {
-    pub fn new_node(kernel_stats: &Arc<KernelStats>) -> impl FsNodeOps {
-        DynamicFile::new_node(Self { kernel_stats: kernel_stats.clone() })
-    }
-}
-impl DynamicFileSource for MeminfoFile {
-    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let stats = self.kernel_stats.get();
-        let memory_stats =
-            stats.get_memory_stats_extended(zx::MonotonicInstant::INFINITE).map_err(|e| {
-                log_error!("FIDL error getting memory stats: {e}");
-                errno!(EIO)
-            })?;
-        let compression_stats =
-            stats.get_memory_stats_compression(zx::MonotonicInstant::INFINITE).map_err(|e| {
-                log_error!("FIDL error getting memory compression stats: {e}");
-                errno!(EIO)
-            })?;
-
-        let mem_total = memory_stats.total_bytes.unwrap_or_default() / 1024;
-        let mem_free = memory_stats.free_bytes.unwrap_or_default() / 1024;
-        let mem_available = (memory_stats.free_bytes.unwrap_or_default()
-            + memory_stats.vmo_discardable_unlocked_bytes.unwrap_or_default())
-            / 1024;
-
-        let swap_used = compression_stats.uncompressed_storage_bytes.unwrap_or_default() / 1024;
-        // Fuchsia doesn't have a limit on the size of its swap file, so we just pretend that
-        // we're willing to grow the swap by half the amount of free memory.
-        let swap_free = mem_free / 2;
-        let swap_total = swap_used + swap_free;
-
-        writeln!(sink, "MemTotal:       {:8} kB", mem_total)?;
-        writeln!(sink, "MemFree:        {:8} kB", mem_free)?;
-        writeln!(sink, "MemAvailable:   {:8} kB", mem_available)?;
-        writeln!(sink, "SwapTotal:      {:8} kB", swap_total)?;
-        writeln!(sink, "SwapFree:       {:8} kB", swap_free)?;
-        Ok(())
-    }
-}
-
-#[derive(Clone)]
-struct UptimeFile {
-    kernel_stats: Arc<KernelStats>,
-}
-
-impl UptimeFile {
-    pub fn new_node(kernel_stats: &Arc<KernelStats>) -> impl FsNodeOps {
-        DynamicFile::new_node(Self { kernel_stats: kernel_stats.clone() })
-    }
-}
-
-impl DynamicFileSource for UptimeFile {
-    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let uptime = (zx::MonotonicInstant::get() - zx::MonotonicInstant::ZERO).into_seconds_f64();
-
-        // Fetch CPU stats from `fuchsia.kernel.Stats` to calculate idle time.
-        let cpu_stats = self
-            .kernel_stats
-            .get()
-            .get_cpu_stats(zx::MonotonicInstant::INFINITE)
-            .map_err(|_| errno!(EIO))?;
-        let per_cpu_stats = cpu_stats.per_cpu_stats.unwrap_or(vec![]);
-        let idle_time = per_cpu_stats.iter().map(|s| s.idle_time.unwrap_or(0)).sum();
-        let idle_time = zx::MonotonicDuration::from_nanos(idle_time).into_seconds_f64();
-
-        writeln!(sink, "{:.2} {:.2}", uptime, idle_time)?;
-
-        Ok(())
-    }
-}
-
-#[derive(Clone)]
-struct ZoneInfoFile {
-    kernel_stats: Arc<KernelStats>,
-}
-
-impl ZoneInfoFile {
-    pub fn new_node(kernel_stats: &Arc<KernelStats>) -> impl FsNodeOps {
-        DynamicFile::new_node(Self { kernel_stats: kernel_stats.clone() })
-    }
-}
-
-impl DynamicFileSource for ZoneInfoFile {
-    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let mem_stats = self
-            .kernel_stats
-            .get()
-            .get_memory_stats_extended(zx::MonotonicInstant::INFINITE)
-            .map_err(|e| {
-                log_error!("FIDL error getting memory stats: {e}");
-                errno!(EIO)
-            })?;
-
-        let userpager_total = mem_stats.vmo_pager_total_bytes.unwrap_or_default() / *PAGE_SIZE;
-        let userpager_active = mem_stats.vmo_pager_newest_bytes.unwrap_or_default() / *PAGE_SIZE;
-
-        let nr_active_file = userpager_active;
-        let nr_inactive_file = userpager_total.saturating_sub(userpager_active);
-        let free = mem_stats.free_bytes.unwrap_or_default() / *PAGE_SIZE;
-        let present = mem_stats.total_bytes.unwrap_or_default() / *PAGE_SIZE;
-
-        // Pages min: minimum number of free pages the kernel tries to maintain in this memory zone.
-        // Can be set by writing to `/proc/sys/vm/min_free_kbytes`. It is observed to be ~3% of the
-        // total memory.
-        let pages_min = present * 3 / 100;
-        // Pages low: more aggressive memory reclaimation when free pages fall below this level.
-        // Typically ~4% of the total memory.
-        let pages_low = present * 4 / 100;
-        // Pages high: page reclamation begins when free pages drop below this level.
-        // Typically ~4% of the total memory.
-        let pages_high = present * 6 / 100;
-
-        // Only required fields are written. Add more fields as needed.
-        writeln!(sink, "Node 0, zone   Normal")?;
-        writeln!(sink, "  per-node stats")?;
-        writeln!(sink, "      nr_inactive_file {}", nr_inactive_file)?;
-        writeln!(sink, "      nr_active_file {}", nr_active_file)?;
-        writeln!(sink, "  pages free     {}", free)?;
-        writeln!(sink, "        min      {}", pages_min)?;
-        writeln!(sink, "        low      {}", pages_low)?;
-        writeln!(sink, "        high     {}", pages_high)?;
-        writeln!(sink, "        present  {}", present)?;
-        writeln!(sink, "  pagesets")?;
-
-        Ok(())
-    }
-}
-
-#[derive(Clone)]
-struct VmStatFile {
-    kernel_stats: Arc<KernelStats>,
-}
-
-impl VmStatFile {
-    pub fn new_node(kernel_stats: &Arc<KernelStats>) -> impl FsNodeOps {
-        DynamicFile::new_node(Self { kernel_stats: kernel_stats.clone() })
-    }
-}
-
-impl DynamicFileSource for VmStatFile {
-    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let mem_stats = self
-            .kernel_stats
-            .get()
-            .get_memory_stats_extended(zx::MonotonicInstant::INFINITE)
-            .map_err(|e| {
-                log_error!("FIDL error getting memory stats: {e}");
-                errno!(EIO)
-            })?;
-
-        let userpager_total = mem_stats.vmo_pager_total_bytes.unwrap_or_default() / *PAGE_SIZE;
-        let userpager_active = mem_stats.vmo_pager_newest_bytes.unwrap_or_default() / *PAGE_SIZE;
-
-        let nr_active_file = userpager_active;
-        let nr_inactive_file = userpager_total.saturating_sub(userpager_active);
-
-        // Only fields required so far are written. Add more fields as needed.
-        writeln!(sink, "workingset_refault_file {}", 0)?;
-        writeln!(sink, "nr_inactive_file {}", nr_inactive_file)?;
-        writeln!(sink, "nr_active_file {}", nr_active_file)?;
-        writeln!(sink, "pgscan_direct {}", 0)?;
-        writeln!(sink, "pgscan_kswapd {}", 0)?;
-
-        Ok(())
-    }
-}
-
-#[derive(Clone)]
-struct StatFile {
-    kernel_stats: Arc<KernelStats>,
-}
-impl StatFile {
-    pub fn new_node(kernel_stats: &Arc<KernelStats>) -> impl FsNodeOps {
-        DynamicFile::new_node(Self { kernel_stats: kernel_stats.clone() })
-    }
-}
-impl DynamicFileSource for StatFile {
-    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let uptime = zx::MonotonicInstant::get() - zx::MonotonicInstant::ZERO;
-
-        let cpu_stats =
-            self.kernel_stats.get().get_cpu_stats(zx::MonotonicInstant::INFINITE).map_err(|e| {
-                log_error!("FIDL error getting cpu stats: {e}");
-                errno!(EIO)
-            })?;
-
-        // Number of values reported per CPU. See `get_cpu_stats_row` below for the list of values.
-        const NUM_CPU_STATS: usize = 10;
-
-        let get_cpu_stats_row = |cpu_stats: &fidl_fuchsia_kernel::PerCpuStats| {
-            let idle = zx::MonotonicDuration::from_nanos(cpu_stats.idle_time.unwrap_or(0));
-
-            // Assume that all non-idle time is spent in user mode.
-            let user = uptime - idle;
-
-            // Zircon currently reports only number of various interrupts, but not the time spent
-            // handling them. Return zeros.
-            let nice: u64 = 0;
-            let system: u64 = 0;
-            let iowait: u64 = 0;
-            let irq: u64 = 0;
-            let softirq: u64 = 0;
-            let steal: u64 = 0;
-            let quest: u64 = 0;
-            let quest_nice: u64 = 0;
-
-            [
-                duration_to_scheduler_clock(user) as u64,
-                nice,
-                system,
-                duration_to_scheduler_clock(idle) as u64,
-                iowait,
-                irq,
-                softirq,
-                steal,
-                quest,
-                quest_nice,
-            ]
-        };
-        let per_cpu_stats = cpu_stats.per_cpu_stats.unwrap_or(vec![]);
-        let mut cpu_total_row = [0u64; NUM_CPU_STATS];
-        for row in per_cpu_stats.iter().map(get_cpu_stats_row) {
-            for (i, value) in row.iter().enumerate() {
-                cpu_total_row[i] += value
-            }
-        }
-
-        writeln!(sink, "cpu {}", cpu_total_row.map(|n| n.to_string()).join(" "))?;
-        for (i, row) in per_cpu_stats.iter().map(get_cpu_stats_row).enumerate() {
-            writeln!(sink, "cpu{} {}", i, row.map(|n| n.to_string()).join(" "))?;
-        }
-
-        let context_switches: u64 =
-            per_cpu_stats.iter().map(|s| s.context_switches.unwrap_or(0)).sum();
-        writeln!(sink, "ctxt {}", context_switches)?;
-
-        let num_interrupts: u64 = per_cpu_stats.iter().map(|s| s.ints.unwrap_or(0)).sum();
-        writeln!(sink, "intr {}", num_interrupts)?;
-
-        let epoch_time = zx::MonotonicDuration::from(
-            SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap_or_default(),
-        );
-        let boot_time_epoch = epoch_time - uptime;
-        writeln!(sink, "btime {}", boot_time_epoch.into_seconds())?;
-
-        Ok(())
-    }
-}
-
-#[derive(Clone)]
-struct LoadavgFile(Weak<Kernel>);
-impl LoadavgFile {
-    pub fn new_node(kernel: &Arc<Kernel>) -> impl FsNodeOps {
-        DynamicFile::new_node(Self(Arc::downgrade(kernel)))
-    }
-}
-impl DynamicFileSource for LoadavgFile {
-    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let (runnable_tasks, existing_tasks, last_pid) = {
-            let kernel = self.0.upgrade().ok_or_else(|| errno!(EIO))?;
-            let pid_table = kernel.pids.read();
-
-            let curr_tids = pid_table.task_ids();
-            let mut runnable_tasks = 0;
-            for pid in &curr_tids {
-                let weak_task = pid_table.get_task(*pid);
-                if let Some(task) = weak_task.upgrade() {
-                    if task.state_code() == TaskStateCode::Running {
-                        runnable_tasks += 1;
-                    }
-                };
-            }
-
-            let existing_tasks = pid_table.process_ids().len() + curr_tids.len();
-            (runnable_tasks, existing_tasks, pid_table.last_pid())
-        };
-
-        track_stub!(TODO("https://fxbug.dev/322874486"), "/proc/loadavg load stats");
-        writeln!(sink, "0.50 0.50 0.50 {}/{} {}", runnable_tasks, existing_tasks, last_pid)?;
-        Ok(())
-    }
-}
-
-#[derive(Clone)]
-// Tuple member is never used
-#[allow(dead_code)]
-struct SwapsFile(Weak<Kernel>);
-impl SwapsFile {
-    pub fn new_node(kernel: &Arc<Kernel>) -> impl FsNodeOps {
-        DynamicFile::new_node(Self(Arc::downgrade(kernel)))
-    }
-}
-impl DynamicFileSource for SwapsFile {
-    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        track_stub!(TODO("https://fxbug.dev/322874154"), "/proc/swaps includes Kernel::swap_files");
-        writeln!(sink, "Filename\t\t\t\tType\t\tSize\t\tUsed\t\tPriority")?;
         Ok(())
     }
 }

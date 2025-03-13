@@ -54,7 +54,7 @@ ignore_policy = struct(
     packages = bool_dict([
         to_package_str(Label(label))
         for label in [
-            "@fuchsia_sdk//fuchsia/tools",
+            "@rules_fuchsia//fuchsia/tools",
         ]
     ]),
 )

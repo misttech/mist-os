@@ -111,9 +111,15 @@ impl<D: Diagnostics, M: ReferenceTimeProvider> PushSourceManager<D, M> {
                         error!("Error launching {:?} time source: {:?}", self.role, err);
                         debug!("Sampling will be reattempted until success.");
                         self.record_time_source_failure(TimeSourceError::LaunchFailed);
-                        if self.delays_enabled {
-                            fasync::Timer::new(fasync::BootInstant::after(RESTART_DELAY)).await;
-                        }
+                        fasync::Timer::new(fasync::BootInstant::after(if self.delays_enabled {
+                            RESTART_DELAY
+                        } else {
+                            // Yield even if no delays are requested.  This ensures that this
+                            // coroutine does not monopolize the executor, which is useful
+                            // in tests.
+                            zx::BootDuration::from_nanos(1)
+                        }))
+                        .await;
                         continue;
                     }
                 },

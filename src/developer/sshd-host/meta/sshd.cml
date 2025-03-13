@@ -39,6 +39,7 @@
             directory: "boot-bin",
             rights: [ "rx*" ],
             path: "/boot-bin",
+            availability: "optional",
         },
         {
             directory: "build-info",
@@ -181,8 +182,6 @@
                 "fuchsia.sysmem2.Allocator",
                 "fuchsia.thermal.ClientStateConnector",
                 "fuchsia.time.Maintenance",
-                "fuchsia.tracing.kernel.Controller",
-                "fuchsia.tracing.kernel.Reader",
                 "fuchsia.ui.activity.control.Control",
                 "fuchsia.ui.activity.Provider",
                 "fuchsia.update.CommitStatusProvider",
@@ -327,6 +326,7 @@
             service: [
                 "fuchsia.hardware.cpu.ctrl.Service",
                 "fuchsia.hardware.suspend.SuspendService",
+                "fuchsia.hardware.usb.peripheral.Service",
             ],
         },
         { service: "fuchsia.hardware.spmi.DebugService" },

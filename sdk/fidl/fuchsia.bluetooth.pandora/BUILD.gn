@@ -7,9 +7,7 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.bluetooth.pandora") {
   name = "fuchsia.bluetooth.pandora"
 
-  sdk_category = "partner_internal"
-  stable = false
-  sdk_area = "Unknown"
+  sdk_area = "Bluetooth"
 
   sources = [ "pandora.fidl" ]
 }

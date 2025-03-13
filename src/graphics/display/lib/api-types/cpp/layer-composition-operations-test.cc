@@ -112,7 +112,7 @@ TEST(LayerCompositionOperationsTest, IsValidBanjoUnknownOperations) {
 
 TEST(LayerCompositionOperationsTest, HasUseImage) {
   EXPECT_EQ(false, LayerCompositionOperations::kNoOperations.HasUseImage());
-  EXPECT_EQ(false, LayerCompositionOperations::kMergeBase.HasUseImage());
+  EXPECT_EQ(false, LayerCompositionOperations::kMerge.HasUseImage());
 
   EXPECT_EQ(true, LayerCompositionOperations::kUseImage.HasUseImage());
   EXPECT_EQ(true, LayerCompositionOperations::kAllOperations.HasUseImage());
@@ -127,38 +127,20 @@ TEST(LayerCompositionOperationsTest, WithUseImage) {
             LayerCompositionOperations::kAllOperations.WithUseImage());
 }
 
-TEST(LayerCompositionOperationsTest, HasMergeBase) {
-  EXPECT_EQ(false, LayerCompositionOperations::kNoOperations.HasMergeBase());
-  EXPECT_EQ(false, LayerCompositionOperations::kMergeSrc.HasMergeBase());
+TEST(LayerCompositionOperationsTest, HasMerge) {
+  EXPECT_EQ(false, LayerCompositionOperations::kNoOperations.HasMerge());
+  EXPECT_EQ(false, LayerCompositionOperations::kUseImage.HasMerge());
 
-  EXPECT_EQ(true, LayerCompositionOperations::kMergeBase.HasMergeBase());
-  EXPECT_EQ(true, LayerCompositionOperations::kAllOperations.HasMergeBase());
+  EXPECT_EQ(true, LayerCompositionOperations::kMerge.HasMerge());
+  EXPECT_EQ(true, LayerCompositionOperations::kAllOperations.HasMerge());
 }
 
-TEST(LayerCompositionOperationsTest, WithMergeBase) {
-  EXPECT_EQ(LayerCompositionOperations::kMergeBase,
-            LayerCompositionOperations::kNoOperations.WithMergeBase());
-  EXPECT_EQ(LayerCompositionOperations::kMergeBase,
-            LayerCompositionOperations::kMergeBase.WithMergeBase());
+TEST(LayerCompositionOperationsTest, WithMerge) {
+  EXPECT_EQ(LayerCompositionOperations::kMerge,
+            LayerCompositionOperations::kNoOperations.WithMerge());
+  EXPECT_EQ(LayerCompositionOperations::kMerge, LayerCompositionOperations::kMerge.WithMerge());
   EXPECT_EQ(LayerCompositionOperations::kAllOperations,
-            LayerCompositionOperations::kAllOperations.WithMergeBase());
-}
-
-TEST(LayerCompositionOperationsTest, HasMergeSrc) {
-  EXPECT_EQ(false, LayerCompositionOperations::kNoOperations.HasMergeSrc());
-  EXPECT_EQ(false, LayerCompositionOperations::kFrameScale.HasMergeSrc());
-
-  EXPECT_EQ(true, LayerCompositionOperations::kMergeSrc.HasMergeSrc());
-  EXPECT_EQ(true, LayerCompositionOperations::kAllOperations.HasMergeSrc());
-}
-
-TEST(LayerCompositionOperationsTest, WithMergeSrc) {
-  EXPECT_EQ(LayerCompositionOperations::kMergeSrc,
-            LayerCompositionOperations::kNoOperations.WithMergeSrc());
-  EXPECT_EQ(LayerCompositionOperations::kMergeSrc,
-            LayerCompositionOperations::kMergeSrc.WithMergeSrc());
-  EXPECT_EQ(LayerCompositionOperations::kAllOperations,
-            LayerCompositionOperations::kAllOperations.WithMergeSrc());
+            LayerCompositionOperations::kAllOperations.WithMerge());
 }
 
 TEST(LayerCompositionOperationsTest, HasFrameScale) {

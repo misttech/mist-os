@@ -48,7 +48,15 @@
             subdir: "scene_manager",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-input-report",
+            from: "parent",
+            to: [ "#scene_manager" ],
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.input.report.Service",
             from: "parent",
             to: [ "#scene_manager" ],
         },
@@ -82,7 +90,10 @@
             ],
         },
         {
-            protocol: "fuchsia.metrics.MetricEventLoggerFactory",
+            protocol: [
+                "fuchsia.metrics.MetricEventLoggerFactory",
+                "fuchsia.scheduler.RoleManager",
+            ],
             from: "parent",
             to: [ "#scene_manager" ],
         },

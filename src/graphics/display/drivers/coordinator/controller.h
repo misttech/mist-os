@@ -25,12 +25,12 @@
 #include <cstdlib>
 #include <list>
 #include <memory>
+#include <span>
 
-#include <fbl/array.h>
 #include <fbl/mutex.h>
-#include <fbl/ref_ptr.h>
 #include <fbl/vector.h>
 
+#include "src/graphics/display/drivers/coordinator/added-display-info.h"
 #include "src/graphics/display/drivers/coordinator/capture-image.h"
 #include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
@@ -38,13 +38,15 @@
 #include "src/graphics/display/drivers/coordinator/engine-driver-client.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
-#include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/drivers/coordinator/vsync-monitor.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/engine-info.h"
+#include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 
 namespace display_coordinator {
 
@@ -111,10 +113,10 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
 
   void OnClientDead(ClientProxy* client);
   void SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode virtcon_mode);
-  void ShowActiveDisplay();
 
-  void ApplyConfig(DisplayConfig* configs[], int32_t count, display::ConfigStamp config_stamp,
-                   uint32_t layer_stamp, ClientId client_id) __TA_EXCLUDES(mtx());
+  void ApplyConfig(std::span<DisplayConfig*> display_configs,
+                   display::ConfigStamp client_config_stamp, uint32_t layer_stamp,
+                   ClientId client_id) __TA_EXCLUDES(mtx());
 
   void ReleaseImage(display::DriverImageId driver_image_id);
   void ReleaseCaptureImage(display::DriverCaptureImageId driver_capture_image_id);
@@ -129,7 +131,7 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   zx::result<std::span<const display::DisplayTiming>> GetDisplayTimings(
       display::DisplayId display_id) __TA_REQUIRES(mtx());
 
-  zx::result<fbl::Array<CoordinatorPixelFormat>> GetSupportedPixelFormats(
+  zx::result<fbl::Vector<display::PixelFormat>> GetSupportedPixelFormats(
       display::DisplayId display_id) __TA_REQUIRES(mtx());
 
   // Calls `callback` with a const DisplayInfo& matching the given `display_id`.
@@ -143,7 +145,7 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
 
   EngineDriverClient* engine_driver_client() { return engine_driver_client_.get(); }
 
-  bool supports_capture() { return supports_capture_; }
+  bool supports_capture() { return engine_info_->is_capture_supported(); }
 
   fdf::UnownedSynchronizedDispatcher client_dispatcher() const {
     return client_dispatcher_->borrow();
@@ -159,7 +161,12 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   const inspect::Inspector& inspector() const { return inspector_; }
 
   size_t ImportedImagesCountForTesting() const;
-  display::ConfigStamp TEST_controller_stamp() const;
+
+  // Identifies the most recent completely applied display configuration.
+  //
+  // The returned stamp is updated after the display engine driver acknowledges
+  // having applied the configuration.
+  display::DriverConfigStamp last_applied_driver_config_stamp() const;
 
   // Typically called by OpenController/OpenVirtconController. However, this is made public
   // for use by testing services which provide a fake display controller.
@@ -188,10 +195,19 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   zx::result<> Initialize();
 
   void HandleClientOwnershipChanges() __TA_REQUIRES(mtx());
-  void PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) __TA_EXCLUDES(mtx());
 
-  zx::result<> AddDisplay(const raw_display_info_t& banjo_display_info);
-  zx::result<> RemoveDisplay(display::DisplayId display_id);
+  // Processes a display addition notification from an engine driver.
+  //
+  // Must be called on the client dispatcher.
+  void AddDisplay(std::unique_ptr<AddedDisplayInfo> added_display_info);
+
+  // Processes a display removal notification from an engine driver.
+  //
+  // Must be called on the client dispatcher.
+  void RemoveDisplay(display::DisplayId removed_display_id);
+
+  // Must be called on the client dispatcher.
+  void PopulateDisplayTimings(DisplayInfo& info) __TA_EXCLUDES(mtx());
 
   inspect::Inspector inspector_;
   // Currently located at bootstrap/driver_manager:root/display.
@@ -211,7 +227,8 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   display::DriverCaptureImageId pending_release_capture_image_id_ =
       display::kInvalidDriverCaptureImageId;
 
-  bool supports_capture_ = false;
+  // Populated after the engine is initialized.
+  std::optional<display::EngineInfo> engine_info_;
 
   display::DriverBufferCollectionId next_driver_buffer_collection_id_ __TA_GUARDED(mtx()) =
       display::DriverBufferCollectionId(1);
@@ -220,7 +237,7 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   ClientId next_client_id_ __TA_GUARDED(mtx()) = ClientId(1);
 
   // Pointers to instances owned by `clients_`.
-  ClientProxy* active_client_ __TA_GUARDED(mtx()) = nullptr;
+  ClientProxy* client_owning_displays_ __TA_GUARDED(mtx()) = nullptr;
   ClientProxy* virtcon_client_ __TA_GUARDED(mtx()) = nullptr;
   ClientProxy* primary_client_ __TA_GUARDED(mtx()) = nullptr;
 
@@ -238,13 +255,16 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   inspect::UintProperty last_valid_apply_config_interval_ns_property_;
   inspect::UintProperty last_valid_apply_config_config_stamp_property_;
 
-  display::ConfigStamp controller_stamp_ __TA_GUARDED(mtx()) = display::kInvalidConfigStamp;
+  display::DriverConfigStamp last_issued_driver_config_stamp_ __TA_GUARDED(mtx()) =
+      display::kInvalidDriverConfigStamp;
+  display::DriverConfigStamp last_applied_driver_config_stamp_ __TA_GUARDED(mtx()) =
+      display::kInvalidDriverConfigStamp;
 };
 
 template <typename Callback>
 bool Controller::FindDisplayInfo(display::DisplayId display_id, Callback callback) {
   for (const DisplayInfo& display : displays_) {
-    if (display.id == display_id) {
+    if (display.id() == display_id) {
       callback(display);
       return true;
     }

@@ -346,11 +346,11 @@ TEST_F(IntegrationTest, BindAndInit) {
   auto display_engine_banjo_node_it =
       std::find_if(nodes.begin(), nodes.end(), IsDisplayEngineBanjoNode);
   ASSERT_NE(display_engine_banjo_node_it, nodes.end());
-  FDF_LOG(INFO, "Display controller banjo node is: %s", display_engine_banjo_node_it->name.c_str());
+  fdf::info("Display controller banjo node is: {}", display_engine_banjo_node_it->name);
 
   auto intel_gpu_core_node_it = std::find_if(nodes.begin(), nodes.end(), IsIntelGpuCoreNode);
   ASSERT_NE(intel_gpu_core_node_it, nodes.end());
-  FDF_LOG(INFO, "Intel GPU node is: %s", display_engine_banjo_node_it->name.c_str());
+  fdf::info("Intel GPU node is: {}", display_engine_banjo_node_it->name);
 
   ASSERT_NE(display_engine_banjo_node_it, intel_gpu_core_node_it);
 

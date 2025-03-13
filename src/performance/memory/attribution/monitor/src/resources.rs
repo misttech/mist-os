@@ -375,13 +375,19 @@ impl KernelResourcesBuilder {
                     fplugin::Resource {
                         koid: Some(info_vmo.koid.raw_koid()),
                         name_index: Some(name_index),
+                        // TODO(https://fxbug.dev/393078902): also take into account the fractional
+                        // part.
                         resource_type: Some(fplugin::ResourceType::Vmo(fplugin::Vmo {
-                            committed_bytes: Some(info_vmo.committed_bytes),
-                            populated_bytes: Some(info_vmo.populated_bytes),
                             parent: match info_vmo.parent_koid.raw_koid() {
                                 0 => None,
                                 k => Some(k),
                             },
+                            private_committed_bytes: Some(info_vmo.committed_private_bytes),
+                            private_populated_bytes: Some(info_vmo.populated_private_bytes),
+                            scaled_committed_bytes: Some(info_vmo.committed_scaled_bytes),
+                            scaled_populated_bytes: Some(info_vmo.populated_scaled_bytes),
+                            total_committed_bytes: Some(info_vmo.committed_bytes),
+                            total_populated_bytes: Some(info_vmo.populated_bytes),
                             ..Default::default()
                         })),
                         ..Default::default()
@@ -596,8 +602,8 @@ pub mod tests {
         vmo_info.parent_koid = zx::Koid::from_raw(parent);
         vmo_info.committed_bytes = committed_bytes;
         vmo_info.populated_bytes = populated_bytes;
-        vmo_info.committed_private_bytes = committed_bytes;
-        vmo_info.populated_private_bytes = populated_bytes;
+        vmo_info.committed_fractional_scaled_bytes = 0;
+        vmo_info.populated_fractional_scaled_bytes = 0;
         vmo_info.committed_scaled_bytes = committed_bytes;
         vmo_info.populated_scaled_bytes = populated_bytes;
         vmo_info

@@ -3,17 +3,25 @@
 #![allow(unused_parens, unused_variables, unused_mut, unused_imports, unreachable_code)]
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct SerializableStruct {}
 
 impl ::fidl_next::Encodable for SerializableStruct {
-    type Encoded<'buf> = WireSerializableStruct;
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
+    type Encoded = WireSerializableStruct;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for SerializableStruct {
+impl<___E> ::fidl_next::Encode<___E> for SerializableStruct
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -26,7 +34,7 @@ impl<___E> ::fidl_next::Encode<___E> for SerializableStruct {
 }
 
 impl ::fidl_next::EncodableOption for Box<SerializableStruct> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireSerializableStruct>;
+    type EncodedOption = ::fidl_next::WireBox<WireSerializableStruct>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<SerializableStruct>
@@ -34,10 +42,11 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     SerializableStruct: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -51,7 +60,11 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireSerializableStruct> for SerializableStruct {
-    fn take_from(from: &mut WireSerializableStruct) -> Self {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
+    #[inline]
+    fn take_from(from: &WireSerializableStruct) -> Self {
         Self {}
     }
 }
@@ -63,7 +76,7 @@ pub struct WireSerializableStruct {}
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSerializableStruct
 where
-    ___D: ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -89,17 +102,18 @@ impl SerializableTable {
 }
 
 impl ::fidl_next::Encodable for SerializableTable {
-    type Encoded<'buf> = WireSerializableTable<'buf>;
+    type Encoded = WireSerializableTable;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for SerializableTable
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireSerializableTable { table } = slot);
 
@@ -123,21 +137,22 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireSerializableTable<'buf>> for SerializableTable {
-    fn take_from(from: &mut WireSerializableTable<'buf>) -> Self {
+impl ::fidl_next::TakeFrom<WireSerializableTable> for SerializableTable {
+    #[inline]
+    fn take_from(from: &WireSerializableTable) -> Self {
         Self {}
     }
 }
 
 /// The wire type corresponding to [`SerializableTable`].
 #[repr(C)]
-pub struct WireSerializableTable<'buf> {
-    table: ::fidl_next::WireTable<'buf>,
+pub struct WireSerializableTable {
+    table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireSerializableTable<'buf>
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireSerializableTable
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -155,9 +170,9 @@ where
     }
 }
 
-impl<'buf> WireSerializableTable<'buf> {}
+impl WireSerializableTable {}
 
-impl ::core::fmt::Debug for WireSerializableTable<'_> {
+impl ::core::fmt::Debug for WireSerializableTable {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> Result<(), ::core::fmt::Error> {
         f.debug_struct("SerializableTable").finish()
     }
@@ -169,25 +184,24 @@ pub enum SerializableUnion {
 }
 
 impl ::fidl_next::Encodable for SerializableUnion {
-    type Encoded<'buf> = WireSerializableUnion;
+    type Encoded = WireSerializableUnion;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for SerializableUnion
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
-
-    bool: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireSerializableUnion { raw, _phantom: _ } = slot);
+        ::fidl_next::munge!(let WireSerializableUnion { raw } = slot);
 
         match self {
             Self::Unused(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, bool>(value, 1, encoder, raw)?
+                ::fidl_next::RawWireUnion::encode_as_static::<___E, bool>(value, 1, encoder, raw)?
             }
         }
 
@@ -196,20 +210,21 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<SerializableUnion> {
-    type EncodedOption<'buf> = WireOptionalSerializableUnion;
+    type EncodedOption = WireOptionalSerializableUnion;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<SerializableUnion>
 where
-    ___E: ::fidl_next::Encoder + ?Sized,
+    ___E: ?Sized,
     SerializableUnion: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalSerializableUnion { raw, _phantom: _ } = slot.as_mut());
+        ::fidl_next::munge!(let WireOptionalSerializableUnion { raw } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
@@ -223,10 +238,11 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireSerializableUnion> for SerializableUnion {
-    fn take_from(from: &mut WireSerializableUnion) -> Self {
+    #[inline]
+    fn take_from(from: &WireSerializableUnion) -> Self {
         match from.raw.ordinal() {
             1 => Self::Unused(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get_mut().deref_mut_unchecked()
+                from.raw.get().deref_unchecked()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -235,8 +251,9 @@ impl ::fidl_next::TakeFrom<WireSerializableUnion> for SerializableUnion {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalSerializableUnion> for Option<Box<SerializableUnion>> {
-    fn take_from(from: &mut WireOptionalSerializableUnion) -> Self {
-        if let Some(inner) = from.as_mut() {
+    #[inline]
+    fn take_from(from: &WireOptionalSerializableUnion) -> Self {
+        if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
         } else {
             None
@@ -248,16 +265,11 @@ impl ::fidl_next::TakeFrom<WireOptionalSerializableUnion> for Option<Box<Seriali
 #[repr(transparent)]
 pub struct WireSerializableUnion {
     raw: ::fidl_next::RawWireUnion,
-    _phantom: ::core::marker::PhantomData<()>,
 }
 
 pub mod serializable_union {
     pub enum Ref<'union> {
         Unused(&'union bool),
-    }
-
-    pub enum Mut<'union> {
-        Unused(&'union mut bool),
     }
 }
 
@@ -271,42 +283,27 @@ impl WireSerializableUnion {
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
-
-    pub fn as_mut(&mut self) -> crate::serializable_union::Mut<'_> {
-        match self.raw.ordinal() {
-            1 => crate::serializable_union::Mut::Unused(unsafe {
-                self.raw.get_mut().deref_mut_unchecked()
-            }),
-
-            _ => unsafe { ::core::hint::unreachable_unchecked() },
-        }
-    }
 }
 
 impl Clone for WireSerializableUnion {
     fn clone(&self) -> Self {
         match self.raw.ordinal() {
-            1 => Self {
-                raw: unsafe { self.raw.clone_unchecked::<bool>() },
-                _phantom: ::core::marker::PhantomData,
-            },
+            1 => Self { raw: unsafe { self.raw.clone_unchecked::<bool>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireSerializableUnion
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireSerializableUnion
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    bool: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, bool>(raw, decoder)?,
 
@@ -329,7 +326,6 @@ impl ::core::fmt::Debug for WireSerializableUnion {
 #[repr(transparent)]
 pub struct WireOptionalSerializableUnion {
     raw: ::fidl_next::RawWireUnion,
-    _phantom: ::core::marker::PhantomData<()>,
 }
 
 impl WireOptionalSerializableUnion {
@@ -348,64 +344,31 @@ impl WireOptionalSerializableUnion {
             None
         }
     }
-
-    pub fn as_mut(&mut self) -> Option<&mut WireSerializableUnion> {
-        if self.is_some() {
-            Some(unsafe { &mut *(self as *mut Self).cast() })
-        } else {
-            None
-        }
-    }
-
-    pub fn take(&mut self) -> Option<WireSerializableUnion> {
-        if self.is_some() {
-            Some(WireSerializableUnion {
-                raw: ::core::mem::replace(&mut self.raw, ::fidl_next::RawWireUnion::null()),
-                _phantom: ::core::marker::PhantomData,
-            })
-        } else {
-            None
-        }
-    }
-}
-
-impl Default for WireOptionalSerializableUnion {
-    fn default() -> Self {
-        Self { raw: ::fidl_next::RawWireUnion::null(), _phantom: ::core::marker::PhantomData }
-    }
 }
 
 impl Clone for WireOptionalSerializableUnion {
     fn clone(&self) -> Self {
         if self.is_none() {
-            return WireOptionalSerializableUnion {
-                raw: ::fidl_next::RawWireUnion::null(),
-                _phantom: ::core::marker::PhantomData,
-            };
+            return WireOptionalSerializableUnion { raw: ::fidl_next::RawWireUnion::absent() };
         }
 
         match self.raw.ordinal() {
-            1 => Self {
-                raw: unsafe { self.raw.clone_unchecked::<bool>() },
-                _phantom: ::core::marker::PhantomData,
-            },
+            1 => Self { raw: unsafe { self.raw.clone_unchecked::<bool>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
 }
 
-unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalSerializableUnion
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalSerializableUnion
 where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder,
-
-    bool: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, bool>(raw, decoder)?,
 
@@ -422,3 +385,9 @@ impl ::core::fmt::Debug for WireOptionalSerializableUnion {
         self.as_ref().fmt(f)
     }
 }
+
+/// Commonly-used items that should usually be in scope, such as extension traits.
+pub mod prelude {}
+
+/// Compatibility shims which mimic some API surfaces of the current Rust bindings.
+pub mod compat {}

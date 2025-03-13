@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::time::Duration;
+use fidl_fuchsia_paver as paver;
 use thiserror::Error;
 use zx::Status;
-use {fidl_fuchsia_paver as paver, fidl_fuchsia_update_verify as verify};
 
 /// Error condition that may be returned by a boot manager client.
 #[derive(Error, Debug)]
@@ -38,43 +37,20 @@ pub enum PolicyError {
     CurrentConfigurationUnbootable(paver::Configuration),
 }
 
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum VerifySource {
-    Blobfs,
-    Netstack,
-}
-
-/// Error condition that may be returned when doing health verification.
+/// Error condition that may be returned by HealthVerification.
 #[derive(Error, Debug)]
-pub enum VerifyErrors {
-    #[error("one or more verifications failed: {_0:?}")]
-    VerifyErrors(Vec<VerifyError>),
-}
-
-/// Error condition that may be returned when doing health verification.
-#[derive(Error, Debug)]
-pub enum VerifyError {
-    #[error("the {_0:?} verification failed in {_2:?}")]
-    VerifyError(VerifySource, #[source] VerifyFailureReason, Duration),
-}
-
-#[derive(Error, Debug)]
-pub enum VerifyFailureReason {
-    #[error("the fidl call failed")]
+pub enum HealthVerificationError {
+    #[error("fidl error while querying health checks")]
     Fidl(#[source] fidl::Error),
-
-    #[error("the verify request timed out")]
-    Timeout,
-
-    #[error("the verification failed: {0:?}")]
-    Verify(verify::VerifyError),
+    #[error("HealthVerification responded with unhealthy status")]
+    Unhealthy(#[source] Status),
 }
 
 /// Error condition that may be returned by `put_metadata_in_happy_state`.
 #[derive(Error, Debug)]
 pub enum MetadataError {
     #[error("while doing health verification")]
-    Verify(#[source] VerifyErrors),
+    HealthVerification(#[source] HealthVerificationError),
 
     #[error("while signalling EventPair peer")]
     SignalPeer(#[source] Status),

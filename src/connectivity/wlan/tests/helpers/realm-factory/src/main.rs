@@ -118,7 +118,7 @@ async fn create_realm(mut options: RealmOptions) -> Result<RealmInstance, Error>
         let realm = builder.build().await?;
 
         let devfs = options.devfs_server_end.take().unwrap();
-        realm.root.get_exposed_dir().open3(
+        realm.root.get_exposed_dir().open(
             "dev-topological",
             fidl_fuchsia_io::PERM_READABLE | fidl_fuchsia_io::Flags::PROTOCOL_DIRECTORY,
             &Default::default(),
@@ -145,7 +145,7 @@ async fn start_and_connect_to_driver_test_realm(
 
     let dev_topological =
         driver_config.dev_topological.ok_or(format_err!("DriverConfig missing dev_topological"))?;
-    realm.root.get_exposed_dir().open3(
+    realm.root.get_exposed_dir().open(
         "dev-topological",
         fidl_fuchsia_io::PERM_READABLE | fidl_fuchsia_io::Flags::PROTOCOL_DIRECTORY,
         &Default::default(),
@@ -153,7 +153,7 @@ async fn start_and_connect_to_driver_test_realm(
     )?;
 
     let dev_class = driver_config.dev_class.ok_or(format_err!("DriverConfig missing dev_class"))?;
-    realm.root.get_exposed_dir().open3(
+    realm.root.get_exposed_dir().open(
         "dev-class",
         fidl_fuchsia_io::PERM_READABLE | fidl_fuchsia_io::Flags::PROTOCOL_DIRECTORY,
         &Default::default(),

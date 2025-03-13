@@ -21,6 +21,7 @@ use crate::token_registry::TokenRegistry;
 use fuchsia_async::{JoinHandle, Scope, Task};
 use futures::task::{self, Poll};
 use futures::Future;
+use pin_project::pin_project;
 use std::future::{pending, poll_fn};
 use std::pin::pin;
 use std::sync::{Arc, Mutex, OnceLock};
@@ -102,26 +103,7 @@ impl ExecutionScope {
     /// This way `ExecutionScope` can actually also implement [`futures::task::Spawn`] - it just was
     /// not necessary for now.
     pub fn spawn(&self, task: impl Future<Output = ()> + Send + 'static) -> JoinHandle<()> {
-        let executor = self.executor.clone();
-        self.executor.scope().spawn(async move {
-            let mut task = std::pin::pin!(task);
-            poll_fn(|cx| {
-                let shutdown_state = executor.inner.lock().unwrap().shutdown_state;
-                match task.as_mut().poll(cx) {
-                    Poll::Ready(()) => Poll::Ready(()),
-                    Poll::Pending => match shutdown_state {
-                        ShutdownState::Active => Poll::Pending,
-                        ShutdownState::Shutdown
-                            if executor.inner.lock().unwrap().active_count > 0 =>
-                        {
-                            Poll::Pending
-                        }
-                        _ => Poll::Ready(()),
-                    },
-                }
-            })
-            .await;
-        })
+        self.executor.scope().spawn(FutureWithShutdown { executor: self.executor.clone(), task })
     }
 
     pub fn token_registry(&self) -> &TokenRegistry {
@@ -303,6 +285,33 @@ pub async fn yield_to_executor() {
         }
     })
     .await;
+}
+
+/// A future that wraps another future and watches for the shutdown signal.
+#[pin_project]
+struct FutureWithShutdown<Task: Future<Output = ()> + Send + 'static> {
+    executor: Arc<Executor>,
+    #[pin]
+    task: Task,
+}
+
+impl<Task: Future<Output = ()> + Send + 'static> Future for FutureWithShutdown<Task> {
+    type Output = ();
+
+    fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+        let shutdown_state = this.executor.inner.lock().unwrap().shutdown_state;
+        match this.task.poll(cx) {
+            Poll::Ready(()) => Poll::Ready(()),
+            Poll::Pending => match shutdown_state {
+                ShutdownState::Active => Poll::Pending,
+                ShutdownState::Shutdown if this.executor.inner.lock().unwrap().active_count > 0 => {
+                    Poll::Pending
+                }
+                _ => Poll::Ready(()),
+            },
+        }
+    }
 }
 
 #[cfg(test)]

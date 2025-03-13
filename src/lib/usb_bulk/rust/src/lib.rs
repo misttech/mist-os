@@ -19,7 +19,7 @@ use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::future::Future;
-use std::io::{ErrorKind, Read, Write};
+use std::io::{Read, Write};
 use std::os::raw::c_void;
 use std::pin::Pin;
 use std::sync::{Mutex, RwLock};
@@ -146,7 +146,7 @@ impl Read for Interface {
             unsafe { usb::interface_read(self.interface, buf_ptr, buf.len() as usb::ssize_t) };
 
         if ret < 0 {
-            return Err(std::io::Error::new(ErrorKind::Other, format!("Read error: {}", ret)));
+            return Err(std::io::Error::other(format!("Read error: {}", ret)));
         }
         return Ok(ret as usize);
     }
@@ -161,7 +161,7 @@ impl Write for Interface {
             unsafe { usb::interface_write(self.interface, buf_ptr, buf.len() as usb::ssize_t) };
 
         if ret < 0 {
-            return Err(std::io::Error::new(ErrorKind::Other, format!("Write error: {}", ret)));
+            return Err(std::io::Error::other(format!("Write error: {}", ret)));
         }
         return Ok(ret as usize);
     }
@@ -270,10 +270,7 @@ impl AsyncWrite for AsyncInterface {
                 if let Some(iface_lock) = (*read_guard).get(&serial_clone) {
                     iface_lock.lock().unwrap().write(&buffer)
                 } else {
-                    Err(std::io::Error::new(
-                        ErrorKind::Other,
-                        format!("Interface missing from registry"),
-                    ))
+                    Err(std::io::Error::other("Interface missing from registry"))
                 }
             })));
         }
@@ -287,10 +284,7 @@ impl AsyncWrite for AsyncInterface {
                 Poll::Pending => Poll::Pending,
             }
         } else {
-            Poll::Ready(Err(std::io::Error::new(
-                ErrorKind::Other,
-                format!("Could not add async task to write"),
-            )))
+            Poll::Ready(Err(std::io::Error::other("Could not add async task to write")))
         }
     }
 
@@ -322,10 +316,7 @@ impl AsyncRead for AsyncInterface {
                     buffer.truncate(read);
                     Ok(buffer)
                 } else {
-                    Err(std::io::Error::new(
-                        ErrorKind::Other,
-                        format!("Interface missing from registry"),
-                    ))
+                    Err(std::io::Error::other("Interface missing from registry"))
                 }
             })));
         }
@@ -342,10 +333,7 @@ impl AsyncRead for AsyncInterface {
                 Poll::Pending => Poll::Pending,
             }
         } else {
-            Poll::Ready(Err(std::io::Error::new(
-                ErrorKind::Other,
-                format!("Could not add async task to read"),
-            )))
+            Poll::Ready(Err(std::io::Error::other("Could not add async task to read")))
         }
     }
 }

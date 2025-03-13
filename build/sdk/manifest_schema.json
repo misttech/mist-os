@@ -54,10 +54,9 @@
                     "type": "string",
                     "enum": [
                         "internal",
-                        "cts",
-                        "partner",
+                        "compat_test",
                         "partner_internal",
-                        "public"
+                        "partner"
                     ]
                 },
                 "area": {

@@ -5,9 +5,9 @@ driver, which enables the driver's services to be discovered by other Fuchsia
 components in the system. This guide uses an [example DFv2 driver][example-driver]
 to walk through the `devfs` setup process.
 
-Important: Setting up `devfs` in a DFv2 driver is only necessary when you migrate
-an existing DFv1 driver to DFv2 and this DFv1 driver currently advertises protocols
-using `devfs`.
+Important: Setting up `devfs` is no longer necessary. See
+[Driver Communication][driver-communication] for a guide on how to use services
+in your driver.
 
 The steps are:
 
@@ -128,6 +128,7 @@ if (owned_child.is_error()) {
 <!-- Reference links -->
 
 [devfs]: /docs/concepts/drivers/driver_communication.md
+[driver-communication]: /docs/concepts/drivers/driver_communication.md
 [example-driver]: https://cs.opensource.google/fuchsia/fuchsia/+/main:examples/drivers/
 [retriever-driver-cc]: https://cs.opensource.google/fuchsia/fuchsia/+/main:examples/drivers/metadata/retriever/retriever-driver.cc
 [retriever-protocol]: https://cs.opensource.google/fuchsia/fuchsia/+/main:examples/drivers/metadata/fuchsia.examples.metadata/fuchsia.examples.metadata.fidl

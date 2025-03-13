@@ -4,7 +4,7 @@
 
 /// Provides control of the FTL outside of the normal block operations
 /// (read/write/trim/etc) or filesystem operations (mount/unmount/format/etc).
-@available(added=NEXT)
+@available(added=25)
 library fuchsia.storage.ftl;
 
 using zx;

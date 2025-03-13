@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use crate::writer::{
-    ArithmeticArrayProperty, ArrayProperty, HistogramProperty, InspectType, Node, StringReference,
-    UintArrayProperty,
+    ArithmeticArrayProperty, ArrayProperty, HistogramProperty, InspectType, Node, UintArrayProperty,
 };
 use diagnostics_hierarchy::{ArrayFormat, LinearHistogramParams};
 use inspect_format::constants;
 use log::error;
+use std::borrow::Cow;
 
 #[derive(Debug, Default)]
 /// A linear histogram property for unsigned integer values.
@@ -23,7 +23,7 @@ impl InspectType for UintLinearHistogramProperty {}
 
 impl UintLinearHistogramProperty {
     pub(crate) fn new(
-        name: StringReference,
+        name: Cow<'_, str>,
         params: LinearHistogramParams<u64>,
         parent: &Node,
     ) -> Self {

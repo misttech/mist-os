@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/378521591) Remove once implementations below are used.
-#![allow(dead_code)]
-
 use crate::env::EnvLike;
-use crate::errors::UsageError;
+use crate::errors::BuildError;
+use crate::name::Name;
 use serde::Deserialize;
 use serde_json::Value;
 use serde_json5;
@@ -17,16 +15,13 @@ use std::path::PathBuf;
 
 const DEFAULT_SCHEMA_PATH: &str = "../../build/sdk/test_config_schema.json5";
 const SCHEMA_ARG_PREFIX: &str = "--schema=";
-const PROPERTIES_TAG: &str = "properties";
-const TYPE_TAG: &str = "type";
-const ITEMS_TAG: &str = "items";
 
 /// A JSON schema. `Schema` holds a test config schema in two forms: A serde_json Value suitable
-/// for validating JSON against the schema, and a 'deserialized' idiomatic form for guiding the
-/// processing of test parameters in command lines and environment variables. In this latter form,
-/// the schema includes only what's required for that purpose. For example, object types have no
-/// properties (because object types are not allowed in command lines or environment variables).
-/// Descriptions are also absent as well as enums, which are only used in formal validation.
+/// for validating JSON against the schema, and an idiomatic form for guiding the processing of test
+/// parameters in command lines and environment variables. In this latter form, the schema includes
+/// only what's required for that purpose. For example, object types have no properties (because
+/// object types are not allowed in command lines or environment variables). Descriptions are also
+/// absent as well as enums, which are only used in formal validation.
 #[derive(Deserialize, Debug, Default, PartialEq)]
 pub struct Schema {
     // `Value` form of the schema for validation using `valico::json_schema``.
@@ -34,13 +29,13 @@ pub struct Schema {
     pub as_value: Value,
 
     // Table of deserialized properties.
-    pub properties: HashMap<String, PropertyScheme>,
+    pub properties: HashMap<Name, PropertyScheme>,
 }
 
 impl Schema {
     /// Gets a schema by reading the file specified in the '--schema=' command line argument in
     /// `env_like` or by reading from the default file specified by `DEFAULT_SCHEMA_PATH`.
-    pub fn from_env_like<E: EnvLike>(env_like: &E) -> Result<Self, UsageError> {
+    pub fn from_env_like<E: EnvLike>(env_like: &E) -> Result<Self, BuildError> {
         if let Some(arg) = env_like.args().find(|a| a.starts_with(SCHEMA_ARG_PREFIX)) {
             Self::read(PathBuf::from(arg.strip_prefix(SCHEMA_ARG_PREFIX).unwrap()))
         } else {
@@ -49,28 +44,23 @@ impl Schema {
     }
 
     /// Creates a `Schema` by reading it from the schema from the specified path.
-    pub fn read(path: PathBuf) -> Result<Self, UsageError> {
-        let file = File::open(path.as_path()).map_err(|e| UsageError::FailedToOpenSchema {
-            path: path.clone(),
-            detail: e.to_string(),
-        })?;
+    pub fn read(path: PathBuf) -> Result<Self, BuildError> {
+        let file = File::open(path.as_path())
+            .map_err(|e| BuildError::FailedToOpenSchema { path: path.clone(), source: e })?;
 
         let mut reader = BufReader::new(file);
 
         Self::from_value(
-            serde_json5::from_reader(&mut reader).map_err(|e| UsageError::FailedToParseSchema {
-                path: path.clone(),
-                detail: e.to_string(),
-            })?,
+            serde_json5::from_reader(&mut reader)
+                .map_err(|e| BuildError::FailedToReadSchema { path: path.clone(), source: e })?,
             path,
         )
     }
 
     /// Creates a `Schema' from a `Value``.
-    pub fn from_value(schema_value: Value, path: PathBuf) -> Result<Self, UsageError> {
-        let mut schema: Schema = serde_json::from_value(schema_value.clone()).map_err(|e| {
-            UsageError::FailedToParseSchema { path: path.clone(), detail: e.to_string() }
-        })?;
+    pub fn from_value(schema_value: Value, path: PathBuf) -> Result<Self, BuildError> {
+        let mut schema: Schema = serde_json::from_value(schema_value.clone())
+            .map_err(|e| BuildError::FailedToParseSchema { path: path.clone(), source: e })?;
 
         schema.as_value = schema_value;
 
@@ -94,11 +84,11 @@ pub struct PropertyScheme {
 }
 
 impl PropertyScheme {
-    fn validate(&self, name: &str) -> Result<(), UsageError> {
+    fn validate(&self, name: &Name) -> Result<(), BuildError> {
         match &self.items {
             Some(boxed_scheme) => {
                 if self.property_type != PropertyType::Array {
-                    return Err(UsageError::InvalidSchema(format!(
+                    return Err(BuildError::InvalidSchema(format!(
                         "Property {} has `items` but is not an array",
                         name
                     )));
@@ -108,7 +98,7 @@ impl PropertyScheme {
             }
             None => {
                 if self.property_type == PropertyType::Array {
-                    return Err(UsageError::InvalidSchema(format!(
+                    return Err(BuildError::InvalidSchema(format!(
                         "Property {} is an array but has no `items`",
                         name
                     )));
@@ -145,6 +135,7 @@ pub enum PropertyType {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use assert_matches::assert_matches;
     use serde_json::json;
     use std::fs;
     use tempfile::NamedTempFile;
@@ -235,12 +226,10 @@ pub mod tests {
         let path_buf = PathBuf::from("/non_existent_file");
         let result = Schema::read(path_buf.clone());
         assert!(result.is_err());
-        assert_eq!(
+        assert_matches!(
             result.unwrap_err(),
-            UsageError::FailedToOpenSchema {
-                path: path_buf,
-                detail: String::from("No such file or directory (os error 2)")
-            }
+            BuildError::FailedToOpenSchema { path: p, source: _ }
+                if p == path_buf
         );
 
         let temp_file = NamedTempFile::new().expect("to create temporary file");
@@ -248,12 +237,11 @@ pub mod tests {
         fs::write(temp_file_path, r#"not a valid schema"#).expect("to write to temporary file");
         let result = Schema::read(temp_file.path().to_path_buf());
         assert!(result.is_err());
-        assert_eq!(
+        assert_matches!(
             result.unwrap_err(),
-            UsageError::FailedToParseSchema{
-                path: temp_file.path().to_path_buf(),
-                detail: String::from(" --> 1:1\n  |\n1 | not a valid schema\n  | ^---\n  |\n  = expected array, boolean, null, number, object, or string"),
-            });
+            BuildError::FailedToReadSchema { path: p, source: _ }
+                if p == temp_file.path().to_path_buf()
+        );
         temp_file.close().expect("to close temporary file");
     }
 }

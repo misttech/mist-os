@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.driver.component.test/cpp/driver/wire.h>
 #include <fidl/fuchsia.driver.component.test/cpp/wire.h>
+#include <fidl/fuchsia.driver.framework/cpp/wire_messaging.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>

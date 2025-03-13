@@ -9,7 +9,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/async-loop/testing/cpp/real_loop.h>
 #include <lib/async/cpp/wait.h>
-#include <lib/component/incoming/cpp/protocol.h>
+#include <lib/component/incoming/cpp/directory.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/zx/event.h>
@@ -113,18 +113,16 @@ class StubExceptionHandler final : public fidl::WireServer<fuchsia_exception::Ha
 class FakeService {
  public:
   explicit FakeService(async_dispatcher_t* dispatcher) : outgoing_(dispatcher) {
-    auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-
     ASSERT_OK(outgoing_.AddUnmanagedProtocol<fuchsia_exception::Handler>(
         [this, dispatcher](fidl::ServerEnd<fuchsia_exception::Handler> request) {
           exception_handler_.Connect(dispatcher, std::move(request));
         }));
-    ASSERT_OK(outgoing_.Serve(std::move(server)));
-
-    zx::result remote = fidl::CreateEndpoints(&svc_local_);
-    ASSERT_OK(remote.status_value());
-    ASSERT_OK(component::ConnectAt(client, std::move(remote.value()),
-                                   component::OutgoingDirectory::kServiceDirectory));
+    auto [outgoing_client, outgoing_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    ASSERT_OK(outgoing_.Serve(std::move(outgoing_server)));
+    zx::result svc_local = component::OpenDirectoryAt(
+        outgoing_client, component::OutgoingDirectory::kServiceDirectory);
+    ASSERT_OK(svc_local);
+    svc_local_ = std::move(*svc_local);
   }
 
   StubExceptionHandler& exception_handler() { return exception_handler_; }

@@ -25,7 +25,7 @@ zx::result<fbl::Vector<uint8_t>> ReadExtendedEdid(ReadEdidBlockFunction read_edi
   std::array<uint8_t, edid::kBlockSize> base_edid;
   zx::result<> base_edid_result = read_edid_block(0, base_edid);
   if (base_edid_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to read EDID base block: %s", base_edid_result.status_string());
+    fdf::error("Failed to read EDID base block: {}", base_edid_result);
     return base_edid_result.take_error();
   }
 
@@ -42,7 +42,7 @@ zx::result<fbl::Vector<uint8_t>> ReadExtendedEdid(ReadEdidBlockFunction read_edi
   extended_edid.resize(extended_edid_size, 0, &alloc_checker);
 
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate %zu bytes for E-EDID", extended_edid_size);
+    fdf::error("Failed to allocate {} bytes for E-EDID", extended_edid_size);
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -55,8 +55,8 @@ zx::result<fbl::Vector<uint8_t>> ReadExtendedEdid(ReadEdidBlockFunction read_edi
         extended_edid.begin() + extension_block_offset, edid::kBlockSize);
     zx::result<> extension_block_result = read_edid_block(extension_block_index, extension_block);
     if (extension_block_result.is_error()) {
-      FDF_LOG(ERROR, "Failed to read EDID extension block #%d: %s", extension_block_index,
-              extension_block_result.status_string());
+      fdf::error("Failed to read EDID extension block #{}: {}", extension_block_index,
+                 extension_block_result);
       return extension_block_result.take_error();
     }
   }

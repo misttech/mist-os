@@ -66,7 +66,6 @@ fuchsia_unittest_package("replacedriver_test") {
     "target-1-replacement:component",
     "target-2-replacement:component",
     "//sdk/lib/driver_test_realm:driver_test_realm_component",
-    "//src/devices/bin/driver_host:component",
     "//src/devices/tests/v2/reload-driver/composite:component",
     "//src/devices/tests/v2/reload-driver/leaf:component",
     "//src/devices/tests/v2/reload-driver/left-parent:component",

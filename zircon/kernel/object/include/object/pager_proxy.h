@@ -53,7 +53,7 @@ class PagerProxy : public PageProvider,
   bool DebugIsPageOk(vm_page_t* page, uint64_t offset) final;
   void OnClose() final;
   void OnDetach() final;
-  zx_status_t WaitOnEvent(Event* event) final;
+  zx_status_t WaitOnEvent(Event* event, bool suspendable) final;
   void Dump(uint depth, uint32_t max_items) final;
   bool SupportsPageRequestType(page_request_type type) const final {
     if (type == page_request_type::READ) {
@@ -79,6 +79,10 @@ class PagerProxy : public PageProvider,
   // Called when the packet becomes free. If pending_requests_ is non-empty, queues the
   // next request.
   void OnPacketFreedLocked() TA_REQ(mtx_);
+
+  // Helper to do an informational printout if the thread has been waiting on the page request for
+  // too long.
+  void PrintOvertime(uint64_t waited_seconds) TA_EXCL(mtx_);
 
   mutable DECLARE_MUTEX(PagerProxy) mtx_;
 

@@ -10,7 +10,8 @@ use ffx_config::EnvironmentContext;
 use ffx_emulator_config::ShowDetail;
 use ffx_emulator_engines::EngineBuilder;
 use ffx_emulator_show_args::ShowCommand;
-use fho::{bug, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
+use ffx_writer::{ToolIO as _, VerifiedMachineWriter};
+use fho::{bug, FfxMain, FfxTool};
 use itertools::Itertools;
 use std::path::PathBuf;
 
@@ -174,6 +175,7 @@ mod tests {
                     ports: None,
                     window_height: 0,
                     window_width: 0,
+                    cid: 0,
                 }),
             },
             ShowDetail::Net {
@@ -280,6 +282,7 @@ mod tests {
                 ports: None,
                 window_height: 0,
                 window_width: 0,
+                cid: 0,
             }),
         }];
         assert_eq!(got_data, want_data);

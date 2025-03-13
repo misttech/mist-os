@@ -124,9 +124,38 @@ static inline uint32_t to_uint32(uint64_t val) {
 
 namespace image_pipe_swapchain {
 
+namespace {
+
+using LayerDataMap = std::unordered_map<void*, LayerData*>;
+
+// Returns the `layer_data` instance corresponding to a given `data_key` from
+// given layer_data_map, or creates one if it doesn't exist.
+LayerData* GetOrCreateLayerData(void* data_key, LayerDataMap& layer_data_map) {
+  /* TODO: We probably should lock here, or have caller lock */
+  auto it = layer_data_map.find(data_key);
+
+  if (it != layer_data_map.end()) {
+    return it->second;
+  }
+  LayerData* layer_data = new LayerData;
+  layer_data_map[data_key] = layer_data;
+  return layer_data;
+}
+
+// `data_key` must be a valid key in `layer_data_map`.
+void EraseLayerData(void* data_key, LayerDataMap& layer_data_map) {
+  auto it = layer_data_map.find(data_key);
+  assert(it != layer_data_map.end());
+
+  delete it->second;
+  layer_data_map.erase(it);
+}
+
+}  // namespace
+
 // Global because thats how the layer code in the loader works and I dont know
 // how to make it work otherwise
-std::unordered_map<void*, LayerData*> layer_data_map;
+LayerDataMap layer_data_map;
 
 static const VkExtensionProperties instance_extensions[] = {
     {
@@ -215,9 +244,9 @@ class ImagePipeSwapchain {
 
 void ImagePipeSwapchain::DebugMessage(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
                                       const char* message) {
-  LayerData* device_data = GetLayerDataPtr(get_dispatch_key(device_), layer_data_map);
+  LayerData* device_data = GetOrCreateLayerData(get_dispatch_key(device_), layer_data_map);
   LayerData* instance_data =
-      GetLayerDataPtr(get_dispatch_key(device_data->instance), layer_data_map);
+      GetOrCreateLayerData(get_dispatch_key(device_data->instance), layer_data_map);
 
   VkDebugUtilsMessengerCallbackDataEXT callback_data = {};
   callback_data.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CALLBACK_DATA_EXT;
@@ -239,7 +268,7 @@ VkResult ImagePipeSwapchain::Initialize(VkDevice device,
   is_protected_ = pCreateInfo->flags & VK_SWAPCHAIN_CREATE_PROTECTED_BIT_KHR;
   VkResult result;
   VkLayerDispatchTable* pDisp =
-      GetLayerDataPtr(get_dispatch_key(device), layer_data_map)->device_dispatch_table.get();
+      GetOrCreateLayerData(get_dispatch_key(device), layer_data_map)->device_dispatch_table.get();
   uint32_t num_images = pCreateInfo->minImageCount;
   VkFlags usage = pCreateInfo->imageUsage & surface_->SupportedUsage();
   assert(pCreateInfo->sType == VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR);
@@ -299,7 +328,7 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateSwapchainKHR(VkDevice device,
 
   auto surface = reinterpret_cast<ImagePipeSurface*>(pCreateInfo->surface);
 
-  LayerData* layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
+  LayerData* layer_data = GetOrCreateLayerData(get_dispatch_key(device), layer_data_map);
 
   if (!surface->OnCreateSwapchain(device, layer_data, pCreateInfo, pAllocator)) {
     fprintf(stderr, "OnCreateSwapchain failed\n");
@@ -322,7 +351,7 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateSwapchainKHR(VkDevice device,
 
 void ImagePipeSwapchain::Cleanup(VkDevice device, const VkAllocationCallbacks* pAllocator) {
   VkLayerDispatchTable* pDisp =
-      GetLayerDataPtr(get_dispatch_key(device), layer_data_map)->device_dispatch_table.get();
+      GetOrCreateLayerData(get_dispatch_key(device), layer_data_map)->device_dispatch_table.get();
 
   // Wait for device to be idle to ensure no QueueSubmit operations caused by Present are pending.
   pDisp->DeviceWaitIdle(device);
@@ -404,7 +433,7 @@ VkResult ImagePipeSwapchain::AcquireNextImage(uint64_t timeout_ns, VkSemaphore s
 
   bool wait_for_release_fence = false;
 
-  LayerData* layer_data = GetLayerDataPtr(get_dispatch_key(device_), layer_data_map);
+  LayerData* layer_data = GetOrCreateLayerData(get_dispatch_key(device_), layer_data_map);
 
   if (semaphore == VK_NULL_HANDLE) {
     wait_for_release_fence = true;
@@ -475,7 +504,7 @@ VkResult ImagePipeSwapchain::Present(VkQueue queue, uint32_t index, uint32_t wai
     return VK_ERROR_SURFACE_LOST_KHR;
 
   VkLayerDispatchTable* pDisp =
-      GetLayerDataPtr(get_dispatch_key(queue), layer_data_map)->device_dispatch_table.get();
+      GetOrCreateLayerData(get_dispatch_key(queue), layer_data_map)->device_dispatch_table.get();
 
   PerImageData& per_image_data = per_image_data_[index];
 
@@ -620,7 +649,7 @@ auto out_surface = std::make_unique<ImagePipeSurfaceAsync>(pCreateInfo->imagePip
     return VK_ERROR_DEVICE_LOST;
   }
 
-  LayerData* layer_data = GetLayerDataPtr(get_dispatch_key(instance), layer_data_map);
+  LayerData* layer_data = GetOrCreateLayerData(get_dispatch_key(instance), layer_data_map);
 
   if (!out_surface->OnCreateSurface(instance, layer_data->instance_dispatch_table.get(),
                                     pCreateInfo, pAllocator)) {
@@ -635,7 +664,7 @@ auto out_surface = std::make_unique<ImagePipeSurfaceAsync>(pCreateInfo->imagePip
 VKAPI_ATTR void VKAPI_CALL DestroySurfaceKHR(VkInstance instance, VkSurfaceKHR vk_surface,
                                              const VkAllocationCallbacks* pAllocator) {
   auto surface = reinterpret_cast<ImagePipeSurface*>(vk_surface);
-  LayerData* layer_data = GetLayerDataPtr(get_dispatch_key(instance), layer_data_map);
+  LayerData* layer_data = GetOrCreateLayerData(get_dispatch_key(instance), layer_data_map);
 
   surface->OnDestroySurface(instance, layer_data->instance_dispatch_table.get(), pAllocator);
 
@@ -646,7 +675,7 @@ VKAPI_ATTR VkResult VKAPI_CALL
 GetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface,
                                         VkSurfaceCapabilitiesKHR* pSurfaceCapabilities) {
   VkLayerInstanceDispatchTable* instance_dispatch_table =
-      GetLayerDataPtr(get_dispatch_key(physicalDevice), layer_data_map)
+      GetOrCreateLayerData(get_dispatch_key(physicalDevice), layer_data_map)
           ->instance_dispatch_table.get();
 
   VkPhysicalDeviceProperties props;
@@ -734,7 +763,7 @@ VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceSurfaceFormats2KHR(
 VKAPI_ATTR VkResult VKAPI_CALL
 GetPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevice physicalDevice, const VkSurfaceKHR surface,
                                         uint32_t* pCount, VkPresentModeKHR* pPresentModes) {
-  LayerData* layer_data = GetLayerDataPtr(get_dispatch_key(physicalDevice), layer_data_map);
+  LayerData* layer_data = GetOrCreateLayerData(get_dispatch_key(physicalDevice), layer_data_map);
   return reinterpret_cast<ImagePipeSurface*>(surface)->GetPresentModes(
       physicalDevice, layer_data->instance_dispatch_table.get(), pCount, pPresentModes);
 }
@@ -760,7 +789,8 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo* pCreat
   if (result != VK_SUCCESS)
     return result;
 
-  LayerData* instance_layer_data = GetLayerDataPtr(get_dispatch_key(*pInstance), layer_data_map);
+  LayerData* instance_layer_data =
+      GetOrCreateLayerData(get_dispatch_key(*pInstance), layer_data_map);
   instance_layer_data->instance = *pInstance;
   instance_layer_data->instance_dispatch_table = std::make_unique<VkLayerInstanceDispatchTable>();
   layer_init_instance_dispatch_table(*pInstance, instance_layer_data->instance_dispatch_table.get(),
@@ -772,12 +802,12 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo* pCreat
 VKAPI_ATTR void VKAPI_CALL DestroyInstance(VkInstance instance,
                                            const VkAllocationCallbacks* pAllocator) {
   dispatch_key instance_key = get_dispatch_key(instance);
-  LayerData* my_data = GetLayerDataPtr(instance_key, layer_data_map);
+  LayerData* my_data = GetOrCreateLayerData(instance_key, layer_data_map);
 
   my_data->instance_dispatch_table->DestroyInstance(instance, pAllocator);
 
   // Remove from |layer_data_map| and free LayerData struct.
-  FreeLayerDataPtr(instance_key, layer_data_map);
+  EraseLayerData(instance_key, layer_data_map);
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL CreateDevice(VkPhysicalDevice gpu,
@@ -785,7 +815,7 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateDevice(VkPhysicalDevice gpu,
                                             const VkAllocationCallbacks* pAllocator,
                                             VkDevice* pDevice) {
   void* gpu_key = get_dispatch_key(gpu);
-  LayerData* gpu_layer_data = GetLayerDataPtr(gpu_key, layer_data_map);
+  LayerData* gpu_layer_data = GetOrCreateLayerData(gpu_key, layer_data_map);
 
   bool external_semaphore_extension_available = false;
 #if defined(VK_USE_PLATFORM_FUCHSIA)
@@ -897,7 +927,7 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateDevice(VkPhysicalDevice gpu,
     return result;
   }
 
-  LayerData* device_layer_data = GetLayerDataPtr(get_dispatch_key(*pDevice), layer_data_map);
+  LayerData* device_layer_data = GetOrCreateLayerData(get_dispatch_key(*pDevice), layer_data_map);
 
   // Setup device dispatch table
   device_layer_data->device_dispatch_table = std::make_unique<VkLayerDispatchTable>();
@@ -914,11 +944,11 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateDevice(VkPhysicalDevice gpu,
 
 VKAPI_ATTR void VKAPI_CALL DestroyDevice(VkDevice device, const VkAllocationCallbacks* pAllocator) {
   dispatch_key device_key = get_dispatch_key(device);
-  LayerData* device_data = GetLayerDataPtr(device_key, layer_data_map);
+  LayerData* device_data = GetOrCreateLayerData(device_key, layer_data_map);
   device_data->device_dispatch_table->DestroyDevice(device, pAllocator);
 
   // Remove from |layer_data_map| and free LayerData struct.
-  FreeLayerDataPtr(device_key, layer_data_map);
+  EraseLayerData(device_key, layer_data_map);
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL EnumerateInstanceLayerProperties(uint32_t* pCount,
@@ -951,7 +981,7 @@ EnumerateDeviceExtensionProperties(VkPhysicalDevice physicalDevice, const char* 
   assert(physicalDevice);
 
   dispatch_key key = get_dispatch_key(physicalDevice);
-  LayerData* my_data = GetLayerDataPtr(key, layer_data_map);
+  LayerData* my_data = GetOrCreateLayerData(key, layer_data_map);
   return my_data->instance_dispatch_table->EnumerateDeviceExtensionProperties(physicalDevice, NULL,
                                                                               pCount, pProperties);
 }
@@ -960,7 +990,7 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateDebugUtilsMessengerEXT(
     VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
     const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pMessenger) {
   dispatch_key key = get_dispatch_key(instance);
-  LayerData* my_data = GetLayerDataPtr(key, layer_data_map);
+  LayerData* my_data = GetOrCreateLayerData(key, layer_data_map);
   VkResult res = my_data->instance_dispatch_table->CreateDebugUtilsMessengerEXT(
       instance, pCreateInfo, pAllocator, pMessenger);
   if (res == VK_SUCCESS) {
@@ -973,7 +1003,7 @@ VKAPI_ATTR void VKAPI_CALL DestroyDebugUtilsMessengerEXT(VkInstance instance,
                                                          VkDebugUtilsMessengerEXT messenger,
                                                          const VkAllocationCallbacks* pAllocator) {
   dispatch_key key = get_dispatch_key(instance);
-  LayerData* my_data = GetLayerDataPtr(key, layer_data_map);
+  LayerData* my_data = GetOrCreateLayerData(key, layer_data_map);
   my_data->debug_callbacks.erase(messenger);
   my_data->instance_dispatch_table->DestroyDebugUtilsMessengerEXT(instance, messenger, pAllocator);
 }
@@ -1070,7 +1100,7 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL GetDeviceProcAddr(VkDevice device, cons
     return addr;
   }
 
-  dev_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
+  dev_data = GetOrCreateLayerData(get_dispatch_key(device), layer_data_map);
 
   VkLayerDispatchTable* pTable = dev_data->device_dispatch_table.get();
 
@@ -1095,7 +1125,7 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL GetInstanceProcAddr(VkInstance instance
     return nullptr;
   }
 
-  my_data = GetLayerDataPtr(get_dispatch_key(instance), layer_data_map);
+  my_data = GetOrCreateLayerData(get_dispatch_key(instance), layer_data_map);
 
   VkLayerInstanceDispatchTable* pTable = my_data->instance_dispatch_table.get();
   if (pTable->GetInstanceProcAddr == NULL) {
@@ -1110,7 +1140,7 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL GetPhysicalDeviceProcAddr(VkInstance in
   assert(instance);
 
   LayerData* my_data;
-  my_data = GetLayerDataPtr(get_dispatch_key(instance), layer_data_map);
+  my_data = GetOrCreateLayerData(get_dispatch_key(instance), layer_data_map);
   VkLayerInstanceDispatchTable* pTable = my_data->instance_dispatch_table.get();
 
   if (pTable->GetPhysicalDeviceProcAddr == NULL)

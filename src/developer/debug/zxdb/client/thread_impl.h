@@ -65,7 +65,8 @@ class ThreadImpl final : public Thread, public Stack::Delegate {
   FRIEND_TEST(ThreadImplTest, StopNoStack);
 
   // Stack::Delegate implementation.
-  void SyncFramesForStack(fit::callback<void(const Err&)> callback) override;
+  void SyncFramesForStack(const Stack::SyncFrameOptions& options,
+                          fit::callback<void(const Err&)> callback) override;
   std::unique_ptr<Frame> MakeFrameForStack(const debug_ipc::StackFrame& input,
                                            Location location) override;
   Location GetSymbolizedLocationForAddress(uint64_t address) override;

@@ -101,7 +101,7 @@ class DevicetreeItem1
  private:
   std::string cmdline_;
 };
-static_assert(devicetree::kIsMatcher<DevicetreeItem1>);
+static_assert(devicetree::Matcher<DevicetreeItem1>);
 
 class DevicetreeItem2
     : public FakeMatcher,

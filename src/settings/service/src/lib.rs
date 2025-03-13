@@ -14,20 +14,20 @@ use audio::AudioInfoLoader;
 use display::display_controller::DisplayInfoLoader;
 use fidl_fuchsia_io::DirectoryProxy;
 use fidl_fuchsia_stash::StoreProxy;
-use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 #[cfg(test)]
 use fuchsia_component::server::ProtocolConnector;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir, ServiceObjLocal};
 use fuchsia_inspect::component;
 use futures::lock::Mutex;
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 #[cfg(test)]
 use log as _;
 use settings_storage::device_storage::DeviceStorage;
 use settings_storage::fidl_storage::FidlStorage;
 use settings_storage::storage_factory::{FidlStorageFactory, StorageFactory};
-use zx::MonotonicDuration; // Make it easier to debug tests by always building with tracing
+use zx::MonotonicDuration;
+use {fidl_fuchsia_update_verify as fupdate, fuchsia_async as fasync};
 
 pub use display::display_configuration::DisplayConfiguration;
 pub use handler::setting_proxy_inspect_info::SettingProxyInspectInfo;
@@ -397,11 +397,30 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + 'static> EnvironmentBuilde
         runtime: Runtime,
     ) -> Result<(ServiceFs<ServiceObjLocal<'_, ()>>, Delegate, Seeder, HashSet<Entity>), Error>
     {
-        let service_dir = match runtime {
+        let mut service_dir = match runtime {
             Runtime::Service => fs.dir("svc"),
             #[cfg(test)]
             Runtime::Nested(_) => fs.root_dir(),
         };
+
+        let _ = service_dir.add_fidl_service(
+            move |mut stream: fupdate::ComponentOtaHealthCheckRequestStream| {
+                fasync::Task::local(async move {
+                    while let Some(fupdate::ComponentOtaHealthCheckRequest::GetHealthStatus {
+                        responder,
+                    }) = stream.try_next().await.expect("error running health check service")
+                    {
+                        // We always respond healthy because the health check can only be served
+                        // if the environment is able to spawn which in turn guarantees that no agents
+                        // have returned an error.
+                        responder
+                            .send(fupdate::HealthStatus::Healthy)
+                            .expect("failed to send health status");
+                    }
+                })
+                .detach();
+            },
+        );
 
         // Define top level MessageHub for service communication.
         let delegate = service::MessageHub::create_hub();
@@ -539,6 +558,7 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + 'static> EnvironmentBuilde
         let (mut fs, ..) = executor
             .run_singlethreaded(self.prepare_env(fs, Runtime::Service))
             .context("Failed to prepare env")?;
+
         let _ = fs.take_and_serve_directory_handle().expect("could not service directory handle");
         executor.run_singlethreaded(fs.collect::<()>());
         Ok(())

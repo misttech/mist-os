@@ -9,6 +9,7 @@ use block_client::{BlockFifoRequest, BlockFifoResponse};
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_hardware_block_volume::{self as volume, VolumeMarker, VolumeRequest};
 use fuchsia_async::{self as fasync, FifoReadable, FifoWritable};
+use fuchsia_sync::Mutex;
 use futures::stream::TryStreamExt;
 use futures::try_join;
 use fxfs::errors::FxfsError;
@@ -16,7 +17,6 @@ use fxfs::round::{round_down, round_up};
 use rustc_hash::FxHashMap as HashMap;
 use std::collections::BTreeMap;
 use std::hash::{Hash, Hasher};
-use std::sync::Mutex;
 use vfs::file::File;
 use vfs::node::Node;
 use {fidl_fuchsia_hardware_block as block, fidl_fuchsia_io as fio};
@@ -108,6 +108,7 @@ const DEVICE_VOLUME_SLICE_SIZE: u64 = 32 * 1024;
 /// Implements server to handle Block requests
 pub struct BlockServer {
     file: OpenedNode<FxFile>,
+    read_only: bool,
     server_channel: Option<zx::Channel>,
     maybe_server_fifo: Mutex<Option<zx::Fifo<BlockFifoResponse, BlockFifoRequest>>>,
     message_groups: Mutex<FifoMessageGroups>,
@@ -116,9 +117,14 @@ pub struct BlockServer {
 
 impl BlockServer {
     /// Creates a new BlockServer given a server channel to listen on.
-    pub fn new(file: OpenedNode<FxFile>, server_channel: zx::Channel) -> BlockServer {
+    pub fn new(
+        file: OpenedNode<FxFile>,
+        read_only: bool,
+        server_channel: zx::Channel,
+    ) -> BlockServer {
         BlockServer {
             file,
+            read_only,
             server_channel: Some(server_channel),
             maybe_server_fifo: Mutex::new(None),
             message_groups: Mutex::new(FifoMessageGroups::new()),
@@ -128,7 +134,7 @@ impl BlockServer {
 
     // Returns a VMO id that is currently not being used
     fn get_vmo_id(&self, vmo: zx::Vmo) -> Option<u16> {
-        let mut vmos = self.vmos.lock().unwrap();
+        let mut vmos = self.vmos.lock();
         let mut prev_id = 0;
         for &id in vmos.keys() {
             if id != prev_id + 1 {
@@ -148,10 +154,13 @@ impl BlockServer {
     }
 
     async fn handle_blockio_write(&self, request: &BlockFifoRequest) -> Result<(), Error> {
+        if self.read_only {
+            return Err(zx::Status::ACCESS_DENIED.into());
+        }
         let block_size = self.file.get_block_size();
 
         let data = {
-            let vmos = self.vmos.lock().unwrap();
+            let vmos = self.vmos.lock();
             let vmo = vmos.get(&request.vmoid).ok_or(FxfsError::NotFound)?;
             let mut buffer = vec![0u8; (request.length as u64 * block_size) as usize];
             vmo.read(&mut buffer[..], request.vmo_offset * block_size)?;
@@ -175,7 +184,7 @@ impl BlockServer {
         // Fill in the rest of the buffer if bytes_read is less than the requested amount
         buffer[bytes_read as usize..].fill(0);
 
-        let vmos = self.vmos.lock().unwrap();
+        let vmos = self.vmos.lock();
         let vmo = vmos.get(&request.vmoid).ok_or(FxfsError::NotFound)?;
         vmo.write(&buffer[..], request.vmo_offset * block_size)?;
 
@@ -190,7 +199,7 @@ impl BlockServer {
 
         match block_client::BlockOpcode::from_primitive(request.command.opcode) {
             Some(block_client::BlockOpcode::CloseVmo) => {
-                let mut vmos = self.vmos.lock().unwrap();
+                let mut vmos = self.vmos.lock();
                 match vmos.remove(&request.vmoid) {
                     Some(_vmo) => zx::sys::ZX_OK,
                     None => zx::sys::ZX_ERR_NOT_FOUND,
@@ -202,11 +211,11 @@ impl BlockServer {
             Some(block_client::BlockOpcode::Read) => {
                 into_raw_status(self.handle_blockio_read(&request).await)
             }
-            // TODO(https://fxbug.dev/42171261): simply returning ZX_OK since we're
+            // TODO(https://fxbug.dev/293970391): simply returning ZX_OK since we're
             // writing to device and no need to flush cache, but need to
             // check that flush goes down the stack
             Some(block_client::BlockOpcode::Flush) => zx::sys::ZX_OK,
-            // TODO(https://fxbug.dev/42171261)
+            // TODO(https://fxbug.dev/293970391)
             Some(block_client::BlockOpcode::Trim) => zx::sys::ZX_OK,
             None => panic!("Unexpected message, request {:?}", request.command.opcode),
         }
@@ -220,7 +229,7 @@ impl BlockServer {
         // Set up the BlockFifoResponse for this request, but do no process request yet
         let mut maybe_reply = {
             if is_group {
-                let mut groups = self.message_groups.lock().unwrap();
+                let mut groups = self.message_groups.lock();
                 if wants_reply {
                     let mut group = groups.remove(request.group);
                     group.increment_count();
@@ -256,7 +265,7 @@ impl BlockServer {
             match &mut maybe_reply {
                 None => {
                     // maybe_reply will only be None if it's part of a group request
-                    self.message_groups.lock().unwrap().get(request.group).set_status(status);
+                    self.message_groups.lock().get(request.group).set_status(status);
                 }
                 Some(reply) => {
                     reply.status = status;
@@ -279,7 +288,7 @@ impl BlockServer {
                     flags: block::Flag::empty(),
                 }))?;
             }
-            // TODO(https://fxbug.dev/42171261)
+            // TODO(https://fxbug.dev/293970391)
             VolumeRequest::GetStats { clear: _, responder } => {
                 responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
@@ -289,7 +298,7 @@ impl BlockServer {
                     .try_for_each(|request| async {
                         let () = match request {
                             block::SessionRequest::GetFifo { responder } => {
-                                match self.maybe_server_fifo.lock().unwrap().take() {
+                                match self.maybe_server_fifo.lock().take() {
                                     Some(fifo) => responder.send(Ok(fifo.downcast()))?,
                                     None => {
                                         responder.send(Err(zx::Status::NO_RESOURCES.into_raw()))?
@@ -306,26 +315,26 @@ impl BlockServer {
                                     }
                                 }
                             }
-                            // TODO(https://fxbug.dev/42171261): close fifo
+                            // TODO(https://fxbug.dev/293970391): close fifo
                             block::SessionRequest::Close { responder } => responder.send(Ok(()))?,
                         };
                         Ok(())
                     })
                     .await?;
             }
-            // TODO(https://fxbug.dev/42171261)
+            // TODO(https://fxbug.dev/293970391)
             VolumeRequest::GetTypeGuid { responder } => {
                 responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED, None)?;
             }
-            // TODO(https://fxbug.dev/42171261)
+            // TODO(https://fxbug.dev/293970391)
             VolumeRequest::GetInstanceGuid { responder } => {
                 responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED, None)?;
             }
-            // TODO(https://fxbug.dev/42171261)
+            // TODO(https://fxbug.dev/293970391)
             VolumeRequest::GetName { responder } => {
                 responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED, None)?;
             }
-            // TODO(https://fxbug.dev/42171261)
+            // TODO(https://fxbug.dev/293970391)
             VolumeRequest::GetMetadata { responder } => {
                 responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
             }
@@ -351,7 +360,7 @@ impl BlockServer {
                 }
                 responder.send(status, &slices, response_count)?;
             }
-            // TODO(https://fxbug.dev/42171261): need to check if this returns the right information.
+            // TODO(https://fxbug.dev/293970391): Ensure this returns the correct information.
             VolumeRequest::GetVolumeInfo { responder } => {
                 match self.file.get_attributes(fio::NodeAttributesQuery::STORAGE_SIZE).await {
                     Ok(attr) => {
@@ -382,25 +391,29 @@ impl BlockServer {
                 }
             }
             VolumeRequest::Extend { start_slice, slice_count, responder } => {
-                // TODO(https://fxbug.dev/42171261): this is a hack. When extend is called, the extent is
-                // expected to be set as allocated. The easiest way to do this is to just
-                // write an extent of zeroed data. Another issue here is the size. The memory
-                // allocated here should be bounded to what's available.
-                let data = vec![0u8; (slice_count * DEVICE_VOLUME_SLICE_SIZE) as usize];
-                match self
-                    .file
-                    .write_at_uncached(start_slice * DEVICE_VOLUME_SLICE_SIZE, data[..].into())
-                    .await
-                {
-                    Ok(_) => responder.send(zx::sys::ZX_OK)?,
-                    Err(status) => responder.send(status.into_raw())?,
-                };
+                if self.read_only {
+                    responder.send(zx::sys::ZX_ERR_ACCESS_DENIED)?;
+                } else {
+                    // TODO(https://fxbug.dev/293970391): This is a hack! When extend is called, the
+                    // extent is expected to be set as allocated. The easiest way to do this is to
+                    // just write an extent of zeroed data. Another issue the size: the memory
+                    // allocated here should be bounded to what's available.
+                    let data = vec![0u8; (slice_count * DEVICE_VOLUME_SLICE_SIZE) as usize];
+                    match self
+                        .file
+                        .write_at_uncached(start_slice * DEVICE_VOLUME_SLICE_SIZE, data[..].into())
+                        .await
+                    {
+                        Ok(_) => responder.send(zx::sys::ZX_OK)?,
+                        Err(status) => responder.send(status.into_raw())?,
+                    };
+                }
             }
-            // TODO(https://fxbug.dev/42171261)
+            // TODO(https://fxbug.dev/293970391)
             VolumeRequest::Shrink { start_slice: _, slice_count: _, responder } => {
                 responder.send(zx::sys::ZX_OK)?;
             }
-            // TODO(https://fxbug.dev/42171261)
+            // TODO(https://fxbug.dev/293970391)
             VolumeRequest::Destroy { responder } => {
                 responder.send(zx::sys::ZX_OK)?;
             }
@@ -452,7 +465,7 @@ impl BlockServer {
         let channel_future = async {
             self.handle_requests(server).await?;
             // This is temporary for when client doesn't call for fifo
-            self.maybe_server_fifo.lock().unwrap().take();
+            self.maybe_server_fifo.lock().take();
             Ok(())
         };
 
@@ -464,6 +477,7 @@ impl BlockServer {
 #[cfg(test)]
 mod tests {
     use crate::fuchsia::testing::{open_file_checked, TestFixture};
+    use assert_matches::assert_matches;
     use block_client::{BlockClient, RemoteBlockClient, VmoId};
     use fidl::endpoints::{ClientEnd, ServerEnd};
     use fidl_fuchsia_hardware_block::BlockMarker;
@@ -476,14 +490,35 @@ mod tests {
 
     struct BlockConnector(fio::DirectoryProxy, &'static str);
 
+    // TODO(https://fxbug.dev/397501864): Migrate this to the new Open method, and convert this to
+    // fs_management::filesystem::DirBasedBlockConnector
     impl fs_management::filesystem::BlockConnector for BlockConnector {
         fn connect_volume(&self) -> Result<ClientEnd<VolumeMarker>, anyhow::Error> {
             let (client, server) = fidl::endpoints::create_endpoints::<VolumeMarker>();
             self.0
-                .open(
+                .deprecated_open(
                     fio::OpenFlags::RIGHT_READABLE
                         | fio::OpenFlags::RIGHT_WRITABLE
                         | fio::OpenFlags::BLOCK_DEVICE,
+                    fio::ModeType::empty(),
+                    self.1,
+                    server.into_channel().into(),
+                )
+                .expect("open failed");
+            Ok(client)
+        }
+    }
+
+    struct ReadonlyBlockConnector(fio::DirectoryProxy, &'static str);
+
+    // TODO(https://fxbug.dev/397501864): Migrate this to the new Open method, and convert this to
+    // fs_management::filesystem::DirBasedBlockConnector
+    impl fs_management::filesystem::BlockConnector for ReadonlyBlockConnector {
+        fn connect_volume(&self) -> Result<ClientEnd<VolumeMarker>, anyhow::Error> {
+            let (client, server) = fidl::endpoints::create_endpoints::<VolumeMarker>();
+            self.0
+                .deprecated_open(
+                    fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::BLOCK_DEVICE,
                     fio::ModeType::empty(),
                     self.1,
                     server.into_channel().into(),
@@ -500,11 +535,12 @@ mod tests {
             let root = fixture.root();
             let file = open_file_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::NOT_DIRECTORY,
                 "block_device",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_FILE,
+                &Default::default(),
             )
             .await;
             file.resize(2 * 1024 * 1024).await.expect("FIDL error").expect("resize error");
@@ -538,10 +574,10 @@ mod tests {
                 for _ in 1..5 {
                     match block_client.attach_vmo(&vmo).await {
                         Ok(vmo_id) => {
-                            // TODO(https://fxbug.dev/42171261): need to detach vmoid. into_id() is a
-                            // temporary solution. Remove this after detaching vmo has been
-                            // implemented
-                            // Make sure that vmo_id is unique
+                            // Make sure that vmo_id is unique.
+                            // TODO(https://fxbug.dev/293970391): Need to detach vmoid. Calling
+                            // into_id() is a temporary solution. Remove this after detaching vmo
+                            // has been implemented.
                             assert_eq!(vmo_set.insert(vmo_id.into_id()), true);
                         }
                         Err(e) => panic!("unexpected error {:?}", e),
@@ -550,7 +586,8 @@ mod tests {
             },
             async {
                 let root = fixture.root();
-                root.open(
+                // TODO(https://fxbug.dev/397501864): Migrate to new Open method.
+                root.deprecated_open(
                     fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
                         | fio::OpenFlags::RIGHT_WRITABLE
@@ -584,7 +621,8 @@ mod tests {
             },
             async {
                 let root = fixture.root();
-                root.open(
+                // TODO(https://fxbug.dev/397501864): Migrate to new Open method.
+                root.deprecated_open(
                     fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
                         | fio::OpenFlags::RIGHT_WRITABLE
@@ -644,7 +682,8 @@ mod tests {
             },
             async {
                 let root = fixture.root();
-                root.open(
+                // TODO(https://fxbug.dev/397501864): Migrate to new Open method.
+                root.deprecated_open(
                     fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
                         | fio::OpenFlags::RIGHT_WRITABLE
@@ -656,6 +695,70 @@ mod tests {
                 .expect("open failed");
             }
         );
+        fixture.close().await;
+    }
+
+    #[fuchsia::test(threads = 10)]
+    async fn test_read_only() {
+        let fixture = TestFixture::new().await;
+
+        let (client, server) = fidl::endpoints::create_proxy::<BlockMarker>();
+        let root = fixture.root();
+        // TODO(https://fxbug.dev/397501864): Migrate to new Open method.
+        root.deprecated_open(
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::BLOCK_DEVICE,
+            fio::ModeType::empty(),
+            "foo",
+            server.into_channel().into(),
+        )
+        .expect("open failed");
+        let block_client =
+            RemoteBlockClient::new(client).await.expect("RemoteBlockClient::new failed");
+        let len = block_client.block_size() as usize;
+        let data = vec![0xa3u8; len];
+        block_client.write_at(data[..].into(), 0 as u64).await.expect("write_at failed");
+
+        // Re-open the block device as read-only and verify that we can read the data.
+        let (client, server) = fidl::endpoints::create_proxy::<BlockMarker>();
+        // TODO(https://fxbug.dev/397501864): Migrate to new Open method.
+        root.deprecated_open(
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::BLOCK_DEVICE,
+            fio::ModeType::empty(),
+            "foo",
+            server.into_channel().into(),
+        )
+        .expect("open failed");
+        let block_client =
+            RemoteBlockClient::new(client).await.expect("RemoteBlockClient::new failed");
+        let mut read_buf = vec![0u8; len];
+        block_client.read_at(read_buf.as_mut_slice().into(), 0).await.expect("read_at failed");
+        assert_eq!(&read_buf, &data);
+        // Ensure we cannot write on a read-only connection.
+        let err = block_client
+            .write_at(data[..].into(), 0 as u64)
+            .await
+            .expect_err("write_at should fail");
+        assert_eq!(err, zx::Status::ACCESS_DENIED);
+
+        // Ensure we cannot open the block device without RIGHT_READABLE. This ensures that we have
+        // at *least* RIGHT_READABLE on the directory connection.
+        let (client, server) = fidl::endpoints::create_proxy::<BlockMarker>();
+        root.deprecated_open(
+            fio::OpenFlags::BLOCK_DEVICE,
+            fio::ModeType::empty(),
+            "foo",
+            server.into_channel().into(),
+        )
+        .unwrap();
+        let err = client.get_info().await.expect_err("FIDL call should fail");
+        assert_matches!(
+            err,
+            fidl::Error::ClientChannelClosed { status: zx::Status::ACCESS_DENIED, .. }
+        );
+
         fixture.close().await;
     }
 
@@ -674,7 +777,8 @@ mod tests {
             },
             async {
                 let root = fixture.root();
-                root.open(
+                // TODO(https://fxbug.dev/397501864): Migrate to new Open method.
+                root.deprecated_open(
                     fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
                         | fio::OpenFlags::RIGHT_WRITABLE
@@ -710,11 +814,12 @@ mod tests {
                 let root = fixture.root();
                 let file = open_file_checked(
                     &root,
-                    fio::OpenFlags::CREATE
-                        | fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::RIGHT_WRITABLE
-                        | fio::OpenFlags::NOT_DIRECTORY,
                     "block_device",
+                    fio::Flags::FLAG_MAYBE_CREATE
+                        | fio::PERM_READABLE
+                        | fio::PERM_WRITABLE
+                        | fio::Flags::PROTOCOL_FILE,
+                    &Default::default(),
                 )
                 .await;
                 let () = file
@@ -730,7 +835,8 @@ mod tests {
                     .map_err(zx::Status::from_raw)
                     .expect("close error");
 
-                root.open(
+                // TODO(https://fxbug.dev/397501864): Migrate to new Open method.
+                root.deprecated_open(
                     fio::OpenFlags::RIGHT_READABLE
                         | fio::OpenFlags::RIGHT_WRITABLE
                         | fio::OpenFlags::BLOCK_DEVICE,
@@ -751,11 +857,12 @@ mod tests {
             let root = fixture.root();
             let file = open_file_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::NOT_DIRECTORY,
                 "block_device",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_FILE,
+                &Default::default(),
             )
             .await;
             file.resize(5 * 1024 * 1024).await.expect("FIDL error").expect("resize error");
@@ -798,6 +905,15 @@ mod tests {
             // Check that blobfs can be successfully unmounted
             serving.shutdown().await.expect("shutdown blobfs failed");
 
+            // Re-open Blobfs but with the block device as read-only.
+            let connector = {
+                let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+                fixture.root().clone(server.into_channel().into()).expect("clone error");
+                ReadonlyBlockConnector(client, "block_device")
+            };
+
+            let mut blobfs =
+                Filesystem::new(connector, Blobfs { readonly: true, ..Default::default() });
             let serving = blobfs.serve().await.expect("serve blobfs failed");
             {
                 let file = fuchsia_fs::directory::open_file(

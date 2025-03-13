@@ -50,6 +50,7 @@ source_set("common_sources") {
 }
 
 fuchsia_cc_driver("vim3-mcu-driver") {
+  legacy = true
   output_name = "vim3-mcu"
   deps = [
     ":common_sources",

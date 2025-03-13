@@ -94,7 +94,7 @@ impl TargetHandleInner {
                 let result = self
                     .target
                     .set_preferred_ssh_address(ip.into())
-                    .then(|| ())
+                    .then_some(())
                     .ok_or(ffx::TargetError::AddressNotFound);
 
                 if result.is_ok() {
@@ -222,10 +222,7 @@ mod tests {
     use std::net::{IpAddr, SocketAddr};
     use std::str::FromStr;
     use std::sync::Arc;
-    use {
-        fidl_fuchsia_developer_remotecontrol as fidl_rcs, fidl_fuchsia_io as fio,
-        fidl_fuchsia_sys2 as fsys,
-    };
+    use {fidl_fuchsia_developer_remotecontrol as fidl_rcs, fidl_fuchsia_sys2 as fsys};
 
     #[test]
     fn test_host_pipe_err_to_fidl_conversion() {
@@ -327,16 +324,14 @@ mod tests {
                                     }))
                                     .unwrap();
                             }
-                            fidl_rcs::RemoteControlRequest::DeprecatedOpenCapability {
+                            fidl_rcs::RemoteControlRequest::ConnectCapability {
                                 moniker,
                                 capability_set,
                                 capability_name,
                                 server_channel,
-                                flags,
                                 responder,
                             } => {
                                 assert_eq!(capability_set, fsys::OpenDirType::ExposedDir);
-                                assert_eq!(flags, fio::OpenFlags::empty());
                                 assert_eq!(moniker, "/core/remote-control");
                                 assert_eq!(
                                     capability_name,

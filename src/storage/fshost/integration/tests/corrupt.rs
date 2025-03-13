@@ -7,7 +7,7 @@
 
 use device_watcher::recursive_wait;
 use fidl::endpoints::{create_proxy, ServiceMarker as _};
-use fshost_test_fixture::{write_test_blob, write_test_blob_fxblob};
+use fshost_test_fixture::write_test_blob;
 use {fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio};
 
 pub mod config;
@@ -78,30 +78,21 @@ async fn wipe_storage_handles_corrupt_fvm() {
         recursive_wait(ramdisk_dir, GPT_PATH).await.unwrap();
     }
 
-    let (blob_creator_proxy, blob_creator) = if cfg!(feature = "fxblob") {
-        let (proxy, server_end) = fidl::endpoints::create_proxy();
-        (Some(proxy), Some(server_end))
-    } else {
-        (None, None)
-    };
+    let (blob_creator_proxy, blob_creator_server_end) = fidl::endpoints::create_proxy();
 
     // Invoke WipeStorage, which will unbind the FVM, reprovision it, and format/mount Blobfs.
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
-    let (blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
+    let (_blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
     admin
-        .wipe_storage(Some(blobfs_server), blob_creator)
+        .wipe_storage(Some(blobfs_server), Some(blob_creator_server_end))
         .await
         .unwrap()
         .map_err(zx::Status::from_raw)
         .expect("WipeStorage unexpectedly failed");
 
     // Ensure that we can write a blob into the new Blobfs instance.
-    if cfg!(feature = "fxblob") {
-        write_test_blob_fxblob(blob_creator_proxy.unwrap(), &TEST_BLOB_DATA).await;
-    } else {
-        write_test_blob(&blobfs_root, &TEST_BLOB_DATA, false).await;
-    }
+    write_test_blob(blob_creator_proxy, &TEST_BLOB_DATA).await;
 
     fixture.tear_down().await;
 }

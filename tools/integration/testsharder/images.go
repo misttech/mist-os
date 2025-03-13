@@ -25,7 +25,7 @@ type FFXInterface interface {
 }
 
 var GetFFX = func(ctx context.Context, ffxPath, outputsDir string) (FFXInterface, error) {
-	return ffxutil.NewFFXInstance(ctx, ffxPath, "", []string{}, "", "", outputsDir)
+	return ffxutil.NewFFXInstance(ctx, ffxPath, "", []string{}, "", "", outputsDir, ffxutil.UseFFXLegacy)
 }
 
 // AddImageDeps selects and adds the subset of images needed by a shard to

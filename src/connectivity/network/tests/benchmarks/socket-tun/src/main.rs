@@ -234,9 +234,29 @@ async fn bench_tcp<'a, I: IpExt>(
         listen_sock.listen(0).expect("listen");
         let listen_sockaddr = listen_sock.local_addr().expect("local addr");
 
-        // Set send buffer to transfer size to ensure we can write
-        // `transfer` bytes before reading it on the other end.
-        client_sock.set_send_buffer_size(transfer).expect("set send buffer size to transfer size");
+        const BUFFER_SIZE_MULTIPLER: usize = 4;
+
+        // Set send buffer to a multiple of the transfer size to ensure we can
+        // write `transfer` bytes before reading it on the other end. The
+        // multiplier allows the receiver to delay acknowledgements but the
+        // transfer still proceeds. This is especially impactful for small
+        // transfer sizes.
+        client_sock
+            .set_send_buffer_size(transfer * BUFFER_SIZE_MULTIPLER)
+            .expect("set send buffer size");
+
+        // Also set the receive buffer size.
+        //
+        // We use the same multiplier on the transfer size so silly window
+        // avoidance doesn't kick in in-between test iterations which causes
+        // pollution in the results.
+        //
+        // This ensures fairness in the benchmark since TCP will base the window
+        // value on the available receive buffer size and different numbers will
+        // skew the test results.
+        listen_sock
+            .set_recv_buffer_size(transfer * BUFFER_SIZE_MULTIPLER)
+            .expect("set receive buffer size");
 
         // Disable the Nagle algorithm, it introduces artificial
         // latency that defeats this benchmark.
@@ -245,18 +265,6 @@ async fn bench_tcp<'a, I: IpExt>(
 
         let (server_sock, _): (_, socket2::SockAddr) = listen_sock.accept().expect("accept");
 
-        // Also set the receive buffer size.
-        //
-        // We use double the transfer size so silly window avoidance doesn't
-        // kick in in-between test iterations which causes pollution in the
-        // results.
-        //
-        // This ensures fairness in the benchmark since TCP will base the window
-        // value on the available receive buffer size and different numbers will
-        // skew the test results.
-        server_sock
-            .set_recv_buffer_size(transfer * 2)
-            .expect("set receive buffer size to transfer size");
         (client_sock, server_sock)
     };
 

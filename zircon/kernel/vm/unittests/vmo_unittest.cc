@@ -1337,7 +1337,7 @@ static bool vmo_lookup_clone_test() {
   ASSERT_EQ(ZX_OK, status, "vmobject creation\n");
 
   fbl::RefPtr<VmObject> clone;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0, alloc_size, false,
+  status = vmo->CreateClone(Resizability::NonResizable, SnapshotType::Full, 0, alloc_size, false,
                             &clone);
   ASSERT_EQ(ZX_OK, status, "vmobject creation\n");
   ASSERT_TRUE(clone, "vmobject creation\n");
@@ -1409,7 +1409,7 @@ static bool vmo_clone_removes_write_test() {
   vmo->set_user_id(42);
   fbl::RefPtr<VmObject> clone;
   status =
-      vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0, PAGE_SIZE, true, &clone);
+      vmo->CreateClone(Resizability::NonResizable, SnapshotType::Full, 0, PAGE_SIZE, true, &clone);
   EXPECT_EQ(ZX_OK, status, "create clone");
 
   // Aspace should now have a read only mapping with the same underlying page.
@@ -1468,7 +1468,7 @@ static bool vmo_clones_of_compressed_pages_test() {
   // Creating a clone should keep the page compressed.
   fbl::RefPtr<VmObject> clone;
   status =
-      vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0, PAGE_SIZE, true, &clone);
+      vmo->CreateClone(Resizability::NonResizable, SnapshotType::Full, 0, PAGE_SIZE, true, &clone);
   ASSERT_OK(status);
   clone->set_user_id(43);
   EXPECT_TRUE((VmObject::AttributionCounts{.compressed_bytes = PAGE_SIZE,
@@ -1531,8 +1531,8 @@ static bool vmo_clone_kernel_mapped_compressed_test() {
 
   // Now create a child of the VMO and fork the page into it.
   fbl::RefPtr<VmObject> clone;
-  ASSERT_OK(vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0, PAGE_SIZE, true,
-                             &clone));
+  ASSERT_OK(
+      vmo->CreateClone(Resizability::NonResizable, SnapshotType::Full, 0, PAGE_SIZE, true, &clone));
   data = 41;
   EXPECT_OK(clone->Write(&data, 0, sizeof(data)));
 
@@ -1610,8 +1610,8 @@ static bool vmo_move_pages_on_access_test() {
 
   // Touching pages in a child should also move the page to the front of the queues.
   fbl::RefPtr<VmObject> child;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
-                            PAGE_SIZE, true, &child);
+  status = vmo->CreateClone(Resizability::NonResizable, SnapshotType::OnWrite, 0, PAGE_SIZE, true,
+                            &child);
   ASSERT_EQ(ZX_OK, status);
 
   status = child->GetPageBlocking(0, VMM_PF_FLAG_SW_FAULT, nullptr, nullptr, nullptr);
@@ -1788,8 +1788,8 @@ static bool vmo_eviction_hints_clone_test() {
 
   // Create a clone.
   fbl::RefPtr<VmObject> clone;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
-                            2 * PAGE_SIZE, true, &clone);
+  status = vmo->CreateClone(Resizability::NonResizable, SnapshotType::OnWrite, 0, 2 * PAGE_SIZE,
+                            true, &clone);
   ASSERT_EQ(ZX_OK, status);
 
   // Use the clone to perform a bunch of hinting operations on the first page.
@@ -1816,8 +1816,8 @@ static bool vmo_eviction_hints_clone_test() {
 
   // Hinting should also work via a clone of a clone.
   fbl::RefPtr<VmObject> clone2;
-  status = clone->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
-                              2 * PAGE_SIZE, true, &clone2);
+  status = clone->CreateClone(Resizability::NonResizable, SnapshotType::OnWrite, 0, 2 * PAGE_SIZE,
+                              true, &clone2);
   ASSERT_EQ(ZX_OK, status);
 
   // Hint that the page is not needed.
@@ -1881,8 +1881,8 @@ static bool vmo_eviction_hints_clone_test() {
   // Create another clone that sees the forked page.
   // Hinting through this clone should have no effect, since it will see the forked page.
   fbl::RefPtr<VmObject> clone3;
-  status = clone->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
-                              2 * PAGE_SIZE, true, &clone3);
+  status = clone->CreateClone(Resizability::NonResizable, SnapshotType::OnWrite, 0, 2 * PAGE_SIZE,
+                              true, &clone3);
   ASSERT_EQ(ZX_OK, status);
 
   // Move the page back to the DontNeed queue first.
@@ -1934,9 +1934,6 @@ static bool vmo_eviction_test() {
   // Shouldn't be able to evict pages from the wrong VMO.
   ASSERT_EQ(reclaim_page(vmo, page2, 0, VmCowPages::EvictionHintAction::Follow, nullptr), 0u);
   ASSERT_EQ(reclaim_page(vmo2, page, 0, VmCowPages::EvictionHintAction::Follow, nullptr), 0u);
-
-  // We stack-own loaned pages from ReclaimPage() to pmm_free_page().
-  __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
 
   // Eviction should actually drop the number of committed pages.
   EXPECT_TRUE(make_private_attribution_counts(PAGE_SIZE, 0) == vmo2->GetAttributedMemory());
@@ -1999,7 +1996,7 @@ static bool vmo_attribution_clones_test() {
 
   // Create a clone that sees the second and third pages.
   fbl::RefPtr<VmObject> clone;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, PAGE_SIZE,
+  status = vmo->CreateClone(Resizability::NonResizable, SnapshotType::Full, PAGE_SIZE,
                             2 * PAGE_SIZE, true, &clone);
   ASSERT_EQ(ZX_OK, status);
   clone->set_user_id(0xfc);
@@ -2328,8 +2325,8 @@ static bool vmo_attribution_pager_test() {
 
   // Create a COW clone that sees the first page.
   fbl::RefPtr<VmObject> clone;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
-                            PAGE_SIZE, true, &clone);
+  status = vmo->CreateClone(Resizability::NonResizable, SnapshotType::OnWrite, 0, PAGE_SIZE, true,
+                            &clone);
   ASSERT_EQ(ZX_OK, status);
   clone->set_user_id(0xfc);
 
@@ -2360,9 +2357,6 @@ static bool vmo_attribution_evict_test() {
   ASSERT_EQ(ZX_OK, status);
 
   EXPECT_TRUE(vmo->GetAttributedMemory() == make_private_attribution_counts(PAGE_SIZE, 0));
-
-  // We stack-own loaned pages from ReclaimPage() to pmm_free_page().
-  __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
 
   ASSERT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, nullptr), 1u);
   EXPECT_TRUE(vmo->GetAttributedMemory() == AttributionCounts{});
@@ -2505,8 +2499,8 @@ static bool vmo_parent_merge_test() {
   vmo->set_user_id(42);
 
   fbl::RefPtr<VmObject> child;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0, PAGE_SIZE, false,
-                            &child);
+  status =
+      vmo->CreateClone(Resizability::NonResizable, SnapshotType::Full, 0, PAGE_SIZE, false, &child);
   ASSERT_EQ(ZX_OK, status);
 
   child->set_user_id(43);
@@ -2528,17 +2522,17 @@ static bool vmo_parent_merge_test() {
   status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, PAGE_SIZE, &vmo);
   ASSERT_EQ(ZX_OK, status);
   vmo->set_user_id(42);
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0, PAGE_SIZE, false,
-                            &child);
+  status =
+      vmo->CreateClone(Resizability::NonResizable, SnapshotType::Full, 0, PAGE_SIZE, false, &child);
   ASSERT_EQ(ZX_OK, status);
   child->set_user_id(43);
   fbl::RefPtr<VmObject> child2;
-  status = child->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0, PAGE_SIZE, false,
+  status = child->CreateClone(Resizability::NonResizable, SnapshotType::Full, 0, PAGE_SIZE, false,
                               &child2);
   ASSERT_EQ(ZX_OK, status);
   child2->set_user_id(44);
   fbl::RefPtr<VmObject> child3;
-  status = child->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0, PAGE_SIZE, false,
+  status = child->CreateClone(Resizability::NonResizable, SnapshotType::Full, 0, PAGE_SIZE, false,
                               &child3);
   ASSERT_EQ(ZX_OK, status);
   child3->set_user_id(45);
@@ -3070,8 +3064,8 @@ static bool vmo_write_does_not_commit_test() {
 
   // Create a CoW clone of the vmo.
   fbl::RefPtr<VmObject> clone;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0, PAGE_SIZE, false,
-                            &clone);
+  status =
+      vmo->CreateClone(Resizability::NonResizable, SnapshotType::Full, 0, PAGE_SIZE, false, &clone);
 
   // Querying the page for read in the clone should return it.
   EXPECT_OK(clone->GetPageBlocking(0, 0, nullptr, nullptr, nullptr));
@@ -3085,220 +3079,6 @@ static bool vmo_write_does_not_commit_test() {
   EXPECT_OK(clone->GetPageBlocking(0, VMM_PF_FLAG_WRITE | VMM_PF_FLAG_SW_FAULT, nullptr, nullptr,
                                    nullptr));
 
-  END_TEST;
-}
-
-static bool vmo_stack_owned_loaned_pages_interval_test() {
-  BEGIN_TEST;
-
-  // This test isn't stress, but have a few threads to check on multiple waiters per page and
-  // multiple waiters per stack_owner.
-  constexpr uint32_t kFakePageCount = 8;
-  constexpr uint32_t kWaitingThreadsPerPage = 2;
-  constexpr uint32_t kWaitingThreadCount = kFakePageCount * kWaitingThreadsPerPage;
-  constexpr int kOwnerThreadBasePriority = LOW_PRIORITY;
-  constexpr int kBlockedThreadBasePriority = DEFAULT_PRIORITY;
-  constexpr SchedWeight kOwnerThreadBaseWeight =
-      SchedulerState::ConvertPriorityToWeight(kOwnerThreadBasePriority);
-  constexpr SchedWeight kBlockedThreadBaseWeight =
-      SchedulerState::ConvertPriorityToWeight(kBlockedThreadBasePriority);
-
-  fbl::AllocChecker ac;
-
-  // Local structures used by the tests.  The kernel stack is pretty small, so
-  // don't take any chances here.  Heap allocate these structures instead of
-  // stack allocating them.
-  struct OwningThread {
-    Thread* thread = nullptr;
-    vm_page_t pages[kFakePageCount] = {};
-    Event ownership_acquired;
-    Event release_stack_ownership;
-    Event exit_now;
-  };
-
-  auto ot = ktl::make_unique<OwningThread>(&ac);
-  ASSERT_TRUE(ac.check());
-
-  struct WaitingThread {
-    OwningThread* ot = nullptr;
-    uint32_t i = 0;
-    Thread* thread = nullptr;
-  };
-
-  auto waiting_threads = ktl::make_unique<ktl::array<WaitingThread, kWaitingThreadCount>>(&ac);
-  ASSERT_TRUE(ac.check());
-
-  for (auto& page : ot->pages) {
-    EXPECT_EQ(vm_page_state::FREE, page.state());
-    // Normally this would be under PmmLock; only for testing.
-    page.set_is_loaned();
-  }
-
-  // Test no pages stack owned in a given interval.
-  {  // scope raii_interval
-    StackOwnedLoanedPagesInterval raii_interval;
-    DEBUG_ASSERT(&StackOwnedLoanedPagesInterval::current() == &raii_interval);
-  }  // ~raii_interval
-
-  // Test page stack owned but never waited on.  Hold SOLPI lock for this to get
-  // a failure if the SOLPI lock is ever acquired for this scenario.  Normally
-  // the lock would not be held for these steps, and we should DEBUG_ASSERT if
-  // anything in the flow below attempts to obtain the lock while we perform the
-  // sequence.
-  //
-  {  // scope thread_lock_guard, raii_interval
-    Guard<SpinLock, IrqSave> sollock_guard{&StackOwnedLoanedPagesInterval::get_lock()};
-    StackOwnedLoanedPagesInterval raii_interval;
-    DEBUG_ASSERT(&StackOwnedLoanedPagesInterval::current() == &raii_interval);
-    ot->pages[0].object.set_stack_owner(&StackOwnedLoanedPagesInterval::current());
-    ot->pages[0].object.clear_stack_owner();
-  }  // ~raii_interval, ~thread_lock_guard
-
-  // Test pages stack owned each with multiple waiters.
-  ot->thread = Thread::Create(
-      "owning_thread",
-      [](void* arg) -> int {
-        // Take "stack ownership" of the pages involved in the test, then signal the test thread
-        // that we are ready to proceed.
-        OwningThread& ot = *reinterpret_cast<OwningThread*>(arg);
-
-        {
-          StackOwnedLoanedPagesInterval raii_interval;
-          for (auto& page : ot.pages) {
-            DEBUG_ASSERT(&StackOwnedLoanedPagesInterval::current() == &raii_interval);
-            page.object.set_stack_owner(&StackOwnedLoanedPagesInterval::current());
-          }
-          ot.ownership_acquired.Signal();
-
-          // Wait until the test thread tells us it is time to release ownership.
-          ot.release_stack_ownership.Wait();
-
-          // Now release ownership and wait until we are told that we can exit.
-          for (auto& page : ot.pages) {
-            page.object.clear_stack_owner();
-          }
-          // ~raii_interval
-        }
-
-        ot.exit_now.Wait();
-        return 0;
-      },
-      ot.get(), kOwnerThreadBasePriority);
-
-  // Let the owner thread run.  If anything goes wrong from here on out, make
-  // sure we drop all of the barriers to the owner thread exiting, and clean
-  // everything up.
-  ot->thread->Resume();
-  auto cleanup = fit::defer([&ot, &waiting_threads]() {
-    int ret;
-
-    ot->release_stack_ownership.Signal();
-    ot->exit_now.Signal();
-    ot->thread->Join(&ret, ZX_TIME_INFINITE);
-
-    for (auto& wt : *waiting_threads) {
-      if (wt.thread != nullptr) {
-        wt.thread->Join(&ret, ZX_TIME_INFINITE);
-      }
-    }
-  });
-
-  // Now wait until the owner thread has taken ownership of the test pages, then
-  // double check to make sure that the owner thread is still running with its
-  // base profile.
-  ot->ownership_acquired.Wait();
-  {
-    SingleChainLockGuard guard{IrqSaveOption, ot->thread->get_lock(),
-                               CLT_TAG("vmo_stack_owned_loaned_pages_interval_test (1)")};
-    const SchedulerState::EffectiveProfile& ep = ot->thread->scheduler_state().effective_profile();
-    ASSERT_TRUE(ep.IsFair());
-    ASSERT_EQ(kOwnerThreadBaseWeight.raw_value(), ep.fair.weight.raw_value());
-  }
-
-  // Start up all of our waiter threads.
-  for (uint32_t i = 0; i < kWaitingThreadCount; ++i) {
-    auto& wt = waiting_threads->at(i);
-    wt.ot = ot.get();
-    wt.i = i;
-    wt.thread = Thread::Create(
-        "waiting_thread",
-        [](void* arg) -> int {
-          WaitingThread& wt = *reinterpret_cast<WaitingThread*>(arg);
-          StackOwnedLoanedPagesInterval::WaitUntilContiguousPageNotStackOwned(
-              &wt.ot->pages[wt.i / kWaitingThreadsPerPage]);
-          return 0;
-        },
-        &wt, kBlockedThreadBasePriority);
-    ASSERT_NONNULL(wt.thread);
-    wt.thread->Resume();
-  }
-
-  // Wait until all of the threads have blocked behind the owner of the
-  // StackOwnedLoanedPagesInterval object.
-  for (auto& wt : *waiting_threads) {
-    while (true) {
-      {
-        SingleChainLockGuard guard{IrqSaveOption, wt.thread->get_lock(),
-                                   CLT_TAG("vmo_stack_owned_loaned_pages_interval_test (2)")};
-        if (wt.thread->state() == THREAD_BLOCKED) {
-          break;
-        }
-      }
-      Thread::Current::SleepRelative(ZX_MSEC(1));
-    }
-  }
-
-  // Now that we are certain that all threads are blocked in the wait queue, we
-  // should see the weight of the owning thread increased to the total of its
-  // base weight, and weights of all of the threads blocked behind it.
-  {
-    SingleChainLockGuard guard{IrqSaveOption, ot->thread->get_lock(),
-                               CLT_TAG("vmo_stack_owned_loaned_pages_interval_test (3)")};
-    const SchedulerState::EffectiveProfile& ep = ot->thread->scheduler_state().effective_profile();
-    constexpr SchedWeight kExpectedWeight =
-        kOwnerThreadBaseWeight + (kWaitingThreadCount * kBlockedThreadBaseWeight);
-    ASSERT_TRUE(ep.IsFair());
-    ASSERT_EQ(kExpectedWeight.raw_value(), ep.fair.weight.raw_value());
-  }
-
-  // Wait a bit, the threads should still be blocked.
-  Thread::Current::SleepRelative(ZX_MSEC(100));
-  {
-    for (auto& wt : *waiting_threads) {
-      SingleChainLockGuard guard{IrqSaveOption, wt.thread->get_lock(),
-                                 CLT_TAG("vmo_stack_owned_loaned_pages_interval_test (4)")};
-      ASSERT_EQ(THREAD_BLOCKED, wt.thread->state());
-    }
-  }
-
-  // Tell the owner thread that it can destroy its StackOwnedLoanedPagesInterval
-  // object. This should release all of the blocked thread.  One they are all
-  // unblocked, we expect to see the owner thread's priority relax back down to
-  // its base priority.
-  ot->release_stack_ownership.Signal();
-  for (auto& wt : *waiting_threads) {
-    while (true) {
-      {
-        SingleChainLockGuard guard{IrqSaveOption, wt.thread->get_lock(),
-                                   CLT_TAG("vmo_stack_owned_loaned_pages_interval_test (5)")};
-        if (wt.thread->state() != THREAD_BLOCKED) {
-          break;
-        }
-      }
-      Thread::Current::SleepRelative(ZX_MSEC(1));
-    }
-  }
-
-  // Verify that the profile of the owner thread has relaxed.
-  {
-    SingleChainLockGuard guard{IrqSaveOption, ot->thread->get_lock(),
-                               CLT_TAG("vmo_stack_owned_loaned_pages_interval_test (6)")};
-    const SchedulerState::EffectiveProfile& ep = ot->thread->scheduler_state().effective_profile();
-    ASSERT_TRUE(ep.IsFair());
-    ASSERT_EQ(kOwnerThreadBaseWeight.raw_value(), ep.fair.weight.raw_value());
-  }
-
-  // Test is finished.  Let our fit::defer handle all of the cleanup.
   END_TEST;
 }
 
@@ -3788,7 +3568,7 @@ static bool vmo_high_priority_reclaim_test() {
   ASSERT_EQ(ZX_OK, status);
 
   auto change_priority = [&vmo](int64_t delta) {
-    Guard<CriticalMutex> guard{vmo->lock()};
+    Guard<VmoLockType> guard{vmo->lock()};
     vmo->ChangeHighPriorityCountLocked(delta);
   };
 
@@ -3860,7 +3640,7 @@ static bool vmo_snapshot_modified_test() {
 
   // Snapshot-modified all 3 pages of root.
   fbl::RefPtr<VmObject> clone;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0, alloc_size,
+  status = vmo->CreateClone(Resizability::NonResizable, SnapshotType::Modified, 0, alloc_size,
                             false, &clone);
   ASSERT_EQ(ZX_OK, status, "vmobject full clone\n");
   ASSERT_NONNULL(clone, "vmobject full clone\n");
@@ -3868,8 +3648,8 @@ static bool vmo_snapshot_modified_test() {
 
   // Hang another snapshot-modified clone off root that only sees the first page.
   fbl::RefPtr<VmObject> clone2;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0, PAGE_SIZE,
-                            false, &clone2);
+  status = vmo->CreateClone(Resizability::NonResizable, SnapshotType::Modified, 0, PAGE_SIZE, false,
+                            &clone2);
   ASSERT_EQ(ZX_OK, status, "vmobject partial clone\n");
   ASSERT_NONNULL(clone2, "vmobject partial clone\n");
   clone2->set_user_id(44);
@@ -3893,7 +3673,7 @@ static bool vmo_snapshot_modified_test() {
 
   // Call snapshot-modified again on the full clone, which will create a hidden parent.
   fbl::RefPtr<VmObject> snapshot;
-  status = clone->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0,
+  status = clone->CreateClone(Resizability::NonResizable, SnapshotType::Modified, 0,
                               PAGE_SIZE * kNumPages, false, &snapshot);
   ASSERT_EQ(ZX_OK, status, "vmobject snapshot-modified\n");
   ASSERT_NONNULL(snapshot, "vmobject snapshot-modified clone\n");
@@ -3908,8 +3688,8 @@ static bool vmo_snapshot_modified_test() {
 
   // Calling CreateClone directly with SnapshotAtLeastOnWrite should upgrade to snapshot-modified.
   fbl::RefPtr<VmObject> atleastonwrite;
-  status = clone->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
-                              alloc_size, false, &atleastonwrite);
+  status = clone->CreateClone(Resizability::NonResizable, SnapshotType::OnWrite, 0, alloc_size,
+                              false, &atleastonwrite);
   ASSERT_EQ(ZX_OK, status, "vmobject snapshot-at-least-on-write clone.\n");
   ASSERT_NONNULL(atleastonwrite, "vmobject snapshot-at-least-on-write clone\n");
 
@@ -3925,8 +3705,8 @@ static bool vmo_snapshot_modified_test() {
 
   // Snapshot-modified of root-slice should work.
   fbl::RefPtr<VmObject> slicesnapshot;
-  status = slice->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0,
-                              kSliceSize, false, &slicesnapshot);
+  status = slice->CreateClone(Resizability::NonResizable, SnapshotType::Modified, 0, kSliceSize,
+                              false, &slicesnapshot);
   ASSERT_EQ(ZX_OK, status, "snapshot-modified root-slice\n");
   ASSERT_NONNULL(slicesnapshot, "snapshot modified root-slice\n");
   slicesnapshot->set_user_id(46);
@@ -3944,7 +3724,7 @@ static bool vmo_snapshot_modified_test() {
 
   // Create a slice of the clone of the root-slice.
   fbl::RefPtr<VmObject> slicesnapshot_slice;
-  status = slicesnapshot->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0,
+  status = slicesnapshot->CreateClone(Resizability::NonResizable, SnapshotType::Modified, 0,
                                       kSliceSize, false, &slicesnapshot_slice);
   ASSERT_EQ(ZX_OK, status, "slice snapshot-modified-root-slice\n");
   ASSERT_NONNULL(slicesnapshot_slice, "slice snapshot-modified-root-slice\n");
@@ -3952,7 +3732,7 @@ static bool vmo_snapshot_modified_test() {
 
   // Check that snapshot-modified will work again on the snapshot-modified clone of the slice.
   fbl::RefPtr<VmObject> slicesnapshot2;
-  status = slicesnapshot->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0,
+  status = slicesnapshot->CreateClone(Resizability::NonResizable, SnapshotType::Modified, 0,
                                       kSliceSize, false, &slicesnapshot2);
   ASSERT_EQ(ZX_OK, status, "snapshot-modified root-slice-snapshot\n");
   ASSERT_NONNULL(slicesnapshot2, "snapshot-modified root-slice-snapshot\n");
@@ -3965,7 +3745,7 @@ static bool vmo_snapshot_modified_test() {
 
   // Snapshot-modified should not be allowed on a slice of a clone.
   fbl::RefPtr<VmObject> cloneslicesnapshot;
-  status = cloneslice->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0,
+  status = cloneslice->CreateClone(Resizability::NonResizable, SnapshotType::Modified, 0,
                                    kSliceSize, false, &cloneslicesnapshot);
   ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, status, "snapshot-modified clone-slice\n");
   ASSERT_NULL(cloneslicesnapshot, "snapshot-modified clone-slice\n");
@@ -3977,8 +3757,8 @@ static bool vmo_snapshot_modified_test() {
   anon_vmo->set_user_id(0x49);
 
   fbl::RefPtr<VmObject> anon_clone;
-  status = anon_vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0,
-                                 PAGE_SIZE, true, &anon_clone);
+  status = anon_vmo->CreateClone(Resizability::NonResizable, SnapshotType::Modified, 0, PAGE_SIZE,
+                                 true, &anon_clone);
   ASSERT_OK(status);
   anon_clone->set_user_id(0x50);
 
@@ -3992,31 +3772,31 @@ static bool vmo_snapshot_modified_test() {
 
   // Snapshot-modified should also be upgraded when used on a SNAPSHOT clone.
   fbl::RefPtr<VmObject> anon_snapshot;
-  status = anon_clone->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0,
-                                   PAGE_SIZE, true, &anon_snapshot);
+  status = anon_clone->CreateClone(Resizability::NonResizable, SnapshotType::Modified, 0, PAGE_SIZE,
+                                   true, &anon_snapshot);
   ASSERT_OK(status);
   anon_snapshot->set_user_id(0x51);
 
   // Snapshot-modified shold not be allowed on a unidirectional chain of length > 2
   fbl::RefPtr<VmObject> chain1;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
-                            PAGE_SIZE, true, &chain1);
+  status = vmo->CreateClone(Resizability::NonResizable, SnapshotType::OnWrite, 0, PAGE_SIZE, true,
+                            &chain1);
   ASSERT_OK(status);
   chain1->set_user_id(0x52);
   uint64_t data1 = 42;
   EXPECT_OK(chain1->Write(&data1, 0, sizeof(data)));
 
   fbl::RefPtr<VmObject> chain2;
-  status = chain1->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
-                               PAGE_SIZE, true, &chain2);
+  status = chain1->CreateClone(Resizability::NonResizable, SnapshotType::OnWrite, 0, PAGE_SIZE,
+                               true, &chain2);
   ASSERT_OK(status);
   chain2->set_user_id(0x51);
   uint64_t data2 = 43;
   EXPECT_OK(chain2->Write(&data2, 0, sizeof(data)));
 
   fbl::RefPtr<VmObject> chain_snap;
-  status = chain2->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0,
-                               PAGE_SIZE, true, &chain_snap);
+  status = chain2->CreateClone(Resizability::NonResizable, SnapshotType::Modified, 0, PAGE_SIZE,
+                               true, &chain_snap);
   ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, status, "snapshot-modified unidirectional chain\n");
 
   END_TEST;
@@ -4179,7 +3959,7 @@ static bool vmo_skip_range_update_test() {
   EXPECT_OK(vmo->CommitRange(0, PAGE_SIZE * kNumPages));
 
   fbl::RefPtr<VmObject> child;
-  ASSERT_OK(vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0u,
+  ASSERT_OK(vmo->CreateClone(Resizability::NonResizable, SnapshotType::Full, 0u,
                              PAGE_SIZE * kNumPages, false, &child));
 
   // Fork some pages into the child to have some regions that should be able to avoid range updates.
@@ -4230,10 +4010,13 @@ static bool vmo_skip_range_update_test() {
     }
     // Perform the requested range update.
     {
-      Guard<CriticalMutex> guard{hidden_parent->lock()};
-      hidden_parent->RangeChangeUpdateLocked(
-          VmCowRange(range.page_start * PAGE_SIZE, range.num_pages * PAGE_SIZE),
-          VmCowPages::RangeChangeOp::Unmap);
+      Guard<VmoLockType> guard{hidden_parent->lock()};
+      const VmCowRange range_update =
+          VmCowRange(range.page_start * PAGE_SIZE, range.num_pages * PAGE_SIZE);
+      hidden_parent->RangeChangeUpdateSelfLocked(range_update, VmCowPages::RangeChangeOp::Unmap,
+                                                 VmCowPages::RangeChangeChildren::Deferred);
+      hidden_parent->RangeChangeUpdateCowChildrenLocked(range_update,
+                                                        VmCowPages::RangeChangeOp::Unmap);
     }
     // Check all the mappings are either there or not there as expected.
     bool expected[kNumPages];
@@ -4270,7 +4053,7 @@ static bool vmo_user_stream_size_test() {
   ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, 4 * PAGE_SIZE, &vmo));
 
   {
-    Guard<CriticalMutex> guard{vmo->lock()};
+    Guard<VmoLockType> guard{vmo->lock()};
     EXPECT_EQ(vmo->size_locked(), (uint64_t)4 * PAGE_SIZE);
     // Should not have an allocated stream size.
     auto result = vmo->user_content_size_locked();
@@ -4286,7 +4069,7 @@ static bool vmo_user_stream_size_test() {
   vmo->SetUserContentSize(csm);
 
   {
-    Guard<CriticalMutex> guard{vmo->lock()};
+    Guard<VmoLockType> guard{vmo->lock()};
     auto result = vmo->user_content_size_locked();
     ASSERT_TRUE(result.has_value());
     const uint64_t stream_size = result.value();
@@ -4350,7 +4133,6 @@ VM_UNITTEST(vmo_discard_failure_test)
 VM_UNITTEST(vmo_discardable_counts_test)
 VM_UNITTEST(vmo_lookup_compressed_pages_test)
 VM_UNITTEST(vmo_write_does_not_commit_test)
-VM_UNITTEST(vmo_stack_owned_loaned_pages_interval_test)
 VM_UNITTEST(vmo_dirty_pages_test)
 VM_UNITTEST(vmo_dirty_pages_writeback_test)
 VM_UNITTEST(vmo_dirty_pages_with_hints_test)

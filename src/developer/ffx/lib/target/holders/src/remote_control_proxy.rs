@@ -5,7 +5,7 @@
 use std::ops::Deref;
 use std::time::Duration;
 
-use crate::init_daemon_behavior;
+use crate::init_connection_behavior;
 use async_trait::async_trait;
 use errors::FfxError;
 use ffx_command_error::{bug, FfxContext as _, Result};
@@ -36,7 +36,7 @@ impl TryFromEnv for RemoteControlProxyHolder {
         let behavior = if let Some(behavior) = env.behavior().await {
             behavior
         } else {
-            let b = init_daemon_behavior(env.environment_context()).await?;
+            let b = init_connection_behavior(env.environment_context()).await?;
             env.set_behavior(b.clone()).await;
             b
         };
@@ -44,11 +44,16 @@ impl TryFromEnv for RemoteControlProxyHolder {
             FhoConnectionBehavior::DaemonConnector(daemon) => match daemon.remote_factory().await {
                 Ok(p) => Ok(p.into()),
                 Err(e) => {
+                    let doctor_tip = "Please check the connection to the target; `ffx doctor -v` may help diagnose the issue.";
                     if let Some(ffx_e) = &e.downcast_ref::<FfxError>() {
-                        let message = format!("Failed connecting to remote control proxy: {ffx_e}");
+                        let message = format!(
+                            "Failed connecting to remote control proxy: {ffx_e}. {doctor_tip}"
+                        );
                         Err(e).user_message(message)
                     } else {
-                        Err(e).user_message("Failed to create remote control proxy. Please check the connection to the target;`ffx doctor -v` may help diagnose the issue.")
+                        let message =
+                            format!("Failed to create remote control proxy: {e}. {doctor_tip}");
+                        Err(e).user_message(message)
                     }
                 }
             },
@@ -78,20 +83,17 @@ where
     P: Proxy + 'static,
     P::Protocol: DiscoverableProtocolMarker,
 {
-    let (proxy, server_end) = fidl::endpoints::create_proxy::<P::Protocol>();
     rcs::open_with_timeout::<P::Protocol>(
         timeout,
         moniker,
         capability_set,
         rcs,
-        server_end.into_channel(),
     )
     .await
     .with_user_message(|| {
         let protocol_name = P::Protocol::PROTOCOL_NAME;
         format!("Failed to connect to protocol '{protocol_name}' at moniker '{moniker}' within {} seconds", timeout.as_secs_f64())
-    })?;
-    Ok(proxy)
+    })
 }
 
 /// Sets up a fake proxy of type `T` handing requests to the given callback and returning

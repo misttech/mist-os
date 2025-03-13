@@ -6,6 +6,7 @@ use anyhow::Error;
 use argh::FromArgs;
 use fxfs::filesystem::{mkfs_with_volume, FxFilesystem, FxFilesystemBuilder};
 use fxfs::fsck;
+use fxfs::object_store::NO_OWNER;
 use fxfs_crypto::Crypt;
 use fxfs_insecure_crypto::InsecureCrypt;
 use std::io::Read;
@@ -208,7 +209,8 @@ async fn main() -> Result<(), Error> {
                         512,
                     ));
                     let fs = FxFilesystem::open(device).await?;
-                    let vol = ops::open_volume(&fs, DEFAULT_VOLUME, Some(crypt.clone())).await?;
+                    let vol = ops::open_volume(&fs, DEFAULT_VOLUME, NO_OWNER, Some(crypt.clone()))
+                        .await?;
                     ops::unlink(&fs, &vol, &Path::new(&rmargs.path)).await?;
                     fs.close().await?;
                     let result = ops::fsck(&fs, args.verbose).await?;
@@ -221,7 +223,7 @@ async fn main() -> Result<(), Error> {
                         512,
                     ));
                     let fs = FxFilesystemBuilder::new().read_only(true).open(device).await?;
-                    let vol = ops::open_volume(&fs, DEFAULT_VOLUME, Some(crypt)).await?;
+                    let vol = ops::open_volume(&fs, DEFAULT_VOLUME, NO_OWNER, Some(crypt)).await?;
                     let data = ops::get(&vol, &Path::new(&getargs.src)).await?;
                     let mut reader = std::io::Cursor::new(&data);
                     let mut writer = std::fs::File::create(getargs.dst)?;
@@ -234,7 +236,8 @@ async fn main() -> Result<(), Error> {
                         512,
                     ));
                     let fs = FxFilesystem::open(device).await?;
-                    let vol = ops::open_volume(&fs, DEFAULT_VOLUME, Some(crypt.clone())).await?;
+                    let vol = ops::open_volume(&fs, DEFAULT_VOLUME, NO_OWNER, Some(crypt.clone()))
+                        .await?;
                     let mut data = Vec::new();
                     std::fs::File::open(&putargs.src)?.read_to_end(&mut data)?;
                     ops::put(&fs, &vol, &Path::new(&putargs.dst), data).await?;
@@ -270,7 +273,7 @@ async fn main() -> Result<(), Error> {
                         512,
                     ));
                     let fs = FxFilesystemBuilder::new().read_only(true).open(device).await?;
-                    let vol = ops::open_volume(&fs, DEFAULT_VOLUME, Some(crypt)).await?;
+                    let vol = ops::open_volume(&fs, DEFAULT_VOLUME, NO_OWNER, Some(crypt)).await?;
                     let dir = ops::walk_dir(&vol, &Path::new(&lsargs.path)).await?;
                     ops::print_ls(&dir).await?;
                     Ok(())
@@ -281,7 +284,8 @@ async fn main() -> Result<(), Error> {
                         512,
                     ));
                     let fs = FxFilesystem::open(device).await?;
-                    let vol = ops::open_volume(&fs, DEFAULT_VOLUME, Some(crypt.clone())).await?;
+                    let vol = ops::open_volume(&fs, DEFAULT_VOLUME, NO_OWNER, Some(crypt.clone()))
+                        .await?;
                     ops::mkdir(&fs, &vol, &Path::new(&mkdirargs.path)).await?;
                     fs.close().await?;
                     ops::fsck(&fs, args.verbose).await?;
@@ -293,7 +297,8 @@ async fn main() -> Result<(), Error> {
                         512,
                     ));
                     let fs = FxFilesystem::open(device).await?;
-                    let vol = ops::open_volume(&fs, DEFAULT_VOLUME, Some(crypt.clone())).await?;
+                    let vol = ops::open_volume(&fs, DEFAULT_VOLUME, NO_OWNER, Some(crypt.clone()))
+                        .await?;
                     ops::unlink(&fs, &vol, &Path::new(&rmdirargs.path)).await?;
                     fs.close().await?;
                     ops::fsck(&fs, args.verbose).await?;

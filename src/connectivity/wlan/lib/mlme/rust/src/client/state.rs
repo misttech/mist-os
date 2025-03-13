@@ -23,7 +23,7 @@ use wlan_common::capabilities::{intersect_with_ap_as_client, ApCapabilities, Sta
 use wlan_common::energy::DecibelMilliWatt;
 use wlan_common::mac::{self, BeaconHdr};
 use wlan_common::stats::SignalStrengthAverage;
-use wlan_common::timer::{EventId, Timer};
+use wlan_common::timer::{EventHandle, Timer};
 use wlan_common::{ie, tim};
 use wlan_statemachine::*;
 use zerocopy::SplitByteSlice;
@@ -239,7 +239,7 @@ impl Authenticated {
         &self,
         sta: &mut BoundClient<'_, D>,
         req: fidl_mlme::ReconnectRequest,
-    ) -> Result<EventId, ()> {
+    ) -> Result<EventHandle, ()> {
         let peer_sta_address: Bssid = req.peer_sta_address.into();
         if peer_sta_address == sta.sta.connect_req.selected_bss.bssid {
             match sta.send_assoc_req_frame() {
@@ -271,11 +271,11 @@ impl Authenticated {
 #[derive(Debug, Default)]
 pub struct Associating {
     /// This field is only populated when MLME is reconnecting after a disassociation.
-    reconnect_timeout: Option<EventId>,
+    reconnect_timeout: Option<EventHandle>,
 }
 
 impl Associating {
-    fn new_with_reconnect_timeout(reconnect_timeout: EventId) -> Self {
+    fn new_with_reconnect_timeout(reconnect_timeout: EventHandle) -> Self {
         Self { reconnect_timeout: Some(reconnect_timeout) }
     }
 
@@ -483,7 +483,7 @@ pub fn schedule_association_status_timeout(
 ) -> StatusCheckTimeout {
     let duration = beacon_period * ASSOCIATION_STATUS_TIMEOUT_BEACON_COUNT;
     StatusCheckTimeout {
-        next_id: Some(timer.schedule_after(duration, TimedEvent::AssociationStatusCheck)),
+        next_event: Some(timer.schedule_after(duration, TimedEvent::AssociationStatusCheck)),
     }
 }
 
@@ -511,7 +511,7 @@ impl Qos {
 
 #[derive(Debug)]
 pub struct StatusCheckTimeout {
-    next_id: Option<EventId>,
+    next_event: Option<EventHandle>,
 }
 
 #[derive(Debug)]
@@ -892,7 +892,7 @@ impl Associated {
     }
 
     async fn pre_leaving_associated_state<D: DeviceOps>(&mut self, sta: &mut BoundClient<'_, D>) {
-        self.0.status_check_timeout.next_id.take();
+        self.0.status_check_timeout.next_event.take();
         self.0.controlled_port_open = false;
         if let Err(e) = sta.ctx.device.set_ethernet_down().await {
             error!("Error disabling ethernet device offline: {}", e);
@@ -902,16 +902,7 @@ impl Associated {
     #[must_use]
     /// Reports average signal strength to SME and check if auto deauthentication is due.
     /// Returns true if there auto deauthentication is triggered by lack of beacon frames.
-    async fn on_timeout<D: DeviceOps>(
-        &mut self,
-        sta: &mut BoundClient<'_, D>,
-        event_id: EventId,
-    ) -> bool {
-        if self.0.status_check_timeout.next_id != Some(event_id) {
-            // Do nothing if we've canceled the timeout (e.g. by going off-channel).
-            return false;
-        }
-        self.0.status_check_timeout.next_id.take();
+    async fn on_timeout<D: DeviceOps>(&mut self, sta: &mut BoundClient<'_, D>) -> bool {
         if let Err(e) = sta.ctx.device.send_mlme_event(fidl_mlme::MlmeEvent::SignalReport {
             ind: fidl_internal::SignalReportIndication {
                 rssi_dbm: self.0.signal_strength_average.avg_dbm().0,
@@ -1201,13 +1192,9 @@ impl States {
         self,
         sta: &mut BoundClient<'_, D>,
         event: TimedEvent,
-        event_id: EventId,
     ) -> States {
         match event {
             TimedEvent::Connecting => {
-                if sta.sta.connect_timeout != Some(event_id) {
-                    return self;
-                }
                 sta.sta.connect_timeout.take();
                 sta.send_connect_conf_failure(fidl_ieee80211::StatusCode::RejectedSequenceTimeout);
                 let _ = sta
@@ -1223,9 +1210,6 @@ impl States {
             }
             TimedEvent::Reassociating => match self {
                 States::Associating(mut state) => {
-                    if state.reconnect_timeout != Some(event_id) {
-                        return state.into();
-                    }
                     state.reconnect_timeout.take();
                     sta.send_connect_conf_failure(
                         fidl_ieee80211::StatusCode::RejectedSequenceTimeout,
@@ -1236,7 +1220,7 @@ impl States {
             },
             TimedEvent::AssociationStatusCheck => match self {
                 States::Associated(mut state) => {
-                    let should_auto_deauth = state.on_timeout(sta, event_id).await;
+                    let should_auto_deauth = state.on_timeout(sta).await;
                     match should_auto_deauth {
                         true => state.transition_to(Joined).into(),
                         false => state.into(),
@@ -1248,7 +1232,7 @@ impl States {
                 if let Err(e) = sta
                     .channel_state
                     .bind(sta.ctx, sta.scanner)
-                    .handle_channel_switch_timeout(event_id)
+                    .handle_channel_switch_timeout()
                     .await
                 {
                     error!("ChannelSwitch timeout handler failed: {}", e);
@@ -3039,13 +3023,13 @@ mod tests {
         assert_variant!(state, States::Associating(_), "not in associating state");
 
         // Verify an event was queued up in the timer.
-        let (event, id) = assert_variant!(drain_timeouts(&mut m.time_stream).get(&TimedEventClass::Reassociating), Some(ids) => {
+        let (event, _id) = assert_variant!(drain_timeouts(&mut m.time_stream).get(&TimedEventClass::Reassociating), Some(ids) => {
             assert_eq!(ids.len(), 1);
             ids[0].clone()
         });
 
         // Notify reconnecting timeout
-        let state = state.on_timed_event(&mut sta, event, id).await;
+        let state = state.on_timed_event(&mut sta, event).await;
         assert_variant!(state, States::Authenticated(_), "not in auth'd state");
         assert!(m.fake_device_state.lock().join_bss_request.is_some());
 
@@ -3884,9 +3868,9 @@ mod tests {
             empty_association(&mut sta),
         ))));
 
-        let (_, timed_event) =
+        let (_, timed_event, _) =
             m.time_stream.try_next().unwrap().expect("Should have scheduled signal report timeout");
-        let state = state.on_timed_event(&mut sta, timed_event.event, timed_event.id).await;
+        let state = state.on_timed_event(&mut sta, timed_event.event).await;
 
         let signal_ind = m
             .fake_device_state
@@ -3915,9 +3899,9 @@ mod tests {
         let rx_info = rx_info_with_dbm(&sta, EXPECTED_DBM);
         let state = state.on_mac_frame(&mut sta, &beacon[..], rx_info, 0.into()).await;
 
-        let (_, timed_event) =
+        let (_, timed_event, _) =
             m.time_stream.try_next().unwrap().expect("Should have scheduled signal report timeout");
-        let _state = state.on_timed_event(&mut sta, timed_event.event, timed_event.id).await;
+        let _state = state.on_timed_event(&mut sta, timed_event.event).await;
 
         let signal_ind = m
             .fake_device_state

@@ -782,32 +782,31 @@ TEST_F(RiscvDevicetreeCpuTopologyItemTest, Qemu) {
 }
 
 TEST_F(RiscvDevicetreeCpuTopologyItemTest, VisionFive2) {
-  constexpr std::string_view kHart0IsaString = "rv64imac";         // strtab index 1
-  constexpr std::string_view kCommonHartIsaString = "rv64imafdc";  // strtab index 10
+  constexpr std::string_view kCommonHartIsaString = "rv64imafdc";  // strtab index 1
   constexpr std::array kExpectedTopology = {
-      // cpu@0
-      zbi_topology_node_t{
-          .entity =
-              {
-                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
-                  .processor =
-                      {
-                          .architecture_info =
-                              {
-                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
-                                  .riscv64 =
-                                      {
-                                          .hart_id = 0,
-                                          .isa_strtab_index = 1,
-                                      },
-                              },
-                          .flags = 0,
-                          .logical_ids = {3, 0, 0, 0},
-                          .logical_id_count = 1,
-                      },
-              },
-          .parent_index = ZBI_TOPOLOGY_NO_PARENT,
-      },
+      // cpu@0 - disabled
+      //  zbi_topology_node_t{
+      //      .entity =
+      //          {
+      //              .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+      //              .processor =
+      //                  {
+      //                      .architecture_info =
+      //                          {
+      //                              .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+      //                              .riscv64 =
+      //                                  {
+      //                                      .hart_id = 0,
+      //                                      .isa_strtab_index = 1,
+      //                                  },
+      //                          },
+      //                      .flags = 0,
+      //                      .logical_ids = {3, 0, 0, 0},
+      //                      .logical_id_count = 1,
+      //                  },
+      //          },
+      //      .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+      //  },
 
       // cpu@1
       zbi_topology_node_t{
@@ -822,11 +821,11 @@ TEST_F(RiscvDevicetreeCpuTopologyItemTest, VisionFive2) {
                                   .riscv64 =
                                       {
                                           .hart_id = 1,
-                                          .isa_strtab_index = 10,
+                                          .isa_strtab_index = 1,
                                       },
                               },
                           .flags = 0,
-                          .logical_ids = {1, 0, 0, 0},
+                          .logical_ids = {2, 0, 0, 0},
                           .logical_id_count = 1,
                       },
               },
@@ -846,11 +845,11 @@ TEST_F(RiscvDevicetreeCpuTopologyItemTest, VisionFive2) {
                                   .riscv64 =
                                       {
                                           .hart_id = 2,
-                                          .isa_strtab_index = 10,
+                                          .isa_strtab_index = 1,
                                       },
                               },
                           .flags = 0,
-                          .logical_ids = {2, 0, 0, 0},
+                          .logical_ids = {1, 0, 0, 0},
                           .logical_id_count = 1,
                       },
               },
@@ -870,7 +869,7 @@ TEST_F(RiscvDevicetreeCpuTopologyItemTest, VisionFive2) {
                                   .riscv64 =
                                       {
                                           .hart_id = 3,
-                                          .isa_strtab_index = 10,
+                                          .isa_strtab_index = 1,
                                       },
                               },
                           .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
@@ -894,11 +893,11 @@ TEST_F(RiscvDevicetreeCpuTopologyItemTest, VisionFive2) {
                                   .riscv64 =
                                       {
                                           .hart_id = 4,
-                                          .isa_strtab_index = 10,
+                                          .isa_strtab_index = 1,
                                       },
                               },
                           .flags = 0,
-                          .logical_ids = {4, 0, 0, 0},
+                          .logical_ids = {3, 0, 0, 0},
                           .logical_id_count = 1,
                       },
               },
@@ -927,7 +926,7 @@ TEST_F(RiscvDevicetreeCpuTopologyItemTest, VisionFive2) {
       boot_shim::testing::CheckCpuTopology(nodes, kExpectedTopology);
     } else if (header->type == ZBI_TYPE_RISCV64_ISA_STRTAB) {
       string_table_present = true;
-      ASSERT_NO_FATAL_FAILURE(ExpectStringTable({kHart0IsaString, kCommonHartIsaString}, payload));
+      ASSERT_NO_FATAL_FAILURE(ExpectStringTable({kCommonHartIsaString}, payload));
     }
   }
   EXPECT_TRUE(topology_present);
@@ -935,8 +934,9 @@ TEST_F(RiscvDevicetreeCpuTopologyItemTest, VisionFive2) {
 }
 
 TEST_F(RiscvDevicetreeCpuTopologyItemTest, HifiveSifiveUnmatched) {
-  constexpr std::string_view kHart0IsaString = "rv64imac";         // strtab index 1
-  constexpr std::string_view kCommonHartIsaString = "rv64imafdc";  // strtab index 10
+  // CPU 0 is disabled.
+  // constexpr std::string_view kHart0IsaString = "rv64imac";         // strtab index 1
+  constexpr std::string_view kCommonHartIsaString = "rv64imafdc";  // strtab index 1
   constexpr std::array kExpectedTopology = {
       // cluster0
       zbi_topology_node_t{
@@ -964,7 +964,7 @@ TEST_F(RiscvDevicetreeCpuTopologyItemTest, HifiveSifiveUnmatched) {
                                   .riscv64 =
                                       {
                                           .hart_id = 3,
-                                          .isa_strtab_index = 10,
+                                          .isa_strtab_index = 1,
                                       },
                               },
                           .flags = 0,
@@ -988,7 +988,7 @@ TEST_F(RiscvDevicetreeCpuTopologyItemTest, HifiveSifiveUnmatched) {
                                   .riscv64 =
                                       {
                                           .hart_id = 1,
-                                          .isa_strtab_index = 10,
+                                          .isa_strtab_index = 1,
                                       },
                               },
                           .flags = 0,
@@ -1012,7 +1012,7 @@ TEST_F(RiscvDevicetreeCpuTopologyItemTest, HifiveSifiveUnmatched) {
                                   .riscv64 =
                                       {
                                           .hart_id = 4,
-                                          .isa_strtab_index = 10,
+                                          .isa_strtab_index = 1,
                                       },
                               },
                           .flags = 0,
@@ -1036,7 +1036,7 @@ TEST_F(RiscvDevicetreeCpuTopologyItemTest, HifiveSifiveUnmatched) {
                                   .riscv64 =
                                       {
                                           .hart_id = 2,
-                                          .isa_strtab_index = 10,
+                                          .isa_strtab_index = 1,
                                       },
                               },
                           .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
@@ -1047,29 +1047,29 @@ TEST_F(RiscvDevicetreeCpuTopologyItemTest, HifiveSifiveUnmatched) {
           .parent_index = 0,
       },
 
-      // cpu@0
-      zbi_topology_node_t{
-          .entity =
-              {
-                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
-                  .processor =
-                      {
-                          .architecture_info =
-                              {
-                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
-                                  .riscv64 =
-                                      {
-                                          .hart_id = 0,
-                                          .isa_strtab_index = 1,
-                                      },
-                              },
-                          .flags = 0,
-                          .logical_ids = {4, 0, 0, 0},
-                          .logical_id_count = 1,
-                      },
-              },
-          .parent_index = 0,
-      },
+      // cpu@0 -- disabled
+      // zbi_topology_node_t{
+      //     .entity =
+      //         {
+      //             .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+      //             .processor =
+      //                 {
+      //                     .architecture_info =
+      //                         {
+      //                             .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+      //                             .riscv64 =
+      //                                 {
+      //                                     .hart_id = 0,
+      //                                     .isa_strtab_index = 1,
+      //                                 },
+      //                         },
+      //                     .flags = 0,
+      //                     .logical_ids = {4, 0, 0, 0},
+      //                     .logical_id_count = 1,
+      //                 },
+      //         },
+      //     .parent_index = 0,
+      // },
   };
 
   std::array<std::byte, 1024> image_buffer;
@@ -1093,7 +1093,7 @@ TEST_F(RiscvDevicetreeCpuTopologyItemTest, HifiveSifiveUnmatched) {
       boot_shim::testing::CheckCpuTopology(nodes, kExpectedTopology);
     } else if (header->type == ZBI_TYPE_RISCV64_ISA_STRTAB) {
       string_table_present = true;
-      ASSERT_NO_FATAL_FAILURE(ExpectStringTable({kHart0IsaString, kCommonHartIsaString}, payload));
+      ASSERT_NO_FATAL_FAILURE(ExpectStringTable({kCommonHartIsaString}, payload));
     }
   }
   EXPECT_TRUE(topology_present);

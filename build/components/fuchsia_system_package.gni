@@ -7,15 +7,6 @@ import("fuchsia_package.gni")
 # Defines a Fuchsia package that contains binaries or resources to be
 # part of the Fuchsia system image (i.e. copied to /system/...).
 #
-# Such packages should not contain any component, and should be
-# reachable from the //build/input:system_image target, and optionally
-# for //build/images:base_packages and //build/images:meta_packages.
-#
-# System packages should be rare, and can be added to the system image
-# by adding them to the //build/input:system_image dependency tree,
-# should _only_ list fuchsia_system_package() intances. The
-# build will complain if it finds a non-driver fuchsia_package().
-#
 # Parameters:
 #
 #   package_name (optional)

@@ -14,6 +14,7 @@ import fidl.fuchsia_bluetooth as f_bt
 import fidl.fuchsia_bluetooth_sys as f_btsys_controller
 from parameterized import param, parameterized
 
+from honeydew import affordances_capable
 from honeydew.affordances.connectivity.bluetooth.bluetooth_common import (
     bluetooth_common_using_fc,
 )
@@ -23,8 +24,9 @@ from honeydew.affordances.connectivity.bluetooth.utils import (
 from honeydew.affordances.connectivity.bluetooth.utils import (
     types as bluetooth_types,
 )
-from honeydew.interfaces.device_classes import affordances_capable
-from honeydew.transports import fuchsia_controller as fc_transport
+from honeydew.transports.fuchsia_controller import (
+    fuchsia_controller as fc_transport,
+)
 
 BluetoothAcceptPairing = bluetooth_types.BluetoothAcceptPairing
 BluetoothConnectionType = bluetooth_types.BluetoothConnectionType

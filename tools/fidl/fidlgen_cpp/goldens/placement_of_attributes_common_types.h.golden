@@ -128,16 +128,16 @@ constexpr inline auto ToUnderlying(::test_placementofattributes::ExampleEnum val
 }
 
 template <>
-struct IsFidlType<::test_placementofattributes::ExampleBits> : public std::true_type{};
+struct IsFidlType<::test_placementofattributes::ExampleBits> : public std::true_type {};
 template <>
-struct ContainsHandle<::test_placementofattributes::ExampleBits> : public std::false_type{};
+struct ContainsHandle<::test_placementofattributes::ExampleBits> : public std::false_type {};
 static_assert(std::is_standard_layout_v<::test_placementofattributes::ExampleBits>);
 static_assert(sizeof(::test_placementofattributes::ExampleBits) == sizeof(uint32_t));
 
 template <>
-struct IsFidlType<::test_placementofattributes::ExampleEnum> : public std::true_type{};
+struct IsFidlType<::test_placementofattributes::ExampleEnum> : public std::true_type {};
 template <>
-struct ContainsHandle<::test_placementofattributes::ExampleEnum> : public std::false_type{};
+struct ContainsHandle<::test_placementofattributes::ExampleEnum> : public std::false_type {};
 
 #pragma clang diagnostic pop
 

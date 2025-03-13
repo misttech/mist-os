@@ -21,6 +21,10 @@ uint64_t kMaxFrameSize = 8ull * 1024 * 1024;  // 8 MB
 
 }  // namespace
 
+Error FramePointerUnwinder::Step(Memory* stack, const Frame& current, Frame& next) {
+  return Step(stack, current.regs, next.regs);
+}
+
 Error FramePointerUnwinder::Step(Memory* stack, const Registers& current, Registers& next) {
   RegisterID fp_reg;
   switch (current.arch()) {

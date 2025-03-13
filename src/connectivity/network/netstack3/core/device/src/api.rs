@@ -18,6 +18,7 @@ use netstack3_ip::device::{
     IpAddressIdSpecContext, IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceTimerId,
     Ipv6DeviceConfigurationContext,
 };
+use netstack3_ip::gmp::{IgmpCounters, MldCounters};
 use netstack3_ip::{self as ip, RawMetric};
 use packet::BufferMut;
 
@@ -284,11 +285,33 @@ where
         inspector: &mut N,
     ) {
         inspector.record_child("Counters", |inspector| {
-            self.core_ctx().with_per_resource_counters(device, |counters: &DeviceCounters| {
-                inspector.delegate_inspectable(counters)
+            inspector.delegate_inspectable(
+                ResourceCounterContext::<_, DeviceCounters>::per_resource_counters(
+                    self.core_ctx(),
+                    device,
+                ),
+            );
+            inspector.delegate_inspectable(
+                ResourceCounterContext::<_, D::Counters>::per_resource_counters(
+                    self.core_ctx(),
+                    device,
+                ),
+            );
+            inspector.record_child("IGMP", |inspector| {
+                inspector.delegate_inspectable(
+                    ResourceCounterContext::<_, IgmpCounters>::per_resource_counters(
+                        self.core_ctx(),
+                        device,
+                    ),
+                );
             });
-            self.core_ctx().with_per_resource_counters(device, |counters: &D::Counters| {
-                inspector.delegate_inspectable(counters)
+            inspector.record_child("MLD", |inspector| {
+                inspector.delegate_inspectable(
+                    ResourceCounterContext::<_, MldCounters>::per_resource_counters(
+                        self.core_ctx(),
+                        device,
+                    ),
+                );
             });
         });
     }
@@ -385,21 +408,25 @@ pub trait DeviceApiCoreContext<
     + RecvFrameContext<D::FrameMetadata<BaseDeviceId<D, BC>>, BC>
     + ResourceCounterContext<Self::DeviceId, DeviceCounters>
     + ResourceCounterContext<Self::DeviceId, D::Counters>
+    + ResourceCounterContext<Self::DeviceId, IgmpCounters>
+    + ResourceCounterContext<Self::DeviceId, MldCounters>
     + CoreTimerContext<D::TimerId<Self::WeakDeviceId>, BC>
 {
 }
 
-impl<O, D, BC> DeviceApiCoreContext<D, BC> for O
+impl<CC, D, BC> DeviceApiCoreContext<D, BC> for CC
 where
     D: Device + DeviceStateSpec + DeviceReceiveFrameSpec,
     BC: DeviceApiBindingsContext,
-    O: DeviceIdContext<D, DeviceId = BaseDeviceId<D, BC>, WeakDeviceId = BaseWeakDeviceId<D, BC>>
+    CC: DeviceIdContext<D, DeviceId = BaseDeviceId<D, BC>, WeakDeviceId = BaseWeakDeviceId<D, BC>>
         + OriginTrackerContext
         + DeviceCollectionContext<D, BC>
         + DeviceConfigurationContext<D>
         + RecvFrameContext<D::FrameMetadata<BaseDeviceId<D, BC>>, BC>
         + ResourceCounterContext<Self::DeviceId, DeviceCounters>
         + ResourceCounterContext<Self::DeviceId, D::Counters>
+        + ResourceCounterContext<Self::DeviceId, IgmpCounters>
+        + ResourceCounterContext<Self::DeviceId, MldCounters>
         + CoreTimerContext<D::TimerId<Self::WeakDeviceId>, BC>,
 {
 }

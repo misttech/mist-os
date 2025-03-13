@@ -80,8 +80,6 @@ class FakeCodec final
   async_dispatcher_t* dispatcher() { return dispatcher_; }
   bool is_bound() const { return binding_.has_value(); }
 
-  bool responsive() const { return responsive_; }
-  void set_responsive(bool responsive) { responsive_ = responsive; }
   std::optional<bool> health_state() const { return healthy_; }
   void set_health_state(std::optional<bool> healthy) { healthy_ = healthy; }
 
@@ -222,9 +220,7 @@ class FakeCodec final
   std::optional<fidl::ServerBindingRef<fuchsia_hardware_audio_signalprocessing::SignalProcessing>>
       signal_processing_binding_;
 
-  bool responsive_ = true;
   std::optional<bool> healthy_ = true;
-  std::optional<GetHealthStateCompleter::Async> health_completer_;
 
   bool supports_signalprocessing_ = false;
 

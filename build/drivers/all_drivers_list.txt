@@ -20,10 +20,10 @@
 //examples/drivers/transport/zircon/v2:child_driver
 //examples/drivers/transport/zircon/v2:parent_driver
 //sdk/lib/driver/devicetree/examples/example-board:bazel_package.bazel_build
-//sdk/lib/driver/metadata/cpp/tests/metadata_forwarder_test_driver:driver
-//sdk/lib/driver/metadata/cpp/tests/metadata_retriever_test_driver:driver
-//sdk/lib/driver/metadata/cpp/tests/metadata_sender_test_driver:driver
-//sdk/lib/driver/metadata/cpp/tests/test_root:driver
+//sdk/lib/driver/metadata/cpp/tests/metadata_integration_test/metadata_forwarder_test_driver:driver
+//sdk/lib/driver/metadata/cpp/tests/metadata_integration_test/metadata_retriever_test_driver:driver
+//sdk/lib/driver/metadata/cpp/tests/metadata_integration_test/metadata_sender_test_driver:driver
+//sdk/lib/driver/metadata/cpp/tests/metadata_integration_test/test_root:driver
 //sdk/lib/driver_test_realm/fake_driver:driver
 //src/camera/drivers/bus/aml_mipicsi:aml_mipicsi_driver-driver
 //src/camera/drivers/controller/sherlock:sherlock-camera-controller_driver
@@ -58,7 +58,8 @@
 //src/connectivity/openthread/drivers/ot-radio:ot-radio-sherlock-mfg_driver
 //src/connectivity/openthread/drivers/ot-radio:ot-radio-sherlock_driver
 //src/connectivity/openthread/tests/fake-drivers/fake-ot-radio:fake-ot-radio-driver-driver
-//src/connectivity/overnet/usb:overnet-usb-driver
+//src/connectivity/overnet/usb/overnet-usb-service:overnet-usb-service-driver
+//src/connectivity/overnet/usb/overnet-usb:overnet-usb-driver
 //src/connectivity/telephony/drivers/qmi-fake-transport:fake_qmi_driver-driver
 //src/connectivity/telephony/drivers/qmi-usb-transport:qmi_driver-driver
 //src/connectivity/telephony/tests/fake-drivers/at-fake-transport:fake_at_driver-driver
@@ -115,6 +116,7 @@
 //src/devices/board/drivers/vim3-devicetree:bazel_package.bazel_build
 //src/devices/bus/drivers/pci/test:pci_fake-driver
 //src/devices/bus/drivers/pci/test:pci_protocol_test_driver-driver
+//src/devices/bus/drivers/pci:bus-kpci-driver
 //src/devices/bus/drivers/pci:bus-pci-driver
 //src/devices/bus/drivers/platform/test/power-integration-test:test-power-child-driver
 //src/devices/bus/drivers/platform/test/power-integration-test:test-power-integration-board-driver
@@ -240,6 +242,7 @@
 //src/devices/tests/v2/compat/leaf:driver
 //src/devices/tests/v2/compat/root:driver
 //src/devices/tests/v2/ddk-init-test:driver
+//src/devices/tests/v2/devfs-export-service:root_driver
 //src/devices/tests/v2/devfs_exporter:root_driver
 //src/devices/tests/v2/dynamic_offers:leaf_driver
 //src/devices/tests/v2/dynamic_offers:root_driver
@@ -259,6 +262,10 @@
 //src/devices/tests/v2/reload-driver/root:driver
 //src/devices/tests/v2/reload-driver/target-1:driver
 //src/devices/tests/v2/reload-driver/target-2:driver
+//src/devices/tests/v2/reload-driver-nested-composite/drivers:root_driver
+//src/devices/tests/v2/reload-driver-nested-composite/drivers:driver_composite_a
+//src/devices/tests/v2/reload-driver-nested-composite/drivers:driver_composite_b
+//src/devices/tests/v2/reload-driver-nested-composite/drivers:driver_top_b
 //src/devices/tests/v2/replace-driver/composite-replacement:driver
 //src/devices/tests/v2/replace-driver/target-1-replacement:driver
 //src/devices/tests/v2/replace-driver/target-2-replacement:driver
@@ -270,6 +277,7 @@
 //src/devices/tests/v2/runtime-protocol:leaf-driver
 //src/devices/tests/v2/runtime-protocol:root-driver
 //src/devices/tests/v2/services:root_driver
+//src/devices/tests/v2/services:v1_driver
 //src/devices/thermal/drivers/aml-thermal-s905d2g-legacy:aml-thermal-s905d2g-legacy-driver
 //src/devices/thermal/drivers/aml-thermal:aml-thermal-driver
 //src/devices/thermal/drivers/aml-thermistor:aml-thermistor-driver
@@ -332,8 +340,8 @@
 //src/media/audio/drivers/testing/realm:codec-test-driver2
 //src/media/audio/drivers/testing/realm:dai-test-driver
 //src/media/audio/drivers/usb-audio:usb-audio-driver
-//src/media/audio/drivers/virtual_audio:virtual_audio_driver-driver
-//src/media/audio/drivers/virtual-audio-dfv2:virtual-audio-dfv2-driver
+//src/media/audio/drivers/virtual-audio:virtual-audio-driver
+//src/media/audio/drivers/virtual-audio-legacy:virtual-audio-legacy-driver
 //src/power/fake-powersource:fake_battery_driver
 //src/power/power-manager/testing/fake_driver:fake-cpu-ctrl
 //src/power/power-manager/testing/fake_driver:fake-temperature

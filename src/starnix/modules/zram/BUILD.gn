@@ -17,7 +17,7 @@ rustc_library("zram") {
     "//sdk/rust/zx",
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/kernel:starnix_logging",
-    "//src/starnix/lib/starnix-sync",
-    "//src/starnix/lib/starnix-uapi",
+    "//src/starnix/lib/starnix_sync",
+    "//src/starnix/lib/starnix_uapi",
   ]
 }

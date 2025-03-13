@@ -12,8 +12,7 @@ use std::sync::Arc;
 /// the mpsc::Sender<TelemetryEvent>.
 pub const TELEMETRY_EVENT_BUFFER_SIZE: usize = 100;
 
-#[derive(Clone)]
-#[cfg_attr(test, derive(Debug))]
+#[derive(Clone, Debug)]
 pub struct TelemetrySender {
     sender: Arc<Mutex<mpsc::Sender<crate::TelemetryEvent>>>,
     sender_is_blocked: Arc<AtomicBool>,

@@ -404,7 +404,7 @@ struct LookupIpErrorsFromSource {
 impl LookupIpErrorsFromSource {
     fn any_error(&self) -> Option<&ResolveError> {
         let Self { ipv4, ipv6, canonical_name } = self;
-        ipv4.as_ref().or_else(|| ipv6.as_ref()).or_else(|| canonical_name.as_ref())
+        ipv4.as_ref().or(ipv6.as_ref()).or(canonical_name.as_ref())
     }
 
     fn accumulate(&mut self, src: LookupIpErrorSource, error: ResolveError) {
@@ -549,7 +549,10 @@ async fn sort_preferred_addresses(
             // reallocate.
             .drain(..)
             .map(|addr| async move {
-                let source_addr = match routes.resolve(&addr).await? {
+                let source_addr = match routes.resolve(&addr).await.map_err(|e: fidl::Error| {
+                    warn!("fuchsia.net.routes/State.resolve FIDL error {:?}", e);
+                    fname::LookupError::InternalError
+                })? {
                     Ok(fnet_routes::Resolved::Direct(fnet_routes::Destination {
                         source_address,
                         ..
@@ -572,11 +575,7 @@ async fn sort_preferred_addresses(
                 Ok((addr, DasCmpInfo::from_addrs(&addr, source_addr.as_ref())))
             }),
     )
-    .await
-    .map_err(|e: fidl::Error| {
-        warn!("fuchsia.net.routes/State.resolve FIDL error {:?}", e);
-        fname::LookupError::InternalError
-    })?;
+    .await?;
     let () = addrs_info.sort_by(|(_laddr, left), (_raddr, right)| left.cmp(right));
     // Reinsert the addresses in order from addr_info.
     let () = addrs.extend(addrs_info.into_iter().map(|(addr, _)| addr));

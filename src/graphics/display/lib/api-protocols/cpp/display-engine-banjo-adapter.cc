@@ -19,10 +19,10 @@
 
 #include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-banjo.h"
 #include "src/graphics/display/lib/api-protocols/cpp/display-engine-interface.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
@@ -47,13 +47,15 @@ compat::DeviceServer::BanjoConfig DisplayEngineBanjoAdapter::CreateBanjoConfig()
   return banjo_config;
 }
 
-void DisplayEngineBanjoAdapter::DisplayEngineSetListener(
-    const display_engine_listener_protocol_t* display_engine_listener) {
-  ZX_DEBUG_ASSERT(display_engine_listener);
+void DisplayEngineBanjoAdapter::DisplayEngineCompleteCoordinatorConnection(
+    const display_engine_listener_protocol_t* display_engine_listener,
+    engine_info_t* out_banjo_engine_info) {
+  ZX_DEBUG_ASSERT(display_engine_listener != nullptr);
+  ZX_DEBUG_ASSERT(out_banjo_engine_info != nullptr);
+
   engine_events_.SetListener(display_engine_listener);
-  if (display_engine_listener != nullptr) {
-    engine_.OnCoordinatorConnected();
-  }
+  const EngineInfo engine_info = engine_.CompleteCoordinatorConnection();
+  *out_banjo_engine_info = engine_info.ToBanjo();
 }
 
 void DisplayEngineBanjoAdapter::DisplayEngineUnsetListener() {
@@ -142,9 +144,8 @@ config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration
   // This adapter does not currently support multi-layer configurations. This
   // restriction will be lifted in the near future.
   if (banjo_layers.size() > 1) {
-    out_layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
-    for (size_t i = 1; i < banjo_layers.size(); ++i) {
-      out_layer_composition_operations[i] = LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
+    for (size_t i = 0; i < banjo_layers.size(); ++i) {
+      out_layer_composition_operations[i] = LAYER_COMPOSITION_OPERATIONS_MERGE;
     }
     return display::ConfigCheckResult::kUnsupportedConfig.ToBanjo();
   }
@@ -208,7 +209,7 @@ void DisplayEngineBanjoAdapter::DisplayEngineApplyConfiguration(
 
   engine_.ApplyConfiguration(display::ToDisplayId(banjo_display_config->display_id),
                              display::ModeId(1), layers,
-                             display::ToConfigStamp(*banjo_config_stamp));
+                             display::ToDriverConfigStamp(*banjo_config_stamp));
 }
 
 zx_status_t DisplayEngineBanjoAdapter::DisplayEngineSetBufferCollectionConstraints(
@@ -230,10 +231,6 @@ zx_status_t DisplayEngineBanjoAdapter::DisplayEngineSetDisplayPower(uint64_t ban
   return result.status_value();
 }
 
-bool DisplayEngineBanjoAdapter::DisplayEngineIsCaptureSupported() {
-  return engine_.IsCaptureSupported();
-}
-
 zx_status_t DisplayEngineBanjoAdapter::DisplayEngineStartCapture(uint64_t banjo_capture_handle) {
   const display::DriverCaptureImageId capture_image_id =
       display::ToDriverCaptureImageId(banjo_capture_handle);
@@ -251,44 +248,6 @@ zx_status_t DisplayEngineBanjoAdapter::DisplayEngineReleaseCapture(uint64_t banj
 zx_status_t DisplayEngineBanjoAdapter::DisplayEngineSetMinimumRgb(uint8_t minimum_rgb) {
   zx::result<> result = engine_.SetMinimumRgb(minimum_rgb);
   return result.status_value();
-}
-
-config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration(
-    const display_config_t* banjo_display_configs_array, size_t banjo_display_configs_count,
-    layer_composition_operations_t* out_layer_composition_operations_list,
-    size_t out_layer_composition_operations_size, size_t* out_layer_composition_operations_actual) {
-  // The display coordinator currently uses zero-display configs to blank all
-  // displays. We'll remove this eventually.
-  if (banjo_display_configs_count == 0) {
-    return display::ConfigCheckResult::kOk.ToBanjo();
-  }
-
-  // This adapter does not support multiple-display operation. None of our
-  // drivers supports this mode.
-  if (banjo_display_configs_count > 1) {
-    ZX_DEBUG_ASSERT_MSG(false, "Multiple displays registered with the display coordinator");
-    return display::ConfigCheckResult::kTooManyDisplays.ToBanjo();
-  }
-
-  return DisplayEngineCheckConfiguration(
-      banjo_display_configs_array, out_layer_composition_operations_list,
-      out_layer_composition_operations_size, out_layer_composition_operations_actual);
-}
-
-void DisplayEngineBanjoAdapter::DisplayEngineApplyConfiguration(
-    const display_config_t* banjo_display_configs_array, size_t banjo_display_configs_count,
-    const config_stamp_t* banjo_config_stamp) {
-  // The display coordinator currently uses zero-display configs to blank all
-  // displays. We'll remove this eventually.
-  if (banjo_display_configs_count == 0) {
-    return;
-  }
-
-  // This adapter does not support multiple-display operation. None of our
-  // drivers supports this mode.
-  ZX_DEBUG_ASSERT_MSG(banjo_display_configs_count == 1,
-                      "Display coordinator applied rejected multi-display config");
-  DisplayEngineApplyConfiguration(banjo_display_configs_array, banjo_config_stamp);
 }
 
 display_engine_protocol_t DisplayEngineBanjoAdapter::GetProtocol() {

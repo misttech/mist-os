@@ -389,6 +389,8 @@ impl Inner {
                 continue;
             }
 
+            container.stats.ingest_message(amount_read, header.severity().into());
+
             if container.msg_ids.end == container.msg_ids.start {
                 container.first_index = self.head;
             }
@@ -971,10 +973,14 @@ impl Drop for OnInactiveNotifier<'_> {
 mod tests {
     use super::SharedBuffer;
     use crate::logs::shared_buffer::LazyItem;
+    use crate::logs::stats::LogStreamStats;
     use crate::logs::testing::make_message;
     use assert_matches::assert_matches;
+    use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fidl_fuchsia_diagnostics::StreamMode;
     use fuchsia_async as fasync;
+    use fuchsia_inspect::{Inspector, InspectorConfig};
+    use fuchsia_inspect_derive::WithInspect;
     use futures::channel::mpsc;
     use futures::poll;
     use futures::stream::{FuturesUnordered, StreamExt as _};
@@ -1346,6 +1352,99 @@ mod tests {
 
         // The original cursor should have finished.
         assert_matches!(cursor.next().await, None);
+    }
+
+    #[fuchsia::test]
+    async fn socket_increments_logstats() {
+        let inspector = Inspector::new(InspectorConfig::default());
+        let stats: Arc<LogStreamStats> =
+            Arc::new(LogStreamStats::default().with_inspect(inspector.root(), "test").unwrap());
+        let buffer = Arc::new(SharedBuffer::new(65536, Box::new(|_| {})));
+        let container_a = Arc::new(buffer.new_container_buffer(Arc::new(vec!["a"].into()), stats));
+        let msg = make_message("a", None, zx::BootInstant::from_nanos(1));
+
+        let (local, remote) = zx::Socket::create_datagram();
+        container_a.add_socket(remote);
+
+        let cursor_a = container_a.cursor(StreamMode::Subscribe).unwrap();
+
+        // Use FuturesUnordered so that we can make sure that the cursor is woken when a message is
+        // received (FuturesUnordered uses separate wakers for all the futures it manages).
+        let mut futures = FuturesUnordered::new();
+        futures.push(async move {
+            let mut cursor_a = pin!(cursor_a);
+            cursor_a.next().await
+        });
+        let mut next = futures.next();
+        assert!(futures::poll!(&mut next).is_pending());
+
+        local.write(msg.bytes()).unwrap();
+
+        let cursor_b = pin!(container_a.cursor(StreamMode::Snapshot).unwrap());
+
+        assert_eq!(
+            cursor_b
+                .map(|item| {
+                    match item {
+                        LazyItem::Next(item) => assert_eq!(item.bytes(), msg.bytes()),
+                        _ => panic!("Unexpected item {item:?}"),
+                    }
+                })
+                .count()
+                .await,
+            1
+        );
+
+        // If cursor_a wasn't woken, this will hang.
+        next.await;
+        // Validate logstats (must happen after the socket was handled)
+        assert_data_tree!(
+            inspector,
+            root: contains {
+                test: {
+                    url: "",
+                    last_timestamp: AnyProperty,
+                    sockets_closed: 0u64,
+                    sockets_opened: 0u64,
+                    invalid: {
+                        number: 0u64,
+                        bytes: 0u64,
+                    },
+                    total: {
+                        number: 1u64,
+                        bytes: 88u64,
+                    },
+                    rolled_out: {
+                        number: 0u64,
+                        bytes: 0u64,
+                    },
+                    trace: {
+                        number: 0u64,
+                        bytes: 0u64,
+                    },
+                    debug: {
+                        number: 1u64,
+                        bytes: 88u64,
+                    },
+                    info: {
+                        number: 0u64,
+                        bytes: 0u64,
+                    },
+                    warn: {
+                        number: 0u64,
+                        bytes: 0u64,
+                    },
+                    error: {
+                        number: 0u64,
+                        bytes: 0u64,
+                    },
+                    fatal: {
+                        number: 0u64,
+                        bytes: 0u64,
+                    },
+                }
+            }
+        );
     }
 
     #[fuchsia::test]

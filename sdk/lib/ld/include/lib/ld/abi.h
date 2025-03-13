@@ -68,6 +68,9 @@ struct Abi {
   // (except for any redundancies).
   Ptr<const Module> loaded_modules;
 
+  // This is the number of elements in the loaded_modules list.
+  Addr loaded_modules_count;
+
   // TLS details for initial-exec modules that have PT_TLS segments.  The entry
   // at index `.tls_mod_id - 1` describes that module's PT_TLS.  A module with
   // `.tls_mod_id == 0` has no PT_TLS segment.  TLS module ID numbers above

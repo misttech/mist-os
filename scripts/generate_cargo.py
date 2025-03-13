@@ -258,6 +258,7 @@ def write_toml_file(
         "rust_library",
         "rust_proc_macro",
         "static_library",
+        "shared_library",
     ]:
         target_type = "[lib]"
     else:

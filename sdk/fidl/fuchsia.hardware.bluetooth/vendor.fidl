@@ -86,3 +86,8 @@ open protocol Vendor {
         channel client_end:Snoop;
     }) error zx.Status;
 };
+
+// Added to allow service connection to replace devfs
+service Service {
+    vendor client_end:Vendor;
+};

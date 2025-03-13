@@ -592,7 +592,6 @@ impl ReplayableIteratorCursor for FileCursor {
 mod test {
     use super::*;
     use crate::test::*;
-    use futures::StreamExt;
     use std::collections::HashMap;
     use {fidl_fuchsia_io as fio, fidl_test_fidlcodec_examples as fctest};
 
@@ -619,24 +618,24 @@ mod test {
 
     #[fuchsia::test]
     async fn req() {
-        Test::test(format!(
-            "open /test | req \\i _ @DeprecatedClone {{ flags: {}, object: $i }}",
-            fio::OpenFlags::DESCRIBE.bits()
-        ))
-        .with_fidl()
-        .with_standard_test_dirs()
-        .check_async(|value| async move {
-            let Value::OutOfLine(PlaygroundValue::InUseHandle(i)) = value else {
-                panic!();
-            };
-            let endpoint = i.take_client(Some("fuchsia.io/Node")).unwrap();
-            let proxy = fidl::endpoints::ClientEnd::<fio::NodeMarker>::from(endpoint).into_proxy();
-            let event = proxy.take_event_stream().next().await.unwrap().unwrap();
-            let fio::NodeEvent::OnOpen_ { s: _, info } = event else { panic!() };
-            let info = *info.unwrap();
-            let fio::NodeInfoDeprecated::Directory(fio::DirectoryObject) = info else { panic!() };
-        })
-        .await
+        Test::test(format!("open /test | req \\i _ @Clone {{ request: $i }}",))
+            .with_fidl()
+            .with_standard_test_dirs()
+            .check_async(|value| async move {
+                let Value::OutOfLine(PlaygroundValue::InUseHandle(i)) = value else {
+                    panic!();
+                };
+                let endpoint = i.take_client(Some("fuchsia.unknown/Cloneable")).unwrap();
+                let proxy =
+                    fidl::endpoints::ClientEnd::<fio::DirectoryMarker>::from(endpoint).into_proxy();
+                let (_, attrs) = proxy
+                    .get_attributes(fio::NodeAttributesQuery::PROTOCOLS)
+                    .await
+                    .unwrap()
+                    .unwrap();
+                assert_eq!(attrs.protocols.unwrap(), fio::NodeProtocolKinds::DIRECTORY);
+            })
+            .await
     }
 
     #[fuchsia::test]

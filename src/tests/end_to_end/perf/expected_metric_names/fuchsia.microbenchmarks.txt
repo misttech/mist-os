@@ -853,6 +853,9 @@ fuchsia.microbenchmarks: Vmo/CreateWriteReadClose/512kbytes.close
 fuchsia.microbenchmarks: Vmo/CreateWriteReadClose/512kbytes.create
 fuchsia.microbenchmarks: Vmo/CreateWriteReadClose/512kbytes.read
 fuchsia.microbenchmarks: Vmo/CreateWriteReadClose/512kbytes.write
+fuchsia.microbenchmarks: Vmo/ManyMappingsReadWriteDecommit/8192.decommit
+fuchsia.microbenchmarks: Vmo/ManyMappingsReadWriteDecommit/8192.read
+fuchsia.microbenchmarks: Vmo/ManyMappingsReadWriteDecommit/8192.write
 fuchsia.microbenchmarks: Vmo/MapClone/128kbytes.clone
 fuchsia.microbenchmarks: Vmo/MapClone/128kbytes.close
 fuchsia.microbenchmarks: Vmo/MapClone/128kbytes.map

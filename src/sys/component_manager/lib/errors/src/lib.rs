@@ -11,6 +11,7 @@ use cm_config::CompatibilityCheckError;
 use cm_rust::UseDecl;
 use cm_types::{Name, Url};
 use component_id_index::InstanceId;
+use fuchsia_fs::directory::WatcherCreateError;
 use moniker::{ChildName, ExtendedMoniker, Moniker, MonikerError};
 use router_error::{Explain, RouterError};
 use sandbox::ConversionError;
@@ -753,8 +754,15 @@ pub enum OpenError {
     },
     #[error("timed out opening capability")]
     Timeout,
+    #[error("invalid path found")]
+    BadPath,
     #[error("capability does not support opening: {0}")]
     DoesNotSupportOpen(ConversionError),
+    #[error("failed to create directory watcher: {err}")]
+    WatcherCreateError {
+        #[from]
+        err: WatcherCreateError,
+    },
 }
 
 impl Explain for OpenError {
@@ -765,7 +773,15 @@ impl Explain for OpenError {
             Self::CapabilityProviderError { err } => err.as_zx_status(),
             Self::CapabilityProviderNotFound => zx::Status::NOT_FOUND,
             Self::Timeout => zx::Status::TIMED_OUT,
+            Self::BadPath => zx::Status::BAD_PATH,
             Self::DoesNotSupportOpen(_) => zx::Status::NOT_SUPPORTED,
+            Self::WatcherCreateError { err: WatcherCreateError::SendWatchRequest(_err) } => {
+                zx::Status::PEER_CLOSED
+            }
+            Self::WatcherCreateError { err: WatcherCreateError::WatchError(status) } => *status,
+            Self::WatcherCreateError { err: WatcherCreateError::ChannelConversion(status) } => {
+                *status
+            }
         }
     }
 }

@@ -3,6 +3,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::bpf::attachments::CgroupEbpfProgramSet;
 use crate::container_namespace::ContainerNamespace;
 #[cfg(not(feature = "starnix_lite"))]
 use crate::device::android::bootloader_message_store::AndroidBootloaderMessageStore;
@@ -16,13 +17,14 @@ use crate::execution::CrashReporter;
 use crate::fs::nmfs::NetworkManagerHandle;
 use crate::fs::proc::SystemLimits;
 use crate::memory_attribution::MemoryAttributionManager;
-use crate::mm::{FutexTable, SharedFutexKey};
+use crate::mm::{FutexTable, MappingSummary, SharedFutexKey};
 use crate::power::SuspendResumeManagerHandle;
 use crate::security;
 use crate::task::{
-    AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, HrTimerManager,
-    HrTimerManagerHandle, IpTables, KernelStats, KernelThreads, NetstackDevices, PidTable,
-    PsiProvider, StopState, Syslog, ThreadGroup, UtsNamespace, UtsNamespaceHandle,
+    AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, Cgroups, CurrentTask,
+    HrTimerManager, HrTimerManagerHandle, IpTables, KernelStats, KernelThreads, NetstackDevices,
+    PidTable, PsiProvider, SchedulerManager, StopState, Syslog, ThreadGroup, UtsNamespace,
+    UtsNamespaceHandle,
 };
 
 #[cfg(not(feature = "starnix_lite"))]
@@ -43,7 +45,6 @@ use fidl::endpoints::{
 };
 use fidl_fuchsia_component_runner::{ComponentControllerControlHandle, ComponentStopInfo};
 use fidl_fuchsia_feedback::CrashReporterProxy;
-use fidl_fuchsia_scheduler::RoleManagerSynchronousProxy;
 use futures::FutureExt;
 use linux_uapi::FSCRYPT_KEY_IDENTIFIER_SIZE;
 use netlink::interfaces::InterfacesHandler;
@@ -61,7 +62,8 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::from_status_like_fdio;
 use starnix_uapi::open_flags::OpenFlags;
 #[cfg(not(feature = "starnix_lite"))]
-use std::collections::BTreeMap;
+use std::borrow::Cow;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU8, Ordering};
 use std::sync::{Arc, OnceLock, Weak};
@@ -101,10 +103,11 @@ pub struct KernelFeatures {
     /// Components can override this by setting the `seclabel` field in their program block.
     pub default_seclabel: Option<String>,
 
-    /// The default fsseclabel that is applied to components that are run in this kernel.
+    /// The default mount options to use when mounting directories from a component's namespace.
     ///
-    /// Components can override this by setting the `fsseclabel` field in their program block.
-    pub default_fsseclabel: Option<String>,
+    /// The key is the path in the component's namespace, and the value is the mount options
+    /// string.
+    pub default_ns_mount_options: Option<HashMap<String, String>>,
 
     /// The default uid that is applied to components that are run in this kernel.
     ///
@@ -166,28 +169,8 @@ pub struct Kernel {
     /// The kernel command line. Shows up in /proc/cmdline.
     pub cmdline: BString,
 
-    // Owned by anon_node.rs
-    pub anon_fs: OnceLock<FileSystemHandle>,
-    // Owned by pipe.rs
-    pub pipe_fs: OnceLock<FileSystemHandle>,
-    // Owned by socket.rs
-    pub socket_fs: OnceLock<FileSystemHandle>,
-    // Owned by devtmpfs.rs
-    pub dev_tmp_fs: OnceLock<FileSystemHandle>,
-    // Owned by devpts.rs
-    pub dev_pts_fs: OnceLock<FileSystemHandle>,
-    // Owned by procfs.rs
-    pub proc_fs: OnceLock<FileSystemHandle>,
-    // Owned by sysfs.rs
-    pub sys_fs: OnceLock<FileSystemHandle>,
-    // Owned by security/selinux_hooks/fs.rs
-    pub selinux_fs: OnceCell<FileSystemHandle>,
-    // Owned by nmfs.rs
-    pub nmfs: OnceLock<FileSystemHandle>,
     // Global state held by the Linux Security Modules subsystem.
     pub security_state: security::KernelState,
-    // Owned by tracefs/fs.rs
-    pub trace_fs: OnceLock<FileSystemHandle>,
 
     /// The registry of device drivers.
     pub device_registry: DeviceRegistry,
@@ -303,8 +286,8 @@ pub struct Kernel {
     // as well as `CurrentTask`).
     pub delayed_releaser: DelayedReleaser,
 
-    /// Proxy to the scheduler role manager for adjusting task priorities.
-    pub role_manager: Option<RoleManagerSynchronousProxy>,
+    /// Manages task priorities.
+    pub scheduler: SchedulerManager,
 
     /// The syslog manager.
     pub syslog: Syslog,
@@ -335,6 +318,14 @@ pub struct Kernel {
 
     /// Control handle to the running container's ComponentController.
     pub container_control_handle: Mutex<Option<ComponentControllerControlHandle>>,
+
+    /// eBPF programs attached to the root cgroup.
+    /// TODO(https://fxbug.dev/388077431) Move this out of `Kernel` once cgroup hierarchy is
+    /// moved to starnix_core.
+    pub root_cgroup_ebpf_programs: CgroupEbpfProgramSet,
+
+    /// Cgroups of the kernel.
+    pub cgroups: Cgroups,
 }
 
 /// An implementation of [`InterfacesHandler`].
@@ -362,7 +353,9 @@ impl InterfacesHandlerImpl {
         if let Some(kernel) = self.0.upgrade() {
             kernel.kthreads.spawner().spawn(move |_, current_task| {
                 let kernel = current_task.kernel();
-                f(current_task, &kernel.netstack_devices, kernel.proc_fs.get(), kernel.sys_fs.get())
+                let procfs = crate::fs::proc::get_proc_fs(&kernel);
+                let sysfs = crate::fs::sysfs::get_sys_fs(&kernel);
+                f(current_task, &kernel.netstack_devices, procfs.as_ref(), sysfs.as_ref())
             });
         }
     }
@@ -389,7 +382,7 @@ impl Kernel {
         cmdline: BString,
         features: KernelFeatures,
         container_namespace: ContainerNamespace,
-        role_manager: Option<RoleManagerSynchronousProxy>,
+        scheduler: SchedulerManager,
         crash_reporter_proxy: Option<CrashReporterProxy>,
         inspect_node: fuchsia_inspect::Node,
         #[cfg(not(feature = "starnix_lite"))] framebuffer_aspect_ratio: Option<&AspectRatio>,
@@ -418,17 +411,7 @@ impl Kernel {
                 vsock_address_maker,
             ),
             cmdline,
-            anon_fs: Default::default(),
-            pipe_fs: Default::default(),
-            dev_tmp_fs: Default::default(),
-            dev_pts_fs: Default::default(),
-            proc_fs: Default::default(),
-            socket_fs: Default::default(),
-            sys_fs: Default::default(),
-            selinux_fs: Default::default(),
-            nmfs: Default::default(),
             security_state,
-            trace_fs: Default::default(),
             device_registry: Default::default(),
             container_namespace,
             remote_block_device_registry: Default::default(),
@@ -463,7 +446,7 @@ impl Kernel {
             stats: Arc::new(KernelStats::default()),
             psi_provider: PsiProvider::default(),
             delayed_releaser: Default::default(),
-            role_manager,
+            scheduler,
             syslog: Default::default(),
             mounts: Mounts::new(),
             hrtimer_manager,
@@ -473,6 +456,8 @@ impl Kernel {
             procfs_device_tree_setup,
             shutting_down: AtomicBool::new(false),
             container_control_handle: Mutex::new(None),
+            root_cgroup_ebpf_programs: Default::default(),
+            cgroups: Cgroups::new(kernel.clone()),
         });
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle
@@ -510,8 +495,9 @@ impl Kernel {
     /// 2. Shut down individual ThreadGroups until only the init and system tasks remain
     /// 3. Repeat the above for the init task
     /// 4. Ensure this process is the only one running in the kernel job.
-    /// 5. Tell CF the container component has stopped
-    /// 6. Exit this process
+    /// 5. Unmounts the kernel's mounts' FileSystems.
+    /// 6. Tell CF the container component has stopped
+    /// 7. Exit this process
     ///
     /// If a ThreadGroup does not shut down on its own (including after SIGKILL), that phase of
     /// shutdown will hang. To gracefully shut down any further we need the other kernel processes
@@ -616,7 +602,10 @@ impl Kernel {
             futures::future::join_all(terminated_signals).await;
         }
 
-        // Step 5: Tell CF the container stopped.
+        // Step 5: Forcibly unmounts the mounts' FileSystems.
+        self.mounts.clear();
+
+        // Step 6: Tell CF the container stopped.
         log_debug!("all non-root processes killed, notifying CF container is stopped");
         if let Some(control_handle) = self.container_control_handle.lock().take() {
             log_debug!("Notifying CF that the container has stopped.");
@@ -632,7 +621,7 @@ impl Kernel {
             log_warn!("Shutdown invoked without a container controller control handle.");
         }
 
-        // Step 6: exiting this process.
+        // Step 7: exiting this process.
         log_info!("All tasks killed, exiting Starnix kernel root process.");
         std::process::exit(0);
     }
@@ -721,25 +710,51 @@ impl Kernel {
         let inspector = fuchsia_inspect::Inspector::default();
 
         let thread_groups = inspector.root();
-        for thread_group in self.pids.read().get_thread_groups() {
-            let tg = thread_group.read();
+        let mut mm_summary = MappingSummary::default();
+        let mut mms_summarized = HashSet::new();
+
+        // Avoid holding locks for the entire iteration.
+        let all_thread_groups = {
+            let pid_table = self.pids.read();
+            pid_table.get_thread_groups().map(TempRef::into_static).collect::<Vec<_>>()
+        };
+        for thread_group in all_thread_groups {
+            // Avoid holding the state lock while summarizing.
+            let (ppid, tasks) = {
+                let tg = thread_group.read();
+                (tg.get_ppid() as i64, tg.tasks().map(TempRef::into_static).collect::<Vec<_>>())
+            };
 
             let tg_node = thread_groups.create_child(format!("{}", thread_group.leader));
             if let Ok(koid) = &thread_group.process.get_koid() {
                 tg_node.record_int("koid", koid.raw_koid() as i64);
             }
             tg_node.record_int("pid", thread_group.leader as i64);
-            tg_node.record_int("ppid", tg.get_ppid() as i64);
+            tg_node.record_int("ppid", ppid);
             tg_node.record_bool("stopped", thread_group.load_stopped() == StopState::GroupStopped);
 
             let tasks_node = tg_node.create_child("tasks");
-            for task in tg.tasks() {
+            for task in tasks {
+                if let Some(mm) = task.mm() {
+                    if mms_summarized.insert(Arc::as_ptr(mm) as usize) {
+                        mm.summarize(&mut mm_summary);
+                    }
+                }
                 let set_properties = |node: &fuchsia_inspect::Node| {
                     node.record_string("command", task.command().to_str().unwrap_or("{err}"));
 
                     let sched_policy = task.read().scheduler_policy;
                     if !sched_policy.is_default() {
-                        node.record_string("sched_policy", format!("{sched_policy:?}"));
+                        node.record_child("sched", |node| {
+                            node.record_string(
+                                "role_name",
+                                self.scheduler
+                                    .role_name(&task)
+                                    .map(|n| Cow::Borrowed(n))
+                                    .unwrap_or_else(|e| Cow::Owned(e.to_string())),
+                            );
+                            node.record_string("policy", format!("{sched_policy:?}"));
+                        });
                     }
                 };
                 if task.id == thread_group.leader {
@@ -753,6 +768,8 @@ impl Kernel {
             tg_node.record(tasks_node);
             thread_groups.record(tg_node);
         }
+
+        thread_groups.record_child("memory_managers", |node| mm_summary.record(node));
 
         inspector
     }

@@ -32,8 +32,8 @@ zx::result<> CheckExists(fidl::UnownedClientEnd<fuchsia_io::Directory> exposed_d
   // TODO(https://fxbug.dev/42174810): Check the epitaph of the call to Mount instead.
   auto [client, server] = fidl::Endpoints<fuchsia_io::Node>::Create();
   auto res = fidl::WireCall(exposed_dir)
-                 ->Open(fuchsia_io::wire::OpenFlags::kNodeReference, {},
-                        fidl::StringView::FromExternal(path), std::move(server));
+                 ->Open(fidl::StringView::FromExternal(path),
+                        fuchsia_io::wire::Flags::kProtocolNode, {}, server.TakeChannel());
   if (!res.ok()) {
     return zx::error(res.error().status());
   }

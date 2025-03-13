@@ -42,12 +42,10 @@ zx::result<fidl::ClientEnd<fuchsia_io::Directory>> OpenServiceRoot(
 //
 //   * `ZX_ERR_INVALID_ARGS`: `path` is too long.
 //   * `ZX_ERR_NOT_FOUND`: A prefix of `path` cannot be found in the namespace.
-// TODO(https://fxbug.dev/324111518): Disallow using this function to open fuchsia.io protocols.
-// Unlike protocol connectors, opening files/directories requires rights to be specified explicitly.
-// Existing callers can use component::OpenDirectory instead.
 template <typename Protocol, typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
 zx::result<> Connect(fidl::ServerEnd<Protocol> server_end,
                      std::string_view path = fidl::DiscoverableProtocolDefaultPath<Protocol>) {
+  internal::EnsureCanConnectToProtocol<Protocol>();
   return internal::ConnectRaw(server_end.TakeChannel(), path);
 }
 
@@ -64,22 +62,15 @@ zx::result<> Connect(fidl::ServerEnd<Protocol> server_end,
 //
 //   * `ZX_ERR_INVALID_ARGS`: `path` is too long.
 //   * `ZX_ERR_NOT_FOUND`: A prefix of `path` cannot be found in the namespace.
-// TODO(https://fxbug.dev/324111518): Disallow using this function to open fuchsia.io protocols.
-// Unlike protocol connectors, opening files/directories requires rights to be specified explicitly.
-// Existing callers can use component::OpenDirectory instead.
 template <typename Protocol, typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
 zx::result<fidl::ClientEnd<Protocol>> Connect(
     std::string_view path = fidl::DiscoverableProtocolDefaultPath<Protocol>) {
-  auto endpoints = fidl::CreateEndpoints<Protocol>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-
-  if (auto result = Connect<Protocol>(std::move(endpoints->server), path); result.is_error()) {
+  internal::EnsureCanConnectToProtocol<Protocol>();
+  auto [client, server] = fidl::Endpoints<Protocol>::Create();
+  if (auto result = Connect<Protocol>(std::move(server), path); result.is_error()) {
     return result.take_error();
   }
-
-  return zx::ok(std::move(endpoints->client));
+  return zx::ok(std::move(client));
 }
 
 // Connects to the FIDL Protocol in the directory `svc_dir`.
@@ -94,13 +85,11 @@ zx::result<fidl::ClientEnd<Protocol>> Connect(
 // # Errors
 //
 //   * `ZX_ERR_INVALID_ARGS`: `name` is too long.
-// TODO(https://fxbug.dev/324111518): Disallow using this function to open fuchsia.io protocols.
-// Unlike protocol connectors, opening files/directories requires rights to be specified explicitly.
-// Existing callers can use component::OpenDirectoryAt instead.
 template <typename Protocol, typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
 zx::result<> ConnectAt(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir,
                        fidl::ServerEnd<Protocol> server_end,
                        std::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
+  internal::EnsureCanConnectToProtocol<Protocol>();
   return internal::ConnectAtRaw(svc_dir, server_end.TakeChannel(), name);
 }
 
@@ -115,24 +104,16 @@ zx::result<> ConnectAt(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir,
 // # Errors
 //
 //   * `ZX_ERR_INVALID_ARGS`: `name` is too long.
-// TODO(https://fxbug.dev/324111518): Disallow using this function to open fuchsia.io protocols.
-// Unlike protocol connectors, opening files/directories requires rights to be specified explicitly.
-// Existing callers can use component::OpenDirectoryAt instead.
 template <typename Protocol, typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
 zx::result<fidl::ClientEnd<Protocol>> ConnectAt(
     fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir,
     std::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
-  auto endpoints = fidl::CreateEndpoints<Protocol>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-
-  if (auto result = ConnectAt<Protocol>(svc_dir, std::move(endpoints->server), name);
-      result.is_error()) {
+  internal::EnsureCanConnectToProtocol<Protocol>();
+  auto [client, server] = fidl::Endpoints<Protocol>::Create();
+  if (auto result = ConnectAt<Protocol>(svc_dir, std::move(server), name); result.is_error()) {
     return result.take_error();
   }
-
-  return zx::ok(std::move(endpoints->client));
+  return zx::ok(std::move(client));
 }
 
 }  // namespace component

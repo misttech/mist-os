@@ -20,7 +20,6 @@ rustc_library("terminal") {
   test_deps = [
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:once_cell",
   ]
 
   sources = [

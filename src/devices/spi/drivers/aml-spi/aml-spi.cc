@@ -914,13 +914,16 @@ void AmlSpiDriver::OnGetSchedulerRoleName(
 
 void AmlSpiDriver::OnCompatServerInitialized(fdf::StartCompleter completer) {
   auto task =
-      fpromise::join_promises(MapMmio(pdev_, 0), GetConfig(), GetInterrupt(), GetBti())
+      fpromise::join_promises(MapMmio(pdev_, 0), GetConfig(), GetInterrupt(), GetBti(),
+                              GetSpiBusMetadata())
           .then([this, completer = std::move(completer)](
-                    fpromise::result<
-                        std::tuple<fpromise::result<fdf::MmioBuffer, zx_status_t>,
-                                   fpromise::result<amlogic_spi::amlspi_config_t, zx_status_t>,
-                                   fpromise::result<zx::interrupt, zx_status_t>,
-                                   fpromise::result<zx::bti, zx_status_t>>>& results) mutable {
+                    fpromise::result<std::tuple<
+                        fpromise::result<fdf::MmioBuffer, zx_status_t>,
+                        fpromise::result<amlogic_spi::amlspi_config_t, zx_status_t>,
+                        fpromise::result<zx::interrupt, zx_status_t>,
+                        fpromise::result<zx::bti, zx_status_t>,
+                        fpromise::result<std::optional<std::vector<uint8_t>>, zx_status_t>>>&
+                        results) mutable {
             if (results.is_error()) {
               FDF_LOG(ERROR, "Failed to get resources");
               return completer(zx::error(ZX_ERR_INTERNAL));
@@ -946,14 +949,42 @@ void AmlSpiDriver::OnCompatServerInitialized(fdf::StartCompleter completer) {
               bti = std::move(std::get<3>(results.value()).value());
             }
 
+            fpromise::result encoded_spi_bus_metadata = std::get<4>(results.value());
+            if (encoded_spi_bus_metadata.is_error()) {
+              return completer(zx::error(encoded_spi_bus_metadata.error()));
+            }
+
             AddNode(std::move(mmio), config, std::move(interrupt), std::move(bti),
-                    std::move(completer));
+                    std::move(encoded_spi_bus_metadata.value()), std::move(completer));
           });
   executor_.schedule_task(std::move(task));
 }
 
 void AmlSpiDriver::AddNode(fdf::MmioBuffer mmio, const amlogic_spi::amlspi_config_t& config,
-                           zx::interrupt interrupt, zx::bti bti, fdf::StartCompleter completer) {
+                           zx::interrupt interrupt, zx::bti bti,
+                           std::optional<std::vector<uint8_t>> encoded_spi_bus_metadata,
+                           fdf::StartCompleter completer) {
+  // Setup SPI bus metadata server.
+  {
+    if (encoded_spi_bus_metadata.has_value()) {
+      auto metadata = fidl::Unpersist<fuchsia_hardware_spi_businfo::SpiBusMetadata>(
+          encoded_spi_bus_metadata.value());
+      if (metadata.is_error()) {
+        FDF_LOG(ERROR, "Failed to unpersist encoded SPI bus metadata: %s",
+                metadata.error_value().status_string());
+        return completer(zx::error(metadata.error_value().status()));
+      }
+      if (zx::result result = metadata_server_.SetMetadata(metadata.value()); result.is_error()) {
+        FDF_LOG(ERROR, "Failed to set metadata for metadata server: %s", result.status_string());
+        return completer(result.take_error());
+      }
+    }
+    if (zx::result result = metadata_server_.Serve(*outgoing(), dispatcher()); result.is_error()) {
+      FDF_LOG(ERROR, "Failed to serve metadata server: %s", result.status_string());
+      return completer(result.take_error());
+    }
+  }
+
   // Stop DMA in case the driver is restarting and didn't shut down cleanly.
   DmaReg::Get().FromValue(0).WriteTo(&mmio);
   ConReg::Get().FromValue(0).WriteTo(&mmio);
@@ -1043,6 +1074,7 @@ void AmlSpiDriver::AddNode(fdf::MmioBuffer mmio, const amlogic_spi::amlspi_confi
   std::vector offers = compat_server_.CreateOffers2(arena);
   offers.push_back(
       fdf::MakeOffer2<fuchsia_hardware_spiimpl::Service>(arena, component::kDefaultInstance));
+  offers.push_back(metadata_server_.MakeOffer(arena));
   const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                         .name(arena, devname)
                         .offers2(arena, std::move(offers))
@@ -1118,6 +1150,34 @@ fpromise::promise<zx::bti, zx_status_t> AmlSpiDriver::GetBti() {
       completer.complete_ok(std::move(result->value()->bti));
     }
   });
+
+  return bridge.consumer.promise_or(fpromise::error(ZX_ERR_INTERNAL));
+}
+
+fpromise::promise<std::optional<std::vector<uint8_t>>, zx_status_t>
+AmlSpiDriver::GetSpiBusMetadata() {
+  fpromise::bridge<std::optional<std::vector<uint8_t>>, zx_status_t> bridge;
+
+  pdev_->GetMetadata(fuchsia_hardware_spi_businfo::SpiBusMetadata::kSerializableName)
+      .Then([completer = std::move(bridge.completer)](auto& result) mutable {
+        if (!result.ok()) {
+          FDF_LOG(ERROR, "Failed to send GetMetadata request: %s", result.status_string());
+          completer.complete_error(result.status());
+          return;
+        }
+
+        if (result->is_error()) {
+          if (result->error_value() == ZX_ERR_NOT_FOUND) {
+            completer.complete_ok(std::nullopt);
+            return;
+          }
+          FDF_LOG(ERROR, "Failed to get metadata: %s", zx_status_get_string(result->error_value()));
+          completer.complete_error(result->error_value());
+        }
+
+        auto& metadata = result->value()->metadata;
+        completer.complete_ok({{metadata.begin(), metadata.end()}});
+      });
 
   return bridge.consumer.promise_or(fpromise::error(ZX_ERR_INTERNAL));
 }

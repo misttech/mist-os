@@ -9,7 +9,7 @@ use fidl::endpoints::ProtocolMarker;
 use fidl_fuchsia_hardware_backlight::{
     DeviceMarker as BacklightMarker, DeviceProxy as BacklightProxy, State as BacklightCommand,
 };
-use fidl_fuchsia_ui_display_internal::{DisplayPowerMarker, DisplayPowerProxy};
+use fidl_fuchsia_ui_display_singleton::{DisplayPowerMarker, DisplayPowerProxy};
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use futures::channel::oneshot;
@@ -583,7 +583,7 @@ mod dual_state_tests {
     use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_hardware_backlight::DeviceRequestStream as BacklightRequestStream;
-    use fidl_fuchsia_ui_display_internal::{DisplayPowerRequest, DisplayPowerRequestStream};
+    use fidl_fuchsia_ui_display_singleton::{DisplayPowerRequest, DisplayPowerRequestStream};
     use fuchsia_async::{self as fasync, Task};
     use futures::prelude::future;
     use futures::{Future, TryStreamExt};
@@ -687,6 +687,9 @@ mod dual_state_tests {
                             self.last_set_display_power_value.lock().await.replace(power_on);
                         }
                         responder.send(result).expect("send SetDisplayPower");
+                    }
+                    DisplayPowerRequest::_UnknownMethod { ordinal, .. } => {
+                        panic!("Unexpected method: {}", ordinal);
                     }
                 };
             }

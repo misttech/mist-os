@@ -58,6 +58,7 @@ group("tests") {
     "power-manager:tests",
     "shutdown-shim:tests",
     "system-activity-governor:tests",
+    "system-activity-governor-controller:tests",
     "testing:tests",
     "thermd:tests",
     "topology-test-daemon:tests",

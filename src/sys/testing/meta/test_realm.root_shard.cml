@@ -7,7 +7,17 @@
     offer: [
         // Needed for storage-tests
         {
-            protocol: [ "fuchsia.storage.partitions.PartitionsManager" ],
+            directory: [ "volumes" ],
+            from: "#bootstrap",
+            to: "#core",
+            availability: "optional",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [
+                "fuchsia.fs.startup.Volumes",
+                "fuchsia.storage.partitions.PartitionsManager",
+            ],
             from: "#bootstrap",
             to: "#core",
             availability: "optional",

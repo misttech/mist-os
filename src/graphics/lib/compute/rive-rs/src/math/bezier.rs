@@ -71,7 +71,7 @@ fn left_different(points: &[math::Vec]) -> [math::Vec; 2] {
         .windows(2)
         .find_map(|window| {
             if let [p0, p1] = *window {
-                (!approx_eq(p0, p1)).then(|| [p0, p1])
+                (!approx_eq(p0, p1)).then_some([p0, p1])
             } else {
                 unreachable!()
             }
@@ -85,7 +85,7 @@ pub fn right_different(points: &[math::Vec]) -> [math::Vec; 2] {
         .rev()
         .find_map(|window| {
             if let [p0, p1] = *window {
-                (!approx_eq(p0, p1)).then(|| [p0, p1])
+                (!approx_eq(p0, p1)).then_some([p0, p1])
             } else {
                 unreachable!()
             }

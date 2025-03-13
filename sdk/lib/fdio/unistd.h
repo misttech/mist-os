@@ -15,21 +15,21 @@ struct fdio;
 namespace fdio_internal {
 
 struct OpenAtOptions {
-  // Do not allow this open to resolve to a directory. If the operation would
-  // open a directory, instead generates a ZX_ERR_NOT_FILE error.
-  bool disallow_directory;
+  // Allow this open request to resolve to a directory. If the operation might open a non-directory,
+  // generates a ZX_ERR_NOT_FILE error.
+  bool allow_directory;
 
   // Permit absolute path as input. If the provided path is absolute, instead
   // generates a ZX_ERR_INVALID_ARGS error.
   bool allow_absolute_path;
 };
 
-zx::result<fbl::RefPtr<fdio>> open_at_impl(int dirfd, const char* path,
-                                           fuchsia_io::wire::OpenFlags flags,
-                                           OpenAtOptions options);
+// Translates deprecated `fuchsia.io/OpenFlags` to an equivalent set of `fuchsia.io/Flags`.
+fuchsia_io::wire::Flags TranslateDeprecatedFlags(fuchsia_io::wire::OpenFlags deprecated_flags);
 
-zx::result<fbl::RefPtr<fdio>> open3_at_impl(int dirfd, const char* path, fuchsia_io::Flags flags,
-                                            OpenAtOptions options);
+// Implements openat logic.
+zx::result<fbl::RefPtr<fdio>> OpenAt(int dirfd, const char* path, fuchsia_io::Flags flags,
+                                     OpenAtOptions options);
 
 }  // namespace fdio_internal
 

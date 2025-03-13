@@ -7,7 +7,7 @@
 #include <fuchsia/media/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 
-#include "src/media/audio/audio_core/shared/device_id.h"
+#include "src/media/audio/audio_core/device_id.h"
 #include "src/media/audio/audio_core/testing/integration/renderer_shim.h"
 #include "src/media/audio/lib/format/audio_buffer.h"
 #include "src/media/audio/lib/wav/wav_writer.h"

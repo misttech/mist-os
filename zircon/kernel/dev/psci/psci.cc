@@ -9,14 +9,13 @@
 #include <string.h>
 #include <trace.h>
 
+#include <arch/arm64.h>
 #include <arch/arm64/smccc.h>
 #include <dev/psci.h>
 #include <pdev/power.h>
+#include <phys/handoff.h>
 
 #define LOCAL_TRACE 0
-
-// Defined in start.S.
-extern paddr_t kernel_entry_paddr;
 
 namespace {
 
@@ -77,7 +76,9 @@ zx_status_t psci_system_off() {
       do_psci_call(PSCI64_SYSTEM_OFF, shutdown_args[0], shutdown_args[1], shutdown_args[2]));
 }
 
-uint32_t psci_get_version() { return static_cast<uint32_t>(do_psci_call(PSCI64_PSCI_VERSION, 0, 0, 0)); }
+uint32_t psci_get_version() {
+  return static_cast<uint32_t>(do_psci_call(PSCI64_PSCI_VERSION, 0, 0, 0));
+}
 
 /* powers down the calling cpu - only returns if call fails */
 zx_status_t psci_cpu_off() {
@@ -224,7 +225,11 @@ int cmd_psci(int argc, const cmd_args* argv, uint32_t flags) {
     if (argc < 3) {
       goto notenoughargs;
     }
-    uint32_t ret = psci_cpu_on(argv[2].u, kernel_entry_paddr, 0);
+
+    uintptr_t secondary_entry_paddr =
+        KernelPhysicalLoadAddress() + (reinterpret_cast<uintptr_t>(&arm64_secondary_start) -
+                                       reinterpret_cast<uintptr_t>(__executable_start));
+    uint32_t ret = psci_cpu_on(argv[2].u, secondary_entry_paddr, 0);
     printf("psci_cpu_on returns %u\n", ret);
   } else if (!strcmp(argv[1].str, "affinity_info")) {
     if (argc < 4) {

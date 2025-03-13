@@ -146,16 +146,15 @@ FormatStackOptions FormatStackOptions::GetFrameOptions(Target* target, bool verb
   return opts;
 }
 
-fxl::RefPtr<AsyncOutputBuffer> FormatStack(Thread* thread, bool force_update,
-                                           const FormatStackOptions& opts) {
+fxl::RefPtr<AsyncOutputBuffer> FormatStack(Thread* thread, const FormatStackOptions& opts) {
   auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
-  if (!force_update && thread->GetStack().has_all_frames()) {
+  if (!opts.sync_options.force_update && thread->GetStack().has_all_frames()) {
     out->Complete(ListCompletedFrames(thread, opts));
     return out;
   }
 
   // Request a stack update.
-  thread->GetStack().SyncFrames(force_update,
+  thread->GetStack().SyncFrames(opts.sync_options,
                                 [thread = thread->GetWeakPtr(), opts, out](const Err& err) {
                                   if (!err.has_error() && thread)
                                     out->Complete(ListCompletedFrames(thread.get(), opts));
@@ -211,7 +210,6 @@ fxl::RefPtr<AsyncOutputBuffer> FormatFrame(const Frame* frame, const FormatFrame
 }
 
 fxl::RefPtr<AsyncOutputBuffer> FormatAllThreadStacks(const std::vector<Thread*>& threads,
-                                                     bool force_update,
                                                      const FormatStackOptions& opts,
                                                      fxl::RefPtr<CommandContext>& cmd_context) {
   struct PackedJoinType {
@@ -222,7 +220,7 @@ fxl::RefPtr<AsyncOutputBuffer> FormatAllThreadStacks(const std::vector<Thread*>&
   auto joiner = fxl::MakeRefCounted<JoinCallbacks<PackedJoinType>>();
 
   for (auto thread : threads) {
-    auto async_out = FormatStack(thread, force_update, opts);
+    auto async_out = FormatStack(thread, opts);
     if (async_out->is_complete()) {
       auto cb = joiner->AddCallback();
       PackedJoinType p{async_out->DestructiveFlatten(), thread};

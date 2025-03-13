@@ -89,9 +89,7 @@ impl Service<Uri> for HyperConnector {
 
 impl HyperConnector {
     async fn call_async(&self, dst: Uri) -> Result<TcpStream, io::Error> {
-        let host = dst.host().ok_or_else(|| {
-            io::Error::new(io::ErrorKind::Other, "destination host is unspecified")
-        })?;
+        let host = dst.host().ok_or_else(|| io::Error::other("destination host is unspecified"))?;
         let port = match dst.port() {
             Some(port) => port.as_u16(),
             None => {
@@ -156,10 +154,7 @@ impl RealServiceConnector {
 impl ProviderConnector for RealServiceConnector {
     fn connect(&self) -> Result<ProviderProxy, io::Error> {
         self.socket_provider_connector.connect().map_err(|err| {
-            io::Error::new(
-                io::ErrorKind::Other,
-                format!("failed to connect to socket provider service: {}", err),
-            )
+            io::Error::other(format!("failed to connect to socket provider service: {}", err))
         })
     }
 }
@@ -167,10 +162,7 @@ impl ProviderConnector for RealServiceConnector {
 impl LookupConnector for RealServiceConnector {
     fn connect(&self) -> Result<LookupProxy, io::Error> {
         self.name_lookup_connector.connect().map_err(|err| {
-            io::Error::new(
-                io::ErrorKind::Other,
-                format!("failed to connect to name lookup service: {}", err),
-            )
+            io::Error::other(format!("failed to connect to name lookup service: {}", err))
         })
     }
 }
@@ -212,25 +204,15 @@ async fn resolve_ip_addr(
             },
         )
         .await
-        .map_err(|err| {
-            io::Error::new(
-                io::ErrorKind::Other,
-                format!("failed to call NameProvider.LookupIp: {}", err),
-            )
-        })?
+        .map_err(|err| io::Error::other(format!("failed to call NameProvider.LookupIp: {}", err)))?
         .map_err(|err| {
             // Match stdlib's behavior, which maps all GAI errors but EAI_SYSTEM
             // to io::ErrorKind::Other.
-            io::Error::new(
-                io::ErrorKind::Other,
-                format!("NameProvider.LookupIp failure: {:?}", err),
-            )
+            io::Error::other(format!("NameProvider.LookupIp failure: {:?}", err))
         })?;
 
     Ok(addresses
-        .ok_or_else(|| {
-            io::Error::new(io::ErrorKind::Other, "addresses not provided in NameProvider response")
-        })?
+        .ok_or_else(|| io::Error::other("addresses not provided in NameProvider response"))?
         .into_iter()
         .map(move |addr| {
             let fidl_fuchsia_net_ext::IpAddress(addr) = addr.into();
@@ -249,16 +231,16 @@ async fn parse_ip_addr_with_provider(
             .interface_name_to_index(zone_id)
             .await
             .map_err(|err| {
-                io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("failed to get interface index from socket provider: {}", err),
-                )
+                io::Error::other(format!(
+                    "failed to get interface index from socket provider: {}",
+                    err
+                ))
             })?
             .map_err(|status| zx::Status::from_raw(status).into_io_error())?;
 
         // SocketAddrV6 only works with 32 bit scope ids.
         u32::try_from(id).map_err(|TryFromIntError { .. }| {
-            io::Error::new(io::ErrorKind::Other, "interface index too large to convert to scope_id")
+            io::Error::other("interface index too large to convert to scope_id")
         })
     })
     .await
@@ -370,7 +352,7 @@ mod test {
 
         impl ProviderConnector for ErrorConnector {
             fn connect(&self) -> Result<ProviderProxy, io::Error> {
-                Err(io::Error::new(io::ErrorKind::Other, "something bad happened"))
+                Err(io::Error::other("something bad happened"))
             }
         }
 

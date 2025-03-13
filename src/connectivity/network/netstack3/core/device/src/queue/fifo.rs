@@ -84,7 +84,7 @@ impl<Meta, Buffer> Queue<Meta, Buffer> {
     pub(crate) fn tx_inserter(&mut self) -> Option<QueueTxInserter<'_, Meta, Buffer>> {
         let Self { items } = self;
         let len = items.len();
-        (len < MAX_TX_QUEUED_LEN).then(|| QueueTxInserter { queue: self, len })
+        (len < MAX_TX_QUEUED_LEN).then_some(QueueTxInserter { queue: self, len })
     }
 
     pub(super) fn len(&self) -> usize {

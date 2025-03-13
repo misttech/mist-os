@@ -734,11 +734,17 @@ impl ManagedRealm {
                         })?;
                 }
                 ManagedRealmRequest::GetDevfs { devfs: server_end, control_handle: _ } => {
-                    let () = devfs.clone().open(
+                    let flags = fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY;
+                    // On errors `server_end` will be closed with an epitaph.
+                    let _ = devfs.clone().open3(
                         vfs::execution_scope::ExecutionScope::new(),
-                        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                         vfs::path::Path::dot(),
-                        server_end.into_channel().into(),
+                        flags,
+                        &mut vfs::ObjectRequest::new(
+                            flags,
+                            &Default::default(),
+                            server_end.into_channel(),
+                        ),
                     );
                 }
                 ManagedRealmRequest::AddDevice { path, device, responder } => {
@@ -922,16 +928,15 @@ impl ManagedRealm {
                     directory,
                     control_handle: _,
                 } => {
-                    let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY;
-
+                    let flags = fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY;
                     realm
                         .root
                         .get_exposed_dir()
                         .open(
-                            flags,
-                            fio::ModeType::empty(),
                             &format!("{child_name}-diagnostics"),
-                            ServerEnd::new(directory.into_channel()),
+                            flags,
+                            &Default::default(),
+                            directory.into_channel(),
                         )
                         .context(format!("opening diagnostics dir for {child_name}"))?;
                 }
@@ -1573,12 +1578,12 @@ mod tests {
     ) {
         let TestRealm { realm } = realm;
         let realm_moniker = realm.get_moniker().await.expect("failed to get moniker");
-        let data = diagnostics_reader::ArchiveReader::new()
+        let data = diagnostics_reader::ArchiveReader::inspect()
             .add_selector(diagnostics_reader::ComponentSelector::new(vec![
                 selectors::sanitize_string_for_selectors(&realm_moniker).into_owned(),
                 component_moniker.into(),
             ]))
-            .snapshot::<diagnostics_reader::Inspect>()
+            .snapshot()
             .await
             .expect("failed to get inspect data")
             .into_iter()
@@ -2687,10 +2692,10 @@ mod tests {
         let (network, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let () = devfs
             .open(
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-                fio::ModeType::empty(),
                 &ethernet_path,
-                server_end.into_channel().into(),
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                &Default::default(),
+                server_end.into_channel(),
             )
             .expect("calling open");
         let mut watcher = fvfs_watcher::Watcher::new(&network).await.expect("watcher creation");

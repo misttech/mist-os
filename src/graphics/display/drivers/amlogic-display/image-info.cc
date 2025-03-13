@@ -10,14 +10,13 @@
 namespace amlogic_display {
 
 ImageInfo::~ImageInfo() {
-  FDF_LOG(INFO, "Destroying image on canvas %d", canvas_idx);
+  fdf::info("Destroying image on canvas {}", canvas_idx);
   if (canvas.has_value()) {
     fidl::WireResult result = fidl::WireCall(canvas.value())->Free(canvas_idx);
     if (!result.ok()) {
-      FDF_LOG(WARNING, "Failed to call Canvas Free: %s",
-              result.error().FormatDescription().c_str());
+      fdf::warn("Failed to call Canvas Free: {}", result.error().FormatDescription());
     } else if (result->is_error()) {
-      FDF_LOG(WARNING, "Canvas Free failed: %s", zx_status_get_string(result->error_value()));
+      fdf::warn("Canvas Free failed: {}", zx::make_result(result->error_value()));
     }
   }
   if (pmt) {

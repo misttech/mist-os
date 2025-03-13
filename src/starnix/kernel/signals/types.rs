@@ -2,20 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::task::{
-    IntervalTimerHandle, ThreadGroupReadGuard, WaitCanceler, WaitQueue, Waiter, WaiterRef,
-};
+use crate::mm::MemoryAccessor;
+use crate::task::{IntervalTimerHandle, ThreadGroupReadGuard, WaitQueue, Waiter, WaiterRef};
 use starnix_sync::{InterruptibleEvent, RwLock};
+use starnix_types::arch::ArchWidth;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS};
 use starnix_uapi::union::struct_with_union_into_bytes;
-use starnix_uapi::user_address::UserAddress;
+use starnix_uapi::user_address::{ArchSpecific, MultiArchUserRef, UserAddress};
 use starnix_uapi::{
-    __sifields__bindgen_ty_1, __sifields__bindgen_ty_2, __sifields__bindgen_ty_4,
-    __sifields__bindgen_ty_7, c_int, c_uint, error, pid_t, sigaction_t, sigaltstack, sigevent,
-    siginfo_t, sigval_t, uapi, uid_t, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGEV_THREAD_ID,
-    SIG_DFL, SIG_IGN, SI_KERNEL, SI_MAX_SIZE,
+    c_int, c_uint, errno, error, pid_t, sigaction_t, sigaltstack, sigevent, sigval_t, uaddr, uapi,
+    uid_t, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGEV_THREAD_ID, SIG_DFL, SIG_IGN, SI_KERNEL,
+    SI_MAX_SIZE,
 };
+use static_assertions::const_assert;
 use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -23,21 +23,19 @@ use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 /// Internal signal that cannot be masked, blocked or ignored.
 pub enum KernelSignal {
-    Freeze(Waiter, WaitCanceler),
+    Freeze(Waiter),
 }
 
 /// Signal info wrapper around user and internal signals.
 pub enum KernelSignalInfo {
     User(SignalInfo),
-    Freeze(Waiter, WaitCanceler),
+    Freeze(Waiter),
 }
 
 impl From<KernelSignal> for KernelSignalInfo {
     fn from(value: KernelSignal) -> Self {
         match value {
-            KernelSignal::Freeze(waiter, wait_canceler) => {
-                KernelSignalInfo::Freeze(waiter, wait_canceler)
-            }
+            KernelSignal::Freeze(waiter) => KernelSignalInfo::Freeze(waiter),
         }
     }
 }
@@ -103,6 +101,12 @@ pub enum RunState {
 
     /// This thread is blocked in an `InterruptibleEvent`.
     Event(Arc<InterruptibleEvent>),
+
+    /// This thread is frozen by a `Waiter`.
+    ///
+    /// When waiting on the `Waiter`, it should have a loop to prevent any signals except
+    /// notification.
+    Frozen(Waiter),
 }
 
 impl Default for RunState {
@@ -119,7 +123,7 @@ impl RunState {
         match self {
             RunState::Running => false,
             RunState::Waiter(waiter) => waiter.is_valid(),
-            RunState::Event(_) => true,
+            RunState::Event(_) | RunState::Frozen(_) => true,
         }
     }
 
@@ -129,6 +133,8 @@ impl RunState {
             RunState::Running => (),
             RunState::Waiter(waiter) => waiter.interrupt(),
             RunState::Event(event) => event.interrupt(),
+            // When frozen, the task immunes to any interrupts.
+            RunState::Frozen(_) => (),
         }
     }
 }
@@ -139,6 +145,7 @@ impl PartialEq<RunState> for RunState {
             (RunState::Running, RunState::Running) => true,
             (RunState::Waiter(lhs), RunState::Waiter(rhs)) => lhs == rhs,
             (RunState::Event(lhs), RunState::Event(rhs)) => Arc::ptr_eq(lhs, rhs),
+            (RunState::Frozen(lhs), RunState::Frozen(rhs)) => lhs == rhs,
             _ => false,
         }
     }
@@ -370,6 +377,13 @@ impl SignalState {
     }
 }
 
+// Starnix code reuse the same object and parsing method for 32 and 64 signal information. Ensure
+// this is correct
+static_assertions::const_assert_eq!(
+    std::mem::size_of::<uapi::siginfo>(),
+    std::mem::size_of::<uapi::arch32::siginfo>()
+);
+
 #[derive(Clone, Debug, Default, Eq, PartialEq, IntoBytes, KnownLayout, FromBytes, Immutable)]
 #[repr(C)]
 pub struct SignalInfoHeader {
@@ -390,21 +404,10 @@ pub struct SignalInfo {
     pub force: bool,
 }
 
-impl SignalInfo {
-    pub fn default(signal: Signal) -> Self {
-        Self::new(signal, SI_KERNEL as i32, SignalDetail::default())
-    }
-
-    pub fn new(signal: Signal, code: i32, detail: SignalDetail) -> Self {
-        Self { signal, errno: 0, code, detail, force: false }
-    }
-
-    // TODO(tbodt): Add a bound requiring siginfo_t to be FromBytes. This will help ensure the
-    // Linux side won't get an invalid siginfo_t.
-    pub fn as_siginfo_bytes(&self) -> [u8; std::mem::size_of::<siginfo_t>()] {
-        macro_rules! make_siginfo {
+macro_rules! make_siginfo {
             ($self:ident $(, $( $sifield:ident ).*, $value:expr)?) => {
-                struct_with_union_into_bytes!(siginfo_t {
+                {
+                struct_with_union_into_bytes!(uapi_path::siginfo_t {
                     __bindgen_anon_1.__bindgen_anon_1.si_signo: $self.signal.number() as i32,
                     __bindgen_anon_1.__bindgen_anon_1.si_errno: $self.errno,
                     __bindgen_anon_1.__bindgen_anon_1.si_code: $self.code,
@@ -412,18 +415,26 @@ impl SignalInfo {
                         __bindgen_anon_1.__bindgen_anon_1._sifields.$( $sifield ).*: $value,
                     )?
                 })
+                }
             };
         }
 
-        match self.detail {
-            SignalDetail::None => make_siginfo!(self),
+macro_rules! signal_info_as_siginfo_bytes {
+    ($ns:path, $self:ident) => {{
+        use $ns as uapi_path;
+        match $self.detail {
+            SignalDetail::None => make_siginfo!($self),
             SignalDetail::Kill { pid, uid } => {
-                make_siginfo!(self, _kill, __sifields__bindgen_ty_1 { _pid: pid, _uid: uid })
+                make_siginfo!(
+                    $self,
+                    _kill,
+                    uapi_path::__sifields__bindgen_ty_1 { _pid: pid, _uid: uid }
+                )
             }
             SignalDetail::SIGCHLD { pid, uid, status } => make_siginfo!(
-                self,
+                $self,
                 _sigchld,
-                __sifields__bindgen_ty_4 {
+                uapi_path::__sifields__bindgen_ty_4 {
                     _pid: pid,
                     _uid: uid,
                     _status: status,
@@ -431,28 +442,35 @@ impl SignalInfo {
                 }
             ),
             SignalDetail::SigFault { addr } => {
-                make_siginfo!(self, _sigfault._addr, linux_uapi::uaddr { addr })
+                make_siginfo!(
+                    $self,
+                    _sigfault._addr,
+                    uapi::uaddr { addr }.try_into().map_err(|_| errno!(EINVAL))?
+                )
             }
             SignalDetail::SIGSYS { call_addr, syscall, arch } => make_siginfo!(
-                self,
+                $self,
                 _sigsys,
-                __sifields__bindgen_ty_7 {
-                    _call_addr: call_addr.into(),
+                uapi_path::__sifields__bindgen_ty_7 {
+                    _call_addr: uaddr::from(call_addr).try_into().map_err(|_| errno!(EINVAL))?,
                     _syscall: syscall as c_int,
                     _arch: arch as c_uint,
                 }
             ),
             SignalDetail::Timer { ref timer } => {
-                let sigval: uapi::sigval = if timer.signal_event.notify == SignalEventNotify::None {
-                    Default::default()
-                } else {
-                    timer.signal_event.value.into()
-                };
+                let sigval: uapi_path::sigval =
+                    if timer.signal_event.notify == SignalEventNotify::None {
+                        Default::default()
+                    } else {
+                        uapi::sigval::from(timer.signal_event.value)
+                            .try_into()
+                            .map_err(|_| errno!(EINVAL))?
+                    };
 
                 make_siginfo!(
-                    self,
+                    $self,
                     _timer,
-                    __sifields__bindgen_ty_2 {
+                    uapi_path::__sifields__bindgen_ty_2 {
                         _tid: timer.timer_id,
                         _overrun: timer.overrun_cur(),
                         _sigval: sigval,
@@ -462,9 +480,9 @@ impl SignalInfo {
             }
             SignalDetail::Raw { data } => {
                 let header = SignalInfoHeader {
-                    signo: self.signal.number(),
-                    errno: self.errno,
-                    code: self.code,
+                    signo: $self.signal.number(),
+                    errno: $self.errno,
+                    code: $self.code,
                     _pad: 0,
                 };
                 let mut array: [u8; SI_MAX_SIZE as usize] = [0; SI_MAX_SIZE as usize];
@@ -473,6 +491,59 @@ impl SignalInfo {
                 array
             }
         }
+    }};
+}
+
+impl SignalInfo {
+    pub fn default(signal: Signal) -> Self {
+        Self::new(signal, SI_KERNEL as i32, SignalDetail::default())
+    }
+
+    pub fn new(signal: Signal, code: i32, detail: SignalDetail) -> Self {
+        Self { signal, errno: 0, code, detail, force: false }
+    }
+
+    pub fn write<MA: MemoryAccessor>(
+        &self,
+        ma: &MA,
+        addr: MultiArchUserRef<uapi::siginfo_t, uapi::arch32::siginfo_t>,
+    ) -> Result<(), Errno> {
+        if addr.is_arch32() {
+            ma.write_memory(addr.addr(), &self.as_siginfo32_bytes()?)?;
+        } else {
+            ma.write_memory(addr.addr(), &self.as_siginfo64_bytes()?)?;
+        }
+        Ok(())
+    }
+
+    pub fn as_siginfo_bytes(
+        &self,
+        arch_width: ArchWidth,
+    ) -> Result<[u8; std::mem::size_of::<uapi::siginfo_t>()], Errno> {
+        const_assert!(
+            std::mem::size_of::<uapi::siginfo_t>()
+                >= std::mem::size_of::<uapi::arch32::siginfo_t>()
+        );
+        if arch_width.is_arch32() {
+            let mut result = [0_u8; std::mem::size_of::<uapi::siginfo_t>()];
+            result[..std::mem::size_of::<uapi::arch32::siginfo_t>()]
+                .copy_from_slice(&self.as_siginfo32_bytes()?);
+            Ok(result)
+        } else {
+            self.as_siginfo64_bytes()
+        }
+    }
+
+    // TODO(tbodt): Add a bound requiring siginfo_t to be FromBytes. This will help ensure the
+    // Linux side won't get an invalid siginfo_t.
+    fn as_siginfo64_bytes(&self) -> Result<[u8; std::mem::size_of::<uapi::siginfo_t>()], Errno> {
+        Ok(signal_info_as_siginfo_bytes!(uapi, self))
+    }
+
+    fn as_siginfo32_bytes(
+        &self,
+    ) -> Result<[u8; std::mem::size_of::<uapi::arch32::siginfo_t>()], Errno> {
+        Ok(signal_info_as_siginfo_bytes!(uapi::arch32, self))
     }
 }
 
@@ -644,14 +715,15 @@ mod test {
     fn test_siginfo_bytes() {
         let mut sigchld_bytes =
             vec![17, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 123, 0, 0, 0, 200, 1, 0, 0, 2];
-        sigchld_bytes.resize(std::mem::size_of::<siginfo_t>(), 0);
+        sigchld_bytes.resize(std::mem::size_of::<uapi::siginfo_t>(), 0);
         assert_eq!(
             &SignalInfo::new(
                 SIGCHLD,
                 CLD_EXITED as i32,
                 SignalDetail::SIGCHLD { pid: 123, uid: 456, status: 2 }
             )
-            .as_siginfo_bytes(),
+            .as_siginfo64_bytes()
+            .expect("as_siginfo_bytes"),
             sigchld_bytes.as_slice()
         );
     }

@@ -91,6 +91,20 @@ fuchsia.microbenchmarks: TicksGet              no_sig_diff       0.981-1.022    
 ...
 ```
 
+## Interpreting the results
+
+*   `no_sig_diff` means that no [statistically
+    significant](https://en.wikipedia.org/wiki/Statistical_significance)
+    difference was found in the metric.  It does not mean that there
+    was no difference, just that any difference was too small
+    (relative to the amount of variation in the metric) to be
+    detected.
+
+*   `ci_too_wide` is shown in the "Factor change" column if the
+    confidence intervals in "Mean before" and "Mean after" are so wide
+    that the lower bound went negative.  This will happen for a metric
+    if it has a large amount of variation.
+
 ## Testing CL stacks versus individual CLs
 
 The perfcompare builder measures the performance impact of individual

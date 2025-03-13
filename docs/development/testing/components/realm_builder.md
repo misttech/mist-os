@@ -179,21 +179,7 @@ First, you must implement your mock component.
 
 * {Rust}
 
-    In Rust, a mock component is implemented via function that has the following
-    signature:
-
-    ```rust
-    {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="src/lib/fuchsia-component-test/src/mock.rs" region_tag="mock_interface_rust" adjust_indentation="auto" fail_with="Missing code example" %}
-    ```
-
-    `MockHandles` is a struct containing handles to the component's incoming
-    and outgoing capabilities:
-
-    ```rust
-    {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="src/lib/fuchsia-component-test/src/mock.rs" region_tag="mock_handles_rust" adjust_indentation="auto" fail_with="Missing code example" %}
-    ```
-
-    An implementation for a mock component would look like:
+    In Rust, an implementation for a mock component can look like:
 
     ```rust
     {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/realm_builder/rust/src/lib.rs" region_tag="mock_component_impl_rust" adjust_indentation="auto" %}

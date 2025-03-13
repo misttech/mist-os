@@ -64,3 +64,8 @@ closed protocol Device {
         scale float64;
     }) error zx.Status;
 };
+
+// Added to allow service connection to replace devfs
+service Service {
+    backlight client_end:Device;
+};

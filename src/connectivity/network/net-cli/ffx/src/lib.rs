@@ -2,14 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fho::{user_error, FfxMain, FfxTool, MachineWriter};
+use ffx_writer::MachineWriter;
+use fho::{user_error, FfxMain, FfxTool};
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker};
 use std::ops::Deref as _;
 use target_holders::RemoteControlProxyHolder;
 use {
-    fidl_fuchsia_developer_remotecontrol as fremotecontrol, fidl_fuchsia_io as fio,
-    fidl_fuchsia_net_debug as fdebug, fidl_fuchsia_net_dhcp as fdhcp,
-    fidl_fuchsia_net_filter as ffilter, fidl_fuchsia_net_filter_deprecated as ffilter_deprecated,
+    fidl_fuchsia_developer_remotecontrol as fremotecontrol, fidl_fuchsia_net_debug as fdebug,
+    fidl_fuchsia_net_dhcp as fdhcp, fidl_fuchsia_net_filter as ffilter,
+    fidl_fuchsia_net_filter_deprecated as ffilter_deprecated,
     fidl_fuchsia_net_interfaces as finterfaces,
     fidl_fuchsia_net_interfaces_admin as finterfaces_admin, fidl_fuchsia_net_name as fname,
     fidl_fuchsia_net_neighbor as fneighbor, fidl_fuchsia_net_root as froot,
@@ -43,12 +44,11 @@ impl FfxConnector<'_> {
         }
         let (proxy, server_end) = fidl::endpoints::create_proxy::<S>();
         remote_control
-            .deprecated_open_capability(
+            .connect_capability(
                 &moniker,
                 fsys::OpenDirType::ExposedDir,
                 S::PROTOCOL_NAME,
                 server_end.into_channel(),
-                fio::OpenFlags::empty(),
             )
             .await?
             .map_err(|e| {
@@ -233,7 +233,7 @@ impl NetTool {
     async fn net(&self, writer: <Self as fho::FfxMain>::Writer) -> fho::Result<()> {
         let realm = self.cmd.realm.as_deref().unwrap_or(NETWORK_REALM);
         let res = net_cli::do_root(
-            writer,
+            writer.into(),
             net_cli::Command { cmd: self.cmd.cmd.clone() },
             &FfxConnector { remote_control: self.remote_control.deref().clone(), realm },
         )

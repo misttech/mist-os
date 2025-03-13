@@ -35,6 +35,7 @@ sha1_visibility = [
   # use this if it's implementing legacy protocols that require SHA-1; it should
   # never be used for new cryptographic development.
 
+  "//src/tee/runtime/api_impl:*",
   "//src/connectivity/wlan/lib/rsn:*",
 ]
 
@@ -56,7 +57,7 @@ lazy_static_visibility = [
   # standard library APIs.
   #
   # To regenerate, run:
-  # (cd $FUCHSIA_DIR && git grep  --files-with-matches '//third_party/rust_crates:lazy_static' -- '*BUILD.gn' | sed 's|\(.*\)/BUILD.gn|"\1:*",|')
+  # (cd $FUCHSIA_DIR && git grep  --files-with-matches '//third_party/rust_crates:lazy_static' -- '*BUILD.gn' | sed 's|\(.*\)/BUILD.gn|"//\1:*",|')
   "//examples/components/storage:*",
   "//examples/fidl/new/key_value_store/add_iterator/rust/server:*",
   "//examples/fidl/new/key_value_store/add_read_item/rust/server:*",
@@ -114,7 +115,6 @@ lazy_static_visibility = [
   "//src/lib/assembly/platform_configuration:*",
   "//src/lib/async-utils:*",
   "//src/lib/fuchsia-async:*",
-  "//src/lib/fuchsia-component-test/realm_builder_server:*",
   "//src/lib/fuchsia-url:*",
   "//src/lib/icu_data/rust/icu_data:*",
   "//src/lib/intl/strings:*",
@@ -131,7 +131,6 @@ lazy_static_visibility = [
   "//src/recovery/lib/recovery-ui:*",
   "//src/recovery/lib/recovery-util:*",
   "//src/session/bin/element_manager:*",
-  "//src/session/bin/session_manager:*",
   "//src/session/lib/realm_management:*",
   "//src/storage/fxfs/platform:*",
   "//src/storage/lib/block_client/rust:*",
@@ -140,7 +139,6 @@ lazy_static_visibility = [
   "//src/sys/component_manager/lib/diagnostics:*",
   "//src/sys/component_manager/lib/sandbox:*",
   "//src/sys/lib/cm_fidl_validator:*",
-  "//src/sys/lib/cm_fidl_validator/tests:*",
   "//src/sys/lib/cm_rust:*",
   "//src/sys/lib/cm_types:*",
   "//src/sys/lib/component-events:*",
@@ -164,7 +162,6 @@ lazy_static_visibility = [
   "//src/sys/time/time_test_client:*",
   "//src/sys/time/timekeeper:*",
   "//src/testing/fidl/intl_property_manager:*",
-  "//src/testing/pkgstats:*",
   "//src/testing/sl4f:*",
   "//src/ui/bin/brightness_manager:*",
   "//src/ui/lib/input_pipeline:*",
@@ -179,7 +176,6 @@ lazy_static_visibility = [
 
   # At this time we are not enforcing restrictions on the below.
   "//third_party/*",
-  "//vendor/*",
 ]
 
 once_cell_visibility = [
@@ -203,45 +199,29 @@ once_cell_visibility = [
   # (cd $FUCHSIA_DIR && git grep  --files-with-matches '//third_party/rust_crates:once_cell' -- '*BUILD.gn' | sed 's|\(.*\)/BUILD.gn|"//\1:*",|')
   "//src/connectivity/network/netstack3:*",
   "//src/connectivity/network/netstack3/core/filter:*",
-  "//src/developer/ffx/testing:*",
   "//src/fonts:*",
   "//src/graphics/lib/compute/rive-rs:*",
-  "//src/lib/analytics/rust:*",
-  "//src/lib/assembly/config_schema:*",
   "//src/lib/async-utils:*",
-  "//src/lib/flyweights:*",
   "//src/lib/ui/carnelian:*",
-  "//src/lib/ui/terminal:*",
-  "//src/recovery/lib/recovery-ui:*",
-  "//src/security/lib/scrutiny/collector:*",
-  "//src/security/lib/scrutiny/testing:*",
-  "//src/security/lib/scrutiny/utils:*",
   "//src/starnix/kernel:*",
-  "//src/starnix/modules/*:*",
-  "//src/starnix/lib/extended_pstate:*",
-  "//src/starnix/lib/selinux/core:*",
-  "//src/starnix/lib/starnix-uapi:*",
-  "//src/starnix/lib/starnix-sync:*",
+  "//src/starnix/modules/ashmem:*",
+  "//src/starnix/modules/ext4:*",
+  "//src/starnix/modules/overlayfs:*",
   "//src/starnix_lite/kernel:*",
   "//src/starnix_lite/lib/extended_pstate:*",
   "//src/starnix_lite/lib/selinux/core:*",
   "//src/starnix_lite/lib/starnix-uapi:*",
   "//src/storage/ext4/read-only:*",
   "//src/storage/fxfs:*",
-  "//src/storage/fxfs/platform:*",
   "//src/storage/fxfs/tools:*",
   "//src/storage/stress-tests/genericfs:*",
   "//src/sys/lib/elf_runner:*",
   "//src/testing/sl4f:*",
   "//src/ui/testing/puppet:*",
-  "//src/virtualization/bin/vmm/device/virtio_sound:*",
-  "//tools/auto_owners:*",
   "//tools/shush:*",
-  "//tools/update_crates/tests:*",
 
   # At this time we are not enforcing restrictions on the below.
   "//third_party/*",
-  "//vendor/*",
 ]
 
 tracing_visibility = [
@@ -308,4 +288,36 @@ tracing_subscriber_visibility = [
 
   # At this time we are not enforcing restrictions on the below.
   "//third_party/*",
+]
+
+zeroize_visibility = [
+  #  ________  _________  ________  ________
+  # |\   ____\|\___   ___\\   __  \|\   __  \
+  # \ \  \___|\|___ \  \_\ \  \|\  \ \  \|\  \
+  #  \ \_____  \   \ \  \ \ \  \\\  \ \   ____\
+  #   \|____|\  \   \ \  \ \ \  \\\  \ \  \___|
+  #     ____\_\  \   \ \__\ \ \_______\ \__\
+  #    |\_________\   \|__|  \|_______|\|__|
+  #    \|_________|
+  #
+  # This is an allowlist of targets that use the `zeroize` Rust crate.
+  #
+  # At this time only Android KeyMint is allowed to use it.
+  "//third_party/android/platform/system/keymint:*",
+]
+
+openssl_visibility = [
+  #  ________  _________  ________  ________
+  # |\   ____\|\___   ___\\   __  \|\   __  \
+  # \ \  \___|\|___ \  \_\ \  \|\  \ \  \|\  \
+  #  \ \_____  \   \ \  \ \ \  \\\  \ \   ____\
+  #   \|____|\  \   \ \  \ \ \  \\\  \ \  \___|
+  #     ____\_\  \   \ \__\ \ \_______\ \__\
+  #    |\_________\   \|__|  \|_______|\|__|
+  #    \|_________|
+  #
+  # This is an allowlist of targets that use the `openssl` Rust crate.
+  #
+  # At this time only Android KeyMint is allowed to use it.
+  "//third_party/android/platform/system/keymint:*",
 ]

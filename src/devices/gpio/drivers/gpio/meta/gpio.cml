@@ -20,9 +20,6 @@
         { service: "fuchsia.hardware.pin.Service" },
     ],
     use: [
-        {
-            protocol: [ "fuchsia.scheduler.RoleManager" ],
-        },
         { service: 'fuchsia.hardware.pinimpl.Service' },
     ],
     expose: [

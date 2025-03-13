@@ -29,7 +29,7 @@ impl Mock {
     /// Panics on error or assertion violation (unexpected requests or a mismatched open call)
     pub async fn expect_open_blob(&mut self, merkle: Hash) -> Blob {
         match self.stream.next().await {
-            Some(Ok(fio::DirectoryRequest::Open {
+            Some(Ok(fio::DirectoryRequest::DeprecatedOpen {
                 flags,
                 mode: _,
                 path,
@@ -42,7 +42,7 @@ impl Mock {
                 let stream = object.into_stream().cast_stream();
                 Blob { stream }
             }
-            Some(Ok(fio::DirectoryRequest::Open3 {
+            Some(Ok(fio::DirectoryRequest::Open {
                 path,
                 flags,
                 options: _,
@@ -70,7 +70,7 @@ impl Mock {
     /// Panics on error or assertion violation (unexpected requests or a mismatched open call)
     pub async fn expect_create_blob(&mut self, merkle: Hash) -> Blob {
         match self.stream.next().await {
-            Some(Ok(fio::DirectoryRequest::Open {
+            Some(Ok(fio::DirectoryRequest::DeprecatedOpen {
                 flags,
                 mode: _,
                 path,
@@ -83,7 +83,7 @@ impl Mock {
                 let stream = object.into_stream().cast_stream();
                 Blob { stream }
             }
-            Some(Ok(fio::DirectoryRequest::Open3 {
+            Some(Ok(fio::DirectoryRequest::Open {
                 path,
                 flags,
                 options: _,
@@ -187,7 +187,7 @@ impl Mock {
 
         while !(readable.is_empty() && missing.is_empty()) {
             match self.stream.next().await {
-                Some(Ok(fio::DirectoryRequest::Open {
+                Some(Ok(fio::DirectoryRequest::DeprecatedOpen {
                     flags,
                     mode: _,
                     path,
@@ -208,7 +208,7 @@ impl Mock {
                         panic!("Unexpected blob existance check for {path}");
                     }
                 }
-                Some(Ok(fio::DirectoryRequest::Open3 {
+                Some(Ok(fio::DirectoryRequest::Open {
                     path,
                     flags,
                     options: _,

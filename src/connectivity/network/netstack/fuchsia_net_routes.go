@@ -46,7 +46,10 @@ type getWatcherImpl struct {
 	interruptChan chan<- routeInterrupt
 }
 
-func (r *resolveImpl) Resolve(ctx fidl.Context, destination net.IpAddress) (fnetRoutes.StateResolveResult, error) {
+func (r *resolveImpl) resolveInner(ctx fidl.Context, destination net.IpAddress, options fnetRoutes.ResolveOptions) (fnetRoutes.ResolveResult, tcpip.Error) {
+	if options.HasMarks() {
+		syslog.WarnTf(routesFidlName, "Resolve2 received non-empty options, will ignore")
+	}
 	const unspecifiedNIC = tcpip.NICID(0)
 	var unspecifiedLocalAddress tcpip.Address
 
@@ -72,11 +75,11 @@ func (r *resolveImpl) Resolve(ctx fidl.Context, destination net.IpAddress) (fnet
 	route, err := r.stack.FindRoute(unspecifiedNIC, unspecifiedLocalAddress, remote, proto, false /* multicastLoop */)
 	if err != nil {
 		logFn("", err)
-		return fnetRoutes.StateResolveResultWithErr(int32(WrapTcpIpError(err).ToZxStatus())), nil
+		return fnetRoutes.ResolveResult{}, err
 	}
 	defer route.Release()
 
-	return func() fnetRoutes.StateResolveResult {
+	return func() (fnetRoutes.ResolveResult, tcpip.Error) {
 		ch := make(chan stack.ResolvedFieldsResult, 1)
 		err := route.ResolvedFields(func(result stack.ResolvedFieldsResult) {
 			ch <- result
@@ -99,29 +102,61 @@ func (r *resolveImpl) Resolve(ctx fidl.Context, destination net.IpAddress) (fnet
 					}
 					node.SetInterfaceId(uint64(nicID))
 
-					var response fnetRoutes.StateResolveResponse
+					var result fnetRoutes.ResolveResult
 					if route.NextHop.Len() != 0 {
 						node.SetAddress(fidlconv.ToNetIpAddress(route.NextHop))
-						response.Result.SetGateway(node)
+						result.SetGateway(node)
 					} else {
 						node.SetAddress(fidlconv.ToNetIpAddress(route.RemoteAddress))
-						response.Result.SetDirect(node)
+						result.SetDirect(node)
 					}
-					return fnetRoutes.StateResolveResultWithResponse(response)
+					return result, nil
 				}
 				err = result.Err
 			case <-ctx.Done():
 				switch ctx.Err() {
 				case context.Canceled:
-					return fnetRoutes.StateResolveResultWithErr(int32(zx.ErrCanceled))
+					return fnetRoutes.ResolveResult{}, &tcpip.ErrAborted{}
 				case context.DeadlineExceeded:
-					return fnetRoutes.StateResolveResultWithErr(int32(zx.ErrTimedOut))
+					return fnetRoutes.ResolveResult{}, &tcpip.ErrTimeout{}
 				}
 			}
 		}
 		logFn(".ResolvedFields(...)", err)
-		return fnetRoutes.StateResolveResultWithErr(int32(zx.ErrAddressUnreachable))
-	}(), nil
+		return fnetRoutes.ResolveResult{}, &tcpip.ErrNetworkUnreachable{}
+	}()
+}
+
+func (r *resolveImpl) Resolve2(ctx fidl.Context, destination net.IpAddress, options fnetRoutes.ResolveOptions) (fnetRoutes.StateResolve2Result, error) {
+	result, err := r.resolveInner(ctx, destination, options)
+	if err != nil {
+		return fnetRoutes.StateResolve2ResultWithErr(fnetRoutes.ResolveErrorAddressUnreachable), nil
+	}
+	return fnetRoutes.StateResolve2ResultWithResponse(fnetRoutes.StateResolve2Response{
+		Result: result,
+	}), nil
+}
+
+func (r *resolveImpl) Resolve(ctx fidl.Context, destination net.IpAddress) (fnetRoutes.StateResolveResult, error) {
+	result, err := r.resolveInner(ctx, destination, fnetRoutes.ResolveOptions{})
+	if err != nil {
+		switch err.(type) {
+		case *tcpip.ErrAborted:
+			return fnetRoutes.StateResolveResultWithErr(int32(zx.ErrCanceled)), nil
+		default:
+			return fnetRoutes.StateResolveResultWithErr(int32(WrapTcpIpError(err).ToZxStatus())), nil
+		}
+	}
+	var response fnetRoutes.StateResolveResponse
+	switch tag := result.Which(); tag {
+	case fnetRoutes.ResolveResultGateway:
+		response.Result.SetGateway(result.Gateway)
+	case fnetRoutes.ResolveResultDirect:
+		response.Result.SetDirect((result.Direct))
+	default:
+		panic(fmt.Sprintf("Invalid tag for the result: %d", tag))
+	}
+	return fnetRoutes.StateResolveResultWithResponse(response), nil
 }
 
 // GetRouteTableName implements fuchsia.net.routes/State.GetRouteTableName.

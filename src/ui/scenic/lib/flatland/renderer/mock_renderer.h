@@ -33,8 +33,8 @@ class MockRenderer : public Renderer {
                const std::vector<allocation::ImageMetadata>&, const std::vector<zx::event>&, bool));
 
   MOCK_METHOD(void, SetColorConversionValues,
-              ((const std::array<float, 9>&), (const std::array<float, 3>&),
-               (const std::array<float, 3>&)));
+              ((const fidl::Array<float, 9>&), (const fidl::Array<float, 3>&),
+               (const fidl::Array<float, 3>&)));
 
   MOCK_METHOD(fuchsia_images2::PixelFormat, ChoosePreferredRenderTargetFormat,
               (const std::vector<fuchsia_images2::PixelFormat>&), (const));

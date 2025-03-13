@@ -28,7 +28,7 @@ impl DefineSubsystemConfiguration<SystemSoundsConfig> for SystemSoundsSubsystem 
                 builder
                     .package("scene_manager")
                     .config_data(FileEntry {
-                        source: path.clone().to_utf8_pathbuf(),
+                        source: path.clone(),
                         destination: "chirp-start-tone.wav".into(),
                     })
                     .context("Setting scene-manager start sound")?;

@@ -3,5 +3,6 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /third_party/rust_crates/vendor/darling_core-0.12.4/OWNERS
+include /third_party/rust_crates/vendor/darling_core-0.20.10/OWNERS
 include /third_party/rust_crates/vendor/http-0.2.4/OWNERS
 include /third_party/rust_crates/vendor/rusty-fork-0.3.0/OWNERS

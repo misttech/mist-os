@@ -346,17 +346,8 @@ bool ElfLib::SetDebugData(std::unique_ptr<ElfLib> debug) {
 }
 
 const Elf64_Shdr* ElfLib::GetSectionHeader(size_t section) {
-  // Processes may not map the section headers at all, so we don't look for
-  // section headers unless we're in file mode.
-  if (address_mode_ == AddressMode::kFile && sections_.empty()) {
-    auto sections = reinterpret_cast<const Elf64_Shdr*>(
-        memory_->GetMemory(header_.e_shoff, sizeof(Elf64_Shdr) * header_.e_shnum));
-
-    if (!sections) {
-      return nullptr;
-    }
-
-    std::copy(sections, sections + header_.e_shnum, std::back_inserter(sections_));
+  if (!LoadSectionHeaders()) {
+    return nullptr;
   }
 
   if (section >= sections_.size()) {
@@ -380,6 +371,34 @@ bool ElfLib::LoadProgramHeaders() {
 
   std::copy(segments, segments + header_.e_phnum, std::back_inserter(segments_));
   return true;
+}
+
+bool ElfLib::LoadSectionHeaders() {
+  // Already loaded.
+  if (!sections_.empty()) {
+    return true;
+  }
+
+  // Processes may not map the section headers at all, so we don't look for
+  // section headers unless we're in file mode.
+  if (address_mode_ == AddressMode::kFile && sections_.empty()) {
+    auto sections = reinterpret_cast<const Elf64_Shdr*>(
+        memory_->GetMemory(header_.e_shoff, sizeof(Elf64_Shdr) * header_.e_shnum));
+
+    if (!sections) {
+      return false;
+    }
+
+    std::copy(sections, sections + header_.e_shnum, std::back_inserter(sections_));
+    return true;
+  }
+
+  return false;
+}
+
+const std::vector<Elf64_Shdr>& ElfLib::GetSectionHeaders() {
+  LoadSectionHeaders();
+  return sections_;
 }
 
 const std::vector<Elf64_Phdr>& ElfLib::GetSegmentHeaders() {
@@ -508,17 +527,28 @@ std::optional<std::string> ElfLib::GetSoname() {
 }
 
 ElfLib::MemoryRegion ElfLib::GetSectionData(size_t section) {
-  const Elf64_Shdr* header = GetSectionHeader(section);
-
+  auto header = GetSectionHeader(section);
   if (!header) {
     return {};
   }
 
+  // This check has to be performed here so that |debug_| can have a chance to load its own headers.
   if (header->sh_type == SHT_NULL) {
     if (debug_) {
+      // |section| is not a typo. Since we're calling into another instance of ElfLib, we have to
+      // use the higher level interface so that it can load its headers which are not necessarily
+      // the same this instance's.
       return debug_->GetSectionData(section);
     }
 
+    return {};
+  }
+
+  return GetSectionData(header);
+}
+
+ElfLib::MemoryRegion ElfLib::GetSectionData(const Elf64_Shdr* header) {
+  if (!header) {
     return {};
   }
 

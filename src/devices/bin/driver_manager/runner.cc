@@ -4,6 +4,7 @@
 
 #include "src/devices/bin/driver_manager/runner.h"
 
+#include <fidl/fuchsia.component/cpp/common_types_format.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/processargs.h>
 
@@ -28,41 +29,6 @@ zx::result<zx_koid_t> GetKoid(zx_handle_t handle) {
     return zx::error(status);
   }
   return zx::ok(info.koid);
-}
-
-const char* GetErrorString(fcomponent::Error error) {
-  switch (error) {
-    case fcomponent::Error::kInternal:
-      return "INTERNAL";
-    case fcomponent::Error::kInvalidArguments:
-      return "INVALID_ARGUMENTS";
-    case fcomponent::Error::kUnsupported:
-      return "UNSUPPORTED";
-    case fcomponent::Error::kAccessDenied:
-      return "ACCESS_DENIED";
-    case fcomponent::Error::kInstanceNotFound:
-      return "INSTANCE_NOT_FOUND";
-    case fcomponent::Error::kInstanceAlreadyExists:
-      return "INSTANCE_ALREADY_EXISTS";
-    case fcomponent::Error::kInstanceCannotStart:
-      return "INSTANCE_CANNOT_START";
-    case fcomponent::Error::kInstanceCannotResolve:
-      return "INSTANCE_CANNOT_RESOLVE";
-    case fcomponent::Error::kCollectionNotFound:
-      return "COLLECTION_NOT_FOUND";
-    case fcomponent::Error::kResourceUnavailable:
-      return "RESOURCE_UNAVAILABLE";
-    case fcomponent::Error::kInstanceDied:
-      return "INSTANCE_DIED";
-    case fcomponent::Error::kResourceNotFound:
-      return "RESOURCE_NOT_FOUND";
-    case fcomponent::Error::kInstanceCannotUnresolve:
-      return "INSTANCE_CANNOT_UNRESOLVE";
-    case fcomponent::Error::kInstanceAlreadyStarted:
-      return "INSTANCE_ALREADY_STARTED";
-    default:
-      return "UNKNOWN";
-  }
 }
 
 }  // namespace
@@ -144,8 +110,9 @@ void Runner::StartDriverComponent(
                result.FormatDescription().c_str());
           is_error = true;
         } else if (result.value().is_error()) {
-          LOGF(ERROR, "Failed to create child '%s': %s", child_moniker.c_str(),
-               GetErrorString(result.value().error_value()));
+          auto msg = std::format("Failed to create child '{}': {}", child_moniker,
+                                 result.value().error_value());
+          LOGF(ERROR, msg.c_str());
           is_error = true;
         }
         if (is_error) {

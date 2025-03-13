@@ -19,8 +19,12 @@
 
 namespace fake_display {
 
-// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// WARNING: Don't use this code as a template for new tests as it uses the old driver testing
 // library.
+
+// Manages a self-contained Sysmem service instance.
+//
+// Tests that create this class do not need Sysmem capabilities routed to them.
 class FakeSysmemDeviceHierarchy : public SysmemServiceProvider {
  public:
   static zx::result<std::unique_ptr<FakeSysmemDeviceHierarchy>> Create();
@@ -38,10 +42,11 @@ class FakeSysmemDeviceHierarchy : public SysmemServiceProvider {
 
   // SysmemServiceProvider:
   zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> ConnectAllocator2() override;
-  zx::result<fidl::ClientEnd<fuchsia_hardware_sysmem::Sysmem>> ConnectHardwareSysmem() override;
 
  private:
-  async::Loop loop_;
+  async::Loop sysmem_client_loop_;
+
+  // Set in the constructor, reset in the destructor.
   std::unique_ptr<sysmem_service::Sysmem> sysmem_service_;
 };
 

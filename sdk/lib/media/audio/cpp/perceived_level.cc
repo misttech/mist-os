@@ -56,7 +56,7 @@ int PerceivedLevel::GainToLevel(float gain_db, int max_level) {
     return max_level;
   }
 
-  return static_cast<int>(std::round(max_level * GainToLevel(gain_db)));
+  return static_cast<int>(std::round(static_cast<float>(max_level) * GainToLevel(gain_db)));
 }
 
 // static
@@ -71,7 +71,7 @@ float PerceivedLevel::LevelToGain(int level, int max_level) {
     return kUnityGainDb;
   }
 
-  return LevelToGain(static_cast<float>(level) / max_level);
+  return LevelToGain(static_cast<float>(level) / static_cast<float>(max_level));
 }
 
 }  // namespace media

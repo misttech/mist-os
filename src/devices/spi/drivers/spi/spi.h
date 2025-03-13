@@ -18,12 +18,15 @@ namespace spi {
 
 class SpiChild;
 
-class SpiDevice : public fdf::DriverBase {
+class SpiDriver : public fdf::DriverBase {
  public:
-  SpiDevice(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
-      : fdf::DriverBase("spi", std::move(start_args), std::move(dispatcher)) {}
+  static constexpr std::string_view kDriverName = "spi";
+  static constexpr std::string_view kChildNodeName = "spi";
 
-  void Start(fdf::StartCompleter completer) override;
+  SpiDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
+      : fdf::DriverBase(kDriverName, std::move(start_args), std::move(dispatcher)) {}
+
+  zx::result<> Start() override;
 
  private:
   zx::result<> AddChildren(const fuchsia_hardware_spi_businfo::SpiBusMetadata& metadata,
@@ -42,9 +45,7 @@ class SpiDevice : public fdf::DriverBase {
 
   std::vector<std::unique_ptr<SpiChild>> children_;
 
-  fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_;
-  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
-  fidl::WireSyncClient<fuchsia_driver_framework::Node> spi_node_;
+  fdf::OwnedChildNode child_;
 };
 
 }  // namespace spi

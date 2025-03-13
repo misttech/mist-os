@@ -4,4 +4,4 @@
 
 include /src/sys/pkg/OWNERS
 include /third_party/rust_crates/vendor/trust-dns-proto-0.22.0/OWNERS
-include /third_party/rust_crates/vendor/tuf-0.3.0-beta11/OWNERS
+include /third_party/rust_crates/vendor/tuf-0.3.0-beta13/OWNERS

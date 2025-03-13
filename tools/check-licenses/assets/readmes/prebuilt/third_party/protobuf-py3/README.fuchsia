@@ -1,0 +1,18 @@
+Name: protobuf-py3
+
+URL: https://chrome-infra-packages.appspot.com/p/infra/python/wheels/protobuf-py3
+
+License File: protobuf-5.29.3.dist-info/LICENSE
+ -> License File Format: Single License
+ -> License Classifications: BSD-3
+
+Description:
+These are protoc-generated source files produced by following
+these instructions: https://github.com/protocolbuffers/protobuf/tree/main/python#building-packages-from-this-repo
+
+The infra code for building this package is in:
+https://chromium.googlesource.com/infra/infra/+/main/infra/tools/dockerbuild/
+https://chromium.googlesource.com/infra/infra/+/main/infra/tools/dockerbuild/wheels.py#2528
+
+Builders are https://ci.chromium.org/ui/p/infra-internal/g/wheel_builders/builders
+

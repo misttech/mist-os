@@ -29,6 +29,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <zircon/assert.h>
+#include <zircon/availability.h>
 #include <zircon/compiler.h>
 #include <zircon/syscalls/object.h>
 #include <zircon/types.h>
@@ -53,6 +54,22 @@ typedef struct trace_prolonged_context trace_prolonged_context_t;
 //
 // This function is thread-safe.
 bool trace_context_is_category_enabled(trace_context_t* context, const char* category_literal);
+
+// Returns true if tracing of the specified category has been enabled.
+//
+// Use |trace_context_register_category_bytestring()| if you intend to immediately
+// write a record into the trace buffer after checking the category.
+//
+// |context| must be a valid trace context reference.
+// |bytes| must be a static bytestring constant.
+// |length| must be the length of the bytestring
+//
+// This function is thread-safe.
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+bool trace_context_is_category_bytestring_enabled(trace_context_t* context,
+                                                  const unsigned char* bytes, size_t length)
+    ZX_AVAILABLE_SINCE(NEXT);
+#endif
 
 // Registers a copy of a string into the string table.
 //
@@ -95,6 +112,27 @@ static inline trace_string_ref_t trace_context_make_registered_string_copy(trace
 void trace_context_register_string_literal(trace_context_t* context, const char* string_literal,
                                            trace_string_ref_t* out_ref);
 
+// Registers a bytestring literal into the string table keyed by its address in memory.
+//
+// The trace context caches the string so that subsequent registrations using
+// the same memory address may return the same indexed string reference if
+// found in the cache.
+//
+// Writes a string record into the trace buffer if the string was added to the
+// string table.  If the string table is full, returns an inline string reference.
+//
+// |context| must be a valid trace context reference.
+// |bytes| must be a static byte string constant.
+// |length| the number of bytes in the string
+// |out_ref| points to where the registered string reference should be returned.
+//
+// This function is thread-safe.
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+void trace_context_register_bytestring(trace_context_t* context, const unsigned char* bytes,
+                                       size_t length, trace_string_ref_t* out_ref)
+    ZX_AVAILABLE_SINCE(NEXT);
+#endif
+
 // Registers a string literal and returns its string ref.
 // Helper for |trace_context_register_string_literal()|.
 static inline trace_string_ref_t trace_context_make_registered_string_literal(
@@ -124,6 +162,32 @@ static inline trace_string_ref_t trace_context_make_registered_string_literal(
 // This function is thread-safe.
 bool trace_context_register_category_literal(trace_context_t* context, const char* category_literal,
                                              trace_string_ref_t* out_ref);
+
+// Registers a category into the string table, if it is enabled, keyed by its
+// address in memory.
+//
+// The trace context caches the string so that subsequent registrations using
+// the same memory address may return the same indexed string reference if
+// found in the cache.
+//
+// Writes a string record into the trace buffer if the category was added to the
+// string table.  If the string table is full, returns an inline string reference.
+//
+// |context| must be a valid trace context reference.
+// |bytes| must be a static bytestring constant.
+// |length| is the length of the bytestring
+// |out_ref| points to where the registered string reference should be returned.
+//
+// Returns true and registers the string if the category is enabled, otherwise
+// returns false and does not modify |*out_ref|.
+//
+// This function is thread-safe.
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+bool trace_context_register_category_bytestring(trace_context_t* context,
+                                                const unsigned char* bytes, size_t length,
+                                                trace_string_ref_t* out_ref)
+    ZX_AVAILABLE_SINCE(NEXT);
+#endif
 
 // Registers the current thread into the thread table.
 //
@@ -219,6 +283,16 @@ void trace_context_write_blob_record(trace_context_t* context, trace_blob_type_t
 //
 // This function is thread-safe.
 void trace_context_send_alert(trace_context_t* context, const char* alert_name);
+
+// Sends an alert.
+// |context| must be a valid trace context reference.
+// |alert_name| is the name of the alert (max 14 characters).
+//
+// This function is thread-safe.
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+void trace_context_send_alert_bytestring(trace_context_t* context, const unsigned char* alert_name,
+                                         size_t length) ZX_AVAILABLE_SINCE(NEXT);
+#endif
 
 // Writes a kernel object record for the object reference by the specified handle
 // into the trace buffer.  Discards the record if it cannot be written.

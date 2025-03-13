@@ -20,7 +20,7 @@ use starnix_core::vfs::{
     fs_node_impl_dir_readonly, fs_node_impl_not_dir, parse_unsigned_file, unbounded_seek,
     BytesFile, BytesFileOps, CacheMode, DirEntry, DirectoryEntryType, DirentSink, FileObject,
     FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
-    FsNodeInfo, FsNodeOps, FsStr, FsString, MemoryFileNode, NamespaceNode, SeekTarget,
+    FsNodeInfo, FsNodeOps, FsStr, FsString, MemoryRegularNode, NamespaceNode, SeekTarget,
     SimpleFileNode, StaticDirectoryBuilder, VecDirectory, VecDirectoryEntry,
 };
 use starnix_uapi::auth::FsCred;
@@ -182,7 +182,7 @@ impl SeLinuxFs {
         dir.entry(
             current_task,
             "status",
-            MemoryFileNode::from_memory(Arc::new(MemoryObject::from(status_file))),
+            MemoryRegularNode::from_memory(Arc::new(MemoryObject::from(status_file))),
             mode!(IFREG, 0o444),
         );
         security_server.set_status_publisher(Box::new(status_holder));
@@ -960,12 +960,15 @@ pub fn selinux_fs(
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
+    struct SeLinuxFsHandle(FileSystemHandle);
+
     profile_duration!("selinuxfs.mount");
-    current_task
+    Ok(current_task
         .kernel()
-        .selinux_fs
-        .get_or_try_init(|| SeLinuxFs::new_fs(current_task, options))
-        .cloned()
+        .expando
+        .get_or_try_init(|| Ok(SeLinuxFsHandle(SeLinuxFs::new_fs(current_task, options)?)))?
+        .0
+        .clone())
 }
 
 #[cfg(test)]

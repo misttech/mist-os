@@ -24,7 +24,7 @@ static void timer_irq_callback(Timer* timer, zx_time_t now, void* arg) {
   // We are in IRQ context and cannot touch the timer state_tracker, so we
   // schedule a DPC to do so. TODO(cpu): figure out ways to reduce the lag.
   auto dpc = reinterpret_cast<Dpc*>(arg);
-  dpc->Queue();
+  DpcRunner::Enqueue(*dpc, DpcRunner::QueueType::LowLatency);
 }
 
 static void dpc_callback(Dpc* d) { d->arg<TimerDispatcher>()->OnTimerFired(); }

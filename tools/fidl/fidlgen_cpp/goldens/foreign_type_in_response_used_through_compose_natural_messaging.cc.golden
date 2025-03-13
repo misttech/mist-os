@@ -3,6 +3,7 @@
 // fidl_experiment = output_index_json
 
 #include <fidl/test.foreigntypeinresponseusedthroughcompose/cpp/natural_messaging.h>
+#include <fidl/test.foreigntypeinresponseusedthroughcompose/cpp/wire_messaging.h>
 #include <lib/fidl/cpp/wire/unknown_interactions.h>
 
 #pragma clang diagnostic push

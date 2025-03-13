@@ -316,10 +316,12 @@ open protocol Node {
     });
 
     /// DEPRECATED - Use `fuchsia.unknown/Cloneable.Clone` instead.
-    // TODO(https://fxbug.dev/324081103): Mark this as removed=NEXT once we ship API level 26.
-    // We can't remove a method at the same API level it was added, and although this is only
-    // a semantic rename with the same ordinal, it still counts as "adding" a new method.
-    @available(added=26, removed=HEAD)
+    // TODO(https://fxbug.dev/324081103): Mark this as removed=NEXT once the following places have
+    // been updated to no longer depend on this method:
+    //  - //third_party/go: Relied on by implementation of Go fdio library.
+    //  - //src/developer/ffx/playground/src/builtins.rs
+    //  - //src/tests/end_to_end/fidlcat/fidlcat_e2e_tests.py
+    @available(added=26, deprecated=NEXT)
     @selector("fuchsia.io1/Node.Clone")
     flexible DeprecatedClone(resource struct {
         flags OpenFlags;

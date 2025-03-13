@@ -3,13 +3,13 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /build/OWNERS
+include /build/components/OWNERS
 include /examples/intl/OWNERS
 include /src/connectivity/bluetooth/OWNERS
 include /src/connectivity/weave/OWNERS
 include /src/connectivity/wlan/tools/wlantool/OWNERS
 include /src/connectivity/wlan/wlancfg/OWNERS
 include /src/devices/tools/fidlgen_banjo/OWNERS
-include /src/diagnostics/OWNERS
 include /src/diagnostics/iquery/OWNERS
 include /src/diagnostics/triage/OWNERS
 include /src/factory/OWNERS

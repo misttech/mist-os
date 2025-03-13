@@ -12,11 +12,10 @@ use fidl_fuchsia_hardware_block::BlockProxy;
 use fidl_fuchsia_hardware_block_partition::PartitionMarker;
 use fs_management::partition::{find_partition_in, PartitionMatcher};
 use fshost_test_fixture::disk_builder::VolumesSpec;
-use fshost_test_fixture::{write_test_blob, write_test_blob_fxblob};
+use fshost_test_fixture::write_test_blob;
 use {fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio};
 
-// TODO(https://fxbug.dev/391889311): Remove the not storage-host feature
-#[cfg(all(feature = "fxblob", not(feature = "storage-host")))]
+#[cfg(feature = "fxblob")]
 use {fshost::StarnixVolumeProviderMarker, fshost_test_fixture::STARNIX_VOLUME_NAME};
 
 pub mod config;
@@ -90,40 +89,33 @@ async fn write_blob() {
         }
     }
 
-    let (blob_creator_proxy, blob_creator) = if cfg!(feature = "fxblob") {
-        let (proxy, server_end) = fidl::endpoints::create_proxy();
-        (Some(proxy), Some(server_end))
-    } else {
-        (None, None)
-    };
+    let (blob_creator_proxy, blob_creator_server_end) = fidl::endpoints::create_proxy();
 
     // Invoke WipeStorage, which will unbind the FVM, reprovision it, and format/mount Blobfs.
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
-    let (blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
+    let (_blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
     admin
-        .wipe_storage(Some(blobfs_server), blob_creator)
+        .wipe_storage(Some(blobfs_server), Some(blob_creator_server_end))
         .await
         .unwrap()
         .expect("WipeStorage unexpectedly failed");
 
     // Ensure that we can write a blob into the new Blobfs instance.
-    if cfg!(feature = "fxblob") {
-        write_test_blob_fxblob(blob_creator_proxy.unwrap(), &TEST_BLOB_DATA).await;
-    } else {
-        write_test_blob(&blobfs_root, &TEST_BLOB_DATA, false).await;
-    }
+    write_test_blob(blob_creator_proxy, &TEST_BLOB_DATA).await;
 
     fixture.tear_down().await;
 }
 
 #[fuchsia::test]
-// TODO(https://fxbug.dev/391889311): Remove the not storage-host feature
-#[cfg(all(feature = "fxblob", not(feature = "storage-host")))]
+#[cfg(feature = "fxblob")]
 async fn wipe_storage_deletes_starnix_volume() {
     let mut builder = new_builder();
     builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec()).with_gpt();
-    builder.fshost().set_config_value("starnix_volume_name", STARNIX_VOLUME_NAME);
+    builder
+        .fshost()
+        .create_starnix_volume_crypt()
+        .set_config_value("starnix_volume_name", STARNIX_VOLUME_NAME);
 
     let fixture = builder.build().await;
     fixture.check_fs_type("blob", blob_fs_type()).await;
@@ -145,10 +137,10 @@ async fn wipe_storage_deletes_starnix_volume() {
         .expect("fidl transport error")
         .expect("mount failed");
 
-    let vmo = fixture.into_vmo().await.unwrap();
+    let disk = fixture.tear_down().await.unwrap();
 
-    let mut builder = new_builder().with_disk_from_vmo(vmo);
-    builder.fshost().set_config_value("ramdisk_image", true);
+    let mut builder = new_builder().with_disk_from(disk);
+    builder.fshost().create_starnix_volume_crypt().set_config_value("ramdisk_image", true);
     builder.with_zbi_ramdisk().format_volumes(volumes_spec());
 
     let fixture = builder.build().await;
@@ -194,9 +186,12 @@ async fn wipe_storage_deletes_starnix_volume() {
         .map_err(zx::Status::from_raw)
         .expect("WipeStorage unexpectedly failed");
 
-    let vmo = fixture.into_vmo().await.unwrap();
-    let mut builder = new_builder().with_disk_from_vmo(vmo);
-    builder.fshost().set_config_value("starnix_volume_name", STARNIX_VOLUME_NAME);
+    let disk = fixture.tear_down().await.unwrap();
+    let mut builder = new_builder().with_disk_from(disk);
+    builder
+        .fshost()
+        .create_starnix_volume_crypt()
+        .set_config_value("starnix_volume_name", STARNIX_VOLUME_NAME);
 
     let fixture = builder.build().await;
     fixture.check_fs_type("blob", blob_fs_type()).await;
@@ -249,29 +244,20 @@ async fn write_blob_no_existing_data_partition() {
         }
     }
 
-    let (blob_creator_proxy, blob_creator) = if cfg!(feature = "fxblob") {
-        let (proxy, server_end) = fidl::endpoints::create_proxy();
-        (Some(proxy), Some(server_end))
-    } else {
-        (None, None)
-    };
+    let (blob_creator_proxy, blob_creator_server_end) = fidl::endpoints::create_proxy();
 
     // Invoke WipeStorage, which will unbind the FVM, reprovision it, and format/mount Blobfs.
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
-    let (blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
+    let (_blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
     admin
-        .wipe_storage(Some(blobfs_server), blob_creator)
+        .wipe_storage(Some(blobfs_server), Some(blob_creator_server_end))
         .await
         .unwrap()
         .expect("WipeStorage unexpectedly failed");
 
     // Ensure that we can write a blob into the new Blobfs instance.
-    if cfg!(feature = "fxblob") {
-        write_test_blob_fxblob(blob_creator_proxy.unwrap(), &TEST_BLOB_DATA).await;
-    } else {
-        write_test_blob(&blobfs_root, &TEST_BLOB_DATA, false).await;
-    }
+    write_test_blob(blob_creator_proxy, &TEST_BLOB_DATA).await;
 
     fixture.tear_down().await;
 }
@@ -291,9 +277,9 @@ async fn blobfs_formatted() {
     // The test fixture writes tests blobs to blobfs or fxblob when it is formatted.
     fixture.check_test_blob(cfg!(feature = "fxblob")).await;
 
-    let vmo = fixture.into_vmo().await.unwrap();
+    let disk = fixture.tear_down().await.unwrap();
 
-    let mut builder = new_builder().with_disk_from_vmo(vmo);
+    let mut builder = new_builder().with_disk_from(disk);
     builder.fshost().set_config_value("ramdisk_image", true);
     builder.with_zbi_ramdisk().format_volumes(volumes_spec());
 

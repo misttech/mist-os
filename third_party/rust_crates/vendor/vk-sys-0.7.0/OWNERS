@@ -4,4 +4,3 @@
 
 include /src/lib/fuchsia-image-format/OWNERS
 include /src/lib/ui/fuchsia-vulkan/OWNERS
-include /src/starnix/OWNERS

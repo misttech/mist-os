@@ -94,7 +94,7 @@ class TestEntry:
     environments: list[EnvironmentEntry] | None = None
 
     # Optional field that is set for boot tests only.
-    product_bundle: str | None = None
+    is_boot_test: bool | None = None
 
     @classmethod
     def from_file(

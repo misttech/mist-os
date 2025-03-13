@@ -237,5 +237,5 @@ FIDL has outlined the [best practices for protocol composition][composition].
 
 <!-- xrefs -->
 [composition]: /docs/contribute/governance/rfcs/0023_compositional_model_protocols.md
-[project]: /docs/contribute/open_projects/drivers/fidl_multiplexing.md
+[project]: /docs/contribute/open_projects/graduated/fidl_multiplexing.md
 [service-capabilities]: /docs/concepts/components/v2/capabilities/service.md

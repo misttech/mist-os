@@ -41,6 +41,7 @@ common_deps = [
 ]
 
 fuchsia_cc_driver("driver") {
+  legacy = true
   output_name = "chromeos-acpi"
   sources = [ "chromeos_acpi.cc" ]
   deps = common_deps

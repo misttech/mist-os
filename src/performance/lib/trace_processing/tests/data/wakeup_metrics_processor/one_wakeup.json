@@ -29,11 +29,33 @@
         {
             "cat": "power",
             "name": "WakeupEvent1",
+            "ph": "s",
+            "pid": 53280,
+            "tid": 49152,
+            "ts": 30001,
+            "bp": "e",
+            "id": 1234,
+            "_comment": "A flow event to skip gracefully."
+        },
+        {
+            "cat": "power",
+            "name": "WakeupEvent1",
             "ph": "X",
             "pid": 53280,
             "tid": 49152,
             "ts": 20000,
-            "dur": 1
+            "dur": 1000
+        },
+        {
+            "cat": "power",
+            "name": "WakeupEvent1",
+            "ph": "f",
+            "pid": 53280,
+            "tid": 49152,
+            "ts": 30001,
+            "bp": "e",
+            "id": 1234,
+            "_comment": "Here to terminate the flow started above."
         },
         {
             "cat": "random",
@@ -42,7 +64,28 @@
             "pid": 53280,
             "tid": 49152,
             "ts": 30000,
-            "dur": 1
+            "dur": 100
+        },
+        {
+            "cat": "power",
+            "name": "WakeupEvent2",
+            "ph": "s",
+            "pid": 53280,
+            "tid": 49152,
+            "ts": 30001,
+            "id": 1235,
+            "_comment": "A flow event to skip gracefully."
+        },
+        {
+            "cat": "power",
+            "name": "WakeupEvent2",
+            "ph": "f",
+            "pid": 53280,
+            "tid": 49152,
+            "ts": 40001,
+            "bp": "e",
+            "id": 1235,
+            "_comment": "A flow event to skip gracefully."
         },
         {
             "cat": "power",
@@ -51,7 +94,7 @@
             "pid": 53280,
             "tid": 49152,
             "ts": 40000,
-            "dur": 1
+            "dur": 100
         },
         {
             "cat": "power",
@@ -60,7 +103,7 @@
             "pid": 53280,
             "tid": 32768,
             "ts": 50000,
-            "dur": 1
+            "dur": 2000
         }
     ]
 }

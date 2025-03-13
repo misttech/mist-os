@@ -26,6 +26,7 @@ driver_bind_rules("power-bind") {
 }
 
 fuchsia_cc_driver("power-driver") {
+  legacy = true
   output_name = "power"
   configs += [
     "//build/config:all_source",

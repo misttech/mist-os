@@ -4,17 +4,16 @@
 
 use anyhow::{anyhow, Context as _, Result};
 use ffx_config::{global_env_context, EnvironmentContext, SdkRoot};
+use ffx_executor::{CommandOutput, FfxExecutor};
 use sdk::FfxSdkConfig;
 use serde::Serialize;
 use serde_json::Value;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::process::{Child, ExitStatus};
+use std::process::Child;
 use std::time::SystemTime;
 use tempfile::TempDir;
-
-pub mod test;
 
 /// Where to search for ffx and subtools, based on either being part of an
 /// ffx command (like `ffx self-test`) or being part of the build (using the
@@ -25,7 +24,22 @@ pub enum SearchContext {
     Build { build_root: PathBuf },
 }
 
-fn env_search_paths(search: &SearchContext) -> Vec<Cow<'_, Path>> {
+impl SearchContext {
+    fn sdk_config(&self) -> Option<FfxSdkConfig> {
+        match self {
+            SearchContext::Runtime { sdk_root: Some(sdk_root), .. } => Some(sdk_root.to_config()),
+            SearchContext::Build { build_root } => {
+                // TODO(392136182): Do not refer to hardcoded SDK paths. This support is being
+                // removed.
+                let root = Some(build_root.join("sdk/exported/core"));
+                Some(FfxSdkConfig { root, manifest: None, module: None })
+            }
+            _ => None,
+        }
+    }
+}
+
+pub(crate) fn env_search_paths(search: &SearchContext) -> Vec<Cow<'_, Path>> {
     use SearchContext::*;
     match search {
         Runtime { subtool_search_paths, .. } => {
@@ -43,7 +57,7 @@ fn env_search_paths(search: &SearchContext) -> Vec<Cow<'_, Path>> {
     }
 }
 
-fn find_ffx(search: &SearchContext, search_paths: &[Cow<'_, Path>]) -> Result<PathBuf> {
+pub(crate) fn find_ffx(search: &SearchContext, search_paths: &[Cow<'_, Path>]) -> Result<PathBuf> {
     use SearchContext::*;
     match search {
         Runtime { ffx_path, .. } => return Ok(ffx_path.to_owned()),
@@ -62,11 +76,38 @@ fn find_ffx(search: &SearchContext, search_paths: &[Cow<'_, Path>]) -> Result<Pa
     ))
 }
 
-#[derive(Debug)]
-pub struct CommandOutput {
-    pub status: ExitStatus,
-    pub stdout: String,
-    pub stderr: String,
+pub(crate) fn get_log_dir(log_dir_root: &TempDir) -> PathBuf {
+    if let Ok(d) = std::env::var("FUCHSIA_TEST_OUTDIR") {
+        // If this is the daemon, and we use the same dir as the parent,
+        // the two daemons will race to write the same file. So instead let's
+        // always try to create a subdir when in the infra environment.
+        // To do so, we take the tail of the tmpdir (which Path calls
+        // file_name() even when actually a directory), and add it
+        // to the end of FUCHSIA_TEST_OUTDIR, to give the new subdirectory.
+        // Because the tail of the tmpdir includes the "name", we'll be able
+        // to associate the log directory with the isolated test.
+        let mut pb = PathBuf::from(d);
+        if let Some(tmptail) = log_dir_root.path().file_name() {
+            pb.push(tmptail);
+        }
+        pb
+    } else {
+        log_dir_root.path().join("log")
+    }
+}
+
+pub(crate) fn create_directories(log_dir: &PathBuf, log_dir_root: &TempDir) -> Result<()> {
+    std::fs::create_dir_all(&log_dir)?;
+    let metrics_path = log_dir_root.path().join("metrics_home/.fuchsia/metrics");
+    std::fs::create_dir_all(&metrics_path)?;
+
+    // TODO(287694118): See if we should get isolate-dir itself to deal with metrics isolation.
+
+    // Mark that analytics are disabled
+    std::fs::write(metrics_path.join("analytics-status"), "0")?;
+    // Mark that the notice has been given
+    std::fs::write(metrics_path.join("ffx"), "1")?;
+    Ok(())
 }
 
 /// Isolate provides an abstraction around an isolated configuration environment for `ffx`.
@@ -74,6 +115,14 @@ pub struct Isolate {
     tmpdir: TempDir,
     log_dir: PathBuf,
     env_ctx: ffx_config::EnvironmentContext,
+}
+
+impl FfxExecutor for Isolate {
+    fn make_ffx_cmd(&self, args: &[&str]) -> Result<std::process::Command> {
+        let mut cmd = self.env_context().rerun_prefix()?;
+        cmd.args(args);
+        Ok(cmd)
+    }
 }
 
 impl Isolate {
@@ -98,50 +147,9 @@ impl Isolate {
 
         let ffx_path = find_ffx(&search, &search_paths)?;
 
-        let sdk_config = match &search {
-            SearchContext::Runtime { sdk_root: Some(sdk_root), .. } => Some(sdk_root.to_config()),
-            SearchContext::Build { build_root } => {
-                let root = Some(build_root.join("sdk/exported/core"));
-                Some(FfxSdkConfig { root, module: None })
-            }
-            _ => None,
-        };
-
-        let log_dir = if let Ok(d) = std::env::var("FUCHSIA_TEST_OUTDIR") {
-            // If this is the daemon, and we use the same dir as the parent,
-            // the two daemons will race to write the same file. So instead let's
-            // always try to create a subdir when in the infra environment.
-            // To do so, we take the tail of the tmpdir (which Path calls
-            // file_name() even when actually a directory), and add it
-            // to the end of FUCHSIA_TEST_OUTDIR, to give the new subdirectory.
-            // Because the tail of the tmpdir includes the "name", we'll be able
-            // to associate the log directory with the isolated test.
-            let mut pb = PathBuf::from(d);
-            if let Some(tmptail) = tmpdir.path().file_name() {
-                pb.push(tmptail);
-            }
-            pb
-        } else {
-            tmpdir.path().join("log")
-        };
-        // Propagate log configuration information to the isolate.
-        // TODO(slgrady): we should propagate _all_ log values,
-        // except possibly log.dir (which may be set above from
-        // FUCHSIA_TEST_OUTDIR)
-        let log_level = env_context.query("log.level").get()?;
-        let log_target_levels = env_context.query("log.target_levels").get()?;
-
-        std::fs::create_dir_all(&log_dir)?;
-        let metrics_path = tmpdir.path().join("metrics_home/.fuchsia/metrics");
-        std::fs::create_dir_all(&metrics_path)?;
-
-        // TODO(114011): See if we should get isolate-dir itself to deal with metrics isolation.
-
-        // Mark that analytics are disabled
-        std::fs::write(metrics_path.join("analytics-status"), "0")?;
-        // Mark that the notice has been given
-        std::fs::write(metrics_path.join("ffx"), "1")?;
-
+        let sdk_config = search.sdk_config();
+        let log_dir = get_log_dir(&tmpdir);
+        create_directories(&log_dir, &tmpdir)?;
         let mut mdns_discovery = true;
         let mut target_addr = None;
         if let Some(addr) =
@@ -152,6 +160,13 @@ impl Isolate {
             target_addr = Option::Some(Cow::Owned(addr + ":0"));
             mdns_discovery = false;
         }
+        let log_target_levels = env_context.query("log.target_levels").get()?;
+        // Propagate log configuration information to the isolate.
+        // TODO(396473745): we should propagate _all_ log values,
+        // except possibly log.dir (which may be set above from
+        // FUCHSIA_TEST_OUTDIR)
+        let log_level = env_context.query("log.level").get()?;
+
         let user_config = UserConfig::for_test(
             log_dir.to_string_lossy(),
             log_level,
@@ -300,23 +315,14 @@ impl Isolate {
         Ok(daemon)
     }
 
-    #[allow(clippy::unused_async)] // TODO(https://fxbug.dev/386387845)
+    // TODO(396006570): Remove these functions once migrations have been done in external
+    // users.
     pub async fn ffx_cmd(&self, args: &[&str]) -> Result<std::process::Command> {
-        let mut cmd = self.env_ctx.rerun_prefix()?;
-        cmd.args(args);
-        Ok(cmd)
+        std::future::ready(FfxExecutor::make_ffx_cmd(self, args)).await
     }
 
     pub async fn ffx(&self, args: &[&str]) -> Result<CommandOutput> {
-        let mut cmd = self.ffx_cmd(args).await?;
-
-        fuchsia_async::unblock(move || {
-            let out = cmd.output().context("failed to execute")?;
-            let stdout = String::from_utf8(out.stdout).context("convert from utf8")?;
-            let stderr = String::from_utf8(out.stderr).context("convert from utf8")?;
-            Ok::<_, anyhow::Error>(CommandOutput { status: out.status, stdout, stderr })
-        })
-        .await
+        FfxExecutor::exec_ffx(self, args).await.map_err(Into::into)
     }
 }
 

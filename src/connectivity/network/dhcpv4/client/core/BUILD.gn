@@ -13,6 +13,7 @@ rustc_library("core") {
     "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/packet-formats",
     "//src/connectivity/network/dhcpv4/protocol",
+    "//src/connectivity/network/lib/diagnostics-traits",
     "//src/lib/fuchsia-async",
     "//src/lib/network/packet",
     "//third_party/rust_crates:anyhow",
@@ -22,6 +23,7 @@ rustc_library("core") {
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:thiserror",
   ]
+
   test_deps = [
     "//src/connectivity/lib/net-declare",
     "//src/connectivity/network/dhcpv4/lib",
@@ -34,6 +36,7 @@ rustc_library("core") {
   sources = [
     "src/client.rs",
     "src/deps.rs",
+    "src/inspect.rs",
     "src/lib.rs",
     "src/parse.rs",
   ]
@@ -48,11 +51,4 @@ fuchsia_unittest_package("dhcp_client_core_test") {
 group("tests") {
   testonly = true
   deps = [ ":dhcp_client_core_test" ]
-
-  # include the non-test library so that we observe unused warnings for fns used
-  # only in tests.
-  deps += [
-    ":core",
-    ":core($host_toolchain)",
-  ]
 }

@@ -7,4 +7,5 @@
 # this will add both the loadable module, configuration JSON file and related
 # dependencies.
 
-import("//third_party/Vulkan-ValidationLayers/scripts/gn/layers-fuchsia.gni")
+import(
+    "//third_party/Vulkan-ValidationLayers/src/scripts/gn/layers-fuchsia.gni")

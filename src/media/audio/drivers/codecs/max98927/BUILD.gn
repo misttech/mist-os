@@ -15,6 +15,7 @@ driver_bind_rules("max98927_bind") {
 }
 
 fuchsia_cc_driver("max98927-driver") {
+  legacy = true
   output_name = "max98927"
   configs += [
     "//build/config:all_source",

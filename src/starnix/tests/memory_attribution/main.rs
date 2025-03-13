@@ -4,7 +4,7 @@
 
 use assert_matches::assert_matches;
 use attribution_testing::PrincipalIdentifier;
-use diagnostics_reader::{ArchiveReader, Logs};
+use diagnostics_reader::ArchiveReader;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl::AsHandleRef;
 use fidl_fuchsia_sys2::OpenError;
@@ -280,12 +280,11 @@ async fn init_attribution_test() -> AttributionTest {
 }
 
 async fn wait_for_log(realm: &RealmInstance, expected_log: &str) {
-    let mut reader = ArchiveReader::new();
+    let mut reader = ArchiveReader::logs();
     let selector: Moniker = realm.root.moniker().parse().unwrap();
-    let selector = selectors::sanitize_moniker_for_selectors(&selector.to_string());
-    let selector = format!("{}/**:root", selector);
-    reader.add_selector(selector);
-    let mut logs = reader.snapshot_then_subscribe::<Logs>().unwrap();
+    let selector = format!("{}/**", selector);
+    reader.select_all_for_component(selector.as_str());
+    let mut logs = reader.snapshot_then_subscribe().unwrap();
     loop {
         let message = logs.next().await.unwrap().unwrap();
         if message.msg().unwrap().contains(expected_log) {
@@ -347,7 +346,7 @@ async fn connect_to_service_in_exposed_dir<T: DiscoverableProtocolMarker>(
     realm.open_directory(moniker, fsys2::OpenDirType::ExposedDir, server_end).await.unwrap()?;
     let (service, server_end) = fidl::endpoints::create_proxy::<T>();
     exposed_dir
-        .open3(
+        .open(
             T::PROTOCOL_NAME,
             fio::Flags::PROTOCOL_SERVICE,
             &Default::default(),

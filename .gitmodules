@@ -78,11 +78,6 @@
 	url = https://fuchsia.googlesource.com/third_party/github.com/pciutils/pciids
 	name = third_party/github.com/pciutils/pciids
 	ignore = all
-[submodule "third_party/protobuf"]
-	path = third_party/protobuf
-	url = https://fuchsia.googlesource.com/third_party/protobuf
-	name = third_party/protobuf
-	ignore = all
 [submodule "third_party/pytoml"]
 	path = third_party/pytoml
 	url = https://fuchsia.googlesource.com/third_party/pytoml
@@ -102,16 +97,6 @@
 	path = third_party/re2/src
 	url = https://fuchsia.googlesource.com/third_party/re2
 	name = third_party/re2
-	ignore = all
-[submodule "third_party/rust_crates/mirrors/serde_json5"]
-	path = third_party/rust_crates/mirrors/serde_json5
-	url = https://fuchsia.googlesource.com/third_party/github.com/google/serde_json5
-	name = third_party/github.com/google/serde_json5
-	ignore = all
-[submodule "third_party/sbase"]
-	path = third_party/sbase
-	url = https://fuchsia.googlesource.com/third_party/sbase
-	name = third_party/sbase
 	ignore = all
 [submodule "third_party/scudo/gwp_asan"]
 	path = third_party/scudo/gwp_asan

@@ -996,7 +996,7 @@ static bool vmaspace_priority_bidir_clone_test() {
 
   // Create a clone of the VMO.
   fbl::RefPtr<VmObject> vmo_child;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0, PAGE_SIZE, true,
+  status = vmo->CreateClone(Resizability::NonResizable, SnapshotType::Full, 0, PAGE_SIZE, true,
                             &vmo_child);
   ASSERT_OK(status);
   VmObjectPaged* childp = reinterpret_cast<VmObjectPaged*>(vmo_child.get());
@@ -1015,7 +1015,7 @@ static bool vmaspace_priority_bidir_clone_test() {
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugIsHighMemoryPriority());
 
   // Create a new clone of the VMO and map in the clone.
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0, PAGE_SIZE, true,
+  status = vmo->CreateClone(Resizability::NonResizable, SnapshotType::Full, 0, PAGE_SIZE, true,
                             &vmo_child);
   ASSERT_OK(status);
   childp = reinterpret_cast<VmObjectPaged*>(vmo_child.get());
@@ -1117,8 +1117,8 @@ static bool vmaspace_priority_pager_test() {
 
   // Create a clone of the VMO.
   fbl::RefPtr<VmObject> vmo_child;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
-                            PAGE_SIZE, true, &vmo_child);
+  status = vmo->CreateClone(Resizability::NonResizable, SnapshotType::OnWrite, 0, PAGE_SIZE, true,
+                            &vmo_child);
   ASSERT_OK(status);
   VmObjectPaged* childp = reinterpret_cast<VmObjectPaged*>(vmo_child.get());
 
@@ -1133,8 +1133,8 @@ static bool vmaspace_priority_pager_test() {
 
   // Create a second child of the root.
   fbl::RefPtr<VmObject> vmo_child2;
-  status = vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
-                            PAGE_SIZE, true, &vmo_child);
+  status = vmo->CreateClone(Resizability::NonResizable, SnapshotType::OnWrite, 0, PAGE_SIZE, true,
+                            &vmo_child);
   ASSERT_OK(status);
   VmObjectPaged* childp2 = reinterpret_cast<VmObjectPaged*>(vmo_child.get());
 
@@ -1530,14 +1530,14 @@ static bool vm_mapping_page_fault_optimisation_test() {
 
   AutoVmScannerDisable scanner_disable;
 
-  constexpr size_t alloc_size = 32 * PAGE_SIZE;
+  constexpr uint64_t kMaxOptPages = VmMapping::kPageFaultMaxOptimisticPages;
+
+  // Size the allocation of the VMO / mapping to be double the optimistic extension so we can
+  // validate that it is limited by the optimistic cap, not the size of the VMO.
+  constexpr size_t alloc_size = kMaxOptPages * 2 * PAGE_SIZE;
   static const uint8_t align_pow2 = log2_floor(alloc_size);
 
-  // This is duplicating a constant in VmMapping::PageFaultLocked. Optimisation will fault the
-  // minimum of 16 pages and the end of the VMO, protection range.
-  static const size_t max_opportunistic_pages = 16;
-
-  // 32 Page mapped & fully committed VMO.
+  // Mapped & fully committed VMO.
   fbl::RefPtr<VmObjectPaged> committed_vmo;
   ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, alloc_size, &committed_vmo));
 
@@ -1550,11 +1550,12 @@ static bool vm_mapping_page_fault_optimisation_test() {
   // Trigger a page fault on the first page in the VMO/Mapping.
   mapping->put(42);
 
-  // Optimisation will fault the minimum of 16 pages and the end of the VMO, protection
-  // range, mapping or page table. We have ensures that all of these will be > 16 in this case.
-  ASSERT_TRUE(verify_mapped_page_range(mapping->base(), alloc_size, max_opportunistic_pages));
+  // Optimisation will fault the minimum of kMaxOptPages pages and the end of the VMO, protection
+  // range, mapping or page table. We have ensured that all of these will be > kMaxOptPages in this
+  // case.
+  ASSERT_TRUE(verify_mapped_page_range(mapping->base(), alloc_size, kMaxOptPages));
 
-  // 32 Page mapped but not committed VMO.
+  // Mapped but not committed VMO.
   fbl::RefPtr<VmObjectPaged> uncommitted_vmo;
   ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, alloc_size, &uncommitted_vmo));
 
@@ -1568,7 +1569,7 @@ static bool vm_mapping_page_fault_optimisation_test() {
   // As the VMO is uncommitted, only the requested page should have been faulted.
   ASSERT_TRUE(verify_mapped_page_range(mapping2->base(), alloc_size, 1));
 
-  // 32 Page VMO with a single committed page.
+  // Single committed page.
   fbl::RefPtr<VmObjectPaged> onepage_committed_vmo;
   ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, alloc_size, &onepage_committed_vmo));
 
@@ -1584,7 +1585,8 @@ static bool vm_mapping_page_fault_optimisation_test() {
   // Only the requested page should have been faulted.
   ASSERT_TRUE(verify_mapped_page_range(mapping3->base(), alloc_size, 1));
 
-  // 32 Page VMO with a 4 committed pages.
+  // 4 committed pages.
+  static_assert(4 <= kMaxOptPages);
   fbl::RefPtr<VmObjectPaged> partially_committed_vmo;
   ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, alloc_size, &partially_committed_vmo));
 
@@ -1599,6 +1601,255 @@ static bool vm_mapping_page_fault_optimisation_test() {
 
   // Only the already committed pages should be committed.
   ASSERT_TRUE(verify_mapped_page_range(mapping4->base(), alloc_size, 4));
+
+  END_TEST;
+}
+
+// Validate that the page fault optimisation correctly respects page table boundaries.
+static bool vm_mapping_page_fault_optimization_pt_limit_test() {
+  BEGIN_TEST;
+
+  AutoVmScannerDisable scanner_disable;
+
+  constexpr size_t kMaxOptPages = VmMapping::kPageFaultMaxOptimisticPages;
+  // Size our top level vmar allocation to be two page tables in size, ensuring that we will both
+  // have a page table boundary crossing in the allocation, as well as some amount of allocation on
+  // either side of it.
+  constexpr size_t kPageTableSize = ArchVmAspace::NextUserPageTableOffset(0);
+  constexpr size_t kVmarSize = kPageTableSize * 2;
+  // Align our allocation on a page table boundary, ensuring we have 1 page table worth of space
+  // before and after our PT crossing point.
+  constexpr size_t kVmarAlign = log2_floor(kPageTableSize);
+  // Size the allocation of the VMO / mapping to be double the optimistic extension so we can
+  // validate that it is limited by the optimistic cap, not the size of the VMO.
+  constexpr size_t kMapSize = kMaxOptPages * 2 * PAGE_SIZE;
+
+  // Allocate our large top level vmar in root vmar of the current aspace.
+  fbl::RefPtr<VmAddressRegion> root_vmar = Thread::Current::active_aspace()->RootVmar();
+  fbl::RefPtr<VmAddressRegion> vmar;
+  ASSERT_OK(root_vmar->CreateSubVmar(0, kVmarSize, kVmarAlign,
+                                     VMAR_FLAG_CAN_MAP_READ | VMAR_FLAG_CAN_MAP_WRITE |
+                                         VMAR_FLAG_CAN_MAP_EXECUTE | VMAR_FLAG_CAN_MAP_SPECIFIC,
+                                     "unittest", &vmar));
+  auto cleanup_vmar = fit::defer([&] { vmar->Destroy(); });
+
+  const vaddr_t next_pt_base = ArchVmAspace::NextUserPageTableOffset(vmar->base());
+  // If our alignment was specified correctly the next pt should be exactly one pt from our base.
+  ASSERT_EQ(vmar->base() + kPageTableSize, next_pt_base);
+
+  // Try touching at different distances from the start of the next page table and validate that
+  // mappings are not added beyond it.
+  for (size_t page_offset = 0; page_offset <= kMaxOptPages + 1; page_offset++) {
+    // Create a subvmar at the correct offset that will precisely hold our mapping.
+    fbl::RefPtr<VmAddressRegion> sub_vmar;
+    const size_t offset = kPageTableSize - PAGE_SIZE * page_offset;
+    ASSERT_OK(vmar->CreateSubVmar(offset, kMapSize, 0,
+                                  VMAR_FLAG_CAN_MAP_READ | VMAR_FLAG_CAN_MAP_WRITE |
+                                      VMAR_FLAG_CAN_MAP_EXECUTE | VMAR_FLAG_SPECIFIC,
+                                  "unittest", &sub_vmar));
+    auto cleanup_sub_vmar = fit::defer([&] { sub_vmar->Destroy(); });
+
+    fbl::RefPtr<VmObjectPaged> committed_vmo;
+    ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, kMapSize, &committed_vmo));
+
+    ktl::unique_ptr<testing::UserMemory> mapping =
+        testing::UserMemory::CreateInVmar(committed_vmo, sub_vmar);
+    ASSERT_NONNULL(mapping);
+
+    committed_vmo->CommitRange(0, kMapSize);
+
+    // Trigger a page fault on the first page of the mapping.
+    mapping->put(42);
+
+    // We expect the number of pages that are mapped in to be clipped at the page table boundary,
+    // which would be |page_offset|. The two exceptions to this are if page_offset is greater than
+    // kMaxOptPages, in which case that becomes the cap, or if the page_offset is 0, in which case
+    // we are actually at the *start* of the next page table, and so kMaxOptPages should get mapped.
+    const size_t kExpectedPages =
+        page_offset == 0 ? kMaxOptPages : ktl::min(kMaxOptPages, page_offset);
+
+    ASSERT_TRUE(verify_mapped_page_range(mapping->base(), kMapSize, kExpectedPages));
+  }
+
+  END_TEST;
+}
+
+static bool vm_mapping_page_fault_range_test() {
+  BEGIN_TEST;
+
+  AutoVmScannerDisable scanner_disable;
+
+  constexpr size_t kTestPages = VmMapping::kPageFaultMaxOptimisticPages * 2;
+  constexpr size_t kAllocSize = kTestPages * PAGE_SIZE;
+  constexpr uint kReadFlags = VMM_PF_FLAG_USER;
+  constexpr uint kWriteFlags = VMM_PF_FLAG_USER | VMM_PF_FLAG_WRITE;
+  // Aligning the mapping is for when testing the optimistic fault handler to ensure that there are
+  // no spurious failures due to crossing a page table boundary.
+  static const uint8_t align_pow2 = log2_floor(kAllocSize);
+
+  fbl::RefPtr<VmObjectPaged> vmo;
+  ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kResizable, kAllocSize, &vmo));
+
+  ktl::unique_ptr<testing::UserMemory> mapping = testing::UserMemory::Create(vmo, 0, align_pow2);
+  ASSERT_NONNULL(mapping);
+
+  // Faulting even 1 additional page should prevent optimistic faulting.
+  {
+    // Decommit and recommit the VMO to ensure no page table mappings.
+    EXPECT_OK(vmo->DecommitRange(0, kAllocSize));
+    EXPECT_OK(vmo->CommitRange(0, kAllocSize));
+    EXPECT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, 0));
+
+    // Fault a two page range should only give two pages.
+    EXPECT_OK(Thread::Current::SoftFaultInRange(mapping->base(), kReadFlags, PAGE_SIZE * 2));
+    EXPECT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, 2));
+
+    // Reset and fault a single page to validate optimistic faulting would otherwise have happened.
+    EXPECT_OK(vmo->DecommitRange(0, kAllocSize));
+    EXPECT_OK(vmo->CommitRange(0, kAllocSize));
+    EXPECT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, 0));
+    EXPECT_OK(Thread::Current::SoftFaultInRange(mapping->base(), kReadFlags, PAGE_SIZE));
+    EXPECT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize,
+                                         VmMapping::kPageFaultMaxOptimisticPages));
+  }
+
+  // Will map in pages that are not committed on read without allocating.
+  {
+    // Start with one page committed.
+    EXPECT_OK(vmo->DecommitRange(0, kAllocSize));
+    EXPECT_OK(vmo->CommitRange(0, PAGE_SIZE));
+    EXPECT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, 0));
+    EXPECT_TRUE(vmo->GetAttributedMemory() == make_private_attribution_counts(PAGE_SIZE, 0));
+
+    // Read faulting the range should map without allocating.
+    EXPECT_OK(Thread::Current::SoftFaultInRange(mapping->base(), kReadFlags, kAllocSize));
+    EXPECT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, kTestPages));
+    EXPECT_TRUE(vmo->GetAttributedMemory() == make_private_attribution_counts(PAGE_SIZE, 0));
+  }
+
+  // Write faulting should cause allocations
+  {
+    // Start with one page committed.
+    EXPECT_OK(vmo->DecommitRange(0, kAllocSize));
+    EXPECT_OK(vmo->CommitRange(0, PAGE_SIZE));
+    EXPECT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, 0));
+    EXPECT_TRUE(vmo->GetAttributedMemory() == make_private_attribution_counts(PAGE_SIZE, 0));
+
+    // Write faulting the range should both map and allocate the pages.
+    EXPECT_OK(Thread::Current::SoftFaultInRange(mapping->base(), kWriteFlags, kAllocSize));
+    EXPECT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, kTestPages));
+    EXPECT_TRUE(vmo->GetAttributedMemory() == make_private_attribution_counts(kAllocSize, 0));
+  }
+
+  // Faulting a partial range should not overrun
+  {
+    EXPECT_OK(vmo->DecommitRange(0, kAllocSize));
+    EXPECT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, 0));
+    EXPECT_TRUE(vmo->GetAttributedMemory() == make_private_attribution_counts(0, 0));
+
+    // Write faulting the range should both map and allocate the requested pages, but no more.
+    EXPECT_OK(Thread::Current::SoftFaultInRange(mapping->base(), kWriteFlags, kAllocSize / 2));
+    EXPECT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, kTestPages / 2));
+    EXPECT_TRUE(vmo->GetAttributedMemory() == make_private_attribution_counts(kAllocSize / 2, 0));
+  }
+
+  // Should not error if > VMO length.
+  {
+    EXPECT_OK(vmo->DecommitRange(0, kAllocSize));
+    // Shrink the VMO so that it is smaller than the mapping.
+    EXPECT_OK(vmo->Resize(kAllocSize / 2));
+    EXPECT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, 0));
+
+    // Attempt to fault the entire mapping range, which is now larger than the VMO.
+    EXPECT_OK(Thread::Current::SoftFaultInRange(mapping->base(), kWriteFlags, kAllocSize));
+    // Only half should have been mapped and what is now the whole VMO should be committed.
+    EXPECT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, kTestPages / 2));
+    EXPECT_TRUE(vmo->GetAttributedMemory() == make_private_attribution_counts(kAllocSize / 2, 0));
+
+    // Restore the VMO size.
+    EXPECT_OK(vmo->Resize(kAllocSize));
+  }
+
+  // Will respect protection boundaries.
+  {
+    EXPECT_OK(vmo->DecommitRange(0, kAllocSize));
+    // Remove write permissions from half the mapping.
+    EXPECT_OK(mapping->Protect(ARCH_MMU_FLAG_PERM_READ, kAllocSize / 2));
+
+    // Attempt to write fault the entire mapping.
+    EXPECT_OK(Thread::Current::SoftFaultInRange(mapping->base(), kWriteFlags, kAllocSize));
+    // Only the writable half should have been mapped and committed.
+    EXPECT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, kTestPages / 2));
+    EXPECT_TRUE(vmo->GetAttributedMemory() == make_private_attribution_counts(kAllocSize / 2, 0));
+
+    // Reset protections.
+    EXPECT_OK(mapping->Protect(ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE));
+  }
+
+  // Will mark modified if even one writable page is mapped even if mapping aborts early due to an
+  // error.
+  {
+    // Create a pager backed VMO with one page committed and map it.
+    fbl::RefPtr<VmObjectPaged> paged_vmo;
+    ASSERT_OK(
+        make_partially_committed_pager_vmo(kTestPages, 1, false, false, true, nullptr, &paged_vmo));
+    ktl::unique_ptr<testing::UserMemory> paged_mapping = testing::UserMemory::Create(paged_vmo);
+
+    // Consume any existing modified flag.
+    zx_pager_vmo_stats_t stats;
+    EXPECT_OK(paged_vmo->QueryPagerVmoStats(true, &stats));
+    EXPECT_OK(paged_vmo->QueryPagerVmoStats(true, &stats));
+    EXPECT_EQ(stats.modified, 0u);
+
+    // Perform a fault that will have to generate a page request. To avoid blocking on the page
+    // request we must directly call the PageFaultLocked method instead of the VmAspace fault.
+    {
+      const vaddr_t base = paged_mapping->base();
+      Guard<CriticalMutex> guard{paged_mapping->mapping()->lock()};
+      MultiPageRequest page_request;
+      ktl::pair<zx_status_t, uint32_t> result;
+      // Although the first page is supplied to paged_vmo, attempting to map it could still fail due
+      // to either it being deduped to a marker, or it being a loaned page and needing to be
+      // swapped. Both of these cases require an allocation, which could need to wait. This wait
+      // request should only be due to the pmm random delayed allocations, and so we can just ignore
+      // it and try again.
+      size_t retry_count = 0;
+      do {
+        result = paged_mapping->mapping()->PageFaultLocked(base, kWriteFlags, kTestPages - 1,
+                                                           &page_request);
+        page_request.CancelRequests();
+        retry_count++;
+      } while (result.first == ZX_ERR_SHOULD_WAIT && result.second == 0 && retry_count < 100);
+      EXPECT_EQ(result.first, ZX_ERR_SHOULD_WAIT);
+      EXPECT_EQ(result.second, 1u);
+    }
+
+    // The one previously committed page should have been mapped in and the VMO marked modified.
+    EXPECT_TRUE(verify_mapped_page_range(paged_mapping->base(), kAllocSize, 1));
+
+    EXPECT_OK(paged_vmo->QueryPagerVmoStats(true, &stats));
+    EXPECT_EQ(stats.modified, ZX_PAGER_VMO_STATS_MODIFIED);
+  }
+
+  // Read fault on copy-on-write hierarchy with some leaf pages will map both parent and child
+  // pages without committing extra pages into the child.
+  {
+    EXPECT_OK(vmo->CommitRange(0, kAllocSize));
+    // Create a snapshot with some committed pages and map it in.
+    fbl::RefPtr<VmObject> child_vmo;
+    ASSERT_OK(vmo->CreateClone(Resizability::NonResizable, SnapshotType::Full, 0, kAllocSize, true,
+                               &child_vmo));
+    EXPECT_OK(child_vmo->CommitRange(0, PAGE_SIZE));
+    EXPECT_OK(child_vmo->CommitRange(kAllocSize / 2, PAGE_SIZE));
+    ktl::unique_ptr<testing::UserMemory> child_mapping = testing::UserMemory::Create(child_vmo);
+
+    // Read fault the entire range. Everything should get mapped with the child's memory attribution
+    // being unchanged.
+    VmObject::AttributionCounts original_counts = child_vmo->GetAttributedMemory();
+    EXPECT_OK(Thread::Current::SoftFaultInRange(child_mapping->base(), kReadFlags, kAllocSize));
+    EXPECT_TRUE(verify_mapped_page_range(child_mapping->base(), kAllocSize, kTestPages));
+    EXPECT_TRUE(original_counts == child_vmo->GetAttributedMemory());
+  }
 
   END_TEST;
 }
@@ -2192,6 +2443,7 @@ static bool region_list_is_range_available_test() {
 }
 
 // Helper class for writing tests against the pausable VmAddressRegionEnumerator
+template <VmAddressRegionEnumeratorType Type>
 class EnumeratorTestHelper {
  public:
   EnumeratorTestHelper() = default;
@@ -2222,16 +2474,16 @@ class EnumeratorTestHelper {
       const size_t offset = region.page_offset_begin * PAGE_SIZE;
       const vaddr_t vaddr = test_vmar_->base() + offset;
       // See if there's a child VMAR that we should be making this in instead of our test root.
-      fbl::RefPtr<VmAddressRegion> vmar;
-      auto child_region = test_vmar_->FindRegion(vaddr);
-      if (child_region) {
-        // Set our target vmar to the child region. If it's actually a mapping then this is fine,
-        // we'll end up trying to create in the test_vmar which will then fail.
-        vmar = child_region->as_vm_address_region();
-      }
-      // If no child then use the root test_vmar
-      if (!vmar) {
-        vmar = test_vmar_;
+      fbl::RefPtr<VmAddressRegion> vmar = test_vmar_;
+      auto next_region = [&]() {
+        auto child_region = vmar->FindRegion(vaddr);
+        if (child_region) {
+          return child_region->as_vm_address_region();
+        }
+        return fbl::RefPtr<VmAddressRegion>();
+      };
+      while (auto next = next_region()) {
+        vmar = next;
       }
       // Create either a mapping or vmar as requested.
       const size_t size = (region.page_offset_end - region.page_offset_begin) * PAGE_SIZE;
@@ -2254,13 +2506,11 @@ class EnumeratorTestHelper {
     }
     return ZX_OK;
   }
-  using RegionEnumerator =
-      VmAddressRegionEnumerator<VmAddressRegionEnumeratorType::PausableMapping>;
+  using RegionEnumerator = VmAddressRegionEnumerator<Type>;
   RegionEnumerator Enumerator(size_t page_offset_begin, size_t page_offset_end) TA_REQ(lock()) {
     const vaddr_t min_addr = test_vmar_->base() + page_offset_begin * PAGE_SIZE;
     const vaddr_t max_addr = test_vmar_->base() + page_offset_end * PAGE_SIZE;
-    return VmAddressRegionEnumerator<VmAddressRegionEnumeratorType::PausableMapping>(
-        *test_vmar_, min_addr, max_addr);
+    return VmAddressRegionEnumerator<Type>(*test_vmar_, min_addr, max_addr);
   }
 
   void Resume(RegionEnumerator& enumerator) TA_REQ(lock()) {
@@ -2273,14 +2523,14 @@ class EnumeratorTestHelper {
     AssertHeld(enumerator.lock_ref());
     for (auto& region : regions) {
       ASSERT(region.page_offset_end > region.page_offset_begin);
-      if (!region.mapping) {
-        continue;
-      }
       auto next = enumerator.next();
       if (!next.has_value()) {
         return false;
       }
       AssertHeld(next->region_or_mapping->lock_ref());
+      if (region.mapping != next->region_or_mapping->is_mapping()) {
+        return false;
+      }
       if (next->region_or_mapping->base_locked() !=
           test_vmar_->base() + region.page_offset_begin * PAGE_SIZE) {
         return false;
@@ -2297,7 +2547,21 @@ class EnumeratorTestHelper {
     ASSERT(page_offset_end > page_offset_begin);
     const vaddr_t vaddr = test_vmar_->base() + page_offset_begin * PAGE_SIZE;
     const size_t size = (page_offset_end - page_offset_begin) * PAGE_SIZE;
-    return test_vmar_->Unmap(vaddr, size, VmAddressRegionOpChildren::Yes);
+    // Attempt to unmap, walking down into child vmars if the unmap fails due to it causing a
+    // subvmar to be partially unmapped.
+    fbl::RefPtr<VmAddressRegion> vmar = test_vmar_;
+    do {
+      zx_status_t status = vmar->Unmap(vaddr, size, VmAddressRegionOpChildren::Yes);
+      if (status != ZX_ERR_INVALID_ARGS) {
+        return status;
+      }
+      fbl::RefPtr<VmAddressRegionOrMapping> next = vmar->FindRegion(vaddr);
+      if (!next) {
+        return status;
+      }
+      vmar = next->as_vm_address_region();
+    } while (vmar);
+    return ZX_ERR_NOT_FOUND;
   }
 
   Lock<CriticalMutex>* lock() const TA_RET_CAP(test_vmar_->lock()) { return test_vmar_->lock(); }
@@ -2314,43 +2578,43 @@ class EnumeratorTestHelper {
   fbl::RefPtr<VmAddressRegion> test_vmar_;
 };
 
-static bool address_region_enumerator_mapping_test() {
+static bool address_region_enumerator_test() {
   BEGIN_TEST;
 
   fbl::RefPtr<VmAspace> aspace = VmAspace::Create(VmAspace::Type::User, "test aspace");
 
   // Smoke test of a single region.
   {
-    EnumeratorTestHelper test;
+    EnumeratorTestHelper<VmAddressRegionEnumeratorType::VmarsAndMappings> test;
     ASSERT_OK(test.Init(aspace));
     EXPECT_OK(test.AddRegions({{true, 0, 1}}));
     Guard<CriticalMutex> guard{test.lock()};
     auto enumerator = test.Enumerator(0, 1);
     AssertHeld(enumerator.lock_ref());
-    ASSERT_TRUE(test.ExpectRegions(enumerator, {{true, 0, 1}}));
-    ASSERT_FALSE(enumerator.next().has_value());
+    EXPECT_TRUE(test.ExpectRegions(enumerator, {{true, 0, 1}}));
+    EXPECT_FALSE(enumerator.next().has_value());
   }
   // Unmap while iterating a subvmar and resume in the parent.
   {
-    EnumeratorTestHelper test;
+    EnumeratorTestHelper<VmAddressRegionEnumeratorType::VmarsAndMappings> test;
     ASSERT_OK(test.Init(aspace));
     EXPECT_OK(
         test.AddRegions({{false, 0, 7}, {true, 1, 2}, {true, 3, 4}, {true, 5, 6}, {true, 7, 8}}));
     Guard<CriticalMutex> guard{test.lock()};
     auto enumerator = test.Enumerator(0, 10);
     AssertHeld(enumerator.lock_ref());
-    ASSERT_TRUE(test.ExpectRegions(enumerator, {{true, 1, 2}}));
+    EXPECT_TRUE(test.ExpectRegions(enumerator, {{false, 0, 7}, {true, 1, 2}}));
     enumerator.pause();
     // Unmap the entire subvmar we created
     guard.CallUnlocked([&test] { test.Unmap(0, 7); });
     test.Resume(enumerator);
     // Last mapping should still be there.
-    ASSERT_TRUE(test.ExpectRegions(enumerator, {{true, 7, 8}}));
-    ASSERT_FALSE(enumerator.next().has_value());
+    EXPECT_TRUE(test.ExpectRegions(enumerator, {{true, 7, 8}}));
+    EXPECT_FALSE(enumerator.next().has_value());
   }
   // Pause immediately without enumerating when the start is a subvmar.
   {
-    EnumeratorTestHelper test;
+    EnumeratorTestHelper<VmAddressRegionEnumeratorType::VmarsAndMappings> test;
     ASSERT_OK(test.Init(aspace));
     EXPECT_OK(test.AddRegions({{false, 0, 2}, {true, 1, 2}}));
     Guard<CriticalMutex> guard{test.lock()};
@@ -2358,96 +2622,96 @@ static bool address_region_enumerator_mapping_test() {
     AssertHeld(enumerator.lock_ref());
     enumerator.pause();
     test.Resume(enumerator);
-    ASSERT_TRUE(test.ExpectRegions(enumerator, {{true, 1, 2}}));
-    ASSERT_FALSE(enumerator.next().has_value());
+    EXPECT_TRUE(test.ExpectRegions(enumerator, {{false, 0, 2}, {true, 1, 2}}));
+    EXPECT_FALSE(enumerator.next().has_value());
   }
   // Add future mapping.
   {
-    EnumeratorTestHelper test;
+    EnumeratorTestHelper<VmAddressRegionEnumeratorType::VmarsAndMappings> test;
     ASSERT_OK(test.Init(aspace));
     EXPECT_OK(test.AddRegions({{true, 0, 1}, {true, 1, 2}}));
     Guard<CriticalMutex> guard{test.lock()};
     auto enumerator = test.Enumerator(0, 3);
     AssertHeld(enumerator.lock_ref());
-    ASSERT_TRUE(test.ExpectRegions(enumerator, {{true, 0, 1}}));
+    EXPECT_TRUE(test.ExpectRegions(enumerator, {{true, 0, 1}}));
     enumerator.pause();
     guard.CallUnlocked([&test] { test.AddRegions({{true, 2, 3}}); });
     test.Resume(enumerator);
-    ASSERT_TRUE(test.ExpectRegions(enumerator, {{true, 1, 2}, {true, 2, 3}}));
-    ASSERT_FALSE(enumerator.next().has_value());
+    EXPECT_TRUE(test.ExpectRegions(enumerator, {{true, 1, 2}, {true, 2, 3}}));
+    EXPECT_FALSE(enumerator.next().has_value());
   }
   // Replace the next mapping.
   {
-    EnumeratorTestHelper test;
+    EnumeratorTestHelper<VmAddressRegionEnumeratorType::VmarsAndMappings> test;
     ASSERT_OK(test.Init(aspace));
     EXPECT_OK(test.AddRegions({{true, 0, 1}, {true, 1, 2}}));
     Guard<CriticalMutex> guard{test.lock()};
     auto enumerator = test.Enumerator(0, 3);
     AssertHeld(enumerator.lock_ref());
-    ASSERT_TRUE(test.ExpectRegions(enumerator, {{true, 0, 1}}));
+    EXPECT_TRUE(test.ExpectRegions(enumerator, {{true, 0, 1}}));
     enumerator.pause();
     guard.CallUnlocked([&test] {
       test.Unmap(1, 2);
       test.AddRegions({{true, 1, 3}});
     });
     test.Resume(enumerator);
-    ASSERT_TRUE(test.ExpectRegions(enumerator, {{true, 1, 3}}));
-    ASSERT_FALSE(enumerator.next().has_value());
+    EXPECT_TRUE(test.ExpectRegions(enumerator, {{true, 1, 3}}));
+    EXPECT_FALSE(enumerator.next().has_value());
   }
   // Add earlier regions.
   {
-    EnumeratorTestHelper test;
+    EnumeratorTestHelper<VmAddressRegionEnumeratorType::VmarsAndMappings> test;
     ASSERT_OK(test.Init(aspace));
     EXPECT_OK(test.AddRegions({{true, 2, 3}, {true, 3, 4}}));
     Guard<CriticalMutex> guard{test.lock()};
     auto enumerator = test.Enumerator(0, 4);
     AssertHeld(enumerator.lock_ref());
-    ASSERT_TRUE(test.ExpectRegions(enumerator, {{true, 2, 3}}));
+    EXPECT_TRUE(test.ExpectRegions(enumerator, {{true, 2, 3}}));
     enumerator.pause();
     guard.CallUnlocked([&test] { test.AddRegions({{true, 0, 1}, {true, 1, 32}}); });
     test.Resume(enumerator);
-    ASSERT_TRUE(test.ExpectRegions(enumerator, {{true, 3, 4}}));
-    ASSERT_FALSE(enumerator.next().has_value());
+    EXPECT_TRUE(test.ExpectRegions(enumerator, {{true, 3, 4}}));
+    EXPECT_FALSE(enumerator.next().has_value());
   }
   // Replace current.
   {
-    EnumeratorTestHelper test;
+    EnumeratorTestHelper<VmAddressRegionEnumeratorType::VmarsAndMappings> test;
     ASSERT_OK(test.Init(aspace));
     EXPECT_OK(test.AddRegions({{true, 1, 2}, {true, 2, 3}}));
     Guard<CriticalMutex> guard{test.lock()};
     auto enumerator = test.Enumerator(0, 3);
     AssertHeld(enumerator.lock_ref());
-    ASSERT_TRUE(test.ExpectRegions(enumerator, {{true, 1, 2}}));
+    EXPECT_TRUE(test.ExpectRegions(enumerator, {{true, 1, 2}}));
     enumerator.pause();
     guard.CallUnlocked([&test] {
       test.Unmap(1, 2);
       test.AddRegions({{true, 0, 2}});
     });
     test.Resume(enumerator);
-    ASSERT_TRUE(test.ExpectRegions(enumerator, {{true, 2, 3}}));
-    ASSERT_FALSE(enumerator.next().has_value());
+    EXPECT_TRUE(test.ExpectRegions(enumerator, {{true, 2, 3}}));
+    EXPECT_FALSE(enumerator.next().has_value());
   }
   // Replace current and next with a single mapping.
   {
-    EnumeratorTestHelper test;
+    EnumeratorTestHelper<VmAddressRegionEnumeratorType::VmarsAndMappings> test;
     ASSERT_OK(test.Init(aspace));
     EXPECT_OK(test.AddRegions({{true, 1, 2}, {true, 2, 3}}));
     Guard<CriticalMutex> guard{test.lock()};
     auto enumerator = test.Enumerator(0, 3);
     AssertHeld(enumerator.lock_ref());
-    ASSERT_TRUE(test.ExpectRegions(enumerator, {{true, 1, 2}}));
+    EXPECT_TRUE(test.ExpectRegions(enumerator, {{true, 1, 2}}));
     enumerator.pause();
     guard.CallUnlocked([&test] {
       test.Unmap(1, 3);
       test.AddRegions({{true, 0, 3}});
     });
     test.Resume(enumerator);
-    ASSERT_TRUE(test.ExpectRegions(enumerator, {{true, 0, 3}}));
-    ASSERT_FALSE(enumerator.next().has_value());
+    EXPECT_FALSE(test.ExpectRegions(enumerator, {{true, 0, 3}}));
+    EXPECT_FALSE(enumerator.next().has_value());
   }
   // Start enumerating part way into a mapping.
   {
-    EnumeratorTestHelper test;
+    EnumeratorTestHelper<VmAddressRegionEnumeratorType::MappingsOnly> test;
     ASSERT_OK(test.Init(aspace));
     EXPECT_OK(test.AddRegions({{false, 0, 6}, {true, 0, 2}, {true, 2, 4}, {true, 6, 7}}));
     Guard<CriticalMutex> guard{test.lock()};
@@ -2455,8 +2719,44 @@ static bool address_region_enumerator_mapping_test() {
     AssertHeld(enumerator.lock_ref());
     enumerator.pause();
     test.Resume(enumerator);
-    ASSERT_TRUE(test.ExpectRegions(enumerator, {{true, 2, 4}, {true, 6, 7}}));
-    ASSERT_FALSE(enumerator.next().has_value());
+    EXPECT_TRUE(test.ExpectRegions(enumerator, {{true, 2, 4}, {true, 6, 7}}));
+    EXPECT_FALSE(enumerator.next().has_value());
+  }
+  // Delete depth that was just yielded
+  {
+    EnumeratorTestHelper<VmAddressRegionEnumeratorType::VmarsAndMappings> test;
+    ASSERT_OK(test.Init(aspace));
+    EXPECT_OK(test.AddRegions({{false, 0, 10}, {false, 0, 9}, {false, 0, 8}, {false, 0, 7}}));
+    Guard<CriticalMutex> guard{test.lock()};
+    auto enumerator = test.Enumerator(0, 10);
+    AssertHeld(enumerator.lock_ref());
+    EXPECT_TRUE(test.ExpectRegions(enumerator, {{false, 0, 10}, {false, 0, 9}}));
+    enumerator.pause();
+    guard.CallUnlocked([&test] {
+      ASSERT(test.Unmap(0, 9) == ZX_OK);
+      ASSERT(test.AddRegions({{false, 0, 8}, {false, 0, 7}}) == ZX_OK);
+    });
+    test.Resume(enumerator);
+    // Subtree was deleted and the new one will not be yielded.
+    EXPECT_FALSE(enumerator.next().has_value());
+  }
+  // Delete next depth to be yielded
+  {
+    EnumeratorTestHelper<VmAddressRegionEnumeratorType::VmarsAndMappings> test;
+    ASSERT_OK(test.Init(aspace));
+    EXPECT_OK(test.AddRegions({{false, 0, 10}, {false, 0, 9}, {false, 0, 8}, {false, 0, 7}}));
+    Guard<CriticalMutex> guard{test.lock()};
+    auto enumerator = test.Enumerator(0, 10);
+    AssertHeld(enumerator.lock_ref());
+    EXPECT_TRUE(test.ExpectRegions(enumerator, {{false, 0, 10}, {false, 0, 9}}));
+    enumerator.pause();
+    guard.CallUnlocked([&test] {
+      ASSERT(test.Unmap(0, 8) == ZX_OK);
+      ASSERT(test.AddRegions({{false, 0, 7}}) == ZX_OK);
+    });
+    test.Resume(enumerator);
+    // Subtree was deleted and the new one will not be yielded.
+    EXPECT_FALSE(enumerator.next().has_value());
   }
 
   EXPECT_OK(aspace->Destroy());
@@ -2659,6 +2959,8 @@ VM_UNITTEST(vm_mapping_attribution_map_unmap_test)
 VM_UNITTEST(vm_mapping_attribution_merge_test)
 VM_UNITTEST(vm_mapping_sparse_mapping_test)
 VM_UNITTEST(vm_mapping_page_fault_optimisation_test)
+VM_UNITTEST(vm_mapping_page_fault_optimization_pt_limit_test)
+VM_UNITTEST(vm_mapping_page_fault_range_test)
 VM_UNITTEST(arch_is_user_accessible_range)
 VM_UNITTEST(validate_user_address_range)
 VM_UNITTEST(arch_noncontiguous_map)
@@ -2672,7 +2974,7 @@ VM_UNITTEST(region_list_find_region_test)
 VM_UNITTEST(region_list_include_or_higher_test)
 VM_UNITTEST(region_list_upper_bound_test)
 VM_UNITTEST(region_list_is_range_available_test)
-VM_UNITTEST(address_region_enumerator_mapping_test)
+VM_UNITTEST(address_region_enumerator_test)
 VM_UNITTEST(dump_all_aspaces)  // Run last
 UNITTEST_END_TESTCASE(aspace_tests, "aspace", "VmAspace / ArchVmAspace / VMAR tests")
 

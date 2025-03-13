@@ -2,23 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use async_lock::MutexGuard;
 use async_trait::async_trait;
 use errors::FfxError;
-use ffx_command_error::{bug, return_bug, user_error, Error, Result};
-use ffx_config::{EnvironmentContext, TryFromEnvContext};
+use ffx_command_error::{return_bug, Error, Result};
 use ffx_target::ssh_connector::SshConnector;
-use ffx_target::{Connection, ConnectionError, TargetConnector};
 use fho::{DirectConnector, FhoConnectionBehavior, FhoEnvironment, TryFromEnv};
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_developer_ffx as ffx_fidl;
 use std::sync::Arc;
 use std::time::Duration;
-use target_holders::{init_daemon_behavior, DaemonProxyHolder, DeviceLookupDefaultImpl};
-
-mod network_connector;
-
-use network_connector::NetworkConnector;
+use target_holders::{init_connection_behavior, DaemonProxyHolder, DeviceLookupDefaultImpl};
+use target_network_connector::NetworkConnector;
 
 /// A connector lets a tool make multiple attempts to connect to an object. It
 /// retains the environment in the tool body to allow this.
@@ -64,8 +58,8 @@ impl<T: TryFromEnv> Connector<T> {
 impl<T: TryFromEnv> TryFromEnv for Connector<T> {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         if env.behavior().await.is_none() {
-            let b = init_daemon_behavior(env.environment_context()).await?;
-            env.set_behavior(b.clone()).await;
+            let b = init_connection_behavior(env.environment_context()).await?;
+            env.set_behavior(b).await;
         }
         if env.lookup().await.is_none() {
             env.set_lookup(Box::new(DeviceLookupDefaultImpl)).await
@@ -207,31 +201,6 @@ async fn daemon_try_connect<T: TryFromEnv>(
     }
 }
 
-async fn connect_helper<T: TryFromEnvContext + TargetConnector + 'static>(
-    env: &EnvironmentContext,
-    conn: &mut MutexGuard<'_, Option<Connection>>,
-) -> Result<()> {
-    match **conn {
-        Some(_) => Ok(()),
-        None => {
-            let overnet_connector = T::try_from_env_context(env).await?;
-            let c = match Connection::new(overnet_connector).await {
-                Ok(c) => Ok(c),
-                Err(ConnectionError::ConnectionStartError(cmd_info, error)) => {
-                    tracing::info!("connector encountered start error: {cmd_info}, '{error}'");
-                    Err(user_error!(
-                        "Unable to connect to device via {}: {error}",
-                        <T as TargetConnector>::CONNECTION_TYPE
-                    ))
-                }
-                Err(e) => Err(bug!("{e}")),
-            }?;
-            **conn = Some(c);
-            Ok(())
-        }
-    }
-}
-
 async fn direct_connector_try_connect<T: TryFromEnv>(
     env: &FhoEnvironment,
     dc: &Arc<dyn DirectConnector>,
@@ -267,7 +236,7 @@ mod tests {
 
     use super::*;
     use async_lock::Mutex;
-    use ffx_command_error::NonFatalError;
+    use ffx_command_error::{bug, NonFatalError};
     use ffx_config::{EnvironmentContext, TryFromEnvContext};
     use ffx_target::connection::testing::{FakeOvernet, FakeOvernetBehavior};
     use ffx_target::{TargetConnection, TargetConnectionError, TargetConnector};

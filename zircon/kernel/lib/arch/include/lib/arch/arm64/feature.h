@@ -209,6 +209,106 @@ struct ArmIdAa64IsaR1El1 : public SysRegBase<ArmIdAa64IsaR1El1> {
 };
 ARCH_ARM64_SYSREG(ArmIdAa64IsaR1El1, "ID_AA64ISAR1_EL1");
 
+// [arm/sysreg]/ID_AA64ISAR2_EL1: AArch64 Instruction Set Attribute Register 2
+struct ArmIdAa64IsaR2El1 : public SysRegBase<ArmIdAa64IsaR2El1> {
+  enum class Ats1a : uint8_t {
+    kNone = 0b0000,
+    kAts1a = 0b0001,
+  };
+
+  enum class Lut : uint8_t {
+    kNone = 0b0000,
+    kLut = 0b0001,
+  };
+
+  enum class Cssc : uint8_t {
+    kNone = 0b0000,
+    kCssc = 0b0001,  // FEAT_CSSC
+  };
+
+  enum class Rprfm : uint8_t {
+    kNone = 0b0000,
+    kRprfm = 0b0001,  // FEAT_RPRFM
+  };
+
+  enum class Prfmslc : uint8_t {
+    kNone = 0b0000,
+    kPrfmslc = 0b0001,  // FEAT_PRFMSLC
+  };
+
+  enum class Sysinstr_128 : uint8_t {
+    kNone = 0b0000,
+    kSysinstr_128 = 0b0001,  // FEAT_SYSINSTR128
+  };
+
+  enum class Sysreg_128 : uint8_t {
+    kNone = 0b0000,
+    kSysreg_128 = 0b0001,  // FEAT_SYSREG128
+  };
+
+  enum class Clrbhb : uint8_t {
+    kNone = 0b0000,
+    kClrbhb = 0b0001,  // FEAT_CLRBHB
+  };
+
+  enum class Pac_frac : uint8_t {
+    kNone = 0b0000,
+    kPac_frac = 0b0001,  // FEAT_CONSTPACFIELD
+  };
+
+  enum class Bc : uint8_t {
+    kNone = 0b0000,
+    kBc = 0b0001,  // FEAT_HBC
+  };
+
+  enum class Mops : uint8_t {
+    kNone = 0b0000,
+    kMops = 0b0001,  // FEAT_MOPS
+  };
+
+  enum class Apa3 : uint8_t {
+    kNone = 0b0000,
+    kNoEnhanced = 0b0001,    // FEAT_PAuth
+    kEnhancedPac = 0b0010,   // FEAT_EPAC
+    kEnhancedPac2 = 0b0011,  // FEAT_Pauth2
+    kFpac = 0b0100,          // FEAT_FPAC
+    kFpacCombined = 0b0101,  // FEAT_FPACCCOMBINE
+  };
+
+  enum class Gpa3 : uint8_t {
+    kNone = 0b0000,
+    kGpa3 = 0b0001,  // FEAT_PACQARMA3
+  };
+
+  enum class Rpres : uint8_t {
+    kNone = 0b0000,
+    kRpres = 0b0001,  // FEAT_RPRES
+  };
+
+  enum class Wfxt : uint8_t {
+    kNone = 0b0000,
+    kWfxt = 0b0001,  // FEAT_WFxT
+  };
+
+  DEF_ENUM_FIELD(Ats1a, 63, 60, ats1a);
+  DEF_ENUM_FIELD(Lut, 59, 56, lut);
+  DEF_ENUM_FIELD(Cssc, 55, 52, cssc);
+  DEF_ENUM_FIELD(Rprfm, 51, 48, rprfm);
+  DEF_RSVDZ_FIELD(47, 44);
+  DEF_ENUM_FIELD(Prfmslc, 43, 40, prfmslc);
+  DEF_ENUM_FIELD(Sysinstr_128, 39, 36, sysinstr_128);
+  DEF_ENUM_FIELD(Sysreg_128, 35, 32, sysreg_128);
+  DEF_ENUM_FIELD(Clrbhb, 31, 28, clrbhb);
+  DEF_ENUM_FIELD(Pac_frac, 27, 24, pac_frac);
+  DEF_ENUM_FIELD(Bc, 23, 20, bc);
+  DEF_ENUM_FIELD(Mops, 19, 16, mops);
+  DEF_ENUM_FIELD(Apa3, 15, 12, apa3);
+  DEF_ENUM_FIELD(Gpa3, 11, 8, gpa3);
+  DEF_ENUM_FIELD(Rpres, 7, 4, rpres);
+  DEF_ENUM_FIELD(Wfxt, 3, 0, wfxt);
+};
+ARCH_ARM64_SYSREG(ArmIdAa64IsaR2El1, "ID_AA64ISAR2_EL1");
+
 // [arm/sysreg]/ID_AA64PFR0_EL1: AArch64 Processor Feature Register 0
 struct ArmIdAa64Pfr0El1 : public SysRegBase<ArmIdAa64Pfr0El1> {
   enum class Csv3 : uint8_t {
@@ -290,6 +390,97 @@ struct ArmIdAa64Pfr0El1 : public SysRegBase<ArmIdAa64Pfr0El1> {
   DEF_ENUM_FIELD(El, 3, 0, el0);
 };
 ARCH_ARM64_SYSREG(ArmIdAa64Pfr0El1, "ID_AA64PFR0_EL1");
+
+// [arm/sysreg]/ID_AA64PFR1_EL1: AArch64 Processor Feature Register 1
+struct ArmIdAa64Pfr1El1 : public SysRegBase<ArmIdAa64Pfr1El1> {
+  enum class Pfar : uint8_t {
+    kNone = 0b0000,
+    kPfar = 0b0001,  // FEAT_PFAR
+  };
+
+  enum class Df2 : uint8_t {
+    kNone = 0b0000,
+    kDf2 = 0b0001,  // FEAT_DoubleFault2
+  };
+
+  enum class Mtex : uint8_t {
+    kNone = 0b0000,
+    kMtex = 0b0001,  // FEAT_MTE_NO_ADDRESS_TAGS, FEAT_MTE_CANONICAL_TAGS
+  };
+
+  enum class The : uint8_t {
+    kNone = 0b0000,
+    kThe = 0b0001,  // FEAT_THE
+  };
+
+  enum class Gcs : uint8_t {
+    kNone = 0b0000,
+    kGcs = 0b0001,  // FEAT_GCS
+  };
+
+  enum class Mte_frac : uint8_t {
+    kAsync = 0b0000,  // FEAT_MTE_ASYNC
+    kNone = 0b1111,
+  };
+
+  enum class Nmi : uint8_t {
+    kNone = 0b0000,
+    kNmi = 0b0001,  // FEAT_NMI
+  };
+
+  enum class Csv2_frac : uint8_t {
+    kNone = 0b0000,
+    k1p1 = 0b0001,  // FEAT_CSV2_1p1
+    k1p2 = 0b0010,  // FEAT_CSV2_1p2
+  };
+
+  enum class Rndr_trap : uint8_t {
+    kNone = 0b0000,
+    kTrap = 0b0001,  // FEAT_RNG_TRAP
+  };
+
+  enum class Sme : uint8_t {
+    kNone = 0b0000,
+    kSme = 0b0001,   // FEAT_SME
+    kSme2 = 0b0010,  // FEAT_SME2
+  };
+
+  enum class Mte : uint8_t {
+    kNone = 0b0000,
+    kMte = 0b0001,   // FEAT_MTE
+    kMte2 = 0b0010,  // FEAT_MTE2
+    kMte3 = 0b0011,  // FEAT_MTE3
+  };
+
+  enum class Ssbs : uint8_t {
+    kNone = 0b0000,
+    kSsbs = 0b0001,   // FEAT_SSBS
+    kSsbs2 = 0b0010,  // FEAT_SSBS2
+  };
+
+  enum class Bt : uint8_t {
+    kNone = 0b0000,
+    kBt = 0b0001,  // FEAT_BTI
+  };
+
+  DEF_ENUM_FIELD(Pfar, 63, 60, pfar);
+  DEF_ENUM_FIELD(Df2, 59, 56, df2);
+  DEF_ENUM_FIELD(Mtex, 55, 52, mtex);
+  DEF_ENUM_FIELD(The, 51, 48, the);
+  DEF_ENUM_FIELD(Gcs, 47, 44, gcs);
+  DEF_ENUM_FIELD(Mte_frac, 43, 40, mte_frac);
+  DEF_ENUM_FIELD(Nmi, 39, 36, nmi);
+  DEF_ENUM_FIELD(Csv2_frac, 35, 32, csv2_frac);
+  DEF_ENUM_FIELD(Rndr_trap, 31, 28, rndr_trap);
+  DEF_ENUM_FIELD(Sme, 27, 24, sme);
+  DEF_RSVDZ_FIELD(23, 20);
+  DEF_FIELD(35, 32, mpam_frac);
+  DEF_FIELD(15, 12, ras_frac);
+  DEF_ENUM_FIELD(Mte, 11, 8, mte);
+  DEF_ENUM_FIELD(Ssbs, 7, 4, ssbs);
+  DEF_ENUM_FIELD(Bt, 3, 0, bt);
+};
+ARCH_ARM64_SYSREG(ArmIdAa64Pfr1El1, "ID_AA64PFR1_EL1");
 
 // ASID size.
 enum class ArmAsidSize {

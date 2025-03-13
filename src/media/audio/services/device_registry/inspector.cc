@@ -151,6 +151,9 @@ DeviceInspectInstance::DeviceInspectInstance(inspect::Node device_node, std::str
 
   device_type_ss << device_type;
   type_ = device_node_.CreateString(kDeviceType, device_type_ss.str());
+
+  timeout_count_ = device_node_.CreateUint(kDriverTimeout, 0);
+  late_response_count_ = device_node_.CreateUint(kDriverLateResponse, 0);
 }
 
 DeviceInspectInstance::~DeviceInspectInstance() { ADR_LOG_METHOD(kTraceInspector); }
@@ -216,6 +219,21 @@ std::shared_ptr<RingBufferInspectInstance> DeviceInspectInstance::RecordRingBuff
     return nullptr;
   }
   return (*found)->RecordRingBufferInstance(created_at);
+}
+
+void DeviceInspectInstance::RecordCommandTimeout(const std::string& cmd_tag,
+                                                 const zx::duration& expected,
+                                                 std::optional<zx::duration> actual) {
+  if (actual.has_value()) {
+    late_response_count_.Add(1);
+    ADR_LOG_METHOD(kTraceInspector)
+        << "Driver command '" << cmd_tag << "' expected in " << expected.to_usecs()
+        << " usec, received in " << actual->to_usecs() << " usec.";
+  } else {
+    timeout_count_.Add(1);
+    ADR_LOG_METHOD(kTraceInspector) << "Driver command '" << cmd_tag << "' expected in "
+                                    << expected.to_usecs() << " usec, not yet received.";
+  }
 }
 
 void DeviceInspectInstance::RecordError(const zx::time& failed_at) {

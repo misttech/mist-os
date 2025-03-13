@@ -40,6 +40,11 @@ import("//sdk/config.gni")
 #          reference collections with the same name, but different directories
 #          (e.g. `//sdk:core` and `//vendor/acme/sdk:core`).
 #
+#   sdk_collection_name (optional)
+#     The name of the collection specified by `sdk_collection_label`.
+#     Should match the name of the collection if it is overridden.
+#     Defaults to the name portion of the `sdk_collection_label`.
+#
 template("idk_subbuilds") {
   main_target_name = target_name
 
@@ -53,6 +58,13 @@ template("idk_subbuilds") {
   _api_levels = platform_version.idk_buildable_api_levels
   _target_cpus = idk_target_cpus_default
 
+  if (defined(invoker.sdk_collection_name)) {
+    _sdk_collection_dir_name = invoker.sdk_collection_name
+  } else {
+    _sdk_collection_dir_name =
+        get_label_info(invoker.sdk_collection_label, "name")
+  }
+
   # First, define subbuild targets for the default API level.
   foreach(target_cpu, _target_cpus) {
     _subbuild_target = "${main_target_name}-${target_cpu}"
@@ -62,12 +74,11 @@ template("idk_subbuilds") {
       target = invoker.sdk_collection_label
       use_idk_tools_only = true
 
-      _sdk_collection_name = get_label_info(target, "name")
       _collection_dir_manifest =
-          "/sdk/exported/${_sdk_collection_name}/meta/manifest.json"
+          "/sdk/exported/${_sdk_collection_dir_name}/meta/manifest.json"
       outputs = [ _collection_dir_manifest ]
 
-      api_level_path = "/sdk/exported/${_sdk_collection_name}/api_level"
+      api_level_path = "/sdk/exported/${_sdk_collection_dir_name}/api_level"
 
       target_cpu = target_cpu
       api_level = "PLATFORM"
@@ -86,7 +97,7 @@ template("idk_subbuilds") {
     }
   }
 
-  # Now do them for all individual API levels.
+  # Now, define subbuild targets for all individual API levels and CPUs.
   foreach(api_level, _api_levels) {
     foreach(target_cpu, _target_cpus) {
       _subbuild_target = "${main_target_name}-api${api_level}-${target_cpu}"
@@ -96,12 +107,11 @@ template("idk_subbuilds") {
         target = invoker.sdk_collection_label
         use_idk_tools_only = true
 
-        _sdk_collection_name = get_label_info(target, "name")
         _collection_dir_manifest =
-            "/sdk/exported/${_sdk_collection_name}/meta/manifest.json"
+            "/sdk/exported/${_sdk_collection_dir_name}/meta/manifest.json"
         outputs = [ _collection_dir_manifest ]
 
-        api_level_path = "/sdk/exported/${_sdk_collection_name}/api_level"
+        api_level_path = "/sdk/exported/${_sdk_collection_dir_name}/api_level"
 
         target_cpu = target_cpu
         api_level = "$api_level"

@@ -27,9 +27,6 @@ FuchsiaConfigDataInfo = provider(
 FuchsiaProductConfigInfo = provider(
     doc = "A product-info used to containing the product_config.json and deps.",
     fields = {
-        # TODO(https://fxbug.dev/390189313): Remove this once all product
-        # configs have a consistent layout.
-        "config_path": "An optional path to the config inside the directory",
         "directory": "Directory of the product config container",
         "build_type": "The build type of the product.",
         "build_id_dirs": "Directories containing the debug symbols",
@@ -39,8 +36,7 @@ FuchsiaProductConfigInfo = provider(
 FuchsiaBoardInputBundleInfo = provider(
     doc = "A board input bundle info used to containing the board input bundle directory",
     fields = {
-        "config": "The config file located in the root directory containing Board Input Bundle.",
-        "files": "All files belong to Board Input Bundles",
+        "directory": "Directory of the board input bundle container",
         "build_id_dirs": "Directories containing the debug symbols",
     },
 )
@@ -48,8 +44,7 @@ FuchsiaBoardInputBundleInfo = provider(
 FuchsiaBoardConfigInfo = provider(
     doc = "A board info used to containing the board_configuration.json and its associated files",
     fields = {
-        "files": "A list of files consisting the board config.",
-        "config": "The path to JSON board configuration file.",
+        "directory": "Directory of the board config container",
         "build_id_dirs": "Directories containing the debug symbols",
     },
 )

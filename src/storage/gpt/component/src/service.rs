@@ -14,9 +14,10 @@ use vfs::directory::helper::DirectlyMutable as _;
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
 use {
-    fidl_fuchsia_fs_startup as fstartup, fidl_fuchsia_hardware_block as fblock,
-    fidl_fuchsia_io as fio, fidl_fuchsia_process_lifecycle as flifecycle,
-    fidl_fuchsia_storage_partitions as fpartitions, fuchsia_async as fasync,
+    fidl_fuchsia_fs as ffs, fidl_fuchsia_fs_startup as fstartup,
+    fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_io as fio,
+    fidl_fuchsia_process_lifecycle as flifecycle, fidl_fuchsia_storage_partitions as fpartitions,
+    fuchsia_async as fasync,
 };
 
 pub struct StorageHostService {
@@ -115,6 +116,20 @@ impl StorageHostService {
                     async move {
                         if let Some(me) = weak.upgrade() {
                             let _ = me.handle_partitions_manager_requests(requests).await;
+                        }
+                    }
+                }),
+            )
+            .unwrap();
+        let weak = Arc::downgrade(&self);
+        svc_dir
+            .add_entry(
+                ffs::AdminMarker::PROTOCOL_NAME,
+                vfs::service::host(move |requests| {
+                    let weak = weak.clone();
+                    async move {
+                        if let Some(me) = weak.upgrade() {
+                            let _ = me.handle_admin_requests(requests).await;
                         }
                     }
                 }),
@@ -352,6 +367,25 @@ impl StorageHostService {
         Ok(())
     }
 
+    async fn handle_admin_requests(
+        &self,
+        mut stream: ffs::AdminRequestStream,
+    ) -> Result<(), Error> {
+        if let Some(request) = stream.try_next().await.context("Reading request")? {
+            match request {
+                ffs::AdminRequest::Shutdown { responder } => {
+                    log::info!("Received Admin::Shutdown request");
+                    self.shutdown().await;
+                    responder
+                        .send()
+                        .unwrap_or_else(|e| log::error!(e:?; "Failed to send shutdown response"));
+                    log::info!("Admin shutdown complete");
+                }
+            }
+        }
+        Ok(())
+    }
+
     async fn handle_lifecycle_requests(&self, lifecycle_channel: zx::Channel) -> Result<(), Error> {
         let mut stream = flifecycle::LifecycleRequestStream::from_channel(
             fasync::Channel::from_channel(lifecycle_channel),
@@ -359,12 +393,8 @@ impl StorageHostService {
         match stream.try_next().await.context("Reading request")? {
             Some(flifecycle::LifecycleRequest::Stop { .. }) => {
                 log::info!("Received Lifecycle::Stop request");
-                let mut state = self.state.lock().await;
-                if let State::Running(gpt) = std::mem::take(&mut *state) {
-                    gpt.shutdown().await;
-                }
-                self.scope.shutdown();
-                log::info!("Shutdown complete");
+                self.shutdown().await;
+                log::info!("Lifecycle shutdown complete");
             }
             None => {}
         }
@@ -376,6 +406,14 @@ impl StorageHostService {
             State::Stopped | State::NeedsFormatting(_) => Err(zx::Status::BAD_STATE),
             State::Running(gpt) => Ok(gpt.clone()),
         }
+    }
+
+    async fn shutdown(&self) {
+        let mut state = self.state.lock().await;
+        if let State::Running(gpt) = std::mem::take(&mut *state) {
+            gpt.shutdown().await;
+        }
+        self.scope.shutdown();
     }
 }
 
@@ -391,9 +429,10 @@ mod tests {
     use gpt::{Gpt, Guid, PartitionInfo};
     use std::sync::Arc;
     use {
-        fidl_fuchsia_fs_startup as fstartup, fidl_fuchsia_hardware_block as fblock,
-        fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio,
-        fidl_fuchsia_storage_partitions as fpartitions, fuchsia_async as fasync,
+        fidl_fuchsia_fs as ffs, fidl_fuchsia_fs_startup as fstartup,
+        fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume,
+        fidl_fuchsia_io as fio, fidl_fuchsia_storage_partitions as fpartitions,
+        fuchsia_async as fasync,
     };
 
     async fn setup_server(
@@ -468,6 +507,75 @@ mod tests {
                     .run(outgoing_dir_server.into_channel(), Some(lifecycle_server.into_channel()))
                     .await
                     .expect("Run failed");
+            },
+            async {
+                // Block device
+                let server = setup_server(
+                    512,
+                    8,
+                    vec![PartitionInfo {
+                        label: "part".to_string(),
+                        type_guid: Guid::from_bytes([0xabu8; 16]),
+                        instance_guid: Guid::from_bytes([0xcdu8; 16]),
+                        start_block: 4,
+                        num_blocks: 1,
+                        flags: 0,
+                    }],
+                )
+                .await;
+                let _ = server.serve(volume_stream).await;
+            }
+            .fuse(),
+        );
+    }
+
+    #[fuchsia::test]
+    async fn admin_shutdown() {
+        let (outgoing_dir, outgoing_dir_server) =
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+        let (block_client, block_server) =
+            fidl::endpoints::create_endpoints::<fblock::BlockMarker>();
+        let volume_stream =
+            fidl::endpoints::ServerEnd::<fvolume::VolumeMarker>::from(block_server.into_channel())
+                .into_stream();
+
+        futures::join!(
+            async {
+                // Client
+                let client =
+                    connect_to_protocol_at_dir_svc::<fstartup::StartupMarker>(&outgoing_dir)
+                        .unwrap();
+                let admin_client =
+                    connect_to_protocol_at_dir_svc::<ffs::AdminMarker>(&outgoing_dir).unwrap();
+                client
+                    .start(
+                        block_client,
+                        fstartup::StartOptions {
+                            read_only: false,
+                            verbose: false,
+                            fsck_after_every_transaction: false,
+                            write_compression_algorithm:
+                                fstartup::CompressionAlgorithm::ZstdChunked,
+                            write_compression_level: 0,
+                            cache_eviction_policy_override: fstartup::EvictionPolicyOverride::None,
+                            startup_profiling_seconds: 0,
+                        },
+                    )
+                    .await
+                    .expect("FIDL error")
+                    .expect("Start failed");
+                admin_client.shutdown().await.expect("admin shutdown failed");
+                fasync::OnSignals::new(
+                    &admin_client.into_channel().expect("into_channel failed"),
+                    zx::Signals::CHANNEL_PEER_CLOSED,
+                )
+                .await
+                .expect("OnSignals failed");
+            },
+            async {
+                // Server
+                let service = StorageHostService::new();
+                service.run(outgoing_dir_server.into_channel(), None).await.expect("Run failed");
             },
             async {
                 // Block device

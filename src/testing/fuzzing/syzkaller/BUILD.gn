@@ -19,7 +19,7 @@ group("tests") {
   deps = [ ":syz-executor-pkg" ]
 }
 
-fuchsia_shell_package("syz-executor-pkg") {
+fuchsia_package("syz-executor-pkg") {
   deps = [ ":syz-executor" ]
 }
 

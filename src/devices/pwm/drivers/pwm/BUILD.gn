@@ -15,6 +15,7 @@ driver_bind_rules("pwm-bind") {
 }
 
 fuchsia_cc_driver("pwm-driver") {
+  legacy = true
   output_name = "pwm"
   configs += [
     "//build/config:all_source",

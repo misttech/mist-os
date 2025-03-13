@@ -174,11 +174,8 @@ impl DefineSubsystemConfiguration<PlatformSysmemConfig> for SysmemConfig {
         // potentially other input config files). This mechanism is intended for aspects of sysmem
         // config that are too verbose/repetitive for direct inclusion in BoardSysmemConfig and/or
         // PlatformSysmemConfig.
-        let format_costs_files: Vec<Utf8PathBuf> = settings
-            .format_costs
-            .iter()
-            .map(|pathname| pathname.as_utf8_pathbuf().clone())
-            .collect();
+        let format_costs_files: Vec<Utf8PathBuf> = settings.format_costs.to_vec();
+
         // On error, load_and_merge_pixel_format_costs_files has already attached context.
         let format_costs = load_and_merge_pixel_format_costs_files(&format_costs_files)?;
         let domain_config_fidl =
@@ -287,7 +284,6 @@ mod test {
     use crate::subsystems::ConfigurationBuilderImpl;
     use crate::{DomainConfig, DomainConfigDirectory, FileOrContents};
     use assembly_config_schema::{BoardInformation, BoardProvidedConfig};
-    use assembly_file_relative_path::FileRelativePathBuf;
     use serde_json::{Number, Value};
 
     #[test]
@@ -711,9 +707,7 @@ mod test {
             build_type: &BuildType::Eng,
             board_info: &BoardInformation {
                 configuration: BoardProvidedConfig {
-                    sysmem_format_costs: vec![FileRelativePathBuf::FileRelative(
-                        BOARD_FORMAT_COSTS_FILENAME.into(),
-                    )],
+                    sysmem_format_costs: vec![BOARD_FORMAT_COSTS_FILENAME.into()],
                     ..Default::default()
                 },
                 ..Default::default()
@@ -724,9 +718,7 @@ mod test {
         };
 
         let platform_sysmem_config = PlatformSysmemConfig {
-            format_costs: vec![FileRelativePathBuf::FileRelative(
-                PLATFORM_FORMAT_COSTS_FILENAME.into(),
-            )],
+            format_costs: vec![PLATFORM_FORMAT_COSTS_FILENAME.into()],
             ..Default::default()
         };
 

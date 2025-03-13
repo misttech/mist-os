@@ -5,4 +5,3 @@
 using fuchsia.intel.platform.gpucore;
 
 fuchsia.BIND_PROTOCOL == fuchsia.intel.platform.gpucore.BIND_PROTOCOL.DEVICE;
-fuchsia.BIND_AUTOBIND == 0;

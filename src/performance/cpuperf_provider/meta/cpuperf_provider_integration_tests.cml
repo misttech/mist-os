@@ -43,11 +43,7 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.kernel.DebugResource",
-                "fuchsia.tracing.kernel.Controller",
-                "fuchsia.tracing.kernel.Reader",
-            ],
+            protocol: [ "fuchsia.kernel.DebugResource" ],
             from: "parent",
             to: "#trace_manager",
         },

@@ -129,7 +129,10 @@ class PressureWatcherForTest : public fidl::Server<fmp::Watcher> {
     binding_ = fidl::BindServer<fmp::Watcher>(dispatcher, std::move(endpoints->server), this);
   }
 
-  ~PressureWatcherForTest() override { binding_->Close({}); }
+  ~PressureWatcherForTest() override {
+    if (binding_)
+      binding_->Close({});
+  }
 
   void OnLevelChanged(OnLevelChangedRequest& request,
                       OnLevelChangedCompleter::Sync& completer) override {

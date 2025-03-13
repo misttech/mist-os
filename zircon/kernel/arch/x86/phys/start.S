@@ -24,6 +24,16 @@
   // Disable asynchronous interrupts in case the boot loader left them on.
   cli
 
+  // Zero the non-CS segment registers in case the bootloader left anything
+  // there: DS, ES, and SS are vestigial; FS is unused in the kernel; GS will
+  // be reset below.
+  xor %eax, %eax
+  mov %eax, %ds
+  mov %eax, %es
+  mov %eax, %fs
+  mov %eax, %gs
+  mov %eax, %ss
+
   // Clear any incoming stack pointer so it can't be used accidentally
   // before the proper stack is set up below.
   xor %esp, %esp

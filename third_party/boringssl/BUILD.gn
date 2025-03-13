@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/dist/resource.gni")
 import("BUILD.generated.gni")
 import("BUILD.generated_tests.gni")
 
@@ -32,10 +33,10 @@ group("boringssl-static") {
 crypto_sources += crypto_sources_asm
 
 # TODO(https://fxbug.dev/42122741): remove this added source.
-crypto_sources += [ "src/decrepit/xts/xts.c" ]
+crypto_sources += [ "src/decrepit/xts/xts.cc" ]
 
 # TODO(https://fxbug.dev/42122741): Required for TPM2.0 TSS Library //third_party/tpm2-tss.
-crypto_sources += [ "src/decrepit/cfb/cfb.c" ]
+crypto_sources += [ "src/decrepit/cfb/cfb.cc" ]
 
 ################
 # libcrypto.so #
@@ -190,38 +191,44 @@ if (!is_kernel) {
   ##############
 
   crypto_tests = []
-  common_crypto_test_sources = [
-    # This test does nothing when BORINGSSL_SHARED_LIBRARY is defined and is
-    # needed to resolve missing symbols. /shrug
-    "src/crypto/test/file_test_gtest.cc",
-    "src/crypto/test/gtest_main.cc",
-  ]
-  shared_library("crypto_test_data") {
-    # This file is enormous (embeds ~27MiB of data as of when this was written)
-    # and simply including it as a source file with each test results in debug
-    # builds taking up hundreds of megabytes after compression, since each
-    # binary embeds the full file contents.  To avoid excessive binary size
-    # bloat, we compile this as a shared library, so that each test binary will
-    # share a single copy of the test data.
-    sources = [ "crypto_test_data.cc" ]
-    configs += [ ":test_config" ]
+
+  crypto_test_main = "src/crypto/test/gtest_main.cc"
+  source_set("crypto_test_main") {
     visibility = [ ":*" ]
+    testonly = true
+    sources = [ crypto_test_main ]
+    deps = [
+      ":crypto",
+      "//third_party/googletest:gmock",
+      "//third_party/googletest:gtest",
+    ]
   }
-  _crypto_test_sources = crypto_test_sources - common_crypto_test_sources -
-                         [ "crypto_test_data.cc" ]
-  foreach(crypto_test_source, _crypto_test_sources) {
+
+  static_library("test_support") {
+    visibility = [ ":*" ]
+    testonly = true
+
+    # get_test_data.cc provides our own definition of GetTestData(), which is
+    # declared somewhere in test_support_sources. This is permitted by defining
+    # BORINGSSL_CUSTOM_GET_TEST_DATA.
+    sources = test_support_sources + [ "get_test_data.cc" ]
+    deps = [ "//third_party/googletest:gtest" ]
+    configs += [ ":test_config" ]
+    defines = [ "BORINGSSL_CUSTOM_GET_TEST_DATA" ]
+  }
+
+  foreach(crypto_test_source, crypto_test_sources - [ crypto_test_main ]) {
     name = get_path_info(crypto_test_source, "name")
     target_name = "${name}_crypto_test"
     crypto_tests += [ target_name ]
     test(target_name) {
       visibility = [ ":*" ]
-      sources = [ crypto_test_source ] + common_crypto_test_sources +
-                test_support_sources
+      sources = [ crypto_test_source ]
       configs += [ ":test_config" ]
       deps = [
         ":crypto",
-        ":crypto_test_data",
-        "//third_party/googletest:gmock",
+        ":crypto_test_main",
+        ":test_support",
         "//third_party/googletest:gtest",
       ]
     }
@@ -229,14 +236,37 @@ if (!is_kernel) {
 
   test("ssl_test") {
     visibility = [ ":*" ]
-    sources = ssl_test_sources + test_support_sources
+    sources = ssl_test_sources
     configs += [ ":test_config" ]
     deps = [
       ":crypto",
       ":ssl",
+      ":test_support",
       "//third_party/googletest:gmock",
       "//third_party/googletest:gtest",
     ]
+  }
+
+  test_data_deps = []
+  foreach(test_data, crypto_test_data) {
+    target_name = "test_data.${test_data}"
+    resource(target_name) {
+      sources = [ test_data ]
+      outputs = [ "data/" + rebase_path(test_data, "src") ]
+    }
+    test_data_deps += [ ":${target_name}" ]
+  }
+
+  group("temp_storage") {
+    visibility = [ ":*" ]
+    testonly = true
+    metadata = {
+      test_component_manifest_cml = [
+        {
+          include = [ "//src/sys/test_runners/tmp_storage.shard.cml" ]
+        },
+      ]
+    }
   }
 
   if (is_fuchsia) {
@@ -250,11 +280,18 @@ if (!is_kernel) {
             [ crypto_test ] != needs_custom_component_manifest) {
           manifest = "meta/${crypto_test}.cml"
         }
-        deps = [ ":${crypto_test}" ]
+        deps = [
+          ":${crypto_test}",
+          ":temp_storage",
+        ]
       }
     }
     fuchsia_unittest_component("ssl_test_component") {
-      deps = [ ":ssl_test" ]
+      deps = [
+        ":ssl_test",
+        ":temp_storage",
+        "//src/sys/test_runners/gtest:death_test",
+      ]
     }
     fuchsia_test_package("boringssl_tests") {
       test_components = crypto_test_components + [ ":ssl_test_component" ]
@@ -262,6 +299,7 @@ if (!is_kernel) {
         "//src/connectivity/network/netstack:component",
         "//src/sys/stash:stash_secure_v2",
       ]
+      deps += test_data_deps
     }
   }
 
@@ -275,6 +313,7 @@ if (!is_kernel) {
         deps += [ ":${crypto_test}" ]
       }
     }
+    deps += [ "rust:tests" ]
   }
 
   ################################################################################

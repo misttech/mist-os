@@ -23,7 +23,6 @@
 #include <lib/sync/cpp/completion.h>
 #include <lib/zx/event.h>
 #include <threads.h>
-#include <zircon/device/bt-hci.h>
 
 #include <mutex>
 

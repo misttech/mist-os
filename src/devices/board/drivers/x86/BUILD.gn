@@ -7,7 +7,6 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
 import("//build/testing/bootfs_test.gni")
-import("//src/devices/bus/drivers/pci/pci.gni")
 
 group("x86") {
   deps = [ ":platform-bus-x86" ]
@@ -20,10 +19,6 @@ config("config") {
     "include",
     ".",
   ]
-
-  if (platform_enable_user_pci) {
-    defines = [ "ENABLE_USER_PCI" ]
-  }
 
   cflags = [ "-Wno-null-pointer-arithmetic" ]
   cflags_c = [ "-fno-strict-aliasing" ]
@@ -40,6 +35,7 @@ driver_bind_rules("x64-bind") {
 }
 
 fuchsia_cc_driver("platform-bus-x86-driver") {
+  legacy = true
   output_name = "platform-bus-x86"
   configs += [
     "//build/config:all_source",
@@ -60,12 +56,6 @@ fuchsia_cc_driver("platform-bus-x86-driver") {
     "x86.h",
   ]
 
-  # Userspace PCI feature flag.  The scaffolding for the userspace pci bus
-  # driver is in pci.cpp.  If not enabled then the kernel pci bus driver
-  # initialization code in ACPI (kpci.cc) will be built instead.
-  if (!platform_enable_user_pci) {
-    sources += [ "kpci.cc" ]
-  }
   configs += [ ":config" ]
   deps = [
     ":x64-bind",

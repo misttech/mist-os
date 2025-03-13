@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [
-        "//src/testing/system-validation/ui/tests/meta/system_validation_base.cml",
-        "inspect/offer.shard.cml",
-    ],
+    include: [ "//src/testing/system-validation/ui/tests/meta/system_validation_base.cml" ],
     program: {
         // Args for ui_app_controller
         args: [
@@ -28,13 +25,17 @@
     offer: [
         {
             protocol: [
-                "fuchsia.logger.LogSink",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
                 "fuchsia.tracing.provider.Registry",
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",
             ],
+            from: "parent",
+            to: [ "#sample-app" ],
+        },
+        {
+            dictionary: "diagnostics",
             from: "parent",
             to: [ "#sample-app" ],
         },

@@ -26,12 +26,13 @@
 #include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-interface.h"
 #include "src/graphics/display/lib/api-protocols/cpp/display-engine-interface.h"
 #include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
+#include "src/graphics/display/lib/api-types/cpp/engine-info.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types/cpp/layer-composition-operations.h"
@@ -62,7 +63,7 @@ class DisplayEngine final : public display::DisplayEngineInterface {
   zx_status_t Start();
 
   // DisplayEngineInterface:
-  void OnCoordinatorConnected() override;
+  display::EngineInfo CompleteCoordinatorConnection() override;
   zx::result<> ImportBufferCollection(
       display::DriverBufferCollectionId buffer_collection_id,
       fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> buffer_collection_token) override;
@@ -80,12 +81,11 @@ class DisplayEngine final : public display::DisplayEngineInterface {
       cpp20::span<display::LayerCompositionOperations> layer_composition_operations) override;
   void ApplyConfiguration(display::DisplayId display_id, display::ModeId display_mode_id,
                           cpp20::span<const display::DriverLayer> layers,
-                          display::ConfigStamp config_stamp) override;
+                          display::DriverConfigStamp config_stamp) override;
   zx::result<> SetBufferCollectionConstraints(
       const display::ImageBufferUsage& image_buffer_usage,
       display::DriverBufferCollectionId buffer_collection_id) override;
   zx::result<> SetDisplayPower(display::DisplayId display_id, bool power_on) override;
-  bool IsCaptureSupported() override;
   zx::result<> StartCapture(display::DriverCaptureImageId capture_image_id) override;
   zx::result<> ReleaseCapture(display::DriverCaptureImageId capture_image_id) override;
   zx::result<> SetMinimumRgb(uint8_t minimum_rgb) override;
@@ -102,7 +102,12 @@ class DisplayEngine final : public display::DisplayEngineInterface {
   ImportedImages* imported_images_for_testing() { return &imported_images_; }
 
  private:
+  void LogEdidBytes();
+
   DisplayInfo current_display_;
+
+  // Empty if the display does not have EDID information.
+  fbl::Vector<uint8_t> current_display_edid_bytes_;
 
   // Flush thread
   void virtio_gpu_flusher();
@@ -116,8 +121,8 @@ class DisplayEngine final : public display::DisplayEngineInterface {
 
   uint32_t latest_framebuffer_resource_id_ = virtio_abi::kInvalidResourceId;
   uint32_t displayed_framebuffer_resource_id_ = virtio_abi::kInvalidResourceId;
-  display::ConfigStamp latest_config_stamp_ = display::kInvalidConfigStamp;
-  display::ConfigStamp displayed_config_stamp_ = display::kInvalidConfigStamp;
+  display::DriverConfigStamp latest_config_stamp_ = display::kInvalidDriverConfigStamp;
+  display::DriverConfigStamp displayed_config_stamp_ = display::kInvalidDriverConfigStamp;
 
   std::unique_ptr<VirtioGpuDevice> gpu_device_;
 };

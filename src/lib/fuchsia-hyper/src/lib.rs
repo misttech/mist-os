@@ -347,10 +347,7 @@ where
         //
         // TODO: use Ipv6Addr::is_unicast_link_local_strict when available in stable rust.
         if addr.segments()[..4] != [0xfe80, 0, 0, 0] {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "zone_id is only usable with link local addresses",
-            ));
+            return Err(io::Error::other("zone_id is only usable with link local addresses"));
         }
 
         // TODO: validate that the value matches rfc6874 grammar `ZoneID = 1*( unreserved / pct-encoded )`.

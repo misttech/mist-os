@@ -27,7 +27,7 @@ declare_args() {
 
   # Skip generating a UEFI disk for a product whose board defines
   # `build_uefi_disk`
-  product_skip_uefi_disk = false
+  product_skip_uefi_disk = true
 
   # Generate installer disk image (ISO) to be flashed to a USB drive.
   # Will be located at obj/build/images/installer relative to the build directory.
@@ -213,18 +213,12 @@ sign_zbi = custom_signing_script != "" || use_vboot
 # change. See: src/sys/pkg/bin/system-updater/epoch/playbook.md
 update_platform_epoch = 1
 
-# bazel_product_bundle_target is not empty when both
-# bazel_product_bundle_{prefix,board} are defined and will point
-# to the label of a fuchsia_product_bundle() in the Bazel graph.
-if (use_bazel_images_only) {
-  assert(
-      bazel_product_bundle_full != false ||
-          (bazel_product_bundle_prefix != false &&
-               bazel_product_bundle_board != false),
-      "Either bazel_product_bundle_full must be set, or both bazel_product_bundle_prefix and bazel_product_bundle_board must be set when use_bazel_images_only=true. Seeing bazel_product_bundle_full=${bazel_product_bundle_full}, bazel_product_bundle_prefix=${bazel_product_bundle_prefix}, bazel_product_bundle_board=${bazel_product_bundle_board}")
-}
-
-if (bazel_product_bundle_full != false && bazel_product_bundle_board != "") {
+if (main_pb_label != "") {
+  assert(use_bazel_images_only,
+         "main_pb_label can only be set when use_bazel_images_only=true")
+  bazel_product_bundle_target = main_pb_label
+} else if (bazel_product_bundle_full != false &&
+           bazel_product_bundle_board != "") {
   bazel_product_bundle_target =
       bazel_product_bundle_full + "." + bazel_product_bundle_board
 } else if (bazel_product_bundle_prefix != false &&
@@ -234,6 +228,15 @@ if (bazel_product_bundle_full != false && bazel_product_bundle_board != "") {
       bazel_product_bundle_board
 } else {
   bazel_product_bundle_target = ""
+}
+
+declare_args() {
+  # The build is configured as a multi-product build.
+  # This is any product.gni that is bazel-only, but doesn't specify a default PB.
+  # If this is bazel-only, and a main_pb_label is provided, we are also multi-product.
+  is_multi_product_build =
+      use_bazel_images_only &&
+      (bazel_product_bundle_target == "" || main_pb_label != "")
 }
 
 assert(

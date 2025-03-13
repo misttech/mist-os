@@ -7,13 +7,24 @@
 
 import asyncio
 import logging
+from abc import abstractmethod
 from inspect import getframeinfo, stack
 from typing import Any, Dict, Set
 
 import fuchsia_controller_py as fc
 from fidl_codec import decode_fidl_response, encode_fidl_message
 
-from ._fidl_common import *
+from ._fidl_common import (
+    FIDL_EPITAPH_ORDINAL,
+    EpitaphError,
+    FidlMessage,
+    FidlMeta,
+    StopEventHandler,
+    TXID_Type,
+    parse_epitaph_value,
+    parse_ordinal,
+    parse_txid,
+)
 from ._ipc import EventWrapper, GlobalHandleWaker
 
 TXID: TXID_Type = 0
@@ -22,7 +33,14 @@ _CLIENT_ID = 0
 _LOGGER = logging.getLogger("fidl.client")
 
 
-class FidlClient(object):
+class FidlClient(metaclass=FidlMeta):
+    @staticmethod
+    @abstractmethod
+    def construct_response_object(
+        response_ident: str, response_obj: Any
+    ) -> Any:
+        ...
+
     def __init__(self, channel, channel_waker=None):
         global _CLIENT_ID
         self.id = _CLIENT_ID
@@ -45,7 +63,7 @@ class FidlClient(object):
         )
 
     def __str__(self):
-        return f"client:{self.__name__}:{self.id}"
+        return f"client:{type(self).__name__}:{self.id}"
 
     def __del__(self):
         _LOGGER.debug(f"{self} closing")
@@ -235,7 +253,7 @@ class FidlClient(object):
             # and would not have added a reader.
             self.channel_waker.register(self.channel)
             res = await self._read_and_decode(txid)
-            return construct_response_object(response_ident, res)
+            return self.construct_response_object(response_ident, res)
 
         return result(TXID)
 
@@ -262,18 +280,28 @@ class FidlClient(object):
         self.channel.write(encoded_fidl_message)
 
 
-class EventHandlerBase(object):
+class EventHandlerBase(
+    metaclass=FidlMeta,
+    required_class_variables=[
+        ("library", str),
+        ("method_map", dict),
+    ],
+):
     """Base object for doing FIDL client event handling."""
 
-    library: str = ""
-    method_map: typing.Dict[Ordinal, MethodInfo] = {}
+    @staticmethod
+    @abstractmethod
+    def construct_response_object(
+        response_ident: str, response_obj: Any
+    ) -> Any:
+        ...
 
     def __init__(self, client: FidlClient):
         self.client = client
         self.client.channel_waker.register(self.client.channel)
 
     def __str__(self):
-        return f"event:{self.client.__name__}:{self.client.id}"
+        return f"event:{type(self.client).__name__}:{self.client.id}"
 
     async def serve(self):
         while True:
@@ -297,7 +325,7 @@ class EventHandlerBase(object):
         decoded_msg = decode_fidl_response(bytes=msg[0], handles=handles)
         method = self.method_map[ordinal]
         request_ident = method.request_ident
-        request_obj = construct_response_object(request_ident, decoded_msg)
+        request_obj = self.construct_response_object(request_ident, decoded_msg)
         method_lambda = getattr(self, method.name)
         if request_obj is not None:
             res = method_lambda(request_obj)

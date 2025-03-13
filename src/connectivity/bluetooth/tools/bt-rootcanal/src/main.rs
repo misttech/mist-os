@@ -26,10 +26,49 @@ use std::sync::Arc;
 // Across all three link types, ACL has the largest frame at 1028. Add a byte of UART header.
 const UART_MAX_FRAME_BUFFER_SIZE: usize = 1029;
 
-// Default control device.
-fn default_control_device() -> String {
-    // TODO(https://fxbug.dev/303503457): Access virtual device via "/dev/class/bt-hci-virtual"
-    "sys/platform/bt-hci-emulator/bt_hci_virtual".to_string()
+/// The name of the test node to which bt_hci_virtual can expect to bind, i.e. the first positional
+/// argument in `ffx driver test-node add ______ fuchsia.devicetree.FIRST_COMPATIBLE=bt`.
+fn emulator_test_node_name() -> String {
+    "bt-hci-emulator".to_string()
+}
+
+// Read from `read_stream` exactly as many bytes as fit in `buf`. Returns error if EOF encountered
+// before that number of bytes can be read.
+async fn read_exact(
+    read_stream: &mut ReadHalf<impl AsyncRead>,
+    buf: &mut [u8],
+) -> Result<(), Error> {
+    read_stream.read_exact(buf).await.map_err(|e| anyhow!("Unable to read channel {:?}", e))
+}
+
+// Read next HCI packet from `read_stream` into `buf`. Assumes that the last field of the packet
+// header at octet position `length_field_pos` encodes the length of the subsequent data segment
+// beginning at octet position `data_segment_start`. Only supports length fields of 1 or 2 octets.
+//
+// Returns the size of the HCI packet.
+async fn read_hci_packet(
+    mut read_stream: &mut ReadHalf<impl AsyncRead>,
+    buf: &mut [u8],
+    length_field_pos: usize,
+    data_segment_start: usize,
+) -> Result<usize, Error> {
+    // Read header.
+    read_exact(&mut read_stream, &mut buf[..data_segment_start]).await?;
+
+    let data_total_length = match data_segment_start - length_field_pos {
+        1 => buf[length_field_pos] as usize,
+        2 => u16::from_le_bytes(buf[length_field_pos..data_segment_start].try_into().unwrap())
+            as usize,
+        _ => return Err(anyhow!("Cannot read length fields greater than 2 octets")),
+    };
+
+    // Read data.
+    read_exact(
+        &mut read_stream,
+        &mut buf[data_segment_start..data_segment_start + data_total_length],
+    )
+    .await?;
+    Ok(data_segment_start + data_total_length)
 }
 
 /// Reads the TCP stream from the host from the `read_stream` and writes all data to the loopback
@@ -41,15 +80,37 @@ async fn stream_reader(
     let mut buf = [0u8; UART_MAX_FRAME_BUFFER_SIZE];
     let mut handles = Vec::new();
     loop {
-        let size = read_stream
-            .read(&mut buf)
-            .await
-            .map_err(|e| anyhow!("Unable to read TCP channel {:?}", e))?;
-        if size == 0 {
-            return Err(anyhow!("Read zero bytes. Stream may be closed"));
-        }
+        // Read H4 packet type byte.
+        read_exact(&mut read_stream, &mut buf[..1]).await?;
+
+        let hci_packet_size = match buf[0] {
+            // HCI ACL packet.
+            2 => {
+                read_hci_packet(
+                    &mut read_stream,
+                    &mut buf[1..],
+                    /*length_field_pos=*/ 2,
+                    /*data_segment_start=*/ 4,
+                )
+                .await?
+            }
+            // HCI Event packet.
+            4 => {
+                read_hci_packet(
+                    &mut read_stream,
+                    &mut buf[1..],
+                    /*length_field_pos=*/ 1,
+                    /*data_segment_start=*/ 2,
+                )
+                .await?
+            }
+            unsupported_type => {
+                return Err(anyhow!("Received unsupported packet type: {}", unsupported_type));
+            }
+        };
+
         channel
-            .write(&buf[0..size], &mut handles)
+            .write(&buf[0..hci_packet_size + 1], &mut handles)
             .map_err(|e| anyhow!("Unable to write to emulator channel {:?}", e))?;
     }
 }
@@ -142,7 +203,8 @@ impl RootcanalClient {
         };
         log::debug!("Connected");
 
-        let channel_res = open_virtual_device(&default_control_device()).await;
+        let channel_res =
+            open_virtual_device(&(emulator_test_node_name() + "/bt_hci_virtual")).await;
         let Ok(channel) = channel_res else {
             return Err((ServiceError::Failed, channel_res.unwrap_err().into()));
         };
@@ -262,9 +324,9 @@ mod tests {
         assert_eq!(txs.read(&mut read_buf).expect("unable to read"), 4);
         assert_eq!(bytes, read_buf);
 
-        // Write to the socket
-        let bytes = [0x14, 0x15, 0x16, 0x17];
-        assert_eq!(txs.write(&bytes).expect("write failed"), 4);
+        // Write HCI Event to the socket
+        let bytes = [0x04, 0x01, 0x02, 0x16, 0x17];
+        assert_eq!(txs.write(&bytes).expect("write failed"), 5);
 
         // Pump to read bytes from socket and write to the channel.
         assert!(exec.run_until_stalled(&mut fut).is_pending());

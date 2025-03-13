@@ -3,16 +3,29 @@
 # found in the LICENSE file.
 
 # buildifier: disable=module-docstring
-load("@fuchsia_sdk//fuchsia:private_defs.bzl", "FuchsiaBoardConfigInfo")
+load("@rules_fuchsia//fuchsia:private_defs.bzl", "FuchsiaBoardConfigInfo")
 load("//test_utils:json_validator.bzl", "CREATE_VALIDATION_SCRIPT_ATTRS", "create_validation_script_provider")
 
 def _fuchsia_board_configuration_test_impl(ctx):
-    board_config_files = ctx.attr.board_config[FuchsiaBoardConfigInfo].files
-    board_config_file = (
-        ([file for file in board_config_files if file.path.endswith("_board_configuration")] + [None])[0]
-    )
     golden_file = ctx.file.golden_file
-    return [create_validation_script_provider(ctx, board_config_file, golden_file, relative_path = "board_configuration.json")]
+    board_config = ctx.attr.board_config[FuchsiaBoardConfigInfo]
+    if len(ctx.files.board_config) == 1:
+        # This is a newly constructed board config with the only file being
+        # the directory.
+        config_dir = ctx.files.board_config[0]
+    else:
+        # This is a prebuilt board config.
+        config_dir = board_config.directory
+
+    relative_path = "board_configuration.json"
+    return [create_validation_script_provider(
+        ctx,
+        config_dir,
+        golden_file,
+        relative_path,
+        runfiles = ctx.runfiles(files = ctx.files.board_config),
+        is_subset = True,
+    )]
 
 fuchsia_board_configuration_test = rule(
     doc = """Validate the generated board configuration file.""",
@@ -33,11 +46,25 @@ fuchsia_board_configuration_test = rule(
 )
 
 def _fuchsia_hybrid_board_configuration_test_impl(ctx):
-    board_config_files = ctx.attr.hybrid_board_config[FuchsiaBoardConfigInfo].files
-    bib_file = (
-        ([file for file in board_config_files if file.path.endswith("board_input_bundle.json")] + [None])[0]
-    )
-    return [create_validation_script_provider(ctx, bib_file, ctx.file.golden_bib)]
+    golden_file = ctx.file.golden_bib
+    board_config = ctx.attr.hybrid_board_config[FuchsiaBoardConfigInfo]
+    if len(ctx.files.hybrid_board_config) == 1:
+        # This is a newly constructed board config with the only file being
+        # the directory.
+        config_dir = ctx.files.hybrid_board_config[0]
+    else:
+        # This is a prebuilt board config.
+        config_dir = board_config.directory
+
+    relative_path = "input_bundles/bib/board_input_bundle.json"
+    return [create_validation_script_provider(
+        ctx,
+        config_dir,
+        golden_file,
+        relative_path,
+        runfiles = ctx.runfiles(files = ctx.files.hybrid_board_config),
+        is_subset = True,
+    )]
 
 fuchsia_hybrid_board_configuration_test = rule(
     doc = """Validate the hybrid board has replaced BIB. Note this test assumes there is only one BIB to verify.""",

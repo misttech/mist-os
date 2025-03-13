@@ -17,7 +17,7 @@
 
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
 #include "src/graphics/display/drivers/intel-display/registers-pipe.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 
 namespace intel_display {
 
@@ -117,18 +117,19 @@ TEST_F(PipeTest, GetVsyncConfigStamp) {
       .layer_list = test_layers_1,
       .layer_count = 1,
   };
-  display::ConfigStamp stamp_1{1};
+  display::DriverConfigStamp stamp_1{1};
   pipe.ApplyConfiguration(&config, stamp_1, GetGttImageHandle, GetPixelFormat);
 
   // For images that are not registered with Pipe yet, GetVsyncConfigStamp()
   // should return nullopt.
-  display::ConfigStamp vsync_config_stamp_not_found = pipe.GetVsyncConfigStamp({kImageHandle2});
-  EXPECT_EQ(vsync_config_stamp_not_found, display::kInvalidConfigStamp);
+  display::DriverConfigStamp vsync_config_stamp_not_found =
+      pipe.GetVsyncConfigStamp({kImageHandle2});
+  EXPECT_EQ(vsync_config_stamp_not_found, display::kInvalidDriverConfigStamp);
 
   // Otherwise, for a valid image handle that has occurred in a past config,
   // GetVsyncConfigStamp() should return the latest config where it occurred.
-  display::ConfigStamp vsync_config_stamp_1 = pipe.GetVsyncConfigStamp({kImageHandle1});
-  EXPECT_NE(vsync_config_stamp_1, display::kInvalidConfigStamp);
+  display::DriverConfigStamp vsync_config_stamp_1 = pipe.GetVsyncConfigStamp({kImageHandle1});
+  EXPECT_NE(vsync_config_stamp_1, display::kInvalidDriverConfigStamp);
   EXPECT_EQ(vsync_config_stamp_1, stamp_1);
 
   // Applies another configuration with two layers (layer_2 replacing layer_1,
@@ -141,29 +142,29 @@ TEST_F(PipeTest, GetVsyncConfigStamp) {
       .layer_list = test_layers_2,
       .layer_count = 1,
   };
-  display::ConfigStamp stamp_2{2};
+  display::DriverConfigStamp stamp_2{2};
   pipe.ApplyConfiguration(&config_2, stamp_2, GetGttImageHandle, GetPixelFormat);
 
   // It is possible that a layer update is slower than other layers, so on
   // Vsync time the device may have layers from different configurations. In
   // that case, the device should return the oldest configuration stamp, i.e.
   // stamp_1.
-  display::ConfigStamp vsync_config_stamp_2 =
+  display::DriverConfigStamp vsync_config_stamp_2 =
       pipe.GetVsyncConfigStamp({kImageHandle1, kImageHandle3});
-  EXPECT_NE(vsync_config_stamp_2, display::kInvalidConfigStamp);
+  EXPECT_NE(vsync_config_stamp_2, display::kInvalidDriverConfigStamp);
   EXPECT_EQ(vsync_config_stamp_2, stamp_1);
 
   // Now both layers are updated in another new Vsync. GetVsyncConfigStamp()
   // should return the updated stamp value.
-  display::ConfigStamp vsync_config_stamp_3 =
+  display::DriverConfigStamp vsync_config_stamp_3 =
       pipe.GetVsyncConfigStamp({kImageHandle2, kImageHandle3});
-  EXPECT_NE(vsync_config_stamp_3, display::kInvalidConfigStamp);
+  EXPECT_NE(vsync_config_stamp_3, display::kInvalidDriverConfigStamp);
   EXPECT_EQ(vsync_config_stamp_3, stamp_2);
 
   // Old image handle should be evicted from Pipe completely.
-  display::ConfigStamp vsync_config_stamp_4 =
+  display::DriverConfigStamp vsync_config_stamp_4 =
       pipe.GetVsyncConfigStamp({kImageHandle1, kImageHandle3});
-  EXPECT_EQ(vsync_config_stamp_4, display::kInvalidConfigStamp);
+  EXPECT_EQ(vsync_config_stamp_4, display::kInvalidDriverConfigStamp);
 }
 
 }  // namespace intel_display

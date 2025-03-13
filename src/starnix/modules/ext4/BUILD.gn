@@ -34,9 +34,9 @@ rustc_library("ext4") {
     "//src/lib/fuchsia-runtime",
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/kernel:starnix_logging",
-    "//src/starnix/lib/starnix-sync",
-    "//src/starnix/lib/starnix-types",
-    "//src/starnix/lib/starnix-uapi",
+    "//src/starnix/lib/starnix_sync",
+    "//src/starnix/lib/starnix_types",
+    "//src/starnix/lib/starnix_uapi",
     "//src/storage/ext4/read-only:ext4-read-only",
     "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:scopeguard",
@@ -49,7 +49,7 @@ rustc_library("ext4") {
 }
 
 fuchsia_unittest_package("starnix-ext4-tests") {
-  manifest = "meta/starnix-ext4-tests.cml"
+  manifest = "meta/starnix_ext4_tests.cml"
   deps = [ ":ext4_test" ]
   test_specs = {
     log_settings = {

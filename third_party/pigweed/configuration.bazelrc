@@ -4,7 +4,6 @@
 
 # This file is imported into the Fuchsia Bazel workspace bazelrc.
 build --@pigweed//pw_function:config_override=//third_party/pigweed/backends/pw_function:config
-build --@pigweed//pw_assert:backend=//third_party/pigweed/backends/pw_assert
 build --@pigweed//pw_assert:check_backend=//third_party/pigweed/backends/pw_assert
 build --@pigweed//pw_assert:check_backend_impl=@pigweed//pw_build:empty_cc_library
 build --@pigweed//pw_log:backend=//third_party/pigweed/backends/pw_log

@@ -82,12 +82,6 @@ class TestNinjaOutputsDatabase(unittest.TestCase):
     def test_tabular_database(self):
         self.run_tests_for_class(gn_ninja_outputs.NinjaOutputsTabular)
 
-    def test_sqlite_database(self):
-        self.run_tests_for_class(gn_ninja_outputs.NinjaOutputsSqlite3)
-
-    def test_marshal_database(self):
-        self.run_tests_for_class(gn_ninja_outputs.NinjaOutputsMarshal)
-
 
 if __name__ == "__main__":
     unittest.main()

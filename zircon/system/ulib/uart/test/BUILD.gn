@@ -45,8 +45,8 @@ group("tests") {
 
   # Note uart-unittests-bootfs-test is not listed here because bootfs_test()
   # deps are only allowed in bringup, but the host test is included in other
-  # configurations.  So //bundles/bringup:tests lists the bootfs_test() target
-  # directly.  Maybe one day bringup with bootfs packages will get done
+  # configurations.  So //products/bringup_with_tests lists the bootfs_test()
+  # target directly.  Maybe one day bringup with bootfs packages will get done
   # properly and the distinction between including a test in bringup and
   # including a test in another configuration will not impose these kludges.
   deps = [

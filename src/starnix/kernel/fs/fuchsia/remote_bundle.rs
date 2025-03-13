@@ -57,12 +57,12 @@ impl RemoteBundle {
         let (root, server_end) = fidl::endpoints::create_sync_proxy::<fio::DirectoryMarker>();
         let path =
             std::str::from_utf8(&options.source).map_err(|_| anyhow!("Source path is not utf8"))?;
-        base.open3(path, rights, &Default::default(), server_end.into_channel())
+        base.open(path, rights, &Default::default(), server_end.into_channel())
             .map_err(|e| anyhow!("Failed to open root: {}", e))?;
 
         let metadata = {
             let (file, server_end) = fidl::endpoints::create_endpoints::<fio::FileMarker>();
-            root.open3(
+            root.open(
                 "metadata.v1",
                 fio::PERM_READABLE,
                 &Default::default(),
@@ -194,10 +194,11 @@ impl FsNodeOps for File {
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
         let memory = self.inner.lock().unwrap().get_memory()?;
+        let content_size = memory.get_content_size();
         let attrs = zxio_node_attributes_t {
-            content_size: memory.get_content_size(),
+            content_size: content_size,
             // TODO(https://fxbug.dev/293607051): Plumb through storage size from underlying connection.
-            storage_size: 0,
+            storage_size: content_size,
             link_count: 1,
             has: zxio_node_attr_has_t {
                 content_size: true,
@@ -238,12 +239,12 @@ impl FsNodeOps for File {
     }
 }
 
-// NB: This is different from MemoryFileObject, which is designed to wrap a VMO that is owned and
+// NB: This is different from MemoryRegularFile, which is designed to wrap a VMO that is owned and
 // managed by Starnix.  This struct is a wrapper around a pager-backed VMO received from the
 // filesystem backing the remote bundle.
-// MemoryFileObject does its own content size management, which is (a) incompatible with the content
+// MemoryRegularFile does its own content size management, which is (a) incompatible with the content
 // size management done for us by the remote filesystem, and (b) the content size is based on file
-// attributes in the case of MemoryFileObject, which we've intentionally avoided querying here for
+// attributes in the case of MemoryRegularFile, which we've intentionally avoided querying here for
 // performance.  Specifically, MemoryFile is designed to be opened as fast as possible, and requiring
 // that we stat the file whilst opening it is counter to that goal.
 // Note that MemoryFile assumes that the underlying file is read-only and not resizable (which is the
@@ -425,7 +426,7 @@ impl FsNodeOps for DirectoryObject {
                 let (file, server_end) = fidl::endpoints::create_sync_proxy::<fio::FileMarker>();
                 bundle
                     .root
-                    .open3(
+                    .open(
                         &format!("{inode_num}"),
                         bundle.rights,
                         &Default::default(),

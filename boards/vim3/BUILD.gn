@@ -228,7 +228,6 @@ group("vim3-release") {
     "//src/devices/adc/drivers/aml-saradc:package-archive",
     "//src/devices/block/drivers/aml-sdmmc:package-archive",
     "//src/devices/board/drivers/vim3-devicetree:bazel_package-archive",
-    "//src/devices/bus/drivers/pci:package-archive",
     "//src/devices/clock/drivers/vim3-clk:bazel_package-archive",
     "//src/devices/cpu/drivers/aml-cpu:package-archive",
     "//src/devices/gpio/drivers/aml-gpio:bazel_package-archive",

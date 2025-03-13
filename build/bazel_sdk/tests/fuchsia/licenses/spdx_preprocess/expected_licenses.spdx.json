@@ -1,0 +1,69 @@
+{
+    "spdxVersion": "SPDX-2.2",
+    "SPDXID": "SPDXRef-DOCUMENT",
+    "name": "target_with_licenses",
+    "documentNamespace": "",
+    "creationInfo": {
+        "creators": [
+            "Tool: generate_licenses_spdx.py"
+        ]
+    },
+    "dataLicense": "CC0-1.0",
+    "documentDescribes": [
+        "SPDXRef-Package-0",
+        "SPDXRef-Package-1",
+        "SPDXRef-Package-2",
+        "SPDXRef-Package-3"
+    ],
+    "packages": [
+        {
+            "SPDXID": "SPDXRef-Package-2",
+            "name": "Component A",
+            "licenseConcluded": "LicenseRef-4443fab76ce456e7cd8f94fc3be0ce31"
+        },
+        {
+            "SPDXID": "SPDXRef-Package-3",
+            "name": "Component Bar from SPDX"
+        },
+        {
+            "SPDXID": "SPDXRef-Package-1",
+            "name": "Test Package"
+        },
+        {
+            "SPDXID": "SPDXRef-Package-0",
+            "name": "target_with_licenses"
+        }
+    ],
+    "relationships": [
+        {
+            "spdxElementId": "SPDXRef-Package-0",
+            "relatedSpdxElement": "SPDXRef-Package-1",
+            "relationshipType": "CONTAINS"
+        },
+        {
+            "spdxElementId": "SPDXRef-Package-1",
+            "relatedSpdxElement": "SPDXRef-Package-2",
+            "relationshipType": "CONTAINS"
+        },
+        {
+            "spdxElementId": "SPDXRef-Package-2",
+            "relatedSpdxElement": "SPDXRef-Package-3",
+            "relationshipType": "CONTAINS"
+        }
+    ],
+    "hasExtractedLicensingInfos": [
+        {
+            "name": "Bar's license from SPDX",
+            "licenseId": "LicenseRef-4443fab76ce456e7cd8f94fc3be0ce31",
+            "extractedText": "License for Bar.",
+            "crossRefs": [
+                {
+                    "url": "http://bar"
+                }
+            ],
+            "seeAlsos": [
+                "http://bar"
+            ]
+        }
+    ]
+}

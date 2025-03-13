@@ -330,7 +330,8 @@ mod tests {
         queue: TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>,
         transmitted_packets: Vec<(Buf<Vec<u8>>, Option<DequeueContext>)>,
         no_buffers: bool,
-        device_counters: DeviceCounters,
+        stack_wide_device_counters: DeviceCounters,
+        per_device_counters: DeviceCounters,
     }
 
     #[derive(Default)]
@@ -427,20 +428,17 @@ mod tests {
     }
 
     impl ResourceCounterContext<FakeLinkDeviceId, DeviceCounters> for FakeCoreCtxImpl {
-        fn with_per_resource_counters<O, F: FnOnce(&DeviceCounters) -> O>(
-            &mut self,
-            _resource: &FakeLinkDeviceId,
-            cb: F,
-        ) -> O {
-            // There's only a single device, this is just making the types
-            // happy.
-            cb(&DeviceCounters::default())
+        fn per_resource_counters<'a>(
+            &'a self,
+            _resource: &'a FakeLinkDeviceId,
+        ) -> &'a DeviceCounters {
+            &self.state.per_device_counters
         }
     }
 
     impl CounterContext<DeviceCounters> for FakeCoreCtxImpl {
-        fn with_counters<O, F: FnOnce(&DeviceCounters) -> O>(&self, cb: F) -> O {
-            cb(&self.state.device_counters)
+        fn counters(&self) -> &DeviceCounters {
+            &self.state.stack_wide_device_counters
         }
     }
 

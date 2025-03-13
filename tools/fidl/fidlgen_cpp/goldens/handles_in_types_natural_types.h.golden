@@ -528,9 +528,9 @@ namespace fidl {
 #ifdef __Fuchsia__
 
 template <>
-struct IsResource<::test_handlesintypes::HandlesInTypes> : public std::true_type{};
+struct IsResource<::test_handlesintypes::HandlesInTypes> : public std::true_type {};
 template <>
-struct IsFidlType<::test_handlesintypes::HandlesInTypes> : public std::true_type{};
+struct IsFidlType<::test_handlesintypes::HandlesInTypes> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_handlesintypes::HandlesInTypes> {
@@ -542,7 +542,7 @@ struct TypeTraits<::test_handlesintypes::HandlesInTypes> {
 };
 
 template <>
-struct IsStruct<::test_handlesintypes::HandlesInTypes> : public std::true_type{};
+struct IsStruct<::test_handlesintypes::HandlesInTypes> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_handlesintypes::HandlesInTypes, ::fidl::internal::NaturalCodingConstraintEmpty> final
@@ -553,9 +553,9 @@ struct internal::NaturalCodingTraits<::test_handlesintypes::HandlesInTypes, ::fi
 #ifdef __Fuchsia__
 
 template <>
-struct IsResource<::test_handlesintypes::EmptyResourceStruct> : public std::true_type{};
+struct IsResource<::test_handlesintypes::EmptyResourceStruct> : public std::true_type {};
 template <>
-struct IsFidlType<::test_handlesintypes::EmptyResourceStruct> : public std::true_type{};
+struct IsFidlType<::test_handlesintypes::EmptyResourceStruct> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_handlesintypes::EmptyResourceStruct> {
@@ -567,7 +567,7 @@ struct TypeTraits<::test_handlesintypes::EmptyResourceStruct> {
 };
 
 template <>
-struct IsStruct<::test_handlesintypes::EmptyResourceStruct> : public std::true_type{};
+struct IsStruct<::test_handlesintypes::EmptyResourceStruct> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_handlesintypes::EmptyResourceStruct, ::fidl::internal::NaturalCodingConstraintEmpty> final
@@ -578,9 +578,9 @@ struct internal::NaturalCodingTraits<::test_handlesintypes::EmptyResourceStruct,
 #ifdef __Fuchsia__
 
 template <>
-struct IsResource<::test_handlesintypes::TableWithHandle> : public std::true_type{};
+struct IsResource<::test_handlesintypes::TableWithHandle> : public std::true_type {};
 template <>
-struct IsFidlType<::test_handlesintypes::TableWithHandle> : public std::true_type{};
+struct IsFidlType<::test_handlesintypes::TableWithHandle> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_handlesintypes::TableWithHandle> {
@@ -592,7 +592,7 @@ struct TypeTraits<::test_handlesintypes::TableWithHandle> {
 };
 
 template <>
-struct IsTable<::test_handlesintypes::TableWithHandle> : public std::true_type{};
+struct IsTable<::test_handlesintypes::TableWithHandle> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_handlesintypes::TableWithHandle, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_handlesintypes::TableWithHandle> {};
@@ -602,9 +602,9 @@ struct internal::NaturalCodingTraits<::test_handlesintypes::TableWithHandle, ::f
 #ifdef __Fuchsia__
 
 template <>
-struct IsResource<::test_handlesintypes::EmptyResourceTable> : public std::true_type{};
+struct IsResource<::test_handlesintypes::EmptyResourceTable> : public std::true_type {};
 template <>
-struct IsFidlType<::test_handlesintypes::EmptyResourceTable> : public std::true_type{};
+struct IsFidlType<::test_handlesintypes::EmptyResourceTable> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_handlesintypes::EmptyResourceTable> {
@@ -616,7 +616,7 @@ struct TypeTraits<::test_handlesintypes::EmptyResourceTable> {
 };
 
 template <>
-struct IsTable<::test_handlesintypes::EmptyResourceTable> : public std::true_type{};
+struct IsTable<::test_handlesintypes::EmptyResourceTable> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_handlesintypes::EmptyResourceTable, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_handlesintypes::EmptyResourceTable> {};
@@ -626,9 +626,9 @@ struct internal::NaturalCodingTraits<::test_handlesintypes::EmptyResourceTable, 
 #ifdef __Fuchsia__
 
 template <>
-struct IsResource<::test_handlesintypes::UnionWithHandle> : public std::true_type{};
+struct IsResource<::test_handlesintypes::UnionWithHandle> : public std::true_type {};
 template <>
-struct IsFidlType<::test_handlesintypes::UnionWithHandle> : public std::true_type{};
+struct IsFidlType<::test_handlesintypes::UnionWithHandle> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_handlesintypes::UnionWithHandle> {
@@ -640,7 +640,7 @@ struct TypeTraits<::test_handlesintypes::UnionWithHandle> {
 };
 
 template <>
-struct IsUnion<::test_handlesintypes::UnionWithHandle> : public std::true_type{};
+struct IsUnion<::test_handlesintypes::UnionWithHandle> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_handlesintypes::UnionWithHandle, ::fidl::internal::NaturalCodingConstraintEmpty> final
@@ -651,9 +651,9 @@ struct internal::NaturalCodingTraits<::test_handlesintypes::UnionWithHandle, ::f
 #ifdef __Fuchsia__
 
 template <>
-struct IsResource<::test_handlesintypes::EmptyResourceUnion> : public std::true_type{};
+struct IsResource<::test_handlesintypes::EmptyResourceUnion> : public std::true_type {};
 template <>
-struct IsFidlType<::test_handlesintypes::EmptyResourceUnion> : public std::true_type{};
+struct IsFidlType<::test_handlesintypes::EmptyResourceUnion> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_handlesintypes::EmptyResourceUnion> {
@@ -665,7 +665,7 @@ struct TypeTraits<::test_handlesintypes::EmptyResourceUnion> {
 };
 
 template <>
-struct IsUnion<::test_handlesintypes::EmptyResourceUnion> : public std::true_type{};
+struct IsUnion<::test_handlesintypes::EmptyResourceUnion> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_handlesintypes::EmptyResourceUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final

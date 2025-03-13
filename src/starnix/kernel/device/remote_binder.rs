@@ -31,7 +31,7 @@ use starnix_types::ownership::{OwnedRef, WeakRef};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::{Errno, ErrnoCode, EAGAIN, EINTR};
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
+use starnix_uapi::user_address::{UserAddress, UserCStringPtr, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{errno, errno_from_code, error, pid_t, uapi, PATH_MAX};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -486,7 +486,10 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
     ) -> Result<SyscallResult, Errno> {
         let user_addr = UserAddress::from(arg);
         match request {
-            uapi::REMOTE_BINDER_START => self.start(current_task, user_addr.into())?,
+            #[allow(unreachable_patterns)]
+            uapi::REMOTE_BINDER_START | uapi::arch32::REMOTE_BINDER_START => {
+                self.start(current_task, UserCStringPtr::new(current_task, user_addr))?
+            }
             uapi::REMOTE_BINDER_WAIT => self.wait(locked, current_task, user_addr.into())?,
             _ => return error!(ENOTSUP),
         }
@@ -973,9 +976,9 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
     fn start(
         self: &Arc<Self>,
         current_task: &CurrentTask,
-        service_address_ref: UserRef<UserCString>,
+        service_address_ref: UserCStringPtr,
     ) -> Result<(), Errno> {
-        let service_address = current_task.read_object(service_address_ref)?;
+        let service_address = current_task.read_multi_arch_ptr(service_address_ref)?;
         let service = current_task.read_c_string_to_vec(service_address, PATH_MAX as usize)?;
         let service_name = String::from_utf8(service.to_vec()).map_err(|_| errno!(EINVAL))?;
         let remote_controller_client =

@@ -11,7 +11,7 @@
 #include "test-start.h"
 #include "tls-ie-dep.h"
 
-[[gnu::weak, gnu::tls_model("initial-exec")]] extern thread_local int tls_ie_weak;
+[[gnu::weak, gnu::tls_model("initial-exec")]] extern constinit thread_local int tls_ie_weak;
 
 extern "C" int64_t TestStart() {
   if (ld::abi::_ld_abi.static_tls_modules.size() != 1) {

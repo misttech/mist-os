@@ -266,20 +266,19 @@ bool IommuImpl::IsValidBusTxnId(uint64_t bus_txn_id) const {
   return false;
 }
 
-zx_status_t IommuImpl::Map(uint64_t bus_txn_id, const fbl::RefPtr<VmObject>& vmo, uint64_t offset,
-                           size_t size, uint32_t perms, dev_vaddr_t* vaddr, size_t* mapped_len) {
-  DEBUG_ASSERT(vaddr);
-  if (!IS_PAGE_ALIGNED(offset) || size == 0) {
-    return ZX_ERR_INVALID_ARGS;
+zx::result<uint64_t> IommuImpl::Map(uint64_t bus_txn_id, const fbl::RefPtr<VmObject>& vmo,
+                                    uint64_t vmo_offset, size_t size, uint32_t perms) {
+  if (!IS_PAGE_ALIGNED(vmo_offset) || size == 0) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
   if (perms & ~(IOMMU_FLAG_PERM_READ | IOMMU_FLAG_PERM_WRITE | IOMMU_FLAG_PERM_EXECUTE)) {
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
   if (perms == 0) {
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
   if (!IsValidBusTxnId(bus_txn_id)) {
-    return ZX_ERR_NOT_FOUND;
+    return zx::error(ZX_ERR_NOT_FOUND);
   }
 
   ds::Bdf bdf = decode_bus_txn_id(bus_txn_id);
@@ -288,42 +287,36 @@ zx_status_t IommuImpl::Map(uint64_t bus_txn_id, const fbl::RefPtr<VmObject>& vmo
   DeviceContext* dev;
   zx_status_t status = GetOrCreateDeviceContextLocked(bdf, &dev);
   if (status != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
-  return dev->SecondLevelMap(vmo, offset, size, perms, false /* map_contiguous */, vaddr,
-                             mapped_len);
+  return dev->SecondLevelMap(vmo, vmo_offset, size, perms);
 }
 
-zx_status_t IommuImpl::MapContiguous(uint64_t bus_txn_id, const fbl::RefPtr<VmObject>& vmo,
-                                     uint64_t offset, size_t size, uint32_t perms,
-                                     dev_vaddr_t* vaddr, size_t* mapped_len) {
+zx::result<uint64_t> IommuImpl::MapContiguous(uint64_t bus_txn_id, const fbl::RefPtr<VmObject>& vmo,
+                                              uint64_t vmo_offset, size_t size, uint32_t perms) {
+  // All mappings we produce are contiguous in dev_paddr_t space, the underlying DeviceContext will
+  // separately optimize for the provided vmo being contiguous or not.
+  return Map(bus_txn_id, vmo, vmo_offset, size, perms);
+}
+
+zx_status_t IommuImpl::QueryAddress(uint64_t bus_txn_id, const fbl::RefPtr<VmObject>& vmo,
+                                    uint64_t map_token, uint64_t map_offset, size_t size,
+                                    dev_vaddr_t* vaddr, size_t* mapped_len) {
   DEBUG_ASSERT(vaddr);
-  if (!IS_PAGE_ALIGNED(offset) || size == 0) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-  if (perms & ~(IOMMU_FLAG_PERM_READ | IOMMU_FLAG_PERM_WRITE | IOMMU_FLAG_PERM_EXECUTE)) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-  if (perms == 0) {
+  DEBUG_ASSERT(mapped_len);
+  if (!IS_PAGE_ALIGNED(map_token) || !IS_PAGE_ALIGNED(map_offset)) {
     return ZX_ERR_INVALID_ARGS;
   }
   if (!IsValidBusTxnId(bus_txn_id)) {
     return ZX_ERR_NOT_FOUND;
   }
-
-  ds::Bdf bdf = decode_bus_txn_id(bus_txn_id);
-
-  Guard<Mutex> guard{&lock_};
-  DeviceContext* dev;
-  zx_status_t status = GetOrCreateDeviceContextLocked(bdf, &dev);
-  if (status != ZX_OK) {
-    return status;
-  }
-  return dev->SecondLevelMap(vmo, offset, size, perms, true /* map_contiguous */, vaddr,
-                             mapped_len);
+  *vaddr = map_token + map_offset;
+  *mapped_len = size;
+  return ZX_OK;
 }
 
-zx_status_t IommuImpl::Unmap(uint64_t bus_txn_id, dev_vaddr_t vaddr, size_t size) {
+zx_status_t IommuImpl::Unmap(uint64_t bus_txn_id, uint64_t map_token, size_t size) {
+  const dev_vaddr_t vaddr = map_token;
   if (!IS_PAGE_ALIGNED(vaddr) || !IS_PAGE_ALIGNED(size)) {
     return ZX_ERR_INVALID_ARGS;
   }

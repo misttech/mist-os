@@ -49,6 +49,8 @@ _test_fidl = get_label_info("//src/lib/fidl_codec:fidl($fidl_toolchain)",
                             "target_gen_dir")
 _io_fidl =
     get_label_info("//sdk/fidl/fuchsia.io($fidl_toolchain)", "target_gen_dir")
+_unknown_fidl = get_label_info("//sdk/fidl/fuchsia.unknown($fidl_toolchain)",
+                               "target_gen_dir")
 _test_fidl_gen_dir = get_label_info(":test_fidl", "target_gen_dir")
 
 copy("test_fidl_json") {
@@ -62,6 +64,12 @@ copy("io_fidl_json") {
   sources = [ "${_io_fidl}/fuchsia.io.fidl.json" ]
   outputs = [ "${_test_fidl_gen_dir}/fuchsia.io.fidl.json" ]
   deps = [ "//sdk/fidl/fuchsia.io($fidl_toolchain)" ]
+}
+
+copy("unknown_fidl_json") {
+  sources = [ "${_unknown_fidl}/fuchsia.unknown.fidl.json" ]
+  outputs = [ "${_test_fidl_gen_dir}/fuchsia.unknown.fidl.json" ]
+  deps = [ "//sdk/fidl/fuchsia.unknown($fidl_toolchain)" ]
 }
 
 copy("test_fidl_src") {
@@ -80,11 +88,13 @@ rustc_library("test_fidl") {
   inputs = [
     "${_test_fidl_gen_dir}/fidl.fidl.json",
     "${_test_fidl_gen_dir}/fuchsia.io.fidl.json",
+    "${_test_fidl_gen_dir}/fuchsia.unknown.fidl.json",
   ]
   deps = [
     ":io_fidl_json",
     ":test_fidl_json",
     ":test_fidl_src",
+    ":unknown_fidl_json",
   ]
 }
 

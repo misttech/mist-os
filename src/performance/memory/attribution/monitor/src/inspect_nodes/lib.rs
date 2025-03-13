@@ -210,9 +210,13 @@ mod tests {
                         koid: 10,
                         name_index: 0,
                         resource_type: fplugin::ResourceType::Vmo(fplugin::Vmo {
-                            committed_bytes: Some(1024),
-                            populated_bytes: Some(2048),
                             parent: None,
+                            private_committed_bytes: Some(1024),
+                            private_populated_bytes: Some(2048),
+                            scaled_committed_bytes: Some(1024),
+                            scaled_populated_bytes: Some(2048),
+                            total_committed_bytes: Some(1024),
+                            total_populated_bytes: Some(2048),
                             ..Default::default()
                         }),
                     }],

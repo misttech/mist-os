@@ -53,11 +53,11 @@ struct TypeTraits<::test_transitivedependencies::wire::Baz> {
 };
 
 template <>
-struct IsFidlType<::test_transitivedependencies::wire::Baz> : public std::true_type{};
+struct IsFidlType<::test_transitivedependencies::wire::Baz> : public std::true_type {};
 template <>
-struct IsWire<::test_transitivedependencies::wire::Baz> : public std::true_type{};
+struct IsWire<::test_transitivedependencies::wire::Baz> : public std::true_type {};
 template <>
-struct IsStruct<::test_transitivedependencies::wire::Baz> : public std::true_type{};
+struct IsStruct<::test_transitivedependencies::wire::Baz> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_transitivedependencies::wire::Baz>);
 static_assert(offsetof(::test_transitivedependencies::wire::Baz, g) == 0);
 static_assert(sizeof(::test_transitivedependencies::wire::Baz) == TypeTraits<::test_transitivedependencies::wire::Baz>::kPrimarySize);

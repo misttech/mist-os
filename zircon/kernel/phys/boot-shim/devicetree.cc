@@ -125,7 +125,7 @@ void InitMemory(void* dtb, AddressSpace* aspace) {
   // current setting was in place before calling InitMemory. That's often the
   // null driver, but could be something else.
   boot_options.serial = chosen.TakeUart().value_or(ktl::move(GetUartDriver()).TakeUart());
-  SetBootOptionsWithoutEntropy(boot_options, {}, chosen.cmdline().value_or(""));
+  SetBootOptionsWithoutEntropy(boot_options, chosen.zbi(), chosen.cmdline().value_or(""));
   SetUartConsole(boot_options.serial);
 
   Allocation::Init(ranges, special_ranges);

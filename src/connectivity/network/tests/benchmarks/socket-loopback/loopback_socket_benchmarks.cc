@@ -172,17 +172,20 @@ bool TcpWriteRead(perftest::RepeatState* state, int transfer) {
   fbl::unique_fd client_sock;
   CHECK_TRUE_ERRNO(client_sock = fbl::unique_fd(socket(Ip::kFamily, SOCK_STREAM, 0)));
 
-  // Set send buffer to transfer size to ensure we can write `transfer` bytes before reading it on
-  // the other end.
-  CHECK_ZERO_ERRNO(
-      setsockopt(client_sock.get(), SOL_SOCKET, SO_SNDBUF, &transfer, sizeof(transfer)));
+  constexpr int kBufferSizeMultipler = 4;
+  // Set send buffer larger than transfer size to ensure we can write `transfer`
+  // bytes before reading it on the other end. The multiplier allows the
+  // receiver to delay acknowledgements but the transfer still proceeds. This is
+  // especially impactful for small transfer sizes.
+  int sndbuf = transfer * kBufferSizeMultipler;
+  CHECK_ZERO_ERRNO(setsockopt(client_sock.get(), SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(sndbuf)));
   {
     int sndbuf_opt;
     socklen_t sndbuf_optlen = sizeof(sndbuf_opt);
     CHECK_ZERO_ERRNO(
         getsockopt(client_sock.get(), SOL_SOCKET, SO_SNDBUF, &sndbuf_opt, &sndbuf_optlen));
 
-    int want_sndbuf = ExpectedGetBufferSize(transfer, BufferSizeType::kTcpSend);
+    int want_sndbuf = ExpectedGetBufferSize(sndbuf, BufferSizeType::kTcpSend);
     FX_CHECK(sndbuf_opt == want_sndbuf)
         << "sndbuf size (" << sndbuf_opt << ") != want (" << want_sndbuf << ")";
   }
@@ -200,13 +203,13 @@ bool TcpWriteRead(perftest::RepeatState* state, int transfer) {
   // This is set on the listening socket, which is inherited by accepted sockets
   // on creation.
   //
-  // We use double the transfer size so silly window avoidance doesn't kick in
-  // in-between test iterations which causes pollution in the results.
+  // We use a multiplier on the transfer size so silly window avoidance doesn't
+  // kick in in-between test iterations which causes pollution in the results.
   //
   // We don't perform the getopt check here on return to reduce the amount of
   // change detectors on buffer sizes required here, since the buffer size is
   // not load-bearing for the test to complete successfully.
-  int recvbuf = transfer * 2;
+  int recvbuf = transfer * kBufferSizeMultipler;
   CHECK_ZERO_ERRNO(setsockopt(listen_sock.get(), SOL_SOCKET, SO_RCVBUF, &recvbuf, sizeof(recvbuf)));
 
   CHECK_ZERO_ERRNO(connect(client_sock.get(), sockaddr.as_sockaddr(), sockaddr.socklen()));

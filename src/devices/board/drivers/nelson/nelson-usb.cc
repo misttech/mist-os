@@ -11,6 +11,7 @@
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/mmio/mmio.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zircon-internal/align.h>
 #include <stdlib.h>
 
@@ -76,12 +77,12 @@ static const dwc2_metadata_t dwc2_metadata = {
 static const std::vector<fpbus::BootMetadata> usb_boot_metadata{
     {{
         // Use Bluetooth MAC address for USB ethernet as well.
-        .zbi_type = DEVICE_METADATA_MAC_ADDRESS,
+        .zbi_type = ZBI_TYPE_DRV_MAC_ADDRESS,
         .zbi_extra = MACADDR_BLUETOOTH,
     }},
     {{
         // Advertise serial number over USB
-        .zbi_type = DEVICE_METADATA_SERIAL_NUMBER,
+        .zbi_type = ZBI_TYPE_SERIAL_NUMBER,
         .zbi_extra = 0,
     }},
 };

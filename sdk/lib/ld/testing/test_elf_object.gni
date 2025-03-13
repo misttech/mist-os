@@ -33,6 +33,8 @@ template("test_elf_object") {
   main_target = target_name
   rspfile_target = "$target_name.rsp"
   rspfile = "$target_gen_dir/$rspfile_target"
+  libprefix_target = "$target_name.libprefix"
+  libprefix_rspfile = "$target_gen_dir/$libprefix_target"
 
   # `inline const ld::testing::TestElfObject kTestObject_<build-id-hex> = ...;`
   gen_object = "$target_gen_dir/$target_name.test-elf-object.object.inc"
@@ -50,15 +52,22 @@ template("test_elf_object") {
                            ])
     script = "//sdk/lib/ld/testing/gen-test-elf-object.py"
     utils = [ "llvm-readelf" ]
-    sources = [ rspfile ]
+    sources = [
+      libprefix_rspfile,
+      rspfile,
+    ]
     depfile = "$target_gen_dir/$target_name.d"
     outputs = [
       gen_object,
       gen_entry,
     ]
-    deps = [ ":$rspfile_target" ]
+    deps = [
+      ":$libprefix_target",
+      ":$rspfile_target",
+    ]
     args = [
       "--rspfile=" + rebase_path(rspfile, root_build_dir),
+      "--libprefix-rspfile=" + rebase_path(libprefix_rspfile, root_build_dir),
       "--depfile=" + rebase_path(depfile, root_build_dir),
       "--object=$gen_object_path",
       "--entry=$gen_entry_path",
@@ -74,6 +83,16 @@ template("test_elf_object") {
     forward_variables_from(invoker, [ "testonly" ])
     outputs = [ rspfile ]
     deps = invoker.deps
+  }
+
+  generated_file(libprefix_target) {
+    visibility = [ ":$main_target" ]
+    forward_variables_from(invoker, [ "testonly" ])
+    outputs = [ libprefix_rspfile ]
+    deps = invoker.deps
+    output_conversion = "list lines"
+    data_keys = [ "libprefix" ]
+    walk_keys = [ "link_output_barrier" ]
   }
 }
 

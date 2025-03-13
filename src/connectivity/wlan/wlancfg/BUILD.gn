@@ -115,7 +115,6 @@ rustc_library("lib") {
     "src/mode_management/recovery.rs",
     "src/regulatory_manager.rs",
     "src/telemetry/convert.rs",
-    "src/telemetry/experiment.rs",
     "src/telemetry/inspect_time_series.rs",
     "src/telemetry/mod.rs",
     "src/telemetry/windowed_stats.rs",

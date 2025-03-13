@@ -1111,6 +1111,12 @@ choose to use the PCT as the time reference, even if a VCT IRQ is offered in the
 ZBI.  Please note, setting force-pct on a target which has no defined PCT IRQ
 will result in a panic during early boot.
 
+### kernel.arm64.pci=\<bool>
+
+**Default:** `true`
+
+Enables kernel mode PCI support and kernel PCI syscalls.
+
 
 ## Options available only on riscv64 machines
 

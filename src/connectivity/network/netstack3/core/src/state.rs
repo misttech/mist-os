@@ -4,14 +4,11 @@
 
 //! Structs containing the entire stack state.
 
-use net_types::ip::{Ip, Ipv4, Ipv6};
+use lock_order::lock::UnlockedAccess;
 use netstack3_base::{BuildableCoreContext, ContextProvider, CoreTimerContext, CtxPair};
 use netstack3_device::{DeviceId, DeviceLayerState};
 use netstack3_ip::icmp::IcmpState;
-use netstack3_ip::nud::NudCounters;
 use netstack3_ip::{self as ip, IpLayerIpExt, IpLayerTimerId, IpStateInner, Ipv4State, Ipv6State};
-use netstack3_tcp::TcpCounters;
-use netstack3_udp::UdpCounters;
 
 use crate::api::CoreApi;
 use crate::time::TimerId;
@@ -77,22 +74,6 @@ impl<BT: BindingsTypes> StackState<BT> {
         CoreApi::new(CtxPair { core_ctx: CoreCtx::new(self), bindings_ctx })
     }
 
-    pub(crate) fn nud_counters<I: Ip>(&self) -> &NudCounters<I> {
-        I::map_ip_out(
-            self,
-            |state| state.device.nud_counters::<Ipv4>(),
-            |state| state.device.nud_counters::<Ipv6>(),
-        )
-    }
-
-    pub(crate) fn udp_counters<I: Ip>(&self) -> &UdpCounters<I> {
-        &self.transport.udp_counters::<I>()
-    }
-
-    pub(crate) fn tcp_counters<I: Ip>(&self) -> &TcpCounters<I> {
-        &self.transport.tcp_counters::<I>()
-    }
-
     pub(crate) fn inner_ip_state<I: IpLayerIpExt>(&self) -> &IpStateInner<I, DeviceId<BT>, BT> {
         I::map_ip((), |()| &self.ipv4.inner, |()| &self.ipv6.inner)
     }
@@ -140,5 +121,25 @@ impl<BT: BindingsTypes> StackState<BT> {
 impl<BT: BindingsTypes> CoreTimerContext<IpLayerTimerId, BT> for StackState<BT> {
     fn convert_timer(timer: IpLayerTimerId) -> TimerId<BT> {
         timer.into()
+    }
+}
+
+/// It is safe to provide unlocked access to [`StackState`] itself here because
+/// care has been taken to avoid exposing publicly to the core integration crate
+/// any state that is held by a lock, as opposed to read-only state that can be
+/// accessed safely at any lock level, e.g. state with no interior mutability or
+/// atomics.
+///
+/// Access to state held by locks *must* be mediated using the global lock
+/// ordering declared in [`crate::lock_ordering`].
+impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::UnlockedState> for StackState<BT> {
+    type Data = StackState<BT>;
+    type Guard<'l>
+        = &'l StackState<BT>
+    where
+        Self: 'l;
+
+    fn access(&self) -> Self::Guard<'_> {
+        &self
     }
 }

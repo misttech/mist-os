@@ -369,7 +369,7 @@ impl ToResolveError for pkg::cache::WriteBlobError {
         match self {
             Overwrite | Corrupt | UnexpectedResponse(_) | Fidl(_) => pkg::ResolveError::Io,
             NoSpace => pkg::ResolveError::NoSpace,
-            BytesNotNeeded(_) | Other(_) => pkg::ResolveError::Internal,
+            BytesNotNeeded(_) | FxBlob(_) => pkg::ResolveError::Internal,
         }
     }
 }

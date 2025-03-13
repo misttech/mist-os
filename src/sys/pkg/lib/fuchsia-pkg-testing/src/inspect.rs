@@ -3,19 +3,19 @@
 // found in the LICENSE file.
 
 use diagnostics_hierarchy::DiagnosticsHierarchy;
-use diagnostics_reader::{ArchiveReader, ComponentSelector, Inspect};
+use diagnostics_reader::{ArchiveReader, ComponentSelector};
 
 /// Get the Inspect `NodeHierarchy` for the component under test running in the nested environment.
 pub async fn get_inspect_hierarchy(
     nested_environment_label: &str,
     component_name: &str,
 ) -> DiagnosticsHierarchy {
-    let data = ArchiveReader::new()
+    let data = ArchiveReader::inspect()
         .add_selector(ComponentSelector::new(vec![
             nested_environment_label.to_string(),
             component_name.to_string(),
         ]))
-        .snapshot::<Inspect>()
+        .snapshot()
         .await
         .expect("read inspect hierarchy")
         .into_iter()

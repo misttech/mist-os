@@ -27,8 +27,8 @@ import("//build/rust/rustc_test.gni")
 #   test_configs (optional)
 #     A list of config labels applying to the test target, in addition to those in `configs`.
 #
-#   test_vars (optional)
-#     A scope of variables to forward to the test target.
+#   test_visibility (optional)
+#     An override for the visibility setting for the generated test target when there is one.
 #
 #   enforce_source_listing (optional)
 #     When true, enforces that any source files used by the Rust compiler are
@@ -137,6 +137,13 @@ template("rustc_staticlib") {
                                "test_configs",
                                "test_deps",
                              ])
+
+      # Use a different visibility for this test target if specified.
+      if (defined(test_visibility)) {
+        visibility = []
+        visibility = test_visibility
+      }
+
       output_name = invoker.target_name + "_staticlib_test"
       if (defined(invoker.output_name)) {
         output_name = invoker.output_name + "_staticlib_test"
@@ -187,6 +194,33 @@ template("rustc_staticlib") {
     # TODO(https://fxbug.dev/42120123) remove "non_rust_deps"
     if (defined(invoker.non_rust_deps)) {
       deps += invoker.non_rust_deps
+    }
+
+    if (is_fuchsia) {
+      rustflags = [
+        # This nightly flag is needed to support having dylibs in this target's
+        # dependencies or transitive dependencies.
+        "-Zstaticlib-allow-rdylib-deps",
+
+        # This nightly flag says when both rlib and dylibs are available, prefer
+        # dylibs. This seems to only affect Rust stdlib for now.
+        #
+        # Only set this when targeting Fuchsia, so host binaries still
+        # statically link Rust stdlib, making them easier to execute, i.e users
+        # don't need to provide Rust libstd.so.
+        "-Zstaticlib-prefer-dynamic",
+      ]
+
+      # Rust libstd is linked dynamically, so make sure all dependents of this
+      # target have libstd in ldflags. This is necessary because static
+      # libraries are later consumed by non-Rust targets.
+      all_dependent_configs = [ "//build/config/rust:rust-libstd-so-ldflags" ]
+
+      # Rust libstd requires fdio.
+      public_deps = [ "//sdk/lib/fdio" ]
+
+      # libstd deps needs to be picked up by distribution entries.
+      data_deps = [ "//build/toolchain/runtime:shared-rust-libstd-deps" ]
     }
 
     forward_variables_from(invoker,

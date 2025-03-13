@@ -160,6 +160,7 @@ impl ImageAssemblyConfigBuilder {
             packages_to_compile,
             shell_commands,
             developer_provided_files: _,
+            bootfs_files_package,
         } = developer_overrides;
 
         // Set the developer-only options for the buidler to use.
@@ -192,6 +193,10 @@ impl ImageAssemblyConfigBuilder {
             for binary in binaries {
                 self.add_pkg_shell_command_entry(&package, binary)?;
             }
+        }
+
+        if let Some(path) = bootfs_files_package {
+            self.add_bootfs_files_package(path, true)?;
         }
 
         Ok(())
@@ -246,7 +251,8 @@ impl ImageAssemblyConfigBuilder {
         self.add_bundle_packages(bundle_path, &packages)?;
 
         if let Some(path) = bootfs_files_package {
-            self.add_bootfs_files_from_path(bundle_path, path)?;
+            let path = bundle_path.join(path);
+            self.add_bootfs_files_package(path, false).context("Adding bootfs files package")?;
         }
 
         // Base drivers are added to the base packages
@@ -429,14 +435,14 @@ impl ImageAssemblyConfigBuilder {
         Ok(())
     }
 
-    fn add_bootfs_files_from_path(
+    /// Add the blobs of a package as bootfs files
+    pub fn add_bootfs_files_package(
         &mut self,
-        bundle_path: impl AsRef<Utf8Path>,
         path: impl AsRef<Utf8Path>,
+        from_product: bool,
     ) -> Result<()> {
-        let path = bundle_path.as_ref().join(path);
         let manifest = PackageManifest::try_load_from(&path)
-            .with_context(|| format!("parsing {path} as a package manifest"))?;
+            .with_context(|| format!("parsing {} as a package manifest", path.as_ref()))?;
         for mut blob in manifest.into_blobs() {
             if blob.path.starts_with("meta/") {
                 continue;
@@ -444,9 +450,14 @@ impl ImageAssemblyConfigBuilder {
             if let Some(path) = blob.path.strip_prefix("bootfs/") {
                 blob.path = path.to_string();
             }
+            let destination = if from_product {
+                BootfsDestination::FromProduct(blob.path.clone())
+            } else {
+                BootfsDestination::FromAIB(blob.path.clone())
+            };
             self.bootfs_files
-                .add_blob_from_aib(blob)
-                .with_context(|| format!("adding bootfs file from {path}"))?;
+                .add_blob(destination, blob)
+                .with_context(|| format!("adding bootfs file from {}", path.as_ref()))?;
         }
         Ok(())
     }
@@ -576,6 +587,7 @@ impl ImageAssemblyConfigBuilder {
     pub fn add_product_packages(&mut self, packages: ProductPackagesConfig) -> Result<()> {
         self.add_product_packages_to_set(packages.base, PackageSet::Base)?;
         self.add_product_packages_to_set(packages.cache, PackageSet::Cache)?;
+        self.add_product_packages_to_set(packages.bootfs, PackageSet::Bootfs)?;
         Ok(())
     }
 
@@ -855,6 +867,10 @@ impl ImageAssemblyConfigBuilder {
             developer_only_options: _,
             images_config,
         } = self;
+
+        if !boot_args.is_empty() {
+            bail!("Found additional boot args")
+        }
 
         let cmc_tool = tools.get_tool("cmc")?;
 
@@ -1519,7 +1535,7 @@ mod tests {
                 args: vec!["kernel_arg0".into()],
             }),
             qemu_kernel: Some("path/to/qemu/kernel".into()),
-            boot_args: vec!["boot_arg0".into()],
+            boot_args: vec![],
             bootfs_files: vec![],
             bootfs_packages: vec![],
             packages: vec![
@@ -1654,7 +1670,7 @@ mod tests {
                 vars.outdir.join("config/package_manifest.json"),
             ]
         );
-        assert_eq!(result.boot_args, vec!("boot_arg0".to_string()));
+        assert!(result.boot_args.is_empty());
         assert_eq!(
             result
                 .bootfs_files
@@ -1705,7 +1721,7 @@ mod tests {
                 vars.outdir.join("config/package_manifest.json"),
             ]
         );
-        assert_eq!(result.boot_args, vec!("boot_arg0".to_string()));
+        assert!(result.boot_args.is_empty());
         assert_eq!(
             result
                 .bootfs_files
@@ -1756,7 +1772,7 @@ mod tests {
                 vars.outdir.join("config/package_manifest.json"),
             ]
         );
-        assert_eq!(result.boot_args, vec!("boot_arg0".to_string()));
+        assert!(result.boot_args.is_empty());
         assert_eq!(
             result
                 .bootfs_files
@@ -1989,15 +2005,12 @@ mod tests {
                 ("base_a".to_string(), write_empty_pkg(outdir, "base_a", None).into()),
                 (
                     "base_b".to_string(),
-                    ProductPackageDetails {
-                        manifest: FileRelativePathBuf::Resolved(base_b_pathbuf),
-                        config_data: Vec::default(),
-                    },
+                    ProductPackageDetails { manifest: base_b_pathbuf, config_data: Vec::default() },
                 ),
                 (
                     "base_c".to_string(),
                     ProductPackageDetails {
-                        manifest: FileRelativePathBuf::Resolved(base_c_pathbuf),
+                        manifest: base_c_pathbuf,
                         config_data: vec![
                             ProductConfigData {
                                 destination: "dest/path/cfg.txt".into(),
@@ -2017,6 +2030,7 @@ mod tests {
                 ("cache_b".to_string(), write_empty_pkg(outdir, "cache_b", None).into()),
             ]
             .into(),
+            bootfs: [].into(),
         };
 
         let mut builder = get_minimum_config_builder(

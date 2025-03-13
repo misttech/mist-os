@@ -27,8 +27,8 @@ rustc_library("layeredfs") {
 
   deps = [
     "//src/starnix/kernel:starnix_core",
-    "//src/starnix/lib/starnix-sync",
-    "//src/starnix/lib/starnix-uapi",
+    "//src/starnix/lib/starnix_sync",
+    "//src/starnix/lib/starnix_uapi",
   ]
 
   test_deps = [
@@ -38,7 +38,7 @@ rustc_library("layeredfs") {
 }
 
 fuchsia_unittest_package("starnix-layeredfs-tests") {
-  manifest = "meta/starnix-layeredfs-tests.cml"
+  manifest = "meta/starnix_layeredfs_tests.cml"
   deps = [ ":layeredfs_test" ]
   test_specs = {
     log_settings = {

@@ -14,6 +14,7 @@ ffx_plugin("ffx_repository_packages") {
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/pkg",
+    "//src/developer/ffx/lib/writer:lib",
     "//src/lib/fuchsia-hyper",
     "//src/sys/pkg/lib/fuchsia-hash",
     "//src/sys/pkg/lib/fuchsia-pkg",

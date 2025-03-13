@@ -10,6 +10,6 @@
     program: {
         binary: "data/tests/virtmagma_sync_file_tests",
         uid: "0",
-        component_features: [ "magma" ],
+        features: [ "magma" ],
     },
 }

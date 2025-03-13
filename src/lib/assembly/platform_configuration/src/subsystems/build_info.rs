@@ -21,11 +21,11 @@ impl DefineSubsystemConfiguration<Option<BuildInfoConfig>> for BuildInfoSubsyste
             dir.entry_from_contents("board", &context.board_info.name)?;
             dir.entry_from_contents("product", &build_info.name)?;
             dir.entry(FileEntry {
-                source: build_info.version.clone().into(),
+                source: build_info.version.clone(),
                 destination: "version".into(),
             })?;
             dir.entry(FileEntry {
-                source: build_info.version.clone().into(),
+                source: build_info.version.clone(),
                 destination: "product_version".into(),
             })?;
             dir.entry(FileEntry {
@@ -33,11 +33,11 @@ impl DefineSubsystemConfiguration<Option<BuildInfoConfig>> for BuildInfoSubsyste
                 destination: "platform_version".into(),
             })?;
             dir.entry(FileEntry {
-                source: build_info.jiri_snapshot.clone().into(),
+                source: build_info.jiri_snapshot.clone(),
                 destination: "snapshot".into(),
             })?;
             dir.entry(FileEntry {
-                source: build_info.latest_commit_date.clone().into(),
+                source: build_info.latest_commit_date.clone(),
                 destination: "latest-commit-date".into(),
             })?;
         }

@@ -591,6 +591,19 @@ ARCH_ARM64_SYSREG(ArmSpsrEl2, "spsr_el2");
 struct ArmSpsrEl3 : public arch::SysRegDerived<ArmSpsrEl3, ArmSavedProgramStatusRegister> {};
 ARCH_ARM64_SYSREG(ArmSpsrEl3, "spsr_el3");
 
+// [arm/sysreg]/nzcv: Condition Flags
+//
+// This is a subset of SPSR_ELx that is accessible R/W to everyone.
+struct ArmNzcv : public SysRegBase<ArmNzcv, uint64_t> {
+  DEF_RSVDZ_FIELD(63, 32);
+  DEF_BIT(31, n);
+  DEF_BIT(30, z);
+  DEF_BIT(29, c);
+  DEF_BIT(28, v);
+  DEF_RSVDZ_FIELD(27, 0);
+};
+ARCH_ARM64_SYSREG(ArmNzcv, "nzcv");
+
 // [arm/sysreg]/esr_el1: Exception Syndrome Register (El1)
 // [arm/sysreg]/esr_el2: Exception Syndrome Register (El2)
 // [arm/sysreg]/esr_el3: Exception Syndrome Register (El3)
@@ -628,6 +641,7 @@ struct ArmExceptionSyndromeRegister
     kDataAbortLowerEl = 0b100100,
     kDataAbortSameEl = 0b100101,
     kSpAlignment = 0b100110,
+    kMops = 0b100111,
     kFpe32 = 0b101000,
     kFpe64 = 0b101100,
     kSerror = 0b101111,
@@ -798,6 +812,38 @@ struct ArmHypervisorConfigurationRegister
 
 struct ArmHcrEl2 : public arch::SysRegDerived<ArmHcrEl2, ArmHypervisorConfigurationRegister> {};
 ARCH_ARM64_SYSREG(ArmHcrEl2, "hcr_el2");
+
+// [arm/sysreg]/hcrx_el2: Extended Hypervisor Configuration register (EL2)
+struct ArmExtendedHypervisorConfigurationRegister
+    : public SysRegDerivedBase<ArmExtendedHypervisorConfigurationRegister, uint64_t> {
+  DEF_RSVDZ_FIELD(63, 23);  // Safe "pass-through" value for no-op EL2.
+  DEF_BIT(22, gcsen);       // if FEAT_GCS
+  DEF_BIT(21, enidcp128);   // if FEAT_SYSREG128
+  DEF_BIT(20, ensderr);     // if FEAT_ADERR
+  DEF_BIT(19, tmea);        // if FEAT_DoubleFault2
+  DEF_BIT(18, ensnerr);     // if FEAT_ANERR
+  DEF_BIT(17, d128en);      // if FEAT_D128
+  DEF_BIT(16, pttwi);       // if FEAT_THE
+  DEF_BIT(15, sctlr2en);    // if FEAT_SCTLR2
+  DEF_BIT(14, tcr2en);      // if FEAT_TCR2
+  DEF_RSVDZ_FIELD(13, 12);  // RES0
+  DEF_BIT(11, mscen);       // if FEAT_MOPS
+  DEF_BIT(10, mce2);        // if FEAT_MOPS
+  DEF_BIT(9, cmow);         // if CEAT_CMOW
+  DEF_BIT(8, vfnmi);        // if FEAT_NMI
+  DEF_BIT(7, vinmi);        // if FEAT_NMI
+  DEF_BIT(6, tallint);      // if FEAT_NMI
+  DEF_BIT(5, smpme);        // if FEAT_SME
+  DEF_BIT(4, fgtnxs);       // if FEAT_XS
+  DEF_BIT(3, fnxs);         // if FEAT_XS
+  DEF_BIT(2, enasr);        // if FEAT_LS64_V
+  DEF_BIT(1, enals);        // if FEAT_LS64
+  DEF_BIT(0, enas0);        // if FEAT_LS64_ACCDATA
+};
+
+struct ArmHcrxEl2
+    : public arch::SysRegDerived<ArmHcrxEl2, ArmExtendedHypervisorConfigurationRegister> {};
+ARCH_ARM64_SYSREG(ArmHcrxEl2, "hcrx_el2");
 
 // [arm/sysreg]/cnthctl_el2: Counter-timer Hypervisor Control register (EL2)
 //

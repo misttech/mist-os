@@ -60,6 +60,7 @@ driver_bind_rules("parent_device_bind") {
 }
 
 fuchsia_cc_driver("parent_device") {
+  legacy = true
   testonly = true
   output_name = "parent_device"
   sources = [

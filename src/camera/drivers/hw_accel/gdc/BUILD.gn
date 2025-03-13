@@ -64,6 +64,7 @@ source_set("lib") {
 }
 
 fuchsia_cc_driver("fuchsia_driver") {
+  legacy = true
   output_name = "gdc"
   deps = [ ":lib" ]
   configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]

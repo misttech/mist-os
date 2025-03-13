@@ -109,6 +109,7 @@ resource("firmware") {
 }
 
 fuchsia_cc_driver("intel-hda-driver") {
+  legacy = true
   output_name = "intel-hda"
   defines = [ "ADSP_FIRMWARE_PATH=\"$firmware_path\"" ]
   configs += [

@@ -11,6 +11,7 @@
 #include <lib/component/incoming/cpp/clone.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>
+#include <lib/fdio/directory.h>
 #include <lib/fdio/fdio.h>
 #include <lib/fit/defer.h>
 #include <lib/syslog/cpp/macros.h>
@@ -21,7 +22,6 @@
 #include "src/recovery/factory_reset/factory_reset_config.h"
 #include "src/security/lib/kms-stateless/kms-stateless.h"
 #include "src/security/lib/zxcrypt/client.h"
-#include "src/storage/lib/block_client/cpp/remote_block_device.h"
 #include "src/storage/lib/fs_management/cpp/format.h"
 namespace factory_reset {
 
@@ -87,13 +87,16 @@ void FactoryReset::Shred(fit::callback<void(zx_status_t)> callback) const {
       }
       // Fall back to shredding all zxcrypt devices...
       FX_LOGS(INFO) << "Falling back to manually shredding zxcrypt...";
-      zx::result block_dir = component::ConnectAt<fuchsia_io::Directory>(dev_, kBlockPath);
-      if (block_dir.is_error()) {
-        FX_PLOGS(ERROR, block_dir.error_value()) << "Failed to open '" << kBlockPath << "'";
-        return block_dir.error_value();
+      auto [block_dir, block_dir_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+      if (zx_status_t status = fdio_open3_at(dev_.channel().get(), kBlockPath,
+                                             uint64_t{fuchsia_io::wire::kPermReadable},
+                                             block_dir_server.TakeChannel().release());
+          status != ZX_OK) {
+        FX_PLOGS(ERROR, status) << "Failed to open '" << kBlockPath << "'";
+        return status;
       }
       int fd;
-      if (zx_status_t status = fdio_fd_create(block_dir.value().TakeChannel().release(), &fd);
+      if (zx_status_t status = fdio_fd_create(block_dir.TakeChannel().release(), &fd);
           status != ZX_OK) {
         FX_PLOGS(ERROR, status) << "Failed to create fd from '" << kBlockPath << "'";
         return status;

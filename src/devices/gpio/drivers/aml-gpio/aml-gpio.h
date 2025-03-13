@@ -10,6 +10,7 @@
 #include <lib/async/cpp/executor.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/metadata/cpp/metadata_server.h>
 #include <lib/fpromise/promise.h>
 #include <lib/mmio/mmio.h>
 #include <lib/stdcompat/span.h>
@@ -133,14 +134,17 @@ class AmlGpioDriver : public fdf::DriverBase {
       fidl::WireClient<fuchsia_hardware_platform_device::Device>& pdev, uint32_t mmio_id);
 
  private:
-  void OnCompatServerInitialized(fdf::StartCompleter completer);
+  fpromise::promise<void, zx_status_t> InitResources();
   void OnGetNodeDeviceInfo(const fuchsia_hardware_platform_device::wire::NodeDeviceInfo& info,
-                           fdf::StartCompleter completer);
+                           fpromise::completer<void, zx_status_t> completer);
   void OnGetBoardInfo(const fuchsia_hardware_platform_device::wire::BoardInfo& board_info,
-                      uint32_t irq_count, fdf::StartCompleter completer);
-  void MapMmios(uint32_t pid, uint32_t irq_count, fdf::StartCompleter completer);
-  void AddNode(uint32_t pid, uint32_t irq_count, std::vector<fdf::MmioBuffer> mmios,
-               fdf::StartCompleter completer);
+                      uint32_t irq_count, fpromise::completer<void, zx_status_t> completer);
+  void MapMmios(uint32_t pid, uint32_t irq_count, fpromise::completer<void, zx_status_t> completer);
+  void InitDevice(uint32_t pid, uint32_t irq_count, std::vector<fdf::MmioBuffer> mmios,
+                  fpromise::completer<void, zx_status_t> completer);
+  void AddNode(fdf::StartCompleter completer);
+  fpromise::promise<void, zx_status_t> InitCompatServer();
+  fpromise::promise<void, zx_status_t> InitMetadataServer();
 
   fidl::WireClient<fuchsia_driver_framework::Node> parent_;
   fidl::WireClient<fuchsia_driver_framework::NodeController> controller_;
@@ -148,6 +152,7 @@ class AmlGpioDriver : public fdf::DriverBase {
   compat::AsyncInitializedDeviceServer compat_server_;
   std::unique_ptr<AmlGpio> device_;
   async::Executor executor_;
+  fdf_metadata::MetadataServer<fuchsia_hardware_pinimpl::Metadata> metadata_server_;
 };
 
 }  // namespace gpio

@@ -33,9 +33,6 @@ sdk_source_set("cpp") {
   deps = [ "//sdk/lib/vfs/cpp" ]
 
   public_configs = [ "//sdk/config" ]
-
-  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
 }
 
 cc_test_executable("sys_service_unittests") {

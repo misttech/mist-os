@@ -12,10 +12,7 @@
     },
     use: [
         {
-            protocol: [
-                "fuchsia.sysmem.Allocator",
-                "fuchsia.sysmem2.Allocator",
-            ],
+            protocol: [ "fuchsia.sysmem2.Allocator" ],
         },
     ],
 }

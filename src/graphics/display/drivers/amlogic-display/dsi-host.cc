@@ -8,10 +8,10 @@
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/fit/function.h>
+#include <lib/mipi-dsi/mipi-dsi.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
-#include <zircon/status.h>
 
 #include <fbl/alloc_checker.h>
 
@@ -22,6 +22,8 @@
 #include "src/graphics/display/drivers/amlogic-display/lcd.h"
 #include "src/graphics/display/drivers/amlogic-display/mipi-phy.h"
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
+#include "src/graphics/display/lib/designware-dsi/dpi-interface-config.h"
+#include "src/graphics/display/lib/designware-dsi/dsi-host-controller-config.h"
 #include "src/graphics/display/lib/designware-dsi/dsi-host-controller.h"
 
 namespace amlogic_display {
@@ -41,7 +43,7 @@ zx::result<std::unique_ptr<designware_dsi::DsiHostController>> CreateDesignwareD
   auto designware_dsi_host_controller = fbl::make_unique_checked<designware_dsi::DsiHostController>(
       &alloc_checker, std::move(dsi_host_mmio));
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for designware_dsi::DsiHostController");
+    fdf::error("Failed to allocate memory for designware_dsi::DsiHostController");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -80,7 +82,7 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(fdf::Namespace& incoming, u
   zx::result lcd_reset_gpio_result =
       incoming.Connect<fuchsia_hardware_gpio::Service::Device>(kLcdGpioFragmentName);
   if (lcd_reset_gpio_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to get gpio protocol from fragment: %s", kLcdGpioFragmentName);
+    fdf::error("Failed to get gpio protocol from fragment: {}", kLcdGpioFragmentName);
     return lcd_reset_gpio_result.take_error();
   }
   fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> lcd_reset_gpio =
@@ -90,7 +92,7 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(fdf::Namespace& incoming, u
   zx::result<fidl::ClientEnd<fuchsia_hardware_platform_device::Device>> pdev_result =
       incoming.Connect<fuchsia_hardware_platform_device::Service::Device>(kPdevFragmentName);
   if (pdev_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to get the pdev client: %s", pdev_result.status_string());
+    fdf::error("Failed to get the pdev client: {}", pdev_result);
     return pdev_result.take_error();
   }
   fidl::ClientEnd<fuchsia_hardware_platform_device::Device> platform_device =
@@ -111,8 +113,8 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(fdf::Namespace& incoming, u
   zx::result<std::unique_ptr<designware_dsi::DsiHostController>>
       designware_dsi_host_controller_result = CreateDesignwareDsiHostController(platform_device);
   if (designware_dsi_host_controller_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to Create Designware DsiHostController: %s",
-            designware_dsi_host_controller_result.status_string());
+    fdf::error("Failed to Create Designware DsiHostController: {}",
+               designware_dsi_host_controller_result);
     return designware_dsi_host_controller_result.take_error();
   }
   std::unique_ptr<designware_dsi::DsiHostController> designware_dsi_host_controller =
@@ -122,7 +124,7 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(fdf::Namespace& incoming, u
       Lcd::Create(incoming, panel_type, panel_config, designware_dsi_host_controller.get(),
                   kBootloaderDisplayEnabled);
   if (lcd_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to Create Lcd: %s", lcd_result.status_string());
+    fdf::error("Failed to Create Lcd: {}", lcd_result);
     return lcd_result.take_error();
   }
   std::unique_ptr<Lcd> lcd = std::move(lcd_result).value();
@@ -130,7 +132,7 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(fdf::Namespace& incoming, u
   zx::result<std::unique_ptr<MipiPhy>> mipi_phy_result = MipiPhy::Create(
       platform_device, designware_dsi_host_controller.get(), kBootloaderDisplayEnabled);
   if (mipi_phy_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to Create MipiPhy: %s", mipi_phy_result.status_string());
+    fdf::error("Failed to Create MipiPhy: {}", mipi_phy_result);
     return mipi_phy_result.take_error();
   }
   std::unique_ptr<MipiPhy> phy = std::move(mipi_phy_result).value();
@@ -142,7 +144,7 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(fdf::Namespace& incoming, u
       std::move(phy),
       /*enabled=*/kBootloaderDisplayEnabled);
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for DsiHost");
+    fdf::error("Failed to allocate memory for DsiHost");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
   return zx::ok(std::move(dsi_host));
@@ -151,83 +153,79 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(fdf::Namespace& incoming, u
 zx::result<> DsiHost::PerformPowerOpSequence(cpp20::span<const PowerOp> commands,
                                              fit::callback<zx::result<>()> power_on) {
   if (commands.size() == 0) {
-    FDF_LOG(ERROR, "No power commands to execute");
+    fdf::error("No power commands to execute");
     return zx::ok();
   }
   uint8_t wait_count = 0;
 
   for (const auto op : commands) {
-    FDF_LOG(TRACE, "power_op %d index=%d value=%d sleep_ms=%d", op.op, op.index, op.value,
-            op.sleep_ms);
+    fdf::trace("power_op {} index={} value={} sleep_ms={}", static_cast<uint8_t>(op.op), op.index,
+               op.value, op.sleep_ms);
     switch (op.op) {
       case kPowerOpExit:
-        FDF_LOG(TRACE, "power_exit");
+        fdf::trace("power_exit");
         return zx::ok();
       case kPowerOpGpio: {
-        FDF_LOG(TRACE, "power_set_gpio pin #%d value=%d", op.index, op.value);
+        fdf::trace("power_set_gpio pin #{} value={}", op.index, op.value);
         if (op.index != 0) {
-          FDF_LOG(ERROR, "Unrecognized GPIO pin #%d, ignoring", op.index);
+          fdf::error("Unrecognized GPIO pin #{}, ignoring", op.index);
           break;
         }
         fidl::WireResult result = lcd_reset_gpio_->SetBufferMode(
             op.value ? fuchsia_hardware_gpio::BufferMode::kOutputHigh
                      : fuchsia_hardware_gpio::BufferMode::kOutputLow);
         if (!result.ok()) {
-          FDF_LOG(ERROR, "Failed to send Write request to lcd gpio: %s", result.status_string());
+          fdf::error("Failed to send Write request to lcd gpio: {}", result.status_string());
           return zx::error(result.status());
         }
         if (result->is_error()) {
-          FDF_LOG(ERROR, "Failed to write to lcd gpio: %s",
-                  zx_status_get_string(result->error_value()));
+          fdf::error("Failed to write to lcd gpio: {}", zx::make_result(result->error_value()));
           return result->take_error();
         }
         break;
       }
       case kPowerOpSignal: {
-        FDF_LOG(TRACE, "power_signal dsi_init");
+        fdf::trace("power_signal dsi_init");
         zx::result<> power_on_result = power_on();
         if (!power_on_result.is_ok()) {
-          FDF_LOG(ERROR, "Failed to power on MIPI DSI display: %s",
-                  power_on_result.status_string());
+          fdf::error("Failed to power on MIPI DSI display: {}", power_on_result);
           return power_on_result.take_error();
         }
         break;
       }
       case kPowerOpAwaitGpio:
-        FDF_LOG(TRACE, "power_await_gpio pin #%d value=%d timeout=%d msec", op.index, op.value,
-                op.sleep_ms);
+        fdf::trace("power_await_gpio pin #{} value={} timeout={} msec", op.index, op.value,
+                   op.sleep_ms);
         if (op.index != 0) {
-          FDF_LOG(ERROR, "Unrecognized GPIO pin #%d, ignoring", op.index);
+          fdf::error("Unrecognized GPIO pin #{}, ignoring", op.index);
           break;
         }
         {
           fidl::WireResult result =
               lcd_reset_gpio_->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kInput);
           if (!result.ok()) {
-            FDF_LOG(ERROR, "Failed to send SetBufferMode request to lcd gpio: %s",
-                    result.status_string());
+            fdf::error("Failed to send SetBufferMode request to lcd gpio: {}",
+                       result.status_string());
             return zx::error(result.status());
           }
 
           auto& response = result.value();
           if (response.is_error()) {
-            FDF_LOG(ERROR, "Failed to configure lcd gpio to input: %s",
-                    zx_status_get_string(response.error_value()));
+            fdf::error("Failed to configure lcd gpio to input: {}",
+                       zx::make_result(response.error_value()));
             return response.take_error();
           }
         }
         for (wait_count = 0; wait_count < op.sleep_ms; wait_count++) {
           fidl::WireResult read_result = lcd_reset_gpio_->Read();
           if (!read_result.ok()) {
-            FDF_LOG(ERROR, "Failed to send Read request to lcd gpio: %s",
-                    read_result.status_string());
+            fdf::error("Failed to send Read request to lcd gpio: {}", read_result.status_string());
             return zx::error(read_result.status());
           }
 
           auto& read_response = read_result.value();
           if (read_response.is_error()) {
-            FDF_LOG(ERROR, "Failed to read lcd gpio: %s",
-                    zx_status_get_string(read_response.error_value()));
+            fdf::error("Failed to read lcd gpio: {}", zx::make_result(read_response.error_value()));
             return read_response.take_error();
           }
           if (read_result.value()->value == static_cast<bool>(op.value)) {
@@ -236,15 +234,15 @@ zx::result<> DsiHost::PerformPowerOpSequence(cpp20::span<const PowerOp> commands
           zx::nanosleep(zx::deadline_after(zx::msec(1)));
         }
         if (wait_count == op.sleep_ms) {
-          FDF_LOG(ERROR, "Timed out waiting for GPIO value=%d", op.value);
+          fdf::error("Timed out waiting for GPIO value={}", op.value);
         }
         break;
       default:
-        FDF_LOG(ERROR, "Unrecognized power op %d", op.op);
+        fdf::error("Unrecognized power op {}", static_cast<uint8_t>(op.op));
         break;
     }
     if (op.op != kPowerOpAwaitGpio && op.sleep_ms != 0) {
-      FDF_LOG(TRACE, "power_sleep %d msec", op.sleep_ms);
+      fdf::trace("power_sleep {} msec", op.sleep_ms);
       zx::nanosleep(zx::deadline_after(zx::msec(op.sleep_ms)));
     }
   }
@@ -266,24 +264,52 @@ zx::result<> DsiHost::ConfigureDsiHostController(int64_t d_phy_data_lane_bitrate
                       TOP_CNTL_CHROMA_SUBSAMPLE_BITS, 0),
       MIPI_DSI_TOP_CNTL);
 
-  // setup dsi config
-  dsi_config_t dsi_cfg;
-  dsi_cfg.display_setting = ToDisplaySetting(panel_config_);
-  dsi_cfg.video_mode_type = VIDEO_MODE_BURST;
-  dsi_cfg.color_coding = COLOR_CODE_PACKED_24BIT_888;
+  constexpr int kBitsPerByte = 8;
+  constexpr int kDataLaneBitsPerClockLanePeriod = 2;
+  const int64_t d_phy_data_lane_bytes_per_second =
+      d_phy_data_lane_bitrate_bits_per_second / kBitsPerByte;
+  const designware_dsi::DsiHostControllerConfig config = {
+      .dphy_interface_config =
+          {
+              .data_lane_count = panel_config_.dphy_data_lane_count,
+              .clock_lane_mode_automatic_control_enabled = true,
 
-  designware_config_t dw_cfg;
-  dw_cfg.lp_escape_time = phy_->GetLowPowerEscaseTime();
-  dw_cfg.lp_cmd_pkt_size = LPCMD_PKT_SIZE;
-  dw_cfg.phy_timer_clkhs_to_lp = PHY_TMR_LPCLK_CLKHS_TO_LP;
-  dw_cfg.phy_timer_clklp_to_hs = PHY_TMR_LPCLK_CLKLP_TO_HS;
-  dw_cfg.phy_timer_hs_to_lp = PHY_TMR_HS_TO_LP;
-  dw_cfg.phy_timer_lp_to_hs = PHY_TMR_LP_TO_HS;
-  dw_cfg.auto_clklane = 1;
-  dsi_cfg.vendor_config_buffer = reinterpret_cast<uint8_t*>(&dw_cfg);
+              .high_speed_mode_clock_lane_frequency_hz =
+                  d_phy_data_lane_bitrate_bits_per_second / kDataLaneBitsPerClockLanePeriod,
+              .escape_mode_clock_lane_frequency_hz =
+                  d_phy_data_lane_bytes_per_second /
+                  phy_->GetDataLaneByteRateToEscapeClockFrequencyRatio(),
 
-  designware_dsi_host_controller_->Config(&dsi_cfg, d_phy_data_lane_bitrate_bits_per_second);
+              .max_data_lane_hs_to_lp_transition_duration_lane_byte_clock_cycles = PHY_TMR_HS_TO_LP,
+              .max_data_lane_lp_to_hs_transition_duration_lane_byte_clock_cycles = PHY_TMR_LP_TO_HS,
+              .max_clock_lane_hs_to_lp_transition_duration_lane_byte_clock_cycles =
+                  PHY_TMR_LPCLK_CLKHS_TO_LP,
+              .max_clock_lane_lp_to_hs_transition_duration_lane_byte_clock_cycles =
+                  PHY_TMR_LPCLK_CLKLP_TO_HS,
+          },
 
+      .dpi_interface_config =
+          {
+              .color_component_mapping = designware_dsi::DpiColorComponentMapping::k24BitR8G8B8,
+              .video_timing = panel_config_.display_timing,
+              .low_power_command_timer_config =
+                  {
+                      .max_vertical_blank_escape_mode_command_size_bytes = LPCMD_PKT_SIZE,
+                      .max_vertical_active_escape_mode_command_size_bytes = LPCMD_PKT_SIZE,
+                  },
+          },
+
+      .dsi_packet_handler_config =
+          {
+              .packet_sequencing = mipi_dsi::DsiVideoModePacketSequencing::kBurst,
+              .pixel_stream_packet_format = mipi_dsi::DsiPixelStreamPacketFormat::k24BitR8G8B8,
+          },
+  };
+  zx::result config_result = designware_dsi_host_controller_->Config(config);
+  if (config_result.is_error()) {
+    fdf::error("Failed to configure the DSI Host Controller: {}", config_result);
+    return config_result.take_error();
+  }
   return zx::ok();
 }
 
@@ -309,7 +335,7 @@ void DsiHost::Disable() {
   }
 
   // Place dsi in command mode first
-  designware_dsi_host_controller_->SetMode(DSI_MODE_COMMAND);
+  designware_dsi_host_controller_->SetMode(mipi_dsi::DsiOperationMode::kCommand);
   fit::callback<zx::result<>()> power_off = [this]() -> zx::result<> {
     zx::result<> result = lcd_->Disable();
     if (!result.is_ok()) {
@@ -323,7 +349,7 @@ void DsiHost::Disable() {
   zx::result<> power_off_result =
       PerformPowerOpSequence(panel_config_.power_off, std::move(power_off));
   if (!power_off_result.is_ok()) {
-    FDF_LOG(ERROR, "Failed to power off the DSI display: %s", power_off_result.status_string());
+    fdf::error("Failed to power off the DSI display: {}", power_off_result);
   }
 
   enabled_ = false;
@@ -341,8 +367,7 @@ zx::result<> DsiHost::Enable(int64_t dphy_data_lane_bits_per_second) {
     // Load Phy configuration
     zx::result<> phy_config_load_result = phy_->PhyCfgLoad(dphy_data_lane_bits_per_second);
     if (!phy_config_load_result.is_ok()) {
-      FDF_LOG(ERROR, "Error during phy config calculations: %s",
-              phy_config_load_result.status_string());
+      fdf::error("Error during phy config calculations: {}", phy_config_load_result);
       return phy_config_load_result.take_error();
     }
 
@@ -371,38 +396,35 @@ zx::result<> DsiHost::Enable(int64_t dphy_data_lane_bits_per_second) {
     zx::nanosleep(zx::deadline_after(zx::msec(10)));
 
     // Initialize host in command mode first
-    designware_dsi_host_controller_->SetMode(DSI_MODE_COMMAND);
+    designware_dsi_host_controller_->SetMode(mipi_dsi::DsiOperationMode::kCommand);
     zx::result<> dsi_host_config_result =
         ConfigureDsiHostController(dphy_data_lane_bits_per_second);
     if (!dsi_host_config_result.is_ok()) {
-      FDF_LOG(ERROR, "Failed to configure the MIPI DSI Host Controller: %s",
-              dsi_host_config_result.status_string());
+      fdf::error("Failed to configure the MIPI DSI Host Controller: {}", dsi_host_config_result);
       return dsi_host_config_result.take_error();
     }
 
     // Initialize mipi dsi D-phy
     zx::result<> phy_startup_result = phy_->Startup();
     if (!phy_startup_result.is_ok()) {
-      FDF_LOG(ERROR, "Error during MIPI D-PHY Initialization: %s",
-              phy_startup_result.status_string());
+      fdf::error("Error during MIPI D-PHY Initialization: {}", phy_startup_result);
       return phy_startup_result.take_error();
     }
 
     // Load LCD Init values while in command mode
     zx::result<> lcd_enable_result = lcd_->Enable();
     if (!lcd_enable_result.is_ok()) {
-      FDF_LOG(ERROR, "Failed to enable LCD: %s", lcd_enable_result.status_string());
+      fdf::error("Failed to enable LCD: {}", lcd_enable_result);
     }
 
-    // switch to video mode
-    designware_dsi_host_controller_->SetMode(DSI_MODE_VIDEO);
+    designware_dsi_host_controller_->SetMode(mipi_dsi::DsiOperationMode::kVideo);
     return zx::ok();
   };
 
   zx::result<> power_on_result =
       PerformPowerOpSequence(panel_config_.power_on, std::move(power_on));
   if (!power_on_result.is_ok()) {
-    FDF_LOG(ERROR, "Failed to power on the DSI Display: %s", power_on_result.status_string());
+    fdf::error("Failed to power on the DSI Display: {}", power_on_result);
     return power_on_result.take_error();
   }
   // Host is On and Active at this point
@@ -411,28 +433,28 @@ zx::result<> DsiHost::Enable(int64_t dphy_data_lane_bits_per_second) {
 }
 
 void DsiHost::Dump() {
-  FDF_LOG(INFO, "MIPI_DSI_TOP_SW_RESET = 0x%x", mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_SW_RESET));
-  FDF_LOG(INFO, "MIPI_DSI_TOP_CLK_CNTL = 0x%x", mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_CLK_CNTL));
-  FDF_LOG(INFO, "MIPI_DSI_TOP_CNTL = 0x%x", mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_CNTL));
-  FDF_LOG(INFO, "MIPI_DSI_TOP_SUSPEND_CNTL = 0x%x",
-          mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_SUSPEND_CNTL));
-  FDF_LOG(INFO, "MIPI_DSI_TOP_SUSPEND_LINE = 0x%x",
-          mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_SUSPEND_LINE));
-  FDF_LOG(INFO, "MIPI_DSI_TOP_SUSPEND_PIX = 0x%x",
-          mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_SUSPEND_PIX));
-  FDF_LOG(INFO, "MIPI_DSI_TOP_MEAS_CNTL = 0x%x", mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_MEAS_CNTL));
-  FDF_LOG(INFO, "MIPI_DSI_TOP_STAT = 0x%x", mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_STAT));
-  FDF_LOG(INFO, "MIPI_DSI_TOP_MEAS_STAT_TE0 = 0x%x",
-          mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_MEAS_STAT_TE0));
-  FDF_LOG(INFO, "MIPI_DSI_TOP_MEAS_STAT_TE1 = 0x%x",
-          mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_MEAS_STAT_TE1));
-  FDF_LOG(INFO, "MIPI_DSI_TOP_MEAS_STAT_VS0 = 0x%x",
-          mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_MEAS_STAT_VS0));
-  FDF_LOG(INFO, "MIPI_DSI_TOP_MEAS_STAT_VS1 = 0x%x",
-          mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_MEAS_STAT_VS1));
-  FDF_LOG(INFO, "MIPI_DSI_TOP_INTR_CNTL_STAT = 0x%x",
-          mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_INTR_CNTL_STAT));
-  FDF_LOG(INFO, "MIPI_DSI_TOP_MEM_PD = 0x%x", mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_MEM_PD));
+  fdf::info("MIPI_DSI_TOP_SW_RESET = 0x{:x}", mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_SW_RESET));
+  fdf::info("MIPI_DSI_TOP_CLK_CNTL = 0x{:x}", mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_CLK_CNTL));
+  fdf::info("MIPI_DSI_TOP_CNTL = 0x{:x}", mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_CNTL));
+  fdf::info("MIPI_DSI_TOP_SUSPEND_CNTL = 0x{:x}",
+            mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_SUSPEND_CNTL));
+  fdf::info("MIPI_DSI_TOP_SUSPEND_LINE = 0x{:x}",
+            mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_SUSPEND_LINE));
+  fdf::info("MIPI_DSI_TOP_SUSPEND_PIX = 0x{:x}",
+            mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_SUSPEND_PIX));
+  fdf::info("MIPI_DSI_TOP_MEAS_CNTL = 0x{:x}", mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_MEAS_CNTL));
+  fdf::info("MIPI_DSI_TOP_STAT = 0x{:x}", mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_STAT));
+  fdf::info("MIPI_DSI_TOP_MEAS_STAT_TE0 = 0x{:x}",
+            mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_MEAS_STAT_TE0));
+  fdf::info("MIPI_DSI_TOP_MEAS_STAT_TE1 = 0x{:x}",
+            mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_MEAS_STAT_TE1));
+  fdf::info("MIPI_DSI_TOP_MEAS_STAT_VS0 = 0x{:x}",
+            mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_MEAS_STAT_VS0));
+  fdf::info("MIPI_DSI_TOP_MEAS_STAT_VS1 = 0x{:x}",
+            mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_MEAS_STAT_VS1));
+  fdf::info("MIPI_DSI_TOP_INTR_CNTL_STAT = 0x{:x}",
+            mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_INTR_CNTL_STAT));
+  fdf::info("MIPI_DSI_TOP_MEM_PD = 0x{:x}", mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_MEM_PD));
 }
 
 }  // namespace amlogic_display

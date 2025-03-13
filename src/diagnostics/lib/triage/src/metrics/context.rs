@@ -3,10 +3,7 @@
 // found in the LICENSE file.
 
 use nom::error::{ErrorKind, ParseError};
-use nom::{
-    AsBytes, Compare, CompareResult, Err, IResult, InputIter, InputLength, InputTake,
-    InputTakeAtPosition, Needed, Offset, ParseTo, Slice,
-};
+use nom::{AsBytes, Compare, CompareResult, Err, IResult, Input, Needed, Offset, ParseTo};
 use std::num::NonZero;
 use std::str::{CharIndices, Chars};
 
@@ -46,55 +43,47 @@ where
     }
 }
 
-impl<'a> InputIter for ParsingContext<'a> {
+impl<'a> Input for ParsingContext<'a> {
     type Item = char;
-    type Iter = CharIndices<'a>;
-    type IterElem = Chars<'a>;
-    fn iter_indices(&self) -> Self::Iter {
+    type IterIndices = CharIndices<'a>;
+    type Iter = Chars<'a>;
+
+    fn iter_indices(&self) -> Self::IterIndices {
         self.input.char_indices()
     }
-    fn iter_elements(&self) -> Self::IterElem {
+
+    fn iter_elements(&self) -> Self::Iter {
         self.input.chars()
     }
+
     fn position<P>(&self, predicate: P) -> Option<usize>
     where
         P: Fn(Self::Item) -> bool,
     {
         self.input.position(predicate)
     }
+
     fn slice_index(&self, count: usize) -> Result<usize, Needed> {
         self.input.slice_index(count)
     }
-}
 
-impl InputLength for ParsingContext<'_> {
     fn input_len(&self) -> usize {
         self.input.len()
     }
-}
 
-impl InputTake for ParsingContext<'_> {
     fn take(&self, count: usize) -> Self {
         Self::new(&self.input[..count], self.namespace)
+    }
+
+    fn take_from(&self, index: usize) -> Self {
+        Self::new(&self.input[index..], self.namespace)
     }
 
     fn take_split(&self, count: usize) -> (Self, Self) {
         let (s0, s1) = self.input.split_at(count);
         (ParsingContext::new(s1, self.namespace), ParsingContext::new(s0, self.namespace))
     }
-}
 
-impl<'a, R> Slice<R> for ParsingContext<'a>
-where
-    &'a str: Slice<R>,
-{
-    fn slice(&self, range: R) -> Self {
-        Self::new(self.input.slice(range), self.namespace)
-    }
-}
-
-impl InputTakeAtPosition for ParsingContext<'_> {
-    type Item = char;
     fn split_at_position<P, E: ParseError<Self>>(&self, predicate: P) -> IResult<Self, Self, E>
     where
         P: Fn(Self::Item) -> bool,

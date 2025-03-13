@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <sys/syscall.h>
+#include <ucontext.h>
 #include <unistd.h>
 
 #include <climits>
@@ -172,6 +173,18 @@ void raise_with_stack(int signal, uintptr_t stack) {
       : [pid] "r"(pid), [signal] "r"(signal), [new_rsp] "r"(new_rsp), [sys_kill] "i"(SYS_kill)
       : "x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8", "x9", "x10", "x11", "x12", "x13",
         "x14", "x15", "x16", "x17", "x19", "cc", "memory");
+#elif defined(__arm__)
+  __asm__ volatile(
+      "mov r4, sp\n"
+      "mov sp, %[new_rsp]\n"
+      "mov r0, %[pid]\n"
+      "mov r1, %[signal]\n"
+      "mov r7, %[sys_kill]\n"
+      "svc #0\n"
+      "mov sp, r4\n"
+      :
+      : [pid] "r"(pid), [signal] "r"(signal), [new_rsp] "r"(new_rsp), [sys_kill] "i"(SYS_kill)
+      : "r0", "r1", "r2", "r3", "r4", "r7", "cc", "memory");
 #elif defined(__riscv)
   __asm__ volatile(
       "mv s1, sp\n"
@@ -417,9 +430,9 @@ TEST(SignalHandlingDeathTest, SignalStackUnmappedDeliversSIGSEGV) {
   ASSERT_NE(MAP_FAILED, temp_stack);
 
   // Set the stack ptr to the end of the allocated region.
-  uint64_t stack_addr = reinterpret_cast<uint64_t>(temp_stack) + kStackSize;
+  uintptr_t stack_addr = reinterpret_cast<uintptr_t>(temp_stack) + kStackSize;
 
-  auto test_func = [](uint64_t stack_addr) {
+  auto test_func = [](uintptr_t stack_addr) {
     // Set up a handler for SIGUSR1
     struct sigaction sa = {};
     sa.sa_handler = [](int) { exit(kExitTestSuccess); };
@@ -483,8 +496,9 @@ TEST(SignalHandlingDeathTest, SignalAltStackUnmappedDeliversSIGSEGV) {
 // This intentionally creates a segfault which can't pass on sanitizer runs.
 #if (!__has_feature(address_sanitizer))
 TEST(SignalHandlingDeathTest, SignalStackErrorsDeliversSIGSEGV) {
-  std::vector<uint64_t> stack_addrs = {0x0, kRedzoneSize, kRedzoneSize + 1, UINT64_MAX,
-                                       UINT64_MAX - 1};
+  std::vector<uintptr_t> stack_addrs = {0x0, kRedzoneSize, kRedzoneSize + 1,
+                                        std::numeric_limits<uintptr_t>::max(),
+                                        std::numeric_limits<uintptr_t>::max() - 1};
   for (const auto stack_addr : stack_addrs) {
     EXPECT_EXIT(
         [stack_addr]() {
@@ -583,6 +597,8 @@ TEST_F(SigaltstackDeathTest, NestedSignalsWork) {
   test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([&] {
+    static bool sigusr2_called = false;
+
     ASSERT_EQ(0, setup_sigaltstack_at(sigaltstack_base_, sigaltstack_size_));
     struct sigaction sa = {};
     sa.sa_handler = [](int) { raise(SIGUSR2); };
@@ -591,11 +607,12 @@ TEST_F(SigaltstackDeathTest, NestedSignalsWork) {
     ASSERT_EQ(0, sigaction(SIGUSR1, &sa, NULL));
 
     sa = {};
-    sa.sa_sigaction = [](int, siginfo_t *, void *) {};  // empty handler.
+    sa.sa_sigaction = [](int, siginfo_t *, void *) { sigusr2_called = true; };
     sa.sa_flags = SA_ONSTACK | SA_SIGINFO;
 
     ASSERT_EQ(0, sigaction(SIGUSR2, &sa, NULL));
     raise(SIGUSR1);
+    ASSERT_TRUE(sigusr2_called);
   });
   EXPECT_TRUE(helper.WaitForChildren());
 }
@@ -1085,6 +1102,13 @@ TEST(SignalHandling, Repro347063218) {
         :
         : "r"(value)
         : "r0");
+#elif __arm__
+    __asm__ volatile(
+        "mov r0, %0\n"
+        "udf #0\n"
+        :
+        : "r"(value)
+        : "r0");
 #elif __riscv
     __asm__ volatile(
         "mv x0, %0\n"
@@ -1134,6 +1158,66 @@ TEST(SignalHandling, Repro347756382) {
   SAFE_SYSCALL(waitpid(pid, &status, 0));
   EXPECT_TRUE(WIFEXITED(status));
   EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+#if defined(__x86_64__)
+#define INLINE_RAISE_SIGUSR1(tid) \
+  __asm__ volatile("syscall;" ::"a"(SYS_kill), "D"(tid), "S"(SIGUSR1))
+#elif defined(__aarch64__)
+#define INLINE_RAISE_SIGUSR1(tid)                               \
+  do {                                                          \
+    register intptr_t x0 asm("x0") = tid;                       \
+    register intptr_t x1 asm("x1") = SIGUSR1;                   \
+    register intptr_t number asm("x8") = SYS_kill;              \
+    __asm__ volatile("svc #0" ::"r"(x0), "r"(x1), "r"(number)); \
+  } while (0)
+#elif defined(__arm__)
+#define INLINE_RAISE_SIGUSR1(tid)                               \
+  do {                                                          \
+    register intptr_t r0 asm("r0") = tid;                       \
+    register intptr_t r1 asm("r1") = SIGUSR1;                   \
+    register intptr_t number asm("r7") = SYS_kill;              \
+    __asm__ volatile("svc #0" ::"r"(r0), "r"(r1), "r"(number)); \
+  } while (0)
+#elif defined(__riscv)
+#define INLINE_RAISE_SIGUSR1(tid)                              \
+  do {                                                         \
+    register intptr_t a0 asm("a0") = tid;                      \
+    register intptr_t a1 asm("a1") = SIGUSR1;                  \
+    register intptr_t number asm("a7") = SYS_kill;             \
+    __asm__ volatile("ecall" ::"r"(a0), "r"(a1), "r"(number)); \
+  } while (0)
+#else
+#error "Unsupported architecture"
+#endif
+
+TEST(SignalHandling, SetContextInSignal) {
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([]() {
+    static ucontext_t context = {};
+    static volatile bool after_setcontext = false;
+
+    pid_t self_tid = gettid();
+    struct sigaction sigusr1_action = {};
+    sigusr1_action.sa_flags = SA_SIGINFO;
+    sigusr1_action.sa_sigaction = [](int sig, siginfo_t *info, void *ucontext_ptr) {
+      memcpy(&context, ucontext_ptr, sizeof(context));
+    };
+    SAFE_SYSCALL(sigaction(SIGUSR1, &sigusr1_action, nullptr));
+    INLINE_RAISE_SIGUSR1(self_tid);
+    if (after_setcontext) {
+      // This is the expected exit of the test. The signal should change the
+      // context so that it returns here.
+      return;
+    }
+    after_setcontext = true;
+    sigusr1_action.sa_sigaction = [](int sig, siginfo_t *info, void *ucontext_ptr) {
+      memcpy(ucontext_ptr, &context, sizeof(context));
+    };
+    SAFE_SYSCALL(sigaction(SIGUSR1, &sigusr1_action, nullptr));
+    INLINE_RAISE_SIGUSR1(self_tid);
+    FAIL() << "Test should not return here.";
+  });
 }
 
 }  // namespace

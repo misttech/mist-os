@@ -71,39 +71,6 @@ class FileOrDirectory : public fs::Vnode {
   uint64_t modification_time_;
 };
 
-// Helper method to monitor the OnOpen event, used by the tests below when
-// OPEN_FLAG_DESCRIBE is used.
-zx::result<fio::wire::NodeInfoDeprecated> GetOnOpenResponse(
-    fidl::UnownedClientEnd<fio::Node> channel) {
-  class EventHandler final : public fidl::testing::WireSyncEventHandlerTestBase<fio::Node> {
-   public:
-    void OnOpen(fidl::WireEvent<fio::Node::OnOpen>* event) override {
-      ASSERT_NE(event, nullptr);
-      response = std::move(*event);
-    }
-
-    void NotImplemented_(const std::string& name) override {
-      ADD_FAILURE() << "unexpected " << name.c_str();
-    }
-
-    fidl::WireEvent<fio::Node::OnOpen> response;
-  };
-
-  EventHandler event_handler;
-  const fidl::Status result = event_handler.HandleOneEvent(channel);
-  if (!result.ok()) {
-    return zx::error(result.status());
-  }
-  fidl::WireEvent<fio::Node::OnOpen>& response = event_handler.response;
-  if (response.s != ZX_OK) {
-    return zx::error(response.s);
-  }
-  if (!response.info.has_value()) {
-    return zx::error(ZX_ERR_BAD_STATE);
-  }
-  return zx::ok(std::move(response.info.value()));
-}
-
 // Helper method to monitor the OnRepresentation event. Used by the tests below to decode the
 // fuchsia.io/Node.OnRepresentation event, or to check for the correct epitaph on errors.
 zx::result<fio::Representation> GetOnRepresentation(fidl::UnownedClientEnd<fio::Node> channel) {
@@ -421,90 +388,14 @@ TEST_F(ConnectionTest, NegotiateProtocol) {
   auto root = fidl::Endpoints<fio::Directory>::Create();
   ASSERT_EQ(ConnectClient(std::move(root.server)), ZX_OK);
 
-  // Connect to polymorphic node as a directory, by passing |kOpenFlagDirectory|.
-  {
-    auto [dir_client, dir_server] = fidl::Endpoints<fio::Node>::Create();
-    ASSERT_EQ(fidl::WireCall(root.client)
-                  ->Open(fio::OpenFlags::kRightReadable | fio::OpenFlags::kDescribe |
-                             fio::OpenFlags::kDirectory,
-                         {}, fidl::StringView("file_or_dir"), std::move(dir_server))
-                  .status(),
-              ZX_OK);
-    zx::result<fio::wire::NodeInfoDeprecated> dir_info = GetOnOpenResponse(dir_client);
-    ASSERT_EQ(dir_info.status_value(), ZX_OK);
-    ASSERT_TRUE(dir_info->is_directory());
-    // Check that if we clone the connection, we still get the directory protocol.
-    auto [clone_client, clone_server] = fidl::Endpoints<fio::Node>::Create();
-    ASSERT_EQ(fidl::WireCall(dir_client)
-                  ->DeprecatedClone(fio::OpenFlags::kDescribe | fio::OpenFlags::kCloneSameRights,
-                                    std::move(clone_server))
-                  .status(),
-              ZX_OK);
-    zx::result<fio::wire::NodeInfoDeprecated> cloned_info = GetOnOpenResponse(clone_client);
-    ASSERT_EQ(cloned_info.status_value(), ZX_OK);
-    ASSERT_TRUE(cloned_info->is_directory());
-  }
-  {
-    // Connect to polymorphic node as a file, by passing |kOpenFlagNotDirectory|.
-    auto [file_client, file_server] = fidl::Endpoints<fio::Node>::Create();
-    ASSERT_EQ(fidl::WireCall(root.client)
-                  ->Open(fio::OpenFlags::kRightReadable | fio::OpenFlags::kDescribe |
-                             fio::OpenFlags::kNotDirectory,
-                         {}, fidl::StringView("file_or_dir"), std::move(file_server))
-                  .status(),
-              ZX_OK);
-    zx::result<fio::wire::NodeInfoDeprecated> file_info = GetOnOpenResponse(file_client);
-    ASSERT_EQ(file_info.status_value(), ZX_OK);
-    ASSERT_TRUE(file_info->is_file());
-    // Check that if we clone the connection, we still get the file protocol.
-    auto [clone_client, clone_server] = fidl::Endpoints<fio::Node>::Create();
-    ASSERT_EQ(fidl::WireCall(file_client)
-                  ->DeprecatedClone(fio::OpenFlags::kDescribe | fio::OpenFlags::kCloneSameRights,
-                                    std::move(clone_server))
-                  .status(),
-              ZX_OK);
-    zx::result<fio::wire::NodeInfoDeprecated> cloned_info = GetOnOpenResponse(clone_client);
-    ASSERT_EQ(cloned_info.status_value(), ZX_OK);
-    ASSERT_TRUE(cloned_info->is_file());
-  }
-  {
-    // Connect to polymorphic node as a node reference, by passing |kNodeReference|.
-    auto [node_client, node_server] = fidl::Endpoints<fio::Node>::Create();
-    ASSERT_EQ(fidl::WireCall(root.client)
-                  ->Open(fio::OpenFlags::kNodeReference | fio::OpenFlags::kDescribe, {},
-                         fidl::StringView("file_or_dir"), std::move(node_server))
-                  .status(),
-              ZX_OK);
-    zx::result<fio::wire::NodeInfoDeprecated> node_info = GetOnOpenResponse(node_client);
-    ASSERT_EQ(node_info.status_value(), ZX_OK);
-    // In io1, node reference connections map to the service representation in the OnOpen event.
-    ASSERT_TRUE(node_info->is_service());
-    // Check that if we clone the connection, we still get the node protocol.
-    auto [clone_client, clone_server] = fidl::Endpoints<fio::Node>::Create();
-    ASSERT_EQ(fidl::WireCall(node_client)
-                  ->DeprecatedClone(fio::OpenFlags::kDescribe | fio::OpenFlags::kCloneSameRights,
-                                    std::move(clone_server))
-                  .status(),
-              ZX_OK);
-    zx::result<fio::wire::NodeInfoDeprecated> cloned_info = GetOnOpenResponse(clone_client);
-    ASSERT_EQ(cloned_info.status_value(), ZX_OK);
-    ASSERT_TRUE(cloned_info->is_service());
-  }
-}
-
-TEST_F(ConnectionTest, NegotiateProtocolOpen3) {
-  // Create connection to vfs
-  auto root = fidl::Endpoints<fio::Directory>::Create();
-  ASSERT_EQ(ConnectClient(std::move(root.server)), ZX_OK);
-
   {
     // Connect to polymorphic node as a directory.
     zx::result dc = fidl::CreateEndpoints<fio::Node>();
     ASSERT_EQ(dc.status_value(), ZX_OK);
     ASSERT_EQ(fidl::WireCall(root.client)
-                  ->Open3(fidl::StringView("file_or_dir"),
-                          fio::Flags::kProtocolDirectory | fio::Flags::kFlagSendRepresentation, {},
-                          dc->server.TakeChannel())
+                  ->Open(fidl::StringView("file_or_dir"),
+                         fio::Flags::kProtocolDirectory | fio::Flags::kFlagSendRepresentation, {},
+                         dc->server.TakeChannel())
                   .status(),
               ZX_OK);
     zx::result<fio::Representation> dir_info = GetOnRepresentation(dc->client);
@@ -517,35 +408,15 @@ TEST_F(ConnectionTest, NegotiateProtocolOpen3) {
     zx::result fc = fidl::CreateEndpoints<fio::Node>();
     ASSERT_EQ(fc.status_value(), ZX_OK);
     ASSERT_EQ(fidl::WireCall(root.client)
-                  ->Open3(fidl::StringView("file_or_dir"),
-                          fio::Flags::kProtocolFile | fio::Flags::kFlagSendRepresentation, {},
-                          fc->server.TakeChannel())
+                  ->Open(fidl::StringView("file_or_dir"),
+                         fio::Flags::kProtocolFile | fio::Flags::kFlagSendRepresentation, {},
+                         fc->server.TakeChannel())
                   .status(),
               ZX_OK);
     zx::result<fio::Representation> file_info = GetOnRepresentation(fc->client);
     ASSERT_EQ(file_info.status_value(), ZX_OK);
     ASSERT_EQ(file_info->Which(), fio::Representation::Tag::kFile);
   }
-}
-
-TEST_F(ConnectionTest, PrevalidateFlagsOpenFailure) {
-  // Create connection to vfs
-  auto root = fidl::Endpoints<fio::Directory>::Create();
-  ASSERT_EQ(ConnectClient(std::move(root.server)), ZX_OK);
-
-  // The only invalid flag combination for fuchsia.io/Node.Clone is specifying CLONE_SAME_RIGHTS
-  // with any other rights.
-  constexpr fio::OpenFlags kInvalidFlagCombo =
-      fio::OpenFlags::kCloneSameRights | fio::OpenFlags::kRightReadable | fio::OpenFlags::kDescribe;
-  zx::result dc = fidl::CreateEndpoints<fio::Node>();
-  ASSERT_EQ(dc.status_value(), ZX_OK);
-  // Ensure that invalid flag combination returns INVALID_ARGS.
-  ASSERT_EQ(
-      fidl::WireCall(root.client)
-          ->Open(kInvalidFlagCombo, {}, fidl::StringView("file_or_dir"), std::move(dc->server))
-          .status(),
-      ZX_OK);
-  ASSERT_EQ(GetOnOpenResponse(dc->client).status_value(), ZX_ERR_INVALID_ARGS);
 }
 
 TEST_F(ConnectionTest, ValidateRights) {
@@ -557,10 +428,10 @@ TEST_F(ConnectionTest, ValidateRights) {
     zx::result fc = fidl::CreateEndpoints<fio::Node>();
     ASSERT_EQ(fc.status_value(), ZX_OK);
     ASSERT_EQ(fidl::WireCall(root.client)
-                  ->Open3(fidl::StringView("file_or_dir"),
-                          fio::Flags::kFlagSendRepresentation | fio::Flags::kProtocolFile |
-                              fio::Flags::kPermExecute,
-                          {}, fc->server.TakeChannel())
+                  ->Open(fidl::StringView("file_or_dir"),
+                         fio::Flags::kFlagSendRepresentation | fio::Flags::kProtocolFile |
+                             fio::Flags::kPermExecute,
+                         {}, fc->server.TakeChannel())
                   .status(),
               ZX_OK);
     zx::result<fio::Representation> file_info = GetOnRepresentation(fc->client);
@@ -579,10 +450,10 @@ TEST_F(ConnectionTest, ValidateRightsReadonly) {
     zx::result fc = fidl::CreateEndpoints<fio::Node>();
     ASSERT_EQ(fc.status_value(), ZX_OK);
     ASSERT_EQ(fidl::WireCall(root.client)
-                  ->Open3(fidl::StringView("file_or_dir"),
-                          fio::Flags::kFlagSendRepresentation | fio::Flags::kProtocolFile |
-                              fio::Flags::kPermWrite,
-                          {}, fc->server.TakeChannel())
+                  ->Open(fidl::StringView("file_or_dir"),
+                         fio::Flags::kFlagSendRepresentation | fio::Flags::kProtocolFile |
+                             fio::Flags::kPermWrite,
+                         {}, fc->server.TakeChannel())
                   .status(),
               ZX_OK);
     zx::result<fio::Representation> file_info = GetOnRepresentation(fc->client);
@@ -594,10 +465,10 @@ TEST_F(ConnectionTest, ValidateRightsReadonly) {
     zx::result fc = fidl::CreateEndpoints<fio::Node>();
     ASSERT_EQ(fc.status_value(), ZX_OK);
     ASSERT_EQ(fidl::WireCall(root.client)
-                  ->Open3(fidl::StringView("file_or_dir"),
-                          fio::Flags::kFlagSendRepresentation | fio::Flags::kProtocolDirectory |
-                              fio::Flags::kPermGetAttributes | fio::Flags::kPermInheritWrite,
-                          {}, fc->server.TakeChannel())
+                  ->Open(fidl::StringView("file_or_dir"),
+                         fio::Flags::kFlagSendRepresentation | fio::Flags::kProtocolDirectory |
+                             fio::Flags::kPermGetAttributes | fio::Flags::kPermInheritWrite,
+                         {}, fc->server.TakeChannel())
                   .status(),
               ZX_OK);
     zx::result<fio::Representation> dir_info = GetOnRepresentation(fc->client);
@@ -658,8 +529,8 @@ class ConnectionClosingTest : public testing::Test {
 
 TEST_F(ConnectionClosingTest, ClosingChannelImpliesClosingNode) {
   // Create connection to vfs.
-  auto root = fidl::Endpoints<fio::Directory>::Create();
-  ASSERT_EQ(ConnectClient(std::move(root.server)), ZX_OK);
+  auto [root_client, root_server] = fidl::Endpoints<fio::Directory>::Create();
+  ASSERT_EQ(ConnectClient(std::move(root_server)), ZX_OK);
 
   constexpr unsigned kNumActiveClients = 20;
 
@@ -668,14 +539,13 @@ TEST_F(ConnectionClosingTest, ClosingChannelImpliesClosingNode) {
   // Create a number of active connections to "count_outstanding_open_vnode".
   std::vector<fidl::ClientEnd<fio::Node>> clients;
   for (unsigned i = 0; i < kNumActiveClients; i++) {
-    zx::result fc = fidl::CreateEndpoints<fio::Node>();
-    ASSERT_EQ(fc.status_value(), ZX_OK);
-    ASSERT_EQ(fidl::WireCall(root.client)
-                  ->Open(fio::OpenFlags::kRightReadable, {},
-                         fidl::StringView("count_outstanding_open_vnode"), std::move(fc->server))
+    auto [client, server] = fidl::Endpoints<fio::Node>::Create();
+    ASSERT_EQ(fidl::WireCall(root_client)
+                  ->Open(fidl::StringView("count_outstanding_open_vnode"), fio::wire::kPermReadable,
+                         {}, server.TakeChannel())
                   .status(),
               ZX_OK);
-    clients.push_back(std::move(fc->client));
+    clients.push_back(std::move(client));
   }
 
   ASSERT_EQ(loop().RunUntilIdle(), ZX_OK);

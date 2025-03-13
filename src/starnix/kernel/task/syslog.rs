@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::security;
 use crate::task::{CurrentTask, EventHandler, WaitCallback, WaitCanceler, WaitQueue, Waiter};
 use crate::vfs::OutputBuffer;
 use diagnostics_data::{Data, Logs, Severity};
@@ -10,7 +11,7 @@ use fuchsia_component::client::connect_to_protocol_sync;
 use serde::Deserialize;
 use starnix_sync::{Locked, Mutex, Unlocked};
 use starnix_uapi::auth::{CAP_SYSLOG, CAP_SYS_ADMIN};
-use starnix_uapi::errors::{errno, error, Errno, EAGAIN};
+use starnix_uapi::errors::{errno, Errno, EAGAIN};
 use starnix_uapi::vfs::FdEvents;
 use std::cmp;
 use std::collections::VecDeque;
@@ -41,11 +42,10 @@ impl Syslog {
     }
 
     pub fn validate_access(current_task: &CurrentTask) -> Result<(), Errno> {
-        let credentials = current_task.creds();
-        if credentials.has_capability(CAP_SYSLOG) || credentials.has_capability(CAP_SYS_ADMIN) {
-            return Ok(());
+        if !security::is_task_capable_noaudit(current_task, CAP_SYS_ADMIN) {
+            security::check_task_capable(current_task, CAP_SYSLOG)?;
         }
-        error!(EPERM)
+        Ok(())
     }
 
     pub fn snapshot_then_subscribe(current_task: &CurrentTask) -> Result<LogSubscription, Errno> {

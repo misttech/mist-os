@@ -81,7 +81,7 @@ fuchsia_component("hermetic_network_v2") {
 fuchsia_component("hermetic_network_v3") {
   manifest = "meta/hermetic_network_v3.cml"
   deps = hermetic_network_common_deps +
-         [ "//src/connectivity/network/netstack3:component-debug" ]
+         [ "//src/connectivity/network/netstack3:component-conformance" ]
   testonly = true
 }
 

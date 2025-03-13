@@ -19,8 +19,6 @@ pub(crate) enum Responder {
     CreateEventPair(Sender<Result<(), Error>>),
     CreateEvent(Sender<Result<(), Error>>),
     SetSocketDisposition(Sender<Result<(), Error>>),
-    ReadSocket(Sender<Result<proto::SocketReadSocketResponse, Error>>),
-    ReadChannel(Sender<Result<proto::ChannelMessage, Error>>),
     WriteSocket(Sender<Result<proto::SocketWriteSocketResponse, Error>>, proto::HandleId),
     WriteChannel(Sender<Result<(), Error>>, proto::HandleId),
     Close(Sender<Result<(), Error>>),
@@ -29,6 +27,11 @@ pub(crate) enum Responder {
     Signal(Sender<Result<(), Error>>),
     SignalPeer(Sender<Result<(), Error>>),
     WaitForSignals(Sender<Result<proto::FDomainWaitForSignalsResponse, Error>>),
+
+    // Read channel/socket is a little different. We just need the handle ID as we're
+    // going to ask the client to handle the transaction for us.
+    ReadChannel(proto::HandleId),
+    ReadSocket(proto::HandleId),
 
     // We always use the Ignore variant for these, but implementation is here
     // for posterity.
@@ -52,11 +55,12 @@ impl Responder {
     /// Feed this responder a still-encoded FIDL request.
     pub(crate) fn handle(
         self,
+        client_inner: &mut crate::ClientInner,
         result: Result<(fidl_message::TransactionHeader, &[u8]), crate::InnerError>,
     ) -> fidl::Result<ResponderStatus> {
         match self {
             Responder::Namespace(sender) => {
-                Responder::dispatch_handle("namespace", ordinals::NAMESPACE, sender, result)
+                Responder::dispatch_handle("namespace", ordinals::GET_NAMESPACE, sender, result)
             }
             Responder::CreateChannel(sender) => Responder::dispatch_handle(
                 "create_channel",
@@ -82,17 +86,33 @@ impl Responder {
                 sender,
                 result,
             ),
-            Responder::ReadSocket(sender) => {
-                Responder::dispatch_handle("read_socket", ordinals::READ_SOCKET, sender, result)
+            Responder::ReadSocket(id) => {
+                Responder::dispatch_handle_etc::<proto::SocketReadSocketResponse, proto::Error>(
+                    "read_channel",
+                    ordinals::READ_SOCKET,
+                    move |msg| {
+                        client_inner.handle_socket_read_response(msg.map(|x| x.data), id);
+                    },
+                    result,
+                    None,
+                )
             }
-            Responder::ReadChannel(sender) => {
-                Responder::dispatch_handle("read_channel", ordinals::READ_CHANNEL, sender, result)
-            }
+            Responder::ReadChannel(id) => Responder::dispatch_handle_etc::<_, proto::Error>(
+                "read_channel",
+                ordinals::READ_CHANNEL,
+                move |msg| {
+                    client_inner.handle_channel_read_response(msg, id);
+                },
+                result,
+                None,
+            ),
             Responder::WriteSocket(sender, handle) => {
                 Responder::dispatch_handle_etc::<_, proto::WriteSocketError>(
                     "write_socket",
                     ordinals::WRITE_SOCKET,
-                    sender,
+                    move |m| {
+                        let _ = sender.send(m);
+                    },
                     result,
                     Some(handle),
                 )
@@ -101,7 +121,9 @@ impl Responder {
                 Responder::dispatch_handle_etc::<_, proto::WriteChannelError>(
                     "write_channel",
                     ordinals::WRITE_CHANNEL,
-                    sender,
+                    move |m| {
+                        let _ = sender.send(m);
+                    },
                     result,
                     Some(handle),
                 )
@@ -171,7 +193,15 @@ impl Responder {
         sender: Sender<Result<R, Error>>,
         result: Result<(fidl_message::TransactionHeader, &[u8]), crate::InnerError>,
     ) -> fidl::Result<ResponderStatus> {
-        Self::dispatch_handle_etc::<R, proto::Error>(method_name, ordinal, sender, result, None)
+        Self::dispatch_handle_etc::<R, proto::Error>(
+            method_name,
+            ordinal,
+            move |m| {
+                let _ = sender.send(m);
+            },
+            result,
+            None,
+        )
     }
 
     /// Same as `dispatch_handle` except the error type is generic, whereas it
@@ -179,7 +209,7 @@ impl Responder {
     fn dispatch_handle_etc<R: fidl_message::Body, S: Into<Error> + fidl_message::ErrorType>(
         method_name: &'static str,
         ordinal: u64,
-        sender: Sender<Result<R, Error>>,
+        send_fn: impl FnOnce(Result<R, Error>),
         result: Result<(fidl_message::TransactionHeader, &[u8]), crate::InnerError>,
         write_notify: Option<proto::HandleId>,
     ) -> fidl::Result<ResponderStatus> {
@@ -211,11 +241,11 @@ impl Responder {
                         (Err(Error::Protocol(e.clone())), Err(e))
                     }
                 };
-                let _ = sender.send(res);
+                send_fn(res);
                 ret
             }
             Err(e) => {
-                let _ = sender.send(Err(e.into()));
+                send_fn(Err(e.into()));
                 Ok(ResponderStatus::Ok)
             }
         }

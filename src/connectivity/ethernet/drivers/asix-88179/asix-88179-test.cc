@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <fidl/fuchsia.hardware.ax88179/cpp/wire.h>
 #include <lib/async-loop/testing/cpp/real_loop.h>
+#include <lib/component/incoming/cpp/directory.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/fdio/cpp/caller.h>
@@ -72,8 +73,7 @@ class UsbAx88179Test : public zxtest::Test, loop_fixture::RealLoop {
 
     fdio_cpp::UnownedFdioCaller caller(bus_->GetRootFd());
     {
-      zx::result directory =
-          component::ConnectAt<fuchsia_io::Directory>(caller.directory(), "class/network");
+      zx::result directory = component::OpenDirectoryAt(caller.directory(), "class/network");
       ASSERT_OK(directory);
       zx::result watch_result = device_watcher::WatchDirectoryForItems(
           directory.value(), [&dev_path](std::string_view devpath) {
@@ -83,8 +83,8 @@ class UsbAx88179Test : public zxtest::Test, loop_fixture::RealLoop {
       ASSERT_OK(watch_result);
     }
     {
-      zx::result directory = component::ConnectAt<fuchsia_io::Directory>(
-          caller.directory(), "class/test-asix-function");
+      zx::result directory =
+          component::OpenDirectoryAt(caller.directory(), "class/test-asix-function");
       ASSERT_OK(directory);
       zx::result watch_result = device_watcher::WatchDirectoryForItems(
           directory.value(), [&test_function_path](std::string_view devpath) {

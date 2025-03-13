@@ -52,9 +52,9 @@ zx_status_t RebindBlockDevice(DeviceRef* device) {
   auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
   const fidl::OneWayStatus status =
       fidl::WireCall(caller.directory())
-          ->Open(fuchsia_io::OpenFlags::kDirectory, {},
-                 fidl::StringView::FromExternal(device->path()),
-                 fidl::ServerEnd<fuchsia_io::Node>(server_end.TakeChannel()));
+          ->Open(fidl::StringView::FromExternal(device->path()),
+                 fuchsia_io::wire::kPermReadable | fuchsia_io::Flags::kProtocolDirectory, {},
+                 server_end.TakeChannel());
   EXPECT_OK(status);
   if (!status.ok()) {
     return status.status();

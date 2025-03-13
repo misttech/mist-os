@@ -12,6 +12,13 @@ extern "C" void __assert_fail(const char*, const char*, int, const char*) { __bu
 
 extern "C" void __zx_panic(const char* format, ...) { __builtin_trap(); }
 
-void std::__libcpp_verbose_abort(const char* format, ...) { __builtin_trap(); }
+void std::__libcpp_verbose_abort(const char* format, ...) noexcept { __builtin_trap(); }
 
-extern "C" void abort() { __builtin_trap(); }
+// GCC has an implicit declaration of abort with default visibility even under
+// -fvisibility=hidden.  Even with an explicit attribute on the definition, it
+// will just ignore it (with a warning) because of the "previous" declaration.
+// So instead of `extern "C"`, declare a different function from the language
+// perspective (one that would get a mangled name) but override its linkage
+// name explicitly.
+void abort() __asm__("abort");
+void abort() { __builtin_trap(); }

@@ -12,6 +12,7 @@
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/devicetree/visitors/drivers/pci/pci.h>
 #include <lib/driver/metadata/cpp/metadata_server.h>
 #include <lib/pci/devicetree.h>
 #include <lib/pci/pciroot.h>
@@ -20,7 +21,7 @@
 #include <lib/zx/result.h>
 #include <zircon/errors.h>
 
-#include <type_traits>
+#include <span>
 
 #include <bind/fuchsia/pci/cpp/bind.h>
 
@@ -31,18 +32,20 @@ class Pciroot : public PcirootBase, public ddk::PcirootProtocol<Pciroot> {
   Pciroot() = delete;
   Pciroot(std::string node_name, PciRootHost* root_host, async_dispatcher_t* dispatcher,
           fdf::ClientEnd<fuchsia_hardware_platform_bus::Iommu> iommu, zx::vmo cam_vmo,
-          zx::resource irq_resource)
+          zx::resource irq_resource, bool is_extended)
       : PcirootBase(root_host),
         node_name_(std::move(node_name)),
         dispatcher_(dispatcher),
         iommu_(std::move(iommu)),
         cam_(std::move(cam_vmo)),
-        irq_resource_(std::move(irq_resource)) {
+        irq_resource_(std::move(irq_resource)),
+        is_extended_(is_extended) {
     ZX_DEBUG_ASSERT(irq_resource_.is_valid());
     ZX_DEBUG_ASSERT(iommu_.is_valid());
   }
   virtual ~Pciroot() = default;
-  zx::result<> CreateInterruptsAndRouting();
+  zx::result<> CreateInterruptsAndRouting(
+      std::span<const pci_dt::Gicv3InterruptMapElement> interrupts);
 
   // Implementation for fuchsia.hardware.pciroot provided via lib/pci. These
   // disambiguate between the `ddk::Protocol` static implementations and our
@@ -71,6 +74,7 @@ class Pciroot : public PcirootBase, public ddk::PcirootProtocol<Pciroot> {
   const zx::resource irq_resource_;
   std::vector<pci_legacy_irq_t> interrupts_;
   std::vector<pci_irq_routing_entry_t> irq_routing_entries_;
+  const bool is_extended_;
 };
 
 // Ideally Crosvm and Pciroot would be the same class but PciRootHost is not trivially
@@ -83,8 +87,8 @@ class Crosvm : public fdf::DriverBase {
   zx::result<> Start() override;
   zx::result<> CreateMetadata();
   // Create the `Pciroot` and any associated root host dependencies.
-  zx::result<> CreatePciroot();
-  zx::result<> CreateRoothost();
+  zx::result<> CreatePciroot(const pci_dt::PciVisitor& pci_visitor);
+  zx::result<> CreateRoothost(const pci_dt::PciVisitor& pci_visitor);
   // Bring up the compat server and serve the fuchsia.hardware.pciroot banjo service.
   zx::result<> StartBanjoServer();
 

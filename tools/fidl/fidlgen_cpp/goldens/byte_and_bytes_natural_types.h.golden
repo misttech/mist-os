@@ -84,7 +84,7 @@ inline ByteAndBytes::ByteAndBytes(Storage_ storage) noexcept : storage_(std::mov
 inline ByteAndBytes::ByteAndBytes(uint8_t single_byte) noexcept
     : storage_({.single_byte = std::move(single_byte)}) {}
 inline ByteAndBytes::ByteAndBytes(const ::test_byteandbytes::ByteAndBytes& other) noexcept : ::test_byteandbytes::ByteAndBytes(other.CloneStorage_()) {}
-inline ByteAndBytes& ::test_byteandbytes::ByteAndBytes::operator=(const ::test_byteandbytes::ByteAndBytes & other) noexcept {
+inline ByteAndBytes& ::test_byteandbytes::ByteAndBytes::operator=(const ::test_byteandbytes::ByteAndBytes& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -101,7 +101,7 @@ inline ByteAndBytes& ByteAndBytes::single_byte(uint8_t value) {
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_byteandbytes::ByteAndBytes> : public std::true_type{};
+struct IsFidlType<::test_byteandbytes::ByteAndBytes> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_byteandbytes::ByteAndBytes> {
@@ -113,7 +113,7 @@ struct TypeTraits<::test_byteandbytes::ByteAndBytes> {
 };
 
 template <>
-struct IsStruct<::test_byteandbytes::ByteAndBytes> : public std::true_type{};
+struct IsStruct<::test_byteandbytes::ByteAndBytes> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_byteandbytes::ByteAndBytes, ::fidl::internal::NaturalCodingConstraintEmpty> final

@@ -97,7 +97,7 @@ struct CodingTraits<::test::struct_::BasicStruct>
     : public EncodableCodingTraits<::test::struct_::BasicStruct, 24> {};
 
 template <>
-struct HasPadding<::test::struct_::BasicStruct> : public std::true_type{};
+struct HasPadding<::test::struct_::BasicStruct> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::struct_::BasicStruct> : public internal::BoolConstant<

@@ -805,7 +805,7 @@ inline OverrideTest::OverrideTest(::test_anonymous::Op op, ::fidl::Box<::test_an
                 .left = std::move(left),
                 .right = std::move(right)}) {}
 inline OverrideTest::OverrideTest(const ::test_anonymous::OverrideTest& other) noexcept : ::test_anonymous::OverrideTest(other.CloneStorage_()) {}
-inline OverrideTest& ::test_anonymous::OverrideTest::operator=(const ::test_anonymous::OverrideTest & other) noexcept {
+inline OverrideTest& ::test_anonymous::OverrideTest::operator=(const ::test_anonymous::OverrideTest& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -830,7 +830,7 @@ inline OverrideTest& OverrideTest::right(::fidl::Box<::test_anonymous::Expressio
 
 inline FunctionApplication::FunctionApplication(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline FunctionApplication::FunctionApplication(const ::test_anonymous::FunctionApplication& other) noexcept : FunctionApplication(other.CloneStorage_()) {}
-inline FunctionApplication& ::test_anonymous::FunctionApplication::operator=(const FunctionApplication & other) noexcept {
+inline FunctionApplication& ::test_anonymous::FunctionApplication::operator=(const FunctionApplication& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -853,7 +853,7 @@ inline TableData::TableData(Storage_ storage) noexcept : storage_(std::move(stor
 inline TableData::TableData(uint8_t data) noexcept
     : storage_({.data = std::move(data)}) {}
 inline TableData::TableData(const ::test_anonymous::TableData& other) noexcept : ::test_anonymous::TableData(other.CloneStorage_()) {}
-inline TableData& ::test_anonymous::TableData::operator=(const ::test_anonymous::TableData & other) noexcept {
+inline TableData& ::test_anonymous::TableData::operator=(const ::test_anonymous::TableData& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -868,7 +868,7 @@ inline TableData& TableData::data(uint8_t value) {
 
 inline TableMember::TableMember(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline TableMember::TableMember(const ::test_anonymous::TableMember& other) noexcept : TableMember(other.CloneStorage_()) {}
-inline TableMember& ::test_anonymous::TableMember::operator=(const TableMember & other) noexcept {
+inline TableMember& ::test_anonymous::TableMember::operator=(const TableMember& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -884,7 +884,7 @@ inline SomeProtocolSomeMethodRequest::SomeProtocolSomeMethodRequest(::test_anony
     : storage_({.union_member = std::move(union_member),
                 .table_member = std::move(table_member)}) {}
 inline SomeProtocolSomeMethodRequest::SomeProtocolSomeMethodRequest(const ::test_anonymous::SomeProtocolSomeMethodRequest& other) noexcept : ::test_anonymous::SomeProtocolSomeMethodRequest(other.CloneStorage_()) {}
-inline SomeProtocolSomeMethodRequest& ::test_anonymous::SomeProtocolSomeMethodRequest::operator=(const ::test_anonymous::SomeProtocolSomeMethodRequest & other) noexcept {
+inline SomeProtocolSomeMethodRequest& ::test_anonymous::SomeProtocolSomeMethodRequest::operator=(const ::test_anonymous::SomeProtocolSomeMethodRequest& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -906,7 +906,7 @@ inline SomeProtocolSomeMethodResponse::SomeProtocolSomeMethodResponse(Storage_ s
 inline SomeProtocolSomeMethodResponse::SomeProtocolSomeMethodResponse(::test_anonymous::BitsMember bits_member) noexcept
     : storage_({.bits_member = std::move(bits_member)}) {}
 inline SomeProtocolSomeMethodResponse::SomeProtocolSomeMethodResponse(const ::test_anonymous::SomeProtocolSomeMethodResponse& other) noexcept : ::test_anonymous::SomeProtocolSomeMethodResponse(other.CloneStorage_()) {}
-inline SomeProtocolSomeMethodResponse& ::test_anonymous::SomeProtocolSomeMethodResponse::operator=(const ::test_anonymous::SomeProtocolSomeMethodResponse & other) noexcept {
+inline SomeProtocolSomeMethodResponse& ::test_anonymous::SomeProtocolSomeMethodResponse::operator=(const ::test_anonymous::SomeProtocolSomeMethodResponse& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -923,7 +923,7 @@ inline SomeProtocolSomeMethodResponse& SomeProtocolSomeMethodResponse::bits_memb
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_anonymous::OverrideTest> : public std::true_type{};
+struct IsFidlType<::test_anonymous::OverrideTest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_anonymous::OverrideTest> {
@@ -935,14 +935,14 @@ struct TypeTraits<::test_anonymous::OverrideTest> {
 };
 
 template <>
-struct IsStruct<::test_anonymous::OverrideTest> : public std::true_type{};
+struct IsStruct<::test_anonymous::OverrideTest> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_anonymous::OverrideTest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_anonymous::OverrideTest, 40> {};
 
 template <>
-struct IsFidlType<::test_anonymous::TableData> : public std::true_type{};
+struct IsFidlType<::test_anonymous::TableData> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_anonymous::TableData> {
@@ -954,14 +954,14 @@ struct TypeTraits<::test_anonymous::TableData> {
 };
 
 template <>
-struct IsStruct<::test_anonymous::TableData> : public std::true_type{};
+struct IsStruct<::test_anonymous::TableData> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_anonymous::TableData, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_anonymous::TableData, 1> {};
 
 template <>
-struct IsFidlType<::test_anonymous::SomeProtocolSomeMethodRequest> : public std::true_type{};
+struct IsFidlType<::test_anonymous::SomeProtocolSomeMethodRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_anonymous::SomeProtocolSomeMethodRequest> {
@@ -973,14 +973,14 @@ struct TypeTraits<::test_anonymous::SomeProtocolSomeMethodRequest> {
 };
 
 template <>
-struct IsStruct<::test_anonymous::SomeProtocolSomeMethodRequest> : public std::true_type{};
+struct IsStruct<::test_anonymous::SomeProtocolSomeMethodRequest> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_anonymous::SomeProtocolSomeMethodRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_anonymous::SomeProtocolSomeMethodRequest, 32> {};
 
 template <>
-struct IsFidlType<::test_anonymous::SomeProtocolSomeMethodResponse> : public std::true_type{};
+struct IsFidlType<::test_anonymous::SomeProtocolSomeMethodResponse> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_anonymous::SomeProtocolSomeMethodResponse> {
@@ -992,14 +992,14 @@ struct TypeTraits<::test_anonymous::SomeProtocolSomeMethodResponse> {
 };
 
 template <>
-struct IsStruct<::test_anonymous::SomeProtocolSomeMethodResponse> : public std::true_type{};
+struct IsStruct<::test_anonymous::SomeProtocolSomeMethodResponse> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_anonymous::SomeProtocolSomeMethodResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_anonymous::SomeProtocolSomeMethodResponse, 4> {};
 
 template <>
-struct IsFidlType<::test_anonymous::FunctionApplication> : public std::true_type{};
+struct IsFidlType<::test_anonymous::FunctionApplication> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_anonymous::FunctionApplication> {
@@ -1011,13 +1011,13 @@ struct TypeTraits<::test_anonymous::FunctionApplication> {
 };
 
 template <>
-struct IsTable<::test_anonymous::FunctionApplication> : public std::true_type{};
+struct IsTable<::test_anonymous::FunctionApplication> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_anonymous::FunctionApplication, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_anonymous::FunctionApplication> {};
 
 template <>
-struct IsFidlType<::test_anonymous::TableMember> : public std::true_type{};
+struct IsFidlType<::test_anonymous::TableMember> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_anonymous::TableMember> {
@@ -1029,13 +1029,13 @@ struct TypeTraits<::test_anonymous::TableMember> {
 };
 
 template <>
-struct IsTable<::test_anonymous::TableMember> : public std::true_type{};
+struct IsTable<::test_anonymous::TableMember> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_anonymous::TableMember, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_anonymous::TableMember> {};
 
 template <>
-struct IsFidlType<::test_anonymous::Expression> : public std::true_type{};
+struct IsFidlType<::test_anonymous::Expression> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_anonymous::Expression> {
@@ -1047,14 +1047,14 @@ struct TypeTraits<::test_anonymous::Expression> {
 };
 
 template <>
-struct IsUnion<::test_anonymous::Expression> : public std::true_type{};
+struct IsUnion<::test_anonymous::Expression> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_anonymous::Expression, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_anonymous::Expression> {};
 
 template <>
-struct IsFidlType<::test_anonymous::UnionMember> : public std::true_type{};
+struct IsFidlType<::test_anonymous::UnionMember> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_anonymous::UnionMember> {
@@ -1066,14 +1066,14 @@ struct TypeTraits<::test_anonymous::UnionMember> {
 };
 
 template <>
-struct IsUnion<::test_anonymous::UnionMember> : public std::true_type{};
+struct IsUnion<::test_anonymous::UnionMember> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_anonymous::UnionMember, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_anonymous::UnionMember> {};
 
 template <>
-struct IsFidlType<::test_anonymous::SomeProtocolSomeMethodResult> : public std::true_type{};
+struct IsFidlType<::test_anonymous::SomeProtocolSomeMethodResult> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_anonymous::SomeProtocolSomeMethodResult> {
@@ -1085,7 +1085,7 @@ struct TypeTraits<::test_anonymous::SomeProtocolSomeMethodResult> {
 };
 
 template <>
-struct IsUnion<::test_anonymous::SomeProtocolSomeMethodResult> : public std::true_type{};
+struct IsUnion<::test_anonymous::SomeProtocolSomeMethodResult> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_anonymous::SomeProtocolSomeMethodResult, ::fidl::internal::NaturalCodingConstraintEmpty> final

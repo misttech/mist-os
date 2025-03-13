@@ -155,12 +155,7 @@ where
 
             let body = resp.into_body();
 
-            Ok(Resource {
-                content_range,
-                stream: Box::pin(
-                    body.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)),
-                ),
-            })
+            Ok(Resource { content_range, stream: Box::pin(body.map_err(std::io::Error::other)) })
         }
         .boxed()
     }

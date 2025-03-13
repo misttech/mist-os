@@ -53,6 +53,7 @@ driver_bind_rules("parent-driver-bind") {
 }
 
 fuchsia_cc_driver("parent-driver") {
+  legacy = true
   testonly = true
   output_name = "fidl-service-parent"
   sources = [ "parent-driver.cc" ]
@@ -85,6 +86,7 @@ driver_bind_rules("child-driver-bind") {
 }
 
 fuchsia_cc_driver("child-driver") {
+  legacy = true
   testonly = true
   output_name = "fidl-service-child"
   sources = [ "child-driver.cc" ]

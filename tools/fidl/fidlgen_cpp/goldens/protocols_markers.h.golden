@@ -30,6 +30,8 @@ class WithAndWithoutRequestResponse final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5413654872775949227;
   };
   class NoRequestEmptyResponse final {
     NoRequestEmptyResponse() = delete;
@@ -44,6 +46,8 @@ class WithAndWithoutRequestResponse final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 1631193469798418024;
   };
   class NoRequestWithResponse final {
     NoRequestWithResponse() = delete;
@@ -58,6 +62,8 @@ class WithAndWithoutRequestResponse final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 9037369643591427517;
   };
   class WithRequestNoResponse final {
     WithRequestNoResponse() = delete;
@@ -72,6 +78,8 @@ class WithAndWithoutRequestResponse final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 7326057319832554103;
   };
   class WithRequestEmptyResponse final {
     WithRequestEmptyResponse() = delete;
@@ -86,6 +94,8 @@ class WithAndWithoutRequestResponse final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 2877322062572412767;
   };
   class WithRequestWithResponse final {
     WithRequestWithResponse() = delete;
@@ -100,6 +110,8 @@ class WithAndWithoutRequestResponse final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 6417226585456833969;
   };
   class OnEmptyResponse final {
     OnEmptyResponse() = delete;
@@ -114,6 +126,8 @@ class WithAndWithoutRequestResponse final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5397663296507358806;
   };
   class OnWithResponse final {
     OnWithResponse() = delete;
@@ -128,6 +142,8 @@ class WithAndWithoutRequestResponse final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5811598563493228968;
   };
 };
 
@@ -152,6 +168,8 @@ class WithErrorSyntax final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 268248568430741139;
   };
   class ErrorAsPrimitive final {
     ErrorAsPrimitive() = delete;
@@ -166,6 +184,8 @@ class WithErrorSyntax final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 6930994461233198567;
   };
   class ErrorAsEnum final {
     ErrorAsEnum() = delete;
@@ -180,6 +200,8 @@ class WithErrorSyntax final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5491891352371277635;
   };
   class HandleInResult final {
     HandleInResult() = delete;
@@ -194,6 +216,8 @@ class WithErrorSyntax final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 1371676333068455103;
   };
 };
 
@@ -218,6 +242,8 @@ class ChannelProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 3155008840945527714;
   };
   class EventA final {
     EventA() = delete;
@@ -232,6 +258,8 @@ class ChannelProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 2220452875311597006;
   };
   class MethodB final {
     MethodB() = delete;
@@ -246,6 +274,8 @@ class ChannelProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 8903004957800778182;
   };
   class TakeHandle final {
     TakeHandle() = delete;
@@ -260,6 +290,8 @@ class ChannelProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 591935489944717925;
   };
   class MutateSocket final {
     MutateSocket() = delete;
@@ -274,6 +306,8 @@ class ChannelProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 7411742788430590287;
   };
 };
 
@@ -284,6 +318,7 @@ class DiscoverableProtocol final {
   using Transport = ::fidl::internal::ChannelTransport;
 
   static constexpr ::fidl::internal::Openness kOpenness = ::fidl::internal::Openness::kClosed;
+  static constexpr char kDiscoverableName[] = "test.protocols.DiscoverableProtocol";
 
   class Method final {
     Method() = delete;
@@ -298,6 +333,8 @@ class DiscoverableProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 3455873048082739435;
   };
 };
 
@@ -308,6 +345,7 @@ class AnotherDiscoverableProtocol final {
   using Transport = ::fidl::internal::ChannelTransport;
 
   static constexpr ::fidl::internal::Openness kOpenness = ::fidl::internal::Openness::kClosed;
+  static constexpr char kDiscoverableName[] = "fake.library.FakeProtocol";
 };
 
 class PlatformServer final {
@@ -317,6 +355,7 @@ class PlatformServer final {
   using Transport = ::fidl::internal::ChannelTransport;
 
   static constexpr ::fidl::internal::Openness kOpenness = ::fidl::internal::Openness::kClosed;
+  static constexpr char kDiscoverableName[] = "test.protocols.PlatformServer";
 };
 
 class HandleRightsProtocol final {
@@ -340,6 +379,8 @@ class HandleRightsProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 1155044649514904573;
   };
   class ResponseMethod final {
     ResponseMethod() = delete;
@@ -354,6 +395,8 @@ class HandleRightsProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5956276128041940295;
   };
   class AnEvent final {
     AnEvent() = delete;
@@ -368,6 +411,8 @@ class HandleRightsProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 476727631355490611;
   };
 };
 
@@ -392,6 +437,8 @@ class WithProtocolEnds final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5870448041025163330;
   };
   class ServerEnds final {
     ServerEnds() = delete;
@@ -406,6 +453,8 @@ class WithProtocolEnds final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 8115535094437022259;
   };
   class StructContainingEnds final {
     StructContainingEnds() = delete;
@@ -420,6 +469,8 @@ class WithProtocolEnds final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 4076866772260025813;
   };
 };
 
@@ -444,6 +495,8 @@ class ManyParameters final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 6423043252952467815;
   };
 };
 
@@ -468,6 +521,8 @@ class MethodWithUnion final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 4124874338266649112;
   };
 };
 
@@ -475,33 +530,33 @@ class MethodWithUnion final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_protocols::WithAndWithoutRequestResponse> : public std::true_type{};
+struct IsProtocol<::test_protocols::WithAndWithoutRequestResponse> : public std::true_type {};
 
 template <>
-struct IsProtocol<::test_protocols::WithErrorSyntax> : public std::true_type{};
+struct IsProtocol<::test_protocols::WithErrorSyntax> : public std::true_type {};
 
 template <>
-struct IsProtocol<::test_protocols::ChannelProtocol> : public std::true_type{};
+struct IsProtocol<::test_protocols::ChannelProtocol> : public std::true_type {};
 
 template <>
-struct IsProtocol<::test_protocols::DiscoverableProtocol> : public std::true_type{};
+struct IsProtocol<::test_protocols::DiscoverableProtocol> : public std::true_type {};
 
 template <>
-struct IsProtocol<::test_protocols::AnotherDiscoverableProtocol> : public std::true_type{};
+struct IsProtocol<::test_protocols::AnotherDiscoverableProtocol> : public std::true_type {};
 
 template <>
-struct IsProtocol<::test_protocols::PlatformServer> : public std::true_type{};
+struct IsProtocol<::test_protocols::PlatformServer> : public std::true_type {};
 
 template <>
-struct IsProtocol<::test_protocols::HandleRightsProtocol> : public std::true_type{};
+struct IsProtocol<::test_protocols::HandleRightsProtocol> : public std::true_type {};
 
 template <>
-struct IsProtocol<::test_protocols::WithProtocolEnds> : public std::true_type{};
+struct IsProtocol<::test_protocols::WithProtocolEnds> : public std::true_type {};
 
 template <>
-struct IsProtocol<::test_protocols::ManyParameters> : public std::true_type{};
+struct IsProtocol<::test_protocols::ManyParameters> : public std::true_type {};
 
 template <>
-struct IsProtocol<::test_protocols::MethodWithUnion> : public std::true_type{};
+struct IsProtocol<::test_protocols::MethodWithUnion> : public std::true_type {};
 
 }  // namespace fidl

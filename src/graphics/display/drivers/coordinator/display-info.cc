@@ -6,6 +6,7 @@
 
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/driver/logging/cpp/logger.h>
+#include <lib/fit/result.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
 #include <zircon/assert.h>
@@ -15,62 +16,42 @@
 #include <zircon/time.h>
 
 #include <cinttypes>
-#include <cstdint>
+#include <cstddef>
 #include <cstring>
-#include <iterator>
-#include <limits>
+#include <optional>
 #include <span>
 #include <utility>
 
 #include <fbl/alloc_checker.h>
-#include <fbl/ref_ptr.h>
 #include <fbl/string_printf.h>
-#include <pretty/hexdump.h>
 
-#include "src/graphics/display/drivers/coordinator/migration-util.h"
+#include "src/graphics/display/drivers/coordinator/added-display-info.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/edid/edid.h"
 
 namespace display_coordinator {
 
-namespace {
+DisplayInfo::DisplayInfo(display::DisplayId display_id,
+                         fbl::Vector<display::PixelFormat> pixel_formats,
+                         fbl::Vector<display::DisplayTiming> preferred_modes,
+                         std::optional<edid::Edid> edid_info)
+    : IdMappable(display_id),
+      edid_info(std::move(edid_info)),
+      timings(std::move(preferred_modes)),
+      pixel_formats(std::move(pixel_formats)) {
+  ZX_DEBUG_ASSERT(display_id != display::kInvalidDisplayId);
 
-fit::result<const char*, DisplayInfo::Edid> InitEdidFromBytes(std::span<const uint8_t> bytes) {
-  ZX_DEBUG_ASSERT(bytes.size() <= std::numeric_limits<uint16_t>::max());
-
-  fit::result<const char*, edid::Edid> result = edid::Edid::Create(bytes);
-  if (result.is_ok()) {
-    DisplayInfo::Edid edid = {
-        .base = std::move(result).value(),
-    };
-    return fit::ok(std::move(edid));
-  }
-  return result.take_error();
+  // TODO(https://fxbug.dev/343872853): Parse audio information from EDID.
 }
 
-}  // namespace
-
-DisplayInfo::DisplayInfo() = default;
 DisplayInfo::~DisplayInfo() = default;
 
 void DisplayInfo::InitializeInspect(inspect::Node* parent_node) {
-  ZX_DEBUG_ASSERT(init_done);
-  node = parent_node->CreateChild(fbl::StringPrintf("display-%" PRIu64, id.value()).c_str());
-
-  if (mode.has_value()) {
-    node.CreateUint("width", mode->horizontal_active_px, &properties);
-    node.CreateUint("height", mode->vertical_active_lines, &properties);
-    return;
-  }
-
-  ZX_DEBUG_ASSERT(edid.has_value());
-
-  node.CreateByteVector("edid-bytes", std::span(edid->base.edid_bytes(), edid->base.edid_length()),
-                        &properties);
+  node = parent_node->CreateChild(fbl::StringPrintf("display-%" PRIu64, id().value()).c_str());
 
   size_t i = 0;
-  for (const display::DisplayTiming& t : edid->timings) {
+  for (const display::DisplayTiming& t : timings) {
     auto child = node.CreateChild(fbl::StringPrintf("timing-parameters-%lu", ++i).c_str());
     child.CreateDouble("vsync-hz",
                        static_cast<double>(t.vertical_field_refresh_rate_millihertz()) / 1000.0,
@@ -86,64 +67,62 @@ void DisplayInfo::InitializeInspect(inspect::Node* parent_node) {
     child.CreateInt("vertical-sync-pulse", t.vertical_sync_width_lines, &properties);
     properties.emplace(std::move(child));
   }
+
+  if (!edid_info.has_value()) {
+    return;
+  }
+
+  node.CreateByteVector("edid-bytes", std::span(edid_info->edid_bytes(), edid_info->edid_length()),
+                        &properties);
 }
 
 // static
-zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(
-    const raw_display_info_t& banjo_display_info) {
-  fbl::AllocChecker ac;
-  fbl::RefPtr<DisplayInfo> out = fbl::AdoptRef(new (&ac) DisplayInfo);
-  if (!ac.check()) {
+zx::result<std::unique_ptr<DisplayInfo>> DisplayInfo::Create(AddedDisplayInfo added_display_info) {
+  ZX_DEBUG_ASSERT(added_display_info.display_id != display::kInvalidDisplayId);
+  display::DisplayId display_id = added_display_info.display_id;
+
+  fbl::Vector<display::DisplayTiming> preferred_modes;
+  if (!added_display_info.banjo_preferred_modes.is_empty()) {
+    fbl::AllocChecker alloc_checker;
+    preferred_modes.reserve(added_display_info.banjo_preferred_modes.size(), &alloc_checker);
+    if (!alloc_checker.check()) {
+      fdf::error("Failed to allocate DisplayTiming list for display ID: {}", display_id.value());
+      return zx::error(ZX_ERR_NO_MEMORY);
+    }
+    for (const display_mode_t& banjo_preferred_mode : added_display_info.banjo_preferred_modes) {
+      ZX_DEBUG_ASSERT_MSG(
+          preferred_modes.size() < added_display_info.banjo_preferred_modes.size(),
+          "The push_back() below was not supposed to allocate memory, but it might");
+      preferred_modes.push_back(display::ToDisplayTiming(banjo_preferred_mode), &alloc_checker);
+      ZX_DEBUG_ASSERT_MSG(alloc_checker.check(),
+                          "The push_back() above failed to allocate memory; "
+                          "it was not supposed to allocate at all");
+    }
+  }
+
+  std::optional<edid::Edid> edid_info;
+  if (!added_display_info.edid_bytes.is_empty()) {
+    fit::result<const char*, edid::Edid> edid_result =
+        edid::Edid::Create(added_display_info.edid_bytes);
+    if (edid_result.is_error()) {
+      fdf::error("Failed to initialize EDID: {}", edid_result.error_value());
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+    edid_info.emplace(std::move(edid_result).value());
+  }
+
+  fbl::AllocChecker alloc_checker;
+  auto display_info = fbl::make_unique_checked<DisplayInfo>(
+      &alloc_checker, display_id, std::move(added_display_info.pixel_formats),
+      std::move(preferred_modes), std::move(edid_info));
+  if (!alloc_checker.check()) {
+    fdf::error("Failed to allocate DisplayInfo for display ID: {}", display_id.value());
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  out->pending_layer_change = false;
-  out->layer_count = 0;
-  out->id = display::ToDisplayId(banjo_display_info.display_id);
-
-  zx::result get_display_info_pixel_formats_result =
-      CoordinatorPixelFormat::CreateFblVectorFromBanjoVector(
-          std::span(banjo_display_info.pixel_formats_list, banjo_display_info.pixel_formats_count));
-  if (get_display_info_pixel_formats_result.is_error()) {
-    FDF_LOG(ERROR, "Cannot convert pixel formats to FIDL pixel format value: %s",
-            get_display_info_pixel_formats_result.status_string());
-    return get_display_info_pixel_formats_result.take_error();
-  }
-  out->pixel_formats = std::move(get_display_info_pixel_formats_result.value());
-
-  if (banjo_display_info.preferred_modes_count != 0) {
-    ZX_DEBUG_ASSERT(banjo_display_info.preferred_modes_count == 1);
-
-    out->mode = display::ToDisplayTiming(banjo_display_info.preferred_modes_list[0]);
-
-    // TODO(https://fxbug.dev/348695412): This should not be an early return.
-    // `preferred_modes` should be merged and de-duplicated with the modes
-    // decoded from the display's EDID, by the logic below.
-    return zx::ok(std::move(out));
-  }
-
-  auto edid_result = [&]() -> fit::result<const char*, Edid> {
-    if (banjo_display_info.edid_bytes_count != 0) {
-      std::span<const uint8_t> edid_bytes(banjo_display_info.edid_bytes_list,
-                                          banjo_display_info.edid_bytes_count);
-      // TODO(https://fxbug.dev/348695412): Merge and de-duplicate the modes in
-      // `preferred_modes` from the logic above.
-      return InitEdidFromBytes(edid_bytes);
-    }
-
-    return fit::error("Missing display hardware support information");
-  }();
-
-  if (!edid_result.is_ok()) {
-    FDF_LOG(ERROR, "Failed to initialize EDID: %s", edid_result.error_value());
-    return zx::error(ZX_ERR_INTERNAL);
-  }
-  out->edid = std::move(edid_result).value();
-
-  // TODO(https://fxbug.dev/343872853): Parse audio information from EDID.
-
-  if (fdf::Logger::GlobalInstance()->GetSeverity() <= FUCHSIA_LOG_DEBUG) {
-    const auto& edid = out->edid->base;
+  if (fdf::Logger::GlobalInstance()->GetSeverity() <= FUCHSIA_LOG_DEBUG &&
+      display_info->edid_info.has_value()) {
+    const edid::Edid& edid = display_info->edid_info.value();
     std::string manufacturer_id = edid.GetManufacturerId();
     const char* manufacturer_name = edid.GetManufacturerName();
     const char* manufacturer =
@@ -152,48 +131,47 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(
     std::string display_product_name = edid.GetDisplayProductName();
     std::string display_product_serial_number = edid.GetDisplayProductSerialNumber();
 
-    FDF_LOG(DEBUG, "Manufacturer \"%s\", product %d, name \"%s\", serial \"%s\"", manufacturer,
-            edid.product_code(), display_product_name.c_str(),
-            display_product_serial_number.c_str());
-    edid.Print([](const char* str) { FDF_LOG(DEBUG, "%s", str); });
+    fdf::debug("Manufacturer \"{}\", product {}, name \"{}\", serial \"{}\"", manufacturer,
+               edid.product_code(), display_product_name, display_product_serial_number);
+    edid.Print([](const char* str) { fdf::debug("{}", str); });
   }
-  return zx::ok(std::move(out));
+  return zx::ok(std::move(display_info));
 }
 
 int DisplayInfo::GetHorizontalSizeMm() const {
-  if (!edid.has_value()) {
+  if (!edid_info.has_value()) {
     return 0;
   }
-  return edid->base.horizontal_size_mm();
+  return edid_info->horizontal_size_mm();
 }
 
 int DisplayInfo::GetVerticalSizeMm() const {
-  if (!edid.has_value()) {
+  if (!edid_info.has_value()) {
     return 0;
   }
-  return edid->base.vertical_size_mm();
+  return edid_info->vertical_size_mm();
 }
 
 std::string_view DisplayInfo::GetManufacturerName() const {
-  if (!edid.has_value()) {
+  if (!edid_info.has_value()) {
     return std::string_view();
   }
-  const char* manufacturer_name = edid->base.GetManufacturerName();
+  const char* manufacturer_name = edid_info->GetManufacturerName();
   return std::string_view(manufacturer_name);
 }
 
 std::string DisplayInfo::GetMonitorName() const {
-  if (!edid.has_value()) {
+  if (!edid_info.has_value()) {
     return {};
   }
-  return edid->base.GetDisplayProductName();
+  return edid_info->GetDisplayProductName();
 }
 
 std::string DisplayInfo::GetMonitorSerial() const {
-  if (!edid.has_value()) {
+  if (!edid_info.has_value()) {
     return {};
   }
-  return edid->base.GetDisplayProductSerialNumber();
+  return edid_info->GetDisplayProductSerialNumber();
 }
 
 }  // namespace display_coordinator

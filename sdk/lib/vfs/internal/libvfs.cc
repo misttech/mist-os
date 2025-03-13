@@ -76,9 +76,16 @@ class LibvfsComposedServiceDir final : public intree_vfs::PseudoDir {
       } else {
         auto connector = [name = std::string(name.data(), name.length()),
                           dir = &fallback_dir_](zx::channel channel) -> zx_status_t {
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+          auto response = fidl::WireCall(*dir)->DeprecatedOpen(
+              fuchsia_io::OpenFlags(), fuchsia_io::ModeType(), fidl::StringView::FromExternal(name),
+              fidl::ServerEnd<fuchsia_io::Node>{std::move(channel)});
+#else
           auto response = fidl::WireCall(*dir)->Open(
               fuchsia_io::OpenFlags(), fuchsia_io::ModeType(), fidl::StringView::FromExternal(name),
               fidl::ServerEnd<fuchsia_io::Node>{std::move(channel)});
+
+#endif
           if (!response.ok()) {
             return response.error().status();
           }

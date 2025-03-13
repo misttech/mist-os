@@ -215,24 +215,24 @@ constexpr inline auto ToUnderlying(::test_enum::MyEmptyFlexibleEnum value) -> ui
 }
 
 template <>
-struct IsFidlType<::test_enum::MyStrictEnum> : public std::true_type{};
+struct IsFidlType<::test_enum::MyStrictEnum> : public std::true_type {};
 template <>
-struct ContainsHandle<::test_enum::MyStrictEnum> : public std::false_type{};
+struct ContainsHandle<::test_enum::MyStrictEnum> : public std::false_type {};
 
 template <>
-struct IsFidlType<::test_enum::MyFlexibleEnum> : public std::true_type{};
+struct IsFidlType<::test_enum::MyFlexibleEnum> : public std::true_type {};
 template <>
-struct ContainsHandle<::test_enum::MyFlexibleEnum> : public std::false_type{};
+struct ContainsHandle<::test_enum::MyFlexibleEnum> : public std::false_type {};
 
 template <>
-struct IsFidlType<::test_enum::MyFlexibleEnumWithCustomUnknown> : public std::true_type{};
+struct IsFidlType<::test_enum::MyFlexibleEnumWithCustomUnknown> : public std::true_type {};
 template <>
-struct ContainsHandle<::test_enum::MyFlexibleEnumWithCustomUnknown> : public std::false_type{};
+struct ContainsHandle<::test_enum::MyFlexibleEnumWithCustomUnknown> : public std::false_type {};
 
 template <>
-struct IsFidlType<::test_enum::MyEmptyFlexibleEnum> : public std::true_type{};
+struct IsFidlType<::test_enum::MyEmptyFlexibleEnum> : public std::true_type {};
 template <>
-struct ContainsHandle<::test_enum::MyEmptyFlexibleEnum> : public std::false_type{};
+struct ContainsHandle<::test_enum::MyEmptyFlexibleEnum> : public std::false_type {};
 
 #pragma clang diagnostic pop
 

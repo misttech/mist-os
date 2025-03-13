@@ -56,7 +56,7 @@ class MipiPhy {
   void Shutdown();
   zx::result<> PhyCfgLoad(int64_t dphy_data_lane_bits_per_second);
   void Dump();
-  uint32_t GetLowPowerEscaseTime() { return dsi_phy_cfg_.lp_tesc; }
+  uint32_t GetDataLaneByteRateToEscapeClockFrequencyRatio() const { return dsi_phy_cfg_.lp_tesc; }
 
  private:
   // This structure holds the timing parameters used for MIPI D-PHY

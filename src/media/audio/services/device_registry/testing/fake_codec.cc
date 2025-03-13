@@ -17,6 +17,14 @@ namespace media_audio {
 
 namespace fha = fuchsia_hardware_audio;
 
+namespace {
+
+void on_unbind(FakeCodec* fake_codec, fidl::UnbindInfo info,
+               fidl::ServerEnd<fha::Codec> server_end) {
+  ADR_LOG(kLogFakeCodec || kLogObjectLifetimes) << "FakeCodec disconnected";
+}
+
+}  // namespace
 const fha::DaiFrameFormat FakeCodec::kDefaultFrameFormat =
     fha::DaiFrameFormat::WithFrameFormatStandard(fha::DaiFrameFormatStandard::kI2S);
 
@@ -57,11 +65,6 @@ FakeCodec::~FakeCodec() {
   binding_.reset();
 }
 
-void on_unbind(FakeCodec* fake_codec, fidl::UnbindInfo info,
-               fidl::ServerEnd<fha::Codec> server_end) {
-  ADR_LOG(kLogFakeCodec || kLogObjectLifetimes) << "FakeCodec disconnected";
-}
-
 fidl::ClientEnd<fha::Codec> FakeCodec::Enable() {
   ADR_LOG_METHOD(kLogFakeCodec);
   EXPECT_TRUE(server_end_.is_valid());
@@ -69,7 +72,7 @@ fidl::ClientEnd<fha::Codec> FakeCodec::Enable() {
   EXPECT_TRUE(dispatcher_);
   EXPECT_FALSE(binding_);
 
-  binding_ = fidl::BindServer(dispatcher_, std::move(server_end_), this);
+  binding_ = fidl::BindServer(dispatcher_, std::move(server_end_), this, &on_unbind);
   EXPECT_FALSE(server_end_.is_valid());
 
   return std::move(client_end_);
@@ -77,21 +80,16 @@ fidl::ClientEnd<fha::Codec> FakeCodec::Enable() {
 
 void FakeCodec::DropCodec() {
   ADR_LOG_METHOD(kLogFakeCodec);
-  health_completer_.reset();
   watch_plug_state_completer_.reset();
   binding_->Close(ZX_ERR_PEER_CLOSED);
 }
 
 void FakeCodec::GetHealthState(GetHealthStateCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogFakeCodec);
-  if (responsive_) {
-    if (healthy_.has_value()) {
-      completer.Reply(fha::HealthState{{healthy_.value()}});
-    } else {
-      completer.Reply({});
-    }
+  if (healthy_.has_value()) {
+    completer.Reply(fha::HealthState{{healthy_}});
   } else {
-    health_completer_.emplace(completer.ToAsync());  // Just pend it; never respond.
+    completer.Reply({});
   }
 }
 
@@ -118,19 +116,19 @@ void FakeCodec::GetProperties(GetPropertiesCompleter::Sync& completer) {
   // Gather the properties and return them.
   fha::CodecProperties codec_properties{};
   if (is_input_.has_value()) {
-    codec_properties.is_input(*is_input_);
+    codec_properties.is_input(is_input_);
   }
   if (manufacturer_.has_value()) {
-    codec_properties.manufacturer(*manufacturer_);
+    codec_properties.manufacturer(manufacturer_);
   }
   if (product_.has_value()) {
-    codec_properties.product(*product_);
+    codec_properties.product(product_);
   }
   if (uid_.has_value()) {
-    codec_properties.unique_id(*uid_);
+    codec_properties.unique_id(uid_);
   }
   if (plug_detect_capabilities_.has_value()) {
-    codec_properties.plug_detect_capabilities(*plug_detect_capabilities_);
+    codec_properties.plug_detect_capabilities(plug_detect_capabilities_);
   }
 
   completer.Reply(codec_properties);

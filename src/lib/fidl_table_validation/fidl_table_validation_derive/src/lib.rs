@@ -4,7 +4,7 @@
 
 #![recursion_limit = "128"]
 
-use heck::CamelCase;
+use heck::ToUpperCamelCase;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 
@@ -208,7 +208,7 @@ impl TryFrom<Field> for FidlField {
 
 impl FidlField {
     fn camel_case(&self) -> Ident {
-        let name = self.ident.to_string().to_camel_case();
+        let name = self.ident.to_string().to_upper_camel_case();
         Ident::new(&name, Span::call_site())
     }
 

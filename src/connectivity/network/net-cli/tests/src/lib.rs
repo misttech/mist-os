@@ -178,9 +178,9 @@ async fn add_del_route(ip_version: IpVersion) {
     let connector = NetworkTestRealmConnector { realm: &realm };
 
     let list_routes = || async {
-        let buffers = ffx_writer::TestBuffers::default();
+        let buffers = writer::TestBuffers::default();
         net_cli::do_root(
-            ffx_writer::MachineWriter::new_test(Some(ffx_writer::Format::JsonPretty), &buffers),
+            writer::JsonWriter::new_test(Some(writer::Format::JsonPretty), &buffers),
             net_cli::Command::from_args(&["net"], &["route", "list"])
                 .expect("should parse args successfully"),
             &connector,
@@ -221,7 +221,7 @@ async fn add_del_route(ip_version: IpVersion) {
         let nicid = nicid.to_string();
         let metric = metric.to_string();
         net_cli::do_root(
-            ffx_writer::MachineWriter::new(None),
+            writer::JsonWriter::new(None),
             net_cli::Command::from_args(
                 &["net"],
                 &[
@@ -258,7 +258,7 @@ async fn add_del_route(ip_version: IpVersion) {
         let nicid = nicid.to_string();
         let metric = metric.to_string();
         net_cli::do_root(
-            ffx_writer::MachineWriter::new(None),
+            writer::JsonWriter::new(None),
             net_cli::Command::from_args(
                 &["net"],
                 &[
@@ -347,9 +347,9 @@ async fn rule_list() {
 
     let connector = NetworkTestRealmConnector { realm: &realm };
     let list_rules = || async {
-        let buffers = ffx_writer::TestBuffers::default();
+        let buffers = writer::TestBuffers::default();
         net_cli::do_root(
-            ffx_writer::MachineWriter::new_test(Some(ffx_writer::Format::JsonPretty), &buffers),
+            writer::JsonWriter::new_test(Some(writer::Format::JsonPretty), &buffers),
             net_cli::Command::from_args(&["net"], &["rule", "list"])
                 .expect("should parse args successfully"),
             &connector,
@@ -510,9 +510,9 @@ async fn add_remove_blackhole() {
     .expect("should succeed");
 
     {
-        let buffers = ffx_writer::TestBuffers::default();
+        let buffers = writer::TestBuffers::default();
         net_cli::do_root(
-            ffx_writer::MachineWriter::new_test(Some(ffx_writer::Format::JsonPretty), &buffers),
+            writer::JsonWriter::new_test(Some(writer::Format::JsonPretty), &buffers),
             net_cli::Command::from_args(&["net"], &["if", "add", "blackhole", INTERFACE1_NAME])
                 .expect("should parse args successfully"),
             &connector,
@@ -531,9 +531,9 @@ async fn add_remove_blackhole() {
     .expect("should successfully wait for blackhole interface to be installed");
 
     {
-        let buffers = ffx_writer::TestBuffers::default();
+        let buffers = writer::TestBuffers::default();
         net_cli::do_root(
-            ffx_writer::MachineWriter::new_test(Some(ffx_writer::Format::JsonPretty), &buffers),
+            writer::JsonWriter::new_test(Some(writer::Format::JsonPretty), &buffers),
             net_cli::Command::from_args(
                 &["net"],
                 &["if", "get", &format!("name:{INTERFACE1_NAME}")],
@@ -565,9 +565,9 @@ async fn add_remove_blackhole() {
     }
 
     {
-        let buffers = ffx_writer::TestBuffers::default();
+        let buffers = writer::TestBuffers::default();
         net_cli::do_root(
-            ffx_writer::MachineWriter::new_test(Some(ffx_writer::Format::JsonPretty), &buffers),
+            writer::JsonWriter::new_test(Some(writer::Format::JsonPretty), &buffers),
             net_cli::Command::from_args(
                 &["net"],
                 &["if", "remove", &format!("name:{INTERFACE1_NAME}")],
@@ -593,9 +593,9 @@ async fn add_remove_blackhole() {
     .expect("should successfully wait for blackhole interface to be uninstalled");
 
     {
-        let buffers = ffx_writer::TestBuffers::default();
+        let buffers = writer::TestBuffers::default();
         let result = net_cli::do_root(
-            ffx_writer::MachineWriter::new_test(Some(ffx_writer::Format::JsonPretty), &buffers),
+            writer::JsonWriter::new_test(Some(writer::Format::JsonPretty), &buffers),
             net_cli::Command::from_args(
                 &["net"],
                 &["if", "get", &format!("name:{INTERFACE1_NAME}")],

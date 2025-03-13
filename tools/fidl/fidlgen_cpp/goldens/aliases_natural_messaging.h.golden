@@ -6,8 +6,7 @@
 
 #include <fidl/test.aliases/cpp/markers.h>
 #include <fidl/test.aliases/cpp/natural_types.h>
-#include <fidl/test.aliases/cpp/wire_messaging.h>
-#include <fidl/test.someotherlibrary/cpp/natural_messaging.h>
+#include <fidl/test.someotherlibrary/cpp/markers.h>
 #include <lib/fidl/cpp/channel.h>
 #include <lib/fidl/cpp/client.h>
 #include <lib/fidl/cpp/internal/thenable.h>

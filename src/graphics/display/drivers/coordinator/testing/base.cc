@@ -8,8 +8,8 @@
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
 #include <lib/driver/logging/cpp/logger.h>
+#include <lib/zx/result.h>
 #include <zircon/compiler.h>
-#include <zircon/status.h>
 
 #include <memory>
 #include <optional>
@@ -95,7 +95,7 @@ bool TestBase::PollUntilOnLoop(fit::function<bool()> predicate, zx::duration pol
           predicate_eval_state.signal.Signal();
         });
     if (post_task_result.is_error()) {
-      FDF_LOG(ERROR, "Failed to post task: %s", post_task_result.status_string());
+      fdf::error("Failed to post task: {}", post_task_result);
       return false;
     }
 
@@ -111,7 +111,7 @@ bool TestBase::PollUntilOnLoop(fit::function<bool()> predicate, zx::duration pol
 
     zx_status_t sleep_status = zx::nanosleep(zx::deadline_after(poll_interval));
     if (sleep_status != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to sleep: %s", zx_status_get_string(sleep_status));
+      fdf::error("Failed to sleep: {}", zx::make_result(sleep_status));
       return false;
     }
   }

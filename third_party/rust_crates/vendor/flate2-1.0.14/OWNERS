@@ -7,3 +7,4 @@ include /src/devices/lib/OWNERS
 include /src/lib/async-gunzip/OWNERS
 include /third_party/rust_crates/vendor/zip-0.5.5/OWNERS
 include /tools/clidoc/OWNERS
+include /tools/pbtool/OWNERS

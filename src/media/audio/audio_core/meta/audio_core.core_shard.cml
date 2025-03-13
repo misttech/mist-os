@@ -9,6 +9,11 @@
             environment: "#core-env",
             on_terminate: "reboot",
         },
+        {
+            name: "audio_core_pkg_config",
+            url: "fuchsia-pkg://fuchsia.com/audio_core#meta/audio_core_pkg_config.cm",
+            environment: "#core-env",
+        },
     ],
     use: [
         {
@@ -29,11 +34,11 @@
     offer: [
         {
             directory: "config-data",
-            from: "parent",
+            from: "#audio_core_pkg_config",
             to: "#audio_core",
-            subdir: "audio_core",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-audio-input",
@@ -41,11 +46,24 @@
             subdir: "audio-input",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.audio.StreamConfigConnectorInputService",
+            from: "parent",
+            to: "#audio_core",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-audio-output",
             to: "#audio_core",
             subdir: "audio-output",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.audio.StreamConfigConnectorOutputService",
+            from: "parent",
+            to: "#audio_core",
         },
         {
             protocol: [

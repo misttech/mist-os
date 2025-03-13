@@ -3,4 +3,4 @@
 # found in the LICENSE file.
 
 # The path to glslang dependencies.
-glslang_spirv_tools_dir = "//third_party/spirv-tools"
+glslang_spirv_tools_dir = "//third_party/spirv-tools/src"

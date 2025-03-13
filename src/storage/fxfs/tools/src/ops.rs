@@ -14,13 +14,13 @@ use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
 use fxfs::object_store::volume::root_volume;
 use fxfs::object_store::{
     Directory, HandleOptions, ObjectDescriptor, ObjectStore, SetExtendedAttributeMode,
-    StoreObjectHandle,
+    StoreObjectHandle, StoreOwner, NO_OWNER,
 };
 use fxfs_crypto::Crypt;
 use std::io::Write;
 use std::ops::Deref;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 pub async fn print_ls(dir: &Directory<ObjectStore>) -> Result<(), Error> {
     const DATE_FMT: &str = "%b %d %Y %T+00";
@@ -84,17 +84,18 @@ pub async fn create_volume(
     crypt: Option<Arc<dyn Crypt>>,
 ) -> Result<Arc<ObjectStore>, Error> {
     let root_volume = root_volume(fs.deref().clone()).await?;
-    root_volume.new_volume(name, crypt).await
+    root_volume.new_volume(name, NO_OWNER, crypt).await
 }
 
 /// Opens a volume on a device and returns a Directory to it's root.
 pub async fn open_volume(
     fs: &OpenFxFilesystem,
     name: &str,
+    owner: Weak<dyn StoreOwner>,
     crypt: Option<Arc<dyn Crypt>>,
 ) -> Result<Arc<ObjectStore>, Error> {
     let root_volume = root_volume(fs.deref().clone()).await?;
-    root_volume.volume(name, crypt).await.map(|v| v.into())
+    root_volume.volume(name, owner, crypt).await.map(|v| v.into())
 }
 
 /// Walks a directory path from a given root.

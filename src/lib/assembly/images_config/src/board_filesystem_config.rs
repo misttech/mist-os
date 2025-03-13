@@ -2,21 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Result};
+use assembly_container::{WalkPaths, WalkPathsFn};
 use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use camino::Utf8PathBuf;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 /// The board options for configuring the filesystem.
 /// The options include those derived from the partition table and what the bootloader expects.
 /// A board developer can specify options for many different filesystems, and let the product
 /// choose which filesystem to actually create.
-#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, SupportsFileRelativePaths)]
+#[derive(
+    Serialize, Deserialize, Debug, Default, Clone, PartialEq, SupportsFileRelativePaths, WalkPaths,
+)]
 #[serde(deny_unknown_fields)]
 pub struct BoardFilesystemConfig {
     /// Required board configuration for a zbi. All assemblies must produce a ZBI.
     #[serde(default)]
     #[file_relative_paths]
+    #[walk_paths]
     pub zbi: Zbi,
 
     /// Board configuration for a vbmeta if necessary. The bootloader determines whether a vbmeta
@@ -24,6 +29,7 @@ pub struct BoardFilesystemConfig {
     /// chosen by the product, therefore those variables are always available for all boards.
     #[serde(default)]
     #[file_relative_paths]
+    #[walk_paths]
     pub vbmeta: Option<VBMeta>,
 
     /// Board configuration for a fxfs if requested by the product. If the product does not
@@ -115,7 +121,9 @@ impl From<GptMode> for String {
 }
 
 /// Parameters describing how to generate the ZBI.
-#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, SupportsFileRelativePaths)]
+#[derive(
+    Serialize, Deserialize, Debug, Default, Clone, PartialEq, SupportsFileRelativePaths, WalkPaths,
+)]
 #[serde(deny_unknown_fields)]
 pub struct Zbi {
     /// The compression format for the ZBI.
@@ -126,6 +134,7 @@ pub struct Zbi {
     /// This is often used to prepare the ZBI for flashing/updating.
     #[serde(default)]
     #[file_relative_paths]
+    #[walk_paths]
     pub postprocessing_script: Option<PostProcessingScript>,
 }
 
@@ -203,28 +212,77 @@ pub struct PostProcessingScript {
     ///   -o <output path>
     ///   -B <build directory, relative to script's source directory>
     #[serde(default)]
-    pub path: Option<Utf8PathBuf>,
+    pub path: Option<FileRelativePathBuf>,
 
     /// The path to the script, relative to board configuration.
     /// This script _must_ take the following arguments:
     ///   -z <path to ZBI>
     ///   -o <output path>
+    #[serde(default)]
     #[file_relative_paths]
     pub board_script_path: Option<FileRelativePathBuf>,
 
     /// Additional arguments to pass to the script after the above arguments.
     #[serde(default)]
     pub args: Vec<String>,
+
+    /// The input files needed by `board_script_path` at runtime.
+    /// These are expected to be a sibling to `board_script_path`.
+    ///
+    /// This is a map of the path that is expected by `board_script_path` to
+    /// the path in the container, and must include the `board_script_path`.
+    #[serde(default)]
+    #[file_relative_paths]
+    pub inputs: BTreeMap<Utf8PathBuf, FileRelativePathBuf>,
+}
+
+// We need to implement a custom WalkPaths to ensure `inputs` sits in the same
+// directory as `board_script_path`.
+impl WalkPaths for PostProcessingScript {
+    fn walk_paths_with_dest<F: WalkPathsFn>(
+        &mut self,
+        found: &mut F,
+        dest: Utf8PathBuf,
+    ) -> Result<()> {
+        // Walk all the `inputs` and attempt to find the `board_script_path` inside the list.
+        let mut board_script_destination = Option::<Utf8PathBuf>::None;
+        for (relative_path, path) in &mut self.inputs {
+            let parent = relative_path
+                .parent()
+                .ok_or_else(|| anyhow!("Failed to get parent directory for: {}", &relative_path))?;
+            let destination = dest.join(parent);
+
+            // If we find a source that matches the `board_script_path`,
+            // remember the destination for later.
+            let path_owned = path.clone();
+            if Some(path_owned) == self.board_script_path {
+                board_script_destination = Some(destination.clone());
+            }
+
+            path.walk_paths_with_dest(found, destination)?;
+        }
+
+        // Walk board_script_path after determining the destination path above.
+        let board_script_destination = board_script_destination.ok_or_else(|| {
+            anyhow!("The board_script_path does not point to a file in the inputs.")
+        })?;
+        self.board_script_path.walk_paths_with_dest(found, board_script_destination)?;
+        Ok(())
+    }
 }
 
 /// The parameters describing how to create a VBMeta image.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, SupportsFileRelativePaths)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, SupportsFileRelativePaths, WalkPaths)]
 #[serde(deny_unknown_fields)]
 pub struct VBMeta {
     /// Path on host to the key for signing VBMeta.
+    #[file_relative_paths]
+    #[walk_paths]
     pub key: FileRelativePathBuf,
 
     /// Path on host to the key metadata to add to the VBMeta.
+    #[file_relative_paths]
+    #[walk_paths]
     pub key_metadata: FileRelativePathBuf,
 
     /// Optional descriptors to add to the VBMeta image.
@@ -407,6 +465,8 @@ pub struct FastbootFvmConfig {
 #[cfg(test)]
 mod tests {
 
+    use std::str::FromStr;
+
     use super::*;
 
     #[test]
@@ -455,6 +515,58 @@ mod tests {
         assert_eq!(
             serde_json::from_value::<ZbiCompression>(serde_json::json!("none")).unwrap(),
             ZbiCompression::None
+        );
+    }
+
+    #[test]
+    fn test_postprocessing_script_walk() {
+        let mut script = PostProcessingScript {
+            path: None,
+            board_script_path: Some(FileRelativePathBuf::Resolved(
+                Utf8PathBuf::from_str("input/script.sh").unwrap(),
+            )),
+            args: vec![],
+            inputs: [
+                (
+                    Utf8PathBuf::from_str("dest/script.sh").unwrap(),
+                    FileRelativePathBuf::Resolved(
+                        Utf8PathBuf::from_str("input/script.sh").unwrap(),
+                    ),
+                ),
+                (
+                    Utf8PathBuf::from_str("dest/nested/resource").unwrap(),
+                    FileRelativePathBuf::Resolved(
+                        Utf8PathBuf::from_str("input/resource.txt").unwrap(),
+                    ),
+                ),
+            ]
+            .into(),
+        };
+        let mut found_dest = vec![];
+        script
+            .walk_paths_with_dest(
+                &mut |path: &mut Utf8PathBuf,
+                      dest: Utf8PathBuf,
+                      filetype: assembly_container::FileType| {
+                    found_dest.push(dest);
+                    *path = Utf8PathBuf::from_str("bogus").unwrap();
+                    assert_eq!(assembly_container::FileType::Unknown, filetype);
+                    Ok(())
+                },
+                Utf8PathBuf::from_str("inner/path").unwrap(),
+            )
+            .unwrap();
+        found_dest.sort();
+        assert_eq!(
+            vec![
+                // This first one is the board_script_path
+                Utf8PathBuf::from_str("inner/path/dest").unwrap(),
+                // This second one is the board_script_path from the inputs map.
+                Utf8PathBuf::from_str("inner/path/dest").unwrap(),
+                // This third one is the other file in the inputs map.
+                Utf8PathBuf::from_str("inner/path/dest/nested").unwrap(),
+            ],
+            found_dest
         );
     }
 }

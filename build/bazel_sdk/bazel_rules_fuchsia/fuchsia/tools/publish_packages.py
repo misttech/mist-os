@@ -210,12 +210,6 @@ class FuchsiaTaskPublish(FuchsiaTask):
                 args.repo_path,
             )
 
-        # This is for troubleshooting, the daemon based server should always
-        # be not running.
-        print(
-            "Daemon server status:",
-            run(args.ffx, "repository", "server", "status"),
-        )
         print(
             "Running repo servers:",
             run(

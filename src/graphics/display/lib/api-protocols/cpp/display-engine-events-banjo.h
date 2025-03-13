@@ -10,11 +10,12 @@
 #include <lib/zx/time.h>
 #include <zircon/compiler.h>
 
+#include <cstdint>
 #include <mutex>
 
 #include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-interface.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/mode-and-id.h"
 #include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 
@@ -42,10 +43,11 @@ class DisplayEngineEventsBanjo final : public DisplayEngineEventsInterface {
   // DisplayEngineEventsInterface:
   void OnDisplayAdded(display::DisplayId display_id,
                       cpp20::span<const display::ModeAndId> preferred_modes,
+                      cpp20::span<const uint8_t> edid_bytes,
                       cpp20::span<const display::PixelFormat> pixel_formats) override;
   void OnDisplayRemoved(display::DisplayId display_id) override;
   void OnDisplayVsync(display::DisplayId display_id, zx::time timestamp,
-                      display::ConfigStamp config_stamp) override;
+                      display::DriverConfigStamp config_stamp) override;
   void OnCaptureComplete() override;
 
  private:

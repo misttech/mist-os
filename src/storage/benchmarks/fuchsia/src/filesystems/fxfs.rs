@@ -36,8 +36,9 @@ impl FilesystemConfig for Fxfs {
     ) -> FxfsInstance {
         let block_device = block_device_factory
             .create_block_device(&BlockDeviceConfig {
+                requires_fvm: false,
                 use_zxcrypt: false,
-                fvm_volume_size: Some(self.volume_size),
+                volume_size: Some(self.volume_size),
             })
             .await;
         FxfsInstance {

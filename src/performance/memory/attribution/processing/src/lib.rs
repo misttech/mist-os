@@ -579,40 +579,9 @@ pub fn attribute_vmos(attribution_data: AttributionData) -> ProcessedAttribution
     // actually holding memory. We also keep track of the process to display its name in the output.
     for (resource_id, resource_refcell) in &resources {
         let resource = resource_refcell.borrow();
-        if let fplugin::ResourceType::Vmo(vmo) = &resource.resource.resource_type {
-            let mut ancestors = vec![*resource_id];
-            let mut current_parent = vmo.parent;
-            // Add the parents of a VMO as "Child" claims. This is done so that clones of VMOs,
-            // with possibly no memory of their own, get attributed the resources of their parent.
-            while let Some(parent_koid) = current_parent {
-                if parent_koid == 0 {
-                    panic!("Parent is not None but 0.");
-                }
-                ancestors.push(parent_koid);
-                let mut current_resource = match resources.get(&parent_koid) {
-                    Some(res) => res.borrow_mut(),
-                    None => break,
-                };
-                current_resource.claims.extend(resource.claims.iter().map(|c| Claim {
-                    subject: c.subject,
-                    source: c.source,
-                    claim_type: ClaimType::Child,
-                }));
-                current_parent = match &current_resource.resource.resource_type {
-                    fplugin::ResourceType::Job(_) => panic!("This should not happen"),
-                    fplugin::ResourceType::Process(_) => panic!("This should not happen"),
-                    fplugin::ResourceType::Vmo(current_vmo) => current_vmo.parent,
-                    _ => unimplemented!(),
-                };
-            }
-
+        if let fplugin::ResourceType::Vmo(_) = &resource.resource.resource_type {
             for claim in &resource.claims {
-                principals
-                    .get(&claim.subject)
-                    .unwrap()
-                    .borrow_mut()
-                    .resources
-                    .extend(ancestors.iter());
+                principals.get(&claim.subject).unwrap().borrow_mut().resources.insert(*resource_id);
             }
         } else if let fplugin::ResourceType::Process(_) = &resource.resource.resource_type {
             for claim in &resource.claims {
@@ -775,8 +744,12 @@ mod tests {
                 koid: Some(1002),
                 name_index: Some(2),
                 resource_type: Some(fplugin::ResourceType::Vmo(fplugin::Vmo {
-                    committed_bytes: Some(1024),
-                    populated_bytes: Some(2048),
+                    private_committed_bytes: Some(1024),
+                    private_populated_bytes: Some(2048),
+                    scaled_committed_bytes: Some(1024),
+                    scaled_populated_bytes: Some(2048),
+                    total_committed_bytes: Some(1024),
+                    total_populated_bytes: Some(2048),
                     ..Default::default()
                 })),
                 ..Default::default()
@@ -785,8 +758,12 @@ mod tests {
                 koid: Some(1003),
                 name_index: Some(3),
                 resource_type: Some(fplugin::ResourceType::Vmo(fplugin::Vmo {
-                    committed_bytes: Some(1024),
-                    populated_bytes: Some(2048),
+                    private_committed_bytes: Some(1024),
+                    private_populated_bytes: Some(2048),
+                    scaled_committed_bytes: Some(1024),
+                    scaled_populated_bytes: Some(2048),
+                    total_committed_bytes: Some(1024),
+                    total_populated_bytes: Some(2048),
                     ..Default::default()
                 })),
                 ..Default::default()
@@ -840,8 +817,12 @@ mod tests {
                 koid: Some(1006),
                 name_index: Some(6),
                 resource_type: Some(fplugin::ResourceType::Vmo(fplugin::Vmo {
-                    committed_bytes: Some(1024),
-                    populated_bytes: Some(2048),
+                    private_committed_bytes: Some(1024),
+                    private_populated_bytes: Some(2048),
+                    scaled_committed_bytes: Some(1024),
+                    scaled_populated_bytes: Some(2048),
+                    total_committed_bytes: Some(1024),
+                    total_populated_bytes: Some(2048),
                     ..Default::default()
                 })),
                 ..Default::default()
@@ -850,8 +831,12 @@ mod tests {
                 koid: Some(1007),
                 name_index: Some(7),
                 resource_type: Some(fplugin::ResourceType::Vmo(fplugin::Vmo {
-                    committed_bytes: Some(128),
-                    populated_bytes: Some(256),
+                    private_committed_bytes: Some(128),
+                    private_populated_bytes: Some(256),
+                    scaled_committed_bytes: Some(128),
+                    scaled_populated_bytes: Some(256),
+                    total_committed_bytes: Some(128),
+                    total_populated_bytes: Some(256),
                     ..Default::default()
                 })),
                 ..Default::default()
@@ -880,9 +865,13 @@ mod tests {
                 koid: Some(1010),
                 name_index: Some(10),
                 resource_type: Some(fplugin::ResourceType::Vmo(fplugin::Vmo {
-                    committed_bytes: Some(1024),
-                    populated_bytes: Some(2048),
                     parent: Some(1011),
+                    private_committed_bytes: Some(1024),
+                    private_populated_bytes: Some(2048),
+                    scaled_committed_bytes: Some(1024),
+                    scaled_populated_bytes: Some(2048),
+                    total_committed_bytes: Some(1024),
+                    total_populated_bytes: Some(2048),
                     ..Default::default()
                 })),
                 ..Default::default()
@@ -891,8 +880,12 @@ mod tests {
                 koid: Some(1011),
                 name_index: Some(11),
                 resource_type: Some(fplugin::ResourceType::Vmo(fplugin::Vmo {
-                    committed_bytes: Some(1024),
-                    populated_bytes: Some(2048),
+                    private_committed_bytes: Some(1024),
+                    private_populated_bytes: Some(2048),
+                    scaled_committed_bytes: Some(1024),
+                    scaled_populated_bytes: Some(2048),
+                    total_committed_bytes: Some(1024),
+                    total_populated_bytes: Some(2048),
                     ..Default::default()
                 })),
                 ..Default::default()
@@ -901,8 +894,12 @@ mod tests {
                 koid: Some(1012),
                 name_index: Some(12),
                 resource_type: Some(fplugin::ResourceType::Vmo(fplugin::Vmo {
-                    committed_bytes: Some(1024),
-                    populated_bytes: Some(2048),
+                    private_committed_bytes: Some(1024),
+                    private_populated_bytes: Some(2048),
+                    scaled_committed_bytes: Some(1024),
+                    scaled_populated_bytes: Some(2048),
+                    total_committed_bytes: Some(1024),
+                    total_populated_bytes: Some(2048),
                     ..Default::default()
                 })),
                 ..Default::default()
@@ -911,8 +908,12 @@ mod tests {
                 koid: Some(1013),
                 name_index: Some(13),
                 resource_type: Some(fplugin::ResourceType::Vmo(fplugin::Vmo {
-                    committed_bytes: Some(1024),
-                    populated_bytes: Some(2048),
+                    private_committed_bytes: Some(1024),
+                    private_populated_bytes: Some(2048),
+                    scaled_committed_bytes: Some(1024),
+                    scaled_populated_bytes: Some(2048),
+                    total_committed_bytes: Some(1024),
+                    total_populated_bytes: Some(2048),
                     ..Default::default()
                 })),
                 ..Default::default()
@@ -930,7 +931,7 @@ mod tests {
         })
         .summary();
 
-        assert_eq!(output.undigested, 0);
+        assert_eq!(output.undigested, 2048);
         assert_eq!(output.principals.len(), 4);
 
         let principals: HashMap<u64, PrincipalSummary> =
@@ -1021,12 +1022,12 @@ mod tests {
                 id: 2,
                 name: "component 2".to_owned(),
                 principal_type: "R".to_owned(),
-                committed_private: 2048,
-                committed_scaled: 2560.0,
-                committed_total: 3072,
-                populated_private: 4096,
-                populated_scaled: 5120.0,
-                populated_total: 6144,
+                committed_private: 1024,
+                committed_scaled: 1536.0,
+                committed_total: 2048,
+                populated_private: 2048,
+                populated_scaled: 3072.0,
+                populated_total: 4096,
                 attributor: Some("root".to_owned()),
                 processes: vec!["2_process (1009)".to_owned()],
                 vmos: vec![
@@ -1045,19 +1046,6 @@ mod tests {
                     ),
                     (
                         "2_vmo".to_owned(),
-                        VmoSummary {
-                            count: 1,
-                            committed_private: 1024,
-                            committed_scaled: 1024.0,
-                            committed_total: 1024,
-                            populated_private: 2048,
-                            populated_scaled: 2048.0,
-                            populated_total: 2048,
-                            ..Default::default()
-                        }
-                    ),
-                    (
-                        "2_vmo_parent".to_owned(),
                         VmoSummary {
                             count: 1,
                             committed_private: 1024,
@@ -1242,8 +1230,12 @@ mod tests {
                 koid: Some(1003),
                 name_index: Some(3),
                 resource_type: Some(fplugin::ResourceType::Vmo(fplugin::Vmo {
-                    committed_bytes: Some(1024),
-                    populated_bytes: Some(2048),
+                    private_committed_bytes: Some(1024),
+                    private_populated_bytes: Some(2048),
+                    scaled_committed_bytes: Some(1024),
+                    scaled_populated_bytes: Some(2048),
+                    total_committed_bytes: Some(1024),
+                    total_populated_bytes: Some(2048),
                     ..Default::default()
                 })),
                 ..Default::default()
@@ -1375,8 +1367,12 @@ mod tests {
                 koid: Some(1002),
                 name_index: Some(2),
                 resource_type: Some(fplugin::ResourceType::Vmo(fplugin::Vmo {
-                    committed_bytes: Some(1024),
-                    populated_bytes: Some(2048),
+                    private_committed_bytes: Some(1024),
+                    private_populated_bytes: Some(2048),
+                    scaled_committed_bytes: Some(1024),
+                    scaled_populated_bytes: Some(2048),
+                    total_committed_bytes: Some(1024),
+                    total_populated_bytes: Some(2048),
                     ..Default::default()
                 })),
                 ..Default::default()

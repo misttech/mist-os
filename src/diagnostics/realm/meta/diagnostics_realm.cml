@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "inspect/offer.shard.cml" ],
     children: [
         {
             name: "persistence",
@@ -18,12 +17,7 @@
         {
             dictionary: "diagnostics",
             from: "parent",
-            to: "all",
-        },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: "all",
+            to: "#persistence",
         },
         {
             protocol: [ "fuchsia.diagnostics.ArchiveAccessor.feedback" ],

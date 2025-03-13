@@ -112,6 +112,21 @@ pub fn peer_audio_stream_id(peer_id: PeerId, uuid: Uuid) -> [u8; 16] {
     unique_id
 }
 
+/// Given the unique ID used with the audio_core, attempts to extract
+/// the Bluetooth PeerId and the UUID for the service being provided to
+/// the peer from the local device:
+/// * `audio_id` - See [peer_audio_stream_id] for expected format
+///
+/// Returns an error if the device is not a valid Bluetooth audio device.
+pub fn audio_stream_id_to_peer(audio_id: &[u8; 16]) -> Result<(PeerId, Uuid), Error> {
+    if audio_id[0] != 0x42 || audio_id[1] != 0x54 {
+        return Err(Error::other("Not a Bluetooth audio device"));
+    }
+    let uuid = Uuid::new16(u16::from_be_bytes(audio_id[2..4].try_into().unwrap()));
+    let peer_id = PeerId(u64::from_be_bytes(audio_id[8..16].try_into().unwrap()));
+    Ok((peer_id, uuid))
+}
+
 #[cfg(target_os = "fuchsia")]
 impl ImmutableDataInspect<Peer> for ImmutableDataInspectManager {
     fn new(data: &Peer, manager: Node) -> ImmutableDataInspectManager {
@@ -127,7 +142,7 @@ impl IsInspectable for Peer {
 
 #[cfg(target_os = "fuchsia")]
 impl WriteInspect for Peer {
-    fn write_inspect(&self, writer: &Node, key: impl Into<fuchsia_inspect::StringReference>) {
+    fn write_inspect<'a>(&self, writer: &Node, key: impl Into<std::borrow::Cow<'a, str>>) {
         writer.record_child(key, |node| {
             self.record_inspect(node);
         });
@@ -355,5 +370,22 @@ mod tests {
                 assert_ne!(peer_audio_stream_id(peer1, service1), peer_audio_stream_id(peer1, service2));
             }
         }
+    }
+
+    #[test]
+    fn peer_from_audio_stream_id() {
+        use fidl_fuchsia_bluetooth_bredr::ServiceClassProfileIdentifier;
+
+        let a2dp_device = [
+            0x42, 0x54, 0x11, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+            0x07, 0x08,
+        ];
+        let (peer_id, uuid) = audio_stream_id_to_peer(&a2dp_device).expect("should be converted");
+        assert_eq!(peer_id.0, 0x0102030405060708);
+        assert_eq!(uuid, ServiceClassProfileIdentifier::AudioSource.into());
+
+        let non_bluetooth_device = [0x0A; 16];
+        let _ = audio_stream_id_to_peer(&non_bluetooth_device)
+            .expect_err("should have failed to convert");
     }
 }

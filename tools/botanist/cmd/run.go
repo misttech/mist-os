@@ -154,7 +154,7 @@ func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&r.testrunnerOptions.LLVMProfdataPath, "llvm-profdata", "", "Optional path to a llvm-profdata binary to use for merging profiles on the host in between tests.")
 }
 
-func (r *RunCommand) setupFFX(ctx context.Context) (*ffxutil.FFXInstance, func(), error) {
+func (r *RunCommand) setupFFX(ctx context.Context, invokeMode ffxutil.FFXInvokeMode) (*ffxutil.FFXInstance, func(), error) {
 	var cleanup func()
 	if r.ffxPath == "" {
 		return nil, cleanup, fmt.Errorf("ffx path must be provided with the -ffx flag.")
@@ -169,30 +169,29 @@ func (r *RunCommand) setupFFX(ctx context.Context) (*ffxutil.FFXInstance, func()
 			"ffx.target-list.local-connect": true,
 		},
 	}
-	ffx, err := ffxutil.NewFFXInstance(ctx, r.ffxPath, "", []string{}, "", "", ffxOutputsDir, extraConfigs)
+	ffx, err := ffxutil.NewFFXInstance(ctx, r.ffxPath, "", []string{}, "", "", ffxOutputsDir, invokeMode, extraConfigs)
 	if err != nil {
 		return nil, cleanup, err
 	}
 	stdout, stderr, flush := botanist.NewStdioWriters(ctx, "ffx")
 	defer flush()
 	ffx.SetStdoutStderr(stdout, stderr)
-	if err := ffx.Run(ctx, "config", "env"); err != nil {
+	if err := ffx.ConfigEnv(ctx); err != nil {
 		return ffx, cleanup, err
 	}
 
-	cmd := ffx.Command("daemon", "start")
 	daemonLog, err := osmisc.CreateFile(filepath.Join(ffxOutputsDir, "daemon.log"))
 	if err != nil {
 		return ffx, cleanup, err
 	}
-	cmd.Stdout = daemonLog
-	logger.Debugf(ctx, "%s", cmd.Args)
-	// Use a new context so that the subprocess can only be terminated by
-	// a direct call to the cancel function.
-	daemonCtx, daemonCancel := context.WithCancel(context.Background())
+	cmd := ffx.StartDaemon(ctx, daemonLog)
 	if err := cmd.Start(); err != nil {
 		return ffx, cleanup, err
 	}
+	// Use a new context so that the subprocess can only be terminated by
+	// a direct call to the cancel function.
+	daemonCtx, daemonCancel := context.WithCancel(context.Background())
+
 	// Wait for the daemon process to terminate in a separate goroutine
 	// and log when it finishes in order to detect if the process gets
 	// terminated earlier than expected.
@@ -422,7 +421,12 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 		return nil
 	}
 
-	ffx, cleanup, err := r.setupFFX(ctx)
+	experiments := botanist.GetExperiments(r.experiments)
+	invokeMode := ffxutil.UseFFXLegacy
+	if experiments.Contains(botanist.UseFFXStrict) {
+		invokeMode = ffxutil.UseFFXStrict
+	}
+	ffx, cleanup, err := r.setupFFX(ctx, invokeMode)
 	if cleanup != nil {
 		defer cleanup()
 	}
@@ -452,7 +456,6 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 	// streamed from.
 	primaryTarget := fuchsiaTargets[0]
 
-	experiments := botanist.GetExperiments(r.experiments)
 	for _, t := range fuchsiaTargets {
 		// Start serial servers for all targets. Will no-op for targets that
 		// already have serial servers.

@@ -13,7 +13,7 @@ pub struct StatusCode(pub u16);
 
 impl StatusCode {
     pub fn into_fidl_or_refused_unspecified(self) -> fidl_ieee80211::StatusCode {
-        self.try_into().unwrap_or_else(|_| fidl_ieee80211::StatusCode::RefusedReasonUnspecified)
+        self.try_into().unwrap_or(fidl_ieee80211::StatusCode::RefusedReasonUnspecified)
     }
 }
 

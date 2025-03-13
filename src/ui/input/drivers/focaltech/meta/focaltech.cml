@@ -13,12 +13,10 @@
         compat: "driver/focaltech.so",
         colocate: "false",
         default_dispatcher_opts: [ "allow_sync_calls" ],
+        default_dispatcher_scheduler_role: "fuchsia.ui.input.drivers.focaltech.device",
     },
     use: [
         { service: "fuchsia.hardware.gpio.Service" },
-        {
-            protocol: [ "fuchsia.scheduler.RoleManager" ],
-        },
         { service: "fuchsia.hardware.i2c.Service" },
     ],
 }

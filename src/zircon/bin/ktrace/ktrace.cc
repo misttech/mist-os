@@ -4,8 +4,10 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <fuchsia/tracing/kernel/cpp/fidl.h>
-#include <lib/sys/cpp/service_directory.h>
+#include <fidl/fuchsia.kernel/cpp/fidl.h>
+#include <lib/component/incoming/cpp/protocol.h>
+#include <lib/zircon-internal/ktrace.h>
+#include <lib/zx/resource.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,92 +37,47 @@ Options:\n\
 
 void PrintUsage(FILE* f) { fputs(kUsage, f); }
 
-int LogFidlError(zx_status_t status) {
-  fprintf(stderr, "Error in FIDL request: %s(%d)\n", zx_status_get_string(status), status);
-  return EXIT_FAILURE;
-}
-
-int DoStart(const sys::ServiceDirectory& svc, uint32_t group_mask) {
-  using BufferingMode = fuchsia::tracing::BufferingMode;
-
-  fuchsia::tracing::kernel::ControllerSyncPtr controller;
-  if (zx_status_t status = svc.Connect(controller.NewRequest()); status != ZX_OK) {
-    return LogFidlError(status);
-  }
-  zx_status_t start_status;
-  zx_status_t status = controller->Start(group_mask, BufferingMode::ONESHOT, &start_status);
-  if (status != ZX_OK) {
-    return LogFidlError(status);
-  }
-  if (start_status != ZX_OK) {
-    fprintf(stderr, "Error starting ktrace: %s(%d)\n", zx_status_get_string(start_status),
-            start_status);
+int DoStart(const zx::resource& debug_resource, uint32_t group_mask) {
+  if (zx_status_t status =
+          zx_ktrace_control(debug_resource.get(), KTRACE_ACTION_START, group_mask, nullptr);
+      status != ZX_OK) {
+    fprintf(stderr, "Error starting ktrace: %s(%d)\n", zx_status_get_string(status), status);
     return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;
 }
 
-int DoStop(const sys::ServiceDirectory& svc) {
-  fuchsia::tracing::kernel::ControllerSyncPtr controller;
-  if (zx_status_t status = svc.Connect(controller.NewRequest()); status != ZX_OK) {
-    return LogFidlError(status);
-  }
-  zx_status_t stop_status;
-  zx_status_t status = controller->Stop(&stop_status);
-  if (status != ZX_OK) {
-    return LogFidlError(status);
-  }
-  if (stop_status != ZX_OK) {
-    fprintf(stderr, "Error stopping ktrace: %s(%d)\n", zx_status_get_string(stop_status),
-            stop_status);
+int DoStop(const zx::resource& debug_resource) {
+  if (zx_status_t status = zx_ktrace_control(debug_resource.get(), KTRACE_ACTION_STOP, 0, nullptr);
+      status != ZX_OK) {
+    fprintf(stderr, "Error stopping ktrace: %s(%d)\n", zx_status_get_string(status), status);
     return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;
 }
 
-int DoRewind(const sys::ServiceDirectory& svc) {
-  fuchsia::tracing::kernel::ControllerSyncPtr controller;
-  if (zx_status_t status = svc.Connect(controller.NewRequest()); status != ZX_OK) {
-    return LogFidlError(status);
-  }
-  zx_status_t rewind_status;
-  zx_status_t status = controller->Rewind(&rewind_status);
-  if (status != ZX_OK) {
-    return LogFidlError(status);
-  }
-  if (rewind_status != ZX_OK) {
-    fprintf(stderr, "Error rewinding ktrace: %s(%d)\n", zx_status_get_string(rewind_status),
-            rewind_status);
+int DoRewind(const zx::resource& debug_resource) {
+  if (zx_status_t status =
+          zx_ktrace_control(debug_resource.get(), KTRACE_ACTION_REWIND, 0, nullptr);
+      status != ZX_OK) {
+    fprintf(stderr, "Error rewinding ktrace: %s(%d)\n", zx_status_get_string(status), status);
     return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;
 }
 
-int DoWritten(const sys::ServiceDirectory& svc) {
-  fuchsia::tracing::kernel::ReaderSyncPtr reader;
-  if (zx_status_t status = svc.Connect(reader.NewRequest()); status != ZX_OK) {
-    return LogFidlError(status);
-  }
-  zx_status_t written_status;
+int DoWritten(const zx::resource& debug_resource) {
   uint64_t bytes_written;
-  zx_status_t status = reader->GetBytesWritten(&written_status, &bytes_written);
-  if (status != ZX_OK) {
-    return LogFidlError(status);
-  }
-  if (written_status != ZX_OK) {
-    fprintf(stderr, "Error getting bytes written: %s(%d)\n", zx_status_get_string(written_status),
-            written_status);
+  if (zx_status_t status = zx_ktrace_read(debug_resource.get(), nullptr, 0, 0, &bytes_written);
+      status != ZX_OK) {
+    fprintf(stderr, "Error getting bytes written: %s(%d)\n", zx_status_get_string(status), status);
     return EXIT_FAILURE;
   }
   printf("Bytes written: %ld\n", bytes_written);
   return EXIT_SUCCESS;
 }
 
-int DoSave(const sys::ServiceDirectory& svc, const char* path) {
-  fuchsia::tracing::kernel::ReaderSyncPtr reader;
-  if (zx_status_t status = svc.Connect(reader.NewRequest()); status != ZX_OK) {
-    return LogFidlError(status);
-  }
+int DoSave(const zx::resource& debug_resource, const char* path) {
   fbl::unique_fd out_fd(open(path, O_CREAT | O_TRUNC | O_WRONLY, 0666));
   if (!out_fd.is_valid()) {
     fprintf(stderr, "Unable to open file for writing: %s, %s\n", path, strerror(errno));
@@ -128,24 +85,24 @@ int DoSave(const sys::ServiceDirectory& svc, const char* path) {
   }
 
   // Read/write this many bytes at a time.
-  std::vector<uint8_t> buf;
-  size_t read_size = 4096;
+  constexpr size_t read_size = 4096;
+  uint8_t buf[read_size];
   uint32_t offset = 0;
-  zx_status_t out_status;
   zx_status_t status;
-  while ((status = reader->ReadAt(read_size, offset, &out_status, &buf)) == ZX_OK &&
-         out_status == ZX_OK) {
-    if (buf.empty()) {
+  size_t actual;
+  while ((status = zx_ktrace_read(debug_resource.get(), buf, offset, read_size, &actual)) ==
+         ZX_OK) {
+    if (actual == 0) {
       break;
     }
-    offset += buf.size();
-    size_t bytes_written = write(out_fd.get(), buf.data(), buf.size());
+    offset += actual;
+    size_t bytes_written = write(out_fd.get(), buf, actual);
     if (bytes_written < 0) {
       fprintf(stderr, "I/O error saving buffer: %s\n", strerror(errno));
       return EXIT_FAILURE;
     }
-    if (bytes_written != buf.size()) {
-      fprintf(stderr, "Short write saving buffer: %zd vs %zd\n", bytes_written, buf.size());
+    if (bytes_written != actual) {
+      fprintf(stderr, "Short write saving buffer: %zd vs %zd\n", bytes_written, actual);
       return EXIT_FAILURE;
     }
   }
@@ -174,7 +131,20 @@ int main(int argc, char** argv) {
   }
   const fbl::String cmd{argv[1]};
 
-  std::shared_ptr svc = sys::ServiceDirectory::CreateFromNamespace();
+  auto debug_client_end = component::Connect<fuchsia_kernel::DebugResource>();
+  if (debug_client_end.is_error()) {
+    fprintf(stderr, "Error in getting debug resource: %s(%d)\n", debug_client_end.status_string(),
+            debug_client_end.status_value());
+    return 1;
+  }
+  auto debug_result = fidl::SyncClient(std::move(*debug_client_end))->Get();
+  if (!debug_result.is_ok()) {
+    fprintf(stderr, "Error in getting debug resource: %s\n",
+            debug_result.error_value().status_string());
+    return 1;
+  }
+
+  zx::resource debug_resource = std::move(debug_result->resource());
 
   if (cmd == "start") {
     EnsureNArgs(cmd, argc, 3);
@@ -183,20 +153,20 @@ int main(int argc, char** argv) {
       fprintf(stderr, "Invalid group mask\n");
       return EXIT_FAILURE;
     }
-    return DoStart(*svc, group_mask);
+    return DoStart(debug_resource, group_mask);
   } else if (cmd == "stop") {
     EnsureNArgs(cmd, argc, 2);
-    return DoStop(*svc);
+    return DoStop(debug_resource);
   } else if (cmd == "rewind") {
     EnsureNArgs(cmd, argc, 2);
-    return DoRewind(*svc);
+    return DoRewind(debug_resource);
   } else if (cmd == "written") {
     EnsureNArgs(cmd, argc, 2);
-    return DoWritten(*svc);
+    return DoWritten(debug_resource);
   } else if (cmd == "save") {
     EnsureNArgs(cmd, argc, 3);
     const char* path = argv[2];
-    return DoSave(*svc, path);
+    return DoSave(debug_resource, path);
   }
 
   PrintUsage(stderr);

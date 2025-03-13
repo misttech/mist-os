@@ -10,7 +10,7 @@ use std::default::Default;
 use std::path::PathBuf;
 
 #[ffx_command()]
-#[derive(FfxConfigBacked, ArgsInfo, FromArgs, Default, Debug, Eq, PartialEq)]
+#[derive(FfxConfigBacked, ArgsInfo, FromArgs, Default, Clone, Debug, Eq, PartialEq)]
 #[argh(
     subcommand,
     name = "flash",

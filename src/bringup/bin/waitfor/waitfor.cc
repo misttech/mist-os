@@ -301,7 +301,7 @@ int main(int argc, char** argv) {
     exit(1);
   }
 
-  zx_time_t deadline;
+  zx_instant_mono_t deadline;
   if (timeout == 0) {
     deadline = ZX_TIME_INFINITE;
   } else {

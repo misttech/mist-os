@@ -32,6 +32,7 @@ source_set("v2") {
     "//zircon/kernel/dev/pdev/interrupt",
     "//zircon/kernel/lib/fbl",
     "//zircon/kernel/lib/init",
+    "//zircon/kernel/lib/kpci",
     "//zircon/kernel/lib/ktrace",
     "//zircon/kernel/lib/pow2_range_allocator",
     "//zircon/kernel/lib/root_resource_filter",

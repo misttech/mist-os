@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_archivist_pipeline_test_manifest")
+load("@rules_fuchsia//fuchsia:defs.bzl", "fuchsia_archivist_pipeline_test_manifest")
 load(":fuchsia_archivist_pipeline_test_test.bzl", "fuchsia_archivist_pipeline_test_test")
 
 fuchsia_archivist_pipeline_test_manifest(

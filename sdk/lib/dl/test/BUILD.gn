@@ -34,6 +34,7 @@ test("dl-unittests") {
       "dl-impl-tests.cc",
       "dl-impl-tests.h",
       "dl-iterate-phdr-tests.cc",
+      "dl-iterate-phdr-tests.h",
       "dl-load-tests-base.cc",
       "dl-load-tests-base.h",
       "dl-load-tests-basic.cc",
@@ -50,6 +51,8 @@ test("dl-unittests") {
     ]
     deps += [
       ":dl-unittest.deps",
+      ":tls-desc-resolver-tests",
+      ":tlsdesc-runtime-dynamic-tests",
       "..:runtime",
       "//sdk/lib/fit",
       "//sdk/lib/ld/testing",
@@ -69,6 +72,38 @@ test("dl-unittests") {
     }
     data_deps = [ ":test-data" ]
   }
+}
+
+source_set("tlsdesc-runtime-dynamic-tests") {
+  visibility = [ ":*" ]
+  testonly = true
+
+  sources = [
+    "call-tlsdesc.S",
+    "call-tlsdesc.h",
+    "tlsdesc-runtime-dynamic-tests.cc",
+  ]
+  deps = [
+    "..:tlsdesc-runtime-dynamic",
+    "//sdk/lib/ld:headers",
+    "//third_party/googletest:gmock",
+    "//third_party/googletest:gtest",
+    "//zircon/kernel/lib/arch",
+  ]
+}
+
+source_set("tls-desc-resolver-tests") {
+  visibility = [ ":*" ]
+  testonly = true
+
+  sources = [ "tls-desc-resolver-tests.cc" ]
+  deps = [
+    "..:diagnostics",
+    "..:tls-desc-resolver",
+    "//sdk/lib/ld:tlsdesc",
+    "//third_party/googletest:gmock",
+    "//third_party/googletest:gtest",
+  ]
 }
 
 # These are the shared_library() targets to be included as startup modules for

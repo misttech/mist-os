@@ -855,7 +855,7 @@ impl<B: SplitByteSlice + Copy> Domain<B> {
 /// with the initial string that was used to construct it.
 impl<B: SplitByteSlice + Copy> PartialEq<&str> for Domain<B> {
     fn eq(&self, other: &&str) -> bool {
-        self.partial_eq_helper_str(other).or_else::<bool, _>(|_| Ok(false)).unwrap()
+        self.partial_eq_helper_str(other).or::<bool>(Ok(false)).unwrap()
     }
 }
 

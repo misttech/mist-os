@@ -46,7 +46,7 @@ executable("bin") {
   deps = [ ":lib" ]
 }
 
-fuchsia_shell_package("loadbench") {
+fuchsia_package("loadbench") {
   deps = [ ":bin" ]
 }
 

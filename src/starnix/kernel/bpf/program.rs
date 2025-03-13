@@ -11,7 +11,7 @@ use ebpf::{
     BPF_PSEUDO_BTF_ID, BPF_PSEUDO_FUNC, BPF_PSEUDO_MAP_FD, BPF_PSEUDO_MAP_IDX,
     BPF_PSEUDO_MAP_IDX_VALUE, BPF_PSEUDO_MAP_VALUE,
 };
-use ebpf_api::{get_common_helpers, Map, PinnedMap, ProgramType};
+use ebpf_api::{get_common_helpers, AttachType, EbpfApiError, Map, PinnedMap, ProgramType};
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{bpf_attr__bindgen_ty_4, bpf_insn, errno, error};
@@ -20,13 +20,17 @@ use std::collections::HashMap;
 #[derive(Clone, Debug)]
 pub struct ProgramInfo {
     pub program_type: ProgramType,
+    pub expected_attach_type: AttachType,
 }
 
 impl TryFrom<&bpf_attr__bindgen_ty_4> for ProgramInfo {
     type Error = Errno;
 
     fn try_from(info: &bpf_attr__bindgen_ty_4) -> Result<Self, Self::Error> {
-        Ok(Self { program_type: info.prog_type.try_into().map_err(map_ebpf_error)? })
+        Ok(Self {
+            program_type: info.prog_type.try_into().map_err(map_ebpf_api_error)?,
+            expected_attach_type: info.expected_attach_type.into(),
+        })
     }
 }
 
@@ -42,6 +46,16 @@ fn map_ebpf_error(e: EbpfError) -> Errno {
     errno!(EINVAL)
 }
 
+fn map_ebpf_api_error(e: EbpfApiError) -> Errno {
+    log_error!("Failed to load eBPF program: {e:?}");
+    match e {
+        EbpfApiError::InvalidProgramType(_) | EbpfApiError::InvalidExpectedAttachType(_) => {
+            errno!(EINVAL)
+        }
+        EbpfApiError::UnsupportedProgramType(_) => errno!(ENOTSUP),
+    }
+}
+
 impl Program {
     pub fn new(
         current_task: &CurrentTask,
@@ -50,9 +64,12 @@ impl Program {
         mut code: Vec<bpf_insn>,
     ) -> Result<Program, Errno> {
         let maps = link_maps_fds(current_task, &mut code)?;
+        let maps_schema = maps.iter().map(|m| m.schema).collect();
         let mut logger = BufferVeriferLogger::new(logger);
-        let calling_context =
-            info.program_type.create_calling_context(maps.iter().map(|m| m.schema).collect());
+        let calling_context = info
+            .program_type
+            .create_calling_context(info.expected_attach_type, maps_schema)
+            .map_err(map_ebpf_api_error)?;
         let program = verify_program(code, calling_context, &mut logger).map_err(map_ebpf_error)?;
         Ok(Program { info, program, maps })
     }
@@ -62,7 +79,7 @@ impl Program {
         program_type: ProgramType,
         struct_mappings: &[StructMapping],
         local_helpers: &[(u32, EbpfHelperImpl<C>)],
-    ) -> Result<LinkedProgram<C>, Errno> {
+    ) -> Result<EbpfProgram<C>, Errno> {
         if program_type != self.info.program_type {
             return error!(EINVAL);
         }
@@ -74,20 +91,8 @@ impl Program {
         let program = link_program(&self.program, struct_mappings, self.maps.clone(), helpers)
             .map_err(map_ebpf_error)?;
 
-        Ok(LinkedProgram { program, _maps: self.maps.clone() })
+        Ok(program)
     }
-}
-
-#[derive(Debug)]
-pub struct LinkedProgram<C: EbpfProgramContext> {
-    pub program: EbpfProgram<C>,
-
-    // Map references kept to ensure that the maps are not dropped before the
-    // program.
-    //
-    // TODO(https://fxbug.dev/378507648): `EbpfProgram` will keep these
-    // references after the implementation is moved to the `ebpf` crate.
-    _maps: Vec<PinnedMap>,
 }
 
 /// Links maps referenced by FD, replacing them with by-index references.

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use include_str_from_working_dir::include_str_from_working_dir_env;
-use once_cell::sync::Lazy;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -11,7 +10,7 @@ use serde::{Deserialize, Serialize};
 pub struct ICUMap(pub std::collections::HashMap<Revision, String>);
 
 // See `rustenv` in //src/lib/assembly/config_schema:config_schema.
-pub static ICU_CONFIG_INFO: Lazy<ICUMap> = Lazy::new(|| {
+pub static ICU_CONFIG_INFO: std::sync::LazyLock<ICUMap> = std::sync::LazyLock::new(|| {
     serde_json::from_value(
         serde_json::from_str(include_str_from_working_dir_env!("ICU_GIT_INFO_JSON_FILE")).unwrap(),
     )
@@ -58,10 +57,12 @@ pub struct ICUConfig {
     /// The revision (corresponding to either one of the labels, or a git commit ID) of the ICU
     /// library to use in system assembly. This revision is constrained to the commit IDs available
     /// in the repos at `//third_party/icu/{default,latest}`,
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub revision: Revision,
 
     /// A list of packages that should receive ICU tzdata in their config directory.
     /// TODO(b/297214394): Remove this option once all components use tzdata_provider.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub legacy_tzdata_packages: Vec<String>,
 }
 

@@ -30,8 +30,8 @@ class MetadataServerTest : public gtest::TestLoopFixture {
 
     // Connect to devfs directory.
     auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-    ASSERT_EQ(realm_->component().exposed()->Open3("dev-topological", fuchsia::io::PERM_READABLE,
-                                                   {}, server.TakeChannel()),
+    ASSERT_EQ(realm_->component().exposed()->Open("dev-topological", fuchsia::io::PERM_READABLE, {},
+                                                  server.TakeChannel()),
               ZX_OK);
     ASSERT_EQ(fdio_fd_create(client.TakeChannel().release(), &dev_fd_), ZX_OK);
   }

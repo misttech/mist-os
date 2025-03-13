@@ -19,6 +19,7 @@ driver_bind_rules("ethernet_usb_cdc_ecm_bind") {
 }
 
 fuchsia_cc_driver("usb-cdc-ecm-driver") {
+  legacy = true
   output_name = "usb-cdc-ecm"
   configs += [
     "//build/config:all_source",
@@ -114,7 +115,6 @@ test("usb-cdc-ecm-integration") {
   sources = [ "usb-cdc-ecm-test.cc" ]
   deps = [
     ":usb-cdc-ecm-lib",
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.peripheral:fuchsia.hardware.usb.peripheral_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.virtual.bus:fuchsia.hardware.usb.virtual.bus_cpp",
@@ -123,6 +123,7 @@ test("usb-cdc-ecm-integration") {
     "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/fdio",
     "//src/connectivity/lib/network-device/cpp",
+    "//src/devices/lib/client:device_topology",
     "//src/devices/usb/testing/usb-virtual-bus-launcher",
     "//src/lib/ddk",
     "//src/ui/input/lib/hid",

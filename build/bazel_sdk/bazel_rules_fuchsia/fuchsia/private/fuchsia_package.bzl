@@ -5,7 +5,6 @@
 """fuchsia_package() rule."""
 
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
-load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 load("//fuchsia/private/workflows:fuchsia_package_tasks.bzl", "fuchsia_package_tasks")
 load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_ATTRS", "get_fuchsia_api_level")
 load(
@@ -16,6 +15,7 @@ load(
     "strip_resources",
 )
 load(":fuchsia_package_resource.bzl", "fuchsia_find_all_package_resources")
+load(":fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 load(":fuchsia_transition.bzl", "fuchsia_transition")
 load(
     ":providers.bzl",
@@ -419,6 +419,7 @@ def _build_fuchsia_package_impl(ctx):
                 meta_contents_dir,
                 ffx_meta_extract_dir,
             ],
+            mnemonic = "MetaContentAppend",
             progress_message = "Building manifest for %s" % ctx.label,
         )
         meta_content_inputs.append(meta_contents_dir)

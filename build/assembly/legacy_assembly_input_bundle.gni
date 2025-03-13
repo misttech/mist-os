@@ -112,11 +112,6 @@ template("legacy_assembly_input_bundle") {
     _include_config_data = invoker.include_config_data
   }
 
-  _shell_command_packages = []
-  if (defined(invoker.shell_command_packages)) {
-    _shell_command_packages = invoker.shell_command_packages
-  }
-
   _core_realm_definition = false
   if (defined(invoker.core_realm_definition)) {
     _core_realm_definition = invoker.core_realm_definition
@@ -145,7 +140,6 @@ template("legacy_assembly_input_bundle") {
     # The assembly bundle package and archive labels
     assembly_input_bundle_package = "${target_name}.pkg"
     assembly_input_bundle_archive = "${target_name}.tgz"
-    shell_commands_manifest_list = "${target_name}.shell_commands_manifest_list"
     core_realm_shards_list = "${target_name}.core_realm_shards_list"
     fshost = "${target_name}.fshost"
   }
@@ -187,28 +181,11 @@ template("legacy_assembly_input_bundle") {
     assembly_input_bundle_archive = "${assembly_input_bundle_dir}.tgz"
     assembly_input_bundle_archive_manifest =
         "${assembly_input_bundle_dir}.tgz.fini_manifest"
-    shell_command_manifests_list =
-        "${assembly_input_bundle_dir}.package_manifest_list.shell_commands"
     core_realm_shards_list =
         "${assembly_input_bundle_dir}.core_realm_shards_list"
 
     # The cmc_merge() template this is used with prepends $target_out_dir.
     fshost_merged_cml = "${target_name}/fshost.merged.cml"
-  }
-
-  if (_shell_command_packages != []) {
-    generated_file(labels.shell_commands_manifest_list) {
-      forward_variables_from(invoker,
-                             [
-                               "deps",
-                               "testonly",
-                             ])
-      deps = _shell_command_packages
-      outputs = [ "${files.shell_command_manifests_list}" ]
-      data_keys = [ "shell_commands_distribution_manifests" ]
-      walk_keys = [ "shell_commands_barrier" ]
-      output_conversion = "json"
-    }
   }
 
   if (_core_realm_definition != false) {
@@ -256,7 +233,6 @@ template("legacy_assembly_input_bundle") {
   }
 
   # Construct a list of bootfs packages.
-  # Ignores any fuchsia_driver_packages and fuchsia_shell_packages
   package_manifests_list(labels.bootfs_package_list) {
     forward_variables_from(invoker,
                            [
@@ -425,15 +401,6 @@ template("legacy_assembly_input_bundle") {
       ":${labels.cache_package_list}",
       ":${labels.kernel_cmdline_args}",
     ]
-
-    if (_shell_command_packages != []) {
-      args += [
-        "--shell-commands-packages-list",
-        rebase_path(files.shell_command_manifests_list, root_build_dir),
-      ]
-      inputs += [ files.shell_command_manifests_list ]
-      deps += [ ":${labels.shell_commands_manifest_list}" ]
-    }
 
     if (_core_realm_definition != false) {
       args += [

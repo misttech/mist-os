@@ -39,8 +39,8 @@ group("tests") {
   testonly = true
 
   # NOTE: The other tests in this file are zbi tests which are
-  # included from //bundles/bringup:tests. The list below should
-  # instead be reachable from //src:tests.
+  # included from //products/bringup_with_tests. The list below
+  # should instead be reachable from //src:tests.
   deps = [
     ":libhwreg-i2c-test-pkg",
     ":libhwreg-test($host_toolchain)",

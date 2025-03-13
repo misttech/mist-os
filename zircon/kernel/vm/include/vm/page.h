@@ -20,7 +20,6 @@
 #include <ktl/type_traits.h>
 #include <vm/page_state.h>
 #include <vm/phys/arena.h>
-#include <vm/stack_owned_loaned_pages_interval.h>
 
 // core per page structure allocated at pmm arena creation time
 struct vm_page {
@@ -33,233 +32,16 @@ struct vm_page {
 
   union {
     struct {
-      // This field is used for two different purposes, depending on whether the low order bit is
-      // set or not.  This same field exists in states OBJECT, ALLOC, and FREE.
-      //
-      // When all bits are 0:
-      //
-      // There is no object and no StackOwnedLoanedPagesInterval.
-      //
-      // When kObjectOrStackOwnerIsStackOwnerFlag is set:
-      //
-      // The rest of the bits are a pointer to a StackOwnedLoanedPagesInterval.  This allows a
-      // thread reclaiming a loaned page to apply priority inheritance onto the thread whose stack
-      // is transiently owning a loaned page.  The StackOwnedLoanedPagesInterval has an
-      // OwnedWaitQueue that's used to avoid priority inversion while the reclaiming thread is
-      // waiting for the loaned page to no longer be stack owned.  This brief waiting is part of
-      // chasing down and replacing loaned pages that are being borrowed, so that the loaned page
-      // can be returned to its contiguous VmCowPages.
-      //
-      // When kObjectOrStackOwnerIsStackOwnerFlag bit is 0 but any other bits are 1:
-      //
       // This is a back pointer to the vm object this page is currently contained in.  It is
       // implicitly valid when the page is in a VmCowPages (which is a superset of intervals
       // during which the page is in a page queue), and nullptr (or logically nullptr) otherwise.
       // This should not be modified (except under the page queue lock) whilst a page is in a
       // VmCowPages.
-      //
-      // More details:
-      //
-      // This field is accessed via an atomic_ref<>.  Using ktl::atomic<> here seems to make GCC
-      // unhappy, depite the offset and alignment being fine (verified by static asserts and
-      // DEBUG_ASSERT()s).  So instead we use atomic_ref<>.
-      //
-      // If a page is loaned, installation of StackOwnedLoanedPagesInterval on a page must occur
-      // before any stack ownership of the page has begun, and removal of
-      // StackOwnedLoanedPagesInterval must occur after stack ownership of the page has already
-      // ended.
-      //
-      // This field is a struct to enforce that all access is at least atomic memory_order_relaxed.
-      //
       // Field should be modified by the setters and getters to allow for future encoding changes.
-      //
-      // Any changes to this field need to be made to "alloc" and "free" union variants also.
-      struct {
-       public:
-        ktl::atomic_ref<uintptr_t> get() {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
-          // This is fine, because vm_page_t are 8 byte aligned, and object_or_stack_owner_priv is 8
-          // byte aligned within the vm_page_t.
-          static_assert(offsetof(vm_page, object.object_or_stack_owner.object_or_stack_owner) %
-                            sizeof(decltype(object_or_stack_owner)) ==
-                        0);
-          DEBUG_ASSERT(reinterpret_cast<uintptr_t>(&object_or_stack_owner) %
-                           sizeof(decltype(object_or_stack_owner)) ==
-                       0);
-          return ktl::atomic_ref<uintptr_t>(*&object_or_stack_owner);
-#pragma GCC diagnostic pop
-        }
+      void* object_priv;
 
-        ktl::atomic_ref<uintptr_t> get() const {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
-          // This is fine, because vm_page_t are 8 byte aligned, and object_or_stack_owner_priv is 8
-          // byte aligned within the vm_page_t.
-          static_assert(offsetof(vm_page, object.object_or_stack_owner.object_or_stack_owner) %
-                            sizeof(decltype(object_or_stack_owner)) ==
-                        0);
-          DEBUG_ASSERT(reinterpret_cast<uintptr_t>(&object_or_stack_owner) %
-                           sizeof(decltype(object_or_stack_owner)) ==
-                       0);
-          // TODO(https://fxbug.dev/355287217): Remove const_cast when libcxx `atomic_ref<T>` is
-          // fixed.
-          return ktl::atomic_ref<uintptr_t>(*const_cast<uintptr_t*>(&object_or_stack_owner));
-#pragma GCC diagnostic pop
-        }
-
-       private:
-        uintptr_t object_or_stack_owner;
-
-       public:
-        // Only for a static_assert() below.  Logically private.
-        using InternalType = decltype(object_or_stack_owner);
-      } __PACKED object_or_stack_owner;
-      using object_or_stack_owner_t = decltype(object_or_stack_owner);
-
-      // TODO(https://fxbug.dev/354716628): Remove workaround for const/volatile qualified
-      // atomic_ref.
-      auto* self() const { return const_cast<ktl::remove_const_t<decltype(this)>>(this); }
-
-      void* get_object() const {
-        uintptr_t value = self()->object_or_stack_owner.get().load(ktl::memory_order_relaxed);
-        if (unlikely(value & kObjectOrStackOwnerIsStackOwnerFlag)) {
-          return nullptr;
-        }
-        return reinterpret_cast<void*>(value);
-      }
-
-      // This also logically does clear_stack_owner() atomically.
-      void set_object(void* obj) {
-        // If the caller wants to clear the object, use clear_object() instead.
-        DEBUG_ASSERT(obj);
-        // Calling set_object() on a loaned page requires a StackOwnedLoanedPagesInterval on the
-        // current stack.  If the object is already set, the stack ownership interval is essentially
-        // quite short and all under a single VmCowPages hierarchy lock hold interval.  But we still
-        // require the StackOwnedLoanedPagesInterval for consistency, since the page can be moving
-        // between different VmCowPages, so in a sense it still stack owned.
-        //
-        // For longer stack ownership intervals (those not entirely under a single VmCowPages
-        // hierarchy lock hold interval), the object won't be set on entry to this method, and we
-        // can verify that a StackOwnedLoanedPagesInterval was set on the page, and is still the
-        // current active interval.
-#if DEBUG_ASSERT_IMPLEMENTED
-        if (containerof(this, vm_page, object)->is_loaned()) {
-          Thread* current_thread = Thread::Current::Get();
-          if (!get_object()) {
-            DEBUG_ASSERT(is_stack_owned());
-            DEBUG_ASSERT(current_thread->stack_owned_loaned_pages_interval() == &stack_owner());
-          } else if (obj != get_object()) {
-            DEBUG_ASSERT(current_thread->stack_owned_loaned_pages_interval());
-          }
-        }
-#endif
-        // Ensure set_object() is visible after set_page_offset().
-        ktl::atomic_thread_fence(ktl::memory_order_release);
-        if (is_stack_owned()) {
-          clear_stack_owner_internal(obj);
-          return;
-        }
-        object_or_stack_owner.get().store(reinterpret_cast<uintptr_t>(obj),
-                                          ktl::memory_order_relaxed);
-      }
-
-      // In addition to clearing object, this does set_stack_owner() atomically, if needed.
-      void clear_object() {
-        DEBUG_ASSERT(!is_stack_owned());
-        if (containerof(this, vm_page, object)->is_loaned()) {
-          Thread* current_thread = Thread::Current::Get();
-          // To clear the object backlink of a loaned page, a StackOwnedLoanedPagesInterval on the
-          // current stack is required.
-          DEBUG_ASSERT(current_thread->stack_owned_loaned_pages_interval());
-          set_stack_owner(current_thread->stack_owned_loaned_pages_interval());
-          return;
-        }
-        object_or_stack_owner.get().store(0, ktl::memory_order_relaxed);
-      }
-
-      StackOwnedLoanedPagesInterval* maybe_stack_owner() const {
-        uintptr_t value = self()->object_or_stack_owner.get().load(ktl::memory_order_relaxed);
-        if (!(value & kObjectOrStackOwnerIsStackOwnerFlag)) {
-          return nullptr;
-        }
-        return reinterpret_cast<StackOwnedLoanedPagesInterval*>(value & ~kObjectOrStackOwnerFlags);
-      }
-
-      StackOwnedLoanedPagesInterval& stack_owner() const {
-        uintptr_t value = self()->object_or_stack_owner.get().load(ktl::memory_order_relaxed);
-        DEBUG_ASSERT(value & kObjectOrStackOwnerIsStackOwnerFlag);
-        return *reinterpret_cast<StackOwnedLoanedPagesInterval*>(value & ~kObjectOrStackOwnerFlags);
-      }
-
-      void set_stack_owner(StackOwnedLoanedPagesInterval* stack_owner) {
-        DEBUG_ASSERT(stack_owner);
-        // The stack owner shouldn't be set by the caller in situations where the/a stack owner is
-        // already set.  It is expected that the field may currently be set to a VmCowPages*, but
-        // that won't have the kObjectOrStackOwnerIsStackOwnerFlag bit set due to pointer alignment.
-        DEBUG_ASSERT(!(object_or_stack_owner.get().load(ktl::memory_order_relaxed) &
-                       kObjectOrStackOwnerIsStackOwnerFlag));
-        // We use relaxed here because we're only relying on atomicity.  For ordering, the PmmNode
-        // lock and PageQueues locks are relevant.  For ordering of a thread joining the owned wait
-        // queue vs. deletion of the owned wait queue, the thread lock is relevant.
-        object_or_stack_owner.get().store(
-            reinterpret_cast<uintptr_t>(stack_owner) | kObjectOrStackOwnerIsStackOwnerFlag,
-            ktl::memory_order_relaxed);
-      }
-
-      void clear_stack_owner() { clear_stack_owner_internal(nullptr); }
-
-      void clear_stack_owner_internal(void* new_obj) {
-        // If this fires, it likely means there's an extra clear somewhere, possibly by the current
-        // thread, or possibly by a different thread.  This call could be the "extra" clear if the
-        // caller didn't check whether there's a stack owner before calling.
-        DEBUG_ASSERT(is_stack_owned());
-        while (true) {
-          uintptr_t old_value = object_or_stack_owner.get().load(ktl::memory_order_relaxed);
-          // If this fires, it likely means that some other thread did a clear (so either this
-          // thread or the other thread shouldn't have cleared).  If this thread had already done a
-          // previous clear, the assert near the top would have fired instead.
-          DEBUG_ASSERT(old_value & kObjectOrStackOwnerIsStackOwnerFlag);
-          // We don't want to be acquiring SOLIP::lock here every time we free a loaned page, so we
-          // only acquire the lock if the page's StackOwnedLoanedPagesInterval has a waiter,
-          // which is much more rare.  In that case we must acquire the SOLPI::lock to avoid letting
-          // this thread continue and signal and delete the StackOwnedLoanedPagesInterval until
-          // after the waiter has committed to blocking on the OwnedWaitQueue, so that the waiter
-          // can be woken and removed from the OwnedWaitQueue before the OwnedWaitQueue is deleted.
-          ktl::optional<Guard<SpinLock, IrqSave>> maybe_sollock_guard;
-          if (old_value & kObjectOrStackOwnerHasWaiter) {
-            // Go ahead and actually acquire the lock.
-            maybe_sollock_guard.emplace(&StackOwnedLoanedPagesInterval::get_lock());
-          }
-
-          if (object_or_stack_owner.get().compare_exchange_strong(
-                  old_value, reinterpret_cast<uintptr_t>(new_obj), ktl::memory_order_relaxed)) {
-            break;
-          }
-          // ~maybe_sollock_guard will release the lock if it was acquired
-        }
-      }
-
-      bool is_stack_owned() const {
-        // This can return true for a page that was loaned fairly recently but is no longer loaned.
-        return !!(self()->object_or_stack_owner.get().load(ktl::memory_order_relaxed) &
-                  kObjectOrStackOwnerIsStackOwnerFlag);
-      }
-
-      struct TrySetHasWaiterResult {
-        // True iff this call to try_set_has_waiter() was the first thread to set that there's a
-        // waiter.
-        bool first_setter;
-        // The stack_owner may own the page.  The stack_owner can be waited on safely now that the
-        // waiter bit is set.  The wait on stack_owner must occur while still the calling thread is
-        // still holding the SOLPI::lock.
-        StackOwnedLoanedPagesInterval* stack_owner;
-      };
-      // ktl::is_ok() iff the page has a stack_owner and the waiter bit is set.
-      // !ktl::is_ok() iff the page no longer has a stack_owner.
-      ktl::optional<TrySetHasWaiterResult> try_set_has_waiter()
-          TA_REQ(StackOwnedLoanedPagesInterval::get_lock());
-
+      void* get_object() const { return object_priv; }
+      void set_object(void* obj) { object_priv = obj; }
       // offset 0x20
 
       // When object_or_event_priv is pointing to a VmCowPages, this is the offset in the VmCowPages
@@ -319,16 +101,6 @@ struct vm_page {
       // space we would have otherwise wasted in padding, without breaking alignment rules.
     } __PACKED object;  // attached to a vm object
     struct {
-      // No fields may be added for these variants due to UB until we improve the stack ownership
-      // system, or otherwise address the current usage of object.object_or_stack_owner outside
-      // of OBJECT state.
-    } free;  // free - typically in free_list_ or free_loaned_list_, unless loan_cancelled
-    struct {
-      // No fields may be added for these variants due to UB until we improve the stack ownership
-      // system, or otherwise address the current usage of object.object_or_stack_owner outside
-      // of OBJECT state.
-    } alloc;  // allocated, but not yet put to any specific use
-    struct {
       // Tracks user-provided metadata for the item in each of the possible buckets.
       uint32_t left_metadata;
       uint32_t mid_metadata;
@@ -358,6 +130,9 @@ struct vm_page {
   // logically private, use loaned getters and setters below.
   static constexpr uint8_t kLoanedStateIsLoaned = 1;
   static constexpr uint8_t kLoanedStateIsLoanCancelled = 2;
+  // The loaned state is packed into a single byte here to reduce memory usage, but due to the
+  // allowable access patterns this means the getters and setters must perform atomic loads and
+  // stores to prevent UB.
   uint8_t loaned_state_priv;
 
   // helper routines
@@ -379,6 +154,8 @@ struct vm_page {
   // which causes the data in the loaned page to be moved into a different physical page (which
   // itself can be non-loaned or loaned).  A loaned page cannot be used to allocate a new contiguous
   // VMO.
+  // Maybe queried by anyone who either owns the page, or has sufficient knowledge that the loaned
+  // state cannot be being altered in parallel.
   bool is_loaned() const {
     // TODO(https://fxbug.dev/355287217): Remove const_cast when libcxx `atomic_ref<T>` is fixed.
     return !!(ktl::atomic_ref<uint8_t>(*const_cast<uint8_t*>(&loaned_state_priv))
@@ -389,28 +166,32 @@ struct vm_page {
   // the page is no longer loaned, either via commit of the page back into the contiguous VMO that
   // loaned the page, or via deletion of the contiguous VMO that loaned the page.  Such pages are
   // not in the free_loaned_list_ in pmm, which is how re-use is prevented.
+  // Should only be called by the PmmNode under its lock.
   bool is_loan_cancelled() const {
-    return !!(ktl::atomic_ref<uint8_t>(*const_cast<uint8_t*>(&loaned_state_priv)) &
+    return !!(ktl::atomic_ref<uint8_t>(*const_cast<uint8_t*>(&loaned_state_priv))
+                  .load(ktl::memory_order_relaxed) &
               kLoanedStateIsLoanCancelled);
   }
   // Manipulation of 'loaned' should only be done by the PmmNode under the loaned pages lock whilst
   // it is the owner of the page.
   void set_is_loaned() {
-    ktl::atomic_ref<uint8_t>(loaned_state_priv).fetch_or(kLoanedStateIsLoaned);
+    ktl::atomic_ref<uint8_t>(loaned_state_priv)
+        .fetch_or(kLoanedStateIsLoaned, ktl::memory_order_relaxed);
   }
   void clear_is_loaned() {
     ktl::atomic_ref<uint8_t>(loaned_state_priv)
-        .fetch_and(static_cast<uint8_t>(~kLoanedStateIsLoaned));
+        .fetch_and(~kLoanedStateIsLoaned, ktl::memory_order_relaxed);
   }
 
   // Manipulation of 'loan_cancelled' should only be done by the PmmNode under its lock, but may be
   // done when the PmmNode is not the owner of the page.
   void set_is_loan_cancelled() {
-    ktl::atomic_ref<uint8_t>(loaned_state_priv).fetch_or(kLoanedStateIsLoanCancelled);
+    ktl::atomic_ref<uint8_t>(loaned_state_priv)
+        .fetch_or(kLoanedStateIsLoanCancelled, ktl::memory_order_relaxed);
   }
   void clear_is_loan_cancelled() {
     ktl::atomic_ref<uint8_t>(loaned_state_priv)
-        .fetch_and(static_cast<uint8_t>(~kLoanedStateIsLoanCancelled));
+        .fetch_and(~kLoanedStateIsLoanCancelled, ktl::memory_order_relaxed);
   }
 
   void dump() const;
@@ -449,9 +230,6 @@ struct vm_page {
   static constexpr uintptr_t kObjectOrStackOwnerIsStackOwnerFlag = 0x1;
   static constexpr uintptr_t kObjectOrStackOwnerHasWaiter = 0x2;
   static constexpr uintptr_t kObjectOrStackOwnerFlags = 0x3;
-  // Make sure the address of a StackOwnedLoanedPagesInterval will always have room for at least 2
-  // low order bit flags.
-  static_assert(alignof(StackOwnedLoanedPagesInterval) >= kObjectOrStackOwnerFlags + 1);
 };
 
 // Provide a type alias using modern syntax to avoid clang-tidy warnings.
@@ -466,11 +244,11 @@ static_assert(offsetof(vm_page_t, paddr_priv) == 0x10);
 static_assert(offsetof(vm_page_t, paddr_priv) % alignof(decltype(vm_page_t::paddr_priv)) == 0);
 static_assert(offsetof(vm_page_t, paddr_priv) % alignof(paddr_t) == 0);
 
-static_assert(offsetof(vm_page_t, object.object_or_stack_owner) == 0x18);
-static_assert(offsetof(vm_page_t, object.object_or_stack_owner) %
-                  alignof(vm_page_t::object_t::object_or_stack_owner_t::InternalType) ==
+static_assert(offsetof(vm_page_t, object.object_priv) == 0x18);
+static_assert(offsetof(vm_page_t, object.object_priv) %
+                  alignof(decltype(vm_page_t::object_t::object_priv)) ==
               0);
-static_assert(offsetof(vm_page_t, object.object_or_stack_owner) % alignof(uintptr_t) == 0);
+static_assert(offsetof(vm_page_t, object.object_priv) % alignof(uintptr_t) == 0);
 
 static_assert(offsetof(vm_page_t, object.page_offset_priv) == 0x20);
 static_assert(offsetof(vm_page_t, object.page_offset_priv) %

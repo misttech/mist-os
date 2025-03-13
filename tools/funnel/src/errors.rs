@@ -39,7 +39,7 @@ impl IntoExitCode for FunnelError {
     fn exit_code(&self) -> i32 {
         match self {
             Self::Error(_) => 1,
-            Self::IoError(e) => e.raw_os_error().unwrap_or_else(|| 2),
+            Self::IoError(e) => e.raw_os_error().unwrap_or(2),
             Self::CloseExistingTunnelError(e) => e.exit_code(),
             Self::TunnelError(e) => e.exit_code(),
             #[cfg(feature = "update")]

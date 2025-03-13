@@ -5,6 +5,7 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
+use crate::nanohub_socket_file::NanohubSocketFile;
 use fidl_fuchsia_hardware_sockettunnel::{DeviceMarker, DeviceRegisterSocketRequest};
 use starnix_core::device::kobject::Device;
 use starnix_core::device::DeviceOps;
@@ -23,33 +24,42 @@ use {fidl_fuchsia_hardware_sockettunnel, fuchsia_component as fcomponent};
 pub struct SocketTunnelFile {
     socket_label: Arc<FsString>,
 }
+#[derive(Clone)]
+pub struct SocketTunnelSysfsFile {
+    socket_label: Arc<FsString>,
+}
 
 impl SocketTunnelFile {
     pub fn new(socket_label: FsString) -> SocketTunnelFile {
         SocketTunnelFile { socket_label: Arc::new(socket_label) }
     }
-
-    fn connect(&self) -> Result<Box<dyn FileOps>, Errno> {
-        let device_proxy = fcomponent::client::connect_to_protocol_sync::<DeviceMarker>()
-            .map_err(|_| errno!(ENOENT))?;
-
-        // Create the socket pair for local/remote sides
-        let (tx, rx) = zx::Socket::create_datagram();
-
-        let register_socket_params = DeviceRegisterSocketRequest {
-            server_socket: rx.into(),
-            socket_label: Some(self.socket_label.deref().clone().to_string()),
-            ..Default::default()
-        };
-        // Execute command, check if the FIDL connection succeeded, and extract the Status
-        device_proxy
-            .register_socket(register_socket_params, zx::MonotonicInstant::INFINITE)
-            .map_err(|_| errno!(ENOENT))?
-            .map_err(|_| errno!(ENOENT))?;
-
-        // This will only be reached if the status was OK
-        new_remote_file_ops(tx.into())
+}
+impl SocketTunnelSysfsFile {
+    pub fn new(socket_label: FsString) -> SocketTunnelSysfsFile {
+        SocketTunnelSysfsFile { socket_label: Arc::new(socket_label) }
     }
+}
+
+fn connect(socket_label: Arc<FsString>) -> Result<Box<dyn FileOps>, Errno> {
+    let device_proxy = fcomponent::client::connect_to_protocol_sync::<DeviceMarker>()
+        .map_err(|_| errno!(ENOENT))?;
+
+    // Create the socket pair for local/remote sides
+    let (tx, rx) = zx::Socket::create_datagram();
+
+    let register_socket_params = DeviceRegisterSocketRequest {
+        server_socket: rx.into(),
+        socket_label: Some(socket_label.deref().clone().to_string()),
+        ..Default::default()
+    };
+    // Execute command, check if the FIDL connection succeeded, and extract the Status
+    device_proxy
+        .register_socket(register_socket_params, zx::MonotonicInstant::INFINITE)
+        .map_err(|_| errno!(ENOENT))?
+        .map_err(|_| errno!(ENOENT))?;
+
+    // This will only be reached if the status was OK
+    new_remote_file_ops(tx.into())
 }
 
 impl DeviceOps for SocketTunnelFile {
@@ -61,11 +71,11 @@ impl DeviceOps for SocketTunnelFile {
         _node: &FsNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        self.connect()
+        connect(self.socket_label.clone())
     }
 }
 
-impl FsNodeOps for SocketTunnelFile {
+impl FsNodeOps for SocketTunnelSysfsFile {
     fs_node_impl_not_dir!();
 
     fn create_file_ops(
@@ -75,7 +85,7 @@ impl FsNodeOps for SocketTunnelFile {
         _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        self.connect()
+        Ok(NanohubSocketFile::new(connect(self.socket_label.clone())?))
     }
 }
 

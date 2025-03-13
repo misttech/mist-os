@@ -25,9 +25,9 @@ static_assert(std::is_standard_layout_v<EmptyResponse>);
 static_assert(sizeof(EmptyResponse) == 24);
 static_assert(alignof(EmptyResponse) == 8);
 
-static_assert(std::is_standard_layout_v<ScanoutGeometry>);
-static_assert(sizeof(ScanoutGeometry) == 16);
-static_assert(alignof(ScanoutGeometry) == 4);
+static_assert(std::is_standard_layout_v<Rectangle>);
+static_assert(sizeof(Rectangle) == 16);
+static_assert(alignof(Rectangle) == 4);
 
 static_assert(std::is_standard_layout_v<ScanoutInfo>);
 static_assert(sizeof(ScanoutInfo) == 24);
@@ -36,6 +36,14 @@ static_assert(alignof(ScanoutInfo) == 4);
 static_assert(std::is_standard_layout_v<DisplayInfoResponse>);
 static_assert(sizeof(DisplayInfoResponse) == size_t{24} * 17);
 static_assert(alignof(DisplayInfoResponse) == 8);
+
+static_assert(std::is_standard_layout_v<GetExtendedDisplayIdCommand>);
+static_assert(sizeof(GetExtendedDisplayIdCommand) == 32);
+static_assert(alignof(GetExtendedDisplayIdCommand) == 8);
+
+static_assert(std::is_standard_layout_v<ExtendedDisplayIdResponse>);
+static_assert(sizeof(ExtendedDisplayIdResponse) == 1056);
+static_assert(alignof(ExtendedDisplayIdResponse) == 8);
 
 static_assert(std::is_standard_layout_v<Create2DResourceCommand>);
 static_assert(sizeof(Create2DResourceCommand) == 40);

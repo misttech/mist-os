@@ -115,6 +115,10 @@ class PropertyListMatcher : public ::testing::MatcherInterface<const NodeValue&>
 ::testing::Matcher<const PropertyValue&> DoubleArrayIs(const std::string& name,
                                                        ::testing::Matcher<std::vector<double>>);
 
+// Matches the values of a string array.
+::testing::Matcher<const PropertyValue&> StringArrayIs(
+    const std::string& name, const ::testing::Matcher<std::vector<std::string>>& matcher);
+
 // Matches the display format of a numeric array value.
 ::testing::Matcher<const PropertyValue&> ArrayDisplayFormatIs(ArrayDisplayFormat format);
 

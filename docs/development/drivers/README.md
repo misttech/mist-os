@@ -37,7 +37,7 @@ section.
 
   - [Set up the compat device server in a DFv2 driver][set-up-compat-device-server]
   - [Connect and serve Banjo protocols in a DFv2 driver][serve-banjo-protocols]
-  - [Set up devfs in a DFv2 driver][set-up-devfs]
+  - [Advertise services in a DFv2 driver][driver-communication]
 
 ### DFv2 driver development
 
@@ -210,9 +210,9 @@ section.
 [set-up-compat-device-server]: migration/set-up-compat-device-server.md
 [write-a-minimal-driver]: developer_guide/write-a-minimal-dfv2-driver.md
 [serve-banjo-protocols]: migration/serve-banjo-protocols.md
-[set-up-devfs]: migration/set-up-devfs.md
 [troubleshoot-common-issues]: developer_guide/troubleshoot-common-issues.md
 [driver-examples]: developer_guide/driver-examples.md
 [metadata-tutorial]: tutorials/metadata-tutorial.md
 [dfv2-overview]: dfv2-overview.md
 [spmi-overview]: driver_guides/spmi/overview.md
+[driver-communication]: /docs/concepts/drivers/driver_communication.md

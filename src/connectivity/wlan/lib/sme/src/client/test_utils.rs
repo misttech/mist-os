@@ -204,6 +204,7 @@ pub struct MockSupplicant {
     auth_cfg: auth::Config,
 }
 
+#[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
 fn populate_update_sink(
     update_sink: &mut UpdateSink,
     results: &Arc<Mutex<Result<UpdateSink, anyhow::Error>>>,

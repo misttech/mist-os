@@ -5,6 +5,7 @@
 #ifndef SRC_MEDIA_AUDIO_DRIVERS_CODECS_DA7219_DA7219_DFV2_H_
 #define SRC_MEDIA_AUDIO_DRIVERS_CODECS_DA7219_DA7219_DFV2_H_
 
+#include <fidl/fuchsia.driver.framework/cpp/wire.h>
 #include <fidl/fuchsia.hardware.audio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.i2c/cpp/wire.h>
 #include <lib/driver/component/cpp/driver_base.h>

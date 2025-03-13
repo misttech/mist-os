@@ -25,7 +25,7 @@ DDK_PROTOCOL_DEF(BLOCK_IMPL,              2,    "block-impl", PF_NOPUB)
 DDK_PROTOCOL_DEF(BLOCK_PARTITION,         3,    "block-partition", 0)
 DDK_PROTOCOL_DEF(BLOCK_VOLUME,            4,    "block-volume", 0)
 DDK_PROTOCOL_DEF(CODEC,                   6,    "codec", 0)
-DDK_PROTOCOL_DEF(CONSOLE,                 8,    "console", 0)
+// 8 was console
 DDK_PROTOCOL_DEF(DEVICE,                  9,    "device", 0)
 DDK_PROTOCOL_DEF(DISPLAY_CAPTURE_IMPL,    10,   "display-capture-impl", PF_NOPUB)
 DDK_PROTOCOL_DEF(DISPLAY_COORDINATOR,     11,   "display-coordinator", 0)
@@ -33,7 +33,6 @@ DDK_PROTOCOL_DEF(DISPLAY_ENGINE,          12,   "display-engine", PF_NOPUB)
 // 13 was dotmatrix-display
 DDK_PROTOCOL_DEF(ETHERNET,                14,   "ethernet", 0)
 DDK_PROTOCOL_DEF(ETHERNET_IMPL,           15,   "ethernet-impl", 0)
-// FASTBOOT defined as 167 below.
 DDK_PROTOCOL_DEF(FRAMEBUFFER,             16,   "framebuffer", 0)
 DDK_PROTOCOL_DEF(GOLDFISH_ADDRESS_SPACE,  17,   "goldfish-address-space", 0)
 DDK_PROTOCOL_DEF(GOLDFISH_CONTROL,        18,   "goldfish-control", 0)
@@ -102,8 +101,8 @@ DDK_PROTOCOL_DEF(TEST_PARENT,             83,   "test-parent", PF_NOPUB)
 // 84 was PBUS.
 DDK_PROTOCOL_DEF(PDEV,                    85,   "platform-dev", 0)
 DDK_PROTOCOL_DEF(I2C_HID,                 86,   "i2c-hid", 0)
-DDK_PROTOCOL_DEF(SERIAL,                  87,   "serial", 0)
-DDK_PROTOCOL_DEF(SERIAL_IMPL,             88,   "serial-impl", 0)
+// SERIAL was 87
+// SERIAL_IMPL was 88
 // 89 was SHARED_DMA
 DDK_PROTOCOL_DEF(CLOCK,                   90,   "clock", PF_NOPUB)
 DDK_PROTOCOL_DEF(CLOCK_IMPL,              91,   "clock-impl", 0)
@@ -132,7 +131,7 @@ DDK_PROTOCOL_DEF(NNA,                     113,  "nna", PF_NOPUB)
 DDK_PROTOCOL_DEF(GPU,                     114, "gpu", 0)
 DDK_PROTOCOL_DEF(RTC,                     115, "rtc", 0)
 DDK_PROTOCOL_DEF(TEE,                     116, "tee", 0)
-DDK_PROTOCOL_DEF(VSOCK,                   117, "vsock", 0)
+// 117 was vsock
 DDK_PROTOCOL_DEF(SYSMEM,                  118, "sysmem", 0)
 DDK_PROTOCOL_DEF(MLG,                     119, "mlg", 0)
 DDK_PROTOCOL_DEF(ZXCRYPT,                 120, "zxcrypt", 0)
@@ -140,7 +139,7 @@ DDK_PROTOCOL_DEF(SPI,                     121, "spi", 0)
 DDK_PROTOCOL_DEF(SPI_IMPL,                122, "spi-impl", 0)
 DDK_PROTOCOL_DEF(SECURE_MEM,              123, "securemem", 0)
 DDK_PROTOCOL_DEF(DEVHOST_TEST,            124, "tdh", 0)
-DDK_PROTOCOL_DEF(SERIAL_IMPL_ASYNC,       125, "serial-impl-async", 0)
+// 125 was SERIAL_IMPL_ASYNC
 DDK_PROTOCOL_DEF(AT_TRANSPORT,            126, "at-transport", 0)
 // 127 was pwm
 DDK_PROTOCOL_DEF(PWM_IMPL,                128, "pwm-impl", 0)
@@ -156,7 +155,7 @@ DDK_PROTOCOL_DEF(VIRTUALBUS_TEST,         137, "virtual-bus-test", 0)
 DDK_PROTOCOL_DEF(TEST_ASIX_FUNCTION,      138, "test-asix-function", 0)
 DDK_PROTOCOL_DEF(AUDIO_INPUT,             140, "audio-input", 0)
 DDK_PROTOCOL_DEF(AUDIO_OUTPUT,            141, "audio-output", 0)
-DDK_PROTOCOL_DEF(AMLOGIC_RAM,             142, "aml-ram", 0)
+// 142 was aml-ram
 DDK_PROTOCOL_DEF(GPU_PERFORMANCE_COUNTERS, 143, "gpu-performance-counters", 0)
 // 144 was display-clamprgb-impl
 DDK_PROTOCOL_DEF(TEMPERATURE,             145, "temperature", 0)
@@ -178,13 +177,12 @@ DDK_PROTOCOL_DEF(CHROMEOS_ACPI,           161, "chromeos-acpi", 0)
 DDK_PROTOCOL_DEF(CTAP,                    162, "ctap", 0)
 DDK_PROTOCOL_DEF(AML_MAILBOX,             163, "aml-mailbox", 0)
 // 164 was aml-dsp
-DDK_PROTOCOL_DEF(ADB,                     165, "adb", 0)
+// 165 was adb
 // Out-of-order (or added later).
 DDK_PROTOCOL_DEF(USB_INTERFACE_ASSOCIATION, 166, "usb-interface-association", PF_NOPUB)
-DDK_PROTOCOL_DEF(FASTBOOT, 167, "fastboot", 0)
+// 167 was fastboot
 DDK_PROTOCOL_DEF(WLAN_FACTORY,            168,   "wlan-factory", 0)
-DDK_PROTOCOL_DEF(OVERNET,                 169, "overnet-usb", 0)
-DDK_PROTOCOL_DEF(FAN,                     170, "fan", 0)
+// 170 was fan
 DDK_PROTOCOL_DEF(AUDIO_COMPOSITE,         171, "audio-composite", 0)
 DDK_PROTOCOL_DEF(TRIP_POINT,              172, "trippoint", 0)
 DDK_PROTOCOL_DEF(SUSPEND_HAL,             173, "suspend", 0)

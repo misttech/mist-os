@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use super::{EnvironmentKind, ExecutableKind};
 use crate::api::value::{TryConvert, ValueStrategy};
 use crate::api::ConfigError;
+use crate::cache::Cache;
 use crate::storage::{AssertNoEnv, Config};
 use crate::{is_analytics_disabled, ConfigMap, ConfigQuery, Environment};
 use anyhow::{Context, Result};
@@ -18,19 +20,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
 use thiserror::Error;
-use tracing::{debug, error, trace};
-
-use super::{EnvironmentKind, ExecutableKind};
 
 /// A name for the type used as an environment variable mapping for isolation override
 type EnvVars = HashMap<String, String>;
-
-const SDK_NOT_FOUND_HELP: &str = "\
-SDK directory could not be found. Please set with
-`ffx sdk set root <PATH_TO_SDK_DIR>`\n
-If you are developing in the fuchsia tree, ensure \
-that you are running the `ffx` command (in $FUCHSIA_DIR/.jiri_root) or `fx ffx`, not a built binary.
-Running the binary directly is not supported in the fuchsia tree.\n\n";
 
 /// Contextual information about where this instance of ffx is running
 #[derive(Clone, Debug)]
@@ -92,7 +84,7 @@ impl EnvironmentContext {
     /// Initializes an environment type that is just the bare minimum, containing no ambient configuration, only
     /// the runtime args.
     pub fn strict(exe_kind: ExecutableKind, runtime_args: ConfigMap) -> Result<Self> {
-        let cache = Arc::default();
+        let cache = Arc::new(Cache::<Config>::new(None));
         let res = Self {
             kind: EnvironmentKind::StrictContext,
             exe_kind: exe_kind.clone(),
@@ -286,13 +278,13 @@ impl EnvironmentContext {
         self.exe_kind
     }
 
-    pub async fn analytics_enabled(&self) -> bool {
+    pub fn analytics_enabled(&self) -> bool {
         use EnvironmentKind::*;
         if let Isolated { .. } = self.kind {
             false
         } else {
             // note: double negative to turn this into an affirmative
-            !is_analytics_disabled(self).await
+            !is_analytics_disabled(self)
         }
     }
 
@@ -422,17 +414,17 @@ impl EnvironmentContext {
         // Out of tree, we will always want to pull the config from the normal config path, which
         // we can defer to the SdkRoot's mechanisms for.
         let runtime_root: Option<PathBuf> = self.query("sdk.root").get().ok();
+        let module = self.query("sdk.module").get().ok();
 
         match (&self.kind, runtime_root) {
             (EnvironmentKind::InTree { build_dir: Some(build_dir), .. }, None) => {
-                let manifest = build_dir.clone();
-                let module = self.query("sdk.module").get().ok();
+                let root = build_dir.clone();
                 match module {
-                    Some(module) => Ok(SdkRoot::Modular { manifest, module }),
-                    None => Ok(SdkRoot::Full(manifest)),
+                    Some(module) => Ok(SdkRoot::Modular { root, module }),
+                    None => Ok(SdkRoot::Full { root, manifest: None }),
                 }
             }
-            (_, runtime_root) => self.sdk_from_config(runtime_root.as_deref()),
+            (_, runtime_root) => SdkRoot::from_paths(runtime_root.as_deref(), module),
         }
     }
 
@@ -543,42 +535,6 @@ impl EnvironmentContext {
         cm
     }
 
-    /// Gets the basic information about the sdk as configured, without diving deeper into the sdk's own configuration.
-    fn sdk_from_config(&self, sdk_root: Option<&Path>) -> Result<SdkRoot> {
-        // All gets in this function should declare that they don't want the build directory searched, because
-        // if there is a build directory it *is* generally the sdk.
-        let manifest = match sdk_root {
-            Some(root) => root.to_owned(),
-            _ => {
-                let exe_path = find_exe_path()?;
-
-                match find_sdk_root(&Path::new(&exe_path)) {
-                    Ok(Some(root)) => root,
-                    Ok(None) => {
-                        errors::ffx_bail!(
-                            "{}Could not find an SDK manifest in any parent of ffx's directory.",
-                            SDK_NOT_FOUND_HELP,
-                        );
-                    }
-                    Err(e) => {
-                        errors::ffx_bail!("{}Error was: {:?}", SDK_NOT_FOUND_HELP, e);
-                    }
-                }
-            }
-        };
-        let module = self.query("sdk.module").get().ok();
-        match module {
-            Some(module) => {
-                debug!("Found modular Fuchsia SDK at {manifest:?} with module {module}");
-                Ok(SdkRoot::Modular { manifest, module })
-            }
-            _ => {
-                debug!("Found full Fuchsia SDK at {manifest:?}");
-                Ok(SdkRoot::Full(manifest))
-            }
-        }
-    }
-
     /// Returns the configuration domain for the current invocation, if there
     /// is one.
     pub fn get_config_domain(&self) -> Option<&ConfigDomain> {
@@ -595,79 +551,6 @@ impl EnvironmentContext {
         match &mut self.kind {
             EnvironmentKind::ConfigDomain { domain, .. } => Some(domain),
             _ => None,
-        }
-    }
-}
-
-/// Finds the executable path of the ffx binary being run, attempting to
-/// get the path the user believes it to be at, even if it's symlinked from
-/// somewhere else, by using `argv[0]` and [`std::env::current_exe`].
-///
-/// We do this because sometimes ffx is invoked through an SDK that is symlinked
-/// into place from a content addressable store, and we want to make a best
-/// effort to search for the sdk in the right place.
-fn find_exe_path() -> Result<PathBuf> {
-    // get the 'real' binary path, which may have symlinks resolved, as well
-    // as the command this was run as and the cwd
-    let cwd = std::env::current_dir().context("FFX was run from an invalid working directory")?;
-    let binary_path = std::env::current_exe()
-        .and_then(|p| p.canonicalize())
-        .context("FFX Binary doesn't exist in the file system")?;
-    let args_path = match std::env::args_os().next() {
-        Some(arg) => PathBuf::from(&arg),
-        None => {
-            trace!("FFX was run without an argv[0] somehow");
-            return Ok(binary_path);
-        }
-    };
-
-    // canonicalize the path from argv0 to try to figure out where it 'really'
-    // is to make sure it's actually the right binary through potential
-    // symlinks.
-    let canonical_args_path = match args_path.canonicalize() {
-        Ok(path) => path,
-        Err(e) => {
-            trace!(
-                "Could not canonicalize the path ffx was run with, \
-                which might mean the working directory has changed or the file \
-                doesn't exist anymore: {e:?}"
-            );
-            return Ok(binary_path);
-        }
-    };
-
-    // check that it's the same file in the end
-    if binary_path == canonical_args_path {
-        // but return the path it was actually run through instead of the canonical
-        // path, but [`Path::join`]-ed to the cwd to make it more or less
-        // absolute.
-        Ok(cwd.join(args_path))
-    } else {
-        trace!(
-            "FFX's argv[0] ({args_path:?}) resolved to {canonical_args_path:?} \
-            instead of the binary's path {binary_path:?}, falling back to the \
-            binary path."
-        );
-        Ok(binary_path)
-    }
-}
-
-fn find_sdk_root(start_path: &Path) -> Result<Option<PathBuf>> {
-    let cwd = std::env::current_dir()
-        .context("Could not resolve working directory while searching for the Fuchsia SDK")?;
-    let mut path = cwd.join(start_path);
-    debug!("Attempting to find the sdk root from {path:?}");
-
-    loop {
-        path = if let Some(parent) = path.parent() {
-            parent.to_path_buf()
-        } else {
-            return Ok(None);
-        };
-
-        if SdkRoot::is_sdk_root(&path) {
-            debug!("Found sdk root through recursive search in {path:?}");
-            return Ok(Some(path));
         }
     }
 }
@@ -695,40 +578,9 @@ mod test {
             }
         }
     }
-
-    #[fuchsia::test]
-    fn test_find_sdk_root_finds_root() {
-        let temp = tempdir().unwrap();
-        let temp_path = std::fs::canonicalize(temp.path()).expect("canonical temp path");
-
-        let start_path = temp_path.join("test1").join("test2");
-        std::fs::create_dir_all(start_path.clone()).unwrap();
-
-        let meta_path = temp_path.join("meta");
-        std::fs::create_dir(meta_path.clone()).unwrap();
-
-        std::fs::write(meta_path.join("manifest.json"), "").unwrap();
-
-        assert_eq!(find_sdk_root(&start_path).unwrap().unwrap(), temp_path);
-    }
-
-    #[fuchsia::test]
-    fn test_find_sdk_root_no_manifest() {
-        let temp = tempdir().unwrap();
-
-        let start_path = temp.path().to_path_buf().join("test1").join("test2");
-        std::fs::create_dir_all(start_path.clone()).unwrap();
-
-        let meta_path = temp.path().to_path_buf().join("meta");
-        std::fs::create_dir(meta_path).unwrap();
-
-        assert!(find_sdk_root(&start_path).unwrap().is_none());
-    }
-
     fn domains_test_data_path() -> &'static Utf8Path {
         Utf8Path::new(DOMAINS_TEST_DATA_PATH)
     }
-
     #[fuchsia::test]
     fn test_config_domain_context() {
         let domain_root = domains_test_data_path().join("basic_example");
@@ -840,7 +692,7 @@ mod test {
             context.get_build_config_file().unwrap(),
             domain_root.join(".fuchsia-build-config.json")
         );
-        assert_matches!(context.get_sdk_root().unwrap(), SdkRoot::Full(path) if path == domain_root.join("bazel-out/external/fuchsia_sdk"));
+        assert_matches!(context.get_sdk_root().unwrap(), SdkRoot::Full{root:path, manifest:None} if path == domain_root.join("bazel-out/external/fuchsia_sdk"));
     }
 
     fn check_isolated_paths(context: &EnvironmentContext, isolate_dir: &Path) {

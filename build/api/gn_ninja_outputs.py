@@ -8,8 +8,6 @@
 import argparse
 import difflib
 import json
-import marshal
-import sqlite3
 import sys
 from pathlib import Path
 from typing import Dict, List, Sequence
@@ -157,49 +155,6 @@ class NinjaOutputsJSON(NinjaOutputsBase):
         for label, paths in self._label_to_paths.items():
             for path in paths:
                 self._path_to_label[path] = label
-
-    def get_labels_internal(self) -> List[str]:
-        return self._label_to_paths.keys()
-
-    def get_paths_internal(self) -> List[str]:
-        return self._path_to_label.keys()
-
-    def gn_label_to_paths(self, label: str) -> List[str]:
-        return self._label_to_paths.get(label, [])
-
-    def path_to_gn_label(self, path: str) -> str:
-        return self._path_to_label.get(path, "")
-
-
-class NinjaOutputsMarshal(NinjaOutputsBase):
-    """A NinjaOutputsBase implementation that uses marshalled Python data structures.
-
-    Profiling shows that queries are about 2x slower compared to NinjaOutputsJSON due
-    to the cost of unmarshaling the data structures at load time.
-    """
-
-    def __init__(self):
-        super().__init__()
-        self._label_to_paths: Dict[str, List[str]] = {}
-        self._path_to_label: Dict[str, str] = {}
-
-    def load_from_json(self, input_path: Path):
-        with input_path.open() as f:
-            self._label_to_paths = json.load(f)
-        self._path_to_label = {}
-        for label, paths in self._label_to_paths.items():
-            for path in paths:
-                self._path_to_label[path] = label
-
-    def save_to_file(self, output_path: Path):
-        with output_path.open("wb") as f:
-            marshal.dump(self._label_to_paths, f)
-            marshal.dump(self._path_to_label, f)
-
-    def load_from_file(self, input_path: Path):
-        with input_path.open("rb") as f:
-            self._label_to_paths = marshal.load(f)
-            self._path_to_label = marshal.load(f)
 
     def get_labels_internal(self) -> List[str]:
         return self._label_to_paths.keys()
@@ -431,126 +386,8 @@ class NinjaOutputsTabular(NinjaOutputsBase):
         return result
 
 
-class NinjaOutputsSqlite3(NinjaOutputsBase):
-    """A NinjaOutputsBase implementation that uses an in-memory sqlite3 database.
-
-    Profiling that queries are slightly faster than the NinjaOutputsTabular implementation
-    (46.5ms versus 57.3ms). But generation takes a lot more time (4.7s vs 443ms).
-    over NinjaOutputsTabular.
-
-    The generated file is about 109 MiB for a 47 MiB input file.
-    """
-
-    def __init__(self):
-        super().__init__()
-        self._db = None
-
-    def __exit__(self, exc_type, exc_value, exc_tb):
-        if self._db:
-            self._db.close()
-        return False
-
-    def load_from_json(self, input_path: Path):
-        with input_path.open() as f:
-            input_json = json.load(f)
-        self._db = sqlite3.connect(":memory:")
-
-        # Create the three tables + two indices.
-        c = self._db.cursor()
-        c.execute(
-            "CREATE TABLE labels (id integer PRIMARY KEY, label text NOT NULL)"
-        )
-        c.execute(
-            "CREATE TABLE paths (id integer PRIMARY KEY, path text NOT NULL)"
-        )
-        c.execute("CREATE TABLE outputs (label_id integer, path_id integer)")
-
-        # Populate the tables
-        for label, paths in input_json.items():
-            c.execute(f"INSERT INTO labels(label) VALUES('{label}')")
-            label_id = c.lastrowid
-            for path in paths:
-                c.execute(f'INSERT INTO paths(path) VALUES("{path}")')
-                path_id = c.lastrowid
-                c.execute(
-                    f"INSERT INTO outputs(label_id, path_id) VALUES({label_id}, {path_id});"
-                )
-
-        # Create the indices after the tables are created, for better performance.
-        c.execute("CREATE UNIQUE INDEX idx_labels ON labels(label)")
-        c.execute("CREATE UNIQUE INDEX idx_paths ON paths(path)")
-        c.execute("CREATE INDEX idx_output_labels ON outputs(label_id)")
-        c.execute("CREATE UNIQUE INDEX idx_output_paths ON outputs(path_id)")
-
-        self._db.commit()
-
-    def load_from_file(self, input_path: Path):
-        if self._db:
-            self._db.close()
-        self._db = sqlite3.connect(input_path)
-
-    def save_to_file(self, output_path: Path):
-        assert (
-            self._db
-        ), "No database, please call load_from_json() or load_from_file() first!"
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        if output_path.exists():
-            output_path.unlink()
-        out_db = sqlite3.connect(output_path)
-        self._db.backup(out_db)
-        out_db.close()
-        return True
-
-    def get_labels_internal(self) -> List[str]:
-        if not self._db:
-            return []
-
-        c = self._db.cursor()
-        c.execute("""SELECT l.label FROM labels l""")
-        return [x[0] for x in c.fetchall()]
-
-    def get_paths_internal(self) -> List[str]:
-        if not self._db:
-            return []
-
-        c = self._db.cursor()
-        c.execute("""SELECT p.path FROM paths p""")
-        return sorted(x[0] for x in c.fetchall())
-
-    def gn_label_to_paths(self, label: str) -> List[str]:
-        if not self._db:
-            return []
-
-        c = self._db.cursor()
-        c.execute(
-            """SELECT p.path FROM paths p WHERE p.id IN (
-                        SELECT o.path_id FROM outputs o WHERE o.label_id IN (
-                            SELECT l.id FROM labels l WHERE l.label = ?))""",
-            (label,),
-        )
-        return [x[0] for x in c.fetchall()]
-
-    def path_to_gn_label(self, path: str) -> str:
-        if not self._db:
-            return ""
-
-        c = self._db.cursor()
-        c.execute(
-            """SELECT l.label FROM labels l WHERE l.id IN (
-                        SELECT o.label_id FROM outputs o WHERE o.path_id IN (
-                            SELECT p.id FROM paths p WHERE p.path = ?))""",
-            (path,),
-        )
-        labels = c.fetchall()
-        if not labels:
-            return ""
-        return labels[0][0]
-
-
 _FORMAT_TO_CLASS_MAP = {
     "json": NinjaOutputsJSON,
-    "sqlite": NinjaOutputsSqlite3,
-    "marshal": NinjaOutputsMarshal,
     "tabular": NinjaOutputsTabular,
 }
 

@@ -11,8 +11,6 @@ import (
 	_ "github.com/BurntSushi/toml"
 	_ "github.com/creack/pty"
 	_ "github.com/dustin/go-humanize"
-	_ "github.com/dustin/go-humanize/english"
-	_ "github.com/fsnotify/fsnotify"
 	_ "github.com/golang/glog"
 	_ "github.com/google/go-cmp/cmp"
 	_ "github.com/google/go-cmp/cmp/cmpopts"

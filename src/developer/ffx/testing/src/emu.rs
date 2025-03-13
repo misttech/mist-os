@@ -4,7 +4,6 @@
 
 use anyhow::anyhow;
 use make_fuchsia_vol::make_empty_disk_with_uefi;
-use once_cell::sync::Lazy;
 use std::ffi::OsString;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
@@ -19,8 +18,8 @@ pub struct Emu {
 
 impl Emu {
     pub fn product_bundle_dir() -> &'static Path {
-        static PRODUCT_BUNDLE_DIR: Lazy<PathBuf> =
-            Lazy::new(|| crate::ROOT_BUILD_DIR.join(env!("PRODUCT_BUNDLE")));
+        static PRODUCT_BUNDLE_DIR: std::sync::LazyLock<PathBuf> =
+            std::sync::LazyLock::new(|| crate::ROOT_BUILD_DIR.join(env!("PRODUCT_BUNDLE")));
         &*PRODUCT_BUNDLE_DIR
     }
 
@@ -49,11 +48,12 @@ impl Emu {
         let disk_path = emu_dir.path().join("disk.img");
         make_empty_disk_with_uefi(&disk_path, &esp_blk).expect("failed to make empty disk");
 
-        static RUN_ZIRCON_PATH: Lazy<PathBuf> =
-            Lazy::new(|| crate::ROOT_BUILD_DIR.join(env!("RUN_ZIRCON")));
+        static RUN_ZIRCON_PATH: std::sync::LazyLock<PathBuf> =
+            std::sync::LazyLock::new(|| crate::ROOT_BUILD_DIR.join(env!("RUN_ZIRCON")));
 
-        static QEMU_PATH: Lazy<PathBuf> =
-            Lazy::new(|| crate::ROOT_BUILD_DIR.join(concat!(env!("QEMU_PATH"), "/bin")));
+        static QEMU_PATH: std::sync::LazyLock<PathBuf> = std::sync::LazyLock::new(|| {
+            crate::ROOT_BUILD_DIR.join(concat!(env!("QEMU_PATH"), "/bin"))
+        });
 
         let emu_serial = emu_dir.path().join("serial");
         let emu_serial_log = ctx.isolate().log_dir().join("emulator.serial.log");

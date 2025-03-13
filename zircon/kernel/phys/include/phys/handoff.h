@@ -7,6 +7,15 @@
 #ifndef ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_HANDOFF_H_
 #define ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_HANDOFF_H_
 
+// `offsetof(PhysHandoff, kernel_physical_load_address)`, for use in assembly.
+//
+// TODO(https://fxbug.dev/379891035): We only need this for x86 kASan
+// page-table set-up in start.S, which can go away with proper kASan support in
+// physboot.
+#define PHYS_HANDOFF_KERNEL_PHYSICAL_LOAD_ADDRESS 0x8
+
+#ifndef __ASSEMBLER__
+
 // Note: we refrain from using the ktl namespace as <phys/handoff.h> is
 // expected to be compiled in the userboot toolchain.
 
@@ -115,6 +124,9 @@ struct PhysHandoff {
 
   const uint64_t magic = kMagic;
 
+  // The physical address at which the kernel is to be loaded.
+  uintptr_t kernel_physical_load_address = 0;
+
   // TODO(https://fxbug.dev/42164859): This will eventually be made a permanent pointer.
   PhysHandoffTemporaryPtr<const BootOptions> boot_options;
 
@@ -192,6 +204,15 @@ struct PhysHandoff {
 
 static_assert(std::is_default_constructible_v<PhysHandoff>);
 
+// PhysHandoff does not have a standard layout due to some non-standard
+// members, but it's standard enough that we'd expect to be able to use
+// offsetof() on its members, especially on early ones like this.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Winvalid-offsetof"
+static_assert(offsetof(PhysHandoff, kernel_physical_load_address) ==
+              PHYS_HANDOFF_KERNEL_PHYSICAL_LOAD_ADDRESS);
+#pragma GCC diagnostic pop
+
 extern PhysHandoff* gPhysHandoff;
 
 // This is the entry point function for the ELF kernel.
@@ -211,6 +232,9 @@ class VmObject;
 
 // Called as soon as the physmap is available to set the gPhysHandoff pointer.
 void HandoffFromPhys(paddr_t handoff_paddr);
+
+// Valid to call only after HandoffFromPhys().
+paddr_t KernelPhysicalLoadAddress();
 
 // This can be used after HandoffFromPhys and before the ZBI is handed off to
 // userboot at the very end of kernel initialization code.  Userboot calls it
@@ -240,5 +264,6 @@ struct HandoffEnd {
 HandoffEnd EndHandoff();
 
 #endif  // _KERNEL
+#endif  // __ASSEMBLER__
 
 #endif  // ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_HANDOFF_H_

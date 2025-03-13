@@ -5,14 +5,15 @@
 #ifndef ZXTEST_BASE_REPORTER_H_
 #define ZXTEST_BASE_REPORTER_H_
 
-#include <cstdio>
 #include <memory>
 #include <utility>
 
 #include <fbl/string.h>
 #include <fbl/vector.h>
+#include <zxtest/base/json-reporter.h>
 #include <zxtest/base/log-sink.h>
 #include <zxtest/base/observer.h>
+#include <zxtest/base/timer.h>
 
 namespace zxtest {
 
@@ -23,20 +24,6 @@ class TestCase;
 class TestInfo;
 
 namespace internal {
-
-// Helper class to measure a timer interval.
-class Timer {
- public:
-  Timer();
-
-  void Reset();
-
-  // Gets the amount of milliseconds since |start_|.
-  int64_t GetElapsedTime() const;
-
- private:
-  uint64_t start_;
-};
 
 // Summary about test results.
 struct IterationSummary {

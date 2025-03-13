@@ -58,5 +58,5 @@ had an appropriate policy agent for this purpose the policy agent would take an
 assertive dependency on the low priority application, thus telling the
 application when to be active.
 
-[coordination]: intro.md#coordination
+[coordination]: README.md#coordination
 [taking_action]: basic_suspend_resume.md#taking-action-on-system-suspend-or-resume

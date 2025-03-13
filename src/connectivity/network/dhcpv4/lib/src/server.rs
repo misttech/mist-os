@@ -825,7 +825,7 @@ pub fn build_offer(
         None => default_lease_length_seconds,
     };
     options.push(DhcpOption::IpAddressLeaseTime(lease_length));
-    let v = renewal_time_value.unwrap_or_else(|| lease_length / 2);
+    let v = renewal_time_value.unwrap_or(lease_length / 2);
     options.push(DhcpOption::RenewalTimeValue(v));
     let v =
         rebinding_time_value.unwrap_or_else(|| (lease_length / 4) * 3 + (lease_length % 4) * 3 / 4);

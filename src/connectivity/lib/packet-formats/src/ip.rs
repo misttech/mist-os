@@ -233,6 +233,9 @@ pub trait IpPacket<B: SplitByteSlice, I: IpExt>:
 
     /// Copies the full packet into a `Vec`.
     fn to_vec(&self) -> Vec<u8>;
+
+    /// Constructs a builder with the same contents as this packet's header.
+    fn builder(&self) -> Self::Builder;
 }
 
 impl<B: SplitByteSlice> IpPacket<B, Ipv4> for Ipv4Packet<B> {
@@ -286,6 +289,10 @@ impl<B: SplitByteSlice> IpPacket<B, Ipv4> for Ipv4Packet<B> {
     fn to_vec(&self) -> Vec<u8> {
         self.to_vec()
     }
+
+    fn builder(&self) -> Self::Builder {
+        Ipv4Header::builder(self)
+    }
 }
 
 impl<B: SplitByteSlice> IpPacket<B, Ipv6> for Ipv6Packet<B> {
@@ -336,6 +343,10 @@ impl<B: SplitByteSlice> IpPacket<B, Ipv6> for Ipv6Packet<B> {
 
     fn to_vec(&self) -> Vec<u8> {
         self.to_vec()
+    }
+
+    fn builder(&self) -> Self::Builder {
+        self.builder()
     }
 }
 

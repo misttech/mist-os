@@ -15,6 +15,7 @@ namespace ktrace_provider {
 class Reader {
  public:
   Reader(const char* buffer, size_t buffer_size);
+
   virtual ~Reader() = default;
 
   const uint64_t* ReadNextRecord();

@@ -5,7 +5,6 @@
 source_set("env") {
   sources = [
     "__environ.c",
-    "__stack_chk_fail.c",
     "clearenv.c",
     "getenv.c",
     "putenv.c",
@@ -30,6 +29,7 @@ source_set("start-main") {
   sources = [ "__libc_start_main.c" ]
 
   deps = [
+    "//zircon/system/ulib/c/startup:startup-random-impl",
     "//zircon/system/ulib/processargs",
     "//zircon/third_party/ulib/musl:musl_internal",
   ]

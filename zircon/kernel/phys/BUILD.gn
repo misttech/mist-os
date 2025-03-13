@@ -154,9 +154,6 @@ if (toolchain_environment == "kernel.phys" ||
   static_library("symbolize") {
     public = [ "include/phys/symbolize.h" ]
 
-    # TODO(https://fxbug.dev/374753100): Remove this after soft transition.
-    defines = [ "_LIBCPP_VERBOSE_ABORT_NOT_NOEXCEPT" ]
-
     sources = [
       "main-symbolize.cc",
       "panic.cc",
@@ -579,6 +576,7 @@ if (toolchain_environment == "kernel.phys" ||
     ]
     public_deps = [ ":handoff-prep.h" ]
     deps = [
+      ":address-space",
       ":allocation",
       ":elf-image",
       ":handoff",
@@ -881,7 +879,6 @@ if (is_kernel) {
     sources = [ "physboot.cc" ]
     include_dirs = [ "//zircon/kernel/arch/$zircon_cpu/include" ]
     deps = [
-      ":address-space",
       ":allocation",
       ":boot-zbi",
       ":elf-image",

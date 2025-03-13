@@ -43,6 +43,7 @@ common_deps = [
 ]
 
 fuchsia_cc_driver("goldfish_driver-driver") {
+  legacy = true
   output_name = "goldfish"
 
   sources = [

@@ -5,7 +5,8 @@
 use argh::{ArgsInfo, FromArgs};
 use async_trait::async_trait;
 use ffx_config::EnvironmentContext;
-use fho::{Error, FfxMain, FfxTool, Result, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{Error, FfxMain, FfxTool, Result};
 use target_connector::Connector;
 use target_holders::{RemoteControlProxyHolder, TargetProxyHolder};
 

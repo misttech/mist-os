@@ -26,13 +26,17 @@ pub enum PackagesSubCommand {
 #[argh(subcommand, name = "list", description = "Inspect and manage package repositories")]
 pub struct ListSubCommand {
     #[argh(option, short = 'r')]
-    /// list packages from this repository.
+    /// list packages from a running repository with this name.
     pub repository: Option<String>,
 
     #[argh(option, short = 'p')]
     /// repository server port number.
     /// Required needed to disambiguate multiple repositories with the same name.
     pub port: Option<u16>,
+
+    #[argh(option)]
+    /// list packages stored in the repository stored on disk.
+    pub repo_path: Option<PathBuf>,
 
     /// if true, package hashes will be displayed in full (i.e. not truncated).
     #[argh(switch)]
@@ -59,6 +63,10 @@ pub struct ShowSubCommand {
     /// repository server port number.
     /// Required to disambiguate multiple repositories with the same name.
     pub port: Option<u16>,
+
+    #[argh(option)]
+    /// list packages stored in the repository stored on disk.
+    pub repo_path: Option<PathBuf>,
 
     /// if true, package hashes will be displayed in full (i.e. not truncated).
     #[argh(switch)]
@@ -92,6 +100,10 @@ pub struct ExtractArchiveSubCommand {
     /// repository server port number.
     /// Required disambiguate multiple repositories with the same name.
     pub port: Option<u16>,
+
+    #[argh(option)]
+    /// list packages stored in the repository stored on disk.
+    pub repo_path: Option<PathBuf>,
 
     #[argh(positional)]
     /// extract this package.

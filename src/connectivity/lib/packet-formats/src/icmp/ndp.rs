@@ -1336,9 +1336,9 @@ mod tests {
     fn nonce_length_validation(
         length: usize,
     ) -> Result<options::NdpNonce<&'static [u8]>, options::InvalidNonceError> {
-        let bytes = vec![0u8; length];
-        let bytes = Box::leak(Box::new(bytes));
-        options::NdpNonce::new(&bytes[..])
+        const LEN: usize = (u8::MAX as usize + 1) * 8;
+        const BYTES: [u8; LEN] = [0u8; LEN];
+        options::NdpNonce::new(&BYTES[..length])
     }
 
     #[test]

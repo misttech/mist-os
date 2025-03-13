@@ -5,11 +5,12 @@
 #ifndef LIB_COMPONENT_OUTGOING_CPP_OUTGOING_DIRECTORY_H_
 #define LIB_COMPONENT_OUTGOING_CPP_OUTGOING_DIRECTORY_H_
 
-#include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/markers.h>
 #include <lib/async/cpp/sequence_checker.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/dispatcher.h>
 #include <lib/component/outgoing/cpp/handlers.h>
+#include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fidl/cpp/wire/traits.h>
 #include <lib/fit/function.h>
 #include <lib/stdcompat/string_view.h>

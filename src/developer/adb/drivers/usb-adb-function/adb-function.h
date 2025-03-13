@@ -10,59 +10,94 @@
 #include <fidl/fuchsia.hardware.usb.function/cpp/fidl.h>
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/ddk/driver.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/devfs/cpp/connector.h>
 #include <lib/sync/cpp/completion.h>
 #include <zircon/compiler.h>
 
 #include <mutex>
 #include <queue>
 
-#include <ddktl/device.h>
-#include <ddktl/protocol/empty-protocol.h>
 #include <usb-endpoint/usb-endpoint-client.h>
 #include <usb/descriptors.h>
 
 namespace usb_adb_function {
 
+constexpr uint32_t kBulkTxCount = 16;
+constexpr uint32_t kBulkRxCount = 16;
+constexpr size_t kVmoDataSize = 2048;
+
 constexpr uint16_t kBulkMaxPacket = 512;
+
+constexpr char kDeviceName[] = "usb-adb-function";
 
 namespace fadb = fuchsia_hardware_adb;
 namespace fendpoint = fuchsia_hardware_usb_endpoint;
 
-class UsbAdbDevice;
-using UsbAdb = ddk::Device<UsbAdbDevice, ddk::Suspendable, ddk::Unbindable,
-                           ddk::Messageable<fadb::Device>::Mixin>;
+// The driver's internal state machine. Begins in kAwaitingUsbConnection.
+enum class State : uint8_t {
+  // In kAwaitingUsbConnection, we have called function_.SetInterface(this), and
+  // are waiting for the function driver to call SetConfigured(true). Calls to
+  // SetConfigured(false) are ignored.
+  //
+  // Once SetConfigured(true) has been called, we:
+  // - Send USB "receive" requests to the endpoint,
+  // - Tell any connected UsbAdbImpl clients that the device is online, and
+  // - Move to kConnected.
+  //
+  // If a fadb::Device client requests shutdown by calling StopAdb() or closing
+  // a UsbAdbImpl connection, we call function_.SetInterface(nullptr), and move
+  // to kStoppingUsb. Likewise if PrepareStop is called.
+  kAwaitingUsbConnection,
 
-// Implements USB ADB function driver.
-// Components implementing ADB protocol should open a AdbImpl FIDL connection to dev-class/adb/xxx
-// supported by this class to queue ADB messages. ADB protocol component can provide a client
-// end channel to AdbInterface during Start method call to receive ADB messages sent by the host.
-class UsbAdbDevice : public UsbAdb,
+  // In kConnected, the USB connection is live, and we respond to any
+  // QueueTx/Receive requests from UsbAdbImpl clients.
+  //
+  // If any of the following happen:
+  // - A fadb::Device client calls StopAdb().
+  // - A UsbAdbImpl client closes their channel.
+  // - The USB function driver calls SetConfigured(false)
+  // - PrepareStop get called.
+  //
+  // ... we call function_.SetInterface(nullptr) and move to kStoppingUsb. (We
+  // hold onto the responder for any calls to StopAdb()).
+  kConnected,
+
+  // In kStoppingUsb, we wait for all outstanding USB requests to be completed.
+  // Once they have been, we:
+  // - Return OK to any StopAdb() calls that triggered the stoppage (or
+  //   happened while in kStoppingUsb).
+  // - Tell any connected UsbAdbImpl clients that the device is
+  //   offline,
+  // - Close all UsbAdbImpl connections.
+  //
+  // At that point, if the stoppage was caused by a call to PrepareStop (or
+  // PrepareStop we called while shutting down), we respond that the driver has
+  // shutdown successfully. Otherwise, we restart the USB connection by calling
+  // function_.SetInterface(this), and move back to kAwaitingUsbConnection.
+  kStoppingUsb,
+};
+
+// Implements the USB ADB function driver.
+class UsbAdbDevice : public fdf::DriverBase,
                      public ddk::UsbFunctionInterfaceProtocol<UsbAdbDevice>,
-                     public ddk::EmptyProtocol<ZX_PROTOCOL_ADB>,
+                     public fidl::WireServer<fadb::Device>,
                      public fidl::Server<fadb::UsbAdbImpl> {
  public:
-  // Driver bind method.
-  static zx_status_t Bind(void* ctx, zx_device_t* parent);
-
-  explicit UsbAdbDevice(zx_device_t* parent, uint32_t bulk_tx_count, uint32_t bulk_rx_count,
-                        uint32_t vmo_data_size)
-      : UsbAdb(parent),
-        bulk_tx_count_(bulk_tx_count),
-        bulk_rx_count_(bulk_rx_count),
-        vmo_data_size_(vmo_data_size),
-        function_(parent) {
-    loop_.StartThread("usb-adb-loop");
-    dispatcher_ = loop_.dispatcher();
+  explicit UsbAdbDevice(fdf::DriverStartArgs start_args,
+                        fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+      : fdf::DriverBase("usb_adb", std::move(start_args), std::move(driver_dispatcher)),
+        checker_(dispatcher()) {
+    // TODO(https://fxrev.dev/333883656): Use SynchronizedDispatcher with
+    // FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS instead.
+    usb_loop_.StartThread("usb-adb-loop");
+    usb_dispatcher_ = usb_loop_.dispatcher();
   }
 
-  // Initialize endpoints and request pools.
-  zx_status_t Init();
-
-  // DDK lifecycle methods.
-  void DdkRelease();
-  void DdkSuspend(ddk::SuspendTxn txn);
-  void DdkUnbind(ddk::UnbindTxn txn);
+  // Driver lifecycle methods.
+  zx::result<> Start() override;
+  void PrepareStop(fdf::PrepareStopCompleter completer) override;
 
   // UsbFunctionInterface methods.
   size_t UsbFunctionInterfaceGetDescriptorsSize();
@@ -74,26 +109,25 @@ class UsbAdbDevice : public UsbAdb,
   zx_status_t UsbFunctionInterfaceSetInterface(uint8_t interface, uint8_t alt_setting);
 
   // fadb::Device methods.
-  void Start(StartRequestView request, StartCompleter::Sync& completer) override;
-  void Stop(StopCompleter::Sync& completer) override;
-
-  // Helper method called when fadb::Device closes.
-  void Stop();
+  void StartAdb(StartAdbRequestView request, StartAdbCompleter::Sync& completer) override;
+  void StopAdb(StopAdbCompleter::Sync& completer) override;
 
   // fadb::UsbAdbImpl methods.
   void QueueTx(QueueTxRequest& request, QueueTxCompleter::Sync& completer) override;
   void Receive(ReceiveCompleter::Sync& completer) override;
 
-  // Public for testing
-  void SetShutdownCallback(fit::callback<void()> cb) {
-    std::lock_guard<std::mutex> _(lock_);
-    shutdown_callback_ = std::move(cb);
-  }
-
  private:
-  const uint32_t bulk_tx_count_;
-  const uint32_t bulk_rx_count_;
-  const size_t vmo_data_size_;
+  mutable async::sequence_checker checker_;
+
+  State state_ __TA_GUARDED(checker_) = State::kAwaitingUsbConnection;
+
+  // State transition helpers.
+  void StartUsb() __TA_REQUIRES(checker_);
+  void EnableEndpoints() __TA_REQUIRES(checker_);
+  void ResetOrStopUsb() __TA_REQUIRES(checker_);
+  void CheckUsbStopComplete() __TA_REQUIRES(checker_);
+
+  fidl::ServerBindingGroup<fadb::Device> device_bindings_;
 
   // Structure to store pending transfer requests when there are not enough USB request buffers.
   struct txn_req_t {
@@ -102,70 +136,40 @@ class UsbAdbDevice : public UsbAdb,
     QueueTxCompleter::Async completer;
   };
 
-  // Helper method to perform bookkeeping and insert requests back to the free pool.
-  zx_status_t InsertUsbRequest(fuchsia_hardware_usb_request::Request req,
-                               usb::EndpointClient<UsbAdbDevice>& ep);
+  // Helper methods to get free request buffer and queue the request for transmitting.
+  void SendQueued() __TA_REQUIRES(checker_);
+  bool SendQueuedOnce() __TA_REQUIRES(checker_);
 
-  // Helper method to get free request buffer and queue the request for transmitting.
-  zx::result<> SendLocked() __TA_REQUIRES(bulk_in_ep_.mutex());
-  // Helper method to get free request buffer and queue the request for receiving.
-  void ReceiveLocked() __TA_REQUIRES(bulk_out_ep_.mutex());
+  // Helper methods to get free request buffer and queue the request for receiving.
+  void ReceiveQueued() __TA_REQUIRES(checker_);
+  bool ReceiveQueuedOnce() __TA_REQUIRES(checker_);
 
-  // USB request completion callback methods.
-  void TxComplete(fendpoint::Completion completion);
-  void RxComplete(fendpoint::Completion completion);
+  // USB request completion callback methods - these run on the driver
+  // dispatcher.
+  void TxComplete(fendpoint::Completion completion) __TA_REQUIRES(checker_);
+  void RxComplete(fendpoint::Completion completion) __TA_REQUIRES(checker_);
 
-  // Helper method to configure endpoints
-  zx_status_t ConfigureEndpoints(bool enable);
+  // USB request completion callback methods - these can run on any thread.
+  void TxCompleteCallback(fendpoint::Completion completion);
+  void RxCompleteCallback(fendpoint::Completion completion);
 
   uint8_t bulk_out_addr() const { return descriptors_.bulk_out_ep.b_endpoint_address; }
   uint8_t bulk_in_addr() const { return descriptors_.bulk_in_ep.b_endpoint_address; }
 
-  bool Online() const {
-    std::lock_guard<std::mutex> _(lock_);
-    return (status_ == fadb::StatusFlags::kOnline) && !shutdown_callback_;
-  }
-
-  // Called when shutdown is in progress and all pending requests are completed. Invokes shutdown
-  // completion callback.
-  void ShutdownComplete() __TA_REQUIRES(lock_);
-
   ddk::UsbFunctionProtocolClient function_;
 
-  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
-  async_dispatcher_t* dispatcher_;
+  // Loop and dispatcher used in the background by the USB endpoint clients.
+  async::Loop usb_loop_{&kAsyncLoopConfigNeverAttachToThread};
+  async_dispatcher_t* usb_dispatcher_;
 
-  // UsbAdbImpl service binding. This is created when client calls Start.
-  std::optional<fidl::ServerBinding<fadb::UsbAdbImpl>> adb_binding_;
+  // UsbAdbImpl service binding. ServerEnds passed into StartAdb() end up here.
+  std::optional<fidl::ServerBinding<fadb::UsbAdbImpl>> adb_binding_ __TA_GUARDED(checker_);
 
-  // Set once the interface is configured.
-  fadb::StatusFlags status_ __TA_GUARDED(lock_) = fadb::StatusFlags(0);
-
-  // Holds suspend/unbind DDK callback to be invoked once shutdown is complete.
-  fit::callback<void()> shutdown_callback_ __TA_GUARDED(lock_);
-  // `stop_completed_` ensures that `shutdown_callback_` is only called after `Stop()` has finished
-  // all its necessary operations including deconfiguring endpoints, etc. In practice, this is not
-  // important, but this facilitates orderly shutdown which avoids flakes in tests.
-  std::atomic_bool stop_completed_ __TA_GUARDED(lock_) = false;
-
-  // This driver uses 4 locks to avoid race conditions in different sub-parts of the driver. The
-  // OUT/IN endpoints each contain one mutex, where bulk_in_ep_.mutex() is used to avoid race
-  // conditions w.r.t transmit buffers. bulk_out_ep_.mutex() is used to avoid race conditions w.r.t
-  // receive buffers. lock_ is used for all driver internal states. Alternatively a single lock
-  // (lock_) could have been used for TX, RX and driver states, but that will serialize TX methods
-  // w.r.t RX. Hence the separation of locks.
-  //
-  // NOTE: In order to maintain reentrancy, do not hold any lock when invoking callbacks/methods
-  // that can reenter the driver methods.
-  //
-  // As for lock ordering, IN/OUT mutex_s must be the highest order lock i.e. it must be
-  // acquired before lock_ when both locks are held. IN/OUT mutex_s are
-  // never acquired together.
-
-  // Lock for guarding driver states. This should be held for only a short duration and is the inner
-  // most lock in all cases.
-  mutable std::mutex lock_ __TA_ACQUIRED_AFTER(bulk_in_ep_.mutex())
-      __TA_ACQUIRED_AFTER(bulk_out_ep_.mutex());
+  // Callbacks to call when the USB stack has been brought down and it's safe to
+  // call AdbStart().
+  std::vector<StopAdbCompleter::Async> stop_completers_ __TA_GUARDED(checker_);
+  // Holds Stop callback to be invoked once shutdown is complete.
+  std::optional<fdf::PrepareStopCompleter> shutdown_callback_ __TA_GUARDED(checker_);
 
   // USB ADB interface descriptor.
   struct {
@@ -207,22 +211,23 @@ class UsbAdbDevice : public UsbAdb,
 
   zx_status_t InitEndpoint(fidl::ClientEnd<fuchsia_hardware_usb_function::UsbFunction>& client,
                            uint8_t direction, uint8_t* ep_addrs,
-                           usb::EndpointClient<UsbAdbDevice>& ep, uint32_t req_count);
+                           usb::EndpointClient<UsbAdbDevice>& ep, uint32_t req_count)
+      __TA_REQUIRES(checker_);
 
   // Bulk OUT/RX endpoint
   usb::EndpointClient<UsbAdbDevice> bulk_out_ep_{usb::EndpointType::BULK, this,
-                                                 std::mem_fn(&UsbAdbDevice::RxComplete)};
+                                                 std::mem_fn(&UsbAdbDevice::RxCompleteCallback)};
   // Queue of pending Receive requests from client.
-  std::queue<ReceiveCompleter::Async> rx_requests_ __TA_GUARDED(bulk_out_ep_.mutex());
+  std::queue<ReceiveCompleter::Async> rx_requests_ __TA_GUARDED(checker_);
   // pending_replies_ only used for bulk_out_ep_
-  std::queue<fendpoint::Completion> pending_replies_ __TA_GUARDED(bulk_out_ep_.mutex());
+  std::queue<fendpoint::Completion> pending_replies_ __TA_GUARDED(checker_);
 
   // Bulk IN/TX endpoint
   usb::EndpointClient<UsbAdbDevice> bulk_in_ep_{usb::EndpointType::BULK, this,
-                                                std::mem_fn(&UsbAdbDevice::TxComplete)};
+                                                std::mem_fn(&UsbAdbDevice::TxCompleteCallback)};
   // Queue of pending transfer requests that need to be transmitted once the BULK IN request buffers
   // become available.
-  std::queue<txn_req_t> tx_pending_reqs_ __TA_GUARDED(bulk_in_ep_.mutex());
+  std::queue<txn_req_t> tx_pending_reqs_ __TA_GUARDED(checker_);
 };
 
 }  // namespace usb_adb_function

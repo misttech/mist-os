@@ -387,7 +387,7 @@ zx_status_t VmObjectDispatcher::SetStreamSize(uint64_t stream_size) {
   VmObjectPaged* paged = DownCastVmObject<VmObjectPaged>(vmo_.get());
   DEBUG_ASSERT(paged);
   {
-    Guard<CriticalMutex> vmo_guard{paged->lock()};
+    Guard<VmoLockType> vmo_guard{paged->lock()};
     paged->ForwardRangeChangeUpdateLocked(zero_start, vmo_size - zero_start,
                                           VmCowPages::RangeChangeOp::Unmap);
     op.CommitLocked();
@@ -560,16 +560,16 @@ zx_status_t VmObjectDispatcher::CreateChildInternal(uint32_t options, uint64_t o
   }
 
   // Check for mutually-exclusive child type flags.
-  CloneType type;
+  SnapshotType type;
   if (options & ZX_VMO_CHILD_SNAPSHOT) {
     options &= ~ZX_VMO_CHILD_SNAPSHOT;
-    type = CloneType::Snapshot;
+    type = SnapshotType::Full;
   } else if (options & ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE) {
     options &= ~ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE;
-    type = CloneType::SnapshotAtLeastOnWrite;
+    type = SnapshotType::OnWrite;
   } else if (options & ZX_VMO_CHILD_SNAPSHOT_MODIFIED) {
     options &= ~ZX_VMO_CHILD_SNAPSHOT_MODIFIED;
-    type = CloneType::SnapshotModified;
+    type = SnapshotType::Modified;
   } else {
     return ZX_ERR_INVALID_ARGS;
   }

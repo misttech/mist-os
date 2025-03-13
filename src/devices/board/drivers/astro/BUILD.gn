@@ -25,6 +25,7 @@ driver_bind_rules("astro-bind") {
 }
 
 fuchsia_cc_driver("astro-driver") {
+  legacy = true
   output_name = "astro"
   configs += [
     "//build/config:all_source",

@@ -385,7 +385,7 @@ void HdmiTransmitterControllerImpl::Reset() {
 
 void HdmiTransmitterControllerImpl::SetupScdc(bool is4k) {
   uint8_t scdc_data = ScdcRead(0x1);
-  FDF_LOG(INFO, "version is %s\n", (scdc_data == 1) ? "2.0" : "<= 1.4");
+  fdf::info("version is {}", (scdc_data == 1) ? "2.0" : "<= 1.4");
   // scdc write is done twice in uboot
   // TODO: find scdc register def
   ScdcWrite(0x2, 0x1);
@@ -715,8 +715,8 @@ zx::result<> HdmiTransmitterControllerImpl::ReadEdidBlock(
 
     bool success = PollForDdcCommandDone();
     if (!success) {
-      FDF_LOG(ERROR, "DDC controller did not finish reading after %d attempts",
-              kMaxAttemptCountForPollForDdcCommandDone);
+      fdf::error("DDC controller did not finish reading after {} attempts",
+                 kMaxAttemptCountForPollForDdcCommandDone);
       return zx::error(ZX_ERR_TIMED_OUT);
     }
 
@@ -734,14 +734,14 @@ zx::result<fbl::Vector<uint8_t>> HdmiTransmitterControllerImpl::ReadExtendedEdid
   fbl::AllocChecker alloc_checker;
   base_edid.resize(edid::kBlockSize, &alloc_checker);
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for base EDID");
+    fdf::error("Failed to allocate memory for base EDID");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   zx::result<> base_edid_result =
       ReadEdidBlock(0, std::span<uint8_t, edid::kBlockSize>(base_edid.data(), edid::kBlockSize));
   if (base_edid_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to read EDID base block: %s", base_edid_result.status_string());
+    fdf::error("Failed to read EDID base block: {}", base_edid_result.status_string());
     return base_edid_result.take_error();
   }
 
@@ -757,7 +757,7 @@ zx::result<fbl::Vector<uint8_t>> HdmiTransmitterControllerImpl::ReadExtendedEdid
   extended_edid.resize(extended_edid_size, 0, &alloc_checker);
 
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate %zu bytes for E-EDID", extended_edid_size);
+    fdf::error("Failed to allocate {} bytes for E-EDID", extended_edid_size);
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -770,8 +770,8 @@ zx::result<fbl::Vector<uint8_t>> HdmiTransmitterControllerImpl::ReadExtendedEdid
         extended_edid.begin() + extended_block_offset, edid::kBlockSize);
     zx::result<> extension_block_result = ReadEdidBlock(extension_block_index, extended_block);
     if (extension_block_result.is_error()) {
-      FDF_LOG(ERROR, "Failed to read EDID extension block #%d: %s", extension_block_index,
-              extension_block_result.status_string());
+      fdf::error("Failed to read EDID extension block #{}: {}", extension_block_index,
+                 extension_block_result.status_string());
       return extension_block_result.take_error();
     }
   }
@@ -781,11 +781,11 @@ zx::result<fbl::Vector<uint8_t>> HdmiTransmitterControllerImpl::ReadExtendedEdid
 
 #define PRINT_REG(name) PrintReg(#name, (name))
 void HdmiTransmitterControllerImpl::PrintReg(const char* name, uint32_t address) {
-  FDF_LOG(INFO, "%s (0x%4x): %u", name, address, ReadReg(address));
+  fdf::info("{} (0x{:4x}): {}", name, address, ReadReg(address));
 }
 
 void HdmiTransmitterControllerImpl::PrintRegisters() {
-  FDF_LOG(INFO, "------------HdmiDw Registers------------");
+  fdf::info("------------HdmiDw Registers------------");
 
   PRINT_REG(HDMITX_DWC_A_APIINTCLR);
   PRINT_REG(HDMITX_DWC_CSC_CFG);

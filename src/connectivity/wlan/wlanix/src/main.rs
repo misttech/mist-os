@@ -18,6 +18,7 @@ use wlan_common::bss::BssDescription;
 use wlan_common::channel::{Cbw, Channel};
 use wlan_telemetry::{self, TelemetryEvent, TelemetrySender};
 use {
+    fidl_fuchsia_wlan_device_service as fidl_device_service,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
     fidl_fuchsia_wlan_wlanix as fidl_wlanix, fuchsia_async as fasync,
 };
@@ -568,6 +569,7 @@ async fn handle_client_connect_transactions<C: ClientIface>(
                     fasync::MonotonicInstant::now() - ctx.most_recent_connect_time;
                 telemetry_sender.send(TelemetryEvent::Disconnect {
                     info: wlan_telemetry::DisconnectInfo {
+                        iface_id,
                         connected_duration,
                         is_sme_reconnecting: info.is_sme_reconnecting,
                         disconnect_source: info.disconnect_source,
@@ -1531,8 +1533,10 @@ async fn main() {
     .expect("Failed to initialize wlanix logs");
     info!("Starting Wlanix");
 
-    let iface_manager = ifaces::DeviceMonitorIfaceManager::new()
-        .expect("Failed to connect wlanix to wlandevicemonitor");
+    let monitor_svc = fuchsia_component::client::connect_to_protocol::<
+        fidl_device_service::DeviceMonitorMarker,
+    >()
+    .expect("failed to connect to device monitor");
 
     // Setup telemetry module
     let cobalt_logger = wlan_telemetry::setup_cobalt_proxy().await.unwrap_or_else(|err| {
@@ -1554,11 +1558,15 @@ async fn main() {
     const CLIENT_STATS_NODE_NAME: &str = "client_stats";
     let (telemetry_sender, serve_telemetry_fut) = wlan_telemetry::serve_telemetry(
         cobalt_logger,
-        iface_manager.clone_device_monitor_svc(),
+        monitor_svc.clone(),
         fuchsia_inspect::component::inspector().root().create_child(CLIENT_STATS_NODE_NAME),
         &format!("root/{CLIENT_STATS_NODE_NAME}"),
         persistence_sender,
     );
+
+    let iface_manager =
+        ifaces::DeviceMonitorIfaceManager::new(monitor_svc, telemetry_sender.clone())
+            .expect("Failed to connect wlanix to wlandevicemonitor");
 
     let res = futures::try_join!(
         serve_telemetry_fut,
@@ -2852,9 +2860,10 @@ mod tests {
         assert_eq!(message.payload.cmd, Nl80211Cmd::NewInterface);
         assert!(message.payload.attrs.iter().any(|attr| *attr
             == Nl80211Attr::IfaceIndex(ifaces::test_utils::FAKE_IFACE_RESPONSE.id.into())));
-        assert!(message.payload.attrs.iter().any(
-            |attr| *attr == Nl80211Attr::Mac(ifaces::test_utils::FAKE_IFACE_RESPONSE.sta_addr)
-        ));
+        assert!(message
+            .payload
+            .attrs
+            .contains(&Nl80211Attr::Mac(ifaces::test_utils::FAKE_IFACE_RESPONSE.sta_addr)));
         assert_eq!(responses[1].message_type, Some(fidl_wlanix::Nl80211MessageType::Done));
     }
 
@@ -3097,10 +3106,6 @@ mod tests {
         assert_eq!(responses.len(), 1);
         let message = expect_nl80211_message(&responses[0]);
         assert_eq!(message.payload.cmd, Nl80211Cmd::GetReg);
-        assert!(message
-            .payload
-            .attrs
-            .iter()
-            .any(|attr| *attr == Nl80211Attr::RegulatoryRegionAlpha2([b'W', b'W'])));
+        assert!(message.payload.attrs.contains(&Nl80211Attr::RegulatoryRegionAlpha2([b'W', b'W'])));
     }
 }

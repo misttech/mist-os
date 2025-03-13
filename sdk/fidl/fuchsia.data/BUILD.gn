@@ -12,4 +12,5 @@ fidl("fuchsia.data") {
   sources = [ "data.fidl" ]
 
   enable_hlcpp = true
+  enable_rust_next = true
 }

@@ -85,7 +85,6 @@ if (toolchain_base_environment == "kernel") {
       "vector_asm.S",
     ]
     deps = [
-      ":boot-mmu",
       "//sdk/lib/zbi-format",
       "//zircon/kernel/dev/iommu/dummy",
       "//zircon/kernel/dev/pdev/power",
@@ -108,20 +107,5 @@ if (toolchain_base_environment == "kernel") {
       "//zircon/system/ulib/bitmap",
       "//zircon/system/ulib/pretty",
     ]
-  }
-
-  source_set("boot-mmu") {
-    visibility = [ ":*" ]
-
-    sources = [ "boot-mmu.cc" ]
-    deps = [ "//zircon/kernel/vm" ]
-
-    # Everything in this file runs too early to use the full ABI.  Per-function
-    # attribute suppression of sanitizer modes doesn't work for C++ lambda.
-    configs += [ "//build/config/sanitizers:no_sanitizers" ]
-
-    # Avoid generating coverage code since this may generate misaligned stores
-    # to the coverage array.
-    configs += [ "//build/config/profile:no-coverage" ]
   }
 }

@@ -26,14 +26,13 @@ async fn test_logs_lifecycle() {
     .expect("create base topology");
 
     let accessor = utils::connect_accessor(&realm, utils::ALL_PIPELINE).await;
-    let mut reader = ArchiveReader::new();
+    let mut reader = ArchiveReader::logs();
     reader
         .with_archive(accessor)
         .with_minimum_schema_count(0) // we want this to return even when no log messages
         .retry(RetryConfig::never());
 
-    let (mut subscription, mut errors) =
-        reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
+    let (mut subscription, mut errors) = reader.snapshot_then_subscribe().unwrap().split_streams();
     let _log_errors = fasync::Task::spawn(async move {
         if let Some(error) = errors.next().await {
             panic!("{error:#?}");
@@ -54,7 +53,7 @@ async fn test_logs_lifecycle() {
         check_message(&puppet_name, subscription.next().await.unwrap());
 
         reader.with_minimum_schema_count(i);
-        let all_messages = reader.snapshot::<Logs>().await.unwrap();
+        let all_messages = reader.snapshot().await.unwrap();
 
         for message in all_messages {
             check_message("puppet", message);

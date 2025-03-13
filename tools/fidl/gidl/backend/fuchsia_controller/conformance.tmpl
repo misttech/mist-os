@@ -21,8 +21,8 @@ class EncodeConformanceTests(unittest.TestCase):
         handle_defs: list[BaseHandle] = {{ .HandleDefs }}
         {{- end }}
         value = {{ .Value }}
-        b, hdls = value.encode()
-        self.assertEqual(b, {{ .Bytes }})
+        encoded_bytes, hdls = value.encode()
+        self.assertEqual(encoded_bytes, {{ .ExpectedBytes }})
         {{- if .Handles }}
         handles = [handle_defs[i].as_int() for i in {{ .Handles }}]
         self.assertEqual([hdl[1] for hdl in hdls], handles)
@@ -43,9 +43,9 @@ class DecodeConformanceTests(unittest.TestCase):
         {{- else }}
         handles: list[int] = []
         {{- end }}
-        bytes = {{ .Bytes }}
+        encoded_bytes = {{ .Bytes }}
         type_name = "{{ .ValueType }}"
-        value = decode_standalone(type_name=type_name, bytes=bytes, handles=handles)
+        value = decode_standalone(type_name=type_name, bytes=encoded_bytes, handles=handles)
         value = construct_response_object(type_name, value)
 {{ .EqualityCheck }}
 {{ end }}

@@ -33,6 +33,7 @@ driver_bind_rules("root-driver-bind") {
 }
 
 fuchsia_cc_driver("root-driver") {
+  legacy = true
   output_name = "runtime-composite-root-driver"
   sources = [ "root-driver.cc" ]
   deps = [
@@ -63,6 +64,7 @@ driver_bind_rules("leaf-driver-bind") {
 }
 
 fuchsia_cc_driver("leaf-driver") {
+  legacy = true
   output_name = "runtime-composite-leaf-driver"
   sources = [ "leaf-driver.cc" ]
   deps = [
@@ -92,6 +94,7 @@ driver_bind_rules("composite-bind") {
 }
 
 fuchsia_cc_driver("composite-driver") {
+  legacy = true
   output_name = "runtime-composite-composite-driver"
   sources = [ "composite-driver.cc" ]
   deps = [

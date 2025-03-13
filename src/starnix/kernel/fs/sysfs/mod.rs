@@ -10,6 +10,7 @@ mod kernel_directory;
 mod kobject_directory;
 mod kobject_symlink_directory;
 mod power_directory;
+mod vulnerabilities_class_directory;
 
 pub use bus_collection_directory::*;
 pub use cpu_class_directory::*;
@@ -19,3 +20,4 @@ pub use kernel_directory::*;
 pub use kobject_directory::*;
 pub use kobject_symlink_directory::*;
 pub use power_directory::*;
+pub use vulnerabilities_class_directory::*;

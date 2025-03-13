@@ -179,6 +179,16 @@ zx_status_t device_get_fragment_metadata(zx_device_t* device, const char* name, 
   return device_get_metadata(device, type, buf, buflen, actual);
 }
 
+__EXPORT zx_status_t device_register_service_member(zx_device_t* dev, void* handler,
+                                                    const char* service_name,
+                                                    const char* instance_name,
+                                                    const char* member_name) {
+  // This call is currently unsupported in the MockDdk, so we just drop the handler on the floor.
+  // As this is a unit-testing library, consider accessing the class directly and managing the
+  // bindings in the test.
+  return ZX_OK;
+}
+
 __EXPORT zx_status_t device_connect_fidl_protocol2(zx_device_t* device, const char* service_name,
                                                    const char* protocol_name, zx_handle_t request) {
   std::lock_guard guard(libdriver_lock);

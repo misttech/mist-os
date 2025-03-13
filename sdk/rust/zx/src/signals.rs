@@ -101,6 +101,9 @@ bitflags! {
         const FIFO_WRITABLE    = ZX_FIFO_WRITABLE;
         const FIFO_PEER_CLOSED = ZX_FIFO_PEER_CLOSED;
 
+        // Iob
+        const IOB_PEER_CLOSED = ZX_IOB_PEER_CLOSED;
+
         // Job
         const JOB_TERMINATED   = ZX_JOB_TERMINATED;
         const JOB_NO_JOBS      = ZX_JOB_NO_JOBS;

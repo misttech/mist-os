@@ -53,3 +53,8 @@ closed protocol Device {
         client_type fuchsia.thermal.ClientType;
     });
 };
+
+// Added to allow service connection to replace devfs
+service Service {
+    device client_end:Device;
+};

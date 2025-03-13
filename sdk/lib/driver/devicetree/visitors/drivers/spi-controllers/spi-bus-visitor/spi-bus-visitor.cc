@@ -41,18 +41,21 @@ zx::result<> SpiBusVisitor::FinalizeNode(fdf_devicetree::Node& node) {
       .channels = controller->second.channels,
       .bus_id = controller->second.bus_id,
   }};
-  fit::result data = fidl::Persist(bus_metadata);
-  if (data.is_error()) {
+  fit::result encoded_bus_metadata = fidl::Persist(bus_metadata);
+  if (encoded_bus_metadata.is_error()) {
     FDF_LOG(INFO, "Failed to persist FIDL metadata for SPI controller '%s': %s",
-            node.name().c_str(), data.error_value().FormatDescription().c_str());
-    return zx::error(data.error_value().status());
+            node.name().c_str(), encoded_bus_metadata.error_value().FormatDescription().c_str());
+    return zx::error(encoded_bus_metadata.error_value().status());
   }
-
-  fuchsia_hardware_platform_bus::Metadata pbus_metadata = {{
+  // TODO(b/392676138): Don't add DEVICE_METADATA_SPI_CHANNELS once no longer retrieved.
+  node.AddMetadata({{
       .id = std::to_string(DEVICE_METADATA_SPI_CHANNELS),
-      .data = data.value(),
-  }};
-  node.AddMetadata(std::move(pbus_metadata));
+      .data = encoded_bus_metadata.value(),
+  }});
+  node.AddMetadata({{
+      .id = fuchsia_hardware_spi_businfo::SpiBusMetadata::kSerializableName,
+      .data = std::move(encoded_bus_metadata.value()),
+  }});
   FDF_LOG(DEBUG, "SPI channels metadata added to node '%s'", node.name().c_str());
   return zx::ok();
 }

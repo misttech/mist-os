@@ -6,6 +6,25 @@
 
 def _fuchsia_licenses_preprocess_impl(ctx):
     spdx_output = ctx.actions.declare_file(ctx.attr.output)
+    args = [
+        "--input=%s" % ctx.file.input.path,
+        "--output=%s" % spdx_output.path,
+    ]
+
+    if ctx.attr.spdx_id:
+        args += ["--spdx_id=%s" % ctx.attr.spdx_id]
+
+    if ctx.attr.license_id:
+        args += ["--license_id=%s" % ctx.attr.license_id]
+
+    if ctx.attr.project_name:
+        args += ["--project_name=%s" % ctx.attr.project_name]
+
+    if ctx.attr.cut_after:
+        args += ["--cut_after=%s" % ctx.attr.cut_after]
+
+    if ctx.attr.cut_entirely:
+        args += ["--cut_entirely"]
 
     ctx.actions.run(
         progress_message = "Preprocessing license file %s" %
@@ -13,12 +32,7 @@ def _fuchsia_licenses_preprocess_impl(ctx):
         inputs = [ctx.file.input],
         outputs = [spdx_output],
         executable = ctx.executable._remove_license_segment_tool,
-        arguments = [
-            "--input=%s" % ctx.file.input.path,
-            "--output=%s" % spdx_output.path,
-            "--license_id=%s" % ctx.attr.license_id,
-            "--cut_after=%s" % ctx.attr.cut_after,
-        ],
+        arguments = args,
     )
 
     return [DefaultInfo(files = depset([spdx_output]))]
@@ -41,11 +55,23 @@ Preprocess a license SPDX file.
         ),
         "license_id": attr.string(
             doc = "The name of the license ID in the SPDX file.",
-            mandatory = True,
+            default = "",
+        ),
+        "spdx_id": attr.string(
+            doc = "The ID of the SPDX package in the SPDX file.",
+            default = "",
+        ),
+        "project_name": attr.string(
+            doc = "The name of the SPDX package in the SPDX file.",
+            default = "",
         ),
         "cut_after": attr.string(
             doc = "The string pattern where the license text should be cut.",
-            mandatory = True,
+            default = "",
+        ),
+        "cut_entirely": attr.bool(
+            doc = "Flag instructing whether the entire license with ID 'license_id' should be removed.",
+            default = False,
         ),
         "exit_on_failure": attr.bool(
             doc = """Whether or not to fail the build if the given

@@ -1,0 +1,32 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load("@rules_python//python:py_test.bzl", "py_test")
+
+py_test(
+    name = "simple_test",
+    srcs = ["simple_test.py"],
+)
+
+py_test(
+    name = "test_with_py_library",
+    srcs = ["test_with_py_library.py"],
+    deps = [":py_lib_for_test"],
+)
+
+py_library(
+    name = "py_lib_for_test",
+    srcs = ["lib_for_test.py"],
+    imports = [
+        ".",
+        "foo",
+    ],
+)
+
+py_test(
+    name = "test_with_py_binary",
+    srcs = ["test_with_py_binary.py"],
+    data = [":test_with_py_library"],
+    deps = ["@bazel_tools//tools/python/runfiles"],
+)

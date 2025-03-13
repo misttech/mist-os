@@ -5,10 +5,8 @@
 use fidl_fuchsia_diagnostics::Severity;
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned, TokenStreamExt};
-use syn::parse::{Parse, ParseStream};
-use syn::{
-    Attribute, Block, Error, Ident, ItemFn, LitBool, LitInt, LitStr, Signature, Token, Visibility,
-};
+use syn::parse::{Parse, ParseStream, Parser};
+use syn::{Attribute, Block, Error, Expr, ItemFn, LitBool, LitStr, Signature, Token, Visibility};
 
 #[derive(Clone, Copy)]
 enum FunctionType {
@@ -17,20 +15,21 @@ enum FunctionType {
 }
 
 // How should code be executed?
-#[derive(Clone, Copy)]
+#[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
 enum Executor {
     // Directly by calling it
-    None,
+    None { thread_role: Option<Expr> },
     // fasync::run_singlethreaded
-    Singlethreaded,
+    Singlethreaded { thread_role: Option<Expr> },
     // fasync::run
-    Multithreaded(usize),
+    Multithreaded { threads: Expr, thread_role: Option<Expr> },
     // #[test]
     Test,
     // fasync::run_singlethreaded(test)
     SinglethreadedTest,
     // fasync::run(test)
-    MultithreadedTest(usize),
+    MultithreadedTest { threads: Expr },
     // fasync::run_until_stalled
     UntilStalledTest,
 }
@@ -40,26 +39,48 @@ impl Executor {
         match self {
             Executor::Test
             | Executor::SinglethreadedTest
-            | Executor::MultithreadedTest(_)
+            | Executor::MultithreadedTest { .. }
             | Executor::UntilStalledTest => true,
-            Executor::None | Executor::Singlethreaded | Executor::Multithreaded(_) => false,
+            Executor::None { .. }
+            | Executor::Singlethreaded { .. }
+            | Executor::Multithreaded { .. } => false,
         }
     }
 
     fn is_some(&self) -> bool {
-        !matches!(self, Executor::Test | Executor::None)
+        !matches!(self, Executor::Test | Executor::None { .. })
     }
 }
 
 impl quote::ToTokens for Executor {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         tokens.extend(match self {
-            Executor::None => quote! { ::fuchsia::main_not_async(func) },
+            Executor::None { thread_role } => {
+                if let Some(role) = thread_role {
+                    quote! { ::fuchsia::main_not_async_with_role(func, #role) }
+                } else {
+                    quote! { ::fuchsia::main_not_async(func) }
+                }
+            }
             Executor::Test => quote! { ::fuchsia::test_not_async(func) },
-            Executor::Singlethreaded => quote! { ::fuchsia::main_singlethreaded(func) },
-            Executor::Multithreaded(n) => quote! { ::fuchsia::main_multithreaded(func, #n) },
+            Executor::Singlethreaded { thread_role } => {
+                if let Some(role) = thread_role {
+                    quote! { ::fuchsia::main_singlethreaded_with_role(func, #role) }
+                } else {
+                    quote! { ::fuchsia::main_singlethreaded(func) }
+                }
+            }
+            Executor::Multithreaded { threads, thread_role } => {
+                if let Some(role) = thread_role {
+                    quote! { ::fuchsia::main_multithreaded_with_role(func, #threads, #role) }
+                } else {
+                    quote! { ::fuchsia::main_multithreaded(func, #threads) }
+                }
+            }
             Executor::SinglethreadedTest => quote! { ::fuchsia::test_singlethreaded(func) },
-            Executor::MultithreadedTest(n) => quote! { ::fuchsia::test_multithreaded(func, #n) },
+            Executor::MultithreadedTest { threads } => {
+                quote! { ::fuchsia::test_multithreaded(func, #threads) }
+            }
             Executor::UntilStalledTest => quote! { ::fuchsia::test_until_stalled(func) },
         })
     }
@@ -88,7 +109,8 @@ pub struct Transformer {
 }
 
 struct Args {
-    threads: usize,
+    threads: Option<Expr>,
+    thread_role: Option<Expr>,
     allow_stalls: Option<bool>,
     logging: bool,
     logging_blocking: bool,
@@ -157,44 +179,22 @@ impl quote::ToTokens for Interest {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         tokens.extend(match self.min_severity {
             None => quote! { ::fuchsia::Interest::default() },
-            Some(severity) => match severity {
-                Severity::Trace => quote! {
+            Some(severity) => {
+                let severity_tok = match severity {
+                    Severity::Trace => quote!(::fuchsia::Severity::Trace),
+                    Severity::Debug => quote!(::fuchsia::Severity::Debug),
+                    Severity::Info => quote!(::fuchsia::Severity::Info),
+                    Severity::Warn => quote!(::fuchsia::Severity::Warn),
+                    Severity::Error => quote!(::fuchsia::Severity::Error),
+                    Severity::Fatal => quote!(::fuchsia::Severity::Fatal),
+                };
+                quote! {
                     ::fuchsia::Interest {
-                        min_severity: Some(::fuchsia::Severity::Trace),
+                        min_severity: Some(#severity_tok),
                         ..Default::default()
                     }
-                },
-                Severity::Debug => quote! {
-                    ::fuchsia::Interest {
-                        min_severity: Some(::fuchsia::Severity::Debug),
-                        ..Default::default()
-                    }
-                },
-                Severity::Info => quote! {
-                    ::fuchsia::Interest {
-                        min_severity: Some(::fuchsia::Severity::Info),
-                        ..Default::default()
-                    }
-                },
-                Severity::Warn => quote! {
-                    ::fuchsia::Interest {
-                        min_severity: Some(::fuchsia::Severity::Warn),
-                        ..Default::default()
-                    }
-                },
-                Severity::Error => quote! {
-                    ::fuchsia::Interest {
-                        min_severity: Some(::fuchsia::Severity::Error),
-                        ..Default::default()
-                    }
-                },
-                Severity::Fatal => quote! {
-                    ::fuchsia::Interest {
-                        min_severity: Some(::fuchsia::Severity::Fatal),
-                        ..Default::default()
-                    }
-                },
-            },
+                }
+            }
         });
     }
 }
@@ -202,14 +202,6 @@ impl quote::ToTokens for Interest {
 fn get_arg<T: Parse>(p: &ParseStream<'_>) -> syn::Result<T> {
     p.parse::<Token![=]>()?;
     p.parse()
-}
-
-fn get_base10_arg<T>(p: &ParseStream<'_>) -> syn::Result<T>
-where
-    T: std::str::FromStr,
-    T::Err: std::fmt::Display,
-{
-    get_arg::<LitInt>(p)?.base10_parse()
 }
 
 fn get_bool_arg(p: &ParseStream<'_>, if_present: bool) -> syn::Result<bool> {
@@ -233,10 +225,11 @@ fn get_interest_arg(input: &ParseStream<'_>) -> syn::Result<Interest> {
     input.parse::<Interest>()
 }
 
-impl Parse for Args {
-    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+impl Args {
+    fn parse(input: TokenStream) -> syn::Result<Self> {
         let mut args = Self {
-            threads: 1,
+            threads: None,
+            thread_role: None,
             allow_stalls: None,
             logging: true,
             logging_blocking: false,
@@ -247,32 +240,29 @@ impl Parse for Args {
             add_test_attr: true,
         };
 
-        loop {
-            if input.is_empty() {
-                break;
-            }
-            let ident: Ident = input.parse()?;
-            let err = |message| Err(Error::new(ident.span(), message));
+        let arg_parser = syn::meta::parser(|meta| {
+            let ident =
+                meta.path.get_ident().ok_or_else(|| meta.error("arguments must have a key"))?;
             match ident.to_string().as_ref() {
-                "threads" => args.threads = get_base10_arg(&input)?,
-                "allow_stalls" => args.allow_stalls = Some(get_bool_arg(&input, true)?),
-                "logging" => args.logging = get_bool_arg(&input, true)?,
-                "logging_blocking" => args.logging_blocking = get_bool_arg(&input, true)?,
-                "logging_tags" => args.logging_tags = get_logging_tags(&input)?,
+                "threads" => args.threads = Some(get_arg::<Expr>(&meta.input)?),
+                "thread_role" => args.thread_role = Some(get_arg::<Expr>(&meta.input)?),
+                "allow_stalls" => args.allow_stalls = Some(get_bool_arg(&meta.input, true)?),
+                "logging" => args.logging = get_bool_arg(&meta.input, true)?,
+                "logging_blocking" => args.logging_blocking = get_bool_arg(&meta.input, true)?,
+                "logging_tags" => args.logging_tags = get_logging_tags(&meta.input)?,
                 "always_log_file_line" => {
-                    args.logging_include_file_line = get_bool_arg(&input, true)?
+                    args.logging_include_file_line = get_bool_arg(&meta.input, true)?
                 }
-                "logging_minimum_severity" => args.interest = get_interest_arg(&input)?,
-                "logging_panic_prefix" => args.panic_prefix = Some(get_arg(&input)?),
-                "add_test_attr" => args.add_test_attr = get_bool_arg(&input, true)?,
-                x => return err(format!("unknown argument: {}", x)),
+                "logging_minimum_severity" => args.interest = get_interest_arg(&meta.input)?,
+                "logging_panic_prefix" => args.panic_prefix = Some(get_arg(&meta.input)?),
+                "add_test_attr" => args.add_test_attr = get_bool_arg(&meta.input, true)?,
+                _ => return Err(meta.error("unrecognized argument")),
             }
-            if input.is_empty() {
-                break;
-            }
-            input.parse::<Token![,]>()?;
-        }
 
+            Ok(())
+        });
+
+        arg_parser.parse2(input)?;
         Ok(args)
     }
 }
@@ -296,32 +286,47 @@ impl Transformer {
         args: TokenStream,
         input: TokenStream,
     ) -> Result<Transformer, Error> {
-        let args: Args = syn::parse2(args)?;
+        let args = Args::parse(args)?;
         let ItemFn { attrs, vis, sig, block } = syn::parse2(input)?;
         let is_async = sig.asyncness.is_some();
 
         let err = |message| Err(Error::new(sig.ident.span(), message));
 
-        let executor = match (args.threads, args.allow_stalls, is_async, function_type) {
-            (0, _, _, _) => return err("need at least one thread"),
-            (_, Some(_), _, FunctionType::Component) => {
-                return err("allow_stalls only applies to tests")
-            }
-            (1, _, false, FunctionType::Component) => Executor::None,
-            (1, None, true, FunctionType::Component) => Executor::Singlethreaded,
-            (n, None, true, FunctionType::Component) => Executor::Multithreaded(n),
-            (1, Some(_), false, FunctionType::Test) => {
-                return err("allow_stalls only applies to async tests")
-            }
-            (1, None, false, FunctionType::Test) => Executor::Test,
-            (1, Some(true) | None, true, FunctionType::Test) => Executor::SinglethreadedTest,
-            (n, Some(true) | None, true, FunctionType::Test) => Executor::MultithreadedTest(n),
-            (1, Some(false), true, FunctionType::Test) => Executor::UntilStalledTest,
-            (_, Some(false), _, FunctionType::Test) => {
-                return err("allow_stalls=false tests must be single threaded")
-            }
-            (_, Some(true) | None, false, _) => return err("must be async to use >1 thread"),
-        };
+        let executor =
+            match (args.threads, args.allow_stalls, args.thread_role, is_async, function_type) {
+                (_, _, Some(_), _, FunctionType::Test) => {
+                    return err("thread_role cannot be applied to tests")
+                }
+                (_, Some(_), _, _, FunctionType::Component) => {
+                    return err("allow_stalls only applies to tests")
+                }
+                (None, _, thread_role, false, FunctionType::Component) => {
+                    Executor::None { thread_role }
+                }
+                (None, None, thread_role, true, FunctionType::Component) => {
+                    Executor::Singlethreaded { thread_role }
+                }
+                (Some(threads), None, thread_role, true, FunctionType::Component) => {
+                    Executor::Multithreaded { threads, thread_role }
+                }
+                (None, Some(_), _, false, FunctionType::Test) => {
+                    return err("allow_stalls only applies to async tests")
+                }
+                (None, None, _, false, FunctionType::Test) => Executor::Test,
+                (None, Some(true) | None, _, true, FunctionType::Test) => {
+                    Executor::SinglethreadedTest
+                }
+                (Some(threads), Some(true) | None, _, true, FunctionType::Test) => {
+                    Executor::MultithreadedTest { threads }
+                }
+                (None, Some(false), _, true, FunctionType::Test) => Executor::UntilStalledTest,
+                (_, Some(false), _, _, FunctionType::Test) => {
+                    return err("allow_stalls=false tests must be single threaded")
+                }
+                (_, Some(true) | None, _, false, _) => {
+                    return err("must be async to use >1 thread")
+                }
+            };
 
         let panic_prefix =
             args.panic_prefix.unwrap_or_else(|| LitStr::new("PANIC", sig.ident.span()));
@@ -431,7 +436,7 @@ impl Finish for Transformer {
             // Anything with more than one argument: error.
             (_, n) => panic!("Too many ({}) arguments to function", n),
         };
-        let tokenized_executor = self.executor;
+        let tokenized_executor = &self.executor;
         let is_nonempty_ret_type = !matches!(ret_type, syn::ReturnType::Default);
 
         // Select executor

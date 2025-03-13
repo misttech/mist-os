@@ -14,27 +14,6 @@ alias AttemptId = string:36; // 36 == strlen("01234567-89ab-cdef-0123-456789abcd
 /// discovering when to update and what version of the system to install.
 @discoverable
 closed protocol Installer {
-    /// Get the status of the last update attempt. If this device hasn't
-    /// attempted an update since the last factory reset, every field in the
-    /// result will be absent.
-    ///
-    /// - response `info` the status of the last update attempt, if available.
-    strict GetLastUpdateResult() -> (struct {
-        info UpdateResult;
-    });
-
-    /// Get the status of the given update attempt, if it exists. If this device
-    /// hasn't attempted an update with the given `attempt_id` or forgotten about
-    /// that attempt, every field in the result will be absent.
-    ///
-    /// + request `attempt_id` UUID identifying the requested update attempt.
-    /// - response `info` the status of the last update attempt, if available.
-    strict GetUpdateResult(struct {
-        attempt_id AttemptId;
-    }) -> (struct {
-        info UpdateResult;
-    });
-
     /// Start an update if one is not running, or attach to a pending update
     /// attempt if one is running and
     /// [`Options.allow_attach_to_existing_attempt`] is true. If an update
@@ -123,23 +102,6 @@ closed protocol RebootController {
     /// Informs the update attempt that it should wait to reboot indefinitely,
     /// even if this [`RebootController`] connection is dropped.
     strict Detach();
-};
-
-/// Metadata about a prior update attempt.
-type UpdateResult = table {
-    /// Unique identifier for this specific update attempt. Always present.
-    1: attempt_id AttemptId;
-
-    /// fuchsia-pkg:// url for the update package associated with this update
-    /// attempt. Always present.
-    2: url fuchsia.pkg.PackageUrl;
-
-    /// Configuration options for this update attempt. Always present.
-    3: options Options;
-
-    /// Terminal state of this update attempt. Always present if the update
-    /// failed. None if the update succeeded.
-    4: state State;
 };
 
 /// Configuration options for an update attempt.

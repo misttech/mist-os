@@ -21,7 +21,7 @@
             to: "#dns_resolver",
         },
         {
-            dictionary: "daignostics",
+            dictionary: "diagnostics",
             from: "parent",
             to: [ "#dns_resolver" ],
         },

@@ -4,7 +4,7 @@
 
 use anyhow::{anyhow, Error};
 use fidl_ir_lib::fidl::{self, *};
-use heck::SnakeCase;
+use heck::ToSnakeCase;
 use std::iter;
 
 static ATTR_NAME_DERIVE_DEBUG: &'static str = "derive_debug";
@@ -381,6 +381,7 @@ pub fn handle_type_to_cpp_str(ty: &HandleSubtype) -> String {
         HandleSubtype::Fifo => String::from("zx::fifo"),
         HandleSubtype::Guest => String::from("zx::guest"),
         HandleSubtype::Interrupt => String::from("zx::interrupt"),
+        HandleSubtype::Iob => String::from("zx::iob"),
         HandleSubtype::Iommu => String::from("zx::iommu"),
         HandleSubtype::Job => String::from("zx::job"),
         HandleSubtype::Msi => String::from("zx::msi"),

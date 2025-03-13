@@ -13,6 +13,7 @@ if (is_host) {
     "doctor_utils",
     "emulator_instance",
     "errors",
+    "executor",
     "fastboot",
     "fastboot_file_discovery",
     "fho",

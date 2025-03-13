@@ -11,7 +11,7 @@ use core::num::NonZeroU8;
 use core::ops::{Deref as _, DerefMut as _};
 use core::sync::atomic::AtomicU16;
 
-use lock_order::lock::{LockLevelFor, UnlockedAccess, UnlockedAccessMarkerFor};
+use lock_order::lock::{LockLevelFor, UnlockedAccess};
 use lock_order::relation::LockBefore;
 use log::debug;
 use net_types::ip::{AddrSubnet, Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu};
@@ -19,7 +19,7 @@ use net_types::{LinkLocalUnicastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr,
 use netstack3_base::{
     AnyDevice, CoreEventContext, CoreTimerContext, CounterContext, DeviceIdContext, ExistsError,
     IpDeviceAddr, IpDeviceAddressIdContext, Ipv4DeviceAddr, Ipv6DeviceAddr, NotFoundError,
-    RemoveResourceResultWithContext,
+    RemoveResourceResultWithContext, ResourceCounterContext,
 };
 use netstack3_device::{DeviceId, WeakDeviceId};
 use netstack3_filter::FilterImpl;
@@ -36,8 +36,8 @@ use netstack3_ip::device::{
     Ipv6AddressFlags, Ipv6AddressState, Ipv6DadState, Ipv6DeviceConfiguration, Ipv6DeviceTimerId,
     Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext, Ipv6NetworkLearnedParameters,
     Ipv6RouteDiscoveryContext, Ipv6RouteDiscoveryState, RsContext, RsState, RsTimerId,
-    SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses, SlaacConfig, SlaacConfigAndState,
-    SlaacContext, SlaacCounters, SlaacState, WeakAddressId,
+    SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses, SlaacConfigAndState, SlaacContext,
+    SlaacCounters, SlaacState, WeakAddressId,
 };
 use netstack3_ip::gmp::{
     GmpGroupState, GmpState, GmpStateRef, IgmpContext, IgmpContextMarker, IgmpSendContext,
@@ -48,7 +48,7 @@ use netstack3_ip::nud::{self, ConfirmationFlags, NudCounters, NudIpHandler};
 use netstack3_ip::{
     self as ip, AddableMetric, AddressStatus, FilterHandlerProvider, IpDeviceContext,
     IpDeviceEgressStateContext, IpDeviceIngressStateContext, IpLayerIpExt, IpSasHandler,
-    IpSendFrameError, Ipv4PresentAddressStatus, RawMetric, DEFAULT_TTL,
+    IpSendFrameError, Ipv4PresentAddressStatus, DEFAULT_TTL,
 };
 use packet::{EmptyBuf, InnerPacketBuilder, Serializer};
 use packet_formats::icmp::ndp::options::{NdpNonce, NdpOptionBuilder};
@@ -57,7 +57,7 @@ use packet_formats::icmp::IcmpZeroCode;
 
 use crate::context::prelude::*;
 use crate::context::WrapLockLevel;
-use crate::{BindingsContext, BindingsTypes, CoreCtx, IpExt, StackState};
+use crate::{BindingsContext, BindingsTypes, CoreCtx, IpExt};
 
 pub struct SlaacAddrs<'a, BC: BindingsContext> {
     pub(crate) core_ctx: CoreCtxWithIpDeviceConfiguration<
@@ -110,8 +110,13 @@ where
 }
 
 impl<'a, BC: BindingsContext> CounterContext<SlaacCounters> for SlaacAddrs<'a, BC> {
-    fn with_counters<O, F: FnOnce(&SlaacCounters) -> O>(&self, cb: F) -> O {
-        cb(self.core_ctx.core_ctx.unlocked_access::<crate::lock_ordering::SlaacCounters>())
+    fn counters(&self) -> &SlaacCounters {
+        &self
+            .core_ctx
+            .core_ctx
+            .unlocked_access::<crate::lock_ordering::UnlockedState>()
+            .ipv6
+            .slaac_counters
     }
 }
 
@@ -186,8 +191,10 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
         &mut self,
         bindings_ctx: &mut BC,
         addr: &Ipv6DeviceAddr,
-    ) -> Result<(AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>, SlaacConfig<BC::Instant>), NotFoundError>
-    {
+    ) -> Result<
+        (AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>, Ipv6AddrSlaacConfig<BC::Instant>),
+        NotFoundError,
+    > {
         let SlaacAddrs { core_ctx, device_id, config } = self;
         del_ip_addr_inner::<Ipv6, _, _>(
             core_ctx,
@@ -201,7 +208,7 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
             assert_eq!(&addr_sub.addr(), addr);
             bindings_ctx.defer_removal_result(result);
             match config {
-                Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { inner, .. }) => (addr_sub, inner),
+                Ipv6AddrConfig::Slaac(config) => (addr_sub, config),
                 Ipv6AddrConfig::Manual(_manual_config) => {
                     unreachable!(
                         "address {addr_sub} on device {device_id:?} should have been a SLAAC \
@@ -328,7 +335,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
     IpDeviceEgressStateContext<Ipv4> for CoreCtx<'_, BC, L>
 {
     fn with_next_packet_id<O, F: FnOnce(&AtomicU16) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::Ipv4StateNextPacketId>())
+        cb(&self.unlocked_access::<crate::lock_ordering::UnlockedState>().ipv4.next_packet_id)
     }
 
     fn get_local_addr_for_remote(
@@ -522,8 +529,18 @@ impl<'a, Config, L, BC: BindingsContext, T> CounterContext<T>
 where
     CoreCtx<'a, BC, L>: CounterContext<T>,
 {
-    fn with_counters<O, F: FnOnce(&T) -> O>(&self, cb: F) -> O {
-        self.core_ctx.with_counters(cb)
+    fn counters(&self) -> &T {
+        self.core_ctx.counters()
+    }
+}
+
+impl<'a, Config, L, BC: BindingsContext, R, T> ResourceCounterContext<R, T>
+    for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
+where
+    CoreCtx<'a, BC, L>: ResourceCounterContext<R, T>,
+{
+    fn per_resource_counters<'b>(&'b self, resource: &'b R) -> &'b T {
+        self.core_ctx.per_resource_counters(resource)
     }
 }
 
@@ -622,11 +639,17 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> SlaacCont
         BC,
     >
 {
+    type LinkLayerAddr = <Self as device::Ipv6DeviceContext<BC>>::LinkLayerAddr;
+
     type SlaacAddrs<'s> = SlaacAddrs<'s, BC>;
 
     fn with_slaac_addrs_mut_and_configs<
         O,
-        F: FnOnce(&mut Self::SlaacAddrs<'_>, SlaacConfigAndState<BC>, &mut SlaacState<BC>) -> O,
+        F: FnOnce(
+            &mut Self::SlaacAddrs<'_>,
+            SlaacConfigAndState<Self::LinkLayerAddr, BC>,
+            &mut SlaacState<BC>,
+        ) -> O,
     >(
         &mut self,
         device_id: &Self::DeviceId,
@@ -643,8 +666,12 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> SlaacCont
                 params.retrans_timer_or_default().get()
             },
         );
-        let interface_identifier = device::Ipv6DeviceContext::get_eui64_iid(core_ctx, device_id)
-            .unwrap_or_else(Default::default);
+        // We use the link-layer address to derive opaque IIDs for the interface, rather
+        // than the interface ID or name, because it is more stable. This does imply
+        // that we do not generate SLAAC addresses for interfaces without a link-layer
+        // address (e.g. loopback and pure IP devices); we could revisit this in the
+        // future if desired.
+        let link_layer_addr = device::Ipv6DeviceContext::get_link_layer_addr(core_ctx, device_id);
 
         let config = Borrow::borrow(config);
         let Ipv6DeviceConfiguration {
@@ -654,8 +681,9 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> SlaacCont
             ip_config: _,
         } = *config;
 
-        let temp_secret_key =
-            core_ctx.unlocked_access::<crate::lock_ordering::SlaacTempSecretKey>();
+        let ipv6_state = &core_ctx.unlocked_access::<crate::lock_ordering::UnlockedState>().ipv6;
+        let stable_secret_key = ipv6_state.slaac_stable_secret_key;
+        let temp_secret_key = ipv6_state.slaac_temp_secret_key;
         let mut core_ctx_and_resource =
             crate::device::integration::ip_device_state_and_core_ctx(core_ctx, device_id);
         let (mut state, mut locked) = core_ctx_and_resource
@@ -671,8 +699,9 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> SlaacCont
                 config: slaac_config,
                 dad_transmits,
                 retrans_timer,
-                interface_identifier,
-                temp_secret_key: *temp_secret_key,
+                link_layer_addr,
+                temp_secret_key,
+                stable_secret_key,
                 _marker: PhantomData,
             },
             &mut state,
@@ -848,12 +877,9 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> RsContext
         cb(&mut state, Borrow::borrow(&*config).max_router_solicitations)
     }
 
-    fn get_link_layer_addr_bytes(
-        &mut self,
-        device_id: &Self::DeviceId,
-    ) -> Option<Self::LinkLayerAddr> {
+    fn get_link_layer_addr(&mut self, device_id: &Self::DeviceId) -> Option<Self::LinkLayerAddr> {
         let Self { config: _, core_ctx } = self;
-        device::Ipv6DeviceContext::get_link_layer_addr_bytes(core_ctx, device_id)
+        device::Ipv6DeviceContext::get_link_layer_addr(core_ctx, device_id)
     }
 
     fn send_rs_packet<
@@ -987,17 +1013,9 @@ impl<'a, Config, BC: BindingsContext> device::Ipv6DeviceContext<BC>
         WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>,
     > as device::Ipv6DeviceContext<BC>>::LinkLayerAddr;
 
-    fn get_link_layer_addr_bytes(
-        &mut self,
-        device_id: &Self::DeviceId,
-    ) -> Option<Self::LinkLayerAddr> {
+    fn get_link_layer_addr(&mut self, device_id: &Self::DeviceId) -> Option<Self::LinkLayerAddr> {
         let Self { config: _, core_ctx } = self;
-        device::Ipv6DeviceContext::get_link_layer_addr_bytes(core_ctx, device_id)
-    }
-
-    fn get_eui64_iid(&mut self, device_id: &Self::DeviceId) -> Option<[u8; 8]> {
-        let Self { config: _, core_ctx } = self;
-        device::Ipv6DeviceContext::get_eui64_iid(core_ctx, device_id)
+        device::Ipv6DeviceContext::get_link_layer_addr(core_ctx, device_id)
     }
 
     fn set_link_mtu(&mut self, device_id: &Self::DeviceId, mtu: Mtu) {
@@ -1418,23 +1436,9 @@ impl<
     }
 }
 
-impl<BC: BindingsContext, I: Ip> UnlockedAccess<crate::lock_ordering::NudCounters<I>>
-    for StackState<BC>
-{
-    type Data = NudCounters<I>;
-    type Guard<'l>
-        = &'l NudCounters<I>
-    where
-        Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        self.nud_counters()
-    }
-}
-
 impl<BC: BindingsContext, I: Ip, L> CounterContext<NudCounters<I>> for CoreCtx<'_, BC, L> {
-    fn with_counters<O, F: FnOnce(&NudCounters<I>) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::NudCounters<I>>())
+    fn counters(&self) -> &NudCounters<I> {
+        self.unlocked_access::<crate::lock_ordering::UnlockedState>().device.nud_counters::<I>()
     }
 }
 
@@ -1501,12 +1505,25 @@ impl<BT: IpDeviceStateBindingsTypes> LockLevelFor<DualStackIpDeviceState<BT>>
     type Data = SlaacState<BT>;
 }
 
-impl<BT: IpDeviceStateBindingsTypes> UnlockedAccessMarkerFor<DualStackIpDeviceState<BT>>
-    for crate::lock_ordering::RoutingMetric
+/// It is safe to provide unlocked access to [`DualStackIpDeviceState`] itself
+/// here because care has been taken to avoid exposing publicly to the core
+/// integration crate any state that is held by a lock, as opposed to read-only
+/// state that can be accessed safely at any lock level, e.g. state with no
+/// interior mutability or atomics.
+///
+/// Access to state held by locks *must* be mediated using the global lock
+/// ordering declared in [`crate::lock_ordering`].
+impl<BT: IpDeviceStateBindingsTypes> UnlockedAccess<crate::lock_ordering::UnlockedState>
+    for DualStackIpDeviceState<BT>
 {
-    type Data = RawMetric;
-    fn unlocked_access(t: &DualStackIpDeviceState<BT>) -> &Self::Data {
-        t.metric()
+    type Data = DualStackIpDeviceState<BT>;
+    type Guard<'l>
+        = &'l DualStackIpDeviceState<BT>
+    where
+        Self: 'l;
+
+    fn access(&self) -> Self::Guard<'_> {
+        &self
     }
 }
 
@@ -1558,20 +1575,8 @@ impl<BT: IpDeviceStateBindingsTypes> LockLevelFor<Ipv6AddressEntry<BT>>
     type Data = Ipv6AddressState<BT::Instant>;
 }
 
-impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::SlaacCounters> for StackState<BT> {
-    type Data = SlaacCounters;
-    type Guard<'l>
-        = &'l SlaacCounters
-    where
-        Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        &self.ipv6.slaac_counters
-    }
-}
-
 impl<BT: BindingsTypes, L> CounterContext<SlaacCounters> for CoreCtx<'_, BT, L> {
-    fn with_counters<O, F: FnOnce(&SlaacCounters) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::SlaacCounters>())
+    fn counters(&self) -> &SlaacCounters {
+        &self.unlocked_access::<crate::lock_ordering::UnlockedState>().ipv6.slaac_counters
     }
 }

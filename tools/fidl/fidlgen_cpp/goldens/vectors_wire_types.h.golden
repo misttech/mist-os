@@ -54,11 +54,11 @@ struct TypeTraits<::test_vectors::wire::ExampleUseOfVectors> {
 };
 
 template <>
-struct IsFidlType<::test_vectors::wire::ExampleUseOfVectors> : public std::true_type{};
+struct IsFidlType<::test_vectors::wire::ExampleUseOfVectors> : public std::true_type {};
 template <>
-struct IsWire<::test_vectors::wire::ExampleUseOfVectors> : public std::true_type{};
+struct IsWire<::test_vectors::wire::ExampleUseOfVectors> : public std::true_type {};
 template <>
-struct IsStruct<::test_vectors::wire::ExampleUseOfVectors> : public std::true_type{};
+struct IsStruct<::test_vectors::wire::ExampleUseOfVectors> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_vectors::wire::ExampleUseOfVectors>);
 static_assert(offsetof(::test_vectors::wire::ExampleUseOfVectors, vector_of_uint8) == 0);
 static_assert(offsetof(::test_vectors::wire::ExampleUseOfVectors, vector_of_vector_of_bool) == 16);

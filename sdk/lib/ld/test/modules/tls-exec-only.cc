@@ -20,8 +20,9 @@ namespace {
 // that EnsureTestThreadPointer() always returns false (e.g. via LTO) then it
 // will optimize out the actual references.  Make sure neither it (via used)
 // nor the linker (via retain) will do so.
-[[gnu::tls_model("local-exec"), gnu::used, gnu::retain]] alignas(64) thread_local int tls_data = 23;
-[[gnu::tls_model("local-exec"), gnu::used, gnu::retain]] thread_local int tls_bss;
+[[gnu::tls_model("local-exec"), gnu::used,
+  gnu::retain]] alignas(64) constinit thread_local int tls_data = 23;
+[[gnu::tls_model("local-exec"), gnu::used, gnu::retain]] constinit thread_local int tls_bss;
 
 using Traits = elfldltl::TlsTraits<>;
 

@@ -12,7 +12,7 @@ use fuchsia_component::server;
 use guest_manager::GuestManager;
 use std::rc::Rc;
 
-#[fuchsia::main(logging = true, threads = 1)]
+#[fuchsia::main(logging = true)]
 async fn main() -> Result<(), Error> {
     let mut fs = server::ServiceFs::new();
     fs.dir("svc").add_fidl_service(|stream: GuestManagerRequestStream| stream);

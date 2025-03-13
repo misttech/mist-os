@@ -4,7 +4,7 @@
 
 //! See https://www.kernel.org/doc/html/latest/admin-guide/sysrq.html.
 
-use crate::task::{CurrentTask, Kernel};
+use crate::task::CurrentTask;
 use crate::vfs::{
     fileops_impl_noop_sync, AppendLockGuard, FileObject, FileOps, FsNode, FsNodeHandle, FsNodeOps,
     FsStr, InputBuffer, OutputBuffer, SeekTarget,
@@ -23,7 +23,7 @@ use starnix_uapi::{error, off_t};
 pub struct SysRqNode {}
 
 impl SysRqNode {
-    pub fn new(_kernel: &Kernel) -> Self {
+    pub fn new() -> Self {
         Self {}
     }
 }

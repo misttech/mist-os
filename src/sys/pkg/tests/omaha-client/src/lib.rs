@@ -8,7 +8,7 @@ use anyhow::anyhow;
 use assert_matches::assert_matches;
 use diagnostics_assertions::{assert_data_tree, tree_assertion, AnyProperty, TreeAssertion};
 use diagnostics_hierarchy::DiagnosticsHierarchy;
-use diagnostics_reader::{ArchiveReader, Inspect};
+use diagnostics_reader::ArchiveReader;
 use fidl_fuchsia_feedback::FileReportResults;
 use fidl_fuchsia_hardware_power_statecontrol::{RebootOptions, RebootReason2};
 use fidl_fuchsia_pkg::{self as fpkg, PackageCacheRequestStream, PackageResolverRequestStream};
@@ -31,6 +31,7 @@ use futures::channel::{mpsc, oneshot};
 use futures::prelude::*;
 use mock_boot_arguments::MockBootArgumentsService;
 use mock_crash_reporter::{CrashReport, MockCrashReporterService, ThrottleHook};
+use mock_health_verification::MockHealthVerificationService;
 use mock_installer::MockUpdateInstallerService;
 use mock_omaha_server::{
     OmahaResponse, OmahaServer, OmahaServerBuilder, PrivateKeyAndId, PrivateKeys,
@@ -39,7 +40,6 @@ use mock_omaha_server::{
 use mock_paver::{hooks as mphooks, MockPaverService, MockPaverServiceBuilder, PaverEvent};
 use mock_reboot::MockRebootService;
 use mock_resolver::MockResolverService;
-use mock_verifier::MockVerifierService;
 use omaha_client::cup_ecdsa::test_support::{
     make_default_private_key_for_test, RAW_PUBLIC_KEY_FOR_TEST,
 };
@@ -305,18 +305,14 @@ impl TestEnvBuilder {
         });
 
         // Set up verifier service.
-        let verifier = Arc::new(MockVerifierService::new(|_| Ok(())));
+        let verifier = Arc::new(MockHealthVerificationService::new(|| zx::Status::OK));
         {
             let verifier = Arc::clone(&verifier);
             svc.add_fidl_service(move |stream| {
-                fasync::Task::spawn(Arc::clone(&verifier).run_blobfs_verifier_service(stream))
+                fasync::Task::spawn(Arc::clone(&verifier).run_health_verification_service(stream))
                     .detach()
             });
         }
-        svc.add_fidl_service(move |stream| {
-            fasync::Task::spawn(Arc::clone(&verifier).run_netstack_verifier_service(stream))
-                .detach()
-        });
 
         // Set up crash reporter service.
         let crash_reporter = Arc::new(self.crash_reporter.unwrap_or_else(|| {
@@ -487,8 +483,7 @@ impl TestEnvBuilder {
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol::<fupdate_verify::BlobfsVerifierMarker>())
-                    .capability(Capability::protocol::<fupdate_verify::NetstackVerifierMarker>())
+                    .capability(Capability::protocol::<fupdate_verify::HealthVerificationMarker>())
                     .from(&fake_capabilities)
                     .to(&system_update_committer),
             )
@@ -660,9 +655,9 @@ impl TestEnv {
             "test_driver/realm_builder\\:{}/omaha_client_service:root",
             self.realm_instance.root.child_name()
         );
-        ArchiveReader::new()
+        ArchiveReader::inspect()
             .add_selector(nested_environment_label.to_string())
-            .snapshot::<Inspect>()
+            .snapshot()
             .await
             .expect("read inspect hierarchy")
             .into_iter()

@@ -12,7 +12,7 @@ mod trusted_app;
 use anyhow::{self, Context, Error};
 use android_system_microfuchsia_vm_service::aidl::android::system::microfuchsia::vm_service::IMicrofuchsia::GUEST_PORT;
 
-extern "C" {
+unsafe extern "C" {
     fn register_dev_urandom_compat() -> zx::sys::zx_status_t;
 }
 

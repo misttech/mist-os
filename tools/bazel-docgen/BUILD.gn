@@ -32,7 +32,7 @@ if (is_host) {
     ]
     deps = [
       ":proto_lib",
-      "//third_party/golibs:golang.org/x/exp",
+      "//third_party/golibs:golang.org/x/exp/maps",
       "//third_party/golibs:gopkg.in/yaml.v2",
     ]
   }

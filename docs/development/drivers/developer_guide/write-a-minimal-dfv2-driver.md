@@ -402,8 +402,7 @@ so no logging is needed by the driver.
 #### Create an unowned node
 
 To create an unowned node, a driver can use the `DriverBase::AddChild()` helper
-functions. There are two types of these functions: one that allows providing
-`DevfsAddArgs` and the other that does not. These functions allow setting the
+functions. These functions allow setting the
 properties on an unowned node, which the driver framework uses to find a matching
 driver. The return result of both is a client end to the `NodeController` protocol,
 which can either be kept by the driver or discarded safely.
@@ -418,8 +417,7 @@ The example code below creates an unowned node under the driver's bound node:
 #### Create an owned node
 
 To create an owned node, a driver can use the `DriverBase::AddOwnedChild()` helper
-functions. There are again two types: one that allows `DevfsAddArgs` and the other
-that does not. These functions do not provide a properties argument since an owned
+functions. These functions do not provide a properties argument since an owned
 node does not participate in driver matching. The return result of both is an
 `OwnedChildNode` object that contains a client end to the `NodeController` (which
 is safe to discard) and a client end to the `Node` protocol, which is
@@ -427,7 +425,7 @@ is safe to discard) and a client end to the `Node` protocol, which is
 it wants the owned node to stay around. Dropping this client will cause the driver
 framework to remove the node.
 
-The example code below creates an owned node with `devfs` arguments:
+The example code below creates an owned node:
 
 ```cpp
 {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/metadata/retriever/retriever-driver.cc" adjust_indentation="auto" region_tag="add_child" %}

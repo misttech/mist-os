@@ -13,10 +13,11 @@ use net_types::ethernet::Mac;
 use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6};
 use netstack3_base::sync::RwLock;
 use netstack3_base::{
-    Counter, Device, DeviceIdContext, HandleableTimer, Inspectable, Inspector, InstantContext,
-    ReferenceNotifiers, TimerBindingsTypes, TimerHandler, TxMetadataBindingsTypes,
+    Counter, Device, DeviceIdContext, HandleableTimer, Inspectable, Inspector, InspectorExt as _,
+    InstantContext, ReferenceNotifiers, TimerBindingsTypes, TimerHandler, TxMetadataBindingsTypes,
 };
 use netstack3_filter::FilterBindingsTypes;
+use netstack3_ip::device::Ipv6LinkLayerAddr;
 use netstack3_ip::nud::{LinkResolutionContext, NudCounters};
 use packet::Buf;
 
@@ -31,7 +32,7 @@ use crate::internal::loopback::{LoopbackDeviceId, LoopbackPrimaryDeviceId};
 use crate::internal::pure_ip::{PureIpDeviceId, PureIpPrimaryDeviceId};
 use crate::internal::queue::rx::ReceiveQueueBindingsContext;
 use crate::internal::queue::tx::TransmitQueueBindingsContext;
-use crate::internal::socket::{self, HeldSockets};
+use crate::internal::socket::{self, DeviceSocketCounters, HeldSockets};
 use crate::internal::state::DeviceStateSpec;
 
 /// Iterator over devices.
@@ -73,10 +74,16 @@ pub enum Ipv6DeviceLinkLayerAddr {
     // Add other link-layer address types as needed.
 }
 
-impl AsRef<[u8]> for Ipv6DeviceLinkLayerAddr {
-    fn as_ref(&self) -> &[u8] {
+impl Ipv6LinkLayerAddr for Ipv6DeviceLinkLayerAddr {
+    fn as_bytes(&self) -> &[u8] {
         match self {
             Ipv6DeviceLinkLayerAddr::Mac(a) => a.as_ref(),
+        }
+    }
+
+    fn eui64_iid(&self) -> [u8; 8] {
+        match self {
+            Ipv6DeviceLinkLayerAddr::Mac(a) => a.to_eui64(),
         }
     }
 }
@@ -162,6 +169,8 @@ pub struct DeviceLayerState<BT: DeviceLayerTypes> {
     pub origin: OriginTracker,
     /// Collection of all device sockets.
     pub shared_sockets: HeldSockets<BT>,
+    /// Device socket counters.
+    pub device_socket_counters: DeviceSocketCounters,
     /// Common device counters.
     pub counters: DeviceCounters,
     /// Ethernet counters.

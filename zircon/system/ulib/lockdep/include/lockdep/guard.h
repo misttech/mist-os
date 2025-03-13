@@ -263,15 +263,6 @@ class __TA_SCOPED_CAPABILITY
     state.state_.reset();
   }
 
-  // Adopts the lock state and validator state. This constructor uses a type
-  // tag argument to avoid automatic move constructor semantics.
-  //
-  // Example:
-  //  Guard<fbl::Mutex> guard{AdoptLock, std::move(rvalue_arugment)};
-  //
-  __WARN_UNUSED_CONSTRUCTOR Guard(AdoptLockTag, Guard&& other) __TA_ACQUIRE(other.validator_.lock())
-      : validator_{std::move(other.validator_)}, state_{std::move(other.state_)} {}
-
   // Temporarily releases and un-tracks the guarded lock before executing the
   // given callable Op and then re-acquires and tracks the lock. This permits
   // the same Guard instance to protect a larger scope while performing an
@@ -449,6 +440,20 @@ class Guard<LockType, Option, internal::EnableIfNotShared<LockType, Option>>::Ad
   }
   ~Adoptable() { ZX_ASSERT(!state_.has_value()); }
 
+  // Returns true if the adoptable holds an actively acquired lock.
+  explicit operator bool() const { return state_.has_value(); }
+
+  // Returns true if this adoptable originates from |lock|.
+  bool wraps_lock(const LockType& lock) const {
+    return state_.has_value() && &lock == state_->first.lock();
+  }
+
+  // Read-only access to the underlying |lock|.
+  const LockType* lock() const {
+    DEBUG_ASSERT(*this);
+    return state_->first.lock();
+  }
+
  private:
   Adoptable(Validator&& v, State&& s) : state_({std::move(v), std::move(s)}) {}
   friend Guard;
@@ -589,16 +594,6 @@ class __TA_SCOPED_CAPABILITY Guard<LockType, Option, internal::EnableIfShared<Lo
     ZX_DEBUG_ASSERT(&lock->lock() == validator_.lock());
     state.state_.reset();
   }
-
-  // Adopts the lock state and validator state. This constructor uses a type
-  // tag argument to avoid automatic move constructor semantics.
-  //
-  // Example:
-  //  Guard<fbl::Mutex> guard{AdoptLock, std::move(rvalue_arugment)};
-  //
-  __WARN_UNUSED_CONSTRUCTOR Guard(AdoptLockTag, Guard&& other)
-      __TA_ACQUIRE_SHARED(other.validator_.lock())
-      : validator_{std::move(other.validator_)}, state_{std::move(other.state_)} {}
 
   // Temporarily releases and un-tracks the guarded lock before executing the
   // given callable Op and then re-acquires and tracks the lock. This permits

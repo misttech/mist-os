@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/fake/sysmem-service-forwarder.h"
 
-#include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
@@ -53,12 +52,6 @@ SysmemServiceForwarder::ConnectAllocator2() {
     return connect_result.take_error();
   }
   return zx::ok(std::move(client_end));
-}
-
-zx::result<fidl::ClientEnd<fuchsia_hardware_sysmem::Sysmem>>
-SysmemServiceForwarder::ConnectHardwareSysmem() {
-  ZX_ASSERT_MSG(false, "fuchsia.hardware.sysmem/Sysmem protocol not supported");
-  return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
 }  // namespace fake_display

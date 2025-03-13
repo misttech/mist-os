@@ -31,7 +31,10 @@ const FUCHSIA_TOUCH_PRODUCT_ID: u16 = 0x2;
 // May not be zero, see below.
 const FUCHSIA_KEYBOARD_PRODUCT_ID: u16 = 0x1;
 
-// Touch and keyboard input IDs should be distinct.
+// May not be zero, see below.
+const FUCHSIA_MOUSE_PRODUCT_ID: u16 = 0x3;
+
+// Touch, keyboard, and mouse input IDs should be distinct.
 // Per https://www.linuxjournal.com/article/6429, the bus type should be populated with a
 // sensible value, but other fields may not be.
 //
@@ -66,6 +69,15 @@ const KEYBOARD_INPUT_ID: input_id = input_id {
     version: 1,
 };
 
+const MOUSE_INPUT_ID: input_id = input_id {
+    bustype: BUS_VIRTUAL as u16,
+    // Make sure that vendor ID and product ID at least seem plausible.  See
+    // above for details.
+    vendor: FUCHSIA_VENDOR_ID,
+    product: FUCHSIA_MOUSE_PRODUCT_ID,
+    version: 1,
+};
+
 #[derive(Clone)]
 enum InputDeviceType {
     // A touch device, containing (display width, display height).
@@ -73,6 +85,9 @@ enum InputDeviceType {
 
     // A keyboard device.
     Keyboard,
+
+    // A mouse device.
+    Mouse,
 }
 
 /// An [`InputDeviceStatus`] is tied to an [`InputDeviceBinding`] and provides properties
@@ -201,6 +216,15 @@ impl InputDevice {
         })
     }
 
+    pub fn new_mouse(inspect_node: &fuchsia_inspect::Node) -> Arc<Self> {
+        let node = inspect_node.create_child("mouse_device");
+        Arc::new(InputDevice {
+            device_type: InputDeviceType::Mouse,
+            open_files: Default::default(),
+            inspect_status: Arc::new(InputDeviceStatus::new(node)),
+        })
+    }
+
     pub fn register<L>(
         self: Arc<Self>,
         locked: &mut Locked<'_, L>,
@@ -252,6 +276,16 @@ impl InputDevice {
                     .node
                     .create_child(format!("keyboard_file_{}", file_nodes.len()));
                 let file = Arc::new(InputFile::new_keyboard(KEYBOARD_INPUT_ID, Some(&child_node)));
+                file_nodes.push(child_node);
+                file
+            }
+            InputDeviceType::Mouse => {
+                let mut file_nodes = self.inspect_status.file_nodes.lock();
+                let child_node = self
+                    .inspect_status
+                    .node
+                    .create_child(format!("mouse_file_{}", file_nodes.len()));
+                let file = Arc::new(InputFile::new_mouse(MOUSE_INPUT_ID, Some(&child_node)));
                 file_nodes.push(child_node);
                 file
             }
@@ -358,6 +392,9 @@ mod test {
         let (touch_source_client_end, touch_source_stream) =
             fidl::endpoints::create_request_stream::<TouchSourceMarker>();
 
+        let (mouse_source_client_end, _mouse_source_stream) =
+            fidl::endpoints::create_request_stream::<fuipointer::MouseSourceMarker>();
+
         let (keyboard_proxy, _keyboard_stream) =
             fidl::endpoints::create_sync_proxy_and_stream::<fuiinput::KeyboardMarker>();
         let view_ref_pair =
@@ -373,11 +410,14 @@ mod test {
             EventProxyMode::None,
             touch_source_client_end,
             keyboard_proxy,
+            mouse_source_client_end,
             view_ref_pair.view_ref,
             device_registry_proxy,
             input_device.open_files.clone(),
             Default::default(),
+            Default::default(),
             Some(input_device.inspect_status.clone()),
+            None,
             None,
         );
 
@@ -404,18 +444,24 @@ mod test {
         let (touch_source_client_end, _touch_source_stream) =
             fidl::endpoints::create_request_stream::<TouchSourceMarker>();
 
+        let (mouse_source_client_end, _mouse_source_stream) =
+            fidl::endpoints::create_request_stream::<fuipointer::MouseSourceMarker>();
+
         let relay = input_event_relay::InputEventsRelay::new();
         relay.start_relays(
             current_task.kernel(),
             EventProxyMode::None,
             touch_source_client_end,
             keyboard_proxy,
+            mouse_source_client_end,
             view_ref_pair.view_ref,
             device_registry_proxy,
             Default::default(),
             input_device.open_files.clone(),
+            Default::default(),
             None,
             Some(input_device.inspect_status.clone()),
+            None,
         );
 
         (input_device, input_file, keyboard_stream)
@@ -443,6 +489,8 @@ mod test {
 
         let (touch_source_client_end, _touch_source_stream) =
             fidl::endpoints::create_request_stream::<TouchSourceMarker>();
+        let (mouse_source_client_end, _mouse_source_stream) =
+            fidl::endpoints::create_request_stream::<fuipointer::MouseSourceMarker>();
         let (keyboard_proxy, _keyboard_stream) =
             fidl::endpoints::create_sync_proxy_and_stream::<fuiinput::KeyboardMarker>();
         let view_ref_pair =
@@ -454,14 +502,69 @@ mod test {
             EventProxyMode::None,
             touch_source_client_end,
             keyboard_proxy,
+            mouse_source_client_end,
             view_ref_pair.view_ref,
             device_registry_proxy,
             Default::default(),
             input_device.open_files.clone(),
+            Default::default(),
+            None,
+            Some(input_device.inspect_status.clone()),
+            None,
+        );
+        (input_device, input_file, device_listener_stream)
+    }
+
+    fn start_mouse_input(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+    ) -> (Arc<InputDevice>, FileHandle, fuipointer::MouseSourceRequestStream) {
+        let inspector = fuchsia_inspect::Inspector::default();
+        start_mouse_input_inspect(locked, current_task, &inspector)
+    }
+
+    fn start_mouse_input_inspect(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        inspector: &fuchsia_inspect::Inspector,
+    ) -> (Arc<InputDevice>, FileHandle, fuipointer::MouseSourceRequestStream) {
+        let input_device = InputDevice::new_mouse(inspector.root());
+        let input_file =
+            input_device.open_test(locked, current_task).expect("Failed to create input file");
+
+        let (touch_source_client_end, _touch_source_stream) =
+            fidl::endpoints::create_request_stream::<TouchSourceMarker>();
+
+        let (mouse_source_client_end, mouse_source_stream) =
+            fidl::endpoints::create_request_stream::<fuipointer::MouseSourceMarker>();
+
+        let (keyboard_proxy, _keyboard_stream) =
+            fidl::endpoints::create_sync_proxy_and_stream::<fuiinput::KeyboardMarker>();
+        let view_ref_pair =
+            fuchsia_scenic::ViewRefPair::new().expect("Failed to create ViewRefPair");
+
+        let (device_registry_proxy, _device_listener_stream) =
+            fidl::endpoints::create_sync_proxy_and_stream::<fuipolicy::DeviceListenerRegistryMarker>(
+            );
+
+        let relay = input_event_relay::InputEventsRelay::new();
+        relay.start_relays(
+            &current_task.kernel(),
+            EventProxyMode::None,
+            touch_source_client_end,
+            keyboard_proxy,
+            mouse_source_client_end,
+            view_ref_pair.view_ref,
+            device_registry_proxy,
+            Default::default(),
+            Default::default(),
+            input_device.open_files.clone(),
+            None,
             None,
             Some(input_device.inspect_status.clone()),
         );
-        (input_device, input_file, device_listener_stream)
+
+        (input_device, input_file, mouse_source_stream)
     }
 
     fn make_touch_event(pointer_id: u32) -> fuipointer::TouchEvent {
@@ -533,6 +636,22 @@ mod test {
         }
     }
 
+    fn make_mouse_wheel_event(ticks: i64) -> fuipointer::MouseEvent {
+        make_mouse_wheel_event_with_timestamp(ticks, 0)
+    }
+
+    fn make_mouse_wheel_event_with_timestamp(ticks: i64, timestamp: i64) -> fuipointer::MouseEvent {
+        fuipointer::MouseEvent {
+            timestamp: Some(timestamp),
+            pointer_sample: Some(fuipointer::MousePointerSample {
+                device_id: Some(0),
+                scroll_v: Some(ticks),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+    }
+
     fn read_uapi_events<L>(
         locked: &mut Locked<'_, L>,
         file: &FileHandle,
@@ -566,7 +685,7 @@ mod test {
 
     // Waits for a `Watch()` request to arrive on `request_stream`, and responds with
     // `touch_event`. Returns the arguments to the `Watch()` call.
-    async fn answer_next_watch_request(
+    async fn answer_next_touch_watch_request(
         request_stream: &mut fuipointer::TouchSourceRequestStream,
         touch_events: Vec<TouchEvent>,
     ) -> Vec<TouchResponse> {
@@ -574,6 +693,20 @@ mod test {
             Some(Ok(TouchSourceRequest::Watch { responses, responder })) => {
                 responder.send(&touch_events).expect("failure sending Watch reply");
                 responses
+            }
+            unexpected_request => panic!("unexpected request {:?}", unexpected_request),
+        }
+    }
+
+    // Waits for a `Watch()` request to arrive on `request_stream`, and responds with
+    // `mouse_events`.
+    async fn answer_next_mouse_watch_request(
+        request_stream: &mut fuipointer::MouseSourceRequestStream,
+        mouse_events: Vec<fuipointer::MouseEvent>,
+    ) {
+        match request_stream.next().await {
+            Some(Ok(fuipointer::MouseSourceRequest::Watch { responder })) => {
+                responder.send(&mouse_events).expect("failure sending Watch reply");
             }
             unexpected_request => panic!("unexpected request {:?}", unexpected_request),
         }
@@ -659,12 +792,12 @@ mod test {
         );
 
         // Reply to first `Watch` request.
-        answer_next_watch_request(
+        answer_next_touch_watch_request(
             &mut touch_source_stream,
             vec![make_touch_event_with_phase(EventPhase::Add, 1)],
         )
         .await;
-        answer_next_watch_request(&mut touch_source_stream, vec![make_touch_event(1)]).await;
+        answer_next_touch_watch_request(&mut touch_source_stream, vec![make_touch_event(1)]).await;
 
         // `InputFile` should be done processing the first reply, since it has sent its second
         // request. And, as part of processing the first reply, `InputFile` should have notified
@@ -703,7 +836,7 @@ mod test {
         assert!(futures::poll!(&mut waiter_thread).is_pending());
 
         // Reply to first `Watch` request.
-        answer_next_watch_request(
+        answer_next_touch_watch_request(
             &mut touch_source_stream,
             vec![make_touch_event_with_phase(EventPhase::Add, 1)],
         )
@@ -714,7 +847,7 @@ mod test {
         // TODO(https://fxbug.dev/42075452): Without this, `relay_thread` gets stuck `await`-ing
         // the reply to its first request. Figure out why that happens, and remove this second
         // reply.
-        answer_next_watch_request(&mut touch_source_stream, vec![make_touch_event(1)]).await;
+        answer_next_touch_watch_request(&mut touch_source_stream, vec![make_touch_event(1)]).await;
     }
 
     #[::fuchsia::test]
@@ -746,7 +879,7 @@ mod test {
         );
 
         // Reply to first `Watch` request with an empty set of events.
-        answer_next_watch_request(&mut touch_source_stream, vec![]).await;
+        answer_next_touch_watch_request(&mut touch_source_stream, vec![]).await;
 
         // `InputFile` should be done processing the first reply. Since there
         // were no touch_events given, `InputFile` should not have notified the
@@ -802,13 +935,13 @@ mod test {
         waitkeys.into_iter().next().expect("failed to get first waitkey").cancel();
 
         // Reply to first `Watch` request.
-        answer_next_watch_request(
+        answer_next_touch_watch_request(
             &mut touch_source_stream,
             vec![make_touch_event_with_phase(EventPhase::Add, 1)],
         )
         .await;
         // Wait for another `Watch`.
-        answer_next_watch_request(&mut touch_source_stream, vec![make_touch_event(1)]).await;
+        answer_next_touch_watch_request(&mut touch_source_stream, vec![make_touch_event(1)]).await;
 
         // `InputFile` should be done processing the first reply, since it has sent its second
         // request. And, as part of processing the first reply, `InputFile` should have notified
@@ -838,14 +971,14 @@ mod test {
         );
 
         // Reply to first `Watch` request.
-        answer_next_watch_request(
+        answer_next_touch_watch_request(
             &mut touch_source_stream,
             vec![make_touch_event_with_phase(EventPhase::Add, 1)],
         )
         .await;
 
         // Wait for another `Watch`.
-        answer_next_watch_request(&mut touch_source_stream, vec![make_touch_event(1)]).await;
+        answer_next_touch_watch_request(&mut touch_source_stream, vec![make_touch_event(1)]).await;
 
         // Check post-watch expectation.
         assert_eq!(
@@ -883,7 +1016,7 @@ mod test {
 
         // Touch add for pointer 1. This should be counted as a received event and a converted
         // event. It should also yield 6 generated events.
-        answer_next_watch_request(
+        answer_next_touch_watch_request(
             &mut touch_source_stream,
             vec![make_touch_event_with_phase(EventPhase::Add, 1)],
         )
@@ -892,7 +1025,8 @@ mod test {
         // Wait for another `Watch` to ensure input_file done processing the first reply.
         // Use an empty `TouchEvent`, to minimize the chance that this event creates unexpected
         // `uapi::input_event`s. This should be counted as a received event and an ignored event.
-        answer_next_watch_request(&mut touch_source_stream, vec![make_empty_touch_event()]).await;
+        answer_next_touch_watch_request(&mut touch_source_stream, vec![make_empty_touch_event()])
+            .await;
 
         // Consume all of the `uapi::input_event`s that are available.
         let events = read_uapi_events(&mut locked, &input_file, &current_task);
@@ -901,7 +1035,8 @@ mod test {
 
         // Reply to `Watch` request of empty event. This should be counted as a received event and
         // an ignored event.
-        answer_next_watch_request(&mut touch_source_stream, vec![make_empty_touch_event()]).await;
+        answer_next_touch_watch_request(&mut touch_source_stream, vec![make_empty_touch_event()])
+            .await;
 
         // Wait for another `Watch`.
         match touch_source_stream.next().await {
@@ -949,7 +1084,7 @@ mod test {
 
         // Touch add for pointer 1. This should be counted as a received event and a converted
         // event. It should also yield 6 generated events.
-        answer_next_watch_request(
+        answer_next_touch_watch_request(
             &mut touch_source_stream,
             vec![make_touch_event_with_phase(EventPhase::Add, 1)],
         )
@@ -958,7 +1093,8 @@ mod test {
         // Wait for another `Watch` to ensure input_file done processing the first reply.
         // Use an empty `TouchEvent`, to minimize the chance that this event creates unexpected
         // `uapi::input_event`s. This should be counted as a received event and an ignored event.
-        answer_next_watch_request(&mut touch_source_stream, vec![make_empty_touch_event()]).await;
+        answer_next_touch_watch_request(&mut touch_source_stream, vec![make_empty_touch_event()])
+            .await;
 
         // Consume all of the `uapi::input_event`s that are available.
         let events = read_uapi_events(&mut locked, &input_file, &current_task);
@@ -967,7 +1103,7 @@ mod test {
 
         // Reply to `Watch` request of given event. This should be counted as a received event and
         // an unexpected event.
-        answer_next_watch_request(&mut touch_source_stream, vec![event]).await;
+        answer_next_touch_watch_request(&mut touch_source_stream, vec![event]).await;
 
         // Wait for another `Watch`.
         match touch_source_stream.next().await {
@@ -1009,7 +1145,7 @@ mod test {
             start_touch_input(&mut locked, &current_task);
 
         // Touch add for pointer 1.
-        answer_next_watch_request(
+        answer_next_touch_watch_request(
             &mut touch_source_stream,
             vec![make_touch_event_with_phase(EventPhase::Add, 1)],
         )
@@ -1018,7 +1154,8 @@ mod test {
         // Wait for another `Watch` to ensure input_file done processing the first reply.
         // Use an empty `TouchEvent`, to minimize the chance that this event
         // creates unexpected `uapi::input_event`s.
-        answer_next_watch_request(&mut touch_source_stream, vec![make_empty_touch_event()]).await;
+        answer_next_touch_watch_request(&mut touch_source_stream, vec![make_empty_touch_event()])
+            .await;
 
         // Consume all of the `uapi::input_event`s that are available.
         let events = read_uapi_events(&mut locked, &input_file, &current_task);
@@ -1044,7 +1181,7 @@ mod test {
             start_touch_input(&mut locked, &current_task);
 
         // Touch add for pointer 1.
-        answer_next_watch_request(
+        answer_next_touch_watch_request(
             &mut touch_source_stream,
             vec![make_touch_event_with_phase(EventPhase::Add, 1)],
         )
@@ -1053,7 +1190,8 @@ mod test {
         // Wait for another `Watch` to ensure input_file done processing the first reply.
         // Use an empty `TouchEvent`, to minimize the chance that this event
         // creates unexpected `uapi::input_event`s.
-        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
+        answer_next_touch_watch_request(&mut touch_source_stream, vec![TouchEvent::default()])
+            .await;
 
         // Consume all of the `uapi::input_event`s that are available.
         let events = read_uapi_events(&mut locked, &input_file, &current_task);
@@ -1061,14 +1199,15 @@ mod test {
         assert_eq!(events.len(), 6);
 
         // Reply to touch change.
-        answer_next_watch_request(
+        answer_next_touch_watch_request(
             &mut touch_source_stream,
             vec![make_touch_event_with_coords(10.0, 20.0, 1)],
         )
         .await;
 
         // Wait for another `Watch`.
-        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
+        answer_next_touch_watch_request(&mut touch_source_stream, vec![TouchEvent::default()])
+            .await;
 
         let events = read_uapi_events(&mut locked, &input_file, &current_task);
         assert_eq!(
@@ -1090,7 +1229,7 @@ mod test {
             start_touch_input(&mut locked, &current_task);
 
         // Touch add for pointer 1.
-        answer_next_watch_request(
+        answer_next_touch_watch_request(
             &mut touch_source_stream,
             vec![make_touch_event_with_phase(EventPhase::Add, 1)],
         )
@@ -1099,7 +1238,8 @@ mod test {
         // Wait for another `Watch` to ensure input_file done processing the first reply.
         // Use an empty `TouchEvent`, to minimize the chance that this event
         // creates unexpected `uapi::input_event`s.
-        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
+        answer_next_touch_watch_request(&mut touch_source_stream, vec![TouchEvent::default()])
+            .await;
 
         // Consume all of the `uapi::input_event`s that are available.
         let events = read_uapi_events(&mut locked, &input_file, &current_task);
@@ -1107,14 +1247,15 @@ mod test {
         assert_eq!(events.len(), 6);
 
         // Reply to touch change.
-        answer_next_watch_request(
+        answer_next_touch_watch_request(
             &mut touch_source_stream,
             vec![make_touch_event_with_phase(EventPhase::Remove, 1)],
         )
         .await;
 
         // Wait for another `Watch`.
-        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
+        answer_next_touch_watch_request(&mut touch_source_stream, vec![TouchEvent::default()])
+            .await;
 
         let events = read_uapi_events(&mut locked, &input_file, &current_task);
         assert_eq!(
@@ -1136,20 +1277,21 @@ mod test {
             start_touch_input(&mut locked, &current_task);
 
         // Touch add for pointer 1.
-        answer_next_watch_request(
+        answer_next_touch_watch_request(
             &mut touch_source_stream,
             vec![make_touch_event_with_phase(EventPhase::Add, 1)],
         )
         .await;
 
         // Wait for another `Watch`.
-        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
+        answer_next_touch_watch_request(&mut touch_source_stream, vec![TouchEvent::default()])
+            .await;
         let events = read_uapi_events(&mut locked, &input_file, &current_task);
 
         assert_eq!(events.len(), 6);
 
         // Touch add for pointer 2.
-        answer_next_watch_request(
+        answer_next_touch_watch_request(
             &mut touch_source_stream,
             vec![
                 make_touch_event_with_coords(10.0, 20.0, 1),
@@ -1159,7 +1301,8 @@ mod test {
         .await;
 
         // Wait for another `Watch`.
-        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
+        answer_next_touch_watch_request(&mut touch_source_stream, vec![TouchEvent::default()])
+            .await;
         let events = read_uapi_events(&mut locked, &input_file, &current_task);
 
         assert_eq!(
@@ -1177,7 +1320,7 @@ mod test {
         );
 
         // Both pointers move.
-        answer_next_watch_request(
+        answer_next_touch_watch_request(
             &mut touch_source_stream,
             vec![
                 make_touch_event_with_coords(11.0, 21.0, 1),
@@ -1187,7 +1330,8 @@ mod test {
         .await;
 
         // Wait for another `Watch`.
-        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
+        answer_next_touch_watch_request(&mut touch_source_stream, vec![TouchEvent::default()])
+            .await;
         let events = read_uapi_events(&mut locked, &input_file, &current_task);
 
         assert_eq!(
@@ -1204,7 +1348,7 @@ mod test {
         );
 
         // Pointer 1 up.
-        answer_next_watch_request(
+        answer_next_touch_watch_request(
             &mut touch_source_stream,
             vec![
                 make_touch_event_with_phase(EventPhase::Remove, 1),
@@ -1214,7 +1358,8 @@ mod test {
         .await;
 
         // Wait for another `Watch`.
-        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
+        answer_next_touch_watch_request(&mut touch_source_stream, vec![TouchEvent::default()])
+            .await;
         let events = read_uapi_events(&mut locked, &input_file, &current_task);
 
         assert_eq!(
@@ -1230,14 +1375,15 @@ mod test {
         );
 
         // Pointer 2 up.
-        answer_next_watch_request(
+        answer_next_touch_watch_request(
             &mut touch_source_stream,
             vec![make_touch_event_with_phase(EventPhase::Remove, 2)],
         )
         .await;
 
         // Wait for another `Watch`.
-        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
+        answer_next_touch_watch_request(&mut touch_source_stream, vec![TouchEvent::default()])
+            .await;
         let events = read_uapi_events(&mut locked, &input_file, &current_task);
 
         assert_eq!(
@@ -1259,7 +1405,7 @@ mod test {
             start_touch_input(&mut locked, &current_task);
 
         // Touch add for pointer 1.
-        answer_next_watch_request(
+        answer_next_touch_watch_request(
             &mut touch_source_stream,
             vec![
                 make_touch_event_with_coords_phase_timestamp(
@@ -1275,7 +1421,8 @@ mod test {
         .await;
 
         // Wait for another `Watch`.
-        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
+        answer_next_touch_watch_request(&mut touch_source_stream, vec![TouchEvent::default()])
+            .await;
         let events = read_uapi_events(&mut locked, &input_file, &current_task);
 
         assert_eq!(
@@ -1317,14 +1464,15 @@ mod test {
             start_touch_input(&mut locked, &current_task);
 
         // Touch add.
-        answer_next_watch_request(
+        answer_next_touch_watch_request(
             &mut touch_source_stream,
             vec![make_touch_event_with_coords_phase(x, y, EventPhase::Add, 1)],
         )
         .await;
 
         // Wait for another `Watch`.
-        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
+        answer_next_touch_watch_request(&mut touch_source_stream, vec![TouchEvent::default()])
+            .await;
         let events = read_uapi_events(&mut locked, &input_file, &current_task);
 
         // Check that the reported positions are within the acceptable error. The acceptable
@@ -1369,11 +1517,12 @@ mod test {
             start_touch_input(&mut locked, &current_task);
 
         // Reply to first `Watch` request.
-        answer_next_watch_request(&mut touch_source_stream, vec![event]).await;
+        answer_next_touch_watch_request(&mut touch_source_stream, vec![event]).await;
 
         // Get response to `event`.
         let responses =
-            answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
+            answer_next_touch_watch_request(&mut touch_source_stream, vec![TouchEvent::default()])
+                .await;
 
         // Return the value for `test_case` to match on.
         responses.get(0).cloned()
@@ -1647,6 +1796,72 @@ mod test {
         assert_eq!(events[2].value, 1);
     }
 
+    #[test_case(1; "Scroll up")]
+    #[test_case(-1; "Scroll down")]
+    #[::fuchsia::test]
+    async fn sends_mouse_wheel_events(ticks: i64) {
+        let time = 100;
+        let uapi_event = uapi::input_event {
+            time: timeval_from_time(zx::MonotonicInstant::from_nanos(time)),
+            type_: uapi::EV_REL as u16,
+            code: uapi::REL_WHEEL as u16,
+            value: ticks as i32,
+        };
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_mouse_device, mouse_file, mut mouse_stream) =
+            start_mouse_input(&mut locked, &current_task);
+
+        answer_next_mouse_watch_request(
+            &mut mouse_stream,
+            vec![make_mouse_wheel_event_with_timestamp(ticks, time)],
+        )
+        .await;
+
+        // Wait for another `Watch` to ensure mouse_file is done processing the other replies.
+        // Use an empty vec, to ensure no unexpected `uapi::input_event`s are created.
+        answer_next_mouse_watch_request(&mut mouse_stream, vec![]).await;
+
+        let events = read_uapi_events(&mut locked, &mouse_file, &current_task);
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0], uapi_event);
+    }
+
+    #[::fuchsia::test]
+    async fn ignore_mouse_non_wheel_events() {
+        let mouse_move_event = fuipointer::MouseEvent {
+            timestamp: Some(0),
+            pointer_sample: Some(fuipointer::MousePointerSample {
+                device_id: Some(0),
+                position_in_viewport: Some([50.0, 50.0]),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let mouse_click_event = fuipointer::MouseEvent {
+            timestamp: Some(0),
+            pointer_sample: Some(fuipointer::MousePointerSample {
+                device_id: Some(0),
+                pressed_buttons: Some(vec![1]),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_mouse_device, mouse_file, mut mouse_stream) =
+            start_mouse_input(&mut locked, &current_task);
+
+        // Expect mouse relay to discard MouseEvents without vertical scroll.
+        answer_next_mouse_watch_request(&mut mouse_stream, vec![mouse_move_event]).await;
+        answer_next_mouse_watch_request(&mut mouse_stream, vec![mouse_click_event]).await;
+
+        // Wait for another `Watch` to ensure mouse_file is done processing the other replies.
+        // Use an empty vec, to ensure no unexpected `uapi::input_event`s are created.
+        answer_next_mouse_watch_request(&mut mouse_stream, vec![]).await;
+
+        let events = read_uapi_events(&mut locked, &mouse_file, &current_task);
+        assert_eq!(events.len(), 0);
+    }
+
     #[::fuchsia::test]
     async fn touch_input_initialized_with_inspect_node() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
@@ -1787,6 +2002,8 @@ mod test {
 
         let (touch_source_client_end, mut touch_source_stream) =
             fidl::endpoints::create_request_stream::<TouchSourceMarker>();
+        let (mouse_source_client_end, _mouse_source_stream) =
+            fidl::endpoints::create_request_stream::<fuipointer::MouseSourceMarker>();
         let (keyboard_proxy, _keyboard_stream) =
             fidl::endpoints::create_sync_proxy_and_stream::<fuiinput::KeyboardMarker>();
         let view_ref_pair =
@@ -1807,11 +2024,14 @@ mod test {
             EventProxyMode::None,
             touch_source_client_end,
             keyboard_proxy,
+            mouse_source_client_end,
             view_ref_pair.view_ref,
             device_registry_proxy,
             input_device.open_files.clone(),
             Default::default(),
+            Default::default(),
             Some(input_device.inspect_status.clone()),
+            None,
             None,
         );
 
@@ -2037,6 +2257,114 @@ mod test {
                     // Button events perform a realtime clockread, so any value will do.
                     last_generated_uapi_event_timestamp_ns: AnyProperty,
                     last_read_uapi_event_timestamp_ns: AnyProperty,
+                },
+            }
+        });
+    }
+
+    #[::fuchsia::test]
+    async fn mouse_input_initialized_with_inspect_node() {
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let mouse_device = InputDevice::new_mouse(&inspector.root());
+        let _file_obj = mouse_device.open_test(&mut locked, &current_task);
+
+        assert_data_tree!(inspector, root: {
+            mouse_device: {
+                total_fidl_events_received_count: 0u64,
+                total_fidl_events_ignored_count: 0u64,
+                total_fidl_events_unexpected_count: 0u64,
+                total_fidl_events_converted_count: 0u64,
+                total_uapi_events_generated_count: 0u64,
+                last_generated_uapi_event_timestamp_ns: 0i64,
+                mouse_file_0: {
+                    fidl_events_received_count: 0u64,
+                    fidl_events_ignored_count: 0u64,
+                    fidl_events_unexpected_count: 0u64,
+                    fidl_events_converted_count: 0u64,
+                    uapi_events_generated_count: 0u64,
+                    uapi_events_read_count: 0u64,
+                    last_generated_uapi_event_timestamp_ns: 0i64,
+                    last_read_uapi_event_timestamp_ns: 0i64,
+                }
+            }
+        });
+    }
+
+    #[::fuchsia::test]
+    async fn mouse_relay_updates_mouse_inspect_status() {
+        let inspector = fuchsia_inspect::Inspector::default();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_input_device, input_file, mut mouse_source_stream) =
+            start_mouse_input_inspect(&mut locked, &current_task, &inspector);
+
+        let mouse_move_event = fuipointer::MouseEvent {
+            timestamp: Some(0),
+            pointer_sample: Some(fuipointer::MousePointerSample {
+                device_id: Some(0),
+                position_in_viewport: Some([50.0, 50.0]),
+                scroll_v: Some(0),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let mouse_click_event = fuipointer::MouseEvent {
+            timestamp: Some(0),
+            pointer_sample: Some(fuipointer::MousePointerSample {
+                device_id: Some(0),
+                scroll_v: Some(0),
+                pressed_buttons: Some(vec![1]),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        // Send 2 non-wheel MouseEvents to proxy that should be counted as `received` by InputFile
+        // These events have no scroll_v delta in the pointer sample so they should be ignored.
+        answer_next_mouse_watch_request(
+            &mut mouse_source_stream,
+            vec![mouse_move_event, mouse_click_event],
+        )
+        .await;
+
+        // Send 5 MouseEvents with non-zero scroll_v delta to proxy, these should be received and
+        // converted to 1 uapi event each, with an extra sync event to signify end of the batch.
+        answer_next_mouse_watch_request(
+            &mut mouse_source_stream,
+            vec![make_mouse_wheel_event(1); 5],
+        )
+        .await;
+
+        // Send a final mouse wheel event and ensure the inspect tree reflects it's timestamp under
+        // last_generated_uapi_event_timestamp_ns and last_read_uapi_event_timestamp_ns.
+        answer_next_mouse_watch_request(
+            &mut mouse_source_stream,
+            vec![make_mouse_wheel_event_with_timestamp(-1, 5000)],
+        )
+        .await;
+
+        // Wait for another `Watch` to ensure mouse_file is done processing the other replies.
+        // Use an empty vec, to ensure no unexpected `uapi::input_event`s are created.
+        answer_next_mouse_watch_request(&mut mouse_source_stream, vec![]).await;
+
+        let _events = read_uapi_events(&mut locked, &input_file, &current_task);
+        assert_data_tree!(inspector, root: {
+            mouse_device: {
+                total_fidl_events_received_count: 8u64,
+                total_fidl_events_ignored_count: 2u64,
+                total_fidl_events_unexpected_count: 0u64,
+                total_fidl_events_converted_count: 6u64,
+                total_uapi_events_generated_count: 8u64,
+                last_generated_uapi_event_timestamp_ns: 5000i64,
+                mouse_file_0: {
+                    fidl_events_received_count: 8u64,
+                    fidl_events_ignored_count: 2u64,
+                    fidl_events_unexpected_count: 0u64,
+                    fidl_events_converted_count: 6u64,
+                    uapi_events_generated_count: 8u64,
+                    uapi_events_read_count: 8u64,
+                    last_generated_uapi_event_timestamp_ns: 5000i64,
+                    last_read_uapi_event_timestamp_ns: 5000i64,
                 },
             }
         });

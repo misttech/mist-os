@@ -7,12 +7,17 @@
 #include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
+#include <lib/zx/result.h>
 #include <zircon/errors.h>
-#include <zircon/status.h>
+
+#include <memory>
+#include <utility>
 
 #include <gtest/gtest.h>
 
+#include "src/graphics/display/drivers/coordinator/added-display-info.h"
 #include "src/graphics/display/lib/edid-values/edid-values.h"
+#include "src/graphics/display/lib/edid/edid.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace display_coordinator {
@@ -38,19 +43,24 @@ TEST_F(DisplayInfoTest, InitializeWithEdidValueSingleBlock) {
       .pixel_formats_count = pixel_formats.size(),
   };
 
-  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result = DisplayInfo::Create(raw_display_info);
-  ASSERT_TRUE(display_info_result.is_ok())
-      << "Failed to create DisplayInfo: "
-      << zx_status_get_string(display_info_result.error_value());
+  zx::result<std::unique_ptr<AddedDisplayInfo>> added_display_info_result =
+      AddedDisplayInfo::Create(raw_display_info);
+  ASSERT_OK(added_display_info_result);
+  std::unique_ptr<AddedDisplayInfo> added_display_info =
+      std::move(added_display_info_result).value();
 
-  fbl::RefPtr<DisplayInfo> display_info = std::move(display_info_result).value();
-  ASSERT_TRUE(display_info->edid.has_value());
+  zx::result<std::unique_ptr<DisplayInfo>> display_info_result =
+      DisplayInfo::Create(std::move(*added_display_info));
+  ASSERT_OK(display_info_result);
 
-  const edid::Edid& edid_base = display_info->edid->base;
-  EXPECT_EQ(edid_base.edid_length(), edid::kHpZr30wEdid.size());
-  EXPECT_EQ(edid_base.GetManufacturerName(), std::string("HEWLETT PACKARD"));
-  EXPECT_EQ(edid_base.product_code(), 10348u);
-  EXPECT_EQ(edid_base.GetDisplayProductSerialNumber(), std::string("CN413010YH"));
+  std::unique_ptr<DisplayInfo> display_info = std::move(display_info_result).value();
+  ASSERT_TRUE(display_info->edid_info.has_value());
+
+  const edid::Edid& edid_info = display_info->edid_info.value();
+  EXPECT_EQ(edid_info.edid_length(), edid::kHpZr30wEdid.size());
+  EXPECT_EQ(edid_info.GetManufacturerName(), std::string("HEWLETT PACKARD"));
+  EXPECT_EQ(edid_info.product_code(), 10348u);
+  EXPECT_EQ(edid_info.GetDisplayProductSerialNumber(), std::string("CN413010YH"));
 }
 
 TEST_F(DisplayInfoTest, InitializeWithEdidValueMultipleBlocks) {
@@ -67,19 +77,24 @@ TEST_F(DisplayInfoTest, InitializeWithEdidValueMultipleBlocks) {
       .pixel_formats_count = pixel_formats.size(),
   };
 
-  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result = DisplayInfo::Create(raw_display_info);
-  ASSERT_TRUE(display_info_result.is_ok())
-      << "Failed to create DisplayInfo: "
-      << zx_status_get_string(display_info_result.error_value());
+  zx::result<std::unique_ptr<AddedDisplayInfo>> added_display_info_result =
+      AddedDisplayInfo::Create(raw_display_info);
+  ASSERT_OK(added_display_info_result);
+  std::unique_ptr<AddedDisplayInfo> added_display_info =
+      std::move(added_display_info_result).value();
 
-  fbl::RefPtr<DisplayInfo> display_info = std::move(display_info_result).value();
-  ASSERT_TRUE(display_info->edid.has_value());
+  zx::result<std::unique_ptr<DisplayInfo>> display_info_result =
+      DisplayInfo::Create(std::move(*added_display_info));
+  ASSERT_OK(display_info_result);
 
-  const edid::Edid& edid_base = display_info->edid->base;
-  EXPECT_EQ(edid_base.edid_length(), edid::kSamsungCrg9Edid.size());
-  EXPECT_EQ(edid_base.GetManufacturerName(), std::string("SAMSUNG ELECTRIC COMPANY"));
-  EXPECT_EQ(edid_base.product_code(), 28754u);
-  EXPECT_EQ(edid_base.GetDisplayProductSerialNumber(), std::string("H4ZR701271"));
+  std::unique_ptr<DisplayInfo> display_info = std::move(display_info_result).value();
+  ASSERT_TRUE(display_info->edid_info.has_value());
+
+  const edid::Edid& edid_info = display_info->edid_info.value();
+  EXPECT_EQ(edid_info.edid_length(), edid::kSamsungCrg9Edid.size());
+  EXPECT_EQ(edid_info.GetManufacturerName(), std::string("SAMSUNG ELECTRIC COMPANY"));
+  EXPECT_EQ(edid_info.product_code(), 28754u);
+  EXPECT_EQ(edid_info.GetDisplayProductSerialNumber(), std::string("H4ZR701271"));
 }
 
 TEST_F(DisplayInfoTest, InitializeWithEdidValueOfInvalidLength) {
@@ -100,7 +115,14 @@ TEST_F(DisplayInfoTest, InitializeWithEdidValueOfInvalidLength) {
       .pixel_formats_count = pixel_formats.size(),
   };
 
-  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result = DisplayInfo::Create(raw_display_info);
+  zx::result<std::unique_ptr<AddedDisplayInfo>> added_display_info_result =
+      AddedDisplayInfo::Create(raw_display_info);
+  ASSERT_OK(added_display_info_result);
+  std::unique_ptr<AddedDisplayInfo> added_display_info =
+      std::move(added_display_info_result).value();
+
+  zx::result<std::unique_ptr<DisplayInfo>> display_info_result =
+      DisplayInfo::Create(std::move(*added_display_info));
   ASSERT_FALSE(display_info_result.is_ok());
   EXPECT_STATUS(display_info_result.error_value(), ZX_ERR_INTERNAL);
 }
@@ -123,7 +145,14 @@ TEST_F(DisplayInfoTest, InitializeWithEdidValueIncomplete) {
       .pixel_formats_count = pixel_formats.size(),
   };
 
-  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result = DisplayInfo::Create(raw_display_info);
+  zx::result<std::unique_ptr<AddedDisplayInfo>> added_display_info_result =
+      AddedDisplayInfo::Create(raw_display_info);
+  ASSERT_OK(added_display_info_result);
+  std::unique_ptr<AddedDisplayInfo> added_display_info =
+      std::move(added_display_info_result).value();
+
+  zx::result<std::unique_ptr<DisplayInfo>> display_info_result =
+      DisplayInfo::Create(std::move(*added_display_info));
   ASSERT_FALSE(display_info_result.is_ok());
   EXPECT_STATUS(display_info_result.error_value(), ZX_ERR_INTERNAL);
 }
@@ -155,7 +184,14 @@ TEST_F(DisplayInfoTest, InitializeWithEdidValueNonDigitalDisplay) {
       .pixel_formats_count = pixel_formats.size(),
   };
 
-  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result = DisplayInfo::Create(raw_display_info);
+  zx::result<std::unique_ptr<AddedDisplayInfo>> added_display_info_result =
+      AddedDisplayInfo::Create(raw_display_info);
+  ASSERT_OK(added_display_info_result);
+  std::unique_ptr<AddedDisplayInfo> added_display_info =
+      std::move(added_display_info_result).value();
+
+  zx::result<std::unique_ptr<DisplayInfo>> display_info_result =
+      DisplayInfo::Create(std::move(*added_display_info));
   ASSERT_FALSE(display_info_result.is_ok());
   EXPECT_STATUS(display_info_result.error_value(), ZX_ERR_INTERNAL);
 }

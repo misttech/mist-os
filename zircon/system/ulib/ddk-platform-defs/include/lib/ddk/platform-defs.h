@@ -52,7 +52,7 @@
 #define PDEV_DID_FUSB302                0x2C  // FUSB203, USB power delivery
 #define PDEV_DID_RAM_DISK               0x2D  // RAM disk device
 #define PDEV_DID_RAM_NAND               0x2E  // RAM disk for nand devices
-#define PDEV_DID_VIRTUAL_AUDIO          0x2F  // Virtual audio for test
+// #define PDEV_DID_VIRTUAL_AUDIO_LEGACY was 0x2F  // Legacy virtual audio for test
 #define PDEV_DID_BT_HCI_EMULATOR        0x30  // Bluetooth HCI emulator for test
 #define PDEV_DID_POWER_CORE             0x31  // Power core
 #define PDEV_DID_DEVICETREE_NODE        0x32  // Node published by devicetree driver
@@ -62,6 +62,7 @@
 #define PDEV_DID_BUTTONS                0x36  // Buttons
 #define PDEV_DID_FAKE_AC                0x37  // Fake ac for test
 #define PDEV_DID_HRTIMER                0x38  // High resolution timers
+// #define PDEV_DID_VIRTUAL_AUDIO was 0x39 // Virtual audio for test
 
 // QEMU emulator
 #define PDEV_VID_QEMU               0x01

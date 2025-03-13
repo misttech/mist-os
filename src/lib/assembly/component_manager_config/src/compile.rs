@@ -118,7 +118,7 @@ struct Config {
     builtin_capabilities: Option<Vec<cml::Capability>>,
     use_builtin_process_launcher: Option<bool>,
     maintain_utc_clock: Option<bool>,
-    num_threads: Option<u32>,
+    num_threads: Option<u8>,
     root_component_url: Option<Url>,
     component_id_index_path: Option<String>,
     log_destination: Option<LogDestination>,
@@ -902,7 +902,7 @@ mod tests {
                     event_stream: "foo_event_stream",
                 }
             ],
-            num_threads: 321,
+            num_threads: 210,
             root_component_url: "fuchsia-pkg://fuchsia.com/foo#meta/foo.cm",
             component_id_index_path: "/this/is/an/absolute/path",
             log_destination: "klog",
@@ -1015,7 +1015,7 @@ mod tests {
                         ..Default::default()
                     }),
                 ]),
-                num_threads: Some(321),
+                num_threads: Some(210),
                 root_component_url: Some("fuchsia-pkg://fuchsia.com/foo#meta/foo.cm".to_string()),
                 component_id_index_path: Some("/this/is/an/absolute/path".to_string()),
                 log_destination: Some(component_internal::LogDestination::Klog),

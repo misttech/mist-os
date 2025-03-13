@@ -15,7 +15,7 @@
 
 namespace {
 
-TEST(RoleApi, SetRole) {
+TEST(RoleApi, SetThreadRole) {
   // Test setting a role on the current thread.
   {
     EXPECT_OK(fuchsia_scheduler::SetRoleForThisThread("test.core.a"));
@@ -47,6 +47,24 @@ TEST(RoleApi, SetRole) {
     condition.notify_all();
     thread.join();
   }
+}
+
+TEST(RoleApi, SetMemoryRoleRoot) {
+  EXPECT_OK(fuchsia_scheduler::SetRoleForRootVmar("test.core.a.memory"));
+  EXPECT_EQ(ZX_ERR_NOT_FOUND, fuchsia_scheduler::SetRoleForRootVmar("test.nonexistent.role"));
+}
+
+TEST(RoleApi, SetMemoryRoleNested) {
+  zx::vmar nested;
+  uintptr_t child_addr;
+  ASSERT_EQ(zx::vmar::root_self()->allocate(ZX_VM_CAN_MAP_READ, 0, 4096, &nested, &child_addr),
+            ZX_OK);
+  EXPECT_OK(fuchsia_scheduler::SetRoleForVmar(nested.borrow(), "test.core.a.memory"));
+
+  ASSERT_EQ(zx::vmar::root_self()->allocate(ZX_VM_CAN_MAP_READ, 0, 4096, &nested, &child_addr),
+            ZX_OK);
+  EXPECT_EQ(ZX_ERR_NOT_FOUND,
+            fuchsia_scheduler::SetRoleForVmar(nested.borrow(), "test.nonexistent.role"));
 }
 
 }  // anonymous namespace

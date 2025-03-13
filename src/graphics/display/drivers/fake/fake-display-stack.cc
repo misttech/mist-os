@@ -32,10 +32,6 @@ FakeDisplayStack::FakeDisplayStack(std::unique_ptr<SysmemServiceProvider> sysmem
   fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_allocator = ConnectToSysmemAllocatorV2();
   display_engine_ = std::make_unique<FakeDisplay>(device_config, std::move(sysmem_allocator),
                                                   inspect::Inspector{});
-  zx_status_t status = display_engine_->Initialize();
-  if (status != ZX_OK) {
-    ZX_PANIC("Failed to initialize fake-display: %s", zx_status_get_string(status));
-  }
 
   zx::result<fdf::SynchronizedDispatcher> create_dispatcher_result =
       fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,

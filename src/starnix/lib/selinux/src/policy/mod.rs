@@ -25,7 +25,7 @@ use index::PolicyIndex;
 use metadata::HandleUnknown;
 use parsed_policy::ParsedPolicy;
 use parser::{ByRef, ByValue, ParseStrategy};
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
 use std::num::{NonZeroU32, NonZeroU64};
 use std::ops::Deref;
@@ -38,15 +38,15 @@ use zerocopy::{
 pub const SUPPORTED_POLICY_VERSION: u32 = 33;
 
 /// Identifies a user within a policy.
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Hash, Eq, Ord, PartialEq, PartialOrd)]
 pub struct UserId(NonZeroU32);
 
 /// Identifies a role within a policy.
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Hash, Eq, Ord, PartialEq, PartialOrd)]
 pub struct RoleId(NonZeroU32);
 
 /// Identifies a type within a policy.
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Hash, Eq, Ord, PartialEq, PartialOrd)]
 pub struct TypeId(NonZeroU32);
 
 /// Identifies a sensitivity level within a policy.
@@ -67,9 +67,20 @@ impl Into<u32> for ClassId {
     }
 }
 
-/// Encapsulates the result of a permissions calculation, between source & target domains, for a
-/// specific class. Decisions describe which permissions are allowed, and whether permissions should
-/// be audit-logged when allowed, and when denied.
+/// Identifies a permission within a class.
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+pub struct ClassPermissionId(NonZeroU32);
+
+impl Display for ClassPermissionId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+/// Encapsulates the result of a permissions calculation, between
+/// source & target domains, for a specific class. Decisions describe
+/// which permissions are allowed, and whether permissions should be
+/// audit-logged when allowed, and when denied.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AccessDecision {
     pub allow: AccessVector,
@@ -114,8 +125,8 @@ impl AccessVector {
     pub const NONE: AccessVector = AccessVector(0);
     pub const ALL: AccessVector = AccessVector(std::u32::MAX);
 
-    pub(super) fn from_raw(access_vector: u32) -> Self {
-        Self(access_vector)
+    pub(super) fn from_class_permission_id(id: ClassPermissionId) -> Self {
+        Self((1 as u32) << (id.0.get() - 1))
     }
 }
 
@@ -144,6 +155,12 @@ impl std::ops::BitAndAssign for AccessVector {
 impl std::ops::BitOrAssign for AccessVector {
     fn bitor_assign(&mut self, rhs: Self) {
         self.0 |= rhs.0
+    }
+}
+
+impl std::ops::SubAssign for AccessVector {
+    fn sub_assign(&mut self, rhs: Self) {
+        self.0 = self.0 ^ (self.0 & rhs.0);
     }
 }
 
@@ -242,13 +259,14 @@ impl<PS: ParseStrategy> Policy<PS> {
         self.0.parsed_policy().type_by_name(name).map(|x| x.id())
     }
 
-    /// Returns the set of permissions for the given class, including both the explicitly owned permissions
-    /// and the inherited ones from common symbols. Each permission is a tuple of the permission identifier
-    /// and it's name.
+    /// Returns the set of permissions for the given class, including both the
+    /// explicitly owned permissions and the inherited ones from common symbols.
+    /// Each permission is a tuple of the permission identifier (in the scope of
+    /// the given class) and the permission name.
     pub fn find_class_permissions_by_name(
         &self,
         class_name: &str,
-    ) -> Result<Vec<(u32, Vec<u8>)>, ()> {
+    ) -> Result<Vec<(ClassPermissionId, Vec<u8>)>, ()> {
         let class = find_class_by_name(self.0.parsed_policy().classes(), class_name).ok_or(())?;
         let owned_permissions = class.permissions();
 
@@ -376,19 +394,31 @@ impl<PS: ParseStrategy> Policy<PS> {
         )
     }
 
-    /// Computes the access vector that associates type `source_type_name` and `target_type_name`
-    /// via an explicit `allow [...];` statement in the binary policy. Computes `AccessVector::NONE`
-    /// if no such statement exists.
-    pub fn compute_explicitly_allowed(
+    /// Computes the access vector that associates type `source_type_name` and
+    /// `target_type_name` via an explicit `allow [...];` statement in the
+    /// binary policy, subject to any matching constraint statements. Computes
+    /// `AccessVector::NONE` if no such statement exists.
+    ///
+    /// Access decisions are currently based on explicit "allow" rules and
+    /// "constrain" or "mlsconstrain" statements. A permission is allowed if
+    /// it is allowed by an explicit "allow", and if in addition, all matching
+    /// constraints are satisfied.
+    //
+    // TODO: https://fxbug.dev/372400976 - Check that this is actually the
+    // correct interaction between constraints and explicit "allow" rules.
+    //
+    // TODO: https://fxbug.dev/372400419 - Validate that "neverallow" rules
+    // don't need any deliberate handling here.
+    pub fn compute_access_decision(
         &self,
-        source_type: TypeId,
-        target_type: TypeId,
-        object_class: sc::ObjectClass,
+        source_context: &SecurityContext,
+        target_context: &SecurityContext,
+        object_class: &sc::ObjectClass,
     ) -> AccessDecision {
         if let Some(target_class) = self.0.class(&object_class) {
-            self.0.parsed_policy().compute_explicitly_allowed(
-                source_type,
-                target_type,
+            self.0.parsed_policy().compute_access_decision(
+                source_context,
+                target_context,
                 target_class,
             )
         } else {
@@ -396,20 +426,21 @@ impl<PS: ParseStrategy> Policy<PS> {
         }
     }
 
-    /// Computes the access vector that associates type `source_type_name` and `target_type_name`
-    /// via an explicit `allow [...];` statement in the binary policy. Computes `AccessVector::NONE`
-    /// if no such statement exists. This is the "custom" form of this API because
-    /// `target_class_name` is associated with a [`crate::AbstractObjectClass::Custom`]
-    /// value.
-    pub fn compute_explicitly_allowed_custom(
+    /// Computes the access vector that associates type `source_type_name` and
+    /// `target_type_name` via an explicit `allow [...];` statement in the
+    /// binary policy, subject to any matching constraint statements. Computes
+    /// `AccessVector::NONE` if no such statement exists. This is the "custom"
+    /// form of this API because `target_class_name` is associated with a
+    /// [`crate::AbstractObjectClass::Custom`] value.
+    pub fn compute_access_decision_custom(
         &self,
-        source_type: TypeId,
-        target_type: TypeId,
+        source_context: &SecurityContext,
+        target_context: &SecurityContext,
         target_class_name: &str,
     ) -> AccessDecision {
-        self.0.parsed_policy().compute_explicitly_allowed_custom(
-            source_type,
-            target_type,
+        self.0.parsed_policy().compute_access_decision_custom(
+            source_context,
+            target_context,
             target_class_name,
         )
     }
@@ -436,11 +467,7 @@ impl<PS: ParseStrategy> AccessVectorComputer for Policy<PS> {
         for permission in permissions {
             if let Some(permission_info) = self.0.permission(&permission.clone().into()) {
                 // Compute bit flag associated with permission.
-                // Use `permission.id() - 1` below because ids start at `1` to refer to the
-                // "shift `1` by 0 bits".
-                //
-                // id=1 => bits:0...001, id=2 => bits:0...010, etc.
-                access_vector |= AccessVector(1 << (permission_info.id() - 1));
+                access_vector |= AccessVector::from_class_permission_id(permission_info.id());
             } else {
                 // The permission is unknown so defer to the policy-define unknown handling behaviour.
                 if self.0.parsed_policy().handle_unknown() != HandleUnknown::Allow {
@@ -855,7 +882,6 @@ pub(super) mod testing {
 pub(super) mod tests {
     use super::*;
 
-    use crate::policy::error::QueryError;
     use crate::policy::metadata::HandleUnknown;
     use crate::policy::{parse_policy_by_reference, parse_policy_by_value, SecurityContext};
     use crate::{
@@ -875,24 +901,45 @@ pub(super) mod tests {
         source_type: TypeId,
         target_type: TypeId,
         permission: sc::Permission,
-    ) -> Result<bool, QueryError> {
+    ) -> Result<bool, &'static str> {
         let object_class = permission.class();
-        if let (Some(target_class), Some(permission)) =
-            (policy.0.class(&object_class), policy.0.permission(&permission))
-        {
-            policy.0.parsed_policy().class_permission_is_explicitly_allowed(
-                source_type,
-                target_type,
-                target_class,
-                permission,
-            )
-        } else {
-            Ok(false)
-        }
+        let target_class = policy.0.class(&object_class).ok_or("class lookup failed")?;
+        let permission = policy.0.permission(&permission).ok_or("permission lookup failed")?;
+        let access_decision = policy.0.parsed_policy().compute_explicitly_allowed(
+            source_type,
+            target_type,
+            target_class,
+        );
+        let permission_bit = AccessVector::from_class_permission_id(permission.id());
+        Ok(permission_bit == access_decision.allow & permission_bit)
     }
 
-    fn type_id_by_name<PS: ParseStrategy>(parsed_policy: &ParsedPolicy<PS>, name: &str) -> TypeId {
-        parsed_policy.type_by_name(name).unwrap().id()
+    /// Returns whether the input types are explicitly granted `permission` via an `allow [...];`
+    /// policy statement, when the target class and permission name are specified as strings.
+    ///
+    /// # Panics
+    /// If supplied with type Ids not previously obtained from the `Policy` itself; validation
+    /// ensures that all such Ids have corresponding definitions.
+    fn is_explicitly_allowed_custom<PS: ParseStrategy>(
+        policy: &Policy<PS>,
+        source_type: TypeId,
+        target_type: TypeId,
+        target_class_name: &str,
+        permission_name: &str,
+    ) -> Result<bool, &'static str> {
+        let (permission_id, _) = policy
+            .find_class_permissions_by_name(target_class_name)
+            .or(Err("class name lookup failed"))?
+            .into_iter()
+            .find(|(_, name)| name == permission_name.as_bytes())
+            .ok_or("permission name lookup failed")?;
+        let access_decision = policy.0.parsed_policy().compute_explicitly_allowed_custom(
+            source_type,
+            target_type,
+            target_class_name,
+        );
+        let permission_bit = AccessVector::from_class_permission_id(permission_id);
+        Ok(permission_bit == access_decision.allow & permission_bit)
     }
 
     #[derive(Debug, Deserialize)]
@@ -935,7 +982,7 @@ pub(super) mod tests {
         ];
 
         for [policy_path, policy_bytes, expectations_bytes] in policies_and_expectations {
-            let expectations = serde_json5::from_reader::<Expectations, _>(
+            let expectations = serde_json5::from_reader::<_, Expectations>(
                 &mut std::io::Cursor::new(expectations_bytes),
             )
             .expect("deserialize expectations");
@@ -962,7 +1009,6 @@ pub(super) mod tests {
             assert_eq!(policy_bytes, returned_policy_bytes);
 
             // Test parse-by-reference.
-
             let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
             let policy = policy.validate().expect("validate policy");
 
@@ -977,15 +1023,15 @@ pub(super) mod tests {
         let (policy, _) = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
         let policy = policy.validate().expect("validate selinux testsuite policy");
 
-        let unconfined_t = type_id_by_name(policy.0.parsed_policy(), "unconfined_t");
+        let unconfined_t = policy.type_id_by_name("unconfined_t").expect("look up type id");
 
-        is_explicitly_allowed(
+        assert!(is_explicitly_allowed(
             &policy,
             unconfined_t,
             unconfined_t,
             Permission::Process(ProcessPermission::Fork),
         )
-        .expect("check for `allow unconfined_t unconfined_t:process fork;` in policy");
+        .expect("check for `allow unconfined_t unconfined_t:process fork;"));
     }
 
     #[test]
@@ -1007,15 +1053,15 @@ pub(super) mod tests {
     fn explicit_allow_type_type() {
         let policy_bytes =
             include_bytes!("../../testdata/micro_policies/allow_a_t_b_t_class0_perm0_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
-        let parsed_policy = &policy.0;
-        Validate::validate(parsed_policy).expect("validate policy");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
 
-        let a_t = type_id_by_name(parsed_policy, "a_t");
-        let b_t = type_id_by_name(parsed_policy, "b_t");
+        let a_t = policy.type_id_by_name("a_t").expect("look up type id");
+        let b_t = policy.type_id_by_name("b_t").expect("look up type id");
 
-        assert!(parsed_policy
-            .is_explicitly_allowed_custom(a_t, b_t, "class0", "perm0")
+        assert!(is_explicitly_allowed_custom(&policy, a_t, b_t, "class0", "perm0")
             .expect("query well-formed"));
     }
 
@@ -1023,15 +1069,15 @@ pub(super) mod tests {
     fn no_explicit_allow_type_type() {
         let policy_bytes =
             include_bytes!("../../testdata/micro_policies/no_allow_a_t_b_t_class0_perm0_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
-        let parsed_policy = &policy.0;
-        Validate::validate(parsed_policy).expect("validate policy");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
 
-        let a_t = type_id_by_name(parsed_policy, "a_t");
-        let b_t = type_id_by_name(parsed_policy, "b_t");
+        let a_t = policy.type_id_by_name("a_t").expect("look up type id");
+        let b_t = policy.type_id_by_name("b_t").expect("look up type id");
 
-        assert!(!parsed_policy
-            .is_explicitly_allowed_custom(a_t, b_t, "class0", "perm0")
+        assert!(!is_explicitly_allowed_custom(&policy, a_t, b_t, "class0", "perm0")
             .expect("query well-formed"));
     }
 
@@ -1039,15 +1085,15 @@ pub(super) mod tests {
     fn explicit_allow_type_attr() {
         let policy_bytes =
             include_bytes!("../../testdata/micro_policies/allow_a_t_b_attr_class0_perm0_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
-        let parsed_policy = &policy.0;
-        Validate::validate(parsed_policy).expect("validate policy");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
 
-        let a_t = type_id_by_name(parsed_policy, "a_t");
-        let b_t = type_id_by_name(parsed_policy, "b_t");
+        let a_t = policy.type_id_by_name("a_t").expect("look up type id");
+        let b_t = policy.type_id_by_name("b_t").expect("look up type id");
 
-        assert!(parsed_policy
-            .is_explicitly_allowed_custom(a_t, b_t, "class0", "perm0")
+        assert!(is_explicitly_allowed_custom(&policy, a_t, b_t, "class0", "perm0")
             .expect("query well-formed"));
     }
 
@@ -1056,15 +1102,15 @@ pub(super) mod tests {
         let policy_bytes = include_bytes!(
             "../../testdata/micro_policies/no_allow_a_t_b_attr_class0_perm0_policy.pp"
         );
-        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
-        let parsed_policy = &policy.0;
-        Validate::validate(parsed_policy).expect("validate policy");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
 
-        let a_t = type_id_by_name(parsed_policy, "a_t");
-        let b_t = type_id_by_name(parsed_policy, "b_t");
+        let a_t = policy.type_id_by_name("a_t").expect("look up type id");
+        let b_t = policy.type_id_by_name("b_t").expect("look up type id");
 
-        assert!(!parsed_policy
-            .is_explicitly_allowed_custom(a_t, b_t, "class0", "perm0")
+        assert!(!is_explicitly_allowed_custom(&policy, a_t, b_t, "class0", "perm0")
             .expect("query well-formed"));
     }
 
@@ -1073,15 +1119,15 @@ pub(super) mod tests {
         let policy_bytes = include_bytes!(
             "../../testdata/micro_policies/allow_a_attr_b_attr_class0_perm0_policy.pp"
         );
-        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
-        let parsed_policy = &policy.0;
-        Validate::validate(parsed_policy).expect("validate policy");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
 
-        let a_t = type_id_by_name(parsed_policy, "a_t");
-        let b_t = type_id_by_name(parsed_policy, "b_t");
+        let a_t = policy.type_id_by_name("a_t").expect("look up type id");
+        let b_t = policy.type_id_by_name("b_t").expect("look up type id");
 
-        assert!(parsed_policy
-            .is_explicitly_allowed_custom(a_t, b_t, "class0", "perm0")
+        assert!(is_explicitly_allowed_custom(&policy, a_t, b_t, "class0", "perm0")
             .expect("query well-formed"));
     }
 
@@ -1090,35 +1136,147 @@ pub(super) mod tests {
         let policy_bytes = include_bytes!(
             "../../testdata/micro_policies/no_allow_a_attr_b_attr_class0_perm0_policy.pp"
         );
-        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
-        let parsed_policy = &policy.0;
-        Validate::validate(parsed_policy).expect("validate policy");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
 
-        let a_t = type_id_by_name(parsed_policy, "a_t");
-        let b_t = type_id_by_name(parsed_policy, "b_t");
+        let a_t = policy.type_id_by_name("a_t").expect("look up type id");
+        let b_t = policy.type_id_by_name("b_t").expect("look up type id");
 
-        assert!(!parsed_policy
-            .is_explicitly_allowed_custom(a_t, b_t, "class0", "perm0")
+        assert!(!is_explicitly_allowed_custom(&policy, a_t, b_t, "class0", "perm0")
             .expect("query well-formed"));
     }
 
     #[test]
     fn compute_explicitly_allowed_multiple_attributes() {
         let policy_bytes = include_bytes!("../../testdata/micro_policies/allow_a_t_a1_attr_class0_perm0_a2_attr_class0_perm1_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
-        let parsed_policy = &policy.0;
-        Validate::validate(parsed_policy).expect("validate policy");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
 
-        let a_t = type_id_by_name(parsed_policy, "a_t");
+        let a_t = policy.type_id_by_name("a_t").expect("look up type id");
 
         let raw_access_vector =
-            parsed_policy.compute_explicitly_allowed_custom(a_t, a_t, "class0").allow.0;
+            policy.0.parsed_policy().compute_explicitly_allowed_custom(a_t, a_t, "class0").allow.0;
 
         // Two separate attributes are each allowed one permission on `[attr] self:class0`. Both
         // attributes are associated with "a_t". No other `allow` statements appear in the policy
         // in relation to "a_t". Therefore, we expect exactly two 1's in the access vector for
         // query `("a_t", "a_t", "class0")`.
         assert_eq!(2, raw_access_vector.count_ones());
+    }
+
+    #[test]
+    fn compute_access_decision_with_constraints() {
+        let policy_bytes =
+            include_bytes!("../../testdata/micro_policies/allow_with_constraints_policy.pp");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
+
+        let source_context: SecurityContext = policy
+            .parse_security_context(b"user0:object_r:type0:s0-s0".into())
+            .expect("create source security context");
+
+        let target_context_satisfied: SecurityContext = source_context.clone();
+        let decision_satisfied = policy.compute_access_decision(
+            &source_context,
+            &target_context_satisfied,
+            &ObjectClass::File,
+        );
+        // The class `file` has 4 permissions, 3 of which are explicitly
+        // allowed for this target context. All of those permissions satisfy all
+        // matching constraints.
+        assert_eq!(decision_satisfied.allow, AccessVector(7));
+
+        let target_context_unsatisfied: SecurityContext = policy
+            .parse_security_context(b"user1:object_r:type0:s0:c0-s0:c0".into())
+            .expect("create target security context failing some constraints");
+        let decision_unsatisfied = policy.compute_access_decision(
+            &source_context,
+            &target_context_unsatisfied,
+            &ObjectClass::File,
+        );
+        // Two of the explicitly-allowed permissions fail to satisfy a matching
+        // constraint. Only 1 is allowed in the final access decision.
+        assert_eq!(decision_unsatisfied.allow, AccessVector(4));
+    }
+
+    #[test]
+    fn compute_access_decision_custom_with_mlsconstrain() {
+        let policy_bytes =
+            include_bytes!("../../testdata/micro_policies/allow_with_constraints_policy.pp");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
+
+        let source_context: SecurityContext = policy
+            .parse_security_context(b"user0:object_r:type0:s0-s0".into())
+            .expect("create source security context");
+
+        let target_context_satisfied: SecurityContext = source_context.clone();
+        let decision_satisfied = policy.compute_access_decision_custom(
+            &source_context,
+            &target_context_satisfied,
+            "class_mlsconstrain",
+        );
+        // The class `class_mlsconstrain` has 3 permissions, 2 of which are explicitly
+        // allowed for this target context. Both of those permissions satisfy all
+        // matching constraints.
+        assert_eq!(decision_satisfied.allow, AccessVector(3));
+
+        let target_context_unsatisfied: SecurityContext = policy
+            .parse_security_context(b"user1:object_r:type0:s0:c0-s0:c0".into())
+            .expect("create target security context failing a constraint");
+        let decision_unsatisfied = policy.compute_access_decision_custom(
+            &source_context,
+            &target_context_unsatisfied,
+            "class_mlsconstrain",
+        );
+        // One of the explicitly-allowed permissions fails to satisfy a matching
+        // constraint.
+        assert_eq!(decision_unsatisfied.allow, AccessVector(2));
+    }
+
+    #[test]
+    fn compute_access_decision_custom_with_constrain() {
+        let policy_bytes =
+            include_bytes!("../../testdata/micro_policies/allow_with_constraints_policy.pp");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
+
+        let source_context: SecurityContext = policy
+            .parse_security_context(b"user0:object_r:type0:s0-s0".into())
+            .expect("create source security context");
+
+        let target_context_satisfied: SecurityContext = source_context.clone();
+        let decision_satisfied = policy.compute_access_decision_custom(
+            &source_context,
+            &target_context_satisfied,
+            "class_mlsconstrain",
+        );
+        // The class `class_constrain` has 3 permissions, 2 of which are explicitly
+        // allowed for this target context. Both of those permissions satisfy all
+        // matching constraints.
+        assert_eq!(decision_satisfied.allow, AccessVector(3));
+
+        let target_context_unsatisfied: SecurityContext = policy
+            .parse_security_context(b"user1:object_r:type0:s0:c0-s0:c0".into())
+            .expect("create target security context failing a constraint");
+        let decision_unsatisfied = policy.compute_access_decision_custom(
+            &source_context,
+            &target_context_unsatisfied,
+            "class_constrain",
+        );
+        // One of the explicitly-allowed permissions fails to satisfy a matching
+        // constraint.
+        assert_eq!(decision_unsatisfied.allow, AccessVector(2));
     }
 
     #[test]

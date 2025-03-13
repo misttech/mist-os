@@ -64,7 +64,7 @@ impl FDomainProxyChannel {
         handles: &mut Vec<HandleInfo>,
     ) -> Poll<Result<(), Option<crate::Error>>> {
         let Some(got) = std::task::ready!(self.0.lock().unwrap().poll_next_unpin(ctx)) else {
-            return Poll::Ready(Err(Some(Error::ClientLost)));
+            return Poll::Ready(Err(Some(Error::StreamingAborted)));
         };
 
         match got {
@@ -90,7 +90,7 @@ impl ::fidl::encoding::ProxyChannelBox<FDomainResourceDialect> for FDomainProxyC
         buf: &mut MessageBuf,
     ) -> Poll<Result<(), Option<Error>>> {
         let Some(got) = std::task::ready!(self.0.lock().unwrap().poll_next_unpin(ctx)) else {
-            return Poll::Ready(Err(Some(Error::ClientLost)));
+            return Poll::Ready(Err(Some(Error::StreamingAborted)));
         };
 
         match got {
@@ -115,7 +115,7 @@ impl ::fidl::encoding::ProxyChannelBox<FDomainResourceDialect> for FDomainProxyC
                 handle.rights,
             ));
         }
-        let _ = self.1.write_etc(bytes, handle_ops);
+        let _ = self.1.fdomain_write_etc(bytes, handle_ops);
         Ok(())
     }
 
@@ -124,11 +124,7 @@ impl ::fidl::encoding::ProxyChannelBox<FDomainResourceDialect> for FDomainProxyC
     }
 
     fn unbox(self) -> Channel {
-        // We drop the queue of pending data here. The FIDL client has some
-        // invariants it maintains that should make it very unlikely that
-        // there's anything to read from it.
-        let (channel, _) = self.0.into_inner().unwrap().rejoin(self.1);
-        channel
+        self.0.into_inner().unwrap().rejoin(self.1)
     }
 
     fn as_channel(&self) -> &Channel {
@@ -208,14 +204,14 @@ impl ::fidl::encoding::ProxyChannelFor<FDomainResourceDialect> for Channel {
                 handle.rights,
             ));
         }
-        let _ = self.write_etc(bytes, handle_ops);
+        let _ = self.fdomain_write_etc(bytes, handle_ops);
         Ok(())
     }
 }
 
 impl ::fidl::epitaph::ChannelLike for Channel {
     fn write_epitaph(&self, bytes: &[u8]) -> Result<(), ::fidl::TransportError> {
-        let _ = self.write_etc(bytes, vec![]);
+        let _ = self.write(bytes, vec![]);
         Ok(())
     }
 }
@@ -378,9 +374,12 @@ pub trait Proxy: Sized + Send + Sync {
     /// exclusive control over these operations.
     fn as_channel(&self) -> &Channel;
 
-    /// Get the client supporting this proxy.
-    fn client(&self) -> Result<Arc<crate::Client>, Error> {
-        self.as_channel().client()
+    /// Get the client supporting this proxy. We call this a "domain" here because:
+    /// * Client is especially overloaded in contexts where this is useful.
+    /// * We simulate this call for target-side FIDL proxies, so it isn't always
+    ///   really a client.
+    fn domain(&self) -> Arc<crate::Client> {
+        self.as_channel().domain()
     }
 }
 
@@ -492,6 +491,16 @@ impl<T: ProtocolMarker> From<Channel> for ClientEnd<T> {
     }
 }
 
+impl<T: ProtocolMarker> AsHandleRef for ClientEnd<T> {
+    fn as_handle_ref(&self) -> crate::HandleRef<'_> {
+        AsHandleRef::as_handle_ref(&self.inner)
+    }
+
+    fn object_type() -> fidl::ObjectType {
+        <Channel as AsHandleRef>::object_type()
+    }
+}
+
 /// The `Server` end of a FIDL connection.
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct ServerEnd<T: ProtocolMarker> {
@@ -552,5 +561,15 @@ impl<T: ProtocolMarker> From<Handle> for ServerEnd<T> {
 impl<T: ProtocolMarker> From<Channel> for ServerEnd<T> {
     fn from(chan: Channel) -> Self {
         ServerEnd { inner: chan, phantom: PhantomData }
+    }
+}
+
+impl<T: ProtocolMarker> AsHandleRef for ServerEnd<T> {
+    fn as_handle_ref(&self) -> crate::HandleRef<'_> {
+        AsHandleRef::as_handle_ref(&self.inner)
+    }
+
+    fn object_type() -> fidl::ObjectType {
+        <Channel as AsHandleRef>::object_type()
     }
 }

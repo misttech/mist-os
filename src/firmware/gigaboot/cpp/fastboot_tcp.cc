@@ -23,10 +23,8 @@ namespace gigaboot {
 namespace {
 constexpr uint16_t kFbServerPort = 5554;
 
-// TODO(b/268532862): This needs to be large enough to hold the entire FVM image until we
-// implement sparse flashing support.
 constexpr size_t kPageSize = 4096;
-constexpr size_t kDownloadBufferSize = 4ULL * 1024 * 1024 * 1024;  // 4GB
+constexpr size_t kDownloadBufferSize = 1ULL * 1024 * 1024 * 1024;  // 1GB
 constexpr size_t kDownloadBufferPageCount = kDownloadBufferSize / kPageSize;
 
 zx::result<> TcpInitialize(tcp6_socket &fb_tcp_socket) {

@@ -23,7 +23,7 @@ rustc_test("net-cli-integration") {
     "//src/connectivity/network/testing/network-test-realm/fidl:fuchsia.net.test.realm_rust",
     "//src/connectivity/network/testing/network-test-realm/service:network_test_realm",
     "//src/connectivity/network/tests/integration/common:netstack_testing_common",
-    "//src/developer/ffx/lib/writer:lib",
+    "//src/developer/lib/writer:lib",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",

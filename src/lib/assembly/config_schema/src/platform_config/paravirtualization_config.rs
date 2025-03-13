@@ -11,6 +11,7 @@ use crate::common::FeatureControl;
 #[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct PlatformParavirtualizationConfig {
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub enabled: FeatureControl,
 }
 

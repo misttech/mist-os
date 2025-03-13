@@ -2,13 +2,25 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/components.gni")
 import("//build/testing/cc_test_executable.gni")
 import("//src/graphics/lib/magma/gnbuild/magma.gni")
 
-group("integration") {
-  testonly = true
-
-  public_deps = [ ":msd_arm_mali_integration_tests" ]
+fuchsia_unittest_package("integration") {
+  package_name = "msd-arm-mali-integration-tests"
+  deps = [
+    ":msd_arm_mali_integration_tests",
+    "../..:msd_arm_test",
+    "//src/graphics/magma/tests/unit_tests:test_firmware",
+  ]
+  manifest = "meta/msd_arm_mali_integration_tests.cml"
+  test_specs = {
+    environments = magma_arm_gpu_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+  test_type = "device"
 }
 
 source_set("mali_utils") {

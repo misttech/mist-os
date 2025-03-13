@@ -48,6 +48,7 @@ class ArchRegisterState {
   virtual uintptr_t pc() const;
   virtual void set_pc(uintptr_t pc);
   virtual void set_arg_regs(uint64_t arg0, uint64_t arg1);
+  virtual bool ArchSupported() const { return true; }
 
   virtual void PrintState(const zx_restricted_state_t& state);
   virtual void PrintExceptionState(const zx_restricted_exception_t& exc);

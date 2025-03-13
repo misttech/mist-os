@@ -20,8 +20,8 @@ pub struct Handle {
 
 impl Handle {
     /// Get the FDomain client this handle belongs to.
-    pub(crate) fn client(&self) -> Result<Arc<Client>, Error> {
-        self.client.upgrade().ok_or(Error::ClientLost)
+    pub(crate) fn client(&self) -> Arc<Client> {
+        self.client.upgrade().unwrap_or_else(|| Arc::clone(&*crate::DEAD_CLIENT))
     }
 
     /// Get an invalid handle.
@@ -78,19 +78,15 @@ impl HandleRef<'_> {
     ) -> impl Future<Output = Result<Handle, Error>> + 'static {
         let client = self.0.client();
         let handle = self.0.proto();
-        let result = client.map(|client| {
-            let new_handle = client.new_hid();
-            let id = new_handle.id;
-            client
-                .transaction(
-                    ordinals::DUPLICATE,
-                    proto::FDomainDuplicateRequest { handle, new_handle, rights },
-                    Responder::Duplicate,
-                )
-                .map(move |res| res.map(|_| Handle { id, client: Arc::downgrade(&client) }))
-        });
-
-        async move { result?.await }
+        let new_handle = client.new_hid();
+        let id = new_handle.id;
+        client
+            .transaction(
+                ordinals::DUPLICATE,
+                proto::FDomainDuplicateRequest { handle, new_handle, rights },
+                Responder::Duplicate,
+            )
+            .map(move |res| res.map(|_| Handle { id, client: Arc::downgrade(&client) }))
     }
 
     /// Assert and deassert signals on this handle.
@@ -102,15 +98,11 @@ impl HandleRef<'_> {
         let handle = self.proto();
         let client = self.client();
 
-        let result: Result<_, Error> = client.map(|client| {
-            client.transaction(
-                ordinals::SIGNAL,
-                proto::FDomainSignalRequest { handle, set: set.bits(), clear: clear.bits() },
-                Responder::Signal,
-            )
-        });
-
-        async move { result?.await }
+        client.transaction(
+            ordinals::SIGNAL,
+            proto::FDomainSignalRequest { handle, set: set.bits(), clear: clear.bits() },
+            Responder::Signal,
+        )
     }
 }
 
@@ -128,9 +120,9 @@ pub trait AsHandleRef {
         self.as_handle_ref().signal(set, clear)
     }
 
-    /// Get the client supporting this handle.
-    fn client(&self) -> Result<Arc<Client>, Error> {
-        self.as_handle_ref().0.client.upgrade().ok_or(Error::ClientLost)
+    /// Get the client supporting this handle. See `fidl::Proxy::domain`.
+    fn domain(&self) -> Arc<Client> {
+        self.as_handle_ref().0.client()
     }
 }
 
@@ -157,15 +149,11 @@ pub trait Peered: HandleBased {
         let handle = self.as_handle_ref().proto();
         let client = self.as_handle_ref().client();
 
-        let result: Result<_, Error> = client.map(|client| {
-            client.transaction(
-                ordinals::SIGNAL_PEER,
-                proto::FDomainSignalPeerRequest { handle, set: set.bits(), clear: clear.bits() },
-                Responder::SignalPeer,
-            )
-        });
-
-        async move { result?.await }
+        client.transaction(
+            ordinals::SIGNAL_PEER,
+            proto::FDomainSignalPeerRequest { handle, set: set.bits(), clear: clear.bits() },
+            Responder::SignalPeer,
+        )
     }
 }
 
@@ -224,18 +212,14 @@ impl OnFDomainSignals {
     pub fn new(handle: &Handle, signals: fidl::Signals) -> Self {
         let client = handle.client();
         let handle = handle.proto();
-        let result = client.map(|client| {
-            client
-                .transaction(
-                    ordinals::WAIT_FOR_SIGNALS,
-                    proto::FDomainWaitForSignalsRequest { handle, signals: signals.bits() },
-                    Responder::WaitForSignals,
-                )
-                .map(|f| f.map(|x| x.signals))
-        });
-        OnFDomainSignals {
-            fut: async move { result?.await.map(fidl::Signals::from_bits_retain) }.boxed(),
-        }
+        let fut = client
+            .transaction(
+                ordinals::WAIT_FOR_SIGNALS,
+                proto::FDomainWaitForSignalsRequest { handle, signals: signals.bits() },
+                Responder::WaitForSignals,
+            )
+            .map(|f| f.map(|x| fidl::Signals::from_bits_retain(x.signals)));
+        OnFDomainSignals { fut: fut.boxed() }
     }
 }
 
@@ -265,41 +249,34 @@ impl Handle {
     /// Close this handle. Surfaces errors that dropping the handle will not.
     pub fn close(self) -> impl Future<Output = Result<(), Error>> {
         let client = self.client();
-        let result = client.map(|client| {
-            client.transaction(
-                ordinals::CLOSE,
-                proto::FDomainCloseRequest { handles: vec![self.take_proto()] },
-                Responder::Close,
-            )
-        });
-        async move { result?.await }
+        client.transaction(
+            ordinals::CLOSE,
+            proto::FDomainCloseRequest { handles: vec![self.take_proto()] },
+            Responder::Close,
+        )
     }
 
     /// Replace this handle with a new handle to the same object, with different
     /// rights.
     pub fn replace(self, rights: fidl::Rights) -> impl Future<Output = Result<Handle, Error>> {
-        let params = (move || {
-            let client = self.client()?;
-            let handle = self.take_proto();
-            let new_handle = client.new_hid();
-            Ok((new_handle, handle, client))
-        })();
+        let client = self.client();
+        let handle = self.take_proto();
+        {
+            let mut client = client.0.lock().unwrap();
+            let _ = client.channel_read_states.remove(&handle);
+            let _ = client.socket_read_states.remove(&handle);
+        }
+        let new_handle = client.new_hid();
 
-        let result: Result<_, Error> = params.map(|(new_handle, handle, client)| {
-            let id = new_handle.id;
-            let ret = Handle { id, client: Arc::downgrade(&client) };
-            (
-                client.transaction(
-                    ordinals::REPLACE,
-                    proto::FDomainReplaceRequest { handle, new_handle, rights },
-                    Responder::Replace,
-                ),
-                ret,
-            )
-        });
+        let id = new_handle.id;
+        let ret = Handle { id, client: Arc::downgrade(&client) };
+        let fut = client.transaction(
+            ordinals::REPLACE,
+            proto::FDomainReplaceRequest { handle, new_handle, rights },
+            Responder::Replace,
+        );
 
         async move {
-            let (fut, ret) = result?;
             fut.await?;
             Ok(ret)
         }
@@ -308,8 +285,12 @@ impl Handle {
 
 impl Drop for Handle {
     fn drop(&mut self) {
-        if let Ok(client) = self.client() {
-            client.0.lock().unwrap().waiting_to_close.push(self.proto());
+        if let Some(client) = self.client.upgrade() {
+            let mut client = client.0.lock().unwrap();
+            if client.waiting_to_close.is_empty() {
+                client.waiting_to_close_waker.wake_by_ref();
+            }
+            client.waiting_to_close.push(self.proto());
         }
     }
 }

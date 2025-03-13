@@ -108,7 +108,7 @@
 #define __HAS_KERNEL__ 1
 #endif
 // Specific fuse header to use android specific extensions
-#include "src/starnix/lib/linux_uapi/third_party/fuse_kernel.h"
+#include "src/starnix/lib/linux_uapi/third_party/libfuse/fuse_kernel.h"
 #if __HAS_KERNEL__
 #undef __KERNEL__
 #endif
@@ -116,8 +116,11 @@
 
 #endif  // #ifndef __arm__
 
+// Android kgsl header
+#include "src/starnix/lib/linux_uapi/stub/kgsl/msm_kgsl.h"
+
 // Data shared between Starnix and a vDSO implementation.
-#include "src/starnix/kernel/vdso/vvar-data.h"
+#include "src/starnix/kernel/vdso/vvar_data.h"
 
 #ifdef __x86_64__
 #include <asm/prctl.h>
@@ -128,7 +131,10 @@
 //   __NR_arch32_[name]
 // when the implementation of [name] differs
 // between 32-bit and 64-bit.
-#include <arm-arch32-syscalls.h>
+#include <arm_arch32_syscalls.h>
+
+// Definition of ucontext
+#include <arm_arch32_ucontext.h>
 #endif
 
 #include <fcntl.h>

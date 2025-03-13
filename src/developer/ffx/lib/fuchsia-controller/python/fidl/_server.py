@@ -7,13 +7,23 @@
 
 import asyncio
 import logging
-import typing
+from abc import abstractmethod
 from inspect import getframeinfo, stack
+from typing import Any
 
 import fuchsia_controller_py as fc
 from fidl_codec import decode_fidl_request, encode_fidl_message
 
-from ._fidl_common import *
+from ._fidl_common import (
+    DomainError,
+    FidlMessage,
+    FidlMeta,
+    FrameworkError,
+    GenericResult,
+    StopServer,
+    parse_ordinal,
+    parse_txid,
+)
 from ._ipc import GlobalHandleWaker
 
 # Rather than make a long server UUID, this will be a monotonically increasing
@@ -26,14 +36,24 @@ class ServerError(Exception):
     pass
 
 
-class ServerBase(object):
+class ServerBase(
+    metaclass=FidlMeta,
+    required_class_variables=[
+        ("library", str),
+        ("method_map", dict),
+    ],
+):
     """Base object for doing basic FIDL server tasks."""
 
-    library: str = ""
-    method_map: typing.Dict[Ordinal, MethodInfo] = {}
+    @staticmethod
+    @abstractmethod
+    def construct_response_object(
+        response_ident: str, response_obj: Any
+    ) -> Any:
+        ...
 
     def __str__(self):
-        return f"server:{self.__name__}:{self.id}"
+        return f"server:{type(self).__name__}:{self.id}"
 
     def __init__(self, channel: fc.Channel, channel_waker=None):
         global _SERVER_ID
@@ -169,7 +189,7 @@ class ServerBase(object):
         txid = parse_txid(raw_msg)
         handles = [x.take() for x in raw_msg[1]]
         msg = decode_fidl_request(bytes=raw_msg[0], handles=handles)
-        result_obj = construct_response_object(
+        result_obj = self.construct_response_object(
             self.method_map[ordinal].request_ident, msg
         )
         return result_obj, txid, ordinal

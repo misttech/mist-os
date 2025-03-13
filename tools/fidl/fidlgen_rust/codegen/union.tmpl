@@ -5,6 +5,7 @@
 */}}
 
 {{- define "UnionDeclaration" }}
+{{- if EmitType .IsValueType }}
 {{- range .DocComments }}
 ///{{ . }}
 {{- end }}
@@ -88,8 +89,10 @@ impl {{ .Name }} {
 
 impl fidl::{{ if .IsValueType }}Persistable{{ else }}Standalone<{{ ResourceDialect }}>{{ end }} for {{ .Name }} {}
 {{- end }}
+{{- end }}
 
 {{- define "UnionInternal" }}
+{{- if EmitType .IsValueType }}
 {{ $resourceDialectName := "D" }}
 {{ $resourceDialectGeneric := "<D: fidl::encoding::ResourceDialect>" }}
 {{- if .IsResourceType }}
@@ -229,4 +232,5 @@ impl{{ $resourceDialectGeneric }} fidl::encoding::Decode<Self, {{ $resourceDiale
         Ok(())
     }
 }
+{{- end }}
 {{- end }}

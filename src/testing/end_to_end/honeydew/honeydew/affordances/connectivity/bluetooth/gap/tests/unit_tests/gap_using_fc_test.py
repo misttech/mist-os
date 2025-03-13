@@ -7,9 +7,11 @@
 import unittest
 from unittest import mock
 
+from honeydew import affordances_capable
 from honeydew.affordances.connectivity.bluetooth.gap import gap, gap_using_fc
-from honeydew.interfaces.device_classes import affordances_capable
-from honeydew.transports import fuchsia_controller as fc_transport
+from honeydew.transports.fuchsia_controller import (
+    fuchsia_controller as fc_transport,
+)
 
 
 class BluetoothGapFCTests(unittest.TestCase):

@@ -315,6 +315,7 @@ devicetree::ScanState DevicetreeCpuTopologyItem::AddCpuNodeSecondScan(
       .reg = reg,
       .properties = decoder.properties(),
   };
+
   // Committing the CPU entry is equivalent at this point to incrementing the
   // index. Gate that on checking the integrity of the architecture-specific
   // processor information.
@@ -375,6 +376,10 @@ fit::result<ItemBase::DataZbi::Error> DevicetreeCpuTopologyItem::UpdateEntryCpuL
                                     return !element.present || element.phandle < phandle;
                                   });
     if (index == cpu_table.end()) {
+      return std::nullopt;
+    }
+    // Broken link, due to cpu entry being omitted.
+    if (index->phandle != phandle) {
       return std::nullopt;
     }
     return index->cpu_index;
@@ -501,10 +506,19 @@ fit::result<DevicetreeCpuTopologyItem::DataZbi::Error> DevicetreeCpuTopologyItem
     return result;
   }
 
+  size_t skipped_topology_nodes = 0;
+  if (auto result = MarkSkippedMapEntries(); result.is_error()) {
+    return result.take_error();
+  } else {
+    skipped_topology_nodes = *result;
+  }
+
+  size_t adjusted_node_count = node_element_count() - skipped_topology_nodes;
+
   // Allocate the container in the zbi.
   auto result = zbi.Append({
       .type = ZBI_TYPE_CPU_TOPOLOGY,
-      .length = static_cast<uint32_t>(node_element_count() * sizeof(zbi_topology_node_t)),
+      .length = static_cast<uint32_t>((adjusted_node_count) * sizeof(zbi_topology_node_t)),
   });
   if (result.is_error()) {
     return result.take_error();
@@ -512,13 +526,16 @@ fit::result<DevicetreeCpuTopologyItem::DataZbi::Error> DevicetreeCpuTopologyItem
 
   auto [header, payload] = **result;
   cpp20::span topology_nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
-                             node_element_count());
+                             adjusted_node_count);
 
   size_t current_node = 0;
   uint16_t logical_cpu_id = 0;
   std::optional<size_t> cpu_zero_node_index;
   for (size_t entry_index = 0; entry_index < map_entries_.size(); ++entry_index) {
     auto& entry = map_entries_[entry_index];
+    if (entry.skip) {
+      continue;
+    }
 
     if (entry.type == TopologyEntryType::kThread) {
       if (entry.cpu_index) {
@@ -587,6 +604,67 @@ fit::result<DevicetreeCpuTopologyItem::DataZbi::Error> DevicetreeCpuTopologyItem
     current_node++;
   }
   return CalculateClusterPerformanceClass(topology_nodes);
+}
+
+fit::result<ItemBase::DataZbi::Error, size_t> DevicetreeCpuTopologyItem::MarkSkippedMapEntries()
+    const {
+  ZX_ASSERT(cpu_entry_count_ > 0);
+
+  if (!has_cpu_map_) {
+    return fit::ok(0);
+  }
+
+  fbl::AllocChecker ac;
+
+  // Number of 'thread' entries contained in the respective node. Thread nodes contain themselves,
+  // so long the associated CPU entry is "okay".
+  auto contained_cpus = Allocate<size_t>(map_entry_count_, ac);
+  if (!ac.check()) {
+    return fit::error(DataZbi::Error{
+        .zbi_error = "Failed to allocate scratch buffer for cleaning up disabled CPUs.",
+        .item_offset = 0,
+    });
+  }
+  std::fill(contained_cpus.begin(), contained_cpus.end(), 0);
+
+  // Calculate the number of contained CPUs per container node.
+  size_t total_skipped = 0;
+  for (size_t i = 0; i < map_entry_count_; ++i) {
+    auto& map_entry = map_entries_[i];
+
+    if (map_entry.type != TopologyEntryType::kThread) {
+      continue;
+    }
+
+    if (!map_entry.cpu_index) {
+      continue;
+    }
+
+    // Increase the count of any entry in the map, that is an ancestor of this thread node.
+    size_t current = i;
+    size_t parent = map_entry.parent_index;
+    while (current != parent) {
+      contained_cpus[current]++;
+      current = parent;
+      parent = map_entries_[current].parent_index;
+    }
+    // Accounts for the root.
+    contained_cpus[parent]++;
+  }
+
+  // Mark any node whose contained_cpu count is 0 as an entry that should produce no output in the
+  // zbi item.
+  for (size_t i = 0; i < map_entry_count_; ++i) {
+    if (contained_cpus[i] == 0) {
+      map_entries_[i].skip = true;
+      // `kThread` and `kCore` are combined into a single topology entry in the zbi item.
+      if (map_entries_[i].type != TopologyEntryType::kThread) {
+        total_skipped++;
+      }
+    }
+  }
+
+  return fit::ok(total_skipped);
 }
 
 }  // namespace boot_shim

@@ -29,10 +29,9 @@ constexpr uint32_t kBulkReqSize = 4 * 1024;
 constexpr uint16_t kBulkMaxPacketSize = 512;
 
 class UsbFastbootFunction;
-using DeviceType = ddk::Device<UsbFastbootFunction, ddk::Initializable,
-                               ddk::Messageable<fuchsia_hardware_fastboot::FastbootImpl>::Mixin>;
+using DeviceType = ddk::Device<UsbFastbootFunction, ddk::Initializable>;
 class UsbFastbootFunction : public DeviceType,
-                            public ddk::EmptyProtocol<ZX_PROTOCOL_FASTBOOT>,
+                            public fidl::WireServer<fuchsia_hardware_fastboot::FastbootImpl>,
                             public ddk::UsbFunctionInterfaceProtocol<UsbFastbootFunction> {
  public:
   explicit UsbFastbootFunction(zx_device_t* parent) : DeviceType(parent), function_(parent) {}
@@ -90,6 +89,8 @@ class UsbFastbootFunction : public DeviceType,
   size_t requested_size_ __TA_GUARDED(receive_lock_) = 0;
   std::optional<ReceiveCompleter::Async> receive_completer_ __TA_GUARDED(receive_lock_);
   usb::RequestPool<> bulk_out_reqs_ __TA_GUARDED(receive_lock_){};
+
+  fidl::ServerBindingGroup<fuchsia_hardware_fastboot::FastbootImpl> bindings_;
 
   // USB request completion callback methods.
   void TxComplete(usb_request_t* req);

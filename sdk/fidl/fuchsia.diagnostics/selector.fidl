@@ -5,7 +5,15 @@ library fuchsia.diagnostics;
 
 //  The size bound of 100 is a reasonably low limit chosen based on observed
 //  strings used as identifiers.
+@available(replaced=NEXT)
 const MAX_STRING_SELECTOR_LENGTH uint16 = 100;
+
+// Max string selector length. Must be kept in-sync
+// with sdk/fidl/fuchsia.component/constants.fidl.
+// TODO(https://fxbug.dev/400782257): just use `fuchsia.component.MAX_CHILD_NAME_LENGTH`
+// when `fuchsia.logger` doesn't depend on `fuchsia.diagnsotics`.
+@available(added=NEXT)
+const MAX_STRING_SELECTOR_LENGTH uint16 = 1024;
 
 //  The size bound of 25 is a reasonably low limit chosen based on observed
 //  component hierarchy depths, and awareness of maximum zircon message sizes.
@@ -38,9 +46,6 @@ type StringSelector = flexible union {
     ///   multiple levels in a component selector only. See |ComponentSelector| for
     ///   details.
     1: string_pattern string:MAX_STRING_SELECTOR_LENGTH;
-
-    ///  This is a provided string that defines an exact string to match against. No
-    ///  characters are treated as special, or carry special syntax.
     2: exact_match string:MAX_STRING_SELECTOR_LENGTH;
 };
 

@@ -13,9 +13,12 @@ use fuchsia_fs::directory;
 use fuchsia_runtime::{UtcDuration, UtcInstant};
 use futures::{select, StreamExt, TryFutureExt};
 use log::{debug, error, warn};
+use std::cell::RefCell;
 use std::path::PathBuf;
 use std::pin::pin;
+use std::rc::Rc;
 use thiserror::Error;
+use time_persistence::State;
 use {fidl_fuchsia_hardware_rtc as frtc, fidl_fuchsia_io as fio};
 #[cfg(test)]
 use {fuchsia_sync::Mutex, std::sync::Arc};
@@ -45,8 +48,8 @@ pub enum RtcCreationError {
 /// Interface to interact with a real-time clock. Note that the RTC hardware interface is limited
 /// to a resolution of one second; times returned by the RTC will always be a whole number of
 /// seconds and times sent to the RTC will discard any fractional second.
-#[async_trait]
-pub trait Rtc: Send + Sync {
+#[async_trait(?Send)]
+pub trait Rtc {
     /// Returns the current time reported by the realtime clock.
     async fn get(&self) -> Result<UtcInstant>;
     /// Sets the time of the realtime clock to `value`.
@@ -55,6 +58,75 @@ pub trait Rtc: Send + Sync {
 
 fn get_dir() -> Result<fio::DirectoryProxy, fuchsia_fs::node::OpenError> {
     directory::open_in_namespace(RTC_PATH, fio::PERM_READABLE)
+}
+
+/// An implementation of the `Rtc` trait that uses persistent storage to emulate
+/// writable RTC nonvolatile memory.
+///
+/// Requires an operational boot clock, since it relies on boot clock readings to
+/// reasonably advance while the device is in low power states. This makes
+/// this particular RTC implementation unusable if an operational boot clock
+/// is not available.
+pub struct ReadOnlyRtcImpl<F, C>
+where
+    F: Fn(&State) -> Result<()>,
+    C: Fn() -> zx::BootInstant,
+{
+    state: Rc<RefCell<State>>,
+    // Overridable for tests.
+    writer_fn: F,
+    clock_fn: C,
+}
+
+/// Create a new `ReadOnlyRtcImpl`, using the provided `state` for UTC reference
+/// storage.
+pub fn new_read_only_rtc(
+    state: Rc<RefCell<State>>,
+) -> ReadOnlyRtcImpl<impl Fn(&State) -> Result<()>, impl Fn() -> zx::BootInstant> {
+    new_read_only_rtc_with_dependencies(
+        state,
+        |s: &State| State::write(s),
+        || fasync::BootInstant::now().into(),
+    )
+}
+
+// A factory method with an option to inject state. Intended to be called
+// directly in tests, and its non-test counterpart above.
+fn new_read_only_rtc_with_dependencies<F, C>(
+    state: Rc<RefCell<State>>,
+    writer: F,
+    now_fn: C,
+) -> ReadOnlyRtcImpl<F, C>
+where
+    F: Fn(&State) -> Result<()>,
+    C: Fn() -> zx::BootInstant,
+{
+    ReadOnlyRtcImpl { state, writer_fn: writer, clock_fn: now_fn }
+}
+
+#[async_trait(?Send)]
+impl<F, C> Rtc for ReadOnlyRtcImpl<F, C>
+where
+    F: Fn(&State) -> Result<()>,
+    C: Fn() -> zx::BootInstant,
+{
+    /// Returns a linear approximation of the UtcInstant based on a valid reading
+    /// of the current boot clock, and assuming a valid persisted reference boot instant.
+    async fn get(&self) -> Result<UtcInstant> {
+        let boot_now = (self.clock_fn)();
+        let (boot_reference, utc_reference) = self.state.borrow().get_rtc_reference();
+        let diff_nanos = boot_now.into_nanos() - boot_reference.into_nanos();
+        let utc_now = utc_reference + UtcDuration::from_nanos(diff_nanos);
+        Ok(utc_now)
+    }
+
+    /// Sets a reference point based on the current reading of the boot clock,
+    /// and a reference UTC instant.
+    async fn set(&self, value: UtcInstant) -> Result<()> {
+        let boot_now = (self.clock_fn)();
+        self.state.borrow_mut().set_rtc_reference(boot_now.into(), value);
+        (self.writer_fn)(&self.state.borrow())
+    }
 }
 
 /// An implementation of the `Rtc` trait that connects to an RTC device in /dev/class/rtc.
@@ -195,7 +267,7 @@ fn zx_time_to_fidl_time(zx_time: UtcInstant) -> frtc::Time {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl Rtc for RtcImpl {
     async fn get(&self) -> Result<UtcInstant> {
         self.proxy
@@ -270,7 +342,7 @@ impl FakeRtc {
 }
 
 #[cfg(test)]
-#[async_trait]
+#[async_trait(?Send)]
 impl Rtc for FakeRtc {
     async fn get(&self) -> Result<UtcInstant> {
         self.value.as_ref().map(|time| time.clone()).map_err(|msg| Error::msg(msg.clone()))
@@ -463,5 +535,60 @@ mod test {
         // Connection fails because it's a dir, not a service, but we expected
         // that.
         assert_matches!(result, Err(RtcCreationError::ConnectionFailed(_)))
+    }
+
+    #[fuchsia::test]
+    async fn rtc_read_only() {
+        let d = tempfile::TempDir::new().expect("tempdir created");
+        let p = d.path().join("file.json");
+        let state = Rc::new(RefCell::new(State::new(false)));
+
+        let fake_boot_now = Rc::new(RefCell::new(zx::BootInstant::from_nanos(100)));
+
+        {
+            // Try initializing and moving the reference point as fake time passes.
+            let p_clone = p.clone();
+            let rtc = new_read_only_rtc_with_dependencies(
+                state,
+                // Fake persistent state is stored in a tempfile.
+                |s| State::write_internal(&p_clone, s),
+                // Fake "now".
+                || fake_boot_now.borrow().clone(),
+            );
+            let utc_reference = UtcInstant::from_nanos(42000);
+            rtc.set(utc_reference).await.unwrap();
+
+            // Advance the boot clock a bit. Verify that the UTC moved too.
+            (*fake_boot_now.borrow_mut()) += zx::BootDuration::from_nanos(100);
+            let utc = rtc.get().await.unwrap();
+            assert_eq!(utc, UtcInstant::from_nanos(42100));
+
+            // Again, please.
+            (*fake_boot_now.borrow_mut()) += zx::BootDuration::from_nanos(100);
+            let utc = rtc.get().await.unwrap();
+            assert_eq!(utc, UtcInstant::from_nanos(42200));
+
+            // Time travel is allowed in fake-land. Rewind time a bit, check it.
+            (*fake_boot_now.borrow_mut()) -= zx::BootDuration::from_nanos(100);
+            let utc = rtc.get().await.unwrap();
+            assert_eq!(utc, UtcInstant::from_nanos(42100));
+        }
+
+        {
+            // Now try reading the contents of the persisted file, and verify that
+            // we're reading what we persisted. But forward time a bit too.
+            let p_clone = p.clone();
+            let state = Rc::new(RefCell::new(State::read_and_update_internal(p_clone).unwrap()));
+            let rtc = new_read_only_rtc_with_dependencies(
+                state,
+                |s| State::write_internal(&p, s),
+                || fake_boot_now.borrow().clone(),
+            );
+
+            // Some time passed since we last wrote the above file.
+            (*fake_boot_now.borrow_mut()) += zx::BootDuration::from_nanos(300);
+            let utc = rtc.get().await.unwrap();
+            assert_eq!(utc, UtcInstant::from_nanos(42400));
+        }
     }
 }

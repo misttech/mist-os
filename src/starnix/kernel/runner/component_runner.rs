@@ -15,7 +15,8 @@ use futures::channel::oneshot;
 use futures::{FutureExt, StreamExt};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
-use runner::{get_program_string, get_program_strvec, StartInfoProgramError};
+use serde::de::Error as _;
+use serde::Deserialize;
 use starnix_core::execution::execute_task_with_prerun_result;
 use starnix_core::fs::fuchsia::{create_file_from_handle, RemoteFs, SyslogFile};
 use starnix_core::task::{CurrentTask, ExitStatus, Task};
@@ -53,6 +54,62 @@ use {
 /// get Linux exit code from component runner.
 const COMPONENT_EXIT_CODE_BASE: i32 = 1024;
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ComponentProgram {
+    binary: CString,
+
+    #[serde(default)]
+    args: Vec<String>,
+
+    #[serde(default)]
+    environ: Vec<String>,
+
+    #[serde(default)]
+    cwd: Option<String>,
+
+    #[serde(default)]
+    uid: Option<runner::serde::StoreAsString<u32>>,
+
+    #[serde(default)]
+    component_mounts: Vec<String>,
+
+    #[serde(default)]
+    features: Vec<String>,
+
+    #[serde(default, deserialize_with = "parse_capabilities")]
+    capabilities: Option<Capabilities>,
+
+    #[serde(default)]
+    seclabel: Option<CString>,
+}
+
+impl ComponentProgram {
+    fn resolve_templates(&mut self, component_path: &str, pkg_path: &str) {
+        let resolve_template = |values: &mut Vec<String>| {
+            for val in values {
+                *val = val
+                    .replace("{pkg_path}", &pkg_path)
+                    .replace("{component_path}", &component_path);
+            }
+        };
+
+        resolve_template(&mut self.args);
+        resolve_template(&mut self.environ);
+    }
+}
+
+fn parse_capabilities<'de, D>(deserializer: D) -> Result<Option<Capabilities>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let mut capabilities = Capabilities::empty();
+    for cap in Vec::<String>::deserialize(deserializer)? {
+        capabilities |= cap.parse().map_err(D::Error::custom)?;
+    }
+    Ok(Some(capabilities))
+}
+
 /// Starts a component inside the given container.
 ///
 /// The component's `binary` can either:
@@ -68,32 +125,34 @@ pub async fn start_component(
     system_task: &CurrentTask,
 ) -> Result<(), Error> {
     let url = start_info.resolved_url.clone().unwrap_or_else(|| "<unknown>".to_string());
-    log_info!("start_component: {}", url);
 
     // TODO(https://fxbug.dev/42076551): We leak the directory created by this function.
     let component_path = generate_component_path(
         system_task.kernel().kthreads.unlocked_for_async().deref_mut(),
         system_task,
     )?;
+    let pkg_path = format!("{component_path}/pkg");
 
     let mount_record = Arc::new(Mutex::new(MountRecord::default()));
 
     let ns = start_info.ns.take().ok_or_else(|| anyhow!("Missing namespace"))?;
 
-    // If the component specifies a filesystem security label then it will be applied to all files
-    // in all directories mounted from the component's namespace.
-    let mount_seclabel = {
-        match get_program_string(&start_info, "fsseclabel") {
-            Some(s) => Some(s),
-            None => system_task.kernel().features.default_fsseclabel.as_deref(),
-        }
-    };
+    let program = start_info.program.as_ref().context("reading program block")?;
+    let mut program: ComponentProgram =
+        runner::serde::deserialize_program(program).context("parsing program block")?;
+    program.resolve_templates(&component_path, &pkg_path);
+    log_info!("start_component: {}\n{:#?}", url, program);
 
+    let ns_mount_options = system_task.kernel().features.default_ns_mount_options.as_ref();
     let mut maybe_pkg = None;
     let mut maybe_svc = None;
     for entry in ns {
         if let (Some(dir_path), Some(dir_handle)) = (entry.path, entry.directory) {
-            match dir_path.as_str() {
+            let dir_path_str = dir_path.as_str();
+            let mount_options =
+                ns_mount_options.and_then(|mount_options| mount_options.get(dir_path_str).cloned());
+
+            match dir_path_str {
                 "/svc" => {
                     maybe_svc = Some(fio::DirectoryProxy::new(AsyncChannel::from_channel(
                         dir_handle.into_channel(),
@@ -110,7 +169,7 @@ pub async fn start_component(
                             system_task,
                             &dir_proxy,
                             &dir_path,
-                            mount_seclabel,
+                            mount_options.as_ref(),
                         )
                         .with_context(|| format!("failed to mount_remote on path {}", &dir_path))?;
                 }
@@ -123,7 +182,7 @@ pub async fn start_component(
                             system_task,
                             &dir_proxy,
                             &format!("{component_path}/{dir_path}"),
-                            mount_seclabel,
+                            mount_options.as_ref(),
                         )
                         .with_context(|| {
                             format!("failed to mount_remote on path {component_path}/{dir_path}")
@@ -137,74 +196,30 @@ pub async fn start_component(
     }
 
     let pkg = maybe_pkg.ok_or_else(|| anyhow!("Missing /pkg entry in namespace"))?;
-    let pkg_path = format!("{component_path}/pkg");
 
-    let resolve_template = |value: &str| {
-        value.replace("{pkg_path}", &pkg_path).replace("{component_path}", &component_path)
-    };
+    let uid =
+        program.uid.map(|uid| uid.0).unwrap_or_else(|| system_task.kernel().features.default_uid);
 
-    let resolve_program_strvec = |key| {
-        get_program_strvec(&start_info, key)?
-            .unwrap_or(&vec![])
-            .iter()
-            .map(|arg| {
-                CString::new(resolve_template(arg))
-                    .map_err(|_| StartInfoProgramError::InvalidStrVec(key.to_string()))
-            })
-            .collect::<Result<Vec<CString>, _>>()
-    };
-
-    let args = resolve_program_strvec("args")?;
-    let environ = resolve_program_strvec("environ")?;
-    let component_features =
-        get_program_strvec(&start_info, "features")?.cloned().unwrap_or_default();
-
-    let binary_path = get_program_string(&start_info, "binary")
-        .ok_or_else(|| anyhow!("Missing \"binary\" in manifest"))?;
-    let binary_path = CString::new(binary_path.to_owned())?;
-
-    let uid = {
-        if let Some(component_uid) = get_program_string(&start_info, "uid") {
-            component_uid.parse()?
-        } else {
-            system_task.kernel().features.default_uid
-        }
-    };
     let mut credentials = Credentials::with_ids(uid, uid);
-    if let Some(caps) = get_program_strvec(&start_info, "capabilities")? {
-        let mut capabilities = Capabilities::empty();
-        for cap in caps {
-            capabilities |= cap.parse()?;
-        }
+    if let Some(capabilities) = program.capabilities {
         credentials.cap_permitted = capabilities;
         credentials.cap_effective = capabilities;
         credentials.cap_inheritable = capabilities;
         credentials.cap_ambient = capabilities;
     }
 
-    run_component_features(system_task.kernel(), &component_features, maybe_svc).unwrap_or_else(
+    run_component_features(system_task.kernel(), &program.features, maybe_svc).unwrap_or_else(
         |e| {
             log_error!("failed to set component features for {} - {:?}", url, e);
         },
     );
 
-    let security_context = {
-        match get_program_string(&start_info, "seclabel") {
-            Some(s) => Some(CString::new(s.to_owned())?),
-            None => system_task
-                .kernel()
-                .features
-                .default_seclabel
-                .as_ref()
-                .map(|s| CString::new(s.clone()).expect("seclabel cstring")),
-        }
-    };
     let (task_complete_sender, task_complete) = oneshot::channel::<TaskResult>();
     let current_task = CurrentTask::create_init_child_process(
         system_task.kernel().kthreads.unlocked_for_async().deref_mut(),
         system_task.kernel(),
-        &binary_path,
-        security_context.as_ref(),
+        &program.binary,
+        program.seclabel.as_ref(),
     )?;
 
     let weak_task = execute_task_with_prerun_result(
@@ -213,8 +228,7 @@ pub async fn start_component(
         {
             let mount_record = mount_record.clone();
             move |locked, current_task| {
-                let cwd_path =
-                    FsString::from(get_program_string(&start_info, "cwd").unwrap_or(&pkg_path));
+                let cwd_path = FsString::from(program.cwd.unwrap_or(pkg_path));
                 let cwd = current_task.lookup_path(
                     locked,
                     &mut LookupContext::default(),
@@ -225,26 +239,19 @@ pub async fn start_component(
 
                 current_task.set_creds(credentials);
 
-                let local_mounts =
-                    get_program_strvec(&start_info, "component_mounts").map_err(|e| {
-                        log_error!("Error while reading the mounts: {e:?}");
-                        errno!(EINVAL)
-                    })?;
-                if let Some(local_mounts) = local_mounts {
-                    for mount in local_mounts.iter() {
-                        let action = MountAction::from_spec(locked, current_task, &pkg, mount)
-                            .map_err(|e| {
-                                log_error!("Error while mounting the filesystems: {e:?}");
-                                errno!(EINVAL)
-                            })?;
-                        let mount_point =
-                            current_task.lookup_path_from_root(locked, action.path.as_ref())?;
-                        mount_record.lock().mount(
-                            mount_point,
-                            WhatToMount::Fs(action.fs),
-                            action.flags,
-                        )?;
-                    }
+                for mount in &program.component_mounts {
+                    let action = MountAction::from_spec(locked, current_task, &pkg, mount)
+                        .map_err(|e| {
+                            log_error!("Error while mounting the filesystems: {e:?}");
+                            errno!(EINVAL)
+                        })?;
+                    let mount_point =
+                        current_task.lookup_path_from_root(locked, action.path.as_ref())?;
+                    mount_record.lock().mount(
+                        mount_point,
+                        WhatToMount::Fs(action.fs),
+                        action.flags,
+                    )?;
                 }
 
                 parse_numbered_handles(
@@ -257,15 +264,22 @@ pub async fn start_component(
                     errno!(EINVAL)
                 })?;
 
-                let mut argv = vec![binary_path.clone()];
-                argv.extend(args);
+                let mut argv = vec![program.binary.clone()];
+                for arg in program.args {
+                    argv.push(CString::new(arg).map_err(|_| errno!(EINVAL))?);
+                }
+
+                let mut environ = vec![];
+                for env in program.environ {
+                    environ.push(CString::new(env).map_err(|_| errno!(EINVAL))?);
+                }
 
                 let executable = current_task.open_file(
                     locked,
-                    binary_path.as_bytes().into(),
+                    program.binary.as_bytes().into(),
                     OpenFlags::RDONLY,
                 )?;
-                current_task.exec(locked, executable, binary_path, argv, environ)?;
+                current_task.exec(locked, executable, program.binary, argv, environ)?;
 
                 Ok(WeakRef::from(&current_task.task))
             }
@@ -454,7 +468,7 @@ impl MountRecord {
         system_task: &CurrentTask,
         directory: &fio::DirectorySynchronousProxy,
         path: &str,
-        mount_seclabel: Option<&str>,
+        mount_options: Option<&String>,
     ) -> Result<(), Error>
     where
         L: LockBefore<FileOpsCore>,
@@ -499,8 +513,9 @@ impl MountRecord {
 
         // If a filesystem security label argument was provided then apply it to all files via
         // mountpoint-labeling, with a "context=..." mount option.
-        let params = if let Some(security_context) = mount_seclabel {
-            MountParams::parse(format!("context={}", security_context).as_str().into()).unwrap()
+        let params = if let Some(mount_options) = mount_options {
+            MountParams::parse(mount_options.as_str().into())
+                .expect("failed to parse default_ns_mount_options")
         } else {
             MountParams::default()
         };

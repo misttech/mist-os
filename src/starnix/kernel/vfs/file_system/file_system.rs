@@ -367,6 +367,13 @@ impl FileSystem {
         self.ops.exchange(self, current_task, node1, parent1, name1, node2, parent2, name2)
     }
 
+    /// Forces a FileSystem unmount.
+    // TODO(https://fxbug.dev/394694891): kernel shutdown should ideally unmount FileSystems via
+    // their drop impl, which should be triggered by Mount.unmount().
+    pub fn force_unmount_ops(&self) {
+        self.ops.unmount();
+    }
+
     /// Returns the `statfs` for this filesystem.
     ///
     /// Each `FileSystemOps` impl is expected to override this to return the specific statfs for
@@ -447,6 +454,10 @@ impl FileSystem {
     pub fn name(&self) -> &'static FsStr {
         self.ops.name()
     }
+
+    pub fn manages_timestamps(&self) -> bool {
+        self.ops.manages_timestamps()
+    }
 }
 
 /// The filesystem-implementation-specific data for FileSystem.
@@ -523,6 +534,15 @@ pub trait FileSystemOps: AsAny + Send + Sync + 'static {
 
     /// Called when the filesystem is unmounted.
     fn unmount(&self) {}
+
+    /// Indicates if the filesystem can manage the timestamps (i.e. ctime and mtime).
+    ///
+    /// Starnix updates the timestamps in FsNode's `info` directly. However, if the filesystem can
+    /// manage the timestamps, then Starnix does not need to do so. `info` will be refreshed with
+    /// the timestamps from the filesystem by calling `fetch_and_refresh_info(..)` on the FsNode.
+    fn manages_timestamps(&self) -> bool {
+        false
+    }
 }
 
 impl Drop for FileSystem {

@@ -46,9 +46,10 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
   void Init(std::initializer_list<std::string_view> args = {},
             std::initializer_list<std::string_view> env = {});
 
-  void Load(std::string_view executable_name) {
+  void Load(std::string_view executable_name,
+            std::optional<std::string_view> expected_config = std::nullopt) {
     elfldltl::testing::ExpectOkDiagnostics diag;
-    ASSERT_NO_FATAL_FAILURE(Load(diag, executable_name, false));
+    ASSERT_NO_FATAL_FAILURE(Load(diag, executable_name, expected_config, false));
   }
 
   void Start();
@@ -57,7 +58,7 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
 
   template <class... Reports>
   void LoadAndFail(std::string_view name, elfldltl::testing::ExpectedErrorList<Reports...> diag) {
-    ASSERT_NO_FATAL_FAILURE(Load(diag, name, true));
+    ASSERT_NO_FATAL_FAILURE(Load(diag, name, std::nullopt, true));
     ASSERT_NO_FATAL_FAILURE(ExpectLog(""));
   }
 
@@ -114,18 +115,25 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
   void MakeBootstrapChannel(zx::channel& bootstrap_receiver);
 
   template <class Diagnostics>
-  void Load(Diagnostics& diag, std::string_view executable_name, bool should_fail) {
+  void Load(Diagnostics& diag, std::string_view executable_name,
+            std::optional<std::string_view> expected_config, bool should_fail) {
     Linker linker;
 
     // This points GetLibVmo() to the right place.
     LdsvcPathPrefix(executable_name);
 
-    // Prime the mock loader service from the Needed() calls.
+    // First, fetch the main executable and use its PT_INTERP to discern where
+    // dependencies were packaged.  This appends to what LdsvcPathPrefix() did.
+    zx::vmo vmo;
+    ASSERT_NO_FATAL_FAILURE(vmo = GetExecutableVmo(executable_name));
+    ConfigFromInterp(vmo.borrow(), expected_config);
+
+    // Prime the mock loader service from the Needed() calls.  It never expects
+    // a Config() message, though ConfigFromInterp() may have changed where the
+    // primed files will be found in the test packaging.
     ASSERT_NO_FATAL_FAILURE(LdsvcExpectNeeded());
 
     // Decode the main executable.
-    zx::vmo vmo;
-    ASSERT_NO_FATAL_FAILURE(vmo = GetExecutableVmo(executable_name));
     Linker::InitModuleList initial_modules{{
         Linker::Executable(RemoteModule::Decoded::Create(diag, std::move(vmo), kPageSize)),
     }};

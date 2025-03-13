@@ -73,6 +73,13 @@ zx_status_t device_get_fragment_metadata(zx_device_t* device, const char* name, 
   return ZX_ERR_NOT_SUPPORTED;
 }
 
+__EXPORT zx_status_t device_register_service_member(zx_device_t* dev, void* handler,
+                                                    const char* service_name,
+                                                    const char* instance_name,
+                                                    const char* member_name) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
 __EXPORT
 zx_status_t device_set_profile_by_role(zx_device_t* device, zx_handle_t thread, const char* role,
                                        size_t role_size) {

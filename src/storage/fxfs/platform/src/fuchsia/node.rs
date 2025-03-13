@@ -4,6 +4,7 @@
 
 use crate::fuchsia::directory::FxDirectory;
 use crate::fuchsia::file::FxFile;
+use fuchsia_sync::Mutex;
 use futures::future::poll_fn;
 use fxfs::object_store::ObjectDescriptor;
 use fxfs_macros::ToWeakNode;
@@ -11,7 +12,7 @@ use std::any::TypeId;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::mem::ManuallyDrop;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Weak};
 use std::task::{Poll, Waker};
 use vfs::common::IntoAny;
 
@@ -40,7 +41,7 @@ struct Placeholder(Mutex<PlaceholderInner>);
 
 impl FxNode for Placeholder {
     fn object_id(&self) -> u64 {
-        self.0.lock().unwrap().object_id
+        self.0.lock().object_id
     }
     fn parent(&self) -> Option<Arc<FxDirectory>> {
         unreachable!();
@@ -75,11 +76,11 @@ impl PlaceholderOwner<'_> {
 
 impl Drop for PlaceholderOwner<'_> {
     fn drop(&mut self) {
-        let mut p = self.inner.0.lock().unwrap();
+        let mut p = self.inner.0.lock();
         if !self.committed {
             // If the placeholder is dropped before it was committed, remove the cache entry so that
             // another caller blocked in NodeCache::get_or_reserve can take the slot.
-            self.cache.0.lock().unwrap().map.remove(&p.object_id);
+            self.cache.0.lock().map.remove(&p.object_id);
         }
         for waker in p.wakers.drain(..) {
             waker.wake();
@@ -198,7 +199,7 @@ pub struct FileIter<'a> {
 impl<'a> Iterator for FileIter<'a> {
     type Item = Arc<FxFile>;
     fn next(&mut self) -> Option<Self::Item> {
-        let cache = self.cache.0.lock().unwrap();
+        let cache = self.cache.0.lock();
         let range = match self.object_id {
             None => cache.map.range(0..),
             Some(oid) => cache.map.range(oid + 1..),
@@ -228,11 +229,11 @@ impl NodeCache {
         let mut waker_sequence = 0;
         let mut waker_index = 0;
         poll_fn(|cx| {
-            let mut this = self.0.lock().unwrap();
+            let mut this = self.0.lock();
             if let Some(node) = this.map.get(&object_id) {
                 if let Some(node) = upgrade_node(node) {
                     if let Ok(placeholder) = node.clone().into_any().downcast::<Placeholder>() {
-                        let mut inner = placeholder.0.lock().unwrap();
+                        let mut inner = placeholder.0.lock();
                         if inner.waker_sequence == waker_sequence {
                             inner.wakers[waker_index] = cx.waker().clone();
                         } else {
@@ -265,7 +266,7 @@ impl NodeCache {
     /// Removes a node from the cache. Calling this on a placeholder is an error; instead, the
     /// placeholder should simply be dropped.
     pub fn remove(&self, node: &dyn FxNode) {
-        let mut this = self.0.lock().unwrap();
+        let mut this = self.0.lock();
         if let Entry::Occupied(o) = this.map.entry(node.object_id()) {
             // If this method is called when a node is being dropped, then upgrade will fail and
             // it's possible the cache has been populated with another node, so to avoid that race,
@@ -282,7 +283,7 @@ impl NodeCache {
 
     /// Returns the given node if present in the cache.
     pub fn get(&self, object_id: u64) -> Option<Arc<dyn FxNode>> {
-        self.0.lock().unwrap().map.get(&object_id).and_then(|n| upgrade_node(n))
+        self.0.lock().map.get(&object_id).and_then(|n| upgrade_node(n))
     }
 
     /// Returns an iterator over all files in the cache.
@@ -291,7 +292,7 @@ impl NodeCache {
     }
 
     pub fn terminate(&self) {
-        let nodes = std::mem::take(&mut self.0.lock().unwrap().map);
+        let nodes = std::mem::take(&mut self.0.lock().map);
         for (_, node) in nodes {
             if let Some(node) = upgrade_node(&node) {
                 node.terminate();
@@ -300,7 +301,7 @@ impl NodeCache {
     }
 
     fn commit(&self, node: &Arc<dyn FxNode>) {
-        let mut this = self.0.lock().unwrap();
+        let mut this = self.0.lock();
         this.map.insert(node.object_id(), node.clone().to_weak_node());
     }
 }
@@ -356,11 +357,12 @@ mod tests {
     use crate::fuchsia::directory::FxDirectory;
     use crate::fuchsia::node::{FxNode, GetResult, NodeCache};
     use fuchsia_async as fasync;
+    use fuchsia_sync::Mutex;
     use futures::future::join_all;
     use fxfs::object_store::ObjectDescriptor;
     use fxfs_macros::ToWeakNode;
     use std::sync::atomic::{AtomicU64, Ordering};
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
     use std::time::Duration;
 
     #[derive(ToWeakNode)]
@@ -479,10 +481,10 @@ mod tests {
                     match cache.get_or_reserve(node.object_id()).await {
                         GetResult::Node(result) => {
                             assert_eq!(node.object_id(), result.object_id());
-                            reads.lock().unwrap()[node.object_id() as usize] += 1;
+                            reads.lock()[node.object_id() as usize] += 1;
                         }
                         GetResult::Placeholder(p) => {
-                            writes.lock().unwrap()[node.object_id() as usize] += 1;
+                            writes.lock()[node.object_id() as usize] += 1;
                             // Add a delay to simulate doing some work (e.g. loading from disk).
                             fasync::Timer::new(Duration::from_millis(100)).await;
                             p.commit(&(node as Arc<dyn FxNode>));
@@ -492,7 +494,7 @@ mod tests {
             })
         }))
         .await;
-        assert_eq!(*writes.lock().unwrap(), vec![1u64; NUM_OBJECTS]);
-        assert_eq!(*reads.lock().unwrap(), vec![TASKS_PER_OBJECT as u64 - 1; NUM_OBJECTS]);
+        assert_eq!(*writes.lock(), vec![1u64; NUM_OBJECTS]);
+        assert_eq!(*reads.lock(), vec![TASKS_PER_OBJECT as u64 - 1; NUM_OBJECTS]);
     }
 }

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::mm::MemoryAccessorExt;
+use crate::security;
 use crate::task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
@@ -572,9 +573,7 @@ impl<G: AtomicGetter + Send + Sync + 'static> InotifyLimitProcFile<G> {
 
 impl<G: AtomicGetter + Send + Sync + 'static> BytesFileOps for InotifyLimitProcFile<G> {
     fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
-            return error!(EPERM);
-        }
+        security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
         let value = fs_args::parse::<i32>(data.as_slice().into())?;
         if value < 0 {
             return error!(EINVAL);

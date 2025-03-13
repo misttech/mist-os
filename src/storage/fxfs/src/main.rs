@@ -3,16 +3,15 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use fuchsia_async as fasync;
 use fuchsia_component::server::MissingStartupHandle;
 use fuchsia_runtime::HandleType;
 use fxfs::log::*;
 use fxfs::serialized_types::LATEST_VERSION;
 use fxfs_platform::component::Component;
 
-#[fasync::run(6)]
+// TODO(https://fxbug.dev/402196421) improve scheduler integration
+#[fuchsia::main(threads = num_worker_threads(), thread_role = "fuchsia.fs.fxfs")]
 async fn main() -> Result<(), Error> {
-    diagnostics_log::initialize(diagnostics_log::PublishOptions::default())?;
     let _inspect_server_task = inspect_runtime::publish(
         fuchsia_inspect::component::inspector(),
         inspect_runtime::PublishOptions::default().send_vmo_preference(
@@ -34,4 +33,9 @@ async fn main() -> Result<(), Error> {
             fuchsia_runtime::take_startup_handle(HandleType::Lifecycle.into()).map(|h| h.into()),
         )
         .await
+}
+
+// TODO(https://fxbug.dev/402196413) delegate thread count to product config
+fn num_worker_threads() -> u8 {
+    (std::cmp::max(zx::system_get_num_cpus(), 2) - 1).try_into().unwrap_or(u8::MAX)
 }

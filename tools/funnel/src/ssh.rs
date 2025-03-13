@@ -57,10 +57,8 @@ impl IntoExitCode for TunnelError {
             Self::InvalidHomeDir { home_dir: _ } => 33,
             Self::NoHomeDir => 34,
             Self::ControlMasterPathCannotBeAtRoot => 35,
-            Self::CannotCreateControlMasterPath { source } => {
-                source.raw_os_error().unwrap_or_else(|| 36)
-            }
-            Self::SshDidNotStart(e) => e.raw_os_error().unwrap_or_else(|| 37),
+            Self::CannotCreateControlMasterPath { source } => source.raw_os_error().unwrap_or(36),
+            Self::SshDidNotStart(e) => e.raw_os_error().unwrap_or(37),
             Self::SshError(i) => *i,
         }
     }
@@ -244,7 +242,7 @@ impl IntoExitCode for CloseExistingTunnelError {
         match self {
             Self::Error(_) => 1,
             Self::TunnelError(e) => e.exit_code(),
-            Self::SshError(e) => e.raw_os_error().unwrap_or_else(|| 1),
+            Self::SshError(e) => e.raw_os_error().unwrap_or(1),
         }
     }
 }

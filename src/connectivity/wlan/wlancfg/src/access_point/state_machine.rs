@@ -14,7 +14,7 @@ use crate::util::state_machine::{self, ExitReason, IntoStateExt, StateMachineSta
 use anyhow::format_err;
 use fidl_fuchsia_wlan_sme as fidl_sme;
 use fuchsia_async::{self as fasync, DurationExt};
-use fuchsia_inspect::{Node as InspectNode, StringReference};
+use fuchsia_inspect::Node as InspectNode;
 use fuchsia_inspect_contrib::inspect_insert;
 use fuchsia_inspect_contrib::log::WriteInspect;
 use fuchsia_sync::Mutex;
@@ -24,6 +24,7 @@ use futures::future::FutureExt;
 use futures::select;
 use futures::stream::{self, Fuse, FuturesUnordered, StreamExt, TryStreamExt};
 use log::{info, warn};
+use std::borrow::Cow;
 use std::fmt::Debug;
 use std::pin::pin;
 use std::sync::Arc;
@@ -136,7 +137,7 @@ impl Status {
 }
 
 impl WriteInspect for Status {
-    fn write_inspect(&self, writer: &InspectNode, key: impl Into<StringReference>) {
+    fn write_inspect<'a>(&self, writer: &InspectNode, key: impl Into<Cow<'a, str>>) {
         match self {
             Status::Started { band, channel, mode, num_clients, security_type } => {
                 inspect_insert!(writer, var key: {

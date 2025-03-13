@@ -39,6 +39,10 @@ class PagerDispatcher final : public SoloDispatcher<PagerDispatcher, ZX_DEFAULT_
 
   void on_zero_handles() final;
 
+  zx_status_t set_debug_name(const char* name, size_t len) { return debug_name_.set(name, len); }
+
+  void get_debug_name(char* name, size_t len) const { debug_name_.get(len, name); }
+
  private:
   explicit PagerDispatcher();
 
@@ -47,6 +51,8 @@ class PagerDispatcher final : public SoloDispatcher<PagerDispatcher, ZX_DEFAULT_
   // Track whether zero handles has been triggered. This prevents race conditions where we might
   // create new sources after on_zero_handles has been called.
   bool triggered_zero_handles_ TA_GUARDED(lock_) = false;
+
+  fbl::Name<ZX_MAX_NAME_LEN> debug_name_;
 };
 
 #endif  // ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_PAGER_DISPATCHER_H_

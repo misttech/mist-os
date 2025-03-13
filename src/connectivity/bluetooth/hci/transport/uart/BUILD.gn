@@ -12,7 +12,10 @@ driver_bind_rules("bt_transport_uart_bind") {
   rules = "meta/bt_transport_uart.bind"
   bind_output = "bt-transport-uart.bindbc"
   tests = "meta/bind_tests.json"
-  deps = [ "//src/devices/bind/fuchsia.serial" ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.serialimpl:fuchsia.hardware.serialimpl_bindlib",
+    "//src/devices/bind/fuchsia.serial",
+  ]
 }
 
 source_set("common") {

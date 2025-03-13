@@ -1059,10 +1059,18 @@ TEST_F(FuseTest, Rename) {
 }
 
 TEST_F(FuseTest, Rmdir) {
+  // Validate removal of empty dir
   ASSERT_TRUE(Mount());
   std::string dir = GetMountDir() + "/dir";
   ASSERT_EQ(mkdir(dir.c_str(), 0777), 0);
   EXPECT_EQ(rmdir(dir.c_str()), 0) << strerror(errno);
+
+  // Validate failure of non-empty dir
+  ASSERT_EQ(mkdir(dir.c_str(), 0777), 0);
+  std::string file_path = dir + "/new_name";
+  fbl::unique_fd fd(open(file_path.c_str(), O_WRONLY | O_CREAT));
+  ASSERT_TRUE(fd.is_valid());
+  ASSERT_NE(rmdir(dir.c_str()), 0);
 }
 
 TEST_F(FuseServerTest, NoReqsUntilInitResponse) {
@@ -1558,7 +1566,7 @@ uint64_t ExpectedGetAttrsValue(ExpectedGetAttrBehaviour behaviour, uint64_t acce
     case ExpectedGetAttrBehaviour::kNone:
       return 0;
     case ExpectedGetAttrBehaviour::kOncePerFile:
-      return std::min(access_count, 1ul);
+      return std::min(access_count, static_cast<uint64_t>(1));
     case ExpectedGetAttrBehaviour::kOncePerAccess:
       return access_count;
   }

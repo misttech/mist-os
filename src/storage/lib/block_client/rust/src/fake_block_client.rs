@@ -67,10 +67,11 @@ impl BlockClient for FakeBlockClient {
         }
     }
 
-    async fn read_at(
+    async fn read_at_traced(
         &self,
         buffer_slice: MutableBufferSlice<'_>,
         device_offset: u64,
+        _trace_flow_id: u64,
     ) -> Result<(), zx::Status> {
         if device_offset % self.block_size as u64 != 0 {
             return Err(zx::Status::INVALID_ARGS);
@@ -100,11 +101,12 @@ impl BlockClient for FakeBlockClient {
         }
     }
 
-    async fn write_at_with_opts(
+    async fn write_at_with_opts_traced(
         &self,
         buffer_slice: BufferSlice<'_>,
         device_offset: u64,
         _opts: WriteOptions,
+        _trace_flow_id: u64,
     ) -> Result<(), zx::Status> {
         if device_offset % self.block_size as u64 != 0 {
             return Err(zx::Status::INVALID_ARGS);
@@ -134,7 +136,7 @@ impl BlockClient for FakeBlockClient {
         }
     }
 
-    async fn trim(&self, range: Range<u64>) -> Result<(), zx::Status> {
+    async fn trim_traced(&self, range: Range<u64>, _trace_flow_id: u64) -> Result<(), zx::Status> {
         if range.start % self.block_size as u64 != 0 {
             return Err(zx::Status::INVALID_ARGS);
         }
@@ -150,7 +152,7 @@ impl BlockClient for FakeBlockClient {
         Ok(())
     }
 
-    async fn flush(&self) -> Result<(), zx::Status> {
+    async fn flush_traced(&self, _trace_flow_id: u64) -> Result<(), zx::Status> {
         self.flush_count.fetch_add(1, atomic::Ordering::Relaxed);
         Ok(())
     }

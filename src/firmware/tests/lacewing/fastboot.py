@@ -9,7 +9,7 @@ import re
 from typing import Tuple
 
 from fuchsia_base_test import fuchsia_base_test
-from honeydew.interfaces.device_classes import fuchsia_device
+from honeydew.fuchsia_device import fuchsia_device
 from mobly import asserts, test_runner
 
 # Required fastboot variables.

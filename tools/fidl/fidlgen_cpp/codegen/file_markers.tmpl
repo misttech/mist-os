@@ -32,6 +32,11 @@ fidl/{{ .LibraryDots }}/cpp/markers.h
 
       static constexpr ::fidl::internal::Openness kOpenness = {{ .OpennessValue }};
 
+      {{- if .DiscoverableName }}
+        static constexpr char kDiscoverableName[] = {{ .DiscoverableName }};
+      {{- end }}
+
+
       {{ range .Methods }}
         {{- .Docs }}
         class {{ .Marker.Self }} final {
@@ -46,6 +51,8 @@ fidl/{{ .LibraryDots }}/cpp/markers.h
           static constexpr bool kHasNonEmptyUserFacingResponse = {{ .HasNonEmptyPayload }};
           static constexpr bool kHasDomainError = {{ .HasDomainError }};
           static constexpr bool kHasFrameworkError = {{ .HasFrameworkError }};
+
+          static constexpr uint64_t kOrdinal = {{ .Ordinal }};
         };
       {{- end }}
     };

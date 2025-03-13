@@ -109,9 +109,6 @@ static lazy_init::LazyInit<Thread::List> thread_list TA_GUARDED(Thread::get_list
 
 Thread::MigrateList Thread::migrate_list_;
 
-// master thread spinlock
-MonitoredSpinLock thread_lock __CPU_ALIGN_EXCLUSIVE{"thread_lock"_intern};
-
 const char* ToString(enum thread_state state) {
   switch (state) {
     case THREAD_INITIAL:
@@ -227,7 +224,8 @@ static void free_thread_resources(Thread* t) {
   }
 }
 
-zx_status_t Thread::Current::Fault(Thread::Current::FaultType type, vaddr_t va, uint flags) {
+template <typename F>
+zx_status_t Thread::Current::Fault(vaddr_t va, F resolve_fault) {
   if (is_kernel_address(va)) {
     // Kernel addresses should never fault.
     return ZX_ERR_NOT_FOUND;
@@ -251,17 +249,24 @@ zx_status_t Thread::Current::Fault(Thread::Current::FaultType type, vaddr_t va, 
   }
 
   // Call the appropriate fault function on the containing address space.
-  switch (type) {
-    case Thread::Current::FaultType::PageFault:
-      return containing_aspace->PageFault(va, flags);
-    case Thread::Current::FaultType::SoftFault:
-      return containing_aspace->SoftFault(va, flags);
-    case Thread::Current::FaultType::AccessedFault:
-      DEBUG_ASSERT(flags == 0);
-      return containing_aspace->AccessedFault(va);
-  }
-  // This should be unreachable, and is here mainly to satisfy GCC.
-  return ZX_ERR_NOT_FOUND;
+  return resolve_fault(containing_aspace);
+}
+
+zx_status_t Thread::Current::PageFault(vaddr_t va, uint flags) {
+  return Fault(va, [va, flags](VmAspace* aspace) { return aspace->PageFault(va, flags); });
+}
+
+zx_status_t Thread::Current::SoftFault(vaddr_t va, uint flags) {
+  return Fault(va, [va, flags](VmAspace* aspace) { return aspace->SoftFault(va, flags); });
+}
+
+zx_status_t Thread::Current::SoftFaultInRange(vaddr_t va, uint flags, size_t len) {
+  return Fault(
+      va, [va, flags, len](VmAspace* aspace) { return aspace->SoftFaultInRange(va, flags, len); });
+}
+
+zx_status_t Thread::Current::AccessedFault(vaddr_t va) {
+  return Fault(va, [va](VmAspace* aspace) { return aspace->AccessedFault(va); });
 }
 
 void Thread::Trampoline() {
@@ -883,11 +888,6 @@ void Thread::Forget() {
  * This function does not return.
  */
 __NO_RETURN void Thread::Current::Exit(int retcode) {
-  // create a dpc on the stack to queue up a free.
-  // must be put at top scope in this function to force the compiler to keep it from
-  // reusing the stack before the function exits
-  Dpc free_dpc;
-
   Thread* const current_thread = Thread::Current::Get();
   current_thread->canary_.Assert();
   DEBUG_ASSERT(!current_thread->IsIdle());
@@ -1045,8 +1045,8 @@ __NO_RETURN void Thread::Current::Exit(int retcode) {
   // It should not be possible to get to this point without needing to drop our
   // locks and queue a DPC to clean ourselves up.
   ASSERT(queue_free_dpc);
-  free_dpc = Dpc(&Thread::FreeDpc, current_thread);
-  [[maybe_unused]] zx_status_t status = free_dpc.Queue();
+  Dpc free_dpc(&Thread::FreeDpc, current_thread);
+  [[maybe_unused]] zx_status_t status = DpcRunner::Enqueue(free_dpc);
   DEBUG_ASSERT(status == ZX_OK);
 
   // Relock our thread one last time before dropping into our final reschedule
@@ -1270,7 +1270,7 @@ void Thread::Current::DoSuspend() {
   }
 
   if (current_thread->user_thread_) {
-    DEBUG_ASSERT(!arch_ints_disabled() || !thread_lock.IsHeld());
+    DEBUG_ASSERT(!arch_ints_disabled());
     current_thread->user_thread_->Resuming();
   }
 }
@@ -1683,9 +1683,6 @@ void Thread::SleepHandler(Timer* timer, zx_instant_mono_t now, void* arg) {
 }
 
 void Thread::HandleSleep(Timer* timer, zx_instant_mono_t now) {
-  // spin trylocking on the thread lock since the routine that set up the
-  // callback, thread_sleep_etc, may be trying to simultaneously cancel this
-  // timer while holding the thread_lock.
   const auto do_transaction =
       [&]() TA_REQ(chainlock_transaction_token) -> ChainLockTransaction::Result<> {
     if (timer->TrylockOrCancel(get_lock())) {
@@ -2054,7 +2051,7 @@ void thread_secondary_cpu_entry() {
 
   // CAREFUL: This must happen after the idle/power thread is revived, since creating the DPC thread
   // can contend on VM locks and could cause this CPU to go idle.
-  current_cpu.dpc_queue.InitForCurrentCpu();
+  current_cpu.dpc_runner.InitForCurrentCpu();
 
   // Remove ourselves from the Scheduler's bookkeeping.
   {

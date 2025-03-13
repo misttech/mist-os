@@ -151,6 +151,7 @@ pub struct Component {
 }
 
 impl Component {
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401254441)
     pub fn resolve_with_config(
         ResolvedComponent {
             resolved_url,
@@ -890,7 +891,7 @@ impl ComponentInstance {
             }
         }
         #[allow(clippy::manual_try_fold, reason = "mass allow for https://fxbug.dev/381896734")]
-        join_all(futures).await.into_iter().fold(Ok(()), |acc, r| acc.and_then(|_| r))
+        join_all(futures).await.into_iter().fold(Ok(()), |acc, r| acc.and(r))
     }
 
     pub async fn destroy_child(
@@ -949,7 +950,7 @@ impl ComponentInstance {
             | InstanceState::Started(ref mut resolved, _) => {
                 let program_escrow =
                     resolved.program_escrow().ok_or(OpenOutgoingDirError::InstanceNonExecutable)?;
-                program_escrow.open_outgoing(open_request)?;
+                program_escrow.open_outgoing(open_request).await?;
                 Ok(())
             }
             _ => Err(OpenOutgoingDirError::InstanceNotResolved),
@@ -988,7 +989,7 @@ impl ComponentInstance {
 
     /// Obtains the component output dict.
     pub async fn get_component_output_dict(self: &Arc<Self>) -> Result<Dict, RouterError> {
-        Ok(self.lock_resolved_state().await?.sandbox.component_output_dict.clone())
+        Ok(self.lock_resolved_state().await?.sandbox.component_output.capabilities())
     }
 
     /// Returns a router that delegates to the component output dict.
@@ -1104,7 +1105,7 @@ impl ComponentInstance {
                 clippy::manual_try_fold,
                 reason = "mass allow for https://fxbug.dev/381896734"
             )]
-            join_all(futures).await.into_iter().fold(Ok(()), |acc, r| acc.and_then(|_| r))?;
+            join_all(futures).await.into_iter().fold(Ok(()), |acc, r| acc.and(r))?;
             Ok(())
         };
         Box::pin(f)

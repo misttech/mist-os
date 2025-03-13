@@ -11,13 +11,14 @@ use crate::object_handle::INVALID_OBJECT_ID;
 use crate::object_store::allocator::{AllocatorItem, Reservation};
 use crate::object_store::object_manager::{reserved_space_from_journal_usage, ObjectManager};
 use crate::object_store::object_record::{
-    ObjectItem, ObjectItemV32, ObjectItemV33, ObjectItemV37, ObjectItemV38, ObjectItemV40,
-    ObjectItemV41, ObjectItemV43, ObjectKey, ObjectKeyData, ObjectValue, ProjectProperty,
+    ObjectItem, ObjectItemV40, ObjectItemV41, ObjectItemV43, ObjectKey, ObjectKeyData, ObjectValue,
+    ProjectProperty,
 };
 use crate::serialized_types::{migrate_nodefault, migrate_to_version, Migrate, Versioned};
 use anyhow::Error;
 use either::{Either, Left, Right};
 use fprint::TypeFingerprint;
+use fuchsia_sync::Mutex;
 use futures::future::poll_fn;
 use futures::pin_mut;
 use fxfs_crypto::{WrappedKey, WrappedKeyV32, WrappedKeyV40};
@@ -30,7 +31,7 @@ use std::collections::hash_map::Entry;
 use std::collections::BTreeSet;
 use std::marker::PhantomPinned;
 use std::ops::{Deref, DerefMut, Range};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::task::{Poll, Waker};
 use std::{fmt, mem};
 
@@ -130,61 +131,6 @@ pub enum MutationV40 {
     CreateInternalDir(u64),
 }
 
-#[derive(Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
-#[migrate_to_version(MutationV40)]
-pub enum MutationV38 {
-    ObjectStore(ObjectStoreMutationV38),
-    EncryptedObjectStore(Box<[u8]>),
-    Allocator(AllocatorMutationV32),
-    BeginFlush,
-    EndFlush,
-    DeleteVolume,
-    UpdateBorrowed(u64),
-    UpdateMutationsKey(UpdateMutationsKeyV32),
-    CreateInternalDir(u64),
-}
-
-#[derive(Migrate, Deserialize, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(MutationV38)]
-pub enum MutationV37 {
-    ObjectStore(ObjectStoreMutationV37),
-    EncryptedObjectStore(Box<[u8]>),
-    Allocator(AllocatorMutationV32),
-    BeginFlush,
-    EndFlush,
-    DeleteVolume,
-    UpdateBorrowed(u64),
-    UpdateMutationsKey(UpdateMutationsKeyV32),
-    CreateInternalDir(u64),
-}
-
-#[derive(Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(MutationV37)]
-pub enum MutationV33 {
-    ObjectStore(ObjectStoreMutationV33),
-    EncryptedObjectStore(Box<[u8]>),
-    Allocator(AllocatorMutationV32),
-    BeginFlush,
-    EndFlush,
-    DeleteVolume,
-    UpdateBorrowed(u64),
-    UpdateMutationsKey(UpdateMutationsKeyV32),
-    CreateInternalDir(u64),
-}
-
-#[derive(Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(MutationV33)]
-pub enum MutationV32 {
-    ObjectStore(ObjectStoreMutationV32),
-    EncryptedObjectStore(Box<[u8]>),
-    Allocator(AllocatorMutationV32),
-    BeginFlush,
-    EndFlush,
-    DeleteVolume,
-    UpdateBorrowed(u64),
-    UpdateMutationsKey(UpdateMutationsKeyV32),
-}
-
 impl Mutation {
     pub fn insert_object(key: ObjectKey, value: ObjectValue) -> Self {
         Mutation::ObjectStore(ObjectStoreMutation {
@@ -239,38 +185,6 @@ pub struct ObjectStoreMutationV41 {
 pub struct ObjectStoreMutationV40 {
     pub item: ObjectItemV40,
     pub op: OperationV32,
-}
-
-#[derive(Migrate, Serialize, Deserialize, TypeFingerprint)]
-#[migrate_nodefault]
-#[migrate_to_version(ObjectStoreMutationV40)]
-pub struct ObjectStoreMutationV38 {
-    pub item: ObjectItemV38,
-    pub op: OperationV32,
-}
-
-#[derive(Deserialize, Migrate, Serialize, TypeFingerprint)]
-#[migrate_nodefault]
-#[migrate_to_version(ObjectStoreMutationV38)]
-pub struct ObjectStoreMutationV37 {
-    item: ObjectItemV37,
-    op: OperationV32,
-}
-
-#[derive(Deserialize, Migrate, Serialize, TypeFingerprint)]
-#[migrate_nodefault]
-#[migrate_to_version(ObjectStoreMutationV37)]
-pub struct ObjectStoreMutationV33 {
-    item: ObjectItemV33,
-    op: OperationV32,
-}
-
-#[derive(Deserialize, Migrate, Serialize, TypeFingerprint)]
-#[migrate_nodefault]
-#[migrate_to_version(ObjectStoreMutationV33)]
-pub struct ObjectStoreMutationV32 {
-    item: ObjectItemV32,
-    op: OperationV32,
 }
 
 /// The different LSM tree operations that can be performed as part of a mutation.
@@ -1224,7 +1138,7 @@ impl LockWaker {
     async fn wait(&self, manager: &LockManager) {
         // We must guard against the future being dropped.
         let waker_guard = scopeguard::guard((), |_| {
-            let mut locks = manager.locks.lock().unwrap();
+            let mut locks = manager.locks.lock();
             // SAFETY: We've acquired the lock.
             unsafe {
                 if (*self.waker.get()).is_woken() {
@@ -1243,7 +1157,7 @@ impl LockWaker {
         });
 
         poll_fn(|cx| {
-            let _locks = manager.locks.lock().unwrap();
+            let _locks = manager.locks.lock();
             // SAFETY: We've acquired the lock.
             unsafe {
                 if (*self.waker.get()).is_woken() {
@@ -1314,7 +1228,7 @@ impl LockManager {
             let lock_waker = None;
             pin_mut!(lock_waker);
             {
-                let mut locks = self.locks.lock().unwrap();
+                let mut locks = self.locks.lock();
                 match locks.keys.entry(*lock) {
                     Entry::Vacant(vacant) => {
                         vacant.insert(LockEntry {
@@ -1379,7 +1293,7 @@ impl LockManager {
 
     /// This should be called by the filesystem's drop_transaction implementation.
     pub fn drop_transaction(&self, transaction: &mut Transaction<'_>) {
-        let mut locks = self.locks.lock().unwrap();
+        let mut locks = self.locks.lock();
         locks.drop_write_locks(std::mem::take(&mut transaction.txn_locks));
     }
 
@@ -1393,7 +1307,7 @@ impl LockManager {
             let lock_waker = None;
             pin_mut!(lock_waker);
             {
-                let mut locks = self.locks.lock().unwrap();
+                let mut locks = self.locks.lock();
                 let entry = locks.keys.get_mut(lock).unwrap();
                 assert_eq!(entry.state, LockState::Locked);
 
@@ -1450,7 +1364,7 @@ impl LockManager {
     /// Downgrades locks from the WriteLock state to Locked state.  This will panic if the locks are
     /// not in the WriteLock state.
     pub fn downgrade_locks(&self, lock_keys: &LockKeys) {
-        self.locks.lock().unwrap().downgrade_locks(lock_keys);
+        self.locks.lock().downgrade_locks(lock_keys);
     }
 }
 
@@ -1586,7 +1500,7 @@ impl ReadGuard<'_> {
 
 impl Drop for ReadGuard<'_> {
     fn drop(&mut self) {
-        let mut locks = self.manager.locks.lock().unwrap();
+        let mut locks = self.manager.locks.lock();
         locks.drop_read_locks(std::mem::take(&mut self.lock_keys));
     }
 }
@@ -1608,7 +1522,7 @@ pub struct WriteGuard<'a> {
 
 impl Drop for WriteGuard<'_> {
     fn drop(&mut self) {
-        let mut locks = self.manager.locks.lock().unwrap();
+        let mut locks = self.manager.locks.lock();
         locks.drop_write_locks(std::mem::take(&mut self.lock_keys));
     }
 }
@@ -1649,11 +1563,11 @@ mod tests {
     use super::{LockKey, LockKeys, LockManager, LockState, Mutation, Options};
     use crate::filesystem::FxFilesystem;
     use fuchsia_async as fasync;
+    use fuchsia_sync::Mutex;
     use futures::channel::oneshot::channel;
     use futures::future::FutureExt;
     use futures::stream::FuturesUnordered;
     use futures::{join, pin_mut, StreamExt};
-    use std::sync::Mutex;
     use std::task::Poll;
     use std::time::Duration;
     use storage_device::fake_device::FakeDevice;
@@ -1696,7 +1610,7 @@ mod tests {
                 recv2.await.unwrap();
                 // This is a halting problem so all we can do is sleep.
                 fasync::Timer::new(Duration::from_millis(100)).await;
-                assert!(!*done.lock().unwrap());
+                assert!(!*done.lock());
             }
             .boxed(),
         );
@@ -1728,7 +1642,7 @@ mod tests {
                         Options::default(),
                     )
                     .await;
-                *done.lock().unwrap() = true;
+                *done.lock() = true;
             }
             .boxed(),
         );
@@ -1755,7 +1669,7 @@ mod tests {
                 send1.send(()).unwrap(); // Tell the next future to continue.
                 recv2.await.unwrap();
                 t.commit().await.expect("commit failed");
-                *done.lock().unwrap() = true;
+                *done.lock() = true;
             },
             async {
                 recv1.await.unwrap();
@@ -1769,7 +1683,7 @@ mod tests {
                 // It shouldn't proceed until we release our read lock, but it's a halting
                 // problem, so sleep.
                 fasync::Timer::new(Duration::from_millis(100)).await;
-                assert!(!*done.lock().unwrap());
+                assert!(!*done.lock());
             },
         );
     }
@@ -1794,7 +1708,7 @@ mod tests {
                 // It shouldn't proceed until we release our read lock, but it's a halting
                 // problem, so sleep.
                 fasync::Timer::new(Duration::from_millis(100)).await;
-                assert!(!*done.lock().unwrap());
+                assert!(!*done.lock());
             },
             async {
                 recv1.await.unwrap();
@@ -1808,7 +1722,7 @@ mod tests {
                     .expect("new_transaction failed");
                 send2.send(()).unwrap(); // Tell the first future to continue;
                 t.commit().await.expect("commit failed");
-                *done.lock().unwrap() = true;
+                *done.lock() = true;
             },
         );
     }

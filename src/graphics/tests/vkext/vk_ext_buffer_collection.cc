@@ -972,7 +972,7 @@ TEST_F(VulkanExtensionTest, ImportAliasing) {
     src_image1 = std::move(vk_image_);
     src_memory1 = std::move(vk_device_memory_);
 
-    WriteLinearImage(src_memory1.get(), src_is_coherent, kDefaultWidth, kSrcHeight, kPattern);
+    WriteImage(src_memory1.get(), src_is_coherent, vk_device_memory_size_, kPattern);
 
     ASSERT_TRUE(InitializeDirectImage(*collection, image_create_info));
     ASSERT_TRUE(InitializeDirectImageMemory(*collection));
@@ -1013,7 +1013,7 @@ TEST_F(VulkanExtensionTest, ImportAliasing) {
     dst_image = std::move(vk_image_);
     dst_memory = std::move(vk_device_memory_);
 
-    WriteLinearImage(dst_memory.get(), dst_is_coherent, kDefaultWidth, kDstHeight, 0xffffffff);
+    WriteImage(dst_memory.get(), dst_is_coherent, vk_device_memory_size_, 0xffffffff);
   }
 
   vk::UniqueCommandPool command_pool;
@@ -1131,7 +1131,8 @@ TEST_F(VulkanExtensionTest, ImportAliasing) {
 
   EXPECT_EQ(vk::Result::eSuccess, vulkan_context().queue().waitIdle());
 
-  CheckLinearImage(dst_memory.get(), dst_is_coherent, kDefaultWidth, kDstHeight, kPattern);
+  CheckLinearImage(dst_image.get(), dst_memory.get(), dst_is_coherent, kDefaultWidth, kDstHeight,
+                   kPattern);
 }
 
 class VulkanFormatTest : public VulkanExtensionTest,
@@ -1191,7 +1192,7 @@ TEST_P(VulkanFormatTest, FastClear) {
   vk::UniqueImage image;
   vk::UniqueDeviceMemory memory;
 
-  fuchsia::sysmem2::BufferCollectionInfo sysmem_collection;
+  fuchsia::sysmem2::BufferCollectionInfo buffer_collection_info;
   bool src_is_coherent;
   {
     auto [vulkan_token, local_token] = MakeSharedCollection<2>();
@@ -1233,7 +1234,8 @@ TEST_P(VulkanFormatTest, FastClear) {
       image_constraints.mutable_color_spaces()->emplace_back(fuchsia::images2::ColorSpace::SRGB);
     }
 
-    sysmem_collection = AllocateSysmemCollection(std::move(constraints), std::move(local_token));
+    buffer_collection_info =
+        AllocateSysmemCollection(std::move(constraints), std::move(local_token));
 
     ASSERT_TRUE(InitializeDirectImage(*collection, image_create_info));
 
@@ -1245,7 +1247,7 @@ TEST_P(VulkanFormatTest, FastClear) {
     image = std::move(vk_image_);
     memory = std::move(vk_device_memory_);
 
-    WriteLinearImage(memory.get(), src_is_coherent, kDefaultWidth, kDefaultHeight, kPattern);
+    WriteImage(memory.get(), src_is_coherent, vk_device_memory_size_, kPattern);
   }
 
   vk::UniqueCommandPool command_pool;
@@ -1383,7 +1385,7 @@ TEST_P(VulkanFormatTest, FastClear) {
 
   EXPECT_EQ(vk::Result::eSuccess, vulkan_context().queue().waitIdle());
 
-  ASSERT_TRUE(sysmem_collection.settings().has_image_format_constraints());
+  ASSERT_TRUE(buffer_collection_info.settings().has_image_format_constraints());
   {
     void *addr;
     vk::Result result = ctx_->device()->mapMemory(*memory, 0 /* offset */, VK_WHOLE_SIZE,
@@ -1395,7 +1397,7 @@ TEST_P(VulkanFormatTest, FastClear) {
       EXPECT_EQ(vk::Result::eSuccess, ctx_->device()->invalidateMappedMemoryRanges(1, &range));
     }
 
-    CheckImageFill(kDefaultWidth, kDefaultHeight, addr, sysmem_collection, 0xffffffff);
+    CheckImageFill(kDefaultWidth, kDefaultHeight, addr, buffer_collection_info, 0xffffffff);
     ctx_->device()->unmapMemory(*memory);
   }
 }
@@ -1448,7 +1450,7 @@ TEST_F(VulkanExtensionTest, OptimalCopy) {
     src_image = std::move(vk_image_);
     src_memory = std::move(vk_device_memory_);
 
-    WriteLinearImage(src_memory.get(), src_is_coherent, kDefaultWidth, kDefaultHeight, kPattern);
+    WriteImage(src_memory.get(), src_is_coherent, vk_device_memory_size_, kPattern);
   }
 
   vk::UniqueImage mid_image1, mid_image2;
@@ -1511,8 +1513,7 @@ TEST_F(VulkanExtensionTest, OptimalCopy) {
       mid_image1 = std::move(vk_image_);
       mid_memory1 = std::move(vk_device_memory_);
 
-      WriteLinearImage(mid_memory1.get(), mid_is_coherent, kDefaultWidth, kDefaultHeight,
-                       0xffffffff);
+      WriteImage(mid_memory1.get(), mid_is_coherent, vk_device_memory_size_, 0xffffffff);
     }
     {
       real_image_create_info.setUsage(vk::ImageUsageFlagBits::eTransferSrc);
@@ -1558,7 +1559,7 @@ TEST_F(VulkanExtensionTest, OptimalCopy) {
     dst_image = std::move(vk_image_);
     dst_memory = std::move(vk_device_memory_);
 
-    WriteLinearImage(dst_memory.get(), dst_is_coherent, kDefaultWidth, kDefaultHeight, 0xffffffff);
+    WriteImage(dst_memory.get(), dst_is_coherent, vk_device_memory_size_, 0xffffffff);
   }
 
   auto range = vk::ImageSubresourceRange()
@@ -1724,7 +1725,8 @@ TEST_F(VulkanExtensionTest, OptimalCopy) {
 
   EXPECT_EQ(vk::Result::eSuccess, vulkan_context().queue().waitIdle());
 
-  CheckLinearImage(dst_memory.get(), dst_is_coherent, kDefaultWidth, kDefaultHeight, kPattern);
+  CheckLinearImage(dst_image.get(), dst_memory.get(), dst_is_coherent, kDefaultWidth,
+                   kDefaultHeight, kPattern);
 }
 
 // Test that the correct pixels are written to with linear images with non-packed strides.

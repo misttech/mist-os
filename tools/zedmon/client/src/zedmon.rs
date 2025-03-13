@@ -1194,7 +1194,7 @@ mod tests {
                         }
                         NextRead::Timestamp => self.read_timestamp(buffer),
                     }),
-                    None => Err(std::io::Error::new(std::io::ErrorKind::Other, "Read error: -1")),
+                    None => Err(std::io::Error::other("Read error: -1")),
                 }
             }
         }
@@ -1459,7 +1459,7 @@ mod tests {
             // If any failures remain, inject one; otherwise, return an enqueued Report.
             if self.num_failures > 0 {
                 self.num_failures -= 1;
-                Err(std::io::Error::new(std::io::ErrorKind::Other, "Read error: -1"))
+                Err(std::io::Error::other("Read error: -1"))
             } else {
                 let response = self.response_queue.pop_front().unwrap();
                 match response {

@@ -19,17 +19,12 @@
             to: [ "#binder_rpc_inet_test" ],
         },
         {
-            protocol: "fuchsia.logger.LogSink",
+            dictionary: "diagnostics",
             from: "parent",
             to: [
                 "#binder_rpc_inet_test",
                 "#netstack",
             ],
-        },
-        {
-            dictionary: "diagnostics",
-            from: "parent",
-            to: "all",
         },
     ],
     expose: [

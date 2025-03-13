@@ -8,7 +8,7 @@
 #include <zircon/availability.h>
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(18)
-#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
+#include <fidl/fuchsia.driver.framework/cpp/natural_types.h>
 
 #include <unordered_set>
 #include <vector>

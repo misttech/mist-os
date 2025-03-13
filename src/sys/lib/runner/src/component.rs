@@ -84,7 +84,7 @@ impl StopInfo {
 
     pub fn from_u32(s: u32, c: Option<i64>) -> Self {
         Self {
-            termination_status: Status::from_raw(i32::try_from(s).unwrap_or_else(|_| i32::MAX)),
+            termination_status: Status::from_raw(i32::try_from(s).unwrap_or(i32::MAX)),
             exit_code: c,
         }
     }

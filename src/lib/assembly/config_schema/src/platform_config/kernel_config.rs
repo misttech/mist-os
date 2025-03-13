@@ -46,36 +46,45 @@ pub enum MemoryReclamationStrategy {
 #[serde(default, deny_unknown_fields)]
 pub struct PlatformKernelConfig {
     /// What should happen if the device runs out-of-memory.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub oom_behavior: OOMBehavior,
 
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub memory_compression: bool,
 
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub lru_memory_compression: bool,
 
     /// Configures kernel eviction to run continually in the background to try
     /// and keep the system out of memory pressure, as opposed to triggering
     /// one-shot eviction only at memory pressure level transitions.
     /// Enables the `kernel_evict_continuous` assembly input bundle.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub continuous_eviction: bool,
 
     /// Configures cprng related behaviors
     #[serde(default)]
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub cprng: CprngConfig,
 
     /// For address spaces that use ASLR this controls the number of bits of
     /// entropy in the randomization. Higher entropy results in a sparser
     /// address space and uses more memory for page tables. Valid values range
     /// from 0-36. Default value is 30.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub aslr_entropy_bits: Option<u8>,
 
     /// Upper-bound in megabytes for the system memory.
     /// It simulates a system with less physical memory than it actually has.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub memory_limit_mb: Option<u64>,
 
     /// Configuration for the kernel memory reclamation strategy.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub memory_reclamation_strategy: MemoryReclamationStrategy,
 
     /// Configurations related to page scanner behavior.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub page_scanner: Option<PageScannerConfig>,
 }
 
@@ -85,15 +94,18 @@ pub struct PlatformKernelConfig {
 pub struct CprngConfig {
     /// When enabled and if jitterentropy fails at initial seeding, CPRNG panics.
     #[serde(default)]
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub seed_require_jitterentropy: bool,
 
     /// When enabled and if you do not provide entropy input from the kernel
     /// command line, CPRNG panics.
     #[serde(default)]
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub seed_require_cmdline: bool,
 
     /// When enabled and if jitterentropy fails at reseeding, CPRNG panics.
     #[serde(default)]
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub reseed_require_jitterentropy: bool,
 }
 
@@ -119,6 +131,7 @@ pub enum PagetableEvictionPolicy {
 #[serde(default, deny_unknown_fields)]
 pub struct PageScannerConfig {
     /// Sets the reclamation policy for user page tables that are not accessed.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub page_table_eviction_policy: PagetableEvictionPolicy,
 
     /// This option causes the kernels active memory scanner to be initially
@@ -130,6 +143,7 @@ pub struct PageScannerConfig {
     /// Every action the scanner performs can be individually configured and
     /// disabled. If all actions are disabled then enabling the scanner has no
     /// effect.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub disable_at_boot: bool,
 
     /// This option configures the maximal number of candidate pages the zero
@@ -137,10 +151,22 @@ pub struct PageScannerConfig {
     ///
     /// The page scanner must be running for this option to have any effect. It
     /// can be enabled at boot unless `disable_at_boot` is set to True.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub zero_page_scans_per_second: ZeroPageScanCount,
 
     /// When set, disable the page scanner to evict user pager backed pages.
     /// Eviction can reduce memory usage and prevent out of memory scenarios,
     /// but removes some timing predictability from system behavior.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub disable_eviction: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_serialization() {
+        crate::common::tests::default_serialization_helper::<PlatformKernelConfig>();
+    }
 }

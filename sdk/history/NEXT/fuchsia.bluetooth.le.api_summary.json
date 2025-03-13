@@ -1022,7 +1022,7 @@
         "kind": "table/member",
         "name": "fuchsia.bluetooth.le/IsochronousStreamWriteRequest.data",
         "ordinal": "1",
-        "type": "vector<uint8>"
+        "type": "vector<uint8>:4095"
     },
     {
         "kind": "table",
@@ -1065,6 +1065,12 @@
         "name": "fuchsia.bluetooth.le/MAX_BROADCAST_NAME_OCTETS",
         "type": "uint8",
         "value": "128"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.bluetooth.le/MAX_ISO_PACKET_SIZE",
+        "type": "uint16",
+        "value": "4095"
     },
     {
         "kind": "const",

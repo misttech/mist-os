@@ -3,6 +3,22 @@
 // found in the LICENSE file.
 library fuchsia.hardware.display.engine;
 
+/// Type of the internal value in [`ConfigStamp`].
+alias ConfigStampValue = uint64;
+
+/// Unique identifier for a display configuration applied by the Coordinator.
+///
+/// [`INVALID_CONFIG_STAMP_VALUE`] represents an invalid value.
+///
+/// Valid values uniquely idenfiy configurations applied by the Display
+/// Coordinator. Each [`Engine.ApplyConfiguration`] call will use a value
+/// greater than all previously used values.
+type ConfigStamp = struct {
+    value ConfigStampValue;
+};
+
+const INVALID_CONFIG_STAMP_VALUE ConfigStampValue = 0;
+
 /// Type of the internal value in [`ImageId`].
 alias ImageIdValue = uint64;
 

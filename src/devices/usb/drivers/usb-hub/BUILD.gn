@@ -41,6 +41,7 @@ source_set("usb-hub-common") {
 }
 
 fuchsia_cc_driver("usb-hub-driver") {
+  legacy = true
   output_name = "usb-hub"
   configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
   deps = [

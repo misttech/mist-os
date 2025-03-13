@@ -76,6 +76,7 @@
         },
         {
             // The `audio_driver_tests` suite requires access to various audio driver types...
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have been migrated to services. The service capability has been added below.
             directory: [
                 "dev-audio-composite",
                 "dev-audio-input",
@@ -88,7 +89,21 @@
             rights: [ "r*" ],
         },
         {
-            // ... including the `virtual_audio` driver, at /dev/sys/platform/virtual-audio.
+            // These services replace the directory capabilities above.
+            service: [
+                "fuchsia.gpu.magma.Service",
+                "fuchsia.hardware.audio.CodecConnectorService",
+                "fuchsia.hardware.audio.CompositeConnectorService",
+                "fuchsia.hardware.audio.DaiConnectorService",
+                "fuchsia.hardware.audio.StreamConfigConnectorInputService",
+                "fuchsia.hardware.audio.StreamConfigConnectorOutputService",
+            ],
+            from: "parent",
+            to: [ "#devices-tests" ],
+        },
+        {
+            // ... including the `virtual-audio-legacy` driver, at
+            // /dev/sys/platform/virtual-audio-legacy.
             directory: "sys",
             from: "parent",
             to: [ "#devices-tests" ],

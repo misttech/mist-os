@@ -15,8 +15,8 @@ class ServiceAggregateTest : public testing::TestBase {};
 
 TEST_F(ServiceAggregateTest, OpenServiceAggregateAt) {
   fidl::InterfaceHandle<fuchsia::io::Directory> directory;
-  zx_status_t status =
-      fdio_ns_service_connect(ns(), "/svc", directory.NewRequest().TakeChannel().release());
+  zx_status_t status = fdio_ns_open3(ns(), "/svc", uint64_t{fuchsia::io::PERM_READABLE},
+                                     directory.NewRequest().TakeChannel().release());
   ASSERT_EQ(ZX_OK, status);
 
   auto service_aggregate = OpenServiceAggregateAt<fuchsia::examples::EchoService>(directory);

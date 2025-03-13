@@ -9,17 +9,22 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct PlatformMediaConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub audio: Option<AudioConfig>,
 
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub camera: CameraConfig,
 
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub multizone_leader: MultizoneConfig,
 
     /// Enable platform-provided video and audio decoders and encoders.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub enable_codecs: bool,
 
     /// Enable a platform-provided service that allows active media players (sessions) to be
     /// published and discovered, primarily for user control of those sessiosn.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub enable_sessions: bool,
 }
 
@@ -39,6 +44,7 @@ pub enum AudioConfig {
 #[serde(default, deny_unknown_fields)]
 pub struct AudioCoreConfig {
     /// Route the ADC device to audio_core.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub use_adc_device: bool,
 }
 
@@ -46,6 +52,7 @@ pub struct AudioCoreConfig {
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default)]
 pub struct CameraConfig {
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub enabled: bool,
 }
 
@@ -57,5 +64,6 @@ pub struct MultizoneConfig {
     /// The component should expose these capabilities:
     ///   fuchsia.media.SessionAudioConsumerFactory
     ///   google.cast.multizone.Leader
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub component_url: Option<String>,
 }

@@ -78,6 +78,12 @@ enumerable_enum! {
         AnonFsNode,
         /// The SELinux "blk_file" object class.
         Block,
+        /// The SELinux "bpf" object class.
+        Bpf,
+        /// The SELinux "capability" object class.
+        Capability,
+        /// The SELinux "capability2" object class.
+        Capability2,
         /// The SELinux "chr_file" object class.
         Character,
         /// The SELinux "dir" object class.
@@ -97,6 +103,8 @@ enumerable_enum! {
         /// The SELinux "security" object class.
         Security,
         /// The SELinux "sock_file" object class.
+        SockFile,
+        /// The SELinux "socket" object class.
         Socket,
         // keep-sorted end
     }
@@ -109,6 +117,9 @@ impl ObjectClass {
             // keep-sorted start
             Self::AnonFsNode => "anon_inode",
             Self::Block => "blk_file",
+            Self::Bpf => "bpf",
+            Self::Capability => "capability",
+            Self::Capability2 => "capability2",
             Self::Character => "chr_file",
             Self::Dir => "dir",
             Self::Fd => "fd",
@@ -118,7 +129,8 @@ impl ObjectClass {
             Self::Link => "lnk_file",
             Self::Process => "process",
             Self::Security => "security",
-            Self::Socket => "sock_file",
+            Self::SockFile => "sock_file",
+            Self::Socket => "socket",
             // keep-sorted end
         }
     }
@@ -133,6 +145,50 @@ impl From<ObjectClass> for AbstractObjectClass {
 impl From<String> for AbstractObjectClass {
     fn from(name: String) -> Self {
         Self::Custom(name)
+    }
+}
+
+enumerable_enum! {
+    /// Covers the set of classes that inherit from the common "cap" symbol (e.g. "capability" for
+    /// now and "cap_userns" after Starnix gains user namespacing support).
+    #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+    CapClass {
+        // keep-sorted start
+        /// The SELinux "capability" object class.
+        Capability,
+        // keep-sorted end
+    }
+}
+
+impl From<CapClass> for ObjectClass {
+    fn from(cap_class: CapClass) -> Self {
+        match cap_class {
+            // keep-sorted start
+            CapClass::Capability => Self::Capability,
+            // keep-sorted end
+        }
+    }
+}
+
+enumerable_enum! {
+    /// Covers the set of classes that inherit from the common "cap2" symbol (e.g. "capability2" for
+    /// now and "cap2_userns" after Starnix gains user namespacing support).
+    #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+    Cap2Class {
+        // keep-sorted start
+        /// The SELinux "capability2" object class.
+        Capability2,
+        // keep-sorted end
+    }
+}
+
+impl From<Cap2Class> for ObjectClass {
+    fn from(cap2_class: Cap2Class) -> Self {
+        match cap2_class {
+            // keep-sorted start
+            Cap2Class::Capability2 => Self::Capability2,
+            // keep-sorted end
+        }
     }
 }
 
@@ -157,7 +213,7 @@ enumerable_enum! {
         /// The SELinux "lnk_file" object class.
         Link,
         /// The SELinux "sock_file" object class.
-        Socket,
+        SockFile,
         // keep-sorted end
     }
 }
@@ -173,9 +229,60 @@ impl From<FileClass> for ObjectClass {
             FileClass::Fifo => Self::Fifo,
             FileClass::File => Self::File,
             FileClass::Link => Self::Link,
-            FileClass::Socket => Self::Socket,
+            FileClass::SockFile => Self::SockFile,
             // keep-sorted end
         }
+    }
+}
+
+enumerable_enum! {
+    /// Distinguishes socket-like kernel object classes defined in SELinux policy.
+    #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+    SocketClass {
+        // keep-sorted start
+        /// Generic socket class applied to all socket-like objects for which no more specific
+        /// class is defined.
+        Socket,
+        // keep-sorted end
+    }
+}
+
+impl From<SocketClass> for ObjectClass {
+    fn from(sock_class: SocketClass) -> Self {
+        match sock_class {
+            // keep-sorted start
+            SocketClass::Socket => Self::Socket,
+            // keep-sorted end
+        }
+    }
+}
+
+/// Container for a security class that could be associated with a [`crate::vfs::FsNode`], to allow
+/// permissions common to both file-like and socket-like classes to be generated easily by hooks.
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+pub enum FsNodeClass {
+    File(FileClass),
+    Socket(SocketClass),
+}
+
+impl From<FsNodeClass> for ObjectClass {
+    fn from(class: FsNodeClass) -> Self {
+        match class {
+            FsNodeClass::File(file_class) => file_class.into(),
+            FsNodeClass::Socket(sock_class) => sock_class.into(),
+        }
+    }
+}
+
+impl From<FileClass> for FsNodeClass {
+    fn from(file_class: FileClass) -> Self {
+        FsNodeClass::File(file_class)
+    }
+}
+
+impl From<SocketClass> for FsNodeClass {
+    fn from(sock_class: SocketClass) -> Self {
+        FsNodeClass::Socket(sock_class)
     }
 }
 
@@ -254,6 +361,12 @@ permission_enum! {
         AnonFsNode(AnonFsNodePermission),
         /// Permissions for the well-known SELinux "blk_file" file-like object class.
         Block(BlockFilePermission),
+        /// Permissions for the well-known SELinux "bpf" file-like object class.
+        Bpf(BpfPermission),
+        /// Permissions for the well-known SELinux "capability" object class.
+        Capability(CapabilityPermission),
+        /// Permissions for the well-known SELinux "capability2" object class.
+        Capability2(Capability2Permission),
         /// Permissions for the well-known SELinux "chr_file" file-like object class.
         Character(CharacterFilePermission),
         /// Permissions for the well-known SELinux "dir" file-like object class.
@@ -273,6 +386,8 @@ permission_enum! {
         /// Permissions for access to parts of the "selinuxfs" used to administer and query SELinux.
         Security(SecurityPermission),
         /// Permissions for the well-known SELinux "sock_file" file-like object class.
+        SockFile(SockFilePermission),
+        /// Permissions for the well-known SELinux "socket" file-like object class.
         Socket(SocketPermission),
         // keep-sorted end
     }
@@ -327,45 +442,201 @@ macro_rules! class_permission_enum {
 }
 
 common_permission_enum! {
+    /// Permissions common to all cap-like object classes (e.g. "capability" for now and
+    /// "cap_userns" after Starnix gains user namespacing support). These are combined with a
+    /// specific `CapabilityClass` by policy enforcement hooks, to obtain class-affine permission
+    /// values to check.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    CommonCapPermission {
+        // keep-sorted start
+
+        AuditControl("audit_control"),
+        AuditWrite("audit_write"),
+        Chown("chown"),
+        DacOverride("dac_override"),
+        DacReadSearch("dac_read_search"),
+        Fowner("fowner"),
+        Fsetid("fsetid"),
+        IpcLock("ipc_lock"),
+        IpcOwner("ipc_owner"),
+        Kill("kill"),
+        Lease("lease"),
+        LinuxImmutable("linux_immutable"),
+        Mknod("mknod"),
+        NetAdmin("net_admin"),
+        NetBindService("net_bind_service"),
+        NetBroadcast("net_broadcast"),
+        NetRaw("net_raw"),
+        Setfcap("setfcap"),
+        Setgid("setgid"),
+        Setpcap("setpcap"),
+        Setuid("setuid"),
+        SysAdmin("sys_admin"),
+        SysBoot("sys_boot"),
+        SysChroot("sys_chroot"),
+        SysModule("sys_module"),
+        SysNice("sys_nice"),
+        SysPacct("sys_pacct"),
+        SysPtrace("sys_ptrace"),
+        SysRawio("sys_rawio"),
+        SysResource("sys_resource"),
+        SysTime("sys_time"),
+        SysTtyConfig("sys_tty_config"),
+
+        // keep-sorted end
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "capability" class permission in SELinux policy that has a particular meaning
+    /// in policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    CapabilityPermission extends CommonCapPermission {}
+}
+
+impl CommonCapPermission {
+    /// Returns the `class`-affine `Permission` value corresponding to this common permission.
+    /// This is used to allow hooks to resolve e.g. common "sys_nice" permission access based on the
+    /// "allow" rules for the correct target object class.
+    pub fn for_class(&self, class: CapClass) -> Permission {
+        match class {
+            CapClass::Capability => CapabilityPermission::Common(self.clone()).into(),
+        }
+    }
+}
+
+common_permission_enum! {
+    /// Permissions common to all cap2-like object classes (e.g. "capability2" for now and
+    /// "cap2_userns" after Starnix gains user namespacing support). These are combined with a
+    /// specific `Capability2Class` by policy enforcement hooks, to obtain class-affine permission
+    /// values to check.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    CommonCap2Permission {
+        // keep-sorted start
+
+        AuditRead("audit_read"),
+        BlockSuspend("block_suspend"),
+        MacAdmin("mac_admin"),
+        MacOverride("mac_override"),
+        Syslog("syslog"),
+        WakeAlarm("wake_alarm"),
+
+        // keep-sorted end
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "capability2" class permission in SELinux policy that has a particular meaning
+    /// in policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    Capability2Permission extends CommonCap2Permission {}
+}
+
+impl CommonCap2Permission {
+    /// Returns the `class`-affine `Permission` value corresponding to this common permission.
+    /// This is used to allow hooks to resolve e.g. common "mac_admin" permission access based on
+    /// the "allow" rules for the correct target object class.
+    pub fn for_class(&self, class: Cap2Class) -> Permission {
+        match class {
+            Cap2Class::Capability2 => Capability2Permission::Common(self.clone()).into(),
+        }
+    }
+}
+
+common_permission_enum! {
+    /// Permissions meaningful for all [`crate::vfs::FsNode`]s, whether file- or socket-like.
+    ///
+    /// This extra layer of common permissions is not reflected in the hierarchy defined by the
+    /// SELinux Reference Policy. Because even common permissions are mapped per-class, by name, to
+    /// the policy equivalents, the implementation and policy notions of common permissions need not
+    /// be identical.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    CommonFsNodePermission {
+        // keep-sorted start
+        /// Permission to append to a file or socket.
+        Append("append"),
+        /// Permission to create a file or socket.
+        Create("create"),
+        /// Permission to query attributes, including uid, gid and extended attributes.
+        GetAttr("getattr"),
+        /// Permission to execute ioctls on the file or socket.
+        Ioctl("ioctl"),
+        /// Permission to set and unset file or socket locks.
+        Lock("lock"),
+        /// Permission to read content from a file or socket, as well as reading or following links.
+        Read("read"),
+        /// Permission checked against the existing label when updating a node's security label.
+        RelabelFrom("relabelfrom"),
+        /// Permission checked against the new label when updating a node's security label.
+        RelabelTo("relabelto"),
+        /// Permission to modify attributes, including uid, gid and extended attributes.
+        SetAttr("setattr"),
+        /// Permission to write contents to the file or socket.
+        Write("write"),
+        // keep-sorted end
+    }
+}
+
+impl CommonFsNodePermission {
+    /// Returns the `class`-affine `Permission` value corresponding to this common permission.
+    /// This is used to allow hooks to resolve e.g. common "read" permission access based on the
+    /// "allow" rules for the correct target object class.
+    pub fn for_class(&self, class: impl Into<FsNodeClass>) -> Permission {
+        match class.into() {
+            FsNodeClass::File(file_class) => {
+                CommonFilePermission::Common(self.clone()).for_class(file_class)
+            }
+            FsNodeClass::Socket(sock_class) => {
+                CommonSocketPermission::Common(self.clone()).for_class(sock_class)
+            }
+        }
+    }
+}
+common_permission_enum! {
+    /// Permissions common to all socket-like object classes. These are combined with a specific
+    /// `SocketClass` by policy enforcement hooks, to obtain class-affine permission values.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    CommonSocketPermission extends CommonFsNodePermission {
+        // keep-sorted start
+        // keep-sorted end
+    }
+}
+
+impl CommonSocketPermission {
+    pub fn for_class(&self, class: SocketClass) -> Permission {
+        match class {
+            SocketClass::Socket => SocketPermission::Common(self.clone()).into(),
+        }
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "socket" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    SocketPermission extends CommonSocketPermission {
+    }
+}
+
+common_permission_enum! {
     /// Permissions common to all file-like object classes (e.g. "lnk_file", "dir"). These are
     /// combined with a specific `FileClass` by policy enforcement hooks, to obtain class-affine
     /// permission values to check.
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-    CommonFilePermission {
+    CommonFilePermission extends CommonFsNodePermission {
         // keep-sorted start
-        /// Permission to append to a file.
-        Append("append"),
-        /// Permission to create a file.
-        Create("create"),
         /// Permission to execute a file with domain transition.
         Execute("execute"),
-        /// Permission to query attributes, including uid, gid and extended attributes.
-        GetAttr("getattr"),
-        /// Permission to execute ioctls on the file.
-        Ioctl("ioctl"),
         /// Permissions to create hard link.
         Link("link"),
-        /// Permission to set and unset file locks.
-        Lock("lock"),
         /// Permission to use as mount point; only useful for directories and files.
         MountOn("mounton"),
         /// Permission to open a file.
         Open("open"),
-        /// Permission to read file contents. Note this applies to reading more than regular file's
-        /// data.
-        Read("read"),
-        /// Permission checked against the existing label when updating a file's security label.
-        RelabelFrom("relabelfrom"),
-        /// Permission checked against the new label when updating a file's security label.
-        RelabelTo("relabelto"),
         /// Permission to rename a file.
         Rename("rename"),
-        /// Permission to modify attributes, including uid, gid and extended attributes.
-        SetAttr("setattr"),
         /// Permission to delete a file or remove a hard link.
         Unlink("unlink"),
-        /// Permission to write or append file contents.
-        Write("write"),
         // keep-sorted end
     }
 }
@@ -383,7 +654,7 @@ impl CommonFilePermission {
             FileClass::Fifo => FifoFilePermission::Common(self.clone()).into(),
             FileClass::File => FilePermission::Common(self.clone()).into(),
             FileClass::Link => LinkFilePermission::Common(self.clone()).into(),
-            FileClass::Socket => SocketPermission::Common(self.clone()).into(),
+            FileClass::SockFile => SockFilePermission::Common(self.clone()).into(),
         }
     }
 }
@@ -442,6 +713,26 @@ class_permission_enum! {
         /// context. This permission is generally used to control whether an `exec*()` call from a
         /// cloned process that retained a copy of the file descriptor table should succeed.
         Use("use"),
+        // keep-sorted end
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "bpf" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    BpfPermission {
+        // keep-sorted start
+        /// Permission to create a map.
+        MapCreate("map_create"),
+        /// Permission to read from a map.
+        MapRead("map_read"),
+        /// Permission to write on a map.
+        MapWrite("map_write"),
+        /// Permission to load a program.
+        ProgLoad("prog_load"),
+        /// Permission to run a program.
+        ProgRun("prog_run"),
         // keep-sorted end
     }
 }
@@ -536,6 +827,8 @@ class_permission_enum! {
         SetSched("setsched"),
         /// Permission to set the Security Context used when creating new labeled sockets.
         SetSockCreate("setsockcreate"),
+        /// Permission to share resources (e.g. FD table, address-space, etc) with a process.
+        Share("share"),
         /// Permission to send SIGCHLD to a process.
         SigChld("sigchld"),
         /// Permission to send SIGKILL to a process.
@@ -578,7 +871,7 @@ class_permission_enum! {
     /// A well-known "sock_file" class permission in SELinux policy that has a particular meaning in
     /// policy enforcement hooks.
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-    SocketPermission extends CommonFilePermission {
+    SockFilePermission extends CommonFilePermission {
     }
 }
 
@@ -672,9 +965,19 @@ impl<'a, S: AsRef<[u8]> + ?Sized> From<&'a S> for NullessByteStr<'a> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct FileSystemMountSids {
+    pub context: Option<SecurityId>,
+    pub fs_context: Option<SecurityId>,
+    pub def_context: Option<SecurityId>,
+    pub root_context: Option<SecurityId>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct FileSystemLabel {
     pub sid: SecurityId,
     pub scheme: FileSystemLabelingScheme,
+    // Sids obtained by parsing the mount options of the FileSystem.
+    pub mount_sids: FileSystemMountSids,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -682,10 +985,10 @@ pub enum FileSystemLabelingScheme {
     /// This filesystem was mounted with "context=".
     Mountpoint { sid: SecurityId },
     /// This filesystem has an "fs_use_xattr", "fs_use_task", or "fs_use_trans" entry in the
-    /// policy. `root_sid` identifies the context for the root of the filesystem and `def_sid`
-    /// identifies the context to use for unlabeled files in the filesystem (the "default
-    /// context").
-    FsUse { fs_use_type: FsUseType, def_sid: SecurityId, root_sid: Option<SecurityId> },
+    /// policy. `root_sid` identifies the context for the root of the filesystem and
+    /// `computed_def_sid`  identifies the context to use for unlabeled files in the filesystem
+    /// (the "default context").
+    FsUse { fs_use_type: FsUseType, computed_def_sid: SecurityId },
     /// This filesystem has one or more "genfscon" statements associated with it in the policy.
     GenFsCon,
 }

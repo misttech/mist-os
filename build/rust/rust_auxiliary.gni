@@ -3,6 +3,93 @@
 # found in the LICENSE file.
 import("//build/rust/rust_auxiliary_args.gni")
 
+# An internal template for defining targets to collect Rust-related metadata for
+# auxiliary targets (e.g. clippy and rustdoc).
+#
+# Three subtargets are created by this template:
+#
+#  - ${target_name}.deps
+#  - ${target_name}.deps.rmeta
+#  - ${target_name}.transdeps
+#
+# Parameters
+#
+#  deps
+#  data_deps
+#  public_deps
+#  testonly
+#
+template("rust_aux_deps") {
+  _deps_target = "${target_name}.deps"
+  _deps_output = "${target_gen_dir}/${_deps_target}"
+  generated_file(_deps_target) {
+    forward_variables_from(invoker,
+                           [
+                             "data_deps",
+                             "deps",
+                             "public_deps",
+                             "testonly",
+                           ])
+    outputs = [ _deps_output ]
+    visibility = [ ":*" ]
+
+    # rust_rlib is a list of `--extern` flags [0] following the format expected
+    # by rustc. For example:
+    #
+    #   --extern=foo=path/to/libfoo.rlib
+    #
+    # [0] https://doc.rust-lang.org/rustc/command-line-arguments.html#--extern-specify-where-an-external-library-is-located
+    data_keys = [ "rust_rlib" ]
+    walk_keys = [ "rust_barrier" ]
+  }
+
+  # rustdoc only needs to work with rmeta, so we tell it to
+  # use the rmeta to avoid having to download rlibs with remote building.
+  _deps_rmeta_target = "${target_name}.deps.rmeta"
+  action(_deps_rmeta_target) {
+    forward_variables_from(invoker, [ "testonly" ])
+
+    inputs = [ _deps_output ]
+    deps = [ ":${_deps_target}" ]
+    outputs = [ "${target_gen_dir}/${target_name}" ]
+
+    script = "//build/rust/deps_to_rmeta.sh"
+    args = [
+      rebase_path(inputs[0], root_build_dir),
+      rebase_path(outputs[0], root_build_dir),
+    ]
+  }
+
+  _transdeps_target = "${target_name}.transdeps"
+  generated_file(_transdeps_target) {
+    forward_variables_from(invoker,
+                           [
+                             "data_deps",
+                             "deps",
+                             "public_deps",
+                             "testonly",
+                           ])
+    outputs = [ "${target_gen_dir}/${target_name}" ]
+
+    # rust_searchdir is a list of `-Ldependency` flags [0] following the format
+    # expected by rustc. For example:
+    #
+    #   -Ldependency=path/to/lib/dir
+    #
+    # [0] https://doc.rust-lang.org/rustc/command-line-arguments.html#-l-add-a-directory-to-the-library-search-path
+    data_keys = [ "rust_searchdir" ]
+  }
+
+  group(target_name) {
+    forward_variables_from(invoker, [ "testonly" ])
+    public_deps = [
+      ":${_deps_rmeta_target}",
+      ":${_deps_target}",
+      ":${_transdeps_target}",
+    ]
+  }
+}
+
 # Rust targets in GN have two entry points:
 #
 # * rust_{library|proc_macro}, which are invoked directly by third party rust
@@ -12,24 +99,16 @@ import("//build/rust/rust_auxiliary_args.gni")
 # //build/rust/rustc_artifact.gni.
 #
 # * //build/rust/rustc_{library|macro|binary|...}.gni, which is invoked by
-# first party rust code. rustc_artifact renames the target that *actual*ly
-# invokes rustc with a .actual suffix. rustc_artifact contains a group that
-# depends on the .actual subtarget, and an auxiliary .aux group.
+# first party rust code. rustc_artifact contains a group that depends on the
+# .actual subtarget, and an auxiliary .aux group.
 #
-# Rust targets have two auxiliary subtargets: {.actual}?.clippy, and
-# {.actual}?.rustdoc. These auxiliary subtargets are declared in this file.
-# This file is included by the `rust_{library|proc_macro}` targets in
-# BUILDCONFIG.gn. `gen_deps` dependencies on this {.actual?}.aux group can be
-# found in BUILDCONFIG.gn, and `data_deps` dependency on this {.actual?}.aux
-# group can be found in rustc_artifact.
+# Rust targets have two auxiliary subtargets: .clippy, and .rustdoc. These
+# auxiliary subtargets are declared in this file.
 #
-# Clippy is only built for first party targets, because these are the only
-# crates that Fuchsia developers can take action on. Rustdoc targets are
-# *generated* (a la `gen_deps`) for both first and third party targets. Rustdoc
-# subtargets can be opted out with `disable_rustdoc` on a per-target basis. Doc
-# failures are only actionable for first party crates, so when `fx build` is run,
-# docs are built only for first party crates. Actually building first party
-# rustdoc subtargets can be opted in with `include_rustdoc` on a global basis.
+# Clippy and rustdoc targets are only built for first-party targets, because
+# these are the only crates that Fuchsia developers can take action on. The
+# `rust_{library|proc_macro}` wrappers in BUILDCONFIG.gn define .dep targets,
+# which provide the necessary metadata for first-party Rust auxiliary targets.
 #
 # There are two groups: the one declared in this file, and the one declared in
 # rustc_artifact.gni. The group declared in rustc_artifact is needed to enable
@@ -41,9 +120,9 @@ import("//build/rust/rust_auxiliary_args.gni")
 #     ---------------------                   ------------------------
 # <:foo> (group)                          <:foo> (alias)
 # ├───<:foo.actual> (rust_library)        ╰───<:foo-v0_1_0> (rust_library)
-# ╰───<:foo.aux> (group)                      ╰───<:foo.aux> (group)
-#     ├───<:foo.actual.clippy>                    ╰───<:foo.actual.rustdoc>
-#     ╰───<:foo.actual.rustdoc>
+# ╰───<:foo.aux> (group)                      ╰───<:foo.aux.deps> (group)
+#     ├───<:foo.clippy>
+#     ╰───<:foo.rustdoc>
 #
 # The .rustdoc subtargets are also consumed by `fx rustdoc-link`
 # (//tools/devshell/contrib/lib/rust/rustdoc-link.py). This script respects
@@ -51,6 +130,7 @@ import("//build/rust/rust_auxiliary_args.gni")
 # inspecting a `rust_target_mapping.json` file in the build dir. It explicitly
 # builds all enabled docs, bypassing `include_rustdoc`, and merges their docs
 # to a central location.
+#
 template("rust_auxiliary") {
   # redefined in rustdoc tests
   if (defined(invoker.rustdoc_out_dir)) {
@@ -106,53 +186,17 @@ template("rust_auxiliary") {
   forward_variables_from(invoker, [ "aliased_deps" ])
 
   if (_define_rustdoc || _define_clippy) {
-    _deps_file = "$target_name.deps"
-    generated_file(_deps_file) {
+    _aux_deps_target = "${target_name}.deps"
+    _deps_rmeta_output = "${target_gen_dir}/${_aux_deps_target}.deps.rmeta"
+    _transdeps_output = "${target_gen_dir}/${_aux_deps_target}.transdeps"
+    rust_aux_deps(_aux_deps_target) {
       forward_variables_from(invoker,
                              [
-                               "testonly",
-                               "public_deps",
                                "data_deps",
+                               "public_deps",
+                               "testonly",
                              ])
       deps = _invoker_deps
-      visibility = [ ":*" ]
-      outputs = [ "$target_gen_dir/$target_name" ]
-      data_keys = [ "rlib" ]
-      walk_keys = [ "rust_barrier" ]
-    }
-
-    # rustdoc only needs to work with rmeta, so we tell it to
-    # use the rmeta to avoid having to download rlibs with remote building.
-    _deps_file_rmeta = "$_deps_file.rmeta"
-    action(_deps_file_rmeta) {
-      forward_variables_from(invoker, [ "testonly" ])
-      script = "//build/rust/deps_to_rmeta.sh"
-      _dep_input = "$target_gen_dir/$_deps_file"
-      deps = [ ":${_deps_file}" ]
-      inputs = [ _dep_input ]
-      outputs = [ "$target_gen_dir/$target_name" ]
-      args = [
-        rebase_path(_dep_input, root_build_dir),
-        rebase_path(outputs[0], root_build_dir),
-      ]
-    }
-  } else {
-    not_needed([ "_invoker_deps" ])
-  }
-
-  if (_define_rustdoc || _define_clippy) {
-    _transdeps_file = "$target_name.transdeps"
-    generated_file(_transdeps_file) {
-      forward_variables_from(invoker,
-                             [
-                               "testonly",
-                               "public_deps",
-                               "data_deps",
-                             ])
-      deps = _invoker_deps
-      visibility = [ ":*" ]
-      outputs = [ "$target_gen_dir/$target_name" ]
-      data_keys = [ "searchdir" ]
     }
   } else {
     not_needed([ "_invoker_deps" ])
@@ -176,19 +220,15 @@ template("rust_auxiliary") {
         quiet_clippy = false
       }
 
-      deps = _invoker_deps
-      deps += [
-        ":$_deps_file_rmeta",
-        ":$_transdeps_file",
-      ]
+      deps = _invoker_deps + [ ":${_aux_deps_target}" ]
       if (defined(invoker.non_rust_deps)) {
         deps += invoker.non_rust_deps
       }
       mnemonic = "CLIPPY"
 
       inputs = [
-        "$target_gen_dir/$_deps_file_rmeta",
-        "$target_gen_dir/$_transdeps_file",
+        _deps_rmeta_output,
+        _transdeps_output,
       ]
       script = "//build/rust/clippy_wrapper.sh"
 
@@ -202,9 +242,9 @@ template("rust_auxiliary") {
         "--jq",
         rebase_path(_jq, root_build_dir),
         "--deps",
-        rebase_path("$target_gen_dir/$_deps_file_rmeta", root_build_dir),
+        rebase_path(_deps_rmeta_output, root_build_dir),
         "--transdeps",
-        rebase_path("$target_gen_dir/$_transdeps_file", root_build_dir),
+        rebase_path(_transdeps_output, root_build_dir),
       ]
 
       if (quiet_clippy) {
@@ -227,9 +267,9 @@ template("rust_auxiliary") {
         args += invoker.rustenv
       }
       args += [
-        "$rebased_rustc_prefix/bin/clippy-driver",
+        "${rebased_rustc_prefix}/bin/clippy-driver",
         rebase_path(invoker.crate_root, root_build_dir),
-        "--sysroot=$rebased_rustc_prefix",
+        "--sysroot=${rebased_rustc_prefix}",
         "--crate-type=${invoker.rust_crate_type}",
       ]
 
@@ -296,10 +336,7 @@ template("rust_auxiliary") {
                              ])
       script = "//build/rust/rustdoc_wrapper.py"
       mnemonic = "DOC"
-      deps = _invoker_deps + [
-               ":$_deps_file_rmeta",
-               ":$_transdeps_file",
-             ]
+      deps = _invoker_deps + [ ":${_aux_deps_target}" ]
 
       if (defined(invoker.non_rust_deps)) {
         deps += invoker.non_rust_deps
@@ -327,26 +364,26 @@ template("rust_auxiliary") {
       }
 
       # touched by rustdoc_wrapper.py on successful doc
-      _rustdoc_stamp_output = "$_rustdoc_out_dir.touch"
+      _rustdoc_stamp_output = "${_rustdoc_out_dir}.touch"
       outputs = [ _rustdoc_stamp_output ]
       if (defined(zip_rustdoc_to)) {
         outputs += [ zip_rustdoc_to ]
       }
       _rebased_target_gen_dir = rebase_path(target_gen_dir, root_build_dir)
       if (is_fuchsia) {
-        _extern_html_root_url = "$rustdoc_extern_html_root_url_base"
+        _extern_html_root_url = "${rustdoc_extern_html_root_url_base}"
       } else {
-        _extern_html_root_url = "$rustdoc_extern_html_root_url_base/host"
+        _extern_html_root_url = "${rustdoc_extern_html_root_url_base}/host"
       }
 
       args = [
         "--touch",
         rebase_path(_rustdoc_stamp_output, root_build_dir),
-        "@$_rebased_target_gen_dir/$_deps_file_rmeta",
+        "@${_rebased_target_gen_dir}/${_deps_file_rmeta}",
         "--extern-html-root-url=$_extern_html_root_url",
       ]
       if (defined(aliased_deps)) {
-        _aliased_deps_map = "$target_gen_dir/$target_name.aliased-deps"
+        _aliased_deps_map = "${target_gen_dir}/${target_name}.aliased-deps"
         write_file(_aliased_deps_map, aliased_deps, "json")
         args += [
           "--aliased-deps-map",
@@ -354,10 +391,10 @@ template("rust_auxiliary") {
         ]
       }
       if (quiet_rustdoc) {
-        _dir = rebase_path("$target_gen_dir/$target_name", root_build_dir)
+        _dir = rebase_path("${target_gen_dir}/${target_name}", root_build_dir)
         args += [
-          "--stdout-path=$_dir.stdout",
-          "--stderr-path=$_dir.stderr",
+          "--stdout-path=${_dir}.stdout",
+          "--stderr-path=${_dir}.stderr",
           "--no-fail",
         ]
       }
@@ -379,17 +416,17 @@ template("rust_auxiliary") {
         args += invoker.rustenv
       }
       args += [
-        "$rebased_rustc_prefix/bin/rustdoc",
+        "${rebased_rustc_prefix}/bin/rustdoc",
 
         # rustdoc will receive remaining arguments
         rebase_path(crate_root, root_build_dir),
         "-Zunstable-options",
         "--out-dir",
         rebase_path(_rustdoc_out_dir, root_build_dir),
-        "@$_rebased_target_gen_dir/$_transdeps_file",
-        "--sysroot=$rebased_rustc_prefix",
-        "--crate-type=$rust_crate_type",
-        "--crate-name=$_crate_name",
+        "@${_rebased_target_gen_dir}/${_transdeps_file}",
+        "--sysroot=${rebased_rustc_prefix}",
+        "--crate-type=${rust_crate_type}",
+        "--crate-name=${_crate_name}",
         "{{rustflags}}",
       ]
       args += invoker.rustflags
@@ -426,9 +463,8 @@ template("rust_auxiliary") {
                              "testonly",
                              "visibility",
                            ])
-
     if (defined(visibility)) {
-      visibility += [ ":$_actual_name" ]
+      visibility += [ ":${_actual_name}" ]
     }
 
     gen_deps = []
@@ -437,17 +473,17 @@ template("rust_auxiliary") {
         defined(invoker.include_rustdoc_first_party) &&
         invoker.include_rustdoc_first_party
     if (_define_rustdoc) {
-      gen_deps += [ ":$_rustdoc_name" ]
+      gen_deps += [ ":${_rustdoc_name}" ]
     }
     if (_define_rustdoc && _include_rustdoc_first_party) {
-      data_deps += [ ":$_rustdoc_name" ]
+      data_deps += [ ":${_rustdoc_name}" ]
     }
 
     if (_define_clippy) {
-      gen_deps += [ ":$_clippy_name" ]
+      gen_deps += [ ":${_clippy_name}" ]
     }
     if (_define_clippy && include_clippy) {
-      data_deps += [ ":$_clippy_name" ]
+      data_deps += [ ":${_clippy_name}" ]
     }
 
     assert(invoker.rust_crate_type != "lib",
@@ -478,17 +514,17 @@ template("rust_auxiliary") {
           disable_rustdoc = !_define_rustdoc
           disable_clippy = !_define_clippy
           rustdoc_label =
-              get_label_info(":$_rustdoc_name", "label_with_toolchain")
+              get_label_info(":${_rustdoc_name}", "label_with_toolchain")
           clippy_label =
-              get_label_info(":$_clippy_name", "label_with_toolchain")
+              get_label_info(":${_clippy_name}", "label_with_toolchain")
           actual_label =
-              get_label_info(":$_actual_name", "label_with_toolchain")
-          original_label =
-              get_label_info(":$_original_target_name", "label_with_toolchain")
+              get_label_info(":${_actual_name}", "label_with_toolchain")
+          original_label = get_label_info(":${_original_target_name}",
+                                          "label_with_toolchain")
           rustdoc_out_dir = rebase_path(_rustdoc_out_dir, root_build_dir)
           if (_can_have_reverse_deps) {
-            extern = "--extern=$_crate_name=$_rlib_path"
-            searchdir = "-Ldependency=$_searchdir_path"
+            extern = "--extern=${_crate_name}=${_rlib_path}"
+            searchdir = "-Ldependency=${_searchdir_path}"
           }
           target = current_target_tuple
           clippy_output = rebase_path(_clippy_output, root_build_dir)

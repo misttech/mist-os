@@ -3,5 +3,5 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /third_party/rust_crates/ask2patch/csv/OWNERS
-include /third_party/rust_crates/vendor/serde_json-1.0.87/OWNERS
+include /third_party/rust_crates/vendor/serde_json-1.0.128/OWNERS
 include /third_party/rust_crates/vendor/serde_yaml-0.9.14/OWNERS

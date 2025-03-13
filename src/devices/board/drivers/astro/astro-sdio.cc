@@ -11,6 +11,7 @@
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/mmio/mmio.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zircon-internal/align.h>
 
 #include <bind/fuchsia/broadcom/platform/cpp/bind.h>
@@ -46,7 +47,7 @@ constexpr uint32_t kGpioBaseOffset = S905D2_GPIO_BASE - kGpioBase;
 
 static const std::vector<fpbus::BootMetadata> wifi_boot_metadata{
     {{
-        .zbi_type = DEVICE_METADATA_MAC_ADDRESS,
+        .zbi_type = ZBI_TYPE_DRV_MAC_ADDRESS,
         .zbi_extra = MACADDR_WIFI,
     }},
 };

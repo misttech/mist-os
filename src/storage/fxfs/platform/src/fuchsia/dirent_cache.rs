@@ -3,12 +3,13 @@
 // found in the LICENSE file.
 
 use crate::fuchsia::node::FxNode;
+use fuchsia_sync::Mutex;
 use fxfs::object_handle::INVALID_OBJECT_ID;
 use linked_hash_map::LinkedHashMap;
 use rustc_hash::FxHasher;
 use std::borrow::Borrow;
 use std::hash::{BuildHasherDefault, Hash, Hasher};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 enum CacheHolder {
     Node(Arc<dyn FxNode>),
@@ -55,7 +56,7 @@ impl DirentCache {
     pub fn new(limit: usize) -> Self {
         Self {
             inner: Mutex::new(DirentCacheInner {
-                lru: linked_hash_map_with_capacity(limit + 1),
+                lru: create_linked_hash_map(),
                 limit,
                 timer_in_queue: false,
             }),
@@ -64,19 +65,19 @@ impl DirentCache {
 
     /// Fetch the limit for the cache.
     pub fn limit(&self) -> usize {
-        self.inner.lock().unwrap().limit
+        self.inner.lock().limit
     }
 
     /// Returns the number of elements in the cache.
     pub fn len(&self) -> usize {
-        self.inner.lock().unwrap().lru.len()
+        self.inner.lock().lru.len()
     }
 
     /// Lookup directory entry by name and directory object id.
     pub fn lookup(&self, key: &(u64, &str)) -> Option<Arc<dyn FxNode>> {
         assert_ne!(key.0, INVALID_OBJECT_ID, "Looked up dirent key reserved for timer.");
         if let CacheHolder::Node(node) =
-            self.inner.lock().unwrap().lru.get_refresh(key as &dyn DirentCacheKeyRef)?
+            self.inner.lock().lru.get_refresh(key as &dyn DirentCacheKeyRef)?
         {
             return Some(node.clone());
         }
@@ -86,22 +87,20 @@ impl DirentCache {
     /// Insert an object id for a directory entry.
     pub fn insert(&self, dir_id: u64, name: String, node: Arc<dyn FxNode>) {
         assert_ne!(dir_id, INVALID_OBJECT_ID, "Looked up dirent key reserved for timer.");
-        let _dropped =
-            self.inner.lock().unwrap().insert_internal(dir_id, name, CacheHolder::Node(node));
+        let _dropped = self.inner.lock().insert_internal(dir_id, name, CacheHolder::Node(node));
     }
 
     /// Remove an entry from the cache.
     pub fn remove(&self, key: &(u64, &str)) {
-        let _dropped_item = self.inner.lock().unwrap().lru.remove(key as &dyn DirentCacheKeyRef);
+        let _dropped_item = self.inner.lock().lru.remove(key as &dyn DirentCacheKeyRef);
     }
 
     /// Remove all items from the cache.
     pub fn clear(&self) {
         let _dropped = {
-            let mut this = self.inner.lock().unwrap();
+            let mut this = self.inner.lock();
             this.timer_in_queue = false;
-            let limit = this.limit;
-            std::mem::replace(&mut this.lru, linked_hash_map_with_capacity(limit + 1))
+            std::mem::replace(&mut this.lru, create_linked_hash_map())
         };
     }
 
@@ -110,9 +109,13 @@ impl DirentCache {
         #[allow(clippy::collection_is_never_read)]
         let mut dropped_items;
         {
-            let mut this = self.inner.lock().unwrap();
+            let mut this = self.inner.lock();
+
             this.limit = limit;
             if this.lru.len() <= limit {
+                if this.lru.capacity() > limit {
+                    this.lru.shrink_to_fit();
+                }
                 return;
             }
             dropped_items = Vec::with_capacity(this.lru.len() - limit);
@@ -122,6 +125,7 @@ impl DirentCache {
                     CacheHolder::Timer => this.timer_in_queue = false,
                 }
             }
+            this.lru.shrink_to_fit();
         }
     }
 
@@ -132,7 +136,7 @@ impl DirentCache {
         #[allow(clippy::collection_is_never_read)]
         let mut dropped_items = Vec::new();
         {
-            let mut this = self.inner.lock().unwrap();
+            let mut this = self.inner.lock();
             if this.timer_in_queue {
                 while let CacheHolder::Node(node) = this.lru.pop_front().unwrap().1 {
                     dropped_items.push(node);
@@ -152,10 +156,9 @@ impl DirentCache {
     }
 }
 
-fn linked_hash_map_with_capacity(
-    capacity: usize,
+fn create_linked_hash_map(
 ) -> LinkedHashMap<DirentCacheKey, CacheHolder, BuildHasherDefault<FxHasher>> {
-    LinkedHashMap::with_capacity_and_hasher(capacity, BuildHasherDefault::<FxHasher>::default())
+    LinkedHashMap::with_hasher(BuildHasherDefault::<FxHasher>::default())
 }
 
 /// Hash function for both `DirentCacheKey` and `DirentCacheKeyRef` to ensure that both types hash
@@ -249,7 +252,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_simple_lru() {
+    fn test_simple_lru() {
         let cache = DirentCache::new(5);
         for i in 1..6 {
             cache.insert(1, i.to_string(), Arc::new(FakeNode(i)));
@@ -285,7 +288,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_change_limit() {
+    fn test_change_limit() {
         let cache = DirentCache::new(10);
 
         for i in 1..16 {
@@ -311,7 +314,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_cache_clear() {
+    fn test_cache_clear() {
         let cache = DirentCache::new(10);
 
         for i in 1..6 {
@@ -331,7 +334,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_timeout() {
+    fn test_timeout() {
         let cache = DirentCache::new(20);
 
         cache.recycle_stale_files();
@@ -357,5 +360,32 @@ mod tests {
                 None => assert_eq!(i % 2, 0, "Odd number {} missing.", i),
             }
         }
+    }
+
+    #[fuchsia::test]
+    fn test_set_limit_changes_capacity_when_above_limit() {
+        const CACHE_SIZE: usize = 1024;
+        let cache = DirentCache::new(CACHE_SIZE);
+        for i in 0..CACHE_SIZE {
+            cache.insert(1, i.to_string(), Arc::new(FakeNode(i as u64)));
+        }
+        assert!(cache.inner.lock().lru.capacity() >= CACHE_SIZE);
+        cache.set_limit(8);
+        assert!(cache.inner.lock().lru.capacity() < CACHE_SIZE);
+    }
+
+    #[fuchsia::test]
+    fn test_set_limit_changes_capacity_when_below_limit() {
+        const CACHE_SIZE: usize = 1024;
+        let cache = DirentCache::new(CACHE_SIZE);
+        for i in 0..CACHE_SIZE {
+            cache.insert(1, i.to_string(), Arc::new(FakeNode(i as u64)));
+        }
+        assert!(cache.inner.lock().lru.capacity() >= CACHE_SIZE);
+        cache.recycle_stale_files();
+        cache.recycle_stale_files(); // Remove everything from the cache.
+        assert_eq!(cache.inner.lock().lru.len(), 0);
+        cache.set_limit(8);
+        assert!(cache.inner.lock().lru.capacity() < CACHE_SIZE);
     }
 }

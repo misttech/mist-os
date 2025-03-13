@@ -15,6 +15,7 @@ ffx_plugin("ffx_wlan_ap") {
     "//src/connectivity/wlan/wlancfg/tool/policy:donut-lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/target/holders:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//src/developer/ffx/plugins/wlan/common:ffx-wlan-common",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",

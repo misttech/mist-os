@@ -123,7 +123,7 @@ func GetCoverageDataFromTest(t *testing.T, outDir string, config *Config) []stri
 	defer cancel()
 
 	runnerCtx := context.Background()
-	ffxInstance, err := ffxutil.NewFFXInstance(runnerCtx, config.Bin.Ffx, "", os.Environ(), defaultNodename, "", outDir)
+	ffxInstance, err := ffxutil.NewFFXInstance(runnerCtx, config.Bin.Ffx, "", os.Environ(), defaultNodename, "", outDir, ffxutil.UseFFXLegacy)
 	if err != nil {
 		t.Fatalf("Cannot create Ffx instance. Reason: %s", err)
 	}

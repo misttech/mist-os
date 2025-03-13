@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use super::super::timer::Timers;
+use super::atomic_future::{AtomicFuture, AttemptPollResult};
 use super::packets::{PacketReceiver, PacketReceiverMap, ReceiverRegistration};
 use super::scope::ScopeHandle;
 use super::time::{BootInstant, MonotonicInstant};
-use crate::atomic_future::{AtomicFuture, AttemptPollResult};
 use crossbeam::queue::SegQueue;
 use fuchsia_sync::Mutex;
 use zx::BootDuration;
@@ -707,7 +707,7 @@ impl EHandle {
     /// to create shorter-lived child scopes.
     ///
     /// Most users should create an owned scope with
-    /// [`Scope::new`][crate::Scope::new] instead of using this method.
+    /// [`Scope::new_with_name`][crate::Scope::new_with_name] instead of using this method.
     pub fn global_scope(&self) -> &ScopeHandle {
         &self.root_scope
     }

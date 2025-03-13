@@ -376,7 +376,12 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
     ///   instead of the default configuration.
     /// - kernel commandline if present. This is currently needed for GPT images to pass kernel
     ///   parameters, as zedboot is not passing them through.
-    async fn embed_boot_data(ctx: &EnvironmentContext, src: &PathBuf, dest: &PathBuf, cmdline: Option<String>) -> Result<()> {
+    async fn embed_boot_data(
+        ctx: &EnvironmentContext,
+        src: &PathBuf,
+        dest: &PathBuf,
+        cmdline: Option<String>,
+    ) -> Result<()> {
         let zbi_tool = get_host_tool(config::ZBI_HOST_TOOL)
             .await
             .map_err(|e| bug!("ZBI tool is missing: {e}"))?;
@@ -882,9 +887,8 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             match response_iter.next() {
                 Some(Ok(data)) => {
                     if let Some(return_string) = data.get("return") {
-                        let port_pairs = Self::parse_return_string(
-                            return_string.as_str().unwrap_or_else(|| ""),
-                        )?;
+                        let port_pairs =
+                            Self::parse_return_string(return_string.as_str().unwrap_or(""))?;
                         let mut modified = false;
                         // Iterate over the parsed port pairs, then find the matching entry in
                         // the port map.

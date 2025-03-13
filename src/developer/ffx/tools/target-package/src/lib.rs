@@ -107,7 +107,7 @@ fn parse_resolver(flag: &str) -> Result<fdash::FuchsiaPkgResolver, String> {
 
 #[async_trait::async_trait(?Send)]
 impl fho::FfxMain for TargetPackageTool {
-    type Writer = fho::SimpleWriter;
+    type Writer = ffx_writer::SimpleWriter;
     async fn main(self, _: Self::Writer) -> fho::Result<()> {
         match self.cmd.subcommand {
             TargetPackageSubCommand::Explore(command) =>

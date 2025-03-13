@@ -18,6 +18,6 @@ executable("bin") {
   ]
 }
 
-fuchsia_shell_package("audio-codec-ctl") {
+fuchsia_package("audio-codec-ctl") {
   deps = [ ":bin" ]
 }

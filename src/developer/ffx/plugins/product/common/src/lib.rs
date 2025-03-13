@@ -1,7 +1,8 @@
 // Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use fho::{Result, VerifiedMachineWriter};
+use ffx_writer::VerifiedMachineWriter;
+use fho::Result;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
@@ -72,7 +73,7 @@ impl<T: Serialize + JsonSchema> MachineUi<T> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use fho::{Format, TestBuffers};
+    use ffx_writer::{Format, TestBuffers};
 
     #[derive(Debug, Serialize, JsonSchema)]
     struct TestBundle {

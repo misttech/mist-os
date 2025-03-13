@@ -3,6 +3,7 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /src/developer/ffx/OWNERS
+include /src/developer/ffx/lib/emulator_instance/OWNERS
 include /src/lib/usb_rs/OWNERS
 include /src/sys/lib/notify-batch-watcher/OWNERS
 include /src/sys/pkg/OWNERS

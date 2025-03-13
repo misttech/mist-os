@@ -11,8 +11,8 @@ use nom::branch::alt;
 use nom::bytes::complete::{escaped, is_not, tag};
 use nom::character::complete::{char, one_of};
 use nom::combinator::{map, opt};
-use nom::sequence::{delimited, tuple};
-use nom::IResult;
+use nom::sequence::delimited;
+use nom::{IResult, Parser};
 use std::collections::HashSet;
 
 #[derive(Debug, PartialEq)]
@@ -46,23 +46,23 @@ impl<'a> TryFrom<&'a str> for Ast<'a> {
 }
 
 fn keyword_composite(input: NomSpan) -> IResult<NomSpan, NomSpan, BindParserError> {
-    ws(map_err(tag("composite"), BindParserError::CompositeKeyword))(input)
+    ws(map_err(tag("composite"), BindParserError::CompositeKeyword)).parse(input)
 }
 
 fn keyword_node(input: NomSpan) -> IResult<NomSpan, NomSpan, BindParserError> {
-    ws(map_err(tag("node"), BindParserError::NodeKeyword))(input)
+    ws(map_err(tag("node"), BindParserError::NodeKeyword)).parse(input)
 }
 
 fn keyword_primary(input: NomSpan) -> IResult<NomSpan, NomSpan, BindParserError> {
-    ws(map_err(tag("primary"), BindParserError::PrimaryOrOptionalKeyword))(input)
+    ws(map_err(tag("primary"), BindParserError::PrimaryOrOptionalKeyword)).parse(input)
 }
 
 fn keyword_optional(input: NomSpan) -> IResult<NomSpan, NomSpan, BindParserError> {
-    ws(map_err(tag("optional"), BindParserError::PrimaryOrOptionalKeyword))(input)
+    ws(map_err(tag("optional"), BindParserError::PrimaryOrOptionalKeyword)).parse(input)
 }
 
 fn node_type(input: NomSpan) -> IResult<NomSpan, NodeType, BindParserError> {
-    let (input, keyword) = opt(alt((keyword_optional, keyword_primary)))(input)?;
+    let (input, keyword) = opt(alt((keyword_optional, keyword_primary))).parse(input)?;
     match keyword {
         Some(kw) => match kw.fragment() {
             &"optional" => Ok((input, NodeType::Optional)),
@@ -77,21 +77,20 @@ fn node_type(input: NomSpan) -> IResult<NomSpan, NodeType, BindParserError> {
 
 fn composite_name(input: NomSpan) -> IResult<NomSpan, CompoundIdentifier, BindParserError> {
     let terminator = ws(map_err(tag(";"), BindParserError::Semicolon));
-    delimited(keyword_composite, ws(compound_identifier), terminator)(input)
+    delimited(keyword_composite, ws(compound_identifier), terminator).parse(input)
 }
 
 fn node_name(input: NomSpan) -> IResult<NomSpan, String, BindParserError> {
     let escapable = escaped(is_not(r#"\""#), '\\', one_of(r#"\""#));
     let literal = delimited(char('"'), escapable, char('"'));
-    map_err(map(literal, |s: NomSpan| s.fragment().to_string()), BindParserError::InvalidNodeName)(
-        input,
-    )
+    map_err(map(literal, |s: NomSpan| s.fragment().to_string()), BindParserError::InvalidNodeName)
+        .parse(input)
 }
 
 fn node(input: NomSpan) -> IResult<NomSpan, (NodeType, String, Vec<Statement>), BindParserError> {
     let (input, node_type) = node_type(input)?;
     let (input, _node) = keyword_node(input)?;
-    let (input, node_name) = ws(node_name)(input)?;
+    let (input, node_name) = ws(node_name).parse(input)?;
 
     let (input, statements) = statement_block(input)?;
     return Ok((input, (node_type, node_name, statements)));
@@ -100,7 +99,7 @@ fn node(input: NomSpan) -> IResult<NomSpan, (NodeType, String, Vec<Statement>), 
 fn composite<'a>(input: NomSpan<'a>) -> IResult<NomSpan, Ast, BindParserError> {
     let nodes =
         |input: NomSpan<'a>| -> IResult<NomSpan, (Node<'a>, Vec<Node<'a>>, Vec<Node<'a>>), BindParserError> {
-            let (input, nodes) = many_until_eof(ws(node))(input)?;
+            let (input, nodes) = many_until_eof(ws(node)).parse(input)?;
             if nodes.is_empty() {
                 return Err(nom::Err::Error(BindParserError::NoNodes(input.to_string())));
             }
@@ -139,7 +138,7 @@ fn composite<'a>(input: NomSpan<'a>) -> IResult<NomSpan, Ast, BindParserError> {
             return Err(nom::Err::Error(BindParserError::OnePrimaryNode(input.to_string())));
         };
     map(
-        tuple((ws(composite_name), ws(using_list), nodes)),
+        (ws(composite_name), ws(using_list), nodes),
         |(name, using, (primary_node, additional_nodes, optional_nodes))| Ast {
             name,
             using,
@@ -147,7 +146,8 @@ fn composite<'a>(input: NomSpan<'a>) -> IResult<NomSpan, Ast, BindParserError> {
             additional_nodes,
             optional_nodes,
         },
-    )(input)
+    )
+    .parse(input)
 }
 
 #[cfg(test)]

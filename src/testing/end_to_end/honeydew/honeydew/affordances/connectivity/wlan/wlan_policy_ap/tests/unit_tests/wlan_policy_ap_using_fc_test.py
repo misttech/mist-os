@@ -14,6 +14,7 @@ import fidl.fuchsia_wlan_common as f_wlan_common
 import fidl.fuchsia_wlan_policy as f_wlan_policy
 from fuchsia_controller_py import Channel, ZxStatus
 
+from honeydew import affordances_capable
 from honeydew.affordances.connectivity.wlan.utils.errors import (
     HoneydewWlanError,
 )
@@ -29,9 +30,10 @@ from honeydew.affordances.connectivity.wlan.wlan_policy_ap import (
     wlan_policy_ap_using_fc,
 )
 from honeydew.errors import NotSupportedError
-from honeydew.interfaces.device_classes import affordances_capable
-from honeydew.transports import ffx as ffx_transport
-from honeydew.transports import fuchsia_controller as fc_transport
+from honeydew.transports.ffx import ffx as ffx_transport
+from honeydew.transports.fuchsia_controller import (
+    fuchsia_controller as fc_transport,
+)
 
 _TEST_SSID = "ThepromisedLAN"
 _TEST_SSID_BYTES = list(str.encode(_TEST_SSID))
@@ -204,13 +206,8 @@ class WlanPolicyApFCTests(unittest.TestCase):
 
     def test_init_connect_proxy(self) -> None:
         """Verify WlanPolicyAp connects to
-        fuchsia.wlan.policy/AccessPointProvider and AccessPointListener."""
-        self.assertIsNotNone(
-            self.wlan_policy_ap_obj._access_point_provider_proxy
-        )
-        self.assertIsNotNone(
-            self.wlan_policy_ap_obj._access_point_listener_proxy
-        )
+        fuchsia.wlan.policy/AccessPointProvider."""
+        self.assertIsNotNone(self.wlan_policy_ap_obj._access_point_controller)
 
     def test_start(self) -> None:
         """Verify WlanPolicyAp.start()."""

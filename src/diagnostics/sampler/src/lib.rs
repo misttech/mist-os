@@ -1,6 +1,8 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
+use crate::config::SamplerConfig;
 use anyhow::{Context, Error};
 use argh::FromArgs;
 use fuchsia_component::client::connect_to_protocol;
@@ -10,11 +12,9 @@ use fuchsia_inspect::{self as inspect};
 use futures::{StreamExt, TryStreamExt};
 use log::{info, warn};
 use sampler_component_config::Config as ComponentConfig;
-use {
-    fidl_fuchsia_hardware_power_statecontrol as reboot, fuchsia_async as fasync,
-    sampler_config as config,
-};
+use {fidl_fuchsia_hardware_power_statecontrol as reboot, fuchsia_async as fasync};
 
+mod config;
 mod diagnostics;
 mod executor;
 
@@ -42,63 +42,34 @@ pub async fn main() -> Result<(), Error> {
     // Starting service.
     inspect::component::health().set_starting_up();
 
-    let component_config = ComponentConfig::take_from_startup_handle();
-    inspector
-        .root()
-        .record_child("config", |config_node| component_config.record_inspect(config_node));
+    let sampler_config = SamplerConfig::new(ComponentConfig::take_from_startup_handle())?;
 
-    let sampler_config = format!("{}/metrics", component_config.configs_path);
-    let fire_config = format!("{}/fire", component_config.configs_path);
+    // Create endpoint for the reboot watcher register.
+    let (reboot_watcher_client, reboot_watcher_request_stream) =
+        fidl::endpoints::create_request_stream::<reboot::RebootWatcherMarker>();
 
-    match config::SamplerConfigBuilder::default()
-        .minimum_sample_rate_sec(component_config.minimum_sample_rate_sec)
-        .sampler_dir(sampler_config)
-        .fire_dir(fire_config)
-        .load()
     {
-        Ok(sampler_config) => {
-            // Create endpoint for the reboot watcher register.
-            let (reboot_watcher_client, reboot_watcher_request_stream) =
-                fidl::endpoints::create_request_stream::<reboot::RebootWatcherMarker>();
+        // Let the transient connection fall out of scope once we've passed the client
+        // end to our callback server.
+        let reboot_watcher_register =
+            connect_to_protocol::<reboot::RebootMethodsWatcherRegisterMarker>()
+                .context("Connect to Reboot watcher register")?;
 
-            {
-                // Let the transient connection fall out of scope once we've passed the client
-                // end to our callback server.
-                let reboot_watcher_register =
-                    connect_to_protocol::<reboot::RebootMethodsWatcherRegisterMarker>()
-                        .context("Connect to Reboot watcher register")?;
-
-                reboot_watcher_register
-                    .register_watcher(reboot_watcher_client)
-                    .await
-                    .context("Providing the reboot register with callback channel.")?;
-            }
-
-            info!("publishing inspect");
-            sampler_config.publish_inspect(inspector.root());
-
-            let sampler_executor = executor::SamplerExecutor::new(sampler_config.clone()).await?;
-
-            // Trigger the project samplers and returns a TaskCancellation struct used to trigger
-            // reboot shutdown of sampler.
-            let task_canceller = sampler_executor.execute();
-
-            inspect::component::health().set_ok();
-            reboot_watcher(reboot_watcher_request_stream, task_canceller).await;
-
-            // Keep the original config around until termination.
-            // Otherwise we cannot inspect its value.
-            let _sampler_config = sampler_config;
-            Ok(())
-        }
-        Err(e) => {
-            warn!(
-                "Failed to parse sampler configurations from /config/data/(metrics|fire): {:?}",
-                e
-            );
-            Ok(())
-        }
+        reboot_watcher_register
+            .register_watcher(reboot_watcher_client)
+            .await
+            .context("Providing the reboot register with callback channel.")?;
     }
+
+    let sampler_executor = executor::SamplerExecutor::new(sampler_config).await?;
+
+    // Trigger the project samplers and returns a TaskCancellation struct used to trigger
+    // reboot shutdown of sampler.
+    let task_canceller = sampler_executor.execute();
+
+    inspect::component::health().set_ok();
+    reboot_watcher(reboot_watcher_request_stream, task_canceller).await;
+    Ok(())
 }
 
 async fn reboot_watcher(

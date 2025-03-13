@@ -337,11 +337,11 @@ mod test {
     }
 
     impl DiagnosticsProvider for FakeProvider {
-        async fn snapshot<D: diagnostics_data::DiagnosticsData>(
+        async fn snapshot(
             &self,
             _: Option<&str>,
             _: impl IntoIterator<Item = Selector>,
-        ) -> Result<Vec<diagnostics_data::Data<D>>, Error> {
+        ) -> Result<Vec<diagnostics_data::Data<diagnostics_data::Inspect>>, Error> {
             unreachable!("unimplemented");
         }
 

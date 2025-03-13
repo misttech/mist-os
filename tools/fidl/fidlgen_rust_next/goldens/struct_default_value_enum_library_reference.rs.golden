@@ -3,22 +3,35 @@
 #![allow(unused_parens, unused_variables, unused_mut, unused_imports, unreachable_code)]
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct Foo {
-    pub field: fidl_next_test_dependent::MyEnum,
+    pub field: ::fidl_next_test_dependent::MyEnum,
 }
 
 impl ::fidl_next::Encodable for Foo {
-    type Encoded<'buf> = WireFoo;
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true
+
+                && <
+                    ::fidl_next_test_dependent::MyEnum as ::fidl_next::Encodable
+                >::COPY_OPTIMIZATION.is_enabled()
+
+        )
+    };
+
+    type Encoded = WireFoo;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for Foo
 where
-    fidl_next_test_dependent::MyEnum: ::fidl_next::Encode<___E>,
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -34,7 +47,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<Foo> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireFoo>;
+    type EncodedOption = ::fidl_next::WireBox<WireFoo>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<Foo>
@@ -42,10 +55,11 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     Foo: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -59,8 +73,20 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireFoo> for Foo {
-    fn take_from(from: &mut WireFoo) -> Self {
-        Self { field: ::fidl_next::TakeFrom::take_from(&mut from.field) }
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true
+
+                && <
+                    ::fidl_next_test_dependent::MyEnum as ::fidl_next::Encodable
+                >::COPY_OPTIMIZATION.is_enabled()
+
+        )
+    };
+
+    #[inline]
+    fn take_from(from: &WireFoo) -> Self {
+        Self { field: ::fidl_next::TakeFrom::take_from(&from.field) }
     }
 }
 
@@ -68,14 +94,12 @@ impl ::fidl_next::TakeFrom<WireFoo> for Foo {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireFoo {
-    pub field: fidl_next_test_dependent::WireMyEnum,
+    pub field: ::fidl_next_test_dependent::WireMyEnum,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireFoo
 where
-    ___D: ?Sized,
-
-    fidl_next_test_dependent::WireMyEnum: ::fidl_next::Decode<___D>,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -93,3 +117,9 @@ where
         Ok(())
     }
 }
+
+/// Commonly-used items that should usually be in scope, such as extension traits.
+pub mod prelude {}
+
+/// Compatibility shims which mimic some API surfaces of the current Rust bindings.
+pub mod compat {}

@@ -4,10 +4,11 @@
 
 use async_trait::async_trait;
 use component_debug::cli::capability_cmd;
-use errors::FfxError;
+use errors::ffx_error;
 use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_capability_args::ComponentCapabilityCommand;
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool};
 use target_holders::RemoteControlProxyHolder;
 
 #[derive(FfxTool)]
@@ -27,7 +28,7 @@ impl FfxMain for CapabilityTool {
         // All errors from component_debug library are user-visible.
         capability_cmd(self.cmd.capability, realm_query, writer)
             .await
-            .map_err(|e| FfxError::Error(e, 1))?;
+            .map_err(|e| ffx_error!(e))?;
         Ok(())
     }
 }

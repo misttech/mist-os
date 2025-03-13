@@ -19,6 +19,10 @@ def main():
         required=True,
     )
     parser.add_argument(
+        "--expect-product-bundle-name",
+        help="A product bundle name that MUST exist in the manifest",
+    )
+    parser.add_argument(
         "--stamp",
         help="Path to the stamp file to emit",
         required=True,
@@ -26,7 +30,16 @@ def main():
 
     args = parser.parse_args()
     with open(args.product_bundle_json) as f:
-        product_bundles = map(lambda entry: entry["name"], json.load(f))
+        product_bundles = list(map(lambda entry: entry["name"], json.load(f)))
+
+    if args.expect_product_bundle_name:
+        if args.expect_product_bundle_name not in product_bundles:
+            print(
+                "\nFailed to find required product bundle with name: %s.\n"
+                % args.expect_product_bundle_name,
+                file=sys.stderr,
+            )
+            return 1
 
     counts = {}
     for pb in product_bundles:

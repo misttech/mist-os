@@ -3,7 +3,7 @@
 
 #include <zircon/types.h>
 
-#include "src/media/audio/audio_core/shared/stream_usage.h"
+#include "src/media/audio/audio_core/stream_usage.h"
 #include "src/media/audio/audio_core/test/api/ultrasound_test_shared.h"
 #include "src/media/audio/lib/clock/utils.h"
 

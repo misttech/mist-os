@@ -6,7 +6,6 @@
 
 #include "handoff-prep.h"
 
-#include <ctype.h>
 #include <lib/boot-options/boot-options.h>
 #include <lib/instrumentation/debugdata.h>
 #include <lib/llvm-profdata/llvm-profdata.h>
@@ -21,6 +20,7 @@
 
 #include <ktl/algorithm.h>
 #include <ktl/tuple.h>
+#include <phys/address-space.h>
 #include <phys/allocation.h>
 #include <phys/arch/arch-handoff.h>
 #include <phys/elf-image.h>
@@ -191,7 +191,12 @@ void HandoffPrep::SetMemory() {
       // shouldn't actually be used by the kernel after that; mark it for
       // clean-up.
       case memalloc::Type::kTemporaryIdentityPageTables:
-        return memalloc::Type::kTemporaryPhysHandoff;
+        // TODO(https://fxbug.dev/398950948): Ideally these ranges would be
+        // passed on as temporary handoff data, but the kernel currently
+        // expects this memory to persist past boot (e.g, for later
+        // hotplugging). Pending revisiting that in the kernel, we hand off all
+        // "temporary" identity tables as permanent for now.
+        return memalloc::Type::kKernelPageTables;
 
       // An NVRAM range should no longer be treated like normal RAM. The kernel
       // will access it through PhysHandoff::nvram via its own mapping for it.
@@ -334,10 +339,27 @@ void HandoffPrep::SetVersionString(ktl::string_view version) {
   }
 }
 
-[[noreturn]] void HandoffPrep::DoHandoff(UartDriver& uart, ktl::span<ktl::byte> zbi,
+void HandoffPrep::ConstructKernelAddressSpace(const ElfImage& kernel) {
+  // TODO(https://fxbug.dev/42164859): Reframe this logic into something that
+  // also tracks other metadata we'll need for the final form of the handoff
+  // (e.g., for VM init).
+
+  // Construct the physmap.
+  constexpr AddressSpace::MapSettings kRwRam{
+      .access = {.readable = true, .writable = true},
+      .memory = kArchNormalMemoryType,
+  };
+  AddressSpace::PanicIfError(
+      gAddressSpace->Map(kArchPhysmapVirtualBase, kArchPhysmapSize, 0, kRwRam));
+
+  // Construct the kernel's mapping.
+  AddressSpace::PanicIfError(kernel.MapInto(*gAddressSpace));
+}
+
+[[noreturn]] void HandoffPrep::DoHandoff(const ElfImage& kernel, UartDriver& uart,
+                                         ktl::span<ktl::byte> zbi,
                                          const KernelStorage::Bootfs& kernel_package,
-                                         const ArchPatchInfo& patch_info,
-                                         fit::inline_function<void(PhysHandoff*)> boot) {
+                                         const ArchPatchInfo& patch_info) {
   // Hand off the boot options first, which don't really change.  But keep a
   // mutable reference to update boot_options.serial later to include live
   // driver state and not just configuration like other BootOptions members do.
@@ -367,13 +389,28 @@ void HandoffPrep::SetVersionString(ktl::string_view version) {
   // hand-off.
   handoff()->times = gBootTimes;
 
-  // This finalizes the state of memory to hand off to the kernel, which is affected by other set-up
-  // routines.
+  handoff()->kernel_physical_load_address = kernel.physical_load_address();
+  ConstructKernelAddressSpace(kernel);
+
+  // This must be called last, as this finalizes the state of memory to hand off
+  // to the kernel, which is affected by other set-up routines.
   SetMemory();
 
   // Hand-off the serial driver. There may be no more logging beyond this point.
   handoff()->uart = ktl::move(uart).TakeUart();
 
-  boot(handoff());
-  ZX_PANIC("HandoffPrep::DoHandoff boot function returned!");
+  debugf("%s: Handing off at physical load address %#" PRIxPTR ", entry %#" PRIx64 "...\n",
+         gSymbolize->name(), kernel.physical_load_address(), kernel.entry());
+#ifdef __aarch64__
+  // Make sure all prior stores have been written back to main memory so that
+  // secondary CPUs booting with MMU/caches off will see a coherent view.
+  //
+  // TODO(https://fxbug.dev/42164859): This is expediently done to the whole
+  // cache rather than to the lines possibly holding the precise memory of
+  // interest to the secondaries. Formalize or rethink this hammer in the
+  // context of the physboot's hand-off contract with the kernel.
+  arch::CleanAndInvalidateLocalCaches();
+#endif
+  kernel.Handoff<void(PhysHandoff*)>(handoff());
+  ZX_PANIC("ElfImage::Handoff returned!");
 }

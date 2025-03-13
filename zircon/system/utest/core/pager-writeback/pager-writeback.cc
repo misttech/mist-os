@@ -501,7 +501,6 @@ TEST(PagerWriteback, NoDirtyRequestsForClones) {
   });
   ASSERT_TRUE(t1.Start());
 
-  ASSERT_TRUE(t1.WaitForBlocked());
   // Writing the pages in the clone should trigger faults in the parent.
   ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, kNumPages, ZX_TIME_INFINITE));
   ASSERT_TRUE(pager.SupplyPages(vmo, 0, kNumPages));
@@ -737,7 +736,6 @@ TEST(PagerWriteback, DirtyRequestsRandomOffsets) {
       }
 
       // Should see a read request for this not-present page run.
-      ASSERT_TRUE(t.WaitForBlocked());
       ASSERT_TRUE(pager.WaitForPageRead(vmo, i, not_present_run_size, ZX_TIME_INFINITE));
       ASSERT_TRUE(pager.SupplyPages(vmo, i, not_present_run_size));
 
@@ -8083,6 +8081,60 @@ TEST(PagerWriteback, UntrackedAbsorbsPages) {
 
   // Pages beyond the new stream size should read as zeros.
   EXPECT_TRUE(check_buffer_data(vmo, 1, 9, expected.data(), false));
+
+  // No more page requests seen.
+  uint64_t offset, length;
+  ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
+  ASSERT_FALSE(pager.GetPageDirtyRequest(vmo, 0, &offset, &length));
+}
+
+// Test that suspending and resuming a thread in the middle of a dirty request works.
+VMO_VMAR_TEST(PagerWriteback, SuspendDirtyTest) {
+  // This test cannot run as a component due to its usage of WaitForBlocked() which will return true
+  // if the test thread is blocked on pagers outside of the test. WaitForBlocked() can only be
+  // relied upon in a non-component environment. The pager-writeback tests cannot run as standalone
+  // bootfs tests either because they need the next vDSO. Hence the only supported mode for this
+  // test is unified mode, where the system resource will be available.
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    ZXTEST_SKIP("System resource not available, skipping\n");
+  }
+
+  UserPager pager;
+
+  ASSERT_TRUE(pager.Init());
+
+  Vmo* vmo;
+  ASSERT_TRUE(pager.CreateVmoWithOptions(1, ZX_VMO_TRAP_DIRTY, &vmo));
+  ASSERT_TRUE(pager.SupplyPages(vmo, 0, 1));
+
+  // Write to the VMO, which will trigger a dirty request.
+  TestThread t([vmo, check_vmar]() -> bool {
+    uint8_t data = 0xaa;
+    if (check_vmar) {
+      auto ptr = reinterpret_cast<uint8_t*>(vmo->base_addr());
+      *ptr = data;
+      return true;
+    }
+    return vmo->vmo().write(&data, 0, sizeof(data)) == ZX_OK;
+  });
+
+  ASSERT_TRUE(t.Start());
+
+  // Make sure we're blocked on the dirty request. Then suspend the thread.
+  ASSERT_TRUE(pager.WaitForPageDirty(vmo, 0, 1, ZX_TIME_INFINITE));
+  ASSERT_TRUE(t.WaitForBlocked());
+
+  t.SuspendSync();
+  t.Resume();
+
+  // The thread should block again on resume and we should see another dirty request.
+  ASSERT_TRUE(t.WaitForBlocked());
+  ASSERT_TRUE(pager.WaitForPageDirty(vmo, 0, 1, ZX_TIME_INFINITE));
+
+  ASSERT_TRUE(pager.DirtyPages(vmo, 0, 1));
+
+  ASSERT_TRUE(t.Wait());
 
   // No more page requests seen.
   uint64_t offset, length;

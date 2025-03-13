@@ -93,7 +93,7 @@ supported_conformance_types = [
   "test.conformance/MyUint64",
   "test.conformance/MyUint8",
   "test.conformance/NodeAttributes",
-  "test.conformance/OneEmptyStructInStruct",
+  "test.conformance/AnEmptyStructInStruct",
   "test.conformance/OneLayerStructNoPaddingAlign4",
   "test.conformance/OneLayerStructNoPaddingAlign8",
   "test.conformance/OneLayerStructWithBool",

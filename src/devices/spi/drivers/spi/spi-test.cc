@@ -365,7 +365,7 @@ class TestEnvironment : public fdf_testing::Environment {
 
 struct FixtureConfig {
  public:
-  using DriverType = SpiDevice;
+  using DriverType = SpiDriver;
   using EnvironmentType = TestEnvironment;
 };
 

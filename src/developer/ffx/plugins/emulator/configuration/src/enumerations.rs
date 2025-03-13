@@ -81,6 +81,9 @@ pub struct VirtualDeviceInfo {
 
     /// The width of the virtual device's screen, measured in pixels.
     pub window_width: usize,
+
+    /// The context identifier for the virtual machine.
+    pub cid: u32,
 }
 
 impl From<VirtualDeviceV1> for VirtualDeviceInfo {
@@ -97,6 +100,7 @@ impl From<VirtualDeviceV1> for VirtualDeviceInfo {
             window_height: value.hardware.window_size.height,
             window_width: value.hardware.window_size.width,
             ports: value.ports,
+            cid: value.hardware.vsock.cid,
         }
     }
 }

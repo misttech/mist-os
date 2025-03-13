@@ -174,7 +174,7 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
         match &zbi_config.postprocessing_script {
             Some(script) => {
                 let tool_path = match &script.path {
-                    Some(path) => path.clone(),
+                    Some(path) => path.clone().to_utf8_pathbuf(),
                     None => script
                         .board_script_path
                         .clone()

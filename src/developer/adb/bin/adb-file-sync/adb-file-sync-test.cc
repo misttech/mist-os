@@ -101,7 +101,7 @@ class FakeDirectory : public fidl::testing::WireTestBase<fuchsia_io::Directory> 
 
   void Open(fuchsia_io::wire::DirectoryOpenRequest* request,
             OpenCompleter::Sync& completer) override {
-    file_.BindServer(dispatcher_, request->object.TakeChannel());
+    file_.BindServer(dispatcher_, std::move(request->object));
   }
   FakeFile file_;  // Only allow one open file at a time for tests. Hardcoded file parameters.
 

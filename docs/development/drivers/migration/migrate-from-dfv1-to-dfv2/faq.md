@@ -114,19 +114,9 @@ protocol providing the service in different ways:
 
 ## How does my driver's node (or device) get exposed in the system in DFv2?
 
-Fuchsia has a global tree of devices exposed as a filesystem known as
-[`devfs`][devfs], which is routed to most components as `/dev`. When
-a driver adds a [device node][driver-node], it has the option of adding
-a "file" into `devfs`. Then this file in `devfs` allows other components
-in the system to talk to the driver. For instance, an audio driver may add
-a speaker device node and the audio driver wants to make sure that other
-components can use this node to output audio to the speaker. To accomplish
-this, the audio driver [adds (or exposes) a `devfs` node][expose-devfs]
-for the speaker so that it appears as `/dev/class/audio/<random_number>`
-in the system.
-
-For more details, see the [Set up devfs in a DFv2 driver][set-up-devfs]
-guide.
+Drivers can [expose services][driver-communication] that can be routed to clients.
+In addition, drivers, like all components, can be listed by using
+`ffx component list`.
 
 ## What is not implemented in DFv2 that was available in DFv1?
 
@@ -226,6 +216,7 @@ contains most of the new APIs).
 [migrate-from-banjo-to-fidl]: /docs/development/drivers/migration/migrate-from-banjo-to-fidl.md
 [banjo]: /docs/development/drivers/concepts/device_driver_model/banjo.md
 [driver-dispatcher]: /docs/concepts/drivers/driver-dispatcher-and-threads.md
+[driver-communication]: /docs/concepts/drivers/driver_communication.md
 [driver-node]: /docs/concepts/drivers/drivers_and_nodes.md
 [device-lifecycle]: /docs/development/drivers/concepts/device_driver_model/device-lifecycle.md#an_example_of_the_tear-down_sequence
 [ddk-device-h-77]: https://source.corp.google.com/fuchsia/src/lib/ddk/include/lib/ddk/device.h;l=77
@@ -235,7 +226,6 @@ contains most of the new APIs).
 [synchronized-dispatchers]: /docs/concepts/drivers/driver-dispatcher-and-threads.md#synchronized-and-unsynchronized
 [gc-intel-wifi]:https://fuchsia-review.git.corp.google.com/c/fuchsia/+/692243
 [pcie-iwlwifi-driver-cc]: https://fuchsia-review.git.corp.google.com/c/fuchsia/+/692243/47/src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/pcie-iwlwifi-driver.cc
-[devfs]: /docs/concepts/drivers/driver_communication.md#service_discovery_using_devfs
 [codelab-driver-service]: /docs/get-started/sdk/learn/driver/driver-service.md
 [logger-h]: https://source.corp.google.com/h/turquoise-internal/turquoise/+/main:sdk/lib/driver/logging/cpp/logger.h;l=15
 [load-firmware]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/lib/ddk/include/lib/ddk/driver.h;l=408
@@ -250,7 +240,6 @@ contains most of the new APIs).
 [update-driver-interfaces]: update-ddk-interfaces-to-dfv2.md#update-interfaces-from-ddk-to-dfv2
 [use-service-discovery]: update-other-services-to-dfv2.md#use-the-dfv2-service-discovery
 [update-component-manifests]: update-other-services-to-dfv2.md#update-component-manifests-of-other-drivers
-[expose-devfs]: update-other-services-to-dfv2.md#expose-a-devfs-node-from-the-dfv2-driver
 [use-dispatchers]: update-other-services-to-dfv2.md#use-dispatchers
 [use-dfv2-inspect]: update-other-services-to-dfv2.md#use-the-dfv2-inspect
 [use-dfv2-logger]: update-other-services-to-dfv2.md#use-the-dfv2-logger
@@ -259,4 +248,3 @@ contains most of the new APIs).
 [update-unit-tests]: update-other-services-to-dfv2.md#update-unit-tests-to-dfv2
 [additional-resources]: update-other-services-to-dfv2.md#additional-resources
 [serve-banjo-protocols-in-a-dfv2-driver]: /docs/development/drivers/migration/serve-banjo-protocols.md
-[set-up-devfs]: /docs/development/drivers/migration/set-up-devfs.md

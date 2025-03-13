@@ -7,14 +7,14 @@ use crate::log::*;
 use crate::object_store::{FSCRYPT_KEY_ID, VOLUME_DATA_KEY_ID};
 use anyhow::Error;
 use event_listener::Event;
-use futures::TryFutureExt;
+use fuchsia_sync::Mutex;
 use fxfs_crypto::{CipherSet, Crypt, FindKeyResult, Key, UnwrappedKeys, WrappedKeys};
 use scopeguard::ScopeGuard;
 use std::cell::UnsafeCell;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::future::Future;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 use {fuchsia_async as fasync, zx_status as zx};
 
@@ -114,7 +114,7 @@ impl Inner {
             fasync::Task::spawn(async move {
                 loop {
                     fasync::Timer::new(PURGE_TIMEOUT).await;
-                    let mut inner = inner.lock().unwrap();
+                    let mut inner = inner.lock();
                     if inner.keys.purge() {
                         inner.purge_task = None;
                         break;
@@ -149,7 +149,7 @@ impl UnwrapResult {
         permanent: bool,
         result: Result<Option<Arc<CipherSet>>, zx::Status>,
     ) -> bool {
-        let mut guard = inner.lock().unwrap();
+        let mut guard = inner.lock();
         // SAFETY: Safe because we hold the lock on `inner`.
         let cancelled = unsafe { *self.cancelled.get() };
         let set_error = |error| {
@@ -202,7 +202,7 @@ impl KeyManager {
     pub async fn get(&self, object_id: u64) -> Result<Option<Key>, Error> {
         loop {
             let (unwrap_result, listener) = {
-                let mut inner = self.inner.lock().unwrap();
+                let mut inner = self.inner.lock();
 
                 if let Some(keys) = inner.keys.get(object_id) {
                     return match keys.find_key(VOLUME_DATA_KEY_ID) {
@@ -237,7 +237,7 @@ impl KeyManager {
         &self,
         object_id: u64,
         crypt: &dyn Crypt,
-        wrapped_keys: &mut Option<impl Future<Output = Result<WrappedKeys, Error>>>,
+        wrapped_keys: &mut Option<impl AsyncFnOnce() -> Result<WrappedKeys, Error>>,
         permanent: bool,
         force: bool,
     ) -> Result<Arc<CipherSet>, Error> {
@@ -246,7 +246,7 @@ impl KeyManager {
 
         loop {
             let listener = {
-                let mut inner = inner.lock().unwrap();
+                let mut inner = inner.lock();
 
                 if !force {
                     if let Some(keys) = inner.keys.get(object_id) {
@@ -283,16 +283,15 @@ impl KeyManager {
             unwrap_result.set(&inner, object_id, permanent, result);
         });
 
-        match wrapped_keys
-            .take()
-            .unwrap()
-            .map_err(|error| {
+        let wrapped_keys = match wrapped_keys.take().unwrap()().await {
+            Ok(wrapped_keys) => wrapped_keys,
+            Err(error) => {
                 error!(error:?; "Failed to get wrapped keys");
-                zx::Status::INTERNAL
-            })
-            .and_then(|keys| async move { crypt.unwrap_keys(&keys, object_id).await })
-            .await
-        {
+                *result = Err(zx::Status::INTERNAL);
+                return Err(zx::Status::INTERNAL.into());
+            }
+        };
+        match crypt.unwrap_keys(&wrapped_keys, object_id).await {
             Ok(unwrapped_keys) => {
                 let keys = unwrapped_keys.to_cipher_set();
                 let _ = ScopeGuard::into_inner(result);
@@ -315,7 +314,7 @@ impl KeyManager {
         &self,
         object_id: u64,
         crypt: &dyn Crypt,
-        wrapped_keys: impl Future<Output = Result<WrappedKeys, Error>>,
+        wrapped_keys: impl AsyncFnOnce() -> Result<WrappedKeys, Error>,
         key_id: u64,
     ) -> Result<Option<Key>, Error> {
         let mut wrapped_keys = Some(wrapped_keys);
@@ -347,7 +346,7 @@ impl KeyManager {
         &self,
         object_id: u64,
         crypt: &dyn Crypt,
-        wrapped_keys: impl Future<Output = Result<WrappedKeys, Error>>,
+        wrapped_keys: impl AsyncFnOnce() -> Result<WrappedKeys, Error>,
     ) -> Result<Key, Error> {
         let mut wrapped_keys = Some(wrapped_keys);
         let mut force = false;
@@ -377,7 +376,7 @@ impl KeyManager {
         &self,
         object_id: u64,
         crypt: &dyn Crypt,
-        wrapped_keys: impl Future<Output = Result<WrappedKeys, Error>>,
+        wrapped_keys: impl AsyncFnOnce() -> Result<WrappedKeys, Error>,
     ) -> Result<Option<Key>, Error> {
         let mut wrapped_keys = Some(wrapped_keys);
         let mut force = false;
@@ -403,7 +402,7 @@ impl KeyManager {
     /// This inserts the keys into the cache.  Any existing keys will be overwritten.  It's
     /// unspecified what happens if keys for the object are currently being unwrapped.
     pub fn insert(&self, object_id: u64, keys: impl ToCipherSet, permanent: bool) {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         inner.keys.insert(object_id, keys.to_cipher_set(), permanent);
         inner.start_purge_task(&self.inner);
     }
@@ -416,7 +415,7 @@ impl KeyManager {
         object_id: u64,
         merge: impl FnOnce(Option<&Arc<CipherSet>>) -> Arc<CipherSet>,
     ) {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         inner.keys.merge(object_id, merge);
         inner.start_purge_task(&self.inner);
     }
@@ -425,7 +424,7 @@ impl KeyManager {
     /// task that might be running to fetch keys will have finished.
     pub fn remove(&self, object_id: u64) -> impl Future<Output = ()> {
         {
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self.inner.lock();
             inner.keys.remove(object_id);
             if let Some(u) = inner.unwrapping.get(&object_id) {
                 // SAFETY: Safe because of lock on `inner`.
@@ -435,7 +434,7 @@ impl KeyManager {
         let inner = self.inner.clone();
         async move {
             let listener = {
-                if let Some(u) = inner.lock().unwrap().unwrapping.get(&object_id) {
+                if let Some(u) = inner.lock().unwrapping.get(&object_id) {
                     u.event.listen()
                 } else {
                     return;
@@ -447,7 +446,7 @@ impl KeyManager {
 
     /// This clears the caches of all keys.
     pub fn clear(&self) {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         inner.keys.clear();
         inner.unwrapping.clear();
     }
@@ -593,7 +592,7 @@ mod tests {
                     .get_keys(
                         1,
                         crypt1.as_ref(),
-                        &mut Some(async { Ok(wrapped_keys()) }),
+                        &mut Some(async || Ok(wrapped_keys())),
                         false,
                         false,
                     )
@@ -613,7 +612,7 @@ mod tests {
                     .get_keys(
                         1,
                         crypt2.as_ref(),
-                        &mut Some(async { Ok(wrapped_keys()) }),
+                        &mut Some(async || Ok(wrapped_keys())),
                         false,
                         false,
                     )
@@ -737,32 +736,18 @@ mod tests {
         let crypt1 = crypt.clone();
         let crypt2 = crypt.clone();
 
-        let task1 =
-            fasync::Task::spawn(async move {
-                assert!(manager1
-                    .get_keys(
-                        1,
-                        crypt1.as_ref(),
-                        &mut Some(async { Ok(wrapped_keys()) }),
-                        false,
-                        false,
-                    )
-                    .await
-                    .is_err());
-            });
-        let task2 =
-            fasync::Task::spawn(async move {
-                assert!(manager2
-                    .get_keys(
-                        1,
-                        crypt2.as_ref(),
-                        &mut Some(async { Ok(wrapped_keys()) }),
-                        false,
-                        false,
-                    )
-                    .await
-                    .is_err());
-            });
+        let task1 = fasync::Task::spawn(async move {
+            assert!(manager1
+                .get_keys(1, crypt1.as_ref(), &mut Some(async || Ok(wrapped_keys())), false, false,)
+                .await
+                .is_err());
+        });
+        let task2 = fasync::Task::spawn(async move {
+            assert!(manager2
+                .get_keys(1, crypt2.as_ref(), &mut Some(async || Ok(wrapped_keys())), false, false,)
+                .await
+                .is_err());
+        });
 
         TestExecutor::advance_to(MonotonicInstant::after(zx::MonotonicDuration::from_seconds(1)))
             .await;
@@ -780,7 +765,7 @@ mod tests {
 
         assert!(join!(
             async {
-                let mut unwrap_keys = Some(async {
+                let mut unwrap_keys = Some(async || {
                     struct OnDrop<'a>(&'a AtomicBool);
                     impl Drop for OnDrop<'_> {
                         fn drop(&mut self) {

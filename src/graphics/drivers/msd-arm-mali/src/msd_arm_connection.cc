@@ -276,41 +276,6 @@ bool MsdArmConnection::ExecuteAtom(
   return true;
 }
 
-magma_status_t MsdArmContext::ExecuteImmediateCommands(
-    cpp20::span<uint8_t> commands, cpp20::span<msd::Semaphore*> msd_semaphores) {
-  auto connection = connection_.lock();
-  if (!connection)
-    return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Connection not valid");
-
-  std::deque<std::shared_ptr<magma::PlatformSemaphore>> deprecated_semaphores;
-  for (size_t i = 0; i < msd_semaphores.size(); i++) {
-    deprecated_semaphores.push_back(MsdArmAbiSemaphore::cast(msd_semaphores[i])->ptr());
-  }
-  uint64_t offset = 0;
-  while (offset + sizeof(uint64_t) < commands.size()) {
-    magma_arm_mali_atom* atom =
-        reinterpret_cast<magma_arm_mali_atom*>(static_cast<uint8_t*>(commands.data()) + offset);
-    if (atom->size < sizeof(uint64_t)) {
-      return DRET_MSG(MAGMA_STATUS_CONTEXT_KILLED, "Atom size must be at least 8");
-    }
-
-    // This check could be changed to allow for backwards compatibility in
-    // future versions.
-    if (atom->size < sizeof(magma_arm_mali_atom)) {
-      return DRET_MSG(MAGMA_STATUS_CONTEXT_KILLED, "Atom size %ld too small", atom->size);
-    }
-
-    size_t remaining_data_size = commands.size() - offset;
-    std::vector<std::shared_ptr<magma::PlatformSemaphore>> empty_semaphores;
-    if (!connection->ExecuteAtom(&remaining_data_size, atom, empty_semaphores,
-                                 &deprecated_semaphores))
-      return DRET(MAGMA_STATUS_CONTEXT_KILLED);
-    offset = commands.size() - remaining_data_size;
-  }
-
-  return MAGMA_STATUS_OK;
-}
-
 magma_status_t MsdArmContext::ExecuteInlineCommand(magma_inline_command_buffer* command,
                                                    msd::Semaphore** msd_semaphores) {
   auto connection = connection_.lock();

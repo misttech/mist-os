@@ -46,12 +46,6 @@ set -e
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../lib/vars.sh || exit $?
 fx-config-read
 
-OWNERS_TOOL_TARGET="host-tools/auto_owners"
-OWNERS_TOOL_BIN="${FUCHSIA_BUILD_DIR}/${OWNERS_TOOL_TARGET}"
-
-GN_DESC_TOOL_TARGET="host-tools/gn_desc"
-GN_DESC_TOOL_BIN="${FUCHSIA_BUILD_DIR}/${GN_DESC_TOOL_TARGET}"
-
 # Parse arguments
 while [[ $# -ge 1 ]]; do
   case "$1" in
@@ -104,7 +98,7 @@ if [[ -z "$RUST_METADATA" ]] && [[ -z "$INTEGRATION_MANIFEST" ]] && [[ -z "$PROJ
   fx-warn "Use [ --rust-metadata | --integration-manifest | --path ] to specify projects."
 fi
 
-fx-command-run build ${OWNERS_TOOL_TARGET} ${GN_DESC_TOOL_TARGET} || ( \
+fx-command-run build --host //tools/auto_owners:install_auto_owners --host //tools/gn_desc:install_gn_desc || ( \
   fx-error "Failed to build owners tool."; \
   exit 1
 )
@@ -116,7 +110,7 @@ if [[ ! -n "$SKIP_RUSTC_3P_UPDATE" ]]; then
   )
 fi
 
-(cd $FUCHSIA_DIR; $OWNERS_TOOL_BIN \
+(cd $FUCHSIA_DIR; ${FUCHSIA_BUILD_DIR}/host-tools/auto_owners \
   $RUST_METADATA \
   $INTEGRATION_MANIFEST \
   --overrides "$FUCHSIA_DIR/third_party/owners.toml" \

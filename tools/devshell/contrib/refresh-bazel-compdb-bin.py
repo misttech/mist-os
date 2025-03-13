@@ -16,11 +16,28 @@ _OPT_PATTERN = re.compile("[\W]+")
 
 _SHOULD_LOG = False
 
-_CPU_MAP = {"aarch64": "arm64", "x86_64": "x64"}
+_FUCHSIA_PACKAGE_SUFFIX = "_fuchsia_package"
+
+_FUCHSIA_CPU_MAP = {"aarch64": "arm64", "x86_64": "x64"}
+
+_BAZEL_CPU_ALIASES = {
+    "k8": "x86_64",
+    "x64": "x86_64",
+    "x86_64": "x86_64",
+    "aarch64": "aarch64",
+    "arm64": "aarch64",
+    "riscv64": "riscv64",
+}
 
 
-def _map_cpu(cpu):
-    return _CPU_MAP.get(cpu, cpu)
+def _map_fuchsia_cpu(cpu):
+    """Converts a bazel cpu to a fuchsia cpu"""
+    return _FUCHSIA_CPU_MAP.get(cpu, cpu)
+
+
+def _map_bazel_cpu(cpu):
+    """Converts a cpu to one that bazel recognizes"""
+    return _BAZEL_CPU_ALIASES.get(cpu, cpu)
 
 
 # These regex patterns are a tuple of compiled regex's to lambdas that will be
@@ -50,9 +67,8 @@ _REGEX_PATH_PATTERNS = [
         re.compile(
             ".*bazel-out.*\/(?P<arch>[a-zA-Z0-9]+)-.*\/bin\/src\/devices\/bind\/(?P<name>.*)\/_virtual_includes.*"
         ),
-        # _map_cpu
         lambda m: "-I{cpu}-shared/gen/src/devices/bind/{name}/{name}/bind_cpp".format(
-            cpu=_map_cpu(m["arch"]),
+            cpu=_map_fuchsia_cpu(m["arch"]),
             name=m["name"],
         ),
     ),
@@ -211,7 +227,7 @@ def collect_actions(action_graph: Sequence[Dict]) -> Sequence[Action]:
 
 
 def get_action_graph_from_labels(
-    bazel_exe: str, compilation_mode, labels: Sequence[str]
+    bazel_exe: str, compilation_mode: str, cpu: str, labels: Sequence[str]
 ) -> Sequence[Dict]:
     labels_set = "set({})".format(" ".join(labels))
     info("Getting action graph for {}".format(labels_set))
@@ -221,6 +237,7 @@ def get_action_graph_from_labels(
             "aquery",
             "mnemonic('CppCompile',deps({}))".format(labels_set),
             compilation_mode,
+            "--cpu={}".format(_map_bazel_cpu(cpu)),
             "--output=jsonproto",
             "--ui_event_filters=-info,-warning",
             "--noshow_loading_progress",
@@ -242,12 +259,22 @@ def compilation_mode(args: Sequence[str]) -> str:
         return "--compilation_mode=fastbuild"
 
 
-def assert_arg_label_is_fuchsia_package(args: argparse.Namespace):
-    results = collect_labels_from_scope(args.bazel, args.label)
+def canonicalize_label_from_arg(label: str) -> str:
+    # fuchsia_package targets append a suffix to them which is not obvious.
+    # We check the label to see if the user has appended it or not and fix
+    # it for them here.
+    if label.endswith(_FUCHSIA_PACKAGE_SUFFIX):
+        return label
+    else:
+        return label + _FUCHSIA_PACKAGE_SUFFIX
+
+
+def assert_arg_label_is_fuchsia_package(bazel_exe: str, label: str):
+    results = collect_labels_from_scope(bazel_exe, label)
     if len(results) == 0:
         fail(
             "Provided label '{}' is not a valid fuchsia_package label. Please provide a label that points to a valid fuchsia package or use --dir instead.".format(
-                args.label
+                label
             )
         )
 
@@ -331,6 +358,9 @@ def main(argv: Sequence[str]):
         "--optimization", required=True, help="The build level optimization"
     )
     parser.add_argument(
+        "--target-cpu", required=True, help="The cpu we are targeting"
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         required=False,
@@ -364,9 +394,10 @@ def main(argv: Sequence[str]):
 
     labels = []
     if args.label:
-        info("Verifying label '{}' is valid".format(args.label))
-        assert_arg_label_is_fuchsia_package(args)
-        labels.append(args.label)
+        label = canonicalize_label_from_arg(args.label)
+        info("Verifying label '{}' is valid".format(label))
+        assert_arg_label_is_fuchsia_package(args.bazel, label)
+        labels.append(label)
 
     if args.dir:
         info("Finding all labels in dir '{}'".format(args.dir))
@@ -375,6 +406,7 @@ def main(argv: Sequence[str]):
     actions = get_action_graph_from_labels(
         args.bazel,
         compilation_mode(args),
+        args.target_cpu,
         labels,
     )
 

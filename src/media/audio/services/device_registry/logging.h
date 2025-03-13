@@ -43,6 +43,7 @@ inline constexpr bool kLogDeviceInitializationProgress = false;
 inline constexpr bool kLogAudioDeviceRegistryMethods = false;
 inline constexpr bool kLogDeviceAddErrorRemove = true;
 inline constexpr bool kLogDeviceInfo = false;
+inline constexpr bool kLogDriverCommandTimeouts = false;
 
 inline constexpr bool kTraceInspector = false;
 inline constexpr bool kLogObjectLifetimes = false;
@@ -65,10 +66,6 @@ inline constexpr bool kLogCodecFidlResponseValues = false;
 inline constexpr bool kLogCompositeFidlCalls = false;
 inline constexpr bool kLogCompositeFidlResponses = false;
 inline constexpr bool kLogCompositeFidlResponseValues = false;
-
-inline constexpr bool kLogStreamConfigFidlCalls = false;
-inline constexpr bool kLogStreamConfigFidlResponses = false;
-inline constexpr bool kLogStreamConfigFidlResponseValues = false;
 
 inline constexpr bool kLogSignalProcessingFidlCalls = false;
 inline constexpr bool kLogSignalProcessingFidlResponses = false;
@@ -99,8 +96,6 @@ inline constexpr bool kLogRingBufferServerResponses = false;
 
 std::string UidToString(std::optional<UniqueId> unique_instance_id);
 
-void LogStreamProperties(const fuchsia_hardware_audio::StreamProperties& stream_props);
-void LogGainState(const fuchsia_hardware_audio::GainState& gain_state);
 void LogPlugState(const fuchsia_hardware_audio::PlugState& plug_state);
 
 void LogCodecProperties(const fuchsia_hardware_audio::CodecProperties& codec_props);
@@ -419,12 +414,6 @@ inline std::ostream& operator<<(
         return (out << "CODEC");
       case fuchsia_audio_device::DeviceType::kComposite:
         return (out << "COMPOSITE");
-      case fuchsia_audio_device::DeviceType::kDai:
-        return (out << "DAI");
-      case fuchsia_audio_device::DeviceType::kInput:
-        return (out << "INPUT");
-      case fuchsia_audio_device::DeviceType::kOutput:
-        return (out << "OUTPUT");
       default:
         return (out << "[UNKNOWN]");
     }

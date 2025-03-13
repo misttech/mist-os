@@ -6,7 +6,8 @@ use async_trait::async_trait;
 use ffx_config::api::ConfigError;
 use ffx_config::EnvironmentContext;
 use ffx_repository_server_list_args::ListCommand;
-use fho::{bug, Error, FfxMain, FfxTool, Result, VerifiedMachineWriter};
+use ffx_writer::VerifiedMachineWriter;
+use fho::{bug, Error, FfxMain, FfxTool, Result};
 
 use fidl_fuchsia_pkg_ext::{RepositoryRegistrationAliasConflictMode, RepositoryStorageType};
 use fuchsia_repo::repository::RepositorySpec;
@@ -180,7 +181,7 @@ mod tests {
     use super::*;
     use camino::Utf8PathBuf;
     use ffx_config::ConfigLevel;
-    use fho::{Format, TestBuffers};
+    use ffx_writer::{Format, TestBuffers};
     use fidl_fuchsia_pkg_ext::{RepositoryConfigBuilder, RepositoryStorageType};
     use std::collections::BTreeSet;
     use std::net::SocketAddr;

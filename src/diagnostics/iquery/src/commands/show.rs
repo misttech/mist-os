@@ -8,7 +8,7 @@ use crate::text_formatter;
 use crate::types::Error;
 use argh::{ArgsInfo, FromArgs};
 use derivative::Derivative;
-use diagnostics_data::{Inspect, InspectData};
+use diagnostics_data::InspectData;
 use serde::Serialize;
 use std::cmp::Ordering;
 use std::fmt;
@@ -101,7 +101,7 @@ impl Command for ShowCommand {
 
         utils::ensure_tree_field_is_set(&mut selectors, self.name)?;
         let inspect_data_iter =
-            provider.snapshot::<Inspect>(self.accessor.as_deref(), selectors).await?.into_iter();
+            provider.snapshot(self.accessor.as_deref(), selectors).await?.into_iter();
 
         let mut results = inspect_data_iter
             .map(|mut d: InspectData| {

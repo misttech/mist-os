@@ -1,7 +1,0 @@
-Name: spirv-tools
-License: Apache 2.0
-License File: LICENSE
-Upstream Git: https://github.com/KhronosGroup/SPIRV-Tools
-Description:
-
-The SPIR-V Tools project provides an API and commands for processing SPIR-V modules.

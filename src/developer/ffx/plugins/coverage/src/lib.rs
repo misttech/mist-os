@@ -4,7 +4,8 @@
 
 use anyhow::{anyhow, Context, Result};
 use ffx_coverage_args::CoverageCommand;
-use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{AvailabilityFlag, FfxMain, FfxTool};
 use glob::glob;
 use std::fs::File;
 use std::path::{Path, PathBuf};

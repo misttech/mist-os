@@ -15,9 +15,9 @@ use crate::signals::{
 };
 use crate::task::{
     ExitStatus, Kernel, PidTable, ProcessGroup, PtraceCoreState, PtraceEvent, PtraceEventData,
-    PtraceOptions, RobustList, RobustListHead, SeccompFilter, SeccompFilterContainer,
-    SeccompNotifierHandle, SeccompState, SeccompStateValue, StopState, Task, TaskFlags,
-    ThreadGroup, ThreadGroupParent, Waiter,
+    PtraceOptions, RobustList, RobustListHead, RobustListHeadPtr, SeccompFilter,
+    SeccompFilterContainer, SeccompNotifierHandle, SeccompState, SeccompStateValue, StopState,
+    Task, TaskFlags, ThreadGroup, ThreadGroupParent, Waiter,
 };
 use crate::vfs::{
     CheckAccessReason, FdNumber, FdTable, FileHandle, FsContext, FsStr, LookupContext,
@@ -44,11 +44,11 @@ use starnix_uapi::file_mode::{Access, AccessCheck, FileMode};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::signals::{SigSet, Signal, SIGBUS, SIGCHLD, SIGILL, SIGSEGV, SIGTRAP};
-use starnix_uapi::user_address::{UserAddress, UserRef};
+use starnix_uapi::user_address::{ArchSpecific, UserAddress, UserRef};
 use starnix_uapi::vfs::ResolveFlags;
 use starnix_uapi::{
     clone_args, errno, error, from_status_like_fdio, pid_t, rlimit, sock_filter,
-    CLONE_CHILD_CLEARTID, CLONE_CHILD_SETTID, CLONE_FILES, CLONE_FS, CLONE_INTO_CGROUP,
+    CLONE_CHILD_CLEARTID, CLONE_CHILD_SETTID, CLONE_FILES, CLONE_FS, CLONE_INTO_CGROUP, CLONE_IO,
     CLONE_NEWUTS, CLONE_PARENT, CLONE_PARENT_SETTID, CLONE_PTRACE, CLONE_SETTLS, CLONE_SIGHAND,
     CLONE_SYSVSEM, CLONE_THREAD, CLONE_VFORK, CLONE_VM, FUTEX_OWNER_DIED, FUTEX_TID_MASK,
     ROBUST_LIST_LIMIT, SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER,
@@ -715,6 +715,10 @@ impl CurrentTask {
             };
 
         let name = if flags.contains(OpenFlags::TMPFILE) {
+            // `O_TMPFILE` is incompatible with `O_CREAT`
+            if flags.contains(OpenFlags::CREAT) {
+                return error!(EINVAL);
+            }
             name.create_tmpfile(locked, self, mode.with_type(FileMode::IFREG), flags)?
         } else {
             let mode = name.entry.node.info().mode;
@@ -990,7 +994,7 @@ impl CurrentTask {
 
             let mut persistent_info = self.persistent_info.lock();
             state.set_sigaltstack(None);
-            state.robust_list_head = Default::default();
+            state.robust_list_head = RobustListHeadPtr::null(self);
 
             // From <https://man7.org/linux/man-pages/man2/execve.2.html>:
             //
@@ -1281,6 +1285,10 @@ impl CurrentTask {
     /// If you just need a kernel task, and not an entire userspace process, consider using
     /// `create_system_task` instead. Even better, consider using the `kthreads` threadpool.
     ///
+    /// If `seclabel` is set, or the container specified a `default_seclabel`, then it will be
+    /// resolved against the `kernel`'s active security policy, and applied to the new task.
+    /// Otherwise the task will inherit its LSM state from the "init" task.
+    ///
     /// This function creates an underlying Zircon process to host the new task.
     pub fn create_init_child_process<L>(
         locked: &mut Locked<'_, L>,
@@ -1295,9 +1303,13 @@ impl CurrentTask {
         let weak_init = kernel.pids.read().get_task(1);
         let init_task = weak_init.upgrade().ok_or_else(|| errno!(EINVAL))?;
         let initial_name_bytes = initial_name.as_bytes().to_owned();
-        let security_context = match seclabel {
-            Some(s) => security::task_for_context(&init_task, s.as_bytes().into())?,
-            None => security::task_alloc(&init_task, 0),
+
+        let security_context = if let Some(seclabel) = seclabel {
+            security::task_for_context(&init_task, seclabel.as_bytes().into())?
+        } else if let Some(default_seclabel) = kernel.features.default_seclabel.as_ref() {
+            security::task_for_context(&init_task, default_seclabel.as_bytes().into())?
+        } else {
+            security::task_alloc(&init_task, 0)
         };
 
         let task = Self::create_task(
@@ -1521,7 +1533,7 @@ impl CurrentTask {
                 false,
                 SeccompState::default(),
                 SeccompFilterContainer::default(),
-                Default::default(),
+                RobustListHeadPtr::null(&ArchWidth::Arch64),
                 default_timerslack,
                 security_state,
             )),
@@ -1590,7 +1602,7 @@ impl CurrentTask {
             false,
             SeccompState::default(),
             SeccompFilterContainer::default(),
-            Default::default(),
+            RobustListHeadPtr::null(&ArchWidth::Arch64),
             default_timerslack_ns,
             security_state,
         ))
@@ -1640,6 +1652,7 @@ impl CurrentTask {
             | CLONE_VFORK
             | CLONE_NEWUTS
             | CLONE_PTRACE) as u64;
+
         // A mask with all valid flags set, because we want to return a different error code for an
         // invalid flag vs an unimplemented flag. Subtracting 1 from the largest valid flag gives a
         // mask with all flags below it set. Shift up by one to make sure the largest flag is also
@@ -1723,7 +1736,7 @@ impl CurrentTask {
         let scheduler_policy;
         let no_new_privs;
         let seccomp_filters;
-        let robust_list_head = Default::default();
+        let robust_list_head = RobustListHeadPtr::null(self);
         let child_signal_mask;
         let timerslack_ns;
         let uts_ns;
@@ -1736,7 +1749,7 @@ impl CurrentTask {
             let original_parent;
 
             // Make sure to drop these locks ASAP to avoid inversion
-            let thread_group_state = {
+            let mut thread_group_state = {
                 let thread_group_state = self.thread_group.write();
                 if clone_parent {
                     // With the CLONE_PARENT flag, the parent of the new task is our parent
@@ -1766,9 +1779,7 @@ impl CurrentTask {
             timerslack_ns = state.timerslack_ns;
 
             uts_ns = if clone_newuts {
-                if !self.creds().has_capability(CAP_SYS_ADMIN) {
-                    return error!(EPERM);
-                }
+                security::check_task_capable(self, CAP_SYS_ADMIN)?;
                 state.uts_ns.read().fork()
             } else {
                 state.uts_ns.clone()
@@ -1791,7 +1802,17 @@ impl CurrentTask {
                     self.thread_group.signal_actions.fork()
                 };
                 let process_group = thread_group_state.process_group.clone();
-                ReleaseGuard::take(create_zircon_process(
+
+                // If the new `Task` is not a thread, but is sharing resources with the parent,
+                // then mark both the parent and the new task as sharing.  Otherwise, the new `Task`
+                // is marked as not-sharing, and the parent left unmodified (since it may be
+                // sharing with other `ThreadGroups`).
+                let clone_io = (flags & CLONE_IO as u64) != 0;
+                let is_sharing =
+                    clone_vm | clone_fs | clone_files | clone_sighand | clone_io | clone_sysvsem;
+                thread_group_state.is_sharing |= is_sharing;
+
+                let task_info = ReleaseGuard::take(create_zircon_process(
                     locked,
                     kernel,
                     Some(thread_group_state),
@@ -1799,7 +1820,17 @@ impl CurrentTask {
                     process_group,
                     signal_actions,
                     command.as_bytes(),
-                )?)
+                )?);
+
+                task_info.thread_group.write().is_sharing = is_sharing;
+
+                kernel.cgroups.cgroup2.inherit_cgroup(
+                    self.get_pid(),
+                    pid,
+                    &OwnedRef::temp(&task_info.thread_group),
+                );
+
+                task_info
             }
         };
 
@@ -2096,6 +2127,12 @@ impl CurrentTask {
             .expect("failed to create task in test");
 
         result.into()
+    }
+}
+
+impl ArchSpecific for CurrentTask {
+    fn is_arch32(&self) -> bool {
+        self.thread_state.arch_width.is_arch32()
     }
 }
 

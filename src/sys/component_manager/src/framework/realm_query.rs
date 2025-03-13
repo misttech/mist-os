@@ -454,16 +454,33 @@ async fn open_deprecated(
                 .ok_or(fsys::OpenError::InstanceNotRunning)?
                 .runtime_dir()
                 .ok_or(fsys::OpenError::NoSuchDir)?;
-            dir.open(flags, mode, path, object).map_err(|_| fsys::OpenError::FidlError)
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            let result = dir
+                .deprecated_open(flags, mode, path, object)
+                .map_err(|_| fsys::OpenError::FidlError);
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            let result =
+                dir.open(flags, mode, path, object).map_err(|_| fsys::OpenError::FidlError);
+
+            result
         }
         fsys::OpenDirType::PackageDir => {
             let mut state = instance.lock_state().await;
             match state.get_resolved_state_mut() {
                 Some(r) => {
                     let pkg = r.package().ok_or(fsys::OpenError::NoSuchDir)?;
-                    pkg.package_dir
+                    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+                    let result = pkg
+                        .package_dir
+                        .deprecated_open(flags, mode, path, object)
+                        .map_err(|_| fsys::OpenError::FidlError);
+                    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+                    let result = pkg
+                        .package_dir
                         .open(flags, mode, path, object)
-                        .map_err(|_| fsys::OpenError::FidlError)
+                        .map_err(|_| fsys::OpenError::FidlError);
+
+                    result
                 }
                 None => Err(fsys::OpenError::InstanceNotResolved),
             }
@@ -552,7 +569,7 @@ async fn open_directory(
                 .runtime_dir()
                 .ok_or(fsys::OpenError::NoSuchDir)?;
             runtime_dir
-                .open3(path.as_ref(), FLAGS, &Default::default(), request.into_channel())
+                .open(path.as_ref(), FLAGS, &Default::default(), request.into_channel())
                 .map_err(|_| fsys::OpenError::FidlError)
         }
         fsys::OpenDirType::PackageDir => {
@@ -561,7 +578,7 @@ async fn open_directory(
                 state.get_resolved_state().ok_or(fsys::OpenError::InstanceNotResolved)?;
             let package_dir = &resolved.package().ok_or(fsys::OpenError::NoSuchDir)?.package_dir;
             package_dir
-                .open3(path.as_ref(), FLAGS, &Default::default(), request.into_channel())
+                .open(path.as_ref(), FLAGS, &Default::default(), request.into_channel())
                 .map_err(|_| fsys::OpenError::FidlError)
         }
         fsys::OpenDirType::ExposedDir => {
@@ -1017,16 +1034,8 @@ mod tests {
         test.model.start().await;
 
         let (outgoing_dir, server_end) = create_endpoints::<fio::DirectoryMarker>();
-        let server_end = ServerEnd::new(server_end.into_channel());
         query
-            .deprecated_open(
-                "./",
-                fsys::OpenDirType::OutgoingDir,
-                fio::OpenFlags::empty(),
-                fio::ModeType::empty(),
-                ".",
-                server_end,
-            )
+            .open_directory("./", fsys::OpenDirType::OutgoingDir, server_end)
             .await
             .unwrap()
             .unwrap();
@@ -1035,16 +1044,8 @@ mod tests {
         assert!(is_closed(outgoing_dir));
 
         let (runtime_dir, server_end) = create_endpoints::<fio::DirectoryMarker>();
-        let server_end = ServerEnd::new(server_end.into_channel());
         query
-            .deprecated_open(
-                "./",
-                fsys::OpenDirType::RuntimeDir,
-                fio::OpenFlags::empty(),
-                fio::ModeType::empty(),
-                ".",
-                server_end,
-            )
+            .open_directory("./", fsys::OpenDirType::RuntimeDir, server_end)
             .await
             .unwrap()
             .unwrap();
@@ -1053,48 +1054,29 @@ mod tests {
         assert!(is_closed(runtime_dir));
 
         let (pkg_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
-        let server_end = ServerEnd::new(server_end.into_channel());
         query
-            .deprecated_open(
-                "./",
-                fsys::OpenDirType::PackageDir,
-                fio::OpenFlags::empty(),
-                fio::ModeType::empty(),
-                ".",
-                server_end,
-            )
+            .open_directory("./", fsys::OpenDirType::PackageDir, server_end)
             .await
             .unwrap()
             .unwrap();
 
         let (exposed_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
-        let server_end = ServerEnd::new(server_end.into_channel());
         query
-            .deprecated_open(
-                "./",
-                fsys::OpenDirType::ExposedDir,
-                fio::OpenFlags::empty(),
-                fio::ModeType::empty(),
-                ".",
-                server_end,
-            )
+            .open_directory("./", fsys::OpenDirType::ExposedDir, server_end)
+            .await
+            .unwrap()
+            .unwrap();
+
+        let (namespace_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
+        query
+            .open_directory("./", fsys::OpenDirType::NamespaceDir, server_end)
             .await
             .unwrap()
             .unwrap();
 
         let (svc_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
-        let server_end = ServerEnd::new(server_end.into_channel());
-        query
-            .deprecated_open(
-                "./",
-                fsys::OpenDirType::NamespaceDir,
-                fio::OpenFlags::empty(),
-                fio::ModeType::empty(),
-                "svc",
-                server_end,
-            )
-            .await
-            .unwrap()
+        namespace_dir
+            .open("svc", fio::PERM_READABLE, &Default::default(), server_end.into_channel())
             .unwrap();
 
         // Test resolvers provide a pkg dir with a fake file

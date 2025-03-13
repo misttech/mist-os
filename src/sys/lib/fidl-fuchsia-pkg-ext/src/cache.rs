@@ -658,9 +658,8 @@ pub enum WriteBlobError {
     #[error("bytes were written but not needed in state {0}")]
     BytesNotNeeded(&'static str),
 
-    // TODO(https://fxbug.dev/42080352) Add error variants to BlobWriter.
-    #[error("unspecified error")]
-    Other(#[source] anyhow::Error),
+    #[error("while using the fxblob writer")]
+    FxBlob(#[source] blob_writer::WriteError),
 }
 
 /// An error encountered while sending the BlobWritten message.

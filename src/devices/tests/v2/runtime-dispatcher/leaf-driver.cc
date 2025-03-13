@@ -20,12 +20,14 @@ class LeafDriver : public fdf::DriverBase {
       : fdf::DriverBase("leaf", std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> Start() override {
+    fdf::info("Start hook reached leaf");
     // Test we can block on the dispatcher thread.
     ZX_ASSERT(ZX_OK == DoHandshakeSynchronously());
 
     auto waiter = incoming()->Connect<ft::Waiter>();
     if (waiter.is_error()) {
       node().reset();
+      fdf::info("failed to connect to waiter");
       return waiter.take_error();
     }
 
@@ -33,6 +35,7 @@ class LeafDriver : public fdf::DriverBase {
     auto result = client.sync()->Ack();
     if (!result.ok()) {
       node().reset();
+      fdf::info("failed to ack waiter");
       return zx::error(result.error().status());
     }
 

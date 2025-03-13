@@ -1,8 +1,0 @@
-Name: Vulkan-ValidationLayers
-License: Apache 2.0
-License File: LICENSE.txt
-Upstream Git: https://github.com/KhronosGroup/Vulkan-ValidationLayers
-Description:
-
-Provides the Khronos official Vulkan validation layers.
-

@@ -9,7 +9,7 @@ use anyhow::bail;
 use futures::Future;
 use log::error;
 use wlan_common::mac::BeaconHdr;
-use wlan_common::timer::EventId;
+use wlan_common::timer::EventHandle;
 use wlan_common::{ie, TimeUnit};
 use zerocopy::SplitByteSlice;
 use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync};
@@ -19,7 +19,7 @@ pub trait ChannelActions {
         &mut self,
         new_main_channel: fidl_common::WlanChannel,
     ) -> impl Future<Output = Result<(), zx::Status>>;
-    fn schedule_channel_switch_timeout(&mut self, time: zx::MonotonicInstant) -> EventId;
+    fn schedule_channel_switch_timeout(&mut self, time: zx::MonotonicInstant) -> EventHandle;
     fn disable_scanning(&mut self) -> impl Future<Output = Result<(), zx::Status>>;
     fn enable_scanning(&mut self);
     fn disable_tx(&mut self) -> Result<(), zx::Status>;
@@ -38,7 +38,7 @@ impl<'a, D: DeviceOps> ChannelActions for ChannelActionHandle<'a, D> {
     ) -> Result<(), zx::Status> {
         self.ctx.device.set_channel(new_main_channel).await
     }
-    fn schedule_channel_switch_timeout(&mut self, time: zx::MonotonicInstant) -> EventId {
+    fn schedule_channel_switch_timeout(&mut self, time: zx::MonotonicInstant) -> EventHandle {
         self.ctx.timer.schedule_at(time, TimedEvent::ChannelSwitch)
     }
     async fn disable_scanning(&mut self) -> Result<(), zx::Status> {
@@ -61,7 +61,7 @@ pub struct ChannelState {
     // The current main channel configured in the driver. If None, the driver may
     // be set to any channel.
     main_channel: Option<fidl_common::WlanChannel>,
-    pending_channel_switch: Option<(ChannelSwitch, EventId)>,
+    pending_channel_switch: Option<(ChannelSwitch, EventHandle)>,
     beacon_interval: Option<TimeUnit>,
     last_beacon_timestamp: Option<fasync::MonotonicInstant>,
 }
@@ -229,18 +229,9 @@ impl<'a, T: ChannelActions> BoundChannelState<'a, T> {
         }
     }
 
-    pub async fn handle_channel_switch_timeout(
-        &mut self,
-        event_id: EventId,
-    ) -> Result<(), anyhow::Error> {
-        if let Some((channel_switch, switch_id)) = self.channel_state.pending_channel_switch.take()
-        {
-            if event_id == switch_id {
-                // This is the most recently scheduled channel switch. Execute it.
-                self.set_main_channel(channel_switch.new_channel).await?;
-            } else {
-                self.channel_state.pending_channel_switch.replace((channel_switch, switch_id));
-            }
+    pub async fn handle_channel_switch_timeout(&mut self) -> Result<(), anyhow::Error> {
+        if let Some((channel_switch, _handle)) = self.channel_state.pending_channel_switch.take() {
+            self.set_main_channel(channel_switch.new_channel).await?;
         }
         Ok(())
     }
@@ -390,6 +381,7 @@ mod tests {
     use test_case::test_case;
     use wlan_common::assert_variant;
     use wlan_common::mac::CapabilityInfo;
+    use wlan_common::timer::EventId;
     use zerocopy::IntoBytes;
 
     const NEW_CHANNEL: u8 = 10;
@@ -672,10 +664,10 @@ mod tests {
             self.actions.push(ChannelAction::SwitchChannel(new_main_channel));
             Ok(())
         }
-        fn schedule_channel_switch_timeout(&mut self, time: zx::MonotonicInstant) -> EventId {
+        fn schedule_channel_switch_timeout(&mut self, time: zx::MonotonicInstant) -> EventHandle {
             self.event_id_ctr += 1;
             self.actions.push(ChannelAction::Timeout(self.event_id_ctr, time.into()));
-            self.event_id_ctr
+            EventHandle::new_test(self.event_id_ctr)
         }
         async fn disable_scanning(&mut self) -> Result<(), zx::Status> {
             self.actions.push(ChannelAction::DisableScanning);
@@ -754,7 +746,7 @@ mod tests {
         }
         assert_eq!(actions.actions.len(), 2);
         assert_variant!(actions.actions[0], ChannelAction::DisableScanning);
-        let (first_event_id, event_time) =
+        let (_first_event_id, event_time) =
             assert_variant!(actions.actions[1], ChannelAction::Timeout(eid, time) => (eid, time));
         assert_eq!(event_time, (time + (bcn_header.beacon_interval * 2u16).into()).into());
         actions.actions.clear();
@@ -776,7 +768,7 @@ mod tests {
         }
         assert_eq!(actions.actions.len(), 2);
         assert_variant!(actions.actions[0], ChannelAction::DisableScanning);
-        let (second_event_id, event_time) =
+        let (_second_event_id, event_time) =
             assert_variant!(actions.actions[1], ChannelAction::Timeout(eid, time) => (eid, time));
         assert_eq!(event_time, (time + bcn_header.beacon_interval.into()).into());
         actions.actions.clear();
@@ -784,10 +776,10 @@ mod tests {
         time += bcn_header.beacon_interval.into();
         exec.set_fake_time(time);
 
-        // First timeout is ignored.
+        // Timeout results in completion.
         {
             let mut bound_channel_state = channel_state.test_bind(&mut actions);
-            let fut = bound_channel_state.handle_channel_switch_timeout(first_event_id);
+            let fut = bound_channel_state.handle_channel_switch_timeout();
             let mut fut = pin!(fut);
             assert_variant!(
                 exec.run_until_stalled(&mut fut),
@@ -795,19 +787,7 @@ mod tests {
                 "Failed to handle channel switch timeout"
             );
         }
-        assert!(actions.actions.is_empty());
 
-        // Second timeout results in completion.
-        {
-            let mut bound_channel_state = channel_state.test_bind(&mut actions);
-            let fut = bound_channel_state.handle_channel_switch_timeout(second_event_id);
-            let mut fut = pin!(fut);
-            assert_variant!(
-                exec.run_until_stalled(&mut fut),
-                Poll::Ready(Ok(_)),
-                "Failed to handle channel switch timeout"
-            );
-        }
         assert_eq!(actions.actions.len(), 3);
         let new_channel =
             assert_variant!(actions.actions[0], ChannelAction::SwitchChannel(chan) => chan);
@@ -906,7 +886,7 @@ mod tests {
         }
         assert_eq!(actions.actions.len(), 2);
         assert_variant!(actions.actions[0], ChannelAction::DisableScanning);
-        let (event_id, event_time) =
+        let (_event_id, event_time) =
             assert_variant!(actions.actions[1], ChannelAction::Timeout(eid, time) => (eid, time));
         assert_eq!(event_time, bcn_time);
         actions.actions.clear();
@@ -915,7 +895,7 @@ mod tests {
         exec.set_fake_time(bcn_time);
         {
             let mut bound_channel_state = channel_state.test_bind(&mut actions);
-            let fut = bound_channel_state.handle_channel_switch_timeout(event_id);
+            let fut = bound_channel_state.handle_channel_switch_timeout();
             let mut fut = pin!(fut);
             assert_variant!(
                 exec.run_until_stalled(&mut fut),

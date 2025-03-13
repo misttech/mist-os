@@ -14,8 +14,6 @@ pub enum TraversalPosition {
     Start,
     /// A name of an entry.
     Name(String),
-    /// Bytes for an entry.
-    Bytes(Vec<u8>),
     /// The index of an entry.
     Index(u64),
     /// The whole listing was traversed.  There is nothing else to return.

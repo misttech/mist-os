@@ -633,6 +633,50 @@ impl From<SocketAddress> for fidl::SocketAddress {
     }
 }
 
+/// This struct represents all the marks the netstack supports.
+#[derive(Debug, Default, Clone)]
+pub struct Marks {
+    /// The mark for the MARK_1 domain.
+    pub mark_1: Option<u32>,
+    /// The mark for the MARK_2 domain.
+    pub mark_2: Option<u32>,
+}
+
+/// The maximum number of mark domains supported.
+pub const MAX_MARK_DOMAIN_COUNTS: usize = 2;
+
+impl IntoIterator for Marks {
+    type Item = (fidl::MarkDomain, fidl::Mark);
+
+    type IntoIter = std::iter::Flatten<
+        std::array::IntoIter<Option<(fidl::MarkDomain, fidl::Mark)>, MAX_MARK_DOMAIN_COUNTS>,
+    >;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let Self { mark_1, mark_2 } = self;
+        [
+            mark_1.map(|mark| (fidl::MarkDomain::Mark1, mark)),
+            mark_2.map(|mark| (fidl::MarkDomain::Mark2, mark)),
+        ]
+        .into_iter()
+        .flatten()
+    }
+}
+
+impl From<fidl::Marks> for Marks {
+    fn from(value: fidl::Marks) -> Self {
+        let fidl::Marks { mark_1, mark_2, __source_breaking } = value;
+        return Self { mark_1, mark_2 };
+    }
+}
+
+impl From<Marks> for fidl::Marks {
+    fn from(value: Marks) -> Self {
+        let Marks { mark_1, mark_2 } = value;
+        Self { mark_1, mark_2, __source_breaking: Default::default() }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

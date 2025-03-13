@@ -47,6 +47,18 @@ pub enum MetricsStatus {
     GooglerOptedInAndNeedsNotice, // user is a googler yet to set an analytics state and will be shown the enhanced analytics notice and we will collect basic analytics
 }
 
+impl MetricsStatus {
+    pub(crate) fn is_opted_in(&self) -> bool {
+        match self {
+            MetricsStatus::OptedIn
+            | MetricsStatus::OptedInEnhanced
+            | MetricsStatus::NewToTool
+            | MetricsStatus::GooglerOptedInAndNeedsNotice => true,
+            _ => false,
+        }
+    }
+}
+
 impl MetricsState {
     pub(crate) fn from_config(
         metrics_dir: &PathBuf,
@@ -129,13 +141,7 @@ impl MetricsState {
     }
 
     pub(crate) fn is_opted_in(&self) -> bool {
-        match self.status {
-            MetricsStatus::OptedIn
-            | MetricsStatus::OptedInEnhanced
-            | MetricsStatus::NewToTool
-            | MetricsStatus::GooglerOptedInAndNeedsNotice => true,
-            _ => false,
-        }
+        self.status.is_opted_in()
     }
 
     pub(crate) fn set_new_opt_in_status(&mut self, status: MetricsStatus) -> Result<(), Error> {

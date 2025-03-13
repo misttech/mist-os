@@ -367,9 +367,9 @@ are combined together in the trace; you do not need to repeat them.
 
   ```rust
   let async_id = 555;
-  async_begin!(c"{{ '<var>trace_category</var>' }}", c"{{ '<var>trace_async_name</var>' }}", async_id, "{{ '<var>argument_1</var>' }}" => {{ '<var>argument_1_value</var>' }});
-  async_instant!(c"{{ '<var>trace_category</var>' }}", c"{{ '<var>trace_async_instant_name</var>' }}", async_id);
-  async_end!(c"{{ '<var>trace_category</var>' }}", c"{{ '<var>trace_async_name</var>' }}", async_id);
+  async_begin!(async_id, c"{{ '<var>trace_category</var>' }}", c"{{ '<var>trace_async_name</var>' }}", "{{ '<var>argument_1</var>' }}" => {{ '<var>argument_1_value</var>' }});
+  async_instant!(async_id, c"{{ '<var>trace_category</var>' }}", c"{{ '<var>trace_async_instant_name</var>' }}");
+  async_end!(async_id, c"{{ '<var>trace_category</var>' }}", c"{{ '<var>trace_async_name</var>' }}");
   ```
 
 In Perfetto, an async event is placed on its own named track and isn't placed

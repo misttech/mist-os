@@ -13,8 +13,14 @@ pub(super) async fn serve(
     _ns: Netstack,
     _stream: DnsServerWatcherRequestStream,
 ) -> Result<(), fidl::Error> {
-    // TODO(https://fxbug.dev/341759423): Expose NDP-acquired DNS server
-    // configuration from netstack3.
-    warn!("blocking forever serving {}", fnet_name::DnsServerWatcherMarker::DEBUG_NAME);
+    // netstack3 deliberately does not serve fuchsia.net.name.DnsServerWatcher,
+    // with the expectation that netcfg serves a unified view of DNS servers
+    // instead (including consuming the
+    // fuchsia.net.ndp.RouterAdvertisementOptionWatcherProvider instance that
+    // netstack3 does serve).
+    warn!(
+        "Blocking forever serving {}. To obtain DNS servers, use netcfg instead.",
+        fnet_name::DnsServerWatcherMarker::DEBUG_NAME
+    );
     futures::future::pending().await
 }

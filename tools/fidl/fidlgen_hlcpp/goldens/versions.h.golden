@@ -524,7 +524,7 @@ struct Equality<::test::versions::Table> {
 #ifdef __Fuchsia__
 
 template <>
-struct IsFidlXUnion<::test::versions::Union> : public std::true_type{};
+struct IsFidlXUnion<::test::versions::Union> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::versions::Union>

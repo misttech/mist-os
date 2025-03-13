@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 pub mod component;
+pub mod serde;
 
 use fidl::endpoints::ServerEnd;
 #[cfg(fuchsia_api_level_at_least = "HEAD")]
@@ -364,9 +365,8 @@ pub struct StartInfo {
 impl TryFrom<fcrunner::ComponentStartInfo> for StartInfo {
     type Error = StartInfoError;
     fn try_from(start_info: fcrunner::ComponentStartInfo) -> Result<Self, Self::Error> {
-        let resolved_url =
-            start_info.resolved_url.ok_or_else(|| StartInfoError::MissingResolvedUrl)?;
-        let program = start_info.program.ok_or_else(|| StartInfoError::MissingProgram)?;
+        let resolved_url = start_info.resolved_url.ok_or(StartInfoError::MissingResolvedUrl)?;
+        let program = start_info.program.ok_or(StartInfoError::MissingProgram)?;
         Ok(Self {
             resolved_url,
             program,

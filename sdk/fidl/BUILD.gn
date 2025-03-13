@@ -49,7 +49,6 @@ _partner_idk_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner",
   "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox",
   "//sdk/fidl/fuchsia.component.test:fuchsia.component.test",
-  "//sdk/fidl/fuchsia.component.types:fuchsia.component.types",
   "//sdk/fidl/fuchsia.data:fuchsia.data",
   "//sdk/fidl/fuchsia.debugdata:fuchsia.debugdata",
   "//sdk/fidl/fuchsia.developer.tiles:fuchsia.developer.tiles",
@@ -66,6 +65,7 @@ _partner_idk_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.factory.wlan:fuchsia.factory.wlan",
   "//sdk/fidl/fuchsia.feedback:fuchsia.feedback",
   "//sdk/fidl/fuchsia.fonts:fuchsia.fonts",
+  "//sdk/fidl/fuchsia.gnss.types:fuchsia.gnss.types",
   "//sdk/fidl/fuchsia.gpu.agis:fuchsia.gpu.agis",
   "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma",
   "//sdk/fidl/fuchsia.hardware.adc:fuchsia.hardware.adc",
@@ -76,7 +76,9 @@ _partner_idk_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock",
   "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl",
   "//sdk/fidl/fuchsia.hardware.cpu.ctrl:fuchsia.hardware.cpu.ctrl",
+  "//sdk/fidl/fuchsia.hardware.gnss:fuchsia.hardware.gnss",
   "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio",
+  "//sdk/fidl/fuchsia.hardware.hrtimer:fuchsia.hardware.hrtimer",
   "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c",
   "//sdk/fidl/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl",
   "//sdk/fidl/fuchsia.hardware.i2c.businfo:fuchsia.hardware.i2c.businfo",
@@ -103,6 +105,7 @@ _partner_idk_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.hardware.serialimpl:fuchsia.hardware.serialimpl",
   "//sdk/fidl/fuchsia.hardware.sharedmemory:fuchsia.hardware.sharedmemory",
   "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi",
+  "//sdk/fidl/fuchsia.hardware.spi.businfo:fuchsia.hardware.spi.businfo",
   "//sdk/fidl/fuchsia.hardware.spiimpl:fuchsia.hardware.spiimpl",
   "//sdk/fidl/fuchsia.hardware.spmi:fuchsia.hardware.spmi",
   "//sdk/fidl/fuchsia.hardware.temperature:fuchsia.hardware.temperature",
@@ -243,23 +246,27 @@ sdk_molecule("fidl") {
   category = "partner"
 
   deps = []
-  non_sdk_deps = []
   foreach(fidl_library_path, _partner_idk_fidl_libraries_targets_list) {
     deps += [ "${fidl_library_path}_sdk($fidl_toolchain)" ]
   }
 
-  # Ensure that the API compatibility tests run on libraries that require
+  # Ensure that the API compatibility tests run on all libraries that require
   # compatibility but are not in the IDK.
-  non_sdk_deps += [ ":partner_internal_fidl_libraries_non_sdk_molecule" ]
+  non_sdk_deps = [
+    # "partner" is covered above.
+    # ":compat_test_fidl_libraries_non_sdk_molecule" is covered in
+    # "compatibility_tests". It cannot be here because it is "testonly = true".
+    ":partner_internal_fidl_libraries_non_sdk_molecule",
+  ]
 }
 
-group("sdk_fidl_partner_allowlist") {
+group("sdk_partner_libs_allowlist") {
   visibility = _partner_idk_fidl_libraries_targets_list
 }
 
 # The list of FIDL libraries in the "partner_internal" SDK category.
-# These libraries are NOT included in the IDK and is only used by the targets
-# below to ensure that we run the FIDL API compatibility tests on these
+# These libraries are NOT included in the IDK; this list is only used by the
+# targets below to ensure that we run the FIDL API compatibility tests on these
 # libraries and allowlist additions.
 # Targets must be included if and only if the `fidl()` target specifies:
 # `sdk_category = "partner_internal"`.
@@ -267,22 +274,14 @@ group("sdk_fidl_partner_allowlist") {
 #   git rm sdk/history/*/<library_name>.api_summary.json
 _partner_internal_fidl_libraries_targets_list = [
   # keep-sorted: begin
-  "//sdk/fidl/fuchsia.audio:fuchsia.audio",
-  "//sdk/fidl/fuchsia.audio.controller:fuchsia.audio.controller",
-  "//sdk/fidl/fuchsia.audio.device:fuchsia.audio.device",
-  "//sdk/fidl/fuchsia.bluetooth.pandora:fuchsia.bluetooth.pandora",
   "//sdk/fidl/fuchsia.dash:fuchsia.dash",
   "//sdk/fidl/fuchsia.debugger:fuchsia.debugger",
   "//sdk/fidl/fuchsia.developer.ffxdaemonlifecycle:fuchsia.developer.ffxdaemonlifecycle",
   "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol",
   "//sdk/fidl/fuchsia.device:fuchsia.device",
   "//sdk/fidl/fuchsia.diagnostics.host:fuchsia.diagnostics.host",
-  "//sdk/fidl/fuchsia.drm:fuchsia.drm",
-  "//sdk/fidl/fuchsia.fdomain:fuchsia.fdomain",
   "//sdk/fidl/fuchsia.fs:fuchsia.fs",
   "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty",
-  "//sdk/fidl/fuchsia.media2:fuchsia.media2",
-  "//sdk/fidl/fuchsia.memory.attribution.plugin:fuchsia.memory.attribution.plugin",
   "//sdk/fidl/fuchsia.memory.debug:fuchsia.memory.debug",
   "//sdk/fidl/fuchsia.memory.heapdump.client:fuchsia.memory.heapdump.client",
   "//sdk/fidl/fuchsia.memory.inspection:fuchsia.memory.inspection",
@@ -293,27 +292,28 @@ _partner_internal_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.posix.socket.packet:fuchsia.posix.socket.packet",
   "//sdk/fidl/fuchsia.posix.socket.raw:fuchsia.posix.socket.raw",
   "//sdk/fidl/fuchsia.power.metrics:fuchsia.power.metrics",
-  "//sdk/fidl/fuchsia.session.power:fuchsia.session.power",
   "//sdk/fidl/fuchsia.starnix.container:fuchsia.starnix.container",
   "//sdk/fidl/fuchsia.sys2:fuchsia.sys2",
   "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager",
-  "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness",
   "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader",
 
   # keep-sorted: end
 ]
 
-# Do NOT depend on this molecule from another SDK atom's `deps`. If is only
+# Do NOT depend on this molecule from another SDK atom's `deps`. It is only
 # to be used in `non_sdk_deps` of the "fidl" target to ensure a) there are no
 # category violations and b) that compatibility tests are run.
 # It must be an `sdk_molecule()` and not a `group()` because category checking
 # is not performed on `non_sdk_deps`.
 sdk_molecule("partner_internal_fidl_libraries_non_sdk_molecule") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":fidl.manifest",
+    ":partner_internal_fidl_libraries_non_sdk_molecule",
+    ":partner_internal_fidl_libraries_non_sdk_molecule.validate",
+  ]
   category = "partner_internal"
 
   deps = []
-  non_sdk_deps = []
   foreach(fidl_library_path, _partner_internal_fidl_libraries_targets_list) {
     deps += [ "${fidl_library_path}_sdk($fidl_toolchain)" ]
   }
@@ -323,11 +323,58 @@ group("sdk_partner_internal_libs_allowlist") {
   visibility = _partner_internal_fidl_libraries_targets_list
 }
 
+# The list of FIDL libraries in the "compat_test" SDK category.
+# These libraries are NOT included in the IDK; this list is only used by the
+# targets below to ensure that we run the FIDL API compatibility tests on these
+# libraries and allowlist additions.
+# Targets must be included if and only if the `fidl()` target specifies:
+# `sdk_category = "compat_test"`.
+# When removing a library from all such lists, delete all of its history files:
+#   git rm sdk/history/*/<library_name>.api_summary.json
+_compat_test_fidl_libraries_targets_list = [
+  # keep-sorted: begin
+  "//sdk/ctf/tests/fidl/fuchsia.element/testing/fidl:fuchsia.element.test",
+  "//sdk/ctf/tests/fidl/fuchsia.intl/testing/fidl:fuchsia.intl.test",
+  "//sdk/ctf/tests/fidl/fuchsia.settings/testing/fidl:fuchsia.settings.test",
+  "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness",
+  "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus",
+  "//src/diagnostics/archivist/tests/integration/realm_factory/fidl:fuchsia.archivist.test",
+
+  # keep-sorted: end
+]
+
+# Do NOT depend on this molecule from another SDK atom's `deps`. It is only to
+# be used in `non_sdk_deps` of the "compatibility_tests" target to ensure
+# a) there are no category violations and b) that compatibility tests are run.
+# It must be an `sdk_molecule()` and not a `group()` because category checking
+# is not performed on `non_sdk_deps`.
+sdk_molecule("compat_test_fidl_libraries_non_sdk_molecule") {
+  testonly = true
+  visibility = [
+    ":compat_test_fidl_libraries_non_sdk_molecule",
+    ":compat_test_fidl_libraries_non_sdk_molecule.validate",
+    ":compatibility_checks_for_categories_supporting_testonly.manifest",
+    ":fidl.manifest",
+  ]
+  category = "compat_test"
+
+  deps = []
+  foreach(fidl_library_path, _compat_test_fidl_libraries_targets_list) {
+    deps += [ "${fidl_library_path}_sdk($fidl_toolchain)" ]
+  }
+}
+
+group("sdk_compat_test_libs_allowlist") {
+  visibility = _compat_test_fidl_libraries_targets_list
+}
+
 # Ensure the lists are mutually exclusive.
 assert(
     _partner_idk_fidl_libraries_targets_list +
+        _partner_internal_fidl_libraries_targets_list +
+        _compat_test_fidl_libraries_targets_list -
         _partner_internal_fidl_libraries_targets_list -
-        _partner_internal_fidl_libraries_targets_list ==
+        _compat_test_fidl_libraries_targets_list ==
         _partner_idk_fidl_libraries_targets_list,
     "A FIDL library appears in more than one SDK category list. If adding a library to a category, remove it from the other.")
 
@@ -338,4 +385,36 @@ group("internal_only_idk_libs_allowlist") {
   # TODO(https://fxbug.dev/333907192): Promote this library to "partner" or
   # "partner_internal" and delete this group.
   visibility += [ "//sdk/fidl/fuchsia.boot($fidl_toolchain)" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":compatibility_tests" ]
+}
+
+# Runs the build-time compatibility tests for all FIDL libraries that need them.
+group("compatibility_tests") {
+  visibility = [
+    ":tests",
+    "//:default",
+  ]
+  testonly = true
+  deps = [
+    # Compatibility tests are only run on these libraries via this target.
+    ":compatibility_checks_for_categories_supporting_testonly",
+
+    # For completeness, depend on the target that runs the tests for all other
+    # libraries.
+    ":fidl",
+  ]
+}
+
+# Runs API compatibility tests on libraries that require compatibility and may
+# be test-only. This is necessary because some libraries are `testonly = true`
+# and thus cannot be dependencies of a production target such as ":fidl".
+sdk_molecule("compatibility_checks_for_categories_supporting_testonly") {
+  category = "compat_test"
+  testonly = true
+
+  non_sdk_deps = [ ":compat_test_fidl_libraries_non_sdk_molecule" ]
 }

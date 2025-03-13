@@ -6,6 +6,7 @@
 #define SRC_DEVICES_I2C_DRIVERS_INTEL_I2C_INTEL_I2C_CONTROLLER_H_
 
 #include <fidl/fuchsia.hardware.acpi/cpp/wire.h>
+#include <fidl/fuchsia.hardware.i2c.businfo/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.i2cimpl/cpp/driver/wire.h>
 #include <lib/ddk/device.h>
 #include <lib/device-protocol/pci.h>
@@ -22,6 +23,7 @@
 #include <optional>
 
 #include <ddktl/device.h>
+#include <ddktl/metadata_server.h>
 
 #include "intel-i2c-subordinate.h"
 #include "sdk/lib/driver/outgoing/cpp/outgoing_directory.h"
@@ -249,6 +251,8 @@ class IntelI2cController : public IntelI2cControllerType,
 
   fdf::ServerBindingGroup<fuchsia_hardware_i2cimpl::Device> bindings_;
   fdf::OutgoingDirectory outgoing_;
+
+  ddk::MetadataServer<fuchsia_hardware_i2c_businfo::I2CBusMetadata> metadata_server_;
 };
 
 }  // namespace intel_i2c

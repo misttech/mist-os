@@ -17,7 +17,9 @@ Symbols:
   - { Name: vkCmdBeginRenderPass2, Type: Func }
   - { Name: vkCmdBeginRendering, Type: Func }
   - { Name: vkCmdBindDescriptorSets, Type: Func }
+  - { Name: vkCmdBindDescriptorSets2, Type: Func }
   - { Name: vkCmdBindIndexBuffer, Type: Func }
+  - { Name: vkCmdBindIndexBuffer2, Type: Func }
   - { Name: vkCmdBindPipeline, Type: Func }
   - { Name: vkCmdBindVertexBuffers, Type: Func }
   - { Name: vkCmdBindVertexBuffers2, Type: Func }
@@ -55,6 +57,11 @@ Symbols:
   - { Name: vkCmdPipelineBarrier, Type: Func }
   - { Name: vkCmdPipelineBarrier2, Type: Func }
   - { Name: vkCmdPushConstants, Type: Func }
+  - { Name: vkCmdPushConstants2, Type: Func }
+  - { Name: vkCmdPushDescriptorSet, Type: Func }
+  - { Name: vkCmdPushDescriptorSet2, Type: Func }
+  - { Name: vkCmdPushDescriptorSetWithTemplate, Type: Func }
+  - { Name: vkCmdPushDescriptorSetWithTemplate2, Type: Func }
   - { Name: vkCmdResetEvent, Type: Func }
   - { Name: vkCmdResetEvent2, Type: Func }
   - { Name: vkCmdResetQueryPool, Type: Func }
@@ -73,10 +80,13 @@ Symbols:
   - { Name: vkCmdSetEvent, Type: Func }
   - { Name: vkCmdSetEvent2, Type: Func }
   - { Name: vkCmdSetFrontFace, Type: Func }
+  - { Name: vkCmdSetLineStipple, Type: Func }
   - { Name: vkCmdSetLineWidth, Type: Func }
   - { Name: vkCmdSetPrimitiveRestartEnable, Type: Func }
   - { Name: vkCmdSetPrimitiveTopology, Type: Func }
   - { Name: vkCmdSetRasterizerDiscardEnable, Type: Func }
+  - { Name: vkCmdSetRenderingAttachmentLocations, Type: Func }
+  - { Name: vkCmdSetRenderingInputAttachmentIndices, Type: Func }
   - { Name: vkCmdSetScissor, Type: Func }
   - { Name: vkCmdSetScissorWithCount, Type: Func }
   - { Name: vkCmdSetStencilCompareMask, Type: Func }
@@ -91,6 +101,9 @@ Symbols:
   - { Name: vkCmdWaitEvents2, Type: Func }
   - { Name: vkCmdWriteTimestamp, Type: Func }
   - { Name: vkCmdWriteTimestamp2, Type: Func }
+  - { Name: vkCopyImageToImage, Type: Func }
+  - { Name: vkCopyImageToMemory, Type: Func }
+  - { Name: vkCopyMemoryToImage, Type: Func }
   - { Name: vkCreateBuffer, Type: Func }
   - { Name: vkCreateBufferView, Type: Func }
   - { Name: vkCreateCommandPool, Type: Func }
@@ -171,6 +184,7 @@ Symbols:
   - { Name: vkGetDeviceGroupSurfacePresentModesKHR, Type: Func }
   - { Name: vkGetDeviceImageMemoryRequirements, Type: Func }
   - { Name: vkGetDeviceImageSparseMemoryRequirements, Type: Func }
+  - { Name: vkGetDeviceImageSubresourceLayout, Type: Func }
   - { Name: vkGetDeviceMemoryCommitment, Type: Func }
   - { Name: vkGetDeviceMemoryOpaqueCaptureAddress, Type: Func }
   - { Name: vkGetDeviceProcAddr, Type: Func }
@@ -188,6 +202,7 @@ Symbols:
   - { Name: vkGetImageSparseMemoryRequirements, Type: Func }
   - { Name: vkGetImageSparseMemoryRequirements2, Type: Func }
   - { Name: vkGetImageSubresourceLayout, Type: Func }
+  - { Name: vkGetImageSubresourceLayout2, Type: Func }
   - { Name: vkGetInstanceProcAddr, Type: Func }
   - { Name: vkGetPhysicalDeviceDisplayPlaneProperties2KHR, Type: Func }
   - { Name: vkGetPhysicalDeviceDisplayPlanePropertiesKHR, Type: Func }
@@ -222,10 +237,12 @@ Symbols:
   - { Name: vkGetPrivateData, Type: Func }
   - { Name: vkGetQueryPoolResults, Type: Func }
   - { Name: vkGetRenderAreaGranularity, Type: Func }
+  - { Name: vkGetRenderingAreaGranularity, Type: Func }
   - { Name: vkGetSemaphoreCounterValue, Type: Func }
   - { Name: vkGetSwapchainImagesKHR, Type: Func }
   - { Name: vkInvalidateMappedMemoryRanges, Type: Func }
   - { Name: vkMapMemory, Type: Func }
+  - { Name: vkMapMemory2, Type: Func }
   - { Name: vkMergePipelineCaches, Type: Func }
   - { Name: vkQueueBindSparse, Type: Func }
   - { Name: vkQueuePresentKHR, Type: Func }
@@ -241,8 +258,10 @@ Symbols:
   - { Name: vkSetEvent, Type: Func }
   - { Name: vkSetPrivateData, Type: Func }
   - { Name: vkSignalSemaphore, Type: Func }
+  - { Name: vkTransitionImageLayout, Type: Func }
   - { Name: vkTrimCommandPool, Type: Func }
   - { Name: vkUnmapMemory, Type: Func }
+  - { Name: vkUnmapMemory2, Type: Func }
   - { Name: vkUpdateDescriptorSetWithTemplate, Type: Func }
   - { Name: vkUpdateDescriptorSets, Type: Func }
   - { Name: vkWaitForFences, Type: Func }

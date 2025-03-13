@@ -5,7 +5,6 @@
 #ifndef LIB_DRIVER_MOCK_MMIO_CPP_MOCK_MMIO_REG_H_
 #define LIB_DRIVER_MOCK_MMIO_CPP_MOCK_MMIO_REG_H_
 
-#include <lib/mmio-ptr/fake.h>
 #include <lib/mmio/mmio.h>
 
 #include <memory>

@@ -13,7 +13,6 @@
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
 #include <zircon/assert.h>
-#include <zircon/status.h>
 #include <zircon/threads.h>
 
 #include <memory>
@@ -44,8 +43,7 @@ zx::result<std::unique_ptr<VsyncReceiver>> VsyncReceiver::Create(
           fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "vsync-interrupt-thread",
           /*shutdown_handler=*/[](fdf_dispatcher_t*) {}, kRoleName);
   if (create_dispatcher_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to create vsync Dispatcher: %s",
-            create_dispatcher_result.status_string());
+    fdf::error("Failed to create vsync Dispatcher: {}", create_dispatcher_result);
     return create_dispatcher_result.take_error();
   }
   fdf::SynchronizedDispatcher dispatcher = std::move(create_dispatcher_result).value();
@@ -55,13 +53,13 @@ zx::result<std::unique_ptr<VsyncReceiver>> VsyncReceiver::Create(
       fbl::make_unique_checked<VsyncReceiver>(&alloc_checker, std::move(vsync_irq_result).value(),
                                               std::move(on_vsync), std::move(dispatcher));
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Out of memory while allocating VsyncReceiver");
+    fdf::error("Out of memory while allocating VsyncReceiver");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   zx::result<> start_result = vsync_receiver->SetReceivingState(/*receiving=*/true);
   if (start_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to start VsyncReceiver: %s", start_result.status_string());
+    fdf::error("Failed to start VsyncReceiver: {}", start_result);
     return start_result.take_error();
   }
 
@@ -82,8 +80,7 @@ VsyncReceiver::~VsyncReceiver() {
   if (vsync_irq_.is_valid()) {
     zx_status_t status = vsync_irq_.destroy();
     if (status != ZX_OK) {
-      FDF_LOG(ERROR, "VsyncReceiver done interrupt destroy failed: %s",
-              zx_status_get_string(status));
+      fdf::error("VsyncReceiver done interrupt destroy failed: {}", zx::make_result(status));
     }
   }
 
@@ -107,14 +104,14 @@ zx::result<> VsyncReceiver::PostStart() {
       async::PostTask(irq_handler_dispatcher_.async_dispatcher(), [this] {
         zx_status_t status = irq_handler_.Begin(irq_handler_dispatcher_.async_dispatcher());
         if (status != ZX_OK) {
-          FDF_LOG(ERROR, "Failed to bind the Vsync handler to the async loop: %s",
-                  zx_status_get_string(status));
+          fdf::error("Failed to bind the Vsync handler to the async loop: {}",
+                     zx::make_result(status));
         }
       });
 
   if (post_task_status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to post the Vsync handler begin task: %s",
-            zx_status_get_string(post_task_status));
+    fdf::error("Failed to post the Vsync handler begin task: {}",
+               zx::make_result(post_task_status));
     return zx::error(post_task_status);
   }
   is_receiving_ = true;
@@ -130,13 +127,13 @@ zx::result<> VsyncReceiver::PostStop() {
       async::PostTask(irq_handler_dispatcher_.async_dispatcher(), [this]() {
         zx_status_t status = irq_handler_.Cancel();
         if (status != ZX_OK) {
-          FDF_LOG(ERROR, "Failed to cancel the Vsync handler: %s", zx_status_get_string(status));
+          fdf::error("Failed to cancel the Vsync handler: {}", zx::make_result(status));
         }
       });
 
   if (post_task_status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to post the Vsync handler cancel task: %s",
-            zx_status_get_string(post_task_status));
+    fdf::error("Failed to post the Vsync handler cancel task: {}",
+               zx::make_result(post_task_status));
     return zx::error(post_task_status);
   }
 
@@ -147,11 +144,11 @@ zx::result<> VsyncReceiver::PostStop() {
 void VsyncReceiver::InterruptHandler(async_dispatcher_t* dispatcher, async::IrqBase* irq,
                                      zx_status_t status, const zx_packet_interrupt_t* interrupt) {
   if (status == ZX_ERR_CANCELED) {
-    FDF_LOG(INFO, "Vsync interrupt wait is cancelled.");
+    fdf::info("Vsync interrupt wait is cancelled.");
     return;
   }
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Vsync interrupt wait failed: %s", zx_status_get_string(status));
+    fdf::error("Vsync interrupt wait failed: {}", zx::make_result(status));
     // A failed async interrupt wait doesn't remove the interrupt from the
     // async loop, so we have to manually cancel it.
     irq->Cancel();

@@ -21,6 +21,7 @@ source_set("top") {
     "//zircon/kernel/kernel",
     "//zircon/kernel/lib/backtrace",
     "//zircon/kernel/lib/boot-options",
+    "//zircon/kernel/lib/code-patching:self-test",
     "//zircon/kernel/lib/console",
     "//zircon/kernel/lib/counters",
     "//zircon/kernel/lib/crashlog",
@@ -39,7 +40,4 @@ source_set("top") {
   if (is_mistos) {
     deps += [ "//vendor/misttech/zircon/kernel/lib/starnix" ]
   }
-
-  # TODO(https://fxbug.dev/374753100): Remove this after soft transition.
-  defines = [ "_LIBCPP_VERBOSE_ABORT_NOT_NOEXCEPT" ]
 }

@@ -30,7 +30,7 @@ implementations of the same function for fidl proxy creation and benchmarks.
 3. Start the Fuchsia emulator
 
     ```
-    ffx emu start --headless
+    ffx emu start --headless --net tap
     ```
 
 4. In a separate terminal, serve Fuchsia packages
@@ -42,8 +42,13 @@ implementations of the same function for fidl proxy creation and benchmarks.
 5. Run the tests
 
     ```
-    fx test --e2e takewakelease_benchmarks -o
     fx test --e2e power_framework_microbenchmarks -o
+    ```
+
+6. Run integration tests (optional)
+
+    ```
+    fx test -o power-framework-bench-integration-tests --test-filter=*test_topologytestdaemon_toggle -- --repeat 2000
     ```
 
 After completing, the tests will print the name of the

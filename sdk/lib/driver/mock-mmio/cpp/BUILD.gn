@@ -20,10 +20,7 @@ sdk_source_set("cpp") {
     "mock-mmio-reg.h",
   ]
 
-  public_deps = [
-    "//src/devices/lib/mmio",
-    "//zircon/system/ulib/mmio-ptr",
-  ]
+  public_deps = [ "//src/devices/lib/mmio" ]
 
   public_configs = [ "//sdk/config" ]
 }

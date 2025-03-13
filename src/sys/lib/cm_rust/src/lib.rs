@@ -14,7 +14,7 @@ use std::hash::Hash;
 use thiserror::Error;
 use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
-    fidl_fuchsia_process as fprocess,
+    fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys,
 };
 
 #[cfg(feature = "serde")]
@@ -1926,6 +1926,7 @@ fidl_translations_identical!(fio::Operations);
 fidl_translations_identical!(fdecl::EnvironmentExtends);
 fidl_translations_identical!(fdecl::StorageId);
 fidl_translations_identical!(Vec<fprocess::HandleInfo>);
+fidl_translations_identical!(fsys::ServiceInstance);
 fidl_translations_from_into!(cm_types::AllowedOffers, fdecl::AllowedOffers);
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize), serde(rename_all = "snake_case"))]

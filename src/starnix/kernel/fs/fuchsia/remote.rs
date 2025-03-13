@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::fs::fuchsia::remote_volume::RemoteVolume;
 use crate::fs::fuchsia::sync_file::{SyncFence, SyncFile, SyncPoint, Timeline};
 #[cfg(not(feature = "starnix_lite"))]
 use crate::fs::fuchsia::RemoteUnixDomainSocket;
@@ -122,7 +123,11 @@ impl RemoteFs {
     /// This will panic if `fs`'s ops aren't `RemoteFs`, so this should only be called when this is
     /// known to be the case.
     fn from_fs(fs: &FileSystem) -> &RemoteFs {
-        fs.downcast_ops::<RemoteFs>().unwrap()
+        if let Some(remote_vol) = fs.downcast_ops::<RemoteVolume>() {
+            remote_vol.remotefs()
+        } else {
+            fs.downcast_ops::<RemoteFs>().unwrap()
+        }
     }
 }
 
@@ -220,21 +225,19 @@ impl FileSystemOps for RemoteFs {
             .rename(get_name_str(old_name)?, &new_parent.zxio, get_name_str(new_name)?)
             .map_err(|status| from_status_like_fdio!(status))
     }
+
+    fn manages_timestamps(&self) -> bool {
+        true
+    }
 }
 
 impl RemoteFs {
-    pub fn new_fs(
-        kernel: &Arc<Kernel>,
-        root: zx::Channel,
-        mut options: FileSystemOptions,
-        rights: fio::Flags,
-    ) -> Result<FileSystemHandle, Errno> {
+    pub fn new(root: zx::Channel, server_end: zx::Channel) -> Result<RemoteFs, Errno> {
         // See if open3 works.  We assume that if open3 works on the root, it will work for all
         // descendent nodes in this filesystem.  At the time of writing, this is true for Fxfs.
-        let (client_end, server_end) = zx::Channel::create();
         let root_proxy = fio::DirectorySynchronousProxy::new(root);
         root_proxy
-            .open3(
+            .open(
                 ".",
                 fio::Flags::PROTOCOL_DIRECTORY
                     | fio::PERM_READABLE
@@ -260,7 +263,17 @@ impl RemoteFs {
             && info
                 .map(|i| i.fs_type == fidl_fuchsia_fs::VfsType::Fxfs.into_primitive())
                 .unwrap_or(false);
+        Ok(RemoteFs { use_remote_ids, root_proxy })
+    }
 
+    pub fn new_fs(
+        kernel: &Arc<Kernel>,
+        root: zx::Channel,
+        mut options: FileSystemOptions,
+        rights: fio::Flags,
+    ) -> Result<FileSystemHandle, Errno> {
+        let (client_end, server_end) = zx::Channel::create();
+        let remotefs = RemoteFs::new(root, server_end)?;
         let mut attrs = zxio_node_attributes_t {
             has: zxio_node_attr_has_t { id: true, ..Default::default() },
             ..Default::default()
@@ -274,15 +287,9 @@ impl RemoteFs {
         if !rights.contains(fio::PERM_WRITABLE) {
             options.flags |= MountFlags::RDONLY;
         }
-        // NOTE: This mount option exists for now to workaround selinux issues.  The `defcontext`
-        // option operates similarly to Linux's equivalent, but it's not exactly the same.  When our
-        // selinux support is further along, we might want to remove this mount option.
-        let fs = FileSystem::new(
-            kernel,
-            CacheMode::Cached(CacheConfig::default()),
-            RemoteFs { use_remote_ids, root_proxy },
-            options,
-        )?;
+        let use_remote_ids = remotefs.use_remote_ids;
+        let fs =
+            FileSystem::new(kernel, CacheMode::Cached(CacheConfig::default()), remotefs, options)?;
         let mut root_node = FsNode::new_root(remote_node);
         if use_remote_ids {
             root_node.node_id = node_id;
@@ -290,9 +297,13 @@ impl RemoteFs {
         fs.set_root_node(root_node);
         Ok(fs)
     }
+
+    pub fn use_remote_ids(&self) -> bool {
+        self.use_remote_ids
+    }
 }
 
-struct RemoteNode {
+pub struct RemoteNode {
     /// The underlying Zircon I/O object for this remote node.
     ///
     /// We delegate to the zxio library for actually doing I/O with remote
@@ -303,6 +314,12 @@ struct RemoteNode {
     /// The fuchsia.io rights for the dir handle. Subdirs will be opened with
     /// the same rights.
     rights: fio::Flags,
+}
+
+impl RemoteNode {
+    pub fn new(zxio: Arc<syncio::Zxio>, rights: fio::Flags) -> Self {
+        Self { zxio, rights }
+    }
 }
 
 /// Create a file handle from a zx::Handle.
@@ -441,8 +458,9 @@ pub fn update_info_from_attrs(info: &mut FsNodeInfo, attrs: &zxio_node_attribute
         info.size = attrs.content_size.try_into().unwrap_or(std::usize::MAX);
     }
     if attrs.has.storage_size {
-        info.blocks = usize::try_from(attrs.storage_size).unwrap_or(std::usize::MAX)
-            / DEFAULT_BYTES_PER_BLOCK;
+        info.blocks = usize::try_from(attrs.storage_size)
+            .unwrap_or(std::usize::MAX)
+            .div_ceil(DEFAULT_BYTES_PER_BLOCK)
     }
     info.blksize = DEFAULT_BYTES_PER_BLOCK;
     if attrs.has.link_count {
@@ -850,10 +868,6 @@ impl FsNodeOps for RemoteNode {
         fetch_and_refresh_info_impl(&self.zxio, info)
     }
 
-    fn filesystem_manages_timestamps(&self, _node: &FsNode) -> bool {
-        true
-    }
-
     fn update_attributes(
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
@@ -948,6 +962,73 @@ impl FsNodeOps for RemoteNode {
 
     fn get_attr(&self, has: zxio_node_attr_has_t) -> Result<zxio_node_attributes_t, Errno> {
         self.zxio.attr_get(has).map_err(|status| from_status_like_fdio!(status))
+    }
+
+    fn create_tmpfile(
+        &self,
+        node: &FsNode,
+        current_task: &CurrentTask,
+        mode: FileMode,
+        owner: FsCred,
+    ) -> Result<FsNodeHandle, Errno> {
+        let fs = node.fs();
+        let fs_ops = RemoteFs::from_fs(&fs);
+
+        let zxio;
+        let mut node_id;
+        if !mode.is_reg() {
+            return error!(EINVAL);
+        }
+        let mut attrs = zxio_node_attributes_t {
+            has: zxio_node_attr_has_t { id: true, ..Default::default() },
+            ..Default::default()
+        };
+        // `create_tmpfile` is used by O_TMPFILE. Note that
+        // <https://man7.org/linux/man-pages/man2/open.2.html> states that if O_EXCL is specified
+        // with O_TMPFILE, the temporary file created cannot be linked into the filesystem. Although
+        // there exist fuchsia flags `fio::FLAG_TEMPORARY_AS_NOT_LINKABLE`, the starnix vfs already
+        // handles this case and makes sure that the created file is not linkable. There is also no
+        // current way of passing the open flags to this function.
+        zxio = Arc::new(
+            self.zxio
+                .open(
+                    ".",
+                    fio::Flags::PROTOCOL_FILE
+                        | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
+                        | self.rights,
+                    ZxioOpenOptions::new(
+                        Some(&mut attrs),
+                        Some(zxio_node_attributes_t {
+                            mode: mode.bits(),
+                            uid: owner.uid,
+                            gid: owner.gid,
+                            has: zxio_node_attr_has_t {
+                                mode: true,
+                                uid: true,
+                                gid: true,
+                                ..Default::default()
+                            },
+                            ..Default::default()
+                        }),
+                    ),
+                )
+                .map_err(|status| from_status_like_fdio!(status))?,
+        );
+        node_id = attrs.id;
+
+        let ops = Box::new(RemoteNode { zxio, rights: self.rights }) as Box<dyn FsNodeOps>;
+
+        if !fs_ops.use_remote_ids {
+            node_id = fs.next_node_id();
+        }
+        let child = fs.create_node_with_id(
+            current_task,
+            ops,
+            node_id,
+            FsNodeInfo::new(node_id, mode, owner),
+        );
+
+        Ok(child)
     }
 
     fn link(
@@ -1518,10 +1599,6 @@ impl FsNodeOps for RemoteSymlink {
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
         fetch_and_refresh_info_impl(&self.zxio, info)
-    }
-
-    fn filesystem_manages_timestamps(&self, _node: &FsNode) -> bool {
-        true
     }
 }
 

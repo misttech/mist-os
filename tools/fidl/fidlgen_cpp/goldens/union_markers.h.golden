@@ -30,6 +30,8 @@ class TestProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 6628358876445129155;
   };
   class FlexibleUnionHenceResponseMustBeHeapAllocated final {
     FlexibleUnionHenceResponseMustBeHeapAllocated() = delete;
@@ -44,6 +46,8 @@ class TestProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 7588545459451501794;
   };
 };
 
@@ -51,6 +55,6 @@ class TestProtocol final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_union::TestProtocol> : public std::true_type{};
+struct IsProtocol<::test_union::TestProtocol> : public std::true_type {};
 
 }  // namespace fidl

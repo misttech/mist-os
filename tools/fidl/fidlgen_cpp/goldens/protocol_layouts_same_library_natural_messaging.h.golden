@@ -6,7 +6,6 @@
 
 #include <fidl/test.protocollayoutssamelibrary/cpp/markers.h>
 #include <fidl/test.protocollayoutssamelibrary/cpp/natural_types.h>
-#include <fidl/test.protocollayoutssamelibrary/cpp/wire_messaging.h>
 #include <lib/fidl/cpp/channel.h>
 #include <lib/fidl/cpp/client.h>
 #include <lib/fidl/cpp/internal/thenable.h>
@@ -48,6 +47,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::C
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>>;
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>&)>;
+  using DomainError = uint32_t;
 };
 
 template <>
@@ -82,6 +82,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::C
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>>;
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>&)>;
+  using DomainError = uint32_t;
 };
 
 template <>
@@ -445,6 +446,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::M
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>>;
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>&)>;
+  using DomainError = uint32_t;
 };
 
 template <>
@@ -479,6 +481,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::M
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>>;
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>&)>;
+  using DomainError = uint32_t;
 };
 
 template <>
@@ -513,6 +516,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::M
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>>;
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>&)>;
+  using DomainError = uint32_t;
 };
 
 template <>
@@ -547,6 +551,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::M
   using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>>;
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>&)>;
+  using DomainError = uint32_t;
 };
 
 template <>

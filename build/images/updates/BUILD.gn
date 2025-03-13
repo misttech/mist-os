@@ -155,19 +155,23 @@ import("//src/sys/pkg/repositories/devhost/devhost.gni")
 assert(current_toolchain == default_toolchain,
        "//build/images/* are only valid in the Fuchsia toolchain")
 
+has_product_bundle =
+    !(use_bazel_images_only && bazel_product_bundle_target == "")
+
 if (use_bringup_assembly) {
-  # These don't have any meaning in a bringup assembly, so leave them as empty
+  not_needed([ "has_product_bundle" ])
+
+  # These don't have any meaning in these assemblies, so leave them as empty
   # placeholder targets.
   group("updates") {
   }
   group("packages") {
   }
-  group("publish") {
+  group("prepare_publish") {
   }
-
-  # This file doesn't exist for bringup, as bringup does not have packages to
-  # upload blobs for.
   group("all_package_manifests.list") {
+  }
+  group("publish") {
   }
 } else {
   group("updates") {
@@ -180,10 +184,6 @@ if (use_bringup_assembly) {
 
   # Use the common `labels` and `files` vars
   import("//build/images/paths.gni")
-
-  #####
-  # These are the package groups that are used to build the system
-
   group("universe_packages") {
     testonly = true
     visibility = [ ":*" ]
@@ -221,13 +221,17 @@ if (use_bringup_assembly) {
     deps = [
       # The universe package set
       ":universe_packages",
-
-      # Everything else in the main image
-      labels.images,
-
-      # The recovery image
-      labels.recovery_images,
     ]
+
+    if (has_product_bundle) {
+      deps += [
+        # Everything else in the main image
+        labels.images,
+
+        # The recovery image
+        labels.recovery_images,
+      ]
+    }
 
     # Restrict usages to //BUILD.gn targets only (build_api_module()s, for the
     # most part)
@@ -240,39 +244,41 @@ if (use_bringup_assembly) {
     }
   }
 
-  #####
-  # These are lists of the names of the packages in each package set, sourced
-  # either from assembly's outputs, or from GN metadata walks.  It's not clear
-  # who uses these files (aside from the base_packages.list)
-  # These are intermediate outputs which are used to create the final outputs
+  if (has_product_bundle) {
+    #####
+    # These are lists of the names of the packages in each package set, sourced
+    # either from assembly's outputs, or from GN metadata walks.  It's not clear
+    # who uses these files (aside from the base_packages.list)
+    # These are intermediate outputs which are used to create the final outputs
 
-  # This file is used by `fx test` to determine if a test package is in the base
-  # package set, and if so, triggers an OTA instead of a resolving of the
-  # package by merkle.
-  package_list_from_assembly("base_packages.list") {
-    testonly = true
-    system_label = labels.images
-    if (use_bazel_images_only) {
-      # In Bazel assembly, images.json is produced by the "_create_system"
-      # subtarget.
-      system_label += "_create_system"
+    # This file is used by `fx test` to determine if a test package is in the base
+    # package set, and if so, triggers an OTA instead of a resolving of the
+    # package by merkle.
+    package_list_from_assembly("base_packages.list") {
+      testonly = true
+      system_label = labels.images
+      if (use_bazel_images_only) {
+        # In Bazel assembly, images.json is produced by the "_create_system"
+        # subtarget.
+        system_label += "_create_system"
+      }
+      package_set = "base"
+      contents = "name"
+      outputs = [ files.base_package_names ]
     }
-    package_set = "base"
-    contents = "name"
-    outputs = [ files.base_package_names ]
-  }
 
-  package_list_from_assembly("cache_packages.list") {
-    testonly = true
-    system_label = labels.images
-    if (use_bazel_images_only) {
-      # In Bazel assembly, images.json is produced by the "_create_system"
-      # subtarget.
-      system_label += "_create_system"
+    package_list_from_assembly("cache_packages.list") {
+      testonly = true
+      system_label = labels.images
+      if (use_bazel_images_only) {
+        # In Bazel assembly, images.json is produced by the "_create_system"
+        # subtarget.
+        system_label += "_create_system"
+      }
+      package_set = "cache"
+      contents = "name"
+      outputs = [ files.cache_package_names ]
     }
-    package_set = "cache"
-    contents = "name"
-    outputs = [ files.cache_package_names ]
   }
 
   generate_package_metadata("universe_packages.list") {
@@ -288,33 +294,41 @@ if (use_bringup_assembly) {
     visibility = [ ":*" ]
 
     deps = [
-      ":all_package_manifests.list",
-      ":assembly_cache_packages.list",
-      ":base_packages.list",
-
-      # These are still necessary for fx list-packages.
-      ":cache_packages.list",
+      # This is still necessary for fx list-packages.
       ":universe_packages.list",
     ]
-  }
 
-  ###
-  ### Amber updates.
-  ###
+    if (has_product_bundle) {
+      deps += [
+        ":all_package_manifests.list",
+        ":assembly_cache_packages.list",
+        ":base_packages.list",
 
-  if (!use_bazel_images_only) {
-    recovery_images_list = root_build_dir + "/recovery_images_list"
-    generated_file("recovery_images_list") {
-      testonly = true
-      outputs = [ recovery_images_list ]
-      output_conversion = "list lines"
-      data_keys = [ "update_target" ]
-      deps = [ recovery_label ]
+        # This is still necessary for fx list-packages.
+        ":cache_packages.list",
+      ]
     }
   }
 
-  generate_epoch("epoch.json") {
-    output_file = "${target_out_dir}/${target_name}"
+  if (has_product_bundle) {
+    ###
+    ### Amber updates.
+    ###
+
+    if (!use_bazel_images_only) {
+      recovery_images_list = root_build_dir + "/recovery_images_list"
+      generated_file("recovery_images_list") {
+        testonly = true
+        outputs = [ recovery_images_list ]
+        output_conversion = "list lines"
+        data_keys = [ "update_target" ]
+        deps = [ recovery_label ]
+      }
+    }
+
+    generate_epoch("epoch.json") {
+      output_file = "${target_out_dir}/${target_name}"
+    }
   }
 
   # This output is a manifest of manifests that is usable as an input to `pm
@@ -329,41 +343,50 @@ if (use_bringup_assembly) {
     deps = [
       # Universe
       ":universe_packages",
-
-      # The update packages for the main image
-      labels.images,
     ]
-  }
 
-  if (!use_bazel_images_only) {
-    # When using GN-based assembly, these lists need to be extracted from the
-    # assembly manifest.
-
-    package_list_from_assembly("base_package_manifests.list") {
-      testonly = true
-      system_label = labels.images
-      package_set = "base"
-      contents = "manifest"
-      outputs = [ files.base_package_manifests ]
-    }
-
-    package_list_from_assembly("cache_package_manifests.list") {
-      testonly = true
-      system_label = labels.images
-      package_set = "cache"
-      contents = "manifest"
-      outputs = [ files.cache_package_manifests ]
+    if (has_product_bundle) {
+      deps += [
+        # The update packages for the main image
+        labels.images,
+      ]
     }
   }
 
-  # The on_demand package set defined during assembly, so that its packages can
-  # be published along with the universe package set.
-  packages_from_product_assembler("assembly_ondemand_packages.list") {
-    package_set = "on_demand"
-    assembly_label = labels.images
-    is_bazel_assembled = use_bazel_images_only
-    outputs = [ files.assembly_ondemand_package_manifests ]
-    testonly = true
+  if (has_product_bundle) {
+    #####
+    # These are the package groups that are used to build the system
+
+    if (!use_bazel_images_only) {
+      # When using GN-based assembly, these lists need to be extracted from the
+      # assembly manifest.
+
+      package_list_from_assembly("base_package_manifests.list") {
+        testonly = true
+        system_label = labels.images
+        package_set = "base"
+        contents = "manifest"
+        outputs = [ files.base_package_manifests ]
+      }
+
+      package_list_from_assembly("cache_package_manifests.list") {
+        testonly = true
+        system_label = labels.images
+        package_set = "cache"
+        contents = "manifest"
+        outputs = [ files.cache_package_manifests ]
+      }
+    }
+
+    # The on_demand package set defined during assembly, so that its packages can
+    # be published along with the universe package set.
+    packages_from_product_assembler("assembly_ondemand_packages.list") {
+      package_set = "on_demand"
+      assembly_label = labels.images
+      is_bazel_assembled = use_bazel_images_only
+      outputs = [ files.assembly_ondemand_package_manifests ]
+      testonly = true
+    }
   }
 
   action("universe_package_manifests.list") {
@@ -429,41 +452,43 @@ if (use_bringup_assembly) {
       rebase_path(files.universe_package_manifests, root_build_dir),
     ]
 
-    if (use_bazel_images_only) {
-      # Assemblies in Bazel provide a single file that lists all packages in
-      # base and cache
-      deps += [ labels.bazel_package_manifests_list ]
-      inputs += [ files.bazel_package_manifests_list ]
+    if (has_product_bundle) {
+      if (use_bazel_images_only) {
+        # Assemblies in Bazel provide a single file that lists all packages in
+        # base and cache
+        deps += [ labels.bazel_package_manifests_list ]
+        inputs += [ files.bazel_package_manifests_list ]
+        args += [
+          "--paths",
+          rebase_path(files.bazel_package_manifests_list, root_build_dir),
+        ]
+      } else {
+        # Assemblies in GN use a file for each package set.
+        deps += [
+          ":base_package_manifests.list",
+          ":cache_package_manifests.list",
+        ]
+        inputs += [
+          files.base_package_manifests,
+          files.cache_package_manifests,
+        ]
+        args += [
+          "--paths",
+          rebase_path(files.base_package_manifests, root_build_dir),
+          "--paths",
+          rebase_path(files.cache_package_manifests, root_build_dir),
+        ]
+      }
+
+      # The on_demand package set is added via the same mechanism, whether it's a
+      # Bazel or GN-based assembly.
+      deps += [ ":assembly_ondemand_packages.list" ]
+      inputs += [ files.assembly_ondemand_package_manifests ]
       args += [
         "--paths",
-        rebase_path(files.bazel_package_manifests_list, root_build_dir),
-      ]
-    } else {
-      # Assemblies in GN use a file for each package set.
-      deps += [
-        ":base_package_manifests.list",
-        ":cache_package_manifests.list",
-      ]
-      inputs += [
-        files.base_package_manifests,
-        files.cache_package_manifests,
-      ]
-      args += [
-        "--paths",
-        rebase_path(files.base_package_manifests, root_build_dir),
-        "--paths",
-        rebase_path(files.cache_package_manifests, root_build_dir),
+        rebase_path(files.assembly_ondemand_package_manifests, root_build_dir),
       ]
     }
-
-    # The on_demand package set is added via the same mechanism, whether it's a
-    # Bazel or GN-based assembly.
-    deps += [ ":assembly_ondemand_packages.list" ]
-    inputs += [ files.assembly_ondemand_package_manifests ]
-    args += [
-      "--paths",
-      rebase_path(files.assembly_ondemand_package_manifests, root_build_dir),
-    ]
 
     # And the output file
     outputs = [ all_package_manifests_list ]
@@ -501,19 +526,21 @@ if (use_bringup_assembly) {
     }
   }
 
-  # Generate a list of packages for the `fx publish` tool to use, these are
-  # different from those used above to create the `all_package_manifests.list`
-  # files.
-  #
-  # These are defined by assembly, and not by legacy GN arguments.
+  if (has_product_bundle) {
+    # Generate a list of packages for the `fx publish` tool to use, these are
+    # different from those used above to create the `all_package_manifests.list`
+    # files.
+    #
+    # These are defined by assembly, and not by legacy GN arguments.
 
-  # The cache package set from assembly
-  packages_from_product_assembler("assembly_cache_packages.list") {
-    package_set = "cache"
-    assembly_label = labels.images
-    is_bazel_assembled = use_bazel_images_only
-    outputs = [ files.assembly_cache_package_manifests ]
-    testonly = true
+    # The cache package set from assembly
+    packages_from_product_assembler("assembly_cache_packages.list") {
+      package_set = "cache"
+      assembly_label = labels.images
+      is_bazel_assembled = use_bazel_images_only
+      outputs = [ files.assembly_cache_package_manifests ]
+      testonly = true
+    }
   }
 
   # Allow the incremental publisher to stage the repository keys and root metadata so it can publish

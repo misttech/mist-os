@@ -31,7 +31,7 @@ use starnix_types::ownership::Releasable;
 use starnix_types::time::{timespec_from_time, NANOS_PER_SECOND};
 use starnix_uapi::as_any::AsAny;
 use starnix_uapi::auth::{
-    Credentials, FsCred, UserAndOrGroupId, CAP_CHOWN, CAP_FOWNER, CAP_FSETID, CAP_MKNOD,
+    FsCred, UserAndOrGroupId, CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_FOWNER, CAP_FSETID, CAP_MKNOD,
     CAP_SYS_ADMIN, CAP_SYS_RESOURCE,
 };
 use starnix_uapi::device_type::DeviceType;
@@ -187,7 +187,7 @@ pub struct FsNode {
 pub type FsNodeHandle = Arc<FsNodeReleaser>;
 pub type WeakFsNodeHandle = Weak<FsNodeReleaser>;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct FsNodeInfo {
     pub ino: ino_t,
     pub mode: FileMode,
@@ -234,7 +234,6 @@ impl FsNodeInfo {
 
     pub fn chmod(&mut self, mode: FileMode) {
         self.mode = (self.mode & !FileMode::PERMISSIONS) | (mode & FileMode::PERMISSIONS);
-        self.time_status_change = utc::utc_now();
     }
 
     pub fn chown(&mut self, owner: Option<uid_t>, group: Option<gid_t>) {
@@ -249,7 +248,6 @@ impl FsNodeInfo {
             self.mode &= !FileMode::ISUID;
             self.clear_sgid_bit();
         }
-        self.time_status_change = utc::utc_now();
     }
 
     fn clear_sgid_bit(&mut self) {
@@ -269,7 +267,7 @@ impl FsNodeInfo {
         FsCred { uid: self.uid, gid: self.gid }
     }
 
-    pub fn suid_and_sgid(&self, creds: &Credentials) -> Result<UserAndOrGroupId, Errno> {
+    pub fn suid_and_sgid(&self, current_task: &CurrentTask) -> Result<UserAndOrGroupId, Errno> {
         let uid = self.mode.contains(FileMode::ISUID).then_some(self.uid);
 
         // See <https://man7.org/linux/man-pages/man7/inode.7.html>:
@@ -285,7 +283,7 @@ impl FsNodeInfo {
         if maybe_set_id.is_some() {
             // Check that uid and gid actually have execute access before
             // returning them as the SUID or SGID.
-            creds.check_access(Access::EXEC, self.uid, self.gid, self.mode)?;
+            check_access(current_task, Access::EXEC, self.uid, self.gid, self.mode)?;
         }
         Ok(maybe_set_id)
     }
@@ -771,15 +769,6 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
         Ok(info.read())
     }
 
-    /// Indicates if the filesystem can manage the timestamps (i.e. atime, ctime, and mtime).
-    ///
-    /// Starnix updates the timestamps in node.info directly. However, if the filesystem can manage
-    /// the timestamps, then Starnix does not need to do so. `node.info`` will be refreshed with the
-    /// timestamps from the filesystem by calling `fetch_and_refresh_info(..)`.
-    fn filesystem_manages_timestamps(&self, _node: &FsNode) -> bool {
-        false
-    }
-
     /// Update node attributes persistently.
     fn update_attributes(
         &self,
@@ -1175,7 +1164,7 @@ impl FsNode {
     {
         let mut info = FsNodeInfo::new(0, mode!(IFDIR, 0o777), FsCred::root());
         info_updater(&mut info);
-        Self::new_internal(Box::new(ops), Weak::new(), Weak::new(), 0, info, &Credentials::root())
+        Self::new_internal(Box::new(ops), Weak::new(), Weak::new(), 0, info, None)
     }
 
     /// Create a node without inserting it into the FileSystem node cache. This is usually not what
@@ -1188,9 +1177,15 @@ impl FsNode {
         info: FsNodeInfo,
     ) -> FsNodeHandle {
         let ops = ops.into();
-        let creds = current_task.creds();
-        Self::new_internal(ops, fs.kernel.clone(), Arc::downgrade(fs), node_id, info, &creds)
-            .into_handle()
+        Self::new_internal(
+            ops,
+            fs.kernel.clone(),
+            Arc::downgrade(fs),
+            node_id,
+            info,
+            Some(current_task),
+        )
+        .into_handle()
     }
 
     pub fn into_handle(mut self) -> FsNodeHandle {
@@ -1206,7 +1201,7 @@ impl FsNode {
         fs: Weak<FileSystem>,
         node_id: ino_t,
         info: FsNodeInfo,
-        credentials: &Credentials,
+        current_task: Option<&CurrentTask>,
     ) -> Self {
         // Allow the FsNodeOps to populate initial info.
         let info = {
@@ -1216,8 +1211,10 @@ impl FsNode {
         };
 
         let fifo = if info.mode.is_fifo() {
+            let current_task = current_task
+                .expect("expected that a CurrentTask would be available when creating a fifo");
             let mut default_pipe_capacity = (*PAGE_SIZE * 16) as usize;
-            if !credentials.has_capability(CAP_SYS_RESOURCE) {
+            if !security::is_task_capable_noaudit(current_task, CAP_SYS_RESOURCE) {
                 let kernel = kernel.upgrade().expect("Invalid kernel when creating fs node");
                 let max_size = kernel.system_limits.pipe_max_size.load(Ordering::Relaxed);
                 default_pipe_capacity = std::cmp::min(default_pipe_capacity, max_size);
@@ -1481,16 +1478,16 @@ impl FsNode {
             CheckAccessReason::InternalPermissionChecks,
         )?;
         if mode.is_reg() {
-            security::check_fs_node_create_access(current_task, self, mode)?;
+            security::check_fs_node_create_access(current_task, self, mode, name)?;
         } else if mode.is_dir() {
             // Even though the man page for mknod(2) says that mknod "cannot be used to create
             // directories" in starnix the mkdir syscall (`sys_mkdirat`) ends up calling mknod.
-            security::check_fs_node_mkdir_access(current_task, self, mode)?;
+            security::check_fs_node_mkdir_access(current_task, self, mode, name)?;
         } else if !matches!(
             mode.fmt(),
             FileMode::IFCHR | FileMode::IFBLK | FileMode::IFIFO | FileMode::IFSOCK
         ) {
-            security::check_fs_node_mknod_access(current_task, self, mode, dev)?;
+            security::check_fs_node_mknod_access(current_task, self, mode, name, dev)?;
         }
 
         self.update_metadata_for_child(current_task, &mut mode, &mut owner);
@@ -1507,17 +1504,14 @@ impl FsNode {
             //   CAP_MKNOD capability); also returned if the filesystem
             //   containing pathname does not support the type of node
             //   requested.
-            let creds = current_task.creds();
-            if !creds.has_capability(CAP_MKNOD) {
-                if !matches!(mode.fmt(), FileMode::IFREG | FileMode::IFIFO | FileMode::IFSOCK) {
-                    return error!(EPERM);
-                }
+            if !matches!(mode.fmt(), FileMode::IFREG | FileMode::IFIFO | FileMode::IFSOCK) {
+                security::check_task_capable(current_task, CAP_MKNOD)?;
             }
             let mut locked = locked.cast_locked::<FileOpsCore>();
             self.ops().mknod(&mut locked, self, current_task, name, mode, dev, owner)?
         };
 
-        self.init_new_node_security_on_create(locked, current_task, &new_node)?;
+        self.init_new_node_security_on_create(locked, current_task, &new_node, name)?;
 
         Ok(new_node)
     }
@@ -1541,13 +1535,13 @@ impl FsNode {
             Access::WRITE,
             CheckAccessReason::InternalPermissionChecks,
         )?;
-        security::check_fs_node_symlink_access(current_task, self, target)?;
+        security::check_fs_node_symlink_access(current_task, self, name, target)?;
 
         let mut locked = locked.cast_locked::<FileOpsCore>();
         let new_node =
             self.ops().create_symlink(&mut locked, self, current_task, name, target, owner)?;
 
-        self.init_new_node_security_on_create(&mut locked, current_task, &new_node)?;
+        self.init_new_node_security_on_create(&mut locked, current_task, &new_node, name)?;
 
         Ok(new_node)
     }
@@ -1561,12 +1555,13 @@ impl FsNode {
         locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         new_node: &FsNode,
+        name: &FsStr,
     ) -> Result<(), Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
         let mut locked = locked.cast_locked::<FileOpsCore>();
-        security::fs_node_init_on_create(current_task, &new_node, self)?
+        security::fs_node_init_on_create(current_task, &new_node, self, name)?
             .map(|xattr| {
                 match new_node.ops().set_xattr(
                     &mut locked,
@@ -1612,7 +1607,7 @@ impl FsNode {
         )?;
         self.update_metadata_for_child(current_task, &mut mode, &mut owner);
         let node = self.ops().create_tmpfile(self, current_task, mode, owner)?;
-        security::fs_node_init_on_create(current_task, &node, self)?;
+        self.init_new_node_security_on_create(locked, current_task, &node, "".into())?;
         node.link_behavior.set(link_behavior).unwrap();
         Ok(node)
     }
@@ -1673,7 +1668,8 @@ impl FsNode {
         // Check that the the filesystem UID of the calling process (`current_task`) is the same as
         // the UID of the existing file. The check can be bypassed if the calling process has
         // `CAP_FOWNER` capability.
-        if !creds.has_capability(CAP_FOWNER) && child_uid != creds.fsuid {
+        if child_uid != creds.fsuid && !security::is_task_capable_noaudit(current_task, CAP_FOWNER)
+        {
             // If current_task is not the user of the existing file, it needs to have read and write
             // access to the existing file.
             child
@@ -1932,9 +1928,9 @@ impl FsNode {
             // We need to check whether the current task has permission to create such a file.
             // See a similar check in `FsNode::chmod`.
             let creds = current_task.creds();
-            if !creds.has_capability(CAP_FOWNER)
-                && owner.gid != creds.fsgid
+            if owner.gid != creds.fsgid
                 && !creds.is_in_group(owner.gid)
+                && !security::is_task_capable_noaudit(current_task, CAP_FOWNER)
             {
                 *mode &= !FileMode::ISGID;
             }
@@ -1959,11 +1955,10 @@ impl FsNode {
         //      *  The calling process has the CAP_FOWNER capability in
         //         its user namespace and the owner UID of the file has a
         //         mapping in the namespace.
-        if creds.has_capability(CAP_FOWNER) || creds.fsuid == self.info().uid {
-            Ok(())
-        } else {
-            error!(EPERM)
+        if creds.fsuid != self.info().uid {
+            security::check_task_capable(current_task, CAP_FOWNER)?;
         }
+        Ok(())
     }
 
     pub fn default_check_access_impl(
@@ -1981,15 +1976,19 @@ impl FsNode {
             // To set the timestamps to other values the caller must either be the file owner or hold
             // the CAP_FOWNER capability.
             let creds = current_task.creds();
-            let has_owner_priviledge = creds.fsuid == node_uid || creds.has_capability(CAP_FOWNER);
-            if has_owner_priviledge {
+            if creds.fsuid == node_uid {
                 return Ok(());
             }
-            if !now {
-                return error!(EPERM);
+            if now {
+                if security::is_task_capable_noaudit(current_task, CAP_FOWNER) {
+                    return Ok(());
+                }
+            } else {
+                security::check_task_capable(current_task, CAP_FOWNER)?;
+                return Ok(());
             }
         }
-        current_task.creds().check_access(access, node_uid, node_gid, mode)
+        check_access(current_task, access, node_uid, node_gid, mode)
     }
 
     /// Check whether the node can be accessed in the current context with the specified access
@@ -2031,11 +2030,8 @@ impl FsNode {
         child: &FsNodeHandle,
     ) -> Result<(), Errno> {
         let creds = current_task.creds();
-        if !creds.has_capability(CAP_FOWNER)
-            && self.info().mode.contains(FileMode::ISVTX)
-            && child.info().uid != creds.fsuid
-        {
-            return error!(EPERM);
+        if self.info().mode.contains(FileMode::ISVTX) && child.info().uid != creds.fsuid {
+            security::check_task_capable(current_task, CAP_FOWNER)?;
         }
         Ok(())
     }
@@ -2065,6 +2061,14 @@ impl FsNode {
         let mut info = self.info.write();
         let mut new_info = info.clone();
         mutator(&mut new_info)?;
+
+        // `mutator`s should not update the attribute change time, which is managed by this API.
+        assert_eq!(info.time_status_change, new_info.time_status_change);
+        if *info == new_info {
+            return Ok(());
+        }
+        new_info.time_status_change = utc::utc_now();
+
         let mut has = zxio_node_attr_has_t { ..Default::default() };
         has.modification_time = info.time_modify != new_info.time_modify;
         has.access_time = info.time_access != new_info.time_access;
@@ -2073,6 +2077,9 @@ impl FsNode {
         has.gid = info.gid != new_info.gid;
         has.rdev = info.rdev != new_info.rdev;
         has.casefold = info.casefold != new_info.casefold;
+
+        security::check_fs_node_setattr_access(current_task, &self, &has)?;
+
         // Call `update_attributes(..)` to persist the changes for the following fields.
         if has.modification_time
             || has.access_time
@@ -2106,13 +2113,14 @@ impl FsNode {
         mount.check_readonly_filesystem()?;
         self.update_attributes(locked, current_task, |info| {
             let creds = current_task.creds();
-            if !creds.has_capability(CAP_FOWNER) {
-                if info.uid != creds.euid {
-                    return error!(EPERM);
-                }
-                if info.gid != creds.egid && !creds.is_in_group(info.gid) {
-                    mode &= !FileMode::ISGID;
-                }
+            if info.uid != creds.euid {
+                security::check_task_capable(current_task, CAP_FOWNER)?;
+            } else if info.gid != creds.egid
+                && !creds.is_in_group(info.gid)
+                && mode.intersects(FileMode::ISGID)
+                && !security::is_task_capable_noaudit(current_task, CAP_FOWNER)
+            {
+                mode &= !FileMode::ISGID;
             }
             info.chmod(mode);
             Ok(())
@@ -2133,7 +2141,7 @@ impl FsNode {
     {
         mount.check_readonly_filesystem()?;
         self.update_attributes(locked, current_task, |info| {
-            if current_task.creds().has_capability(CAP_CHOWN) {
+            if security::is_task_capable_noaudit(current_task, CAP_CHOWN) {
                 info.chown(owner, group);
                 return Ok(());
             }
@@ -2343,7 +2351,7 @@ impl FsNode {
             if !info.mode.is_reg() && !info.mode.is_dir() {
                 return Err(error());
             }
-        } else if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
+        } else if !security::is_task_capable_noaudit(current_task, CAP_SYS_ADMIN) {
             // Non-privileged callers only have access to the user namespace.
             return Err(error());
         }
@@ -2507,7 +2515,7 @@ impl FsNode {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        if !current_task.creds().has_capability(CAP_FSETID) {
+        if !security::is_task_capable_noaudit(current_task, CAP_FSETID) {
             self.update_attributes(locked, current_task, |info| {
                 info.clear_suid_and_sgid_bits();
                 Ok(())
@@ -2518,7 +2526,7 @@ impl FsNode {
 
     /// Update the ctime and mtime of a file to now.
     pub fn update_ctime_mtime(&self) {
-        if self.ops().filesystem_manages_timestamps(self) {
+        if self.fs().manages_timestamps() {
             return;
         }
         self.update_info(|info| {
@@ -2530,7 +2538,7 @@ impl FsNode {
 
     /// Update the ctime of a file to now.
     pub fn update_ctime(&self) {
-        if self.ops().filesystem_manages_timestamps(self) {
+        if self.fs().manages_timestamps() {
             return;
         }
         self.update_info(|info| {
@@ -2570,7 +2578,6 @@ impl FsNode {
             // filesystems that manages file timestamps.
             self.update_attributes(locked, current_task, |info| {
                 let now = utc::utc_now();
-                info.time_status_change = now;
                 let get_time = |time: TimeUpdateType| match time {
                     TimeUpdateType::Now => Some(now),
                     TimeUpdateType::Time(t) => Some(t),
@@ -2639,12 +2646,49 @@ impl Releasable for FsNode {
     }
 }
 
+fn check_access(
+    current_task: &CurrentTask,
+    access: Access,
+    node_uid: uid_t,
+    node_gid: gid_t,
+    mode: FileMode,
+) -> Result<(), Errno> {
+    let mode_bits = mode.bits();
+    let mode_rwx_bits = if current_task.creds().fsuid == node_uid {
+        (mode_bits & 0o700) >> 6
+    } else if current_task.creds().is_in_group(node_gid) {
+        (mode_bits & 0o070) >> 3
+    } else {
+        mode_bits & 0o007
+    };
+    if (access.rwx_bits() as u32 & mode_rwx_bits) == access.rwx_bits() as u32 {
+        return Ok(());
+    }
+    let capability_check_mode_rwx_bits = if mode.is_dir() {
+        0o7
+    } else {
+        // At least one of the EXEC bits must be set to execute files.
+        0o6 | (mode_bits & 0o100) >> 6 | (mode_bits & 0o010) >> 3 | mode_bits & 0o001
+    };
+    if (capability_check_mode_rwx_bits & access.rwx_bits() as u32) == access.rwx_bits() as u32 {
+        // TODO: https://fxbug.dev/401196505 - upgrade to security::check_task_capable.
+        if current_task.creds().has_capability(CAP_DAC_OVERRIDE) {
+            Ok(())
+        } else {
+            error!(EACCES)
+        }
+    } else {
+        error!(EACCES)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::device::mem::mem_device_init;
     use crate::testing::*;
     use crate::vfs::buffers::VecOutputBuffer;
+    use starnix_uapi::auth::Credentials;
 
     #[::fuchsia::test]
     async fn open_device_file() {

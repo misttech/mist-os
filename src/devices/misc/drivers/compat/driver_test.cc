@@ -332,10 +332,6 @@ class TestDirectory : public fidl::testing::WireTestBase<fio::Directory> {
 
  private:
   void Open(OpenRequestView request, OpenCompleter::Sync& completer) override {
-    open_handler_(request->path.get(), std::move(request->object));
-  }
-
-  void Open3(Open3RequestView request, Open3Completer::Sync& completer) override {
     open_handler_(request->path.get(), fidl::ServerEnd<fio::Node>(std::move(request->object)));
   }
 
@@ -614,9 +610,9 @@ class IncomingNamespace {
       }
       fidl::OneWayError error =
           fidl::WireCall(outgoing_client)
-              ->Open3("svc",
-                      fuchsia_io::wire::kPermReadable | fuchsia_io::wire::Flags::kProtocolDirectory,
-                      {}, svc_server.TakeChannel());
+              ->Open("svc",
+                     fuchsia_io::wire::kPermReadable | fuchsia_io::wire::Flags::kProtocolDirectory,
+                     {}, svc_server.TakeChannel());
       if (!error.ok()) {
         return zx::error(error.status());
       }

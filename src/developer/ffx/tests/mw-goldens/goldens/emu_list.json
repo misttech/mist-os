@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Array_of_EmuListItem",
+  "type": "array",
+  "items": {
+    "$ref": "#/definitions/EmuListItem"
+  },
+  "definitions": {
+    "EmuListItem": {
+      "description": "This is the item representing the output for a single emulator instance.",
+      "type": "object",
+      "required": [
+        "name",
+        "state"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/definitions/EngineState"
+        }
+      }
+    },
+    "EngineState": {
+      "description": "The emulator engine follows a strict state transition graph, as outlined below.\n\n--------------------------------------- |             |                       v New ---> Configured ---> Staged <---> Running ---> end |            |             |            |          ^ ----------------> Error <----------------          | |                              | -------------------------------|",
+      "type": "string",
+      "enum": [
+        "new",
+        "configured",
+        "staged",
+        "running",
+        "error"
+      ]
+    }
+  }
+}

@@ -97,7 +97,7 @@ impl TryFrom<AffineTransform> for GeomPresTransform {
         let scales_up_y = t.vx * t.vx + t.vy * t.vy > MAX_SCALING_FACTOR_Y;
 
         (!scales_up_x && !scales_up_y)
-            .then(|| Self(t))
+            .then_some(Self(t))
             .ok_or(GeomPresTransformError::ExceededScalingFactor { x: scales_up_x, y: scales_up_y })
     }
 }

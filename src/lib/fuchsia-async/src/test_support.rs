@@ -58,7 +58,7 @@ pub trait MultithreadedTestResult: Sized {
     /// How to repeatedly run a test with this result in a multi threaded executor.
     fn run<F: 'static + Sync + Fn(usize) -> Fut, Fut: 'static + Send + Future<Output = Self>>(
         test: F,
-        threads: usize,
+        threads: u8,
         cfg: Config,
     ) -> Self;
 
@@ -108,7 +108,7 @@ impl<E: Send + 'static + std::fmt::Debug> TestResult for Result<(), E> {
 impl<E: 'static + Send> MultithreadedTestResult for Result<(), E> {
     fn run<F: 'static + Sync + Fn(usize) -> Fut, Fut: 'static + Send + Future<Output = Self>>(
         test: F,
-        threads: usize,
+        threads: u8,
         cfg: Config,
     ) -> Self {
         let test = apply_timeout!(cfg, |run| test(run));
@@ -163,7 +163,7 @@ impl TestResult for () {
 impl MultithreadedTestResult for () {
     fn run<F: 'static + Sync + Fn(usize) -> Fut, Fut: 'static + Send + Future<Output = Self>>(
         test: F,
-        threads: usize,
+        threads: u8,
         cfg: Config,
     ) -> Self {
         // Fuchsia's SendExecutor actually uses an extra thread, but it doesn't do anything, so we
@@ -184,7 +184,7 @@ impl MultithreadedTestResult for () {
 pub struct Config {
     repeat_count: usize,
     max_concurrency: usize,
-    max_threads: usize,
+    max_threads: u8,
     timeout: Option<Duration>,
 }
 
@@ -205,7 +205,7 @@ impl Config {
 
     fn in_parallel<E: Send>(
         &self,
-        threads: usize,
+        threads: u8,
         f: impl Fn() -> Result<(), E> + Sync,
     ) -> Result<(), E> {
         std::thread::scope(|s| {
@@ -229,15 +229,17 @@ impl Config {
 
     fn run<E: Send>(
         &self,
-        test_threads: usize,
+        test_threads: u8,
         f: impl Fn(usize) -> Result<(), E> + Sync,
     ) -> Result<(), E> {
         // max_concurrency is the maximum number of runs of the same test to run in parallel, but
         // each test can run multiple threads.  max_threads is the maximum number of threads.
         let mut threads = std::cmp::min(std::cmp::max(self.repeat_count, 1), self.max_concurrency);
         if self.max_threads != 0 {
-            threads = std::cmp::min(threads, std::cmp::max(self.max_threads / test_threads, 1));
+            threads =
+                std::cmp::min(threads, std::cmp::max(self.max_threads / test_threads, 1) as usize);
         }
+        let threads = u8::try_from(threads).unwrap_or(u8::MAX);
         let run = AtomicUsize::new(0);
         self.in_parallel(threads, || {
             loop {
@@ -278,7 +280,7 @@ where
 }
 
 /// Runs a test in an executor, potentially repeatedly and concurrently
-pub fn run_test<F, Fut, R>(test: F, threads: usize) -> R
+pub fn run_test<F, Fut, R>(test: F, threads: u8) -> R
 where
     F: 'static + Sync + Fn(usize) -> Fut,
     Fut: 'static + Send + Future<Output = R>,
@@ -299,7 +301,7 @@ mod tests {
     #[test]
     fn run_singlethreaded() {
         const REPEAT_COUNT: usize = 1000;
-        const MAX_THREADS: usize = 10;
+        const MAX_THREADS: u8 = 10;
         let pending_runs: Arc<Mutex<HashSet<_>>> =
             Arc::new(Mutex::new((0..REPEAT_COUNT).collect()));
         let pending_runs_child = pending_runs.clone();
@@ -370,7 +372,7 @@ mod tests {
     #[test]
     fn run() {
         const REPEAT_COUNT: usize = 1000;
-        const THREADS: usize = 4;
+        const THREADS: u8 = 4;
         let pending_runs: Arc<Mutex<HashSet<_>>> =
             Arc::new(Mutex::new((0..REPEAT_COUNT).collect()));
         let pending_runs_child = pending_runs.clone();
@@ -397,7 +399,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn run_with_timeout() {
-        const THREADS: usize = 4;
+        const THREADS: u8 = 4;
         MultithreadedTestResult::run(
             move |_| async move {
                 futures::future::pending::<()>().await;

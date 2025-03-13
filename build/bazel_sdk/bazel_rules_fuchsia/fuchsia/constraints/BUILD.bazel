@@ -5,12 +5,6 @@
 # Constraints and platforms for Fuchsia.
 
 load("@bazel_skylib//lib:selects.bzl", "selects")
-
-# NOTE: api_version.bzl is a generated file that only exists in @fuchsia_sdk.
-# This means that , at the moment, targets in this file cannot be used by a
-# workspace that only wants to use @rules_fuchsia without @fuchsia_sdk
-# (e.g. a Pigweed workspace).
-load("@fuchsia_sdk//:api_version.bzl", "INTERNAL_ONLY_ALL_KNOWN_API_LEVELS", "INTERNAL_ONLY_SUPPORTED_API_LEVELS")
 load(":target_compatibility.bzl", "COMPATIBILITY", "define_host_can_build_fuchsia_flag")
 
 package(
@@ -44,17 +38,6 @@ constraint_setting(
     visibility = ["//visibility:public"],
 )
 
-# Target API level constraints.
-[
-    config_setting(
-        name = "api_level_%s" % api_level.api_level,
-        flag_values = {
-            "@fuchsia_sdk//fuchsia:fuchsia_api_level": api_level.api_level,
-        },
-    )
-    for api_level in INTERNAL_ONLY_ALL_KNOWN_API_LEVELS
-]
-
 # CPU based configurations
 selects.config_setting_group(
     name = "cpu_arm64",
@@ -62,6 +45,7 @@ selects.config_setting_group(
         ":cpu_arm64_flag",
         "@platforms//cpu:arm64",
     ],
+    visibility = ["//visibility:public"],
 )
 
 selects.config_setting_group(
@@ -70,6 +54,7 @@ selects.config_setting_group(
         ":cpu_x64_flag",
         "@platforms//cpu:x86_64",
     ],
+    visibility = ["//visibility:public"],
 )
 
 selects.config_setting_group(
@@ -78,6 +63,7 @@ selects.config_setting_group(
         ":cpu_riscv64_flag",
         "@platforms//cpu:riscv64",
     ],
+    visibility = ["//visibility:public"],
 )
 
 config_setting(
@@ -101,6 +87,7 @@ selects.config_setting_group(
         "@platforms//os:fuchsia",
         ":cpu_arm64",
     ],
+    visibility = ["//visibility:public"],
 )
 
 selects.config_setting_group(
@@ -109,6 +96,7 @@ selects.config_setting_group(
         "@platforms//os:fuchsia",
         ":cpu_x64",
     ],
+    visibility = ["//visibility:public"],
 )
 
 selects.config_setting_group(
@@ -117,28 +105,8 @@ selects.config_setting_group(
         "@platforms//os:fuchsia",
         ":cpu_riscv64",
     ],
+    visibility = ["//visibility:public"],
 )
-
-# Variants based configuration
-[
-    selects.config_setting_group(
-        name = "is_%s_api_%s" % (
-            cpu,
-            api_level.api_level,
-        ),
-        match_all = [
-            "@platforms//os:fuchsia",
-            ":cpu_%s" % cpu,
-            ":api_level_%s" % api_level.api_level,
-        ],
-    )
-    for api_level in INTERNAL_ONLY_SUPPORTED_API_LEVELS
-    for cpu in [
-        "arm64",
-        "x64",
-        "riscv64",
-    ]
-]
 
 # This is a stub target specifying a `target_compatible_with` clause effectively constraining the
 # acceptable exec build platform to linux-amd64.

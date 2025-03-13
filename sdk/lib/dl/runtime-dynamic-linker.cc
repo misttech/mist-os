@@ -6,6 +6,11 @@
 
 namespace dl {
 
+void RuntimeDynamicLinker::AddNewModules(ModuleList modules) {
+  loaded_ += modules.size();
+  modules_.splice(modules_.end(), modules);
+}
+
 RuntimeModule* RuntimeDynamicLinker::FindModule(Soname name) {
   if (auto it = std::find(modules_.begin(), modules_.end(), name); it != modules_.end()) {
     // TODO(https://fxbug.dev/328135195): increase reference count.
@@ -62,6 +67,7 @@ void RuntimeDynamicLinker::PopulateStartupModules(fbl::AllocChecker& func_ac,
   // Arm the function-level AllocChecker with the result of the function.
   auto set_result = [&func_ac](bool v) { func_ac.arm(sizeof(RuntimeModule), v); };
 
+  ModuleList startup_modules;
   for (const AbiModule& abi_module : ld::AbiLoadedModules(abi)) {
     fbl::AllocChecker ac;
     std::unique_ptr<RuntimeModule> module =
@@ -73,8 +79,10 @@ void RuntimeDynamicLinker::PopulateStartupModules(fbl::AllocChecker& func_ac,
     module->SetStartupModule(abi_module, abi);
     // TODO(https://fxbug.dev/379766260): Fill out the direct_deps of
     // startup modules.
-    modules_.push_back(std::move(module));
+    startup_modules.push_back(std::move(module));
   }
+
+  AddNewModules(std::move(startup_modules));
 
   set_result(true);
 }
@@ -102,6 +110,20 @@ std::unique_ptr<RuntimeDynamicLinker> RuntimeDynamicLinker::Create(const ld::abi
   }
 
   return result(std::move(dynamic_linker));
+}
+
+// TODO(https://fxbug.dev/382516279): This needs to handle synchronization
+// between locking the modules_ list and running the user callback outside
+// of any locks.
+int RuntimeDynamicLinker::IteratePhdrInfo(DlIteratePhdrCallback* callback, void* data) const {
+  for (const RuntimeModule& module : modules_) {
+    dl_phdr_info phdr_info = module.MakeDlPhdrInfo(dl_phdr_info_counts());
+    // A non-zero return value ends the iteration.
+    if (int result = callback(&phdr_info, sizeof(phdr_info), data); result != 0) {
+      return result;
+    }
+  }
+  return 0;
 }
 
 }  // namespace dl

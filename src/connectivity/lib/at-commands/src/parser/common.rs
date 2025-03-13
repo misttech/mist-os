@@ -36,7 +36,7 @@ pub enum ParseError<Rule: RuleType> {
     UnknownExtensionCharacter(String),
 }
 
-pub type ParseResult<T, R> = std::result::Result<T, ParseError<R>>;
+pub type ParseResult<T, R> = std::result::Result<T, Box<ParseError<R>>>;
 
 /// Get the next Pair syntax node out of an iterator if it is matched by one of the expected Rules.
 /// Otherwise, fail.
@@ -50,10 +50,10 @@ pub fn next_match_one_of<'a, Rule: RuleType>(
 
     let pair_rule = pair.as_rule();
     if !expected_rules.contains(&pair_rule) {
-        return Err(ParseError::NextRuleUnexpected {
+        return Err(Box::new(ParseError::NextRuleUnexpected {
             expected_rules: expected_rules,
             actual_rule: pair_rule,
-        });
+        }));
     }
 
     Ok(pair)
@@ -111,7 +111,8 @@ pub fn parse_string<Rule: RuleType>(string: Pair<'_, Rule>) -> ParseResult<Strin
 /// rule that can be parsed to a valid integer.
 pub fn parse_integer<Rule: RuleType>(integer: Pair<'_, Rule>) -> ParseResult<i64, Rule> {
     let str = integer.as_span().as_str();
-    str.parse().map_err(|err| ParseError::InvalidInteger { string: str.to_string(), error: err })
+    str.parse()
+        .map_err(|err| Box::new(ParseError::InvalidInteger { string: str.to_string(), error: err }))
 }
 
 /// Parse a pair to a string.  The caller must ensure that this is actually matched by a

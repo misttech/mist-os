@@ -94,6 +94,7 @@ def compile_text_policy_to_binary_policy(
     checkpolicy_executable_path: str,
     input_file_path: str,
     output_file_path: str,
+    handle_unknown: str = "deny",
 ) -> None:
     subprocess.run(
         [
@@ -103,6 +104,8 @@ def compile_text_policy_to_binary_policy(
             "33",
             "--output",
             output_file_path,
+            "--handle-unknown",
+            handle_unknown,
             "-t",
             "selinux",
             input_file_path,

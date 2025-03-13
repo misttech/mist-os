@@ -28,6 +28,7 @@ static_library("unwinder") {
     "dwarf_expr.cc",
     "error.cc",
     "fp_unwinder.cc",
+    "frame.h",
     "memory.cc",
     "plt_unwinder.cc",
     "plt_unwinder.h",
@@ -35,8 +36,9 @@ static_library("unwinder") {
     "scs_unwinder.cc",
     "scs_unwinder.h",
     "unwind.cc",
+    "unwinder_base.h",
   ]
-  deps = []
+  deps = [ "//sdk/lib/fit" ]
   friend = [ ":tests" ]
 
   if (is_mac) {

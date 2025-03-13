@@ -22,7 +22,7 @@ fn test_boxed_str() {
 
 #[test]
 fn test_boxed_thiserror() {
-    let error = MyError { source: io::Error::new(io::ErrorKind::Other, "oh no!") };
+    let error = MyError { source: io::Error::other("oh no!") };
     let error = anyhow!(error);
     assert_eq!("oh no!", error.source().unwrap().to_string());
 }

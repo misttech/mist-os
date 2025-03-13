@@ -38,7 +38,6 @@ if (target_cpu == "x64" || target_cpu == "arm64") {
     bazel_recovery_image_target = "//products/zedboot:${board_name}"
     bazel_inputs_from_gn = [
       "//build/images/flash:esp.bazel_input",
-      "//build/images/zedboot:zedboot.bazel_legacy_aib",
       "//src/tee/ta/noop:ta-noop_for_bazel",
       "//boards/${board_name}:${board_name}.bazel_input",
     ]

@@ -8,11 +8,10 @@
 use alloc::vec::Vec;
 use core::convert::Infallible as Never;
 
-use lock_order::lock::{LockLevelFor, UnlockedAccessMarkerFor};
+use lock_order::lock::LockLevelFor;
 use lock_order::relation::LockBefore;
 use log::error;
 use netstack3_base::DeviceIdContext;
-use netstack3_device::ethernet::EthernetDeviceCounters;
 use netstack3_device::loopback::{
     LoopbackDevice, LoopbackDeviceId, LoopbackRxQueueMeta, LoopbackTxQueueMeta,
     LoopbackWeakDeviceId,
@@ -177,16 +176,6 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxDequeue>
         let (mut x, mut locked) = core_ctx_and_resource
             .lock_with_and::<crate::lock_ordering::LoopbackTxDequeue, _>(|c| c.right());
         cb(&mut x, &mut locked.cast_core_ctx())
-    }
-}
-
-impl<BT: DeviceLayerTypes> UnlockedAccessMarkerFor<IpLinkDeviceState<LoopbackDevice, BT>>
-    for crate::lock_ordering::LoopbackDeviceCounters
-{
-    type Data = EthernetDeviceCounters;
-
-    fn unlocked_access(t: &IpLinkDeviceState<LoopbackDevice, BT>) -> &Self::Data {
-        &t.link.counters
     }
 }
 

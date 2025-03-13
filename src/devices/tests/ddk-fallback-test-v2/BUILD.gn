@@ -19,6 +19,7 @@ driver_bind_rules("test-driver-bind") {
 }
 
 fuchsia_cc_driver("ddk-fallback-test-driver-module") {
+  legacy = true
   sources = [ "test-driver.cc" ]
   deps = [
     ":test-driver-bind",

@@ -17,6 +17,7 @@
 #include <ddktl/protocol/empty-protocol.h>
 #include <fbl/array.h>
 #include <fbl/intrusive_double_list.h>
+#include <fbl/mutex.h>
 
 namespace virtio {
 
@@ -63,13 +64,12 @@ class TransferQueue {
 };
 
 class ConsoleDevice;
-using DeviceType = ddk::Device<ConsoleDevice, ddk::Unbindable,
-                               ddk::Messageable<fuchsia_hardware_pty::Device>::Mixin>;
+using DeviceType = ddk::Device<ConsoleDevice, ddk::Unbindable>;
 
 // Actual virtio console implementation
 class ConsoleDevice : public Device,
                       public DeviceType,
-                      public ddk::EmptyProtocol<ZX_PROTOCOL_CONSOLE> {
+                      public fidl::WireServer<fuchsia_hardware_pty::Device> {
  public:
   explicit ConsoleDevice(zx_device_t* device, zx::bti bti, std::unique_ptr<Backend> backend);
   ~ConsoleDevice() override;

@@ -9,6 +9,7 @@ use crate::thread::{ProcessKoid, ProcessRef, ThreadKoid, ThreadRef};
 use crate::{trace_header, ParseResult, Provider, LOG_RECORD_TYPE};
 use flyweights::FlyStr;
 use nom::combinator::all_consuming;
+use nom::Parser;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct LogRecord {
@@ -47,7 +48,8 @@ impl<'a> RawLogRecord<'a> {
         let (payload, process) = ProcessRef::parse(header.thread_ref(), payload)?;
         let (payload, thread) = ThreadRef::parse(header.thread_ref(), payload)?;
         let (empty, message) =
-            all_consuming(|p| parse_padded_string(header.message_len() as usize, p))(payload)?;
+            all_consuming(|p| parse_padded_string(header.message_len() as usize, p))
+                .parse(payload)?;
         assert!(empty.is_empty(), "all_consuming must not return any remaining buffer");
         Ok((rem, Self { ticks, process, thread, message }))
     }

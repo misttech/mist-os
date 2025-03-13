@@ -37,9 +37,9 @@ rustc_library("tracefs") {
     "//src/lib/trace/rust:trace",
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/kernel:starnix_logging",
-    "//src/starnix/lib/starnix-sync",
-    "//src/starnix/lib/starnix-types",
-    "//src/starnix/lib/starnix-uapi",
+    "//src/starnix/lib/starnix_sync",
+    "//src/starnix/lib/starnix_types",
+    "//src/starnix/lib/starnix_uapi",
     "//third_party/rust_crates:zerocopy",
   ]
 
@@ -50,7 +50,7 @@ rustc_library("tracefs") {
 }
 
 fuchsia_unittest_package("starnix-tracefs-tests") {
-  manifest = "meta/starnix-tracefs-tests.cml"
+  manifest = "meta/starnix_tracefs_tests.cml"
   deps = [ ":tracefs_test" ]
   test_specs = {
     log_settings = {

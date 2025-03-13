@@ -17,7 +17,7 @@ group("drivers-not-templates") {
     "//src/camera:drivers",
     "//src/connectivity/bundles:drivers",
     "//src/connectivity/ethernet/drivers/third_party/igc",
-    "//src/connectivity/overnet/usb:overnet-usb",
+    "//src/connectivity/overnet/usb:drivers",
     "//src/developer/adb:drivers",
     "//src/devices/bundles:drivers",
     "//src/diagnostics/validator/logs/ddk/log-test-driver",

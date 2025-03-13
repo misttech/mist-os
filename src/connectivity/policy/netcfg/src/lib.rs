@@ -37,8 +37,9 @@ use {
     fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_masquerade as fnet_masquerade, fidl_fuchsia_net_name as fnet_name,
-    fidl_fuchsia_net_routes_admin as fnet_routes_admin, fidl_fuchsia_net_stack as fnet_stack,
-    fidl_fuchsia_net_virtualization as fnet_virtualization, fuchsia_async as fasync,
+    fidl_fuchsia_net_ndp as fnet_ndp, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
+    fidl_fuchsia_net_stack as fnet_stack, fidl_fuchsia_net_virtualization as fnet_virtualization,
+    fuchsia_async as fasync,
 };
 
 use anyhow::{anyhow, Context as _};
@@ -552,8 +553,9 @@ impl InterfaceState {
                 interface_admin_auth,
                 interface_naming_id,
             }) => {
+                let interface_id = properties.id.try_into().expect("should be nonzero");
                 NetCfg::handle_dhcpv4_client_start(
-                    properties.id.into(),
+                    interface_id,
                     &properties.name,
                     dhcpv4_client,
                     dhcpv4_client_provider,
@@ -614,6 +616,8 @@ pub struct NetCfg<'a> {
 
     dns_servers: DnsServers,
     dns_server_watch_responders: dns::DnsServerWatchResponders,
+    route_advertisement_watcher_provider:
+        Option<fnet_ndp::RouterAdvertisementOptionWatcherProviderProxy>,
 
     forwarded_device_classes: ForwardedDeviceClasses,
 
@@ -905,6 +909,11 @@ impl<'a> NetCfg<'a> {
         let installer = svc_connect::<fnet_interfaces_admin::InstallerMarker>(&svc_dir)
             .await
             .context("could not connect to installer")?;
+        let route_advertisement_watcher_provider = optional_svc_connect::<
+            fnet_ndp::RouterAdvertisementOptionWatcherProviderMarker,
+        >(&svc_dir)
+        .await
+        .context("could not connect to fuchsia.net.ndp.RouteAdvertisementOptionWatcherProvider")?;
         let interface_naming_config =
             interface::InterfaceNamingConfig::from_naming_rules(interface_naming_policy);
 
@@ -925,6 +934,7 @@ impl<'a> NetCfg<'a> {
             interface_metrics,
             dns_servers: Default::default(),
             dns_server_watch_responders: Default::default(),
+            route_advertisement_watcher_provider,
             forwarded_device_classes,
             dhcpv4_configuration_streams: dhcpv4::ConfigurationStreamMap::empty(),
             dhcpv6_prefix_provider_handler: None,
@@ -1028,6 +1038,41 @@ impl<'a> NetCfg<'a> {
                     InterfaceConfigState::Blackhole(BlackholeInterfaceState) => {
                         panic!(
                             "should not have a DNS watcher for a blackhole interface with id={}",
+                            interface_id
+                        );
+                    }
+                }
+            }
+            DnsServersUpdateSource::Ndp { interface_id } => {
+                let interface_id = interface_id.try_into().expect("should be nonzero");
+                let InterfaceState { config, provisioning, .. } = self
+                    .interface_states
+                    .get_mut(&interface_id)
+                    .unwrap_or_else(|| panic!("no interface state found for id={}", interface_id));
+
+                // Netcfg won't watch NDP servers for a delegated interface.
+                debug_assert!(provisioning == &interface::ProvisioningAction::Local);
+
+                match config {
+                    InterfaceConfigState::Host(HostInterfaceState { .. }) => {
+                        Ok(dns::remove_rdnss_watcher(
+                            &self.lookup_admin,
+                            &mut self.dns_servers,
+                            &mut self.dns_server_watch_responders,
+                            interface_id,
+                            dns_watchers,
+                        )
+                        .await)
+                    }
+                    InterfaceConfigState::WlanAp(WlanApInterfaceState { .. }) => {
+                        panic!(
+                            "should not have a NDP DNS watcher for a WLAN AP interface with id={}",
+                            interface_id
+                        );
+                    }
+                    InterfaceConfigState::Blackhole(BlackholeInterfaceState) => {
+                        panic!(
+                            "should not have a NDP DNS watcher for a blackhole interface with id={}",
                             interface_id
                         );
                     }
@@ -1231,7 +1276,11 @@ impl<'a> NetCfg<'a> {
                         netdev_res.context("error retrieving netdev instance")?.ok_or_else(
                             || anyhow::anyhow!("netdev instance watcher stream ended unexpectedly"),
                         )?;
-                    self.handle_device_instance(instance).await.context("handle netdev instance")?
+                    // DNS watchers must be propagated to start an RA NDP watcher for the interface
+                    // prior to the interface getting enabled in the Netstack.
+                    self.handle_device_instance(instance, dns_watchers.get_mut())
+                        .await
+                        .context("handle netdev instance")?
                 }
                 Event::LifecycleRequest(req) => {
                     let req = req.context("lifecycle request")?.ok_or_else(|| {
@@ -2028,8 +2077,9 @@ impl<'a> NetCfg<'a> {
                                 interface_admin_auth: _,
                                 interface_naming_id: _,
                             }) => {
+                                let interface_id: InterfaceId = (*id).into();
                                 Self::handle_dhcpv4_client_stop(
-                                    (*id).into(),
+                                    interface_id,
                                     name,
                                     &mut dhcpv4_client,
                                     dhcpv4_configuration_streams,
@@ -2058,13 +2108,22 @@ impl<'a> NetCfg<'a> {
                                     sockaddr.display_ext()
                                 );
 
-                                Ok(dhcpv6::stop_client(
+                                dhcpv6::stop_client(
                                     &lookup_admin,
                                     dns_servers,
                                     dns_server_watch_responders,
-                                    (*id).into(),
+                                    interface_id,
                                     watchers,
                                     dhcpv6_prefixes_streams,
+                                )
+                                .await;
+
+                                Ok(dns::remove_rdnss_watcher(
+                                    &lookup_admin,
+                                    dns_servers,
+                                    dns_server_watch_responders,
+                                    interface_id,
+                                    watchers,
                                 )
                                 .await)
                             }
@@ -2189,6 +2248,7 @@ impl<'a> NetCfg<'a> {
     async fn handle_device_instance(
         &mut self,
         instance: devices::NetworkDeviceInstance,
+        dns_watchers: &mut DnsServerWatchers<'_>,
     ) -> Result<(), anyhow::Error> {
         // Produce the identifier for the device to determine if it is already
         // known to Netcfg.
@@ -2255,7 +2315,7 @@ impl<'a> NetCfg<'a> {
             }
         }
 
-        match self.add_new_device(&instance).await {
+        match self.add_new_device(&instance, dns_watchers).await {
             Ok(()) => {
                 return Ok(());
             }
@@ -2348,6 +2408,7 @@ impl<'a> NetCfg<'a> {
     async fn add_new_device(
         &mut self,
         device_instance: &devices::NetworkDeviceInstance,
+        dns_watchers: &mut DnsServerWatchers<'_>,
     ) -> Result<(), devices::AddDeviceError> {
         let device_info =
             device_instance.get_device_info().await.context("error getting device info and MAC")?;
@@ -2403,6 +2464,7 @@ impl<'a> NetCfg<'a> {
             interface_name,
             interface_naming_id,
             &device_info,
+            dns_watchers,
         )
         .await
         .context("error configuring ethernet interface")
@@ -2421,6 +2483,7 @@ impl<'a> NetCfg<'a> {
         interface_name: String,
         interface_naming_id: interface::InterfaceNamingIdentifier,
         device_info: &DeviceInfoRef<'_>,
+        dns_watchers: &mut DnsServerWatchers<'_>,
     ) -> Result<(), errors::Error> {
         let ForwardedDeviceClasses { ipv4, ipv6 } = &self.forwarded_device_classes;
         let ipv4_forwarding = ipv4.contains(&device_info.device_class);
@@ -2574,6 +2637,12 @@ impl<'a> NetCfg<'a> {
             )
             .await
             .context("error configuring host")?;
+
+            if let Some(watcher_provider) = &self.route_advertisement_watcher_provider {
+                dns::add_rdnss_watcher(&watcher_provider, interface_id, dns_watchers)
+                    .await
+                    .map_err(errors::Error::NonFatal)?;
+            }
 
             let _did_enable: bool = control
                 .enable()
@@ -3616,6 +3685,7 @@ mod tests {
                 interface_metrics: Default::default(),
                 dns_servers: Default::default(),
                 dns_server_watch_responders: Default::default(),
+                route_advertisement_watcher_provider: Default::default(),
                 forwarded_device_classes: Default::default(),
                 dhcpv6_prefix_provider_handler: Default::default(),
                 allowed_upstream_device_classes: &DEFAULT_ALLOWED_UPSTREAM_DEVICE_CLASSES,

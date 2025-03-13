@@ -43,7 +43,7 @@ toc:
     path: /docs/development/diagnostics/logs/severity.md
   - title: "View"
     path: /docs/development/diagnostics/logs/viewing.md
-  - title: "Logging and tests"
+  - title: "Additional logging workflows"
     path: /docs/development/diagnostics/test_and_logs.md
   - title: "Reference"
     section:
@@ -67,7 +67,7 @@ toc:
     path: /docs/development/diagnostics/triage/fx_triage.md
   - title: "Codelab: Using Triage"
     path: /docs/development/diagnostics/triage/codelab.md
-- title: "Reference"
+- title: "Diagnostics reference"
   section:
   - title: "Diagnostics schema"
     path: /docs/reference/platform-spec/diagnostics/schema.md

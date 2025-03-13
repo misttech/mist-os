@@ -48,6 +48,7 @@ if (is_host) {
     ]
 
     inputs = [
+      "templates/gn_group.template",
       "templates/gn_header.template",
       "templates/gn_import.template",
       "templates/gn_license.template",
@@ -85,6 +86,7 @@ if (is_host) {
     ]
 
     inputs = [
+      "templates/gn_group.template",
       "templates/gn_header.template",
       "templates/gn_import.template",
       "templates/gn_license.template",

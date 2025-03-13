@@ -7,6 +7,7 @@
 #include <lib/fidl/cpp/wire/unknown_interactions.h>
 
 #include <fidl/test.unknowninteractions/cpp/natural_messaging.h>
+#include <fidl/test.unknowninteractions/cpp/wire_messaging.h>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"

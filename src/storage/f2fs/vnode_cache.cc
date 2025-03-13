@@ -115,18 +115,8 @@ void VnodeCache::Downgrade(VnodeF2fs* raw_vnode) {
   // We resurrect it, so it can be used without strong references in the inactive state
   raw_vnode->ResurrectRef();
   fbl::RefPtr<VnodeF2fs> vnode = fbl::ImportFromRawPtr(raw_vnode);
-
-  // If it has been evicted already, it should be freed.
-  if (!(*raw_vnode).fbl::WAVLTreeContainable<VnodeF2fs*>::InContainer()) {
-    ZX_ASSERT(!(*raw_vnode).fbl::DoublyLinkedListable<fbl::RefPtr<VnodeF2fs>>::InContainer());
-    vnode->ReleasePagedVmo();
-    delete fbl::ExportToRawPtr(&vnode);
-    return;
-  }
-
   // It is leaked to keep alive in vnode_table
   [[maybe_unused]] auto leak = fbl::ExportToRawPtr(&vnode);
-  raw_vnode->Deactivate();
 }
 
 zx_status_t VnodeCache::Lookup(const ino_t& ino, fbl::RefPtr<VnodeF2fs>* out) {

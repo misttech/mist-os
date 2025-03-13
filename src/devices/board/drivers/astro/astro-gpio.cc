@@ -8,7 +8,6 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 
-#include <ddk/metadata/gpio.h>
 #include <soc/aml-s905d2/s905d2-gpio.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
 
@@ -17,6 +16,13 @@
 
 // uncomment to disable LED blinky test
 // #define GPIO_TEST
+
+#define DECL_GPIO_PIN(x)     \
+  {                          \
+    {                        \
+      .pin = (x), .name = #x \
+    }                        \
+  }
 
 namespace {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -74,19 +80,31 @@ const std::vector<fpbus::Irq> kGpioIrqs{
 #ifdef GPIO_TEST
 zx_status_t CreateTestGpioPlatformDevice(
     fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus) {
-  const gpio_pin_t kTestGpioPins[] = {
+  const std::vector<fuchsia_hardware_pinimpl::Pin> kTestGpioPins = {
       // SYS_LED
       DECL_GPIO_PIN(S905D2_GPIOAO(11)),
       // JTAG Adapter Pin
       DECL_GPIO_PIN(S905D2_GPIOAO(6)),
   };
 
-  const std::vector<fpbus::Metadata> kGpioMetadata{
+  const fuchsia_hardware_pinimpl::Metadata kMetadata{{.pins = kTestGpioPins}};
+
+  fit::result encoded_metadata = fidl::Persist(kMetadata);
+  if (!encoded_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to encode GPIO init metadata: %s",
+           encoded_metadata.error_value().FormatDescription().c_str());
+    return encoded_metadata.error_value().status();
+  }
+
+  std::vector<fpbus::Metadata> gpio_metadata{
+      // TODO(b/388305889): Remove once no longer retrieved.
       {{
-          .id = std::to_string(DEVICE_METADATA_GPIO_PINS),
-          .data = std::vector<uint8_t>(
-              reinterpret_cast<const uint8_t*>(&kTestGpioPins),
-              reinterpret_cast<const uint8_t*>(&kTestGpioPins) + sizeof(kTestGpioPins)),
+          .id = std::to_string(DEVICE_METADATA_GPIO_CONTROLLER),
+          .data = encoded_metadata.value(),
+      }},
+      {{
+          .id = fuchsia_hardware_pinimpl::Metadata::kSerializableName,
+          .data = std::move(encoded_metadata.value()),
       }},
   };
 
@@ -95,7 +113,7 @@ zx_status_t CreateTestGpioPlatformDevice(
       .vid = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC,
       .pid = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC,
       .did = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_GPIO_TEST,
-      .metadata = kGpioMetadata,
+      .metadata = std::move(gpio_metadata),
   }};
 
   fidl::Arena<> fidl_arena;
@@ -120,7 +138,7 @@ namespace astro {
 
 zx_status_t Astro::CreateGpioPlatformDevice() {
   // GPIOs to expose from generic GPIO driver.
-  const gpio_pin_t kGpioPins[] = {
+  const std::vector<fuchsia_hardware_pinimpl::Pin> kGpioPins = {
       // For wifi.
       DECL_GPIO_PIN(S905D2_WIFI_SDIO_WAKE_HOST),
       // For display.
@@ -153,7 +171,8 @@ zx_status_t Astro::CreateGpioPlatformDevice() {
       DECL_GPIO_PIN(astro::GPIO_HW_ID2),
   };
 
-  fuchsia_hardware_pinimpl::Metadata metadata{{.init_steps = std::move(gpio_init_steps_)}};
+  fuchsia_hardware_pinimpl::Metadata metadata{
+      {.init_steps = std::move(gpio_init_steps_), .pins = kGpioPins}};
   gpio_init_steps_.clear();
 
   fit::result encoded_metadata = fidl::Persist(metadata);
@@ -164,15 +183,14 @@ zx_status_t Astro::CreateGpioPlatformDevice() {
   }
 
   std::vector<fpbus::Metadata> gpio_metadata{
-      {{
-          .id = std::to_string(DEVICE_METADATA_GPIO_PINS),
-          .data = std::vector<uint8_t>(
-              reinterpret_cast<const uint8_t*>(&kGpioPins),
-              reinterpret_cast<const uint8_t*>(&kGpioPins) + sizeof(kGpioPins)),
-      }},
+      // TODO(b/388305889): Remove once no longer retrieved.
       {{
           .id = std::to_string(DEVICE_METADATA_GPIO_CONTROLLER),
           .data = encoded_metadata.value(),
+      }},
+      {{
+          .id = fuchsia_hardware_pinimpl::Metadata::kSerializableName,
+          .data = std::move(encoded_metadata.value()),
       }},
   };
 
@@ -183,7 +201,7 @@ zx_status_t Astro::CreateGpioPlatformDevice() {
       .did = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_GPIO,
       .mmio = kGpioMmios,
       .irq = kGpioIrqs,
-      .metadata = gpio_metadata,
+      .metadata = std::move(gpio_metadata),
   }};
 
   fidl::Arena<> fidl_arena;

@@ -22,6 +22,8 @@ where
 {
     info!("started");
     let mut executor = fasync::LocalExecutor::new();
+    fuchsia_trace_provider::trace_provider_create_with_fdio();
+    fuchsia_trace_provider::trace_provider_wait_for_init();
 
     let mut fs = ServiceFs::new_local();
     fs.dir("svc").add_fidl_service(move |stream| {

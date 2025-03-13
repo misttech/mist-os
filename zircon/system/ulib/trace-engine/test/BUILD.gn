@@ -29,12 +29,32 @@ test("hash-table-test") {
   ]
 }
 
+test("trace_engine_test") {
+  visibility = [ ":*" ]
+  sources = [ "trace_engine_test.cc" ]
+  deps = [
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
+    "//sdk/lib/fit",
+    "//src/lib/fxl/test:gtest_main",
+    "//zircon/system/ulib/trace-engine",
+  ]
+}
+
 fuchsia_unittest_package("hash-table-test-pkg") {
   package_name = "trace-engine-hash-table-test"
   deps = [ ":hash-table-test" ]
 }
 
+fuchsia_unittest_package("trace-engine-test-pkg") {
+  package_name = "trace-engine-test"
+  deps = [ ":trace_engine_test" ]
+}
+
 group("tests") {
   testonly = true
-  deps = [ ":hash-table-test-pkg" ]
+  deps = [
+    ":hash-table-test-pkg",
+    ":trace-engine-test-pkg",
+  ]
 }

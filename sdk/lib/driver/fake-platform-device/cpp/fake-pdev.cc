@@ -11,13 +11,12 @@
 
 namespace fdf_fake {
 
-void FakePDev::GetMmioById(GetMmioByIdRequestView request, GetMmioByIdCompleter::Sync& completer) {
-  auto mmio = config_.mmios.find(request->index);
+zx::result<fuchsia_hardware_platform_device::wire::Mmio> FakePDev::GetMmioById(
+    uint32_t index, fidl::AnyArena& arena) {
+  auto mmio = config_.mmios.find(index);
   if (mmio == config_.mmios.end()) {
-    completer.ReplyError(ZX_ERR_NOT_FOUND);
-    return;
+    return zx::error(ZX_ERR_NOT_FOUND);
   }
-  fidl::Arena arena;
   auto builder = fuchsia_hardware_platform_device::wire::Mmio::Builder(arena);
   if (auto* mmio_info = std::get_if<fdf::PDev::MmioInfo>(&mmio->second); mmio_info) {
     builder.offset(mmio_info->offset).size(mmio_info->size);
@@ -28,12 +27,33 @@ void FakePDev::GetMmioById(GetMmioByIdRequestView request, GetMmioByIdCompleter:
     auto& mmio_buffer = std::get<fdf::MmioBuffer>(mmio->second);
     builder.offset(reinterpret_cast<size_t>(&mmio_buffer));
   }
-  completer.ReplySuccess(builder.Build());
+  return zx::ok(builder.Build());
+}
+
+void FakePDev::GetMmioById(GetMmioByIdRequestView request, GetMmioByIdCompleter::Sync& completer) {
+  fidl::Arena arena;
+  zx::result mmio = GetMmioById(request->index, arena);
+  if (mmio.is_error()) {
+    completer.ReplyError(mmio.status_value());
+    return;
+  }
+  completer.ReplySuccess(std::move(mmio.value()));
 }
 
 void FakePDev::GetMmioByName(GetMmioByNameRequestView request,
                              GetMmioByNameCompleter::Sync& completer) {
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  auto index = config_.mmio_names.find(request->name.get());
+  if (index == config_.mmio_names.end()) {
+    completer.ReplyError(ZX_ERR_NOT_FOUND);
+    return;
+  }
+  fidl::Arena arena;
+  zx::result mmio = GetMmioById(index->second, arena);
+  if (mmio.is_error()) {
+    completer.ReplyError(mmio.status_value());
+    return;
+  }
+  completer.ReplySuccess(std::move(mmio.value()));
 }
 
 zx::result<zx::interrupt> FakePDev::GetInterruptById(uint32_t index) {

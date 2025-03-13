@@ -41,6 +41,10 @@
                     from: "#gunit_runner",
                 },
                 {
+                    runner: "zxtest_runner",
+                    from: "#zxtest_runner",
+                },
+                {
                     runner: "netemul_test_runner",
                     from: "#netemul_test_runner",
                 },

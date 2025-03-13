@@ -14,8 +14,6 @@ executable("lsblk") {
     "//sdk/lib/component/incoming/cpp",
     "//src/lib/fxl",
     "//src/storage/gpt",
-    "//src/storage/lib/block_client/cpp",
-    "//src/storage/lib/storage-metrics",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/pretty",

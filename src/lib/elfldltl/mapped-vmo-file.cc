@@ -20,7 +20,7 @@ zx::result<> MappedVmoFile::Init(zx::unowned_vmo vmo, zx::unowned_vmar vmar) {
       uintptr_t mapped;
       status = vmar->map(ZX_VM_PERM_READ, 0, *vmo, 0, vmo_size, &mapped);
       if (status == ZX_OK) {
-        set_image({reinterpret_cast<std::byte*>(mapped), content_size});
+        set_image({reinterpret_cast<std::byte*>(mapped), static_cast<size_t>(content_size)});
         vmar_ = vmar->borrow();
         mapped_size_ = vmo_size;
       }

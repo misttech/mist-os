@@ -27,11 +27,13 @@
             source_availability: "unknown",
         },
         {
+            config: "fuchsia.bluetooth.LegacyPairing",
             from: "parent",
             to: "#bluetooth-core",
-            config: "fuchsia.bluetooth.LegacyPairing",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-bt-hci",
@@ -39,9 +41,20 @@
             subdir: "bt-hci",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.bluetooth.Service",
+            from: "parent",
+            to: "#bluetooth-core",
+        },
+        {
             protocol: "fuchsia.metrics.MetricEventLoggerFactory",
             from: "#cobalt",
             to: [ "#bluetooth-core" ],
+        },
+        {
+            protocol: "fuchsia.scheduler.RoleManager",
+            from: "parent",
+            to: "#bluetooth-core",
         },
 
         // Only needed when `bt-fastpair-provider` is present, so that

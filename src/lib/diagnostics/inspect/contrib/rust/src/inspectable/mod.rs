@@ -45,10 +45,8 @@
 
 use core::ops::{Deref, DerefMut};
 use derivative::Derivative;
-use fuchsia_inspect::{
-    BoolProperty, Node, Property, StringProperty, StringReference, UintProperty,
-};
-use std::borrow::Borrow;
+use fuchsia_inspect::{BoolProperty, Node, Property, StringProperty, UintProperty};
+use std::borrow::{Borrow, Cow};
 use std::collections::HashSet;
 
 /// Generic wrapper for exporting variables via Inspect. Mutations to
@@ -77,7 +75,7 @@ where
     W: Watch<V>,
 {
     /// Creates an `Inspectable` wrapping `value`. Exports `value` via Inspect.
-    pub fn new(value: V, node: &Node, name: impl Into<StringReference>) -> Self {
+    pub fn new<'a>(value: V, node: &Node, name: impl Into<Cow<'a, str>>) -> Self {
         let watcher = W::new(&value, node, name);
         Self { value, watcher }
     }
@@ -113,7 +111,7 @@ where
 pub trait Watch<V> {
     /// Used by [`Inspectable::new()`][Inspectable::new] to create a `Watch`er that exports via
     /// Inspect the [`Inspectable`][Inspectable]'s wrapped `value`.
-    fn new(value: &V, node: &Node, name: impl Into<StringReference>) -> Self;
+    fn new<'a>(value: &V, node: &Node, name: impl Into<Cow<'a, str>>) -> Self;
 
     /// Called by [`InspectableGuard`][InspectableGuard] when the guard is dropped, letting the
     /// `Watch`er update its state with the updated `value`.
@@ -178,7 +176,7 @@ impl<V> Watch<V> for InspectableLenWatcher
 where
     V: Len,
 {
-    fn new(value: &V, node: &Node, name: impl Into<StringReference>) -> Self {
+    fn new<'a>(value: &V, node: &Node, name: impl Into<Cow<'a, str>>) -> Self {
         Self { len: node.create_uint(name, value.len() as u64) }
     }
 
@@ -213,7 +211,7 @@ impl<V> Watch<V> for InspectableDebugStringWatcher
 where
     V: std::fmt::Debug,
 {
-    fn new(value: &V, node: &Node, name: impl Into<StringReference>) -> Self {
+    fn new<'a>(value: &V, node: &Node, name: impl Into<Cow<'a, str>>) -> Self {
         Self { debug_string: node.create_string(name, format!("{:?}", value)) }
     }
 
@@ -233,7 +231,7 @@ pub struct InspectableU64Watcher {
 }
 
 impl Watch<u64> for InspectableU64Watcher {
-    fn new(value: &u64, node: &Node, name: impl Into<StringReference>) -> Self {
+    fn new<'a>(value: &u64, node: &Node, name: impl Into<Cow<'a, str>>) -> Self {
         Self { uint_property: node.create_uint(name, *value) }
     }
 
@@ -251,7 +249,7 @@ pub struct InspectableBoolWatcher {
 }
 
 impl Watch<bool> for InspectableBoolWatcher {
-    fn new(value: &bool, node: &Node, name: impl Into<StringReference>) -> Self {
+    fn new<'a>(value: &bool, node: &Node, name: impl Into<Cow<'a, str>>) -> Self {
         Self { bool_property: node.create_bool(name, *value) }
     }
 
@@ -272,7 +270,7 @@ mod test {
         i: IntProperty,
     }
     impl Watch<i64> for InspectableIntWatcher {
-        fn new(value: &i64, node: &Node, name: impl Into<StringReference>) -> Self {
+        fn new<'a>(value: &i64, node: &Node, name: impl Into<Cow<'a, str>>) -> Self {
             Self { i: node.create_int(name, *value) }
         }
         fn watch(&mut self, value: &i64) {

@@ -45,3 +45,8 @@ closed protocol FastbootImpl {
         data zx.Handle:VMO;
     }) error zx.Status;
 };
+
+// Added to allow service connection to replace devfs
+service Service {
+    fastboot client_end:FastbootImpl;
+};

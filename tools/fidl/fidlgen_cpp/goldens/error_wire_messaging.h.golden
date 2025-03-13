@@ -26,14 +26,9 @@ namespace test_error {
 
 class Example;
 
-}  // namespace test_error
-
-template <>
-struct ::fidl::internal::WireOrdinal<::test_error::Example::Foo> final {
-  static constexpr uint64_t value = 1107623248440401476lu;
-};
-
 #ifdef __Fuchsia__
+
+}  // namespace test_error
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_error::Example::Foo> {
@@ -54,21 +49,12 @@ struct ::fidl::internal::WireMethodTypes<::test_error::Example::Foo> {
           ::fidl::internal::TransactionalRequest<::test_error::Example::Foo>, ::fidl::internal::ChannelTransport>>;
 };
 
-#endif  // __Fuchsia__
-
 namespace test_error {
 
-}  // namespace test_error
-
-#ifdef __Fuchsia__
-
-template <>
-struct ::fidl::internal::ProtocolDetails<::test_error::Example> {
-};
-
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
+}  // namespace test_error
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_error::Example> final {
@@ -86,8 +72,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_error::Example> final {
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
+namespace test_error {
 
 #endif  // __Fuchsia__
+}  // namespace test_error
 
 #ifdef __Fuchsia__
 template <>
@@ -190,9 +178,9 @@ namespace fidl {
 
 #ifdef __Fuchsia__
 template <>
-struct IsFidlType<::fidl::internal::TransactionalRequest<::test_error::Example::Foo>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalRequest<::test_error::Example::Foo>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_error::Example::Foo>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_error::Example::Foo>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_error::Example::Foo>> {
@@ -215,11 +203,11 @@ static_assert(offsetof(::test_error::wire::ExampleFooRequest, s) == 0);
 #endif  // __Fuchsia__
 
 template <>
-struct IsFidlType<::fidl::internal::TransactionalResponse<::test_error::Example::Foo>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalResponse<::test_error::Example::Foo>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalResponse<::test_error::Example::Foo>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalResponse<::test_error::Example::Foo>> : public std::true_type {};
 template <>
-struct IsFidlType<::fidl::WireResponse<::test_error::Example::Foo>> : public std::true_type{};
+struct IsFidlType<::fidl::WireResponse<::test_error::Example::Foo>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_error::Example::Foo>> {

@@ -4,6 +4,7 @@
 
 use crate::{connect, serde_ext};
 use camino::Utf8PathBuf;
+use fac::{DEFAULT_DAI_INTERCONNECT_ELEMENT_ID, DEFAULT_RING_BUFFER_ELEMENT_ID};
 use ffx_command_error::{bug, user_error, FfxContext as _, Result};
 use fuchsia_audio::dai::{
     DaiFormatSet, DaiFrameFormat, DaiFrameFormatClocking, DaiFrameFormatJustification,
@@ -29,7 +30,8 @@ use std::collections::BTreeMap;
 use std::fmt::{Display, Write};
 use zx_status::Status;
 use {
-    fidl_fuchsia_audio_device as fadevice, fidl_fuchsia_hardware_audio as fhaudio,
+    fidl_fuchsia_audio_controller as fac, fidl_fuchsia_audio_device as fadevice,
+    fidl_fuchsia_hardware_audio as fhaudio,
     fidl_fuchsia_hardware_audio_signalprocessing as fhaudio_sigproc, fidl_fuchsia_io as fio,
     zx_types,
 };
@@ -1205,16 +1207,16 @@ impl From<(Info, Selector)> for InfoResult {
     }
 }
 
-pub struct HardwareCompositeInfo {
-    properties: fhaudio::CompositeProperties,
-    dai_formats: BTreeMap<fhaudio_sigproc::ElementId, Vec<fhaudio::DaiSupportedFormats>>,
-    ring_buffer_formats: BTreeMap<fhaudio_sigproc::ElementId, Vec<fhaudio::SupportedFormats>>,
-}
-
 pub struct HardwareCodecInfo {
     properties: fhaudio::CodecProperties,
     dai_formats: Vec<fhaudio::DaiSupportedFormats>,
     plug_state: fhaudio::PlugState,
+}
+
+pub struct HardwareCompositeInfo {
+    properties: fhaudio::CompositeProperties,
+    dai_formats: BTreeMap<fhaudio_sigproc::ElementId, Vec<fhaudio::DaiSupportedFormats>>,
+    ring_buffer_formats: BTreeMap<fhaudio_sigproc::ElementId, Vec<fhaudio::SupportedFormats>>,
 }
 
 pub struct HardwareDaiInfo {
@@ -1232,8 +1234,8 @@ pub struct HardwareStreamConfigInfo {
 
 /// Information about a device from its hardware protocol.
 pub enum HardwareInfo {
-    Composite(HardwareCompositeInfo),
     Codec(HardwareCodecInfo),
+    Composite(HardwareCompositeInfo),
     Dai(HardwareDaiInfo),
     StreamConfig(HardwareStreamConfigInfo),
 }
@@ -1241,8 +1243,8 @@ pub enum HardwareInfo {
 impl HardwareInfo {
     pub fn unique_instance_id(&self) -> Option<UniqueInstanceId> {
         let id = match self {
-            HardwareInfo::Composite(composite) => composite.properties.unique_id,
             HardwareInfo::Codec(codec) => codec.properties.unique_id,
+            HardwareInfo::Composite(composite) => composite.properties.unique_id,
             HardwareInfo::Dai(dai) => dai.properties.unique_id,
             HardwareInfo::StreamConfig(stream_config) => stream_config.properties.unique_id,
         };
@@ -1251,8 +1253,8 @@ impl HardwareInfo {
 
     pub fn manufacturer(&self) -> Option<String> {
         match self {
-            HardwareInfo::Composite(composite) => composite.properties.manufacturer.clone(),
             HardwareInfo::Codec(codec) => codec.properties.manufacturer.clone(),
+            HardwareInfo::Composite(composite) => composite.properties.manufacturer.clone(),
             HardwareInfo::Dai(dai) => dai.properties.manufacturer.clone(),
             HardwareInfo::StreamConfig(stream_config) => {
                 stream_config.properties.manufacturer.clone()
@@ -1262,8 +1264,8 @@ impl HardwareInfo {
 
     pub fn product_name(&self) -> Option<String> {
         match self {
-            HardwareInfo::Composite(composite) => composite.properties.product.clone(),
             HardwareInfo::Codec(codec) => codec.properties.product.clone(),
+            HardwareInfo::Composite(composite) => composite.properties.product.clone(),
             HardwareInfo::Dai(dai) => dai.properties.product_name.clone(),
             HardwareInfo::StreamConfig(stream_config) => stream_config.properties.product.clone(),
         }
@@ -1320,6 +1322,7 @@ impl HardwareInfo {
         }
 
         match self {
+            HardwareInfo::Codec(_) => None,
             HardwareInfo::Composite(composite) => Some(
                 composite
                     .ring_buffer_formats
@@ -1329,19 +1332,18 @@ impl HardwareInfo {
                     })
                     .collect(),
             ),
-            HardwareInfo::Codec(_) => None,
             HardwareInfo::Dai(dai) => Some({
                 let pcm_format_sets =
                     supported_formats_to_pcm_format_sets(&dai.ring_buffer_formats);
                 let mut map = BTreeMap::new();
-                map.insert(fadevice::DEFAULT_RING_BUFFER_ELEMENT_ID, pcm_format_sets);
+                map.insert(DEFAULT_RING_BUFFER_ELEMENT_ID, pcm_format_sets);
                 map
             }),
             HardwareInfo::StreamConfig(stream_config) => Some({
                 let pcm_format_sets =
                     supported_formats_to_pcm_format_sets(&stream_config.supported_formats);
                 let mut map = BTreeMap::new();
-                map.insert(fadevice::DEFAULT_RING_BUFFER_ELEMENT_ID, pcm_format_sets);
+                map.insert(DEFAULT_RING_BUFFER_ELEMENT_ID, pcm_format_sets);
                 map
             }),
         }
@@ -1360,6 +1362,12 @@ impl HardwareInfo {
         }
 
         match self {
+            HardwareInfo::Codec(codec) => Some({
+                let dai_format_sets = dai_supported_formats_to_dai_format_sets(&codec.dai_formats);
+                let mut map = BTreeMap::new();
+                map.insert(DEFAULT_DAI_INTERCONNECT_ELEMENT_ID, dai_format_sets);
+                map
+            }),
             HardwareInfo::Composite(composite) => Some(
                 composite
                     .dai_formats
@@ -1372,16 +1380,10 @@ impl HardwareInfo {
                     })
                     .collect(),
             ),
-            HardwareInfo::Codec(codec) => Some({
-                let dai_format_sets = dai_supported_formats_to_dai_format_sets(&codec.dai_formats);
-                let mut map = BTreeMap::new();
-                map.insert(fadevice::DEFAULT_DAI_INTERCONNECT_ELEMENT_ID, dai_format_sets);
-                map
-            }),
             HardwareInfo::Dai(dai) => Some({
                 let dai_format_sets = dai_supported_formats_to_dai_format_sets(&dai.dai_formats);
                 let mut map = BTreeMap::new();
-                map.insert(fadevice::DEFAULT_DAI_INTERCONNECT_ELEMENT_ID, dai_format_sets);
+                map.insert(DEFAULT_DAI_INTERCONNECT_ELEMENT_ID, dai_format_sets);
                 map
             }),
             HardwareInfo::StreamConfig(_) => None,
@@ -1390,9 +1392,9 @@ impl HardwareInfo {
 
     pub fn gain_state(&self) -> Option<GainState> {
         match self {
+            HardwareInfo::Codec(_) | HardwareInfo::Dai(_) => None,
             // TODO(https://fxbug.dev/334981374): Support gain state for hardware Composite
             HardwareInfo::Composite(_) => None,
-            HardwareInfo::Codec(_) | HardwareInfo::Dai(_) => None,
             HardwareInfo::StreamConfig(stream_config) => {
                 stream_config.gain_state.clone().try_into().ok()
             }
@@ -1401,9 +1403,9 @@ impl HardwareInfo {
 
     pub fn plug_event(&self) -> Option<PlugEvent> {
         match self {
+            HardwareInfo::Codec(codec) => codec.plug_state.clone().try_into().ok(),
             // TODO(https://fxbug.dev/334980316): Support plug state for hardware Composite
             HardwareInfo::Composite(_) => None,
-            HardwareInfo::Codec(codec) => codec.plug_state.clone().try_into().ok(),
             HardwareInfo::Dai(_) => None,
             HardwareInfo::StreamConfig(stream_config) => {
                 stream_config.plug_state.clone().try_into().ok()
@@ -1457,7 +1459,6 @@ impl RegistrySignalProcessingInfo {
 /// Information about a device from `fuchsia.audio.device.Registry`.
 pub struct RegistryInfo {
     device_info: DeviceInfo,
-    gain_state: Option<GainState>,
     plug_event: Option<PlugEvent>,
     signal_processing: Option<RegistrySignalProcessingInfo>,
 }
@@ -1492,14 +1493,14 @@ impl Info {
     pub fn gain_state(&self) -> Option<GainState> {
         match self {
             Info::Hardware(hw_info) => hw_info.gain_state(),
-            Info::Registry(registry_info) => registry_info.gain_state.clone(),
+            Info::Registry(_) => None,
         }
     }
 
     pub fn gain_capabilities(&self) -> Option<GainCapabilities> {
         match self {
             Info::Hardware(hw_info) => hw_info.gain_capabilities(),
-            Info::Registry(registry_info) => registry_info.device_info.gain_capabilities(),
+            Info::Registry(_) => None,
         }
     }
 
@@ -1592,6 +1593,22 @@ async fn get_hw_codec_info(codec: &fhaudio::CodecProxy) -> Result<HardwareCodecI
     Ok(HardwareCodecInfo { properties, dai_formats, plug_state })
 }
 
+/// Returns information about a Composite device from its hardware protocol.
+async fn get_hw_composite_info(
+    composite: &fhaudio::CompositeProxy,
+) -> Result<HardwareCompositeInfo> {
+    let properties =
+        composite.get_properties().await.bug_context("Failed to call Composite.GetProperties")?;
+
+    // TODO(https://fxbug.dev/333120537): Support fetching DAI formats for hardware Composite
+    let dai_formats = BTreeMap::new();
+
+    // TODO(https://fxbug.dev/333120537): Support fetching ring buffer formats for hardware Composite
+    let ring_buffer_formats = BTreeMap::new();
+
+    Ok(HardwareCompositeInfo { properties, dai_formats, ring_buffer_formats })
+}
+
 /// Returns information about a Dai device from its hardware protocol.
 async fn get_hw_dai_info(dai: &fhaudio::DaiProxy) -> Result<HardwareDaiInfo> {
     let properties = dai.get_properties().await.bug_context("Failed to call Dai.GetProperties")?;
@@ -1611,22 +1628,6 @@ async fn get_hw_dai_info(dai: &fhaudio::DaiProxy) -> Result<HardwareDaiInfo> {
         .bug_context("Failed to get ring buffer formats")?;
 
     Ok(HardwareDaiInfo { properties, dai_formats, ring_buffer_formats })
-}
-
-/// Returns information about a Composite device from its hardware protocol.
-async fn get_hw_composite_info(
-    composite: &fhaudio::CompositeProxy,
-) -> Result<HardwareCompositeInfo> {
-    let properties =
-        composite.get_properties().await.bug_context("Failed to call Composite.GetProperties")?;
-
-    // TODO(https://fxbug.dev/333120537): Support fetching DAI formats for hardware Composite
-    let dai_formats = BTreeMap::new();
-
-    // TODO(https://fxbug.dev/333120537): Support fetching ring buffer formats for hardware Composite
-    let ring_buffer_formats = BTreeMap::new();
-
-    Ok(HardwareCompositeInfo { properties, dai_formats, ring_buffer_formats })
 }
 
 /// Returns information about a StreamConfig device from its hardware protocol.
@@ -1663,23 +1664,23 @@ async fn get_hardware_info(
 ) -> Result<HardwareInfo> {
     let protocol_path = selector.relative_path();
 
-    match selector.device_type().0 {
-        fadevice::DeviceType::Codec => {
+    match fac::DeviceType::from(selector.device_type()) {
+        fac::DeviceType::Codec => {
             let codec = connect::connect_hw_codec(dev_class, protocol_path.as_str())?;
             let codec_info = get_hw_codec_info(&codec).await?;
             Ok(HardwareInfo::Codec(codec_info))
         }
-        fadevice::DeviceType::Composite => {
+        fac::DeviceType::Composite => {
             let composite = connect::connect_hw_composite(dev_class, protocol_path.as_str())?;
             let composite_info = get_hw_composite_info(&composite).await?;
             Ok(HardwareInfo::Composite(composite_info))
         }
-        fadevice::DeviceType::Dai => {
+        fac::DeviceType::Dai => {
             let dai = connect::connect_hw_dai(dev_class, protocol_path.as_str())?;
             let dai_info = get_hw_dai_info(&dai).await?;
             Ok(HardwareInfo::Dai(dai_info))
         }
-        fadevice::DeviceType::Input | fadevice::DeviceType::Output => {
+        fac::DeviceType::Input | fac::DeviceType::Output => {
             let stream_config =
                 connect::connect_hw_streamconfig(dev_class, protocol_path.as_str())?;
             let stream_config_info = get_hw_stream_config_info(&stream_config).await?;
@@ -1717,8 +1718,7 @@ async fn get_registry_info(
 
     let registry_info = RegistryInfo {
         device_info,
-        // TODO(https://fxbug.dev/329150383): Supports gain_state/plug_state/plug_time for ADR devices
-        gain_state: None,
+        // TODO(https://fxbug.dev/329150383): Support plug_state/plug_time for ADR devices
         plug_event: None,
         signal_processing,
     };
@@ -1829,7 +1829,7 @@ mod test {
             supported_dai_formats: Some({
                 let mut map = BTreeMap::new();
                 map.insert(
-                    fadevice::DEFAULT_DAI_INTERCONNECT_ELEMENT_ID,
+                    DEFAULT_DAI_INTERCONNECT_ELEMENT_ID,
                     vec![fhaudio::DaiSupportedFormats {
                         number_of_channels: vec![1, 2],
                         sample_formats: vec![
@@ -1874,7 +1874,7 @@ mod test {
             supported_ring_buffer_formats: Some({
                 let mut map = BTreeMap::new();
                 map.insert(
-                    fadevice::DEFAULT_RING_BUFFER_ELEMENT_ID,
+                    DEFAULT_RING_BUFFER_ELEMENT_ID,
                     vec![PcmFormatSet {
                         channel_sets: vec![
                             ChannelSet::try_from(vec![ChannelAttributes::default()]).unwrap(),

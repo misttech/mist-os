@@ -4,8 +4,11 @@
 
 use std::cell::RefCell;
 use std::num::NonZeroU64;
+use std::sync::Arc;
 
 use anyhow::Context as _;
+use dhcp_client_core::inspect::Counters;
+use diagnostics_traits::Inspector;
 use fidl::endpoints::{self, Proxy as _};
 use fidl_fuchsia_net_dhcp::{
     self as fdhcp, ClientExitReason, ClientRequestStream, ClientWatchConfigurationResponse,
@@ -22,6 +25,8 @@ use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fuchsia_async as fasync,
 };
+
+use crate::inspect::{Inspect, LeaseChangeInspect, LeaseInspectProperties, StateInspect};
 
 #[derive(thiserror::Error, Debug)]
 pub(crate) enum Error {
@@ -66,10 +71,12 @@ pub(crate) async fn serve_client(
     udp_socket_provider: &impl dhcp_client_core::deps::UdpSocketProvider,
     params: NewClientParams,
     requests: ClientRequestStream,
+    inspect_root: &fuchsia_inspect::Node,
 ) -> Result<(), Error> {
     let (stop_sender, stop_receiver) = mpsc::unbounded();
     let stop_sender = &stop_sender;
     let debug_log_prefix = dhcp_client_core::client::DebugLogPrefix { interface_id };
+    let inspect = Arc::new(Inspect::new());
     let client = RefCell::new(Client::new(
         mac,
         interface_id,
@@ -78,6 +85,27 @@ pub(crate) async fn serve_client(
         stop_receiver,
         debug_log_prefix,
     )?);
+    let counters = Arc::new(Counters::default());
+    let _node = inspect_root.create_lazy_child(interface_id.get().to_string(), {
+        let counters = counters.clone();
+        let inspect = inspect.clone();
+        move || {
+            let inspector = fuchsia_inspect::Inspector::default();
+            {
+                let mut inspector =
+                    diagnostics_traits::FuchsiaInspector::<'_, ()>::new(inspector.root());
+                inspector.record_uint("InterfaceId", interface_id.get());
+                inspect.record(&mut inspector);
+                inspector.record_child("Counters", |inspector| {
+                    counters.record(inspector);
+                });
+            }
+            Box::pin(futures::future::ready(Ok(inspector)))
+        }
+    });
+
+    let counters = counters.as_ref();
+    let inspect = inspect.as_ref();
     requests
         .map_err(Error::Fidl)
         .try_for_each_concurrent(None, |request| {
@@ -89,7 +117,16 @@ pub(crate) async fn serve_client(
                             Error::Exit(ClientExitReason::WatchConfigurationAlreadyPending)
                         })?;
                         responder
-                            .send(client.watch_configuration(provider, udp_socket_provider).await?)
+                            .send(
+                                client
+                                    .watch_configuration(
+                                        provider,
+                                        udp_socket_provider,
+                                        counters,
+                                        inspect,
+                                    )
+                                    .await?,
+                            )
                             .map_err(Error::Fidl)?;
                         Ok(())
                     }
@@ -236,7 +273,7 @@ impl Client {
             lease_time,
             parameters,
         }: dhcp_client_core::client::NewlyAcquiredLease<fasync::MonotonicInstant>,
-    ) -> Result<ClientWatchConfigurationResponse, Error> {
+    ) -> Result<(ClientWatchConfigurationResponse, LeaseChangeInspect), Error> {
         let Self {
             core: _,
             rng: _,
@@ -254,13 +291,22 @@ impl Client {
         for option in parameters {
             match option {
                 dhcp_protocol::DhcpOption::SubnetMask(len) => {
-                    assert_eq!(prefix_len.replace(len), None);
+                    let previous_prefix_len = prefix_len.replace(len);
+                    if let Some(prev) = previous_prefix_len {
+                        log::warn!("expected previous_prefix_len to be None, got {prev:?}");
+                    }
                 }
                 dhcp_protocol::DhcpOption::DomainNameServer(list) => {
-                    assert_eq!(dns_servers.replace(list.into()), None);
+                    let previous_dns_servers = dns_servers.replace(list.into());
+                    if let Some(prev) = previous_dns_servers {
+                        log::warn!("expected previous_dns_servers to be None, got {prev:?}");
+                    }
                 }
                 dhcp_protocol::DhcpOption::Router(list) => {
-                    assert_eq!(routers.replace(list.into()), None);
+                    let previous_routers = routers.replace(list.into());
+                    if let Some(prev) = previous_routers {
+                        log::warn!("expected previous_routers to be None, got {prev:?}");
+                    }
                 }
                 _ => {
                     unrequested_options.push(option);
@@ -295,30 +341,45 @@ impl Client {
             self.handle_lease_drop(previous_lease).await?;
         }
 
-        Ok(ClientWatchConfigurationResponse {
-            address: Some(fdhcp::Address {
-                address: Some(fnet::Ipv4AddressWithPrefix {
-                    addr: ip_address.get().into_ext(),
-                    prefix_len,
-                }),
-                address_parameters: Some(fnet_interfaces_admin::AddressParameters {
-                    initial_properties: Some(fnet_interfaces_admin::AddressProperties {
-                        preferred_lifetime_info: None,
-                        valid_lifetime_end: Some(
-                            zx::MonotonicInstant::from(start_time + lease_time.into()).into_nanos(),
-                        ),
+        let lease_inspect_properties = LeaseInspectProperties {
+            ip_address,
+            lease_length: lease_time.into(),
+            dns_server_count: dns_servers.as_ref().map(|list| list.len()).unwrap_or(0),
+            routers_count: routers.as_ref().map(|list| list.len()).unwrap_or(0),
+        };
+
+        Ok((
+            ClientWatchConfigurationResponse {
+                address: Some(fdhcp::Address {
+                    address: Some(fnet::Ipv4AddressWithPrefix {
+                        addr: ip_address.get().into_ext(),
+                        prefix_len,
+                    }),
+                    address_parameters: Some(fnet_interfaces_admin::AddressParameters {
+                        initial_properties: Some(fnet_interfaces_admin::AddressProperties {
+                            preferred_lifetime_info: None,
+                            valid_lifetime_end: Some(
+                                zx::MonotonicInstant::from(start_time + lease_time.into())
+                                    .into_nanos(),
+                            ),
+                            ..Default::default()
+                        }),
+                        add_subnet_route: Some(true),
                         ..Default::default()
                     }),
-                    add_subnet_route: Some(true),
+                    address_state_provider: Some(asp_server_end),
                     ..Default::default()
                 }),
-                address_state_provider: Some(asp_server_end),
+                dns_servers: dns_servers.map(into_fidl_list),
+                routers: routers.map(into_fidl_list),
                 ..Default::default()
-            }),
-            dns_servers: dns_servers.map(into_fidl_list),
-            routers: routers.map(into_fidl_list),
-            ..Default::default()
-        })
+            },
+            LeaseChangeInspect::LeaseAdded {
+                start_time,
+                prefix_len,
+                properties: lease_inspect_properties,
+            },
+        ))
     }
 
     async fn handle_lease_renewal(
@@ -328,7 +389,7 @@ impl Client {
             lease_time,
             parameters,
         }: dhcp_client_core::client::LeaseRenewal<fasync::MonotonicInstant>,
-    ) -> Result<ClientWatchConfigurationResponse, Error> {
+    ) -> Result<(ClientWatchConfigurationResponse, LeaseChangeInspect), Error> {
         let Self {
             core: _,
             rng: _,
@@ -351,10 +412,16 @@ impl Client {
                     );
                 }
                 dhcp_protocol::DhcpOption::DomainNameServer(list) => {
-                    assert_eq!(dns_servers.replace(list.into()), None);
+                    let prev = dns_servers.replace(list.into());
+                    if let Some(prev) = prev {
+                        log::warn!("expected prev_dns_servers to be None, got {prev:?}");
+                    }
                 }
                 dhcp_protocol::DhcpOption::Router(list) => {
-                    assert_eq!(routers.replace(list.into()), None);
+                    let prev = routers.replace(list.into());
+                    if let Some(prev) = prev {
+                        log::warn!("expected prev_routers to be None, got {prev:?}");
+                    }
                 }
                 option => {
                     unrequested_options.push(option);
@@ -369,7 +436,7 @@ impl Client {
             );
         }
 
-        let Lease { event_stream: _, address_state_provider, ip_address: _ } =
+        let Lease { event_stream: _, address_state_provider, ip_address } =
             current_lease.as_mut().expect("should have current lease if we're handling a renewal");
 
         address_state_provider
@@ -383,12 +450,25 @@ impl Client {
             .await
             .map_err(Error::Fidl)?;
 
-        Ok(ClientWatchConfigurationResponse {
-            address: None,
-            dns_servers: dns_servers.map(into_fidl_list),
-            routers: routers.map(into_fidl_list),
-            ..Default::default()
-        })
+        let lease_inspect_properties = LeaseInspectProperties {
+            ip_address: *ip_address,
+            lease_length: lease_time.into(),
+            dns_server_count: dns_servers.as_ref().map(|list| list.len()).unwrap_or(0),
+            routers_count: routers.as_ref().map(|list| list.len()).unwrap_or(0),
+        };
+
+        Ok((
+            ClientWatchConfigurationResponse {
+                address: None,
+                dns_servers: dns_servers.map(into_fidl_list),
+                routers: routers.map(into_fidl_list),
+                ..Default::default()
+            },
+            LeaseChangeInspect::LeaseRenewed {
+                renewed_time: start_time,
+                properties: lease_inspect_properties,
+            },
+        ))
     }
 
     async fn handle_lease_drop(&mut self, mut lease: Lease) -> Result<(), Error> {
@@ -430,69 +510,92 @@ impl Client {
         &mut self,
         packet_socket_provider: &crate::packetsocket::PacketSocketProviderImpl,
         udp_socket_provider: &impl dhcp_client_core::deps::UdpSocketProvider,
+        counters: &Counters,
+        inspect: &Inspect,
     ) -> Result<ClientWatchConfigurationResponse, Error> {
-        let clock = Clock;
         loop {
-            let step =
-                self.watch_configuration_step(packet_socket_provider, udp_socket_provider).await;
+            let step = self
+                .watch_configuration_step(packet_socket_provider, udp_socket_provider, counters)
+                .await;
+            let HandledWatchConfigurationStep { state_inspect, lease_inspect, response_to_return } =
+                self.handle_watch_configuration_step(step, packet_socket_provider).await?;
 
-            let Self { core, rng: _, config, stop_receiver: _, current_lease, interface_id: _ } =
-                self;
-            match step {
-                WatchConfigurationStep::CurrentLeaseAddressRemoved((reason, ip_address)) => {
-                    *current_lease = None;
-                    let debug_log_prefix = &config.debug_log_prefix;
-                    match reason {
-                        None => {
-                            return Err(Error::Exit(ClientExitReason::AddressStateProviderError))
+            // watch_configuration_step only resolves once there's been a state
+            // transition, so we should always update the state inspect and its
+            // history.
+            inspect.update(state_inspect, lease_inspect, self.config.debug_log_prefix);
+            if let Some(response) = response_to_return {
+                return Ok(response);
+            }
+        }
+    }
+
+    async fn handle_watch_configuration_step(
+        &mut self,
+        step: WatchConfigurationStep,
+        packet_socket_provider: &crate::packetsocket::PacketSocketProviderImpl,
+    ) -> Result<HandledWatchConfigurationStep, Error> {
+        let Self { core, rng: _, config, stop_receiver: _, current_lease, interface_id: _ } = self;
+        match step {
+            WatchConfigurationStep::CurrentLeaseAddressRemoved((reason, ip_address)) => {
+                *current_lease = None;
+                let debug_log_prefix = &config.debug_log_prefix;
+                match reason {
+                    None => return Err(Error::Exit(ClientExitReason::AddressStateProviderError)),
+                    Some(reason) => match reason {
+                        fnet_interfaces_admin::AddressRemovalReason::Invalid => {
+                            panic!("yielded invalid address")
                         }
-                        Some(reason) => match reason {
-                            fnet_interfaces_admin::AddressRemovalReason::Invalid => {
-                                panic!("yielded invalid address")
-                            }
-                            fnet_interfaces_admin::AddressRemovalReason::InvalidProperties => {
-                                panic!("used invalid properties")
-                            }
-                            fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved => {
-                                log::warn!("{debug_log_prefix} interface removed; stopping");
-                                return Err(Error::Exit(ClientExitReason::InvalidInterface));
-                            }
-                            fnet_interfaces_admin::AddressRemovalReason::UserRemoved => {
-                                log::warn!(
-                                    "{debug_log_prefix} address \
-                                    administratively removed; stopping"
-                                );
-                                return Err(Error::Exit(ClientExitReason::AddressRemovedByUser));
-                            }
-                            fnet_interfaces_admin::AddressRemovalReason::AlreadyAssigned => {
-                                log::warn!(
-                                    "{debug_log_prefix} address already assigned; notifying core"
-                                );
-                            }
-                            fnet_interfaces_admin::AddressRemovalReason::DadFailed => {
-                                log::warn!(
-                                    "{debug_log_prefix} duplicate address detected; notifying core"
-                                );
-                            }
-                        },
-                    };
-
-                    match core
-                        .on_address_rejection(config, packet_socket_provider, &clock, ip_address)
-                        .await
-                        .map_err(Error::from_core)?
-                    {
-                        dhcp_client_core::client::AddressRejectionOutcome::ShouldBeImpossible => {
-                            unreachable!(
-                                "should not observe address rejection without active lease"
+                        fnet_interfaces_admin::AddressRemovalReason::InvalidProperties => {
+                            panic!("used invalid properties")
+                        }
+                        fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved => {
+                            log::warn!("{debug_log_prefix} interface removed; stopping");
+                            return Err(Error::Exit(ClientExitReason::InvalidInterface));
+                        }
+                        fnet_interfaces_admin::AddressRemovalReason::UserRemoved => {
+                            log::warn!(
+                                "{debug_log_prefix} address \
+                                administratively removed; stopping"
+                            );
+                            return Err(Error::Exit(ClientExitReason::AddressRemovedByUser));
+                        }
+                        fnet_interfaces_admin::AddressRemovalReason::AlreadyAssigned => {
+                            log::warn!(
+                                "{debug_log_prefix} address already assigned; notifying core"
                             );
                         }
-                        dhcp_client_core::client::AddressRejectionOutcome::NextState(state) => {
-                            *core = state;
+                        fnet_interfaces_admin::AddressRemovalReason::DadFailed => {
+                            log::warn!(
+                                "{debug_log_prefix} duplicate address detected; notifying core"
+                            );
                         }
+                    },
+                };
+
+                match core
+                    .on_address_rejection(config, packet_socket_provider, &Clock, ip_address)
+                    .await
+                    .map_err(Error::from_core)?
+                {
+                    dhcp_client_core::client::AddressRejectionOutcome::ShouldBeImpossible => {
+                        unreachable!("should not observe address rejection without active lease");
+                    }
+                    dhcp_client_core::client::AddressRejectionOutcome::NextState(state) => {
+                        *core = state;
+                        Ok(HandledWatchConfigurationStep {
+                            state_inspect: StateInspect {
+                                state: *core,
+                                time: fasync::MonotonicInstant::now(),
+                            },
+                            lease_inspect: LeaseChangeInspect::LeaseDropped,
+                            response_to_return: None,
+                        })
                     }
                 }
-                WatchConfigurationStep::CoreStep(core_step) => match core_step? {
+            }
+            WatchConfigurationStep::CoreStep(core_step) => {
+                match core_step? {
                     dhcp_client_core::client::Step::NextState(transition) => {
                         let (next_core, effect) = core.apply(config, transition);
                         *core = next_core;
@@ -501,22 +604,54 @@ impl Client {
                                 let current_lease =
                                     self.current_lease.take().expect("should have current lease");
                                 self.handle_lease_drop(current_lease).await?;
+                                Ok(HandledWatchConfigurationStep {
+                                    state_inspect: StateInspect {
+                                        state: next_core,
+                                        time: fasync::MonotonicInstant::now(),
+                                    },
+                                    lease_inspect: LeaseChangeInspect::LeaseDropped,
+                                    response_to_return: None,
+                                })
                             }
                             Some(dhcp_client_core::client::TransitionEffect::HandleNewLease(
                                 newly_acquired_lease,
                             )) => {
-                                return self
-                                    .handle_newly_acquired_lease(newly_acquired_lease)
-                                    .await;
+                                let (response, lease_inspect) =
+                                    self.handle_newly_acquired_lease(newly_acquired_lease).await?;
+                                let start_time = fasync::MonotonicInstant::now();
+                                Ok(HandledWatchConfigurationStep {
+                                    state_inspect: StateInspect {
+                                        state: next_core,
+                                        time: start_time,
+                                    },
+                                    lease_inspect,
+                                    response_to_return: Some(response),
+                                })
                             }
                             Some(
                                 dhcp_client_core::client::TransitionEffect::HandleRenewedLease(
                                     lease_renewal,
                                 ),
                             ) => {
-                                return self.handle_lease_renewal(lease_renewal).await;
+                                let (response, lease_inspect) =
+                                    self.handle_lease_renewal(lease_renewal).await?;
+                                Ok(HandledWatchConfigurationStep {
+                                    state_inspect: StateInspect {
+                                        state: next_core,
+                                        time: fasync::MonotonicInstant::now(),
+                                    },
+                                    lease_inspect,
+                                    response_to_return: Some(response),
+                                })
                             }
-                            None => (),
+                            None => Ok(HandledWatchConfigurationStep {
+                                state_inspect: StateInspect {
+                                    state: *core,
+                                    time: fasync::MonotonicInstant::now(),
+                                },
+                                lease_inspect: LeaseChangeInspect::NoChange,
+                                response_to_return: None,
+                            }),
                         }
                     }
                     dhcp_client_core::client::Step::Exit(reason) => match reason {
@@ -528,8 +663,8 @@ impl Client {
                             return Err(Error::Exit(ClientExitReason::GracefulShutdown));
                         }
                     },
-                },
-            };
+                }
+            }
         }
     }
 
@@ -537,6 +672,7 @@ impl Client {
         &mut self,
         packet_socket_provider: &crate::packetsocket::PacketSocketProviderImpl,
         udp_socket_provider: &impl dhcp_client_core::deps::UdpSocketProvider,
+        counters: &Counters,
     ) -> WatchConfigurationStep {
         let Self { core, rng, config, stop_receiver, current_lease, interface_id } = self;
         let clock = Clock;
@@ -565,7 +701,15 @@ impl Client {
         //    which point `current_lease` will be cleared for the next
         //    iteration.
         let mut core_step_fut = pin!(core
-            .run(config, packet_socket_provider, udp_socket_provider, rng, &clock, stop_receiver)
+            .run(
+                config,
+                packet_socket_provider,
+                udp_socket_provider,
+                rng,
+                &clock,
+                stop_receiver,
+                counters
+            )
             .fuse());
         let mut address_removed_fut = pin!(async {
             match current_lease {
@@ -598,6 +742,12 @@ impl Client {
             },
         }
     }
+}
+
+struct HandledWatchConfigurationStep {
+    state_inspect: StateInspect,
+    lease_inspect: LeaseChangeInspect,
+    response_to_return: Option<ClientWatchConfigurationResponse>,
 }
 
 enum WatchConfigurationStep {

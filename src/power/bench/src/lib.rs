@@ -11,7 +11,7 @@ mod sag_work;
 use anyhow::{format_err, Error, Result};
 use argh::FromArgs;
 use diagnostics_hierarchy::DiagnosticsHierarchy;
-use diagnostics_reader::{ArchiveReader, Inspect};
+use diagnostics_reader::ArchiveReader;
 use std::time::Instant;
 
 #[derive(FromArgs, Debug)]
@@ -71,9 +71,9 @@ fn test_topologytestdaemon_toggle() -> Result<()> {
 }
 
 async fn get_power_broker_inspect() -> Result<DiagnosticsHierarchy, Error> {
-    ArchiveReader::new()
+    ArchiveReader::inspect()
         .select_all_for_moniker("test-power-broker")
-        .snapshot::<Inspect>()
+        .snapshot()
         .await?
         .into_iter()
         .next()

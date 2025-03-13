@@ -30,6 +30,8 @@ class SimpleProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 9142761280038437494;
   };
 };
 
@@ -37,6 +39,6 @@ class SimpleProtocol final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_nullable::SimpleProtocol> : public std::true_type{};
+struct IsProtocol<::test_nullable::SimpleProtocol> : public std::true_type {};
 
 }  // namespace fidl

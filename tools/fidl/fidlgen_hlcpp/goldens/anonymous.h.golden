@@ -1017,7 +1017,7 @@ struct CodingTraits<::test::anonymous::OverrideTest>
     : public EncodableCodingTraits<::test::anonymous::OverrideTest, 40> {};
 
 template <>
-struct HasPadding<::test::anonymous::OverrideTest> : public std::true_type{};
+struct HasPadding<::test::anonymous::OverrideTest> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::anonymous::OverrideTest> : public internal::BoolConstant<
@@ -1117,7 +1117,7 @@ struct Equality<::test::anonymous::FunctionApplication> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::anonymous::Expression> : public std::true_type{};
+struct IsFidlXUnion<::test::anonymous::Expression> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::anonymous::Expression>
@@ -1175,7 +1175,7 @@ struct Equality<::test::anonymous::Expression> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::anonymous::UnionMember> : public std::true_type{};
+struct IsFidlXUnion<::test::anonymous::UnionMember> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::anonymous::UnionMember>
@@ -1279,7 +1279,7 @@ struct CodingTraits<::test::anonymous::SomeProtocolSomeMethodRequest>
     : public EncodableCodingTraits<::test::anonymous::SomeProtocolSomeMethodRequest, 32> {};
 
 template <>
-struct HasPadding<::test::anonymous::SomeProtocolSomeMethodRequest> : public std::true_type{};
+struct HasPadding<::test::anonymous::SomeProtocolSomeMethodRequest> : public std::true_type {};
 
 template <>
 struct IsMemcpyCompatible<::test::anonymous::SomeProtocolSomeMethodRequest> : public internal::BoolConstant<
@@ -1381,7 +1381,7 @@ struct Equality<::test::anonymous::SomeProtocol_SomeMethod_Error> {
 };
 
 template <>
-struct IsFidlXUnion<::test::anonymous::SomeProtocol_SomeMethod_Result> : public std::true_type{};
+struct IsFidlXUnion<::test::anonymous::SomeProtocol_SomeMethod_Result> : public std::true_type {};
 
 template <>
 struct CodingTraits<::test::anonymous::SomeProtocol_SomeMethod_Result>

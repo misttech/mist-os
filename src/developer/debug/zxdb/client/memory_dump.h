@@ -10,16 +10,22 @@
 #include <vector>
 
 #include "src/developer/debug/ipc/records.h"
+#include "src/developer/debug/zxdb/common/err.h"
+#include "src/lib/unwinder/memory.h"
 
 namespace zxdb {
 
 // Memory in a debugged process can be mapped or not mapped. This dump object represents a view into
 // memory consisting of a sequence of these blocks.
-class MemoryDump {
+//
+// This class also serves as an implementation of |unwinder::Memory|, which allows the unwinder to
+// access memory that has been pre-fetched from the target process when we're trying to unwind
+// on the host using extra debug info.
+class MemoryDump : public unwinder::Memory {
  public:
   MemoryDump();
-  MemoryDump(std::vector<debug_ipc::MemoryBlock>&& blocks);
-  ~MemoryDump();
+  explicit MemoryDump(std::vector<debug_ipc::MemoryBlock>&& blocks);
+  ~MemoryDump() override;
 
   // Returns the begin address of this dump.
   uint64_t address() const {
@@ -38,6 +44,8 @@ class MemoryDump {
   // Returns true if every block in this memory dump is valid.
   bool AllValid() const;
 
+  unwinder::Error ReadBytes(uint64_t addr, uint64_t size, void* dest) override;
+
   // The blocks in the memory dump will be contiguous. Anything not mapped will be represented by a
   // block marked not valid.
   const std::vector<debug_ipc::MemoryBlock>& blocks() const { return blocks_; }
@@ -47,6 +55,11 @@ class MemoryDump {
   bool GetByte(uint64_t address, uint8_t* byte) const;
 
  private:
+  // Reads |size| from the given address, performing necessary bounds and range checks. If any error
+  // occurs, |dest| is not modified and this function will return false. When true is returned, then
+  // |dest| holds the result of the read.
+  Err Read(uint64_t address, size_t size, void* dest) const;
+
   std::vector<debug_ipc::MemoryBlock> blocks_;
 };
 

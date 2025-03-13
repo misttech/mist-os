@@ -71,11 +71,11 @@ struct TypeTraits<::test_escaping::wire::DocCommentWithQuotes> {
 };
 
 template <>
-struct IsFidlType<::test_escaping::wire::DocCommentWithQuotes> : public std::true_type{};
+struct IsFidlType<::test_escaping::wire::DocCommentWithQuotes> : public std::true_type {};
 template <>
-struct IsWire<::test_escaping::wire::DocCommentWithQuotes> : public std::true_type{};
+struct IsWire<::test_escaping::wire::DocCommentWithQuotes> : public std::true_type {};
 template <>
-struct IsStruct<::test_escaping::wire::DocCommentWithQuotes> : public std::true_type{};
+struct IsStruct<::test_escaping::wire::DocCommentWithQuotes> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_escaping::wire::DocCommentWithQuotes>);
 static_assert(offsetof(::test_escaping::wire::DocCommentWithQuotes, __reserved) == 0);
 static_assert(sizeof(::test_escaping::wire::DocCommentWithQuotes) == TypeTraits<::test_escaping::wire::DocCommentWithQuotes>::kPrimarySize);

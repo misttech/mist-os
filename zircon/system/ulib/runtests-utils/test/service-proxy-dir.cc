@@ -77,15 +77,12 @@ TEST(ServiceProxyDirTest, Simple) {
 
   // First check the service served directly by the proxy.
   {
-    auto [client, server] = fidl::Endpoints<fio::Node>::Create();
-
+    auto [client, server] = fidl::Endpoints<fidl_test_echo::Echo>::Create();
     ASSERT_OK(fidl::WireCall(proxy_client)
-                  ->Open({}, {}, fidl::StringView(kProxyEchoString), std::move(server))
+                  ->Open(fidl::StringView(kProxyEchoString), fio::Flags::kProtocolService, {},
+                         server.TakeChannel())
                   .status());
-
-    const fidl::WireResult result =
-        fidl::WireCall(fidl::UnownedClientEnd<fidl_test_echo::Echo>{client.channel().borrow()})
-            ->EchoString(kTestString);
+    const fidl::WireResult result = fidl::WireCall(client)->EchoString(kTestString);
     ASSERT_OK(result.status());
     const fidl::WireResponse response = result.value();
     ASSERT_EQ(response.response.get(), kProxyEchoString);
@@ -93,15 +90,12 @@ TEST(ServiceProxyDirTest, Simple) {
 
   // Second check the service that's being proxied by the proxy.
   {
-    auto [client, server] = fidl::Endpoints<fio::Node>::Create();
-
+    auto [client, server] = fidl::Endpoints<fidl_test_echo::Echo>::Create();
     ASSERT_OK(fidl::WireCall(proxy_client)
-                  ->Open({}, {}, fidl::StringView(kEchoString), std::move(server))
+                  ->Open(fidl::StringView(kEchoString), fio::Flags::kProtocolService, {},
+                         server.TakeChannel())
                   .status());
-
-    const fidl::WireResult result =
-        fidl::WireCall(fidl::UnownedClientEnd<fidl_test_echo::Echo>{client.channel().borrow()})
-            ->EchoString(kTestString);
+    const fidl::WireResult result = fidl::WireCall(client)->EchoString(kTestString);
     ASSERT_OK(result.status());
     const fidl::WireResponse response = result.value();
     ASSERT_EQ(response.response.get(), kEchoString);

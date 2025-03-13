@@ -5,7 +5,7 @@
 # buildifier: disable=module-docstring
 load("@bazel_skylib//lib:paths.bzl", "paths")
 load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts")
-load("@fuchsia_sdk//fuchsia:private_defs.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "FuchsiaPackageInfo", "get_fuchsia_api_level", "get_fuchsia_sdk_toolchain")
+load("@rules_fuchsia//fuchsia:private_defs.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "FuchsiaPackageInfo", "get_fuchsia_api_level", "get_fuchsia_sdk_toolchain")
 load("//test_utils:py_test_utils.bzl", "PY_TOOLCHAIN_DEPS", "create_python3_shell_wrapper_provider")
 
 _PACKAGE_RESOURCE_ATTRS = {
@@ -129,7 +129,6 @@ def _fuchsia_package_checker_test_impl(ctx):
     (resource_args, resource_runfiles) = _verify_package_resources(package_info, ctx.attr)
 
     args = [
-        "--far={}".format(sdk.far.short_path),
         "--ffx={}".format(sdk.ffx_package.short_path),
         "--meta_far={}".format(meta_far.short_path),
         "--package_name={}".format(ctx.attr.package_name),
@@ -137,7 +136,6 @@ def _fuchsia_package_checker_test_impl(ctx):
 
     runfiles = [
         meta_far,
-        sdk.far,
         sdk.ffx_package,
     ] + resource_runfiles
 
@@ -201,7 +199,7 @@ fuchsia_package_checker_test = rule(
 
 # Ideally, we could check the API level that would be applied and compare it's ABI to
 # `ctx.attr.expected_abi_revision` (or just compare levels). However, there does not appear to be
-# any indication of the API level, and "@fuchsia_sdk//fuchsia:fuchsia_api_level" is empty.
+# any indication of the API level, and "@fuchsia_sdk//flags:fuchsia_api_level" is empty.
 # Thus, this is just a simple check that there is no error and the blobs are as expected.
 # Similarly, `package_name` and other aspects of the package cannot be verified.
 def _fuchsia_package_checker_analysistest_impl(ctx):
@@ -224,7 +222,7 @@ no_repo_default_api_level_fuchsia_package_checker_test = analysistest.make(
     _fuchsia_package_checker_analysistest_impl,
     attrs = _ANALYSIS_TEST_ATTRS,
     config_settings = {
-        "@fuchsia_sdk//fuchsia:repository_default_fuchsia_api_level": "",
+        "@fuchsia_sdk//flags:repository_default_fuchsia_api_level": "",
     },
 )
 
@@ -232,14 +230,14 @@ repo_default_unknown_api_level_fuchsia_package_checker_test = analysistest.make(
     _fuchsia_package_checker_analysistest_impl,
     attrs = _ANALYSIS_TEST_ATTRS,
     config_settings = {
-        "@fuchsia_sdk//fuchsia:repository_default_fuchsia_api_level": "98765",
+        "@fuchsia_sdk//flags:repository_default_fuchsia_api_level": "98765",
     },
 )
 repo_default_api_level_next_fuchsia_package_checker_test = analysistest.make(
     _fuchsia_package_checker_analysistest_impl,
     attrs = _ANALYSIS_TEST_ATTRS,
     config_settings = {
-        "@fuchsia_sdk//fuchsia:repository_default_fuchsia_api_level": "NEXT",
+        "@fuchsia_sdk//flags:repository_default_fuchsia_api_level": "NEXT",
     },
 )
 
@@ -247,7 +245,7 @@ repo_default_unknown_and_override_next_api_level_fuchsia_package_checker_test = 
     _fuchsia_package_checker_analysistest_impl,
     attrs = _ANALYSIS_TEST_ATTRS,
     config_settings = {
-        "@fuchsia_sdk//fuchsia:repository_default_fuchsia_api_level": "98765",
-        "@fuchsia_sdk//fuchsia:fuchsia_api_level": "NEXT",
+        "@fuchsia_sdk//flags:repository_default_fuchsia_api_level": "98765",
+        "@fuchsia_sdk//flags:fuchsia_api_level": "NEXT",
     },
 )

@@ -112,7 +112,7 @@ impl OpenArgs for fio::OpenFlags {
         path: &str,
         object_request: vfs::ObjectRequestRef<'_>,
     ) {
-        let _ = proxy.open(
+        let _ = proxy.deprecated_open(
             *self,
             fio::ModeType::empty(),
             path,
@@ -128,7 +128,7 @@ impl OpenArgs for fio::Flags {
         path: &str,
         object_request: vfs::ObjectRequestRef<'_>,
     ) {
-        let _ = proxy.open3(
+        let _ = proxy.open(
             path,
             *self,
             &object_request.options(),
@@ -433,7 +433,6 @@ impl Directory for CFDirectory {
                 TraversalPosition::Index(_) => unreachable!(
                     "API contract says if we don't create a ::Index we shouldn't be passed one."
                 ),
-                TraversalPosition::Bytes(_) => unreachable!(),
                 TraversalPosition::Name(_) | TraversalPosition::End => &[],
             };
 
@@ -481,7 +480,7 @@ impl Directory for CFDirectory {
                     (&mut skip_iter) as &mut dyn Iterator<Item = _>
                 }
                 TraversalPosition::Start | TraversalPosition::Name(_) => &mut iter,
-                TraversalPosition::Index(_) | TraversalPosition::Bytes(_) => unreachable!(),
+                TraversalPosition::Index(_) => unreachable!(),
                 TraversalPosition::End => &mut empty_iter,
             };
 
@@ -603,7 +602,7 @@ mod test {
                         );
                         let moniker = Moniker::parse_str(&moniker).unwrap().to_string();
                         if let Some(dir) = dirs.get(&(moniker, dir_type)) {
-                            dir.open(flags, mode, &path, object).unwrap();
+                            dir.deprecated_open(flags, mode, &path, object).unwrap();
                             responder.send(Ok(())).unwrap();
                         } else {
                             responder.send(Err(sys2::OpenError::NoSuchDir)).unwrap();

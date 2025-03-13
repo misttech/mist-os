@@ -11,7 +11,6 @@
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
-#include <zircon/status.h>
 
 #include <cstdint>
 
@@ -37,23 +36,21 @@ zx::result<std::unique_ptr<EngineDriverClient>> CreateFidlEngineDriverClient(
   zx::result<fdf::ClientEnd<fuchsia_hardware_display_engine::Engine>> connect_engine_client_result =
       incoming.Connect<fuchsia_hardware_display_engine::Service::Engine>();
   if (connect_engine_client_result.is_error()) {
-    FDF_LOG(WARNING, "Failed to connect to display engine FIDL client: %s",
-            connect_engine_client_result.status_string());
+    fdf::warn("Failed to connect to display engine FIDL client: {}", connect_engine_client_result);
     return connect_engine_client_result.take_error();
   }
   fdf::ClientEnd<fuchsia_hardware_display_engine::Engine> engine_client =
       std::move(connect_engine_client_result).value();
 
   if (!engine_client.is_valid()) {
-    FDF_LOG(WARNING, "Display engine FIDL device is invalid");
+    fdf::warn("Display engine FIDL device is invalid");
     return zx::error(ZX_ERR_BAD_HANDLE);
   }
 
   fdf::Arena arena(kArenaTag);
   fdf::WireUnownedResult result = fdf::WireCall(engine_client).buffer(arena)->IsAvailable();
   if (!result.ok()) {
-    FDF_LOG(WARNING, "Display engine FIDL device is not available: %s",
-            result.FormatDescription().c_str());
+    fdf::warn("Display engine FIDL device is not available: {}", result.FormatDescription());
     return zx::error(result.status());
   }
 
@@ -61,7 +58,7 @@ zx::result<std::unique_ptr<EngineDriverClient>> CreateFidlEngineDriverClient(
   auto engine_driver_client =
       fbl::make_unique_checked<EngineDriverClient>(&alloc_checker, std::move(engine_client));
   if (!alloc_checker.check()) {
-    FDF_LOG(WARNING, "Failed to allocate memory for EngineDriverClient");
+    fdf::warn("Failed to allocate memory for EngineDriverClient");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -73,13 +70,12 @@ zx::result<std::unique_ptr<EngineDriverClient>> CreateBanjoEngineDriverClient(
   zx::result<ddk::DisplayEngineProtocolClient> dc_result =
       compat::ConnectBanjo<ddk::DisplayEngineProtocolClient>(incoming);
   if (dc_result.is_error()) {
-    FDF_LOG(WARNING, "Failed to connect to Banjo server via the compat client: %s",
-            dc_result.status_string());
+    fdf::warn("Failed to connect to Banjo server via the compat client: {}", dc_result);
     return dc_result.take_error();
   }
   ddk::DisplayEngineProtocolClient dc = std::move(dc_result).value();
   if (!dc.is_valid()) {
-    FDF_LOG(WARNING, "Failed to get Banjo display controller protocol");
+    fdf::warn("Failed to get Banjo display controller protocol");
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
@@ -87,7 +83,7 @@ zx::result<std::unique_ptr<EngineDriverClient>> CreateBanjoEngineDriverClient(
   auto engine_driver_client =
       fbl::make_unique_checked<EngineDriverClient>(&alloc_checker, std::move(dc));
   if (!alloc_checker.check()) {
-    FDF_LOG(WARNING, "Failed to allocate memory for EngineDriverClient");
+    fdf::warn("Failed to allocate memory for EngineDriverClient");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -105,18 +101,18 @@ zx::result<std::unique_ptr<EngineDriverClient>> EngineDriverClient::Create(
   zx::result<std::unique_ptr<EngineDriverClient>> fidl_engine_driver_client_result =
       CreateFidlEngineDriverClient(*incoming);
   if (fidl_engine_driver_client_result.is_ok()) {
-    FDF_LOG(INFO, "Using the FIDL Engine driver client");
+    fdf::info("Using the FIDL Engine driver client");
     return fidl_engine_driver_client_result.take_value();
   }
-  FDF_LOG(WARNING, "Failed to create FIDL Engine driver client: %s; fallback to banjo",
-          fidl_engine_driver_client_result.status_string());
+  fdf::warn("Failed to create FIDL Engine driver client: {}; fallback to banjo",
+            fidl_engine_driver_client_result);
 
   // Fallback to Banjo protocol.
   zx::result<std::unique_ptr<EngineDriverClient>> banjo_engine_driver_client_result =
       CreateBanjoEngineDriverClient(incoming);
   if (banjo_engine_driver_client_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to create banjo Engine driver client: %s",
-            banjo_engine_driver_client_result.status_string());
+    fdf::error("Failed to create banjo Engine driver client: {}",
+               banjo_engine_driver_client_result);
   }
   return banjo_engine_driver_client_result;
 }
@@ -132,17 +128,15 @@ EngineDriverClient::EngineDriverClient(
   ZX_DEBUG_ASSERT(fidl_engine_.is_valid());
 }
 
-EngineDriverClient::~EngineDriverClient() {
-  FDF_LOG(TRACE, "EngineDriverClient::~EngineDriverClient");
-}
+EngineDriverClient::~EngineDriverClient() { fdf::trace("EngineDriverClient::~EngineDriverClient"); }
 
 void EngineDriverClient::ReleaseImage(display::DriverImageId driver_image_id) {
   if (use_engine_) {
     fdf::Arena arena(kArenaTag);
-    fdf::WireUnownedResult result =
+    fidl::OneWayStatus result =
         fidl_engine_.buffer(arena)->ReleaseImage(ToFidlDriverImageId(driver_image_id));
     if (!result.ok()) {
-      FDF_LOG(ERROR, "ReleaseImage failed: %s", result.status_string());
+      fdf::error("ReleaseImage failed: {}", result.status_string());
     }
     return;
   }
@@ -167,7 +161,7 @@ zx::result<> EngineDriverClient::ReleaseCapture(
 }
 
 config_check_result_t EngineDriverClient::CheckConfiguration(
-    const display_config_t* display_config_list, size_t display_config_count,
+    const display_config_t* display_config,
     layer_composition_operations_t* out_layer_composition_operations_list,
     size_t layer_composition_operations_count, size_t* out_layer_composition_operations_actual) {
   if (use_engine_) {
@@ -175,29 +169,34 @@ config_check_result_t EngineDriverClient::CheckConfiguration(
   }
 
   ZX_DEBUG_ASSERT(banjo_engine_.is_valid());
-  return banjo_engine_.CheckConfiguration(
-      display_config_list, display_config_count, out_layer_composition_operations_list,
-      layer_composition_operations_count, out_layer_composition_operations_actual);
+  return banjo_engine_.CheckConfiguration(display_config, out_layer_composition_operations_list,
+                                          layer_composition_operations_count,
+                                          out_layer_composition_operations_actual);
 }
 
-void EngineDriverClient::ApplyConfiguration(const display_config_t* display_config_list,
-                                            size_t display_config_count,
+void EngineDriverClient::ApplyConfiguration(const display_config_t* display_config,
                                             const config_stamp_t* config_stamp) {
   if (use_engine_) {
     return;
   }
 
   ZX_DEBUG_ASSERT(banjo_engine_.is_valid());
-  banjo_engine_.ApplyConfiguration(display_config_list, display_config_count, config_stamp);
+  banjo_engine_.ApplyConfiguration(display_config, config_stamp);
 }
 
-void EngineDriverClient::SetListener(const display_engine_listener_protocol_t& protocol) {
+display::EngineInfo EngineDriverClient::CompleteCoordinatorConnection(
+    const display_engine_listener_protocol_t& protocol) {
   if (use_engine_) {
-    return;
+    return display::EngineInfo({});
   }
 
   ZX_DEBUG_ASSERT(banjo_engine_.is_valid());
-  banjo_engine_.SetListener(protocol.ctx, protocol.ops);
+  engine_info_t banjo_engine_info;
+  banjo_engine_.CompleteCoordinatorConnection(protocol.ctx, protocol.ops, &banjo_engine_info);
+  if (!display::EngineInfo::IsValid(banjo_engine_info)) {
+    fdf::fatal("CompleteCoordinatorConnection returned invalid EngineInfo");
+  }
+  return display::EngineInfo::From(banjo_engine_info);
 }
 
 void EngineDriverClient::UnsetListener() {
@@ -294,15 +293,6 @@ zx::result<> EngineDriverClient::SetBufferCollectionConstraints(
   zx_status_t banjo_status = banjo_engine_.SetBufferCollectionConstraints(
       &banjo_usage, display::ToBanjoDriverBufferCollectionId(collection_id));
   return zx::make_result(banjo_status);
-}
-
-bool EngineDriverClient::IsCaptureSupported() {
-  if (use_engine_) {
-    return false;
-  }
-
-  ZX_DEBUG_ASSERT(banjo_engine_.is_valid());
-  return banjo_engine_.IsCaptureSupported();
 }
 
 zx::result<> EngineDriverClient::StartCapture(

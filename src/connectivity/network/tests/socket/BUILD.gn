@@ -67,6 +67,7 @@ test("netstack_${bsdsocket_label}_test") {
   if (is_fuchsia) {
     deps += [
       "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_cpp",
+      "//sdk/lib/fdio",
       "//sdk/lib/zxio",
     ]
   }

@@ -692,8 +692,9 @@ pub enum Algorithm {
 }
 
 #[repr(u32)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, FromPrimitive, PartialEq)]
 pub enum EccCurve {
+    None = binding::TEE_CRYPTO_ELEMENT_NONE,
     NistP192 = binding::TEE_ECC_CURVE_NIST_P192,
     NistP224 = binding::TEE_ECC_CURVE_NIST_P224,
     NistP256 = binding::TEE_ECC_CURVE_NIST_P256,
@@ -722,8 +723,8 @@ pub enum EccCurve {
 pub enum AttributeId {
     SecretValue = binding::TEE_ATTR_SECRET_VALUE,
     RsaModulus = binding::TEE_ATTR_RSA_MODULUS,
-    PublicExponent = binding::TEE_ATTR_RSA_PUBLIC_EXPONENT,
-    PrivateExponent = binding::TEE_ATTR_RSA_PRIVATE_EXPONENT,
+    RsaPublicExponent = binding::TEE_ATTR_RSA_PUBLIC_EXPONENT,
+    RsaPrivateExponent = binding::TEE_ATTR_RSA_PRIVATE_EXPONENT,
     RsaPrime1 = binding::TEE_ATTR_RSA_PRIME1,
     RsaPrime2 = binding::TEE_ATTR_RSA_PRIME2,
     RsaExponent1 = binding::TEE_ATTR_RSA_EXPONENT1,

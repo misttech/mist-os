@@ -172,7 +172,10 @@ template("audio_core_package") {
                              "testonly",
                            ])
 
-    deps = [ ":${component_target}" ]
+    deps = [
+      ":${component_target}",
+      "//src/media/audio/audio_core:audio_core_pkg_config",
+    ]
     if (defined(invoker.package_deps)) {
       deps += invoker.package_deps
     }
@@ -225,7 +228,7 @@ template("audio_core_test_package") {
     deps = [
       ":${component_target}",
       "//src/cobalt/bin/testing/fake_cobalt:component_v2",
-      "//src/media/audio/drivers/virtual_audio:virtual_audio_driver",
+      "//src/media/audio/drivers/virtual-audio-legacy:virtual-audio-legacy-driver-component",
       "//src/power/testing/thermal-test-control:thermal-test-control-v2",
     ]
     if (defined(invoker.package_deps)) {

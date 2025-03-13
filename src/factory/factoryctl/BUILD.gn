@@ -34,7 +34,7 @@ rustc_binary("bin") {
   sources = [ "src/main.rs" ]
 }
 
-fuchsia_shell_package("factoryctl") {
+fuchsia_package("factoryctl") {
   deps = [ ":bin" ]
 }
 

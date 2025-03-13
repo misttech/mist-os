@@ -15,8 +15,9 @@ use net_declare::net_ip_v4;
 use net_types::ip::{AddrSubnet, Ip as _, Ipv4, Ipv4Addr};
 use net_types::{MulticastAddr, MulticastAddress as _, SpecifiedAddr, Witness};
 use netstack3_base::{
-    AnyDevice, DeviceIdContext, ErrorAndSerializer, HandleableTimer, InspectableValue, Inspector,
-    Instant, InstantContext, Ipv4DeviceAddr, WeakDeviceIdentifier,
+    AnyDevice, Counter, DeviceIdContext, ErrorAndSerializer, HandleableTimer, Inspectable,
+    InspectableValue, Inspector, InspectorExt, Instant, InstantContext, Ipv4DeviceAddr,
+    ResourceCounterContext, WeakDeviceIdentifier,
 };
 use packet::{BufferMut, EmptyBuf, InnerPacketBuilder, PacketBuilder, Serializer};
 use packet_formats::error::ParseError;
@@ -92,7 +93,10 @@ pub trait IgmpStateContext<BT: IgmpBindingsTypes>:
 
 /// The inner execution context for IGMP capable of sending packets.
 pub trait IgmpSendContext<BT: IgmpBindingsTypes>:
-    DeviceIdContext<AnyDevice> + IpLayerHandler<Ipv4, BT> + IpDeviceMtuContext<Ipv4>
+    DeviceIdContext<AnyDevice>
+    + IpLayerHandler<Ipv4, BT>
+    + IpDeviceMtuContext<Ipv4>
+    + ResourceCounterContext<Self::DeviceId, IgmpCounters>
 {
     /// Gets an IP address and subnet associated with this device.
     fn get_ip_addr_subnet(
@@ -103,7 +107,9 @@ pub trait IgmpSendContext<BT: IgmpBindingsTypes>:
 
 /// The execution context for the Internet Group Management Protocol (IGMP).
 pub trait IgmpContext<BT: IgmpBindingsTypes>:
-    DeviceIdContext<AnyDevice> + IgmpContextMarker
+    DeviceIdContext<AnyDevice>
+    + IgmpContextMarker
+    + ResourceCounterContext<Self::DeviceId, IgmpCounters>
 {
     /// The inner IGMP context capable of sending packets.
     type SendContext<'a>: IgmpSendContext<BT, DeviceId = Self::DeviceId> + 'a;
@@ -165,7 +171,7 @@ fn receive_igmp_packet<
     mut buffer: B,
     info: &LocalDeliveryPacketInfo<Ipv4, H>,
 ) -> Result<(), IgmpError> {
-    let LocalDeliveryPacketInfo { meta: _, header_info } = info;
+    let LocalDeliveryPacketInfo { meta: _, header_info, marks: _ } = info;
     let dst_ip = dst_ip.into_addr();
     let ttl = header_info.hop_limit();
 
@@ -173,17 +179,32 @@ fn receive_igmp_packet<
     //
     // Rejecting messages with bad TTL is almost a violation of the Robustness
     // Principle, but a packet with a different TTL is more likely to be
-    // malicious than a poor implementation.
+    // malicious than a poor implementation. Note that the same rationale is
+    // applied to MLD.
     //
     // See RFC 1112 APPENDIX I, RFC 2236 section 2, and RFC 3376 section 4.
-    if ttl != 1 {
+    if ttl != IGMP_IP_TTL {
+        core_ctx.increment_both(device, |counters: &IgmpCounters| &counters.rx_err_bad_ttl);
         return Err(IgmpError::BadTtl(ttl));
     }
 
-    let packet = buffer.parse_with::<_, IgmpPacket<&[u8]>>(()).map_err(IgmpError::Parse)?;
+    let packet = match buffer.parse_with::<_, IgmpPacket<&[u8]>>(()) {
+        Ok(packet) => packet,
+        Err(e) => {
+            core_ctx.increment_both(device, |counters: &IgmpCounters| &counters.rx_err_parse);
+            return Err(IgmpError::Parse(e));
+        }
+    };
 
     match packet {
         IgmpPacket::MembershipQueryV2(msg) => {
+            if msg.is_igmpv1_query() {
+                core_ctx
+                    .increment_both(device, |counters: &IgmpCounters| &counters.rx_igmpv1_query);
+            } else {
+                core_ctx
+                    .increment_both(device, |counters: &IgmpCounters| &counters.rx_igmpv2_query);
+            }
             // From RFC 3376 section 9.1:
             //
             // Hosts SHOULD ignore v1, v2 or v3 General Queries sent to a
@@ -192,6 +213,9 @@ fn receive_igmp_packet<
                 && dst_ip.is_multicast()
                 && dst_ip != *Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS.as_ref()
             {
+                core_ctx.increment_both(device, |counters: &IgmpCounters| {
+                    &counters.rx_err_rejected_general_query
+                });
                 return Err(IgmpError::RejectedGeneralQuery { dst_ip });
             }
             // From RFC 3376 section 9.1:
@@ -199,11 +223,15 @@ fn receive_igmp_packet<
             // Hosts SHOULD ignore v2 or v3 Queries without the Router-Alert
             // option.
             if !msg.is_igmpv1_query() && !header_info.router_alert() {
+                core_ctx.increment_both(device, |counters: &IgmpCounters| {
+                    &counters.rx_err_missing_router_alert_in_query
+                });
                 return Err(IgmpError::MissingRouterAlertInQuery);
             }
             gmp::v1::handle_query_message(core_ctx, bindings_ctx, device, &msg).map_err(Into::into)
         }
         IgmpPacket::MembershipQueryV3(msg) => {
+            core_ctx.increment_both(device, |counters: &IgmpCounters| &counters.rx_igmpv3_query);
             // From RFC 3376 section 9.1:
             //
             // Hosts SHOULD ignore v1, v2 or v3 General Queries sent to a
@@ -212,6 +240,9 @@ fn receive_igmp_packet<
                 && dst_ip.is_multicast()
                 && dst_ip != *Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS.as_ref()
             {
+                core_ctx.increment_both(device, |counters: &IgmpCounters| {
+                    &counters.rx_err_rejected_general_query
+                });
                 return Err(IgmpError::RejectedGeneralQuery { dst_ip });
             }
             // From RFC 3376 section 9.1:
@@ -219,12 +250,16 @@ fn receive_igmp_packet<
             // Hosts SHOULD ignore v2 or v3 Queries without the Router-Alert
             // option.
             if !header_info.router_alert() {
+                core_ctx.increment_both(device, |counters: &IgmpCounters| {
+                    &counters.rx_err_missing_router_alert_in_query
+                });
                 return Err(IgmpError::MissingRouterAlertInQuery);
             }
 
             gmp::v2::handle_query_message(core_ctx, bindings_ctx, device, &msg).map_err(Into::into)
         }
         IgmpPacket::MembershipReportV1(msg) => {
+            core_ctx.increment_both(device, |counters: &IgmpCounters| &counters.rx_igmpv1_report);
             let addr = msg.group_addr();
             MulticastAddr::new(addr).map_or(Err(IgmpError::NotAMember { addr }), |group_addr| {
                 gmp::v1::handle_report_message(core_ctx, bindings_ctx, device, group_addr)
@@ -232,6 +267,7 @@ fn receive_igmp_packet<
             })
         }
         IgmpPacket::MembershipReportV2(msg) => {
+            core_ctx.increment_both(device, |counters: &IgmpCounters| &counters.rx_igmpv2_report);
             let addr = msg.group_addr();
             MulticastAddr::new(addr).map_or(Err(IgmpError::NotAMember { addr }), |group_addr| {
                 gmp::v1::handle_report_message(core_ctx, bindings_ctx, device, group_addr)
@@ -239,10 +275,12 @@ fn receive_igmp_packet<
             })
         }
         IgmpPacket::LeaveGroup(_) => {
+            core_ctx.increment_both(device, |counters: &IgmpCounters| &counters.rx_leave_group);
             debug!("Hosts are not interested in Leave Group messages");
             return Ok(());
         }
         IgmpPacket::MembershipReportV3(_) => {
+            core_ctx.increment_both(device, |counters: &IgmpCounters| &counters.rx_igmpv3_report);
             debug!("Hosts are not interested in IGMPv3 report messages");
             return Ok(());
         }
@@ -443,6 +481,9 @@ where
         let result = match msg_type {
             gmp::v1::GmpMessageType::Report => {
                 if cur_mode.should_send_v1(bindings_ctx) {
+                    self.increment_both(device, |counters: &IgmpCounters| {
+                        &counters.tx_igmpv1_report
+                    });
                     send_igmp_v2_message::<_, _, IgmpMembershipReportV1>(
                         self,
                         bindings_ctx,
@@ -452,6 +493,9 @@ where
                         (),
                     )
                 } else {
+                    self.increment_both(device, |counters: &IgmpCounters| {
+                        &counters.tx_igmpv2_report
+                    });
                     send_igmp_v2_message::<_, _, IgmpMembershipReportV2>(
                         self,
                         bindings_ctx,
@@ -462,22 +506,28 @@ where
                     )
                 }
             }
-            gmp::v1::GmpMessageType::Leave => send_igmp_v2_message::<_, _, IgmpLeaveGroup>(
-                self,
-                bindings_ctx,
-                device,
-                group_addr,
-                Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS,
-                (),
-            ),
+            gmp::v1::GmpMessageType::Leave => {
+                self.increment_both(device, |counters: &IgmpCounters| &counters.tx_leave_group);
+                send_igmp_v2_message::<_, _, IgmpLeaveGroup>(
+                    self,
+                    bindings_ctx,
+                    device,
+                    group_addr,
+                    Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS,
+                    (),
+                )
+            }
         };
 
         match result {
             Ok(()) => {}
-            Err(err) => debug!(
-                "error sending IGMP message ({msg_type:?}) on device {device:?} for group \
+            Err(err) => {
+                self.increment_both(device, |counters: &IgmpCounters| &counters.tx_err);
+                debug!(
+                    "error sending IGMP message ({msg_type:?}) on device {device:?} for group \
                 {group_addr}: {err}",
-            ),
+                )
+            }
         }
     }
 
@@ -502,14 +552,17 @@ where
                 // TODO(https://fxbug.dev/383355972): Consider an assertion here
                 // instead.
                 error!("MTU too small to send IGMP reports: {e:?}");
+                self.increment_both(device, |counters: &IgmpCounters| &counters.tx_err);
                 return;
             }
         };
         for report in reports {
+            self.increment_both(device, |counters: &IgmpCounters| &counters.tx_igmpv3_report);
             let destination = IpPacketDestination::Multicast(dst_ip);
             let ip_frame = report.into_serializer().encapsulate(header.clone());
             IpLayerHandler::send_ip_frame(self, bindings_ctx, device, destination, ip_frame)
                 .unwrap_or_else(|ErrorAndSerializer { error, .. }| {
+                    self.increment_both(device, |counters: &IgmpCounters| &counters.tx_err);
                     debug!("failed to send IGMPv3 report over {device:?}: {error:?}")
                 });
         }
@@ -874,6 +927,96 @@ impl gmp::v2::ProtocolConfig for IgmpConfig {
     }
 }
 
+/// Statistics about IGMP.
+#[derive(Debug, Default)]
+pub struct IgmpCounters {
+    // Count of IGMPv1 queries received.
+    rx_igmpv1_query: Counter,
+    // Count of IGMPv2 queries received.
+    rx_igmpv2_query: Counter,
+    // Count of IGMPv3 queries received.
+    rx_igmpv3_query: Counter,
+    // Count of IGMPv1 reports received.
+    rx_igmpv1_report: Counter,
+    // Count of IGMPv2 reports received.
+    rx_igmpv2_report: Counter,
+    // Count of IGMPv3 reports received.
+    rx_igmpv3_report: Counter,
+    // Count of Leave Group messages received.
+    rx_leave_group: Counter,
+    // The count of received IGMP messages that could not be parsed.
+    rx_err_parse: Counter,
+    // Count of queries that were rejected because the Router Alert option was
+    // not present.
+    rx_err_missing_router_alert_in_query: Counter,
+    // Count of queries that were rejected because they weren't sent to the
+    // all-systems address.
+    rx_err_rejected_general_query: Counter,
+    // Count of received IGMP messages that were rejected because they had
+    // an invalid TTL.
+    rx_err_bad_ttl: Counter,
+    // Count of IGMPv1 reports sent.
+    tx_igmpv1_report: Counter,
+    // Count of IGMPv2 reports sent.
+    tx_igmpv2_report: Counter,
+    // Count of IGMPv3 reports sent.
+    tx_igmpv3_report: Counter,
+    // Count of Leave Group messages sent.
+    tx_leave_group: Counter,
+    // Count of IGMP messages that could not be sent.
+    tx_err: Counter,
+}
+
+impl Inspectable for IgmpCounters {
+    fn record<I: Inspector>(&self, inspector: &mut I) {
+        let Self {
+            rx_igmpv1_query,
+            rx_igmpv2_query,
+            rx_igmpv3_query,
+            rx_igmpv1_report,
+            rx_igmpv2_report,
+            rx_igmpv3_report,
+            rx_leave_group,
+            rx_err_parse,
+            rx_err_missing_router_alert_in_query,
+            rx_err_rejected_general_query,
+            rx_err_bad_ttl,
+            tx_igmpv1_report,
+            tx_igmpv2_report,
+            tx_igmpv3_report,
+            tx_leave_group,
+            tx_err,
+        } = self;
+        inspector.record_child("Rx", |inspector| {
+            inspector.record_counter("IGMPv1Query", rx_igmpv1_query);
+            inspector.record_counter("IGMPv2Query", rx_igmpv2_query);
+            inspector.record_counter("IGMPv3Query", rx_igmpv3_query);
+            inspector.record_counter("IGMPv1Report", rx_igmpv1_report);
+            inspector.record_counter("IGMPv2Report", rx_igmpv2_report);
+            inspector.record_counter("IGMPv3Report", rx_igmpv3_report);
+            inspector.record_counter("LeaveGroup", rx_leave_group);
+            inspector.record_child("Errors", |inspector| {
+                inspector.record_counter("ParseFailed", rx_err_parse);
+                inspector.record_counter(
+                    "MissingRouterAlertInQuery",
+                    rx_err_missing_router_alert_in_query,
+                );
+                inspector.record_counter("RejectedGeneralQuery", rx_err_rejected_general_query);
+                inspector.record_counter("BadTTL", rx_err_bad_ttl);
+            });
+        });
+        inspector.record_child("Tx", |inspector| {
+            inspector.record_counter("IGMPv1Report", tx_igmpv1_report);
+            inspector.record_counter("IGMPv2Report", tx_igmpv2_report);
+            inspector.record_counter("IGMPv3Report", tx_igmpv3_report);
+            inspector.record_counter("LeaveGroup", tx_leave_group);
+            inspector.record_child("Errors", |inspector| {
+                inspector.record_counter("SendFailed", tx_err);
+            });
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use core::cell::RefCell;
@@ -888,7 +1031,9 @@ mod tests {
         assert_empty, run_with_many_seeds, FakeDeviceId, FakeTimerCtxExt, FakeWeakDeviceId,
         TestIpExt as _,
     };
-    use netstack3_base::{CtxPair, Instant as _, IntoCoreTimerCtx, SendFrameContext as _};
+    use netstack3_base::{
+        CounterContext, CtxPair, Instant as _, IntoCoreTimerCtx, SendFrameContext as _,
+    };
     use packet::serialize::Buf;
     use packet::{ParsablePacket as _, ParseBuffer};
     use packet_formats::gmp::GroupRecordType;
@@ -928,6 +1073,8 @@ mod tests {
         igmp_enabled: bool,
         shared: Rc<RefCell<Shared>>,
         addr_subnet: Option<AddrSubnet<Ipv4Addr, Ipv4DeviceAddr>>,
+        stack_wide_counters: IgmpCounters,
+        device_specific_counters: IgmpCounters,
     }
 
     /// The parts of `FakeIgmpCtx` that are behind a RefCell, mocking a lock.
@@ -953,6 +1100,18 @@ mod tests {
             &mut self,
         ) -> &mut MulticastGroupSet<Ipv4Addr, GmpGroupState<Ipv4, FakeBindingsCtx>> {
             &mut Rc::get_mut(&mut self.shared).unwrap().get_mut().groups
+        }
+    }
+
+    impl CounterContext<IgmpCounters> for FakeIgmpCtx {
+        fn counters(&self) -> &IgmpCounters {
+            &self.stack_wide_counters
+        }
+    }
+
+    impl ResourceCounterContext<FakeDeviceId, IgmpCounters> for FakeIgmpCtx {
+        fn per_resource_counters<'a>(&'a self, _device_id: &'a FakeDeviceId) -> &'a IgmpCounters {
+            &self.device_specific_counters
         }
     }
 
@@ -1066,6 +1225,101 @@ mod tests {
         }
     }
 
+    impl CounterContext<IgmpCounters> for &mut FakeCoreCtx {
+        fn counters(&self) -> &IgmpCounters {
+            <FakeCoreCtx as CounterContext<IgmpCounters>>::counters(self)
+        }
+    }
+
+    impl ResourceCounterContext<FakeDeviceId, IgmpCounters> for &mut FakeCoreCtx {
+        fn per_resource_counters<'a>(&'a self, device_id: &'a FakeDeviceId) -> &'a IgmpCounters {
+            <
+                FakeCoreCtx as ResourceCounterContext<FakeDeviceId, IgmpCounters>
+            >::per_resource_counters(self, device_id)
+        }
+    }
+
+    // Like [`IgmpCounters`], but supports test asserts with `PartialEq`.
+    #[derive(Debug, Default, PartialEq)]
+    struct CounterExpectations {
+        rx_igmpv1_query: u64,
+        rx_igmpv2_query: u64,
+        rx_igmpv3_query: u64,
+        rx_igmpv1_report: u64,
+        rx_igmpv2_report: u64,
+        rx_igmpv3_report: u64,
+        rx_leave_group: u64,
+        rx_err_parse: u64,
+        rx_err_missing_router_alert_in_query: u64,
+        rx_err_rejected_general_query: u64,
+        rx_err_bad_ttl: u64,
+        tx_igmpv1_report: u64,
+        tx_igmpv2_report: u64,
+        tx_igmpv3_report: u64,
+        tx_leave_group: u64,
+        tx_err: u64,
+    }
+
+    impl CounterExpectations {
+        #[track_caller]
+        fn assert_counters<CC: ResourceCounterContext<FakeDeviceId, IgmpCounters>>(
+            &self,
+            core_ctx: &mut CC,
+        ) {
+            assert_eq!(
+                self,
+                &CounterExpectations::from(core_ctx.counters()),
+                "stack-wide counter mismatch"
+            );
+            assert_eq!(
+                self,
+                &CounterExpectations::from(core_ctx.per_resource_counters(&FakeDeviceId)),
+                "device-specific counter mismatch"
+            );
+        }
+    }
+
+    impl From<&IgmpCounters> for CounterExpectations {
+        fn from(igmp_counters: &IgmpCounters) -> CounterExpectations {
+            let IgmpCounters {
+                rx_igmpv1_query,
+                rx_igmpv2_query,
+                rx_igmpv3_query,
+                rx_igmpv1_report,
+                rx_igmpv2_report,
+                rx_igmpv3_report,
+                rx_leave_group,
+                rx_err_parse,
+                rx_err_missing_router_alert_in_query,
+                rx_err_rejected_general_query,
+                rx_err_bad_ttl,
+                tx_igmpv1_report,
+                tx_igmpv2_report,
+                tx_igmpv3_report,
+                tx_leave_group,
+                tx_err,
+            } = igmp_counters;
+            CounterExpectations {
+                rx_igmpv1_query: rx_igmpv1_query.get(),
+                rx_igmpv2_query: rx_igmpv2_query.get(),
+                rx_igmpv3_query: rx_igmpv3_query.get(),
+                rx_igmpv1_report: rx_igmpv1_report.get(),
+                rx_igmpv2_report: rx_igmpv2_report.get(),
+                rx_igmpv3_report: rx_igmpv3_report.get(),
+                rx_leave_group: rx_leave_group.get(),
+                rx_err_parse: rx_err_parse.get(),
+                rx_err_missing_router_alert_in_query: rx_err_missing_router_alert_in_query.get(),
+                rx_err_rejected_general_query: rx_err_rejected_general_query.get(),
+                rx_err_bad_ttl: rx_err_bad_ttl.get(),
+                tx_igmpv1_report: tx_igmpv1_report.get(),
+                tx_igmpv2_report: tx_igmpv2_report.get(),
+                tx_igmpv3_report: tx_igmpv3_report.get(),
+                tx_leave_group: tx_leave_group.get(),
+                tx_err: tx_err.get(),
+            }
+        }
+    }
+
     const MY_ADDR: SpecifiedAddr<Ipv4Addr> =
         unsafe { SpecifiedAddr::new_unchecked(Ipv4Addr::new([192, 168, 0, 2])) };
     const ROUTER_ADDR: Ipv4Addr = Ipv4Addr::new([192, 168, 0, 1]);
@@ -1175,6 +1429,8 @@ mod tests {
                 })),
                 igmp_enabled,
                 addr_subnet: None,
+                stack_wide_counters: Default::default(),
+                device_specific_counters: Default::default(),
             })
         });
         ctx.bindings_ctx.seed_rng(seed);
@@ -1246,6 +1502,9 @@ mod tests {
                 .assert_top(&gmp::v1::DelayedReportTimerId::new_multicast(GROUP_ADDR).into(), &());
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(GMP_TIMER_ID));
             check_report(&mut core_ctx);
+
+            CounterExpectations { rx_igmpv2_query: 1, tx_igmpv2_report: 2, ..Default::default() }
+                .assert_counters(&mut core_ctx);
         });
     }
 
@@ -1289,6 +1548,9 @@ mod tests {
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(GMP_TIMER_ID));
             assert_eq!(core_ctx.frames().len(), 3);
             ensure_ttl_ihl_rtr(&core_ctx);
+
+            CounterExpectations { rx_igmpv2_query: 1, tx_igmpv2_report: 3, ..Default::default() }
+                .assert_counters(&mut core_ctx);
         });
     }
 
@@ -1365,6 +1627,15 @@ mod tests {
             // Now we should get V2 report
             assert_eq!(core_ctx.frames().last().unwrap().1[24], 0x16);
             ensure_ttl_ihl_rtr(&core_ctx);
+
+            CounterExpectations {
+                rx_igmpv1_query: 1,
+                rx_igmpv2_query: 1,
+                tx_igmpv2_report: 2,
+                tx_igmpv1_report: 1,
+                ..Default::default()
+            }
+            .assert_counters(&mut core_ctx);
         });
     }
 
@@ -1410,6 +1681,9 @@ mod tests {
         // Make sure it is a V2 report.
         assert_eq!(core_ctx.frames().last().unwrap().1[24], 0x16);
         ensure_ttl_ihl_rtr(&core_ctx);
+
+        CounterExpectations { rx_igmpv2_query: 1, tx_igmpv2_report: 2, ..Default::default() }
+            .assert_counters(&mut core_ctx);
     }
 
     #[test]
@@ -1452,6 +1726,9 @@ mod tests {
             assert_eq!(leave_frame[18], 0);
             assert_eq!(leave_frame[19], 2);
             ensure_ttl_ihl_rtr(&core_ctx);
+
+            CounterExpectations { tx_igmpv2_report: 2, tx_leave_group: 1, ..Default::default() }
+                .assert_counters(&mut core_ctx);
         });
     }
 
@@ -1469,6 +1746,8 @@ mod tests {
             );
             assert_eq!(core_ctx.frames().len(), 0);
             bindings_ctx.timers.assert_no_timers_installed();
+
+            CounterExpectations::default().assert_counters(&mut core_ctx);
         });
     }
 
@@ -1498,6 +1777,9 @@ mod tests {
             // A leave message is not sent.
             assert_eq!(core_ctx.frames().len(), 1);
             ensure_ttl_ihl_rtr(&core_ctx);
+
+            CounterExpectations { tx_igmpv2_report: 1, rx_igmpv2_report: 1, ..Default::default() }
+                .assert_counters(&mut core_ctx);
         });
     }
 
@@ -1538,6 +1820,9 @@ mod tests {
             // Two new reports should be sent.
             assert_eq!(core_ctx.frames().len(), 6);
             ensure_ttl_ihl_rtr(&core_ctx);
+
+            CounterExpectations { rx_igmpv2_query: 1, tx_igmpv2_report: 6, ..Default::default() }
+                .assert_counters(&mut core_ctx);
         });
     }
 
@@ -1588,6 +1873,9 @@ mod tests {
             // We should have left the group but not executed any `Actions`.
             assert!(core_ctx.state.groups().get(&GROUP_ADDR).is_none());
             assert_no_effect(&core_ctx, &bindings_ctx);
+
+            CounterExpectations { rx_igmpv2_report: 1, rx_igmpv2_query: 1, ..Default::default() }
+                .assert_counters(&mut core_ctx);
         });
     }
 
@@ -1642,6 +1930,9 @@ mod tests {
             assert_eq!(core_ctx.frames().len(), 2);
             bindings_ctx.timers.assert_no_timers_installed();
             ensure_ttl_ihl_rtr(&core_ctx);
+
+            CounterExpectations { tx_igmpv2_report: 1, tx_leave_group: 1, ..Default::default() }
+                .assert_counters(&mut core_ctx);
         });
     }
 
@@ -1730,6 +2021,9 @@ mod tests {
                     }
                 );
             }
+
+            CounterExpectations { tx_igmpv2_report: 2, tx_leave_group: 1, ..Default::default() }
+                .assert_counters(&mut core_ctx);
         });
     }
 
@@ -1789,6 +2083,9 @@ mod tests {
             })
             .collect::<Vec<_>>();
         assert_eq!(report, vec![(sent_report_addr.get(), sent_report_mode, sent_report_sources)]);
+
+        CounterExpectations { tx_igmpv3_report: 1, ..Default::default() }
+            .assert_counters(&mut core_ctx);
     }
 
     /// Tests IGMPv3 entering compatibility modes.
@@ -2062,5 +2359,17 @@ mod tests {
                 Err(IgmpError::MissingRouterAlertInQuery)
             );
         }
+
+        CounterExpectations {
+            // Note: Queries with a Bad TTL aren't accounted for here.
+            rx_igmpv1_query: 1,
+            rx_igmpv2_query: 2,
+            rx_igmpv3_query: 2,
+            rx_err_rejected_general_query: 3,
+            rx_err_missing_router_alert_in_query: 2,
+            rx_err_bad_ttl: 3,
+            ..Default::default()
+        }
+        .assert_counters(core_ctx);
     }
 }

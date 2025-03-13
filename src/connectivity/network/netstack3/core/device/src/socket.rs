@@ -15,9 +15,10 @@ use net_types::ethernet::Mac;
 use net_types::ip::IpVersion;
 use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc, WeakRc};
 use netstack3_base::{
-    AnyDevice, ContextPair, Device, DeviceIdContext, FrameDestination, ReferenceNotifiers,
-    ReferenceNotifiersExt as _, RemoveResourceResultWithContext, SendFrameContext,
-    SendFrameErrorReason, StrongDeviceIdentifier as _, WeakDeviceIdentifier as _,
+    AnyDevice, ContextPair, Counter, Device, DeviceIdContext, FrameDestination, Inspectable,
+    Inspector, InspectorDeviceExt, InspectorExt, ReferenceNotifiers, ReferenceNotifiersExt as _,
+    RemoveResourceResultWithContext, ResourceCounterContext, SendFrameContext,
+    SendFrameErrorReason, StrongDeviceIdentifier, WeakDeviceIdentifier as _,
 };
 use packet::{BufferMut, ParsablePacket as _, Serializer};
 use packet_formats::error::ParseError;
@@ -60,17 +61,17 @@ pub struct SocketInfo<D> {
 /// context.
 pub trait DeviceSocketTypes {
     /// State for the socket held by core and exposed to bindings.
-    type SocketState: Send + Sync + Debug;
+    type SocketState<D: Send + Sync + Debug>: Send + Sync + Debug;
 }
 
 /// The execution context for device sockets provided by bindings.
-pub trait DeviceSocketBindingsContext<DeviceId>: DeviceSocketTypes {
+pub trait DeviceSocketBindingsContext<DeviceId: StrongDeviceIdentifier>: DeviceSocketTypes {
     /// Called for each received frame that matches the provided socket.
     ///
     /// `frame` and `raw_frame` are parsed and raw views into the same data.
     fn receive_frame(
         &self,
-        socket: &Self::SocketState,
+        socket: &Self::SocketState<DeviceId::Weak>,
         device: &DeviceId,
         frame: Frame<&[u8]>,
         raw_frame: &[u8],
@@ -81,12 +82,18 @@ pub trait DeviceSocketBindingsContext<DeviceId>: DeviceSocketTypes {
 ///
 /// This type strongly owns the socket state.
 #[derive(Debug)]
-pub struct PrimaryDeviceSocketId<D, BT: DeviceSocketTypes>(PrimaryRc<SocketState<D, BT>>);
+pub struct PrimaryDeviceSocketId<D: Send + Sync + Debug, BT: DeviceSocketTypes>(
+    PrimaryRc<SocketState<D, BT>>,
+);
 
-impl<D, BT: DeviceSocketTypes> PrimaryDeviceSocketId<D, BT> {
+impl<D: Send + Sync + Debug, BT: DeviceSocketTypes> PrimaryDeviceSocketId<D, BT> {
     /// Creates a new socket ID with `external_state`.
-    fn new(external_state: BT::SocketState) -> Self {
-        Self(PrimaryRc::new(SocketState { external_state, target: Default::default() }))
+    fn new(external_state: BT::SocketState<D>) -> Self {
+        Self(PrimaryRc::new(SocketState {
+            external_state,
+            counters: Default::default(),
+            target: Default::default(),
+        }))
     }
 
     /// Clones the primary's underlying reference and returns as a strong id.
@@ -102,16 +109,20 @@ impl<D, BT: DeviceSocketTypes> PrimaryDeviceSocketId<D, BT> {
 /// backing socket.
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Hash(bound = ""), Eq(bound = ""), PartialEq(bound = ""))]
-pub struct DeviceSocketId<D, BT: DeviceSocketTypes>(StrongRc<SocketState<D, BT>>);
+pub struct DeviceSocketId<D: Send + Sync + Debug, BT: DeviceSocketTypes>(
+    StrongRc<SocketState<D, BT>>,
+);
 
-impl<D, BT: DeviceSocketTypes> Debug for DeviceSocketId<D, BT> {
+impl<D: Send + Sync + Debug, BT: DeviceSocketTypes> Debug for DeviceSocketId<D, BT> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self(rc) = self;
         f.debug_tuple("DeviceSocketId").field(&StrongRc::debug_id(rc)).finish()
     }
 }
 
-impl<D, BT: DeviceSocketTypes> OrderedLockAccess<Target<D>> for DeviceSocketId<D, BT> {
+impl<D: Send + Sync + Debug, BT: DeviceSocketTypes> OrderedLockAccess<Target<D>>
+    for DeviceSocketId<D, BT>
+{
     type Lock = Mutex<Target<D>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         let Self(rc) = self;
@@ -125,9 +136,11 @@ impl<D, BT: DeviceSocketTypes> OrderedLockAccess<Target<D>> for DeviceSocketId<D
 /// the backing socket.
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Hash(bound = ""), Eq(bound = ""), PartialEq(bound = ""))]
-pub struct WeakDeviceSocketId<D, BT: DeviceSocketTypes>(WeakRc<SocketState<D, BT>>);
+pub struct WeakDeviceSocketId<D: Send + Sync + Debug, BT: DeviceSocketTypes>(
+    WeakRc<SocketState<D, BT>>,
+);
 
-impl<D, BT: DeviceSocketTypes> Debug for WeakDeviceSocketId<D, BT> {
+impl<D: Send + Sync + Debug, BT: DeviceSocketTypes> Debug for WeakDeviceSocketId<D, BT> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self(rc) = self;
         f.debug_tuple("WeakDeviceSocketId").field(&WeakRc::debug_id(rc)).finish()
@@ -137,7 +150,7 @@ impl<D, BT: DeviceSocketTypes> Debug for WeakDeviceSocketId<D, BT> {
 /// Holds shared state for sockets.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub struct Sockets<D, BT: DeviceSocketTypes> {
+pub struct Sockets<D: Send + Sync + Debug, BT: DeviceSocketTypes> {
     /// Holds strong (but not owning) references to sockets that aren't
     /// targeting a particular device.
     any_device_sockets: RwLock<AnyDeviceSockets<D, BT>>,
@@ -148,30 +161,34 @@ pub struct Sockets<D, BT: DeviceSocketTypes> {
     // This needs to be after `any_device_sockets` so that when an instance of
     // this type is dropped, any strong IDs get dropped before their
     // corresponding primary IDs.
-    all_sockets: Mutex<AllSockets<D, BT>>,
+    all_sockets: RwLock<AllSockets<D, BT>>,
 }
 
 /// The set of sockets associated with a device.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub struct AnyDeviceSockets<D, BT: DeviceSocketTypes>(HashSet<DeviceSocketId<D, BT>>);
+pub struct AnyDeviceSockets<D: Send + Sync + Debug, BT: DeviceSocketTypes>(
+    HashSet<DeviceSocketId<D, BT>>,
+);
 
 /// A collection of all device sockets in the system.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub struct AllSockets<D, BT: DeviceSocketTypes>(
+pub struct AllSockets<D: Send + Sync + Debug, BT: DeviceSocketTypes>(
     HashMap<DeviceSocketId<D, BT>, PrimaryDeviceSocketId<D, BT>>,
 );
 
 /// State held by a device socket.
 #[derive(Debug)]
-pub struct SocketState<D, BT: DeviceSocketTypes> {
+pub struct SocketState<D: Send + Sync + Debug, BT: DeviceSocketTypes> {
     /// State provided by bindings that is held in core.
-    pub external_state: BT::SocketState,
+    pub external_state: BT::SocketState<D>,
     /// The socket's target device and protocol.
     // TODO(https://fxbug.dev/42077026): Consider splitting up the state here to
     // improve performance.
     target: Mutex<Target<D>>,
+    /// Statistics about the socket's usage.
+    counters: DeviceSocketCounters,
 }
 
 /// A device socket's binding information.
@@ -188,8 +205,13 @@ pub struct Target<D> {
 /// should be held in the state for each device in the system.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-#[cfg_attr(test, derivative(Debug, PartialEq(bound = "BT::SocketState: Hash + Eq, D: Hash + Eq")))]
-pub struct DeviceSockets<D, BT: DeviceSocketTypes>(HashSet<DeviceSocketId<D, BT>>);
+#[cfg_attr(
+    test,
+    derivative(Debug, PartialEq(bound = "BT::SocketState<D>: Hash + Eq, D: Hash + Eq"))
+)]
+pub struct DeviceSockets<D: Send + Sync + Debug, BT: DeviceSocketTypes>(
+    HashSet<DeviceSocketId<D, BT>>,
+);
 
 /// Convenience alias for use in device state storage.
 pub type HeldDeviceSockets<BT> = DeviceSockets<WeakDeviceId<BT>, BT>;
@@ -207,6 +229,16 @@ pub trait DeviceSocketContext<BT: DeviceSocketTypes>: DeviceIdContext<AnyDevice>
         DeviceId = Self::DeviceId,
         WeakDeviceId = Self::WeakDeviceId,
     >;
+
+    /// Executes the provided callback with access to the collection of all
+    /// sockets.
+    fn with_all_device_sockets<
+        F: FnOnce(&AllSockets<Self::WeakDeviceId, BT>, &mut Self::SocketTablesCoreCtx<'_>) -> R,
+        R,
+    >(
+        &mut self,
+        cb: F,
+    ) -> R;
 
     /// Executes the provided callback with mutable access to the collection of
     /// all sockets.
@@ -240,14 +272,20 @@ pub trait DeviceSocketContext<BT: DeviceSocketTypes>: DeviceIdContext<AnyDevice>
 /// Core context for accessing the state of an individual socket.
 pub trait SocketStateAccessor<BT: DeviceSocketTypes>: DeviceIdContext<AnyDevice> {
     /// Provides read-only access to the state of a socket.
-    fn with_socket_state<F: FnOnce(&BT::SocketState, &Target<Self::WeakDeviceId>) -> R, R>(
+    fn with_socket_state<
+        F: FnOnce(&BT::SocketState<Self::WeakDeviceId>, &Target<Self::WeakDeviceId>) -> R,
+        R,
+    >(
         &mut self,
         socket: &DeviceSocketId<Self::WeakDeviceId, BT>,
         cb: F,
     ) -> R;
 
     /// Provides mutable access to the state of a socket.
-    fn with_socket_state_mut<F: FnOnce(&BT::SocketState, &mut Target<Self::WeakDeviceId>) -> R, R>(
+    fn with_socket_state_mut<
+        F: FnOnce(&BT::SocketState<Self::WeakDeviceId>, &mut Target<Self::WeakDeviceId>) -> R,
+        R,
+    >(
         &mut self,
         socket: &DeviceSocketId<Self::WeakDeviceId, BT>,
         cb: F,
@@ -257,11 +295,8 @@ pub trait SocketStateAccessor<BT: DeviceSocketTypes>: DeviceIdContext<AnyDevice>
 /// Core context for accessing the socket state for a device.
 pub trait DeviceSocketAccessor<BT: DeviceSocketTypes>: SocketStateAccessor<BT> {
     /// Core context available in callbacks to methods on this context.
-    type DeviceSocketCoreCtx<'a>: SocketStateAccessor<
-        BT,
-        DeviceId = Self::DeviceId,
-        WeakDeviceId = Self::WeakDeviceId,
-    >;
+    type DeviceSocketCoreCtx<'a>: SocketStateAccessor<BT, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
+        + ResourceCounterContext<DeviceSocketId<Self::WeakDeviceId, BT>, DeviceSocketCounters>;
 
     /// Executes the provided callback with immutable access to device-specific
     /// socket state.
@@ -305,7 +340,7 @@ fn update_device_and_protocol<CC: DeviceSocketContext<BT>, BT: DeviceSocketTypes
         // delivered to the socket from either device.
         let old_device = core_ctx.with_socket_state_mut(
             socket,
-            |_: &BT::SocketState, Target { protocol, device }| {
+            |_: &BT::SocketState<CC::WeakDeviceId>, Target { protocol, device }| {
                 match protocol_update {
                     MaybeUpdate::NewValue(p) => *protocol = Some(p),
                     MaybeUpdate::NoChange => (),
@@ -366,7 +401,7 @@ impl<C> DeviceSocketApi<C> {
     }
 }
 
-/// A local alias for [`TcpSocketId`] for use in [`TcpApi`].
+/// A local alias for [`DeviceSocketId`] for use in [`DeviceSocketApi`].
 ///
 /// TODO(https://github.com/rust-lang/rust/issues/8995): Make this an inherent
 /// associated type.
@@ -378,8 +413,9 @@ type ApiSocketId<C> = DeviceSocketId<
 impl<C> DeviceSocketApi<C>
 where
     C: ContextPair,
-    C::CoreContext:
-        DeviceSocketContext<C::BindingsContext> + SocketStateAccessor<C::BindingsContext>,
+    C::CoreContext: DeviceSocketContext<C::BindingsContext>
+        + SocketStateAccessor<C::BindingsContext>
+        + ResourceCounterContext<ApiSocketId<C>, DeviceSocketCounters>,
     C::BindingsContext: DeviceSocketBindingsContext<<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>
         + ReferenceNotifiers
         + 'static,
@@ -397,7 +433,9 @@ where
     /// Creates an packet socket with no protocol set configured for all devices.
     pub fn create(
         &mut self,
-        external_state: <C::BindingsContext as DeviceSocketTypes>::SocketState,
+        external_state: <C::BindingsContext as DeviceSocketTypes>::SocketState<
+            <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId,
+        >,
     ) -> ApiSocketId<C> {
         let core_ctx = self.core_ctx();
 
@@ -453,7 +491,9 @@ where
         &mut self,
         id: ApiSocketId<C>,
     ) -> RemoveResourceResultWithContext<
-        <C::BindingsContext as DeviceSocketTypes>::SocketState,
+        <C::BindingsContext as DeviceSocketTypes>::SocketState<
+            <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId,
+        >,
         C::BindingsContext,
     > {
         let core_ctx = self.core_ctx();
@@ -489,7 +529,7 @@ where
             let PrimaryDeviceSocketId(primary) = primary;
             C::BindingsContext::unwrap_or_notify_with_new_reference_notifier(
                 primary,
-                |SocketState { external_state, target: _ }| external_state,
+                |SocketState { external_state, counters: _, target: _ }| external_state,
             )
         })
     }
@@ -497,7 +537,7 @@ where
     /// Sends a frame for the specified socket.
     pub fn send_frame<S, D>(
         &mut self,
-        _id: &ApiSocketId<C>,
+        id: &ApiSocketId<C>,
         metadata: DeviceSocketMetadata<D, <C::CoreContext as DeviceIdContext<D>>::DeviceId>,
         body: S,
     ) -> Result<(), SendFrameErrorReason>
@@ -513,7 +553,50 @@ where
         C::BindingsContext: DeviceLayerTypes,
     {
         let (core_ctx, bindings_ctx) = self.contexts();
-        core_ctx.send_frame(bindings_ctx, metadata, body).map_err(|e| e.into_err())
+        let result = core_ctx.send_frame(bindings_ctx, metadata, body).map_err(|e| e.into_err());
+        match &result {
+            Ok(()) => {
+                core_ctx.increment_both(id, |counters: &DeviceSocketCounters| &counters.tx_frames)
+            }
+            Err(SendFrameErrorReason::QueueFull) => core_ctx
+                .increment_both(id, |counters: &DeviceSocketCounters| &counters.tx_err_queue_full),
+            Err(SendFrameErrorReason::Alloc) => core_ctx
+                .increment_both(id, |counters: &DeviceSocketCounters| &counters.tx_err_alloc),
+            Err(SendFrameErrorReason::SizeConstraintsViolation) => core_ctx
+                .increment_both(id, |counters: &DeviceSocketCounters| {
+                    &counters.tx_err_size_constraint
+                }),
+        }
+        result
+    }
+
+    /// Provides inspect data for raw IP sockets.
+    pub fn inspect<N>(&mut self, inspector: &mut N)
+    where
+        N: Inspector
+            + InspectorDeviceExt<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+    {
+        self.core_ctx().with_all_device_sockets(|AllSockets(sockets), core_ctx| {
+            sockets.keys().for_each(|socket| {
+                inspector.record_debug_child(socket, |node| {
+                    core_ctx.with_socket_state(
+                        socket,
+                        |_external_state, Target { protocol, device }| {
+                            node.record_debug("Protocol", protocol);
+                            match device {
+                                TargetDevice::AnyDevice => node.record_str("Device", "Any"),
+                                TargetDevice::SpecificDevice(d) => {
+                                    N::record_device(node, "Device", d)
+                                }
+                            }
+                        },
+                    );
+                    node.record_child("Counters", |node| {
+                        node.delegate_inspectable(socket.counters())
+                    })
+                })
+            })
+        })
     }
 }
 
@@ -549,12 +632,12 @@ pub struct EthernetHeaderParams {
 /// socket is not dropped, the socket is guaranteed to exist.
 pub type SocketId<BC> = DeviceSocketId<WeakDeviceId<BC>, BC>;
 
-impl<D, BT: DeviceSocketTypes> DeviceSocketId<D, BT> {
+impl<D: Send + Sync + Debug, BT: DeviceSocketTypes> DeviceSocketId<D, BT> {
     /// Provides immutable access to [`DeviceSocketTypes::SocketState`] for the
     /// socket.
-    pub fn socket_state(&self) -> &BT::SocketState {
+    pub fn socket_state(&self) -> &BT::SocketState<D> {
         let Self(strong) = self;
-        let SocketState { external_state, target: _ } = &**strong;
+        let SocketState { external_state, counters: _, target: _ } = &**strong;
         external_state
     }
 
@@ -562,6 +645,13 @@ impl<D, BT: DeviceSocketTypes> DeviceSocketId<D, BT> {
     pub fn downgrade(&self) -> WeakDeviceSocketId<D, BT> {
         let Self(inner) = self;
         WeakDeviceSocketId(StrongRc::downgrade(inner))
+    }
+
+    /// Provides access to the socket's counters.
+    pub fn counters(&self) -> &DeviceSocketCounters {
+        let Self(strong) = self;
+        let SocketState { external_state: _, counters, target: _ } = &**strong;
+        counters
     }
 }
 
@@ -754,7 +844,7 @@ where
             //   A) deliver to socket X in D's table (!)
             core_ctx.with_device_sockets(&device, |DeviceSockets(device_sockets), core_ctx| {
                 for socket in any_device_sockets.iter().chain(device_sockets) {
-                    core_ctx.with_socket_state(
+                    let delivered = core_ctx.with_socket_state(
                         socket,
                         |external_state, Target { protocol, device: _ }| {
                             let should_deliver = match protocol {
@@ -778,23 +868,70 @@ where
                                     whole_frame,
                                 )
                             }
+                            should_deliver
                         },
-                    )
+                    );
+                    if delivered {
+                        core_ctx.increment_both(socket, |counters: &DeviceSocketCounters| {
+                            &counters.rx_frames
+                        });
+                    }
                 }
             })
         })
     }
 }
 
-impl<D, BT: DeviceSocketTypes> OrderedLockAccess<AnyDeviceSockets<D, BT>> for Sockets<D, BT> {
+/// Usage statistics about Device Sockets.
+///
+/// Tracked stack-wide and per-socket.
+#[derive(Debug, Default)]
+pub struct DeviceSocketCounters {
+    /// Count of incoming frames that were delivered to the socket.
+    ///
+    /// Note that a single frame may be delivered to multiple device sockets.
+    /// Thus this counter, when tracking the stack-wide aggregate, may exceed
+    /// the total number of frames received by the stack.
+    rx_frames: Counter,
+    /// Count of outgoing frames that were sent by the socket.
+    tx_frames: Counter,
+    /// Count of failed tx frames due to [`SendFrameErrorReason::QueueFull`].
+    tx_err_queue_full: Counter,
+    /// Count of failed tx frames due to [`SendFrameErrorReason::Alloc`].
+    tx_err_alloc: Counter,
+    /// Count of failed tx frames due to [`SendFrameErrorReason::SizeConstraintsViolation`].
+    tx_err_size_constraint: Counter,
+}
+
+impl Inspectable for DeviceSocketCounters {
+    fn record<I: Inspector>(&self, inspector: &mut I) {
+        let Self { rx_frames, tx_frames, tx_err_queue_full, tx_err_alloc, tx_err_size_constraint } =
+            self;
+        inspector.record_child("Rx", |inspector| {
+            inspector.record_counter("DeliveredFrames", rx_frames);
+        });
+        inspector.record_child("Tx", |inspector| {
+            inspector.record_counter("SentFrames", tx_frames);
+            inspector.record_counter("QueueFullError", tx_err_queue_full);
+            inspector.record_counter("AllocError", tx_err_alloc);
+            inspector.record_counter("SizeConstraintError", tx_err_size_constraint);
+        });
+    }
+}
+
+impl<D: Send + Sync + Debug, BT: DeviceSocketTypes> OrderedLockAccess<AnyDeviceSockets<D, BT>>
+    for Sockets<D, BT>
+{
     type Lock = RwLock<AnyDeviceSockets<D, BT>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.any_device_sockets)
     }
 }
 
-impl<D, BT: DeviceSocketTypes> OrderedLockAccess<AllSockets<D, BT>> for Sockets<D, BT> {
-    type Lock = Mutex<AllSockets<D, BT>>;
+impl<D: Send + Sync + Debug, BT: DeviceSocketTypes> OrderedLockAccess<AllSockets<D, BT>>
+    for Sockets<D, BT>
+{
+    type Lock = RwLock<AllSockets<D, BT>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.all_sockets)
     }
@@ -802,84 +939,32 @@ impl<D, BT: DeviceSocketTypes> OrderedLockAccess<AllSockets<D, BT>> for Sockets<
 
 #[cfg(any(test, feature = "testutils"))]
 mod testutil {
+    use alloc::vec::Vec;
     use core::num::NonZeroU64;
-
     use netstack3_base::testutil::{FakeBindingsCtx, MonotonicIdentifier};
+    use netstack3_base::StrongDeviceIdentifier;
 
     use super::*;
     use crate::internal::base::{
         DeviceClassMatcher, DeviceIdAndNameMatcher, DeviceLayerStateTypes,
     };
 
+    #[derive(Clone, Debug, PartialEq)]
+    pub struct ReceivedFrame<D> {
+        pub device: D,
+        pub frame: Frame<Vec<u8>>,
+        pub raw: Vec<u8>,
+    }
+
+    #[derive(Debug, Derivative)]
+    #[derivative(Default(bound = ""))]
+    pub struct ExternalSocketState<D>(pub Mutex<Vec<ReceivedFrame<D>>>);
+
     impl<TimerId, Event: Debug, State> DeviceSocketTypes
         for FakeBindingsCtx<TimerId, Event, State, ()>
     {
-        type SocketState = ();
+        type SocketState<D: Send + Sync + Debug> = ExternalSocketState<D>;
     }
-
-    impl<
-            TimerId: Debug + PartialEq + Clone + Send + Sync + 'static,
-            Event: Debug + 'static,
-            State: 'static,
-        > DeviceLayerStateTypes for FakeBindingsCtx<TimerId, Event, State, ()>
-    {
-        type EthernetDeviceState = ();
-        type LoopbackDeviceState = ();
-        type PureIpDeviceState = ();
-        type BlackholeDeviceState = ();
-        type DeviceIdentifier = MonotonicIdentifier;
-    }
-
-    impl DeviceClassMatcher<()> for () {
-        fn device_class_matches(&self, (): &()) -> bool {
-            unimplemented!()
-        }
-    }
-
-    impl DeviceIdAndNameMatcher for MonotonicIdentifier {
-        fn id_matches(&self, _id: &NonZeroU64) -> bool {
-            unimplemented!()
-        }
-
-        fn name_matches(&self, _name: &str) -> bool {
-            unimplemented!()
-        }
-    }
-
-    impl<TimerId, Event: Debug, State, DeviceId> DeviceSocketBindingsContext<DeviceId>
-        for FakeBindingsCtx<TimerId, Event, State, ()>
-    {
-        fn receive_frame(
-            &self,
-            _socket: &Self::SocketState,
-            _device: &DeviceId,
-            _frame: Frame<&[u8]>,
-            _raw_frame: &[u8],
-        ) {
-            unimplemented!()
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use alloc::collections::HashMap;
-    use alloc::vec;
-    use alloc::vec::Vec;
-    use core::cmp::PartialEq;
-    use core::marker::PhantomData;
-
-    use core::convert::Infallible as Never;
-    use derivative::Derivative;
-    use netstack3_base::sync::DynDebugReferences;
-    use netstack3_base::testutil::{
-        FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId,
-    };
-    use netstack3_base::{ContextProvider, CtxPair, DeviceIdentifier};
-    use packet::ParsablePacket;
-    use test_case::test_case;
-
-    use super::*;
 
     impl Frame<&[u8]> {
         pub(crate) fn cloned(self) -> Frame<Vec<u8>> {
@@ -915,58 +1000,75 @@ mod tests {
         }
     }
 
-    #[derive(Clone, Debug, PartialEq)]
-    struct ReceivedFrame<D> {
-        device: D,
-        frame: Frame<Vec<u8>>,
-        raw: Vec<u8>,
-    }
-
-    type FakeCoreCtx<D> = netstack3_base::testutil::FakeCoreCtx<FakeSockets<D>, (), D>;
-    type FakeCtx<D> = CtxPair<FakeCoreCtx<D>, FakeBindingsCtx<D>>;
-    #[derive(Debug, Derivative)]
-    #[derivative(Default(bound = ""))]
-    struct FakeBindingsCtx<D>(PhantomData<D>);
-
-    impl<D> ContextProvider for FakeBindingsCtx<D> {
-        type Context = Self;
-        fn context(&mut self) -> &mut Self::Context {
-            self
-        }
-    }
-
-    impl<D: DeviceIdentifier> DeviceSocketTypes for FakeBindingsCtx<D> {
-        type SocketState = ExternalSocketState<D>;
-    }
-
-    impl<D: DeviceIdentifier> DeviceSocketBindingsContext<D> for FakeBindingsCtx<D> {
+    impl<TimerId, Event: Debug, State, D: StrongDeviceIdentifier> DeviceSocketBindingsContext<D>
+        for FakeBindingsCtx<TimerId, Event, State, ()>
+    {
         fn receive_frame(
             &self,
-            state: &ExternalSocketState<D>,
+            state: &ExternalSocketState<D::Weak>,
             device: &D,
             frame: Frame<&[u8]>,
             raw_frame: &[u8],
         ) {
             let ExternalSocketState(queue) = state;
             queue.lock().push(ReceivedFrame {
-                device: device.clone(),
+                device: device.downgrade(),
                 frame: frame.cloned(),
                 raw: raw_frame.into(),
             })
         }
     }
 
-    impl<D> ReferenceNotifiers for FakeBindingsCtx<D> {
-        type ReferenceReceiver<T: 'static> = Never;
+    impl<
+            TimerId: Debug + PartialEq + Clone + Send + Sync + 'static,
+            Event: Debug + 'static,
+            State: 'static,
+        > DeviceLayerStateTypes for FakeBindingsCtx<TimerId, Event, State, ()>
+    {
+        type EthernetDeviceState = ();
+        type LoopbackDeviceState = ();
+        type PureIpDeviceState = ();
+        type BlackholeDeviceState = ();
+        type DeviceIdentifier = MonotonicIdentifier;
+    }
 
-        type ReferenceNotifier<T: Send + 'static> = Never;
-
-        fn new_reference_notifier<T: Send + 'static>(
-            debug_references: DynDebugReferences,
-        ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>) {
-            panic!("device socket removal unexpectedly deferred in test: {debug_references:?}");
+    impl DeviceClassMatcher<()> for () {
+        fn device_class_matches(&self, (): &()) -> bool {
+            unimplemented!()
         }
     }
+
+    impl DeviceIdAndNameMatcher for MonotonicIdentifier {
+        fn id_matches(&self, _id: &NonZeroU64) -> bool {
+            unimplemented!()
+        }
+
+        fn name_matches(&self, _name: &str) -> bool {
+            unimplemented!()
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::collections::HashMap;
+    use alloc::vec;
+    use alloc::vec::Vec;
+    use core::marker::PhantomData;
+
+    use crate::internal::socket::testutil::{ExternalSocketState, ReceivedFrame};
+    use netstack3_base::testutil::{
+        FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId,
+    };
+    use netstack3_base::{CounterContext, CtxPair, SendFrameError, SendableFrameMeta};
+    use packet::ParsablePacket;
+    use test_case::test_case;
+
+    use super::*;
+
+    type FakeCoreCtx<D> = netstack3_base::testutil::FakeCoreCtx<FakeSockets<D>, (), D>;
+    type FakeBindingsCtx = netstack3_base::testutil::FakeBindingsCtx<(), (), (), ()>;
+    type FakeCtx<D> = CtxPair<FakeCoreCtx<D>, FakeBindingsCtx>;
 
     /// A trait providing a shortcut to instantiate a [`DeviceSocketApi`] from a
     /// context.
@@ -978,29 +1080,29 @@ mod tests {
 
     impl<O> DeviceSocketApiExt for O where O: ContextPair + Sized {}
 
-    #[derive(Debug, Derivative)]
-    #[derivative(Default(bound = ""))]
-    struct ExternalSocketState<D>(Mutex<Vec<ReceivedFrame<D>>>);
-
     #[derive(Derivative)]
     #[derivative(Default(bound = ""))]
     struct FakeSockets<D: FakeStrongDeviceId> {
-        any_device_sockets: AnyDeviceSockets<D::Weak, FakeBindingsCtx<D>>,
-        device_sockets: HashMap<D, DeviceSockets<D::Weak, FakeBindingsCtx<D>>>,
-        all_sockets: AllSockets<D::Weak, FakeBindingsCtx<D>>,
+        any_device_sockets: AnyDeviceSockets<D::Weak, FakeBindingsCtx>,
+        device_sockets: HashMap<D, DeviceSockets<D::Weak, FakeBindingsCtx>>,
+        all_sockets: AllSockets<D::Weak, FakeBindingsCtx>,
+        /// The stack-wide counters for device sockets.
+        counters: DeviceSocketCounters,
+        sent_frames: Vec<Vec<u8>>,
     }
 
     /// Tuple of references
-    struct FakeSocketsMutRefs<'m, AnyDevice, AllSockets, Devices, Device>(
+    pub struct FakeSocketsMutRefs<'m, AnyDevice, AllSockets, Devices, Device>(
         &'m mut AnyDevice,
         &'m mut AllSockets,
         &'m mut Devices,
         PhantomData<Device>,
+        &'m DeviceSocketCounters,
     );
 
     /// Helper trait to allow treating a `&mut self` as a
     /// [`FakeSocketsMutRefs`].
-    trait AsFakeSocketsMutRefs {
+    pub trait AsFakeSocketsMutRefs {
         type AnyDevice: 'static;
         type AllSockets: 'static;
         type Devices: 'static;
@@ -1011,22 +1113,34 @@ mod tests {
     }
 
     impl<D: FakeStrongDeviceId> AsFakeSocketsMutRefs for FakeCoreCtx<D> {
-        type AnyDevice = AnyDeviceSockets<D::Weak, FakeBindingsCtx<D>>;
-        type AllSockets = AllSockets<D::Weak, FakeBindingsCtx<D>>;
-        type Devices = HashMap<D, DeviceSockets<D::Weak, FakeBindingsCtx<D>>>;
+        type AnyDevice = AnyDeviceSockets<D::Weak, FakeBindingsCtx>;
+        type AllSockets = AllSockets<D::Weak, FakeBindingsCtx>;
+        type Devices = HashMap<D, DeviceSockets<D::Weak, FakeBindingsCtx>>;
         type Device = D;
 
         fn as_sockets_ref(
             &mut self,
         ) -> FakeSocketsMutRefs<
             '_,
-            AnyDeviceSockets<D::Weak, FakeBindingsCtx<D>>,
-            AllSockets<D::Weak, FakeBindingsCtx<D>>,
-            HashMap<D, DeviceSockets<D::Weak, FakeBindingsCtx<D>>>,
+            AnyDeviceSockets<D::Weak, FakeBindingsCtx>,
+            AllSockets<D::Weak, FakeBindingsCtx>,
+            HashMap<D, DeviceSockets<D::Weak, FakeBindingsCtx>>,
             D,
         > {
-            let FakeSockets { any_device_sockets, device_sockets, all_sockets } = &mut self.state;
-            FakeSocketsMutRefs(any_device_sockets, all_sockets, device_sockets, PhantomData)
+            let FakeSockets {
+                any_device_sockets,
+                device_sockets,
+                all_sockets,
+                counters,
+                sent_frames: _,
+            } = &mut self.state;
+            FakeSocketsMutRefs(
+                any_device_sockets,
+                all_sockets,
+                device_sockets,
+                PhantomData,
+                counters,
+            )
         }
     }
 
@@ -1041,8 +1155,8 @@ mod tests {
         fn as_sockets_ref(
             &mut self,
         ) -> FakeSocketsMutRefs<'_, AnyDevice, AllSockets, Devices, Device> {
-            let Self(any_device, all_sockets, devices, PhantomData) = self;
-            FakeSocketsMutRefs(any_device, all_sockets, devices, PhantomData)
+            let Self(any_device, all_sockets, devices, PhantomData, counters) = self;
+            FakeSocketsMutRefs(any_device, all_sockets, devices, PhantomData, counters)
         }
     }
 
@@ -1065,6 +1179,8 @@ mod tests {
                 any_device_sockets: AnyDeviceSockets::default(),
                 device_sockets,
                 all_sockets: Default::default(),
+                counters: Default::default(),
+                sent_frames: Default::default(),
             }
         }
     }
@@ -1072,17 +1188,16 @@ mod tests {
     impl<
             'm,
             DeviceId: FakeStrongDeviceId,
-            As: AsFakeSocketsMutRefs<
-                    AllSockets = AllSockets<DeviceId::Weak, FakeBindingsCtx<DeviceId>>,
-                > + DeviceIdContext<AnyDevice, DeviceId = DeviceId, WeakDeviceId = DeviceId::Weak>,
-        > SocketStateAccessor<FakeBindingsCtx<DeviceId>> for As
+            As: AsFakeSocketsMutRefs
+                + DeviceIdContext<AnyDevice, DeviceId = DeviceId, WeakDeviceId = DeviceId::Weak>,
+        > SocketStateAccessor<FakeBindingsCtx> for As
     {
         fn with_socket_state<
-            F: FnOnce(&ExternalSocketState<Self::DeviceId>, &Target<Self::WeakDeviceId>) -> R,
+            F: FnOnce(&ExternalSocketState<Self::WeakDeviceId>, &Target<Self::WeakDeviceId>) -> R,
             R,
         >(
             &mut self,
-            socket: &DeviceSocketId<Self::WeakDeviceId, FakeBindingsCtx<Self::DeviceId>>,
+            socket: &DeviceSocketId<Self::WeakDeviceId, FakeBindingsCtx>,
             cb: F,
         ) -> R {
             let DeviceSocketId(rc) = socket;
@@ -1092,11 +1207,11 @@ mod tests {
         }
 
         fn with_socket_state_mut<
-            F: FnOnce(&ExternalSocketState<Self::DeviceId>, &mut Target<Self::WeakDeviceId>) -> R,
+            F: FnOnce(&ExternalSocketState<Self::WeakDeviceId>, &mut Target<Self::WeakDeviceId>) -> R,
             R,
         >(
             &mut self,
-            socket: &DeviceSocketId<Self::WeakDeviceId, FakeBindingsCtx<Self::DeviceId>>,
+            socket: &DeviceSocketId<Self::WeakDeviceId, FakeBindingsCtx>,
             cb: F,
         ) -> R {
             let DeviceSocketId(rc) = socket;
@@ -1110,24 +1225,15 @@ mod tests {
             'm,
             DeviceId: FakeStrongDeviceId,
             As: AsFakeSocketsMutRefs<
-                    AllSockets = AllSockets<DeviceId::Weak, FakeBindingsCtx<DeviceId>>,
-                    Devices = HashMap<
-                        DeviceId,
-                        DeviceSockets<DeviceId::Weak, FakeBindingsCtx<DeviceId>>,
-                    >,
+                    Devices = HashMap<DeviceId, DeviceSockets<DeviceId::Weak, FakeBindingsCtx>>,
                 > + DeviceIdContext<AnyDevice, DeviceId = DeviceId, WeakDeviceId = DeviceId::Weak>,
-        > DeviceSocketAccessor<FakeBindingsCtx<DeviceId>> for As
+        > DeviceSocketAccessor<FakeBindingsCtx> for As
     {
-        type DeviceSocketCoreCtx<'a> = FakeSocketsMutRefs<
-            'a,
-            As::AnyDevice,
-            AllSockets<DeviceId::Weak, FakeBindingsCtx<DeviceId>>,
-            HashSet<DeviceId>,
-            DeviceId,
-        >;
+        type DeviceSocketCoreCtx<'a> =
+            FakeSocketsMutRefs<'a, As::AnyDevice, As::AllSockets, HashSet<DeviceId>, DeviceId>;
         fn with_device_sockets<
             F: FnOnce(
-                &DeviceSockets<Self::WeakDeviceId, FakeBindingsCtx<Self::DeviceId>>,
+                &DeviceSockets<Self::WeakDeviceId, FakeBindingsCtx>,
                 &mut Self::DeviceSocketCoreCtx<'_>,
             ) -> R,
             R,
@@ -1136,15 +1242,24 @@ mod tests {
             device: &Self::DeviceId,
             cb: F,
         ) -> R {
-            let FakeSocketsMutRefs(any_device, all_sockets, device_sockets, PhantomData) =
+            let FakeSocketsMutRefs(any_device, all_sockets, device_sockets, PhantomData, counters) =
                 self.as_sockets_ref();
             let mut devices = device_sockets.keys().cloned().collect();
             let device = device_sockets.get(device).unwrap();
-            cb(device, &mut FakeSocketsMutRefs(any_device, all_sockets, &mut devices, PhantomData))
+            cb(
+                device,
+                &mut FakeSocketsMutRefs(
+                    any_device,
+                    all_sockets,
+                    &mut devices,
+                    PhantomData,
+                    counters,
+                ),
+            )
         }
         fn with_device_sockets_mut<
             F: FnOnce(
-                &mut DeviceSockets<Self::WeakDeviceId, FakeBindingsCtx<Self::DeviceId>>,
+                &mut DeviceSockets<Self::WeakDeviceId, FakeBindingsCtx>,
                 &mut Self::DeviceSocketCoreCtx<'_>,
             ) -> R,
             R,
@@ -1153,11 +1268,20 @@ mod tests {
             device: &Self::DeviceId,
             cb: F,
         ) -> R {
-            let FakeSocketsMutRefs(any_device, all_sockets, device_sockets, PhantomData) =
+            let FakeSocketsMutRefs(any_device, all_sockets, device_sockets, PhantomData, counters) =
                 self.as_sockets_ref();
             let mut devices = device_sockets.keys().cloned().collect();
             let device = device_sockets.get_mut(device).unwrap();
-            cb(device, &mut FakeSocketsMutRefs(any_device, all_sockets, &mut devices, PhantomData))
+            cb(
+                device,
+                &mut FakeSocketsMutRefs(
+                    any_device,
+                    all_sockets,
+                    &mut devices,
+                    PhantomData,
+                    counters,
+                ),
+            )
         }
     }
 
@@ -1165,26 +1289,23 @@ mod tests {
             'm,
             DeviceId: FakeStrongDeviceId,
             As: AsFakeSocketsMutRefs<
-                    AnyDevice = AnyDeviceSockets<DeviceId::Weak, FakeBindingsCtx<DeviceId>>,
-                    AllSockets = AllSockets<DeviceId::Weak, FakeBindingsCtx<DeviceId>>,
-                    Devices = HashMap<
-                        DeviceId,
-                        DeviceSockets<DeviceId::Weak, FakeBindingsCtx<DeviceId>>,
-                    >,
+                    AnyDevice = AnyDeviceSockets<DeviceId::Weak, FakeBindingsCtx>,
+                    AllSockets = AllSockets<DeviceId::Weak, FakeBindingsCtx>,
+                    Devices = HashMap<DeviceId, DeviceSockets<DeviceId::Weak, FakeBindingsCtx>>,
                 > + DeviceIdContext<AnyDevice, DeviceId = DeviceId, WeakDeviceId = DeviceId::Weak>,
-        > DeviceSocketContext<FakeBindingsCtx<DeviceId>> for As
+        > DeviceSocketContext<FakeBindingsCtx> for As
     {
         type SocketTablesCoreCtx<'a> = FakeSocketsMutRefs<
             'a,
             (),
-            AllSockets<DeviceId::Weak, FakeBindingsCtx<DeviceId>>,
-            HashMap<DeviceId, DeviceSockets<DeviceId::Weak, FakeBindingsCtx<DeviceId>>>,
+            (),
+            HashMap<DeviceId, DeviceSockets<DeviceId::Weak, FakeBindingsCtx>>,
             DeviceId,
         >;
 
         fn with_any_device_sockets<
             F: FnOnce(
-                &AnyDeviceSockets<Self::WeakDeviceId, FakeBindingsCtx<Self::DeviceId>>,
+                &AnyDeviceSockets<Self::WeakDeviceId, FakeBindingsCtx>,
                 &mut Self::SocketTablesCoreCtx<'_>,
             ) -> R,
             R,
@@ -1192,16 +1313,21 @@ mod tests {
             &mut self,
             cb: F,
         ) -> R {
-            let FakeSocketsMutRefs(any_device_sockets, all_sockets, device_sockets, PhantomData) =
-                self.as_sockets_ref();
+            let FakeSocketsMutRefs(
+                any_device_sockets,
+                _all_sockets,
+                device_sockets,
+                PhantomData,
+                counters,
+            ) = self.as_sockets_ref();
             cb(
                 any_device_sockets,
-                &mut FakeSocketsMutRefs(&mut (), all_sockets, device_sockets, PhantomData),
+                &mut FakeSocketsMutRefs(&mut (), &mut (), device_sockets, PhantomData, counters),
             )
         }
         fn with_any_device_sockets_mut<
             F: FnOnce(
-                &mut AnyDeviceSockets<Self::WeakDeviceId, FakeBindingsCtx<Self::DeviceId>>,
+                &mut AnyDeviceSockets<Self::WeakDeviceId, FakeBindingsCtx>,
                 &mut Self::SocketTablesCoreCtx<'_>,
             ) -> R,
             R,
@@ -1209,22 +1335,50 @@ mod tests {
             &mut self,
             cb: F,
         ) -> R {
-            let FakeSocketsMutRefs(any_device_sockets, all_sockets, device_sockets, PhantomData) =
-                self.as_sockets_ref();
+            let FakeSocketsMutRefs(
+                any_device_sockets,
+                _all_sockets,
+                device_sockets,
+                PhantomData,
+                counters,
+            ) = self.as_sockets_ref();
             cb(
                 any_device_sockets,
-                &mut FakeSocketsMutRefs(&mut (), all_sockets, device_sockets, PhantomData),
+                &mut FakeSocketsMutRefs(&mut (), &mut (), device_sockets, PhantomData, counters),
             )
         }
 
-        fn with_all_device_sockets_mut<
-            F: FnOnce(&mut AllSockets<Self::WeakDeviceId, FakeBindingsCtx<Self::DeviceId>>) -> R,
+        fn with_all_device_sockets<
+            F: FnOnce(
+                &AllSockets<Self::WeakDeviceId, FakeBindingsCtx>,
+                &mut Self::SocketTablesCoreCtx<'_>,
+            ) -> R,
             R,
         >(
             &mut self,
             cb: F,
         ) -> R {
-            let FakeSocketsMutRefs(_, all_sockets, _, _) = self.as_sockets_ref();
+            let FakeSocketsMutRefs(
+                _any_device_sockets,
+                all_sockets,
+                device_sockets,
+                PhantomData,
+                counters,
+            ) = self.as_sockets_ref();
+            cb(
+                all_sockets,
+                &mut FakeSocketsMutRefs(&mut (), &mut (), device_sockets, PhantomData, counters),
+            )
+        }
+
+        fn with_all_device_sockets_mut<
+            F: FnOnce(&mut AllSockets<Self::WeakDeviceId, FakeBindingsCtx>) -> R,
+            R,
+        >(
+            &mut self,
+            cb: F,
+        ) -> R {
+            let FakeSocketsMutRefs(_, all_sockets, _, _, _) = self.as_sockets_ref();
             cb(all_sockets)
         }
     }
@@ -1234,6 +1388,43 @@ mod tests {
     {
         type DeviceId = D;
         type WeakDeviceId = FakeWeakDeviceId<D>;
+    }
+
+    impl<D: FakeStrongDeviceId> CounterContext<DeviceSocketCounters> for FakeCoreCtx<D> {
+        fn counters(&self) -> &DeviceSocketCounters {
+            &self.state.counters
+        }
+    }
+
+    impl<D: FakeStrongDeviceId>
+        ResourceCounterContext<DeviceSocketId<D::Weak, FakeBindingsCtx>, DeviceSocketCounters>
+        for FakeCoreCtx<D>
+    {
+        fn per_resource_counters<'a>(
+            &'a self,
+            socket: &'a DeviceSocketId<D::Weak, FakeBindingsCtx>,
+        ) -> &'a DeviceSocketCounters {
+            socket.counters()
+        }
+    }
+
+    impl<'m, X, Y, Z, D> CounterContext<DeviceSocketCounters> for FakeSocketsMutRefs<'m, X, Y, Z, D> {
+        fn counters(&self) -> &DeviceSocketCounters {
+            let FakeSocketsMutRefs(_, _, _, _, counters) = self;
+            counters
+        }
+    }
+
+    impl<'m, X, Y, Z, D: FakeStrongDeviceId>
+        ResourceCounterContext<DeviceSocketId<D::Weak, FakeBindingsCtx>, DeviceSocketCounters>
+        for FakeSocketsMutRefs<'m, X, Y, Z, D>
+    {
+        fn per_resource_counters<'a>(
+            &'a self,
+            socket: &'a DeviceSocketId<D::Weak, FakeBindingsCtx>,
+        ) -> &'a DeviceSocketCounters {
+            socket.counters()
+        }
     }
 
     const SOME_PROTOCOL: NonZeroU16 = NonZeroU16::new(2000).unwrap();
@@ -1408,8 +1599,8 @@ mod tests {
         ctx: &mut FakeCtx<D>,
         device: TargetDevice<D>,
         protocol: Option<Protocol>,
-        state: ExternalSocketState<D>,
-    ) -> DeviceSocketId<D::Weak, FakeBindingsCtx<D>> {
+        state: ExternalSocketState<D::Weak>,
+    ) -> DeviceSocketId<D::Weak, FakeBindingsCtx> {
         let mut api = ctx.device_socket_api();
         let id = api.create(state);
         let device = match &device {
@@ -1428,9 +1619,7 @@ mod tests {
     fn deliver_one_frame(
         delivered_frame: Frame<&[u8]>,
         FakeCtx { core_ctx, bindings_ctx }: &mut FakeCtx<MultipleDevicesId>,
-    ) -> HashSet<
-        DeviceSocketId<FakeWeakDeviceId<MultipleDevicesId>, FakeBindingsCtx<MultipleDevicesId>>,
-    > {
+    ) -> HashSet<DeviceSocketId<FakeWeakDeviceId<MultipleDevicesId>, FakeBindingsCtx>> {
         DeviceSocketHandler::handle_frame(
             core_ctx,
             bindings_ctx,
@@ -1443,6 +1632,8 @@ mod tests {
             all_sockets: AllSockets(all_sockets),
             any_device_sockets: _,
             device_sockets: _,
+            counters: _,
+            sent_frames: _,
         } = &core_ctx.state;
 
         all_sockets
@@ -1455,7 +1646,7 @@ mod tests {
                     assert_eq!(
                         &*frames,
                         &[ReceivedFrame {
-                            device: MultipleDevicesId::A,
+                            device: FakeWeakDeviceId(MultipleDevicesId::A),
                             frame: delivered_frame.cloned(),
                             raw: TestData::BUFFER.into(),
                         }]
@@ -1475,12 +1666,12 @@ mod tests {
         use Protocol::*;
         use TargetDevice::*;
         let never_bound = {
-            let state = ExternalSocketState::<MultipleDevicesId>::default();
+            let state = ExternalSocketState::<FakeWeakDeviceId<MultipleDevicesId>>::default();
             ctx.device_socket_api().create(state)
         };
 
         let mut make_bound = |device, protocol| {
-            let state = ExternalSocketState::<MultipleDevicesId>::default();
+            let state = ExternalSocketState::<FakeWeakDeviceId<MultipleDevicesId>>::default();
             make_bound(&mut ctx, device, protocol, state)
         };
         let bound_a_no_protocol = make_bound(SpecificDevice(MultipleDevicesId::A), None);
@@ -1509,7 +1700,7 @@ mod tests {
             &mut ctx,
         );
 
-        let _ = (
+        let sockets_not_expecting_frames = [
             never_bound,
             bound_a_no_protocol,
             bound_a_wrong_protocol,
@@ -1519,13 +1710,29 @@ mod tests {
             bound_b_wrong_protocol,
             bound_any_no_protocol,
             bound_any_wrong_protocol,
-        );
+        ];
+        let sockets_expecting_frames = [
+            bound_a_all_protocols,
+            bound_a_right_protocol,
+            bound_any_all_protocols,
+            bound_any_right_protocol,
+        ];
 
-        assert!(sockets_with_received_frames.remove(&bound_a_all_protocols));
-        assert!(sockets_with_received_frames.remove(&bound_a_right_protocol));
-        assert!(sockets_with_received_frames.remove(&bound_any_all_protocols));
-        assert!(sockets_with_received_frames.remove(&bound_any_right_protocol));
+        for (n, socket) in sockets_expecting_frames.iter().enumerate() {
+            assert!(
+                sockets_with_received_frames.remove(&socket),
+                "socket {n} didn't receive the frame"
+            );
+        }
         assert!(sockets_with_received_frames.is_empty());
+
+        // Verify Counters were set appropriately for each socket.
+        for (n, socket) in sockets_expecting_frames.iter().enumerate() {
+            assert_eq!(socket.counters().rx_frames.get(), 1, "socket {n} has wrong rx_frames");
+        }
+        for (n, socket) in sockets_not_expecting_frames.iter().enumerate() {
+            assert_eq!(socket.counters().rx_frames.get(), 0, "socket {n} has wrong rx_frames");
+        }
     }
 
     #[test]
@@ -1537,12 +1744,12 @@ mod tests {
         use Protocol::*;
         use TargetDevice::*;
         let never_bound = {
-            let state = ExternalSocketState::<MultipleDevicesId>::default();
+            let state = ExternalSocketState::<FakeWeakDeviceId<MultipleDevicesId>>::default();
             ctx.device_socket_api().create(state)
         };
 
         let mut make_bound = |device, protocol| {
-            let state = ExternalSocketState::<MultipleDevicesId>::default();
+            let state = ExternalSocketState::<FakeWeakDeviceId<MultipleDevicesId>>::default();
             make_bound(&mut ctx, device, protocol, state)
         };
         let bound_a_no_protocol = make_bound(SpecificDevice(MultipleDevicesId::A), None);
@@ -1565,7 +1772,7 @@ mod tests {
         let mut sockets_with_received_frames =
             deliver_one_frame(SentFrame::Ethernet(TestData::frame().into()).into(), &mut ctx);
 
-        let _ = (
+        let sockets_not_expecting_frames = [
             never_bound,
             bound_a_no_protocol,
             bound_a_same_protocol,
@@ -1577,12 +1784,25 @@ mod tests {
             bound_any_no_protocol,
             bound_any_same_protocol,
             bound_any_wrong_protocol,
-        );
-
+        ];
         // Only any-protocol sockets receive sent frames.
-        assert!(sockets_with_received_frames.remove(&bound_a_all_protocols));
-        assert!(sockets_with_received_frames.remove(&bound_any_all_protocols));
+        let sockets_expecting_frames = [bound_a_all_protocols, bound_any_all_protocols];
+
+        for (n, socket) in sockets_expecting_frames.iter().enumerate() {
+            assert!(
+                sockets_with_received_frames.remove(&socket),
+                "socket {n} didn't receive the frame"
+            );
+        }
         assert!(sockets_with_received_frames.is_empty());
+
+        // Verify Counters were set appropriately for each socket.
+        for (n, socket) in sockets_expecting_frames.iter().enumerate() {
+            assert_eq!(socket.counters().rx_frames.get(), 1, "socket {n} has wrong rx_frames");
+        }
+        for (n, socket) in sockets_not_expecting_frames.iter().enumerate() {
+            assert_eq!(socket.counters().rx_frames.get(), 0, "socket {n} has wrong rx_frames");
+        }
     }
 
     #[test]
@@ -1617,18 +1837,20 @@ mod tests {
             all_sockets: AllSockets(mut all_sockets),
             any_device_sockets: _,
             device_sockets: _,
+            counters: _,
+            sent_frames: _,
         } = core_ctx.into_state();
         let primary = all_sockets.remove(&socket).unwrap();
         let PrimaryDeviceSocketId(primary) = primary;
         assert!(all_sockets.is_empty());
         drop(socket);
-        let SocketState { external_state: ExternalSocketState(received), target: _ } =
+        let SocketState { external_state: ExternalSocketState(received), counters, target: _ } =
             PrimaryRc::unwrap(primary);
         assert_eq!(
             received.into_inner(),
             vec![
                 ReceivedFrame {
-                    device: MultipleDevicesId::A,
+                    device: FakeWeakDeviceId(MultipleDevicesId::A),
                     frame: Frame::Received(super::ReceivedFrame::Ethernet {
                         destination: FrameDestination::Individual { local: true },
                         frame: EthernetFrame {
@@ -1643,5 +1865,67 @@ mod tests {
                 RECEIVE_COUNT
             ]
         );
+        assert_eq!(counters.rx_frames.get(), u64::try_from(RECEIVE_COUNT).unwrap());
+    }
+
+    pub struct FakeSendMetadata;
+    impl DeviceSocketSendTypes for AnyDevice {
+        type Metadata = FakeSendMetadata;
+    }
+    impl<BC, D: FakeStrongDeviceId> SendableFrameMeta<FakeCoreCtx<D>, BC>
+        for DeviceSocketMetadata<AnyDevice, D>
+    {
+        fn send_meta<S>(
+            self,
+            core_ctx: &mut FakeCoreCtx<D>,
+            _bindings_ctx: &mut BC,
+            frame: S,
+        ) -> Result<(), SendFrameError<S>>
+        where
+            S: packet::Serializer,
+            S::Buffer: packet::BufferMut,
+        {
+            let frame = match frame.serialize_vec_outer() {
+                Err(e) => {
+                    let _: (packet::SerializeError<core::convert::Infallible>, _) = e;
+                    unreachable!()
+                }
+                Ok(frame) => frame.unwrap_a().as_ref().to_vec(),
+            };
+            core_ctx.state.sent_frames.push(frame);
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn send_multiple_frames() {
+        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtx::with_state(FakeSockets::new(
+            MultipleDevicesId::all(),
+        )));
+
+        const DEVICE: MultipleDevicesId = MultipleDevicesId::A;
+        let socket = make_bound(
+            &mut ctx,
+            TargetDevice::SpecificDevice(DEVICE),
+            Some(Protocol::All),
+            ExternalSocketState::default(),
+        );
+        let mut api = ctx.device_socket_api();
+
+        const SEND_COUNT: usize = 10;
+        const PAYLOAD: &'static [u8] = &[1, 2, 3, 4, 5];
+        for _ in 0..SEND_COUNT {
+            let buf = packet::Buf::new(PAYLOAD.to_vec(), ..);
+            api.send_frame(
+                &socket,
+                DeviceSocketMetadata { device_id: DEVICE, metadata: FakeSendMetadata },
+                buf,
+            )
+            .expect("send failed");
+        }
+
+        assert_eq!(ctx.core_ctx().state.sent_frames, vec![PAYLOAD.to_vec(); SEND_COUNT]);
+
+        assert_eq!(socket.counters().tx_frames.get(), u64::try_from(SEND_COUNT).unwrap());
     }
 }

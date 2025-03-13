@@ -161,10 +161,9 @@ class DmcClockA1 : public hwreg::RegisterBase<DmcClockA1, uint32_t> {
 };
 
 class AmlRam;
-using DeviceType =
-    ddk::Device<AmlRam, ddk::Suspendable, ddk::Messageable<ram_metrics::Device>::Mixin>;
+using DeviceType = ddk::Device<AmlRam, ddk::Suspendable>;
 
-class AmlRam : public DeviceType {
+class AmlRam : public DeviceType, public fidl::WireServer<ram_metrics::Device> {
  public:
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(AmlRam);
 
@@ -218,6 +217,8 @@ class AmlRam : public DeviceType {
   zx::port port_;
   zx::resource smc_monitor_;
   uint32_t device_pid_;
+
+  fidl::ServerBindingGroup<fuchsia_hardware_ram_metrics::Device> bindings_;
 
   // DMC Register Offset
   dmc_reg_ctl_t dmc_offsets_;

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{DecodedRequest, IntoSessionManager, Operation, PartitionInfo, SessionHelper};
+use super::{DecodedRequest, DeviceInfo, IntoSessionManager, Operation, SessionHelper};
 use anyhow::Error;
 use block_protocol::{BlockFifoRequest, WriteOptions};
 use fuchsia_async::{self as fasync, FifoReadable as _, FifoWritable as _};
@@ -11,6 +11,7 @@ use futures::FutureExt;
 use std::borrow::Cow;
 use std::future::Future;
 use std::mem::MaybeUninit;
+use std::num::NonZero;
 use std::sync::Arc;
 use {fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume};
 
@@ -25,8 +26,8 @@ pub trait Interface: Send + Sync + Unpin + 'static {
     /// Called whenever a VMO is detached.
     fn on_detach_vmo(&self, _vmo: &zx::Vmo) {}
 
-    /// Called to get partition information.
-    fn get_info(&self) -> impl Future<Output = Result<Cow<'_, PartitionInfo>, zx::Status>> + Send;
+    /// Called to get block/partition information.
+    fn get_info(&self) -> impl Future<Output = Result<Cow<'_, DeviceInfo>, zx::Status>> + Send;
 
     /// Called for a request to read bytes.
     fn read(
@@ -35,6 +36,7 @@ pub trait Interface: Send + Sync + Unpin + 'static {
         block_count: u32,
         vmo: &Arc<zx::Vmo>,
         vmo_offset: u64, // *bytes* not blocks
+        trace_flow_id: Option<NonZero<u64>>,
     ) -> impl Future<Output = Result<(), zx::Status>> + Send;
 
     /// Called for a request to write bytes.
@@ -45,16 +47,21 @@ pub trait Interface: Send + Sync + Unpin + 'static {
         vmo: &Arc<zx::Vmo>,
         vmo_offset: u64, // *bytes* not blocks
         opts: WriteOptions,
+        trace_flow_id: Option<NonZero<u64>>,
     ) -> impl Future<Output = Result<(), zx::Status>> + Send;
 
     /// Called to flush the device.
-    fn flush(&self) -> impl Future<Output = Result<(), zx::Status>> + Send;
+    fn flush(
+        &self,
+        trace_flow_id: Option<NonZero<u64>>,
+    ) -> impl Future<Output = Result<(), zx::Status>> + Send;
 
     /// Called to trim a region.
     fn trim(
         &self,
         device_block_offset: u64,
         block_count: u32,
+        trace_flow_id: Option<NonZero<u64>>,
     ) -> impl Future<Output = Result<(), zx::Status>> + Send;
 
     /// Called to handle the GetVolumeInfo FIDL call.
@@ -173,7 +180,7 @@ impl<I: Interface> super::SessionManager for SessionManager<I> {
         Ok(())
     }
 
-    async fn get_info(&self) -> Result<Cow<'_, PartitionInfo>, zx::Status> {
+    async fn get_info(&self) -> Result<Cow<'_, DeviceInfo>, zx::Status> {
         self.interface.get_info().await
     }
 
@@ -212,10 +219,17 @@ async fn process_fifo_request<I: Interface>(
     interface: Arc<I>,
     r: DecodedRequest,
 ) -> Result<(), zx::Status> {
+    let trace_flow_id = r.request_tracking.trace_flow_id;
     match r.operation? {
         Operation::Read { device_block_offset, block_count, _unused, vmo_offset } => {
             interface
-                .read(device_block_offset, block_count, &r.vmo.as_ref().unwrap(), vmo_offset)
+                .read(
+                    device_block_offset,
+                    block_count,
+                    &r.vmo.as_ref().unwrap(),
+                    vmo_offset,
+                    trace_flow_id,
+                )
                 .await
         }
         Operation::Write { device_block_offset, block_count, options, vmo_offset } => {
@@ -226,12 +240,13 @@ async fn process_fifo_request<I: Interface>(
                     &r.vmo.as_ref().unwrap(),
                     vmo_offset,
                     options,
+                    trace_flow_id,
                 )
                 .await
         }
-        Operation::Flush => interface.flush().await,
+        Operation::Flush => interface.flush(trace_flow_id).await,
         Operation::Trim { device_block_offset, block_count } => {
-            interface.trim(device_block_offset, block_count).await
+            interface.trim(device_block_offset, block_count, trace_flow_id).await
         }
         Operation::CloseVmo => {
             if let Some(vmo) = &r.vmo {

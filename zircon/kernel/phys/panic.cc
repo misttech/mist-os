@@ -58,7 +58,7 @@ PHYS_SINGLETHREAD void __zx_panic(const char* format, ...) {
 }
 
 // This is what libc++ headers call.
-[[noreturn]] PHYS_SINGLETHREAD void std::__libcpp_verbose_abort(const char* format, ...) {
+[[noreturn]] PHYS_SINGLETHREAD void std::__libcpp_verbose_abort(const char* format, ...) noexcept {
   va_list args;
   va_start(args, format);
   vpanic(format, args);

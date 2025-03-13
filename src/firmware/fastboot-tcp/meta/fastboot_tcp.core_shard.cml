@@ -19,11 +19,15 @@
             protocol: [
                 "fuchsia.fshost.Admin",
                 "fuchsia.hardware.power.statecontrol.Admin",
-                "fuchsia.logger.LogSink",
                 "fuchsia.paver.Paver",
             ],
             from: "parent",
             to: [ "#fastboot-tcp" ],
+        },
+        {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: [ "#bt-map-mce" ],
         },
         {
             protocol: "fuchsia.buildinfo.Provider",

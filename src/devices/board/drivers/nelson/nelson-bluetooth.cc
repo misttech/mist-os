@@ -7,9 +7,9 @@
 #include <fidl/fuchsia.hardware.serial/cpp/wire.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
-#include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/mmio/mmio.h>
+#include <lib/zbi-format/zbi.h>
 #include <unistd.h>
 
 #include <bind/fuchsia/cpp/bind.h>
@@ -47,7 +47,7 @@ static const fuchsia_hardware_serial::wire::SerialPortInfo bt_uart_serial_info =
 
 static const std::vector<fpbus::BootMetadata> bt_uart_boot_metadata{
     {{
-        .zbi_type = DEVICE_METADATA_MAC_ADDRESS,
+        .zbi_type = ZBI_TYPE_DRV_MAC_ADDRESS,
         .zbi_extra = MACADDR_BLUETOOTH,
     }},
 };

@@ -20,5 +20,6 @@ rustc_library("router_error") {
     "//src/sys/component_manager/*",
     "//src/sys/lib/routing/*",
     "//tools/lib/cm_fidl_analyzer:*",
+    "//tools/lib/cm_fidl_analyzer/tests:*",
   ]
 }

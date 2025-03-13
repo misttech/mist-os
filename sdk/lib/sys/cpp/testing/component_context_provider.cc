@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fuchsia/io/cpp/fidl.h>
 #include <lib/fdio/directory.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
 #include <lib/sys/cpp/testing/service_directory_provider.h>
@@ -23,7 +24,8 @@ ComponentContextProvider::ComponentContextProvider(async_dispatcher_t* dispatche
 
   zx::channel request;
   public_service_directory_ = sys::ServiceDirectory::CreateWithRequest(&request);
-  fdio_service_connect_at(outgoing_directory_ptr_.channel().get(), "svc", request.release());
+  fdio_open3_at(outgoing_directory_ptr_.channel().get(), "svc",
+                uint64_t{fuchsia::io::PERM_READABLE}, request.release());
 }
 
 ComponentContextProvider::~ComponentContextProvider() = default;

@@ -189,10 +189,27 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 trace::duration!(c"storage", c"Directory::SetFlags");
                 responder.send(Status::NOT_SUPPORTED.into_raw())?;
             }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::DirectoryRequest::DeprecatedOpen {
+                flags,
+                mode: _,
+                path,
+                object,
+                control_handle: _,
+            } => {
+                {
+                    trace::duration!(c"storage", c"Directory::Open");
+                    self.handle_deprecated_open(flags, path, object);
+                }
+                // Since open typically spawns a task, yield to the executor now to give that task a
+                // chance to run before we try and process the next request for this directory.
+                yield_to_executor().await;
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::DirectoryRequest::Open { flags, mode: _, path, object, control_handle: _ } => {
                 {
                     trace::duration!(c"storage", c"Directory::Open");
-                    self.handle_open(flags, path, object);
+                    self.handle_deprecated_open(flags, path, object);
                 }
                 // Since open typically spawns a task, yield to the executor now to give that task a
                 // chance to run before we try and process the next request for this directory.
@@ -261,6 +278,26 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
             fio::DirectoryRequest::CreateSymlink { responder, .. } => {
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::DirectoryRequest::Open { path, mut flags, options, object, control_handle: _ } => {
+                {
+                    trace::duration!(c"storage", c"Directory::Open3");
+                    // Remove POSIX flags when the respective rights are not available.
+                    if !self.options.rights.contains(fio::INHERITED_WRITE_PERMISSIONS) {
+                        flags &= !fio::Flags::PERM_INHERIT_WRITE;
+                    }
+                    if !self.options.rights.contains(fio::Rights::EXECUTE) {
+                        flags &= !fio::Flags::PERM_INHERIT_EXECUTE;
+                    }
+
+                    ObjectRequest::new(flags, &options, object)
+                        .handle(|req| self.handle_open(path, flags, req));
+                }
+                // Since open typically spawns a task, yield to the executor now to give that task a
+                // chance to run before we try and process the next request for this directory.
+                yield_to_executor().await;
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::DirectoryRequest::Open3 {
                 path,
                 mut flags,
@@ -279,7 +316,7 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                     }
 
                     ObjectRequest::new(flags, &options, object)
-                        .handle(|req| self.handle_open3(path, flags, req));
+                        .handle(|req| self.handle_open(path, flags, req));
                 }
                 // Since open typically spawns a task, yield to the executor now to give that task a
                 // chance to run before we try and process the next request for this directory.
@@ -314,7 +351,7 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
         });
     }
 
-    fn handle_open(
+    fn handle_deprecated_open(
         &self,
         mut flags: fio::OpenFlags,
         path: String,
@@ -357,7 +394,7 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
         directory.open(self.scope.clone(), flags, path, server_end);
     }
 
-    fn handle_open3(
+    fn handle_open(
         &self,
         path: String,
         flags: fio::Flags,
@@ -544,7 +581,7 @@ mod tests {
 
         // Try to open a file that doesn't exist.
         assert_matches!(
-            dir_proxy.open(
+            dir_proxy.deprecated_open(
                 fio::OpenFlags::NOT_DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
                 fio::ModeType::empty(),
                 "foo",
@@ -580,7 +617,7 @@ mod tests {
 
         // Try to open a file that doesn't exist.
         assert_matches!(
-            dir_proxy.open(
+            dir_proxy.deprecated_open(
                 fio::OpenFlags::NOT_DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
                 fio::ModeType::empty(),
                 "foo",
@@ -618,7 +655,7 @@ mod tests {
 
         // Try to open a file that doesn't exist.
         assert_matches!(
-            dir_proxy.open(
+            dir_proxy.deprecated_open(
                 fio::OpenFlags::DIRECTORY
                     | fio::OpenFlags::DESCRIBE
                     | fio::OpenFlags::RIGHT_READABLE,
@@ -656,7 +693,7 @@ mod tests {
 
         // Try to open a file that doesn't exist.
         assert_matches!(
-            dir_proxy.open(
+            dir_proxy.deprecated_open(
                 fio::OpenFlags::DIRECTORY
                     | fio::OpenFlags::DESCRIBE
                     | fio::OpenFlags::RIGHT_READABLE,

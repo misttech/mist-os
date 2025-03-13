@@ -32,7 +32,7 @@ use starnix_modules_input::uinput::register_uinput_device;
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_modules_input::{
     EventProxyMode, InputDevice, InputEventsRelay, DEFAULT_KEYBOARD_DEVICE_ID,
-    DEFAULT_TOUCH_DEVICE_ID,
+    DEFAULT_MOUSE_DEVICE_ID, DEFAULT_TOUCH_DEVICE_ID,
 };
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_modules_magma::magma_device_init;
@@ -129,7 +129,7 @@ impl Features {
                         enable_visual_debugging,
                         default_uid,
                         default_seclabel,
-                        default_fsseclabel,
+                        default_ns_mount_options,
                     },
                 selinux,
                 ashmem,
@@ -199,9 +199,9 @@ impl Features {
                         "default_seclabel",
                         default_seclabel.as_deref().unwrap_or_default(),
                     );
-                    kernel_node.record_string(
-                        "default_fsseclabel",
-                        default_fsseclabel.as_ref().map_or("", |s| s),
+                    inspect_node.record_string(
+                        "default_ns_mount_options",
+                        format!("{:?}", default_ns_mount_options),
                     );
                 });
             }
@@ -217,7 +217,7 @@ pub fn parse_features(
     structured_config: &starnix_kernel_structured_config::Config,
 ) -> Result<Features, Error> {
     let mut features = Features::default();
-    for entry in &config.features {
+    for entry in &config.program.features {
         let (raw_flag, raw_args) =
             entry.split_once(':').map(|(f, a)| (f, Some(a.to_string()))).unwrap_or((entry, None));
         match (raw_flag, raw_args) {
@@ -300,8 +300,23 @@ pub fn parse_features(
         features.kernel.enable_visual_debugging = true;
     }
 
-    features.kernel.default_uid = config.default_uid;
-    features.kernel.default_seclabel = config.default_seclabel.clone();
+    features.kernel.default_uid = config.program.default_uid.0;
+    features.kernel.default_seclabel = config.program.default_seclabel.clone();
+    features.kernel.default_ns_mount_options =
+        if let Some(mount_options) = &config.program.default_ns_mount_options {
+            let options = mount_options
+                .iter()
+                .map(|item| {
+                    let mut splitter = item.splitn(2, ":");
+                    let key = splitter.next().expect("Failed to parse mount options");
+                    let value = splitter.next().expect("Failed to parse mount options");
+                    (key.to_string(), value.to_string())
+                })
+                .collect();
+            Some(options)
+        } else {
+            None
+        };
 
     Ok(features)
 }
@@ -322,8 +337,10 @@ pub fn run_container_features(
         fb_device_init(locked, system_task);
 
         let (touch_source_client, touch_source_server) = fidl::endpoints::create_endpoints();
+        let (mouse_source_client, mouse_source_server) = fidl::endpoints::create_endpoints();
         let view_bound_protocols = fuicomposition::ViewBoundProtocols {
             touch_source: Some(touch_source_server),
+            mouse_source: Some(mouse_source_server),
             ..Default::default()
         };
         let view_identity = fuiviews::ViewIdentityOnCreation::from(
@@ -358,6 +375,7 @@ pub fn run_container_features(
         let touch_device =
             InputDevice::new_touch(display_width, display_height, &kernel.inspect_node);
         let keyboard_device = InputDevice::new_keyboard(&kernel.inspect_node);
+        let mouse_device = InputDevice::new_mouse(&kernel.inspect_node);
 
         touch_device.clone().register(
             locked,
@@ -369,6 +387,11 @@ pub fn run_container_features(
             &kernel.kthreads.system_task(),
             DEFAULT_KEYBOARD_DEVICE_ID,
         );
+        mouse_device.clone().register(
+            locked,
+            &kernel.kthreads.system_task(),
+            DEFAULT_MOUSE_DEVICE_ID,
+        );
 
         let input_events_relay = InputEventsRelay::new();
         input_events_relay.start_relays(
@@ -376,12 +399,15 @@ pub fn run_container_features(
             EventProxyMode::WakeContainer,
             touch_source_client,
             keyboard,
+            mouse_source_client,
             view_ref,
             registry_proxy,
             touch_device.open_files.clone(),
             keyboard_device.open_files.clone(),
+            mouse_device.open_files.clone(),
             Some(touch_device.inspect_status.clone()),
             Some(keyboard_device.inspect_status.clone()),
+            Some(mouse_device.inspect_status.clone()),
         );
 
         register_uinput_device(locked, &kernel.kthreads.system_task(), input_events_relay);

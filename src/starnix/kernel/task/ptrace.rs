@@ -26,18 +26,20 @@ use starnix_uapi::auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS};
 use starnix_uapi::elf::ElfNoteType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::{SigSet, Signal, UncheckedSignal, SIGCHLD, SIGKILL, SIGSTOP, SIGTRAP};
-use starnix_uapi::user_address::{UserAddress, UserRef};
+#[allow(unused_imports)]
+use starnix_uapi::user_address::ArchSpecific;
+use starnix_uapi::user_address::{MultiArchUserRef, UserAddress, UserRef};
 use starnix_uapi::{
-    clone_args, errno, error, iovec, pid_t, ptrace_syscall_info, user_regs_struct, PTRACE_CONT,
-    PTRACE_DETACH, PTRACE_EVENT_CLONE, PTRACE_EVENT_EXEC, PTRACE_EVENT_EXIT, PTRACE_EVENT_FORK,
-    PTRACE_EVENT_SECCOMP, PTRACE_EVENT_STOP, PTRACE_EVENT_VFORK, PTRACE_EVENT_VFORK_DONE,
-    PTRACE_GETEVENTMSG, PTRACE_GETREGSET, PTRACE_GETSIGINFO, PTRACE_GETSIGMASK,
-    PTRACE_GET_SYSCALL_INFO, PTRACE_INTERRUPT, PTRACE_KILL, PTRACE_LISTEN, PTRACE_O_TRACECLONE,
-    PTRACE_O_TRACEEXEC, PTRACE_O_TRACEEXIT, PTRACE_O_TRACEFORK, PTRACE_O_TRACESYSGOOD,
-    PTRACE_O_TRACEVFORK, PTRACE_O_TRACEVFORKDONE, PTRACE_PEEKDATA, PTRACE_PEEKTEXT, PTRACE_PEEKUSR,
-    PTRACE_POKEDATA, PTRACE_POKETEXT, PTRACE_POKEUSR, PTRACE_SETOPTIONS, PTRACE_SETSIGINFO,
-    PTRACE_SETSIGMASK, PTRACE_SYSCALL, PTRACE_SYSCALL_INFO_ENTRY, PTRACE_SYSCALL_INFO_EXIT,
-    PTRACE_SYSCALL_INFO_NONE, SI_MAX_SIZE,
+    clone_args, errno, error, iovec, pid_t, ptrace_syscall_info, uapi, user_regs_struct,
+    PTRACE_CONT, PTRACE_DETACH, PTRACE_EVENT_CLONE, PTRACE_EVENT_EXEC, PTRACE_EVENT_EXIT,
+    PTRACE_EVENT_FORK, PTRACE_EVENT_SECCOMP, PTRACE_EVENT_STOP, PTRACE_EVENT_VFORK,
+    PTRACE_EVENT_VFORK_DONE, PTRACE_GETEVENTMSG, PTRACE_GETREGSET, PTRACE_GETSIGINFO,
+    PTRACE_GETSIGMASK, PTRACE_GET_SYSCALL_INFO, PTRACE_INTERRUPT, PTRACE_KILL, PTRACE_LISTEN,
+    PTRACE_O_EXITKILL, PTRACE_O_TRACECLONE, PTRACE_O_TRACEEXEC, PTRACE_O_TRACEEXIT,
+    PTRACE_O_TRACEFORK, PTRACE_O_TRACESYSGOOD, PTRACE_O_TRACEVFORK, PTRACE_O_TRACEVFORKDONE,
+    PTRACE_PEEKDATA, PTRACE_PEEKTEXT, PTRACE_PEEKUSR, PTRACE_POKEDATA, PTRACE_POKETEXT,
+    PTRACE_POKEUSR, PTRACE_SETOPTIONS, PTRACE_SETSIGINFO, PTRACE_SETSIGMASK, PTRACE_SYSCALL,
+    PTRACE_SYSCALL_INFO_ENTRY, PTRACE_SYSCALL_INFO_EXIT, PTRACE_SYSCALL_INFO_NONE, SI_MAX_SIZE,
 };
 
 use std::collections::BTreeMap;
@@ -868,10 +870,13 @@ pub fn ptrace_dispatch(
             Ok(starnix_syscalls::SUCCESS)
         }
         PTRACE_GETSIGINFO => {
-            let dst: UserRef<u8> = UserRef::from(data);
             if let Some(ptrace) = &state.ptrace {
                 if let Some(signal) = ptrace.last_signal.as_ref() {
-                    current_task.write_objects(dst, &signal.as_siginfo_bytes())?;
+                    let dst = MultiArchUserRef::<uapi::siginfo_t, uapi::arch32::siginfo_t>::new(
+                        current_task,
+                        data,
+                    );
+                    signal.write(current_task, dst)?;
                 } else {
                     return error!(EINVAL);
                 }
@@ -934,13 +939,15 @@ pub fn ptrace_dispatch(
                         | PTRACE_O_TRACEVFORK
                         | PTRACE_O_TRACEVFORKDONE
                         | PTRACE_O_TRACEEXEC
-                        | PTRACE_O_TRACEEXIT)
+                        | PTRACE_O_TRACEEXIT
+                        | PTRACE_O_EXITKILL)
                     != 0)
             {
+                track_stub!(TODO("https://fxbug.dev/322874463"), "ptrace(PTRACE_SETOPTIONS)", mask);
                 return error!(ENOSYS);
             }
             if let Some(ref mut ptrace) = &mut state.ptrace {
-                ptrace.set_options_from_bits(data.ptr() as u32)?;
+                ptrace.set_options_from_bits(mask)?;
             }
             Ok(starnix_syscalls::SUCCESS)
         }
@@ -993,9 +1000,9 @@ fn do_attach(
 }
 
 fn check_caps_for_attach(ptrace_scope: u8, current_task: &CurrentTask) -> Result<(), Errno> {
-    if ptrace_scope == ADMIN_ONLY_SCOPE && !current_task.creds().has_capability(CAP_SYS_PTRACE) {
+    if ptrace_scope == ADMIN_ONLY_SCOPE {
         // Admin only use of ptrace
-        return error!(EPERM);
+        security::check_task_capable(current_task, CAP_SYS_PTRACE)?;
     }
     if ptrace_scope == NO_ATTACH_SCOPE {
         // No use of ptrace

@@ -41,6 +41,7 @@ rustc_library("input") {
     "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_rust",
     "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_rust",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
+    "//sdk/lib/scheduler/rust",
     "//sdk/rust/zx",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",
@@ -48,10 +49,10 @@ rustc_library("input") {
     "//src/lib/fuchsia-component",
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/kernel:starnix_logging",
-    "//src/starnix/lib/starnix-sync",
-    "//src/starnix/lib/starnix-syscalls",
-    "//src/starnix/lib/starnix-types",
-    "//src/starnix/lib/starnix-uapi",
+    "//src/starnix/lib/starnix_sync",
+    "//src/starnix/lib/starnix_syscalls",
+    "//src/starnix/lib/starnix_types",
+    "//src/starnix/lib/starnix_uapi",
     "//third_party/rust_crates:bit-vec",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:thiserror",
@@ -72,7 +73,7 @@ rustc_library("input") {
 }
 
 fuchsia_unittest_package("starnix-input-tests") {
-  manifest = "meta/starnix-input-tests.cml"
+  manifest = "meta/starnix_input_tests.cml"
   deps = [ ":input_test" ]
   test_specs = {
     log_settings = {

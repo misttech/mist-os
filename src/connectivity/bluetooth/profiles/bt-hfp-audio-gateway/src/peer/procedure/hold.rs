@@ -143,10 +143,10 @@ impl Procedure for HoldProcedure {
                         let response = Box::new(Into::into);
                         SlcRequest::Hold { command, response }.into()
                     }
-                    Err(_) => ProcedureRequest::Error(ProcedureError::UnexpectedHf(update)),
+                    Err(_) => ProcedureError::UnexpectedHf(update).into(),
                 }
             }
-            _ => ProcedureRequest::Error(ProcedureError::UnexpectedHf(update)),
+            _ => ProcedureError::UnexpectedHf(update).into(),
         }
     }
 
@@ -157,7 +157,7 @@ impl Procedure for HoldProcedure {
                 self.state.transition();
                 update.into()
             }
-            (_, update) => ProcedureRequest::Error(ProcedureError::UnexpectedAg(update)),
+            (_, update) => ProcedureError::UnexpectedAg(update).into(),
         }
     }
 
@@ -195,7 +195,7 @@ impl Procedure for ThreeWaySupportProcedure {
                 self.terminated = true;
                 AgUpdate::ThreeWaySupport.into()
             }
-            _ => ProcedureRequest::Error(ProcedureError::UnexpectedHf(update)),
+            _ => ProcedureError::UnexpectedHf(update).into(),
         }
     }
 
@@ -272,7 +272,7 @@ mod tests {
         let random_hf = at::Command::CindRead {};
         assert_matches!(
             proc.hf_update(random_hf, &mut state),
-            ProcedureRequest::Error(ProcedureError::UnexpectedHf(_))
+            ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedHf(_))
         );
     }
 
@@ -284,7 +284,7 @@ mod tests {
         let random_ag = AgUpdate::ThreeWaySupport;
         assert_matches!(
             proc.ag_update(random_ag, &mut state),
-            ProcedureRequest::Error(ProcedureError::UnexpectedAg(_))
+            ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedAg(_))
         );
     }
 
@@ -311,11 +311,11 @@ mod tests {
         assert!(proc.is_terminated());
         assert_matches!(
             proc.hf_update(at::Command::Chld { command: String::from("1") }, &mut state),
-            ProcedureRequest::Error(ProcedureError::UnexpectedHf(_))
+            ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedHf(_))
         );
         assert_matches!(
             proc.ag_update(AgUpdate::Ok, &mut state),
-            ProcedureRequest::Error(ProcedureError::UnexpectedAg(_))
+            ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedAg(_))
         );
     }
 
@@ -342,11 +342,11 @@ mod tests {
         assert!(proc.is_terminated());
         assert_matches!(
             proc.hf_update(at::Command::Chld { command: String::from("1") }, &mut state),
-            ProcedureRequest::Error(ProcedureError::UnexpectedHf(_))
+            ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedHf(_))
         );
         assert_matches!(
             proc.ag_update(AgUpdate::Ok, &mut state),
-            ProcedureRequest::Error(ProcedureError::UnexpectedAg(_))
+            ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedAg(_))
         );
     }
 
@@ -359,8 +359,8 @@ mod tests {
             proc.hf_update(at::Command::Chld { command: String::from("invalid") }, &mut state);
         assert_matches!(
             req,
-            ProcedureRequest::Error(ProcedureError::UnexpectedHf(at::Command::Chld { command }))
-                if command == "invalid"
+            ProcedureRequest::Error(err) if
+                matches!(&*err, ProcedureError::UnexpectedHf(at::Command::Chld { command }) if command == "invalid")
         );
         assert!(!proc.is_terminated());
     }
@@ -375,10 +375,10 @@ mod tests {
     fn twc_procedure_handles_invalid_messages() {
         let mut proc = ThreeWaySupportProcedure::new();
         let req = proc.hf_update(at::Command::CindRead {}, &mut SlcState::default());
-        assert_matches!(req, ProcedureRequest::Error(ProcedureError::UnexpectedHf(_)));
+        assert_matches!(req, ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedHf(_)));
 
         let req = proc.ag_update(AgUpdate::ThreeWaySupport, &mut SlcState::default());
-        assert_matches!(req, ProcedureRequest::Error(ProcedureError::UnexpectedAg(_)));
+        assert_matches!(req, ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedAg(_)));
     }
 
     #[test]

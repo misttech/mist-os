@@ -35,6 +35,8 @@
 #include <vm/content_size_manager.h>
 #include <vm/page.h>
 #include <vm/vm.h>
+#include <vm/vm_mapping_subtree_state.h>
+#include <vm/vm_object_lock.h>
 #include <vm/vm_page_list.h>
 
 class VmMapping;
@@ -61,11 +63,15 @@ enum class Resizability {
   NonResizable,
 };
 
-// Argument which specifies the type of clone.
-enum class CloneType {
-  Snapshot,
-  SnapshotAtLeastOnWrite,
-  SnapshotModified,
+// Argument which specifies the required snapshot semantics for the clone.
+enum class SnapshotType {
+  // All pages must appear as if a snapshot is performed at the moment of the clone.
+  Full,
+  // Only pages already modified in the hierarchy need to appear as if a snapshot is performed at
+  // the moment of the clone.
+  Modified,
+  // No pages need to be initially snapshot, but they must have a snapshot taken if written.
+  OnWrite,
 };
 
 // Argument that specifies the context in which we are supplying pages.
@@ -140,16 +146,22 @@ template <typename T>
 fbl::SinglyLinkedListCustomTraits<fbl::RefPtr<T>, typename VmDeferredDeleter<T>::ListTraits>
     VmDeferredDeleter<T>::delete_list_;
 
+// When not using a shared lock this object becomes empty, and never actually gets constructed. We
+// do not fully hide the class definition to avoid the amount of code elsewhere that needs to hidden
+// by pre-precessor guards.
 class VmHierarchyState : public fbl::RefCounted<VmHierarchyState> {
  public:
-  VmHierarchyState() = default;
+  VmHierarchyState() { ASSERT(VMO_USE_SHARED_LOCK); }
   ~VmHierarchyState() = default;
 
-  Lock<CriticalMutex>* lock() const TA_RET_CAP(lock_) { return &lock_; }
-  Lock<CriticalMutex>& lock_ref() const TA_RET_CAP(lock_) { return lock_; }
+#if VMO_USE_SHARED_LOCK
+  Lock<typename VmoLockTraits::SharedLockType>* lock() const TA_RET_CAP(lock_) { return &lock_; }
+  Lock<typename VmoLockTraits::SharedLockType>& lock_ref() const TA_RET_CAP(lock_) { return lock_; }
 
  private:
-  mutable DECLARE_CRITICAL_MUTEX(VmHierarchyState) lock_;
+  mutable LOCK_DEP_INSTRUMENT(VmHierarchyState, VmoLockTraits::SharedLockType,
+                              VmoLockTraits::SharedLockFlags) lock_;
+#endif
 };
 
 // Base class for any objects that want to be part of the VMO hierarchy and share some state,
@@ -159,21 +171,16 @@ class VmHierarchyBase : public fbl::RefCountedUpgradeable<VmHierarchyBase> {
  public:
   explicit VmHierarchyBase(fbl::RefPtr<VmHierarchyState> state);
 
-  Lock<CriticalMutex>* lock() const TA_RET_CAP(hierarchy_state_ptr_->lock_ref()) {
-    return hierarchy_state_ptr_->lock();
-  }
-  Lock<CriticalMutex>& lock_ref() const TA_RET_CAP(hierarchy_state_ptr_->lock_ref()) {
-    return hierarchy_state_ptr_->lock_ref();
-  }
-
  protected:
   // private destructor, only called from refptr
   virtual ~VmHierarchyBase() = default;
   friend fbl::RefPtr<VmHierarchyBase>;
   friend class fbl::Recyclable<VmHierarchyBase>;
 
+#if VMO_USE_SHARED_LOCK
   // Pointer to state shared across all objects in a hierarchy.
   fbl::RefPtr<VmHierarchyState> const hierarchy_state_ptr_;
+#endif
 
  private:
   friend VmHierarchyState;
@@ -291,9 +298,12 @@ class VmObject : public VmHierarchyBase,
   // public API
   virtual zx_status_t Resize(uint64_t size) { return ZX_ERR_NOT_SUPPORTED; }
 
+  virtual Lock<VmoLockType>* lock() const = 0;
+  virtual Lock<VmoLockType>& lock_ref() const = 0;
+
   virtual uint64_t size_locked() const TA_REQ(lock()) = 0;
   uint64_t size() const TA_EXCL(lock()) {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
     return size_locked();
   }
   virtual uint32_t create_options() const { return 0; }
@@ -588,7 +598,7 @@ class VmObject : public VmHierarchyBase,
   }
 
   virtual uint32_t GetMappingCachePolicy() const {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
     return GetMappingCachePolicyLocked();
   }
   virtual uint32_t GetMappingCachePolicyLocked() const = 0;
@@ -598,7 +608,7 @@ class VmObject : public VmHierarchyBase,
 
   // create a copy-on-write clone vmo at the page-aligned offset and length
   // note: it's okay to start or extend past the size of the parent
-  virtual zx_status_t CreateClone(Resizability resizable, CloneType type, uint64_t offset,
+  virtual zx_status_t CreateClone(Resizability resizable, SnapshotType type, uint64_t offset,
                                   uint64_t size, bool copy_name, fbl::RefPtr<VmObject>* child_vmo) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -654,6 +664,7 @@ class VmObject : public VmHierarchyBase,
   void AddMappingLocked(VmMapping* r) TA_REQ(lock());
   void RemoveMappingLocked(VmMapping* r) TA_REQ(lock());
   uint32_t num_mappings() const;
+  uint32_t num_mappings_locked() const TA_REQ(lock()) { return mapping_list_len_; }
 
   // Returns true if this VMO is mapped into any VmAspace whose is_user()
   // returns true.
@@ -665,7 +676,8 @@ class VmObject : public VmHierarchyBase,
 
   // Adds a child to this VMO and returns true if the dispatcher which matches
   // user_id should be notified about the first child being added.
-  bool AddChildLocked(VmObject* child) TA_REQ(lock());
+  bool AddChildLocked(VmObject* child) TA_REQ(ChildListLock::Get());
+  bool AddChild(VmObject* child) TA_EXCL(ChildListLock::Get());
 
   // Removes the child |child| from this VMO and notifies the child observer if the new child count
   // is zero. The |guard| must be this VMO's lock.
@@ -673,7 +685,7 @@ class VmObject : public VmHierarchyBase,
 
   // Drops |c| from the child list without going through the full removal
   // process. ::RemoveChild is probably what you want here.
-  void DropChildLocked(VmObject* c) TA_REQ(lock());
+  void DropChildLocked(VmObject* c) TA_REQ(ChildListLock::Get());
 
   uint32_t num_children() const;
 
@@ -721,6 +733,39 @@ class VmObject : public VmHierarchyBase,
   void RangeChangeUpdateMappingsLocked(uint64_t offset, uint64_t len, RangeChangeOp op)
       TA_REQ(lock());
 
+  // Define custom traits for the mapping WAVLTree as we need both a custom key and node state
+  // accessors. Due to inclusion order this needs to be defined here, and not in the VmMapping
+  // object as the inclusion order is VmObject then VmMapping, but to declare the WAVLTree the
+  // traits object, unlike the VmMapping* pointer, must be fully defined.
+  struct MappingTreeTraits {
+    // Mappings are keyed in the WAVLTree primarily by their offset, however as there can be
+    // multiple mappings starting at the same base offset the address of the mapping object is used
+    // as a tiebreaker.
+    struct Key {
+      uint64_t offset;
+      uint64_t object;
+      static constexpr Key Min() {
+        return Key{
+            .offset = 0,
+            .object = 0,
+        };
+      }
+      bool operator<(const Key& a) const {
+        if (offset != a.offset) {
+          return offset < a.offset;
+        }
+        return object < a.object;
+      }
+      bool operator==(const Key& a) const { return offset == a.offset && object == a.object; }
+    };
+    static fbl::WAVLTreeNodeState<VmMapping*>& node_state(VmMapping& mapping);
+  };
+  using KeyTraits = fbl::DefaultKeyedObjectTraits<
+      MappingTreeTraits::Key, typename fbl::internal::ContainerPtrTraits<VmMapping*>::ValueType>;
+  using MappingTree =
+      fbl::WAVLTree<MappingTreeTraits::Key, VmMapping*, KeyTraits, fbl::DefaultObjectTag,
+                    MappingTreeTraits, VmMappingSubtreeState::Observer<VmMapping>>;
+
  protected:
   enum class VMOType : bool {
     Paged = true,
@@ -750,10 +795,16 @@ class VmObject : public VmHierarchyBase,
   const VMOType type_;
 
   // list of every mapping
-  fbl::DoublyLinkedList<VmMapping*> mapping_list_ TA_GUARDED(lock());
+  MappingTree mapping_list_;
 
-  // list of every child
-  fbl::TaggedDoublyLinkedList<VmObject*, internal::ChildListTag> children_list_ TA_GUARDED(lock());
+  // list of every child. Usage of this lock happens on VmObject creation/deletion in situations
+  // where we are also either manipulating the heap and/or the AllVmosList lock. As such this lock
+  // does not end up receiving any contention, due to both being an infrequent operation and already
+  // effectively serialized by the aforementioned other global locks.
+  // This lock is expected to be acquired after the VMO lock.
+  DECLARE_SINGLETON_CRITICAL_MUTEX(ChildListLock);
+  fbl::TaggedDoublyLinkedList<VmObject*, internal::ChildListTag> children_list_
+      TA_GUARDED(ChildListLock::Get());
 
   // The user_id_ is semi-const in that it is set once, before the VMO becomes publicly visible, by
   // the dispatcher layer. While the dispatcher setting the ID and querying it is trivially
@@ -763,7 +814,7 @@ class VmObject : public VmHierarchyBase,
   RelaxedAtomic<uint64_t> user_id_ = 0;
 
   uint32_t mapping_list_len_ TA_GUARDED(lock()) = 0;
-  uint32_t children_list_len_ TA_GUARDED(lock()) = 0;
+  uint32_t children_list_len_ TA_GUARDED(ChildListLock::Get()) = 0;
 
   // The user-friendly VMO name. For debug purposes only. That
   // is, there is no mechanism to get access to a VMO via this name.

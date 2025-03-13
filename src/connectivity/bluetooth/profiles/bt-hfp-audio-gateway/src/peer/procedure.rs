@@ -111,7 +111,7 @@ pub enum ProcedureError {
     #[error("Unexpected AG procedural update: {:?}", .0)]
     UnexpectedAg(AgUpdate),
     #[error("Unparsable HF procedural update: {:?}", .0)]
-    UnparsableHf(at::DeserializeError),
+    UnparsableHf(Box<at::DeserializeError>),
     #[error("Unexpected HF procedural update: {:?}", .0)]
     UnexpectedHf(at::Command),
     #[error("Invalid HF argument in procedural update: {:?}", .0)]
@@ -257,10 +257,9 @@ impl ProcedureMarker {
         IProcedure::new(procedure)
     }
 
-    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     /// Matches the HF `command` to the SLC Initialization procedure. Before initialization is
     /// complete, all commands should be routed to the initialization procedure.
-    pub fn match_init_command(command: &at::Command) -> Result<Self, ProcedureError> {
+    pub fn match_init_command(command: &at::Command) -> Result<Self, Box<ProcedureError>> {
         match command {
             at::Command::Brsf { .. }
             | at::Command::CindTest { .. }
@@ -272,17 +271,19 @@ impl ProcedureMarker {
             | at::Command::Bac { .. } => Ok(Self::SlcInitialization),
             _ => {
                 warn!("Received unexpected HF command before SLC Initialization was complete");
-                Err(ProcedureError::NotImplemented)
+                Err(Box::new(ProcedureError::NotImplemented))
             }
         }
     }
 
-    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     /// Matches the AT `command` to a procedure. `initialized` represents the initialization state
     /// of the Service Level Connection.
     ///
     /// Returns an error if the command is unable to be matched.
-    pub fn match_command(command: &at::Command, initialized: bool) -> Result<Self, ProcedureError> {
+    pub fn match_command(
+        command: &at::Command,
+        initialized: bool,
+    ) -> Result<Self, Box<ProcedureError>> {
         if !initialized {
             return Self::match_init_command(command);
         } else {
@@ -319,7 +320,7 @@ impl ProcedureMarker {
                 | at::Command::AtdMemory { .. }
                 | at::Command::Bldn { .. } => Ok(Self::InitiateCall),
                 at::Command::Bcc { .. } | at::Command::Bcs { .. } => Ok(Self::CodecConnectionSetup),
-                _ => Err(ProcedureError::NotImplemented),
+                _ => Err(Box::new(ProcedureError::NotImplemented)),
             }
         }
     }
@@ -341,7 +342,7 @@ pub enum ProcedureRequest {
     Request(SlcRequest),
 
     /// Error from processing an update.
-    Error(ProcedureError),
+    Error(Box<ProcedureError>),
 
     /// No-op.
     None,
@@ -371,6 +372,12 @@ impl From<SlcRequest> for ProcedureRequest {
 
 impl From<ProcedureError> for ProcedureRequest {
     fn from(src: ProcedureError) -> Self {
+        Self::Error(Box::new(src))
+    }
+}
+
+impl From<Box<ProcedureError>> for ProcedureRequest {
+    fn from(src: Box<ProcedureError>) -> Self {
         Self::Error(src)
     }
 }
@@ -393,7 +400,7 @@ pub trait Procedure {
     /// Developers should ensure that the final request of a Procedure does not require
     /// a response.
     fn hf_update(&mut self, update: at::Command, _state: &mut SlcState) -> ProcedureRequest {
-        ProcedureRequest::Error(ProcedureError::UnexpectedHf(update))
+        ProcedureError::UnexpectedHf(update).into()
     }
 
     /// Receive an AG `update` to progress the procedure. Returns a request to the update.
@@ -409,7 +416,7 @@ pub trait Procedure {
     /// Developers should ensure that the final request of a Procedure does not require
     /// a response.
     fn ag_update(&mut self, update: AgUpdate, _state: &mut SlcState) -> ProcedureRequest {
-        ProcedureRequest::Error(ProcedureError::UnexpectedAg(update))
+        ProcedureError::UnexpectedAg(update).into()
     }
 
     /// Returns true if the Procedure is finished.

@@ -179,7 +179,7 @@ inline Simple::Simple(uint8_t f1, bool f2) noexcept
     : storage_({.f1 = std::move(f1),
                 .f2 = std::move(f2)}) {}
 inline Simple::Simple(const ::test_struct::Simple& other) noexcept : ::test_struct::Simple(other.CloneStorage_()) {}
-inline Simple& ::test_struct::Simple::operator=(const ::test_struct::Simple & other) noexcept {
+inline Simple& ::test_struct::Simple::operator=(const ::test_struct::Simple& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -202,7 +202,7 @@ inline BasicStruct::BasicStruct(uint32_t x, ::std::string y) noexcept
     : storage_({.x = std::move(x),
                 .y = std::move(y)}) {}
 inline BasicStruct::BasicStruct(const ::test_struct::BasicStruct& other) noexcept : ::test_struct::BasicStruct(other.CloneStorage_()) {}
-inline BasicStruct& ::test_struct::BasicStruct::operator=(const ::test_struct::BasicStruct & other) noexcept {
+inline BasicStruct& ::test_struct::BasicStruct::operator=(const ::test_struct::BasicStruct& other) noexcept {
   storage_ = other.CloneStorage_();
   return *this;
 }
@@ -224,7 +224,7 @@ inline BasicStruct& BasicStruct::y(::std::string value) {
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_struct::Simple> : public std::true_type{};
+struct IsFidlType<::test_struct::Simple> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_struct::Simple> {
@@ -236,14 +236,14 @@ struct TypeTraits<::test_struct::Simple> {
 };
 
 template <>
-struct IsStruct<::test_struct::Simple> : public std::true_type{};
+struct IsStruct<::test_struct::Simple> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_struct::Simple, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_struct::Simple, 2> {};
 
 template <>
-struct IsFidlType<::test_struct::BasicStruct> : public std::true_type{};
+struct IsFidlType<::test_struct::BasicStruct> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_struct::BasicStruct> {
@@ -255,7 +255,7 @@ struct TypeTraits<::test_struct::BasicStruct> {
 };
 
 template <>
-struct IsStruct<::test_struct::BasicStruct> : public std::true_type{};
+struct IsStruct<::test_struct::BasicStruct> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_struct::BasicStruct, ::fidl::internal::NaturalCodingConstraintEmpty> final

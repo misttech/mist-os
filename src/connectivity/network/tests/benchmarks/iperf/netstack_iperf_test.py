@@ -19,7 +19,7 @@ from typing import Any, Callable
 import honeydew
 import test_data
 from fuchsia_base_test import fuchsia_base_test
-from honeydew.interfaces.device_classes import fuchsia_device
+from honeydew.fuchsia_device import fuchsia_device
 from mobly import asserts, test_runner
 from perf_publish import publish
 from trace_processing import trace_importing, trace_metrics, trace_model
@@ -216,7 +216,7 @@ def generate_result(
 
 
 class IperfServer:
-    def __init__(self, ffx: honeydew.transports.ffx.FFX) -> None:
+    def __init__(self, ffx: honeydew.transports.ffx.ffx.FFX) -> None:
         self._process: subprocess.Popen[bytes] = ffx.popen(
             ["target", "ssh", f"iperf3 --server --port {LISTEN_PORT} --json"],
             text=False,

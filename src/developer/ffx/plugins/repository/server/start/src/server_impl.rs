@@ -9,8 +9,6 @@ use ffx_command_error::{bug, return_bug, return_user_error, Result};
 use ffx_config::environment::EnvironmentKind;
 use ffx_config::EnvironmentContext;
 use ffx_repository_server_start_args::{default_address, StartCommand};
-use fho::Deferred;
-use fidl_fuchsia_developer_ffx::{self as ffx, RepositoryRegistryProxy, ServerStatus};
 use fuchsia_async as fasync;
 use fuchsia_repo::manager::RepositoryManager;
 use fuchsia_repo::repo_client::RepoClient;
@@ -137,24 +135,8 @@ pub fn get_repo_base_name(
 pub async fn serve_impl_validate_args(
     cmd: &StartCommand,
     rcs_proxy_connector: &Connector<RemoteControlProxyHolder>,
-    repos: Deferred<RepositoryRegistryProxy>,
     context: &EnvironmentContext,
 ) -> Result<Option<PkgServerInfo>> {
-    /* This check makes sure there is not a daemon based server running, which causes
-     a lot of confusion.
-    */
-    let bg: bool =
-        context.get(REPO_BACKGROUND_FEATURE_FLAG).context("checking for daemon server flag")?;
-    if bg {
-        return_user_error!(
-            r#"The ffx setting '{}' and the standalone server are mutually incompatible.
-Please disable the daemon based serving by running the following command:
-
-ffx config remove repository.server.enabled && ffx doctor --restart-daemon
-"#,
-            REPO_BACKGROUND_FEATURE_FLAG,
-        );
-    }
     // Check that there is a target device identified, it is OK if it is not online.
     if !cmd.no_device {
         let res = rcs_proxy_connector
@@ -264,21 +246,7 @@ ffx config remove repository.server.enabled && ffx doctor --restart-daemon
     let instance_root =
         context.get("repository.process_dir").map_err(|e: ffx_config::api::ConfigError| bug!(e))?;
     let mgr = PkgServerInstances::new(instance_root);
-    let mut running_instances = mgr.list_instances()?;
-
-    // Check for any instances that are daemon based, and if they are, check the status of the daemon
-    // based server. This is only done if needed to avoid starting the daemon unnecessarily.
-    let daemon_running =
-        if running_instances.iter().any(|instance| instance.server_mode == ServerMode::Daemon) {
-            daemon_repo_is_running(repos.await?).await?
-        } else {
-            false
-        };
-
-    // Filter the daemon based instances if the daemon is not running
-    if !daemon_running {
-        running_instances.retain(|instance| instance.server_mode != ServerMode::Daemon);
-    }
+    let running_instances = mgr.list_instances()?;
 
     // Check all the name/path pairs for conflicts. If there is an exact match, return it as
     // an indicator that the server is already running and does not need to be started again.
@@ -333,19 +301,9 @@ ffx config remove repository.server.enabled && ffx doctor --restart-daemon
     Ok(already_running_instance)
 }
 
-async fn daemon_repo_is_running(repos: ffx::RepositoryRegistryProxy) -> Result<bool> {
-    let status = repos.server_status().await.map_err(|e| bug!(e))?;
-    let running = match status {
-        ServerStatus::Running(_) => true,
-        _ => false,
-    };
-    Ok(running)
-}
-
 pub async fn serve_impl<W: Write + 'static>(
     target_proxy: Connector<TargetProxyHolder>,
     rcs_proxy: Connector<RemoteControlProxyHolder>,
-    repos: Deferred<RepositoryRegistryProxy>,
     cmd: StartCommand,
     context: EnvironmentContext,
     mut writer: W,
@@ -354,7 +312,7 @@ pub async fn serve_impl<W: Write + 'static>(
     // Validate the cmd args before processing. This allows good error messages to be presented
     // to the user when running in Background mode. If the server is already running, this returns
     // Ok.
-    if let Some(running) = serve_impl_validate_args(&cmd, &rcs_proxy, repos, &context).await? {
+    if let Some(running) = serve_impl_validate_args(&cmd, &rcs_proxy, &context).await? {
         // The server that matches the cmd is already running.
         writeln!(
             writer,
@@ -593,16 +551,12 @@ mod test {
     use ffx_config::keys::TARGET_DEFAULT_KEY;
     use ffx_config::{ConfigLevel, TestEnv};
     use ffx_target::TargetProxy;
-    use fho::macro_deps::ffx_writer::TestBuffer;
-    use fho::{
-        user_error, FfxMain, FhoConnectionBehavior, FhoEnvironment, Format, SimpleWriter,
-        TestBuffers, TryFromEnv,
-    };
+    use ffx_writer::{Format, SimpleWriter, TestBuffer, TestBuffers};
+    use fho::{user_error, FfxMain, FhoConnectionBehavior, FhoEnvironment, TryFromEnv};
     use fidl::endpoints::DiscoverableProtocolMarker;
     use fidl_fuchsia_developer_ffx::{
-        RemoteControlState, RepositoryError, RepositoryRegistrationAliasConflictMode,
-        RepositoryStorageType, SshHostAddrInfo, TargetAddrInfo, TargetInfo, TargetIpPort,
-        TargetRequest, TargetState,
+        RemoteControlState, RepositoryRegistrationAliasConflictMode, RepositoryStorageType,
+        SshHostAddrInfo, TargetAddrInfo, TargetInfo, TargetIpPort, TargetRequest, TargetState,
     };
     use fidl_fuchsia_developer_remotecontrol::{self as frcs, RemoteControlProxy};
     use fidl_fuchsia_net::{IpAddress, Ipv4Address};
@@ -622,7 +576,6 @@ mod test {
     use fuchsia_repo::repository::HttpRepository;
     use fuchsia_repo::test_utils;
     use futures::channel::mpsc;
-    use futures::channel::oneshot::channel;
     use futures::TryStreamExt;
     use std::collections::BTreeSet;
     use std::sync::Mutex;
@@ -674,12 +627,11 @@ mod test {
     impl FakeRcs {
         fn new(repo_manager: FakeRepositoryManager, engine: FakeEngine) -> RemoteControlProxy {
             let fake_rcs_proxy: RemoteControlProxy = fake_proxy(move |req| match req {
-                frcs::RemoteControlRequest::DeprecatedOpenCapability {
+                frcs::RemoteControlRequest::ConnectCapability {
                     moniker: _,
                     capability_set: _,
                     capability_name,
                     server_channel,
-                    flags: _,
                     responder,
                 } => {
                     match capability_name.as_str() {
@@ -740,12 +692,11 @@ mod test {
                     fasync::Task::local(async move {
                         if let Ok(Some(req)) = s.try_next().await {
                             match req {
-                                frcs::RemoteControlRequest::DeprecatedOpenCapability {
+                                frcs::RemoteControlRequest::ConnectCapability {
                                     moniker: _,
                                     capability_set: _,
                                     capability_name,
                                     server_channel,
-                                    flags: _,
                                     responder,
                                 } => {
                                     match capability_name.as_str() {
@@ -1022,7 +973,6 @@ mod test {
                     refresh_metadata: false,
                     auto_publish: None,
                     background: false,
-                    daemon: false,
                     foreground: true,
                     disconnected: false,
                 },
@@ -1043,7 +993,6 @@ mod test {
                     refresh_metadata: false,
                     auto_publish: None,
                     background: false,
-                    daemon: false,
                     foreground: true,
                     disconnected: false,
                 },
@@ -1064,7 +1013,6 @@ mod test {
                     refresh_metadata: false,
                     auto_publish: None,
                     background: false,
-                    daemon: false,
                     foreground: true,
                     disconnected: false,
                 },
@@ -1085,7 +1033,6 @@ mod test {
                     refresh_metadata: false,
                     auto_publish: None,
                     background: false,
-                    daemon: false,
                     foreground: true,
                     disconnected: false,
                 },
@@ -1106,7 +1053,6 @@ mod test {
                     refresh_metadata: false,
                     auto_publish: None,
                     background: false,
-                    daemon: false,
                     foreground: true,
                     disconnected: false,
                 },
@@ -1127,7 +1073,6 @@ mod test {
                     refresh_metadata: false,
                     auto_publish: Some(Utf8PathBuf::from("/missing/package-list")),
                     background: false,
-                    daemon: false,
                     foreground: true,
                     disconnected: false,
                 },
@@ -1151,7 +1096,6 @@ mod test {
                     refresh_metadata: false,
                     auto_publish: Some(Utf8PathBuf::from("/missing/package-list")),
                     background: false,
-                    daemon: false,
                     foreground: true,
                     disconnected: false,
                 },
@@ -1162,19 +1106,7 @@ mod test {
         let rcs_proxy_connector = make_fake_rcs_proxy_connector(&env).await;
 
         for (cmd, expected) in test_cases {
-            let (sender, _receiver) = channel();
-            let mut sender = Some(sender);
-            let repos = Deferred::from_output(Ok(fake_proxy(move |req| match req {
-                ffx::RepositoryRegistryRequest::ServerStatus { responder } => {
-                    sender.take().unwrap().send(()).unwrap();
-                    responder
-                        .send(&fidl_fuchsia_developer_ffx_ext::ServerStatus::Stopped.into())
-                        .unwrap()
-                }
-                other => panic!("Unexpected request: {:?}", other),
-            })));
-            let result =
-                serve_impl_validate_args(&cmd, &rcs_proxy_connector, repos, &env.context).await;
+            let result = serve_impl_validate_args(&cmd, &rcs_proxy_connector, &env.context).await;
             match expected {
                 Ok(Some(pkg_server_info)) => {
                     if let Some(actual_info) = result.ok().expect("Ok result") {
@@ -1217,7 +1149,6 @@ mod test {
             refresh_metadata: false,
             auto_publish: None,
             background: false,
-            daemon: false,
             foreground: true,
             disconnected: false,
         };
@@ -1228,18 +1159,7 @@ mod test {
 
         let fake_rcs_proxy_connector = make_fake_rcs_proxy_connector(&env).await;
 
-        let (sender, _receiver) = channel();
-        let mut sender = Some(sender);
-        let repos = Deferred::from_output(Ok(fake_proxy(move |req| match req {
-            ffx::RepositoryRegistryRequest::ServerStart { responder, address: None } => {
-                sender.take().unwrap().send(()).unwrap();
-                responder.send(Err(RepositoryError::ServerNotRunning)).unwrap()
-            }
-            other => panic!("Unexpected request: {:?}", other),
-        })));
-
-        let result =
-            serve_impl_validate_args(&cmd, &fake_rcs_proxy_connector, repos, &env.context).await;
+        let result = serve_impl_validate_args(&cmd, &fake_rcs_proxy_connector, &env.context).await;
         match expected {
             Ok(Some(pkg_server_info)) => {
                 if let Some(actual_info) = result.ok().expect("Ok result") {
@@ -1319,7 +1239,6 @@ mod test {
             refresh_metadata: false,
             auto_publish: None,
             background: false,
-            daemon: false,
             foreground: true,
             disconnected: false,
         },
@@ -1344,7 +1263,6 @@ mod test {
            refresh_metadata: false,
            auto_publish: None,
            background: false,
-           daemon: false,
            foreground: true,
            disconnected: false,
        },
@@ -1365,7 +1283,6 @@ mod test {
        refresh_metadata: false,
        auto_publish: None,
        background: false,
-       daemon: false,
        foreground: true,
        disconnected: false,
    },
@@ -1385,17 +1302,7 @@ mod test {
         let rcs_proxy_connector = make_fake_rcs_proxy_connector(&env).await;
 
         for (cmd, expected) in test_cases {
-            let (sender, _receiver) = channel();
-            let mut sender = Some(sender);
-            let repos = Deferred::from_output(Ok(fake_proxy(move |req| match req {
-                ffx::RepositoryRegistryRequest::ServerStart { responder, address: None } => {
-                    sender.take().unwrap().send(()).unwrap();
-                    responder.send(Err(RepositoryError::ServerNotRunning)).unwrap()
-                }
-                other => panic!("Unexpected request: {:?}", other),
-            })));
-            let result =
-                serve_impl_validate_args(&cmd, &rcs_proxy_connector, repos, &env.context).await;
+            let result = serve_impl_validate_args(&cmd, &rcs_proxy_connector, &env.context).await;
             match expected {
                 Ok(Some(pkg_server_info)) => {
                     if let Some(actual_info) = match result {
@@ -1453,16 +1360,6 @@ mod test {
             let frc = fake_repo.clone();
             let fec = fake_engine.clone();
 
-            let (sender, _receiver) = channel();
-            let mut sender = Some(sender);
-            let repos = Deferred::from_output(Ok(fake_proxy(move |req| match req {
-                ffx::RepositoryRegistryRequest::ServerStart { responder, address: None } => {
-                    sender.take().unwrap().send(()).unwrap();
-                    responder.send(Err(RepositoryError::ServerNotRunning)).unwrap()
-                }
-                other => panic!("Unexpected request: {:?}", other),
-            })));
-
             let fake_injector = FakeInjector {
                 remote_factory_closure: Box::new(move || {
                     let fake_repo = frc.clone();
@@ -1504,11 +1401,9 @@ mod test {
                     refresh_metadata: refresh_metadata,
                     auto_publish: None,
                     background: false,
-                    daemon: false,
                     foreground: true,
                     disconnected: false,
                 },
-                repos,
                 context: env.environment_context().clone(),
                 target_proxy_connector: Connector::try_from_env(&env)
                     .await
@@ -1616,18 +1511,6 @@ mod test {
         let frc = fake_repo.clone();
         let fec = fake_engine.clone();
 
-        let (sender, _receiver) = channel();
-        let mut sender = Some(sender);
-        let repos = Deferred::from_output(Ok(fake_proxy(move |req| match req {
-            ffx::RepositoryRegistryRequest::ServerStatus { responder } => {
-                sender.take().unwrap().send(()).unwrap();
-                responder
-                    .send(&fidl_fuchsia_developer_ffx_ext::ServerStatus::Stopped.into())
-                    .unwrap()
-            }
-            other => panic!("Unexpected request: {:?}", other),
-        })));
-
         let fake_injector = FakeInjector {
             remote_factory_closure: Box::new(move || {
                 let fake_repo = frc.clone();
@@ -1663,7 +1546,6 @@ mod test {
                     .await
                     .expect("Could not make target proxy test connector"),
                 Connector::try_from_env(&env).await.expect("Could not make RCS test connector"),
-                repos,
                 StartCommand {
                     repository: Some(REPO_NAME.to_string()),
                     trusted_root: None,
@@ -1678,7 +1560,6 @@ mod test {
                     refresh_metadata: false,
                     auto_publish: None,
                     background: false,
-                    daemon: false,
                     foreground: true,
                     disconnected: false,
                 },
@@ -1794,16 +1675,6 @@ mod test {
         let frc = fake_repo.clone();
         let fec = fake_engine.clone();
 
-        let (sender, _receiver) = channel();
-        let mut sender = Some(sender);
-        let repos = Deferred::from_output(Ok(fake_proxy(move |req| match req {
-            ffx::RepositoryRegistryRequest::ServerStart { responder, address: None } => {
-                sender.take().unwrap().send(()).unwrap();
-                responder.send(Err(RepositoryError::ServerNotRunning)).unwrap()
-            }
-            other => panic!("Unexpected request: {:?}", other),
-        })));
-
         let fake_injector = FakeInjector {
             remote_factory_closure: Box::new(move || {
                 let fake_repo = frc.clone();
@@ -1836,7 +1707,6 @@ mod test {
                     .await
                     .expect("Could not make target proxy test connector"),
                 Connector::try_from_env(&env).await.expect("Could not make RCS test connector"),
-                repos,
                 StartCommand {
                     repository: Some(REPO_NAME.to_string()),
                     trusted_root: None,
@@ -1851,7 +1721,6 @@ mod test {
                     refresh_metadata: false,
                     auto_publish: None,
                     background: false,
-                    daemon: false,
                     foreground: true,
                     disconnected: false,
                 },
@@ -1956,17 +1825,6 @@ mod test {
         let fec = fake_engine.clone();
         let ftpc = fake_target_proxy.clone();
 
-        let (sender, _receiver) = channel();
-        let mut sender = Some(sender);
-        let repos = Deferred::from_output(Ok(fake_proxy(move |req| match req {
-            ffx::RepositoryRegistryRequest::ServerStatus { responder } => {
-                sender.take().unwrap().send(()).unwrap();
-                responder
-                    .send(&fidl_fuchsia_developer_ffx_ext::ServerStatus::Stopped.into())
-                    .unwrap()
-            }
-            other => panic!("Unexpected request: {:?}", other),
-        })));
         let fake_injector = FakeInjector {
             remote_factory_closure: Box::new(move || {
                 let fake_repo = frc.clone();
@@ -2002,7 +1860,6 @@ mod test {
                     .await
                     .expect("Could not make target proxy test connector"),
                 Connector::try_from_env(&env).await.expect("Could not make RCS test connector"),
-                repos,
                 StartCommand {
                     repository: None,
                     trusted_root: None,
@@ -2017,7 +1874,6 @@ mod test {
                     refresh_metadata: false,
                     auto_publish: None,
                     background: false,
-                    daemon: false,
                     foreground: true,
                     disconnected: false,
                 },
@@ -2147,16 +2003,6 @@ mod test {
         let frc = fake_repo.clone();
         let fec = fake_engine.clone();
 
-        let (sender, _receiver) = channel();
-        let mut sender = Some(sender);
-        let repos = Deferred::from_output(Ok(fake_proxy(move |req| match req {
-            ffx::RepositoryRegistryRequest::ServerStart { responder, address: None } => {
-                sender.take().unwrap().send(()).unwrap();
-                responder.send(Err(RepositoryError::ServerNotRunning)).unwrap()
-            }
-            other => panic!("Unexpected request: {:?}", other),
-        })));
-
         let fake_injector = FakeInjector {
             remote_factory_closure: Box::new(move || {
                 let fake_repo = frc.clone();
@@ -2189,7 +2035,6 @@ mod test {
             refresh_metadata: false,
             auto_publish: None,
             background: false,
-            daemon: false,
             foreground: true,
             disconnected: false,
         };
@@ -2204,7 +2049,6 @@ mod test {
                     .await
                     .expect("Could not make target proxy test connector"),
                 Connector::try_from_env(&env).await.expect("Could not make RCS test connector"),
-                repos,
                 serve_cmd_without_root,
                 test_env.context.clone(),
                 SimpleWriter::new(),
@@ -2220,21 +2064,11 @@ mod test {
 
         // Run main in background
         let _task = fasync::Task::local(async move {
-            let (sender, _receiver) = channel();
-            let mut sender = Some(sender);
-            let repos = Deferred::from_output(Ok(fake_proxy(move |req| match req {
-                ffx::RepositoryRegistryRequest::ServerStart { responder, address: None } => {
-                    sender.take().unwrap().send(()).unwrap();
-                    responder.send(Err(RepositoryError::ServerNotRunning)).unwrap()
-                }
-                other => panic!("Unexpected request: {:?}", other),
-            })));
             serve_impl(
                 Connector::try_from_env(&env)
                     .await
                     .expect("Could not make target proxy test connector"),
                 Connector::try_from_env(&env).await.expect("Could not make RCS test connector"),
-                repos,
                 serve_cmd_with_root,
                 test_env.context.clone(),
                 writer,

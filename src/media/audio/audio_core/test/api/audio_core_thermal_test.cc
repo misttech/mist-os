@@ -4,8 +4,8 @@
 
 #include <string>
 
-#include "src/media/audio/audio_core/shared/device_id.h"
-#include "src/media/audio/audio_core/shared/mix_profile_config.h"
+#include "src/media/audio/audio_core/device_id.h"
+#include "src/media/audio/audio_core/mix_profile_config.h"
 #include "src/media/audio/audio_core/testing/integration/hermetic_pipeline_test.h"
 #include "src/media/audio/lib/analysis/generators.h"
 #include "src/media/audio/lib/format/audio_buffer.h"

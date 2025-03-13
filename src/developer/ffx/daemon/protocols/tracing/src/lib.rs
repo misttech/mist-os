@@ -426,12 +426,24 @@ impl FidlProtocol for TracingProtocol {
                             .map_err(Into::into);
                     }
                     Entry::Vacant(e) => {
+                        let expanded_categories = match target_config.categories.clone() {
+                            Some(categories) => {
+                                let context = ffx_config::global_env_context()
+                                    .context("Discovering ffx environment context")?;
+                                Some(ffx_trace::expand_categories(&context, categories).await?)
+                            }
+                            None => None,
+                        };
+                        let target_config_with_expanded_categories = trace::TraceConfig {
+                            categories: expanded_categories,
+                            ..target_config.clone()
+                        };
                         let task = match TraceTask::new(
                             Rc::downgrade(&self.tasks),
                             target_info.clone(),
                             output_file.clone(),
                             options,
-                            target_config,
+                            target_config_with_expanded_categories,
                             provisioner,
                         )
                         .await

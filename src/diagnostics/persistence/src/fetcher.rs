@@ -218,7 +218,7 @@ async fn fetch_and_save(
         selectors
     };
 
-    let mut source = ArchiveReader::new();
+    let mut source = ArchiveReader::inspect();
     source
         .with_archive(proxy.clone())
         .retry(RetryConfig::never())
@@ -227,7 +227,7 @@ async fn fetch_and_save(
     // Do the fetch and record the timestamps.
     let before_utc = utc_now();
     let before_monotonic = zx::MonotonicInstant::get().into_nanos();
-    let data = source.snapshot::<Inspect>().await;
+    let data = source.snapshot().await;
     let after_utc = utc_now();
     let after_monotonic = zx::MonotonicInstant::get().into_nanos();
     let timestamps = Timestamps { before_utc, before_monotonic, after_utc, after_monotonic };

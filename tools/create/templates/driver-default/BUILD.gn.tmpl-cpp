@@ -28,6 +28,7 @@ driver_bind_rules("bind") {
 }
 
 fuchsia_cc_driver("driver") {
+  legacy = true
   output_name = "{{PROJECT_NAME}}"
   sources = [ "{{snake_case PROJECT_NAME}}.cc" ]
   deps = [

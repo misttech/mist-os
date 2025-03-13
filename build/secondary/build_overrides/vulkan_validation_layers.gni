@@ -4,7 +4,7 @@
 
 vulkan_gen_subdir = "vulkan_layers_fuchsia"
 vulkan_data_subdir = "vulkan_layers_data"
-vulkan_headers_dir = "//third_party/Vulkan-Headers"
+vulkan_headers_dir = "//third_party/Vulkan-Headers/src"
 vulkan_utility_libraries_dir = "//third_party/Vulkan-Utility-Libraries/src"
-vvl_glslang_dir = "//third_party/glslang"
-vvl_spirv_tools_dir = "//third_party/spirv-tools"
+vvl_glslang_dir = "//third_party/glslang/src"
+vvl_spirv_tools_dir = "//third_party/spirv-tools/src"

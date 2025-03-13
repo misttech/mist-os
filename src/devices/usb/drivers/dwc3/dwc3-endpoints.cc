@@ -11,7 +11,8 @@ namespace dwc3 {
 
 zx_status_t Dwc3::Fifo::Init(zx::bti& bti) {
   if (buffer) {
-    return ZX_ERR_BAD_STATE;
+    Reset();
+    return ZX_OK;
   }
 
   zx_status_t status =
@@ -82,7 +83,7 @@ zx_status_t Dwc3::EpSetStall(Endpoint& ep, bool stall) {
 }
 
 void Dwc3::EpStartTransfer(Endpoint& ep, Fifo& fifo, uint32_t type, zx_paddr_t buffer,
-                           size_t length, bool send_zlp) {
+                           size_t length) {
   FDF_LOG(DEBUG, "Dwc3::EpStartTransfer ep %u type %u length %zu", ep.ep_num, type, length);
 
   dwc3_trb_t* trb = fifo.next++;
@@ -96,24 +97,8 @@ void Dwc3::EpStartTransfer(Endpoint& ep, Fifo& fifo, uint32_t type, zx_paddr_t b
   trb->ptr_low = static_cast<uint32_t>(buffer);
   trb->ptr_high = static_cast<uint32_t>(buffer >> 32);
   trb->status = TRB_BUFSIZ(static_cast<uint32_t>(length));
-  if (send_zlp) {
-    trb->control = type | TRB_HWO;
-  } else {
-    trb->control = type | TRB_LST | TRB_IOC | TRB_HWO;
-  }
+  trb->control = type | TRB_LST | TRB_IOC | TRB_HWO;
   CacheFlush(fifo.buffer.get(), (trb - fifo.first) * sizeof(*trb), sizeof(*trb));
-
-  if (send_zlp) {
-    dwc3_trb_t* zlp_trb = fifo.next++;
-    if (fifo.next == fifo.last) {
-      fifo.next = fifo.first;
-    }
-    zlp_trb->ptr_low = 0;
-    zlp_trb->ptr_high = 0;
-    zlp_trb->status = TRB_BUFSIZ(0);
-    zlp_trb->control = type | TRB_LST | TRB_IOC | TRB_HWO;
-    CacheFlush(fifo.buffer.get(), (zlp_trb - fifo.first) * sizeof(*trb), sizeof(*trb));
-  }
 
   CmdEpStartTransfer(ep, fifo.GetTrbPhys(trb));
 }
@@ -125,6 +110,7 @@ void Dwc3::EpEndTransfers(Endpoint& ep, zx_status_t reason) {
     ep.current_req->status = reason;
 
     pending_completions_.push(std::move(*ep.current_req));
+    ep.current_req.reset();
   }
   ep.got_not_ready = false;
 
@@ -179,18 +165,16 @@ void Dwc3::UserEpQueueNext(UserEndpoint& uep) {
 
     // TODO(voydanoff) scatter/gather support
     std::tie(phys, size) = *result->at(0).begin();
-    bool send_zlp{(size % ep.max_packet_size) == 0};
-
-    EpStartTransfer(ep, uep.fifo, TRB_TRBCTL_NORMAL, phys, size, send_zlp);
+    EpStartTransfer(ep, uep.fifo, TRB_TRBCTL_NORMAL, phys, size);
   }
 }
 
-zx_status_t Dwc3::UserEpCancelAll(UserEndpoint& uep) {
+zx_status_t Dwc3::CancelAll(Endpoint& ep) {
   FidlRequestQueue to_complete;
 
   {
-    std::lock_guard<std::mutex> lock(uep.ep.lock);
-    to_complete = UserEpCancelAllLocked(uep);
+    std::lock_guard<std::mutex> lock(ep.lock);
+    to_complete = CancelAllLocked(ep);
   }
 
   // Now that we have dropped the lock, go ahead and complete all of the
@@ -199,20 +183,20 @@ zx_status_t Dwc3::UserEpCancelAll(UserEndpoint& uep) {
   return ZX_OK;
 }
 
-Dwc3::FidlRequestQueue Dwc3::UserEpCancelAllLocked(UserEndpoint& uep) {
+Dwc3::FidlRequestQueue Dwc3::CancelAllLocked(Endpoint& ep) {
   // Move the endpoint's queue of requests into a local list so we can
   // complete the requests outside of the endpoint lock.
-  FidlRequestQueue to_complete{std::move(uep.ep.queued_reqs)};
+  FidlRequestQueue to_complete{std::move(ep.queued_reqs)};
 
   // If there is currently a request in-flight, be sure to cancel its
   // transfer, and add the in-flight request to the local queue of requests to
   // complete.  Make sure we add this in-flight request to the _front_ of the
   // queue so that all requests are completed in the order that they were
   // queued.
-  if (uep.ep.current_req.has_value()) {
-    CmdEpEndTransfer(uep.ep);
-    to_complete.push_next(*std::move(uep.ep.current_req));
-    uep.ep.current_req.reset();
+  if (ep.current_req.has_value()) {
+    CmdEpEndTransfer(ep);
+    to_complete.push_next(*std::move(ep.current_req));
+    ep.current_req.reset();
   }
 
   // Return the list of requests back to the caller so they can complete them
@@ -233,30 +217,27 @@ void Dwc3::HandleEpTransferCompleteEvent(uint8_t ep_num) {
     ZX_DEBUG_ASSERT(uep != nullptr);
 
     std::lock_guard<std::mutex> lock{uep->ep.lock};
-
-    if (uep->ep.current_req.has_value()) {
-      opt_info.emplace(std::move(*uep->ep.current_req));
-      uep->ep.current_req.reset();
-
-      dwc3_trb_t trb;
-      EpReadTrb(uep->ep, uep->fifo, uep->fifo.current, &trb);
-      uep->fifo.current = nullptr;
-
-      if (trb.control & TRB_HWO) {
-        FDF_LOG(ERROR, "TRB_HWO still set in dwc3_ep_xfer_complete");
-      }
-
-      auto& freq{std::get<usb::FidlRequest>(opt_info->req)};
-      opt_info->actual = freq->data()->at(0).size().value();
-      opt_info->status = ZX_OK;
+    if (!uep->ep.current_req.has_value()) {
+      FDF_LOG(ERROR, "no usb request found to complete!");
+      return;
     }
+    dwc3_trb_t trb;
+    EpReadTrb(uep->ep, uep->fifo, uep->fifo.current, &trb);
+
+    if (trb.control & TRB_HWO) {
+      FDF_LOG(ERROR, "TRB_HWO still set in dwc3_ep_xfer_complete %d", uep->ep.ep_num);
+      return;
+    }
+
+    opt_info.emplace(std::move(*uep->ep.current_req));
+    uep->ep.current_req.reset();
+    uep->fifo.current = nullptr;
+    opt_info->actual = std::get<usb::FidlRequest>(opt_info->req)->data()->at(0).size().value() -
+                       TRB_BUFSIZ(trb.status);
+    opt_info->status = ZX_OK;
   }
 
-  if (opt_info.has_value()) {
-    pending_completions_.push(std::move(*opt_info));
-  } else {
-    FDF_LOG(ERROR, "no usb request found to complete!");
-  }
+  pending_completions_.push(std::move(*opt_info));
 }
 
 void Dwc3::HandleEpTransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {

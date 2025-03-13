@@ -123,14 +123,6 @@
             from: "parent",
             to: [ "#font_provider" ],
         },
-
-        // TODO(b/345827642): Remove once fonts have been
-        // migrated to use dictionaries.
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent/diagnostics",
-            to: [ "#font_provider" ],
-        },
         {
             config: "fuchsia.power.SuspendEnabled",
             from: "parent",
@@ -223,11 +215,19 @@
             to: [ "#network" ],
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-class-network",
             to: [ "#network" ],
             subdir: "network",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.network.Service",
+            from: "parent",
+            to: [ "#network" ],
         },
         {
             storage: "cache",
@@ -290,6 +290,7 @@
                 "fuchsia.power.CollaborativeRebootInitiator",
                 "fuchsia.power.internal.CollaborativeRebootScheduler",
                 "fuchsia.update.verify.BlobfsVerifier",
+                "fuchsia.update.verify.HealthVerification",
             ],
             from: "parent",
             to: "#system-update",
@@ -406,11 +407,19 @@
             to: [ "#agis" ],
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-display-coordinator",
             to: [ "#agis" ],
             subdir: "display-coordinator",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.display.service",
+            from: "parent",
+            to: [ "#agis" ],
         },
         {
             protocol: "fuchsia.memorypressure.Provider",
@@ -419,6 +428,8 @@
             source_availability: "unknown",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-gpu",
@@ -426,6 +437,14 @@
             subdir: "gpu",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.gpu.magma.Service",
+            from: "parent",
+            to: [ "#vulkan_loader" ],
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-gpu-dependency-injection",
@@ -433,6 +452,14 @@
             subdir: "gpu-dependency-injection",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.gpu.magma.DependencyInjectionService",
+            from: "parent",
+            to: "#vulkan_loader",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-goldfish-pipe",
@@ -440,6 +467,14 @@
             subdir: "goldfish-pipe",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.goldfish.ControllerService",
+            from: "parent",
+            to: "#vulkan_loader",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-goldfish-control",
@@ -447,6 +482,14 @@
             subdir: "goldfish-control",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.goldfish.ControlService",
+            from: "parent",
+            to: "#vulkan_loader",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-goldfish-address-space",
@@ -454,11 +497,25 @@
             subdir: "goldfish-address-space",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.goldfish.AddressSpaceService",
+            from: "parent",
+            to: "#vulkan_loader",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-goldfish-sync",
             to: "#vulkan_loader",
             subdir: "goldfish-sync",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.goldfish.SyncService",
+            from: "parent",
+            to: "#vulkan_loader",
         },
         {
             directory: "dev-class",
@@ -547,6 +604,16 @@
             // See:
             //      `//src/sys/time/timekeeper/config.shard.cml`
             availability: "optional",
+        },
+        {
+            // If set, Timekeeper should serve the FIDL protocol that allows external
+            // time adjustment, `fuchsia.time.external/Adjust`.
+            //
+            // This is a security sensitive protocol, and very few assemblies are
+            // expected to have it turned on.
+            config: "fuchsia.time.config.WritableUTCTime",
+            from: "parent",
+            to: "#timekeeper",
         },
         {
             protocol: [

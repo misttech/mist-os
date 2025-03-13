@@ -27,6 +27,7 @@ driver_bind_rules("root-driver-bind") {
 }
 
 fuchsia_cc_driver("root-driver") {
+  legacy = true
   output_name = "root-driver"
   sources = [ "root-driver.cc" ]
   deps = [
@@ -53,6 +54,7 @@ driver_bind_rules("leaf-driver-bind") {
 }
 
 fuchsia_cc_driver("leaf-driver") {
+  legacy = true
   output_name = "leaf-driver"
   sources = [ "leaf-driver.cc" ]
   deps = [
@@ -78,6 +80,7 @@ driver_bind_rules("node-group-bind") {
 }
 
 fuchsia_cc_driver("node-group-driver") {
+  legacy = true
   output_name = "node-group-driver"
   sources = [ "node-group-driver.cc" ]
   deps = [

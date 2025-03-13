@@ -478,6 +478,7 @@ impl ImagesConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeMap;
     use std::path::PathBuf;
 
     fn test_board_config_fastboot() -> bfc::BoardFilesystemConfig {
@@ -488,6 +489,7 @@ mod tests {
                     path: Some("path/to/script".into()),
                     board_script_path: None,
                     args: vec!["arg1".into(), "arg2".into()],
+                    inputs: BTreeMap::default(),
                 }),
             },
             vbmeta: Some(bfc::VBMeta {
@@ -527,6 +529,7 @@ mod tests {
                     path: Some("path/to/script".into()),
                     board_script_path: None,
                     args: vec!["arg1".into(), "arg2".into()],
+                    inputs: BTreeMap::default(),
                 }),
             },
             vbmeta: Some(bfc::VBMeta {
@@ -587,6 +590,7 @@ mod tests {
                             path: Some("path/to/script".into()),
                             board_script_path: None,
                             args: vec!["arg1".into(), "arg2".into()],
+                            inputs: BTreeMap::default(),
                         }),
                     }),
                     Image::VBMeta(VBMeta {
@@ -625,6 +629,7 @@ mod tests {
                             path: Some("path/to/script".into()),
                             board_script_path: None,
                             args: vec!["arg1".into(), "arg2".into()],
+                            inputs: BTreeMap::default(),
                         }),
                     }),
                     Image::VBMeta(VBMeta {
@@ -671,6 +676,7 @@ mod tests {
                             path: Some("path/to/script".into()),
                             board_script_path: None,
                             args: vec!["arg1".into(), "arg2".into()],
+                            inputs: BTreeMap::default(),
                         }),
                     }),
                     Image::VBMeta(VBMeta {
@@ -767,6 +773,7 @@ mod tests {
                             path: Some("path/to/script".into()),
                             board_script_path: None,
                             args: vec!["arg1".into(), "arg2".into()],
+                            inputs: BTreeMap::default(),
                         }),
                     }),
                     Image::VBMeta(VBMeta {

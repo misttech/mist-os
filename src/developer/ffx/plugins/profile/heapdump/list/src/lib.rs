@@ -8,8 +8,8 @@ use ffx_profile_heapdump_common::{
     build_process_selector, connect_to_collector, prettify_collector_error,
 };
 use ffx_profile_heapdump_list_args::ListCommand;
-use ffx_writer::ToolIO;
-use fho::{AvailabilityFlag, FfxMain, FfxTool, MachineWriter};
+use ffx_writer::{MachineWriter, ToolIO as _};
+use fho::{AvailabilityFlag, FfxMain, FfxTool};
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_memory_heapdump_client as fheapdump_client;
 use prettytable::format::FormatBuilder;

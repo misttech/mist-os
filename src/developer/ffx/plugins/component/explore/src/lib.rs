@@ -4,10 +4,11 @@
 
 use async_trait::async_trait;
 use component_debug::cli::explore_cmd;
-use errors::FfxError;
+use errors::ffx_error;
 use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_explore_args::ExploreComponentCommand;
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool};
 use fidl_fuchsia_dash::LauncherProxy;
 use socket_to_stdio::Stdout;
 use target_holders::{moniker, RemoteControlProxyHolder};
@@ -44,7 +45,7 @@ impl FfxMain for ExploreTool {
             stdout,
         )
         .await
-        .map_err(|e| FfxError::Error(e, 1))?;
+        .map_err(|e| ffx_error!(e))?;
         Ok(())
     }
 }

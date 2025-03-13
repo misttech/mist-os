@@ -6,11 +6,12 @@ use anyhow::Result;
 use async_trait::async_trait;
 use component_debug::query::get_single_instance_from_query;
 use component_debug::realm::{get_runtime, Runtime};
-use errors::{ffx_error, FfxError};
+use errors::ffx_error;
 use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_debug_args::ComponentDebugCommand;
+use ffx_writer::SimpleWriter;
 use ffx_zxdb::Debugger;
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use fho::{FfxMain, FfxTool};
 use target_holders::{moniker, RemoteControlProxyHolder};
 use zx_types::zx_koid_t;
 
@@ -43,7 +44,7 @@ impl FfxMain for DebugTool {
 
         let instance = get_single_instance_from_query(&self.cmd.query, &realm_query)
             .await
-            .map_err(|e| FfxError::Error(e, 1))?;
+            .map_err(|e| ffx_error!(e))?;
         let runtime =
             get_runtime(&instance.moniker, &realm_query).await.unwrap_or(Runtime::Unknown);
         let job_koid = get_job_koid(&runtime).await?;

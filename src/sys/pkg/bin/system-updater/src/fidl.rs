@@ -3,19 +3,17 @@
 // found in the LICENSE file.
 
 use crate::install_manager::InstallManagerControlHandle;
-use crate::update::{Config, ControlRequest, RebootController, UpdateAttempt, UpdateHistory};
+use crate::update::{Config, ControlRequest, RebootController};
 use anyhow::{anyhow, Context, Error};
 use event_queue::{ClosedClient, Notify};
 use fidl_fuchsia_update_installer::{
     InstallerRequest, InstallerRequestStream, MonitorProxy, MonitorProxyInterface,
-    RebootControllerRequest, UpdateResult,
+    RebootControllerRequest,
 };
 use fidl_fuchsia_update_installer_ext::State;
 use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
-use fuchsia_sync::Mutex;
 use futures::prelude::*;
 use log::{error, info};
-use std::sync::Arc;
 
 pub enum IncomingService {
     Installer(InstallerRequestStream),
@@ -46,16 +44,12 @@ impl Notify for UpdateStateNotifier {
 }
 
 pub struct FidlServer {
-    history: Arc<Mutex<UpdateHistory>>,
     install_manager_ch: InstallManagerControlHandle<UpdateStateNotifier>,
 }
 
 impl FidlServer {
-    pub fn new(
-        history: Arc<Mutex<UpdateHistory>>,
-        install_manager_ch: InstallManagerControlHandle<UpdateStateNotifier>,
-    ) -> Self {
-        Self { history, install_manager_ch }
+    pub fn new(install_manager_ch: InstallManagerControlHandle<UpdateStateNotifier>) -> Self {
+        Self { install_manager_ch }
     }
 
     /// Runs the FIDL Server.
@@ -88,16 +82,6 @@ impl FidlServer {
     /// Handles fuchsia.update.update.Installer requests.
     async fn handle_installer_request(&self, request: InstallerRequest) -> Result<(), Error> {
         match request {
-            InstallerRequest::GetLastUpdateResult { responder } => {
-                let history = self.history.lock();
-                let last_result = into_update_result(history.last_update_attempt());
-                responder.send(&last_result)?;
-            }
-            InstallerRequest::GetUpdateResult { attempt_id, responder } => {
-                let history = self.history.lock();
-                let result = into_update_result(history.update_attempt(attempt_id));
-                responder.send(&result)?;
-            }
             InstallerRequest::StartUpdate {
                 url,
                 options,
@@ -178,18 +162,5 @@ impl FidlServer {
             }
         }
         Ok(())
-    }
-}
-
-fn into_update_result(attempt: Option<&UpdateAttempt>) -> UpdateResult {
-    match attempt {
-        None => UpdateResult {
-            attempt_id: None,
-            url: None,
-            options: None,
-            state: None,
-            ..Default::default()
-        },
-        Some(attempt) => attempt.into(),
     }
 }

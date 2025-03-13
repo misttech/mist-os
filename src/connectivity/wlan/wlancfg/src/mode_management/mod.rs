@@ -9,12 +9,13 @@ use crate::telemetry::{TelemetrySender, TimeoutSource};
 use crate::util::listener;
 use anyhow::Error;
 use fuchsia_async as fasync;
-use fuchsia_inspect::{Node as InspectNode, StringReference};
+use fuchsia_inspect::Node as InspectNode;
 use fuchsia_inspect_contrib::inspect_insert;
 use fuchsia_inspect_contrib::log::WriteInspect;
 use futures::channel::mpsc;
 use futures::lock::Mutex;
 use futures::Future;
+use std::borrow::Cow;
 use std::convert::Infallible;
 use std::sync::Arc;
 
@@ -114,7 +115,7 @@ pub enum Defect {
 }
 
 impl WriteInspect for Defect {
-    fn write_inspect(&self, writer: &InspectNode, key: impl Into<StringReference>) {
+    fn write_inspect<'a>(&self, writer: &InspectNode, key: impl Into<Cow<'a, str>>) {
         match self {
             Defect::Phy(PhyFailure::IfaceCreationFailure { phy_id }) => {
                 inspect_insert!(writer, var key: {IfaceCreationFailure: {phy_id: phy_id}})

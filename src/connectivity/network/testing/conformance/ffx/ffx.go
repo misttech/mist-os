@@ -174,7 +174,8 @@ func NewFfxInstance(
 			[]string{},
 			/* target= */ options.Target,
 			sshKey,
-			wrapperFfxInstance.outputDir)
+			wrapperFfxInstance.outputDir,
+			ffxutil.UseFFXLegacy)
 	if err != nil {
 		return nil, fmt.Errorf("ffxutil.NewFFXInstance(..) = %w", err)
 	}

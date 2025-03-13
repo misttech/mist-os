@@ -680,6 +680,20 @@ fxl::RefPtr<AsyncOutputBuffer> FormatScope(const ErrOrValue& scope_state,
               // TODO: Check strong count.
               if (arc_inner.has_error())
                 return cb(FormatError("Invalid children tuple (2)", arc_inner.err()));
+
+              // The name is just a String, which we know how to format using typical machinery.
+              // It's not an error if we fail to resolve the name.
+              ErrOrValue scope_name =
+                  ResolveNonstaticMember(context, arc_inner.value(), {"data", "name"});
+
+              auto resolved_scope_name = fxl::MakeRefCounted<AsyncOutputBuffer>();
+              if (scope_name.has_error()) {
+                resolved_scope_name->Complete(Syntax::kStringDim, "<failed to resolve scope name>");
+              } else {
+                resolved_scope_name =
+                    FormatValueForConsole(scope_name.take_value(), options.variable, context);
+              }
+
               // ArcInner<ScopeInner> -> ScopeInner -> Condition<ScopeState> -> Arc<Mutex<_>> ->
               // ArcInner<Mutex<_>>
               ErrOrValue mutex_ptr = ResolveNonstaticMember(
@@ -702,11 +716,16 @@ fxl::RefPtr<AsyncOutputBuffer> FormatScope(const ErrOrValue& scope_state,
                       out->Append(kAwaiteeMarker);
                       out->Append(std::string(indent - 3, ' '));
                     }
+
                     out->Append(Syntax::kStringBold, "Scope");
-                    out->Append(Syntax::kNumberDim, "(");
-                    out->Append(Syntax::kNumberDim,
-                                to_hex_string(arc_inner_ptr.value().GetAs<TargetPointer>()));
-                    out->Append(Syntax::kNumberDim, ")\n");
+                    out->Append(Syntax::kStringDim, "(");
+                    out->Append(resolved_scope_name);
+                    if (options.verbose) {
+                      out->Append(Syntax::kStringDim, " ");
+                      out->Append(Syntax::kNumberDim,
+                                  to_hex_string(arc_inner_ptr.value().GetAs<TargetPointer>()));
+                    }
+                    out->Append(Syntax::kStringDim, ")\n");
                     out->Append(FormatScope(child_state, options, context, 3 + indent));
                     out->Complete();
                     cb(out);
@@ -794,8 +813,8 @@ void RunVerbAsyncBacktrace(const Command& cmd, fxl::RefPtr<CommandContext> cmd_c
     OnStackReady(cmd.thread()->GetStack(), std::move(cmd_context), options);
   } else {
     cmd.thread()->GetStack().SyncFrames(
-        false, [thread = cmd.thread(), cmd_context = std::move(cmd_context),
-                options](const Err& err) mutable {
+        {}, [thread = cmd.thread(), cmd_context = std::move(cmd_context),
+             options](const Err& err) mutable {
           if (err.has_error()) {
             cmd_context->ReportError(err);
           } else {

@@ -118,7 +118,7 @@ fn from_serializable_common(
     serializable: SerializableCommon<'static>,
 ) -> CommonResult {
     CommonResult {
-        name: serializable.name.unwrap_or_else(|| Cow::Borrowed(RUN_NAME)).into_owned(),
+        name: serializable.name.unwrap_or(Cow::Borrowed(RUN_NAME)).into_owned(),
         artifact_dir: ArtifactSubDirectory {
             version: SchemaVersion::V1,
             root: root_path.join(serializable.artifact_dir),

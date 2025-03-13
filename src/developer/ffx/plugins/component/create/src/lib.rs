@@ -5,10 +5,11 @@
 use async_trait::async_trait;
 use component_debug::cli::create_cmd;
 use component_debug::config::resolve_raw_config_overrides;
-use errors::{ffx_error, FfxError};
+use errors::ffx_error;
 use ffx_component::rcs::{connect_to_lifecycle_controller, connect_to_realm_query};
 use ffx_component_create_args::CreateComponentCommand;
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool};
 use target_holders::RemoteControlProxyHolder;
 
 #[derive(FfxTool)]
@@ -39,7 +40,7 @@ impl FfxMain for CreateTool {
         // All errors from component_debug library are user-visible.
         create_cmd(self.cmd.url, self.cmd.moniker, config_overrides, lifecycle_controller, writer)
             .await
-            .map_err(|e| FfxError::Error(e, 1))?;
+            .map_err(|e| ffx_error!(e))?;
         Ok(())
     }
 }

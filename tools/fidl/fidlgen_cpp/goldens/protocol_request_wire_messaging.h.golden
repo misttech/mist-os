@@ -28,17 +28,8 @@ class Child;
 
 class Parent;
 
+#ifdef __Fuchsia__
 }  // namespace test_protocolrequest
-
-#ifdef __Fuchsia__
-
-template <>
-struct ::fidl::internal::ProtocolDetails<::test_protocolrequest::Child> {
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_protocolrequest::Child> final {
@@ -56,9 +47,11 @@ struct ::fidl::internal::WireServerDispatcher<::test_protocolrequest::Child> fin
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
+namespace test_protocolrequest {
 
 #endif  // __Fuchsia__
 
+}  // namespace test_protocolrequest
 namespace fidl {
 
 #ifdef __Fuchsia__
@@ -173,29 +166,9 @@ namespace fidl {
 
 #endif  // __Fuchsia__
 
-}  // namespace fidl
-
-template <>
-struct ::fidl::internal::WireOrdinal<::test_protocolrequest::Parent::GetChild> final {
-  static constexpr uint64_t value = 881818649151440699lu;
-};
-
-template <>
-struct ::fidl::internal::WireOrdinal<::test_protocolrequest::Parent::GetChildRequest> final {
-  static constexpr uint64_t value = 1096855814967598201lu;
-};
-
-template <>
-struct ::fidl::internal::WireOrdinal<::test_protocolrequest::Parent::TakeChild> final {
-  static constexpr uint64_t value = 4470101341872267920lu;
-};
-
-template <>
-struct ::fidl::internal::WireOrdinal<::test_protocolrequest::Parent::TakeChildRequest> final {
-  static constexpr uint64_t value = 2333981071306416007lu;
-};
-
 #ifdef __Fuchsia__
+
+}  // namespace fidl
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_protocolrequest::Parent::GetChild> {
@@ -214,9 +187,13 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolrequest::Parent::GetChil
           ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChild>, ::fidl::internal::ChannelTransport>>;
 };
 
+namespace fidl {
+
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
+
+}  // namespace fidl
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_protocolrequest::Parent::GetChildRequest> {
@@ -235,9 +212,13 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolrequest::Parent::GetChil
           ::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChildRequest>, ::fidl::internal::ChannelTransport>>;
 };
 
+namespace fidl {
+
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
+
+}  // namespace fidl
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_protocolrequest::Parent::TakeChild> {
@@ -247,9 +228,13 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolrequest::Parent::TakeChi
   using Completer = fidl::Completer<>;
 };
 
+namespace fidl {
+
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
+
+}  // namespace fidl
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_protocolrequest::Parent::TakeChildRequest> {
@@ -259,21 +244,15 @@ struct ::fidl::internal::WireMethodTypes<::test_protocolrequest::Parent::TakeChi
   using Completer = fidl::Completer<>;
 };
 
+namespace fidl {
+
 #endif  // __Fuchsia__
 
+}  // namespace fidl
 namespace test_protocolrequest {
 
+#ifdef __Fuchsia__
 }  // namespace test_protocolrequest
-
-#ifdef __Fuchsia__
-
-template <>
-struct ::fidl::internal::ProtocolDetails<::test_protocolrequest::Parent> {
-};
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_protocolrequest::Parent> final {
@@ -291,8 +270,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_protocolrequest::Parent> fi
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
+namespace test_protocolrequest {
 
 #endif  // __Fuchsia__
+}  // namespace test_protocolrequest
 
 #ifdef __Fuchsia__
 template <>
@@ -572,9 +553,9 @@ namespace fidl {
 
 #ifdef __Fuchsia__
 template <>
-struct IsFidlType<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChild>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChild>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChild>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChild>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChild>> {
@@ -594,16 +575,16 @@ static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_protocolreq
 #endif  // __Fuchsia__
 
 template <>
-struct IsFidlType<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChild>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChild>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChild>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChild>> : public std::true_type {};
 template <>
-struct IsFidlType<::fidl::WireResponse<::test_protocolrequest::Parent::GetChild>> : public std::true_type{};
+struct IsFidlType<::fidl::WireResponse<::test_protocolrequest::Parent::GetChild>> : public std::true_type {};
 #ifdef __Fuchsia__
 template <>
-struct IsResource<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChild>> : public std::true_type{};
+struct IsResource<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChild>> : public std::true_type {};
 template <>
-struct IsResource<::fidl::WireResponse<::test_protocolrequest::Parent::GetChild>> : public std::true_type{};
+struct IsResource<::fidl::WireResponse<::test_protocolrequest::Parent::GetChild>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChild>> {
@@ -640,9 +621,9 @@ static_assert(offsetof(::fidl::WireResponse<::test_protocolrequest::Parent::GetC
 
 #ifdef __Fuchsia__
 template <>
-struct IsFidlType<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChildRequest>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChildRequest>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChildRequest>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChildRequest>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChildRequest>> {
@@ -662,16 +643,16 @@ static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_protocolreq
 #endif  // __Fuchsia__
 
 template <>
-struct IsFidlType<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChildRequest>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChildRequest>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChildRequest>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChildRequest>> : public std::true_type {};
 template <>
-struct IsFidlType<::fidl::WireResponse<::test_protocolrequest::Parent::GetChildRequest>> : public std::true_type{};
+struct IsFidlType<::fidl::WireResponse<::test_protocolrequest::Parent::GetChildRequest>> : public std::true_type {};
 #ifdef __Fuchsia__
 template <>
-struct IsResource<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChildRequest>> : public std::true_type{};
+struct IsResource<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChildRequest>> : public std::true_type {};
 template <>
-struct IsResource<::fidl::WireResponse<::test_protocolrequest::Parent::GetChildRequest>> : public std::true_type{};
+struct IsResource<::fidl::WireResponse<::test_protocolrequest::Parent::GetChildRequest>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChildRequest>> {
@@ -708,11 +689,11 @@ static_assert(offsetof(::fidl::WireResponse<::test_protocolrequest::Parent::GetC
 
 #ifdef __Fuchsia__
 template <>
-struct IsFidlType<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild>> : public std::true_type {};
 template <>
-struct IsResource<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild>> : public std::true_type{};
+struct IsResource<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild>> {
@@ -736,11 +717,11 @@ static_assert(offsetof(::test_protocolrequest::wire::ParentTakeChildRequest, c) 
 
 #ifdef __Fuchsia__
 template <>
-struct IsFidlType<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest>> : public std::true_type {};
 template <>
-struct IsResource<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest>> : public std::true_type{};
+struct IsResource<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest>> {

@@ -21,6 +21,7 @@ use cm_rust_testing::*;
 use cm_types::Url;
 use fidl::prelude::*;
 use moniker::Moniker;
+use router_error::Explain;
 use routing::capability_source::{
     BuiltinSource, CapabilitySource, ComponentCapability, ComponentSource, FrameworkSource,
     InternalCapability, NamespaceSource,
@@ -34,6 +35,7 @@ use routing_test_helpers::{
     CheckUse, ComponentEventRoute, ExpectedResult, RoutingTestModel, RoutingTestModelBuilder,
     ServiceInstance,
 };
+use sandbox::{Capability, RouterResponse};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::Arc;
@@ -456,7 +458,6 @@ impl RoutingTestModel for RoutingTestForAnalyzer {
 
     async fn check_use_exposed_dir(&self, moniker: Moniker, check: CheckUse) {
         let target = self.model.get_instance(&moniker).expect("target instance not found");
-
         let (find_decl, expected) = self.find_matching_expose(check, target.decl_for_testing());
 
         // If `find_decl` is not OK, check that `expected` has a matching error.
@@ -495,6 +496,77 @@ impl RoutingTestModel for RoutingTestForAnalyzer {
                     },
                 }
             }
+        }
+    }
+
+    /// Checks if the capability name referred to in the first element of the path in the
+    /// `CheckUse` can successfully be routed from the capabilities exposed to framework. Panics if
+    /// `path.split()` is longer than one element. Yes it's hacky to use the path to carry a name
+    /// here, but since this is such a small edge case it doesn't seem worth the refactor.
+    async fn check_exposed_to_framework(&self, moniker: Moniker, check: CheckUse) {
+        let (path, expected_res) = match check {
+            CheckUse::Protocol { path, expected_res } => (path, expected_res),
+            CheckUse::Service { .. } => {
+                panic!("unimplemented");
+            }
+            CheckUse::Directory { .. } => {
+                panic!("unimplemented");
+            }
+            CheckUse::Storage { .. } => {
+                panic!("storage capabilities can't be exposed");
+            }
+            CheckUse::StorageAdmin { .. } => {
+                panic!("unimplemented");
+            }
+            CheckUse::EventStream { .. } => {
+                panic!("unimplemented");
+            }
+        };
+        assert_eq!(
+            1,
+            path.split().len(),
+            "path must have only 1 element, instead we have {}",
+            path
+        );
+        let target = self.model.get_instance(&moniker).expect("target instance not found");
+        let capability_name = path.split().first().cloned().unwrap();
+        let router_capability = target
+            .component_sandbox()
+            .await
+            .unwrap()
+            .component_output
+            .framework()
+            .get(&capability_name)
+            .expect(
+                "component is missing capability in sandbox, does the expose to framework exist?",
+            )
+            .unwrap();
+        let router = match router_capability {
+            Capability::ConnectorRouter(r) => r,
+            _ => panic!("unexpected capability type"),
+        };
+        match (expected_res, router.route(None, true).await) {
+            (ExpectedResult::Ok, Ok(RouterResponse::Debug(_debug_data))) => {}
+            (ExpectedResult::Err(status), Err(err)) => {
+                if status != err.as_zx_status() {
+                    panic!(
+                        "unexpected error, we wanted zx status {} but got {} from the error {:?}",
+                        status,
+                        err.as_zx_status(),
+                        err
+                    );
+                }
+            }
+            (ExpectedResult::Ok, Err(err)) => {
+                panic!("failed to route when we expected to succeed: {:?}", err);
+            }
+            (ExpectedResult::Err(_status), Ok(RouterResponse::Debug(debug_data))) => {
+                panic!("routing succeeded when we expected an error, the capability was provided by {:?}", CapabilitySource::try_from(debug_data));
+            }
+            (_, Ok(RouterResponse::Unavailable | RouterResponse::Capability(_))) => {
+                panic!("unexpected router response");
+            }
+            (ExpectedResult::ErrWithNoEpitaph, _) => unimplemented!(),
         }
     }
 

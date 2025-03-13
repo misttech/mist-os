@@ -423,6 +423,11 @@ where
             executable_vmo,
             options: component.options,
             config_vmo: component.config_vmo()?,
+            url: Some(component.url.clone()),
+            component_instance: component
+                .component_instance
+                .as_ref()
+                .map(|c| c.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap()),
         })
         .await?;
     Ok((p, j, out_l, err_l, client))

@@ -101,15 +101,16 @@ pub async fn main() -> std::process::ExitCode {
     let scope = vfs::execution_scope::ExecutionScope::new();
 
     let (svc_dir, server_end) = fidl::endpoints::create_endpoints::<fidl_fuchsia_io::NodeMarker>();
-
-    svc.open(
+    let flags = fidl_fuchsia_io::PERM_READABLE
+        | fidl_fuchsia_io::PERM_WRITABLE
+        | fidl_fuchsia_io::PERM_EXECUTABLE;
+    svc.open3(
         scope.clone(),
-        fidl_fuchsia_io::OpenFlags::RIGHT_READABLE
-            | fidl_fuchsia_io::OpenFlags::RIGHT_WRITABLE
-            | fidl_fuchsia_io::OpenFlags::RIGHT_EXECUTABLE,
         vfs::path::Path::dot(),
-        server_end,
-    );
+        flags.clone(),
+        &mut vfs::ObjectRequest::new(flags, &Default::default(), server_end.into_channel()),
+    )
+    .expect("failed to create connection to service directory");
 
     actions.push(fdio::SpawnAction::add_namespace_entry(c"/svc", svc_dir.into_channel().into()));
 

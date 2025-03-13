@@ -474,12 +474,12 @@ void PageSource::CancelRequestLocked(PageRequest* request) {
   request->offset_ = UINT64_MAX;
 }
 
-zx_status_t PageSource::WaitOnRequest(PageRequest* request) {
+zx_status_t PageSource::WaitOnRequest(PageRequest* request, bool suspendable) {
   canary_.Assert();
 
   // If we have been detached the request will already have been completed in ::Detach and so the
   // provider should instantly wake from the event.
-  return page_provider_->WaitOnEvent(&request->event_);
+  return page_provider_->WaitOnEvent(&request->event_, suspendable);
 }
 
 void PageSource::DumpSelf(uint depth, uint max_items) const {
@@ -489,8 +489,8 @@ void PageSource::DumpSelf(uint depth, uint max_items) const {
   for (uint8_t type = 0; type < page_request_type::COUNT; type++) {
     printer.BeginList(max_items);
     for (auto& req : outstanding_requests_[type]) {
-      printer.Emit("  vmo 0x%lx/k%lu %s req [0x%lx, 0x%lx) pending 0x%lx overlap %lu %s",
-                   req.vmo_debug_info_.vmo_ptr, req.vmo_debug_info_.vmo_id,
+      printer.Emit("  vmo <%s>/k%lu %s req [0x%lx, 0x%lx) pending 0x%lx overlap %lu %s",
+                   req.vmo_debug_info_.vmo_name, req.vmo_debug_info_.vmo_id,
                    PageRequestTypeToString(page_request_type(type)), req.offset_, req.GetEnd(),
                    req.pending_size_, req.overlap_.size_slow(),
                    req.provider_owned_ ? "[sent]" : "");
@@ -547,10 +547,10 @@ ktl::pair<uint64_t, uint64_t> PageRequest::TrimRangeToRequestSpace(uint64_t star
   return {req_offset, req_end};
 }
 
-zx_status_t PageRequest::Wait() {
+zx_status_t PageRequest::Wait(bool suspendable) {
   lockdep::AssertNoLocksHeld();
   VM_KTRACE_DURATION(1, "page_request_wait", ("offset", offset_), ("len", len_));
-  zx_status_t status = src_->WaitOnRequest(this);
+  zx_status_t status = src_->WaitOnRequest(this, suspendable);
   VM_KTRACE_FLOW_END(1, "page_request_signal", reinterpret_cast<uintptr_t>(this));
   if (status != ZX_OK && !PageSource::IsValidInternalFailureCode(status)) {
     src_->CancelRequest(this);
@@ -575,7 +575,7 @@ PageRequest* LazyPageRequest::get() {
   return &*request_;
 }
 
-zx_status_t MultiPageRequest::Wait() {
+zx_status_t MultiPageRequest::Wait(bool suspendable) {
   if (anonymous_.is_active()) {
     DEBUG_ASSERT(!dirty_active_ && !read_active_);
     return anonymous_.Wait();
@@ -584,7 +584,7 @@ zx_status_t MultiPageRequest::Wait() {
   DEBUG_ASSERT(dirty_active_ ^ read_active_);
   read_active_ = false;
   dirty_active_ = false;
-  return page_request_->Wait();
+  return page_request_->Wait(suspendable);
 }
 
 void MultiPageRequest::CancelRequests() {

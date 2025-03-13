@@ -41,6 +41,11 @@ if (is_fuchsia) {
         }
       }
     }
+    cache_packages = [
+      {
+        package_target = "//examples/hello_world/cpp:hello-world-cpp"
+      },
+    ]
   }
 
   board_configuration("board_config") {
@@ -55,14 +60,8 @@ if (is_fuchsia) {
 
   assembled_system("fx_publish_test.gn_assembly") {
     testonly = true
-    include_legacy_bundle = true
     product_assembly_config_label = ":product_assembly_config"
-
     board_config_label = ":board_config"
-
-    base_packages = []
-    cache_packages = [ "//examples/hello_world/cpp:hello-world-cpp" ]
-
     generate_fvm = true
   }
 
@@ -71,8 +70,9 @@ if (is_fuchsia) {
     allow_eng_platform_bundle_use = true
     bazel_product_bundle_target = ":fake_bundle"
     bazel_product_image_target = "//build/images/updates/tests:fake_product"
-    bazel_inputs_from_gn = [ ":fx_publish_test.gn_assembly.bazel_legacy_aib" ]
+    bazel_inputs_from_gn = []
     image_use_vbmeta = false
+    image_has_fxfs_blob = false
   }
 
   # macos infra builders cannot build assembly without timing out, so use a stub package manifest
@@ -264,7 +264,7 @@ if (is_host) {
     if (host_os != "mac") {
       extra_args += [
         "--expect-cache-packages",
-        "hello-world-cpp/0",
+        "hello_cpp/0",
       ]
     }
   }

@@ -897,7 +897,8 @@ def download_from_stub_path(
     download requests via file-lock.
 
     Args:
-      stub_path: is a path to a possible download stub.
+      stub_path: is a path to a possible download stub, relative to the
+        current working dir.
       downloader: remotetool instance used to download.
       working_dir_abs: current working dir.
       verbose: if True, print extra debug information.
@@ -909,7 +910,13 @@ def download_from_stub_path(
     # download requests to the same artifact.
     # If there are concurrent requests to download the same stub,
     # the lock will be granted to one caller, while the other waits.
-    lock_file = Path(str(stub_path) + ".dl-lock")
+    # Locate the corresponding lock file in a separate directory
+    # from the real file because there's no telling what tools may attempt
+    # to glob files from a given directory.  This avoids polluting
+    # directories in the build workspace during a build, which happened
+    # in b/394155554.
+    lock_file = Path(".dl-locks") / stub_path
+    lock_file.parent.mkdir(parents=True, exist_ok=True)
     with cl_utils.BlockingFileLock(lock_file) as lock:
         ok_result = cl_utils.SubprocessResult(0)
         if not stub_path.exists():
@@ -1222,14 +1229,15 @@ exec "${{cmd[@]}}"
         if self._local_only_command == self._remote_only_command:
             return  # no differences to show
 
-        print("local vs. remote command differences:")
+        self.vmsg("local vs. remote command differences:")
         diffs = difflib.unified_diff(
             [tok + "\n" for tok in self.local_only_command],
             [tok + "\n" for tok in self.remote_only_command],
             fromfile="local.command",
             tofile="remote.command",
         )
-        sys.stdout.writelines(diffs)
+        for l in diffs:
+            self.vmsg(l)
 
     @property
     def remote_debug_command(self) -> Sequence[str]:
@@ -1675,6 +1683,7 @@ exec "${{cmd[@]}}"
           Mapping of path to status.
           Failures are always included, but successes are optional.
         """
+        # stub_paths are relative to the current working dir
         stub_paths = [
             path
             for path in self.inputs_relative_to_working_dir
@@ -1801,7 +1810,11 @@ exec "${{cmd[@]}}"
         quoted = cl_utils.command_quoted_str(command)
         self.vmsg(f"Launching: {quoted}")
         with cl_utils.timer_cm("subprocess (remote, rewrapper)"):
-            return cl_utils.subprocess_call(command, cwd=self.working_dir)
+            return cl_utils.subprocess_call(
+                command,
+                cwd=self.working_dir,
+                quiet=self.exec_strategy == "local",
+            )
 
     def _on_success(self) -> int:
         """Work to do after success (local or remote)."""

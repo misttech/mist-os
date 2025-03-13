@@ -34,7 +34,7 @@ namespace wlan {
 namespace brcmfmac {
 namespace {
 
-constexpr uint32_t kEthernetMtu = 1500;
+constexpr uint32_t kEthernetMtu = 1514;
 
 }  // namespace
 
@@ -360,6 +360,19 @@ void WlanInterface::QuerySpectrumManagementSupport(
   fuchsia_wlan_common::wire::SpectrumManagementSupport resp;
   if (wdev_ != nullptr) {
     brcmf_if_query_spectrum_management_support(wdev_->netdev, &resp);
+  }
+  completer.ReplySuccess(resp);
+}
+
+void WlanInterface::QueryTelemetrySupport(QueryTelemetrySupportCompleter::Sync& completer) {
+  std::shared_lock<std::shared_mutex> guard(lock_);
+  constexpr size_t kTelemetrySupportBufferSize =
+      fidl::MaxSizeInChannel<fuchsia_wlan_stats::wire::TelemetrySupport,
+                             fidl::MessageDirection::kSending>();
+  fidl::Arena<kTelemetrySupportBufferSize> table_arena;
+  fuchsia_wlan_stats::wire::TelemetrySupport resp{};
+  if (wdev_ != nullptr) {
+    brcmf_if_query_telemetry_support(wdev_->netdev, &resp, table_arena);
   }
   completer.ReplySuccess(resp);
 }

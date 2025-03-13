@@ -26,14 +26,9 @@ namespace test_drivertwoway {
 
 class TwoWay;
 
-}  // namespace test_drivertwoway
-
-template <>
-struct ::fidl::internal::WireOrdinal<::test_drivertwoway::TwoWay::Add> final {
-  static constexpr uint64_t value = 989730524426044687lu;
-};
-
 #ifdef __Fuchsia__
+
+}  // namespace test_drivertwoway
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_drivertwoway::TwoWay::Add> {
@@ -53,21 +48,12 @@ struct ::fidl::internal::WireMethodTypes<::test_drivertwoway::TwoWay::Add> {
           ::fidl::internal::TransactionalRequest<::test_drivertwoway::TwoWay::Add>, ::fidl::internal::DriverTransport>>;
 };
 
-#endif  // __Fuchsia__
-
 namespace test_drivertwoway {
 
-}  // namespace test_drivertwoway
-
-#ifdef __Fuchsia__
-
-template <>
-struct ::fidl::internal::ProtocolDetails<::test_drivertwoway::TwoWay> {
-};
-
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
+}  // namespace test_drivertwoway
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_drivertwoway::TwoWay> final {
@@ -85,8 +71,10 @@ struct ::fidl::internal::WireServerDispatcher<::test_drivertwoway::TwoWay> final
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
+namespace test_drivertwoway {
 
 #endif  // __Fuchsia__
+}  // namespace test_drivertwoway
 
 #ifdef __Fuchsia__
 template <>
@@ -190,9 +178,9 @@ namespace fidl {
 
 #ifdef __Fuchsia__
 template <>
-struct IsFidlType<::fidl::internal::TransactionalRequest<::test_drivertwoway::TwoWay::Add>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalRequest<::test_drivertwoway::TwoWay::Add>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_drivertwoway::TwoWay::Add>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_drivertwoway::TwoWay::Add>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_drivertwoway::TwoWay::Add>> {
@@ -216,11 +204,11 @@ static_assert(offsetof(::test_drivertwoway::wire::TwoWayAddRequest, addend2) == 
 #endif  // __Fuchsia__
 
 template <>
-struct IsFidlType<::fidl::internal::TransactionalResponse<::test_drivertwoway::TwoWay::Add>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalResponse<::test_drivertwoway::TwoWay::Add>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalResponse<::test_drivertwoway::TwoWay::Add>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalResponse<::test_drivertwoway::TwoWay::Add>> : public std::true_type {};
 template <>
-struct IsFidlType<::fidl::WireResponse<::test_drivertwoway::TwoWay::Add>> : public std::true_type{};
+struct IsFidlType<::fidl::WireResponse<::test_drivertwoway::TwoWay::Add>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_drivertwoway::TwoWay::Add>> {

@@ -5,22 +5,39 @@
 #include <lib/ld/log-zircon.h>
 #include <lib/zircon-internal/unique-backtrace.h>
 #include <zircon/assert.h>
-#include <zircon/compiler.h>
 #include <zircon/sanitizer.h>
 
 #include <__verbose_abort>
 #include <algorithm>
+#include <cassert>
 #include <cstdarg>
+#include <cstddef>
+#include <new>
 
 #include "dynlink.h"
 #include "stdio/printf_core/wrapper.h"
 
 namespace {
 
-// This is constinit so it can be used before constructors run.  But it still
-// engenders a global constructor to register its global destructor.  This is
-// fine, since that registration doesn't need to happen before it gets used.
-__CONSTINIT ld::Log gLog;
+// The code here needs to run before all normal constructors have run, and keep
+// working after all normal destructors have run.  The ld::Log type is entirely
+// constinit-compatible.  But it needs a destructor, so even a constinit global
+// induces a static constructor to register the destructor.  Or else it might
+// induce a direct `.fini_array` entry as a static registration of the
+// destructor.  In either case, it's hard or impossible to ensure that this
+// destructor will run only after all others.  It's important not to tear this
+// down until there is no code (including any plain compiled code that's
+// instrumented to possibly call into a sanitizer runtime) that might ever call
+// into __sanitizer_log_write (or into _dl_log_write otherwise, e.g. via
+// dlopen).  So instead of a simple gLog global object here, that object is
+// created explicitly via placement new in _dl_log_write_preinit.  In the
+// current implementation, the destructor is never run, since it would just be
+// closing handles right before process exit and that accomplishes nothing.
+alignas(alignof(ld::Log)) std::byte gLogStorage[sizeof(ld::Log)];
+
+// This should get compiled away, but it doesn't hurt much if not, and it makes
+// the uses below more natural.
+ld::Log& gLog = *reinterpret_cast<ld::Log*>(gLogStorage);
 
 void LogWrite(std::string_view str) {
   if (!gLog) {
@@ -65,7 +82,7 @@ extern "C" void __zx_panic(const char* format, ...) {
 }
 
 // libc++ header code uses this.
-void std::__libcpp_verbose_abort(const char* format, ...) {
+void std::__libcpp_verbose_abort(const char* format, ...) noexcept {
   va_list args;
   va_start(args, format);
   Panic(format, args);
@@ -73,6 +90,17 @@ void std::__libcpp_verbose_abort(const char* format, ...) {
 }
 
 void _dl_log_write(const char* buffer, size_t len) { LogWrite({buffer, len}); }
+
+// This is called by __dls3 before any other function here could be called.
+// It's doing a touch of redundant work, since the constructor is only storing
+// zeros, and gLogStorage is already implicitly zero-initialized.  But the
+// compiler doesn't know this is the first thing to touch gLogStorage.  It's
+// only a single word write, so it costs less than just the function call
+// overhead, really.
+void _dl_log_write_preinit() {
+  [[maybe_unused]] ld::Log* log = new (gLogStorage) ld::Log;
+  assert(log == &gLog);
+}
 
 // This is called by __dls3 for any PA_FD handle in the bootstrap message.
 void _dl_log_write_init(zx_handle_t handle, uint32_t info) {
@@ -82,7 +110,7 @@ void _dl_log_write_init(zx_handle_t handle, uint32_t info) {
   }
 }
 
-// This is called after the last change to call _dl_log_write_init.
+// This is called after the last chance to call _dl_log_write_init.
 void _dl_log_write_init_fallback() {
   if (gLog) {
     return;

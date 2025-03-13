@@ -104,7 +104,9 @@ pub mod filter {
 
 /// Facilities for inspecting stack state for debugging.
 pub mod inspect {
-    pub use netstack3_base::{Inspectable, InspectableValue, Inspector, InspectorDeviceExt};
+    pub use netstack3_base::{
+        Inspectable, InspectableValue, Inspector, InspectorDeviceExt, InspectorExt,
+    };
 }
 
 /// Methods for dealing with ICMP sockets.
@@ -125,14 +127,15 @@ pub mod ip {
     }
 
     // Re-exported types.
-    pub use netstack3_base::{SubnetMatcher, WrapBroadcastMarker};
+    pub use netstack3_base::{Mark, MarkDomain, SubnetMatcher, WrapBroadcastMarker};
     pub use netstack3_ip::device::{
         AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, AddressRemovedReason,
-        CommonAddressProperties, IidSecret, IpAddressState, IpDeviceConfiguration,
-        IpDeviceConfigurationAndFlags, IpDeviceConfigurationUpdate, IpDeviceEvent, Ipv4AddrConfig,
-        Ipv4DeviceConfiguration, Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig,
-        Ipv6DeviceConfiguration, Ipv6DeviceConfigurationUpdate, Lifetime, PreferredLifetime,
-        SetIpAddressPropertiesError, SlaacConfiguration, SlaacConfigurationUpdate,
+        CommonAddressProperties, IidGenerationConfiguration, IidSecret, IpAddressState,
+        IpDeviceConfiguration, IpDeviceConfigurationAndFlags, IpDeviceConfigurationUpdate,
+        IpDeviceEvent, Ipv4AddrConfig, Ipv4DeviceConfiguration, Ipv4DeviceConfigurationUpdate,
+        Ipv6AddrManualConfig, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationUpdate, Lifetime,
+        PreferredLifetime, SetIpAddressPropertiesError, SlaacConfiguration,
+        SlaacConfigurationUpdate, StableSlaacAddressConfiguration,
         TemporarySlaacAddressConfiguration, UpdateIpConfigurationError,
     };
     pub use netstack3_ip::gmp::{IgmpConfigMode, MldConfigMode};
@@ -167,8 +170,8 @@ pub mod routes {
     pub use netstack3_base::WrapBroadcastMarker;
     pub use netstack3_ip::{
         AddRouteError, AddableEntry, AddableEntryEither, AddableMetric, Entry, EntryEither,
-        Generation, Mark, MarkDomain, MarkMatcher, MarkMatchers, Metric, NextHop, RawMetric,
-        ResolvedRoute, RoutableIpAddr, RoutingTableId, Rule, RuleAction, RuleMatcher,
+        Generation, MarkMatcher, MarkMatchers, Marks, Metric, NextHop, RawMetric, ResolvedRoute,
+        RoutableIpAddr, RouteResolveOptions, RoutingTableId, Rule, RuleAction, RuleMatcher,
         TrafficOriginMatcher,
     };
 }
@@ -243,3 +246,14 @@ pub use transport::TxMetadata;
 // Re-export useful macros.
 pub use netstack3_device::for_any_device_id;
 pub use netstack3_macros::context_ip_bounds;
+
+// Rust compiler spinning workaround (https://fxbug.dev/395694598):
+//
+// If you find yourself with a spinning rustc because you're changing traits
+// that need to be implemented by bindings, uncomment the lines below and give
+// it a go. See attached bug for details.
+//
+// unsafe impl<BT: BindingsTypes> Send for TimerId<BT> {}
+// unsafe impl<BT: BindingsTypes> Sync for TimerId<BT> {}
+// unsafe impl<BT: BindingsTypes> Send for TxMetadata<BT> {}
+// unsafe impl<BT: BindingsTypes> Sync for TxMetadata<BT> {}

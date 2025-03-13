@@ -73,34 +73,13 @@ void Summary::Init(const Capture& capture, Namer* namer,
   std::unordered_map<zx_koid_t, std::unordered_set<zx_koid_t>> vmo_to_processes(
       capture.koid_to_process().size() + 1);
 
-  const auto& koid_to_vmo = capture.koid_to_vmo();
   for (const auto& [process_koid, process] : capture.koid_to_process()) {
     auto& s = process_summaries_.emplace_back(process_koid, process.name);
     for (auto vmo_koid : process.vmos) {
-      do {
-        if (!check_undigested || undigested_vmos.find(vmo_koid) != undigested_vmos.end()) {
-          vmo_to_processes[vmo_koid].insert(process_koid);
-          s.vmos_.insert(vmo_koid);
-        }
-        const auto& vmo = capture.vmo_for_koid(vmo_koid);
-        // Fractional byte values will be `Max` unless the kernel is exposing its new attribution
-        // model.
-        //
-        // Don't attribute parents of cloned VMOs to this process under the new model, because the
-        // kernel already accounts for the copy-on-write sharing internally.
-        // TODO(https://fxbug.dev/issues/338300808): Remove this do-while loop once the kernel's new
-        // attribution behavior is the default.
-        const bool using_new_kernel_behavior =
-            vmo.committed_bytes.fractional != FractionalBytes::Fraction::Max();
-        if (using_new_kernel_behavior) {
-          break;
-        }
-        // The parent koid could be missing.
-        if (!vmo.parent_koid || koid_to_vmo.find(vmo.parent_koid) == koid_to_vmo.end()) {
-          break;
-        }
-        vmo_koid = vmo.parent_koid;
-      } while (true);
+      if (!check_undigested || undigested_vmos.find(vmo_koid) != undigested_vmos.end()) {
+        vmo_to_processes[vmo_koid].insert(process_koid);
+        s.vmos_.insert(vmo_koid);
+      }
     }
     if (s.vmos_.empty()) {
       process_summaries_.pop_back();

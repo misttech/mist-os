@@ -4,7 +4,8 @@
 
 use async_trait::async_trait;
 use ffx_target_repository_list_args::ListCommand;
-use fho::{bug, Error, FfxMain, FfxTool, Result, ToolIO, VerifiedMachineWriter};
+use ffx_writer::{ToolIO as _, VerifiedMachineWriter};
+use fho::{bug, Error, FfxMain, FfxTool, Result};
 use fidl_fuchsia_developer_ffx::RepositoryRegistryProxy;
 use fidl_fuchsia_pkg::RepositoryKeyConfig::Ed25519Key;
 use fidl_fuchsia_pkg::{RepositoryConfig, RepositoryManagerProxy};
@@ -260,8 +261,7 @@ impl ListTool {
 #[cfg(test)]
 mod test {
     use super::*;
-    use ffx_writer::Format;
-    use fho::macro_deps::ffx_writer::TestBuffers;
+    use ffx_writer::{Format, TestBuffers};
     use fidl_fuchsia_developer_ffx::{
         RepositoryRegistryRequest, RepositoryStorageType, RepositoryTarget,
         RepositoryTargetsIteratorRequest,

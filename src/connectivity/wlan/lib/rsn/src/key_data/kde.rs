@@ -9,8 +9,8 @@ use nom::bytes::streaming::take;
 use nom::combinator::{eof, map};
 use nom::error::{Error, ErrorKind};
 use nom::number::streaming::{le_u16, le_u8};
-use nom::sequence::{terminated, tuple};
-use nom::IResult;
+use nom::sequence::terminated;
+use nom::{IResult, Parser};
 use wlan_common::append::{BufferTooSmall, TrackedAppend, VecCursor};
 use wlan_common::ie::{wpa, write_wpa1_ie};
 use wlan_common::organization::Oui;
@@ -142,15 +142,15 @@ pub fn parse(i0: &[u8]) -> IResult<&[u8], Element> {
 
     // Read the KDE Header first.
     let (i1, hdr) = parse_header(i0)?;
-    let (i2, bytes) = take(hdr.data_len())(i1)?;
+    let (i2, bytes) = take(hdr.data_len()).parse(i1)?;
     match hdr.oui {
         Oui::DOT11 => match hdr.data_type {
             GTK_DATA_TYPE => {
-                let (_, gtk) = parse_gtk(hdr.data_len())(bytes)?;
+                let (_, gtk) = parse_gtk(hdr.data_len()).parse(bytes)?;
                 Ok((i2, Element::Gtk(hdr, gtk)))
             }
             IGTK_DATA_TYPE => {
-                let (_, gtk) = parse_igtk(hdr.data_len())(bytes)?;
+                let (_, gtk) = parse_igtk(hdr.data_len()).parse(bytes)?;
                 Ok((i2, Element::Igtk(hdr, gtk)))
             }
             _ => Ok((i2, Element::UnsupportedKde(hdr))),
@@ -166,9 +166,10 @@ pub fn parse(i0: &[u8]) -> IResult<&[u8], Element> {
 }
 
 fn parse_header(input: &[u8]) -> IResult<&[u8], Header> {
-    map(tuple((le_u8, le_u8, take(3usize), le_u8)), |(header_type, length, oui, data_type)| {
+    map((le_u8, le_u8, take(3usize), le_u8), |(header_type, length, oui, data_type)| {
         Header::new(header_type, length, oui, data_type)
-    })(input)
+    })
+    .parse(input)
 }
 
 fn parse_padding(input: &[u8]) -> IResult<&[u8], Element> {
@@ -181,29 +182,30 @@ fn parse_padding(input: &[u8]) -> IResult<&[u8], Element> {
     }
 }
 
-fn parse_gtk(data_len: usize) -> impl FnMut(&[u8]) -> IResult<&[u8], Gtk> {
-    move |input: &[u8]| {
-        map(
-            terminated(
-                tuple((
-                    map(le_u8, GtkInfo),
-                    /* 1 byte reserved */ take(1usize),
-                    take(data_len - 2),
-                )),
-                eof,
+fn parse_gtk<'a>(data_len: usize) -> impl Parser<&'a [u8], Output = Gtk, Error = Error<&'a [u8]>> {
+    map(
+        terminated(
+            (
+                map(le_u8::<&'a [u8], Error<_>>, GtkInfo),
+                /* 1 byte reserved */ take(1usize),
+                take(data_len - 2),
             ),
-            |(info, _reserved, gtk)| Gtk { info, gtk: Vec::from(gtk).into_boxed_slice() },
-        )(input)
-    }
+            eof,
+        ),
+        |(info, _reserved, gtk)| Gtk { info, gtk: Vec::from(gtk).into_boxed_slice() },
+    )
 }
 
-fn parse_igtk(data_len: usize) -> impl FnMut(&[u8]) -> IResult<&[u8], Igtk> {
-    move |input: &[u8]| {
-        map(
-            terminated(tuple((le_u16, take(IGTK_IPN_LEN), take(data_len - IGTK_FIXED_LEN))), eof),
-            |(id, ipn, igtk)| Igtk::new(id, ipn, igtk),
-        )(input)
-    }
+fn parse_igtk<'a>(
+    data_len: usize,
+) -> impl Parser<&'a [u8], Output = Igtk, Error = Error<&'a [u8]>> {
+    map(
+        terminated(
+            (le_u16::<&'a [u8], Error<_>>, take(IGTK_IPN_LEN), take(data_len - IGTK_FIXED_LEN)),
+            eof,
+        ),
+        |(id, ipn, igtk)| Igtk::new(id, ipn, igtk),
+    )
 }
 
 /// KDE Writer to assist with writing key data elements.

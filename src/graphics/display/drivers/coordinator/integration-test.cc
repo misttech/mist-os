@@ -18,7 +18,6 @@
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
-#include <zircon/status.h>
 #include <zircon/types.h>
 
 #include <cstdint>
@@ -40,6 +39,7 @@
 #include "src/graphics/display/lib/api-types/cpp/buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/event-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
@@ -199,6 +199,19 @@ void TestClientState::OnVsync(display::DisplayId display_id, zx::time timestamp,
   }
 }
 
+// Convenience method for creating a B8R8G8A8 color.
+constexpr display::Color BgraColor(uint32_t bgra_color) {
+  const uint8_t blue = static_cast<uint8_t>(bgra_color);
+  const uint8_t green = static_cast<uint8_t>(bgra_color >> 8);
+  const uint8_t red = static_cast<uint8_t>(bgra_color >> 16);
+  const uint8_t alpha = static_cast<uint8_t>(bgra_color >> 24);
+  return display::Color(
+      {.format = display::PixelFormat::kB8G8R8A8,
+       .bytes = std::initializer_list<uint8_t>{blue, green, red, alpha, 0, 0, 0, 0}});
+}
+
+constexpr display::Color kFuchsiaBgra = BgraColor(0xffff00ff);
+
 // Encapsulates boilerplate for driving the Coordinator via FIDL.
 //
 // This class is not thead-safe. Instances must be accessed on a single thread,
@@ -219,8 +232,8 @@ class TestFidlClient {
     // Valid layer configurations must have valid layer IDs.
     display::LayerId layer_id;
 
-    // Valid layer configurations must have valid image IDs.
-    display::ImageId image_id;
+    // Invalid if the layer does not include an image.
+    display::ImageId image_id = display::kInvalidImageId;
 
     // Invalid if the layer does not specify a wait event.
     display::EventId image_ready_wait_event_id = display::kInvalidEventId;
@@ -256,6 +269,7 @@ class TestFidlClient {
 
   zx::result<> SetLayerImage(display::LayerId layer_id, display::ImageId image_id,
                              display::EventId event_id);
+  zx::result<> SetLayerColor(display::LayerId layer_id, const display::Color& fallback_color);
   zx::result<> CheckConfig();
   zx::result<> ApplyConfig(display::ConfigStamp config_stamp);
   zx::result<> AcknowledgeVsync(display::VsyncAckCookie vsync_ack_cookie);
@@ -272,7 +286,12 @@ class TestFidlClient {
   // Creates a layer that covers the first connected display.
   //
   // Crashes if no display is connected.
-  zx::result<display::LayerId> CreateFullscreenLayer();
+  zx::result<display::LayerId> CreateFullscreenImageLayer();
+
+  // Creates a solid color fill layer that covers the first connected display.
+  //
+  // Crashes if no display is connected.
+  zx::result<display::LayerId> CreateFullscreenColorLayer(display::Color color);
 
   zx::result<EventInfo> CreateEvent();
 
@@ -344,7 +363,7 @@ zx::result<> TestFidlClient::OpenCoordinator(
       fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
   auto [coordinator_listener_client, coordinator_listener_server] =
       fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
-  FDF_LOG(INFO, "Opening coordinator");
+  fdf::info("Opening coordinator");
   if (client_priority == ClientPriority::kVirtcon) {
     fidl::Arena arena;
     auto request = fidl::WireRequest<fuchsia_hardware_display::Provider::
@@ -354,8 +373,7 @@ zx::result<> TestFidlClient::OpenCoordinator(
                        .Build();
     auto response = provider->OpenCoordinatorWithListenerForVirtcon(std::move(request));
     if (!response.ok()) {
-      FDF_LOG(ERROR, "Could not open Virtcon coordinator, error=%s",
-              response.FormatDescription().c_str());
+      fdf::error("Could not open Virtcon coordinator, error={}", response.FormatDescription());
       return zx::make_result(response.status());
     }
   } else {
@@ -368,7 +386,7 @@ zx::result<> TestFidlClient::OpenCoordinator(
                        .Build();
     auto response = provider->OpenCoordinatorWithListenerForPrimary(std::move(request));
     if (!response.ok()) {
-      FDF_LOG(ERROR, "Could not open coordinator, error=%s", response.FormatDescription().c_str());
+      fdf::error("Could not open coordinator, error={}", response.FormatDescription());
       return zx::make_result(response.status());
     }
   }
@@ -387,7 +405,7 @@ zx::result<> TestFidlClient::SetVirtconMode(
 
   fidl::OneWayStatus fidl_status = coordinator_fidl_client_->SetVirtconMode(virtcon_mode);
   if (!fidl_status.ok()) {
-    FDF_LOG(ERROR, "SetVirtconMode() failed: %s", fidl_status.status_string());
+    fdf::error("SetVirtconMode() failed: {}", fidl_status.status_string());
     return zx::error(fidl_status.status());
   }
   return zx::ok();
@@ -401,7 +419,7 @@ zx::result<> TestFidlClient::ImportEvent(zx::event event, display::EventId event
   fidl::OneWayStatus fidl_status =
       coordinator_fidl_client_->ImportEvent(std::move(event), fidl_event_id);
   if (!fidl_status.ok()) {
-    FDF_LOG(ERROR, "ImportEvent() failed: %s", fidl_status.status_string());
+    fdf::error("ImportEvent() failed: {}", fidl_status.status_string());
     return zx::error(fidl_status.status());
   }
   return zx::ok();
@@ -413,15 +431,14 @@ zx::result<display::LayerId> TestFidlClient::CreateLayer() {
   const fidl::WireResult<fuchsia_hardware_display::Coordinator::CreateLayer> fidl_status =
       coordinator_fidl_client_->CreateLayer();
   if (!fidl_status.ok()) {
-    FDF_LOG(ERROR, "CreateLayer() failed: %s", fidl_status.status_string());
+    fdf::error("CreateLayer() failed: {}", fidl_status.status_string());
     return zx::error(fidl_status.status());
   }
 
   const fit::result<zx_status_t, fuchsia_hardware_display::wire::CoordinatorCreateLayerResponse*>&
       fidl_value = fidl_status.value();
   if (fidl_value.is_error()) {
-    FDF_LOG(ERROR, "CreateLayer() returned error: %s",
-            zx_status_get_string(fidl_value.error_value()));
+    fdf::error("CreateLayer() returned error: {}", zx::make_result(fidl_value.error_value()));
     return zx::error(fidl_value.error_value());
   }
 
@@ -441,14 +458,13 @@ zx::result<> TestFidlClient::ImportImage(const display::ImageMetadata& image_met
       coordinator_fidl_client_->ImportImage(image_metadata.ToFidl(), fidl_image_buffer_id,
                                             fidl_image_id);
   if (!fidl_status.ok()) {
-    FDF_LOG(ERROR, "ImportImage() failed: %s", fidl_status.status_string());
+    fdf::error("ImportImage() failed: {}", fidl_status.status_string());
     return zx::error(fidl_status.status());
   }
 
   const fit::result<zx_status_t>& fidl_value = fidl_status.value();
   if (fidl_value.is_error()) {
-    FDF_LOG(ERROR, "ImportImage() returned error: %s",
-            zx_status_get_string(fidl_value.error_value()));
+    fdf::error("ImportImage() returned error: {}", zx::make_result(fidl_value.error_value()));
     return zx::error(fidl_value.error_value());
   }
   return zx::ok();
@@ -456,6 +472,8 @@ zx::result<> TestFidlClient::ImportImage(const display::ImageMetadata& image_met
 
 zx::result<> TestFidlClient::SetDisplayLayers(display::DisplayId display_id,
                                               const std::vector<LayerConfig>& layer_configs) {
+  ZX_ASSERT_MSG(!layer_configs.empty(), "Empty configurations are not supported");
+
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
 
   std::vector<fuchsia_hardware_display::wire::LayerId> fidl_layer_ids;
@@ -471,7 +489,7 @@ zx::result<> TestFidlClient::SetDisplayLayers(display::DisplayId display_id,
       display::ToFidlDisplayId(display_id),
       fidl::VectorView<fuchsia_hardware_display::wire::LayerId>::FromExternal(fidl_layer_ids));
   if (!fidl_status.ok()) {
-    FDF_LOG(ERROR, "SetDisplayLayers() failed: %s", fidl_status.status_string());
+    fdf::error("SetDisplayLayers() failed: {}", fidl_status.status_string());
     return zx::error(fidl_status.status());
   }
   return zx::ok();
@@ -488,7 +506,23 @@ zx::result<> TestFidlClient::SetLayerImage(display::LayerId layer_id, display::I
   const fidl::OneWayStatus fidl_status =
       coordinator_fidl_client_->SetLayerImage2(fidl_layer_id, fidl_image_id, fidl_event_id);
   if (!fidl_status.ok()) {
-    FDF_LOG(ERROR, "SetLayerImage2() failed: %s", fidl_status.status_string());
+    fdf::error("SetLayerImage2() failed: {}", fidl_status.status_string());
+    return zx::error(fidl_status.status());
+  }
+  return zx::ok();
+}
+
+zx::result<> TestFidlClient::SetLayerColor(display::LayerId layer_id,
+                                           const display::Color& fallback_color) {
+  ZX_ASSERT(coordinator_fidl_client_.is_valid());
+
+  const fuchsia_hardware_display::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer_id);
+  const fuchsia_hardware_display_types::wire::Color fidl_fallback_color = fallback_color.ToFidl();
+
+  const fidl::OneWayStatus fidl_status =
+      coordinator_fidl_client_->SetLayerColorConfig(fidl_layer_id, fidl_fallback_color);
+  if (!fidl_status.ok()) {
+    fdf::error("SetLayerColorConfig() failed: {}", fidl_status.status_string());
     return zx::error(fidl_status.status());
   }
   return zx::ok();
@@ -500,14 +534,14 @@ zx::result<> TestFidlClient::CheckConfig() {
   const fidl::WireResult<fuchsia_hardware_display::Coordinator::CheckConfig> fidl_status =
       coordinator_fidl_client_->CheckConfig(/*discard=*/false);
   if (!fidl_status.ok()) {
-    FDF_LOG(ERROR, "CheckConfig() failed: %s", fidl_status.status_string());
+    fdf::error("CheckConfig() failed: {}", fidl_status.status_string());
     return zx::error(fidl_status.status());
   }
   const fidl::WireResponse<fuchsia_hardware_display::Coordinator::CheckConfig>& fidl_result =
       fidl_status.value();
   if (fidl_result.res != fuchsia_hardware_display_types::wire::ConfigResult::kOk) {
-    FDF_LOG(ERROR, "CheckConfig() rejected the config: code %" PRIu32,
-            static_cast<uint32_t>(fidl_result.res));
+    fdf::error("CheckConfig() rejected the config: code {}",
+               static_cast<uint32_t>(fidl_result.res));
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
   return zx::ok();
@@ -516,7 +550,7 @@ zx::result<> TestFidlClient::CheckConfig() {
 zx::result<> TestFidlClient::ApplyConfig(display::ConfigStamp config_stamp) {
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
 
-  const fuchsia_hardware_display_types::wire::ConfigStamp fidl_config_stamp =
+  const fuchsia_hardware_display::wire::ConfigStamp fidl_config_stamp =
       display::ToFidlConfigStamp(config_stamp);
   fidl::Arena arena;
   fuchsia_hardware_display::wire::CoordinatorApplyConfig3Request request =
@@ -526,7 +560,7 @@ zx::result<> TestFidlClient::ApplyConfig(display::ConfigStamp config_stamp) {
 
   const fidl::OneWayStatus fidl_status = coordinator_fidl_client_->ApplyConfig3(std::move(request));
   if (!fidl_status.ok()) {
-    FDF_LOG(ERROR, "ApplyConfig() failed: %s", fidl_status.status_string());
+    fdf::error("ApplyConfig() failed: {}", fidl_status.status_string());
     return zx::error(fidl_status.status());
   }
   return zx::ok();
@@ -540,7 +574,7 @@ zx::result<> TestFidlClient::AcknowledgeVsync(display::VsyncAckCookie vsync_ack_
   const fidl::OneWayStatus fidl_status =
       coordinator_fidl_client_->AcknowledgeVsync(fidl_vsync_ack_cookie.value);
   if (!fidl_status.ok()) {
-    FDF_LOG(ERROR, "AcknowledgeVsync() failed: %s", fidl_status.status_string());
+    fdf::error("AcknowledgeVsync() failed: {}", fidl_status.status_string());
     return zx::error(fidl_status.status());
   }
   return zx::ok();
@@ -552,14 +586,13 @@ zx::result<> TestFidlClient::SetMinimumRgb(uint8_t minimum_rgb) {
   const fidl::WireResult<fuchsia_hardware_display::Coordinator::SetMinimumRgb> fidl_status =
       coordinator_fidl_client_->SetMinimumRgb(minimum_rgb);
   if (!fidl_status.ok()) {
-    FDF_LOG(ERROR, "SetMinimumRgb() failed: %s", fidl_status.status_string());
+    fdf::error("SetMinimumRgb() failed: {}", fidl_status.status_string());
     return zx::error(fidl_status.status());
   }
 
   const fit::result<zx_status_t>& fidl_value = fidl_status.value();
   if (fidl_value.is_error()) {
-    FDF_LOG(ERROR, "SetMinimumRgb() returned error: %s",
-            zx_status_get_string(fidl_value.error_value()));
+    fdf::error("SetMinimumRgb() returned error: {}", zx::make_result(fidl_value.error_value()));
     return zx::error(fidl_value.error_value());
   }
   return zx::ok();
@@ -569,7 +602,7 @@ zx::result<display::ImageId> TestFidlClient::CreateFullscreenImage() {
   return ImportImageWithSysmem(state_.FullscreenImageMetadata());
 }
 
-zx::result<display::LayerId> TestFidlClient::CreateFullscreenLayer() {
+zx::result<display::LayerId> TestFidlClient::CreateFullscreenImageLayer() {
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
 
   zx::result<display::LayerId> layer_id_result = CreateLayer();
@@ -581,17 +614,35 @@ zx::result<display::LayerId> TestFidlClient::CreateFullscreenLayer() {
   fidl::OneWayStatus fidl_status = coordinator_fidl_client_->SetLayerPrimaryConfig(
       display::ToFidlLayerId(layer_id_result.value()), state_.FullscreenImageMetadata().ToFidl());
   if (!fidl_status.ok()) {
-    FDF_LOG(ERROR, "SetLayerPrimaryConfig() failed: %s", fidl_status.status_string());
+    fdf::error("SetLayerPrimaryConfig() failed: {}", fidl_status.status_string());
     return zx::error(fidl_status.status());
   }
   return layer_id_result;
+}
+
+zx::result<display::LayerId> TestFidlClient::CreateFullscreenColorLayer(display::Color color) {
+  ZX_ASSERT(coordinator_fidl_client_.is_valid());
+
+  zx::result<display::LayerId> layer_id_result = CreateLayer();
+  if (layer_id_result.is_error()) {
+    // CreateLayer() has already logged the error.
+    return layer_id_result;
+  }
+  const display::LayerId layer_id = layer_id_result.value();
+  zx::result<> set_color_result = SetLayerColor(layer_id, color);
+  if (set_color_result.is_error()) {
+    // SetLayerColor() has already logged the error.
+    return set_color_result.take_error();
+  }
+
+  return zx::ok(layer_id);
 }
 
 zx::result<TestFidlClient::EventInfo> TestFidlClient::CreateEvent() {
   zx::event event;
   zx_status_t create_status = zx::event::create(0u, &event);
   if (create_status != ZX_OK) {
-    FDF_LOG(ERROR, "zx::event::create() failed: %s", zx_status_get_string(create_status));
+    fdf::error("zx::event::create() failed: {}", zx::make_result(create_status));
     return zx::error(create_status);
   }
 
@@ -599,14 +650,14 @@ zx::result<TestFidlClient::EventInfo> TestFidlClient::CreateEvent() {
   zx_status_t get_info_status = event.get_info(ZX_INFO_HANDLE_BASIC, &event_handle_info,
                                                sizeof(event_handle_info), nullptr, nullptr);
   if (get_info_status != ZX_OK) {
-    FDF_LOG(ERROR, "zx::event::get_info() failed: %s", zx_status_get_string(get_info_status));
+    fdf::error("zx::event::get_info() failed: {}", zx::make_result(get_info_status));
     return zx::error(get_info_status);
   }
 
   zx::event event_duplicate;
   zx_status_t duplicate_status = event.duplicate(ZX_RIGHT_SAME_RIGHTS, &event_duplicate);
   if (duplicate_status != ZX_OK) {
-    FDF_LOG(ERROR, "zx::event::duplicate() failed: %s", zx_status_get_string(duplicate_status));
+    fdf::error("zx::event::duplicate() failed: {}", zx::make_result(duplicate_status));
     return zx::error(duplicate_status);
   }
 
@@ -629,6 +680,8 @@ zx::result<> TestFidlClient::EnableVsyncEventDelivery() {
 
 zx::result<> TestFidlClient::ApplyLayers(display::ConfigStamp config_stamp,
                                          const std::vector<LayerConfig>& layer_configs) {
+  ZX_ASSERT_MSG(!layer_configs.empty(), "Empty configurations are not supported");
+
   zx::result<> set_display_layers_result = SetDisplayLayers(state_.display_id(), layer_configs);
   if (set_display_layers_result.is_error()) {
     // SetDisplayLayers() has already logged the error.
@@ -636,6 +689,11 @@ zx::result<> TestFidlClient::ApplyLayers(display::ConfigStamp config_stamp,
   }
 
   for (const LayerConfig& layer_config : layer_configs) {
+    if (layer_config.image_id == display::kInvalidImageId) {
+      // The layer is configured as a solid color fill layer.
+      continue;
+    }
+
     zx::result<> set_layer_image_result = SetLayerImage(
         layer_config.layer_id, layer_config.image_id, layer_config.image_ready_wait_event_id);
     if (set_layer_image_result.is_error()) {
@@ -644,13 +702,10 @@ zx::result<> TestFidlClient::ApplyLayers(display::ConfigStamp config_stamp,
     }
   }
 
-  // CheckConfig() does not accept empty configurations.
-  if (!layer_configs.empty()) {
-    zx::result<> check_config_result = CheckConfig();
-    if (check_config_result.is_error()) {
-      // CheckConfig() has already logged the error.
-      return check_config_result;
-    }
+  zx::result<> check_config_result = CheckConfig();
+  if (check_config_result.is_error()) {
+    // CheckConfig() has already logged the error.
+    return check_config_result;
   }
 
   zx::result<> apply_config_result = ApplyConfig(config_stamp);
@@ -666,8 +721,8 @@ zx::result<> TestFidlClient::ApplyLayers(display::ConfigStamp config_stamp,
   }
 
   if (get_last_config_stamp_result.value() != config_stamp) {
-    FDF_LOG(ERROR, "GetLastAppliedConfigStamp() returned %" PRIu64 ", expected %" PRIu64,
-            get_last_config_stamp_result->value(), config_stamp.value());
+    fdf::error("GetLastAppliedConfigStamp() returned {}, expected {}",
+               get_last_config_stamp_result->value(), config_stamp.value());
     return zx::error(ZX_ERR_INTERNAL);
   }
   return zx::ok();
@@ -678,7 +733,7 @@ zx::result<display::ConfigStamp> TestFidlClient::GetLastAppliedConfigStamp() {
   fidl::WireResult<fuchsia_hardware_display::Coordinator::GetLatestAppliedConfigStamp> fidl_status =
       coordinator_fidl_client_->GetLatestAppliedConfigStamp();
   if (!fidl_status.ok()) {
-    FDF_LOG(ERROR, "GetLatestAppliedConfigStamp() failed: %s", fidl_status.status_string());
+    fdf::error("GetLatestAppliedConfigStamp() failed: {}", fidl_status.status_string());
     return zx::error(fidl_status.status());
   }
   const fidl::WireResponse<fuchsia_hardware_display::Coordinator::GetLatestAppliedConfigStamp>&
@@ -687,7 +742,7 @@ zx::result<display::ConfigStamp> TestFidlClient::GetLastAppliedConfigStamp() {
 }
 
 std::vector<TestFidlClient::LayerConfig> TestFidlClient::CreateFullscreenLayerConfig() {
-  zx::result<display::LayerId> layer_id_result = CreateFullscreenLayer();
+  zx::result<display::LayerId> layer_id_result = CreateFullscreenImageLayer();
   ZX_ASSERT_MSG(layer_id_result.is_ok(), "%s", layer_id_result.status_string());
 
   zx::result<display::ImageId> image_id_result =
@@ -711,7 +766,7 @@ zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmem(
     allocate_shared_request.token_request(std::move(server));
     auto result = sysmem_->AllocateSharedCollection(allocate_shared_request.Build());
     if (!result.ok()) {
-      FDF_LOG(ERROR, "Failed to allocate shared collection: %s", result.status_string());
+      fdf::error("Failed to allocate shared collection: {}", result.status_string());
       return zx::error(result.status());
     }
     local_token = fidl::WireSyncClient<fuchsia_sysmem2::BufferCollectionToken>(std::move(client));
@@ -725,7 +780,7 @@ zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmem(
     duplicate_request.rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS);
     duplicate_request.token_request(std::move(server));
     if (auto result = local_token->Duplicate(duplicate_request.Build()); !result.ok()) {
-      FDF_LOG(ERROR, "Failed to duplicate token: %s", result.FormatDescription().c_str());
+      fdf::error("Failed to duplicate token: {}", result.FormatDescription());
       return zx::error(ZX_ERR_NO_MEMORY);
     }
   }
@@ -734,8 +789,7 @@ zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmem(
   static display::BufferCollectionId next_display_collection_id(0);
   const display::BufferCollectionId display_collection_id = ++next_display_collection_id;
   if (auto result = local_token->Sync(); !result.ok()) {
-    FDF_LOG(ERROR, "Failed to sync token %d %s", result.status(),
-            result.FormatDescription().c_str());
+    fdf::error("Failed to sync token {} {}", result.status(), result.FormatDescription());
     return zx::error(result.status());
   }
 
@@ -744,13 +798,13 @@ zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmem(
   const auto result = coordinator_fidl_client_->ImportBufferCollection(fidl_display_collection_id,
                                                                        std::move(client));
   if (!result.ok()) {
-    FDF_LOG(ERROR, "Failed to call FIDL ImportBufferCollection %lu (%s)",
-            display_collection_id.value(), result.status_string());
+    fdf::error("Failed to call FIDL ImportBufferCollection {} ({})", display_collection_id.value(),
+               result.status_string());
     return zx::error(result.status());
   }
   if (result.value().is_error()) {
-    FDF_LOG(ERROR, "Failed to import buffer collection %lu (%s)", display_collection_id.value(),
-            zx_status_get_string(result.value().error_value()));
+    fdf::error("Failed to import buffer collection {} ({})", display_collection_id.value(),
+               zx::make_result(result.value().error_value()));
     return zx::error(result.value().error_value());
   }
 
@@ -762,14 +816,14 @@ zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmem(
       fidl_display_collection_id, image_buffer_usage);
 
   if (!set_constraints_result.ok()) {
-    FDF_LOG(ERROR, "Failed to call FIDL SetBufferCollectionConstraints %lu (%s)",
-            display_collection_id.value(), set_constraints_result.status_string());
+    fdf::error("Failed to call FIDL SetBufferCollectionConstraints {} ({})",
+               display_collection_id.value(), set_constraints_result.status_string());
     (void)coordinator_fidl_client_->ReleaseBufferCollection(fidl_display_collection_id);
     return zx::error(set_constraints_result.status());
   }
   if (set_constraints_result.value().is_error()) {
-    FDF_LOG(ERROR, "Failed to set buffer collection constraints: %s",
-            zx_status_get_string(set_constraints_result.value().error_value()));
+    fdf::error("Failed to set buffer collection constraints: {}",
+               zx::make_result(set_constraints_result.value().error_value()));
     (void)coordinator_fidl_client_->ReleaseBufferCollection(fidl_display_collection_id);
     return zx::error(set_constraints_result.value().error_value());
   }
@@ -786,7 +840,7 @@ zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmem(
     bind_shared_request.token(local_token.TakeClientEnd());
     bind_shared_request.buffer_collection_request(std::move(server));
     if (auto result = sysmem_->BindSharedCollection(bind_shared_request.Build()); !result.ok()) {
-      FDF_LOG(ERROR, "Failed to bind shared collection: %s", result.FormatDescription().c_str());
+      fdf::error("Failed to bind shared collection: {}", result.FormatDescription());
       return zx::error(result.status());
     }
     sysmem_collection = fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>(std::move(client));
@@ -815,14 +869,14 @@ zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmem(
   set_constraints_request.constraints(constraints.Build());
   zx_status_t status = sysmem_collection->SetConstraints(set_constraints_request.Build()).status();
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Unable to set constraints (%d)", status);
+    fdf::error("Unable to set constraints ({})", status);
     return zx::error(status);
   }
   // Wait for the buffers to be allocated.
   auto info_result = sysmem_collection->WaitForAllBuffersAllocated();
   if (!info_result.ok()) {
-    FDF_LOG(ERROR, "Waiting for buffers failed (fidl=%d res=%u)", info_result.status(),
-            fidl::ToUnderlying(info_result->error_value()));
+    fdf::error("Waiting for buffers failed (fidl={} res={})", info_result.status(),
+               fidl::ToUnderlying(info_result->error_value()));
     zx_status_t status = info_result.status();
     if (status == ZX_OK) {
       status = sysmem::V1CopyFromV2Error(info_result->error_value());
@@ -832,7 +886,7 @@ zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmem(
 
   auto& info = info_result.value()->buffer_collection_info();
   if (info.buffers().count() < 1) {
-    FDF_LOG(ERROR, "Incorrect buffer collection count %zu", info.buffers().count());
+    fdf::error("Incorrect buffer collection count {}", info.buffers().count());
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -879,23 +933,26 @@ class IntegrationTest : public TestBase {
     ClientProxy* client_proxy = GetClientProxy(coordinator_controller, client_priority);
     ZX_ASSERT(client_proxy != nullptr);
 
-    fbl::AutoLock<fbl::Mutex> client_proxy_lock(&client_proxy->mtx_);
-    return client_proxy->handler_.LatestAckedCookie();
+    return client_proxy->LastVsyncAckCookieForTesting();
   }
 
   void SendVsyncAfterUnbind(std::unique_ptr<TestFidlClient> client, display::DisplayId display_id) {
     fbl::AutoLock<fbl::Mutex> controller_lock(CoordinatorController()->mtx());
+    ClientProxy* client_proxy = CoordinatorController()->client_owning_displays_;
+
     // Resetting the client will *start* client tear down.
     //
     // ~MockCoordinatorListener fences the server-side dispatcher thread (consistent with the
     // threading model of its fidl server binding), but that doesn't sync with the client end
     // (intentionally).
     client.reset();
-    ClientProxy* client_ptr = CoordinatorController()->active_client_;
-    EXPECT_OK(sync_completion_wait(client_ptr->handler_.fidl_unbound(), zx::sec(1).get()));
+    ZX_ASSERT_MSG(CoordinatorController()->client_owning_displays_ == client_proxy,
+                  "The display owner changed while holding the controller mutex");
+    EXPECT_OK(
+        sync_completion_wait(client_proxy->FidlUnboundCompletionForTesting(), zx::sec(1).get()));
     // SetVsyncEventDelivery(false) has not completed here, because we are still
     // holding controller()->mtx()
-    client_ptr->OnDisplayVsync(display_id, 0, display::kInvalidConfigStamp);
+    client_proxy->OnDisplayVsync(display_id, 0, display::kInvalidDriverConfigStamp);
   }
 
   bool IsClientConnected(ClientPriority client_priority) {
@@ -906,8 +963,8 @@ class IntegrationTest : public TestBase {
 
   void SendVsyncFromCoordinatorClientProxy() {
     fbl::AutoLock<fbl::Mutex> controller_lock(CoordinatorController()->mtx());
-    CoordinatorController()->active_client_->OnDisplayVsync(display::kInvalidDisplayId, 0,
-                                                            display::kInvalidConfigStamp);
+    CoordinatorController()->client_owning_displays_->OnDisplayVsync(
+        display::kInvalidDisplayId, 0, display::kInvalidDriverConfigStamp);
   }
 
   void SendVsyncFromDisplayEngine() { FakeDisplayEngine().SendVsync(); }
@@ -949,26 +1006,25 @@ class IntegrationTest : public TestBase {
   // |TestBase|
   void SetUp() override {
     TestBase::SetUp();
-    auto sysmem = fidl::SyncClient(ConnectToSysmemAllocatorV2());
-    EXPECT_TRUE(sysmem.is_valid());
+    fidl::SyncClient sysmem_client(ConnectToSysmemAllocatorV2());
+    EXPECT_TRUE(sysmem_client.is_valid());
+
     fuchsia_sysmem2::AllocatorSetDebugClientInfoRequest request;
     request.name() = fsl::GetCurrentProcessName();
     request.id() = fsl::GetCurrentProcessKoid();
-    auto set_debug_result = sysmem->SetDebugClientInfo(std::move(request));
+    fit::result<fidl::OneWayStatus> set_debug_result =
+        sysmem_client->SetDebugClientInfo(std::move(request));
     EXPECT_TRUE(set_debug_result.is_ok());
-    sysmem_client_ = fidl::WireSyncClient<fuchsia_sysmem2::Allocator>(sysmem.TakeClientEnd());
+    sysmem_client_ =
+        fidl::WireSyncClient<fuchsia_sysmem2::Allocator>(sysmem_client.TakeClientEnd());
   }
 
   // |TestBase|
   void TearDown() override {
-    // Wait until the display core has processed all client disconnections before sending the last
-    // vsync.
+    // Wait until the display core has processed all client disconnections.
     EXPECT_TRUE(PollUntilOnLoop([&]() { return !IsClientConnected(ClientPriority::kPrimary); }));
     EXPECT_TRUE(PollUntilOnLoop([&]() { return !IsClientConnected(ClientPriority::kVirtcon); }));
 
-    // Send one last vsync, to make sure any blank configs take effect.
-    SendVsyncFromDisplayEngine();
-    EXPECT_EQ(0u, CoordinatorController()->ImportedImagesCountForTesting());
     TestBase::TearDown();
   }
 
@@ -999,18 +1055,25 @@ TEST_F(IntegrationTest, MustUseUniqueEventIDs) {
   // TODO: Use LLCPP epitaphs when available to detect ZX_ERR_PEER_CLOSED.
 }
 
-TEST_F(IntegrationTest, SendVsyncsAfterEmptyConfig) {
+TEST_F(IntegrationTest, SendVsyncsAfterImagelessConfig) {
   std::unique_ptr<TestFidlClient> virtcon_client = OpenCoordinatorTestFidlClient(
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kVirtcon);
 
+  zx::result<display::LayerId> create_virtcon_color_layer_result =
+      virtcon_client->CreateFullscreenColorLayer(kFuchsiaBgra);
+  ASSERT_OK(create_virtcon_color_layer_result);
+  display::LayerId virtcon_color_layer_id = create_virtcon_color_layer_result.value();
+
+  // Apply a configuration so the client receives VSync events.
   static constexpr display::ConfigStamp kVirtconInitialConfigStamp(1);
-  ASSERT_OK(virtcon_client->ApplyLayers(kVirtconInitialConfigStamp, {}));
+  ASSERT_OK(virtcon_client->ApplyLayers(kVirtconInitialConfigStamp,
+                                        {{.layer_id = virtcon_color_layer_id}}));
 
   std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
 
-  // Present an image
+  // Display an image.
   static constexpr display::ConfigStamp kPrimary1InitialConfigStamp(2);
   ASSERT_OK(primary_client->ApplyLayers(kPrimary1InitialConfigStamp,
                                         primary_client->CreateFullscreenLayerConfig()));
@@ -1020,9 +1083,14 @@ TEST_F(IntegrationTest, SendVsyncsAfterEmptyConfig) {
   EXPECT_EQ(kPrimary1InitialConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(1u, primary_client->state().vsync_count());
 
-  // Set an empty config
+  // Replace the image layer with a color layer.
+  zx::result<display::LayerId> create_primary_color_layer_result =
+      primary_client->CreateFullscreenColorLayer(kFuchsiaBgra);
+  ASSERT_OK(create_primary_color_layer_result);
+  display::LayerId primary_color_layer_id = create_primary_color_layer_result.value();
   static constexpr display::ConfigStamp kPrimary1SecondConfigStamp(3);
-  ASSERT_OK(primary_client->ApplyLayers(kPrimary1SecondConfigStamp, {}));
+  ASSERT_OK(primary_client->ApplyLayers(kPrimary1SecondConfigStamp,
+                                        {{.layer_id = primary_color_layer_id}}));
 
   // The old client disconnects
   primary_client.reset();
@@ -1081,9 +1149,10 @@ TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
   //
   // TODO(https://fxbug.dev/388885807): The call below assumes that engine
   // driver-side config stamps match client-managed config stamps.
-  display::ConfigStamp invalid_config_stamp =
-      CoordinatorController()->TEST_controller_stamp() - display::ConfigStamp{1};
-  const config_stamp_t invalid_banjo_config_stamp = ToBanjoConfigStamp(invalid_config_stamp);
+  display::DriverConfigStamp invalid_config_stamp =
+      CoordinatorController()->last_applied_driver_config_stamp() - display::DriverConfigStamp{1};
+  const config_stamp_t invalid_banjo_config_stamp =
+      display::ToBanjoDriverConfigStamp(invalid_config_stamp);
   CoordinatorController()->DisplayEngineListenerOnDisplayVsync(
       ToBanjoDisplayId(primary_client->state().display_id()), 0u, &invalid_banjo_config_stamp);
 
@@ -1108,9 +1177,14 @@ TEST_F(IntegrationTest, AcknowledgeVsync) {
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
 
+  zx::result<display::LayerId> create_color_layer_result =
+      primary_client->CreateFullscreenColorLayer(kFuchsiaBgra);
+  ASSERT_OK(create_color_layer_result);
+  display::LayerId color_layer_id = create_color_layer_result.value();
+
   // Apply a config so the client starts receiving VSync events.
   static constexpr display::ConfigStamp kInitialConfigStamp(1);
-  ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {}));
+  ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
 
   // send vsyncs up to watermark level
   ASSERT_EQ(0u, primary_client->state().vsync_count());
@@ -1135,9 +1209,14 @@ TEST_F(IntegrationTest, AcknowledgeVsyncAfterQueueFull) {
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
 
+  zx::result<display::LayerId> create_color_layer_result =
+      primary_client->CreateFullscreenColorLayer(kFuchsiaBgra);
+  ASSERT_OK(create_color_layer_result);
+  display::LayerId color_layer_id = create_color_layer_result.value();
+
   // Apply a config so the client starts receiving VSync events.
   static constexpr display::ConfigStamp kInitialConfigStamp(1);
-  ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {}));
+  ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
 
   // send vsyncs until max vsync
   ASSERT_EQ(0u, primary_client->state().vsync_count());
@@ -1182,9 +1261,14 @@ TEST_F(IntegrationTest, AcknowledgeVsyncAfterLongTime) {
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
 
+  zx::result<display::LayerId> create_color_layer_result =
+      primary_client->CreateFullscreenColorLayer(kFuchsiaBgra);
+  ASSERT_OK(create_color_layer_result);
+  display::LayerId color_layer_id = create_color_layer_result.value();
+
   // Apply a config so the client starts receiving VSync events.
   static constexpr display::ConfigStamp kInitialConfigStamp(1);
-  ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {}));
+  ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
 
   // send vsyncs until max vsyncs
   ASSERT_EQ(0u, primary_client->state().vsync_count());
@@ -1226,9 +1310,14 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithUnissuedCookie) {
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
 
+  zx::result<display::LayerId> create_color_layer_result =
+      primary_client->CreateFullscreenColorLayer(kFuchsiaBgra);
+  ASSERT_OK(create_color_layer_result);
+  display::LayerId color_layer_id = create_color_layer_result.value();
+
   // Apply a config so the client starts receiving VSync events.
   static constexpr display::ConfigStamp kInitialConfigStamp(1);
-  ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {}));
+  ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
 
   // send vsyncs until max vsync
   ASSERT_EQ(0u, primary_client->state().vsync_count());
@@ -1293,9 +1382,14 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
 
+  zx::result<display::LayerId> create_color_layer_result =
+      primary_client->CreateFullscreenColorLayer(kFuchsiaBgra);
+  ASSERT_OK(create_color_layer_result);
+  display::LayerId color_layer_id = create_color_layer_result.value();
+
   // Apply a config so the client starts receiving VSync events.
   static constexpr display::ConfigStamp kInitialConfigStamp(1);
-  ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {}));
+  ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
 
   // send vsyncs until max vsync
   ASSERT_EQ(0u, primary_client->state().vsync_count());
@@ -1415,11 +1509,18 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
   }
 }
 
-TEST_F(IntegrationTest, CreateLayer) {
+TEST_F(IntegrationTest, CreateImageLayer) {
   std::unique_ptr<TestFidlClient> client = OpenCoordinatorTestFidlClient(
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
 
-  EXPECT_OK(client->CreateFullscreenLayer());
+  EXPECT_OK(client->CreateFullscreenImageLayer());
+}
+
+TEST_F(IntegrationTest, CreateColorLayer) {
+  std::unique_ptr<TestFidlClient> client = OpenCoordinatorTestFidlClient(
+      &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
+
+  EXPECT_OK(client->CreateFullscreenColorLayer(kFuchsiaBgra));
 }
 
 TEST_F(IntegrationTest, ImportImageWithInvalidImageId) {
@@ -1473,9 +1574,15 @@ TEST_F(IntegrationTest, ClampRgb) {
   primary_client.reset(nullptr);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return virtcon_client->state().has_display_ownership(); }));
 
+  zx::result<display::LayerId> create_virtcon_color_layer_result =
+      virtcon_client->CreateFullscreenColorLayer(kFuchsiaBgra);
+  ASSERT_OK(create_virtcon_color_layer_result);
+  display::LayerId virtcon_color_layer_id = create_virtcon_color_layer_result.value();
+
   // Apply a config so the virtcon client's RGB clamp is set.
   static constexpr display::ConfigStamp kVirtconInitialConfigStamp(1);
-  ASSERT_OK(virtcon_client->ApplyLayers(kVirtconInitialConfigStamp, {}));
+  ASSERT_OK(virtcon_client->ApplyLayers(kVirtconInitialConfigStamp,
+                                        {{.layer_id = virtcon_color_layer_id}}));
 
   SendVsyncFromDisplayEngine();
   // TODO(https://fxbug.dev/388885807): This test is racy. There's no guarantee
@@ -1487,16 +1594,21 @@ TEST_F(IntegrationTest, ClampRgb) {
   ASSERT_TRUE(PollUntilOnLoop([&]() { return FakeDisplayEngine().GetClampRgbValue() == 32; }));
 }
 
-// TODO(https://fxbug.dev/340926351): De-flake and reenable this test.
-TEST_F(IntegrationTest, DISABLED_EmptyConfigIsNotApplied) {
+TEST_F(IntegrationTest, ImagelessConfigIsNotApplied) {
   // Create and bind virtcon client.
   std::unique_ptr<TestFidlClient> virtcon_client = OpenCoordinatorTestFidlClient(
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kVirtcon);
   ASSERT_OK(virtcon_client->SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode::kFallback));
   ASSERT_TRUE(PollUntilOnLoop([&]() { return virtcon_client->state().has_display_ownership(); }));
 
+  zx::result<display::LayerId> create_virtcon_color_layer_result =
+      virtcon_client->CreateFullscreenColorLayer(kFuchsiaBgra);
+  ASSERT_OK(create_virtcon_color_layer_result);
+  display::LayerId virtcon_color_layer_id = create_virtcon_color_layer_result.value();
+
   static constexpr display::ConfigStamp kVirtconInitialConfigStamp(1);
-  ASSERT_OK(virtcon_client->ApplyLayers(kVirtconInitialConfigStamp, {}));
+  ASSERT_OK(virtcon_client->ApplyLayers(kVirtconInitialConfigStamp,
+                                        {{.layer_id = virtcon_color_layer_id}}));
 
   // Create and bind primary client.
   std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
@@ -1528,12 +1640,13 @@ TEST_F(IntegrationTest, DISABLED_EmptyConfigIsNotApplied) {
   EXPECT_EQ(1u, virtcon_client->state().vsync_count());
 }
 
-// This tests the basic behavior of ApplyConfig() and OnVsync() events.
-// We test applying configurations with images without wait fences, so they are
-// guaranteed to be ready when client calls ApplyConfig().
+// This test case covers the basic interaction between ApplyConfig() and VSync
+// events.
 //
-// In this case, the new configuration stamp is guaranteed to appear in the next
-// coming OnVsync() event.
+// The test uses configurations with images without any wait fences. These
+// images are ready for use when the Coordinator receives the ApplyConfig()
+// call. In this case, each VSync event should report the ConfigStamp used
+// in the last ApplyConfig() call.
 //
 // Here we test the following case:
 //
@@ -1543,17 +1656,20 @@ TEST_F(IntegrationTest, DISABLED_EmptyConfigIsNotApplied) {
 //  - Vsync now should have kNoFence2ConfigStamp
 //  * ApplyConfig({}) ==> kNoImageConfigStamp
 //  - Vsync now should have kNoImageConfigStamp
-//
-// Both images are ready at ApplyConfig() time, i.e. no fences are provided.
-TEST_F(IntegrationTest, VsyncEvent) {
+TEST_F(IntegrationTest, VsyncReflectsAppliedConfig) {
   // Create and bind primary client.
   std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
 
+  zx::result<display::LayerId> create_color_layer_result =
+      primary_client->CreateFullscreenColorLayer(kFuchsiaBgra);
+  ASSERT_OK(create_color_layer_result);
+  display::LayerId color_layer_id = create_color_layer_result.value();
+
   // Apply a config so the client starts receiving VSync events.
   static constexpr display::ConfigStamp kInitialConfigStamp(1);
-  ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {}));
+  ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
 
   ASSERT_EQ(0u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
@@ -1561,7 +1677,7 @@ TEST_F(IntegrationTest, VsyncEvent) {
   EXPECT_EQ(kInitialConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(1u, primary_client->state().vsync_count());
 
-  zx::result<display::LayerId> create_layer1_result = primary_client->CreateFullscreenLayer();
+  zx::result<display::LayerId> create_layer1_result = primary_client->CreateFullscreenImageLayer();
   zx::result<display::ImageId> create_image1_result = primary_client->CreateFullscreenImage();
   zx::result<display::ImageId> create_image2_result = primary_client->CreateFullscreenImage();
 
@@ -1595,9 +1711,9 @@ TEST_F(IntegrationTest, VsyncEvent) {
   EXPECT_EQ(kNoFence2ConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(3u, primary_client->state().vsync_count());
 
-  // Hide the existing layer.
+  // Hide the image layer and replace it with a color layer.
   static constexpr display::ConfigStamp kNoImageConfigStamp(4);
-  ASSERT_OK(primary_client->ApplyLayers(kNoImageConfigStamp, {}));
+  ASSERT_OK(primary_client->ApplyLayers(kNoImageConfigStamp, {{.layer_id = color_layer_id}}));
 
   ASSERT_EQ(3u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
@@ -1606,13 +1722,12 @@ TEST_F(IntegrationTest, VsyncEvent) {
   EXPECT_EQ(4u, primary_client->state().vsync_count());
 }
 
-// This tests the behavior of ApplyConfig() and OnVsync() events when images
-// come with wait fences, which is a common use case in Scenic when using GPU
-// composition.
+// This test case covers ApplyConfig() with configurations that include waiting
+// images. This matches the usage pattern of Scenic with GPU composition.
 //
-// When applying configurations with pending images, the ConfigStamp reported
-// by OnVsync() should not be updated unless the image becomes ready and
-// triggers a ReapplyConfig().
+// When applying configurations with waiting images, the ConfigStamp reported by
+// VSync events should match the latest applied configuration that doesn't have
+// any waiting image.
 //
 // Here we test the following case:
 //
@@ -1622,16 +1737,20 @@ TEST_F(IntegrationTest, VsyncEvent) {
 //  - Vsync now should have kImageWithoutFenceConfigStamp
 //  * Signal kImageWithoutFenceConfigStamp
 //  - Vsync now should have kImageWithFenceConfigStamp
-//
-TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
+TEST_F(IntegrationTest, ApplyConfigWithWaitingImage) {
   // Create and bind primary client.
   std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
 
+  zx::result<display::LayerId> create_color_layer_result =
+      primary_client->CreateFullscreenColorLayer(kFuchsiaBgra);
+  ASSERT_OK(create_color_layer_result);
+  display::LayerId color_layer_id = create_color_layer_result.value();
+
   // Apply a config so the client starts receiving VSync events.
   static constexpr display::ConfigStamp kInitialConfigStamp(1);
-  ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {}));
+  ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
 
   ASSERT_EQ(0u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
@@ -1639,7 +1758,7 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
   EXPECT_EQ(kInitialConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(1u, primary_client->state().vsync_count());
 
-  zx::result<display::LayerId> create_layer1_result = primary_client->CreateFullscreenLayer();
+  zx::result<display::LayerId> create_layer1_result = primary_client->CreateFullscreenImageLayer();
   zx::result<display::ImageId> create_image_without_fence_result =
       primary_client->CreateFullscreenImage();
   zx::result<display::ImageId> create_image_with_fence_result =
@@ -1669,9 +1788,9 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
   EXPECT_EQ(kImageWithoutFenceConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(2u, primary_client->state().vsync_count());
 
-  // Present an image layer with a wait event that's not signaled (ready) yet. So the
-  // configuration applied to display device will be still the old one. VSync events
-  // must report the previously applied config stamp.
+  // Present an image layer whose image is not ready yet. The Display
+  // Coordinator must wait on the fence. VSync events must report the previous
+  // configuration.
   static constexpr display::ConfigStamp kImageWithFenceConfigStamp(3);
   ASSERT_OK(primary_client->ApplyLayers(kImageWithFenceConfigStamp,
                                         {{.layer_id = layer1_id,
@@ -1684,18 +1803,17 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
   EXPECT_EQ(kImageWithoutFenceConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(3u, primary_client->state().vsync_count());
 
-  // Signal the event. Display Fence callback will be signaled, and new
-  // configuration with new config stamp (config_stamp_2) will be used.
-  // On next Vsync, the |presented_config_stamp| will be updated.
-  auto old_controller_stamp = CoordinatorController()->TEST_controller_stamp();
+  // Signal the event, marking the image ready. The Coordinator must apply the
+  // configuration kImageWithFenceConfigStamp, which includes the image that is
+  // now ready. Once the configuration is applied, the next VSync must reflect
+  // it.
+  display::DriverConfigStamp image_without_fence_driver_config_stamp =
+      CoordinatorController()->last_applied_driver_config_stamp();
   image_ready_fence.event.signal(0u, ZX_EVENT_SIGNALED);
-  ASSERT_TRUE(PollUntilOnLoop([controller = CoordinatorController(), old_controller_stamp]() {
-    return controller->TEST_controller_stamp() > old_controller_stamp;
+  ASSERT_TRUE(PollUntilOnLoop([&]() {
+    return CoordinatorController()->last_applied_driver_config_stamp() >
+           image_without_fence_driver_config_stamp;
   }));
-  // TODO(https://fxbug.dev/388885807): The check above is racy. Although the
-  // Coordinator processed the new configuration, there is no guarantee that it
-  // was submitted to the display engine driver. The raciness will get worse
-  // when we migrate from Banjo to FIDL.
 
   ASSERT_EQ(3u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
@@ -1704,33 +1822,36 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
   EXPECT_EQ(4u, primary_client->state().vsync_count());
 }
 
-// This tests the behavior of ApplyConfig() and OnVsync() events when images
-// that comes with wait fences are hidden in subsequent configurations.
+// This test case covers ApplyConfig() when an applied configuration removes a layer
+// with a waiting image from a previously applied configuration.
 //
-// If a pending image never becomes ready, the config_stamp returned from
-// OnVsync() should not be updated unless the image layer has been removed from
-// the display in a subsequent configuration.
+// VSync events should never include the ConfigStamp of the configuration with the
+// waiting image, because that image never becomes ready.
 //
 // Here we test the following case:
 //
 //  * ApplyConfig({layer1: image_without_fence}) ==> kImageWithoutFenceConfigStamp
 //  - Vsync now should have kImageWithoutFenceConfigStamp
-//  * ApplyConfig({layerA: img1, waiting on fence1}) ==> kImageWithFenceConfigStamp
+//  * ApplyConfig({layerA: img1, waiting on fence}) ==> kImageWithFenceConfigStamp
 //  - Vsync now should have kImageWithoutFenceConfigStamp
 //  * ApplyConfig({}) ==> kNoImageConfigStamp
 //  - Vsync now should have kNoImageConfigStamp
 //
-// Note that fence1 is never signaled.
-//
-TEST_F(IntegrationTest, VsyncHidePendingLayer) {
+// The fence is never signaled.
+TEST_F(IntegrationTest, ApplyConfigRemovesLayerWithWaitingImage) {
   // Create and bind primary client.
   std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
 
+  zx::result<display::LayerId> create_color_layer_result =
+      primary_client->CreateFullscreenColorLayer(kFuchsiaBgra);
+  ASSERT_OK(create_color_layer_result);
+  display::LayerId color_layer_id = create_color_layer_result.value();
+
   // Apply a config so the client starts receiving VSync events.
   static constexpr display::ConfigStamp kInitialConfigStamp(1);
-  ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {}));
+  ASSERT_OK(primary_client->ApplyLayers(kInitialConfigStamp, {{.layer_id = color_layer_id}}));
 
   ASSERT_EQ(0u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
@@ -1738,7 +1859,7 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   EXPECT_EQ(kInitialConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(1u, primary_client->state().vsync_count());
 
-  zx::result<display::LayerId> create_layer1_result = primary_client->CreateFullscreenLayer();
+  zx::result<display::LayerId> create_layer1_result = primary_client->CreateFullscreenImageLayer();
   zx::result<display::ImageId> create_image_without_fence_result =
       primary_client->CreateFullscreenImage();
   zx::result<display::ImageId> create_image_with_fence_result =
@@ -1768,9 +1889,9 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   EXPECT_EQ(kImageWithoutFenceConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(2u, primary_client->state().vsync_count());
 
-  // Present another image layer; but the image is not ready yet. Display
-  // controller will wait on the fence and Vsync will return the previous
-  // configuration instead.
+  // Present an image layer whose image is not ready yet. The Display
+  // Coordinator must wait on the event. VSync events must report the previous
+  // configuration.
   static constexpr display::ConfigStamp kImageWithFenceConfigStamp(3);
   ASSERT_OK(primary_client->ApplyLayers(kImageWithFenceConfigStamp,
                                         {{.layer_id = layer1_id,
@@ -1783,13 +1904,14 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   EXPECT_EQ(kImageWithoutFenceConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(3u, primary_client->state().vsync_count());
 
-  // Hide the image layer. Display controller will not care about the fence
-  // and thus use the latest configuration stamp.
+  // Replace the image layer with a solid color fill layer. The Coordinator must
+  // "skip over" the image layer that is not ready, and apply the configuration
+  // with the color layer.
   static constexpr display::ConfigStamp kNoImageConfigStamp(4);
-  ASSERT_OK(primary_client->ApplyLayers(kNoImageConfigStamp, {}));
+  ASSERT_OK(primary_client->ApplyLayers(kNoImageConfigStamp, {{.layer_id = color_layer_id}}));
 
   // On Vsync, the configuration stamp client receives on Vsync event message
-  // will be the latest one applied to the display controller, since the pending
+  // will be the latest one applied to the display controller, since the waiting
   // image has been removed from the configuration.
   ASSERT_EQ(3u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
@@ -1798,15 +1920,14 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   EXPECT_EQ(4u, primary_client->state().vsync_count());
 }
 
-// This tests the behavior of ApplyConfig() and OnVsync() events when images
-// that comes with wait fences are overridden in subsequent configurations.
+// This test case covers ApplyConfig() assigning two different waiting images to
+// the same layer in two different applied configs. The second image becomes
+// ready at some point, while the first image remains waiting forever.
 //
-// If a client applies a configuration (#1) with a pending image, while display
-// controller waits for the image to be ready, the client may apply another
-// configuration (#2) with a different image. If the image in configuration #2
-// becomes available earlier than #1, the layer configuration in #1 should be
-// overridden, and signaling wait fences in #1 should not trigger a
-// ReapplyConfig().
+// VSync events should never include the ConfigStamp of the configuration with
+// the first waiting image. After the second image's waiting fence is signaled,
+// the ConfigStamp for the configuration using that second image should be
+// included in VSync events.
 //
 // Here we test the following case:
 //
@@ -1822,14 +1943,14 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
 //  * Signal fence1
 //  - Vsync should still have kImageWithFence2ConfigStamp.
 //
-// Note that fence1 is never signaled.
-TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
+// fence1, the first fence, is never signaled.
+TEST_F(IntegrationTest, ApplyConfigSkipsConfigWithWaitingImage) {
   // Create and bind primary client.
   std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
 
-  zx::result<display::LayerId> create_layer1_result = primary_client->CreateFullscreenLayer();
+  zx::result<display::LayerId> create_layer1_result = primary_client->CreateFullscreenImageLayer();
   zx::result<display::ImageId> create_image_without_fence_result =
       primary_client->CreateFullscreenImage();
   zx::result<display::ImageId> create_image_with_fence1_result =
@@ -1870,7 +1991,7 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
   EXPECT_EQ(1u, primary_client->state().vsync_count());
 
   // Present an image layer whose image is not ready yet. The Display
-  // Coordinator must wait on the fence. VSync events must report the previous
+  // Coordinator must wait on the event. VSync events must report the previous
   // configuration.
   static constexpr display::ConfigStamp kImageWithFence1ConfigStamp(3);
   ASSERT_OK(primary_client->ApplyLayers(kImageWithFence1ConfigStamp,
@@ -1899,12 +2020,17 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
   EXPECT_EQ(kImageWithoutFenceConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(3u, primary_client->state().vsync_count());
 
-  // Signal the second image's event. VSync events must report the second
-  // image's configuration.
-  auto old_controller_stamp = CoordinatorController()->TEST_controller_stamp();
+  // Signal the second image's event. The Coordinator must "skip over" the
+  // configuration that includes the first image, and apply the configuration
+  // that includes the second image. Once the configuration is applied, the next
+  // VSync must reflect it.
+  display::DriverConfigStamp image_without_fence_driver_config_stamp =
+      CoordinatorController()->last_applied_driver_config_stamp();
   image_ready_fence2.event.signal(0u, ZX_EVENT_SIGNALED);
-  ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return CoordinatorController()->TEST_controller_stamp() > old_controller_stamp; }));
+  ASSERT_TRUE(PollUntilOnLoop([&]() {
+    return CoordinatorController()->last_applied_driver_config_stamp() >
+           image_without_fence_driver_config_stamp;
+  }));
 
   ASSERT_EQ(3u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
@@ -1912,14 +2038,27 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
   EXPECT_EQ(kImageWithFence2ConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(4u, primary_client->state().vsync_count());
 
-  // Signal the event #0. Since we have displayed a newer image, signaling the
+  // Signal the first image's event. Since we have displayed a newer image, signaling the
   // old event associated with the old image shouldn't trigger ReapplyConfig().
   // We should still see |apply_config_stamp_2| as the latest presented config
   // stamp in the client.
-  old_controller_stamp = CoordinatorController()->TEST_controller_stamp();
+  display::DriverConfigStamp image_with_fence2_driver_config_stamp =
+      CoordinatorController()->last_applied_driver_config_stamp();
   image_ready_fence1.event.signal(0u, ZX_EVENT_SIGNALED);
-  // TODO(https://fxbug.dev/388885807): This test is racy. There's no guarantee
-  // that the fence's ready event was processed by the Display Coordinator.
+
+  // TODO(https://fxbug.dev/388885807): This check can have a false positive
+  // pass, due to using a hard-coded timeout.
+  {
+    zx::time deadline = zx::deadline_after(zx::sec(1));
+    PollUntilOnLoop([&]() {
+      if (zx::clock::get_monotonic() >= deadline)
+        return true;
+      return CoordinatorController()->last_applied_driver_config_stamp() >
+             image_with_fence2_driver_config_stamp;
+    });
+  }
+  EXPECT_EQ(image_with_fence2_driver_config_stamp,
+            CoordinatorController()->last_applied_driver_config_stamp());
 
   ASSERT_EQ(4u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();

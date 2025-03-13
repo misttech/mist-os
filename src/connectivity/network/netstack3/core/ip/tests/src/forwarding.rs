@@ -7,7 +7,7 @@ use net_declare::{net_subnet_v4, net_subnet_v6};
 use net_types::ip::{AddrSubnet, IpAddress as _, Ipv4Addr, Ipv6Addr, Subnet};
 use net_types::{SpecifiedAddr, Witness as _};
 use netstack3_base::socket::SocketIpAddr;
-use netstack3_base::IpDeviceAddr;
+use netstack3_base::{IpDeviceAddr, MarkDomain};
 use test_case::test_case;
 
 use netstack3_base::testutil::TestIpExt;
@@ -21,7 +21,7 @@ use netstack3_core::testutil::{
 use netstack3_core::StackStateBuilder;
 use netstack3_ip::{
     AddRouteError, AddableEntry, AddableEntryEither, AddableMetric, Entry, InternalForwarding,
-    MarkDomain, MarkMatcher, MarkMatchers, Marks, Metric, RawMetric, ResolvedRoute, Rule,
+    MarkMatcher, MarkMatchers, Marks, Metric, RawMetric, ResolvedRoute, RouteResolveOptions, Rule,
     RuleAction, RuleMatcher,
 };
 
@@ -322,9 +322,10 @@ fn test_route_resolution_respects_source_address_matcher<I: TestIpExt + netstack
     // We need to lookup the route again and in this case the destination address matches the
     // more specific prefix in `second_table`, it should yield the route with a gateway.
     assert_eq!(
-        ctx.core_api()
-            .routes::<I>()
-            .resolve_route(SocketIpAddr::new(I::TEST_ADDRS.remote_ip.get())),
+        ctx.core_api().routes::<I>().resolve_route(
+            SocketIpAddr::new(I::TEST_ADDRS.remote_ip.get()),
+            &RouteResolveOptions::default()
+        ),
         Ok(expected_route_with_gateway.clone())
     );
 
@@ -343,9 +344,10 @@ fn test_route_resolution_respects_source_address_matcher<I: TestIpExt + netstack
     // because of strong host model, the default route is not usable so we will continue to the
     // main table during the second lookup and yield the route without the gateway.
     assert_eq!(
-        ctx.core_api()
-            .routes::<I>()
-            .resolve_route(SocketIpAddr::new(I::get_other_remote_ip_address(254).get())),
+        ctx.core_api().routes::<I>().resolve_route(
+            SocketIpAddr::new(I::get_other_remote_ip_address(254).get()),
+            &RouteResolveOptions::default()
+        ),
         Ok(expected_route_no_gateway.clone())
     );
 

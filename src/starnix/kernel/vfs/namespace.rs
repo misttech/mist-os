@@ -1024,8 +1024,10 @@ impl NamespaceNode {
 
     /// Create a namespace node that is not mounted in a namespace and that refers to a node that
     /// is not rooted in a hierarchy and has no name.
-    pub fn new_anonymous_unrooted(node: FsNodeHandle) -> Self {
-        Self::new_anonymous(DirEntry::new_unrooted(node))
+    pub fn new_anonymous_unrooted(current_task: &CurrentTask, node: FsNodeHandle) -> Self {
+        let dir_entry = DirEntry::new_unrooted(node);
+        let _ = security::fs_node_init_with_dentry_no_xattr(current_task, &dir_entry);
+        Self::new_anonymous(dir_entry)
     }
 
     /// Create a FileObject corresponding to this namespace node.
@@ -1470,7 +1472,12 @@ impl NamespaceNode {
                     current = parent.escape_mount();
                 } else {
                     // This node hasn't intersected with the custom root and has reached the namespace root.
-                    return PathWithReachability::Unreachable(path.build_absolute());
+                    let mut absolute_path = path.build_absolute();
+                    if self.entry.is_dead() {
+                        absolute_path.extend_from_slice(b" (deleted)");
+                    }
+
+                    return PathWithReachability::Unreachable(absolute_path);
                 }
             }
         } else {
@@ -1541,8 +1548,7 @@ impl NamespaceNode {
         if self.mount.flags().contains(MountFlags::NOSUID) {
             Ok(UserAndOrGroupId::default())
         } else {
-            let creds = current_task.creds();
-            self.entry.node.info().suid_and_sgid(&creds)
+            self.entry.node.info().suid_and_sgid(current_task)
         }
     }
 
@@ -1727,6 +1733,17 @@ impl Mounts {
             for mount in mounts {
                 // Ignore errors.
                 let _ = mount.unmount(UnmountFlags::default(), false);
+            }
+        }
+    }
+
+    /// Drain mounts. For each drained mount, force a FileSystem unmount.
+    // TODO(https://fxbug.dev/295073633): Graceful shutdown should try to first unmount the mounts
+    // and only force a FileSystem unmount on failure.
+    pub fn clear(&self) {
+        for (_dir_entry, mounts) in self.mounts.lock().drain() {
+            for mount in mounts {
+                mount.fs.force_unmount_ops();
             }
         }
     }

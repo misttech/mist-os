@@ -91,12 +91,26 @@
 
         // vulkan
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: [
                 "dev-goldfish-address-space",
                 "dev-goldfish-control",
                 "dev-goldfish-pipe",
                 "dev-goldfish-sync",
                 "dev-gpu",
+            ],
+            from: "parent",
+            to: "#google-tests",
+        },
+        {
+            // These services replace the directory capabilities above.
+            service: [
+                "fuchsia.gpu.magma.Service",
+                "fuchsia.hardware.goldfish.AddressSpaceService",
+                "fuchsia.hardware.goldfish.ControllerService",
+                "fuchsia.hardware.goldfish.ControlService",
+                "fuchsia.hardware.goldfish.SyncService",
             ],
             from: "parent",
             to: "#google-tests",

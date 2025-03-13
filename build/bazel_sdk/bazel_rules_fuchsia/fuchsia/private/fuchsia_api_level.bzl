@@ -19,7 +19,7 @@ FuchsiaAPILevelInfo = provider(
 )
 
 # The name for the API level target.
-FUCHSIA_API_LEVEL_TARGET_NAME = "@fuchsia_sdk//fuchsia:fuchsia_api_level"
+FUCHSIA_API_LEVEL_TARGET_NAME = "@fuchsia_sdk//flags:fuchsia_api_level"
 
 # Rules that require the fuchsia api level should depend on this attribute set.
 # They can then use the helper functions in this file to get the flags needed.
@@ -190,7 +190,7 @@ verify_cc_head_api_level = rule(
         "_fuchsia_api_level": attr.label(
             # We have to explicitly depend on the @fuchsia_sdk target because
             # this is used from the internal_sdk as well.
-            default = "@fuchsia_sdk//fuchsia:fuchsia_api_level",
+            default = "@fuchsia_sdk//flags:fuchsia_api_level",
         ),
     },
 )

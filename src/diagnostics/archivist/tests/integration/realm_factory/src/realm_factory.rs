@@ -227,11 +227,32 @@ impl ArchivistRealmFactory {
             )
             .await?;
 
+        builder
+            .add_route(
+                Route::new()
+                    .capability(
+                        Capability::protocol_by_name("fuchsia.debugdata.Publisher").optional(),
+                    )
+                    .from(Ref::parent())
+                    .from_dictionary("diagnostics")
+                    .to(&test_realm),
+            )
+            .await?;
         test_realm
             .add_capability(CapabilityDecl::Dictionary(DictionaryDecl {
                 name: "diagnostics".parse().unwrap(),
                 source_path: None,
             }))
+            .await?;
+        test_realm
+            .add_route(
+                Route::new()
+                    .capability(
+                        Capability::protocol_by_name("fuchsia.debugdata.Publisher").optional(),
+                    )
+                    .from(Ref::parent())
+                    .to(Ref::dictionary("self/diagnostics")),
+            )
             .await?;
         test_realm
             .add_route(

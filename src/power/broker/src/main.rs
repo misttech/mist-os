@@ -4,7 +4,7 @@
 
 use anyhow::{Context as _, Error};
 use async_utils::event::Event;
-use fidl::endpoints::{create_request_stream, ServerEnd};
+use fidl::endpoints::{create_request_stream, ClientEnd, ServerEnd};
 use fidl_fuchsia_power_broker::{
     self as fpb, CurrentLevelRequest, CurrentLevelRequestStream, ElementControlRequest,
     ElementControlRequestStream, LeaseControlMarker, LeaseControlRequest,
@@ -39,6 +39,7 @@ enum IncomingRequest {
 }
 
 struct ElementHandlers {
+    runner: Option<ElementRunnerHandler>,
     current: Option<Rc<CurrentLevelHandler>>,
     required: Option<RequiredLevelHandler>,
     status: Vec<StatusChannelHandler>,
@@ -46,7 +47,7 @@ struct ElementHandlers {
 
 impl ElementHandlers {
     fn new() -> Self {
-        Self { current: None, required: None, status: Vec::new() }
+        Self { runner: None, current: None, required: None, status: Vec::new() }
     }
 }
 
@@ -244,6 +245,7 @@ impl BrokerSvc {
             Option<fpb::LevelControlChannels>,
             Option<ServerEnd<fpb::LessorMarker>>,
             Option<ServerEnd<fpb::ElementControlMarker>>,
+            Option<ClientEnd<fpb::ElementRunnerMarker>>,
         ),
         fpb::AddElementError,
     > {
@@ -256,6 +258,9 @@ impl BrokerSvc {
         let Some(valid_levels) = payload.valid_levels else {
             return Err(fpb::AddElementError::Invalid);
         };
+        if payload.level_control_channels.is_some() && payload.element_runner.is_some() {
+            return Err(fpb::AddElementError::Invalid);
+        }
         let level_dependencies = payload.dependencies.unwrap_or(vec![]);
         Ok((
             element_name,
@@ -265,6 +270,7 @@ impl BrokerSvc {
             payload.level_control_channels,
             payload.lessor_channel,
             payload.element_control,
+            payload.element_runner,
         ))
     }
 
@@ -283,6 +289,7 @@ impl BrokerSvc {
                             level_control_channels,
                             lessor_channel,
                             element_control,
+                            element_runner,
                         )) = Self::validate_and_unpack_add_element_payload(payload)
                         else {
                             return responder
@@ -304,7 +311,16 @@ impl BrokerSvc {
                                 self.element_handlers
                                     .borrow_mut()
                                     .insert(element_id.clone(), ElementHandlers::new());
-                                if let Some(level_control) = level_control_channels {
+                                if let Some(element_runner) = element_runner {
+                                    let mut runner = ElementRunnerHandler::new(element_id.clone());
+                                    runner.start(self.broker.clone(), element_runner.into_proxy());
+                                    self.element_handlers
+                                        .borrow_mut()
+                                        .entry(element_id.clone())
+                                        .and_modify(|e| {
+                                            e.runner = Some(runner);
+                                        });
+                                } else if let Some(level_control) = level_control_channels {
                                     let current = self
                                         .create_current_level_handler(
                                             element_id.clone(),
@@ -423,6 +439,55 @@ impl BrokerSvc {
             .entry(element_id.clone())
             .and_modify(|e| e.status.push(handler));
         Ok(())
+    }
+}
+
+struct ElementRunnerHandler {
+    element_id: ElementID,
+    shutdown: Event,
+}
+
+impl ElementRunnerHandler {
+    fn new(element_id: ElementID) -> Self {
+        Self { element_id, shutdown: Event::new() }
+    }
+
+    fn start(&mut self, broker: Rc<RefCell<Broker>>, element_runner: fpb::ElementRunnerProxy) {
+        let element_id = self.element_id.clone();
+        // Use a shutdown event to ensure any in progress level transition handshakes are completed
+        // before terminating the task.
+        let mut shutdown = self.shutdown.wait_or_dropped();
+        let mut receiver = broker.borrow_mut().watch_required_level(&element_id);
+        log::debug!("Starting new ElementRunnerHandler for {:?}", &self.element_id);
+        Task::local(async move {
+            loop {
+                select! {
+                    _ = shutdown => {
+                        break;
+                    }
+                    required_level = receiver.next() => {
+                        log::debug!("ElementRunnerHandler received required_level: {:?}", required_level);
+                        match required_level {
+                            Some(Some(required_level)) => {
+                                if let Err(err) = element_runner.set_level(required_level.level).await {
+                                    log::error!("ElementRunnerHandler: set_level error: {:?}", err);
+                                } else {
+                                    broker.borrow_mut().update_current_level(&element_id, required_level);
+                                }
+                            },
+                            None => {
+                                log::debug!("ElementRunnerHandler receiver closed (element removed)");
+                                break;
+                            },
+                            _ => {
+                                log::error!("ElementRunnerHandler: unexpected required_level: {:?}", required_level);
+                            }
+                        }
+                    }
+                }
+            }
+            log::debug!("ElementRunnerHandler shutdown for {:?}.", &element_id);
+        }).detach();
     }
 }
 

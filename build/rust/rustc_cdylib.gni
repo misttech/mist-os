@@ -122,12 +122,25 @@ template("rustc_cdylib") {
   # TODO(https://fxbug.dev/42152447): accept a string.
   if (defined(invoker.with_unit_tests) && invoker.with_unit_tests) {
     rustc_test("${target_name}_test") {
-      not_needed(invoker, [ "public" ])
+      not_needed(invoker,
+                 [
+                   "public",
+                   "metadata",
+                   "variant_selector_target_type",
+                   "is_loadable_module",
+                 ])
       output_name = invoker.target_name + "_cdylib_test"
       if (defined(invoker.output_name)) {
         output_name = invoker.output_name + "_cdylib_test"
       }
-      forward_variables_from(invoker, "*", [ "output_name" ])
+      forward_variables_from(invoker,
+                             "*",
+                             [
+                               "output_name",
+                               "metatada",
+                               "variant_selector_target_type",
+                               "is_loadable_module",
+                             ])
       original_target_name = _original_target_name
     }
   }

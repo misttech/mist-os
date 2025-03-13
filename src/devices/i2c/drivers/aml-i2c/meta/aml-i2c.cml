@@ -12,6 +12,7 @@
         binary: "driver/aml-i2c.so",
         bind: "meta/bind/aml-i2c.bindbc",
         default_dispatcher_opts: [ "allow_sync_calls" ],
+        default_dispatcher_scheduler_role: "fuchsia.devices.i2c.drivers.i2c.bus",
         fallback: "false",
     },
     capabilities: [
@@ -19,9 +20,6 @@
         { service: "fuchsia.hardware.i2c.businfo.I2CBusMetadata" },
     ],
     use: [
-        {
-            protocol: [ "fuchsia.scheduler.RoleManager" ],
-        },
         {
             service: [ "fuchsia.hardware.platform.device.Service" ],
         },

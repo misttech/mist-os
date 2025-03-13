@@ -63,7 +63,6 @@ static ACPI_STATUS AcpiOsReadWritePciConfiguration(ACPI_PCI_ID* PciId, UINT32 Re
   uint8_t func = static_cast<uint8_t>(PciId->Function);
   uint8_t offset = static_cast<uint8_t>(Register);
   zx_status_t st;
-#ifdef ENABLE_USER_PCI
   pci_bdf_t addr = {bus, dev, func};
   switch (Width) {
     case 8u:
@@ -80,11 +79,6 @@ static ACPI_STATUS AcpiOsReadWritePciConfiguration(ACPI_PCI_ID* PciId, UINT32 Re
       (Write) ? st = pci_pio_write32(addr, offset, static_cast<uint32_t>(*Value))
               : st = pci_pio_read32(addr, offset, reinterpret_cast<uint32_t*>(Value));
   }
-#else
-  st = zx_pci_cfg_pio_rw(ioport_resource_handle, bus, dev, func, offset,
-                         reinterpret_cast<uint32_t*>(Value), static_cast<uint8_t>(Width), Write);
-
-#endif  // ENABLE_USER_PCI
 #ifdef ACPI_DEBUG_OUTPUT
   if (st != ZX_OK) {
     printf("ACPIOS: pci rw error: %d\n", st);

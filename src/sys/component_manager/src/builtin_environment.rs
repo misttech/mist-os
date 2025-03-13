@@ -17,6 +17,7 @@ use crate::builtin::fuchsia_boot_resolver::{
     FuchsiaBootPackageResolver, FuchsiaBootResolver, SCHEME as BOOT_SCHEME,
 };
 use crate::builtin::log::{ReadOnlyLog, WriteOnlyLog};
+use crate::builtin::ota_health_verification::OtaHealthVerification;
 use crate::builtin::realm_builder::{
     RealmBuilderResolver, RealmBuilderRunnerFactory, RUNNER_NAME as REALM_BUILDER_RUNNER_NAME,
     SCHEME as REALM_BUILDER_SCHEME,
@@ -116,7 +117,8 @@ use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_component_resolution as fresolution,
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio,
     fidl_fuchsia_kernel as fkernel, fidl_fuchsia_pkg as fpkg, fidl_fuchsia_process as fprocess,
-    fidl_fuchsia_sys2 as fsys, fidl_fuchsia_time as ftime, fuchsia_async as fasync,
+    fidl_fuchsia_sys2 as fsys, fidl_fuchsia_time as ftime, fidl_fuchsia_update_verify as fupdate,
+    fuchsia_async as fasync,
 };
 
 #[cfg(feature = "tracing")]
@@ -816,7 +818,7 @@ pub struct BuiltinEnvironment {
     pub trace_provider: TraceProvider,
     // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
     #[allow(dead_code)]
-    pub num_threads: usize,
+    pub num_threads: u8,
     // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
     #[allow(dead_code)]
     pub realm_builder_resolver: Option<RealmBuilderResolver>,
@@ -979,6 +981,15 @@ impl BuiltinEnvironment {
         let crash_records_svc = CrashIntrospectSvc::new(crash_records);
         root_input_builder.add_builtin_protocol_if_enabled::<fsys::CrashIntrospectMarker>(
             move |stream| crash_records_svc.clone().serve(stream).boxed(),
+        );
+
+        // Set up OtaHealthVerification service.
+        let ota_health_verification_svc = OtaHealthVerification::new(
+            runtime_config.health_check.monikers.clone(),
+            Arc::downgrade(&top_instance),
+        );
+        root_input_builder.add_builtin_protocol_if_enabled::<fupdate::HealthVerificationMarker>(
+            move |stream| ota_health_verification_svc.clone().serve(stream).boxed(),
         );
 
         // Set up KernelStats service.

@@ -82,7 +82,13 @@ impl DirectoryWithFileCreateOverride {
     async fn serve(self, mut stream: fio::DirectoryRequestStream) {
         while let Some(req) = stream.next().await {
             match req.unwrap() {
-                fio::DirectoryRequest::Open { flags, mode, path, object, control_handle: _ } => {
+                fio::DirectoryRequest::DeprecatedOpen {
+                    flags,
+                    mode,
+                    path,
+                    object,
+                    control_handle: _,
+                } => {
                     let is_create = flags.intersects(fio::OpenFlags::CREATE);
 
                     if path == "." {
@@ -95,16 +101,10 @@ impl DirectoryWithFileCreateOverride {
                         Task::spawn(async move { handler.handle_file_stream(server_end).await })
                             .detach();
                     } else {
-                        let () = self.inner.open(flags, mode, &path, object).unwrap();
+                        let () = self.inner.deprecated_open(flags, mode, &path, object).unwrap();
                     }
                 }
-                fio::DirectoryRequest::Open3 {
-                    path,
-                    flags,
-                    options,
-                    object,
-                    control_handle: _,
-                } => {
+                fio::DirectoryRequest::Open { path, flags, options, object, control_handle: _ } => {
                     ObjectRequest::new(flags, &options, object).handle(|request| {
                         if path == "." {
                             let stream = fio::NodeRequestStream::from_channel(
@@ -125,7 +125,7 @@ impl DirectoryWithFileCreateOverride {
                             .detach();
                         } else {
                             // The channel will be dropped and closed if the wire call fails.
-                            let _ = self.inner.open3(
+                            let _ = self.inner.open(
                                 &path,
                                 flags,
                                 &request.options(),

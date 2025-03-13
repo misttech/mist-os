@@ -17,6 +17,7 @@ driver_bind_rules("nand-broker-bind") {
 }
 
 fuchsia_cc_driver("nand-broker-driver") {
+  legacy = true
   output_name = "nand-broker"
   configs += [
     "//build/config:all_source",

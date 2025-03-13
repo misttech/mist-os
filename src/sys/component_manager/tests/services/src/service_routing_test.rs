@@ -6,17 +6,25 @@ use anyhow::{format_err, Context, Error};
 use component_events::events::{Destroyed, Event, EventStream, Started};
 use component_events::matcher::EventMatcher;
 use component_events::sequence::*;
-use fidl::endpoints::{ServiceMarker, ServiceProxy};
+use fidl::endpoints::{create_proxy, ServiceMarker, ServiceProxy};
 use fuchsia_component::client;
 use fuchsia_component_test::{
     Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route, ScopedInstance,
 };
+use fuchsia_fs::directory::{WatchEvent, WatchMessage, Watcher};
 use futures::channel::mpsc;
+use futures::lock::Mutex;
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt, TryStreamExt};
 use log::*;
 use moniker::ChildName;
 use std::collections::HashSet;
+use std::sync::Arc;
 use test_case::test_case;
+use vfs::directory::entry::DirectoryEntry;
+use vfs::directory::helper::DirectlyMutable;
+use vfs::directory::simple::Simple;
+use vfs::execution_scope::ExecutionScope;
+use vfs::{pseudo_directory, ToObjectRequest};
 use {
     fidl_fidl_test_components as ftest, fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_examples as fecho,
@@ -414,12 +422,19 @@ fn verify_instances(instances: Vec<String>, expected_len: usize) {
 async fn use_from_collection() {
     let builder = RealmBuilder::new().await.unwrap();
     let (service_directory_sender, mut service_directory_receiver) = mpsc::unbounded();
+    let (service_access_blocker_sender, service_access_blocker_receiver) = mpsc::unbounded();
+    let service_access_blocker_receiver =
+        Arc::new(Mutex::new(Some(service_access_blocker_receiver)));
     let service_accessing_child = builder
         .add_local_child(
             "service_accessing_child",
             move |h| {
                 let service_directory_sender = service_directory_sender.clone();
+                let service_access_blocker_receiver = service_access_blocker_receiver.clone();
                 async move {
+                    let mut service_access_blocker_receiver =
+                        service_access_blocker_receiver.lock().await.take().unwrap();
+                    let () = service_access_blocker_receiver.next().await.unwrap();
                     let service_directory = h.open_service::<fecho::EchoServiceMarker>().unwrap();
                     service_directory_sender.unbounded_send(service_directory).unwrap();
                     futures::future::pending().await
@@ -501,6 +516,7 @@ async fn use_from_collection() {
         .await
         .unwrap()
         .unwrap();
+    service_access_blocker_sender.unbounded_send(()).unwrap();
 
     let service_directory = service_directory_receiver.next().await.unwrap();
     let dir_entries = fuchsia_fs::directory::readdir(&service_directory).await.unwrap();
@@ -524,6 +540,395 @@ async fn use_from_collection() {
     assert_eq!(
         HashSet::from(["Hello, world!".to_string(), "Greetings and Hello, world!".to_string()]),
         echo_results
+    );
+}
+
+/// If a component contributes to a service aggregate and does not publish instances, the instances
+/// published by other instances must still be reachable.
+///
+/// Sets up three statically declared components inside of a nested component manager:
+/// - publishing_child: this component publishes two service instances.
+/// - non_publishing_child: this component does not publish any service instances.
+/// - service_accessing_child: services from the other two children are offered to this component
+///
+/// After constructing this setup, we assert that the service instances from publishing_child are
+/// visible and can be connected to.
+#[fuchsia::test]
+async fn not_every_static_component_publishes_service() {
+    let builder = RealmBuilder::new().await.unwrap();
+    let publishing_child = builder
+        .add_local_child(
+            "publishing_child",
+            move |h| publishing_component_impl(h).boxed(),
+            ChildOptions::new(),
+        )
+        .await
+        .unwrap();
+    let non_publishing_child = builder
+        .add_local_child(
+            "non_publishing_child",
+            move |h| non_publishing_component_impl(h).boxed(),
+            ChildOptions::new(),
+        )
+        .await
+        .unwrap();
+    let (service_directory_sender, mut service_directory_receiver) = mpsc::unbounded();
+    let service_accessing_child = builder
+        .add_local_child(
+            "service_accessing_child",
+            move |h| {
+                let service_directory_sender = service_directory_sender.clone();
+                async move {
+                    let service_directory = h.open_service::<fecho::EchoServiceMarker>().unwrap();
+                    service_directory_sender.unbounded_send(service_directory).unwrap();
+                    Ok(())
+                }
+                .boxed()
+            },
+            ChildOptions::new().eager(),
+        )
+        .await
+        .unwrap();
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::service::<fecho::EchoServiceMarker>())
+                .from(&publishing_child)
+                .to(&service_accessing_child),
+        )
+        .await
+        .unwrap();
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::service::<fecho::EchoServiceMarker>())
+                .from(&non_publishing_child)
+                .to(&service_accessing_child),
+        )
+        .await
+        .unwrap();
+    let _instance =
+        builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap();
+    let service_directory = service_directory_receiver.next().await.unwrap();
+    let dir_entries = fuchsia_fs::directory::readdir(&service_directory).await.unwrap();
+    assert_eq!(2, dir_entries.len());
+    let mut echo_results = HashSet::new();
+    for dir_entry in dir_entries {
+        let instance_dir = fuchsia_fs::directory::open_directory(
+            &service_directory,
+            &dir_entry.name,
+            fio::Flags::empty(),
+        )
+        .await
+        .expect("failed to open instance dir");
+        let echo_service_proxy = fecho::EchoServiceProxy::from_member_opener(Box::new(
+            client::ServiceInstanceDirectory(instance_dir, dir_entry.name.clone()),
+        ));
+        let echo_proxy = echo_service_proxy.connect_to_regular_echo().unwrap();
+        let echoed_string = echo_proxy.echo_string("Hello, world!").await.unwrap();
+        echo_results.insert(echoed_string);
+    }
+    assert_eq!(
+        HashSet::from(["Hello, world!".to_string(), "Greetings and Hello, world!".to_string()]),
+        echo_results
+    );
+}
+
+/// If a component contributes to a service aggregate and does not publish instances, the instances
+/// published by other instances must still be reachable.
+///
+/// Sets up three components inside of a nested component manager, one statically declared and two
+/// dynamic:
+/// - publishing_child: this dynamic component is created in collection `col` and publishes two
+///   service instances.
+/// - non_publishing_child: this dynamic component is created in collection `col` and does not
+///   publish any service instances.
+/// - service_accessing_child: services from collection `col` are offered to this static component.
+///
+/// After constructing this setup, we assert that the service instances from publishing_child are
+/// visible and can be connected to.
+#[fuchsia::test]
+async fn not_every_dynamic_component_publishes_service() {
+    let builder = RealmBuilder::new().await.unwrap();
+    let collection = builder
+        .add_collection(cm_rust::CollectionDecl {
+            name: "col".parse().unwrap(),
+            durability: fdecl::Durability::Transient,
+            environment: None,
+            allowed_offers: cm_types::AllowedOffers::StaticOnly,
+            allow_long_names: false,
+            persistent_storage: None,
+        })
+        .await
+        .unwrap();
+    let (service_directory_sender, mut service_directory_receiver) = mpsc::unbounded();
+    let service_accessing_child = builder
+        .add_local_child(
+            "service_accessing_child",
+            move |h| {
+                let service_directory_sender = service_directory_sender.clone();
+                async move {
+                    let service_directory = h.open_service::<fecho::EchoServiceMarker>().unwrap();
+                    service_directory_sender.unbounded_send(service_directory).unwrap();
+                    futures::future::pending().await
+                }
+                .boxed()
+            },
+            ChildOptions::new(),
+        )
+        .await
+        .unwrap();
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::service::<fecho::EchoServiceMarker>())
+                .from(&collection)
+                .to(&service_accessing_child),
+        )
+        .await
+        .unwrap();
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol::<fcomponent::RealmMarker>())
+                .from(Ref::framework())
+                .to(Ref::parent()),
+        )
+        .await
+        .unwrap();
+    let instance =
+        builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap();
+    let realm_proxy =
+        instance.root.connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>().unwrap();
+
+    let publishing_child_builder = RealmBuilder::new().await.unwrap();
+    let publishing_child = publishing_child_builder
+        .add_local_child(
+            "publishing_child",
+            move |h| publishing_component_impl(h).boxed(),
+            ChildOptions::new(),
+        )
+        .await
+        .unwrap();
+    publishing_child_builder
+        .add_route(
+            Route::new()
+                .capability(Capability::service::<fecho::EchoServiceMarker>())
+                .from(&publishing_child)
+                .to(Ref::parent()),
+        )
+        .await
+        .unwrap();
+    let (url, _publishing_child_task) = publishing_child_builder.initialize().await.unwrap();
+
+    realm_proxy
+        .create_child(
+            &fdecl::CollectionRef { name: "col".to_string() },
+            &fdecl::Child {
+                name: Some("publishing_child".to_string()),
+                url: Some(url),
+                startup: Some(fdecl::StartupMode::Lazy),
+                ..Default::default()
+            },
+            Default::default(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+
+    let non_publishing_child_builder = RealmBuilder::new().await.unwrap();
+    let non_publishing_child = non_publishing_child_builder
+        .add_local_child(
+            "non_publishing_child",
+            move |h| non_publishing_component_impl(h).boxed(),
+            ChildOptions::new(),
+        )
+        .await
+        .unwrap();
+    non_publishing_child_builder
+        .add_route(
+            Route::new()
+                .capability(Capability::service::<fecho::EchoServiceMarker>())
+                .from(&non_publishing_child)
+                .to(Ref::parent()),
+        )
+        .await
+        .unwrap();
+    let (url, _non_publishing_child_task) =
+        non_publishing_child_builder.initialize().await.unwrap();
+
+    realm_proxy
+        .create_child(
+            &fdecl::CollectionRef { name: "col".to_string() },
+            &fdecl::Child {
+                name: Some("non_publishing_child".to_string()),
+                url: Some(url),
+                startup: Some(fdecl::StartupMode::Lazy),
+                ..Default::default()
+            },
+            Default::default(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+
+    let (controller_proxy, server_end) = create_proxy::<fcomponent::ControllerMarker>();
+    realm_proxy
+        .open_controller(
+            &fdecl::ChildRef { name: "service_accessing_child".to_string(), collection: None },
+            server_end,
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    let (_exec_proxy, server_end) = create_proxy::<fcomponent::ExecutionControllerMarker>();
+    controller_proxy.start(Default::default(), server_end).await.unwrap().unwrap();
+
+    let service_directory = service_directory_receiver.next().await.unwrap();
+    let dir_entries = fuchsia_fs::directory::readdir(&service_directory).await.unwrap();
+    assert_eq!(2, dir_entries.len());
+    let mut echo_results = HashSet::new();
+    for dir_entry in dir_entries {
+        let instance_dir = fuchsia_fs::directory::open_directory(
+            &service_directory,
+            &dir_entry.name,
+            fio::Flags::empty(),
+        )
+        .await
+        .expect("failed to open instance dir");
+        let echo_service_proxy = fecho::EchoServiceProxy::from_member_opener(Box::new(
+            client::ServiceInstanceDirectory(instance_dir, dir_entry.name.clone()),
+        ));
+        let echo_proxy = echo_service_proxy.connect_to_regular_echo().unwrap();
+        let echoed_string = echo_proxy.echo_string("Hello, world!").await.unwrap();
+        echo_results.insert(echoed_string);
+    }
+    assert_eq!(
+        HashSet::from(["Hello, world!".to_string(), "Greetings and Hello, world!".to_string()]),
+        echo_results
+    );
+}
+
+/// If a component is contributing to an anonymizing aggregate, any service instances it publishes
+/// well after the service capability is initially routed should appear in the routed directory.
+#[fuchsia::test]
+async fn component_adds_service_entries_late() {
+    let builder = RealmBuilder::new().await.unwrap();
+    let (backing_directory_sender, mut backing_directory_receiver) = mpsc::unbounded();
+    let publishing_child = builder
+        .add_local_child(
+            "publishing_child",
+            move |h| {
+                let backing_directory_sender = backing_directory_sender.clone();
+                async move {
+                    let outdir = Simple::new();
+                    backing_directory_sender.unbounded_send(outdir.clone()).unwrap();
+                    let scope = ExecutionScope::new();
+                    fio::OpenFlags::RIGHT_READABLE.to_object_request(h.outgoing_dir).handle(
+                        |object_request| {
+                            Ok(outdir.open_entry(vfs::directory::entry::OpenRequest::new(
+                                scope.clone(),
+                                fio::OpenFlags::RIGHT_READABLE,
+                                vfs::path::Path::dot(),
+                                object_request,
+                            )))
+                        },
+                    );
+                    scope.wait().await;
+                    Ok(())
+                }
+                .boxed()
+            },
+            ChildOptions::new().eager(),
+        )
+        .await
+        .unwrap();
+    let non_publishing_child = builder
+        .add_local_child(
+            "non_publishing_child",
+            move |h| non_publishing_component_impl(h).boxed(),
+            ChildOptions::new(),
+        )
+        .await
+        .unwrap();
+    let (service_directory_sender, mut service_directory_receiver) = mpsc::unbounded();
+    let service_accessing_child = builder
+        .add_local_child(
+            "service_accessing_child",
+            move |h| {
+                let service_directory_sender = service_directory_sender.clone();
+                async move {
+                    let service_directory = h.open_service::<fecho::EchoServiceMarker>().unwrap();
+                    service_directory_sender.unbounded_send(service_directory).unwrap();
+                    Ok(())
+                }
+                .boxed()
+            },
+            ChildOptions::new().eager(),
+        )
+        .await
+        .unwrap();
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::service::<fecho::EchoServiceMarker>())
+                .from(&publishing_child)
+                .to(&service_accessing_child),
+        )
+        .await
+        .unwrap();
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::service::<fecho::EchoServiceMarker>())
+                .from(&non_publishing_child)
+                .to(&service_accessing_child),
+        )
+        .await
+        .unwrap();
+    let _instance =
+        builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap();
+
+    let service_directory = service_directory_receiver.next().await.unwrap();
+
+    let backing_directory = backing_directory_receiver.next().await.unwrap();
+    let backing_service_instance_directory = Simple::new();
+    backing_directory
+        .add_entry(
+            "svc",
+            pseudo_directory! {
+                "fuchsia.examples.EchoService" => backing_service_instance_directory.clone()
+            },
+        )
+        .unwrap();
+
+    let mut watcher = Watcher::new(&service_directory).await.unwrap();
+
+    assert_eq!(
+        watcher.next().await,
+        Some(Ok(WatchMessage { event: WatchEvent::EXISTING, filename: ".".into() }))
+    );
+    assert_eq!(
+        watcher.next().await,
+        Some(Ok(WatchMessage { event: WatchEvent::IDLE, filename: "".into() }))
+    );
+
+    let dir_entries = fuchsia_fs::directory::readdir(&service_directory).await.unwrap();
+    assert_eq!(0, dir_entries.len());
+
+    backing_service_instance_directory.add_entry("default", pseudo_directory! {}).unwrap();
+
+    let first_watch_event = watcher.next().await.unwrap().unwrap();
+    assert_eq!(first_watch_event.event, WatchEvent::ADD_FILE);
+
+    backing_service_instance_directory.add_entry("foo", pseudo_directory! {}).unwrap();
+
+    let second_watch_event = watcher.next().await.unwrap().unwrap();
+    assert_eq!(
+        second_watch_event.event,
+        WatchEvent::ADD_FILE,
+        "watch_event: {:?}",
+        second_watch_event
     );
 }
 
@@ -553,6 +958,14 @@ async fn publishing_component_impl(handles: LocalComponentHandles) -> Result<(),
         })
     })
     .await;
+    Ok(())
+}
+
+async fn non_publishing_component_impl(handles: LocalComponentHandles) -> Result<(), Error> {
+    let mut fs = fuchsia_component::server::ServiceFs::new();
+    fs.dir("svc");
+    fs.serve_connection(handles.outgoing_dir).unwrap();
+    fs.collect::<()>().await;
     Ok(())
 }
 

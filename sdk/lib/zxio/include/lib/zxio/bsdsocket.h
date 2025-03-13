@@ -108,6 +108,25 @@ typedef struct zxio_socket_mark {
   bool is_present;
 } zxio_socket_mark_t;
 
+// Optional parameters for creating a socket.
+typedef struct zxio_socket_creation_options {
+  // The length of the array pointed by |marks|.
+  size_t num_marks;
+  // An array of |zxio_socket_mark_t|, these marks will be applied to the
+  // created socket from first to last.
+  zxio_socket_mark_t* marks;
+} zxio_socket_creation_options_t;
+
+// Creates a socket with the optional creation |opts|. Expects |service_connector| to yield
+// a borrowed handle to the respective socket provider service. |allocator| is expected to
+// allocate storage for a zxio_t object. On success, |*out_context| will point to the object
+// allocated by |allocator|.
+ZXIO_EXPORT zx_status_t zxio_socket_with_options(zxio_service_connector service_connector,
+                                                 int domain, int type, int protocol,
+                                                 zxio_socket_creation_options_t opts,
+                                                 zxio_storage_alloc allocator, void** out_context,
+                                                 int16_t* out_code);
+
 __END_CDECLS
 
 #endif  // LIB_ZXIO_BSDSOCKET_H_

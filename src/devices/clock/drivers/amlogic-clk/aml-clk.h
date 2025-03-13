@@ -10,7 +10,6 @@
 #include <fidl/fuchsia.hardware.clockimpl/cpp/driver/wire.h>
 #include <fidl/fuchsia.hardware.clockimpl/cpp/natural_types.h>
 #include <lib/ddk/io-buffer.h>
-#include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
 #include <lib/driver/metadata/cpp/metadata_server.h>
@@ -150,7 +149,6 @@ class AmlClock : public fdf::DriverBase,
   meson_clk_msr_t clk_msr_offsets_;
 
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> child_node_controller_;
-  compat::SyncInitializedDeviceServer compat_server_;
   driver_devfs::Connector<fuchsia_hardware_clock_measure::Measurer> devfs_connector_{
       fit::bind_member<&AmlClock::DevfsConnect>(this)};
   fidl::ServerBindingGroup<fuchsia_hardware_clock_measure::Measurer> measurer_binding_group_;

@@ -30,7 +30,7 @@ class FormatFrameTest : public ConsoleTest {
  public:
   // Synchronous wrappers around asynchronous formatting.
   std::string SyncFormatStack(Thread* thread, const FormatStackOptions& opts) {
-    return LoopUntilAsyncOutputBufferComplete(FormatStack(thread, false, opts)).AsString();
+    return LoopUntilAsyncOutputBufferComplete(FormatStack(thread, opts)).AsString();
   }
   std::string SyncFormatFrame(const Frame* frame, const FormatFrameOptions& opts, int id = -1) {
     return LoopUntilAsyncOutputBufferComplete(FormatFrame(frame, opts, id)).AsString();

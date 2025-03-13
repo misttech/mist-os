@@ -2,18 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/hardware/ram/metrics/cpp/fidl_test_base.h>
-#include <fuchsia/metrics/cpp/fidl_test_base.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/inspect/testing/cpp/inspect.h>
-#include <lib/sys/cpp/testing/component_context_provider.h>
 
 #include <cstddef>
-#include <future>
-#include <memory>
 
 #include <gtest/gtest.h>
-#include <src/cobalt/bin/testing/stub_metric_event_logger.h>
 
 #include "lib/fpromise/result.h"
 #include "src/developer/memory/monitor/monitor.h"
@@ -21,109 +15,105 @@
 
 namespace monitor::test {
 
-class FakeRamDevice : public fuchsia::hardware::ram::metrics::testing::Device_TestBase {
+class FakeRamDevice : public fidl::Server<fuchsia_hardware_ram_metrics::Device> {
  public:
-  FakeRamDevice() = default;
+  void MeasureBandwidth(MeasureBandwidthRequest& request,
+                        MeasureBandwidthCompleter::Sync& completer) override {
+    auto mul = request.config().cycles_to_measure() / 1024;
 
-  fidl::InterfaceRequestHandler<fuchsia::hardware::ram::metrics::Device> GetHandler(
-      async_dispatcher_t* dispatcher = nullptr) {
-    return [this,
-            dispatcher](fidl::InterfaceRequest<fuchsia::hardware::ram::metrics::Device> request) {
-      binding_.Bind(std::move(request), dispatcher);
-    };
+    fuchsia_hardware_ram_metrics::BandwidthInfo info{
+        {.timestamp = zx::msec(1234).to_nsecs(),
+         .frequency = static_cast<uint64_t>(256 * 1024 * 1024),
+         .bytes_per_cycle = 1,
+         .channels = {{{{.readwrite_cycles = 10 * mul}},
+                       {{.readwrite_cycles = 20 * mul}},
+                       {{.readwrite_cycles = 30 * mul}},
+                       {{.readwrite_cycles = 40 * mul}},
+                       {{.readwrite_cycles = 50 * mul}},
+                       {{.readwrite_cycles = 60 * mul}},
+                       {{.readwrite_cycles = 70 * mul}},
+                       {{.readwrite_cycles = 80 * mul}}}}}};
+    fuchsia_hardware_ram_metrics::DeviceMeasureBandwidthResponse response{{info}};
+    completer.Reply(fit::success(response));
   }
 
-  void MeasureBandwidth(fuchsia::hardware::ram::metrics::BandwidthMeasurementConfig config,
-                        MeasureBandwidthCallback completer) override {
-    auto mul = config.cycles_to_measure / 1024;
-
-    fuchsia::hardware::ram::metrics::BandwidthInfo info = {};
-    info.timestamp = zx::msec(1234).to_nsecs();
-    info.frequency = static_cast<uint64_t>(256 * 1024 * 1024);
-    info.bytes_per_cycle = 1;
-    info.channels[0].readwrite_cycles = 10 * mul;
-    info.channels[1].readwrite_cycles = 20 * mul;
-    info.channels[2].readwrite_cycles = 30 * mul;
-    info.channels[3].readwrite_cycles = 40 * mul;
-    info.channels[4].readwrite_cycles = 50 * mul;
-    info.channels[5].readwrite_cycles = 60 * mul;
-    info.channels[6].readwrite_cycles = 70 * mul;
-    info.channels[7].readwrite_cycles = 80 * mul;
-
-    fuchsia::hardware::ram::metrics::Device_MeasureBandwidth_Response response(info);
-    auto result = fuchsia::hardware::ram::metrics::Device_MeasureBandwidth_Result::WithResponse(
-        std::move(response));
-    completer(std::move(result));
+  void GetDdrWindowingResults(GetDdrWindowingResultsCompleter::Sync& completer) override {
+    FAIL() << "Not implemented: GetDdrWindowingResults";
   }
-
-  void NotImplemented_(const std::string& name) override { FAIL() << name; }
-
- private:
-  fidl::Binding<fuchsia::hardware::ram::metrics::Device> binding_{this};
 };
 
-class MockLogger : public ::fuchsia::metrics::testing::MetricEventLogger_TestBase {
+class MockLogger : public fidl::Server<fuchsia_metrics::MetricEventLogger> {
  public:
-  void LogMetricEvents(std::vector<fuchsia::metrics::MetricEvent> events,
-                       LogMetricEventsCallback callback) override {
+  void LogMetricEvents(LogMetricEventsRequest& request,
+                       LogMetricEventsCompleter::Sync& completer) override {
     num_calls_++;
-    num_events_ += events.size();
-    callback(fpromise::ok());
+    num_events_ += request.events().size();
+    completer.Reply(fit::success());
   }
-  void NotImplemented_(const std::string& name) override {
-    ASSERT_TRUE(false) << name << " is not implemented";
+  size_t num_calls() const { return num_calls_; }
+  size_t num_events() const { return num_events_; }
+
+  void LogOccurrence(LogOccurrenceRequest& request,
+                     LogOccurrenceCompleter::Sync& completer) override {
+    FAIL() << "Not implemented";
   }
-  int num_calls() { return num_calls_; }
-  int num_events() { return num_events_; }
+  void LogString(LogStringRequest& request, LogStringCompleter::Sync& completer) override {
+    FAIL() << "Not implemented";
+  }
+  void LogInteger(LogIntegerRequest& request, LogIntegerCompleter::Sync& completer) override {
+    FAIL() << "Not implemented";
+  }
+  void LogIntegerHistogram(LogIntegerHistogramRequest& request,
+                           LogIntegerHistogramCompleter::Sync& completer) override {
+    FAIL() << "Not implemented";
+  }
 
  private:
-  int num_calls_ = 0;
-  int num_events_ = 0;
+  size_t num_calls_ = 0;
+  size_t num_events_ = 0;
 };
 
-class MockLoggerFactory : public ::fuchsia::metrics::testing::MetricEventLoggerFactory_TestBase {
+class MockLoggerFactory : public fidl::Server<fuchsia_metrics::MetricEventLoggerFactory> {
  public:
-  MockLogger* logger() { return logger_.get(); }
-  uint32_t received_project_id() { return received_project_id_; }
+  explicit MockLoggerFactory(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
+  uint32_t received_project_id() const { return received_project_id_; }
 
-  void CreateMetricEventLogger(fuchsia::metrics::ProjectSpec project_spec,
-                               ::fidl::InterfaceRequest<fuchsia::metrics::MetricEventLogger> logger,
-                               CreateMetricEventLoggerCallback callback) override {
-    received_project_id_ = project_spec.project_id();
-    logger_ = std::make_unique<MockLogger>();
-    logger_bindings_.AddBinding(logger_.get(), std::move(logger));
-    callback(fpromise::ok());
+  void CreateMetricEventLogger(CreateMetricEventLoggerRequest& request,
+                               CreateMetricEventLoggerCompleter::Sync& completer) override {
+    received_project_id_ = *request.project_spec().project_id();
+    fidl::BindServer(dispatcher_, std::move(request.logger()), &logger_);
+    completer.Reply(fit::success());
   }
 
-  void NotImplemented_(const std::string& name) override {
-    ASSERT_TRUE(false) << name << " is not implemented";
+  void CreateMetricEventLoggerWithExperiments(
+      CreateMetricEventLoggerWithExperimentsRequest& request,
+      CreateMetricEventLoggerWithExperimentsCompleter::Sync& completer) override {
+    FAIL() << "Not implemented";
   }
 
  private:
   uint32_t received_project_id_;
-  std::unique_ptr<MockLogger> logger_;
-  fidl::BindingSet<fuchsia::metrics::MetricEventLogger> logger_bindings_;
+  MockLogger logger_;
+  async_dispatcher_t* dispatcher_;
 };
 
 class MemoryBandwidthInspectTest : public gtest::TestLoopFixture {
  public:
-  MemoryBandwidthInspectTest()
-      : monitor_(std::make_unique<Monitor>(
-            context_provider_.TakeContext(), fxl::CommandLine{}, dispatcher(), false, false,
-            memory_monitor_config::Config{},
-            memory::CaptureMaker::Create(memory::CreateDefaultOS()).value())),
-        executor_(dispatcher()),
-        ram_binding_(&fake_device_),
-        logger_factory_(new MockLoggerFactory()) {
-    // Create metrics
-    auto service_provider = context_provider_.service_directory_provider();
-    service_provider->AddService(factory_bindings_.GetHandler(logger_factory_.get(), dispatcher()));
-    CreateMetrics();
-
-    // Set RamDevice
-    fuchsia::hardware::ram::metrics::DevicePtr ram_device;
-    ram_binding_.Bind(ram_device.NewRequest());
-    monitor_->SetRamDevice(std::move(ram_device));
+  MemoryBandwidthInspectTest() : executor_(dispatcher()), logger_factory_(dispatcher()) {
+    auto logger_endpoints = fidl::CreateEndpoints<fuchsia_metrics::MetricEventLoggerFactory>();
+    fidl::BindServer<fuchsia_metrics::MetricEventLoggerFactory>(
+        dispatcher(), std::move(logger_endpoints->server), &logger_factory_);
+    auto ram_endpoints = fidl::CreateEndpoints<fuchsia_hardware_ram_metrics::Device>();
+    fidl::BindServer<fuchsia_hardware_ram_metrics::Device>(
+        dispatcher(), std::move(ram_endpoints->server), &fake_device_);
+    monitor_ =
+        std::make_unique<Monitor>(dispatcher(), memory_monitor_config::Config{},
+                                  *memory::CaptureMaker::Create(memory::CreateDefaultOS()),
+                                  /* pressure_provider */ std::nullopt, /* root_job */ std::nullopt,
+                                  fidl::Client<fuchsia_metrics::MetricEventLoggerFactory>{
+                                      std::move(logger_endpoints->client), dispatcher()},
+                                  fidl::Client(std::move(ram_endpoints->client), dispatcher()));
+    RunLoopUntilIdle();
   }
 
   void RunPromiseToCompletion(fpromise::promise<> promise) {
@@ -145,26 +135,10 @@ class MemoryBandwidthInspectTest : public gtest::TestLoopFixture {
   inspect::Inspector Inspector() { return monitor_->inspector_.inspector(); }
 
  private:
-  void CreateMetrics() {
-    // The Monitor will make asynchronous calls to the MockLogger*s that are also running in this
-    // class/tests thread. So the call to the Monitor needs to be made on a different thread, such
-    // that the MockLogger*s running on the main thread can respond to those calls.
-    std::future<void /*fuchsia::metrics::MetricEventLogger_Sync**/> result =
-        std::async([this]() { monitor_->CreateMetrics({}); });
-    while (result.wait_for(std::chrono::milliseconds(1)) != std::future_status::ready) {
-      // Run the main thread's loop, allowing the MockLogger* objects to respond to requests.
-      RunLoopUntilIdle();
-    }
-    result.get();
-  }
-
-  sys::testing::ComponentContextProvider context_provider_;
-  std::unique_ptr<Monitor> monitor_;
   async::Executor executor_;
   FakeRamDevice fake_device_;
-  fidl::Binding<fuchsia::hardware::ram::metrics::Device> ram_binding_;
-  std::unique_ptr<MockLoggerFactory> logger_factory_;
-  fidl::BindingSet<fuchsia::metrics::MetricEventLoggerFactory> factory_bindings_;
+  MockLoggerFactory logger_factory_;
+  std::unique_ptr<Monitor> monitor_;
 };
 
 TEST_F(MemoryBandwidthInspectTest, MemoryBandwidth) {

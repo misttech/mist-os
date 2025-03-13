@@ -1,0 +1,45 @@
+{% let non_canonical_name = service.name.decl_name().non_canonical() %}
+{% let service_base_name = service.name.decl_name().camel() %}
+{% let service_name = filters::ident(service_base_name)? %}
+{% let instance_trait_name = format!("{service_base_name}Instance") %}
+
+/// The type corresponding to the {{ non_canonical_name }} service.
+{{ self::doc_string(service.attributes) -}}
+{% if context.config.emit_debug_impls -%}
+    #[derive(Debug)]
+{%- endif %}
+pub struct {{ service_name }};
+
+/// A helper trait for instances of the `{{ non_canonical_name }}` service.
+pub trait {{ instance_trait_name }} {
+    /// The error type for the instance.
+    type Error: ::core::error::Error + Send + Sync + 'static;
+
+    /// The transport type created by connecting to a member.
+    type Transport: ::fidl_next::Transport;
+
+    {% for member in service.members %}
+        /// Attempts to connect to the `{{ member.name.non_canonical() }}` member.
+        fn {{ member.name.snake()|ident }}(&mut self) -> Result<
+            ::fidl_next::ClientEnd<Self::Transport, {{ context.natural_type(member.ty) }}>,
+            Self::Error,
+        >;
+    {% endfor %}
+}
+
+impl<___I> {{ instance_trait_name }} for ::fidl_next::ServiceInstance<___I, {{ service_name }}>
+where
+    ___I: ::fidl_next::protocol::ServiceInstance,
+{
+    type Error = ___I::Error;
+    type Transport = ___I::Transport;
+
+    {% for member in service.members %}
+        fn {{ member.name.snake()|ident }}(&mut self) -> Result<
+            ::fidl_next::ClientEnd<Self::Transport, {{ context.natural_type(member.ty) }}>,
+            Self::Error,
+        > {
+            self.as_untyped_mut().connect("{{ member.name.snake() }}").map(::fidl_next::ClientEnd::from_untyped)
+        }
+    {% endfor %}
+}

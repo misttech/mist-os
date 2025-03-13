@@ -568,9 +568,13 @@ VMO_VMAR_TEST(Pager, SuspendReadTest) {
 
   ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, 1, ZX_TIME_INFINITE));
 
+  // Make sure the thread is blocked before suspending.
+  ASSERT_TRUE(t.WaitForBlocked());
+
   t.SuspendSync();
   t.Resume();
 
+  // Make sure the thread is blocked on resume.
   ASSERT_TRUE(t.WaitForBlocked());
 
   ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, 1, ZX_TIME_INFINITE));
@@ -4088,6 +4092,258 @@ TEST(Pager, Prefetch) {
     EXPECT_TRUE(pager.WaitForPageRead(root_vmo, 1, 1, ZX_TIME_INFINITE));
     EXPECT_TRUE(pager.SupplyPages(root_vmo, 1, 1));
   }
+}
+
+// Tests thread suspension when blocked on a page request from a page fault in kernel mode
+// (usercopy).
+TEST(Pager, SuspendInKernelTest) {
+  UserPager pager;
+
+  ASSERT_TRUE(pager.Init());
+
+  Vmo* vmo;
+  ASSERT_TRUE(pager.CreateVmo(1, &vmo));
+
+  // Issue a syscall with an uncommitted pager-backed VMO passed in as the user buffer.
+  TestThread t([vmo]() -> bool {
+    // Create an anonymous VMO for the syscall to operate on.
+    zx::vmo anon_vmo;
+    if (zx::vmo::create(zx_system_get_page_size(), 0, &anon_vmo) != ZX_OK) {
+      return false;
+    }
+    if (anon_vmo.op_range(ZX_VMO_OP_COMMIT, 0, zx_system_get_page_size(), nullptr, 0) != ZX_OK) {
+      return false;
+    }
+    // Map the pager-backed VMO to provide a user buffer address to the syscall.
+    zx_vaddr_t buf;
+    if (zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo->vmo(), 0,
+                                   zx_system_get_page_size(), &buf) != ZX_OK) {
+      return false;
+    }
+    auto unmap =
+        fit::defer([&]() { zx_vmar_unmap(zx_vmar_root_self(), buf, zx_system_get_page_size()); });
+
+    // This will fault on |buf| in the usercopy. zx_object_get_info() uses the variant of usercopy
+    // that resolves page faults inline. This is the path we're testing here.
+    if (anon_vmo.get_info(ZX_INFO_VMO, reinterpret_cast<void*>(buf), sizeof(zx_info_vmo_t), nullptr,
+                          nullptr) != ZX_OK) {
+      return false;
+    }
+    return true;
+  });
+
+  ASSERT_TRUE(t.Start());
+
+  // Wait for the page request and verify that the thread is blocked.
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, 1, ZX_TIME_INFINITE));
+  ASSERT_TRUE(t.WaitForBlocked());
+
+  // Issue the suspend.
+  t.Suspend();
+
+  // Wait a bit and verify that the thread is still blocked. We're testing for inability to suspend,
+  // so the best we can do is allow some time for the suspend to go through.
+  zx::nanosleep(zx::deadline_after(zx::sec(1)));
+  ASSERT_TRUE(t.WaitForBlocked());
+
+  // Resume the thread.
+  t.Resume();
+
+  // The thread is still blocked since the page request hasn't been resolved.
+  zx::nanosleep(zx::deadline_after(zx::sec(1)));
+  ASSERT_TRUE(t.WaitForBlocked());
+
+  // Suspend the thread again.
+  t.Suspend();
+
+  // Wait a bit and verify that the thread is still blocked.
+  zx::nanosleep(zx::deadline_after(zx::sec(1)));
+  ASSERT_TRUE(t.WaitForBlocked());
+
+  // Resolve the page request. We did not create the VMO with ZX_VMO_TRAP_DIRTY so the write will
+  // proceed without blocking.
+  ASSERT_TRUE(pager.SupplyPages(vmo, 0, 1));
+
+  // The thread should now suspend on its way back to userspace from the syscall.
+  ASSERT_TRUE(t.WaitForSuspend());
+
+  // Resume the thread and wait for it to terminate.
+  t.Resume();
+  ASSERT_TRUE(t.Wait());
+
+  // No more page requests seen.
+  uint64_t offset, length;
+  ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
+  ASSERT_FALSE(pager.GetPageDirtyRequest(vmo, 0, &offset, &length));
+}
+
+// Same as SuspendInKernelTest but tests the usercopy version that captures faults and lets the
+// caller (in the kernel) resolve it.
+TEST(Pager, SuspendInKernelCaptureFaultsTest) {
+  UserPager pager;
+
+  ASSERT_TRUE(pager.Init());
+
+  Vmo* vmo;
+  ASSERT_TRUE(pager.CreateVmo(1, &vmo));
+
+  // Issue a syscall with an uncommitted pager-backed VMO passed in as the user buffer.
+  TestThread t([vmo]() -> bool {
+    // Create an anonymous VMO for the syscall to operate on.
+    zx::vmo anon_vmo;
+    if (zx::vmo::create(zx_system_get_page_size(), 0, &anon_vmo) != ZX_OK) {
+      return false;
+    }
+    if (anon_vmo.op_range(ZX_VMO_OP_COMMIT, 0, zx_system_get_page_size(), nullptr, 0) != ZX_OK) {
+      return false;
+    }
+    // Map the pager-backed VMO to provide a user buffer address to the syscall.
+    zx_vaddr_t buf;
+    if (zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo->vmo(), 0,
+                                   zx_system_get_page_size(), &buf) != ZX_OK) {
+      return false;
+    }
+    auto unmap =
+        fit::defer([&]() { zx_vmar_unmap(zx_vmar_root_self(), buf, zx_system_get_page_size()); });
+
+    // This will fault on |buf| in the usercopy. zx_vmo_write() uses the capture faults variant of
+    // usercopy, and resolves them with an explicit SoftFault(). This is the path we're testing
+    // here.
+    if (anon_vmo.write(reinterpret_cast<void*>(buf), 0, zx_system_get_page_size()) != ZX_OK) {
+      return false;
+    }
+    return true;
+  });
+
+  ASSERT_TRUE(t.Start());
+
+  // Wait for the page request and verify that the thread is blocked.
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, 1, ZX_TIME_INFINITE));
+  ASSERT_TRUE(t.WaitForBlocked());
+
+  // Issue the suspend.
+  t.Suspend();
+
+  // Wait a bit and verify that the thread is still blocked. We're testing for inability to suspend,
+  // so the best we can do is allow some time for the suspend to go through.
+  zx::nanosleep(zx::deadline_after(zx::sec(1)));
+  ASSERT_TRUE(t.WaitForBlocked());
+
+  // Resume the thread.
+  t.Resume();
+
+  // The thread is still blocked since the page request hasn't been resolved.
+  zx::nanosleep(zx::deadline_after(zx::sec(1)));
+  ASSERT_TRUE(t.WaitForBlocked());
+
+  // Suspend the thread again.
+  t.Suspend();
+
+  // Wait a bit and verify that the thread is still blocked.
+  zx::nanosleep(zx::deadline_after(zx::sec(1)));
+  ASSERT_TRUE(t.WaitForBlocked());
+
+  // Resolve the page request.
+  ASSERT_TRUE(pager.SupplyPages(vmo, 0, 1));
+
+  // The thread should now suspend on its way back to userspace from the syscall.
+  ASSERT_TRUE(t.WaitForSuspend());
+
+  // Resume the thread and wait for it to terminate.
+  t.Resume();
+  ASSERT_TRUE(t.Wait());
+
+  // No more page requests seen.
+  uint64_t offset, length;
+  ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
+  ASSERT_FALSE(pager.GetPageDirtyRequest(vmo, 0, &offset, &length));
+}
+
+// Regression test for ensuring that pinning a pager backed VMO with loaned pages correctly replaces
+// the loaned pages.
+TEST(Pager, PinPagerVmoWithLoanedPages) {
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
+    return;
+  }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
+
+  zx::iommu iommu;
+  zx::bti bti;
+  zx_iommu_desc_dummy_t desc;
+  auto final_bti_check = vmo_test::CreateDeferredBtiCheck(bti);
+
+  EXPECT_OK(zx::iommu::create(iommu_resource, ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc), &iommu));
+  bti = vmo_test::CreateNamedBti(iommu, 0, 0xdeadbeef, "VmoTestCase::CompressedContiguous");
+
+  zx_info_bti_t bti_info;
+  EXPECT_OK(bti.get_info(ZX_INFO_BTI, &bti_info, sizeof(bti_info), nullptr, nullptr));
+
+  constexpr size_t kNumPages = 2048;
+
+  // Create single page contiguous VMOs to give us pages to decommit, but avoiding needing to
+  // actually find a contiguous run of pages that could fail.
+  zx::vmo contig_vmos[kNumPages];
+  for (size_t i = 0; i < kNumPages; i++) {
+    ASSERT_OK(zx::vmo::create_contiguous(bti, zx_system_get_page_size(), 0, &contig_vmos[i]));
+  }
+
+  // Now create the pager ready for the loaned pages.
+  UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  Vmo* pager_vmo;
+  ASSERT_TRUE(pager.CreateVmoWithOptions(kNumPages, 0, &pager_vmo));
+
+  // Decommit all the pages from the contiguous VMOs, being tolerant of borrowing potentially not
+  // being enabled.
+  for (size_t i = 0; i < kNumPages; i++) {
+    zx_status_t status =
+        contig_vmos[i].op_range(ZX_VMO_OP_DECOMMIT, 0, zx_system_get_page_size(), nullptr, 0);
+    if (status == ZX_ERR_NOT_SUPPORTED) {
+      printf("Page borrowing not enabled, skipping\n");
+      return;
+    }
+    EXPECT_OK(status);
+  }
+
+  // Now supply the pager, hopefully causing some of the recently loaned pages to be used in the
+  // supply step.
+  EXPECT_TRUE(pager.SupplyPages(pager_vmo, 0, kNumPages));
+  // Make sure any evictions just get a re-supply.
+  EXPECT_TRUE(pager.StartTaggedPageFaultHandler());
+  pager_vmo->SetPageFaultSupplyLimit(kNumPages);
+
+  // Pin a single page from the pager vmo. This will mark the VMO overall as being pinned, and not
+  // a candidate for receiving loaned pages.
+  zx::pmt pmt;
+  uint64_t addr;
+  EXPECT_OK(
+      bti.pin(ZX_BTI_PERM_READ, pager_vmo->vmo(), 0, zx_system_get_page_size(), &addr, 1, &pmt));
+
+  // Pin the remaining portion of the VMO. Although the VMO is not presently eligible for receiving
+  // loaned pages, it might still have loaned pages from the original supply, and these still need
+  // to be replaced.
+  // Failure mode on regression is a kernel panic finding that a page is still loaned when it
+  // attempts to increment the pin count.
+  zx::pmt pmt2;
+  uint64_t addrs[kNumPages - 1];
+  EXPECT_OK(bti.pin(ZX_BTI_PERM_READ, pager_vmo->vmo(), zx_system_get_page_size(),
+                    (kNumPages - 1) * zx_system_get_page_size(), addrs, kNumPages - 1, &pmt2));
+
+  // Recommit the contiguous VMOs. These pages should be available, and not pinned.
+  for (size_t i = 0; i < kNumPages; i++) {
+    EXPECT_OK(contig_vmos[i].op_range(ZX_VMO_OP_COMMIT, 0, zx_system_get_page_size(), nullptr, 0));
+  }
+
+  // Must explicitly unpin.
+  EXPECT_OK(pmt2.unpin());
+  EXPECT_OK(pmt.unpin());
 }
 
 }  // namespace pager_tests

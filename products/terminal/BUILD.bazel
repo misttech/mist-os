@@ -29,6 +29,10 @@ _PRODUCT_CONFIG_BASE_JSON = {
             "include_sl4f": True,
             "authorized_ssh_keys_path": "LABEL(%s)" % authorized_ssh_keys_label if authorized_ssh_keys_label else None,
             "tools": {
+                "audio": {
+                    "driver_tools": True,
+                    "full_stack_tools": True,
+                },
                 "connectivity": {
                     "enable_networking": True,
                     "enable_wlan": True,

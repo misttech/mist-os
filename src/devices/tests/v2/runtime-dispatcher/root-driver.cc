@@ -26,6 +26,7 @@ class RootDriver : public fdf::DriverBase, public fidl::WireServer<ft::Handshake
       : fdf::DriverBase("root", std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> Start() override {
+    fdf::info("Start hook reached");
     node_.Bind(std::move(node()), dispatcher());
     // Setup the outgoing directory.
     auto service = [this](fidl::ServerEnd<ft::Handshake> server_end) {

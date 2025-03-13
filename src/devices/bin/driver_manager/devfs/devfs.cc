@@ -44,6 +44,25 @@ std::string_view Devnode::name() const {
   return {};
 }
 
+void PathServer::Bind(zx::channel channel, const std::string& class_name) {
+  // Only allow binding if the class is on the allowlist
+  if (!kClassesThatAllowTopologicalPath.contains(class_name)) {
+    std::string error_msg = std::format(
+        "Access to the topological path channel is not permitted for class {}.\n  "
+        "To enable this class to access to topological paths, you must add '{}' to"
+        " kClassesThatAllowTopologicalPath\n"
+        "in src/devices/bin/driver_manager/devfs/class_names.h.",
+        class_name, class_name);
+    // Debug assert or just print error and drop channel if not debug
+    ZX_DEBUG_ASSERT_MSG(false, "%s", error_msg.c_str());
+    LOGF(ERROR, error_msg.c_str());
+    return;
+  }
+  bindings_.AddBinding(dispatcher_,
+                       fidl::ServerEnd<fuchsia_device_fs::TopologicalPath>(std::move(channel)),
+                       this, fidl::kIgnoreBindingClosure);
+}
+
 void Devnode::advertise_modified() {
   ZX_ASSERT(parent_ != nullptr);
   parent_->Notify(name(), fio::wire::WatchEvent::kRemoved);
@@ -101,9 +120,13 @@ void MustAddEntry(PseudoDir& parent, const std::string_view name,
 }  // namespace
 
 Devnode::Devnode(Devfs& devfs)
-    : devfs_(devfs), parent_(nullptr), node_(fbl::MakeRefCounted<VnodeImpl>(*this, Target())) {}
+    : devfs_(devfs),
+      parent_(nullptr),
+      node_(fbl::MakeRefCounted<VnodeImpl>(*this, Target())),
+      path_server_("", devfs.dispatcher()) {}
 
-Devnode::Devnode(Devfs& devfs, PseudoDir& parent, Target target, fbl::String name)
+Devnode::Devnode(Devfs& devfs, PseudoDir& parent, Target target, fbl::String name,
+                 const std::string& path, const std::string& class_name)
     : devfs_(devfs),
       parent_(&parent),
       node_(fbl::MakeRefCounted<VnodeImpl>(*this, target)),
@@ -111,7 +134,8 @@ Devnode::Devnode(Devfs& devfs, PseudoDir& parent, Target target, fbl::String nam
         auto [it, inserted] = parent.unpublished.emplace(name, *this);
         ZX_ASSERT(inserted);
         return it->first;
-      }()) {
+      }()),
+      path_server_(path, devfs.dispatcher()) {
   if (target.has_value()) {
     children().AddEntry(
         fuchsia_device_fs::wire::kDeviceControllerName,
@@ -119,6 +143,12 @@ Devnode::Devnode(Devfs& devfs, PseudoDir& parent, Target target, fbl::String nam
           return (*passthrough->controller_connect.get())(
               fidl::ServerEnd<fuchsia_device::Controller>(std::move(channel)));
         }));
+    children().AddEntry(fuchsia_device_fs::wire::kDeviceTopologyName,
+                        fbl::MakeRefCounted<fs::Service>([this, class_name](zx::channel channel) {
+                          path_server_.Bind(std::move(channel), class_name);
+                          return ZX_OK;
+                        }));
+
     children().AddEntry(
         fuchsia_device_fs::wire::kDeviceProtocolName,
         fbl::MakeRefCounted<fs::Service>([passthrough = target](zx::channel channel) {
@@ -154,6 +184,12 @@ Devnode::~Devnode() {
   children().unpublished.clear();
 
   children().RemoveAllEntries();
+
+  if (service_path_.has_value() && service_name_.has_value()) {
+    [[maybe_unused]] auto res = devfs_.outgoing().RemoveProtocolAt(*service_path_, *service_name_);
+    service_path_.reset();
+    service_name_.reset();
+  }
 
   if (parent_ == nullptr) {
     return;
@@ -209,15 +245,9 @@ void DevfsDevice::unpublish() {
 }
 
 zx::result<std::string> Devfs::MakeInstanceName(std::string_view class_name) {
+  // Don't allow classes not listed in class_names.h
   if (!class_entries_.contains(std::string(class_name))) {
-    class_entries_[std::string(class_name)] = fbl::MakeRefCounted<PseudoDir>();
-    zx_status_t status = class_->AddEntry(class_name, class_entries_[std::string(class_name)]);
-    if (status != ZX_OK) {
-      LOGF(WARNING, "Failed to add class name '%.*s'  %s", static_cast<int>(class_name.size()),
-           class_name.data(), zx_status_get_string(status));
-      class_entries_.erase(std::string(class_name));
-      return zx::error(status);
-    }
+    return zx::error(ZX_ERR_NOT_FOUND);
   }
   if (classes_that_assume_ordering.contains(std::string(class_name))) {
     // must give a sequential id:
@@ -225,6 +255,46 @@ zx::result<std::string> Devfs::MakeInstanceName(std::string_view class_name) {
   }
   std::uniform_int_distribution<uint32_t> distrib(0, 0xffffffff);
   return zx::ok(std::format("{}", distrib(device_number_generator_)));
+}
+
+zx_status_t Devnode::TryAddService(std::string_view class_name, Target target,
+                                   std::string_view instance_name) {
+  // Lookup class name in mapping to see if we can translate it to a service name and a service
+  // member
+  auto name_iterator = kClassNameToService.find(class_name);
+  if (name_iterator == kClassNameToService.end()) {
+    return ZX_OK;  // If the class is not in the map, then we are not making it available.
+  }
+  auto& [key, service] = *name_iterator;
+  std::string path = "svc/" + service.service_name + "/" + std::string(instance_name);
+  component::AnyHandler handler = [passthrough = target](zx::channel channel) {
+    (*passthrough->device_connect.get())(std::move(channel));
+  };
+  zx::result result =
+      devfs_.outgoing().AddUnmanagedProtocolAt(std::move(handler), path, service.member_name);
+  if (result.is_error()) {
+    LOGF(WARNING, "Failed to add service entry '%s' for class '%.*s'  %d (%s)",
+         (path + "/" + std::string(service.member_name)).c_str(),
+         static_cast<int>(class_name.size()), class_name.data(), result.status_value(),
+         zx_status_get_string(result.status_value()));
+    return result.status_value();
+  }
+  LOGF(INFO, "Added service entry '%s' for class '%.*s'",
+       (path + "/" + std::string(service.member_name)).c_str(), static_cast<int>(class_name.size()),
+       class_name.data());
+  // set the service name so we know that we need to remove the service if the devnode is
+  // destroyed.
+  service_path_ = path;
+  service_name_ = service.member_name;
+
+  // Add topological path service
+  result = devfs_.outgoing().AddUnmanagedProtocolAt(
+      [this, class_name = std::string(class_name)](zx::channel channel) {
+        path_server_.Bind(std::move(channel), class_name);
+      },
+      path, fuchsia_device_fs::wire::kDeviceTopologyName);
+
+  return result.status_value();
 }
 
 zx_status_t Devnode::add_child(std::string_view name, std::optional<std::string_view> class_name,
@@ -236,19 +306,44 @@ zx_status_t Devnode::add_child(std::string_view name, std::optional<std::string_
          name.data());
     return ZX_ERR_ALREADY_EXISTS;
   }
-
-  // Export the device to its class directory.
-  if (class_name.has_value()) {
+  std::string child_path = path_server_.GetPath() + "/" + std::string(name);
+  // Export the device to its class directory.  Only if the class name exists in class_names.h
+  if (class_name.has_value() && kClassNameToService.contains(class_name.value())) {
     zx::result<std::string> instance_name = devfs_.MakeInstanceName(class_name.value());
-    if (instance_name.is_ok()) {
+    ZX_ASSERT(
+        instance_name.is_ok());  // this would only return an error if we didn't have that class
+    const ServiceEntry& service_entry = kClassNameToService.at(class_name.value());
+    // Add dev/class/<class_name> entry:
+    if (service_entry.state & ServiceEntry::kDevfs) {
       out_child.protocol_node().emplace(devfs_, *devfs_.get_class_entry(class_name.value()), target,
-                                        instance_name.value());
+                                        instance_name.value(), child_path,
+                                        std::string(class_name.value()));
+    }
+    // Add service entry:
+    if (service_entry.state & ServiceEntry::kService) {
+      out_child.protocol_node()->TryAddService(class_name.value(), target, instance_name.value());
     }
   }
-
-  out_child.topological_node().emplace(devfs_, children(), std::move(target), name);
+  // Add entry into dev-topological path:
+  out_child.topological_node().emplace(devfs_, children(), std::move(target), name, child_path);
 
   return ZX_OK;
+}
+
+void Devfs::AttachComponent(
+    fuchsia_component_runner::ComponentStartInfo info,
+    fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller) {
+  // Serve the outgoing directory:
+  if (!info.outgoing_dir().has_value()) {
+    LOGF(WARNING, "No outgoing dir available for devfs component.");
+    return;
+  }
+  auto result = outgoing_.Serve(std::move(*info.outgoing_dir()));
+  if (result.is_error()) {
+    LOGF(WARNING, "Failed to serve the devfs outgoing directory %s", result.status_string());
+    return;
+  }
+  binding_.emplace(dispatcher_, std::move(controller), this, fidl::kIgnoreBindingClosure);
 }
 
 zx::result<fidl::ClientEnd<fio::Directory>> Devfs::Connect(fs::FuchsiaVfs& vfs) {
@@ -259,7 +354,8 @@ zx::result<fidl::ClientEnd<fio::Directory>> Devfs::Connect(fs::FuchsiaVfs& vfs) 
   return zx::make_result(vfs.ServeDirectory(root_.node_, std::move(server)), std::move(client));
 }
 
-Devfs::Devfs(std::optional<Devnode>& root) : root_(root.emplace(*this)) {
+Devfs::Devfs(std::optional<Devnode>& root, async_dispatcher_t* dispatcher)
+    : root_(root.emplace(*this)), outgoing_(dispatcher), dispatcher_(dispatcher) {
   PseudoDir& pd = root_.children();
   MustAddEntry(pd, "class", class_);
   MustAddEntry(pd, kNullDevName, fbl::MakeRefCounted<BuiltinDevVnode>(true));
@@ -270,8 +366,9 @@ Devfs::Devfs(std::optional<Devnode>& root) : root_(root.emplace(*this)) {
     MustAddEntry(*builtin, kZeroDevName, fbl::MakeRefCounted<BuiltinDevVnode>(false));
     MustAddEntry(pd, "builtin", std::move(builtin));
   }
-  for (std::string class_name : kEagerClassNames) {
-    EnsureClassExists(class_name);
+  for (const auto& [class_name, service_entry] : kClassNameToService) {
+    class_entries_[std::string(class_name)] = fbl::MakeRefCounted<PseudoDir>();
+    MustAddEntry(*class_, class_name, class_entries_[std::string(class_name)]);
   }
 }
 
@@ -282,18 +379,10 @@ zx_status_t Devnode::export_class(Devnode::Target target, std::string_view class
     return instance_name.status_value();
   }
   Devnode& child = *out.emplace_back(std::make_unique<Devnode>(
-      devfs_, *devfs_.get_class_entry(class_name), target, instance_name.value()));
+      devfs_, *devfs_.get_class_entry(class_name), target, instance_name.value(), ""));
 
   child.publish();
   return ZX_OK;
-}
-
-void Devfs::EnsureClassExists(std::string_view name) {
-  if (class_entries_.contains(std::string(name))) {
-    return;
-  }
-  class_entries_[std::string(name)] = fbl::MakeRefCounted<PseudoDir>();
-  MustAddEntry(*class_, name, class_entries_[std::string(name)]);
 }
 
 zx_status_t Devnode::export_topological_path(Devnode::Target target,
@@ -339,7 +428,8 @@ zx_status_t Devnode::export_topological_path(Devnode::Target target,
         continue;
       }
       PseudoDir& parent = dn->node().children();
-      Devnode& child = *out.emplace_back(std::make_unique<Devnode>(devfs_, parent, Target{}, name));
+      Devnode& child =
+          *out.emplace_back(std::make_unique<Devnode>(devfs_, parent, Target{}, name, ""));
       child.publish();
       dn = &child;
       continue;
@@ -354,7 +444,7 @@ zx_status_t Devnode::export_topological_path(Devnode::Target target,
     // Create the final child.
     {
       Devnode& child = *out.emplace_back(
-          std::make_unique<Devnode>(devfs_, dn->node().children(), std::move(target), name));
+          std::make_unique<Devnode>(devfs_, dn->node().children(), std::move(target), name, ""));
       child.publish();
     }
   }
@@ -381,4 +471,5 @@ zx_status_t Devnode::export_dir(Devnode::Target target,
 
   return ZX_OK;
 }
+
 }  // namespace driver_manager

@@ -33,6 +33,19 @@ pub async fn wait_for_device_with<T>(
 
             let (controller_proxy, server_end) =
                 fidl::endpoints::create_proxy::<ControllerMarker>();
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            if dev_dir
+                .open(
+                    &controller_filename,
+                    fio::Flags::PROTOCOL_SERVICE,
+                    &fio::Options::default(),
+                    server_end.into_channel(),
+                )
+                .is_err()
+            {
+                return Ok(None);
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             if dev_dir
                 .open3(
                     &controller_filename,

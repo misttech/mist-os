@@ -73,6 +73,7 @@ driver_bind_rules("parent-driver-bind") {
 }
 
 fuchsia_cc_driver("parent-driver-driver") {
+  legacy = true
   output_name = "bindlib-codegen-parent"
   configs += [
     "//build/config:all_source",
@@ -106,6 +107,7 @@ driver_bind_rules("child-driver-bind") {
 }
 
 fuchsia_cc_driver("child-driver-driver") {
+  legacy = true
   output_name = "bindlib-codegen-child"
   configs += [
     "//build/config:all_source",

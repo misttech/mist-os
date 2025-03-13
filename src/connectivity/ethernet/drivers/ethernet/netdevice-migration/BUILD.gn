@@ -42,6 +42,7 @@ source_set("src") {
 }
 
 fuchsia_cc_driver("netdevice-migration-driver") {
+  legacy = true
   output_name = "netdevice-migration"
   deps = [
     ":netdevice-migration-bind",

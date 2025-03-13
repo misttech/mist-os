@@ -6,18 +6,22 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_LAYER_H_
 
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
+#include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.math/cpp/wire.h>
 #include <zircon/types.h>
 
+#include <cstdint>
 #include <memory>
 
 #include <fbl/intrusive_double_list.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/slab_allocator.h>
 
+#include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
+#include "src/graphics/display/drivers/coordinator/waiting-image-list.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-layer-id.h"
@@ -34,70 +38,22 @@ struct LayerNode : public fbl::DoublyLinkedListable<LayerNode*> {
   Layer* layer;
 };
 
-class LayerWaitingImage;
-
-using LayerWaitingImagePointer = std::unique_ptr<LayerWaitingImage>;
-
-// Define a slab allocator for instances of `LayerWaitingImage`. Maintaining the object count is
-// only done in debug builds, to ensure that there are no outstanding allocations when the allocator
-// is destroyed.
-constexpr fbl::SlabAllocatorOptions kLayerWaitingImageAllocatorOptions =
-    fbl::SlabAllocatorOptions::None
-#if !defined(NDEBUG)
-    | fbl::SlabAllocatorOptions::EnableObjectCount
-#endif  // !defined(NDEBUG)
-    ;
-using LayerWaitingImageAllocatorTraits =
-    fbl::InstancedSlabAllocatorTraits<LayerWaitingImagePointer,
-                                      /*SLAB_SIZE=*/fbl::DEFAULT_SLAB_ALLOCATOR_SLAB_SIZE,
-                                      /*LockType=*/fbl::Mutex,
-                                      /*Options=*/kLayerWaitingImageAllocatorOptions>;
-using LayerWaitingImageAllocator = fbl::SlabAllocator<LayerWaitingImageAllocatorTraits>;
-
-using LayerWaitingImageDoublyLinkedList =
-    fbl::DoublyLinkedList<LayerWaitingImagePointer, fbl::DefaultObjectTag, fbl::SizeOrder::N>;
-
-// Maps an image to a wait fence that will be signaled when its contents are ready. We want to be
-// able to maintain per-Layer lists of them without heap allocations, as would be required if we
-// stored them in C++ stdlib containers.
-//
-// This class is thread-unsafe and must be externally synchronized to guarantee access from only
-// one thread at a time.
-class LayerWaitingImage : public fbl::SlabAllocated<LayerWaitingImageAllocatorTraits>,
-                          public fbl::DoublyLinkedListable<LayerWaitingImagePointer> {
- public:
-  // `image` must be non-null. `wait_fence` is nullable; if null it means that the image may be
-  // presented immediately.
-  LayerWaitingImage(fbl::RefPtr<Image> image, fbl::RefPtr<FenceReference> wait_fence)
-      : image_(std::move(image)), wait_fence_(std::move(wait_fence)) {
-    ZX_DEBUG_ASSERT(image_);
-  }
-
-  const fbl::RefPtr<Image>& image() const { return image_; }
-
-  // Indicates whether the image contents are ready for display.
-  bool IsReady() const { return wait_fence_ == nullptr; }
-
-  // Mark the image as presentable if fence matches the wait_fence in the constructor.
-  void OnFenceReady(FenceReference* fence);
-
-  // If there is a wait fence, reset it, then clear it.
-  void ResetWaitFence();
-
- private:
-  fbl::RefPtr<Image> image_;
-  fbl::RefPtr<FenceReference> wait_fence_;
-};
-
 // Almost-POD used by Client to manage layer state. Public state is used by Controller.
 class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> {
  public:
-  // `controller` and `layer_waiting_image_allocator` must be non-null.
-  explicit Layer(Controller* controller, display::DriverLayerId id,
-                 LayerWaitingImageAllocator* layer_waiting_image_allocator);
+  // `controller` must be non-null.
+  explicit Layer(Controller* controller, display::DriverLayerId id);
+
+  Layer(const Layer&) = delete;
+  Layer(Layer&&) = delete;
+  Layer& operator=(const Layer&) = delete;
+  Layer& operator=(Layer&&) = delete;
+
   ~Layer();
 
-  fbl::RefPtr<Image> current_image() const { return displayed_image_; }
+  // The most recent image sent to the display engine for this layer.
+  fbl::RefPtr<Image> applied_image() const { return applied_image_; }
+
   bool is_skipped() const { return is_skipped_; }
 
   // TODO(https://fxbug.dev/42118906) Although this is nominally a POD, the state management and
@@ -105,14 +61,19 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> 
   friend Client;
   friend LayerTest;
 
-  bool in_use() const { return current_node_.InContainer() || pending_node_.InContainer(); }
+  bool in_use() const {
+    return applied_display_config_list_node_.InContainer() ||
+           draft_display_config_list_node_.InContainer();
+  }
 
-  const image_metadata_t& pending_image_metadata() const { return pending_layer_.image_metadata; }
-  uint64_t pending_image_handle() const { return pending_layer_.image_handle; }
+  const image_metadata_t& draft_image_metadata() const {
+    return draft_layer_config_.image_metadata;
+  }
+  uint64_t draft_image_handle() const { return draft_layer_config_.image_handle; }
 
-  // If the layer properties were changed in the pending configuration, this
+  // If the layer properties were changed in the draft configuration, this
   // retires all images as they are invalidated with layer properties change.
-  bool ResolvePendingLayerProperties();
+  bool ResolveDraftLayerProperties();
 
   // This sets up the fence and config stamp for pending images on this layer.
   //
@@ -125,36 +86,42 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> 
   //   layers to determine the current frame state.
   //
   // Returns false if there were any errors.
-  bool ResolvePendingImage(FenceCollection* fence,
-                           display::ConfigStamp stamp = display::kInvalidConfigStamp);
+  bool ResolveDraftImage(FenceCollection* fence,
+                         display::ConfigStamp stamp = display::kInvalidConfigStamp);
 
-  // Make the staged config current.
-  void ApplyChanges(const display_mode_t& mode);
+  // Set the applied layer configuration to the draft layer configuration.
+  void ApplyChanges();
 
-  // Discard the pending changes
+  // Set the draft layer configuration to the applied layer configuration.
+  //
+  // This discards any changes in the draft layer configuration.
   void DiscardChanges();
 
   // Removes references to all Images associated with this Layer.
-  // Returns true if the current config has been affected.
+  // Returns true if the applied config has been affected.
   bool CleanUpAllImages() __TA_REQUIRES(mtx());
 
   // Removes references to the provided Image. `image` must be valid.
-  // Returns true if the current config has been affected.
+  // Returns true if the applied config has been affected.
   bool CleanUpImage(const Image& image) __TA_REQUIRES(mtx());
 
-  // If a new image is available, retire current_image() and other pending images. Returns false if
+  // If a new image is available, retire applied_image() and other pending images. Returns false if
   // no images were ready.
   bool ActivateLatestReadyImage();
 
-  // Get the stamp of configuration that is associated (at ResolvePendingImage)
+  // Get the stamp of configuration that is associated (at ResolveDraftImage)
   // with the image that is currently being displayed on the device.
   // If no image is being displayed on this layer, returns nullopt.
   std::optional<display::ConfigStamp> GetCurrentClientConfigStamp() const;
 
-  // Adds the pending_layer_ to the end of a display list.
+  // Adds the layer's draft config to a display configuration's layer list.
   //
-  // Returns false if the pending_layer_ is currently in use.
-  bool AppendToConfig(fbl::DoublyLinkedList<LayerNode*>* list);
+  // Returns true if the method succeeds. The layer's draft config is be at
+  // the end of the display configuration's list of layer configs.
+  //
+  // Returns false if the layer's draft config is already in a display
+  // configuration's layer list. No changes are made.
+  bool AppendToConfigLayerList(fbl::DoublyLinkedList<LayerNode*>& config_layer_list);
 
   void SetPrimaryConfig(fuchsia_hardware_display_types::wire::ImageMetadata image_metadata);
   void SetPrimaryPosition(
@@ -166,7 +133,7 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> 
 
   // Called on all waiting images when any fence fires. Returns true if an image is ready to
   // present.
-  bool OnFenceReady(FenceReference* fence);
+  bool MarkFenceReady(FenceReference* fence);
 
   // Returns true if the layer has any waiting images. An image transitions from "pending" to
   // "waiting" (in the context of a specific layer) when that layer appears in an applied config.
@@ -176,52 +143,52 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> 
   fbl::Mutex* mtx() const;
 
  private:
-  // Retires the `pending_image_`.
-  void RetirePendingImage();
+  // Retires the `draft_image_`.
+  void RetireDraftImage();
 
   // Retires the `image` from the `waiting_images_` list.
   // Does nothing if `image` is not in the list.
   void RetireWaitingImage(const Image& image);
 
-  // Retires the image that is being displayed.
-  // Returns true if this affects the current display config.
-  bool RetireDisplayedImage() __TA_REQUIRES(mtx());
+  // Retires the image most recently sent to the display engine driver.
+  //
+  // Returns true if this changes the applied display configuration.
+  bool RetireAppliedImage() __TA_REQUIRES(mtx());
 
   Controller& controller_;
 
-  LayerWaitingImageAllocator& layer_waiting_image_allocator_;
+  layer_t draft_layer_config_;
+  layer_t applied_layer_config_;
 
-  layer_t pending_layer_;
-  layer_t current_layer_;
-  // flag indicating that there are changes in pending_layer that
-  // need to be applied to current_layer.
-  bool config_change_;
+  // True if `draft_layer_` is different from `applied_layer_`.
+  bool draft_layer_config_differs_from_applied_;
 
-  // Event ids passed to SetLayerImage which haven't been applied yet.
-  display::EventId pending_wait_event_id_;
+  // The event passed to SetLayerImage which hasn't been applied yet.
+  display::EventId draft_image_wait_event_id_ = display::kInvalidEventId;
 
   // The image given to SetLayerImage which hasn't been applied yet.
-  fbl::RefPtr<Image> pending_image_;
+  fbl::RefPtr<Image> draft_image_;
 
-  // Image which are waiting to be displayed. Each one has an optional wait fence which may not
-  // have been signaled.
+  // Manages images which are waiting to be displayed. Each one has an optional wait fence which
+  // may not have been signaled yet.
   //
   // Must be accessed on `controller_`'s client dispatcher loop. Call-sites must guarantee this via
   // `ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher())`.
-  LayerWaitingImageDoublyLinkedList waiting_images_;
+  WaitingImageList waiting_images_;
 
-  // The image which has most recently been sent to the display controller impl
-  fbl::RefPtr<Image> displayed_image_;
+  fbl::RefPtr<Image> applied_image_;
 
   // Counters used for keeping track of when the layer's images need to be dropped.
-  uint64_t pending_image_config_gen_ = 0;
-  uint64_t current_image_config_gen_ = 0;
+  uint64_t draft_image_config_gen_ = 0;
+  uint64_t applied_image_config_gen_ = 0;
 
-  LayerNode pending_node_;
-  LayerNode current_node_;
+  LayerNode draft_display_config_list_node_;
+  LayerNode applied_display_config_list_node_;
 
-  // The display this layer was most recently displayed on
-  display::DisplayId current_display_id_;
+  // Identifies the display that this layer was last applied to.
+  //
+  // Invalid if this layer never belonged to an applied display configuration.
+  display::DisplayId applied_to_display_id_ = display::kInvalidDisplayId;
 
   bool is_skipped_;
 };

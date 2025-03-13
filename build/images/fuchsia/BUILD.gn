@@ -85,6 +85,7 @@ if (is_fuchsia) {
   assembled_system("fuchsia_assembly") {
     testonly = fuchsia_zbi_testonly
     include_legacy_bundle = true
+    legacy_bundle_must_be_empty = true
 
     generate_fvm = !fxfs_blob
     generate_fxfs = fxfs_blob
@@ -103,8 +104,6 @@ if (is_fuchsia) {
       "//:developer_cache_packages",
       "//:legacy_cache_packages",
     ]
-    universe_packages = [ "//:developer_universe_packages" ]
-    bootfs_package_labels = product_bootfs_packages
 
     if (generate_fvm) {
       assembly_include_account_in_fvm = include_account_in_fvm

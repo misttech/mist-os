@@ -20,7 +20,7 @@
       "optionality": "required",
       "long": "--product",
       "short": null,
-      "description": "the configuration file that describes the product assembly to perform.",
+      "description": "the product configuration directory.",
       "hidden": false
     },
     {
@@ -32,7 +32,7 @@
       "optionality": "required",
       "long": "--board-info",
       "short": null,
-      "description": "the file containing information about the board that the product is being assembled to run on.",
+      "description": "the board configuration directory.",
       "hidden": false
     },
     {
@@ -81,6 +81,14 @@
       "long": "--legacy-bundle",
       "short": null,
       "description": "the path to the legacy assembly input bundle directory",
+      "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--legacy-bundle-must-be-empty",
+      "short": null,
+      "description": "enforce that the legacy AIB is empty",
       "hidden": false
     },
     {

@@ -121,8 +121,22 @@ impl FrameworkCapability for IntrospectorFrameworkCapability {
             /// Moniker for integration tests.
             static ref RECEIVER: Moniker =
                 Moniker::parse_str("/receiver").unwrap();
+            static ref ELF_TEST_RUNNER: Moniker =
+                Moniker::parse_str("/core/testing/elf_test_runner").unwrap();
+            static ref FUZZ_TEST_RUNNER: Moniker =
+                Moniker::parse_str("/core/testing/fuzz_test_runner").unwrap();
+            static ref GO_TEST_RUNNER: Moniker =
+                Moniker::parse_str("/core/testing/go_test_runner").unwrap();
+            static ref GTEST_TEST_RUNNER: Moniker =
+                Moniker::parse_str("/core/testing/gunit_runner").unwrap();
+            static ref GUNIT_TEST_RUNNER: Moniker =
+                Moniker::parse_str("/core/testing/gunit_runner").unwrap();
             static ref RUST_TEST_RUNNER: Moniker =
                 Moniker::parse_str("/core/testing/rust_test_runner").unwrap();
+            static ref STARNIX_TEST_RUNNER: Moniker =
+                Moniker::parse_str("/core/testing/starnix_test_runner").unwrap();
+            static ref ZXTEST_TEST_RUNNER: Moniker =
+                Moniker::parse_str("/core/testing/zxtest_runner").unwrap();
             static ref TEST_REALMS: Moniker =
                 Moniker::parse_str("/core/testing").unwrap();
             static ref STARNIX_TESTS: Name = "starnix-tests".parse().unwrap();
@@ -149,7 +163,14 @@ impl FrameworkCapability for IntrospectorFrameworkCapability {
         };
         if target.moniker != *MEMORY_MONITOR
             && target.moniker != *RECEIVER
+            && target.moniker != *ELF_TEST_RUNNER
+            && target.moniker != *FUZZ_TEST_RUNNER
+            && target.moniker != *GO_TEST_RUNNER
+            && target.moniker != *GTEST_TEST_RUNNER
+            && target.moniker != *GUNIT_TEST_RUNNER
             && target.moniker != *RUST_TEST_RUNNER
+            && target.moniker != *STARNIX_TEST_RUNNER
+            && target.moniker != *ZXTEST_TEST_RUNNER
             && !target.moniker.is_root()
             && !(is_starnix_test_realm(&target.moniker) && is_starnix_test_realm(&scope.moniker))
         {

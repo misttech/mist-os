@@ -188,7 +188,7 @@ class MetricProcessorsTest(unittest.TestCase):
                     TCR(
                         label="RenderCpu",
                         unit=U.milliseconds,
-                        values=[0.09, 0.08, 0.1],
+                        values=[0.09, 0.08],
                     ),
                     TCR(
                         label="RenderTotal",
@@ -205,7 +205,7 @@ class MetricProcessorsTest(unittest.TestCase):
                 model_file="scenic_metric.json",
                 expected_results=(
                     trace_utils.standard_metrics_set(
-                        [0.09, 0.08, 0.1],
+                        [0.09, 0.08],
                         "RenderCpu",
                         U.milliseconds,
                     )

@@ -6,7 +6,6 @@
 
 #ifndef ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_PCI_DEVICE_DISPATCHER_H_
 #define ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_PCI_DEVICE_DISPATCHER_H_
-#if WITH_KERNEL_PCIE
 
 #include <sys/types.h>
 #include <zircon/rights.h>
@@ -70,7 +69,5 @@ class PciDeviceDispatcher final
   uint irqs_avail_cnt_ TA_GUARDED(lock_) = 0;
   bool irqs_maskable_ TA_GUARDED(lock_) = false;
 };
-
-#endif  // if WITH_KERNEL_PCIE
 
 #endif  // ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_PCI_DEVICE_DISPATCHER_H_

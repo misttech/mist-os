@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -39,6 +40,13 @@ const (
 	ffxEnvFilename = ".ffx_env"
 )
 
+type FFXInvokeMode int
+
+const (
+	UseFFXLegacy FFXInvokeMode = iota
+	UseFFXStrict
+)
+
 type LogLevel string
 
 const (
@@ -52,40 +60,45 @@ const (
 
 type ffxCmdBuilder interface {
 	// Build an ffx command with appropriate additional arguments
-	command(ffxPath string, args []string) []string
+	command(ffxPath string, supportsStrict bool, args []string) []string
 	// Store the configuration for future ffx invocations
-	setConfig(user, global map[string]any) error
+	setConfigMap(user, global map[string]any) error
+	// Get the config map
+	getConfigMap() map[string]any
+	// Add an individual mapping to the configuration
+	setConfig(key, val string)
 	// Return additional environment variables required by this runner
 	env() []string
+	// Return whether this builder is strict
+	isStrict() bool
 }
 
-// stdCmdFfxBuilder is a builder for ffx commands using the 'standard" approach:
+// legacyFfxCmdBuilder is a builder for ffx commands using the "legacy" approach:
 // with isolate dirs, invoking `ffx config set` to specify configurations,
-// etc. Eventually we will also have a "strict" builder which will abide by
-// ffx-strict semantics (see b/391391857).
-type stdFfxCmdBuilder struct {
+// etc. See strictFfxCmdBuilder for the alternate mechanism.
+type legacyFfxCmdBuilder struct {
 	isolateDir string
 	configDir  string
 }
 
-func newStdFfxCmdBuilder(
+func newLegacyFfxCmdBuilder(
 	isolateDir string,
 	configDir string,
-) *stdFfxCmdBuilder {
-	return &stdFfxCmdBuilder{
+) *legacyFfxCmdBuilder {
+	return &legacyFfxCmdBuilder{
 		isolateDir,
 		configDir,
 	}
 }
 
-func (r *stdFfxCmdBuilder) command(ffxPath string, args []string) []string {
-	return append([]string{ffxPath, "--isolate-dir", r.isolateDir}, args...)
+func (b *legacyFfxCmdBuilder) command(ffxPath string, _supportsStrict bool, args []string) []string {
+	return append([]string{ffxPath, "--isolate-dir", b.isolateDir}, args...)
 }
 
-func (r *stdFfxCmdBuilder) setConfig(user, global map[string]any) error {
-	ffxEnvFilepath := filepath.Join(r.configDir, ffxEnvFilename)
-	globalConfigFilepath := filepath.Join(r.configDir, "global_config.json")
-	userConfigFilepath := filepath.Join(r.configDir, "user_config.json")
+func (b *legacyFfxCmdBuilder) setConfigMap(user, global map[string]any) error {
+	ffxEnvFilepath := filepath.Join(b.configDir, ffxEnvFilename)
+	globalConfigFilepath := filepath.Join(b.configDir, "global_config.json")
+	userConfigFilepath := filepath.Join(b.configDir, "user_config.json")
 	ffxEnvSettings := map[string]any{
 		"user":   userConfigFilepath,
 		"global": globalConfigFilepath,
@@ -102,8 +115,123 @@ func (r *stdFfxCmdBuilder) setConfig(user, global map[string]any) error {
 	return nil
 }
 
-func (r *stdFfxCmdBuilder) env() []string {
-	return []string{fmt.Sprintf("%s=%s", FFXIsolateDirEnvKey, r.isolateDir)}
+// This should not be called. (Having this code run "ffx config get") would
+// require invoking an external program, which is not the responsibility of
+// an ffxCmdBuilder)
+func (b *legacyFfxCmdBuilder) getConfigMap() map[string]any {
+	panic("getConfigMap shouldn't be called with legacy ffx")
+}
+
+// This should not be called. (Having this code run "ffx config set") would
+// require invoking an external program, which is not the responsibility of
+// an ffxCmdBuilder)
+func (b *legacyFfxCmdBuilder) setConfig(key, val string) {
+	panic("setConfig shouldn't be called with legacy ffx")
+}
+
+func (b *legacyFfxCmdBuilder) env() []string {
+	return []string{fmt.Sprintf("%s=%s", FFXIsolateDirEnvKey, b.isolateDir)}
+}
+
+func (f *legacyFfxCmdBuilder) isStrict() bool {
+	return false
+}
+
+// strictFfxCmdBuilder is a builder for ffx commands using the 'strict"
+// approach: no isolate dir, all required configs passed to the command,
+// etc.
+type strictFfxCmdBuilder struct {
+	outputFile    string
+	configs       map[string]any
+	tmpIsolateDir string
+}
+
+func newStrictFfxCmdBuilder(outputFile string) *strictFfxCmdBuilder {
+	return &strictFfxCmdBuilder{outputFile: outputFile}
+}
+
+// This is a _temporary_ mechanism for using strict ffx, while the
+// necessary subtools are still being developed. It must be provided
+// until the ffx-strict transition is complete, but it is not part of
+// the constructor, as a hint that this is mechanism is temporary.
+// TODO(slgrady): Remove this function and all references to isolateDir
+// from strictFfxCmdBuilder once all necessary ffx subtools implement
+// "--strict"
+func (b *strictFfxCmdBuilder) tempSetIsolateDir(dir string) {
+	b.tmpIsolateDir = dir
+}
+
+// Build the required command for a strict invocation. Note that the command
+// may require the target, but the caller should have set that if so.
+func (b *strictFfxCmdBuilder) command(ffxPath string, supportsStrict bool, args []string) []string {
+	cmd := []string{ffxPath, "-o", b.outputFile}
+
+	if supportsStrict {
+		// The command does in fact support --strict, so let's use it!
+		cmd = append(cmd, "--strict")
+	} else {
+		// We don't support strict, so we'd better keep using the isolate dir
+		cmd = append(cmd, "--isolate-dir", b.tmpIsolateDir)
+	}
+
+	// The caller may have already provided the "--machine" argument
+	if !slices.Contains(args, "--machine") {
+		cmd = append(cmd, "--machine", "json")
+	}
+
+	// TODO(slgrady): Eventually use the specific configs required for
+	// particular commands. Unfortunately that information is not
+	// available from ffx yet.
+	for k, v := range b.configs {
+		cmd = append(cmd, "-c", fmt.Sprintf("%s=%v", k, v))
+	}
+
+	return append(cmd, args...)
+}
+
+// Store the configuration for future invocations
+// TODO(slgrady): change this function to take a single map of
+// configuration options once we remove non-strict ffx invocations,
+func (b *strictFfxCmdBuilder) setConfigMap(user, global map[string]any) error {
+	// In strict mode, both user and global configurations are passed on the
+	// command line, so there is no need to differentiate them, so we just merge
+	// them here before saving them.
+	// Overwrite global with user, in case there are duplicates. This
+	// matches the priority of ffx config.
+	for k, v := range user {
+		global[k] = v
+	}
+
+	// Strip out certain configs that don't apply to strict invocations
+	// TODO(slgrady): enable these once we support all strict commands, and
+	// so none of these configs are necessary. (Until then, we need
+	// to be careful, continuing to prevent a "strict" invocation
+	// from escaping its isolation)
+	// (And later still: TODO(slgrady): remove this code once we remove
+	//  non-strict ffx invocations)
+	// delete(global, "daemon.autostart")
+	// delete(global, "ffx.target-list.local-connect")
+
+	b.configs = global
+	return nil
+}
+
+func (b *strictFfxCmdBuilder) getConfigMap() map[string]any {
+	return b.configs
+}
+
+func (b *strictFfxCmdBuilder) setConfig(key, val string) {
+	b.configs[key] = val
+}
+
+// TODO(slgrady): remove this method once we get rid of isolate dirs, when
+// strict is fully supported
+func (b *strictFfxCmdBuilder) env() []string {
+	return []string{fmt.Sprintf("%s=%s", FFXIsolateDirEnvKey, b.tmpIsolateDir)}
+}
+
+func (f *strictFfxCmdBuilder) isStrict() bool {
+	return true
 }
 
 // FFXInstance takes in a path to the ffx tool and runs ffx commands with the provided config.
@@ -187,8 +315,10 @@ func NewFFXInstance(
 	env []string,
 	target, sshKey string,
 	outputDir string,
+	invokeMode FFXInvokeMode,
 	extraConfigSettings ...ConfigSettings,
 ) (*FFXInstance, error) {
+	logger.Debugf(ctx, "NewFFXInstance: ffx=%s dir=%s target=%s sshKey=%s oDir=%s", ffxPath, processDir, target, sshKey, outputDir)
 	if ffxPath == "" {
 		return nil, nil
 	}
@@ -204,10 +334,21 @@ func NewFFXInstance(
 	if err != nil {
 		return nil, err
 	}
-	cmdBuilder := newStdFfxCmdBuilder(
-		absOutputDir,
-		absOutputDir,
-	)
+	var cmdBuilder ffxCmdBuilder
+	if invokeMode == UseFFXStrict {
+		outputFile := filepath.Join(absOutputDir, "ffx.log")
+		var strictFfx = newStrictFfxCmdBuilder(outputFile)
+		// TODO(slgrady): Remove the isolateDir when ffx-strict is fully
+		// implemented
+		strictFfx.tempSetIsolateDir(absOutputDir)
+		cmdBuilder = strictFfx
+	} else {
+		cmdBuilder = newLegacyFfxCmdBuilder(
+			absOutputDir,
+			absOutputDir,
+		)
+
+	}
 	env = append(os.Environ(), env...)
 	env = append(env, cmdBuilder.env()...)
 	ffx := &FFXInstance{
@@ -220,14 +361,19 @@ func NewFFXInstance(
 		target:     target,
 		env:        env,
 	}
-	if sshKey != "" {
-		sshKey, err = filepath.Abs(sshKey)
+	// Always make sure we have a private key
+	if sshKey == "" {
+		sshKey, err = ffx.GetSshPrivateKey(ctx)
 		if err != nil {
 			return nil, err
 		}
 	}
+	sshKey, err = filepath.Abs(sshKey)
+	if err != nil {
+		return nil, err
+	}
 	userConfig, globalConfig := buildConfigs(absOutputDir, absFFXPath, sshKey, extraConfigSettings)
-	if err := cmdBuilder.setConfig(userConfig, globalConfig); err != nil {
+	if err := cmdBuilder.setConfigMap(userConfig, globalConfig); err != nil {
 		return nil, err
 	}
 	return ffx, nil
@@ -245,9 +391,10 @@ func buildConfigs(absOutputDir string, absFFXPath string, absSshKeyPath string, 
 		"log.dir":                      filepath.Join(absOutputDir, "ffx_logs"),
 		"ffx.subtool-search-paths":     filepath.Dir(absFFXPath),
 		"test.experimental_json_input": true,
+		"emu.instance_dir":             filepath.Join(absOutputDir, "emu/instances"),
 	}
 	if absSshKeyPath != "" {
-		userConfigSettings["ssh.priv"] = []string{absSshKeyPath}
+		userConfigSettings["ssh.priv"] = absSshKeyPath
 	}
 	for _, settings := range extraConfigSettings {
 		if settings.Level == "global" {
@@ -308,6 +455,10 @@ func (f *FFXInstance) Stderr() io.Writer {
 	return f.stderr
 }
 
+func (f *FFXInstance) isStrict() bool {
+	return f.cmdBuilder.isStrict()
+}
+
 // SetStdoutStderr sets the stdout and stderr for the ffx commands to write to.
 func (f *FFXInstance) SetStdoutStderr(stdout, stderr io.Writer) {
 	f.stdout = stdout
@@ -319,44 +470,168 @@ func (f *FFXInstance) SetLogLevel(ctx context.Context, level LogLevel) error {
 	return f.ConfigSet(ctx, "log.level", string(level))
 }
 
-// ConfigSet sets a field in the ffx instance's associated config.
-func (f *FFXInstance) ConfigSet(ctx context.Context, key, value string) error {
-	return f.Run(ctx, "config", "set", key, value)
+func (f *FFXInstance) ConfigEnv(ctx context.Context) error {
+	// Irrelevant in strict mode
+	if f.isStrict() {
+		fmt.Fprintln(f.stdout, "ffx config env unnecessary with ffx-strict")
+		return nil
+	}
+	return f.Run(ctx, "config", "env")
 }
 
-// Command returns an *exec.Cmd to run ffx with the provided args.
-func (f *FFXInstance) Command(args ...string) *exec.Cmd {
-	ffx_cmd := f.cmdBuilder.command(f.ffxPath, args)
-	return f.runner.Command(ffx_cmd, subprocess.RunOptions{
+// ConfigSet sets a field in the ffx instance's associated config.
+func (f *FFXInstance) ConfigSet(ctx context.Context, key, value string) error {
+	// This code is ugly, but we can't delegate the setting to the ffxCmdBuilder
+	// since we may need to invoke an external program, and adding that responsibility
+	// to the ffxCmdBuilder would be ugly. This code will all go away once we switch
+	// fully over to ffx-strict
+	if !f.isStrict() {
+		return f.Run(ctx, "config", "set", key, value)
+	}
+	f.cmdBuilder.setConfig(key, value)
+	return nil
+}
+
+func (f *FFXInstance) invoker(args []string) *ffxInvoker {
+	// By default, use the FFXInstance's stdout/stderr
+	return &ffxInvoker{ffx: f, args: args, stdout: f.stdout, stderr: f.stderr}
+}
+
+type ffxInvoker struct {
+	ffx            *FFXInstance
+	args           []string
+	target         string
+	configs        map[string]string
+	timeout        *time.Duration
+	captureOutput  bool
+	output         *bytes.Buffer
+	stdout         io.Writer
+	stderr         io.Writer
+	noMachine      bool
+	supportsStrict bool // TODO(slgrady) Remove once all required commands support --strict
+}
+
+func (f *ffxInvoker) cmd() *exec.Cmd {
+	args := f.args
+	if f.target != "" {
+		args = append([]string{"--target", f.target}, args...)
+	}
+	// Add command-specific configs
+	for k, v := range f.configs {
+		args = append([]string{"-c", fmt.Sprintf("%s=%v", k, v)}, args...)
+	}
+	ffx_cmd := f.ffx.cmdBuilder.command(f.ffx.ffxPath, f.supportsStrict, args)
+	if f.noMachine {
+		// Strip out the "--machine", "json" flags if they exist
+		for i, arg := range ffx_cmd {
+			if arg == "--machine" {
+				// Note: i+2 because we want to remove both "--machine"
+				// and the following arg
+				ffx_cmd = append(ffx_cmd[:i], ffx_cmd[i+2:]...)
+			}
+		}
+	}
+
+	return f.ffx.runner.Command(ffx_cmd, subprocess.RunOptions{
 		Stdout: f.stdout,
 		Stderr: f.stderr,
 	})
 }
 
-// CommandWithTarget returns a Command to run with the associated target.
-func (f *FFXInstance) CommandWithTarget(args ...string) *exec.Cmd {
-	args = append([]string{"--target", f.target}, args...)
-	return f.Command(args...)
-}
-
-// RunWithTimeout runs ffx with the associated config and provided args.
-func (f *FFXInstance) RunWithTimeout(ctx context.Context, timeout time.Duration, args ...string) error {
-	cmd := f.Command(args...)
+// This function should only be invoked once in an ffxInvoker.
+// The proper idiom is to construct the ffxInvoker, then immediately
+// run (or use the `cmd()` method) without storing it
+func (f *ffxInvoker) run(ctx context.Context) error {
+	// By default, runs ffx commands with a 5 minute timeout.
+	var timeout time.Duration = 5 * time.Minute
+	if f.timeout != nil {
+		timeout = *f.timeout
+	}
 	if timeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
+		ctx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()
 	}
-	if err := f.runner.RunCommand(ctx, cmd); err != nil {
+	if f.captureOutput {
+		// Store the output in our buffer
+		var output bytes.Buffer
+		f.output = &output
+		stdout := io.MultiWriter(f.output, f.stdout)
+		f.stdout = stdout
+	}
+	cmd := f.cmd()
+	if err := f.ffx.runner.RunCommand(ctx, cmd); err != nil {
 		return fmt.Errorf("%s (%s): %w", constants.CommandFailedMsg, cmd.String(), err)
 	}
 	return nil
 }
 
+func (i *ffxInvoker) setTarget(target string) *ffxInvoker {
+	i.target = target
+	return i
+}
+
+func (i *ffxInvoker) setConfigs(configs map[string]string) *ffxInvoker {
+	i.configs = configs
+	return i
+}
+
+func (i *ffxInvoker) setTimeout(timeout time.Duration) *ffxInvoker {
+	i.timeout = &timeout
+	return i
+}
+
+func (i *ffxInvoker) setCaptureOutput() *ffxInvoker {
+	i.captureOutput = true
+	return i
+}
+
+func (i *ffxInvoker) setStdout(stdout io.Writer) *ffxInvoker {
+	i.stdout = stdout
+	return i
+}
+
+func (i *ffxInvoker) setStderr(stderr io.Writer) *ffxInvoker {
+	i.stderr = stderr
+	return i
+}
+
+func (i *ffxInvoker) setStrict() *ffxInvoker {
+	i.supportsStrict = true
+	return i
+}
+
+// Temporary function to tell strict invocations not to use "--machine"
+// if a command (such as "ffx daemon start" doesn't support the flag.
+// TODO(slgrady): remove once all commands support "--machine"
+func (i *ffxInvoker) setNoMachine() *ffxInvoker {
+	i.noMachine = true
+	return i
+}
+
+// Convenience API
+
+// Command returns an *exec.Cmd to run ffx with the provided args.
+func (f *FFXInstance) Command(args ...string) *exec.Cmd {
+	return f.invoker(args).cmd()
+}
+
+// CommandWithTarget returns a Command to run with the associated target.
+func (f *FFXInstance) CommandWithTarget(args ...string) (*exec.Cmd, error) {
+	if f.target == "" {
+		return nil, fmt.Errorf("no target is set")
+	}
+	return f.invoker(args).setTarget(f.target).cmd(), nil
+}
+
+// RunWithTimeout runs ffx with the associated config and provided args.
+func (f *FFXInstance) RunWithTimeout(ctx context.Context, timeout time.Duration, args ...string) error {
+	return f.invoker(args).setTimeout(timeout).run(ctx)
+}
+
 // Run runs ffx with the associated config and provided args.
 func (f *FFXInstance) Run(ctx context.Context, args ...string) error {
-	// By default, runs ffx commands with 5 minutes timeout.
-	return f.RunWithTimeout(ctx, 5*time.Minute, args...)
+	return f.invoker(args).run(ctx)
 }
 
 // RunCommand runs the given cmd with the FFXInstance's subprocess runner.
@@ -369,8 +644,7 @@ func (f *FFXInstance) RunWithTarget(ctx context.Context, args ...string) error {
 	if f.target == "" {
 		return fmt.Errorf("no target is set")
 	}
-	args = append([]string{"--target", f.target}, args...)
-	return f.Run(ctx, args...)
+	return f.invoker(args).setTarget(f.target).run(ctx)
 }
 
 // RunWithTargetAndTimeout runs ffx with the associated target and timeout.
@@ -378,22 +652,22 @@ func (f *FFXInstance) RunWithTargetAndTimeout(ctx context.Context, timeout time.
 	if f.target == "" {
 		return fmt.Errorf("no target is set")
 	}
-	args = append([]string{"--target", f.target}, args...)
-	return f.RunWithTimeout(ctx, timeout, args...)
+	return f.invoker(args).setTarget(f.target).setTimeout(timeout).run(ctx)
 }
 
 // RunAndGetOutput runs ffx with the provided args and returns the stdout.
 func (f *FFXInstance) RunAndGetOutput(ctx context.Context, args ...string) (string, error) {
-	origStdout := f.stdout
-	var output bytes.Buffer
-	f.stdout = io.MultiWriter(&output, origStdout)
-	defer func() {
-		f.stdout = origStdout
-	}()
-	if err := f.Run(ctx, args...); err != nil {
-		return strings.TrimSpace(output.String()), err
-	}
-	return strings.TrimSpace(output.String()), nil
+	i := f.invoker(args).setCaptureOutput()
+	err := i.run(ctx)
+	s := i.output.String()
+	return strings.TrimSpace(s), err
+}
+
+func (f *FFXInstance) StartDaemon(ctx context.Context, daemonLog *os.File) *exec.Cmd {
+	args := []string{"daemon", "start"}
+	cmd := f.invoker(args).setStdout(daemonLog).setNoMachine().cmd()
+	logger.Debugf(ctx, "%s", cmd.Args)
+	return cmd
 }
 
 // WaitForDaemon tries a few times to check that the daemon is up
@@ -443,8 +717,22 @@ func (f *FFXInstance) List(ctx context.Context, args ...string) error {
 }
 
 // TargetWait waits until the target becomes available.
-func (f *FFXInstance) TargetWait(ctx context.Context) error {
-	return f.RunWithTarget(ctx, "target", "wait")
+func (f *FFXInstance) TargetWait(ctx context.Context, args ...string) error {
+	if f.target == "" {
+		return fmt.Errorf("no target is set")
+	}
+	return f.invoker(append([]string{"target", "wait"}, args...)).setTarget(f.target).setStrict().run(ctx)
+}
+
+// EmuStart returns an invoker to start the emulator with the specified
+// commands.
+func (f *FFXInstance) EmuStart(pubPath string, args ...string) *ffxInvoker {
+	configs := map[string]string{"ssh.pub": pubPath}
+	return f.invoker(append([]string{"emu", "start"}, args...)).setStrict().setConfigs(configs)
+}
+
+func (f *FFXInstance) EmuStop(ctx context.Context, args ...string) error {
+	return f.invoker(append([]string{"emu", "stop"}, args...)).setStrict().run(ctx)
 }
 
 // Test runs a test suite.
@@ -465,28 +753,31 @@ func (f *FFXInstance) Test(
 	// Create a new subdirectory within outDir to pass to --output-directory which is expected to be
 	// empty.
 	testOutputDir := filepath.Join(outDir, "test-outputs")
-	f.RunWithTargetAndTimeout(
-		ctx,
-		0,
-		append(
-			[]string{
-				"test",
-				"run",
-				"--continue-on-timeout",
-				"--test-file",
-				testFile,
-				"--output-directory",
-				testOutputDir,
-				"--show-full-moniker-in-logs",
-			},
-			args...)...)
+	args = append(
+		[]string{
+			"test",
+			"run",
+			"--continue-on-timeout",
+			"--test-file",
+			testFile,
+			"--output-directory",
+			testOutputDir,
+			"--show-full-moniker-in-logs",
+		},
+		args...)
+	if err := f.invoker(args).setTarget(f.target).setTimeout(0).setNoMachine().run(ctx); err != nil {
+		return nil, err
+	}
 
 	return GetRunResult(testOutputDir)
 }
 
 // Snapshot takes a snapshot of the target's state and saves it to outDir/snapshotFilename.
 func (f *FFXInstance) Snapshot(ctx context.Context, outDir string, snapshotFilename string) error {
-	err := f.RunWithTarget(ctx, "target", "snapshot", "--dir", outDir)
+	if f.target == "" {
+		return fmt.Errorf("no target is set")
+	}
+	err := f.invoker([]string{"target", "snapshot", "--dir", outDir}).setStrict().setTarget(f.target).run(ctx)
 	if err != nil {
 		return err
 	}
@@ -501,39 +792,46 @@ func (f *FFXInstance) Snapshot(ctx context.Context, outDir string, snapshotFilen
 
 // GetConfig shows the ffx config.
 func (f *FFXInstance) GetConfig(ctx context.Context) error {
-	return f.Run(ctx, "config", "get")
+	if f.isStrict() {
+		for k, v := range f.cmdBuilder.getConfigMap() {
+			fmt.Fprintf(f.stdout, "ffx config: {%s}={%v}\n", k, v)
+		}
+		return nil
+	} else {
+		return f.Run(ctx, "config", "get")
+	}
+}
+
+func (f *FFXInstance) getSshKey(ctx context.Context, configKey string) (string, error) {
+	// Check that the keys exist and are valid
+	args := []string{"config", "check-ssh-keys"}
+	err := f.invoker(args).setNoMachine().run(ctx)
+	if err != nil {
+		return "", err
+	}
+	args = []string{"config", "get", configKey}
+	// TODO(slgrady): when `ffx --machine json config get` works, parse
+	// the json output
+	i := f.invoker(args).setCaptureOutput().setNoMachine()
+	err = i.run(ctx)
+	if err != nil {
+		return "", err
+	}
+	key := i.output.String()
+
+	// strip quotes if present.
+	key = strings.Replace(strings.TrimSpace(key), "\"", "", -1)
+	return key, nil
 }
 
 // GetSshPrivateKey returns the file path for the ssh private key.
 func (f *FFXInstance) GetSshPrivateKey(ctx context.Context) (string, error) {
-	// Check that the keys exist and are valid
-	if err := f.Run(ctx, "config", "check-ssh-keys"); err != nil {
-		return "", err
-	}
-	key, err := f.RunAndGetOutput(ctx, "config", "get", "ssh.priv")
-	if err != nil {
-		return "", err
-	}
-
-	// strip quotes if present.
-	key = strings.Replace(key, "\"", "", -1)
-	return key, nil
+	return f.getSshKey(ctx, "ssh.priv")
 }
 
 // GetSshAuthorizedKeys returns the file path for the ssh auth keys.
 func (f *FFXInstance) GetSshAuthorizedKeys(ctx context.Context) (string, error) {
-	// Check that the keys exist and are valid
-	if err := f.Run(ctx, "config", "check-ssh-keys"); err != nil {
-		return "", err
-	}
-	key, err := f.RunAndGetOutput(ctx, "config", "get", "ssh.pub")
-	if err != nil {
-		return "", err
-	}
-
-	// strip quotes if present.
-	key = strings.Replace(key, "\"", "", -1)
-	return key, nil
+	return f.getSshKey(ctx, "ssh.pub")
 }
 
 // GetPBArtifacts returns a list of the artifacts required for the specified artifactsGroup (flash or emu).

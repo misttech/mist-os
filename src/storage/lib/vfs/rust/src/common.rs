@@ -249,10 +249,15 @@ macro_rules! immutable_attributes {
 /// Represents if and how objects should be created with an open request.
 #[derive(PartialEq, Eq)]
 pub enum CreationMode {
+    // Never create object.
     Never,
+    // Object will be created if it does not exist.
     AllowExisting,
+    // Create the object, will fail if it does exist.
     Always,
+    // Create the object as an unnamed and temporary object.
     UnnamedTemporary,
+    // Create the object as an unnamed, temporary, and unlinkable object.
     UnlinkableUnnamedTemporary,
 }
 

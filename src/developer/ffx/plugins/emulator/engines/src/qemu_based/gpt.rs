@@ -9,7 +9,7 @@ use ffx_config::environment::ExecutableKind;
 use ffx_config::EnvironmentContext;
 use fho::{return_bug, user_error, Result};
 use make_fuchsia_vol::args::{
-    Arch, TopLevel as MakeFuchsiaVolCmd, ABR_SIZE, EFI_SIZE, VBMETA_SIZE,
+    Arch, TopLevel as MakeFuchsiaVolCmd, ABR_SIZE, EFI_SIZE, SYSTEM_PART_SIZE, VBMETA_SIZE,
 };
 use sdk_metadata::CpuArchitecture;
 use std::path::PathBuf;
@@ -81,6 +81,7 @@ impl FuchsiaFullDiskImageBuilder {
             vbmeta_a: self.vbmeta.clone(),
             vbmeta_b: self.vbmeta.clone(),
             vbmeta_size: VBMETA_SIZE,
+            system_disk_size: Some(SYSTEM_PART_SIZE),
             // make_fuchsia_vol uses zbi for both A and B partitions unless specified otherwise:
             // //tools/make-fuchsia-vol/src/args.rs
             zbi: self.zbi,

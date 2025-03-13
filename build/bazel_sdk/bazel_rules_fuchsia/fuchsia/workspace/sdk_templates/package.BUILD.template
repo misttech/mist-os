@@ -8,6 +8,5 @@ fuchsia_prebuilt_package(
     name = "{{name}}",
     files = [{{files}}],
     manifest = "{{manifest}}",
-    deprecation = {{deprecation}},
     target_compatible_with = COMPATIBILITY.HOST_CONDITION,
 )

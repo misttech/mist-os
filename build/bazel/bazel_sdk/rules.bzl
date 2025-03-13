@@ -84,7 +84,7 @@ generate_bazel_sdk = rule(
         "use_rules_fuchsia": attr.bool(
             doc = "Set to True to generate an SDK repository that uses @rules_fuchsia to load rules. " +
                   "By default, this creates a standalone repository instead.",
-            default = False,
+            default = True,
         ),
         "_idk_to_bazel_script": attr.label(
             default = "//build/bazel/bazel_sdk:idk_to_bazel_sdk",

@@ -84,7 +84,7 @@ impl package_directory::NonMetaStorage for BootfsThenBlobfs {
         if self.0.bootfs_contents.contains(blob) {
             self.0
                 .bootfs
-                .open3(
+                .open(
                     &blob.to_string(),
                     flags,
                     &object_request.options(),

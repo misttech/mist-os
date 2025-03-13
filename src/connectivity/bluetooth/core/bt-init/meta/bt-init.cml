@@ -20,6 +20,16 @@
             url: "fuchsia-pkg://fuchsia.com/bt-fastpair-provider#meta/bt-fastpair-provider.cm",
         },
     ],
+    offer: [
+        {
+            protocol: "fuchsia.scheduler.RoleManager",
+            from: "parent",
+            to: [
+                "#bt-host-collection",
+                "#bt-rfcomm",
+            ],
+        },
+    ],
     expose: [
         // This protocol is only exposed in testonly builds (see `bt-init-testonly`).
         // Here, it's exposed from void to prevent access from the sshd shell.

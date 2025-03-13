@@ -72,9 +72,17 @@
             protocol: [
                 "fuchsia.fxfs.BlobCreator",
                 "fuchsia.update.verify.BlobfsVerifier",
-                "fuchsia.update.verify.ComponentOtaHealthCheck",
             ],
             from: "self",
+        },
+        {
+            protocol: [ "fuchsia.update.verify.ComponentOtaHealthCheck" ],
+            from: "self",
+        },
+        {
+            protocol: [ "fuchsia.update.verify.ComponentOtaHealthCheck" ],
+            from: "self",
+            to: "framework",
         },
         {
             protocol: "fuchsia.fxfs.BlobReader",

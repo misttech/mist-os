@@ -60,6 +60,7 @@ driver_bind_rules("interop_v1_bind") {
 }
 
 fuchsia_cc_driver("v1_driver") {
+  legacy = true
   testonly = true
   output_name = "interop_v1"
   sources = [ "v1_driver.cc" ]
@@ -138,6 +139,5 @@ fuchsia_unittest_package("interop_test") {
     ":root",
     ":v1",
     "//sdk/lib/driver_test_realm:driver_test_realm_component",
-    "//src/devices/bin/driver_host:component",
   ]
 }

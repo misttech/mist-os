@@ -35,9 +35,7 @@
             ],
         },
         {
-            directory: "dev-class-fastboot",
-            rights: [ "r*" ],
-            path: "/dev/class/fastboot",
+            service: "fuchsia.hardware.fastboot.Service",
         },
     ],
 }

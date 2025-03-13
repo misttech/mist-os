@@ -30,6 +30,27 @@ pub struct TimekeeperConfig {
     /// If set, the hardware has a counter that is always on and operates even
     /// if the rest of the hardware system is in a low power state.
     pub always_on_counter: bool,
+    /// If set, assembly should configure and route persistent storage to
+    /// Timekeeper.
+    pub use_persistent_storage: bool,
+    /// If set, Timekeeper should serve the FIDL protocol that allows external
+    /// time adjustment, `fuchsia.time.external/Adjust`.
+    ///
+    /// This is a security sensitive protocol, and very few assemblies are
+    /// expected to have it turned on.
+    pub serve_fuchsia_time_external_adjust: bool,
+    /// Maximum absolute difference between proposed UTC reference and actual UTC
+    /// reference, expressed in seconds, when the proposed UTC reference is
+    /// in the "past" with respect of actual UTC reference.
+    ///
+    /// This is always expressed as a non-negative value.
+    pub utc_max_allowed_delta_past_sec: u64,
+    /// Maximum absolute difference between proposed UTC reference and actual UTC
+    /// reference, expressed in seconds, when the proposed UTC reference is
+    /// in the "future" with respect of actual UTC reference.
+    ///
+    /// This is always expressed as a non-negative value.
+    pub utc_max_allowed_delta_future_sec: u64,
 }
 
 impl Default for TimekeeperConfig {
@@ -43,6 +64,10 @@ impl Default for TimekeeperConfig {
             utc_start_at_startup_when_invalid_rtc: false,
             serve_fuchsia_time_alarms: false,
             always_on_counter: false,
+            use_persistent_storage: false,
+            serve_fuchsia_time_external_adjust: false,
+            utc_max_allowed_delta_past_sec: 0,
+            utc_max_allowed_delta_future_sec: 0,
         }
     }
 }
@@ -55,5 +80,10 @@ mod tests {
     fn check_default_serde() {
         let v: TimekeeperConfig = serde_json::from_str("{}").unwrap();
         assert_eq!(v, Default::default());
+    }
+
+    #[test]
+    fn test_default_serialization() {
+        crate::common::tests::default_serialization_helper::<TimekeeperConfig>();
     }
 }

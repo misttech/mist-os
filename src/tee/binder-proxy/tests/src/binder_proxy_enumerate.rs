@@ -11,7 +11,7 @@ use std::{os::fd::{AsRawFd, FromRawFd, IntoRawFd, OwnedFd}, sync::Once};
 use vsock_sys::{create_virtio_stream_socket, sockaddr_vm};
 use binder_proxy_tests_config;
 
-extern "C" {
+unsafe extern "C" {
     fn register_dev_urandom_compat() -> zx::sys::zx_status_t;
 }
 

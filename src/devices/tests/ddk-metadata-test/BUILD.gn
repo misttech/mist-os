@@ -12,6 +12,7 @@ driver_bind_rules("metadata-test-bind") {
 }
 
 fuchsia_cc_driver("fuchsia_driver") {
+  legacy = true
   output_name = "ddk-metadata-test-driver"
 
   configs += [

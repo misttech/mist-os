@@ -30,6 +30,8 @@ class EmptyProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 1378773277029173000;
   };
   class Receive final {
     Receive() = delete;
@@ -44,6 +46,8 @@ class EmptyProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 2301564782476583487;
   };
   class SendAndReceive final {
     SendAndReceive() = delete;
@@ -58,6 +62,8 @@ class EmptyProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 534401212734647530;
   };
 };
 
@@ -65,6 +71,6 @@ class EmptyProtocol final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_emptystruct::EmptyProtocol> : public std::true_type{};
+struct IsProtocol<::test_emptystruct::EmptyProtocol> : public std::true_type {};
 
 }  // namespace fidl

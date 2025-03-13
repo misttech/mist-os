@@ -61,9 +61,6 @@ pub mod emulated_handle {
     pub type zx_handle_t = u32;
 }
 
-/// A future which can be used by multiple threads at once.
-pub mod atomic_future;
-
 pub use fuchsia_async_macro::{run, run_singlethreaded, run_until_stalled};
 
 pub mod condition;

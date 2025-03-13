@@ -25,13 +25,13 @@ group("hw_tests") {
 
   deps = [
     ":vulkan-tests",
+    "../examples:vulkaninfo",
     "../examples/vkproto",
     "../examples/vkproto/cmd-buf-benchmark:cmd-buf-benchmark-test",
     "../examples/vkproto/driver-tests",
     "../examples/vkproto/init_only",
     "../examples/vkproto/test",
     "../examples/vkproto/transaction-elimination-test",
-    "../examples/vulkaninfo",
     "benchmark",
     "vkvalidation",
     "//src/lib/vulkan/tests:image-pipe-swapchain-tests",
@@ -52,5 +52,6 @@ group("vulkan-tests") {
     "vkpriority",
     "vkreadback",
     "//sdk/ctf/tests/pkg/vulkan:tests",
+    "//third_party/volk:tests",
   ]
 }

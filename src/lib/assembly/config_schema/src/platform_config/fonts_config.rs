@@ -23,6 +23,7 @@ pub struct FontsConfig {
     /// When unset, software assembly uses the (deprecated) fonts configuration
     /// that reads the fonts from `config-data`.  When set,
     /// software assembly uses the product configuration instead.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub font_collection: Option<String>,
 }
 
@@ -40,6 +41,11 @@ impl Default for FontsConfig {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn test_default_serialization() {
+        crate::common::tests::default_serialization_helper::<FontsConfig>();
+    }
 
     #[test]
     fn default_fonts_config() {

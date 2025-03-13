@@ -5,9 +5,13 @@
 #include <algorithm>
 #include <cinttypes>
 #include <cstdint>
+#include <utility>
 
 #include <gtest/gtest.h>
 
+#include "sdk/lib/fit/include/lib/fit/function.h"
+#include "src/developer/debug/shared/message_loop.h"
+#include "src/developer/debug/shared/test_with_loop.h"
 #include "src/lib/fxl/strings/string_printf.h"
 #include "src/lib/unwinder/unwind_local.h"
 
@@ -118,6 +122,135 @@ TEST(Unwinder, Scs) {
   check_stack();
 }
 #endif
+
+// Provides a fake implementation of AsyncMemory::Delegate where |FetchMemoryRanges| does nothing
+// and |ReadBytes| reads from local process memory.
+class FakeAsyncMemory : public AsyncMemory::Delegate {
+ public:
+  void FetchMemoryRanges(std::vector<std::pair<uint64_t, uint32_t>> ranges,
+                         fit::callback<void()> done) override {
+    // Note that we cannot actually post tasks to the message loop because we're running in the same
+    // process as the stack we're trying to unwind. If we post a task to the loop, then the stack
+    // will get modified out from under us while we're unwinding.
+    done();
+  }
+
+  Error ReadBytes(uint64_t addr, uint64_t size, void* dst) override {
+    return memory_.ReadBytes(addr, size, dst);
+  }
+
+  Memory* GetLocalMemory() { return &memory_; }
+
+ private:
+  LocalMemory memory_;
+};
+
+// This class helps manage the lifetime of the |on_done| callback which is fed through to the
+// AsyncUnwinder at the bottom of the callstack created via |async_call_sequence|, as well as
+// simplify the introduction of the (cross-platform) message loop implementation we're borrowing
+// from zxdb.
+class AsyncUnwind : public debug::TestWithLoop {
+ public:
+  template <typename... Fn>
+  int async_call_sequence() {
+    UnwindLocalAsync(memory_.GetLocalMemory(), &memory_, [=](std::vector<Frame> frames) mutable {
+      loop().PostTask(
+          FROM_HERE, [this, frames = std::move(frames)]() mutable { on_done_(std::move(frames)); });
+    });
+
+    return 0;
+  }
+
+  template <typename F1, typename... FN>
+  int async_call_sequence(F1 f1, FN... fn) {
+    return f1([=]() mutable {
+      int res = async_call_sequence(fn...);
+      expected_pcs.push_back(reinterpret_cast<uint64_t>(__builtin_return_address(0)));
+      return res;
+    });
+  }
+
+  template <typename F1, typename... FN>
+  int AsyncTestStart(size_t expected_frames, F1 f1, FN... fn) {
+    frames.clear();
+    expected_pcs.clear();
+    test_start_pc = 0;
+
+    on_done_ = [=](std::vector<Frame> result) mutable {
+      frames = std::move(result);
+
+      ASSERT_GE(GetTestStartFrameIndex(), expected_frames);
+      check_stack();
+
+      loop().QuitNow();
+    };
+
+    int res = async_call_sequence(f1, fn...);
+
+    test_start_pc = reinterpret_cast<uint64_t>(__builtin_return_address(0));
+    expected_pcs.push_back(test_start_pc);
+    return res;
+  }
+
+ private:
+  FakeAsyncMemory memory_;
+  fit::callback<void(std::vector<Frame>)> on_done_;
+};
+
+TEST_F(AsyncUnwind, CanUnwindCfi) {
+  int res = AsyncTestStart(4, CfiOnly, CfiOnly, CfiOnly, CfiOnly);
+
+  // At this point the call stack should be set up for us, but nothing posted to the message loop
+  // has been executed yet. Since we set up the call stack synchronously, we should be able to
+  // assert that the functions specified above were called.
+  ASSERT_EQ(res, 4);
+
+  // Now we run the message loop to consume the unwinder results.
+  loop().Run();
+}
+
+// TEST_F(AsyncUnwind, CanUnwindCfiMany) {
+//   int res =
+//       AsyncTestStart(7, CfiOnly, CfiOnly, CfiOnly, CfiOnly, CfiOnly, CfiOnly, CfiOnly);
+
+//   // At this point the call stack should be set up for us, but nothing posted to the message loop
+//   // has been executed yet. Since we set up the call stack synchronously, we should be able to
+//   // assert that the functions specified above were called.
+//   ASSERT_EQ(res, 7);
+
+//   // Now we run the message loop to consume the unwinder results.
+//   loop().Run();
+// }
+
+TEST_F(AsyncUnwind, UnwindFp) {
+  int res = AsyncTestStart(4, FpOnly, FpOnly, FpOnly, FpOnly);
+
+  ASSERT_EQ(res, 40);
+
+  loop().Run();
+}
+
+// CFI unwinding works well when intermixed with frame pointer unwinding, since the stack pointer
+// register is also restored. That means when we unwind a frame with frame pointers, we can and
+// should continue to try to unwind with CFI next.
+TEST_F(AsyncUnwind, CfiFpHybridFromCfi) {
+  int res = AsyncTestStart(4, CfiOnly, FpOnly, CfiOnly, CfiOnly);
+
+  ASSERT_EQ(res, 13);
+
+  // Now we run the message loop to consume the unwinder results.
+  loop().Run();
+}
+
+TEST_F(AsyncUnwind, CfiFpHybridFromFp) {
+  int res = AsyncTestStart(4, FpOnly, FpOnly, CfiOnly, FpOnly);
+
+  // This matches the synchronous unwinder above.
+  ASSERT_EQ(res, 31);
+
+  // Now we run the message loop to consume the unwinder results.
+  loop().Run();
+}
 
 }  // namespace
 

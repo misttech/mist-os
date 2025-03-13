@@ -581,14 +581,17 @@ zx_status_t VmAspace::PageFault(vaddr_t va, uint flags) {
   }
 
   VM_KTRACE_DURATION(2, "VmAspace::PageFault", ("va", va), ("flags", flags));
-  canary_.Assert();
-  LTRACEF("va %#" PRIxPTR ", flags %#x\n", va, flags);
-  DEBUG_ASSERT((flags & VMM_PF_FLAG_ACCESS) == 0);
 
   // With the original va logged in the traces can now convert to a page aligned address suitable
   // for passing to PageFaultLocked.
   va = ROUNDDOWN(va, PAGE_SIZE);
 
+  return PageFaultInternal(va, flags, 0);
+}
+
+zx_status_t VmAspace::PageFaultInternal(vaddr_t va, uint flags, size_t additional_pages) {
+  canary_.Assert();
+  DEBUG_ASSERT((flags & VMM_PF_FLAG_ACCESS) == 0);
   if (type_ == Type::GuestPhysical) {
     flags &= ~VMM_PF_FLAG_USER;
     flags |= VMM_PF_FLAG_GUEST;
@@ -599,6 +602,7 @@ zx_status_t VmAspace::PageFault(vaddr_t va, uint flags) {
   do {
     // For now, hold the aspace lock across the page fault operation, which stops any other
     // operations on the address space from moving the region out from underneath it.
+    uint32_t mapped;
     {
       Guard<CriticalMutex> guard{&lock_};
       DEBUG_ASSERT(!aspace_destroyed_);
@@ -625,11 +629,16 @@ zx_status_t VmAspace::PageFault(vaddr_t va, uint flags) {
       }
       DEBUG_ASSERT(last_fault_);
       AssertHeld(last_fault_->lock_ref());
-      status = last_fault_->PageFaultLocked(va, flags, &page_request);
+      auto [fault_status, count] =
+          last_fault_->PageFaultLocked(va, flags, additional_pages, &page_request);
+      status = fault_status;
+      mapped = count;
     }
 
     if (status == ZX_ERR_SHOULD_WAIT) {
-      zx_status_t st = page_request.Wait();
+      // If the page fault originated in kernel mode (usercopy), we cannot safely suspend the thread
+      // without potential data loss. See https://fxbug.dev/42084841 for details.
+      zx_status_t st = page_request.Wait(/*suspendable=*/flags & VMM_PF_FLAG_USER);
       if (st != ZX_OK) {
         if (st == ZX_ERR_TIMED_OUT) {
           Guard<CriticalMutex> guard{&lock_};
@@ -637,6 +646,15 @@ zx_status_t VmAspace::PageFault(vaddr_t va, uint flags) {
           root_vmar_->DumpLocked(0, false);
         }
         return st;
+      }
+      // Before retrying the page fault, take into account how many pages got mapped on the previous
+      // attempt (if any).
+      if (mapped > 0) {
+        va += PAGE_SIZE * mapped;
+        // For mapped to be non-zero and we were able to have an error then we must have requested
+        // a non-zero amount of additional pages, and not all of them were able to be mapped.
+        DEBUG_ASSERT(mapped <= additional_pages);
+        additional_pages -= mapped;
       }
     }
   } while (status == ZX_ERR_SHOULD_WAIT);
@@ -647,6 +665,30 @@ zx_status_t VmAspace::PageFault(vaddr_t va, uint flags) {
 zx_status_t VmAspace::SoftFault(vaddr_t va, uint flags) {
   // With the current implementation we can just reuse the internal PageFault mechanism.
   return PageFault(va, flags | VMM_PF_FLAG_SW_FAULT);
+}
+
+zx_status_t VmAspace::SoftFaultInRange(vaddr_t va, uint flags, size_t len) {
+  // If the fault was actually an access fault, handle that and return.
+  if (flags & VMM_PF_FLAG_ACCESS) {
+    // Assert that the translation bit is not set.
+    DEBUG_ASSERT((flags & VMM_PF_FLAG_NOT_PRESENT) == 0);
+    return AccessedFault(va);
+  }
+
+  VM_KTRACE_DURATION(2, "VmAspace::SoftFaultInRange", ("va", va), ("flags", flags), ("len", len));
+
+  DEBUG_ASSERT(len > 0);
+  uint64_t range_end;
+  bool overflow = add_overflow(va, len - 1, &range_end);
+  if (unlikely(overflow)) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+  DEBUG_ASSERT(va <= range_end);
+
+  const uint64_t va_page_base = ROUNDDOWN(va, PAGE_SIZE);
+  const uint64_t last_page_base = ROUNDDOWN(range_end, PAGE_SIZE);
+  const uint64_t extra_pages = (last_page_base - va_page_base) / PAGE_SIZE;
+  return PageFaultInternal(va_page_base, flags, extra_pages);
 }
 
 zx_status_t VmAspace::AccessedFault(vaddr_t va) {
@@ -684,22 +726,6 @@ void VmAspace::DumpLocked(bool verbose) const {
     AssertHeld(root_vmar_->lock_ref());
     root_vmar_->DumpLocked(1, verbose);
   }
-}
-
-zx_status_t VmAspace::EnumerateChildren(VmEnumerator* ve) {
-  canary_.Assert();
-  DEBUG_ASSERT(ve != nullptr);
-  Guard<CriticalMutex> guard{&lock_};
-  if (root_vmar_ == nullptr || aspace_destroyed_) {
-    // Aspace hasn't been initialized or has already been destroyed.
-    return ZX_ERR_BAD_STATE;
-  }
-  AssertHeld(root_vmar_->lock_ref());
-  DEBUG_ASSERT(root_vmar_->IsAliveLocked());
-  if (!ve->OnVmAddressRegion(root_vmar_.get(), 0)) {
-    return ZX_ERR_CANCELED;
-  }
-  return root_vmar_->EnumerateChildrenLocked(ve);
 }
 
 void VmAspace::DumpAllAspaces(bool verbose) {

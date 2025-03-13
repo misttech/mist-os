@@ -23,6 +23,7 @@ driver_bind_rules("mbr_bind") {
 }
 
 fuchsia_cc_driver("mbr-driver") {
+  legacy = true
   output_name = "mbr"
   configs += [
     "//build/config:all_source",

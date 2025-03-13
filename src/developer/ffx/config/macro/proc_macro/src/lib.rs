@@ -58,6 +58,7 @@ fn option_wrapped_type<'a>(ty: &'a syn::Type) -> Option<&'a syn::Type> {
     None
 }
 
+#[allow(clippy::large_enum_variant)] // TODO(https://fxbug.dev/401087076)
 enum ConfigArgs {
     Str(syn::LitStr),
     MetaNameValue(syn::MetaNameValue),

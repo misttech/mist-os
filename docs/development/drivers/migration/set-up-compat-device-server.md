@@ -469,22 +469,23 @@ However, if the metadata type is a dynamically sized array, use
 `compat::GetMetadataArray<T>()` and replace `T` with the array's type.
 
 Let's say we need to retrieve metadata for
-`DEVICE_METADATA_GPIO_PINS`, which is an array of the `gpio_pin_t` structs:
+`DEVICE_METADATA_AML_VOLTAGE_TABLE`, which is an array of the
+`aml_voltage_table_t` structs:
 
 ```cpp {:.devsite-disable-click-to-copy}
-// type: array of gpio_pin_t
-#define DEVICE_METADATA_GPIO_PINS 0x4F495047  // GPIO
+#define DEVICE_METADATA_AML_VOLTAGE_TABLE (0x41565400 | (DEVICE_METADATA_PRIVATE))  // AVTp
 ```
 
-Then you need to replace `T` with `gpio_pin_t` and retrieve the metadata
-as shown below:
+Then you need to replace `T` with `aml_voltage_table_t` and retrieve the
+metadata as shown below:
 
 ```cpp {:.devsite-disable-click-to-copy}
-zx::result<std::vector<gpio_pin_t>>  gpio_pins =
-     compat::GetMetadataArray<gpio_pin_t>(incoming(), DEVICE_METADATA_GPIO_PINS);
- if (gpio_pins.is_error()) {
-   FDF_LOG(ERROR, "%s: Failed to get gpio pin metadata");
-   return zx::error(gpio_pins.take_error());
+zx::result<std::vector<aml_voltage_table_t>>  voltage_table =
+     compat::GetMetadataArray<aml_voltage_table_t>(
+      incoming(), DEVICE_METADATA_AML_VOLTAGE_TABLE);
+ if (voltage_table.is_error()) {
+   FDF_LOG(ERROR, "%s: Failed to get voltage table metadata");
+   return zx::error(voltage_table.take_error());
  }
 ```
 
@@ -492,8 +493,9 @@ Likewise, if the driver is composite, pass the parent's name to specify which
 parent node the metadata is from, for example:
 
 ```cpp {:.devsite-disable-click-to-copy}
-zx::result<std::vector<gpio_pin_t>> gpio_pins =
-     compat::GetMetadataArray<gpio_pin_t>(incoming(), DEVICE_METADATA_GPIO_PINS, "pdev");
+zx::result<std::vector<aml_voltage_table_t>> voltage_table =
+     compat::GetMetadataArray<aml_voltage_table_t>(
+      incoming(), DEVICE_METADATA_AML_VOLTAGE_TABLE, "pdev");
 ```
 
 <!-- Reference links -->

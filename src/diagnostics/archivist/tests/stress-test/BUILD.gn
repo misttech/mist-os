@@ -58,6 +58,11 @@ fuchsia_test_package("archivist-stress-test") {
   }
 }
 
+group("build-only") {
+  testonly = true
+  deps = [ ":actor" ]
+}
+
 group("stress-test") {
   testonly = true
   deps = [ ":archivist-stress-test" ]

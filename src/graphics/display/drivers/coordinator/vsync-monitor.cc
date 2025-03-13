@@ -12,7 +12,7 @@
 
 #include <atomic>
 
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 
 namespace display_coordinator {
 
@@ -30,7 +30,7 @@ VsyncMonitor::VsyncMonitor(inspect::Node inspect_root, async_dispatcher_t* dispa
       last_vsync_ns_property_(inspect_root_.CreateUint("last_vsync_timestamp_ns", 0)),
       last_vsync_interval_ns_property_(inspect_root_.CreateUint("last_vsync_interval_ns", 0)),
       last_vsync_config_stamp_property_(inspect_root_.CreateUint(
-          "last_vsync_config_stamp", display::kInvalidConfigStamp.value())),
+          "last_vsync_config_stamp", display::kInvalidDriverConfigStamp.value())),
       vsync_stalls_detected_(inspect_root_.CreateUint("vsync_stalls", 0)),
       dispatcher_(*dispatcher) {
   ZX_DEBUG_ASSERT(dispatcher != nullptr);
@@ -41,7 +41,7 @@ VsyncMonitor::~VsyncMonitor() { Deinitialize(); }
 zx::result<> VsyncMonitor::Initialize() {
   zx_status_t post_status = updater_.PostDelayed(&dispatcher_, kVsyncMonitorInterval);
   if (post_status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to schedule vsync monitor: %s", zx_status_get_string(post_status));
+    fdf::error("Failed to schedule vsync monitor: {}", zx::make_result(post_status));
     return zx::error(post_status);
   }
 
@@ -65,11 +65,12 @@ void VsyncMonitor::UpdateStatistics() {
 
   zx_status_t status = updater_.PostDelayed(&dispatcher_, kVsyncMonitorInterval);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to schedule vsync monitor: %s", zx_status_get_string(status));
+    fdf::error("Failed to schedule vsync monitor: {}", zx::make_result(status));
   }
 }
 
-void VsyncMonitor::OnVsync(zx::time vsync_timestamp, display::ConfigStamp vsync_config_stamp) {
+void VsyncMonitor::OnVsync(zx::time vsync_timestamp,
+                           display::DriverConfigStamp vsync_config_stamp) {
   last_vsync_ns_property_.Set(vsync_timestamp.get());
 
   zx::duration vsync_interval =

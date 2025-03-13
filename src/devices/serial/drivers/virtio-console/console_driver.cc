@@ -4,7 +4,7 @@
 
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/driver.h>
-#include <lib/virtio/driver_utils.h>
+#include <lib/virtio/driver_utils_dfv1.h>
 #include <zircon/types.h>
 
 #include "console.h"

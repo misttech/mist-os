@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use ffx_crash_args::CrashCommand;
-use fho::{FfxMain, FfxTool, Result, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool, Result};
 use fidl_fuchsia_developer_ffx::TestingProxy;
 use target_holders::daemon_protocol;
 #[derive(FfxTool)]
@@ -44,7 +45,7 @@ mod test {
             _ => assert!(false),
         });
         let tool = DaemonCrashTool { cmd: CrashCommand {}, testing_proxy: proxy };
-        let buffers = fho::TestBuffers::default();
+        let buffers = ffx_writer::TestBuffers::default();
         let writer = SimpleWriter::new_test(&buffers);
         assert!(tool.main(writer).await.is_ok());
         assert!(CRASHED.load(Ordering::SeqCst));

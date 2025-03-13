@@ -39,8 +39,8 @@ zx_status_t OpenFileWithMaybeCreate(const fidl::ClientEnd<fio::Directory>& dir,
   fio::Flags flags = fio::Flags::kProtocolFile | fio::Flags::kFlagMaybeCreate |
                      fio::Flags::kFlagSendRepresentation;
   auto file_endpoints = fidl::Endpoints<fio::Node>::Create();
-  auto open_result = fidl::WireCall(dir)->Open3(fidl::StringView::FromExternal(path), flags, {},
-                                                file_endpoints.server.TakeChannel());
+  auto open_result = fidl::WireCall(dir)->Open(fidl::StringView::FromExternal(path), flags, {},
+                                               file_endpoints.server.TakeChannel());
   EXPECT_EQ(open_result.status(), ZX_OK);
   fidl::WireSyncClient child{std::move(file_endpoints.client)};
 
@@ -88,7 +88,7 @@ TEST_P(OpenTest, OpenFileWithCreateCreatesInReadWriteDirWithPermInheritWrite) {
   // parent connection has them.
   constexpr fio::Flags kReopenFlags = fio::kPermReadable | fio::Flags::kPermInheritWrite;
   auto [client, server] = fidl::Endpoints<fio::Directory>::Create();
-  auto result = fidl::WireCall(parent)->Open3(".", kReopenFlags, {}, server.TakeChannel());
+  auto result = fidl::WireCall(parent)->Open(".", kReopenFlags, {}, server.TakeChannel());
   ASSERT_EQ(result.status(), ZX_OK);
   // Creating a file should succeed on `client` as it should have write permissions.
   EXPECT_EQ(OpenFileWithMaybeCreate(client, "b"), ZX_OK);
@@ -102,7 +102,7 @@ TEST_P(OpenTest, OpenFileWithCreateFailsInReadOnlyDirWithPermInheritWrite) {
   // connection will not have write permissions.
   constexpr fio::Flags kReopenFlags = fio::kPermReadable | fio::Flags::kPermInheritWrite;
   auto [client, server] = fidl::Endpoints<fio::Directory>::Create();
-  auto reopen_result = fidl::WireCall(parent)->Open3(".", kReopenFlags, {}, server.TakeChannel());
+  auto reopen_result = fidl::WireCall(parent)->Open(".", kReopenFlags, {}, server.TakeChannel());
   ASSERT_EQ(reopen_result.status(), ZX_OK);
   // Creating a file should fail on `client` as it should not have write permissions.
   EXPECT_EQ(OpenFileWithMaybeCreate(client, "b"), ZX_ERR_ACCESS_DENIED);

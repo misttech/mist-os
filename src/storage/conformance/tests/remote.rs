@@ -103,7 +103,7 @@ async fn open_remote_directory_right_escalation_test() {
     // rights available along the open chain.
     let (node_proxy, node_server) = create_proxy::<fio::NodeMarker>();
     root_proxy
-        .open(
+        .deprecated_open(
             fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::POSIX_WRITABLE
                 | fio::OpenFlags::POSIX_EXECUTABLE

@@ -28,8 +28,11 @@ import("//build/rust/rustc_binary.gni")
 #   board_name (required):
 #     [string] board_name forwarded to assembled_system(target_name).
 #
-#   base_packages (required):
-#     [list of labels] base_packages forwarded to assembled_system(target_name).
+#   base_packages (optional):
+#     [list of labels] fuchsia_package() targets to add to the product config.
+#
+#   tuf_repo_configs (optional):
+#     [list of file paths] List of tuf repo configs to add to the product config.
 #
 #   system_version_file (required):
 #     [string] The file used to designate system version in the assembly's
@@ -93,8 +96,6 @@ import("//build/rust/rustc_binary.gni")
 template("assemble_security_pkg_test_system") {
   assert(defined(invoker.board_name),
          "board_name must be defined for $target_name")
-  assert(defined(invoker.base_packages),
-         "base_packages must be defined for $target_name")
   assert(defined(invoker.system_version_file),
          "system_version_file must be defined for $target_name")
   assert(defined(invoker.packaged_assembly_directory),
@@ -120,9 +121,7 @@ template("assemble_security_pkg_test_system") {
     assembly = assembly_name
     assembly_image_assembler = "${assembly_name}.image_assembler"
     assembly_partitions_config = "${assembly_name}_partitions_config"
-    base_packages = "${assembly_name}.base_packages"
     product_config = "${assembly_name}_product_config"
-    product_config_fxfs = "${assembly_name}_product_config_fxfs"
     board_config = "${assembly_name}_board_config"
     repository_config = "${assembly_name}_repository_config"
     packages_json = "${assembly_name}_packages_json"
@@ -221,22 +220,33 @@ template("assemble_security_pkg_test_system") {
   _build_info.version = rebase_path(invoker.system_version_file, root_build_dir)
 
   product_assembly_configuration(labels.product_config) {
+    testonly = true
     platform = {
       build_type = "eng"
+
+      if (defined(invoker.tuf_repo_configs)) {
+        software_delivery = {
+          tuf_config_paths =
+              rebase_path(invoker.tuf_repo_configs, root_build_dir)
+        }
+      }
 
       # We use a utility assembly, because this needs a filesystem for the test,
       # and bootstrap assemblies cannot produce a filesystem. A standard
       # assembly would insert packages into the filesystem that collide with the
       # packages provided by the test. Utility is the only option.
       feature_set_level = "utility"
+
       storage = {
         filesystems = {
           image_name = labels.assembly
-          volume = {
-            fvm = {
-              data = {
-              }
-              blob = {
+          if (!use_fxfs_blob) {
+            volume = {
+              fvm = {
+                data = {
+                }
+                blob = {
+                }
               }
             }
           }
@@ -246,39 +256,22 @@ template("assemble_security_pkg_test_system") {
     product = {
       build_info = _build_info
     }
-    deps = [ "//build/info:build_info_files" ]
-  }
-
-  product_assembly_configuration(labels.product_config_fxfs) {
-    platform = {
-      build_type = "eng"
-
-      # We use a utility assembly, because this needs a filesystem for the test,
-      # and bootstrap assemblies cannot produce a filesystem. A standard
-      # assembly would insert packages into the filesystem that collide with the
-      # packages provided by the test. Utility is the only option.
-      feature_set_level = "utility"
-      storage = {
-        filesystems = {
-          image_name = labels.assembly
-        }
+    base_packages = [
+      {
+        package_target = ":${labels.root_ssl_certificates}"
+      },
+    ]
+    if (defined(invoker.base_packages)) {
+      foreach(fuchsia_package_target, invoker.base_packages) {
+        base_packages += [
+          {
+            package_target = fuchsia_package_target
+          },
+        ]
       }
     }
-    product = {
-      build_info = _build_info
-    }
     deps = [ "//build/info:build_info_files" ]
   }
-
-  packages_for_assembly = [
-                            ":${labels.root_ssl_certificates}",
-
-                            # TODO(https://fxbug.dev/42169686): There should be a contract for
-                            # determining the correct configuration for every product.
-                            # For now, this appears to be the only configuration in
-                            # use.
-                            "//src/sys/pkg/bin/system-update-committer:enable_reboot_on_verification_failure",
-                          ] + invoker.base_packages
 
   board_configuration(labels.board_config) {
     name = invoker.board_name
@@ -303,18 +296,10 @@ template("assemble_security_pkg_test_system") {
   # Main system assembly.
   assembled_system(labels.assembly) {
     testonly = true
-    include_legacy_bundle = true
     generate_fvm = !use_fxfs_blob
     generate_fxfs = use_fxfs_blob
-    use_fxfs_blob = use_fxfs_blob
-    if (!use_fxfs_blob) {
-      product_assembly_config_label = ":${labels.product_config}"
-    } else {
-      product_assembly_config_label = ":${labels.product_config_fxfs}"
-    }
-
+    product_assembly_config_label = ":${labels.product_config}"
     board_config_label = ":${labels.board_config}"
-    base_packages = packages_for_assembly
   }
 
   generated_partitions_config(labels.assembly_partitions_config) {

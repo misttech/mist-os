@@ -9,6 +9,7 @@ ffx_plugin("ffx_power_plugin") {
   version = "0.1.0"
   edition = "2021"
   plugin_deps = [
+    "collaborative-reboot:ffx_power_collaborative_reboot",
     "debugcmd:ffx_power_debugcmd",
     "system-activity:ffx_power_system_activity",
   ]

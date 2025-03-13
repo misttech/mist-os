@@ -71,6 +71,12 @@ typedef struct gbl_efi_fastboot_protocol {
   efi_status (*set_lock)(struct gbl_efi_fastboot_protocol* self, uint64_t lock_state) EFIAPI;
   efi_status (*clear_lock)(struct gbl_efi_fastboot_protocol* self, uint64_t lock_state) EFIAPI;
 
+  // Local session methods
+  efi_status (*start_local_session)(struct gbl_efi_fastboot_protocol* self, void** ctx) EFIAPI;
+  efi_status (*update_local_session)(struct gbl_efi_fastboot_protocol* self, void* ctx,
+                                     uint8_t* buf, size_t* buf_size) EFIAPI;
+  efi_status (*close_local_session)(struct gbl_efi_fastboot_protocol* self, void* ctx) EFIAPI;
+
   // Misc methods
   efi_status (*get_partition_permissions)(struct gbl_efi_fastboot_protocol* self,
                                           const uint8_t* part_name, size_t part_name_len,

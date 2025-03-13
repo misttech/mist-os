@@ -3,10 +3,14 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /src/developer/ffx/plugins/emulator/OWNERS
+include /src/lib/android/OWNERS
 include /src/lib/gcs/OWNERS
 include /src/lib/structured_ui/OWNERS
-include /third_party/rust_crates/vendor/aes-0.8.2/OWNERS
-include /third_party/rust_crates/vendor/ahash-0.8.6/OWNERS
+include /src/starnix/OWNERS
+include /third_party/rust_crates/forks/nix-0.29.0/OWNERS
+include /third_party/rust_crates/forks/ring-0.17.8/OWNERS
+include /third_party/rust_crates/vendor/aes-0.8.4/OWNERS
+include /third_party/rust_crates/vendor/ahash-0.8.11/OWNERS
 include /third_party/rust_crates/vendor/chacha20-0.9.1/OWNERS
 include /third_party/rust_crates/vendor/crossbeam-0.8.0/OWNERS
 include /third_party/rust_crates/vendor/crossbeam-channel-0.5.1/OWNERS
@@ -17,20 +21,19 @@ include /third_party/rust_crates/vendor/crossbeam-utils-0.8.14/OWNERS
 include /third_party/rust_crates/vendor/filetime-0.2.14/OWNERS
 include /third_party/rust_crates/vendor/getrandom-0.2.10/OWNERS
 include /third_party/rust_crates/vendor/instant-0.1.9/OWNERS
-include /third_party/rust_crates/vendor/loom-0.7.0/OWNERS
+include /third_party/rust_crates/vendor/loom-0.7.1/OWNERS
 include /third_party/rust_crates/vendor/mockall-0.9.0/OWNERS
 include /third_party/rust_crates/vendor/mockall_derive-0.9.0/OWNERS
 include /third_party/rust_crates/vendor/nix-0.26.2/OWNERS
 include /third_party/rust_crates/vendor/parking_lot_core-0.8.3/OWNERS
-include /third_party/rust_crates/vendor/parking_lot_core-0.9.6/OWNERS
-include /third_party/rust_crates/vendor/polling-2.4.0/OWNERS
+include /third_party/rust_crates/vendor/parking_lot_core-0.9.9/OWNERS
 include /third_party/rust_crates/vendor/polyval-0.6.0/OWNERS
-include /third_party/rust_crates/vendor/sha1-0.10.5/OWNERS
+include /third_party/rust_crates/vendor/rutabaga_gfx-0.1.3/OWNERS
+include /third_party/rust_crates/vendor/sha1-0.10.6/OWNERS
 include /third_party/rust_crates/vendor/sha2-0.10.6/OWNERS
 include /third_party/rust_crates/vendor/tempfile-3.2.0/OWNERS
 include /third_party/rust_crates/vendor/test-case-core-3.2.1/OWNERS
 include /third_party/rust_crates/vendor/thread_local-1.1.7/OWNERS
-include /third_party/rust_crates/vendor/tracing-0.1.37/OWNERS
 include /third_party/rust_crates/vendor/trust-dns-proto-0.22.0/OWNERS
 include /third_party/rust_crates/vendor/trust-dns-resolver-0.22.0/OWNERS
 include /tools/doc_checker/OWNERS

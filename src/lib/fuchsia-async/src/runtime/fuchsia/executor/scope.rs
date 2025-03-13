@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use super::super::task::JoinHandle;
+use super::atomic_future::{AtomicFuture, CancelAndDetachResult};
 use super::common::{Executor, Task};
-use crate::atomic_future::{AtomicFuture, CancelAndDetachResult};
 use crate::condition::{Condition, ConditionGuard, WakerEntry};
 use crate::EHandle;
 use pin_project_lite::pin_project;
@@ -64,6 +64,7 @@ use std::{fmt, hash};
 ///
 /// [sc]: https://en.wikipedia.org/wiki/Structured_concurrency
 #[must_use = "Scopes should be explicitly awaited or cancelled"]
+#[derive(Debug)]
 pub struct Scope {
     // LINT.IfChange
     inner: ScopeHandle,
@@ -81,6 +82,18 @@ impl Scope {
     /// call to [`run`][crate::SendExecutor::run]).
     pub fn new() -> Scope {
         ScopeHandle::with_current(|handle| handle.new_child())
+    }
+
+    /// Create a new scope with a name.
+    ///
+    /// The returned scope is a child of the current scope.
+    ///
+    /// # Panics
+    ///
+    /// May panic if not called in the context of an executor (e.g. within a
+    /// call to [`run`][crate::SendExecutor::run]).
+    pub fn new_with_name(name: &str) -> Scope {
+        ScopeHandle::with_current(|handle| handle.new_child_with_name(name))
     }
 
     /// Get the scope of the current task, or the global scope if there is no task
@@ -117,6 +130,16 @@ impl Scope {
     /// Create a child scope.
     pub fn new_child(&self) -> Scope {
         self.inner.new_child()
+    }
+
+    /// Create a child scope with a name.
+    pub fn new_child_with_name(&self, name: &str) -> Scope {
+        self.inner.new_child_with_name(name)
+    }
+
+    /// Returns the name of the scope.
+    pub fn name(&self) -> &str {
+        &self.inner.inner.name
     }
 
     /// Create a [`ScopeHandle`] that may be used to spawn tasks on this scope.
@@ -309,6 +332,22 @@ impl ScopeHandle {
             inner: Arc::new(ScopeInner {
                 executor: self.inner.executor.clone(),
                 state: Condition::new(ScopeState::new(Some(self.clone()), state.status())),
+                name: String::new(),
+            }),
+        };
+        let weak = child.downgrade();
+        state.insert_child(weak);
+        Scope { inner: child }
+    }
+
+    /// Create a child scope.
+    pub fn new_child_with_name(&self, name: &str) -> Scope {
+        let mut state = self.lock();
+        let child = ScopeHandle {
+            inner: Arc::new(ScopeInner {
+                executor: self.inner.executor.clone(),
+                state: Condition::new(ScopeState::new(Some(self.clone()), state.status())),
+                name: name.to_string(),
             }),
         };
         let weak = child.downgrade();
@@ -362,6 +401,7 @@ impl ScopeHandle {
             inner: Arc::new(ScopeInner {
                 executor,
                 state: Condition::new(ScopeState::new(None, Status::default())),
+                name: "root".to_string(),
             }),
         }
     }
@@ -407,7 +447,7 @@ impl ScopeHandle {
 
 impl fmt::Debug for ScopeHandle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Scope").finish()
+        f.debug_struct("Scope").field("name", &self.inner.name).finish()
     }
 }
 
@@ -710,6 +750,7 @@ mod state {
 struct ScopeInner {
     executor: Arc<Executor>,
     state: Condition<ScopeState>,
+    name: String,
 }
 
 impl Drop for ScopeInner {
@@ -1007,7 +1048,7 @@ mod tests {
     #[test]
     fn compute_works_on_new_child() {
         let mut executor = TestExecutor::new();
-        let scope = executor.global_scope().new_child();
+        let scope = executor.global_scope().new_child_with_name("compute_works_on_new_child");
         let mut task = pin!(scope.compute(async { 1 }));
         assert_eq!(executor.run_until_stalled(&mut task), Poll::Ready(1));
     }
@@ -1015,7 +1056,7 @@ mod tests {
     #[test]
     fn scope_drop_cancels_tasks() {
         let mut executor = TestExecutor::new();
-        let scope = executor.global_scope().new_child();
+        let scope = executor.global_scope().new_child_with_name("scope_drop_cancels_tasks");
         let mut task = pin!(scope.compute(async { 1 }));
         drop(scope);
         assert_eq!(executor.run_until_stalled(&mut task), Poll::Pending);
@@ -1024,7 +1065,8 @@ mod tests {
     #[test]
     fn tasks_do_not_spawn_on_cancelled_scopes() {
         let mut executor = TestExecutor::new();
-        let scope = executor.global_scope().new_child();
+        let scope =
+            executor.global_scope().new_child_with_name("tasks_do_not_spawn_on_cancelled_scopes");
         let handle = scope.to_handle();
         let mut cancel = pin!(scope.cancel());
         assert_eq!(executor.run_until_stalled(&mut cancel), Poll::Ready(()));
@@ -1035,7 +1077,8 @@ mod tests {
     #[test]
     fn tasks_do_not_spawn_on_closed_empty_scopes() {
         let mut executor = TestExecutor::new();
-        let scope = executor.global_scope().new_child();
+        let scope =
+            executor.global_scope().new_child_with_name("tasks_do_not_spawn_closed_empty_scopes");
         let handle = scope.to_handle();
         let mut close = pin!(scope.cancel());
         assert_eq!(executor.run_until_stalled(&mut close), Poll::Ready(()));
@@ -1218,7 +1261,7 @@ mod tests {
         {
             let remote = remote.clone();
             scope.spawn(async move {
-                let child = Scope::new();
+                let child = Scope::new_with_name("child");
                 child.spawn(async move {
                     Scope::current().spawn(remote.as_future());
                 });

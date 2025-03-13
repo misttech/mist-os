@@ -49,7 +49,7 @@ class LdStartupCreateProcessTestsBase : public LdLoadZirconProcessTestsBase {
 
   void set_stack_size(std::optional<size_t> stack_size) { stack_size_ = stack_size; }
 
-  void FinishLoad(std::string_view executable_name);
+  void FinishLoad(zx::vmo executable_vmo);
 
  private:
   uintptr_t entry_ = 0;
@@ -67,15 +67,22 @@ class LdStartupCreateProcessTests
  public:
   using LdStartupCreateProcessTestsBase::Run;
 
-  void Load(std::string_view executable_name) {
+  void Load(std::string_view executable_name,
+            std::optional<std::string_view> expected_config = std::nullopt) {
     ASSERT_TRUE(root_vmar());  // Init must have been called already.
 
     // This points GetLibVmo() to the right place.
     LdsvcPathPrefix(executable_name);
 
+    // This will adjust GetLibVmo() to use the libprefix from PT_INTERP so the
+    // fetch of abi::kInterp will get the right install location.
+    zx::vmo executable_vmo = GetExecutableVmoWithInterpConfig(executable_name, expected_config);
+    ASSERT_TRUE(executable_vmo);
+
     // Load the dynamic linker and record its entry point.
     std::optional<LoadResult> result;
-    ASSERT_NO_FATAL_FAILURE(this->Load(GetLibVmo(ld::abi::kInterp), result, root_vmar()));
+    ASSERT_NO_FATAL_FAILURE(
+        this->Load(GetInterp(executable_name, expected_config), result, root_vmar()));
     set_entry(result->entry + result->loader.load_bias());
     set_stack_size(result->stack_size);
 
@@ -89,7 +96,7 @@ class LdStartupCreateProcessTests
     set_vdso_base(result->info.vaddr_start() + result->loader.load_bias());
     std::ignore = std::move(result->loader).Commit(kNoRelro);
 
-    ASSERT_NO_FATAL_FAILURE(FinishLoad(executable_name));
+    ASSERT_NO_FATAL_FAILURE(FinishLoad(std::move(executable_vmo)));
   }
 
   template <class... Reports>

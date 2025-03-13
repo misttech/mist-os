@@ -167,7 +167,7 @@ impl FontMetricsViewAssistant {
     }
 
     fn optional_bg_color(&self) -> Option<Color> {
-        self.show_text_background_color.then(|| self.text_background_color)
+        self.show_text_background_color.then_some(self.text_background_color)
     }
 
     fn toggle_text_background_color(&mut self) {

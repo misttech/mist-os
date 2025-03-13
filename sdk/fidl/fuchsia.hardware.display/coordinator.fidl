@@ -17,9 +17,9 @@ open protocol CoordinatorListener {
     /// Also used to communicate the set of connected displays to a newly
     /// connected client.
     ///
-    /// After this method is called, any current configuration is invalidated.
-    /// The client must validate and apply a new configuration, using the
-    /// methods [`Coordinator.CheckConfig`] and [`Coordinator.ApplyConfig`].
+    /// After this method is called, all applied and draft configurations may no
+    /// longer be valid. The client must validate and apply a new configuration,
+    /// by calling [`Coordinator.CheckConfig`] and [`Coordinator.ApplyConfig`].
     ///
     /// `added` and `removed` must not be both empty.
     strict OnDisplaysChanged(struct {
@@ -58,9 +58,9 @@ open protocol CoordinatorListener {
         ///
         /// If a configuration contains images that are still waiting to be
         /// ready, that configuration will be only partially applied (without
-        /// the pending image). That configuration's stamp will not be reported
+        /// the waiting image). That configuration's stamp will not be reported
         /// here.
-        applied_config_stamp fuchsia.hardware.display.types.ConfigStamp;
+        applied_config_stamp ConfigStamp;
 
         /// Used to acknowledge the receipt of VSync events.
         ///
@@ -85,6 +85,9 @@ open protocol CoordinatorListener {
         has_ownership bool;
     });
 };
+
+/// Constrains the use of `Coordinator.SetLayerImage2`; see documentation there.
+const MAX_WAITING_IMAGES_PER_LAYER uint32 = 10;
 
 /// Interface for accessing the display hardware.
 ///
@@ -125,7 +128,7 @@ closed protocol Coordinator {
     /// Returns `ZX_ERR_NO_MEMORY` if memory cannot be allocated for managing the image
     /// Additionally, this method delegates internally to `fuchsia.hardware.display.engine/Engine`,
     /// and will forward errors received from `ImportImage()` and `ImportImageForCapture()`.
-    // TODO(https://fxbug.dev/391698891): it's undesirable to expose the implementation dependency
+    // TODO(https://fxbug.dev/391698891): it's undesirable to expose this implementation dependency
     //                                    on `fuchsia.hardware.display.engine/Engine`.
     strict ImportImage(struct {
         image_metadata fuchsia.hardware.display.types.ImageMetadata;
@@ -141,7 +144,7 @@ closed protocol Coordinator {
     /// The image must not be the capture target of an ongoing capture specified
     /// in [`fuchsia.hardware.display/Coordinator.StartCapture`].
     ///
-    /// When an image is released, it is immediately removed from any pending
+    /// When an image is released, it is immediately removed from any draft
     /// or active configurations, and any fences associated with the image are
     /// dropped. The resources associated with the image will be released as
     /// soon as the image is no longer in use.
@@ -195,11 +198,19 @@ closed protocol Coordinator {
         layer_id LayerId;
     });
 
-    /// Sets the display mode for the given display.
-    ///
-    /// It is illegal to pass a display mode which was not part of the display's Info.
+    /// Sets the mode for a display.
     strict SetDisplayMode(struct {
+        /// The display whose mode is changed.
+        ///
+        /// The call is ignored if the display ID does not belong to a display
+        /// known by the Coordinator. This can happen if a client issues a call
+        /// to [`Coordinator.SetDisplayMode`] before it receives a notification
+        /// that the display was removed.
         display_id fuchsia.hardware.display.types.DisplayId;
+
+        /// The new mode for the display.
+        ///
+        /// Must be one of the [`Info.modes`] entries for the display.
         mode fuchsia.hardware.display.types.Mode;
     });
 
@@ -230,20 +241,40 @@ closed protocol Coordinator {
     /// successful. If SetDisplayColorConversion() is called and then the config is discarded, then
     /// the last successfully applied state is restored.
     strict SetDisplayColorConversion(struct {
+        /// The display whose color coefficients are set.
+        ///
+        /// The call is ignored if the display ID does not belong to a display
+        /// known by the Coordinator. This can happen if a client issues a call
+        /// to [`Coordinator.SetDisplayColorConversion`] before it receives a
+        /// notification that the display was removed.
         display_id fuchsia.hardware.display.types.DisplayId;
+
         preoffsets array<float32, 3>;
         coefficients array<float32, 9>;
         postoffsets array<float32, 3>;
     });
 
-    /// Sets which layers are on a display. The list is in increasing z-order.
-    ///
-    /// It is illegal to use a layer on multiple displays concurrently. If a layer
-    /// needs to be moved between displays, it must be removed from the first display's
-    /// pending config before being added to the second display's pending config. It
-    /// is also illegal to pass an invalid layer id.
+    /// Assigns a list of layers to be composited on a display.
     strict SetDisplayLayers(struct {
+        /// The display that will show the result of compositing the layers.
+        ///
+        /// The call is ignored if the display ID does not belong to a display
+        /// known by the Coordinator. This can happen if a client issues a call
+        /// to [`Coordinator.SetDisplayLayers`] before it receives a
+        /// notification that the display was removed.
         display_id fuchsia.hardware.display.types.DisplayId;
+
+        // The layers to be composited on the display.
+        //
+        // The layers are listed in increasing Z-order.
+        //
+        // The list must not be empty, and each ID must be valid.
+        //
+        // Each layer ID must not be composited on any another display. Moving a
+        // layer between displays is accomplished by first removing the layer
+        // from its current display, via a call to
+        // [`Coordinator.SetDisplayLayers`] that does not include the layer's
+        // ID.
         layer_ids vector<LayerId>:MAX;
     });
 
@@ -337,27 +368,27 @@ closed protocol Coordinator {
         color fuchsia.hardware.display.types.Color;
     });
 
-    /// Sets the image for the layer.
+    /// Sets the image for the layer's draft configuration.
     ///
     /// If wait_event_id corresponds to an imported event, the driver will
     /// wait for ZX_EVENT_SIGNALED on the object before presenting the image.
     ///
-    /// A layer's active image is the most recently applied image which either has
+    /// A layer's applied image is the most recently applied image which either has
     /// no wait event or whose wait event has been signaled. Whenever a new image
-    /// becomes active, any older images which never became active are dropped, and
+    /// is applied, any older images which never got applied are dropped, and
     /// their signal events will be fired as soon as their wait events are
     /// signaled. The driver also does not have any concept like 'target vsync',
-    /// meaning that if multiple images become active within one vsync period, then
+    /// meaning that if multiple images are applied within one vsync period, then
     /// only the last image will actually be displayed.
     ///
-    /// By default, the driver retains an active image until a new image becomes
-    /// active. However, setting a layer's ImageConfig with SetLayerPrimaryConfig
-    /// resets the layer's active and pending images, even if the new ImageConfig
+    /// By default, the driver retains an applied image until a new image is
+    /// applied. However, setting a layer's ImageConfig with SetLayerPrimaryConfig
+    /// resets the layer's applied and waiting images, even if the new ImageConfig
     /// matches the old ImageConfig.
     ///
     /// An image cannot be used for multiple layers simultaneously, nor can an
     /// image be given back to the display coordinator while it is still in use.
-    /// An image is considered in use when it is part of a pending configuration
+    /// An image is considered in use when it is part of a draft configuration
     /// or from when its configuration is applied until it is replaced by a
     /// subsequent configuration that is *displayed* (not merely applied).
     ///
@@ -367,39 +398,44 @@ closed protocol Coordinator {
     /// with an image layer that has no image (note that is is not illegal to
     /// validate such a configuration). It is illegal to reuse a wait event which
     /// another layer that has not been presented is waiting on.
+    ///
+    /// Each layer can track a maximum of `MAX_WAITING_IMAGES_PER_LAYER` waiting images.
+    /// An image becomes "waiting" when it is the most recent image set to a layer that appears in
+    /// a config that is applied via `ApplyConfig()` or similar.  To avoid exceeding the maximum,
+    /// the client can infer that the image is no longer waiting by:
+    ///   - noting the config stamp when the config containing the layer/image is applied
+    ///   - watching for that same (or later) config stamp to be returned by
+    ///     `CoordinatorListener.OnVsync()`.
     strict SetLayerImage2(struct {
         layer_id LayerId;
         image_id ImageId;
         wait_event_id EventId;
     });
 
-    /// Attempts to validate the current configuration.
+    /// Validates the draft configuration.
     ///
-    /// When CheckConfig is called, the driver will validate the pending
-    /// configuration. If res is UNSUPPORTED_CONFIG, then ops will be
-    /// non-empty.
+    /// Validation entails checking that the draft configuration can be used
+    /// by the system's display hardware.
     ///
-    /// Most SetX operations require revalidating the configuration. The
+    /// Most SetX operations require verifying the draft configuration. The
     /// following operations do not require revalidation.
     /// * SetLayerImage2()
     ///
-    /// If discard is true, the pending changes will be discarded after validation.
     strict CheckConfig(struct {
+        /// If is true, the draft changes will be discarded after validation.
+        ///
+        /// TODO(https://fxbug.dev/395488933): Deprecated; always set this to
+        /// false. Call [`Coordinator.DiscardConfig`] instead.
         discard bool;
     }) -> (struct {
         res fuchsia.hardware.display.types.ConfigResult;
+
+        /// Non-empty iff `res` is UNSUPPORTED_CONFIG.
         ops vector<ClientCompositionOp>:MAX;
     });
 
-    // TODO(https://fxbug.dev/42152065): Deprecated; use ApplyConfig3() instead.
-    //
-    /// Applies any pending changes to the current configuration. This will
-    /// not apply pending changes to layers which are not on any display.
-    ///
-    /// If the pending configuration cannot be applied, this call will silently
-    /// fail, so the client should ensure its configuration is valid with
-    /// CheckConfig.
-    strict ApplyConfig();
+    /// Discard all draft configuration changes.
+    strict DiscardConfig();
 
     // TODO(https://fxbug.dev/42152065): Deprecated; use ApplyConfig3() instead.
     // This is a temporary solution to support old ApplyConfig() with new OnVsync() events.
@@ -408,21 +444,21 @@ closed protocol Coordinator {
     /// Gets the stamp provided with the latest configuration the client
     /// submitted (by calling ApplyConfig()) and the display core driver
     /// accepted; the display configuration may not have been rendered yet
-    /// because of pending image availability or pending layer changes.
+    /// because of pending image availability or draft layer changes.
     /// If no configuration was applied before, returns `INVALID_CONFIG_STAMP_VALUE`.
     strict GetLatestAppliedConfigStamp() -> (struct {
-        stamp fuchsia.hardware.display.types.ConfigStamp;
+        stamp ConfigStamp;
     });
 
-    /// Applies any pending changes to the current configuration. This will
-    /// not apply pending changes to layers which are not on any display.
+    /// Applies any draft changes to the current configuration. This will
+    /// not apply draft changes to layers which are not on any display.
     ///
-    /// If the pending configuration cannot be applied, this call will silently
-    /// fail, so the client should ensure its configuration is valid with
-    /// CheckConfig.
+    /// If the draft configuration cannot be applied, this call will silently
+    /// fail, so the client should ensure its configuration is valid by
+    /// calling [`Coordinator.CheckConfig`].
     strict ApplyConfig3(resource table {
         /// Required. Must be valid and strictly monotonically-increasing.
-        1: stamp fuchsia.hardware.display.types.ConfigStamp;
+        1: stamp ConfigStamp;
     });
 
     /// Configures the client's preferences for VSync event delivery.
@@ -504,25 +540,35 @@ closed protocol Coordinator {
 
     /// Power off/on the display panel.
     ///
-    /// This function takes effect immediately. Clients don't need to call
-    /// `ApplyConfig()` to commit this command.
+    /// This call takes effect immediately. Clients don't need to call
+    /// [`Coordinator.ApplyConfig`].
     ///
-    /// Once a display is turned off, it will not deliver vsync events, which
-    /// may include the vsync event for the most recently applied config.
+    /// Fails with ZX_ERR_NOT_FOUND if `display_id` does not belong to a display
+    /// known by the Coordinator. This can happen if a client issues a call to
+    /// [`Coordinator.SetDisplayPower`] before it receives a notification that
+    /// the display was removed.
     ///
-    /// Staged display control commands (e.g. SetDisplayLayer) will not be
-    /// affected. They are still applied to the display device when client calls
-    /// `ApplyConfig()`, but the contents will be shown on display panel only
-    /// after client powers on the display again.
-    ///
-    /// Newly added displays are turned on by default.
-    ///
-    /// Returns ZX_ERR_NOT_FOUND if `display_id` is invalid when Coordinator
-    /// handles this method.
-    /// Returns ZX_ERR_NOT_SUPPORTED if the display driver IC doesn't support
-    /// turning on/off displays.
+    /// Fails with ZX_ERR_NOT_SUPPORTED if the display drivers or the hardware
+    /// don't support displays on and off.
     strict SetDisplayPower(struct {
         display_id fuchsia.hardware.display.types.DisplayId;
+
+        /// True powers on the display, false powers it off.
+        ///
+        /// Once a display is turned off, the hardware will not generate new
+        /// VSync events. However, the client should be prepared to handle VSync
+        /// events generated before the [`Coordinator.SetDisplayPower`] call
+        /// reaches the hardware.
+        ///
+        /// Calls that impact draft configurations, such as
+        /// [`Coordinator.SetDisplayLayers`], still work while the display is
+        /// powered off.
+        ///
+        /// [`Coordinator.ApplyConfig`] also works while the display is powered
+        /// off.  When the display is powered back on on, it will show the
+        /// latest applied configuration.
+        ///
+        /// Newly added displays are powered on.
         power_on bool;
     }) -> () error zx.Status;
 };

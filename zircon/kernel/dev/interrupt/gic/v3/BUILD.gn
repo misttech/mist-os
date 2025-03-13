@@ -27,6 +27,7 @@ source_set("v3") {
     "//zircon/kernel/dev/pcie",
     "//zircon/kernel/dev/pdev/interrupt",
     "//zircon/kernel/lib/init",
+    "//zircon/kernel/lib/kpci",
     "//zircon/kernel/lib/ktrace",
     "//zircon/kernel/lib/root_resource_filter",
     "//zircon/system/ulib/lazy_init",

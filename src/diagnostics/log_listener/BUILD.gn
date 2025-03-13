@@ -23,7 +23,7 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.diagnostics.host:fuchsia.diagnostics.host_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//sdk/rust/zx",
-    "//src/developer/ffx/lib/writer:lib",
+    "//src/developer/lib/writer:lib",
     "//src/diagnostics/lib/log-command",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
@@ -37,7 +37,7 @@ rustc_binary("bin") {
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
-fuchsia_shell_package("log_listener_shell_pkg") {
+fuchsia_package("log_listener_shell_pkg") {
   package_name = "log_listener_shell"
   deps = [
     ":bin",

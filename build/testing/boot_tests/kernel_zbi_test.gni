@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembled_system.gni")
+import("//build/assembly/product_assembly_configuration.gni")
 import("//build/board.gni")
 import("//build/images/args.gni")
 import("//build/product.gni")
@@ -56,6 +57,47 @@ template("_cuckoo_product_bundle") {
     }
   }
 
+  product_assembly_configuration("${main_target}.product_config") {
+    testonly = true
+    platform = {
+      build_type = "eng"
+      intl = {
+        # A fake intl_services will be injected
+        config_type = "none"
+      }
+      development_support = {
+        enable_userboot_next_component_manager = true
+      }
+      if (!fxfs_blob) {
+        storage = {
+          filesystems = {
+            volume = {
+              fvm = {
+                data = {
+                  if (data_filesystem_format != "fxfs") {
+                    data_filesystem_format = "minfs"
+                  }
+                }
+                blob = {
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    product = {
+    }
+    base_packages = [
+      {
+        package_target = "//src/testing/fidl/intl_property_manager:fake_intl_services_package"
+      },
+      {
+        package_target = ":$stub_test_target"
+      },
+    ]
+  }
+
   # Generate the assembled system with the provided kernel_zbi.
   assembly_kernel_zbi = invoker.kernel_zbi
   assembly_kernel_image_name = get_label_info(assembly_kernel_zbi, "name")
@@ -63,46 +105,25 @@ template("_cuckoo_product_bundle") {
     assembly_kernel_image_name = invoker.kernel_image_name
   }
 
-  assembly_input = {
+  assembled_system(assembled_system_target) {
     testonly = true
     namespace = assembled_system_namespace
     image_name = "fuchsia"
-    include_legacy_bundle = true
     kernel_zbi = assembly_kernel_zbi
     kernel_image_name = assembly_kernel_image_name
-    base_packages =
-        board_package_labels + [
-          # This package is needed to provide a fake intl_services
-          # so that snapshot won't time out trying to collect
-          # locale and timezone annotations.
-          "//src/testing/fidl/intl_property_manager:fake_intl_services_package",
-          ":$stub_test_target",
-        ]
-    cmdline_deps = [ "//build/testing:userboot.next-component-manager" ]
     board_config_label = board_configuration_label
 
+    product_assembly_config_label = ":${main_target}.product_config"
+
     if (fxfs_blob) {
-      product_assembly_config_label =
-          "//build/testing:cuckoo-product-configuration"
       generate_fxfs = true
     } else {
-      if (data_filesystem_format == "fxfs") {
-        product_assembly_config_label =
-            "//build/testing:cuckoo-product-configuration-fxfs"
-      } else {
-        product_assembly_config_label =
-            "//build/testing:cuckoo-product-configuration-minfs"
-      }
       generate_fvm = true
       generate_fvm_fastboot = generate_fvm && assembly_generate_fvm_fastboot
       generate_fvm_nand = generate_fvm && assembly_generate_fvm_nand
     }
 
     generate_vbmeta = use_vbmeta
-  }
-
-  assembled_system(assembled_system_target) {
-    forward_variables_from(assembly_input, "*")
   }
 
   # The following logic to determine the product bundle's partition information

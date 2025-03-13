@@ -44,6 +44,7 @@ bindgen.include_dirs = [
     "sdk/lib/zxio/include",
     "zircon/third_party/ulib/musl/include",
     "zircon/system/public",
+    "zircon/system/ulib/c/include/llvm-libc-golden",
 ]
 
 bindgen.enable_stdlib_include_dirs = False

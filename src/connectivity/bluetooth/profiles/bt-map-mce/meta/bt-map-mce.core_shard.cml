@@ -12,13 +12,13 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
+            protocol: [ "fuchsia.bluetooth.bredr.Profile" ],
+            from: "#bluetooth-core",
             to: [ "#bt-map-mce" ],
         },
         {
-            protocol: [ "fuchsia.bluetooth.bredr.Profile" ],
-            from: "#bluetooth-core",
+            dictionary: "diagnostics",
+            from: "parent",
             to: [ "#bt-map-mce" ],
         },
     ],

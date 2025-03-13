@@ -58,6 +58,11 @@
     },
     {
         "kind": "enum/member",
+        "name": "zx/ObjType.COUNTER",
+        "value": "34"
+    },
+    {
+        "kind": "enum/member",
         "name": "zx/ObjType.EVENT",
         "value": "5"
     },

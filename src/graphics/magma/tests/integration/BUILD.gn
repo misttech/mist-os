@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components/fuchsia_test_component.gni")
+import("//build/fidl/fidl.gni")
 import("//build/packages/sdk_fuchsia_package.gni")
 import("//build/testing/cc_test_executable.gni")
 import("//src/graphics/lib/magma/gnbuild/magma.gni")
@@ -20,12 +21,8 @@ group("integration") {
 group("tests") {
   testonly = true
   deps = [
-    ":magma-conformance-tests",
-    ":magma-conformance-tests-arm",
-    ":magma-conformance-tests-hermetic",
-    ":magma-conformance-tests-hermetic-arm",
-    ":magma-conformance-tests-hermetic-vsi",
-    ":magma-conformance-tests-vsi",
+    ":magma-conformance-tests-generic",
+    ":magma-conformance-tests-generic-hermetic",
   ]
 }
 
@@ -37,9 +34,28 @@ group("linux_x64") {
   ]
 }
 
-fuchsia_component_manifest("conformance-manifest") {
-  component_name = "magma-conformance-tests"
-  manifest = "meta/magma-conformance-tests.cml"
+# Clarify that certain definitions are referenced from driver
+# integration testing areas.
+visibility_list = [
+  "//src/graphics/drivers/*",
+  "//src/graphics/magma/tests/integration/*",
+  "//vendor/google/*",
+]
+
+source_set("vendor_helper_interface") {
+  visibility = visibility_list
+  sources = [ "vendor_helper_generic.h" ]
+  public_deps = [
+    ":fuchsia.gpu.magma.test_cpp",
+    "//sdk/lib/syslog/cpp",
+  ]
+}
+
+# Server implmentations should depend on :vendor_helper_interface
+fidl("fuchsia.gpu.magma.test") {
+  visibility = [ "." ]
+  sources = [ "test_magma.fidl" ]
+  public_deps = [ "//zircon/vdso/zx" ]
 }
 
 fuchsia_component_manifest("conformance_child_manifest") {
@@ -47,21 +63,28 @@ fuchsia_component_manifest("conformance_child_manifest") {
   manifest = "meta/magma_conformance_tests_child.cml"
 }
 
-fuchsia_component_manifest("conformance-hermetic-manifest") {
-  component_name = "magma-conformance-tests-hermetic"
-  manifest = "meta/magma-conformance-tests-hermetic.cml"
-}
-
-fuchsia_component_manifest("conformance-config-manifest") {
-  component_name = "magma-conformance-tests-config"
-  manifest = "meta/magma-conformance-config.shard.cml"
+fuchsia_component_manifest("conformance_child_hermetic_manifest") {
+  testonly = true
+  component_name = "magma_conformance_tests"
+  manifest = "meta/magma_conformance_tests_child_hermetic.cml"
 }
 
 fuchsia_structured_config_cpp_elf_lib("conformance-config") {
-  cm_label = ":conformance-config-manifest"
+  cm_label = ":conformance_child_manifest"
 }
 
 cc_test_executable("magma_conformance_tests") {
+  testonly = true
+  deps = [ ":test_magma_source" ]
+}
+
+cc_test_executable("magma_conformance_hermetic_tests") {
+  testonly = true
+  deps = [ ":test_magma_source_hermetic" ]
+}
+
+source_set("test_magma_source") {
+  testonly = true
   sources = [
     "main.cc",
     "test_magma.cc",
@@ -71,9 +94,9 @@ cc_test_executable("magma_conformance_tests") {
 
   deps = [
     ":conformance-config",
+    ":fuchsia.gpu.magma.test_cpp",
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/magma_client:magma_headers",
-    "//src/graphics/drivers/msd-arm-mali/include",
-    "//src/graphics/drivers/msd-intel-gen/include",
     "//src/graphics/lib/magma/src/libmagma",
     "//src/graphics/magma/lib/magma_client/test_util:magma_map_cpu",
     "//src/lib/fsl",
@@ -98,9 +121,8 @@ cc_test_executable("magma_conformance_tests") {
   }
 }
 
-cc_test_executable("magma_conformance_tests_hermetic") {
+source_set("test_magma_source_hermetic") {
   testonly = true
-
   defines = [ "MAGMA_HERMETIC=1" ]
   sources = [
     "main.cc",
@@ -111,9 +133,9 @@ cc_test_executable("magma_conformance_tests_hermetic") {
 
   deps = [
     ":conformance-config",
+    ":fuchsia.gpu.magma.test_cpp",
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/magma_client:magma_headers",
-    "//src/graphics/drivers/msd-arm-mali/include",
-    "//src/graphics/drivers/msd-intel-gen/include",
     "//src/graphics/lib/magma/src/libmagma:magma_hermetic",
     "//src/graphics/magma/lib/magma_client/test_util:magma_map_cpu",
     "//src/lib/fsl",
@@ -136,11 +158,9 @@ cc_test_executable("magma_conformance_tests_hermetic") {
   }
 }
 
-cc_test_executable("virtmagma_conformance_tests") {
+source_set("test_virtmagma_source") {
   testonly = true
-
   defines = [ "VIRTMAGMA=1" ]
-
   sources = [
     "main.cc",
     "test_magma.cc",
@@ -149,13 +169,16 @@ cc_test_executable("virtmagma_conformance_tests") {
 
   deps = [
     "//sdk/lib/magma_client:magma_headers",
-    "//src/graphics/drivers/msd-arm-mali/include",
-    "//src/graphics/drivers/msd-intel-gen/include",
     "//src/graphics/lib/magma/src/libmagma_virt",
     "//src/graphics/magma/lib/magma_client/test_util:magma_map_cpu",
     "//src/lib/fxl:fxl_cli",
     "//third_party/googletest:gtest",
   ]
+}
+
+cc_test_executable("virtmagma_conformance_tests") {
+  testonly = true
+  deps = [ ":test_virtmagma_source" ]
 }
 
 cc_test_executable("virtmagma_no_cpp_test") {
@@ -202,180 +225,91 @@ cc_test_executable("virtmagma_sync_file_tests") {
   ]
 }
 
-fuchsia_structured_config_values("default_config") {
-  cm_label = ":conformance-manifest"
-  values = {
-    gpu_vendor_id = ""
-    gpu_vendor_id_int = 0
-    disabled_test_pattern = ""
-  }
-}
-
-fuchsia_structured_config_values("child_config") {
-  cm_label = ":conformance_child_manifest"
-  values = {
-    gpu_vendor_id = ""
-    gpu_vendor_id_int = 0
-    disabled_test_pattern = ""
-  }
-}
-
-fuchsia_structured_config_values("arm_config") {
-  cm_label = ":conformance-manifest"
-  values = {
-    gpu_vendor_id = "0x13B5"
-    gpu_vendor_id_int = 0
-    disabled_test_pattern = ""
-  }
-}
-
-fuchsia_structured_config_values("vsi_config") {
-  cm_label = ":conformance-manifest"
-  values = {
-    gpu_vendor_id = "0x10001"
-    gpu_vendor_id_int = 0
-    disabled_test_pattern = ""
-  }
-}
-
-fuchsia_component("magma_conformance_tests_child_component") {
+fuchsia_component("magma-conformance-tests-child-component") {
+  testonly = true
   cm_label = ":conformance_child_manifest"
   deps = [ ":magma_conformance_tests" ]
 }
 
-fuchsia_test_component("magma-conformance-tests-component") {
-  cm_label = ":conformance-manifest"
-  deps = [ ":magma_conformance_tests" ]
-  test_type = "system"
+fuchsia_component("magma-conformance-tests-child-hermetic-component") {
+  testonly = true
+  cm_label = ":conformance_child_hermetic_manifest"
+  deps = [ ":magma_conformance_hermetic_tests" ]
 }
 
-# Runs on any GPU if the only device present; if multiple
-# GPUs are present the vendor must be specified.
-fuchsia_test_package("magma-conformance-tests") {
-  test_components = [ ":magma-conformance-tests-component" ]
-  deps = [ ":default_config" ]
-  test_specs = {
-    environments = magma_intel_gpu_envs
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-  validate_structured_config = false
+#
+# This package is included as a subpackage for vendor-specific conformance tests,
+# similarly to how its included here for :magma-conformance-tests-generic
+#
+fuchsia_package("magma-conformance-tests-child") {
+  testonly = true
+  visibility = visibility_list
+  package_name = "test-magma"
+  deps = [ ":magma-conformance-tests-child-component" ]
 }
 
-fuchsia_package("magma_conformance_tests_for_sdk") {
+fuchsia_package("magma-conformance-tests-child-hermetic") {
+  testonly = true
+  package_name = "test-magma"
+  deps = [ ":magma-conformance-tests-child-hermetic-component" ]
+}
+
+#
+# Conformance tests for generic vendor (runs only on devices with a
+# single magma device).
+#
+executable("vendor-helper-generic") {
+  testonly = true
+  sources = [ "vendor_helper_generic.cc" ]
   deps = [
-    ":child_config",
-    ":magma_conformance_tests_child_component",
+    ":vendor_helper_interface",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/syslog/cpp",
   ]
-  validate_structured_config = false
 }
 
-if (current_toolchain == default_toolchain) {
-  sdk_fuchsia_package("magma_conformance_tests_sdk") {
-    distribution_name = "magma_conformance_tests"
-    category = "partner"
-    package_label = ":magma_conformance_tests_for_sdk"
-    expected_files_exact = [ "meta/magma_conformance_tests.cm" ]
-    api_level_added = 16
-  }
+fuchsia_component("vendor-helper-generic-component") {
+  testonly = true
+  component_name = "vendor-helper"
+  manifest = "meta/vendor_helper.cml"
+  deps = [ ":vendor-helper-generic" ]
 }
 
-fuchsia_test_package("magma-conformance-tests-vsi") {
-  test_components = [ ":magma-conformance-tests-component" ]
-  deps = [ ":vsi_config" ]
-  test_specs = {
-    environments = [
-      sherlock_env,
-      vim3_env,
-    ]
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-  validate_structured_config = false
-}
-
-fuchsia_test_package("magma-conformance-tests-arm") {
-  test_components = [ ":magma-conformance-tests-component" ]
-  deps = [ ":arm_config" ]
-  test_specs = {
-    environments = magma_arm_gpu_envs
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-  validate_structured_config = false
-}
-
-fuchsia_test_component("magma-conformance-tests-hermetic-component") {
-  cm_label = ":conformance-hermetic-manifest"
-  deps = [ ":magma_conformance_tests_hermetic" ]
+fuchsia_test_component("magma-conformance-tests-generic-component") {
+  component_name = "magma-conformance-tests"
+  manifest = "meta/magma_conformance_tests_generic.cml"
   test_type = "system"
 }
 
-fuchsia_structured_config_values("default_config_hermetic") {
-  cm_label = ":conformance-hermetic-manifest"
-  values = {
-    gpu_vendor_id = ""
-    gpu_vendor_id_int = 0
-    disabled_test_pattern = ""
-  }
-}
-
-fuchsia_test_package("magma-conformance-tests-hermetic") {
-  test_components = [ ":magma-conformance-tests-hermetic-component" ]
-  deps = [ ":default_config_hermetic" ]
+fuchsia_test_package("magma-conformance-tests-generic") {
+  test_components = [ ":magma-conformance-tests-generic-component" ]
+  subpackages = [ ":magma-conformance-tests-child" ]
+  deps = [ ":vendor-helper-generic-component" ]
   test_specs = {
     environments = magma_intel_gpu_envs
     log_settings = {
       max_severity = "ERROR"
     }
   }
-  validate_structured_config = false
 }
 
-fuchsia_structured_config_values("arm_config_hermetic") {
-  cm_label = ":conformance-hermetic-manifest"
-  values = {
-    gpu_vendor_id = "0x13B5"
-    gpu_vendor_id_int = 0
-    disabled_test_pattern = ""
-  }
+#
+# Hermetic version of generic conformance tests
+#
+fuchsia_component_manifest("conformance-hermetic-manifest") {
+  component_name = "magma-conformance-tests-hermetic"
+  manifest = "meta/magma_conformance_tests_hermetic.cml"
 }
 
-fuchsia_structured_config_values("vsi_config_hermetic") {
-  cm_label = ":conformance-hermetic-manifest"
-  values = {
-    gpu_vendor_id = "0x10001"
-    gpu_vendor_id_int = 0
-    disabled_test_pattern = ""
-  }
-}
-
-fuchsia_test_package("magma-conformance-tests-hermetic-arm") {
-  test_components = [ ":magma-conformance-tests-hermetic-component" ]
-  deps = [ ":arm_config_hermetic" ]
+fuchsia_test_package("magma-conformance-tests-generic-hermetic") {
+  test_components = [ ":magma-conformance-tests-generic-component" ]
+  subpackages = [ ":magma-conformance-tests-child-hermetic" ]
+  deps = [ ":vendor-helper-generic-component" ]
   test_specs = {
-    environments = magma_arm_gpu_envs
+    environments = magma_intel_gpu_envs
     log_settings = {
       max_severity = "ERROR"
     }
   }
-  validate_structured_config = false
-}
-
-fuchsia_test_package("magma-conformance-tests-hermetic-vsi") {
-  test_components = [ ":magma-conformance-tests-hermetic-component" ]
-  deps = [ ":vsi_config_hermetic" ]
-  test_specs = {
-    environments = [
-      sherlock_env,
-      vim3_env,
-    ]
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-  validate_structured_config = false
 }

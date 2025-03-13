@@ -33,7 +33,9 @@ pub enum ImageType {
     VBMeta,
     Fvm,
     Fxfs,
+    FxfsFastboot,
     QemuKernel,
+    Dtbo,
 }
 
 impl FromStr for ImageType {
@@ -44,9 +46,11 @@ impl FromStr for ImageType {
             "vbmeta" => Ok(ImageType::VBMeta),
             "fvm" => Ok(ImageType::Fvm),
             "fxfs" => Ok(ImageType::Fxfs),
+            "fxfs.fastboot" => Ok(ImageType::FxfsFastboot),
             "qemu-kernel" => Ok(ImageType::QemuKernel),
+            "dtbo" => Ok(ImageType::Dtbo),
             _ => Err(anyhow!(
-                "Invalid image_type: {}. Expect one of : zbi, vbmeta, fvm, fxfs, qemu-kernel",
+                "Invalid image_type: {}. Expect one of : zbi, vbmeta, fvm, fxfs, fxfs.fastboot, qemu-kernel, dtbo",
                 value
             )),
         }

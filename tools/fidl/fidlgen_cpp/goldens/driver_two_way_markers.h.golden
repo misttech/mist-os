@@ -30,6 +30,8 @@ class TwoWay final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 989730524426044687;
   };
 };
 
@@ -37,6 +39,6 @@ class TwoWay final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_drivertwoway::TwoWay> : public std::true_type{};
+struct IsProtocol<::test_drivertwoway::TwoWay> : public std::true_type {};
 
 }  // namespace fidl

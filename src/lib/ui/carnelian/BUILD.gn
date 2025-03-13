@@ -129,9 +129,6 @@ rustc_library("carnelian") {
   }
 
   configs += [ ":carnelian-performance" ]
-
-  # Dynamic linking libstd is incompatible with LTO.
-  configs -= [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
 }
 
 config("carnelian-performance") {

@@ -26,7 +26,7 @@ zx::result<> Vim3Devicetree::Start() {
   }
   manager_.emplace(std::move(*manager));
 
-  auto visitors = fdf_devicetree::LoadVisitors(*incoming());
+  auto visitors = fdf_devicetree::LoadVisitors(symbols());
   if (visitors.is_error()) {
     FDF_LOG(ERROR, "Failed to create visitors: %s", visitors.status_string());
     return visitors.take_error();

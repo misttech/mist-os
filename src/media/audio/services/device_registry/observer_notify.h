@@ -20,7 +20,6 @@ class ObserverNotify {
   virtual void DeviceIsRemoved() = 0;
   virtual void DeviceHasError() = 0;
 
-  virtual void GainStateIsChanged(const fuchsia_audio_device::GainState&) = 0;
   virtual void PlugStateIsChanged(const fuchsia_audio_device::PlugState& new_plug_state,
                                   zx::time plug_change_time) = 0;
 

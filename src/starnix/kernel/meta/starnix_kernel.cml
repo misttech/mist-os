@@ -12,6 +12,7 @@
         job_policy_create_raw_processes: "true",
         is_shared_process: "true",
         use_next_vdso: "true",
+        lifecycle: { stop_event: "notify" },
 
         // Needed because starnix depends on the usercopy crate which takes
         // the job's exception channel to handle page faults. Normally the
@@ -42,21 +43,31 @@
     use: [
         { protocol: "fuchsia.kernel.VmexResource" },
         {
+            // Requires AIB starnix_runner_settable_utc_time.
+            protocol: "fuchsia.time.external.Adjust",
+            availability: "optional",
+        },
+        {
             directory: "boot-kernel",
             rights: [ "r*" ],
             path: "/boot/kernel",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-gpu",
             rights: [ "r*" ],
             path: "/dev/class/gpu",
             availability: "optional",
         },
         {
-            directory: "dev-adb",
-            rights: [ "r*" ],
-            path: "/dev/class/adb",
+            // This service replaces the directory capability above.
+            service: "fuchsia.gpu.magma.Service",
             availability: "optional",
+        },
+        {
+            service: "fuchsia.hardware.adb.Service",
+            from: "parent",
         },
         {
             directory: "container_config",
@@ -66,15 +77,11 @@
             availability: "optional",
         },
         {
-            // Hardware-agnostic wake alarms support
-            protocol: [ "fuchsia.time.alarms.Wake" ],
-            from: "parent",
-        },
-        {
             protocol: [
                 "fuchsia.buildinfo.Provider",
                 "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.feedback.CrashReporter",
+                "fuchsia.hardware.google.nanohub.Device",
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.hardware.sockettunnel.Device",
                 "fuchsia.kernel.Stats",
@@ -104,6 +111,7 @@
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
+                "fuchsia.time.alarms.Wake",
                 "fuchsia.tracing.provider.Registry",
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",

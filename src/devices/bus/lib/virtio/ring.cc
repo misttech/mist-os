@@ -5,6 +5,7 @@
 #include <assert.h>
 #include <inttypes.h>
 #include <lib/dma-buffer/buffer.h>
+#include <lib/mmio/mmio-internal.h>
 #include <lib/stdcompat/bit.h>
 #include <lib/virtio/device.h>
 #include <lib/virtio/ring.h>

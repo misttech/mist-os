@@ -385,12 +385,11 @@ mod tests {
                 let mut server = server.into_stream();
                 while let Some(request) = server.next().await {
                     match request.unwrap() {
-                        rcs::RemoteControlRequest::DeprecatedOpenCapability {
+                        rcs::RemoteControlRequest::ConnectCapability {
                             moniker: _,
                             capability_set,
                             capability_name,
                             server_channel,
-                            flags: _,
                             responder,
                         } => {
                             assert_eq!(sys2::OpenDirType::NamespaceDir, capability_set);

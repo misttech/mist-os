@@ -20,6 +20,8 @@ std::string NameHandleSubtype(HandleSubtype subtype) {
       return "channel";
     case HandleSubtype::kClock:
       return "clock";
+    case HandleSubtype::kCounter:
+      return "counter";
     case HandleSubtype::kEvent:
       return "event";
     case HandleSubtype::kEventpair:

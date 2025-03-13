@@ -80,7 +80,7 @@ rustc_binary("bin") {
   ]
 }
 
-fuchsia_shell_package("fuzzctl") {
+fuchsia_package("fuzzctl") {
   testonly = true
   deps = [ ":bin" ]
 }

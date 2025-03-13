@@ -23,6 +23,7 @@ driver_bind_rules("aml-meson-power-bind") {
 }
 
 fuchsia_cc_driver("aml-meson-power-driver") {
+  legacy = true
   output_name = "aml-meson-power"
   defines = [ "_ALL_SOURCE" ]
   configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]

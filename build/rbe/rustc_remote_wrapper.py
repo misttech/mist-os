@@ -38,6 +38,9 @@ _EXEC_PERMS = (
     stat.S_IRWXU | (stat.S_IRGRP | stat.S_IXGRP) | (stat.S_IROTH | stat.S_IXOTH)
 )
 
+# This is a list of known dylibs built in Fuchsia.
+_KNOWN_FUCHSIA_DYLIBS = ("libvfs_rust",)
+
 
 def msg(text: str) -> None:
     print(f"[{_SCRIPT_BASENAME}] {text}")
@@ -184,12 +187,20 @@ class RemoteInputProcessingError(RuntimeError):
         super().__init__(message)
 
 
-def _filter_local_command(args: Iterable[str]) -> list[str]:
-    return list(cl_utils.strip_option_prefix(args, "--local-only"))
+def _filter_local_command(args: Iterable[str]) -> Iterable[str]:
+    yield from cl_utils.strip_option_prefix(args, "--local-only")
 
 
-def _remove_remote_command(args: Iterable[str]) -> list[str]:
-    return list(a for a in args if not a.startswith("--remote-only"))
+def _filter_remote_command(args: Iterable[str]) -> Iterable[str]:
+    yield from cl_utils.strip_option_prefix(args, "--remote-only")
+
+
+def _remove_local_command(args: Iterable[str]) -> Iterable[str]:
+    yield from cl_utils.filter_out_option_with_arg(args, "--local-only")
+
+
+def _remove_remote_command(args: Iterable[str]) -> Iterable[str]:
+    yield from cl_utils.filter_out_option_with_arg(args, "--remote-only")
 
 
 class RustRemoteAction(object):
@@ -478,8 +489,13 @@ class RustRemoteAction(object):
         local_filtered = _filter_local_command(command)
         remote_removed = _remove_remote_command(local_filtered)
         return (
-            cl_utils.auto_env_prefix_command(remote_removed),
+            cl_utils.auto_env_prefix_command(list(remote_removed)),
             aux_files,
+        )
+
+    def local_compile_command(self) -> Iterable[str]:
+        yield from _remove_remote_command(
+            _filter_local_command(self.original_command)
         )
 
     def remote_compile_command(self) -> Iterable[str]:
@@ -488,7 +504,9 @@ class RustRemoteAction(object):
         Note: that response files are preserved, so tokens inside response files
         cannot be modified.
         """
-        for tok in self.original_command:
+        for tok in _remove_local_command(
+            _filter_remote_command(self.original_command)
+        ):
             # Apply the first matching transform on each token.
             replacement = self._replace_with_remote_compiler(tok)
             if replacement is not None:
@@ -515,11 +533,6 @@ class RustRemoteAction(object):
             ):
                 yield tok
                 yield f"-Clink-arg=--ld-path={self.remote_ld_path}"
-                continue
-
-            remote_only_prefix = "--remote-only="
-            if tok.startswith(remote_only_prefix):
-                yield tok.removeprefix(remote_only_prefix)
                 continue
 
             # else
@@ -572,6 +585,14 @@ class RustRemoteAction(object):
         remote_depfile_inputs = [
             target for paths in target_paths for target in paths
         ]
+
+        # TODO(https://fxbug.dev/395778407): binary-dep-depinfo only emits
+        # .rmeta for Fuchsia dylibs, figure out a better way to include .so
+        # files here, which are necessary in linking.
+        for p in remote_depfile_inputs:
+            libname = p.name.removesuffix(".rmeta")
+            if libname in _KNOWN_FUCHSIA_DYLIBS:
+                remote_depfile_inputs += [p.parent.joinpath(f"{libname}.so")]
 
         # Expand some .rmeta deps for .rlib compilation.
         expanded_remote_inputs = list(
@@ -796,6 +817,7 @@ class RustRemoteAction(object):
             main_args=self._main_args,
             remote_options=translated_remote_options,
             command=list(self.remote_compile_command()),
+            local_only_command=list(self.local_compile_command()),
             inputs=remote_inputs,
             output_files=remote_output_files,
             output_dirs=remote_output_dirs,
@@ -1057,7 +1079,11 @@ class RustRemoteAction(object):
         # or any of the remote action features.
         export_dir = self.miscomparison_export_dir
         command = cl_utils.auto_env_prefix_command(
-            _remove_remote_command(_filter_local_command(self.original_command))
+            list(
+                _remove_remote_command(
+                    _filter_local_command(self.original_command)
+                )
+            )
         )
         if self.check_determinism:
             self.vmsg("Comparing two local runs of the original command.")

@@ -40,6 +40,12 @@
             to: [ "#netstack-migration" ],
         },
         {
+            protocol: [ "fuchsia.net.http.Loader" ],
+            from: "#http-client",
+            to: [ "#netstack-migration" ],
+            dependency: "weak",
+        },
+        {
             protocol: "fuchsia.net.filter.deprecated.Filter",
 
             // NS3 will not implement fuchsia.net.filter.deprecated, mark as optional.

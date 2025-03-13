@@ -33,15 +33,12 @@ const fn part_type(guid: &'static str) -> PartType {
     PartType { guid, os: OperatingSystem::None }
 }
 
-const ZIRCON_A_GUID: PartType = part_type("DE30CC86-1F4A-4A31-93C4-66F147D33E05");
-const ZIRCON_B_GUID: PartType = part_type("23CC04DF-C278-4CE7-8471-897D1A4BCDF7");
-const ZIRCON_R_GUID: PartType = part_type("A0E5CF57-2DEF-46BE-A80C-A2067C37CD49");
-const VBMETA_A_GUID: PartType = part_type("A13B4D9A-EC5F-11E8-97D8-6C3BE52705BF");
-const VBMETA_B_GUID: PartType = part_type("A288ABF2-EC5F-11E8-97D8-6C3BE52705BF");
-const VBMETA_R_GUID: PartType = part_type("6A2460C3-CD11-4E8B-80A8-12CCE268ED0A");
-const MISC_GUID: PartType = part_type("1D75395D-F2C6-476B-A8B7-45CC1C97B476");
+const GUID_BOOTLOADER_STRING: PartType = part_type("5ECE94FE-4C86-11E8-A15B-480FCF35F8E6");
+const GPT_ZIRCON_ABR_TYPE_GUID: PartType = part_type("9B37FFF6-2E58-466A-983A-F7926D0B04E0");
+const GPT_VBMETA_ABR_TYPE_GUID: PartType = part_type("421A8BFC-85D9-4D85-ACDA-B64EEC0133E9");
+const GPT_DURABLE_BOOT_TYPE_GUID: PartType = part_type("A409E16B-78AA-4ACC-995C-302352621A41");
 const INSTALLER_GUID: PartType = part_type("4DCE98CE-E77E-45C1-A863-CAF92F1330C1");
-const FVM_GUID: PartType = part_type("41D0E340-57E3-954E-8C1E-17ECAC44CFF5");
+const GPT_FVM_TYPE_GUID: PartType = part_type("49FD7CB8-DF15-4E73-B9D9-992070127F0F");
 
 /// On QEMU, the bootloader will look for an EFI application commandline in this partition, to
 /// allow tests to control the boot mode.
@@ -127,7 +124,7 @@ fn get_bootloader_partition_name(partitions: &Option<PartitionsConfig>) -> Resul
         }
     }
 
-    Ok("fuchsia-esp")
+    Ok("bootloader")
 }
 
 fn get_zbi_partition_name(
@@ -136,9 +133,9 @@ fn get_zbi_partition_name(
 ) -> Result<&str, Error> {
     let Some(partitions) = partitions else {
         return Ok(match partition_slot {
-            Slot::A => "zircon-a",
-            Slot::B => "zircon-b",
-            Slot::R => "zircon-r",
+            Slot::A => "zircon_a",
+            Slot::B => "zircon_b",
+            Slot::R => "zircon_r",
         });
     };
 
@@ -224,7 +221,7 @@ pub fn run(mut args: TopLevel) -> Result<(), Error> {
 
     let efi_partition_name = get_bootloader_partition_name(&product_bundle_partitions)?;
     let efi_part =
-        add_partition(&mut gpt_disk, efi_partition_name, args.efi_size, gpt::partition_types::EFI)?;
+        add_partition(&mut gpt_disk, efi_partition_name, args.efi_size, GUID_BOOTLOADER_STRING)?;
 
     // If a QEMU commandline is specified, this tuple will hold (partition_range, contents).
     let qemu_commandline = match args.qemu_commandline {
@@ -247,7 +244,7 @@ pub fn run(mut args: TopLevel) -> Result<(), Error> {
         vbmeta_b: Range<u64>,
         zircon_r: Range<u64>,
         vbmeta_r: Range<u64>,
-        misc: Range<u64>,
+        abr_meta: Range<u64>,
     }
 
     let abr_partitions = if !args.no_abr {
@@ -256,39 +253,44 @@ pub fn run(mut args: TopLevel) -> Result<(), Error> {
                 &mut gpt_disk,
                 get_zbi_partition_name(&product_bundle_partitions, Slot::A)?,
                 args.abr_size,
-                ZIRCON_A_GUID,
+                GPT_ZIRCON_ABR_TYPE_GUID,
             )?,
             vbmeta_a: add_partition(
                 &mut gpt_disk,
                 get_vbmeta_partition_name(&product_bundle_partitions, Slot::A)?,
                 args.vbmeta_size,
-                VBMETA_A_GUID,
+                GPT_VBMETA_ABR_TYPE_GUID,
             )?,
             zircon_b: add_partition(
                 &mut gpt_disk,
                 get_zbi_partition_name(&product_bundle_partitions, Slot::B)?,
                 args.abr_size,
-                ZIRCON_B_GUID,
+                GPT_ZIRCON_ABR_TYPE_GUID,
             )?,
             vbmeta_b: add_partition(
                 &mut gpt_disk,
                 get_vbmeta_partition_name(&product_bundle_partitions, Slot::B)?,
                 args.vbmeta_size,
-                VBMETA_B_GUID,
+                GPT_VBMETA_ABR_TYPE_GUID,
             )?,
             zircon_r: add_partition(
                 &mut gpt_disk,
                 get_zbi_partition_name(&product_bundle_partitions, Slot::R)?,
                 args.abr_size,
-                ZIRCON_R_GUID,
+                GPT_VBMETA_ABR_TYPE_GUID,
             )?,
             vbmeta_r: add_partition(
                 &mut gpt_disk,
                 get_vbmeta_partition_name(&product_bundle_partitions, Slot::R)?,
                 args.vbmeta_size,
-                VBMETA_R_GUID,
+                GPT_VBMETA_ABR_TYPE_GUID,
             )?,
-            misc: add_partition(&mut gpt_disk, "misc", args.vbmeta_size, MISC_GUID)?,
+            abr_meta: add_partition(
+                &mut gpt_disk,
+                "durable_boot",
+                args.vbmeta_size,
+                GPT_DURABLE_BOOT_TYPE_GUID,
+            )?,
         })
     } else {
         None
@@ -297,14 +299,14 @@ pub fn run(mut args: TopLevel) -> Result<(), Error> {
     let block_size: u64 = gpt_disk.logical_block_size().clone().into();
 
     let fvm_part = if !args.ramdisk_only && !args.use_fxfs {
-        let size = args.system_disk_size.unwrap_or_else(|| {
+        let avail =
             gpt_disk.find_free_sectors().iter().map(|(_offset, length)| length).max().unwrap()
-                * block_size
-        });
+                * block_size;
+        let size = std::cmp::min(avail, args.system_disk_size.unwrap_or(avail));
         if args.use_sparse_fvm {
             Some(add_partition(&mut gpt_disk, "storage-sparse", size, INSTALLER_GUID)?)
         } else {
-            Some(add_partition(&mut gpt_disk, "fvm", size, FVM_GUID)?)
+            Some(add_partition(&mut gpt_disk, "fvm", size, GPT_FVM_TYPE_GUID)?)
         }
     } else {
         None
@@ -316,7 +318,7 @@ pub fn run(mut args: TopLevel) -> Result<(), Error> {
                 * block_size
         });
         // For now, we use the same name and type as FVM because the paver looks for this.
-        Some(add_partition(&mut gpt_disk, "fvm", size, FVM_GUID)?)
+        Some(add_partition(&mut gpt_disk, "fvm", size, GPT_FVM_TYPE_GUID)?)
     } else {
         None
     };
@@ -431,7 +433,7 @@ pub fn run(mut args: TopLevel) -> Result<(), Error> {
         copy_partition(&mut disk, partitions.vbmeta_b, &args.vbmeta_b.unwrap())?;
         copy_partition(&mut disk, partitions.zircon_r, &args.zircon_r.unwrap())?;
         copy_partition(&mut disk, partitions.vbmeta_r, &args.vbmeta_r.unwrap())?;
-        write_abr(&mut disk, partitions.misc.start, args.abr_boot)?;
+        write_abr(&mut disk, partitions.abr_meta.start, args.abr_boot)?;
     }
 
     if let Some(fvm_part) = fvm_part {
@@ -892,18 +894,23 @@ pub fn make_empty_disk_with_uefi(disk_path: &Path, efi_data: &[u8]) -> anyhow::R
         _vbmeta_b: Range<u64>,
         _zircon_r: Range<u64>,
         _vbmeta_r: Range<u64>,
-        _misc: Range<u64>,
+        _abr_meta: Range<u64>,
     }
 
     let part = Partitions {
-        efi: add_partition(&mut gpt_disk, "fuchsia-esp", EFI_SIZE, gpt::partition_types::EFI)?,
-        _zircon_a: add_partition(&mut gpt_disk, "zircon-a", ABR_SIZE, ZIRCON_A_GUID)?,
-        _vbmeta_a: add_partition(&mut gpt_disk, "vbmeta_a", VBMETA_SIZE, VBMETA_A_GUID)?,
-        _zircon_b: add_partition(&mut gpt_disk, "zircon-b", ABR_SIZE, ZIRCON_B_GUID)?,
-        _vbmeta_b: add_partition(&mut gpt_disk, "vbmeta_b", VBMETA_SIZE, VBMETA_B_GUID)?,
-        _zircon_r: add_partition(&mut gpt_disk, "zircon-r", ABR_SIZE, ZIRCON_R_GUID)?,
-        _vbmeta_r: add_partition(&mut gpt_disk, "vbmeta_r", VBMETA_SIZE, VBMETA_R_GUID)?,
-        _misc: add_partition(&mut gpt_disk, "misc", VBMETA_SIZE, MISC_GUID)?,
+        efi: add_partition(&mut gpt_disk, "bootloader", EFI_SIZE, GUID_BOOTLOADER_STRING)?,
+        _zircon_a: add_partition(&mut gpt_disk, "zircon_a", ABR_SIZE, GPT_ZIRCON_ABR_TYPE_GUID)?,
+        _vbmeta_a: add_partition(&mut gpt_disk, "vbmeta_a", VBMETA_SIZE, GPT_VBMETA_ABR_TYPE_GUID)?,
+        _zircon_b: add_partition(&mut gpt_disk, "zircon_b", ABR_SIZE, GPT_ZIRCON_ABR_TYPE_GUID)?,
+        _vbmeta_b: add_partition(&mut gpt_disk, "vbmeta_b", VBMETA_SIZE, GPT_VBMETA_ABR_TYPE_GUID)?,
+        _zircon_r: add_partition(&mut gpt_disk, "zircon_r", ABR_SIZE, GPT_VBMETA_ABR_TYPE_GUID)?,
+        _vbmeta_r: add_partition(&mut gpt_disk, "vbmeta_r", VBMETA_SIZE, GPT_VBMETA_ABR_TYPE_GUID)?,
+        _abr_meta: add_partition(
+            &mut gpt_disk,
+            "durable_boot",
+            VBMETA_SIZE,
+            GPT_DURABLE_BOOT_TYPE_GUID,
+        )?,
     };
 
     let block_size: u64 = gpt_disk.logical_block_size().clone().into();
@@ -912,7 +919,7 @@ pub fn make_empty_disk_with_uefi(disk_path: &Path, efi_data: &[u8]) -> anyhow::R
         gpt_disk.find_free_sectors().iter().map(|(_offset, length)| length).max().unwrap()
             * block_size;
 
-    let _fvm_part = add_partition(&mut gpt_disk, "fvm", fvm_size, FVM_GUID)?;
+    let _fvm_part = add_partition(&mut gpt_disk, "fvm", fvm_size, GPT_FVM_TYPE_GUID)?;
 
     gpt_disk.write()?;
 
@@ -960,7 +967,7 @@ mod tests {
         //
         //   zstd /tmp/image -o golden
         //
-        // View the contents of one of the partitions e.g. the misc partition:
+        // View the contents of one of the partitions e.g. the AbrMeta partition:
         //
         //   sudo dd if=/dev/loop0p8 | hexdump -C
         assert!(image == golden);

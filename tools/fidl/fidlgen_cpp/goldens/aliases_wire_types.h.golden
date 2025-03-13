@@ -114,7 +114,7 @@ struct internal::WireCodingTraits<::test_aliases::wire::ObjType, ::fidl::interna
 
 #ifdef __Fuchsia__
 template <>
-struct IsResource<::test_aliases::wire::ExampleOfUseOfAliases> : public std::true_type{};
+struct IsResource<::test_aliases::wire::ExampleOfUseOfAliases> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_aliases::wire::ExampleOfUseOfAliases> {
@@ -128,11 +128,11 @@ struct TypeTraits<::test_aliases::wire::ExampleOfUseOfAliases> {
 };
 
 template <>
-struct IsFidlType<::test_aliases::wire::ExampleOfUseOfAliases> : public std::true_type{};
+struct IsFidlType<::test_aliases::wire::ExampleOfUseOfAliases> : public std::true_type {};
 template <>
-struct IsWire<::test_aliases::wire::ExampleOfUseOfAliases> : public std::true_type{};
+struct IsWire<::test_aliases::wire::ExampleOfUseOfAliases> : public std::true_type {};
 template <>
-struct IsStruct<::test_aliases::wire::ExampleOfUseOfAliases> : public std::true_type{};
+struct IsStruct<::test_aliases::wire::ExampleOfUseOfAliases> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_aliases::wire::ExampleOfUseOfAliases>);
 static_assert(offsetof(::test_aliases::wire::ExampleOfUseOfAliases, field_of_u32) == 0);
 static_assert(offsetof(::test_aliases::wire::ExampleOfUseOfAliases, field_of_vec_of_strings) == 8);

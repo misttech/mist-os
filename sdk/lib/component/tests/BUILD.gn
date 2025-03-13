@@ -61,7 +61,7 @@ cc_test_executable("incoming_integration_test_bin") {
   sources = [ "incoming_integration_test.cc" ]
 
   deps = [
-    ":fidl.service.test_hlcpp",
+    ":fidl.service.test_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/tests:fidl.service.test_cpp",
     "//sdk/lib/fidl/hlcpp",
@@ -79,10 +79,10 @@ fuchsia_component("incoming_integration_test") {
   manifest = "meta/incoming_integration_test.cml"
 }
 
-cc_test_executable("service_watcher_unittests") {
+cc_test_executable("directory_watcher_unittests") {
   testonly = true
 
-  sources = [ "service_watcher_test.cc" ]
+  sources = [ "directory_watcher_test.cc" ]
 
   deps = [
     "//examples/fidl/fuchsia.examples:fuchsia.examples_cpp",
@@ -94,10 +94,28 @@ cc_test_executable("service_watcher_unittests") {
   ]
 }
 
-fuchsia_component("service_watcher_tests") {
+fuchsia_component("directory_watcher_tests") {
   testonly = true
-  deps = [ ":service_watcher_unittests" ]
-  manifest = "meta/service_watcher_unittests.cml"
+  deps = [ ":directory_watcher_unittests" ]
+  manifest = "meta/directory_watcher_unittests.cml"
+}
+
+executable("echo_service_watcher_client_bin") {
+  testonly = true
+
+  sources = [ "echo_service_watcher_client.cc" ]
+
+  deps = [
+    ":fidl.service.test_cpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/syslog/cpp",
+  ]
+}
+
+fuchsia_component("echo_service_watcher_client") {
+  testonly = true
+  deps = [ ":echo_service_watcher_client_bin" ]
+  manifest = "meta/echo_service_watcher_client.cml"
 }
 
 executable("echo_service_client_bin") {
@@ -140,12 +158,13 @@ fuchsia_test_package("component_cpp_incoming_tests") {
   test_components = [
     ":incoming_test",
     ":incoming_integration_test",
-    ":service_watcher_tests",
+    ":directory_watcher_tests",
   ]
 
   deps = [
     ":echo_client",
     ":echo_service_client",
+    ":echo_service_watcher_client",
   ]
 }
 

@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 use argh::{ArgsInfo, FromArgs};
 use async_trait::async_trait;
-use fho::{FfxContext, FfxMain, FfxTool, MachineWriter, Result, ToolIO};
+use ffx_writer::{MachineWriter, ToolIO as _};
+use fho::{FfxContext, FfxMain, FfxTool, Result};
 use fidl_fuchsia_developer_ffx as ffx;
 use target_holders::daemon_protocol;
 
@@ -47,7 +48,7 @@ impl FfxMain for EchoTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fho::macro_deps::ffx_writer::TestBuffer;
+    use ffx_writer::TestBuffer;
     use futures_lite::stream::StreamExt;
 
     // [START fake_proxy]

@@ -12,11 +12,13 @@
 #include "asan_impl.h"
 #include "dynlink.h"
 #include "libc.h"
-#include "setjmp_impl.h"
 #include "threads_impl.h"
 #include "zircon_impl.h"
 
 zx_handle_t __zircon_namespace_svc = ZX_HANDLE_INVALID;
+
+// This is actually defined in C++ and aliased with a -D... switch.
+void __libc_init_randoms(void);
 
 struct start_params {
   int (*main)(int, char**, char**);
@@ -198,24 +200,6 @@ __EXPORT NO_ASAN LIBC_NO_SAFESTACK _Noreturn void __libc_start_main(
     CRASH_WITH_UNIQUE_BACKTRACE();
   }
 
-  // Initialize stack-protector canary value first thing.  Do the setjmp
-  // manglers in the same call to avoid the overhead of two system calls.
-  // That means we need a temporary buffer on the stack, which we then
-  // want to clear out so the values don't leak there.
-  struct randoms {
-    uintptr_t stack_guard;
-    struct setjmp_manglers setjmp_manglers;
-  } randoms;
-  static_assert(sizeof(randoms) <= ZX_CPRNG_DRAW_MAX_LEN, "");
-  _zx_cprng_draw(&randoms, sizeof(randoms));
-  __stack_chk_guard = randoms.stack_guard;
-  __setjmp_manglers = randoms.setjmp_manglers;
-  // Zero the stack temporaries.
-  randoms = (struct randoms){};
-  // Tell the compiler that the value is used, so it doesn't optimize
-  // out the zeroing as dead stores.
-  __asm__("# keepalive %0" ::"m"(randoms));
-
   // extract process startup information from channel in arg
   struct start_params p = {.main = main, .utc_reference = ZX_HANDLE_INVALID};
   zx_status_t status = processargs_message_size(bootstrap, &p.nbytes, &p.nhandles);
@@ -250,6 +234,25 @@ __EXPORT NO_ASAN LIBC_NO_SAFESTACK _Noreturn void __libc_start_main(
     thrd_info_t thrd_info = __init_main_thread(main_thread_handle);
     p.td = thrd_info.thread;
     p.runtime = thrd_info.runtime;
+
+    // This initializes p.td->abi.stack_guard.
+    __libc_init_randoms();
+
+    // Note, this doesn't really need to happen so early per se (before stack
+    // switching.  But it does access a global variable (via the zircon_impl.h
+    // macro); since it happens before global constructors run, in an hwasan
+    // build, the shadow memory tagging for the global variable's memory won't
+    // have been done yet, but the global would be accessed via the tagged
+    // address and fail its checks.  This function already has asan/hwasan
+    // instrumentation disabled, so it's easy to do it here instead.  It
+    // doesn't need to be *this* early, but it does need to be before global
+    // constructors in general so there's no way this can happen after the
+    // hwasan constructors run to initialize tags for global variables.
+    //
+    // This is what's used to create new threads, and is also inherited from
+    // the creating thread.  Each thread's slot might be reset by
+    // thrd_set_zx_process to affect new threads it creates.
+    p.td->process_handle = _zx_process_self();
 
     // Switch to the allocated stack and call start_main(&p) there.  The
     // original stack stays around just to hold the message buffer and handles

@@ -85,7 +85,7 @@ import("//build/testing/host_test_data.gni")
 #       * The platform can be explicit with @available(platform="PLATFORM").
 #       * Otherwise, the platform is the first component of the library name.
 #     Defaults are:
-#       * When testonly is true: "unversioned"
+#       * When testonly is true and SDK category is not specified: "unversioned"
 #       * When the library name starts with "fuchsia.":
 #         * If `stable` is true: "fuchsia"
 #         * For unstable libraries in an SDK category: "fuchsia:HEAD"
@@ -142,12 +142,11 @@ import("//build/testing/host_test_data.gni")
 #     Set to true to enable Zither bindings for this library.
 #     See //zircon/tools/zither/README.md for details.
 #
-#   stable (optional flag)
-#     Whether this library is stabilized.
-#     When true, `versioned` defaults to "fuchsia" and an .api file is
-#     generated. When false, the atom is marked as unstable in the final IDK.
-#     Must be specified when `sdk_category` is defined and not "internal";
-#     otherwise, must not be specified.
+#   stable (optional flag) Whether this library is stabilized. When true,
+#     `versioned` defaults to "fuchsia" for "fuchsia.*" library names and an
+#     .api file is generated. When false, the atom is marked as unstable in the
+#     final IDK. Must be specified if and only if `sdk_category` is specified.
+#     May only be false when `sdk_category` is "partner".
 #
 #   applicable_licenses
 #   public_deps
@@ -164,6 +163,14 @@ template("fidl") {
   assert(!defined(invoker.deps),
          "All FIDL dependencies are inherently " +
              "public, use 'public_deps' instead of 'deps'.")
+  assert(defined(invoker.sdk_category) == defined(invoker.stable),
+         "`stable` must be specified when specifying `sdk_category`.")
+  assert(!defined(invoker.sdk_category) || invoker.stable == true ||
+             invoker.sdk_category == "partner" ||
+             # TODO(https://fxbug.dev/333907192): Remove the "internal_only_idk"
+             # exception when fuchsia.boot is promoted.
+             target_name == "fuchsia.boot",
+         "`stable` must be true unless the category is 'partner'.")
 
   # Define values that will be used to generate other variables here so that
   # such use does not count as having used the member of `common_parameters.
@@ -232,6 +239,42 @@ template("fidl") {
     invoker.visibility += [ ":*" ]
   }
 
+  # Use SDK category markers to enable detection of targets that use FIDL
+  # libraries in non-permissible categories.
+  # TODO(https://fxbug.dev/333907192): Remove the "internal_only_idk" exception
+  # when fuchsia.boot is promoted.
+  _not_in_sdk_category = "not-in-idk"
+  if (defined(invoker.sdk_category) &&
+      invoker.sdk_category != "internal_only_idk") {
+    if (invoker.stable) {
+      marker_category = invoker.sdk_category
+      not_needed([ "_not_in_sdk_category" ])
+    } else {
+      # Unstable libraries in the SDK provide no more compatibility guarantee
+      # than libraries not in the SDK. Use the same marker for simplicity.
+      marker_category = _not_in_sdk_category
+    }
+  } else {
+    marker_category = _not_in_sdk_category
+  }
+
+  # Override the category if the library is in the allowlist for ffx.
+  # Only do this when building Rust bindings, which ffx uses, or the FIDL
+  # library, which is a dependency of those bindings.
+  if ((is_host && enable_rust && toolchain_variant.supports_rust) ||
+      is_fidl_toolchain) {
+    import("//src/developer/ffx/build/ffx_subtool_allowlist.gni")
+    label_name = get_label_info(_fidl_target, "label_no_toolchain")
+    is_allowed_for_ffx = ffx_subtool_fidl_allowlist + [ label_name ] -
+                         [ label_name ] != ffx_subtool_fidl_allowlist
+    if (is_allowed_for_ffx) {
+      assert(
+          marker_category == _not_in_sdk_category,
+          "Remove `${label_name}` from //src/developer/ffx/build/ffx_subtool_allowlist.gni.")
+      marker_category = "allowed-for-ffx-subtool"
+    }
+  }
+
   fidl_only = [
     "api",
     "sdk_area",
@@ -258,6 +301,11 @@ template("fidl") {
                                    "sources",
                                  ])
       forward_variables_from(common_parameters, "*")
+
+      if (!defined(invoker.non_fidl_deps)) {
+        non_fidl_deps = []
+      }
+      non_fidl_deps += [ "//sdk/categories:marker-${marker_category}" ]
     }
 
     # Check that the IR JSON is indeed an output of the purported IR target.
@@ -302,19 +350,10 @@ template("fidl") {
         fidl_library_name,
       ]
       outputs = [ fidl_ir_root_outfile ]
-      deps = [ _fidl_target ]
-    }
-
-    # Use SDK category markers to enable detection of host targets that use FIDL
-    # libraries in nonpermissible categories.
-    marker_category = "not-in-idk"
-    if (defined(invoker.sdk_category)) {
-      marker_category = invoker.sdk_category
-
-      # TODO(https://fxbug.dev/333907192): Remove when fuchsia.boot is promoted.
-      if (marker_category == "internal_only_idk") {
-        marker_category = "not-in-idk"
-      }
+      deps = [
+        "//sdk/categories:marker-${marker_category}",
+        _fidl_target,
+      ]
     }
 
     # See https://fxrev.dev/931429 for context.
@@ -330,6 +369,7 @@ template("fidl") {
       ]
 
       # Explicitly set `testonly` to false for SDK inclusion.
+      # See https://fxbug.dev/42070088.
       # host_test_data()'s default for `testonly` is true so we can't simply
       # forward `invoker.testonly` as that's most likely unset for fidl()
       # targets.
@@ -340,17 +380,18 @@ template("fidl") {
 
       deps = [ ":${fidl_ir_root_target}" ]
 
-      # Add SDK category markers as FIDL-IR host data is used for host tests
-      # that use Fuchsia Controller.
-      # Check for allowed marker before adding category.
+      # Override the category if the library is in the allowlist for host tests.
+      # Do not allow the subtool allowlist for host tests.
+      if (marker_category == "allowed-for-ffx-subtool") {
+        marker_category = _not_in_sdk_category
+      }
       import("//src/testing/end_to_end/host_test_allowlist.gni")
       label_name = get_label_info(_fidl_target, "label_no_toolchain")
       is_allowed_for_host_test = host_test_fidl_allowlist + [ label_name ] -
                                  [ label_name ] != host_test_fidl_allowlist
       if (is_allowed_for_host_test) {
         assert(
-            marker_category != "partner" &&
-                marker_category != "partner_internal",
+            marker_category == _not_in_sdk_category,
             "Remove `${label_name}` from //src/testing/end_to_end/host_test_allowlist.gni.")
         marker_category = "allowed-for-host-test"
       }
@@ -394,6 +435,10 @@ template("fidl") {
       forward_variables_from(common_parameters, "*")
       fidl_gen_dir += "/go"
     }
+
+    # This template does not accept `deps`, but it will have an indirect
+    # dependency on the SDK category marker via `fidl_ir_target`.
+
     not_needed(invoker,
                [
                  "contains_drivers",
@@ -435,45 +480,44 @@ template("fidl") {
         # the library is in an SDK category.
         declare_sdk_atom_aliases = current_toolchain == default_toolchain &&
                                    defined(invoker.sdk_category)
-      }
 
-      if (!is_fidl_toolchain) {
-        # Checking if the parameter is defined is insufficient to avoid
-        # "Assignment had no effect."
-        not_needed(invoker, [ "sdk_category" ])
+        # This template does not accept `deps`, but it will have an indirect
+        # dependency on the SDK category marker via `fidl_ir_target`.
       }
     }
 
     if (enable_rust && (is_fidl_toolchain || toolchain_variant.supports_rust)) {
-      if (is_host || enable_fdomain) {
-        # Add SDK category markers as Rust is used for ffx host tools.
-        # Check for allowed marker before adding category.
-        import("//src/developer/ffx/build/ffx_subtool_allowlist.gni")
-        label_name = get_label_info(_fidl_target, "label_no_toolchain")
-        is_allowed_for_ffx = ffx_subtool_fidl_allowlist + [ label_name ] -
-                             [ label_name ] != ffx_subtool_fidl_allowlist
-        marker_category = "not-in-idk"
-        if (defined(invoker.sdk_category)) {
-          assert(
-              !is_allowed_for_ffx,
-              "Remove `${label_name}` from //src/developer/ffx/build/ffx_subtool_allowlist.gni.")
-          marker_category = invoker.sdk_category
-
-          # TODO(https://fxbug.dev/333907192): Remove when fuchsia.boot is promoted.
-          if (marker_category == "internal_only_idk") {
-            marker_category = "not-in-idk"
-          }
-        }
-        if (is_allowed_for_ffx) {
-          marker_category = "allowed-for-ffx-subtool"
-        }
-      }
-
       # Only import the fidl_rust() template if in a rust-capable toolchain and
       # rust bindings are to be defined.
       import("//build/rust/fidl_rust.gni")
 
-      # Define the Rust bindings.
+      # Define the common portion of the rust bindings.
+      fidl_rust("${target_name}_rust_common") {
+        forward_variables_from(invoker,
+                               [
+                                 "applicable_licenses",
+                                 "testonly",
+                                 "visibility",
+                                 "public_deps",
+                                 "disable_rustdoc",
+                               ])
+        forward_variables_from(common_parameters, "*")
+        if (!is_host && enable_rust_drivers) {
+          forward_variables_from(invoker, [ "contains_drivers" ])
+        }
+        deps = []
+        common = true
+        if (is_host) {
+          deps = [ "//sdk/categories:marker-${marker_category}" ]
+        }
+        fidl_gen_dir += "/rust"
+      }
+
+      common_crate_name =
+          "fidl_" + string_replace(common_parameters.library_name, ".", "_") +
+          "_common"
+
+      # Define the standard FIDL Rust bindings.
       fidl_rust("${target_name}_rust") {
         forward_variables_from(invoker,
                                [
@@ -487,14 +531,14 @@ template("fidl") {
         if (!is_host && enable_rust_drivers) {
           forward_variables_from(invoker, [ "contains_drivers" ])
         }
-        if (is_host) {
-          deps = [ "//sdk/categories:marker-${marker_category}" ]
-        }
+        deps = [ ":${invoker.target_name}_rust_common" ]
+        use_common = common_crate_name
+        deps += [ "//sdk/categories:marker-${marker_category}" ]
         fidl_gen_dir += "/rust"
       }
 
       if (enable_fdomain) {
-        # Define the Rust bindings.
+        # Define the FDomain Rust bindings.
         fidl_rust("${target_name}_fdomain") {
           forward_variables_from(invoker,
                                  [
@@ -508,7 +552,11 @@ template("fidl") {
           fdomain = true
 
           forward_variables_from(common_parameters, "*")
-          deps = [ "//sdk/categories:marker-${marker_category}" ]
+          deps = [
+            ":${invoker.target_name}_rust_common",
+            "//sdk/categories:marker-${marker_category}",
+          ]
+          use_common = common_crate_name
           fidl_gen_dir += "/rust"
         }
       }
@@ -531,7 +579,7 @@ template("fidl") {
                                  "disable_rustdoc",
                                ])
         forward_variables_from(common_parameters, "*")
-        deps = []
+        deps = [ "//sdk/categories:marker-${marker_category}" ]
         fidl_gen_dir += "/rust_next"
       }
     } else {
@@ -552,6 +600,9 @@ template("fidl") {
                                ])
         forward_variables_from(common_parameters, "*")
         fidl_gen_dir += "/bindlib"
+
+        # This template does not accept `deps`, but it will have an indirect
+        # dependency on the SDK category marker via `fidl_ir_target`.
       }
     }
 
@@ -569,6 +620,9 @@ template("fidl") {
                                ])
         forward_variables_from(common_parameters, "*")
         fidl_gen_dir += "/banjo"
+
+        # This template does not accept `deps`, but it will have an indirect
+        # dependency on the SDK category marker via `fidl_ir_target`.
       }
     }
 
@@ -589,9 +643,9 @@ template("fidl") {
           forward_variables_from(invoker.zither, "*")
         }
         fidl_gen_dir += "/zither"
-      }
-      if (!is_fidl_toolchain) {
-        not_needed(invoker, [ "sdk_category" ])
+
+        # This template does not accept `deps`, but it will have an indirect
+        # dependency on the SDK category marker via `fidl_ir_target`.
       }
     } else {
       not_needed(invoker, [ "sources" ])
@@ -601,5 +655,13 @@ template("fidl") {
       not_needed(invoker, [ "sources" ])
     }
     not_needed(invoker, [ "disable_rustdoc" ])
+  }
+
+  # Handle the case where only sub-targets that do not support `deps` are
+  # defined.
+  if (!(is_fidl_toolchain ||
+        (is_host && current_toolchain == toolchain_variant.base) ||
+        (enable_rust && toolchain_variant.supports_rust))) {
+    not_needed([ "marker_category" ])
   }
 }

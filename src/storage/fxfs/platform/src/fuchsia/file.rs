@@ -14,6 +14,7 @@ use anyhow::Error;
 use fidl_fuchsia_io as fio;
 use futures::future::BoxFuture;
 use fxfs::filesystem::{SyncOptions, MAX_FILE_SIZE};
+use fxfs::future_with_guard::FutureWithGuard;
 use fxfs::log::*;
 use fxfs::object_handle::{ObjectHandle, ReadObjectHandle};
 use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
@@ -41,17 +42,155 @@ use zx::{self as zx, HandleBased, Status};
 /// (assertions will fire).
 const TO_BE_PURGED: usize = 1 << (usize::BITS - 1);
 
+/// This is the second most significant bit of `open_count`. It set, it indicates that the file is
+/// an unnamed temporary file (i.e. it lives in the graveyard *temporarily* and can be moved out if
+/// it was linked into the filesystem permanently). An unnamed temporary file can be linked into a
+/// directory, which gives it a name and makes it permanent. Internally, linking a regular file and
+/// an unnamed temporary file is handled slightly differently because the latter resides in the
+/// graveyard. We need to be able to identify if a file is an unnamed temporary file whenever there
+/// is an attempt to link it into a directory. Once it has been linked into the filesystem, it is no
+/// longer temporary (it does not reside in the graveyard anymore) and this bit will be set to 0.
+const IS_TEMPORARILY_IN_GRAVEYARD: usize = 1 << (usize::BITS - 2);
+
+/// An unnamed temporary file lives in the graveyard and has to marked to be purged to make sure
+/// that the storage this file uses will be freed when the last handle to it closes.
+const IS_UNNAMED_TEMPORARY: usize = IS_TEMPORARILY_IN_GRAVEYARD | TO_BE_PURGED;
+
+/// The maximum value of open counts. The two most significant bits are used to indicate other
+/// information regarding the state of the file. See the consts defined above.
+const MAX_OPEN_COUNTS: usize = usize::MAX >> 2;
+
+fn open_count(state: usize) -> usize {
+    state & MAX_OPEN_COUNTS
+}
+
+fn to_be_purged(state: usize) -> bool {
+    state & TO_BE_PURGED == TO_BE_PURGED
+}
+
+fn is_unnamed_temporary(state: usize) -> bool {
+    state & IS_UNNAMED_TEMPORARY == IS_UNNAMED_TEMPORARY
+}
+
+fn will_be_tombstoned(state: usize) -> bool {
+    to_be_purged(state) && open_count(state) == 0
+}
+
+struct Flags {
+    is_unnamed_temporary: bool,
+    to_be_purged: bool,
+}
+
+/// Open count and state of the file. See the consts defined above.
+#[derive(Debug)]
+#[repr(transparent)]
+struct State(AtomicUsize);
+
+impl State {
+    fn new(state: usize) -> Self {
+        State(AtomicUsize::new(state))
+    }
+
+    fn get_flags(&self) -> Flags {
+        let state = self.0.load(Ordering::Relaxed);
+        Flags {
+            is_unnamed_temporary: is_unnamed_temporary(state),
+            to_be_purged: to_be_purged(state),
+        }
+    }
+
+    // Increments the open count by 1. Returns the new open count, or None if the node has been
+    // marked to be purged and it has no references to it (and it is not an unnamed temporary file).
+    fn increment_open_count(&self) -> Option<usize> {
+        let mut old = self.0.load(Ordering::Relaxed);
+        loop {
+            if !is_unnamed_temporary(old) && will_be_tombstoned(old) {
+                // For regular files, we cannot increment open count if the file has already been
+                // marked to be purged and the open count was zero (this file will be tombstoned).
+                // However, we treat unnamed temporary files as a special case. There is a moment
+                // during its creation where it will have the `TO_BE_PURGED` bit (and
+                // `IS_TEMPORARILY_IN_GRAVEYARD` bit) set, and its open count is zero. This
+                // operation is called to increment to open count to one when creating the file.
+                return None;
+            }
+
+            assert!(open_count(old) < MAX_OPEN_COUNTS);
+
+            match self.0.compare_exchange_weak(old, old + 1, Ordering::Relaxed, Ordering::Relaxed) {
+                Ok(x) => {
+                    return Some(open_count(x));
+                }
+                Err(new_value) => old = new_value,
+            }
+        }
+    }
+
+    // Decrements the open count by 1. Returns the remaining open count, or None if the node has no
+    // references and should be purged.
+    fn decrement_open_count(&self) -> Option<usize> {
+        let old = self.0.fetch_sub(1, Ordering::Relaxed);
+
+        let old_open_count = open_count(old);
+        assert!(old_open_count > 0);
+
+        if old_open_count == 1 {
+            if to_be_purged(old) {
+                return None;
+            }
+            return Some(0);
+        }
+        Some(old_open_count - 1)
+    }
+
+    // Mark the state as to be purged. Returns true if there are no open references.
+    fn mark_to_be_purged(&self) -> bool {
+        let mut old = self.0.load(Ordering::Relaxed);
+        loop {
+            assert!(!to_be_purged(old));
+            match self.0.compare_exchange_weak(
+                old,
+                old | TO_BE_PURGED,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => return open_count(old) == 0,
+                Err(x) => old = x,
+            }
+        }
+    }
+
+    // Mark the state as permanent (to be used when the file is currently marked as temporary).
+    fn mark_as_permanent(&self) {
+        let mut old = self.0.load(Ordering::Relaxed);
+        loop {
+            assert!(is_unnamed_temporary(old));
+            match self.0.compare_exchange_weak(
+                old,
+                old & !IS_UNNAMED_TEMPORARY,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => return,
+                Err(x) => old = x,
+            }
+        }
+    }
+}
+
 /// FxFile represents an open connection to a file.
 #[derive(ToWeakNode)]
 pub struct FxFile {
     handle: PagedObjectHandle,
-    open_count: AtomicUsize,
+    state: State,
     pager_packet_receiver_registration: PagerPacketReceiverRegistration<Self>,
 }
 
 #[fxfs_trace::trace]
 impl FxFile {
-    pub fn new(handle: DataObjectHandle<FxVolume>) -> Arc<Self> {
+    fn create_new_file(
+        handle: DataObjectHandle<FxVolume>,
+        is_unnamed_temporary: bool,
+    ) -> Arc<Self> {
         let size = handle.get_size();
         let (vmo, pager_packet_receiver_registration) = handle
             .owner()
@@ -60,11 +199,25 @@ impl FxFile {
             .unwrap();
         let file = Arc::new(Self {
             handle: PagedObjectHandle::new(handle, vmo),
-            open_count: AtomicUsize::new(0),
+            state: if is_unnamed_temporary {
+                State::new(IS_UNNAMED_TEMPORARY)
+            } else {
+                State::new(0)
+            },
             pager_packet_receiver_registration,
         });
         file.handle.owner().pager().register_file(&file);
         file
+    }
+
+    /// Creates a new regular FxFile.
+    pub fn new(handle: DataObjectHandle<FxVolume>) -> Arc<Self> {
+        Self::create_new_file(handle, /*is_unnamed_temporary*/ false)
+    }
+
+    /// Creates an unnamed temporary FxFile.
+    pub fn new_unnamed_temporary(handle: DataObjectHandle<FxVolume>) -> Arc<Self> {
+        Self::create_new_file(handle, /*is_unnamed_temporary*/ true)
     }
 
     /// Creates a new connection on the given `scope`. May take a read lock on the object.
@@ -88,10 +241,7 @@ impl FxFile {
                         )))
                         .await
                         .into_owned(fs);
-                    this.handle.owner().scope().spawn(async move {
-                        let _read_lock = read_lock;
-                        fut.await
-                    });
+                    this.handle.owner().scope().spawn(FutureWithGuard::new(read_lock, fut));
                 }
             }
         }
@@ -101,19 +251,12 @@ impl FxFile {
     /// Marks the file to be purged when the open count drops to zero.
     /// Returns true if there are no open references.
     pub fn mark_to_be_purged(&self) -> bool {
-        let mut old = self.open_count.load(Ordering::Relaxed);
-        loop {
-            assert_eq!(old & TO_BE_PURGED, 0);
-            match self.open_count.compare_exchange_weak(
-                old,
-                old | TO_BE_PURGED,
-                Ordering::Relaxed,
-                Ordering::Relaxed,
-            ) {
-                Ok(_) => return old == 0,
-                Err(x) => old = x,
-            }
-        }
+        self.state.mark_to_be_purged()
+    }
+
+    // Indicate the file is permanent (to be used when the file is currently marked as temporary).
+    pub fn mark_as_permanent(&self) {
+        self.state.mark_as_permanent()
     }
 
     pub fn is_verified_file(&self) -> bool {
@@ -127,23 +270,7 @@ impl FxFile {
     /// If this instance has not been marked to be purged, returns an OpenedNode instance.
     /// If marked for purging, returns None.
     pub fn clone_as_opened_node(self: &Arc<Self>) -> Option<OpenedNode<FxFile>> {
-        let mut count = self.open_count.load(Ordering::Relaxed);
-        loop {
-            if count == TO_BE_PURGED {
-                return None;
-            }
-            match self.open_count.compare_exchange_weak(
-                count,
-                count + 1,
-                Ordering::Relaxed,
-                Ordering::Relaxed,
-            ) {
-                Ok(_) => {
-                    return Some(OpenedNode(self.clone()));
-                }
-                Err(new_count) => count = new_count,
-            }
-        }
+        self.state.increment_open_count().map(|_| OpenedNode(self.clone()))
     }
 
     /// Persists any unflushed data to disk.
@@ -201,34 +328,40 @@ impl FxFile {
     /// drops to zero. This function also takes care of purging files that were
     /// 'marked_to_be_purged' due to being deleted while still open.
     fn open_count_sub_one_and_maybe_flush(self: Arc<Self>) {
-        let old = self.open_count.fetch_sub(1, Ordering::Relaxed);
-        assert!(old & !TO_BE_PURGED > 0);
-
-        // TO_BE_PURGED is the top-most bit of count and used to indicate that an object should be
-        // tombstoned when the open count drops to zero. Actual purging is queued to be done
-        // asynchronously. We don't need to do any flushing in this case - if the file is going to
-        // be deleted anyway, there is no point.
-        if old == TO_BE_PURGED + 1 {
-            self.handle.owner().clone().spawn(async move {
-                let store = self.handle.store();
-                let fs = store.filesystem();
-                // Take a truncate lock on the object, because flush also takes this lock, so this
-                // will make sure any previously triggered flushes will complete before we purge.
-                let keys =
-                    lock_keys![LockKey::truncate(store.store_object_id(), self.handle.object_id())];
-                let _flush_guard = fs.lock_manager().write_lock(keys).await;
-                store
-                    .filesystem()
-                    .graveyard()
-                    .queue_tombstone_object(store.store_object_id(), self.object_id());
-            });
-        } else if old == 1 && self.handle.needs_flush() {
-            // If this file is no longer referenced by anything, do a final flush if needed.
-            self.handle.owner().clone().spawn(async move {
-                if let Err(error) = self.handle.flush().await {
-                    log::warn!(error:?; "flush on close failed");
+        match self.state.decrement_open_count() {
+            None => {
+                // This node is marked `TO_BE_PURGED` and there are no more references to it. This
+                // file will be tombstoned. Actual purging is queued to be done asynchronously. We
+                // don't need to do any flushing in this case - if the file is going to be deleted
+                // anyway, there is no point.
+                self.handle.owner().clone().spawn(async move {
+                    let store = self.handle.store();
+                    let fs = store.filesystem();
+                    // Take a truncate lock on the object, because flush also takes this lock, so
+                    // this will make sure any previously triggered flushes will complete before we
+                    // purge.
+                    let keys = lock_keys![LockKey::truncate(
+                        store.store_object_id(),
+                        self.handle.object_id()
+                    )];
+                    let _flush_guard = fs.lock_manager().write_lock(keys).await;
+                    store
+                        .filesystem()
+                        .graveyard()
+                        .queue_tombstone_object(store.store_object_id(), self.object_id());
+                });
+            }
+            Some(0) => {
+                if self.handle.needs_flush() {
+                    // If this file is no longer referenced by anything, do a final flush if needed.
+                    self.handle.owner().clone().spawn(async move {
+                        if let Err(error) = self.handle.flush().await {
+                            log::warn!(error:?; "flush on close failed");
+                        }
+                    });
                 }
-            });
+            }
+            Some(_) => {}
         }
     }
 
@@ -264,8 +397,7 @@ impl FxNode for FxFile {
     }
 
     fn open_count_add_one(&self) {
-        let old = self.open_count.fetch_add(1, Ordering::Relaxed);
-        assert!(old != TO_BE_PURGED && old != TO_BE_PURGED - 1);
+        assert!(self.state.increment_open_count().is_some());
     }
 
     fn open_count_sub_one(self: Arc<Self>) {
@@ -295,6 +427,13 @@ impl vfs::node::Node for FxFile {
         let props = self.handle.get_properties().await.map_err(map_to_status)?;
         let descriptor =
             self.handle.uncached_handle().get_descriptor().await.map_err(map_to_status)?;
+        // In most cases, the reference count of objects can be used as the link count. There are
+        // two cases where this is not the case - for unnamed temporary files and unlink files with
+        // no more open references to it. For these two cases, the link count should be zero (the
+        // object reference count is one as they live in the graveyard). In both cases,
+        // `TO_BE_PURGED` will be set and `refs` is one.
+        let Flags { to_be_purged, .. } = self.state.get_flags();
+        let link_count = if to_be_purged && props.refs == 1 { 0 } else { props.refs };
         Ok(attributes!(
             requested_attributes,
             Mutable {
@@ -321,7 +460,7 @@ impl vfs::node::Node for FxFile {
                     | fio::Operations::WRITE_BYTES,
                 content_size: props.data_attribute_size,
                 storage_size: props.allocated_size,
-                link_count: props.refs,
+                link_count: link_count,
                 id: self.handle.object_id(),
                 change_time: props.change_time.as_nanos(),
                 options: descriptor.clone().map(|a| a.0),
@@ -359,14 +498,25 @@ impl vfs::node::Node for FxFile {
             )
             .await
             .map_err(map_to_status)?;
-        // Check that we're not unlinked.
-        if self.open_count.load(Ordering::Relaxed) & TO_BE_PURGED != 0 {
-            return Err(zx::Status::NOT_FOUND);
-        }
+
         dir.check_fscrypt_hard_link_conditions(
             self.fscrypt_wrapping_key_id().await?.map(|x| u128::from_le_bytes(x)),
         )?;
-        dir.link_object(transaction, &name, object_id, ObjectDescriptor::File).await
+
+        let Flags { is_unnamed_temporary, to_be_purged } = self.state.get_flags();
+        if is_unnamed_temporary {
+            // Remove object from graveyard and link it to `name`.
+            dir.link_graveyard_object(transaction, &name, object_id, ObjectDescriptor::File, || {
+                self.mark_as_permanent()
+            })
+            .await
+        } else {
+            // Check that we're not unlinked.
+            if to_be_purged {
+                return Err(zx::Status::NOT_FOUND);
+            }
+            dir.link_object(transaction, &name, object_id, ObjectDescriptor::File).await
+        }
     }
 
     fn query_filesystem(&self) -> Result<fio::FilesystemInfo, Status> {
@@ -578,12 +728,14 @@ impl GetVmo for FxFile {
 #[cfg(test)]
 mod tests {
     use crate::fuchsia::testing::{
-        close_file_checked, open_file, open_file_checked, TestFixture, TestFixtureOptions,
+        close_file_checked, open_dir_checked, open_file, open_file_checked, TestFixture,
+        TestFixtureOptions,
     };
     use anyhow::format_err;
     use fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions};
     use fuchsia_fs::file;
     use futures::join;
+    use fxfs::fsck::fsck;
     use fxfs::object_handle::INVALID_OBJECT_ID;
     use rand::{thread_rng, Rng};
     use std::sync::atomic::{self, AtomicBool};
@@ -601,8 +753,9 @@ mod tests {
 
         let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -639,11 +792,12 @@ mod tests {
 
         let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -699,11 +853,12 @@ mod tests {
 
             let file = open_file_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::NOT_DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_FILE,
+                &Default::default(),
             )
             .await;
 
@@ -734,8 +889,9 @@ mod tests {
 
         let file = open_file_checked(
             &root,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -778,11 +934,12 @@ mod tests {
 
             let file = open_file_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::NOT_DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_FILE,
+                &Default::default(),
             )
             .await;
 
@@ -812,8 +969,9 @@ mod tests {
 
         let file = open_file_checked(
             &root,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -845,13 +1003,17 @@ mod tests {
             let root = fixture.root();
 
             let flags = if i == 0 {
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
+                fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_READABLE | fio::PERM_WRITABLE
             } else {
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE
+                fio::PERM_READABLE | fio::PERM_WRITABLE
             };
-            let file = open_file_checked(&root, flags | fio::OpenFlags::NOT_DIRECTORY, "foo").await;
+            let file = open_file_checked(
+                &root,
+                "foo",
+                flags | fio::Flags::PROTOCOL_FILE,
+                &Default::default(),
+            )
+            .await;
 
             if i == 0 {
                 let _: u64 = file
@@ -890,12 +1052,13 @@ mod tests {
         for input in inputs {
             let file = open_file_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::APPEND
-                    | fio::OpenFlags::NOT_DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::FILE_APPEND
+                    | fio::Flags::PROTOCOL_FILE,
+                &Default::default(),
             )
             .await;
 
@@ -911,8 +1074,9 @@ mod tests {
 
         let file = open_file_checked(
             &root,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         let buf = file
@@ -940,11 +1104,12 @@ mod tests {
 
         let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -1032,11 +1197,12 @@ mod tests {
 
         let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -1105,11 +1271,12 @@ mod tests {
 
         let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -1181,11 +1348,12 @@ mod tests {
 
         let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -1269,11 +1437,12 @@ mod tests {
                 while !done1.load(atomic::Ordering::Relaxed) {
                     let file = open_file_checked(
                         &root,
-                        fio::OpenFlags::CREATE
-                            | fio::OpenFlags::RIGHT_READABLE
-                            | fio::OpenFlags::RIGHT_WRITABLE
-                            | fio::OpenFlags::NOT_DIRECTORY,
                         "foo",
+                        fio::Flags::FLAG_MAYBE_CREATE
+                            | fio::PERM_READABLE
+                            | fio::PERM_WRITABLE
+                            | fio::Flags::PROTOCOL_FILE,
+                        &Default::default(),
                     )
                     .await;
                     let _: u64 = file
@@ -1289,11 +1458,12 @@ mod tests {
                 while !done2.load(atomic::Ordering::Relaxed) {
                     let file = open_file_checked(
                         &root,
-                        fio::OpenFlags::CREATE
-                            | fio::OpenFlags::RIGHT_READABLE
-                            | fio::OpenFlags::RIGHT_WRITABLE
-                            | fio::OpenFlags::NOT_DIRECTORY,
                         "foo",
+                        fio::Flags::FLAG_MAYBE_CREATE
+                            | fio::PERM_READABLE
+                            | fio::PERM_WRITABLE
+                            | fio::Flags::PROTOCOL_FILE,
+                        &Default::default(),
                     )
                     .await;
                     let _: u64 = file
@@ -1309,11 +1479,12 @@ mod tests {
                 for _ in 0..300 {
                     let file = open_file_checked(
                         &root,
-                        fio::OpenFlags::CREATE
-                            | fio::OpenFlags::RIGHT_READABLE
-                            | fio::OpenFlags::RIGHT_WRITABLE
-                            | fio::OpenFlags::NOT_DIRECTORY,
                         "foo",
+                        fio::Flags::FLAG_MAYBE_CREATE
+                            | fio::PERM_READABLE
+                            | fio::PERM_WRITABLE
+                            | fio::Flags::PROTOCOL_FILE,
+                        &Default::default(),
                     )
                     .await;
                     assert_eq!(
@@ -1339,11 +1510,12 @@ mod tests {
 
         let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -1383,11 +1555,12 @@ mod tests {
 
         let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -1426,11 +1599,12 @@ mod tests {
 
         let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -1462,11 +1636,12 @@ mod tests {
 
         let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -1505,11 +1680,12 @@ mod tests {
 
         let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -1601,11 +1777,12 @@ mod tests {
 
         let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -1634,11 +1811,12 @@ mod tests {
 
         let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -1692,6 +1870,8 @@ mod tests {
         fixture.close().await;
     }
 
+    /// Verify that once we enable verity on a file, it can never be written to or resized.
+    /// This applies even to connections that have [`fio::PERM_WRITABLE`].
     #[fuchsia::test]
     async fn test_write_fail_fsverity_enabled_file() {
         let fixture = TestFixture::new().await;
@@ -1699,11 +1879,12 @@ mod tests {
 
         let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -1724,42 +1905,45 @@ mod tests {
             .expect("FIDL transport error")
             .expect("enable verity failed");
 
-        // Writes via FIDL
-        file.write(&[2; 8192])
-            .await
-            .expect("FIDL transport error")
-            .map_err(Status::from_raw)
-            .expect_err("write succeeded on fsverity-enabled file");
-        // Writes via the pager
-        let vmo = file
-            .get_backing_memory(fio::VmoFlags::READ | fio::VmoFlags::WRITE)
-            .await
-            .expect("FIDL transport error")
-            .map_err(Status::from_raw)
-            .expect("get_backing_memory failed");
-        fasync::unblock(move || {
-            vmo.write(&[2; 8192], 0).expect_err("write via VMO succeeded on fsverity-enabled file");
-        })
-        .await;
-        // Truncation
-        file.resize(1)
-            .await
-            .expect("FIDL transport error")
-            .map_err(Status::from_raw)
-            .expect_err("resize succeeded on fsverity-enabled file");
+        async fn assert_file_is_not_writable(file: &fio::FileProxy) {
+            // Writes via FIDL should fail
+            file.write(&[2; 8192])
+                .await
+                .expect("FIDL transport error")
+                .map_err(Status::from_raw)
+                .expect_err("write succeeded on fsverity-enabled file");
+            // Writes via the pager should fail
+            let vmo = file
+                .get_backing_memory(fio::VmoFlags::READ | fio::VmoFlags::WRITE)
+                .await
+                .expect("FIDL transport error")
+                .map_err(Status::from_raw)
+                .expect("get_backing_memory failed");
+            fasync::unblock(move || {
+                vmo.write(&[2; 8192], 0)
+                    .expect_err("write via VMO succeeded on fsverity-enabled file");
+            })
+            .await;
+            // Truncation should fail
+            file.resize(1)
+                .await
+                .expect("FIDL transport error")
+                .map_err(Status::from_raw)
+                .expect_err("resize succeeded on fsverity-enabled file");
+        }
 
-        // Ensure that new writable handles can't be created
-        open_file(&root, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE, "foo")
-            .await
-            .expect_err("open writable succeeded on fsverity-enabled file");
-
-        // Close the file and ensure that it cannot be reopened for writing
+        assert_file_is_not_writable(&file).await;
         close_file_checked(file).await;
-        open_file(&root, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE, "foo")
-            .await
-            .expect_err("open writable succeeded on fsverity-enabled file");
 
-        // Reopen the filesystem and ensure that the file can't be opened for writing
+        // Ensure that even if new writable connections are created, those also cannot write.
+        let file =
+            open_file(&root, "foo", fio::PERM_READABLE | fio::PERM_WRITABLE, &Default::default())
+                .await
+                .expect("failed to open fsverity-enabled file");
+        assert_file_is_not_writable(&file).await;
+        close_file_checked(file).await;
+
+        // Reopen the filesystem and ensure that the file can't be written to.
         let device = fixture.close().await;
         device.ensure_unique();
         device.reopen(false);
@@ -1775,9 +1959,12 @@ mod tests {
         .await;
 
         let root = fixture.root();
-        open_file(&root, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE, "foo")
-            .await
-            .expect_err("open writable succeeded on fsverity-enabled file");
+        let file =
+            open_file(&root, "foo", fio::PERM_READABLE | fio::PERM_WRITABLE, &Default::default())
+                .await
+                .expect("failed to open fsverity-enabled file");
+        assert_file_is_not_writable(&file).await;
+        close_file_checked(file).await;
 
         fixture.close().await;
     }
@@ -1794,11 +1981,12 @@ mod tests {
 
             let file = open_file_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::NOT_DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_FILE,
+                &Default::default(),
             )
             .await;
 
@@ -1841,8 +2029,9 @@ mod tests {
 
         let file = open_file_checked(
             &root,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -1867,11 +2056,12 @@ mod tests {
 
             let file = open_file_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::NOT_DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_FILE,
+                &Default::default(),
             )
             .await;
 
@@ -1916,8 +2106,9 @@ mod tests {
 
         let file = open_file_checked(
             &root,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -1943,11 +2134,12 @@ mod tests {
 
         let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -1987,11 +2179,12 @@ mod tests {
 
         let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -2042,6 +2235,462 @@ mod tests {
             .expect("get_attributes failed");
         let ctime_after_sync = immutable_attributes.change_time;
         assert_eq!(ctime_after_sync, ctime_after_update);
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_unnamed_temporary_file_can_read_and_write_to_it() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+
+        let tmpfile = open_file_checked(
+            &root,
+            ".",
+            fio::Flags::PROTOCOL_FILE
+                | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE,
+            &fio::Options::default(),
+        )
+        .await;
+
+        let buf = vec![0xaa as u8; 8];
+        file::write(&tmpfile, buf.as_slice()).await.expect("Failed to write to file");
+
+        tmpfile
+            .seek(fio::SeekOrigin::Start, 0)
+            .await
+            .expect("seek failed")
+            .map_err(zx::Status::from_raw)
+            .expect("seek error");
+        let read_buf = file::read(&tmpfile).await.expect("read failed");
+        assert_eq!(read_buf, buf);
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_unnamed_temporary_file_get_space_back_after_closing_file() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+
+        let tmpfile = open_file_checked(
+            &root,
+            ".",
+            fio::Flags::PROTOCOL_FILE
+                | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
+                | fio::PERM_WRITABLE,
+            &fio::Options::default(),
+        )
+        .await;
+
+        const BUFFER_SIZE: u64 = 1024 * 1024;
+        let buf = vec![0xaa as u8; BUFFER_SIZE as usize];
+        file::write(&tmpfile, buf.as_slice()).await.expect("Failed to write to file");
+
+        let info_after_writing_to_tmpfile = root
+            .query_filesystem()
+            .await
+            .expect("Failed wire call to query filesystem")
+            .1
+            .expect("Failed to query filesystem");
+
+        close_file_checked(tmpfile).await;
+
+        // We will get space back soon after closing the file buy maybe not immediately.
+        for i in 1..50 {
+            let info = root
+                .query_filesystem()
+                .await
+                .expect("Failed wire call to query filesystem")
+                .1
+                .expect("Failed to query filesystem");
+
+            // We should claim back at least that amount of data we wrote to the file. There might
+            // be some metadata left that will not be removed until compaction.
+            if info_after_writing_to_tmpfile.used_bytes - info.used_bytes >= BUFFER_SIZE {
+                break;
+            }
+            if i == 49 {
+                panic!("Did not get space back from unnamed temporary file after closing it.");
+            }
+        }
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_unnamed_temporary_file_get_space_back_after_closing_device() {
+        const BUFFER_SIZE: u64 = 1024 * 1024;
+
+        let (reused_device, info_after_writing_to_tmpfile) = {
+            let fixture = TestFixture::new().await;
+            let root = fixture.root();
+
+            let tmpfile = open_file_checked(
+                &root,
+                ".",
+                fio::Flags::PROTOCOL_FILE
+                    | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
+                    | fio::PERM_WRITABLE,
+                &fio::Options::default(),
+            )
+            .await;
+
+            let buf = vec![0xaa as u8; BUFFER_SIZE as usize];
+            file::write(&tmpfile, buf.as_slice()).await.expect("Failed to write to file");
+
+            let info_after_writing_to_tmpfile = root
+                .query_filesystem()
+                .await
+                .expect("Failed wire call to query filesystem")
+                .1
+                .expect("Failed to query filesystem");
+
+            (fixture.close().await, info_after_writing_to_tmpfile)
+        };
+
+        let fixture = TestFixture::open(
+            reused_device,
+            TestFixtureOptions {
+                format: false,
+                as_blob: false,
+                encrypted: true,
+                serve_volume: false,
+            },
+        )
+        .await;
+        let root = fixture.root();
+
+        let info = root
+            .query_filesystem()
+            .await
+            .expect("Failed wire call to query filesystem")
+            .1
+            .expect("Failed to query filesystem");
+
+        // We should claim back at least that amount of data we wrote to the file after rebooting
+        // device. There might be some metadata left that will not be removed until compaction.
+        assert!(info_after_writing_to_tmpfile.used_bytes - info.used_bytes >= BUFFER_SIZE);
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_unnamed_temporary_file_can_link_into() {
+        const FILE1: &str = "foo";
+        const FILE2: &str = "bar";
+        const BUFFER_SIZE: u64 = 1024 * 1024;
+        let buf = vec![0xaa as u8; BUFFER_SIZE as usize];
+
+        let reused_device = {
+            let fixture = TestFixture::new().await;
+            let root = fixture.root();
+
+            let tmpfile = open_file_checked(
+                &root,
+                ".",
+                fio::Flags::PROTOCOL_FILE
+                    | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE,
+                &fio::Options::default(),
+            )
+            .await;
+
+            // Link temporary unnamed file into filesystem, making it permanent.
+            let (status, dst_token) = root.get_token().await.expect("FIDL call failed");
+            zx::Status::ok(status).expect("get_token failed");
+            tmpfile
+                .link_into(zx::Event::from(dst_token.unwrap()), FILE1)
+                .await
+                .expect("link_into wire message failed")
+                .map_err(zx::Status::from_raw)
+                .expect("link_into failed");
+
+            // We should be able to link the temporary file proxy multiple times.
+            let (status, dst_token) = root.get_token().await.expect("FIDL call failed");
+            zx::Status::ok(status).expect("get_token failed");
+            tmpfile
+                .link_into(zx::Event::from(dst_token.unwrap()), FILE2)
+                .await
+                .expect("link_into wire message failed")
+                .map_err(zx::Status::from_raw)
+                .expect("link_into failed");
+
+            // Write to tmpfile, we should see the contents of it when reading from FILE1 or FILE2.
+            file::write(&tmpfile, buf.as_slice()).await.expect("Failed to write to file");
+
+            root.unlink(FILE1, &fio::UnlinkOptions::default())
+                .await
+                .expect("unlink wire call failed")
+                .map_err(zx::Status::from_raw)
+                .expect("unlink failed");
+            fixture.close().await
+        };
+
+        let fixture = TestFixture::open(
+            reused_device,
+            TestFixtureOptions {
+                format: false,
+                as_blob: false,
+                encrypted: true,
+                serve_volume: false,
+            },
+        )
+        .await;
+        let root = fixture.root();
+
+        // FILE1 was unlinked, so we should not be able to open a connection to it.
+        assert_eq!(
+            open_file(
+                &root,
+                FILE1,
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
+                &fio::Options::default()
+            )
+            .await
+            .expect_err("Open succeeded unexpectedly")
+            .root_cause()
+            .downcast_ref::<zx::Status>()
+            .expect("No status"),
+            &zx::Status::NOT_FOUND,
+        );
+
+        // The temporary unnamed file was linked to FILE2. We should find the same contents written
+        // to it.
+        let permanent_file = open_file_checked(
+            &root,
+            FILE2,
+            fio::Flags::PROTOCOL_FILE | fio::PERM_READABLE,
+            &fio::Options::default(),
+        )
+        .await;
+        permanent_file
+            .seek(fio::SeekOrigin::Start, 0)
+            .await
+            .expect("seek wire message failed")
+            .map_err(zx::Status::from_raw)
+            .expect("seek error");
+        let read_buf = file::read(&permanent_file).await.expect("read failed");
+        assert_eq!(read_buf, buf);
+
+        fsck(fixture.fs().clone()).await.expect("fsck failed");
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_unnamed_temporary_file_in_encrypted_directory() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+
+        // Set up encrypted directory
+        let crypt = fixture.crypt().unwrap();
+        let encrypted_directory = open_dir_checked(
+            &root,
+            "encrypted_directory",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::Flags::PROTOCOL_DIRECTORY
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE,
+            fio::Options::default(),
+        )
+        .await;
+        let wrapping_key_id = 123;
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        encrypted_directory
+            .update_attributes(&fio::MutableNodeAttributes {
+                wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
+                ..Default::default()
+            })
+            .await
+            .expect("update_attributes wire call failed")
+            .map_err(zx::ok)
+            .expect("update_attributes failed");
+
+        // Create a temporary unnamed file in that directory, it should have the same wrapping key.
+        let encryped_tmpfile = open_file_checked(
+            &encrypted_directory,
+            ".",
+            fio::Flags::PROTOCOL_FILE
+                | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE,
+            &fio::Options::default(),
+        )
+        .await;
+        let (mutable_attributes, _immutable_attributes) = encryped_tmpfile
+            .get_attributes(fio::NodeAttributesQuery::WRAPPING_KEY_ID)
+            .await
+            .expect("get_attributes wire call failed")
+            .map_err(zx::Status::from_raw)
+            .expect("get_attributes failed");
+        assert_eq!(mutable_attributes.wrapping_key_id, Some(wrapping_key_id.to_le_bytes()));
+
+        // Similar to a regular file, linking a temporary unnamed file into the directory will only
+        // work if they have the same wrapping key ID.
+        let (status, dst_token) = encrypted_directory.get_token().await.expect("FIDL call failed");
+        zx::Status::ok(status).expect("get_token failed");
+        encryped_tmpfile
+            .link_into(zx::Event::from(dst_token.unwrap()), "foo")
+            .await
+            .expect("link_into wire message failed")
+            .expect("link_into failed");
+
+        let unencryped_tmpfile = open_file_checked(
+            &root,
+            ".",
+            fio::Flags::PROTOCOL_FILE
+                | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE,
+            &fio::Options::default(),
+        )
+        .await;
+        let (mutable_attributes, _immutable_attributes) = unencryped_tmpfile
+            .get_attributes(fio::NodeAttributesQuery::WRAPPING_KEY_ID)
+            .await
+            .expect("get_attributes wire call failed")
+            .map_err(zx::Status::from_raw)
+            .expect("get_attributes failed");
+        assert_eq!(mutable_attributes.wrapping_key_id, None);
+        let (status, dst_token) = encrypted_directory.get_token().await.expect("FIDL call failed");
+        zx::Status::ok(status).expect("get_token failed");
+        assert_eq!(
+            unencryped_tmpfile
+                .link_into(zx::Event::from(dst_token.unwrap()), "bar")
+                .await
+                .expect("link_into wire message failed")
+                .map_err(zx::Status::from_raw)
+                .expect_err("link_into passed unexpectedly"),
+            zx::Status::BAD_STATE,
+        );
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_unnamed_temporary_file_in_locked_directory() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+
+        // Set up encrypted directory
+        let crypt = fixture.crypt().unwrap();
+        let encrypted_directory = open_dir_checked(
+            &root,
+            "encrypted_directory",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::Flags::PROTOCOL_DIRECTORY
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE,
+            fio::Options::default(),
+        )
+        .await;
+        let wrapping_key_id = 123;
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        encrypted_directory
+            .update_attributes(&fio::MutableNodeAttributes {
+                wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
+                ..Default::default()
+            })
+            .await
+            .expect("update_attributes wire call failed")
+            .map_err(zx::ok)
+            .expect("update_attributes failed");
+
+        // This locks the directory
+        crypt.remove_wrapping_key(wrapping_key_id);
+
+        // Open unnamed temporary file in a locked directory and should return (key) NOT_FOUND.
+        assert_eq!(
+            open_file(
+                &encrypted_directory,
+                ".",
+                fio::Flags::PROTOCOL_FILE
+                    | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE,
+                &fio::Options::default()
+            )
+            .await
+            .expect_err("Open succeeded unexpectedly")
+            .root_cause()
+            .downcast_ref::<zx::Status>()
+            .expect("No status"),
+            &zx::Status::NOT_FOUND,
+        );
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_unnamed_temporary_file_link_into_with_race() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+
+        for i in 1..100 {
+            let tmpfile = open_file_checked(
+                &root,
+                ".",
+                fio::Flags::PROTOCOL_FILE
+                    | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE,
+                &fio::Options::default(),
+            )
+            .await;
+
+            // Clone tmpfile proxy to use in the separate threads.
+            let (tmpfile_clone1, tmpfile_server1) =
+                fidl::endpoints::create_proxy::<fio::FileMarker>();
+            tmpfile.clone(tmpfile_server1.into_channel().into()).expect("clone failed");
+            let (tmpfile_clone2, tmpfile_server2) =
+                fidl::endpoints::create_proxy::<fio::FileMarker>();
+            tmpfile.clone(tmpfile_server2.into_channel().into()).expect("clone failed");
+
+            // Get the open connection to the sub directory which we would attempt to link the
+            // unnamed temporary file into.
+            let sub_dir = open_dir_checked(
+                &root,
+                "A",
+                fio::Flags::PROTOCOL_DIRECTORY
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::FLAG_MAYBE_CREATE,
+                fio::Options::default(),
+            )
+            .await;
+
+            // Get tokens to the sub directory to use for `link_into`.
+            let (status, dst_token1) = sub_dir.get_token().await.expect("FIDL call failed");
+            zx::Status::ok(status).expect("get_token failed");
+            let (status, dst_token2) = sub_dir.get_token().await.expect("FIDL call failed");
+            zx::Status::ok(status).expect("get_token failed");
+
+            join!(
+                fasync::Task::spawn(async move {
+                    tmpfile_clone1
+                        .link_into(zx::Event::from(dst_token1.unwrap()), &(2 * i).to_string())
+                        .await
+                        .expect("link_into wire message failed")
+                        .expect("link_into failed");
+                }),
+                fasync::Task::spawn(async move {
+                    tmpfile_clone2
+                        .link_into(zx::Event::from(dst_token2.unwrap()), &(2 * i + 1).to_string())
+                        .await
+                        .expect("link_into wire message failed")
+                        .expect("link_into failed");
+                })
+            );
+            let (_, immutable_attributes) = tmpfile
+                .get_attributes(fio::NodeAttributesQuery::LINK_COUNT)
+                .await
+                .expect("Failed get_attributes wire call")
+                .expect("get_attributes failed");
+            assert_eq!(immutable_attributes.link_count.unwrap(), 2);
+            close_file_checked(tmpfile).await;
+        }
         fixture.close().await;
     }
 }

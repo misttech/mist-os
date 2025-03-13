@@ -5,18 +5,17 @@
 use crate::arch::registers::RegisterState;
 use crate::arch::signal_handling::{
     align_stack_pointer, restore_registers, SignalStackFrame, RED_ZONE_SIZE, SIG_STACK_SIZE,
-    SYSCALL_INSTRUCTION_SIZE_BYTES,
 };
 use crate::mm::{MemoryAccessor, MemoryAccessorExt};
 use crate::signals::{KernelSignal, KernelSignalInfo, SignalDetail, SignalInfo, SignalState};
 use crate::task::{
-    CurrentTask, ExitStatus, StopState, Task, TaskFlags, TaskWriteGuard, ThreadState, WaitCanceler,
-    Waiter,
+    CurrentTask, ExitStatus, StopState, Task, TaskFlags, TaskWriteGuard, ThreadState, Waiter,
 };
 use extended_pstate::ExtendedPstateState;
 use starnix_logging::{log_trace, log_warn};
 use starnix_sync::{Locked, Unlocked};
 use starnix_syscalls::SyscallResult;
+use starnix_types::arch::ArchWidth;
 use starnix_uapi::errors::{Errno, EINTR, ERESTART_RESTARTBLOCK};
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::signals::{
@@ -58,19 +57,9 @@ pub fn send_signal(task: &Task, siginfo: SignalInfo) -> Result<(), Errno> {
     send_signal_prio(task, state, siginfo.into(), SignalPriority::Last, false)
 }
 
-pub fn send_freeze_signal(
-    task: &Task,
-    waiter: Waiter,
-    wait_canceler: WaitCanceler,
-) -> Result<(), Errno> {
+pub fn send_freeze_signal(task: &Task, waiter: Waiter) -> Result<(), Errno> {
     let state = task.write();
-    send_signal_prio(
-        task,
-        state,
-        KernelSignalInfo::Freeze(waiter, wait_canceler),
-        SignalPriority::First,
-        true,
-    )
+    send_signal_prio(task, state, KernelSignalInfo::Freeze(waiter), SignalPriority::First, true)
 }
 
 fn send_signal_prio(
@@ -98,7 +87,7 @@ fn send_signal_prio(
                     Some(action),
                 )
             }
-            KernelSignalInfo::Freeze(_, _) => (None, None, false, false, false, None, None),
+            KernelSignalInfo::Freeze(_) => (None, None, false, false, false, None, None),
         };
 
     if is_real_time && prio != SignalPriority::First {
@@ -128,8 +117,8 @@ fn send_signal_prio(
                 }
                 task_state.set_flags(TaskFlags::SIGNALS_AVAILABLE, true);
             }
-            KernelSignalInfo::Freeze(waiter, wait_canceler) => {
-                task_state.enqueue_kernel_signal(KernelSignal::Freeze(waiter, wait_canceler))
+            KernelSignalInfo::Freeze(waiter) => {
+                task_state.enqueue_kernel_signal(KernelSignal::Freeze(waiter))
             }
         }
     }
@@ -254,18 +243,17 @@ pub fn dequeue_signal(locked: &mut Locked<'_, Unlocked>, current_task: &mut Curr
     };
 
     if let Some(kernel_signal) = kernel_signal {
-        let KernelSignal::Freeze(waiter, wait_canceler) = kernel_signal;
-        task_state.freeze_canceler = Some(wait_canceler);
+        let KernelSignal::Freeze(waiter) = kernel_signal;
         drop(task_state);
 
-        // When `Err(EINTR)` is returned, the freeze is canceled due to SIGKILL.
-        let _ = waiter.wait(locked, current_task);
+        waiter.freeze(locked, current_task);
     } else if let Some(ref siginfo) = siginfo {
         if let SignalDetail::Timer { timer } = &siginfo.detail {
             timer.on_signal_delivered();
         }
         if let Some(status) = deliver_signal(
             &task,
+            current_task.thread_state.arch_width,
             task_state,
             siginfo.clone(),
             &mut current_task.thread_state.registers,
@@ -278,6 +266,7 @@ pub fn dequeue_signal(locked: &mut Locked<'_, Unlocked>, current_task: &mut Curr
 
 pub fn deliver_signal(
     task: &Task,
+    arch_width: ArchWidth,
     mut task_state: TaskWriteGuard<'_>,
     mut siginfo: SignalInfo,
     registers: &mut RegisterState,
@@ -294,6 +283,7 @@ pub fn deliver_signal(
                 let signal = siginfo.signal;
                 match dispatch_signal_handler(
                     task,
+                    arch_width,
                     registers,
                     extended_pstate,
                     task_state.signals_mut(),
@@ -368,8 +358,9 @@ pub fn deliver_signal(
 /// Prepares `current` state to execute the signal handler stored in `action`.
 ///
 /// This function stores the state required to restore after the signal handler on the stack.
-pub fn dispatch_signal_handler(
+fn dispatch_signal_handler(
     task: &Task,
+    arch_width: ArchWidth,
     registers: &mut RegisterState,
     extended_pstate: &ExtendedPstateState,
     signal_state: &mut SignalState,
@@ -407,6 +398,8 @@ pub fn dispatch_signal_handler(
         stack_bottom.checked_sub(SIG_STACK_SIZE as u64).ok_or_else(|| errno!(EINVAL))?,
     );
 
+    // Check that if the stack pointer is inside altstack, the entire signal stack is inside
+    // altstack.
     if let Some(alt_stack) = signal_state.alt_stack {
         if sigaltstack_contains_pointer(&alt_stack, stack_pointer)
             != sigaltstack_contains_pointer(&alt_stack, stack_bottom)
@@ -417,6 +410,7 @@ pub fn dispatch_signal_handler(
 
     let signal_stack_frame = SignalStackFrame::new(
         task,
+        arch_width,
         registers,
         extended_pstate,
         signal_state,
@@ -462,7 +456,7 @@ pub fn restore_from_signal_handler(current_task: &mut CurrentTask) -> Result<(),
     restore_registers(current_task, &signal_stack_frame, signal_frame_address)?;
 
     // Restore the stored signal mask.
-    current_task.write().set_signal_mask(SigSet::from(signal_stack_frame.context.uc_sigmask));
+    current_task.write().set_signal_mask(signal_stack_frame.get_signal_mask());
 
     Ok(())
 }
@@ -479,11 +473,6 @@ pub fn prepare_to_restart_syscall(thread_state: &mut ThreadState, sigaction: Opt
     };
 
     if err.should_restart(sigaction) {
-        if thread_state.arch_width.is_arch32() {
-            // TODO(https://fxbug.dev/380405833): Fix pc post syscall for restart.
-            panic!("pc is being changed incorrectly post syscall for restart!");
-        }
-
         // This error code is returned for system calls that need restart_syscall() to adjust time
         // related arguments when the syscall is restarted. Other syscall restarts can be dispatched
         // directly to the original syscall implementation.
@@ -494,9 +483,7 @@ pub fn prepare_to_restart_syscall(thread_state: &mut ThreadState, sigaction: Opt
         }
 
         // TODO(https://fxbug.dev/388051291) figure out whether Linux relies on registers here
-        thread_state.registers.set_instruction_pointer_register(
-            thread_state.registers.instruction_pointer_register() - SYSCALL_INSTRUCTION_SIZE_BYTES,
-        );
+        thread_state.registers.rewind_syscall_instruction();
     } else {
         thread_state.registers.set_return_register(EINTR.return_value());
     }

@@ -174,14 +174,14 @@ OsdRegisters osd1_registers = {
 
 }  // namespace
 
-display::ConfigStamp VideoInputUnit::GetLastConfigStampApplied() {
+display::DriverConfigStamp VideoInputUnit::GetLastConfigStampApplied() {
   return rdma_->GetLastConfigStampApplied();
 }
 
 VideoInputUnit::VideoInputUnit(fdf::MmioBuffer vpu_mmio, std::unique_ptr<RdmaEngine> rdma)
     : vpu_mmio_(std::move(vpu_mmio)), rdma_(std::move(rdma)) {}
 
-void VideoInputUnit::DisableLayer(display::ConfigStamp config_stamp) {
+void VideoInputUnit::DisableLayer(display::DriverConfigStamp config_stamp) {
   rdma_->StopRdma();
   osd1_registers.ctrl_stat.ReadFrom(&vpu_mmio_).set_blk_en(0).WriteTo(&vpu_mmio_);
   rdma_->ResetConfigStamp(config_stamp);
@@ -232,7 +232,7 @@ void VideoInputUnit::SetColorCorrection(uint32_t rdma_table_idx, const display_c
                       : 0);
   rdma_->SetRdmaTableValue(rdma_table_idx, IDX_MATRIX_PRE_OFFSET2, offset2);
   // TODO(b/182481217): remove when this bug is closed.
-  FDF_LOG(TRACE, "pre offset0_1=%u offset2=%u", offset0_1, offset2);
+  fdf::trace("pre offset0_1={} offset2={}", offset0_1, offset2);
 
   // Load PostOffset values (or 0 if none entered)
   offset0_1 = (config.cc_flags & COLOR_CONVERSION_POSTOFFSET
@@ -245,7 +245,7 @@ void VideoInputUnit::SetColorCorrection(uint32_t rdma_table_idx, const display_c
   rdma_->SetRdmaTableValue(rdma_table_idx, IDX_MATRIX_OFFSET0_1, offset0_1);
   rdma_->SetRdmaTableValue(rdma_table_idx, IDX_MATRIX_OFFSET2, offset2);
   // TODO(b/182481217): remove when this bug is closed.
-  FDF_LOG(TRACE, "post offset0_1=%u offset2=%u", offset0_1, offset2);
+  fdf::trace("post offset0_1={} offset2={}", offset0_1, offset2);
 
   // clang-format off
   const float identity[3][3] = {
@@ -270,12 +270,13 @@ void VideoInputUnit::SetColorCorrection(uint32_t rdma_table_idx, const display_c
   rdma_->SetRdmaTableValue(rdma_table_idx, IDX_MATRIX_COEF20_21, coef20_21);
   rdma_->SetRdmaTableValue(rdma_table_idx, IDX_MATRIX_COEF22, coef22);
   // TODO(b/182481217): remove when this bug is closed.
-  FDF_LOG(TRACE, "color correction regs 00_01=%xu 02_12=%xu 11_12=%xu 20_21=%u 22=%xu", coef00_01,
-          coef02_10, coef11_12, coef20_21, coef22);
+  fdf::trace("color correction regs 00_01={:x}u 02_12={:x}u 11_12={:x}u 20_21={} 22={:x}u",
+             coef00_01, coef02_10, coef11_12, coef20_21, coef22);
 }
 
 void VideoInputUnit::FlipOnVsync(const display_config_t& config,
-                                 display::ConfigStamp config_stamp) {
+                                 display::DriverConfigStamp config_stamp) {
+  // TODO(https://fxbug.dev/401286733): color layers not yet supported.
   ZX_DEBUG_ASSERT_MSG(config.layer_list[0].image_source.width != 0,
                       "Solid color fill layers not supported");
   ZX_DEBUG_ASSERT_MSG(config.layer_list[0].image_source.height != 0,
@@ -284,12 +285,12 @@ void VideoInputUnit::FlipOnVsync(const display_config_t& config,
   auto info = reinterpret_cast<ImageInfo*>(config.layer_list[0].image_handle);
   const int next_table_idx = rdma_->GetNextAvailableRdmaTableIndex();
   if (next_table_idx < 0) {
-    FDF_LOG(ERROR, "No table available!");
+    fdf::error("No table available!");
     return;
   }
 
-  FDF_LOG(TRACE, "Table index %d used", next_table_idx);
-  FDF_LOG(TRACE, "AFBC %s", info->is_afbc ? "enabled" : "disabled");
+  fdf::trace("Table index {} used", next_table_idx);
+  fdf::trace("AFBC {}", info->is_afbc ? "enabled" : "disabled");
 
   const display::DisplayTiming display_timing = display::ToDisplayTiming(config.mode);
 
@@ -301,9 +302,9 @@ void VideoInputUnit::FlipOnVsync(const display_config_t& config,
                                       .height = display_timing.vertical_active_lines};
 
   if (ConfigNeededForSingleNonscaledLayer(layer_image_size, display_contents_size)) {
-    FDF_LOG(INFO, "Mode change (%d x %d) to (%d x %d)", display_contents_size_.width,
-            display_contents_size_.height, display_contents_size.width,
-            display_contents_size.height);
+    fdf::info("Mode change ({} x {}) to ({} x {})", display_contents_size_.width,
+              display_contents_size_.height, display_contents_size.width,
+              display_contents_size.height);
     ConfigForSingleNonscaledLayer(layer_image_size, display_contents_size);
   }
 
@@ -735,16 +736,16 @@ void VideoInputUnit::Dump() {
   rdma_->DumpRdmaRegisters();
 }
 
-#define LOG_REG(reg) FDF_LOG(INFO, "reg[0x%x]: 0x%08x " #reg, (reg), vpu_mmio_.Read32((reg)))
+#define LOG_REG(reg) fdf::info("reg[0x{:x}]: 0x{:08x} " #reg, (reg), vpu_mmio_.Read32((reg)))
 #define LOG_REG_INSTANCE(reg, offset, index)                                                 \
-  FDF_LOG(INFO, "reg[0x%x]: 0x%08x " #reg " #%d", (reg) + (offset), vpu_mmio_.Read32((reg)), \
-          index + 1)
+  fdf::info("reg[0x{:x}]: 0x{:08x} " #reg " #{}", (reg) + (offset), vpu_mmio_.Read32((reg)), \
+            index + 1)
 void VideoInputUnit::DumpNonRdmaRegisters() {
   uint32_t offset = 0;
   uint32_t index = 0;
 
-  FDF_LOG(INFO, "VPU_VIU_VENC_MUX_CTRL: 0x%08x",
-          VideoInputUnitEncoderMuxControl::Get().ReadFrom(&vpu_mmio_).reg_value());
+  fdf::info("VPU_VIU_VENC_MUX_CTRL: 0x{:08x}",
+            VideoInputUnitEncoderMuxControl::Get().ReadFrom(&vpu_mmio_).reg_value());
   LOG_REG(VPU_VPP_MISC);
   LOG_REG(VPU_VPP_OFIFO_SIZE);
   LOG_REG(VPU_VPP_HOLD_LINES);
@@ -796,26 +797,24 @@ void VideoInputUnit::DumpNonRdmaRegisters() {
     }
   }
 
-  FDF_LOG(INFO, "Dumping all Color Correction Matrix related Registers");
-  FDF_LOG(INFO, "VPU_VPP_POST_MATRIX_COEF00_01 = 0x%x",
-          vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_COEF00_01));
-  FDF_LOG(INFO, "VPU_VPP_POST_MATRIX_COEF02_10 = 0x%x",
-          vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_COEF02_10));
-  FDF_LOG(INFO, "VPU_VPP_POST_MATRIX_COEF11_12 = 0x%x",
-          vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_COEF11_12));
-  FDF_LOG(INFO, "VPU_VPP_POST_MATRIX_COEF20_21 = 0x%x",
-          vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_COEF20_21));
-  FDF_LOG(INFO, "VPU_VPP_POST_MATRIX_COEF22 = 0x%x", vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_COEF22));
-  FDF_LOG(INFO, "VPU_VPP_POST_MATRIX_OFFSET0_1 = 0x%x",
-          vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_OFFSET0_1));
-  FDF_LOG(INFO, "VPU_VPP_POST_MATRIX_OFFSET2 = 0x%x",
-          vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_OFFSET2));
-  FDF_LOG(INFO, "VPU_VPP_POST_MATRIX_PRE_OFFSET0_1 = 0x%x",
-          vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_PRE_OFFSET0_1));
-  FDF_LOG(INFO, "VPU_VPP_POST_MATRIX_PRE_OFFSET2 = 0x%x",
-          vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_PRE_OFFSET2));
-  FDF_LOG(INFO, "VPU_VPP_POST_MATRIX_EN_CTRL = 0x%x",
-          vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_EN_CTRL));
+  fdf::info("Dumping all Color Correction Matrix related Registers");
+  fdf::info("VPU_VPP_POST_MATRIX_COEF00_01 = 0x{:x}",
+            vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_COEF00_01));
+  fdf::info("VPU_VPP_POST_MATRIX_COEF02_10 = 0x{:x}",
+            vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_COEF02_10));
+  fdf::info("VPU_VPP_POST_MATRIX_COEF11_12 = 0x{:x}",
+            vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_COEF11_12));
+  fdf::info("VPU_VPP_POST_MATRIX_COEF20_21 = 0x{:x}",
+            vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_COEF20_21));
+  fdf::info("VPU_VPP_POST_MATRIX_COEF22 = 0x{:x}", vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_COEF22));
+  fdf::info("VPU_VPP_POST_MATRIX_OFFSET0_1 = 0x{:x}",
+            vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_OFFSET0_1));
+  fdf::info("VPU_VPP_POST_MATRIX_OFFSET2 = 0x{:x}", vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_OFFSET2));
+  fdf::info("VPU_VPP_POST_MATRIX_PRE_OFFSET0_1 = 0x{:x}",
+            vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_PRE_OFFSET0_1));
+  fdf::info("VPU_VPP_POST_MATRIX_PRE_OFFSET2 = 0x{:x}",
+            vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_PRE_OFFSET2));
+  fdf::info("VPU_VPP_POST_MATRIX_EN_CTRL = 0x{:x}", vpu_mmio_.Read32(VPU_VPP_POST_MATRIX_EN_CTRL));
 }
 
 void VideoInputUnit::Release() {
@@ -849,7 +848,7 @@ zx::result<std::unique_ptr<VideoInputUnit>> VideoInputUnit::Create(
 
   zx_status_t status = self->rdma_->SetupRdma();
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Could not setup RDMA");
+    fdf::error("Could not setup RDMA");
     return zx::error(status);
   }
 

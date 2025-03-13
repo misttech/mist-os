@@ -1,3 +1,0 @@
-$ResolvedVersions python.resolved
-$VerifiedPlatform linux-amd64 linux-arm64 mac-amd64 mac-arm64
-infra/3pp/tools/cpython3/${platform} version:2@3.11.1.chromium.23

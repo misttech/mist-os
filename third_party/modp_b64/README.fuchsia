@@ -12,3 +12,6 @@ The modp_b64.cc and modp_b64.h files were modified to make them safe on
 64-bit systems.
 The modp_b64.cc was modified to avoid misaligned read/write on
 little-endian hardware.
+
+*.c file wa added to force GN to compile source as C, to avoid inclusion of C++
+stdlib(std::string) in environments where its not allowed (e.g. kernel, physboot, etc).

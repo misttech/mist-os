@@ -15,7 +15,6 @@ use log::error;
 use std::collections::{HashMap, VecDeque};
 use std::fmt::Display;
 use wlan_common::mac::{self, CapabilityInfo, EthernetIIHdr};
-use wlan_common::timer::EventId;
 use wlan_common::{ie, tim, TimeUnit};
 use zerocopy::SplitByteSlice;
 use {
@@ -600,17 +599,12 @@ impl InfraBss {
     pub async fn handle_timed_event<D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
-        event_id: EventId,
         event: TimedEvent,
     ) -> Result<(), Rejection> {
         match event {
             TimedEvent::ClientEvent(addr, event) => {
                 let client = self.clients.get_mut(&addr).ok_or(Rejection::NoSuchClient(addr))?;
-
-                client
-                    .handle_event(ctx, event_id, event)
-                    .await
-                    .map_err(|e| Rejection::Client(client.addr, e))
+                client.handle_event(ctx, event).await.map_err(|e| Rejection::Client(client.addr, e))
             }
         }
     }
@@ -1428,11 +1422,9 @@ mod tests {
 
         fake_device_state.lock().wlan_queue.clear();
 
-        let (_, timed_event) =
-            time_stream.try_next().unwrap().expect("Should have scheduled a timeout");
+        let _ = time_stream.try_next().unwrap().expect("Should have scheduled a timeout");
         bss.handle_timed_event(
             &mut ctx,
-            timed_event.id,
             TimedEvent::ClientEvent(*CLIENT_ADDR, ClientEvent::BssIdleTimeout),
         )
         .await

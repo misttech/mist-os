@@ -1,5 +1,6 @@
 component_show.json
 daemon_stop.json
+emu_list.json
 emu_show.json
 emu_start.json
 emu_stop.json
@@ -8,7 +9,6 @@ product_download.json
 product_get-artifacts.json
 product_get-image-path.json
 product_lookup.json
-repository_add-from-pm.json
 repository_create.json
 repository_publish.json
 repository_server_start.json

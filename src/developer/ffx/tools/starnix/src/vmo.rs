@@ -4,7 +4,7 @@
 
 use anyhow::{Context, Result};
 use argh::{ArgsInfo, FromArgs};
-use fho::SimpleWriter;
+use ffx_writer::SimpleWriter;
 use {
     fidl_fuchsia_developer_remotecontrol as rc, fidl_fuchsia_starnix_container as fstarcontainer,
 };

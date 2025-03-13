@@ -81,10 +81,6 @@ fidl_testdata_info = [
       # TODO(https://fxbug.dev/42151687): Encode libfuzzer dependency on HLCPP and LLCPP.
       "fidlgen_libfuzzer",
     ]
-    denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support services yet.
-      "fidlgen_rust_next",
-    ]
   },
   {
     name = "bits"
@@ -135,9 +131,8 @@ fidl_testdata_info = [
     host_build_denylist = [
       # TODO(https://fxbug.dev/42140981): Add ifdefs so that protocols compile on host.
       "fidlgen_cpp",
-    ]
-    denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support services yet.
+
+      # Host-side FIDL doesn't support handles
       "fidlgen_rust_next",
     ]
   },
@@ -172,8 +167,8 @@ fidl_testdata_info = [
       "fidlgen_libfuzzer",
       "fidlgen_syzkaller",
     ]
-    denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support services yet.
+    host_build_denylist = [
+      # Host-side FIDL doesn't support handles
       "fidlgen_rust_next",
     ]
   },
@@ -434,9 +429,8 @@ fidl_testdata_info = [
 
       # TODO(https://fxbug.dev/42151687): Encode libfuzzer dependency on HLCPP and LLCPP.
       "fidlgen_libfuzzer",
-    ]
-    denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support services yet.
+
+      # Host-side FIDL doesn't support handles
       "fidlgen_rust_next",
     ]
   },
@@ -519,9 +513,8 @@ fidl_testdata_info = [
     host_build_denylist = [
       # TODO(https://fxbug.dev/42140981): Add ifdefs so that protocols compile on host.
       "fidlgen_cpp",
-    ]
-    denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support services yet.
+
+      # Host-side FIDL doesn't support handles
       "fidlgen_rust_next",
     ]
   },

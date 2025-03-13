@@ -6,12 +6,14 @@
 import argparse
 import contextlib
 import io
+import json
 import shutil
 import subprocess
 import tempfile
 import textwrap
 import unittest
 from pathlib import Path
+from typing import Any
 from unittest import mock
 
 import reproxy_logs
@@ -20,7 +22,7 @@ from go.api.command import command_pb2
 from google.protobuf import timestamp_pb2
 
 
-def _write_file_contents(path: Path, contents: str):
+def _write_file_contents(path: Path, contents: str) -> None:
     with open(path, "w") as f:
         f.write(contents)
 
@@ -33,7 +35,7 @@ def _digests_equal(left: log_pb2.LogRecord, right: log_pb2.LogRecord) -> bool:
 
 
 class DownloadEventTests(unittest.TestCase):
-    def test_distribute_fits_in_first_interval(self):
+    def test_distribute_fits_in_first_interval(self) -> None:
         event = reproxy_logs.DownloadEvent(
             bytes_downloaded=1000,
             start_time=5.0,
@@ -49,7 +51,7 @@ class DownloadEventTests(unittest.TestCase):
             self.assertAlmostEqual(actual_bytes, expected_bytes)
             self.assertAlmostEqual(actual_concurrent, expected_concurrent)
 
-    def test_distribute_fits_in_one_interval(self):
+    def test_distribute_fits_in_one_interval(self) -> None:
         event = reproxy_logs.DownloadEvent(
             bytes_downloaded=1000,
             start_time=34.0,
@@ -65,7 +67,7 @@ class DownloadEventTests(unittest.TestCase):
             self.assertAlmostEqual(actual_bytes, expected_bytes)
             self.assertAlmostEqual(actual_concurrent, expected_concurrent)
 
-    def test_distribute_spans_two_intervals(self):
+    def test_distribute_spans_two_intervals(self) -> None:
         event = reproxy_logs.DownloadEvent(
             bytes_downloaded=1000,
             start_time=24.0,
@@ -87,7 +89,7 @@ class DownloadEventTests(unittest.TestCase):
             self.assertAlmostEqual(actual_bytes, expected_bytes)
             self.assertAlmostEqual(actual_concurrent, expected_concurrent)
 
-    def test_distribute_spans_one_exact_interval(self):
+    def test_distribute_spans_one_exact_interval(self) -> None:
         event = reproxy_logs.DownloadEvent(
             bytes_downloaded=500,
             start_time=20.0,
@@ -108,7 +110,7 @@ class DownloadEventTests(unittest.TestCase):
             self.assertAlmostEqual(actual_bytes, expected_bytes)
             self.assertAlmostEqual(actual_concurrent, expected_concurrent)
 
-    def test_distribute_spans_three_intervals(self):
+    def test_distribute_spans_three_intervals(self) -> None:
         event = reproxy_logs.DownloadEvent(
             bytes_downloaded=1600,
             start_time=28.0,
@@ -133,7 +135,7 @@ class DownloadEventTests(unittest.TestCase):
 
 
 class DistributeDownloadEventBytesOverTimeTests(unittest.TestCase):
-    def test_empty(self):
+    def test_empty(self) -> None:
         intervals = reproxy_logs.distribute_bytes_downloaded_over_time(
             total_time_seconds=3.0,
             interval_seconds=1.0,
@@ -147,7 +149,7 @@ class DistributeDownloadEventBytesOverTimeTests(unittest.TestCase):
             self.assertAlmostEqual(actual_bytes, expected_bytes)
             self.assertAlmostEqual(actual_concurrent, expected_concurrent)
 
-    def test_two_events(self):
+    def test_two_events(self) -> None:
         events = [
             reproxy_logs.DownloadEvent(
                 bytes_downloaded=100,
@@ -183,7 +185,7 @@ class DistributeDownloadEventBytesOverTimeTests(unittest.TestCase):
 
 
 class ReproxyLogTests(unittest.TestCase):
-    def test_construction(self):
+    def test_construction(self) -> None:
         record1 = log_pb2.LogRecord()
         record1.command.output.output_files.extend(["obj/foo.o", "obj/foo2.o"])
         record1.remote_metadata.action_digest = "ffff0000/13"
@@ -209,7 +211,7 @@ class ReproxyLogTests(unittest.TestCase):
             },
         )
 
-    def test_diff_by_outputs_matching(self):
+    def test_diff_by_outputs_matching(self) -> None:
         record1 = log_pb2.LogRecord()
         record1.command.output.output_files.extend(["obj/foo.o"])
         record1.remote_metadata.action_digest = "ffeeff001100/313"
@@ -218,7 +220,7 @@ class ReproxyLogTests(unittest.TestCase):
         diffs = list(log.diff_by_outputs(log, _digests_equal))
         self.assertEqual(diffs, [])
 
-    def test_diff_by_outputs_different(self):
+    def test_diff_by_outputs_different(self) -> None:
         output = Path("obj/foo")
         record1 = log_pb2.LogRecord()
         record1.command.output.output_files.extend([str(output)])
@@ -233,7 +235,7 @@ class ReproxyLogTests(unittest.TestCase):
         diffs = list(log1.diff_by_outputs(log2, _digests_equal))
         self.assertEqual(diffs, [(output, record1, record2)])
 
-    def test_bandwidth_no_remote_metadata(self):
+    def test_bandwidth_no_remote_metadata(self) -> None:
         record = log_pb2.LogRecord()
         # no remote metadata
         log_dump = log_pb2.LogDump(records=[record])
@@ -242,7 +244,7 @@ class ReproxyLogTests(unittest.TestCase):
         self.assertEqual(download_bytes, 0)
         self.assertEqual(upload_bytes, 0)
 
-    def test_bandwidth_no_upload_download(self):
+    def test_bandwidth_no_upload_download(self) -> None:
         record = log_pb2.LogRecord()
         record.remote_metadata.action_digest = "ccddcdcdcdd/13"
         log_dump = log_pb2.LogDump(records=[record])
@@ -251,7 +253,7 @@ class ReproxyLogTests(unittest.TestCase):
         self.assertEqual(download_bytes, 0)
         self.assertEqual(upload_bytes, 0)
 
-    def test_bandwidth_nonzero(self):
+    def test_bandwidth_nonzero(self) -> None:
         record1 = log_pb2.LogRecord()
         record1.remote_metadata.real_bytes_downloaded = 100
         record1.remote_metadata.real_bytes_uploaded = 10
@@ -264,13 +266,13 @@ class ReproxyLogTests(unittest.TestCase):
         self.assertEqual(download_bytes, 120)
         self.assertEqual(upload_bytes, 15)
 
-    def test_download_profile_no_events(self):
+    def test_download_profile_no_events(self) -> None:
         log_dump = log_pb2.LogDump()
         log = reproxy_logs.ReproxyLog(log_dump)
         data = log.download_profile(interval_seconds=5.0)
         self.assertEqual(data, [])
 
-    def test_download_profile_one_event(self):
+    def test_download_profile_one_event(self) -> None:
         record = log_pb2.LogRecord()
         record.remote_metadata.real_bytes_downloaded = 100
         # kwargs dict to workaround 'from' being a Python keyword
@@ -294,11 +296,11 @@ class ReproxyLogTests(unittest.TestCase):
 
 
 class SetupLogdirForLogDumpTest(unittest.TestCase):
-    def test_already_a_directory(self):
+    def test_already_a_directory(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             reproxy_logs.setup_logdir_for_logdump(Path(td))
 
-    def test_log_file_copied_to_new_dir_missing_reproxy_prefix(self):
+    def test_log_file_copied_to_new_dir_missing_reproxy_prefix(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             log_file = Path(td) / "test.rrpl"
             log_contents = "fake log contents, not checked"
@@ -313,7 +315,7 @@ class SetupLogdirForLogDumpTest(unittest.TestCase):
                 log_file, new_log_dir / "reproxy_test.rrpl"
             )
 
-    def test_log_file_copied_to_new_dir_with_reproxy_prefix(self):
+    def test_log_file_copied_to_new_dir_with_reproxy_prefix(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             log_base = "reproxy_foo.rrpl"
             log_file = Path(td) / log_base
@@ -329,7 +331,7 @@ class SetupLogdirForLogDumpTest(unittest.TestCase):
 
 
 class ConvertReproxyActionsLogTest(unittest.TestCase):
-    def test_basic(self):
+    def test_basic(self) -> None:
         empty_log = log_pb2.LogDump()
         with mock.patch.object(subprocess, "check_call") as mock_process_call:
             with mock.patch.object(
@@ -345,7 +347,7 @@ class ConvertReproxyActionsLogTest(unittest.TestCase):
 
 
 class DiffLogsTests(unittest.TestCase):
-    def test_flow(self):
+    def test_flow(self) -> None:
         empty_log = log_pb2.LogDump()
         empty_logs = [reproxy_logs.ReproxyLog(empty_log)] * 2
         args = argparse.Namespace(
@@ -359,7 +361,7 @@ class DiffLogsTests(unittest.TestCase):
 
 
 class WarmthLogsTests(unittest.TestCase):
-    def test_logs_comparison(self):
+    def test_logs_comparison(self) -> None:
         record1 = log_pb2.LogRecord()
         record1.remote_metadata.action_digest = "aaaa/44"
         record1.remote_metadata.result.status = (
@@ -432,7 +434,7 @@ Cache hits warmed up before the first build: 1
 
 
 class LookupOutputFileDigestTests(unittest.TestCase):
-    def test_output_path_not_found(self):
+    def test_output_path_not_found(self) -> None:
         empty_log = log_pb2.LogDump()
         log = reproxy_logs.ReproxyLog(empty_log)
         args = argparse.Namespace(
@@ -446,7 +448,7 @@ class LookupOutputFileDigestTests(unittest.TestCase):
                 reproxy_logs.lookup_output_file_digest_command(args), 1
             )
 
-    def test_output_path_found(self):
+    def test_output_path_found(self) -> None:
         record = log_pb2.LogRecord()
         path1 = "obj/aaa.o"
         path2 = "obj/bbb.o"
@@ -477,10 +479,10 @@ class LookupOutputFileDigestTests(unittest.TestCase):
 
 
 class FilterRecordsTests(unittest.TestCase):
-    def test_basic_counter(self):
+    def test_basic_counter(self) -> None:
         counter = 0
 
-        def action(unused):
+        def action(unused: Any) -> None:
             nonlocal counter  # reference the one in the above scope
             counter += 1
 
@@ -492,10 +494,10 @@ class FilterRecordsTests(unittest.TestCase):
         )
         self.assertEqual(counter, 2)
 
-    def test_basic_no_matches(self):
+    def test_basic_no_matches(self) -> None:
         counter = 0
 
-        def action(unused):
+        def action(unused: Any) -> None:
             nonlocal counter  # reference the one in the above scope
             counter += 1
 
@@ -509,7 +511,7 @@ class FilterRecordsTests(unittest.TestCase):
 
 
 class FilterRlibsCommandTest(unittest.TestCase):
-    def test_filter(self):
+    def test_filter(self) -> None:
         record1 = log_pb2.LogRecord()
         record2 = log_pb2.LogRecord()
         record1.command.output.output_files.extend(["foo.rlib"])  # match this
@@ -532,7 +534,7 @@ class FilterRlibsCommandTest(unittest.TestCase):
 
 
 class MainTests(unittest.TestCase):
-    def test_diff(self):
+    def test_diff(self) -> None:
         empty_log = log_pb2.LogDump()
         empty_logs = [reproxy_logs.ReproxyLog(empty_log)] * 2
         with mock.patch.object(
@@ -543,7 +545,7 @@ class MainTests(unittest.TestCase):
         self.assertEqual(status, 0)
         mock_multi_parse.assert_called()
 
-    def test_output_file_digest(self):
+    def test_output_file_digest(self) -> None:
         record = log_pb2.LogRecord()
         path1 = "obj/aaa.o"
         digest1 = "ababababa/111"
@@ -563,7 +565,7 @@ class MainTests(unittest.TestCase):
         self.assertEqual(status, 0)
         mock_multi_parse.assert_called_once()
 
-    def test_bandwidth(self):
+    def test_bandwidth(self) -> None:
         up = 33
         down = 999
         record = log_pb2.LogRecord()
@@ -587,7 +589,7 @@ class MainTests(unittest.TestCase):
         self.assertEqual(status, 0)
         mock_multi_parse.assert_called_once()
 
-    def test_plot_download(self):
+    def test_plot_download(self) -> None:
         record = log_pb2.LogRecord()
         record.remote_metadata.real_bytes_downloaded = 1000000
         # kwargs dict to workaround 'from' being a Python keyword
@@ -625,7 +627,7 @@ class MainTests(unittest.TestCase):
         self.assertEqual(status, 0)
         mock_multi_parse.assert_called_once()
 
-    def test_filter_rlibs(self):
+    def test_filter_rlibs(self) -> None:
         log = reproxy_logs.ReproxyLog(log_pb2.LogDump())
         with mock.patch.object(
             reproxy_logs, "parse_log", return_value=log
@@ -637,6 +639,23 @@ class MainTests(unittest.TestCase):
         self.assertEqual(status, 0)
         mock_parse.assert_called_once()
         mock_filter.assert_called_once()
+
+    def test_json_export(self) -> None:
+        record = log_pb2.LogRecord()
+        log = reproxy_logs.ReproxyLog(log_pb2.LogDump(records=[record]))
+        with mock.patch.object(
+            reproxy_logs, "parse_log", return_value=log
+        ) as mock_parse:
+            with tempfile.TemporaryDirectory() as td:
+                outfile_path = Path(td) / "output.json"
+                status = reproxy_logs.main(
+                    ["json_export", "log.rrpl", str(outfile_path)]
+                )
+                self.assertEqual(status, 0)
+                with open(outfile_path) as outfile:
+                    output_json = json.load(outfile)
+        mock_parse.assert_called_once()
+        self.assertEqual(output_json, [{}])
 
 
 if __name__ == "__main__":

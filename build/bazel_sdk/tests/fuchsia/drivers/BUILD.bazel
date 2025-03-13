@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_cc_driver")
+load("@rules_fuchsia//fuchsia:defs.bzl", "fuchsia_cc_driver")
 load("@rules_python//python:defs.bzl", "py_binary")
 load(":driver_binary_test.bzl", "driver_binary_test")
 

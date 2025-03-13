@@ -138,9 +138,9 @@ if (is_host) {
     testonly = true
     deps = [ ":ffx_emulator_tests($host_toolchain)" ]
   }
-}
 
-group("e2e_tests") {
-  testonly = true
-  deps = [ "e2e_test:e2e_tests" ]
+  group("host_tests") {
+    testonly = true
+    deps = [ "tests:host_tests" ]
+  }
 }

@@ -56,14 +56,6 @@ TEST(BadAccessTest, SyscallNumTest) {
   ASSERT_DEATH(([]() { bad_syscall(0xff00ff0000000010ull); }));
 }
 
-#if defined(__x86_64__) && !defined(ENABLE_USER_PCI)
-TEST(BadAccessTest, PciCfgPioRw) {
-  EXPECT_EQ(zx_pci_cfg_pio_rw(standalone::GetIoportResource()->get(), 0, 0, 0, 0,
-                              reinterpret_cast<uint32_t*>(unmapped_addr), 0, true),
-            ZX_ERR_INVALID_ARGS);
-}
-#endif
-
 TEST(BadAccessTest, ChannelReadHandle) {
   zx::channel channel_a, channel_b;
 

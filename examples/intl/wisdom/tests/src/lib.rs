@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use diagnostics_reader::{ArchiveReader, Logs};
+use diagnostics_reader::ArchiveReader;
 use fidl_fuchsia_data as fdata;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route};
 use futures::StreamExt;
@@ -57,9 +57,9 @@ async fn wisdom_integration_test() -> Result<(), Error> {
 
     // Initialize the log reader
     let moniker = format!("realm_builder\\:{}/wisdom_client", realm_instance.root.child_name());
-    let mut reader = ArchiveReader::new();
-    reader.add_selector(format!("{}:root", moniker));
-    let mut log_stream = reader.snapshot_then_subscribe::<Logs>()?;
+    let mut reader = ArchiveReader::logs();
+    reader.select_all_for_component(format!("{}", moniker).as_str());
+    let mut log_stream = reader.snapshot_then_subscribe()?;
 
     // Initialize Goldens file
     let goldens = File::open("/pkg/data/golden-output.txt")?;

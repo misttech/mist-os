@@ -33,6 +33,7 @@ source_set("impl") {
   sources = [
     "channel.cc",
     "clock.cc",
+    "counter.cc",
     "debug.cc",
     "driver.cc",
     "driver_${zircon_cpu}.cc",

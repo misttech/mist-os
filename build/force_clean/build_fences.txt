@@ -15,3 +15,4 @@ After fxr/973216, Bazel build complains about dangling symlinks, see http://b/31
 After fxr/1081759, Bazel build is non-incremental, see http://b/353592055
 fxr/1098532 triggers a Bazel error where SDK header changes don't trigger rebuilds, see http://b/356347441
 fxr/1139175 triggers a hard-to-debug Ninja no-op flake in CI/CQ, see https://fxbug.dev/375300815
+fxr/1206397 triggers a Ninja dependency cycle, see https://fxbug.dev/396609750

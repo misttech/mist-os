@@ -13,7 +13,10 @@ _prebuilt_runtime = toolchain_variant.tags + [ "standalone" ] -
 
 config("variant-libprefix") {
   visibility = [ ":*" ]
-  if (is_fuchsia && _prebuilt_runtime) {
+
+  # Even specialized environments that don't use the prebuilt runtime still
+  # expect to use the libprefix-based placement of shared libraries.
+  if (is_fuchsia && !is_kernel) {
     dynamic_linker_flags =
         "-dynamic-linker=${toolchain_variant.libprefix}ld.so.1"
     ldflags = [ "-Wl,$dynamic_linker_flags" ]
@@ -146,6 +149,7 @@ sanitizer_default_options("lsan_default_options") {
 # scripts/gn/trim_visibility.py --target="//build/config/sanitizers:suppress-lsan.DO-NOT-USE-THIS"
 sanitizer_extra_options("suppress-lsan.DO-NOT-USE-THIS") {
   visibility = [
+    "//sdk/lib/driver/component/rust:*",
     "//src/cobalt/bin/system-metrics/*",
     "//src/devices/usb/drivers/xhci/*",
     "//src/fonts/*",
@@ -159,6 +163,7 @@ sanitizer_extra_options("suppress-lsan.DO-NOT-USE-THIS") {
     "//src/settings/*",
     "//third_party/alacritty/alacritty_terminal/*",
     "//third_party/crashpad/src/*",
+    "//vendor/*",
     "//zircon/third_party/uapp/dash/*",
   ]
 

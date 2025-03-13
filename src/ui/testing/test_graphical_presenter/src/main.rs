@@ -361,7 +361,7 @@ enum IncomingService {
     ViewProvider(ViewProviderRequestStream),
 }
 
-#[fuchsia::main(logging = true, threads = 1)]
+#[fuchsia::main(logging = true)]
 async fn main() -> Result<(), Error> {
     if let Err(e) = TestGraphicalPresenter::new()?.run().await {
         log::error!("Failure running test_graphical_presenter {}", e);

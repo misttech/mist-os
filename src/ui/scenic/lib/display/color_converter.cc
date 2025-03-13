@@ -54,7 +54,9 @@ void ColorConverter::SetValues(fuchsia::ui::display::color::ConversionProperties
     return;
   }
 
-  set_color_conversion_values_(coefficients, preoffsets, postoffsets);
+  fidl::Arena arena;
+  set_color_conversion_values_(fidl::ToWire(arena, coefficients), fidl::ToWire(arena, preoffsets),
+                               fidl::ToWire(arena, postoffsets));
   callback(ZX_OK);
 }
 

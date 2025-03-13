@@ -27,9 +27,20 @@ use test_runners_lib::elf::{
 use test_runners_lib::errors::*;
 use test_runners_lib::launch;
 use test_runners_lib::logs::{LogError, LogStreamReader, LoggerStream, SocketLogWriter};
-use {fidl_fuchsia_io as fio, fidl_fuchsia_process as fproc, fuchsia_async as fasync};
+use zx::HandleBased;
+use {
+    fidl_fuchsia_io as fio, fidl_fuchsia_process as fproc, fuchsia_async as fasync,
+    fuchsia_runtime as runtime,
+};
 
 const DYNAMIC_SKIP_RESULT: &str = "SKIPPED";
+
+lazy_static! {
+    static ref NEXT_VDSO: zx::Handle = {
+        runtime::take_startup_handle(runtime::HandleInfo::new(runtime::HandleType::VdsoVmo, 0))
+            .expect("failed to take next vDSO handle")
+    };
+}
 
 /// Implements `fuchsia.test.Suite` and runs provided test.
 pub struct TestServer {
@@ -47,6 +58,9 @@ pub struct TestServer {
 
     /// Cache to store enumerated tests.
     tests_future_container: MemoizedFutureContainer<EnumeratedTestCases, EnumerationError>,
+
+    /// If set, pass the incoming vDSO to created children.
+    duplicate_vdso_for_children: bool,
 }
 
 static PARALLEL_DEFAULT: u16 = 1;
@@ -179,6 +193,19 @@ impl TestServer {
             output_dir_name: output_dir_name,
             output_dir_parent_path: output_dir_parent_path,
             tests_future_container: Arc::new(Mutex::new(None)),
+            duplicate_vdso_for_children: false,
+        }
+    }
+
+    pub fn with_duplicate_vdso_for_children(mut self, value: bool) -> Self {
+        self.duplicate_vdso_for_children = value;
+        self
+    }
+
+    fn vdso_mode(&self) -> VDSOMode {
+        match self.duplicate_vdso_for_children {
+            true => VDSOMode::Duplicate,
+            false => VDSOMode::Default,
         }
     }
 
@@ -198,8 +225,12 @@ impl TestServer {
             test_component: Arc<Component>,
             test_data_namespace: Result<fproc::NameInfo, IoError>,
             output_dir_proxy: Arc<fio::DirectoryProxy>,
+            vdso_mode: VDSOMode,
         ) -> Result<EnumeratedTestCases, EnumerationError> {
-            Ok(Arc::new(get_tests(test_component, test_data_namespace?, output_dir_proxy).await?))
+            Ok(Arc::new(
+                get_tests(test_component, test_data_namespace?, output_dir_proxy, vdso_mode)
+                    .await?,
+            ))
         }
 
         /// Populates the given `tests_future_container` with a future, or returns a copy of that
@@ -209,13 +240,15 @@ impl TestServer {
             tests_future_container: MemoizedFutureContainer<EnumeratedTestCases, EnumerationError>,
             test_data_namespace: Result<fproc::NameInfo, IoError>,
             output_dir_proxy: Arc<fio::DirectoryProxy>,
+            vdso_mode: VDSOMode,
         ) -> Result<EnumeratedTestCases, EnumerationError> {
             tests_future_container
                 .lock()
                 .await
                 .get_or_insert_with(|| {
-                    let fetched: PinnedFuture<EnumeratedTestCases, EnumerationError> =
-                        Box::pin(fetch(test_component, test_data_namespace, output_dir_proxy));
+                    let fetched: PinnedFuture<EnumeratedTestCases, EnumerationError> = Box::pin(
+                        fetch(test_component, test_data_namespace, output_dir_proxy, vdso_mode),
+                    );
                     fetched.shared()
                 })
                 .clone()
@@ -231,6 +264,7 @@ impl TestServer {
             tests_future_container,
             test_data_namespace,
             output_dir_proxy,
+            self.vdso_mode(),
         )
     }
 
@@ -312,7 +346,10 @@ impl TestServer {
         // Load bearing to hold job guard.
         let (process, _job, stdout_logger, stderr_logger) =
             match launch_component_process_separate_std_handles::<RunTestError>(
-                &component, names, args,
+                &component,
+                names,
+                args,
+                self.vdso_mode(),
             )
             .await
             {
@@ -381,13 +418,12 @@ impl TestServer {
         let process_info = process.info().map_err(RunTestError::ProcessInfo)?;
 
         // gtest returns 0 is test succeeds and 1 if test fails. This will test if test ended abnormally.
+        // Even if the test exited abnormally, we will still try to parse the output file if it exists.
+        let mut abnormal_exit = false;
         if process_info.return_code != 0 && process_info.return_code != 1 {
+            warn!("Test exited abnormally with exit code {}", process_info.return_code);
             test_stderr.write_str("Test exited abnormally\n").await?;
-
-            case_listener_proxy
-                .finished(&TestResult { status: Some(Status::Failed), ..Default::default() })
-                .map_err(RunTestError::SendFinish)?;
-            return Ok(());
+            abnormal_exit = true;
         }
 
         debug!("Opening output file for {}", test);
@@ -396,9 +432,12 @@ impl TestServer {
             Ok(b) => b,
             Err(e) => {
                 // TODO(https://fxbug.dev/42122427): Introduce Status::InternalError.
-                test_stderr
-                    .write_str(&format!("Error reading test result:{:?}\n", IoError::File(e)))
-                    .await?;
+                if !abnormal_exit {
+                    // Only report this error if the test didn't exit abnormally.
+                    test_stderr
+                        .write_str(&format!("Error reading test result:{:?}\n", IoError::File(e)))
+                        .await?;
+                }
 
                 case_listener_proxy
                     .finished(&TestResult { status: Some(Status::Failed), ..Default::default() })
@@ -481,6 +520,7 @@ async fn get_tests(
     component: Arc<Component>,
     test_data_namespace: fproc::NameInfo,
     output_dir_proxy: Arc<fio::DirectoryProxy>,
+    vdso_mode: VDSOMode,
 ) -> Result<Vec<TestCaseInfo>, EnumerationError> {
     let names = vec![test_data_namespace];
 
@@ -494,7 +534,7 @@ async fn get_tests(
 
     // Load bearing to hold job guard.
     let (process, _job, stdlogger) =
-        launch_component_process::<EnumerationError>(&component, names, args).await?;
+        launch_component_process::<EnumerationError>(&component, names, args, vdso_mode).await?;
 
     // collect stdout in background before waiting for process termination.
     let std_reader = LogStreamReader::new(stdlogger);
@@ -529,11 +569,32 @@ async fn get_tests(
     parse_test_cases(result_str)
 }
 
+enum VDSOMode {
+    Duplicate,
+    Default,
+}
+
+fn handle_info_for_vdso_mode<E>(vdso_mode: VDSOMode) -> Result<Option<Vec<fproc::HandleInfo>>, E>
+where
+    E: From<NamespaceError> + From<launch::LaunchError> + From<ComponentError>,
+{
+    match vdso_mode {
+        VDSOMode::Duplicate => Ok(Some(vec![fproc::HandleInfo {
+            handle: (*NEXT_VDSO)
+                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                .map_err(launch::LaunchError::DuplicateVdso)?,
+            id: runtime::HandleInfo::new(runtime::HandleType::VdsoVmo, 0).as_raw(),
+        }])),
+        VDSOMode::Default => Ok(None),
+    }
+}
+
 /// Convenience wrapper around [`launch::launch_process`].
 async fn launch_component_process_separate_std_handles<E>(
     component: &Component,
     names: Vec<fproc::NameInfo>,
     args: Vec<String>,
+    vdso_mode: VDSOMode,
 ) -> Result<(zx::Process, launch::ScopedJob, LoggerStream, LoggerStream), E>
 where
     E: From<NamespaceError> + From<launch::LaunchError> + From<ComponentError>,
@@ -541,6 +602,8 @@ where
     let (client, loader) = fidl::endpoints::create_endpoints();
     component.loader_service(loader);
     let executable_vmo = Some(component.executable_vmo()?);
+
+    let handle_infos = handle_info_for_vdso_mode::<E>(vdso_mode)?;
 
     Ok(launch::launch_process_with_separate_std_handles(launch::LaunchProcessArgs {
         bin_path: &component.binary,
@@ -550,11 +613,16 @@ where
         args: Some(args),
         name_infos: Some(names),
         environs: component.environ.clone(),
-        handle_infos: None,
+        handle_infos,
         loader_proxy_chan: Some(client.into_channel()),
         executable_vmo,
         options: component.options,
         config_vmo: component.config_vmo()?,
+        url: Some(component.url.clone()),
+        component_instance: component
+            .component_instance
+            .as_ref()
+            .map(|c| c.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap()),
     })
     .await?)
 }
@@ -564,6 +632,7 @@ async fn launch_component_process<E>(
     component: &Component,
     names: Vec<fproc::NameInfo>,
     args: Vec<String>,
+    vdso_mode: VDSOMode,
 ) -> Result<(zx::Process, launch::ScopedJob, LoggerStream), E>
 where
     E: From<NamespaceError> + From<launch::LaunchError> + From<ComponentError>,
@@ -571,6 +640,8 @@ where
     let (client, loader) = fidl::endpoints::create_endpoints();
     component.loader_service(loader);
     let executable_vmo = Some(component.executable_vmo()?);
+
+    let handle_infos = handle_info_for_vdso_mode::<E>(vdso_mode)?;
 
     Ok(launch::launch_process(launch::LaunchProcessArgs {
         bin_path: &component.binary,
@@ -580,11 +651,16 @@ where
         args: Some(args),
         name_infos: Some(names),
         environs: component.environ.clone(),
-        handle_infos: None,
+        handle_infos,
         loader_proxy_chan: Some(client.into_channel()),
         executable_vmo,
         options: component.options,
         config_vmo: component.config_vmo()?,
+        url: Some(component.url.clone()),
+        component_instance: component
+            .component_instance
+            .as_ref()
+            .map(|c| c.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap()),
     })
     .await?)
 }

@@ -4,7 +4,9 @@
 
 use crate::mm::{MemoryAccessor, MemoryAccessorExt, ProcMapsFile, ProcSmapsFile, PAGE_SIZE};
 use crate::security;
-use crate::task::{CurrentTask, Task, TaskPersistentInfo, TaskStateCode, ThreadGroup};
+use crate::task::{
+    path_from_root, CurrentTask, Task, TaskPersistentInfo, TaskStateCode, ThreadGroup,
+};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
     default_seek, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
@@ -197,12 +199,7 @@ fn static_directory_builder_with_common_task_entries<'a>(
     // proc(5): "The files inside each /proc/pid directory are normally owned by
     // the effective user and effective group ID of the process."
     dir.entry_creds(task.creds().euid_as_fscred());
-    dir.entry(
-        current_task,
-        "cgroup",
-        StubEmptyFile::new_node("/proc/pid/cgroup", bug_ref!("https://fxbug.dev/322893771")),
-        mode!(IFREG, 0o444),
-    );
+    dir.entry(current_task, "cgroup", CgroupFile::new_node(task.into()), mode!(IFREG, 0o444));
     dir.entry(
         current_task,
         "cwd",
@@ -319,6 +316,13 @@ fn static_directory_builder_with_common_task_entries<'a>(
     // attempt to dump process information to read this value, but later work should
     // return a proper 'wchan'.
     dir.entry(current_task, "wchan", BytesFile::new_node(b"0".to_vec()), mode!(IFREG, 0o444));
+    dir.entry(
+        current_task,
+        "clear_refs",
+        ClearRefsFile::new_node(task.into()),
+        // Not a typo, this is a write-only file.
+        mode!(IFREG, 0o200),
+    );
     // proc(5): "The files inside each /proc/pid directory are normally owned by
     // the effective user and effective group ID of the process."
     dir.dir_creds(task.creds().euid_as_fscred());
@@ -653,10 +657,30 @@ impl FsNodeOps for TaskListDirectory {
         if !thread_group.read().contains_task(tid) {
             return error!(ENOENT);
         }
+
         let pid_state = thread_group.kernel.pids.read();
         let weak_task = pid_state.get_task(tid);
         let task = weak_task.upgrade().ok_or_else(|| errno!(ENOENT))?;
+        std::mem::drop(pid_state);
+
         Ok(tid_directory(current_task, &node.fs(), &task))
+    }
+}
+
+#[derive(Clone)]
+struct CgroupFile(WeakRef<Task>);
+impl CgroupFile {
+    pub fn new_node(task: WeakRef<Task>) -> impl FsNodeOps {
+        DynamicFile::new_node(Self(task))
+    }
+}
+impl DynamicFileSource for CgroupFile {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
+        let task = Task::from_weak(&self.0)?;
+        let cgroup = task.kernel().cgroups.cgroup2.get_cgroup(task.get_pid());
+        let path = path_from_root(cgroup)?;
+        sink.write(format!("0::{}\n", path).as_bytes());
+        Ok(())
     }
 }
 
@@ -1205,6 +1229,7 @@ impl DynamicFileSource for StatusFile {
                 writeln!(sink, "VmStk:\t{} kB", mem_stats.vm_stack / 1024)?;
                 writeln!(sink, "VmExe:\t{} kB", mem_stats.vm_exe / 1024)?;
                 writeln!(sink, "VmSwap:\t{} kB", mem_stats.vm_swap / 1024)?;
+                writeln!(sink, "VmHWM:\t{} kB", mem_stats.vm_rss_hwm / 1024)?;
             }
             // Report seccomp filter status.
             let seccomp = task.seccomp_filter_state.get() as u8;
@@ -1257,9 +1282,7 @@ impl BytesFileOps for OomAdjFile {
             let fraction = (value - OOM_ADJUST_MIN) / (OOM_ADJUST_MAX - OOM_ADJUST_MIN);
             fraction * (OOM_SCORE_ADJ_MAX - OOM_SCORE_ADJ_MIN) + OOM_SCORE_ADJ_MIN
         };
-        if !current_task.creds().has_capability(CAP_SYS_RESOURCE) {
-            return error!(EPERM);
-        }
+        security::check_task_capable(current_task, CAP_SYS_RESOURCE)?;
         let task = Task::from_weak(&self.0)?;
         task.write().oom_score_adj = oom_score_adj;
         Ok(())
@@ -1293,9 +1316,7 @@ impl BytesFileOps for OomScoreAdjFile {
         if !(OOM_SCORE_ADJ_MIN..=OOM_SCORE_ADJ_MAX).contains(&value) {
             return error!(EINVAL);
         }
-        if !current_task.creds().has_capability(CAP_SYS_RESOURCE) {
-            return error!(EPERM);
-        }
+        security::check_task_capable(current_task, CAP_SYS_RESOURCE)?;
         let task = Task::from_weak(&self.0)?;
         task.write().oom_score_adj = value;
         Ok(())
@@ -1305,5 +1326,21 @@ impl BytesFileOps for OomScoreAdjFile {
         let task = Task::from_weak(&self.0)?;
         let oom_score_adj = task.read().oom_score_adj;
         Ok(serialize_for_file(oom_score_adj).into())
+    }
+}
+
+struct ClearRefsFile(WeakRef<Task>);
+
+impl ClearRefsFile {
+    fn new_node(task: WeakRef<Task>) -> impl FsNodeOps {
+        BytesFile::new_node(Self(task))
+    }
+}
+
+impl BytesFileOps for ClearRefsFile {
+    fn write(&self, _current_task: &CurrentTask, _data: Vec<u8>) -> Result<(), Errno> {
+        let _task = Task::from_weak(&self.0)?;
+        track_stub!(TODO("https://fxbug.dev/396221597"), "/proc/pid/clear_refs");
+        Ok(())
     }
 }

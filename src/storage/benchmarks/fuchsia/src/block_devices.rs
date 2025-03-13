@@ -26,13 +26,17 @@ use fuchsia_component::client::{
 };
 
 use std::path::PathBuf;
+use std::sync::Arc;
 use storage_benchmarks::block_device::BlockDevice;
 use storage_benchmarks::{BlockDeviceConfig, BlockDeviceFactory};
 use storage_isolated_driver_manager::{
     create_random_guid, find_block_device, find_block_device_devfs, fvm, into_guid,
     wait_for_block_device_devfs, zxcrypt, BlockDeviceMatcher, Guid,
 };
-use {fidl_fuchsia_storage_partitions as fpartitions, fuchsia_async as fasync};
+use {
+    fidl_fuchsia_device as fdevice, fidl_fuchsia_storage_partitions as fpartitions,
+    fuchsia_async as fasync,
+};
 
 const BLOBFS_VOLUME_NAME: &str = "blobfs";
 
@@ -81,7 +85,7 @@ pub async fn create_fvm_volume(
         BENCHMARK_VOLUME_NAME,
         server_end,
         CreateOptions {
-            initial_size: config.fvm_volume_size,
+            initial_size: config.volume_size,
             type_guid: Some(BENCHMARK_TYPE_GUID.clone()),
             guid: Some(instance_guid),
             ..Default::default()
@@ -96,64 +100,101 @@ pub async fn create_fvm_volume(
     (volume_dir, crypt_task)
 }
 
-pub enum FvmComponentInstance {
-    /// A child component of FVM.
-    Local(ServingMultiVolumeFilesystem),
-    /// A connector for the system FVM.
-    System(
+pub enum SystemFvm {
+    /// The FVM is running in devfs.
+    Devfs(VolumeManagerProxy),
+    /// The FVM is running as a component.
+    Component(
         Box<dyn Send + Sync + Fn() -> fidl_fuchsia_fs_startup::VolumesProxy>,
         Box<dyn Send + Sync + Fn() -> fio::DirectoryProxy>,
     ),
 }
 
-impl FvmComponentInstance {
-    fn volumes(&self) -> fidl_fuchsia_fs_startup::VolumesProxy {
-        match self {
-            Self::Local(fs) => connect_to_protocol_at_dir_root::<
-                fidl_fuchsia_fs_startup::VolumesMarker,
-            >(fs.exposed_dir())
-            .unwrap(),
-            Self::System(connector, _) => connector(),
-        }
-    }
+pub enum SystemGpt {
+    /// The GPT is running in devfs.
+    Devfs(fdevice::ControllerProxy),
+    /// The GPT is running as a component.
+    Component(Arc<fpartitions::PartitionServiceProxy>),
+}
 
-    fn volumes_dir(&self) -> fio::DirectoryProxy {
-        match self {
-            Self::Local(fs) => fuchsia_fs::directory::open_directory_async(
-                fs.exposed_dir(),
-                "volumes",
-                fio::PERM_READABLE,
-            )
-            .unwrap(),
-            Self::System(_, connector) => connector(),
-        }
+/// A factory for volumes which the benchmarks run in.  If the system has an FVM, benchmarks run in
+/// a volume in the system FVM.  Otherwise, they run out of a partition in the system GPT (and might
+/// still include a hermetic FVM instance, if the benchmark needs it to run).
+pub enum BenchmarkVolumeFactory {
+    SystemFvm(SystemFvm),
+    SystemGpt(SystemGpt),
+}
+
+struct RawBlockDeviceInDevfs(fdevice::ControllerProxy);
+
+impl BlockDevice for RawBlockDeviceInDevfs {
+    fn connector(&self) -> Box<dyn BlockConnector> {
+        Box::new(self.0.clone())
     }
 }
 
-/// A connection to a running FVM instance on the system.
-pub enum FvmInstance {
-    /// The instance lives in Devfs.  It might be the system FVM, or it might be a test FVM.
-    Devfs(VolumeManagerProxy),
-    /// The instance is a component.  It might be the system FVM, or it might be a child component.
-    Component(FvmComponentInstance),
+struct RawBlockDeviceInGpt(Arc<fpartitions::PartitionServiceProxy>);
+
+impl BlockDevice for RawBlockDeviceInGpt {
+    fn connector(&self) -> Box<dyn BlockConnector> {
+        Box::new(self.0.clone())
+    }
 }
 
 #[async_trait]
-impl BlockDeviceFactory for FvmInstance {
+impl BlockDeviceFactory for BenchmarkVolumeFactory {
     async fn create_block_device(&self, config: &BlockDeviceConfig) -> Box<dyn BlockDevice> {
-        Box::new(self.create_volume(config).await)
+        let instance_guid = create_random_guid();
+        match self {
+            Self::SystemFvm(SystemFvm::Devfs(volume_manager)) => Box::new(
+                Self::create_fvm_volume_in_devfs(volume_manager, instance_guid, config).await,
+            ),
+            Self::SystemFvm(SystemFvm::Component(volumes_connector, _)) => {
+                let volumes = volumes_connector();
+                Box::new(Self::create_fvm_volume(volumes, instance_guid, config).await)
+            }
+            Self::SystemGpt(SystemGpt::Devfs(controller)) => {
+                if config.requires_fvm {
+                    Box::new(
+                        Self::create_fvm_instance_and_volume_in_devfs(
+                            controller,
+                            instance_guid,
+                            config,
+                        )
+                        .await,
+                    )
+                } else {
+                    Box::new(RawBlockDeviceInDevfs(controller.clone()))
+                }
+            }
+            Self::SystemGpt(SystemGpt::Component(partition_service)) => {
+                if config.requires_fvm {
+                    Box::new(
+                        Self::create_fvm_instance_and_volume(
+                            partition_service.clone(),
+                            instance_guid,
+                            config,
+                        )
+                        .await,
+                    )
+                } else {
+                    Box::new(RawBlockDeviceInGpt(partition_service.clone()))
+                }
+            }
+        }
     }
 }
 
-impl FvmInstance {
-    /// Connects to the FVM instance the benchmarks should run in based on the provided
+impl BenchmarkVolumeFactory {
+    /// Creates a factory for volumes in which benchmarks should run in based on the provided
     /// configuration.  Uses various capabilities in the incoming namespace of the process.
-    pub async fn from_config(storage_host: bool, fxfs_blob: bool) -> FvmInstance {
+    pub async fn from_config(storage_host: bool, fxfs_blob: bool) -> BenchmarkVolumeFactory {
         if storage_host {
             let partitions = Service::open(fpartitions::PartitionServiceMarker).unwrap();
             let manager = connect_to_protocol::<fpartitions::PartitionsManagerMarker>().unwrap();
             if fxfs_blob {
-                let instance = FvmInstance::connect_to_test_fvm(partitions, manager).await;
+                let instance =
+                    BenchmarkVolumeFactory::connect_to_test_partition(partitions, manager).await;
                 assert!(
                     instance.is_some(),
                     "Failed to open or create testing FVM in GPT.  \
@@ -161,21 +202,32 @@ impl FvmInstance {
                 );
                 instance.unwrap()
             } else {
-                // TODO(https://fxbug.dev/372555079): Support this by routing the FVM protocols from
-                // fshost.
-                unimplemented!("Running benchmarks on FVM + storage-host is not supported yet!");
+                let volumes_connector = Box::new(move || {
+                    connect_to_protocol::<fidl_fuchsia_fs_startup::VolumesMarker>().unwrap()
+                });
+                let volumes_dir_connector = {
+                    Box::new(move || {
+                        fuchsia_fs::directory::open_in_namespace("volumes", fio::PERM_READABLE)
+                            .unwrap()
+                    })
+                };
+                BenchmarkVolumeFactory::connect_to_system_fvm(
+                    volumes_connector,
+                    volumes_dir_connector,
+                )
+                .unwrap()
             }
         } else {
             if fxfs_blob {
-                let instance = FvmInstance::connect_to_test_fvm_devfs().await;
+                let instance = BenchmarkVolumeFactory::connect_to_test_partition_devfs().await;
                 assert!(
                     instance.is_some(),
-                    "Failed to open or create testing FVM in GPT.  \
+                    "Failed to open or create testing volume in GPT.  \
                     Perhaps the system doesn't have a GPT-formatted block device?"
                 );
                 instance.unwrap()
             } else {
-                let instance = FvmInstance::connect_to_system_fvm_devfs().await;
+                let instance = BenchmarkVolumeFactory::connect_to_system_fvm_devfs().await;
                 assert!(
                     instance.is_some(),
                     "Failed to open or create volume in FVM.  \
@@ -190,15 +242,15 @@ impl FvmInstance {
     pub fn connect_to_system_fvm(
         volumes_connector: Box<dyn Send + Sync + Fn() -> fidl_fuchsia_fs_startup::VolumesProxy>,
         volumes_dir_connector: Box<dyn Send + Sync + Fn() -> fio::DirectoryProxy>,
-    ) -> FvmInstance {
-        FvmInstance::Component(FvmComponentInstance::System(
+    ) -> Option<BenchmarkVolumeFactory> {
+        Some(BenchmarkVolumeFactory::SystemFvm(SystemFvm::Component(
             volumes_connector,
             volumes_dir_connector,
-        ))
+        )))
     }
 
     /// Connects to the system FVM running in devfs.
-    pub async fn connect_to_system_fvm_devfs() -> Option<FvmInstance> {
+    pub async fn connect_to_system_fvm_devfs() -> Option<BenchmarkVolumeFactory> {
         // The FVM won't always have a label or GUID we can search for (e.g. on Astro where it is
         // the top-level partition exposed by the FTL).  Search for blobfs and work backwards.
         let blobfs_dev_path = find_block_device_devfs(&[
@@ -226,19 +278,19 @@ impl FvmInstance {
             Some(p) => assert!(p == "fvm", "Unexpected FVM path: {}", path.display()),
             None => panic!("Unexpected FVM path: {}", path.display()),
         }
-        Some(FvmInstance::Devfs(
+        Some(BenchmarkVolumeFactory::SystemFvm(SystemFvm::Devfs(
             connect_to_protocol_at_path::<VolumeManagerMarker>(path.to_str().unwrap())
                 .unwrap_or_else(|_| panic!("Failed to connect to VolumeManager at {:?}", path)),
-        ))
+        )))
     }
 
-    // Creates and connects to a test-only instance of the FVM, or adds it to the GPT if absent.
-    // This is used on systems which don't have a real FVM, i.e. Fxblob.
-    // The benchmarks have to have an FVM somewhere, since minfs doesn't work properly without FVM.
-    pub async fn connect_to_test_fvm(
+    // Creates and connects to the partition reserved for benchmarks, or adds it to the GPT if
+    // absent.  The partition will be unformatted and should be reformatted explicitly before being
+    // used for a benchmark.
+    pub async fn connect_to_test_partition(
         service: Service<fpartitions::PartitionServiceMarker>,
         manager: fpartitions::PartitionsManagerProxy,
-    ) -> Option<FvmInstance> {
+    ) -> Option<BenchmarkVolumeFactory> {
         let service_instances =
             service.clone().enumerate().await.expect("Failed to enumerate partitions");
         let connector = if let Some(connector) = find_block_device(
@@ -298,25 +350,14 @@ impl FvmInstance {
             .expect("Failed to find block device")?
         };
 
-        let block_device =
-            connector.connect_block().expect("Failed to connect to block").into_proxy();
-        fvm::format_for_fvm(&block_device, BENCHMARK_FVM_SLICE_SIZE_BYTES)
-            .expect("Failed to format FVM");
-
-        let mut fs = fs_management::filesystem::Filesystem::from_boxed_config(
-            Box::new(connector),
-            Box::new(Fvm::default()),
-        );
-        Some(FvmInstance::Component(FvmComponentInstance::Local(
-            fs.serve_multi_volume().await.expect("Failed to serve FVM"),
-        )))
+        Some(BenchmarkVolumeFactory::SystemGpt(SystemGpt::Component(Arc::new(connector))))
     }
 
-    // Connects to a test-only instance of the FVM, or adds it to the GPT if absent.
-    // This is used on systems which don't have a real FVM, i.e. Fxblob.
-    // The benchmarks have to have an FVM somewhere, since minfs doesn't work properly without FVM.
+    // Creates and connects to the partition reserved for benchmarks, or adds it to the GPT if
+    // absent.  The partition will be unformatted and should be reformatted explicitly before being
+    // used for a benchmark.
     // TODO(https://fxbug.dev/372555079): Remove.
-    pub async fn connect_to_test_fvm_devfs() -> Option<FvmInstance> {
+    pub async fn connect_to_test_partition_devfs() -> Option<BenchmarkVolumeFactory> {
         let mut fvm_path = if let Ok(path) = find_block_device_devfs(&[
             BlockDeviceMatcher::Name(BENCHMARK_FVM_VOLUME_NAME),
             BlockDeviceMatcher::TypeGuid(&BENCHMARK_FVM_TYPE_GUID),
@@ -381,58 +422,26 @@ impl FvmInstance {
             connect_to_protocol_at_path::<ControllerMarker>(fvm_path.to_str().unwrap())
                 .expect("failed to connect to controller");
 
-        // Unbind so we can reformat.
-        fvm_controller
-            .unbind_children()
-            .await
-            .expect("FIDL error")
-            .expect("failed to unbind children");
-
-        // We need to connect to the volume's DirectoryProxy via its topological path in order to
-        // allow the caller to access its zxcrypt child. Hence, we use the controller to get access
-        // to the topological path and then call open().
-        // Connect to the controller and get the device's topological path.
-        let topo_path = fvm_controller
-            .get_topological_path()
-            .await
-            .expect("FIDL error")
-            .expect("get_topological_path failed");
-        let block_device = connect_to_protocol_at_path::<BlockMarker>(&topo_path)
-            .expect("Failed to connect to FVM block");
-        fvm::format_for_fvm(&block_device, BENCHMARK_FVM_SLICE_SIZE_BYTES)
-            .expect("Failed to format FVM");
-        let dir = fuchsia_fs::directory::open_in_namespace(&topo_path, fio::PERM_READABLE).unwrap();
-        Some(FvmInstance::Devfs(
-            fvm::start_fvm_driver(&fvm_controller, &dir).await.expect("Failed to start FVM"),
-        ))
+        Some(BenchmarkVolumeFactory::SystemGpt(SystemGpt::Devfs(fvm_controller)))
     }
 
-    pub async fn contains_volume(&self, name: &str) -> bool {
+    #[cfg(test)]
+    pub async fn contains_fvm_volume(&self, name: &str) -> bool {
         match self {
-            Self::Devfs(_) => {
-                find_block_device_devfs(&[BlockDeviceMatcher::Name(BENCHMARK_VOLUME_NAME)])
-                    .await
-                    .is_ok()
+            Self::SystemFvm(SystemFvm::Devfs(_)) => {
+                find_block_device_devfs(&[BlockDeviceMatcher::Name(name)]).await.is_ok()
             }
-            Self::Component(component) => {
-                fuchsia_fs::directory::dir_contains(&component.volumes_dir(), name).await.unwrap()
+            Self::SystemFvm(SystemFvm::Component(_, volumes_dir_connector)) => {
+                let dir = volumes_dir_connector();
+                fuchsia_fs::directory::dir_contains(&dir, name).await.unwrap()
             }
+            // If we're using a system GPT, the FVM instance is created on the fly, so volumes are
+            // too.
+            _ => false,
         }
     }
 
-    async fn create_volume(&self, config: &BlockDeviceConfig) -> FvmVolume {
-        let instance_guid = create_random_guid();
-        match self {
-            Self::Devfs(volume_manager) => {
-                Self::create_volume_in_devfs(volume_manager, instance_guid, config).await
-            }
-            Self::Component(component) => {
-                Self::create_volume_in_component(component.volumes(), instance_guid, config).await
-            }
-        }
-    }
-
-    async fn create_volume_in_devfs(
+    async fn create_fvm_volume_in_devfs(
         volume_manager: &VolumeManagerProxy,
         instance_guid: [u8; 16],
         config: &BlockDeviceConfig,
@@ -442,7 +451,7 @@ impl FvmInstance {
             BENCHMARK_VOLUME_NAME,
             BENCHMARK_TYPE_GUID,
             &instance_guid,
-            config.fvm_volume_size,
+            config.volume_size,
             ALLOCATE_PARTITION_FLAG_INACTIVE,
         )
         .await
@@ -489,57 +498,119 @@ impl FvmInstance {
             destroy_fn: Some(Box::new(move || {
                 zx::ok(volume.destroy(zx::MonotonicInstant::INFINITE).unwrap())
             })),
+            fvm_instance: None,
             volume_dir: Some(volume_dir),
             block_path: ".".to_string(),
             crypt_task: None,
         }
     }
 
-    async fn create_volume_in_component(
-        fvm: fidl_fuchsia_fs_startup::VolumesProxy,
+    async fn create_fvm_volume(
+        volumes: fidl_fuchsia_fs_startup::VolumesProxy,
         instance_guid: [u8; 16],
         config: &BlockDeviceConfig,
     ) -> FvmVolume {
-        let (volume_dir, crypt_task) = create_fvm_volume(&fvm, instance_guid, config).await;
-        let fvm = fvm.into_client_end().unwrap().into_sync_proxy();
+        let (volume_dir, crypt_task) = create_fvm_volume(&volumes, instance_guid, config).await;
+        let volumes = volumes.into_client_end().unwrap().into_sync_proxy();
         FvmVolume {
             destroy_fn: Some(Box::new(move || {
-                fvm.remove(BENCHMARK_VOLUME_NAME, zx::MonotonicInstant::INFINITE)
+                volumes
+                    .remove(BENCHMARK_VOLUME_NAME, zx::MonotonicInstant::INFINITE)
                     .unwrap()
                     .map_err(zx::Status::from_raw)
             })),
             volume_dir: Some(volume_dir),
+            fvm_instance: None,
             block_path: format!("svc/{}", VolumeMarker::PROTOCOL_NAME),
             crypt_task,
         }
+    }
+
+    async fn create_fvm_instance_and_volume(
+        partition: Arc<fpartitions::PartitionServiceProxy>,
+        instance_guid: [u8; 16],
+        config: &BlockDeviceConfig,
+    ) -> FvmVolume {
+        let block_device =
+            partition.connect_block().expect("Failed to connect to block").into_proxy();
+        fvm::format_for_fvm(&block_device, BENCHMARK_FVM_SLICE_SIZE_BYTES)
+            .expect("Failed to format FVM");
+
+        let mut fs = fs_management::filesystem::Filesystem::from_boxed_config(
+            Box::new(partition),
+            Box::new(Fvm::default()),
+        );
+        let fvm_instance = fs.serve_multi_volume().await.expect("Failed to serve FVM");
+        let volumes = connect_to_protocol_at_dir_root::<fidl_fuchsia_fs_startup::VolumesMarker>(
+            fvm_instance.exposed_dir(),
+        )
+        .unwrap();
+
+        let (volume_dir, crypt_task) = create_fvm_volume(&volumes, instance_guid, config).await;
+        FvmVolume {
+            destroy_fn: None,
+            volume_dir: Some(volume_dir),
+            fvm_instance: Some(fvm_instance),
+            block_path: format!("svc/{}", VolumeMarker::PROTOCOL_NAME),
+            crypt_task,
+        }
+    }
+
+    async fn create_fvm_instance_and_volume_in_devfs(
+        fvm_controller: &fdevice::ControllerProxy,
+        instance_guid: [u8; 16],
+        config: &BlockDeviceConfig,
+    ) -> FvmVolume {
+        // Unbind in case anything was using the partition.
+        fvm_controller
+            .unbind_children()
+            .await
+            .expect("FIDL error")
+            .expect("failed to unbind children");
+
+        let (block_device, server_end) = create_proxy::<BlockMarker>();
+        fvm_controller.connect_to_device_fidl(server_end.into_channel()).unwrap();
+        fvm::format_for_fvm(&block_device, BENCHMARK_FVM_SLICE_SIZE_BYTES)
+            .expect("Failed to format FVM");
+
+        let topo_path = fvm_controller
+            .get_topological_path()
+            .await
+            .expect("transport error on get_topological_path")
+            .expect("get_topological_path failed");
+        let dir = fuchsia_fs::directory::open_in_namespace(&topo_path, fio::PERM_READABLE).unwrap();
+        let volume_manager =
+            fvm::start_fvm_driver(&fvm_controller, &dir).await.expect("Failed to start FVM");
+
+        Self::create_fvm_volume_in_devfs(&volume_manager, instance_guid, config).await
     }
 }
 
 /// A block device created on top of an FVM instance.
 pub struct FvmVolume {
     destroy_fn: Option<Box<dyn Send + Sync + FnOnce() -> Result<(), zx::Status>>>,
+    fvm_instance: Option<ServingMultiVolumeFilesystem>,
     volume_dir: Option<fio::DirectoryProxy>,
+    crypt_task: Option<fasync::Task<()>>,
     // The path in `volume_dir` to connect to when opening a new Block connection.
     block_path: String,
-    crypt_task: Option<fasync::Task<()>>,
 }
 
 impl BlockDevice for FvmVolume {
-    fn dir(&self) -> &fio::DirectoryProxy {
-        self.volume_dir.as_ref().unwrap()
-    }
-
     fn connector(&self) -> Box<dyn BlockConnector> {
-        let volume_dir = fuchsia_fs::directory::clone(self.dir()).unwrap();
+        let volume_dir = fuchsia_fs::directory::clone(self.volume_dir.as_ref().unwrap()).unwrap();
         Box::new(DirBasedBlockConnector::new(volume_dir, self.block_path.clone()))
     }
 }
 
 impl Drop for FvmVolume {
     fn drop(&mut self) {
+        self.volume_dir = None;
+        self.fvm_instance = None;
         self.crypt_task = None;
-        let _ = std::mem::take(&mut self.volume_dir);
-        (self.destroy_fn.take().unwrap())().expect("Failed to destroy FVM volume");
+        if let Some(destroy_fn) = self.destroy_fn.take() {
+            destroy_fn().expect("Failed to destroy FVM volume");
+        }
     }
 }
 
@@ -564,7 +635,11 @@ mod tests {
     async fn ramdisk_create_block_device_with_zxcrypt() {
         let ramdisk_factory = RamdiskFactory::new(BLOCK_SIZE, BLOCK_COUNT).await;
         let _ = ramdisk_factory
-            .create_block_device(&BlockDeviceConfig { use_zxcrypt: true, fvm_volume_size: None })
+            .create_block_device(&BlockDeviceConfig {
+                requires_fvm: true,
+                use_zxcrypt: true,
+                volume_size: None,
+            })
             .await;
     }
 
@@ -572,7 +647,11 @@ mod tests {
     async fn ramdisk_create_block_device_without_zxcrypt() {
         let ramdisk_factory = RamdiskFactory::new(BLOCK_SIZE, BLOCK_COUNT).await;
         let _ = ramdisk_factory
-            .create_block_device(&BlockDeviceConfig { use_zxcrypt: false, fvm_volume_size: None })
+            .create_block_device(&BlockDeviceConfig {
+                requires_fvm: true,
+                use_zxcrypt: false,
+                volume_size: None,
+            })
             .await;
     }
 
@@ -580,7 +659,11 @@ mod tests {
     async fn ramdisk_create_block_device_without_volume_size() {
         let ramdisk_factory = RamdiskFactory::new(BLOCK_SIZE, BLOCK_COUNT).await;
         let ramdisk = ramdisk_factory
-            .create_block_device(&BlockDeviceConfig { use_zxcrypt: false, fvm_volume_size: None })
+            .create_block_device(&BlockDeviceConfig {
+                requires_fvm: true,
+                use_zxcrypt: false,
+                volume_size: None,
+            })
             .await;
         let volume_info = ramdisk
             .connector()
@@ -600,8 +683,9 @@ mod tests {
         let ramdisk_factory = RamdiskFactory::new(BLOCK_SIZE, BLOCK_COUNT).await;
         let ramdisk = ramdisk_factory
             .create_block_device(&BlockDeviceConfig {
+                requires_fvm: false,
                 use_zxcrypt: false,
-                fvm_volume_size: Some(RAMDISK_FVM_SLICE_SIZE as u64 * 3),
+                volume_size: Some(RAMDISK_FVM_SLICE_SIZE as u64 * 3),
             })
             .await;
         let volume_info = ramdisk
@@ -652,7 +736,7 @@ mod tests {
         ),
     }
 
-    async fn initialize(config: FvmTestConfig) -> (TestState, FvmInstance) {
+    async fn initialize(config: FvmTestConfig) -> (TestState, BenchmarkVolumeFactory) {
         if config.fxblob_enabled {
             // Initialize a new GPT.
             let vmo = init_gpt(BLOCK_SIZE as u32, GPT_BLOCK_COUNT).await;
@@ -682,7 +766,7 @@ mod tests {
                         gpt.exposed_dir(),
                     )
                     .unwrap();
-                let fvm = FvmInstance::connect_to_test_fvm(partitions, manager)
+                let fvm = BenchmarkVolumeFactory::connect_to_test_partition(partitions, manager)
                     .await
                     .expect("Failed to connect to FVM");
                 (TestState::StorageHost(ramdisk, gpt), fvm)
@@ -698,7 +782,7 @@ mod tests {
                 wait_for_block_device_devfs(&[BlockDeviceMatcher::ContentsMatch(DiskFormat::Gpt)])
                     .await
                     .expect("Failed to wait for GPT to appear");
-                let fvm = FvmInstance::connect_to_test_fvm_devfs()
+                let fvm = BenchmarkVolumeFactory::connect_to_test_partition_devfs()
                     .await
                     .expect("Failed to connect to FVM");
                 (TestState::Devfs(ramdisk), fvm)
@@ -746,9 +830,11 @@ mod tests {
                         .unwrap()
                     })
                 };
-                let fvm =
-                    FvmInstance::connect_to_system_fvm(volumes_connector, volumes_dir_connector);
-                (TestState::StorageHost(ramdisk, fvm_component), fvm)
+                let fvm = BenchmarkVolumeFactory::connect_to_system_fvm(
+                    volumes_connector,
+                    volumes_dir_connector,
+                );
+                (TestState::StorageHost(ramdisk, fvm_component), fvm.unwrap())
             } else {
                 // Add a blob volume, since that is how we identify the system FVM partition.
                 let block_controller = ramdisk.open_controller().unwrap().into_proxy();
@@ -779,7 +865,7 @@ mod tests {
                 ])
                 .await
                 .expect("Failed to wait for blobfs to appear");
-                let fvm = FvmInstance::connect_to_system_fvm_devfs()
+                let fvm = BenchmarkVolumeFactory::connect_to_system_fvm_devfs()
                     .await
                     .expect("Failed to connect to FVM");
                 (TestState::Devfs(ramdisk), fvm)
@@ -787,18 +873,22 @@ mod tests {
         }
     }
 
-    async fn fvm_volume_factory_can_find_fvm_instance(config: FvmTestConfig) {
+    async fn benchmark_volume_factory_can_find_fvm_instance(config: FvmTestConfig) {
         let (_state, volume_factory) = initialize(config).await;
 
         // Verify that a volume can be created.
         volume_factory
-            .create_block_device(&BlockDeviceConfig { use_zxcrypt: false, fvm_volume_size: None })
+            .create_block_device(&BlockDeviceConfig {
+                requires_fvm: true,
+                use_zxcrypt: false,
+                volume_size: None,
+            })
             .await;
     }
 
     #[fuchsia::test]
-    async fn fvm_volume_factory_can_find_fvm_instance_fvm_non_storage_host() {
-        fvm_volume_factory_can_find_fvm_instance(FvmTestConfig {
+    async fn benchmark_volume_factory_can_find_fvm_instance_fvm_non_storage_host() {
+        benchmark_volume_factory_can_find_fvm_instance(FvmTestConfig {
             fxblob_enabled: false,
             storage_host_enabled: false,
         })
@@ -806,8 +896,8 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn fvm_volume_factory_can_find_fvm_instance_gpt_non_storage_host() {
-        fvm_volume_factory_can_find_fvm_instance(FvmTestConfig {
+    async fn benchmark_volume_factory_can_find_fvm_instance_gpt_non_storage_host() {
+        benchmark_volume_factory_can_find_fvm_instance(FvmTestConfig {
             fxblob_enabled: true,
             storage_host_enabled: false,
         })
@@ -815,8 +905,8 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn fvm_volume_factory_can_find_fvm_instance_fvm() {
-        fvm_volume_factory_can_find_fvm_instance(FvmTestConfig {
+    async fn benchmark_volume_factory_can_find_fvm_instance_fvm() {
+        benchmark_volume_factory_can_find_fvm_instance(FvmTestConfig {
             fxblob_enabled: false,
             storage_host_enabled: true,
         })
@@ -824,8 +914,8 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn fvm_volume_factory_can_find_fvm_instance_gpt() {
-        fvm_volume_factory_can_find_fvm_instance(FvmTestConfig {
+    async fn benchmark_volume_factory_can_find_fvm_instance_gpt() {
+        benchmark_volume_factory_can_find_fvm_instance(FvmTestConfig {
             fxblob_enabled: true,
             storage_host_enabled: true,
         })
@@ -837,28 +927,20 @@ mod tests {
         {
             let _volume = volume_factory
                 .create_block_device(&BlockDeviceConfig {
+                    requires_fvm: true,
                     use_zxcrypt: false,
-                    fvm_volume_size: None,
+                    volume_size: None,
                 })
                 .await;
-            assert!(volume_factory.contains_volume(BENCHMARK_VOLUME_NAME).await);
+            assert!(volume_factory.contains_fvm_volume(BENCHMARK_VOLUME_NAME).await);
         };
-        assert!(!volume_factory.contains_volume(BENCHMARK_VOLUME_NAME).await);
+        assert!(!volume_factory.contains_fvm_volume(BENCHMARK_VOLUME_NAME).await);
     }
 
     #[fuchsia::test]
     async fn dropping_an_fvm_volume_removes_the_volume_fvm_non_storage_host() {
         dropping_an_fvm_volume_removes_the_volume(FvmTestConfig {
             fxblob_enabled: false,
-            storage_host_enabled: false,
-        })
-        .await;
-    }
-
-    #[fuchsia::test]
-    async fn dropping_an_fvm_volume_removes_the_volume_gpt_non_storage_host() {
-        dropping_an_fvm_volume_removes_the_volume(FvmTestConfig {
-            fxblob_enabled: true,
             storage_host_enabled: false,
         })
         .await;
@@ -873,25 +955,20 @@ mod tests {
         .await;
     }
 
-    #[fuchsia::test]
-    async fn dropping_an_fvm_volume_removes_the_volume_gpt() {
-        dropping_an_fvm_volume_removes_the_volume(FvmTestConfig {
-            fxblob_enabled: true,
-            storage_host_enabled: true,
-        })
-        .await;
-    }
-
-    async fn fvm_volume_factory_create_block_device_with_zxcrypt(config: FvmTestConfig) {
+    async fn benchmark_volume_factory_create_block_device_with_zxcrypt(config: FvmTestConfig) {
         let (_state, volume_factory) = initialize(config).await;
         let _ = volume_factory
-            .create_block_device(&BlockDeviceConfig { use_zxcrypt: true, fvm_volume_size: None })
+            .create_block_device(&BlockDeviceConfig {
+                requires_fvm: true,
+                use_zxcrypt: true,
+                volume_size: None,
+            })
             .await;
     }
 
     #[fuchsia::test]
-    async fn fvm_volume_factory_create_block_device_with_zxcrypt_fvm_non_storage_host() {
-        fvm_volume_factory_create_block_device_with_zxcrypt(FvmTestConfig {
+    async fn benchmark_volume_factory_create_block_device_with_zxcrypt_fvm_non_storage_host() {
+        benchmark_volume_factory_create_block_device_with_zxcrypt(FvmTestConfig {
             fxblob_enabled: false,
             storage_host_enabled: false,
         })
@@ -899,8 +976,8 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn fvm_volume_factory_create_block_device_with_zxcrypt_gpt_non_storage_host() {
-        fvm_volume_factory_create_block_device_with_zxcrypt(FvmTestConfig {
+    async fn benchmark_volume_factory_create_block_device_with_zxcrypt_gpt_non_storage_host() {
+        benchmark_volume_factory_create_block_device_with_zxcrypt(FvmTestConfig {
             fxblob_enabled: true,
             storage_host_enabled: false,
         })
@@ -908,8 +985,8 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn fvm_volume_factory_create_block_device_with_zxcrypt_fvm() {
-        fvm_volume_factory_create_block_device_with_zxcrypt(FvmTestConfig {
+    async fn benchmark_volume_factory_create_block_device_with_zxcrypt_fvm() {
+        benchmark_volume_factory_create_block_device_with_zxcrypt(FvmTestConfig {
             fxblob_enabled: false,
             storage_host_enabled: true,
         })
@@ -917,8 +994,8 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn fvm_volume_factory_create_block_device_with_zxcrypt_gpt() {
-        fvm_volume_factory_create_block_device_with_zxcrypt(FvmTestConfig {
+    async fn benchmark_volume_factory_create_block_device_with_zxcrypt_gpt() {
+        benchmark_volume_factory_create_block_device_with_zxcrypt(FvmTestConfig {
             fxblob_enabled: true,
             storage_host_enabled: true,
         })

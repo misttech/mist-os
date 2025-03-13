@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::security;
 use bstr::ByteSlice;
 use fuchsia_component::client::connect_to_protocol_sync;
 use linux_uapi::LINUX_REBOOT_CMD_POWER_OFF;
@@ -9,6 +10,7 @@ use starnix_sync::{Locked, Unlocked};
 #[cfg(feature = "starnix_lite")]
 use {fidl_fuchsia_buildinfo as buildinfo, fidl_fuchsia_hardware_power_statecontrol as fpower};
 #[cfg(not(feature = "starnix_lite"))]
+use starnix_uapi::user_address::ArchSpecific;
 use {
     fidl_fuchsia_buildinfo as buildinfo, fidl_fuchsia_hardware_power_statecontrol as fpower,
     fidl_fuchsia_recovery as frecovery,
@@ -19,17 +21,22 @@ use crate::arch::{ARCH_NAME, ARCH_NAME_COMPAT};
 use crate::device::android::bootloader_message_store::BootloaderMessage;
 use crate::mm::{MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
 use crate::task::{CurrentTask, Kernel};
-use crate::vfs::{FdNumber, FsString};
+use crate::vfs::buffers::{InputBuffer, OutputBuffer};
+use crate::vfs::{
+    fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FdFlags, FdNumber, FileObject, FileOps,
+    FsString,
+};
 use starnix_logging::{log_debug, log_error, log_info, log_warn, track_stub};
-use starnix_sync::InterruptibleEvent;
+use starnix_sync::{FileOpsCore, InterruptibleEvent};
 #[cfg(feature = "arch32")]
 use starnix_syscalls::{for_each_arch32_syscall, syscall_arch32_number_to_name_literal_callback};
 use starnix_syscalls::{
-    for_each_syscall, syscall_number_to_name_literal_callback, SyscallResult, SUCCESS,
+    for_each_syscall, syscall_number_to_name_literal_callback, SyscallArg, SyscallResult, SUCCESS,
 };
 use starnix_types::user_buffer::MAX_RW_COUNT;
 use starnix_uapi::auth::{CAP_SYS_ADMIN, CAP_SYS_BOOT, CAP_SYS_MODULE};
 use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::personality::PersonalityFlags;
 use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
 use starnix_uapi::version::KERNEL_RELEASE;
@@ -71,7 +78,7 @@ pub fn do_uname(
 
     init_array(&mut result.version, version.as_bytes());
     // TODO(https://fxbug.dev/380431743) rename property or use personality?
-    if cfg!(feature = "arch32") && current_task.thread_state.arch_width.is_arch32() {
+    if current_task.is_arch32() {
         init_array(&mut result.machine, ARCH_NAME_COMPAT);
     } else {
         init_array(&mut result.machine, ARCH_NAME);
@@ -159,9 +166,7 @@ pub fn sys_sethostname(
     hostname: UserCString,
     len: u64,
 ) -> Result<SyscallResult, Errno> {
-    if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
-        return error!(EPERM);
-    }
+    security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
 
     let hostname = read_name(current_task, hostname, len)?;
 
@@ -178,9 +183,7 @@ pub fn sys_setdomainname(
     domainname: UserCString,
     len: u64,
 ) -> Result<SyscallResult, Errno> {
-    if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
-        return error!(EPERM);
-    }
+    security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
 
     let domainname = read_name(current_task, domainname, len)?;
 
@@ -260,14 +263,13 @@ pub fn sys_reboot(
     {
         return error!(EINVAL);
     }
-    if !current_task.creds().has_capability(CAP_SYS_BOOT) {
-        return error!(EPERM);
-    }
+    security::check_task_capable(current_task, CAP_SYS_BOOT)?;
 
     let arg_bytes = if matches!(cmd, LINUX_REBOOT_CMD_RESTART2) {
         // This is an arbitrary limit that should be large enough.
         const MAX_REBOOT_ARG_LEN: usize = 256;
-        current_task.read_c_string_to_vec(UserCString::new(arg), MAX_REBOOT_ARG_LEN)?
+        current_task
+            .read_c_string_to_vec(UserCString::new(current_task, arg), MAX_REBOOT_ARG_LEN)?
     } else {
         FsString::default()
     };
@@ -421,7 +423,7 @@ pub fn sys_unknown(
     syscall_number: u64,
 ) -> Result<SyscallResult, Errno> {
     #[cfg(feature = "arch32")]
-    if current_task.thread_state.arch_width.is_arch32() {
+    if current_task.is_arch32() {
         let name = for_each_arch32_syscall! { syscall_arch32_number_to_name_literal_callback, syscall_number };
         track_stub!(TODO("https://fxbug.dev/322874143"), name, syscall_number,);
         return error!(ENOSYS);
@@ -452,9 +454,7 @@ pub fn sys_delete_module(
     user_name: UserCString,
     _flags: u32,
 ) -> Result<SyscallResult, Errno> {
-    if !current_task.creds().has_capability(CAP_SYS_MODULE) {
-        return error!(EPERM);
-    }
+    security::check_task_capable(current_task, CAP_SYS_MODULE)?;
     // According to LTP test delete_module02.c
     const MODULE_NAME_LEN: usize = 64 - std::mem::size_of::<u64>();
     let _name = current_task.read_c_string_to_vec(user_name, MODULE_NAME_LEN)?;
@@ -462,17 +462,76 @@ pub fn sys_delete_module(
     error!(ENOENT)
 }
 
+pub struct PerfEventFile {
+    _pid: pid_t,
+    _cpu: i32,
+}
+
+// PerfEventFile object that implements FileOps.
+// See https://man7.org/linux/man-pages/man2/perf_event_open.2.html for
+// implementation details.
+// This object can be saved as a FileDescriptor.
+impl FileOps for PerfEventFile {
+    // Don't need to implement seek or sync for PerfEventFile.
+    fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
+
+    fn read(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _offset: usize,
+        _data: &mut dyn OutputBuffer,
+    ) -> Result<usize, Errno> {
+        track_stub!(TODO("https://fxbug.dev/394960158"), "implement perf event functions");
+        error!(ENOSYS)
+    }
+
+    fn ioctl(
+        &self,
+        _locked: &mut Locked<'_, Unlocked>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _request: u32,
+        _arg: SyscallArg,
+    ) -> Result<SyscallResult, Errno> {
+        track_stub!(TODO("https://fxbug.dev/394960158"), "implement perf event functions");
+        error!(ENOSYS)
+    }
+
+    fn write(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _offset: usize,
+        _data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
+        track_stub!(TODO("https://fxbug.dev/394960158"), "implement perf event functions");
+        error!(ENOSYS)
+    }
+}
+
 pub fn sys_perf_event_open(
     _locked: &mut Locked<'_, Unlocked>,
-    _current_task: &CurrentTask,
+    current_task: &CurrentTask,
     _attr: UserRef<perf_event_attr>,
-    __pid: pid_t,
-    _cpu: i32,
+    pid: pid_t,
+    cpu: i32,
     _group_fd: FdNumber,
     _flags: u64,
 ) -> Result<SyscallResult, Errno> {
-    track_stub!(TODO("https://fxbug.dev/287120583"), "perf_event_open()");
-    error!(ENOSYS)
+    if pid == -1 && cpu == -1 {
+        return error!(EINVAL);
+    }
+
+    let file = Box::new(PerfEventFile { _pid: pid, _cpu: cpu });
+    let file_handle =
+        Anon::new_file(current_task, file, OpenFlags::RDWR, "[fuchsia:perf_event_open]");
+    let file_descriptor = current_task.add_file(file_handle, FdFlags::empty());
+
+    Ok(file_descriptor?.into())
 }
 
 // Syscalls for arch32 usage

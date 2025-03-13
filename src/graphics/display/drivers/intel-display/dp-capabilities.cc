@@ -63,7 +63,7 @@ fpromise::result<DpCapabilities> DpCapabilities::Read(DpAuxChannel* dp_aux_chann
   DpCapabilities caps;
 
   if (!dp_aux_channel->DpcdRead(dpcd::DPCD_CAP_START, caps.dpcd_.data(), caps.dpcd_.size())) {
-    FDF_LOG(TRACE, "Failed to read dpcd capabilities");
+    fdf::trace("Failed to read dpcd capabilities");
     return fpromise::error();
   }
 
@@ -71,17 +71,17 @@ fpromise::result<DpCapabilities> DpCapabilities::Read(DpAuxChannel* dp_aux_chann
       caps.dpcd_reg<dpcd::DownStreamPortPresent, dpcd::DPCD_DOWN_STREAM_PORT_PRESENT>();
   if (dsp_present.is_branch()) {
     auto dsp_count = caps.dpcd_reg<dpcd::DownStreamPortCount, dpcd::DPCD_DOWN_STREAM_PORT_COUNT>();
-    FDF_LOG(DEBUG, "Found branch with %d ports", dsp_count.count());
+    fdf::debug("Found branch with {} ports", dsp_count.count());
   }
 
   if (!dp_aux_channel->DpcdRead(dpcd::DPCD_SINK_COUNT, caps.sink_count_.reg_value_ptr(), 1)) {
-    FDF_LOG(ERROR, "Failed to read DisplayPort sink count");
+    fdf::error("Failed to read DisplayPort sink count");
     return fpromise::error();
   }
 
   caps.max_lane_count_ = caps.dpcd_reg<dpcd::LaneCount, dpcd::DPCD_MAX_LANE_COUNT>();
   if (caps.max_lane_count() != 1 && caps.max_lane_count() != 2 && caps.max_lane_count() != 4) {
-    FDF_LOG(ERROR, "Unsupported DisplayPort lane count: %u", caps.max_lane_count());
+    fdf::error("Unsupported DisplayPort lane count: {}", caps.max_lane_count());
     return fpromise::error();
   }
 
@@ -104,12 +104,12 @@ bool DpCapabilities::ProcessEdp(DpAuxChannel* dp_aux_channel) {
     return true;
   }
 
-  FDF_LOG(TRACE, "eDP registers are available");
+  fdf::trace("eDP registers are available");
 
   edp_dpcd_.emplace();
   if (!dp_aux_channel->DpcdRead(dpcd::DPCD_EDP_CAP_START, edp_dpcd_->bytes.data(),
                                 edp_dpcd_->bytes.size())) {
-    FDF_LOG(ERROR, "Failed to read eDP capabilities");
+    fdf::error("Failed to read eDP capabilities");
     return false;
   }
 
@@ -179,10 +179,10 @@ bool DpCapabilities::ProcessSupportedLinkRates(DpAuxChannel* dp_aux_channel) {
         supported_link_rates_mbps_.push_back(1620);
         break;
       case 0:
-        FDF_LOG(ERROR, "Device did not report supported link rates");
+        fdf::error("Device did not report supported link rates");
         return false;
       default:
-        FDF_LOG(ERROR, "Unsupported max link rate: %u", max_link_rate);
+        fdf::error("Unsupported max link rate: {}", max_link_rate);
         return false;
     }
 

@@ -14,6 +14,7 @@
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/engine-info.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 
@@ -48,13 +49,14 @@ class EngineDriverClient {
   zx::result<> ReleaseCapture(display::DriverCaptureImageId driver_capture_image_id);
 
   config_check_result_t CheckConfiguration(
-      const display_config_t* display_config_list, size_t display_config_count,
+      const display_config_t* display_config,
       layer_composition_operations_t* out_layer_composition_operations_list,
       size_t layer_composition_operations_count, size_t* out_layer_composition_operations_actual);
-  void ApplyConfiguration(const display_config_t* display_config_list, size_t display_config_count,
+  void ApplyConfiguration(const display_config_t* display_config,
                           const config_stamp_t* config_stamp);
 
-  void SetListener(const display_engine_listener_protocol_t& protocol);
+  display::EngineInfo CompleteCoordinatorConnection(
+      const display_engine_listener_protocol_t& protocol);
   void UnsetListener();
 
   zx::result<display::DriverImageId> ImportImage(const display::ImageMetadata& image_metadata,
@@ -69,7 +71,6 @@ class EngineDriverClient {
   zx::result<> SetBufferCollectionConstraints(const display::ImageBufferUsage& usage,
                                               display::DriverBufferCollectionId collection_id);
 
-  bool IsCaptureSupported();
   zx::result<> StartCapture(display::DriverCaptureImageId driver_capture_image_id);
   zx::result<> SetDisplayPower(display::DisplayId display_id, bool power_on);
   zx::result<> SetMinimumRgb(uint8_t minimum_rgb);

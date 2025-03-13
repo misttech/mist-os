@@ -40,8 +40,15 @@ load(
     _FuchsiaDebugSymbolInfo = "FuchsiaDebugSymbolInfo",
     _FuchsiaPackageInfo = "FuchsiaPackageInfo",
     _FuchsiaPackageResourcesInfo = "FuchsiaPackageResourcesInfo",
+    _FuchsiaProductBundleInfo = "FuchsiaProductBundleInfo",
+    _FuchsiaRunnableInfo = "FuchsiaRunnableInfo",
 )
-load("//fuchsia/private:utils.bzl", _append_suffix_to_label = "append_suffix_to_label")
+load(
+    "//fuchsia/private:utils.bzl",
+    _append_suffix_to_label = "append_suffix_to_label",
+    _collect_runfiles = "collect_runfiles",
+    _wrap_executable = "wrap_executable",
+)
 load(
     "//fuchsia/private/assembly:providers.bzl",
     _FuchsiaBoardConfigInfo = "FuchsiaBoardConfigInfo",
@@ -89,6 +96,10 @@ FuchsiaDebugSymbolInfo = _FuchsiaDebugSymbolInfo
 FuchsiaPackageInfo = _FuchsiaPackageInfo
 FuchsiaPackageResourcesInfo = _FuchsiaPackageResourcesInfo
 FuchsiaProductConfigInfo = _FuchsiaProductConfigInfo
+FuchsiaProductBundleInfo = _FuchsiaProductBundleInfo
+FuchsiaRunnableInfo = _FuchsiaRunnableInfo
 
 # utils.bzl
 append_suffix_to_label = _append_suffix_to_label
+collect_runfiles = _collect_runfiles
+wrap_executable = _wrap_executable

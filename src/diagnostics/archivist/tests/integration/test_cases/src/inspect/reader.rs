@@ -5,7 +5,7 @@
 use crate::{test_topology, utils};
 use anyhow::Error;
 use diagnostics_assertions::{assert_data_tree, assert_json_diff, AnyProperty};
-use diagnostics_reader::{ArchiveReader, Inspect};
+use diagnostics_reader::ArchiveReader;
 use difference::assert_diff;
 use realm_proxy_client::RealmProxyClient;
 use {fidl_fuchsia_archivist_test as ftest, fidl_fuchsia_diagnostics as fdiagnostics};
@@ -49,11 +49,11 @@ async fn read_components_inspect() {
     writer.set_health_ok().await.unwrap();
 
     let accessor = utils::connect_accessor(&realm_proxy, utils::ALL_PIPELINE).await;
-    let data = ArchiveReader::new()
+    let data = ArchiveReader::inspect()
         .with_archive(accessor)
         .add_selector("child:root")
         .with_minimum_schema_count(1)
-        .snapshot::<Inspect>()
+        .snapshot()
         .await
         .expect("got inspect data");
 
@@ -98,11 +98,11 @@ async fn read_same_named_trees_from_single_component() {
     writer2.record_string("prop2", "val2").await.unwrap();
 
     let accessor = utils::connect_accessor(&realm_proxy, utils::ALL_PIPELINE).await;
-    let data = ArchiveReader::new()
+    let data = ArchiveReader::inspect()
         .with_archive(accessor)
         .add_selector("child:[name=tree-name]root")
         .with_minimum_schema_count(2)
-        .snapshot::<Inspect>()
+        .snapshot()
         .await
         .expect("got inspect data");
 
@@ -147,11 +147,11 @@ async fn read_component_with_hanging_lazy_node() -> Result<(), Error> {
     writer.record_int("int", 3).await?;
 
     let accessor = utils::connect_accessor(&realm_proxy, utils::ALL_PIPELINE).await;
-    let data = ArchiveReader::new()
+    let data = ArchiveReader::inspect()
         .with_archive(accessor)
         .with_batch_retrieval_timeout_seconds(10)
         .add_selector("hanging_data:[name=tree-name]*")
-        .snapshot::<Inspect>()
+        .snapshot()
         .await
         .expect("got inspect data");
 
@@ -195,10 +195,10 @@ async fn read_components_single_selector() -> Result<(), Error> {
     writer_b.set_health_ok().await.unwrap();
 
     let accessor = utils::connect_accessor(&realm_proxy, utils::ALL_PIPELINE).await;
-    let data = ArchiveReader::new()
+    let data = ArchiveReader::inspect()
         .with_archive(accessor)
         .add_selector("child_a:root")
-        .snapshot::<Inspect>()
+        .snapshot()
         .await
         .expect("got inspect data");
 
@@ -462,14 +462,14 @@ async fn retrieve_and_validate_results(
     golden: &str,
     expected_results_count: usize,
 ) {
-    let mut reader = ArchiveReader::new();
+    let mut reader = ArchiveReader::inspect();
     reader.with_archive(accessor).add_selectors(custom_selectors.into_iter());
     if expected_results_count == 0 {
         reader.with_timeout(zx::MonotonicDuration::from_seconds(10));
     } else {
         reader.with_minimum_schema_count(expected_results_count);
     }
-    let results = reader.snapshot_raw::<Inspect, serde_json::Value>().await.expect("got result");
+    let results = reader.snapshot_raw::<serde_json::Value>().await.expect("got result");
 
     // Convert the json struct into a "pretty" string rather than converting the
     // golden file into a json struct because deserializing the golden file into a
@@ -530,19 +530,19 @@ async fn pipeline_is_filtered(
 ) -> bool {
     let archive_accessor = utils::connect_accessor(&realm, pipeline_name).await;
 
-    let pipeline_results = ArchiveReader::new()
+    let pipeline_results = ArchiveReader::inspect()
         .with_archive(archive_accessor)
         .with_minimum_schema_count(expected_results_count)
-        .snapshot_raw::<Inspect, serde_json::Value>()
+        .snapshot_raw::<serde_json::Value>()
         .await
         .expect("got result");
 
     let all_archive_accessor = utils::connect_accessor(&realm, utils::ALL_PIPELINE).await;
 
-    let all_results = ArchiveReader::new()
+    let all_results = ArchiveReader::inspect()
         .with_archive(all_archive_accessor)
         .with_minimum_schema_count(expected_results_count)
-        .snapshot_raw::<Inspect, serde_json::Value>()
+        .snapshot_raw::<serde_json::Value>()
         .await
         .expect("got result");
 

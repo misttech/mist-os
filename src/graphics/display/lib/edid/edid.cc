@@ -64,15 +64,15 @@ std::string UnpackIdManufacturerName(uint8_t byte_08h, uint8_t byte_09h) {
   // Some EDIDs may contain invalid manufacturer name codes. We replace the
   // invalid characters with the fallback character 'A'.
   if (compressed_character1 < 1 || compressed_character1 > 26) {
-    FDF_LOG(WARNING, "Invalid manufacturer name code character #1: %d", compressed_character1);
+    fdf::warn("Invalid manufacturer name code character #1: {}", compressed_character1);
     compressed_character1 = 1;
   }
   if (compressed_character2 < 1 || compressed_character2 > 26) {
-    FDF_LOG(WARNING, "Invalid manufacturer name code character #2: %d", compressed_character2);
+    fdf::warn("Invalid manufacturer name code character #2: {}", compressed_character2);
     compressed_character2 = 1;
   }
   if (compressed_character3 < 1 || compressed_character3 > 26) {
-    FDF_LOG(WARNING, "Invalid manufacturer name code character #3: %d", compressed_character3);
+    fdf::warn("Invalid manufacturer name code character #3: {}", compressed_character3);
     compressed_character3 = 1;
   }
 
@@ -151,23 +151,42 @@ fit::result<const char*, Edid> Edid::Create(cpp20::span<const uint8_t> bytes) {
   if (bytes.empty()) {
     return fit::error("EDID is empty");
   }
-  if (bytes.size() % kBlockSize != 0) {
-    return fit::error("EDID size is not a multiple of block size");
-  }
-  static constexpr int kMaxAllowedEdidBytesSize = kBlockSize * kMaxEdidBlockCount;
-  if (bytes.size() > kMaxAllowedEdidBytesSize) {
-    return fit::error("EDID size exceeds the maximum allowed size");
+  if (bytes.size() < kBlockSize) {
+    return fit::error("EDID size is too small (no room for the base block)");
   }
 
-  fbl::Vector<uint8_t> bytes_vec;
+  // Engine drivers may report zero-padded EDID data. Work around this issue by
+  // computing the EDID size based on the extension block count in the EDID base
+  // block.
+  const BaseEdid* base_edid = reinterpret_cast<const BaseEdid*>(bytes.data());
+
+  // The addition will not overflow (causing UB) because `num_extension` is a
+  // 1-byte field. The maximum addition result is 256.
+  const int total_edid_block_count = 1 + base_edid->num_extensions;
+
+  // The multiplication will not overflow because of the quantities involved.
+  // `kBlockSize` is 128 and `total_edid_block_count` is at most 256, so the
+  // multiplication result is at most 32,768.
+  const size_t declared_edid_size = size_t{kBlockSize} * total_edid_block_count;
+  if (declared_edid_size > bytes.size()) {
+    return fit::error("EDID size based on declared block count exceeds byte buffer size");
+  }
+  cpp20::span<const uint8_t> valid_edid_bytes = bytes.subspan(0, declared_edid_size);
+
+  // The maximum EDID block count is based on the fact that the size field is stored in a
+  // byte.
+  ZX_DEBUG_ASSERT_MSG(valid_edid_bytes.size() <= size_t{kBlockSize} * kMaxEdidBlockCount,
+                      "Maximum EDID size reasoning was incorrect");
+
+  fbl::Vector<uint8_t> edid_bytes_buffer;
   fbl::AllocChecker alloc_checker;
-  bytes_vec.resize(bytes.size(), 0, &alloc_checker);
+  edid_bytes_buffer.resize(valid_edid_bytes.size(), 0, &alloc_checker);
   if (!alloc_checker.check()) {
     return fit::error("Failed to allocate memory for EDID");
   }
-  std::copy(bytes.begin(), bytes.end(), bytes_vec.begin());
+  std::copy(valid_edid_bytes.begin(), valid_edid_bytes.end(), edid_bytes_buffer.begin());
 
-  Edid edid(std::move(bytes_vec));
+  Edid edid(std::move(edid_bytes_buffer));
   fit::result<const char*> validate_result = edid.Validate();
   if (validate_result.is_error()) {
     return validate_result.take_error();
@@ -355,7 +374,7 @@ display::DisplayTiming DetailedTimingDescriptorToDisplayTiming(
   if (dtd.type() != TYPE_DIGITAL_SEPARATE) {
     // TODO(https://fxbug.dev/42086615): Displays using composite syncs are not
     // supported. We treat them as if they were using separate sync signals.
-    FDF_LOG(WARNING, "The detailed timing descriptor uses composite sync; this is not supported.");
+    fdf::warn("The detailed timing descriptor uses composite sync; this is not supported.");
   }
 
   return display::DisplayTiming{
@@ -395,9 +414,7 @@ std::optional<display::DisplayTiming> StandardTimingDescriptorToDisplayTiming(
   int32_t v_rate = static_cast<int32_t>(std.vertical_freq()) + 60;
 
   if (!width || !height || !v_rate) {
-    FDF_LOG(WARNING,
-            "Invalid standard timing descriptor: %" PRId32 " x %" PRId32 "@ %" PRId32 " Hz", width,
-            height, v_rate);
+    fdf::warn("Invalid standard timing descriptor: {} x {} @ {} Hz", width, height, v_rate);
     return std::nullopt;
   }
 
@@ -408,11 +425,9 @@ std::optional<display::DisplayTiming> StandardTimingDescriptorToDisplayTiming(
     }
   }
 
-  FDF_LOG(
-      WARNING,
-      "This EDID contains a non-DMT standard timing (%" PRIu32 "x%" PRIu32 " @%" PRIu32
-      "Hz). The timing is not supported and will be ignored. See https://fxbug.dev/42085380 for "
-      "details.",
+  fdf::warn(
+      "This EDID contains a non-DMT standard timing ({} x {} @ {} Hz). The timing "
+      "is not supported and will be ignored. See https://fxbug.dev/42085380 for details.",
       width, height, v_rate);
   return std::nullopt;
 }

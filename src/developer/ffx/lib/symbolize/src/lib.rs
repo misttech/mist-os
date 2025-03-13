@@ -286,6 +286,7 @@ pub struct ModuleId(u64);
 
 /// Details of a particular module's mapping. Each module is often mapped multiple times, once for
 /// each PT_LOAD segment.
+#[derive(Clone, PartialEq)]
 pub struct MappingDetails {
     /// The start of the mapping in the process' address space.
     pub start_addr: u64,
@@ -310,7 +311,7 @@ impl std::fmt::Debug for MappingDetails {
 
 bitflags! {
     /// Flags for a module's mapping.
-    #[derive(Debug)]
+    #[derive(Debug, PartialEq, Clone)]
     pub struct MappingFlags: u32 {
         /// The mapping is readable.
         const READ = 0b1;
@@ -333,5 +334,52 @@ impl std::fmt::Display for MappingFlags {
             write!(f, "x")?;
         }
         Ok(())
+    }
+}
+
+/// Errors that can occur when setting mapping flags.
+#[derive(Debug, thiserror::Error, PartialEq)]
+pub enum MappingFlagsError {
+    /// A string cannot be transferred into valid MappingFlags because it contain charaters outside of rwx.
+    #[error("Invalid mapping flags: {:?} provided, only r, w or x are supported.", .0)]
+    InvalidFlagsInput(String),
+}
+
+impl std::str::FromStr for MappingFlags {
+    type Err = MappingFlagsError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut flags = MappingFlags::empty();
+
+        for c in s.chars() {
+            match c {
+                'r' => flags.insert(MappingFlags::READ),
+                'w' => flags.insert(MappingFlags::WRITE),
+                'x' => flags.insert(MappingFlags::EXECUTE),
+                _ => return Err(MappingFlagsError::InvalidFlagsInput(s.to_string())),
+            }
+        }
+
+        Ok(flags)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::str::FromStr;
+
+    #[test]
+    fn test_get_mappingflags_from_str() {
+        let input = "rw";
+        let flags = MappingFlags::from_str(input).unwrap();
+        assert_eq!(flags, MappingFlags::READ | MappingFlags::WRITE);
+    }
+
+    #[test]
+    fn test_invalid_get_mappingflags_from_str() {
+        let input = "wrong";
+        let flags = MappingFlags::from_str(input);
+        assert_eq!(flags, Err(MappingFlagsError::InvalidFlagsInput("wrong".to_string())));
     }
 }

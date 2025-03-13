@@ -19,7 +19,6 @@ load(
 load(
     ":utils.bzl",
     "LOCAL_ONLY_ACTION_KWARGS",
-    "combine_directories",
     "extract_labels",
     "replace_labels_with_files",
     "select_root_dir",
@@ -147,19 +146,25 @@ def _fuchsia_product_configuration_impl(ctx):
     input_files.append(product_config_file)
 
     product_config_dir = ctx.actions.declare_directory(ctx.label.name)
-    args = ["product", "--config", product_config_file.path, "--output", product_config_dir.path]
+    args = [
+        "product",
+        "--config",
+        product_config_file.path,
+        "--output",
+        product_config_dir.path,
+    ]
     ctx.actions.run(
         executable = sdk.assembly_generate_config,
         arguments = args,
         inputs = input_files + ctx.files.product_config_labels + ctx.files.deps,
         outputs = [product_config_dir],
+        progress_message = "Creating product config for %s" % ctx.label.name,
         **LOCAL_ONLY_ACTION_KWARGS
     )
 
     return [
         DefaultInfo(files = depset([product_config_dir])),
         FuchsiaProductConfigInfo(
-            config_path = "",
             directory = product_config_dir.path,
             build_type = build_type,
             build_id_dirs = build_id_dirs,
@@ -167,26 +172,10 @@ def _fuchsia_product_configuration_impl(ctx):
     ]
 
 def _fuchsia_prebuilt_product_configuration_impl(ctx):
-    config_path = ""
-
-    # Try to find product_configuration.json, and use that if found.
-    # TODO(https://fxbug.dev/390189313): Remove this option once all product
-    # configs have a consistent layout.
-    matching_files = [file for file in ctx.files.files if file.basename == "product_configuration.json"]
-    if len(matching_files) > 1:
-        fail("More than one match for 'product_configuration.json'")
-    if len(matching_files) == 1:
-        directory = paths.dirname(matching_files[0].path)
-    else:
-        # If this fails, find the root directory of `files` and use that with `config_path`.
-        directory = select_root_dir(ctx.files.files)
-        if ctx.attr.config_filename:
-            config_path = ctx.attr.config_filename
-
+    directory = select_root_dir(ctx.files.files)
     return [
         DefaultInfo(files = depset(ctx.files.files)),
         FuchsiaProductConfigInfo(
-            config_path = config_path,
             directory = directory,
             build_type = ctx.attr.build_type,
             build_id_dirs = [],
@@ -196,13 +185,7 @@ def _fuchsia_prebuilt_product_configuration_impl(ctx):
 _fuchsia_prebuilt_product_configuration = rule(
     doc = "Use a prebuilt product configuration directory for hybrid assembly.",
     implementation = _fuchsia_prebuilt_product_configuration_impl,
-    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
-        # TODO(https://fxbug.dev/390189313): Deprecate this once all product
-        # configs use hermetic directories.
-        "config_filename": attr.string(
-            doc = "An optional file to use for the config inside the directory.",
-        ),
         "files": attr.label_list(
             doc = "All files referenced by the product config. This should be the entire contents of the product input artifacts directory.",
             mandatory = True,
@@ -210,6 +193,7 @@ _fuchsia_prebuilt_product_configuration = rule(
         "build_type": attr.string(
             doc = "Build type of the product config. Must match the prebuilts.",
             mandatory = True,
+            values = [BUILD_TYPES.ENG, BUILD_TYPES.USER, BUILD_TYPES.USER_DEBUG],
         ),
     } | COMPATIBILITY.HOST_ATTRS,
 )
@@ -264,7 +248,6 @@ def fuchsia_prebuilt_product_configuration(
         name,
         product_config_dir,
         build_type,
-        product_config_filename = "",
         **kwargs):
     _all_files_target = "{}_all_files".format(name)
     native.filegroup(
@@ -274,7 +257,6 @@ def fuchsia_prebuilt_product_configuration(
     _fuchsia_prebuilt_product_configuration(
         name = name,
         files = [":{}".format(_all_files_target)],
-        config_filename = product_config_filename,
         build_type = build_type,
         **kwargs
     )
@@ -342,8 +324,6 @@ def fuchsia_hybrid_product_configuration_impl(ctx):
     replace_packages = []
     for label in ctx.attr.packages:
         replace_packages.append(label[FuchsiaPackageInfo].package_manifest.path)
-    for label, package_name in ctx.attr.replace_packages.items():
-        replace_packages.append(label[FuchsiaPackageInfo].package_manifest.path)
 
     product_config_dir = ctx.actions.declare_directory(ctx.label.name)
     product_config = ctx.attr.product_configuration[FuchsiaProductConfigInfo]
@@ -354,8 +334,6 @@ def fuchsia_hybrid_product_configuration_impl(ctx):
         "--output",
         product_config_dir.path,
     ]
-    if product_config.config_path:
-        args += ["--config-path", product_config.config_path]
     for package_manifest in replace_packages:
         args += ["--replace-package", package_manifest]
 
@@ -363,7 +341,7 @@ def fuchsia_hybrid_product_configuration_impl(ctx):
     ctx.actions.run(
         executable = sdk.assembly_generate_config,
         arguments = args,
-        inputs = ctx.files.packages + ctx.files.replace_packages + ctx.files.product_configuration,
+        inputs = ctx.files.packages + ctx.files.product_configuration,
         outputs = [product_config_dir],
         **LOCAL_ONLY_ACTION_KWARGS
     )
@@ -371,7 +349,6 @@ def fuchsia_hybrid_product_configuration_impl(ctx):
     return [
         DefaultInfo(files = depset([product_config_dir])),
         FuchsiaProductConfigInfo(
-            config_path = "",
             directory = product_config_dir.path,
             build_type = ctx.attr.product_configuration[FuchsiaProductConfigInfo].build_type,
             build_id_dirs = [],
@@ -391,10 +368,6 @@ fuchsia_hybrid_product_configuration = rule(
         ),
         "packages": attr.label_list(
             doc = "List of packages to replace. The packages are replace by their name.",
-        ),
-        # TODO(https://fxbug.dev/390189313): Remove this once all clients move to `packages`.
-        "replace_packages": attr.label_keyed_string_dict(
-            doc = "List of directories and packages to replace them with",
         ),
     } | COMPATIBILITY.HOST_ATTRS,
 )

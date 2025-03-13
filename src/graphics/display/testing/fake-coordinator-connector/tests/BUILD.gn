@@ -4,22 +4,17 @@
 
 import("//build/components.gni")
 import("//build/test.gni")
-import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
   public_deps = [
-    ":fake-display-coordinator-connector-integration-test",
-    ":fake-display-coordinator-connector-unittest",
+    ":fake-display-coordinator-connector-integration-tests-package",
+    ":fake-display-coordinator-connector-unittests-package",
   ]
 }
 
-cc_test_executable("fake-display-coordinator-connector-unittest-bin") {
-  output_name = "fake-display-coordinator-connector-unittest"
-  testonly = true
-
+test("fake-display-coordinator-connector-unittests") {
   sources = [ "fake-display-coordinator-connector-unittest.cc" ]
-
   deps = [
     "//sdk/lib/fidl/hlcpp",
     "//src/graphics/display/testing/fake-coordinator-connector:service",
@@ -29,19 +24,23 @@ cc_test_executable("fake-display-coordinator-connector-unittest-bin") {
   ]
 }
 
-fuchsia_unittest_package("fake-display-coordinator-connector-unittest") {
-  manifest = "meta/fake-display-coordinator-connector-unittest.cml"
-  deps = [ ":fake-display-coordinator-connector-unittest-bin" ]
+fuchsia_unittest_package(
+    "fake-display-coordinator-connector-unittests-package") {
+  package_name = "fake-display-coordinator-connector-unittests"
+
+  manifest = "meta/fake-display-coordinator-connector-unittests.cml"
+  deps = [ ":fake-display-coordinator-connector-unittests" ]
   test_specs = {
     log_settings = {
       max_severity = "ERROR"
     }
   }
+
+  # Needed to access the system Sysmem service.
   test_type = "vulkan"
 }
 
-test("fake-display-coordinator-connector-integration-test-bin") {
-  output_name = "fake-display-coordinator-connector-integration-test"
+test("fake-display-coordinator-connector-integration-tests") {
   sources = [ "fake-display-coordinator-connector-integration-test.cc" ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
@@ -54,18 +53,32 @@ test("fake-display-coordinator-connector-integration-test-bin") {
   ]
 }
 
-fuchsia_component(
-    "fake-display-coordinator-connector-integration-test-component") {
-  testonly = true
-  component_name = "fake-display-coordinator-connector-integration-test"
-  manifest = "meta/fake-display-coordinator-connector-integration-test.cml"
-  deps = [ ":fake-display-coordinator-connector-integration-test-bin" ]
+fuchsia_test_component(
+    "fake-display-coordinator-connector-integration-tests-component") {
+  component_name = "fake-display-coordinator-connector-integration-tests"
+
+  manifest = "meta/fake-display-coordinator-connector-integration-tests.cml"
+  deps = [ ":fake-display-coordinator-connector-integration-tests" ]
+
+  # Needed to access the system Sysmem service.
+  test_type = "vulkan"
 }
 
-fuchsia_test_package("fake-display-coordinator-connector-integration-test") {
+fuchsia_test_package(
+    "fake-display-coordinator-connector-integration-tests-package") {
+  package_name = "fake-display-coordinator-connector-integration-test"
+
   test_components =
-      [ ":fake-display-coordinator-connector-integration-test-component" ]
+      [ ":fake-display-coordinator-connector-integration-tests-component" ]
   deps = [
     "//src/graphics/display/testing/fake-coordinator-connector:child-component",
   ]
+
+  # TODO(https://fxbug.dev/399886375): Remove the error expectations after the
+  # racy error logging on VSync is fixed.
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }

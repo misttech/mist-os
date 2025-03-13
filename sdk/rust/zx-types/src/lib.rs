@@ -33,7 +33,10 @@ pub type zx_instant_boot_t = i64;
 pub type zx_instant_boot_ticks_t = i64;
 pub type zx_instant_mono_t = i64;
 pub type zx_instant_mono_ticks_t = i64;
+pub type zx_iob_access_t = u32;
 pub type zx_iob_allocate_id_options_t = u32;
+pub type zx_iob_discipline_type_t = u64;
+pub type zx_iob_region_type_t = u32;
 pub type zx_off_t = u64;
 pub type zx_paddr_t = usize;
 pub type zx_rights_t = u32;
@@ -53,6 +56,7 @@ pub type zx_vcpu_state_topic_t = u32;
 pub type zx_restricted_reason_t = u64;
 pub type zx_processor_power_level_options_t = u64;
 pub type zx_processor_power_control_t = u64;
+pub type zx_system_memory_stall_type_t = u32;
 
 macro_rules! const_assert {
     ($e:expr $(,)?) => {
@@ -371,6 +375,9 @@ multiconst!(zx_signals_t, [
     ZX_FIFO_WRITABLE            = ZX_OBJECT_WRITABLE;
     ZX_FIFO_PEER_CLOSED         = ZX_OBJECT_PEER_CLOSED;
 
+    // Iob
+    ZX_IOB_PEER_CLOSED           = ZX_OBJECT_PEER_CLOSED;
+
     // Job
     ZX_JOB_TERMINATED           = ZX_OBJECT_SIGNAL_3;
     ZX_JOB_NO_JOBS              = ZX_OBJECT_SIGNAL_4;
@@ -393,6 +400,10 @@ multiconst!(zx_signals_t, [
 
     // Vmo
     ZX_VMO_ZERO_CHILDREN        = ZX_OBJECT_SIGNAL_3;
+
+    // Counter
+    ZX_COUNTER_POSITIVE          = ZX_OBJECT_SIGNAL_4;
+    ZX_COUNTER_NON_POSITIVE      = ZX_OBJECT_SIGNAL_5;
 ]);
 
 multiconst!(zx_obj_type_t, [
@@ -426,6 +437,7 @@ multiconst!(zx_obj_type_t, [
     ZX_OBJ_TYPE_STREAM              = 31;
     ZX_OBJ_TYPE_MSI                 = 32;
     ZX_OBJ_TYPE_IOB                 = 33;
+    ZX_OBJ_TYPE_COUNTER             = 34;
 ]);
 
 // System ABI commits to having no more than 64 object types.
@@ -499,6 +511,46 @@ multiconst!(zx_vcpu_state_topic_t, [
     ZX_VCPU_IO      = 1;
 ]);
 
+// From //zircon/system/public/zircon/features.h
+multiconst!(u32, [
+    ZX_FEATURE_KIND_CPU                        = 0;
+    ZX_FEATURE_KIND_HW_BREAKPOINT_COUNT        = 1;
+    ZX_FEATURE_KIND_HW_WATCHPOINT_COUNT        = 2;
+    ZX_FEATURE_KIND_ADDRESS_TAGGING            = 3;
+    ZX_FEATURE_KIND_VM                         = 4;
+]);
+
+// From //zircon/system/public/zircon/features.h
+multiconst!(u32, [
+    ZX_HAS_CPU_FEATURES                   = 1 << 0;
+
+    ZX_VM_FEATURE_CAN_MAP_XOM             = 1 << 0;
+
+    ZX_ARM64_FEATURE_ISA_FP               = 1 << 1;
+    ZX_ARM64_FEATURE_ISA_ASIMD            = 1 << 2;
+    ZX_ARM64_FEATURE_ISA_AES              = 1 << 3;
+    ZX_ARM64_FEATURE_ISA_PMULL            = 1 << 4;
+    ZX_ARM64_FEATURE_ISA_SHA1             = 1 << 5;
+    ZX_ARM64_FEATURE_ISA_SHA256           = 1 << 6;
+    ZX_ARM64_FEATURE_ISA_CRC32            = 1 << 7;
+    ZX_ARM64_FEATURE_ISA_ATOMICS          = 1 << 8;
+    ZX_ARM64_FEATURE_ISA_RDM              = 1 << 9;
+    ZX_ARM64_FEATURE_ISA_SHA3             = 1 << 10;
+    ZX_ARM64_FEATURE_ISA_SM3              = 1 << 11;
+    ZX_ARM64_FEATURE_ISA_SM4              = 1 << 12;
+    ZX_ARM64_FEATURE_ISA_DP               = 1 << 13;
+    ZX_ARM64_FEATURE_ISA_DPB              = 1 << 14;
+    ZX_ARM64_FEATURE_ISA_FHM              = 1 << 15;
+    ZX_ARM64_FEATURE_ISA_TS               = 1 << 16;
+    ZX_ARM64_FEATURE_ISA_RNDR             = 1 << 17;
+    ZX_ARM64_FEATURE_ISA_SHA512           = 1 << 18;
+    ZX_ARM64_FEATURE_ISA_I8MM             = 1 << 19;
+    ZX_ARM64_FEATURE_ISA_SVE              = 1 << 20;
+    ZX_ARM64_FEATURE_ISA_ARM32            = 1 << 21;
+    ZX_ARM64_FEATURE_ISA_SHA2             = 1 << 6;
+    ZX_ARM64_FEATURE_ADDRESS_TAGGING_TBI  = 1 << 0;
+]);
+
 // From //zircon/system/public/zircon/syscalls/resource.h
 multiconst!(zx_rsrc_kind_t, [
     ZX_RSRC_KIND_MMIO       = 0;
@@ -529,7 +581,8 @@ multiconst!(zx_rsrc_system_base_t, [
 
 // clock ids
 multiconst!(zx_clock_t, [
-    ZX_CLOCK_MONOTONIC    = 0;
+    ZX_CLOCK_MONOTONIC = 0;
+    ZX_CLOCK_BOOT      = 1;
 ]);
 
 // from //zircon/system/public/zircon/syscalls/clock.h
@@ -1692,6 +1745,11 @@ multiconst!(zx_object_info_topic_t, [
     ZX_INFO_MEMORY_STALL               = 38; // zx_info_memory_stall_t[1]
 ]);
 
+multiconst!(zx_system_memory_stall_type_t, [
+    ZX_SYSTEM_MEMORY_STALL_SOME        = 0;
+    ZX_SYSTEM_MEMORY_STALL_FULL        = 1;
+]);
+
 // This macro takes struct-like syntax and creates another macro that can be used to create
 // different instances of the struct with different names. This is used to keep struct definitions
 // from drifting between this crate and the fuchsia-zircon crate where they are identical other
@@ -1773,6 +1831,20 @@ struct_decl_macro! {
 }
 
 zx_info_job_t!(zx_info_job_t);
+
+struct_decl_macro! {
+    #[repr(C)]
+    #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+    #[derive(zerocopy::FromBytes, zerocopy::IntoBytes, zerocopy::Immutable)]
+    pub struct <zx_info_timer_t> {
+        pub options: u32,
+        pub clock_id: zx_clock_t,
+        pub deadline: zx_time_t,
+        pub slack: zx_duration_t,
+    }
+}
+
+zx_info_timer_t!(zx_info_timer_t);
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -2135,8 +2207,8 @@ struct_decl_macro! {
     #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
     #[derive(zerocopy::FromBytes, zerocopy::Immutable, zerocopy::IntoBytes)]
     pub struct <zx_info_memory_stall_t> {
-        pub stall_time_some: zx_duration_t,
-        pub stall_time_full: zx_duration_t,
+        pub stall_time_some: zx_duration_mono_t,
+        pub stall_time_full: zx_duration_mono_t,
     }
 }
 
@@ -2490,6 +2562,54 @@ multiconst!(u32, [
     ZX_INTERRUPT_BIND = 0;
     ZX_INTERRUPT_UNBIND = 1;
 ]);
+
+#[repr(C)]
+pub struct zx_iob_region_t {
+    pub r#type: zx_iob_region_type_t,
+    pub access: zx_iob_access_t,
+    pub size: u64,
+    pub discipline: zx_iob_discipline_t,
+    pub extension: zx_iob_region_extension_t,
+}
+
+multiconst!(zx_iob_region_type_t, [
+    ZX_IOB_REGION_TYPE_PRIVATE = 0;
+]);
+
+multiconst!(zx_iob_access_t, [
+    ZX_IOB_ACCESS_EP0_CAN_MAP_READ = 1 << 0;
+    ZX_IOB_ACCESS_EP0_CAN_MAP_WRITE = 1 << 1;
+    ZX_IOB_ACCESS_EP0_CAN_MEDIATED_READ = 1 << 2;
+    ZX_IOB_ACCESS_EP0_CAN_MEDIATED_WRITE = 1 << 3;
+    ZX_IOB_ACCESS_EP1_CAN_MAP_READ = 1 << 4;
+    ZX_IOB_ACCESS_EP1_CAN_MAP_WRITE = 1 << 5;
+    ZX_IOB_ACCESS_EP1_CAN_MEDIATED_READ = 1 << 6;
+    ZX_IOB_ACCESS_EP1_CAN_MEDIATED_WRITE = 1 << 7;
+]);
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, Default)]
+pub struct zx_iob_discipline_t {
+    pub r#type: zx_iob_discipline_type_t,
+    pub reserved: [u32; 16],
+}
+
+multiconst!(zx_iob_discipline_type_t, [
+    ZX_IOB_DISCIPLINE_TYPE_NONE = 0;
+]);
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct zx_iob_region_private_t {
+    options: u32,
+    padding: [PadByte; 28],
+}
+
+#[repr(C)]
+pub union zx_iob_region_extension_t {
+    pub private_region: zx_iob_region_private_t,
+    pub max_extension: [u8; 32],
+}
 
 #[cfg(test)]
 mod test {

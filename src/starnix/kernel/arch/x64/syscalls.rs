@@ -508,7 +508,7 @@ mod tests {
         let fd = sys_creat(
             &mut locked,
             &current_task,
-            UserCString::new(path_addr),
+            UserCString::new(&current_task, path_addr),
             FileMode::default(),
         )?;
         let _file_handle = current_task.open_file(&mut locked, path.into(), OpenFlags::RDONLY)?;

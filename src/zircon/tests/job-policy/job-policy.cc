@@ -174,7 +174,7 @@ void CheckInvokingPolicyHelper(zx_policy_basic_v2_t* pol, uint32_t pol_count, ui
   auto proc = MakeTestProcess(job, nullptr, &ctrl);
   ASSERT_TRUE(proc.is_valid());
   ASSERT_NE(ctrl, ZX_HANDLE_INVALID);
-  zx_handle_t obj;
+  zx_handle_t obj = ZX_HANDLE_INVALID;
   EXPECT_EQ(mini_process_cmd(ctrl, minip_cmd, &obj), expect_cmd_status);
   if (expect_cmd_status == ZX_ERR_PEER_CLOSED) {
     // We expected the process to be terminated. Verify that it was due to policy.

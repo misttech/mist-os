@@ -12,6 +12,7 @@
 #include <gtest/gtest.h>
 #include <src/cobalt/bin/testing/stub_metric_event_logger.h>
 
+#include "lib/fit/result.h"
 #include "src/developer/memory/metrics/capture.h"
 #include "src/developer/memory/metrics/tests/test_utils.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
@@ -69,7 +70,7 @@ class MetricsUnitTest : public gtest::RealLoopFixture {
     RunLoopUntilIdle();
     ASSERT_TRUE(done);
   }
-  std::vector<CaptureTemplate> Template() {
+  static std::vector<CaptureTemplate> Template() {
     return std::vector<CaptureTemplate>{{
         .time = zx_nsec_from_duration(zx_duration_from_hour(7)),
         .kmem =
@@ -89,91 +90,37 @@ class MetricsUnitTest : public gtest::RealLoopFixture {
                 {.koid = 1,
                  .name = "uncompressed-bootfs",
                  .committed_bytes = 1,
-                 .committed_fractional_scaled_bytes = UINT64_MAX},
+                 .committed_scaled_bytes = 1},
                 {.koid = 2,
                  .name = "magma_create_buffer",
                  .committed_bytes = 2,
-                 .committed_fractional_scaled_bytes = UINT64_MAX},
+                 .committed_scaled_bytes = 2},
                 {.koid = 3,
                  .name = "SysmemAmlogicProtectedPool",
                  .committed_bytes = 3,
-                 .committed_fractional_scaled_bytes = UINT64_MAX},
+                 .committed_scaled_bytes = 3},
                 {.koid = 4,
                  .name = "SysmemContiguousPool",
                  .committed_bytes = 4,
-                 .committed_fractional_scaled_bytes = UINT64_MAX},
-                {.koid = 5,
-                 .name = "test",
-                 .committed_bytes = 5,
-                 .committed_fractional_scaled_bytes = UINT64_MAX},
-                {.koid = 6,
-                 .name = "test",
-                 .committed_bytes = 6,
-                 .committed_fractional_scaled_bytes = UINT64_MAX},
-                {.koid = 7,
-                 .name = "test",
-                 .committed_bytes = 7,
-                 .committed_fractional_scaled_bytes = UINT64_MAX},
-                {.koid = 8,
-                 .name = "dart",
-                 .committed_bytes = 8,
-                 .committed_fractional_scaled_bytes = UINT64_MAX},
-                {.koid = 9,
-                 .name = "test",
-                 .committed_bytes = 9,
-                 .committed_fractional_scaled_bytes = UINT64_MAX},
-                {.koid = 10,
-                 .name = "test",
-                 .committed_bytes = 10,
-                 .committed_fractional_scaled_bytes = UINT64_MAX},
-                {.koid = 11,
-                 .name = "test",
-                 .committed_bytes = 11,
-                 .committed_fractional_scaled_bytes = UINT64_MAX},
-                {.koid = 12,
-                 .name = "test",
-                 .committed_bytes = 12,
-                 .committed_fractional_scaled_bytes = UINT64_MAX},
-                {.koid = 13,
-                 .name = "test",
-                 .committed_bytes = 13,
-                 .committed_fractional_scaled_bytes = UINT64_MAX},
-                {.koid = 14,
-                 .name = "test",
-                 .committed_bytes = 14,
-                 .committed_fractional_scaled_bytes = UINT64_MAX},
-                {.koid = 15,
-                 .name = "test",
-                 .committed_bytes = 15,
-                 .committed_fractional_scaled_bytes = UINT64_MAX},
-                {.koid = 16,
-                 .name = "test",
-                 .committed_bytes = 16,
-                 .committed_fractional_scaled_bytes = UINT64_MAX},
-                {.koid = 17,
-                 .name = "test",
-                 .committed_bytes = 17,
-                 .committed_fractional_scaled_bytes = UINT64_MAX},
-                {.koid = 18,
-                 .name = "test",
-                 .committed_bytes = 18,
-                 .committed_fractional_scaled_bytes = UINT64_MAX},
-                {.koid = 19,
-                 .name = "test",
-                 .committed_bytes = 19,
-                 .committed_fractional_scaled_bytes = UINT64_MAX},
-                {.koid = 20,
-                 .name = "test",
-                 .committed_bytes = 20,
-                 .committed_fractional_scaled_bytes = UINT64_MAX},
-                {.koid = 21,
-                 .name = "test",
-                 .committed_bytes = 21,
-                 .committed_fractional_scaled_bytes = UINT64_MAX},
-                {.koid = 22,
-                 .name = "test",
-                 .committed_bytes = 22,
-                 .committed_fractional_scaled_bytes = UINT64_MAX},
+                 .committed_scaled_bytes = 4},
+                {.koid = 5, .name = "test", .committed_bytes = 5, .committed_scaled_bytes = 5},
+                {.koid = 6, .name = "test", .committed_bytes = 6, .committed_scaled_bytes = 6},
+                {.koid = 7, .name = "test", .committed_bytes = 7, .committed_scaled_bytes = 7},
+                {.koid = 8, .name = "dart", .committed_bytes = 8, .committed_scaled_bytes = 8},
+                {.koid = 9, .name = "test", .committed_bytes = 9, .committed_scaled_bytes = 9},
+                {.koid = 10, .name = "test", .committed_bytes = 10, .committed_scaled_bytes = 10},
+                {.koid = 11, .name = "test", .committed_bytes = 11, .committed_scaled_bytes = 11},
+                {.koid = 12, .name = "test", .committed_bytes = 12, .committed_scaled_bytes = 12},
+                {.koid = 13, .name = "test", .committed_bytes = 13, .committed_scaled_bytes = 13},
+                {.koid = 14, .name = "test", .committed_bytes = 14, .committed_scaled_bytes = 14},
+                {.koid = 15, .name = "test", .committed_bytes = 15, .committed_scaled_bytes = 15},
+                {.koid = 16, .name = "test", .committed_bytes = 16, .committed_scaled_bytes = 16},
+                {.koid = 17, .name = "test", .committed_bytes = 17, .committed_scaled_bytes = 17},
+                {.koid = 18, .name = "test", .committed_bytes = 18, .committed_scaled_bytes = 18},
+                {.koid = 19, .name = "test", .committed_bytes = 19, .committed_scaled_bytes = 19},
+                {.koid = 20, .name = "test", .committed_bytes = 20, .committed_scaled_bytes = 20},
+                {.koid = 21, .name = "test", .committed_bytes = 21, .committed_scaled_bytes = 21},
+                {.koid = 22, .name = "test", .committed_bytes = 22, .committed_scaled_bytes = 22},
             },
         .processes =
             {
@@ -200,16 +147,105 @@ class MetricsUnitTest : public gtest::RealLoopFixture {
             },
     }};
   }
+
+ private:
   async::Executor executor_;
-  sys::testing::ComponentContextProvider context_provider_;
+};
+
+// Wrapper around |cobalt::StubMetricEventLogger_Sync| for new style C++ bindings.
+class StubMetricEventLogger : public fidl::Server<fuchsia_metrics::MetricEventLogger> {
+ public:
+  fidl::Client<fuchsia_metrics::MetricEventLogger> SpawnClient(async_dispatcher_t* dispatcher) {
+    auto endpoints = fidl::CreateEndpoints<fuchsia_metrics::MetricEventLogger>().value();
+    fidl::BindServer(dispatcher, std::move(endpoints.server), this);
+    return fidl::Client{std::move(endpoints.client), dispatcher};
+  }
+
+  void LogOccurrence(LogOccurrenceRequest& request,
+                     LogOccurrenceCompleter::Sync& completer) override {
+    fuchsia::metrics::MetricEventLogger_LogOccurrence_Result result;
+    logger_.LogOccurrence(request.metric_id(), request.count(), request.event_codes(), &result);
+    completer.Reply(fit::success{});
+  }
+
+  void LogInteger(LogIntegerRequest& request, LogIntegerCompleter::Sync& completer) override {
+    fuchsia::metrics::MetricEventLogger_LogInteger_Result result;
+    logger_.LogInteger(request.metric_id(), request.value(), request.event_codes(), &result);
+    completer.Reply(fit::success{});
+  }
+
+  void LogIntegerHistogram(LogIntegerHistogramRequest& request,
+                           LogIntegerHistogramCompleter::Sync& completer) override {
+    std::vector<fuchsia::metrics::HistogramBucket> histograms;
+    for (auto& b : request.histogram()) {
+      histograms.emplace_back(b.index(), b.count());
+    }
+    fuchsia::metrics::MetricEventLogger_LogIntegerHistogram_Result result;
+    logger_.LogIntegerHistogram(request.metric_id(), std::move(histograms), request.event_codes(),
+                                &result);
+    completer.Reply(fit::success{});
+  }
+
+  void LogString(LogStringRequest& request, LogStringCompleter::Sync& completer) override {
+    fuchsia::metrics::MetricEventLogger_LogString_Result result;
+    logger_.LogString(request.metric_id(), request.string_value(), request.event_codes(), &result);
+    completer.Reply(fit::success{});
+  }
+
+  void LogMetricEvents(LogMetricEventsRequest& request,
+                       LogMetricEventsCompleter::Sync& completer) override {
+    fuchsia::metrics::MetricEventLogger_LogMetricEvents_Result result;
+    std::vector<fuchsia::metrics::MetricEvent> events;
+    for (const auto& e : request.events()) {
+      std::optional<fuchsia::metrics::MetricEventPayload> payload;
+      switch (e.payload().Which()) {
+        case fuchsia_metrics::MetricEventPayload::Tag::kCount:
+          payload.emplace(fuchsia::metrics::MetricEventPayload::WithCount(
+              static_cast<uint64_t>(e.payload().count().value())));
+          break;
+        case fuchsia_metrics::MetricEventPayload::Tag::kHistogram: {
+          std::vector<fuchsia::metrics::HistogramBucket> histograms;
+          for (const auto& b : e.payload().histogram().value()) {
+            histograms.emplace_back(b.index(), b.count());
+          }
+          payload.emplace(
+              fuchsia::metrics::MetricEventPayload::WithHistogram(std::move(histograms)));
+        } break;
+        case fuchsia_metrics::MetricEventPayload::Tag::kIntegerValue:
+          payload.emplace(fuchsia::metrics::MetricEventPayload::WithIntegerValue(
+              static_cast<int64_t>(e.payload().integer_value().value())));
+          break;
+        case fuchsia_metrics::MetricEventPayload::Tag::kStringValue:
+          payload.emplace(fuchsia::metrics::MetricEventPayload::WithStringValue(
+              std::string(e.payload().string_value().value())));
+          break;
+        default:
+          FAIL() << "Unknown event type.";
+      }
+      ASSERT_TRUE(payload.has_value());
+      events.emplace_back(e.metric_id(), e.event_codes(), std::move(*payload));
+    }
+
+    logger_.LogMetricEvents(std::move(events), &result);
+    completer.Reply(fit::success{});
+  }
+
+  const std::vector<fuchsia::metrics::MetricEvent>& logged_events() {
+    return logger_.logged_events();
+  }
+
+  size_t event_count() { return logger_.event_count(); }
+
+ private:
+  cobalt::StubMetricEventLogger_Sync logger_;
 };
 
 TEST_F(MetricsUnitTest, Inspect) {
   CaptureSupplier cs(Template());
-  cobalt::StubMetricEventLogger_Sync logger;
   inspect::ComponentInspector inspector(dispatcher(), inspect::PublishOptions{});
+  StubMetricEventLogger logger;
   Metrics m(
-      kBucketMatches, zx::min(5), dispatcher(), &inspector, &logger,
+      kBucketMatches, zx::min(5), dispatcher(), &inspector, logger.SpawnClient(dispatcher()),
       [&cs](Capture* c) {
         return cs.GetCapture(c, CaptureLevel::VMO, true /*use_capture_supplier_time*/);
       },
@@ -239,10 +275,10 @@ TEST_F(MetricsUnitTest, Inspect) {
 
 TEST_F(MetricsUnitTest, All) {
   CaptureSupplier cs(Template());
-  cobalt::StubMetricEventLogger_Sync logger;
   inspect::ComponentInspector inspector(dispatcher(), inspect::PublishOptions{});
+  StubMetricEventLogger logger;
   Metrics m(
-      kBucketMatches, zx::msec(10), dispatcher(), &inspector, &logger,
+      kBucketMatches, zx::msec(10), dispatcher(), &inspector, logger.SpawnClient(dispatcher()),
       [&cs](Capture* c) {
         return cs.GetCapture(c, CaptureLevel::VMO, true /*use_capture_supplier_time*/);
       },
@@ -383,6 +419,8 @@ TEST_F(MetricsUnitTest, All) {
             break;
         }
         break;
+      default:
+        FAIL() << "Unexpected metric id: " << metric_event.metric_id;
     }
   }
 }
@@ -403,20 +441,17 @@ TEST_F(MetricsUnitTest, One) {
           },
       .vmos =
           {
-              {.koid = 1,
-               .name = "",
-               .committed_bytes = 1,
-               .committed_fractional_scaled_bytes = UINT64_MAX},
+              {.koid = 1, .name = "", .committed_bytes = 1, .committed_scaled_bytes = 1},
           },
       .processes =
           {
               {.koid = 1, .name = "bin/bootsvc", .vmos = {1}},
           },
   }});
-  cobalt::StubMetricEventLogger_Sync logger;
+  StubMetricEventLogger logger;
   inspect::ComponentInspector inspector(dispatcher(), inspect::PublishOptions{});
   Metrics m(
-      kBucketMatches, zx::msec(10), dispatcher(), &inspector, &logger,
+      kBucketMatches, zx::msec(10), dispatcher(), &inspector, logger.SpawnClient(dispatcher()),
       [&cs](Capture* c) { return cs.GetCapture(c, CaptureLevel::VMO); },
       [](const Capture& c, Digest* d) { Digester(kBucketMatches).Digest(c, d); });
   RunLoopUntil([&cs] { return cs.empty(); });
@@ -442,11 +477,8 @@ TEST_F(MetricsUnitTest, Undigested) {
               {.koid = 1,
                .name = "uncompressed-bootfs",
                .committed_bytes = 1,
-               .committed_fractional_scaled_bytes = UINT64_MAX},
-              {.koid = 2,
-               .name = "test",
-               .committed_bytes = 2,
-               .committed_fractional_scaled_bytes = UINT64_MAX},
+               .committed_scaled_bytes = 1},
+              {.koid = 2, .name = "test", .committed_bytes = 2, .committed_scaled_bytes = 2},
           },
       .processes =
           {
@@ -454,10 +486,10 @@ TEST_F(MetricsUnitTest, Undigested) {
               {.koid = 2, .name = "test", .vmos = {2}},
           },
   }});
-  cobalt::StubMetricEventLogger_Sync logger;
+  StubMetricEventLogger logger;
   inspect::ComponentInspector inspector(dispatcher(), inspect::PublishOptions{});
   Metrics m(
-      kBucketMatches, zx::msec(10), dispatcher(), &inspector, &logger,
+      kBucketMatches, zx::msec(10), dispatcher(), &inspector, logger.SpawnClient(dispatcher()),
       [&cs](Capture* c) { return cs.GetCapture(c, CaptureLevel::VMO); },
       [](const Capture& c, Digest* d) { Digester(kBucketMatches).Digest(c, d); });
   RunLoopUntil([&cs] { return cs.empty(); });

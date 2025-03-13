@@ -27,7 +27,9 @@
 #include "src/lib/fxl/strings/join_strings.h"
 
 namespace fdf {
+
 using namespace fuchsia_driver_framework;
+
 }
 namespace fdh = fuchsia_driver_host;
 namespace fdd = fuchsia_driver_development;
@@ -219,6 +221,10 @@ void PerformBFS(const std::shared_ptr<Node>& starting_node,
     }
 
     for (const auto& child : current->children()) {
+      if (child->GetPrimaryParent() != current.get()) {
+        continue;
+      }
+
       if (auto [_, inserted] = visited.insert(child); inserted) {
         node_queue.push(child);
       }
@@ -489,6 +495,20 @@ zx::result<> DriverRunner::StartRootDriver(std::string_view url) {
                                        : fdf::DriverPackageType::kBase;
   bootup_tracker_->Start();
   return StartDriver(*root_node_, url, package);
+}
+
+void DriverRunner::StartDevfsDriver(driver_manager::Devfs& devfs) {
+  std::vector<NodeOffer> offers;
+  runner_.StartDriverComponent(
+      "devfs_driver", "fuchsia-boot:///devfs-driver#meta/devfs-driver.cm",
+      CollectionName(Collection::kBoot).get(), offers, std::nullopt,
+      [&devfs](zx::result<driver_manager::Runner::StartedComponent> component) {
+        if (component.is_error()) {
+          LOGF(ERROR, "Starting the devfs component failed %s", component.status_string());
+          return;
+        }
+        devfs.AttachComponent(std::move(component->info), std::move(component->controller));
+      });
 }
 
 void DriverRunner::NewDriverAvailable(NewDriverAvailableCompleter::Sync& completer) {

@@ -98,17 +98,6 @@ pub enum ValidateError {
     UnknownId { kind: &'static str, id: String },
     #[error("invalid MLS range: {low}-{high}")]
     InvalidMlsRange { low: BString, high: BString },
-}
-
-/// Structured errors that may be encountered querying a binary policy.
-#[derive(Debug, Error, PartialEq)]
-pub enum QueryError {
-    #[error("the class {class_name:?} does not exist")]
-    UnknownClass { class_name: String },
-    #[error("the permission {permission_name:?} does not exist for class {class_name:?}")]
-    UnknownPermission { class_name: String, permission_name: String },
-    #[error("the source type {source_type_name:?} does not exist")]
-    UnknownSourceType { source_type_name: String },
-    #[error("the target type {target_type_name:?} does not exist")]
-    UnknownTargetType { target_type_name: String },
+    #[error("invalid extended permissions type: {type_}")]
+    InvalidExtendedPermissionsType { type_: u8 },
 }

@@ -2,6 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::ops::Range;
+
+use tee_internal::binding::{
+    TEE_Result, TEE_ERROR_ACCESS_DENIED, TEE_MEMORY_ACCESS_ANY_OWNER, TEE_MEMORY_ACCESS_READ,
+    TEE_MEMORY_ACCESS_WRITE, TEE_SUCCESS,
+};
+
 pub fn malloc(size: usize, _hint: u32) -> *mut ::std::os::raw::c_void {
     // The 'hint' parameter allows requesting memory that is zeroed and that's
     // not shared with other TAs. We always zero allocations and don't share
@@ -17,7 +24,7 @@ pub unsafe fn realloc(
     buffer: *mut ::std::os::raw::c_void,
     new_size: usize,
 ) -> *mut ::std::os::raw::c_void {
-    libc::realloc(buffer, new_size)
+    unsafe { libc::realloc(buffer, new_size) }
 }
 
 /// # Safety
@@ -25,7 +32,7 @@ pub unsafe fn realloc(
 /// This wraps libc::free and is only safe to call with a pointer value that is NULL or allocated
 /// through malloc / realloc.
 pub unsafe fn free(buffer: *mut ::std::os::raw::c_void) {
-    libc::free(buffer)
+    unsafe { libc::free(buffer) }
 }
 
 pub fn mem_move(dest: *mut ::std::os::raw::c_void, src: *mut ::std::os::raw::c_void, size: usize) {
@@ -83,7 +90,59 @@ pub fn mem_fill(buffer: *mut ::std::os::raw::c_void, x: u8, size: usize) {
     unsafe { std::ptr::write_bytes(buffer as *mut u8, x, size) }
 }
 
-#[no_mangle]
+fn vmar_flags_from_access_flags(access_flags: u32) -> zx::VmarFlagsExtended {
+    let mut flags = zx::VmarFlagsExtended::empty();
+    if access_flags & TEE_MEMORY_ACCESS_READ != 0 {
+        flags |= zx::VmarFlagsExtended::PERM_READ;
+    }
+    if access_flags & TEE_MEMORY_ACCESS_WRITE != 0 {
+        flags |= zx::VmarFlagsExtended::PERM_WRITE;
+    }
+    flags
+}
+
+fn range_contains(contain: &Range<usize>, check: &Range<usize>) -> bool {
+    check.is_empty() || contain.contains(&check.start) && (contain.contains(&(check.end - 1)))
+}
+
+pub fn check_memory_access_rights(
+    access_flags: u32,
+    start: usize,
+    size: usize,
+    mapped_param_ranges: &Vec<Range<usize>>,
+) -> TEE_Result {
+    let end = match start.checked_add(size) {
+        Some(end) => end,
+        None => return TEE_ERROR_ACCESS_DENIED,
+    };
+    let check_range = start..end;
+    let required_mmu_flags = vmar_flags_from_access_flags(access_flags);
+
+    let check_for_exclusive_access = access_flags & TEE_MEMORY_ACCESS_ANY_OWNER == 0;
+    let maps = fuchsia_runtime::vmar_root_self().info_maps_vec().unwrap();
+    for map in maps {
+        if let Some(details) = map.details().as_mapping() {
+            let map_range = map.base..map.base + map.size;
+            if range_contains(&map_range, &check_range)
+                && details.mmu_flags.contains(required_mmu_flags)
+            {
+                if check_for_exclusive_access {
+                    for range in mapped_param_ranges {
+                        if range_contains(range, &check_range) {
+                            return TEE_ERROR_ACCESS_DENIED;
+                        }
+                    }
+                }
+                return TEE_SUCCESS;
+            }
+        }
+    }
+
+    // No mapping found covering the input range.
+    TEE_ERROR_ACCESS_DENIED
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn __scudo_default_options() -> *const std::ffi::c_char {
     b"zero_contents=true\0" as *const u8 as *const std::ffi::c_char
 }
@@ -224,5 +283,24 @@ mod test {
         assert_eq!(mem_compare(b_ptr, a_ptr, 1), 1);
         assert_eq!(mem_compare(b_ptr, c_ptr, 2), 0);
         assert_eq!(mem_compare(b_ptr, c_ptr, 3), -1);
+    }
+
+    #[fuchsia::test]
+    fn test_range_contains() {
+        let empty_range = 0..0;
+        assert_eq!(range_contains(&empty_range, &(0..0)), true);
+        assert_eq!(range_contains(&empty_range, &(1..1)), true);
+
+        let range = 1..5;
+        // Fits range exactly.
+        assert_eq!(range_contains(&range, &(1..5)), true);
+        // Too long.
+        assert_eq!(range_contains(&range, &(1..6)), false);
+        // Starts too early.
+        assert_eq!(range_contains(&range, &(0..5)), false);
+        // Empty length outside the range.
+        assert_eq!(range_contains(&range, &(0..0)), true);
+        // Empty length inside the range.
+        assert_eq!(range_contains(&range, &(2..2)), true);
     }
 }

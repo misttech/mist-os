@@ -26,10 +26,8 @@ use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::user_address::{UserAddress, UserRef};
-use starnix_uapi::{
-    ashmem_pin, device_type, errno, error, off_t, ASHMEM_GET_FILE_ID, ASHMEM_NAME_LEN,
-};
+use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
+use starnix_uapi::{ashmem_pin, device_type, errno, error, off_t, uapi, ASHMEM_NAME_LEN};
 use std::sync::Arc;
 
 /// Initializes the ashmem device.
@@ -86,7 +84,7 @@ impl Ashmem {
             size: 0,
             name: b"dev/ashmem\0".into(),
             prot_flags: ProtectionFlags::ACCESS_FLAGS,
-            unpinned: RangeMap::<u32, bool>::new(),
+            unpinned: RangeMap::<u32, bool>::default(),
             id: id,
         };
 
@@ -241,8 +239,10 @@ impl FileOps for Ashmem {
                 if self.is_mapped() {
                     return error!(EINVAL);
                 }
-                let mut name =
-                    current_task.read_c_string_to_vec(arg.into(), ASHMEM_NAME_LEN as usize)?;
+                let mut name = current_task.read_c_string_to_vec(
+                    UserCString::new(current_task, arg),
+                    ASHMEM_NAME_LEN as usize,
+                )?;
                 name.push(0); // Add a null terminator
 
                 state.name = name.into();
@@ -323,14 +323,16 @@ impl FileOps for Ashmem {
                 if state.unpinned.is_empty() {
                     return Ok(ASHMEM_IS_PINNED.into());
                 }
-                for (range, is_purged) in state.unpinned.iter_mut() {
+                let unpinned: Vec<_> = state.unpinned.iter().map(|(k, _)| k.clone()).collect();
+                for range in unpinned.into_iter() {
                     let (lo, hi) = (range.start as u64, range.end as u64);
-                    *is_purged = true;
                     memory.op_range(zx::VmoOp::ZERO, lo, hi - lo).unwrap_or(());
+                    state.unpinned.insert(range, true);
                 }
                 return Ok(ASHMEM_IS_UNPINNED.into());
             }
-            ASHMEM_GET_FILE_ID => {
+            #[allow(unreachable_patterns)]
+            uapi::ASHMEM_GET_FILE_ID | uapi::arch32::ASHMEM_GET_FILE_ID => {
                 let state = self.state.lock();
                 current_task.write_object(arg.into(), &(state.id))?;
                 Ok(SUCCESS)

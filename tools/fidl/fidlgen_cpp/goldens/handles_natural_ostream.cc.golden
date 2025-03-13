@@ -34,6 +34,8 @@ std::ostream& fidl::ostream::Formatter<::test_handles::Handles>::Format(std::ost
   os << " = " << fidl::ostream::Formatted<::zx::guest>(value.guest_handle()) << ", ";
   os << "interrupt_handle";
   os << " = " << fidl::ostream::Formatted<::zx::interrupt>(value.interrupt_handle()) << ", ";
+  os << "iob_handle";
+  os << " = " << fidl::ostream::Formatted<::zx::iob>(value.iob_handle()) << ", ";
   os << "iommu_handle";
   os << " = " << fidl::ostream::Formatted<::zx::iommu>(value.iommu_handle()) << ", ";
   os << "job_handle";

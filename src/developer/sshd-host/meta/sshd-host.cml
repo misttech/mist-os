@@ -51,7 +51,6 @@
                 "base-bin",
                 "blob",
                 "boot",
-                "boot-bin",
                 "build-info",
                 "config-data",
                 "data",
@@ -65,7 +64,10 @@
             to: "#shell",
         },
         {
-            directory: "mnt",
+            directory: [
+                "boot-bin",
+                "mnt",
+            ],
             from: "parent",
             to: "#shell",
             availability: "optional",
@@ -167,8 +169,6 @@
                 "fuchsia.sysmem2.Allocator",
                 "fuchsia.thermal.ClientStateConnector",
                 "fuchsia.time.Maintenance",
-                "fuchsia.tracing.kernel.Controller",
-                "fuchsia.tracing.kernel.Reader",
                 "fuchsia.ui.activity.control.Control",
                 "fuchsia.ui.activity.Provider",
                 "fuchsia.update.CommitStatusProvider",
@@ -317,6 +317,7 @@
             service: [
                 "fuchsia.hardware.cpu.ctrl.Service",
                 "fuchsia.hardware.suspend.SuspendService",
+                "fuchsia.hardware.usb.peripheral.Service",
             ],
             from: "parent",
             to: "#shell",

@@ -190,8 +190,9 @@ class ProductionTraceHooks final : public TraceHooks {
 // Storage
 //
 namespace {
-using JTraceConfig = ::jtrace::Config<kJTraceTargetBufferSize, kJTraceLastEntryStorage,
-                                      kJTraceIsPersistent, kJTraceUseLargeEntries>;
+using JTraceConfig =
+    ::jtrace::Config<kJTraceTargetBufferSize, kJTraceLastEntryStorage, kJTraceIsPersistent,
+                     kJTraceUseLargeEntries, kJTraceUseMonoTimestamps>;
 using Entry = typename JTraceConfig::Entry;
 
 template <typename Config, typename = void>

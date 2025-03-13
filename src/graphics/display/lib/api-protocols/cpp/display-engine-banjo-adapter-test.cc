@@ -19,6 +19,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include "src/graphics/display/lib/api-protocols/cpp/mock-banjo-display-engine-listener.h"
 #include "src/graphics/display/lib/api-protocols/cpp/mock-display-engine.h"
 #include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
@@ -28,6 +29,7 @@
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
+#include "src/graphics/display/lib/api-types/cpp/engine-info.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types/cpp/image-tiling-type.h"
@@ -51,6 +53,24 @@ class DisplayEngineBanjoAdapterTest : public ::testing::Test {
   const display_engine_protocol_t display_engine_protocol_ = banjo_adapter_.GetProtocol();
   ddk::DisplayEngineProtocolClient engine_banjo_{&display_engine_protocol_};
 };
+
+TEST_F(DisplayEngineBanjoAdapterTest, CompleteCoordinatorConnection) {
+  static constexpr display::EngineInfo kEngineInfo({
+      .max_layer_count = 4,
+      .max_connected_display_count = 1,
+      .is_capture_supported = false,
+  });
+
+  testing::MockBanjoDisplayEngineListener mock_listener;
+  mock_.ExpectCompleteCoordinatorConnection([&] { return kEngineInfo; });
+
+  engine_info_t banjo_engine_info;
+  engine_banjo_.CompleteCoordinatorConnection(mock_listener.GetProtocol().ctx,
+                                              mock_listener.GetProtocol().ops, &banjo_engine_info);
+  EXPECT_EQ(kEngineInfo, display::EngineInfo::From(banjo_engine_info));
+
+  mock_listener.CheckAllCallsReplayed();
+}
 
 TEST_F(DisplayEngineBanjoAdapterTest, ImportBufferCollectionSuccess) {
   auto [buffer_collection_token_client, buffer_collection_token_server] =
@@ -229,7 +249,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationSuccess) {
   std::array<layer_composition_operations_t, 1> banjo_layer_composition_operations;
   size_t banjo_layer_composition_operations_output_size = 0;
   EXPECT_EQ(display::ConfigCheckResult::kOk.ToBanjo(),
-            engine_banjo_.CheckConfiguration(&kBanjoDisplayConfig, 1,
+            engine_banjo_.CheckConfiguration(&kBanjoDisplayConfig,
                                              banjo_layer_composition_operations.data(),
                                              banjo_layer_composition_operations.size(),
                                              &banjo_layer_composition_operations_output_size));
@@ -266,7 +286,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationError) {
   std::array<layer_composition_operations_t, 1> banjo_layer_composition_operations;
   size_t banjo_layer_composition_operations_output_size = 0;
   EXPECT_EQ(display::ConfigCheckResult::kUnsupportedDisplayModes.ToBanjo(),
-            engine_banjo_.CheckConfiguration(&kBanjoDisplayConfig, 1,
+            engine_banjo_.CheckConfiguration(&kBanjoDisplayConfig,
                                              banjo_layer_composition_operations.data(),
                                              banjo_layer_composition_operations.size(),
                                              &banjo_layer_composition_operations_output_size));
@@ -307,7 +327,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationUnsupportedConfig) {
   std::array<layer_composition_operations_t, 1> banjo_layer_composition_operations;
   size_t banjo_layer_composition_operations_output_size = 0;
   ASSERT_EQ(display::ConfigCheckResult::kUnsupportedConfig.ToBanjo(),
-            engine_banjo_.CheckConfiguration(&kBanjoDisplayConfig, 1,
+            engine_banjo_.CheckConfiguration(&kBanjoDisplayConfig,
                                              banjo_layer_composition_operations.data(),
                                              banjo_layer_composition_operations.size(),
                                              &banjo_layer_composition_operations_output_size));
@@ -328,7 +348,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, ApplyConfiguration) {
            .bytes = std::initializer_list<uint8_t>{0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0}}),
       .image_source_transformation = display::CoordinateTransformation::kIdentity,
   });
-  static constexpr display::ConfigStamp kConfigStamp(4242);
+  static constexpr display::DriverConfigStamp kConfigStamp(4242);
 
   static constexpr layer_t kBanjoLayer0 = kLayer0.ToBanjo();
   static constexpr display_config_t kBanjoDisplayConfig = {
@@ -336,17 +356,18 @@ TEST_F(DisplayEngineBanjoAdapterTest, ApplyConfiguration) {
       .layer_list = &kBanjoLayer0,
       .layer_count = 1,
   };
-  static constexpr config_stamp_t kBanjoConfigStamp = display::ToBanjoConfigStamp(kConfigStamp);
+  static constexpr config_stamp_t kBanjoConfigStamp =
+      display::ToBanjoDriverConfigStamp(kConfigStamp);
 
   mock_.ExpectApplyConfiguration([&](display::DisplayId display_id, display::ModeId display_mode_id,
                                      cpp20::span<const display::DriverLayer> layers,
-                                     display::ConfigStamp config_stamp) {
+                                     display::DriverConfigStamp config_stamp) {
     EXPECT_EQ(kDisplayId, display_id);
     EXPECT_EQ(display::ModeId(1), display_mode_id);
     EXPECT_THAT(layers, ::testing::ElementsAre(kLayer0));
     EXPECT_EQ(kConfigStamp, config_stamp);
   });
-  engine_banjo_.ApplyConfiguration(&kBanjoDisplayConfig, 1, &kBanjoConfigStamp);
+  engine_banjo_.ApplyConfiguration(&kBanjoDisplayConfig, &kBanjoConfigStamp);
 }
 
 TEST_F(DisplayEngineBanjoAdapterTest, SetBufferCollectionConstraintsSuccess) {
@@ -404,11 +425,6 @@ TEST_F(DisplayEngineBanjoAdapterTest, SetDisplayPowerError) {
       [&](display::DisplayId display_id, bool power_on) { return zx::error(ZX_ERR_INTERNAL); });
   EXPECT_EQ(ZX_ERR_INTERNAL,
             engine_banjo_.SetDisplayPower(display::ToBanjoDisplayId(kDisplayId), true));
-}
-
-TEST_F(DisplayEngineBanjoAdapterTest, IsCaptureSupported) {
-  mock_.ExpectIsCaptureSupported([&]() { return false; });
-  EXPECT_EQ(false, engine_banjo_.IsCaptureSupported());
 }
 
 TEST_F(DisplayEngineBanjoAdapterTest, StartCaptureSuccess) {

@@ -5,11 +5,15 @@
 
 import argparse
 import os
+import re
 from typing import TextIO
 
 from assembly import AssemblyInputBundle, PackageManifest
 from depfile import DepFile
 from serialization.serialization import json_load
+
+_RUST_LIBSTD_RE = re.compile("lib\/libstd-[a-z0-9]+\.so")
+_RUST_LIBSTD_WILDCARD = "lib/libstd-*"
 
 
 def collect_aib_artifacts(aib: AssemblyInputBundle, aib_path: str) -> DepFile:
@@ -71,6 +75,8 @@ class Golden:
             optional = "?" + name
             if optional in self.lines:
                 self.lines.remove(optional)
+            if _RUST_LIBSTD_RE.match(name):
+                name = _RUST_LIBSTD_WILDCARD
             self.lines.add(name)
 
     def write(self, output: TextIO) -> None:

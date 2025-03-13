@@ -21,6 +21,60 @@ use super::{
     IcmpPacketRaw, IcmpParseArgs, IcmpZeroCode, OriginalPacket,
 };
 
+/// Dispatches expressions to the type-safe variants of [`Icmpv6Packet`] or
+/// [`Icmpv6PacketRaw`].
+///
+/// # Usage
+///
+/// ```
+/// icmpv6_dispatch!(packet, p => p.message_mut().foo());
+///
+/// icmpv6_dispatch!(packet: raw, p => p.message_mut().foo());
+/// ```
+#[macro_export]
+macro_rules! icmpv6_dispatch {
+    (__internal__, $x:ident, $variable:pat => $expression:expr, $($typ:ty),+) => {
+        {
+            $(
+                use $typ::*;
+            )+
+
+            match $x {
+                DestUnreachable($variable) => $expression,
+                PacketTooBig($variable) => $expression,
+                TimeExceeded($variable) => $expression,
+                ParameterProblem($variable) => $expression,
+                EchoRequest($variable) => $expression,
+                EchoReply($variable) => $expression,
+                Ndp(RouterSolicitation($variable)) => $expression,
+                Ndp(RouterAdvertisement($variable)) => $expression,
+                Ndp(NeighborSolicitation($variable)) => $expression,
+                Ndp(NeighborAdvertisement($variable)) => $expression,
+                Ndp(Redirect($variable)) => $expression,
+                Mld(MulticastListenerQuery($variable)) => $expression,
+                Mld(MulticastListenerReport($variable)) => $expression,
+                Mld(MulticastListenerDone($variable)) => $expression,
+                Mld(MulticastListenerQueryV2($variable)) => $expression,
+                Mld(MulticastListenerReportV2($variable)) => $expression,
+            }
+        }
+    };
+    ($x:ident : raw, $variable:pat => $expression:expr) => {
+        $crate::icmpv6_dispatch!(__internal__, $x,
+            $variable => $expression,
+            $crate::icmp::Icmpv6PacketRaw,
+            $crate::icmp::mld::MldPacketRaw,
+            $crate::icmp::ndp::NdpPacketRaw)
+    };
+    ($x:ident, $variable:pat => $expression:expr) => {
+        $crate::icmpv6_dispatch!(__internal__, $x,
+            $variable => $expression,
+            $crate::icmp::Icmpv6Packet,
+            $crate::icmp::mld::MldPacket,
+            $crate::icmp::ndp::NdpPacket)
+    };
+}
+
 /// An ICMPv6 packet with a dynamic message type.
 ///
 /// Unlike `IcmpPacket`, `Packet` only supports ICMPv6, and does not
@@ -86,27 +140,7 @@ impl<B: SplitByteSlice> ParsablePacket<B, IcmpParseArgs<Ipv6Addr>> for Icmpv6Pac
     type Error = ParseError;
 
     fn parse_metadata(&self) -> ParseMetadata {
-        use self::Icmpv6Packet::*;
-        use mld::MldPacket::*;
-        use ndp::NdpPacket::*;
-        match self {
-            DestUnreachable(p) => p.parse_metadata(),
-            PacketTooBig(p) => p.parse_metadata(),
-            TimeExceeded(p) => p.parse_metadata(),
-            ParameterProblem(p) => p.parse_metadata(),
-            EchoRequest(p) => p.parse_metadata(),
-            EchoReply(p) => p.parse_metadata(),
-            Ndp(RouterSolicitation(p)) => p.parse_metadata(),
-            Ndp(RouterAdvertisement(p)) => p.parse_metadata(),
-            Ndp(NeighborSolicitation(p)) => p.parse_metadata(),
-            Ndp(NeighborAdvertisement(p)) => p.parse_metadata(),
-            Ndp(Redirect(p)) => p.parse_metadata(),
-            Mld(MulticastListenerQuery(p)) => p.parse_metadata(),
-            Mld(MulticastListenerReport(p)) => p.parse_metadata(),
-            Mld(MulticastListenerDone(p)) => p.parse_metadata(),
-            Mld(MulticastListenerQueryV2(p)) => p.parse_metadata(),
-            Mld(MulticastListenerReportV2(p)) => p.parse_metadata(),
-        }
+        icmpv6_dispatch!(self, p => p.parse_metadata())
     }
 
     fn parse<BV: BufferView<B>>(buffer: BV, args: IcmpParseArgs<Ipv6Addr>) -> ParseResult<Self> {
@@ -170,35 +204,7 @@ pub enum Icmpv6PacketRaw<B: SplitByteSlice> {
 
 impl<B: SplitByteSliceMut> Icmpv6PacketRaw<B> {
     pub(super) fn header_prefix_mut(&mut self) -> &mut HeaderPrefix {
-        use Icmpv6PacketRaw::*;
-        match self {
-            DestUnreachable(p) => &mut p.header.prefix,
-            PacketTooBig(p) => &mut p.header.prefix,
-            TimeExceeded(p) => &mut p.header.prefix,
-            ParameterProblem(p) => &mut p.header.prefix,
-            EchoRequest(p) => &mut p.header.prefix,
-            EchoReply(p) => &mut p.header.prefix,
-            Ndp(p) => {
-                use ndp::NdpPacketRaw::*;
-                match p {
-                    RouterSolicitation(p) => &mut p.header.prefix,
-                    RouterAdvertisement(p) => &mut p.header.prefix,
-                    NeighborSolicitation(p) => &mut p.header.prefix,
-                    NeighborAdvertisement(p) => &mut p.header.prefix,
-                    Redirect(p) => &mut p.header.prefix,
-                }
-            }
-            Mld(p) => {
-                use mld::MldPacketRaw::*;
-                match p {
-                    MulticastListenerQuery(p) => &mut p.header.prefix,
-                    MulticastListenerReport(p) => &mut p.header.prefix,
-                    MulticastListenerDone(p) => &mut p.header.prefix,
-                    MulticastListenerQueryV2(p) => &mut p.header.prefix,
-                    MulticastListenerReportV2(p) => &mut p.header.prefix,
-                }
-            }
-        }
+        icmpv6_dispatch!(self: raw, p => &mut p.header.prefix)
     }
 
     /// Overwrites the current checksum with `checksum`, returning the original.
@@ -211,35 +217,7 @@ impl<B: SplitByteSliceMut> Icmpv6PacketRaw<B> {
     /// Returns whether the checksum was successfully calculated & written. In
     /// the false case, self is left unmodified.
     pub fn try_write_checksum(&mut self, src_ip: Ipv6Addr, dst_ip: Ipv6Addr) -> bool {
-        use Icmpv6PacketRaw::*;
-        match self {
-            DestUnreachable(p) => p.try_write_checksum(src_ip, dst_ip),
-            PacketTooBig(p) => p.try_write_checksum(src_ip, dst_ip),
-            TimeExceeded(p) => p.try_write_checksum(src_ip, dst_ip),
-            ParameterProblem(p) => p.try_write_checksum(src_ip, dst_ip),
-            EchoRequest(p) => p.try_write_checksum(src_ip, dst_ip),
-            EchoReply(p) => p.try_write_checksum(src_ip, dst_ip),
-            Ndp(p) => {
-                use ndp::NdpPacketRaw::*;
-                match p {
-                    RouterSolicitation(p) => p.try_write_checksum(src_ip, dst_ip),
-                    RouterAdvertisement(p) => p.try_write_checksum(src_ip, dst_ip),
-                    NeighborSolicitation(p) => p.try_write_checksum(src_ip, dst_ip),
-                    NeighborAdvertisement(p) => p.try_write_checksum(src_ip, dst_ip),
-                    Redirect(p) => p.try_write_checksum(src_ip, dst_ip),
-                }
-            }
-            Mld(p) => {
-                use mld::MldPacketRaw::*;
-                match p {
-                    MulticastListenerQuery(p) => p.try_write_checksum(src_ip, dst_ip),
-                    MulticastListenerQueryV2(p) => p.try_write_checksum(src_ip, dst_ip),
-                    MulticastListenerReport(p) => p.try_write_checksum(src_ip, dst_ip),
-                    MulticastListenerDone(p) => p.try_write_checksum(src_ip, dst_ip),
-                    MulticastListenerReportV2(p) => p.try_write_checksum(src_ip, dst_ip),
-                }
-            }
-        }
+        icmpv6_dispatch!(self: raw, p => p.try_write_checksum(src_ip, dst_ip))
     }
 }
 
@@ -247,27 +225,7 @@ impl<B: SplitByteSlice> ParsablePacket<B, ()> for Icmpv6PacketRaw<B> {
     type Error = ParseError;
 
     fn parse_metadata(&self) -> ParseMetadata {
-        use self::Icmpv6PacketRaw::*;
-        use mld::MldPacketRaw::*;
-        use ndp::NdpPacketRaw::*;
-        match self {
-            DestUnreachable(p) => p.parse_metadata(),
-            PacketTooBig(p) => p.parse_metadata(),
-            TimeExceeded(p) => p.parse_metadata(),
-            ParameterProblem(p) => p.parse_metadata(),
-            EchoRequest(p) => p.parse_metadata(),
-            EchoReply(p) => p.parse_metadata(),
-            Ndp(RouterSolicitation(p)) => p.parse_metadata(),
-            Ndp(RouterAdvertisement(p)) => p.parse_metadata(),
-            Ndp(NeighborSolicitation(p)) => p.parse_metadata(),
-            Ndp(NeighborAdvertisement(p)) => p.parse_metadata(),
-            Ndp(Redirect(p)) => p.parse_metadata(),
-            Mld(MulticastListenerQuery(p)) => p.parse_metadata(),
-            Mld(MulticastListenerReport(p)) => p.parse_metadata(),
-            Mld(MulticastListenerDone(p)) => p.parse_metadata(),
-            Mld(MulticastListenerQueryV2(p)) => p.parse_metadata(),
-            Mld(MulticastListenerReportV2(p)) => p.parse_metadata(),
-        }
+        icmpv6_dispatch!(self: raw, p => p.parse_metadata())
     }
 
     fn parse<BV: BufferView<B>>(buffer: BV, _args: ()) -> ParseResult<Self> {

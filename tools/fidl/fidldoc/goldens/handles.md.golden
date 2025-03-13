@@ -8,7 +8,7 @@
 ## **PROTOCOLS**
 
 ## DriverProtocol {#DriverProtocol}
-*Defined in [test.handles/handles.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/handles.test.fidl;l=55)*
+*Defined in [test.handles/handles.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/handles.test.fidl;l=56)*
 
 
 ## SomeProtocol {#SomeProtocol}
@@ -19,7 +19,7 @@
 ## **STRUCTS**
 
 ### FdfHandles [resource](/fuchsia-src/reference/fidl/language/language.md#value-vs-resource){:.fidl-attribute} {#FdfHandles data-text="FdfHandles"}
-*Defined in [test.handles/handles.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/handles.test.fidl;l=58)*
+*Defined in [test.handles/handles.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/handles.test.fidl;l=59)*
 
 <table>
     <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
@@ -138,6 +138,14 @@
             <td><code>interrupt_handle</code></td>
             <td>
                 <code>handle&lt;interrupt&gt;</code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
+        <tr id="Handles.iob_handle">
+            <td><code>iob_handle</code></td>
+            <td>
+                <code>handle&lt;iob&gt;</code>
             </td>
             <td></td>
             <td>No default</td>

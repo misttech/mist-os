@@ -65,7 +65,9 @@ where
     pub unsafe fn raw_get_bit(this: *const Self, index: usize) -> bool {
         debug_assert!(index / 8 < core::mem::size_of::<Storage>());
         let byte_index = index / 8;
-        let byte = *(core::ptr::addr_of!((*this).storage) as *const u8).offset(byte_index as isize);
+        let byte = unsafe {
+            *(core::ptr::addr_of!((*this).storage) as *const u8).offset(byte_index as isize)
+        };
         Self::extract_bit(byte, index)
     }
     #[inline]
@@ -89,9 +91,10 @@ where
     pub unsafe fn raw_set_bit(this: *mut Self, index: usize, val: bool) {
         debug_assert!(index / 8 < core::mem::size_of::<Storage>());
         let byte_index = index / 8;
-        let byte =
-            (core::ptr::addr_of_mut!((*this).storage) as *mut u8).offset(byte_index as isize);
-        *byte = Self::change_bit(*byte, index, val);
+        let byte = unsafe {
+            (core::ptr::addr_of_mut!((*this).storage) as *mut u8).offset(byte_index as isize)
+        };
+        unsafe { *byte = Self::change_bit(*byte, index, val) };
     }
     #[inline]
     pub fn get(&self, bit_offset: usize, bit_width: u8) -> u64 {
@@ -115,7 +118,7 @@ where
         debug_assert!((bit_offset + (bit_width as usize)) / 8 <= core::mem::size_of::<Storage>());
         let mut val = 0;
         for i in 0..(bit_width as usize) {
-            if Self::raw_get_bit(this, i + bit_offset) {
+            if unsafe { Self::raw_get_bit(this, i + bit_offset) } {
                 let index =
                     if cfg!(target_endian = "big") { bit_width as usize - 1 - i } else { i };
                 val |= 1 << index;
@@ -144,7 +147,7 @@ where
             let mask = 1 << i;
             let val_bit_is_set = val & mask == mask;
             let index = if cfg!(target_endian = "big") { bit_width as usize - 1 - i } else { i };
-            Self::raw_set_bit(this, index + bit_offset, val_bit_is_set);
+            unsafe { Self::raw_set_bit(this, index + bit_offset, val_bit_is_set) };
         }
     }
 }
@@ -5905,6 +5908,272 @@ pub const XATTR_POSIX_ACL_ACCESS: &'static std::ffi::CStr = c"posix_acl_access";
 pub const XATTR_NAME_POSIX_ACL_ACCESS: &'static std::ffi::CStr = c"system.posix_acl_access";
 pub const XATTR_POSIX_ACL_DEFAULT: &'static std::ffi::CStr = c"posix_acl_default";
 pub const XATTR_NAME_POSIX_ACL_DEFAULT: &'static std::ffi::CStr = c"system.posix_acl_default";
+pub const KGSL_VERSION_MAJOR: u32 = 3;
+pub const KGSL_VERSION_MINOR: u32 = 14;
+pub const KGSL_CONTEXT_SAVE_GMEM: u32 = 1;
+pub const KGSL_CONTEXT_NO_GMEM_ALLOC: u32 = 2;
+pub const KGSL_CONTEXT_SUBMIT_IB_LIST: u32 = 4;
+pub const KGSL_CONTEXT_CTX_SWITCH: u32 = 8;
+pub const KGSL_CONTEXT_PREAMBLE: u32 = 16;
+pub const KGSL_CONTEXT_TRASH_STATE: u32 = 32;
+pub const KGSL_CONTEXT_PER_CONTEXT_TS: u32 = 64;
+pub const KGSL_CONTEXT_USER_GENERATED_TS: u32 = 128;
+pub const KGSL_CONTEXT_END_OF_FRAME: u32 = 256;
+pub const KGSL_CONTEXT_NO_FAULT_TOLERANCE: u32 = 512;
+pub const KGSL_CONTEXT_SYNC: u32 = 1024;
+pub const KGSL_CONTEXT_PWR_CONSTRAINT: u32 = 2048;
+pub const KGSL_CONTEXT_PRIORITY_MASK: u32 = 61440;
+pub const KGSL_CONTEXT_PRIORITY_SHIFT: u32 = 12;
+pub const KGSL_CONTEXT_PRIORITY_UNDEF: u32 = 0;
+pub const KGSL_CONTEXT_IFH_NOP: u32 = 65536;
+pub const KGSL_CONTEXT_SECURE: u32 = 131072;
+pub const KGSL_CONTEXT_NO_SNAPSHOT: u32 = 262144;
+pub const KGSL_CONTEXT_SPARSE: u32 = 524288;
+pub const KGSL_CONTEXT_PREEMPT_STYLE_MASK: u32 = 234881024;
+pub const KGSL_CONTEXT_PREEMPT_STYLE_SHIFT: u32 = 25;
+pub const KGSL_CONTEXT_PREEMPT_STYLE_DEFAULT: u32 = 0;
+pub const KGSL_CONTEXT_PREEMPT_STYLE_RINGBUFFER: u32 = 1;
+pub const KGSL_CONTEXT_PREEMPT_STYLE_FINEGRAIN: u32 = 2;
+pub const KGSL_CONTEXT_TYPE_MASK: u32 = 32505856;
+pub const KGSL_CONTEXT_TYPE_SHIFT: u32 = 20;
+pub const KGSL_CONTEXT_TYPE_ANY: u32 = 0;
+pub const KGSL_CONTEXT_TYPE_GL: u32 = 1;
+pub const KGSL_CONTEXT_TYPE_CL: u32 = 2;
+pub const KGSL_CONTEXT_TYPE_C2D: u32 = 3;
+pub const KGSL_CONTEXT_TYPE_RS: u32 = 4;
+pub const KGSL_CONTEXT_TYPE_VK: u32 = 5;
+pub const KGSL_CONTEXT_TYPE_UNKNOWN: u32 = 30;
+pub const KGSL_CONTEXT_INVALIDATE_ON_FAULT: u32 = 268435456;
+pub const KGSL_CONTEXT_LPAC: u32 = 536870912;
+pub const KGSL_CONTEXT_FAULT_INFO: u32 = 1073741824;
+pub const KGSL_CONTEXT_INVALID: u32 = 4294967295;
+pub const KGSL_CMDBATCH_MEMLIST: u32 = 1;
+pub const KGSL_CMDBATCH_MARKER: u32 = 2;
+pub const KGSL_CMDBATCH_SUBMIT_IB_LIST: u32 = 4;
+pub const KGSL_CMDBATCH_CTX_SWITCH: u32 = 8;
+pub const KGSL_CMDBATCH_PROFILING: u32 = 16;
+pub const KGSL_CMDBATCH_PROFILING_KTIME: u32 = 32;
+pub const KGSL_CMDBATCH_END_OF_FRAME: u32 = 256;
+pub const KGSL_CMDBATCH_SYNC: u32 = 1024;
+pub const KGSL_CMDBATCH_PWR_CONSTRAINT: u32 = 2048;
+pub const KGSL_CMDBATCH_SPARSE: u32 = 4096;
+pub const KGSL_CMDBATCH_START_RECURRING: u32 = 1048576;
+pub const KGSL_CMDBATCH_STOP_RECURRING: u32 = 2097152;
+pub const KGSL_CMDLIST_IB: u32 = 1;
+pub const KGSL_CMDLIST_CTXTSWITCH_PREAMBLE: u32 = 2;
+pub const KGSL_CMDLIST_IB_PREAMBLE: u32 = 4;
+pub const KGSL_OBJLIST_MEMOBJ: u32 = 8;
+pub const KGSL_OBJLIST_PROFILE: u32 = 16;
+pub const KGSL_CMD_SYNCPOINT_TYPE_TIMESTAMP: u32 = 0;
+pub const KGSL_CMD_SYNCPOINT_TYPE_FENCE: u32 = 1;
+pub const KGSL_CMD_SYNCPOINT_TYPE_TIMELINE: u32 = 2;
+pub const KGSL_MEMFLAGS_SECURE: u32 = 8;
+pub const KGSL_MEMFLAGS_GPUREADONLY: u32 = 16777216;
+pub const KGSL_MEMFLAGS_GPUWRITEONLY: u32 = 33554432;
+pub const KGSL_MEMFLAGS_FORCE_32BIT: u64 = 4294967296;
+pub const KGSL_SPARSE_BIND_MULTIPLE_TO_PHYS: u64 = 17179869184;
+pub const KGSL_SPARSE_BIND: u32 = 1;
+pub const KGSL_SPARSE_UNBIND: u32 = 2;
+pub const KGSL_CACHEMODE_MASK: u32 = 201326592;
+pub const KGSL_CACHEMODE_SHIFT: u32 = 26;
+pub const KGSL_CACHEMODE_WRITECOMBINE: u32 = 0;
+pub const KGSL_CACHEMODE_UNCACHED: u32 = 1;
+pub const KGSL_CACHEMODE_WRITETHROUGH: u32 = 2;
+pub const KGSL_CACHEMODE_WRITEBACK: u32 = 3;
+pub const KGSL_MEMFLAGS_USE_CPU_MAP: u32 = 268435456;
+pub const KGSL_MEMFLAGS_SPARSE_PHYS: u32 = 536870912;
+pub const KGSL_MEMFLAGS_SPARSE_VIRT: u32 = 1073741824;
+pub const KGSL_MEMFLAGS_IOCOHERENT: u32 = 2147483648;
+pub const KGSL_MEMFLAGS_GUARD_PAGE: u64 = 8589934592;
+pub const KGSL_MEMFLAGS_VBO: u64 = 17179869184;
+pub const KGSL_MEMFLAGS_VBO_NO_MAP_ZERO: u64 = 34359738368;
+pub const KGSL_MEMTYPE_MASK: u32 = 65280;
+pub const KGSL_MEMTYPE_SHIFT: u32 = 8;
+pub const KGSL_MEMTYPE_OBJECTANY: u32 = 0;
+pub const KGSL_MEMTYPE_FRAMEBUFFER: u32 = 1;
+pub const KGSL_MEMTYPE_RENDERBUFFER: u32 = 2;
+pub const KGSL_MEMTYPE_ARRAYBUFFER: u32 = 3;
+pub const KGSL_MEMTYPE_ELEMENTARRAYBUFFER: u32 = 4;
+pub const KGSL_MEMTYPE_VERTEXARRAYBUFFER: u32 = 5;
+pub const KGSL_MEMTYPE_TEXTURE: u32 = 6;
+pub const KGSL_MEMTYPE_SURFACE: u32 = 7;
+pub const KGSL_MEMTYPE_EGL_SURFACE: u32 = 8;
+pub const KGSL_MEMTYPE_GL: u32 = 9;
+pub const KGSL_MEMTYPE_CL: u32 = 10;
+pub const KGSL_MEMTYPE_CL_BUFFER_MAP: u32 = 11;
+pub const KGSL_MEMTYPE_CL_BUFFER_NOMAP: u32 = 12;
+pub const KGSL_MEMTYPE_CL_IMAGE_MAP: u32 = 13;
+pub const KGSL_MEMTYPE_CL_IMAGE_NOMAP: u32 = 14;
+pub const KGSL_MEMTYPE_CL_KERNEL_STACK: u32 = 15;
+pub const KGSL_MEMTYPE_COMMAND: u32 = 16;
+pub const KGSL_MEMTYPE_2D: u32 = 17;
+pub const KGSL_MEMTYPE_EGL_IMAGE: u32 = 18;
+pub const KGSL_MEMTYPE_EGL_SHADOW: u32 = 19;
+pub const KGSL_MEMTYPE_MULTISAMPLE: u32 = 20;
+pub const KGSL_MEMTYPE_KERNEL: u32 = 255;
+pub const KGSL_MEMALIGN_MASK: u32 = 16711680;
+pub const KGSL_MEMALIGN_SHIFT: u32 = 16;
+pub const KGSL_MEMFLAGS_USERMEM_MASK: u32 = 224;
+pub const KGSL_MEMFLAGS_USERMEM_SHIFT: u32 = 5;
+pub const KGSL_MEMFLAGS_NOT_USERMEM: u32 = 0;
+pub const KGSL_FLAGS_NORMALMODE: u32 = 0;
+pub const KGSL_FLAGS_SAFEMODE: u32 = 1;
+pub const KGSL_FLAGS_INITIALIZED0: u32 = 2;
+pub const KGSL_FLAGS_INITIALIZED: u32 = 4;
+pub const KGSL_FLAGS_STARTED: u32 = 8;
+pub const KGSL_FLAGS_ACTIVE: u32 = 16;
+pub const KGSL_FLAGS_RESERVED0: u32 = 32;
+pub const KGSL_FLAGS_RESERVED1: u32 = 64;
+pub const KGSL_FLAGS_RESERVED2: u32 = 128;
+pub const KGSL_FLAGS_SOFT_RESET: u32 = 256;
+pub const KGSL_FLAGS_PER_CONTEXT_TIMESTAMPS: u32 = 512;
+pub const KGSL_SYNCOBJ_SERVER_TIMEOUT: u32 = 2000;
+pub const KGSL_UBWC_NONE: u32 = 0;
+pub const KGSL_UBWC_1_0: u32 = 1;
+pub const KGSL_UBWC_2_0: u32 = 2;
+pub const KGSL_UBWC_3_0: u32 = 3;
+pub const KGSL_UBWC_4_0: u32 = 4;
+pub const KGSL_UBWC_5_0: u32 = 5;
+pub const KGSL_PROP_DEVICE_INFO: u32 = 1;
+pub const KGSL_PROP_DEVICE_SHADOW: u32 = 2;
+pub const KGSL_PROP_DEVICE_POWER: u32 = 3;
+pub const KGSL_PROP_SHMEM: u32 = 4;
+pub const KGSL_PROP_SHMEM_APERTURES: u32 = 5;
+pub const KGSL_PROP_MMU_ENABLE: u32 = 6;
+pub const KGSL_PROP_INTERRUPT_WAITS: u32 = 7;
+pub const KGSL_PROP_VERSION: u32 = 8;
+pub const KGSL_PROP_GPU_RESET_STAT: u32 = 9;
+pub const KGSL_PROP_PWRCTRL: u32 = 14;
+pub const KGSL_PROP_PWR_CONSTRAINT: u32 = 18;
+pub const KGSL_PROP_UCHE_GMEM_VADDR: u32 = 19;
+pub const KGSL_PROP_SP_GENERIC_MEM: u32 = 20;
+pub const KGSL_PROP_UCODE_VERSION: u32 = 21;
+pub const KGSL_PROP_GPMU_VERSION: u32 = 22;
+pub const KGSL_PROP_HIGHEST_BANK_BIT: u32 = 23;
+pub const KGSL_PROP_DEVICE_BITNESS: u32 = 24;
+pub const KGSL_PROP_DEVICE_QDSS_STM: u32 = 25;
+pub const KGSL_PROP_MIN_ACCESS_LENGTH: u32 = 26;
+pub const KGSL_PROP_UBWC_MODE: u32 = 27;
+pub const KGSL_PROP_DEVICE_QTIMER: u32 = 32;
+pub const KGSL_PROP_L3_PWR_CONSTRAINT: u32 = 34;
+pub const KGSL_PROP_SECURE_BUFFER_ALIGNMENT: u32 = 35;
+pub const KGSL_PROP_SECURE_CTXT_SUPPORT: u32 = 36;
+pub const KGSL_PROP_SPEED_BIN: u32 = 37;
+pub const KGSL_PROP_GAMING_BIN: u32 = 38;
+pub const KGSL_PROP_QUERY_CAPABILITIES: u32 = 39;
+pub const KGSL_PROP_CONTEXT_PROPERTY: u32 = 40;
+pub const KGSL_PROP_GPU_MODEL: u32 = 41;
+pub const KGSL_PROP_VK_DEVICE_ID: u32 = 42;
+pub const KGSL_PROP_IS_LPAC_ENABLED: u32 = 43;
+pub const KGSL_PROP_GPU_VA64_SIZE: u32 = 44;
+pub const KGSL_PROP_IS_RAYTRACING_ENABLED: u32 = 45;
+pub const KGSL_PROP_IS_FASTBLEND_ENABLED: u32 = 46;
+pub const KGSL_PROP_UCHE_TRAP_BASE: u32 = 47;
+pub const KGSL_PROP_IS_AQE_ENABLED: u32 = 48;
+pub const KGSL_PROP_GPU_SECURE_VA_SIZE: u32 = 49;
+pub const KGSL_PROP_GPU_SECURE_VA_INUSE: u32 = 50;
+pub const KGSL_QUERY_CAPS_PROPERTIES: u32 = 1;
+pub const KGSL_CONTEXT_PROP_FAULTS: u32 = 1;
+pub const KGSL_PERFCOUNTER_GROUP_CP: u32 = 0;
+pub const KGSL_PERFCOUNTER_GROUP_RBBM: u32 = 1;
+pub const KGSL_PERFCOUNTER_GROUP_PC: u32 = 2;
+pub const KGSL_PERFCOUNTER_GROUP_VFD: u32 = 3;
+pub const KGSL_PERFCOUNTER_GROUP_HLSQ: u32 = 4;
+pub const KGSL_PERFCOUNTER_GROUP_VPC: u32 = 5;
+pub const KGSL_PERFCOUNTER_GROUP_TSE: u32 = 6;
+pub const KGSL_PERFCOUNTER_GROUP_RAS: u32 = 7;
+pub const KGSL_PERFCOUNTER_GROUP_UCHE: u32 = 8;
+pub const KGSL_PERFCOUNTER_GROUP_TP: u32 = 9;
+pub const KGSL_PERFCOUNTER_GROUP_SP: u32 = 10;
+pub const KGSL_PERFCOUNTER_GROUP_RB: u32 = 11;
+pub const KGSL_PERFCOUNTER_GROUP_PWR: u32 = 12;
+pub const KGSL_PERFCOUNTER_GROUP_VBIF: u32 = 13;
+pub const KGSL_PERFCOUNTER_GROUP_VBIF_PWR: u32 = 14;
+pub const KGSL_PERFCOUNTER_GROUP_MH: u32 = 15;
+pub const KGSL_PERFCOUNTER_GROUP_PA_SU: u32 = 16;
+pub const KGSL_PERFCOUNTER_GROUP_SQ: u32 = 17;
+pub const KGSL_PERFCOUNTER_GROUP_SX: u32 = 18;
+pub const KGSL_PERFCOUNTER_GROUP_TCF: u32 = 19;
+pub const KGSL_PERFCOUNTER_GROUP_TCM: u32 = 20;
+pub const KGSL_PERFCOUNTER_GROUP_TCR: u32 = 21;
+pub const KGSL_PERFCOUNTER_GROUP_L2: u32 = 22;
+pub const KGSL_PERFCOUNTER_GROUP_VSC: u32 = 23;
+pub const KGSL_PERFCOUNTER_GROUP_CCU: u32 = 24;
+pub const KGSL_PERFCOUNTER_GROUP_LRZ: u32 = 25;
+pub const KGSL_PERFCOUNTER_GROUP_CMP: u32 = 26;
+pub const KGSL_PERFCOUNTER_GROUP_ALWAYSON: u32 = 27;
+pub const KGSL_PERFCOUNTER_GROUP_SP_PWR: u32 = 28;
+pub const KGSL_PERFCOUNTER_GROUP_TP_PWR: u32 = 29;
+pub const KGSL_PERFCOUNTER_GROUP_RB_PWR: u32 = 30;
+pub const KGSL_PERFCOUNTER_GROUP_CCU_PWR: u32 = 31;
+pub const KGSL_PERFCOUNTER_GROUP_UCHE_PWR: u32 = 32;
+pub const KGSL_PERFCOUNTER_GROUP_CP_PWR: u32 = 33;
+pub const KGSL_PERFCOUNTER_GROUP_GPMU_PWR: u32 = 34;
+pub const KGSL_PERFCOUNTER_GROUP_ALWAYSON_PWR: u32 = 35;
+pub const KGSL_PERFCOUNTER_GROUP_GLC: u32 = 36;
+pub const KGSL_PERFCOUNTER_GROUP_FCHE: u32 = 37;
+pub const KGSL_PERFCOUNTER_GROUP_MHUB: u32 = 38;
+pub const KGSL_PERFCOUNTER_GROUP_GMU_XOCLK: u32 = 39;
+pub const KGSL_PERFCOUNTER_GROUP_GMU_GMUCLK: u32 = 40;
+pub const KGSL_PERFCOUNTER_GROUP_GMU_PERF: u32 = 41;
+pub const KGSL_PERFCOUNTER_GROUP_SW: u32 = 42;
+pub const KGSL_PERFCOUNTER_GROUP_UFC: u32 = 43;
+pub const KGSL_PERFCOUNTER_GROUP_BV_CP: u32 = 44;
+pub const KGSL_PERFCOUNTER_GROUP_BV_PC: u32 = 45;
+pub const KGSL_PERFCOUNTER_GROUP_BV_VFD: u32 = 46;
+pub const KGSL_PERFCOUNTER_GROUP_BV_VPC: u32 = 47;
+pub const KGSL_PERFCOUNTER_GROUP_BV_TP: u32 = 48;
+pub const KGSL_PERFCOUNTER_GROUP_BV_SP: u32 = 49;
+pub const KGSL_PERFCOUNTER_GROUP_BV_UFC: u32 = 50;
+pub const KGSL_PERFCOUNTER_GROUP_BV_TSE: u32 = 51;
+pub const KGSL_PERFCOUNTER_GROUP_BV_RAS: u32 = 52;
+pub const KGSL_PERFCOUNTER_GROUP_BV_LRZ: u32 = 53;
+pub const KGSL_PERFCOUNTER_GROUP_BV_HLSQ: u32 = 54;
+pub const KGSL_PERFCOUNTER_GROUP_MAX: u32 = 55;
+pub const KGSL_PERFCOUNTER_NOT_USED: u32 = 4294967295;
+pub const KGSL_PERFCOUNTER_BROKEN: u32 = 4294967294;
+pub const KGSL_IOC_TYPE: u32 = 9;
+pub const KGSL_TIMESTAMP_EVENT_GENLOCK: u32 = 1;
+pub const KGSL_TIMESTAMP_EVENT_FENCE: u32 = 2;
+pub const KGSL_GPUMEM_CACHE_CLEAN: u32 = 1;
+pub const KGSL_GPUMEM_CACHE_TO_GPU: u32 = 1;
+pub const KGSL_GPUMEM_CACHE_INV: u32 = 2;
+pub const KGSL_GPUMEM_CACHE_FROM_GPU: u32 = 2;
+pub const KGSL_GPUMEM_CACHE_FLUSH: u32 = 3;
+pub const KGSL_GPUMEM_CACHE_RANGE: u32 = 2147483648;
+pub const KGSL_IBDESC_MEMLIST: u32 = 1;
+pub const KGSL_IBDESC_PROFILING_BUFFER: u32 = 2;
+pub const KGSL_CONSTRAINT_NONE: u32 = 0;
+pub const KGSL_CONSTRAINT_PWRLEVEL: u32 = 1;
+pub const KGSL_CONSTRAINT_L3_NONE: u32 = 2;
+pub const KGSL_CONSTRAINT_L3_PWRLEVEL: u32 = 3;
+pub const KGSL_CONSTRAINT_PWR_MIN: u32 = 0;
+pub const KGSL_CONSTRAINT_PWR_MAX: u32 = 1;
+pub const KGSL_GPUOBJ_ALLOC_METADATA_MAX: u32 = 64;
+pub const KGSL_GPUOBJ_FREE_ON_EVENT: u32 = 1;
+pub const KGSL_GPU_EVENT_TIMESTAMP: u32 = 1;
+pub const KGSL_GPU_EVENT_FENCE: u32 = 2;
+pub const KGSL_GPUOBJ_SET_INFO_METADATA: u32 = 1;
+pub const KGSL_GPUOBJ_SET_INFO_TYPE: u32 = 2;
+pub const KGSL_GPUMEM_RANGE_OP_BIND: u32 = 1;
+pub const KGSL_GPUMEM_RANGE_OP_UNBIND: u32 = 2;
+pub const KGSL_GPUMEM_BIND_ASYNC: u32 = 1;
+pub const KGSL_GPUMEM_BIND_FENCE_OUT: u32 = 2;
+pub const KGSL_GPU_AUX_COMMAND_BIND: u32 = 1;
+pub const KGSL_GPU_AUX_COMMAND_TIMELINE: u32 = 2;
+pub const KGSL_GPU_AUX_COMMAND_SYNC: u32 = 1024;
+pub const KGSL_TIMELINE_WAIT_ALL: u32 = 1;
+pub const KGSL_TIMELINE_WAIT_ANY: u32 = 2;
+pub const KGSL_FAULT_TYPE_NO_FAULT: u32 = 0;
+pub const KGSL_FAULT_TYPE_PAGEFAULT: u32 = 1;
+pub const KGSL_FAULT_TYPE_MAX: u32 = 2;
+pub const KGSL_PAGEFAULT_TYPE_NONE: u32 = 0;
+pub const KGSL_PAGEFAULT_TYPE_READ: u32 = 1;
+pub const KGSL_PAGEFAULT_TYPE_WRITE: u32 = 2;
+pub const KGSL_PAGEFAULT_TYPE_TRANSLATION: u32 = 4;
+pub const KGSL_PAGEFAULT_TYPE_PERMISSION: u32 = 8;
+pub const KGSL_PAGEFAULT_TYPE_EXTERNAL: u32 = 16;
+pub const KGSL_PAGEFAULT_TYPE_TRANSACTION_STALLED: u32 = 32;
 pub const __NR_ARM_breakpoint: u32 = 983041;
 pub const __NR_ARM_cacheflush: u32 = 983042;
 pub const __NR_ARM_usr26: u32 = 983043;
@@ -5987,24 +6256,18 @@ pub type __sighandler_t = __signalfn_t;
 pub type __restorefn_t = crate::uaddr32;
 pub type __sigrestore_t = __restorefn_t;
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
 pub struct __kernel_sigaction {
-    pub _u: __kernel_sigaction__bindgen_ty_1,
+    pub sa_handler: __sighandler_t,
     pub sa_mask: sigset_t,
     pub sa_flags: crate::types::arch32::c_ulong,
     pub sa_restorer: crate::uaddr32,
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
 pub union __kernel_sigaction__bindgen_ty_1 {
     pub _sa_handler: __sighandler_t,
-    pub _sa_sigaction: ::std::option::Option<
-        unsafe extern "C" fn(
-            arg1: crate::types::arch32::c_int,
-            arg2: crate::uref32<siginfo>,
-            arg3: crate::uaddr32,
-        ),
-    >,
+    pub _sa_sigaction: crate::uaddr32,
 }
 impl Default for __kernel_sigaction__bindgen_ty_1 {
     fn default() -> Self {
@@ -17026,6 +17289,957 @@ pub struct sockaddr_vm {
     pub svm_flags: __u8,
     pub svm_zero: [crate::types::arch32::c_uchar; 3usize],
 }
+pub const kgsl_user_mem_type_KGSL_USER_MEM_TYPE_PMEM: kgsl_user_mem_type = 0;
+pub const kgsl_user_mem_type_KGSL_USER_MEM_TYPE_ASHMEM: kgsl_user_mem_type = 1;
+pub const kgsl_user_mem_type_KGSL_USER_MEM_TYPE_ADDR: kgsl_user_mem_type = 2;
+pub const kgsl_user_mem_type_KGSL_USER_MEM_TYPE_ION: kgsl_user_mem_type = 3;
+pub const kgsl_user_mem_type_KGSL_USER_MEM_TYPE_DMABUF: kgsl_user_mem_type = 3;
+pub const kgsl_user_mem_type_KGSL_USER_MEM_TYPE_MAX: kgsl_user_mem_type = 7;
+pub type kgsl_user_mem_type = crate::types::arch32::c_uint;
+pub const kgsl_ctx_reset_stat_KGSL_CTX_STAT_NO_ERROR: kgsl_ctx_reset_stat = 0;
+pub const kgsl_ctx_reset_stat_KGSL_CTX_STAT_GUILTY_CONTEXT_RESET_EXT: kgsl_ctx_reset_stat = 1;
+pub const kgsl_ctx_reset_stat_KGSL_CTX_STAT_INNOCENT_CONTEXT_RESET_EXT: kgsl_ctx_reset_stat = 2;
+pub const kgsl_ctx_reset_stat_KGSL_CTX_STAT_UNKNOWN_CONTEXT_RESET_EXT: kgsl_ctx_reset_stat = 3;
+pub type kgsl_ctx_reset_stat = crate::types::arch32::c_uint;
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_devinfo {
+    pub device_id: crate::types::arch32::c_uint,
+    pub chip_id: crate::types::arch32::c_uint,
+    pub mmu_enabled: crate::types::arch32::c_uint,
+    pub gmem_gpubaseaddr: crate::types::arch32::c_ulong,
+    pub gpu_id: crate::types::arch32::c_uint,
+    pub gmem_sizebytes: __kernel_size_t,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_devmemstore {
+    pub soptimestamp: crate::types::arch32::c_uint,
+    pub sbz: crate::types::arch32::c_uint,
+    pub eoptimestamp: crate::types::arch32::c_uint,
+    pub sbz2: crate::types::arch32::c_uint,
+    pub preempted: crate::types::arch32::c_uint,
+    pub sbz3: crate::types::arch32::c_uint,
+    pub ref_wait_ts: crate::types::arch32::c_uint,
+    pub sbz4: crate::types::arch32::c_uint,
+    pub current_context: crate::types::arch32::c_uint,
+    pub sbz5: crate::types::arch32::c_uint,
+}
+pub const kgsl_timestamp_type_KGSL_TIMESTAMP_CONSUMED: kgsl_timestamp_type = 1;
+pub const kgsl_timestamp_type_KGSL_TIMESTAMP_RETIRED: kgsl_timestamp_type = 2;
+pub const kgsl_timestamp_type_KGSL_TIMESTAMP_QUEUED: kgsl_timestamp_type = 3;
+pub type kgsl_timestamp_type = crate::types::arch32::c_uint;
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_capabilities_properties {
+    pub list: __u64,
+    pub count: __u32,
+    pub __bindgen_padding_0: [u8; 4usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_capabilities {
+    pub data: __u64,
+    pub size: __u64,
+    pub querytype: __u32,
+    pub __bindgen_padding_0: [u8; 4usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_shadowprop {
+    pub gpuaddr: crate::types::arch32::c_ulong,
+    pub size: __kernel_size_t,
+    pub flags: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_qdss_stm_prop {
+    pub gpuaddr: __u64,
+    pub size: __u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_qtimer_prop {
+    pub gpuaddr: __u64,
+    pub size: __u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_version {
+    pub drv_major: crate::types::arch32::c_uint,
+    pub drv_minor: crate::types::arch32::c_uint,
+    pub dev_major: crate::types::arch32::c_uint,
+    pub dev_minor: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_sp_generic_mem {
+    pub local: __u64,
+    pub pvt: __u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_ucode_version {
+    pub pfp: crate::types::arch32::c_uint,
+    pub pm4: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_gpmu_version {
+    pub major: crate::types::arch32::c_uint,
+    pub minor: crate::types::arch32::c_uint,
+    pub features: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_context_property {
+    pub data: __u64,
+    pub size: __u32,
+    pub type_: __u32,
+    pub contextid: __u32,
+    pub __bindgen_padding_0: [u8; 4usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_context_property_fault {
+    pub faults: __s32,
+    pub timestamp: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_gpu_model {
+    pub gpu_model: [crate::types::arch32::c_char; 32usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_ibdesc {
+    pub gpuaddr: crate::types::arch32::c_ulong,
+    pub __pad: crate::types::arch32::c_ulong,
+    pub sizedwords: __kernel_size_t,
+    pub ctrl: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_cmdbatch_profiling_buffer {
+    pub wall_clock_s: __u64,
+    pub wall_clock_ns: __u64,
+    pub gpu_ticks_queued: __u64,
+    pub gpu_ticks_submitted: __u64,
+    pub gpu_ticks_retired: __u64,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_device_getproperty {
+    pub type_: crate::types::arch32::c_uint,
+    pub value: crate::uaddr32,
+    pub sizebytes: __kernel_size_t,
+}
+impl Default for kgsl_device_getproperty {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_device_waittimestamp {
+    pub timestamp: crate::types::arch32::c_uint,
+    pub timeout: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_device_waittimestamp_ctxtid {
+    pub context_id: crate::types::arch32::c_uint,
+    pub timestamp: crate::types::arch32::c_uint,
+    pub timeout: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_ringbuffer_issueibcmds {
+    pub drawctxt_id: crate::types::arch32::c_uint,
+    pub ibdesc_addr: crate::types::arch32::c_ulong,
+    pub numibs: crate::types::arch32::c_uint,
+    pub timestamp: crate::types::arch32::c_uint,
+    pub flags: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_cmdstream_readtimestamp {
+    pub type_: crate::types::arch32::c_uint,
+    pub timestamp: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_cmdstream_freememontimestamp {
+    pub gpuaddr: crate::types::arch32::c_ulong,
+    pub type_: crate::types::arch32::c_uint,
+    pub timestamp: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_drawctxt_create {
+    pub flags: crate::types::arch32::c_uint,
+    pub drawctxt_id: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_drawctxt_destroy {
+    pub drawctxt_id: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_map_user_mem {
+    pub fd: crate::types::arch32::c_int,
+    pub gpuaddr: crate::types::arch32::c_ulong,
+    pub len: __kernel_size_t,
+    pub offset: __kernel_size_t,
+    pub hostptr: crate::types::arch32::c_ulong,
+    pub memtype: kgsl_user_mem_type,
+    pub flags: crate::types::arch32::c_uint,
+}
+impl Default for kgsl_map_user_mem {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_cmdstream_readtimestamp_ctxtid {
+    pub context_id: crate::types::arch32::c_uint,
+    pub type_: crate::types::arch32::c_uint,
+    pub timestamp: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_cmdstream_freememontimestamp_ctxtid {
+    pub context_id: crate::types::arch32::c_uint,
+    pub gpuaddr: crate::types::arch32::c_ulong,
+    pub type_: crate::types::arch32::c_uint,
+    pub timestamp: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_sharedmem_from_pmem {
+    pub pmem_fd: crate::types::arch32::c_int,
+    pub gpuaddr: crate::types::arch32::c_ulong,
+    pub len: crate::types::arch32::c_uint,
+    pub offset: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_sharedmem_free {
+    pub gpuaddr: crate::types::arch32::c_ulong,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_cff_user_event {
+    pub cff_opcode: crate::types::arch32::c_uchar,
+    pub __bindgen_padding_0: [u8; 3usize],
+    pub op1: crate::types::arch32::c_uint,
+    pub op2: crate::types::arch32::c_uint,
+    pub op3: crate::types::arch32::c_uint,
+    pub op4: crate::types::arch32::c_uint,
+    pub op5: crate::types::arch32::c_uint,
+    pub __pad: [crate::types::arch32::c_uint; 2usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_gmem_desc {
+    pub x: crate::types::arch32::c_uint,
+    pub y: crate::types::arch32::c_uint,
+    pub width: crate::types::arch32::c_uint,
+    pub height: crate::types::arch32::c_uint,
+    pub pitch: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_buffer_desc {
+    pub hostptr: crate::uaddr32,
+    pub gpuaddr: crate::types::arch32::c_ulong,
+    pub size: crate::types::arch32::c_int,
+    pub format: crate::types::arch32::c_uint,
+    pub pitch: crate::types::arch32::c_uint,
+    pub enabled: crate::types::arch32::c_uint,
+}
+impl Default for kgsl_buffer_desc {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_bind_gmem_shadow {
+    pub drawctxt_id: crate::types::arch32::c_uint,
+    pub gmem_desc: kgsl_gmem_desc,
+    pub shadow_x: crate::types::arch32::c_uint,
+    pub shadow_y: crate::types::arch32::c_uint,
+    pub shadow_buffer: kgsl_buffer_desc,
+    pub buffer_id: crate::types::arch32::c_uint,
+}
+impl Default for kgsl_bind_gmem_shadow {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_sharedmem_from_vmalloc {
+    pub gpuaddr: crate::types::arch32::c_ulong,
+    pub hostptr: crate::types::arch32::c_uint,
+    pub flags: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_drawctxt_set_bin_base_offset {
+    pub drawctxt_id: crate::types::arch32::c_uint,
+    pub offset: crate::types::arch32::c_uint,
+}
+pub const kgsl_cmdwindow_type_KGSL_CMDWINDOW_MIN: kgsl_cmdwindow_type = 0;
+pub const kgsl_cmdwindow_type_KGSL_CMDWINDOW_2D: kgsl_cmdwindow_type = 0;
+pub const kgsl_cmdwindow_type_KGSL_CMDWINDOW_3D: kgsl_cmdwindow_type = 1;
+pub const kgsl_cmdwindow_type_KGSL_CMDWINDOW_MMU: kgsl_cmdwindow_type = 2;
+pub const kgsl_cmdwindow_type_KGSL_CMDWINDOW_ARBITER: kgsl_cmdwindow_type = 255;
+pub const kgsl_cmdwindow_type_KGSL_CMDWINDOW_MAX: kgsl_cmdwindow_type = 255;
+pub type kgsl_cmdwindow_type = crate::types::arch32::c_uint;
+#[repr(C)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_cmdwindow_write {
+    pub target: kgsl_cmdwindow_type,
+    pub addr: crate::types::arch32::c_uint,
+    pub data: crate::types::arch32::c_uint,
+}
+impl Default for kgsl_cmdwindow_write {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_gpumem_alloc {
+    pub gpuaddr: crate::types::arch32::c_ulong,
+    pub size: __kernel_size_t,
+    pub flags: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_cff_syncmem {
+    pub gpuaddr: crate::types::arch32::c_ulong,
+    pub len: __kernel_size_t,
+    pub __pad: [crate::types::arch32::c_uint; 2usize],
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_timestamp_event {
+    pub type_: crate::types::arch32::c_int,
+    pub timestamp: crate::types::arch32::c_uint,
+    pub context_id: crate::types::arch32::c_uint,
+    pub priv_: crate::uaddr32,
+    pub len: __kernel_size_t,
+}
+impl Default for kgsl_timestamp_event {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_timestamp_event_genlock {
+    pub handle: crate::types::arch32::c_int,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_timestamp_event_fence {
+    pub fence_fd: crate::types::arch32::c_int,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_gpumem_alloc_id {
+    pub id: crate::types::arch32::c_uint,
+    pub flags: crate::types::arch32::c_uint,
+    pub size: __kernel_size_t,
+    pub mmapsize: __kernel_size_t,
+    pub gpuaddr: crate::types::arch32::c_ulong,
+    pub __pad: [crate::types::arch32::c_ulong; 2usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_gpumem_free_id {
+    pub id: crate::types::arch32::c_uint,
+    pub __pad: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_gpumem_get_info {
+    pub gpuaddr: crate::types::arch32::c_ulong,
+    pub id: crate::types::arch32::c_uint,
+    pub flags: crate::types::arch32::c_uint,
+    pub size: __kernel_size_t,
+    pub mmapsize: __kernel_size_t,
+    pub useraddr: crate::types::arch32::c_ulong,
+    pub __pad: [crate::types::arch32::c_ulong; 4usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_gpumem_sync_cache {
+    pub gpuaddr: crate::types::arch32::c_ulong,
+    pub id: crate::types::arch32::c_uint,
+    pub op: crate::types::arch32::c_uint,
+    pub offset: __kernel_size_t,
+    pub length: __kernel_size_t,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_perfcounter_get {
+    pub groupid: crate::types::arch32::c_uint,
+    pub countable: crate::types::arch32::c_uint,
+    pub offset: crate::types::arch32::c_uint,
+    pub offset_hi: crate::types::arch32::c_uint,
+    pub __pad: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_perfcounter_put {
+    pub groupid: crate::types::arch32::c_uint,
+    pub countable: crate::types::arch32::c_uint,
+    pub __pad: [crate::types::arch32::c_uint; 2usize],
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_perfcounter_query {
+    pub groupid: crate::types::arch32::c_uint,
+    pub countables: crate::uref32<crate::types::arch32::c_uint>,
+    pub count: crate::types::arch32::c_uint,
+    pub max_counters: crate::types::arch32::c_uint,
+    pub __pad: [crate::types::arch32::c_uint; 2usize],
+}
+impl Default for kgsl_perfcounter_query {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_perfcounter_read_group {
+    pub groupid: crate::types::arch32::c_uint,
+    pub countable: crate::types::arch32::c_uint,
+    pub value: crate::types::arch32::c_ulonglong,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_perfcounter_read {
+    pub reads: crate::uref32<kgsl_perfcounter_read_group>,
+    pub count: crate::types::arch32::c_uint,
+    pub __pad: [crate::types::arch32::c_uint; 2usize],
+}
+impl Default for kgsl_perfcounter_read {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_gpumem_sync_cache_bulk {
+    pub id_list: crate::uref32<crate::types::arch32::c_uint>,
+    pub count: crate::types::arch32::c_uint,
+    pub op: crate::types::arch32::c_uint,
+    pub __pad: [crate::types::arch32::c_uint; 2usize],
+}
+impl Default for kgsl_gpumem_sync_cache_bulk {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_cmd_syncpoint_timestamp {
+    pub context_id: crate::types::arch32::c_uint,
+    pub timestamp: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_cmd_syncpoint_fence {
+    pub fd: crate::types::arch32::c_int,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_cmd_syncpoint_timeline {
+    pub timelines: __u64,
+    pub count: __u32,
+    pub timelines_size: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_cmd_syncpoint {
+    pub type_: crate::types::arch32::c_int,
+    pub priv_: crate::uaddr32,
+    pub size: __kernel_size_t,
+}
+impl Default for kgsl_cmd_syncpoint {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_submit_commands {
+    pub context_id: crate::types::arch32::c_uint,
+    pub flags: crate::types::arch32::c_uint,
+    pub cmdlist: crate::uref32<kgsl_ibdesc>,
+    pub numcmds: crate::types::arch32::c_uint,
+    pub synclist: crate::uref32<kgsl_cmd_syncpoint>,
+    pub numsyncs: crate::types::arch32::c_uint,
+    pub timestamp: crate::types::arch32::c_uint,
+    pub __pad: [crate::types::arch32::c_uint; 4usize],
+}
+impl Default for kgsl_submit_commands {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_device_constraint {
+    pub type_: crate::types::arch32::c_uint,
+    pub context_id: crate::types::arch32::c_uint,
+    pub data: crate::uaddr32,
+    pub size: __kernel_size_t,
+}
+impl Default for kgsl_device_constraint {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_device_constraint_pwrlevel {
+    pub level: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_syncsource_create {
+    pub id: crate::types::arch32::c_uint,
+    pub __pad: [crate::types::arch32::c_uint; 3usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_syncsource_destroy {
+    pub id: crate::types::arch32::c_uint,
+    pub __pad: [crate::types::arch32::c_uint; 3usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_syncsource_create_fence {
+    pub id: crate::types::arch32::c_uint,
+    pub fence_fd: crate::types::arch32::c_int,
+    pub __pad: [crate::types::arch32::c_uint; 4usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_syncsource_signal_fence {
+    pub id: crate::types::arch32::c_uint,
+    pub fence_fd: crate::types::arch32::c_int,
+    pub __pad: [crate::types::arch32::c_uint; 4usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_cff_sync_gpuobj {
+    pub offset: __u64,
+    pub length: __u64,
+    pub id: crate::types::arch32::c_uint,
+    pub __bindgen_padding_0: [u8; 4usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_gpuobj_alloc {
+    pub size: __u64,
+    pub flags: __u64,
+    pub va_len: __u64,
+    pub mmapsize: __u64,
+    pub id: crate::types::arch32::c_uint,
+    pub metadata_len: crate::types::arch32::c_uint,
+    pub metadata: __u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_gpuobj_free {
+    pub flags: __u64,
+    pub priv_: __u64,
+    pub id: crate::types::arch32::c_uint,
+    pub type_: crate::types::arch32::c_uint,
+    pub len: crate::types::arch32::c_uint,
+    pub __bindgen_padding_0: [u8; 4usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_gpu_event_timestamp {
+    pub context_id: crate::types::arch32::c_uint,
+    pub timestamp: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_gpu_event_fence {
+    pub fd: crate::types::arch32::c_int,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_gpuobj_info {
+    pub gpuaddr: __u64,
+    pub flags: __u64,
+    pub size: __u64,
+    pub va_len: __u64,
+    pub va_addr: __u64,
+    pub id: crate::types::arch32::c_uint,
+    pub __bindgen_padding_0: [u8; 4usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_gpuobj_import {
+    pub priv_: __u64,
+    pub priv_len: __u64,
+    pub flags: __u64,
+    pub type_: crate::types::arch32::c_uint,
+    pub id: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_gpuobj_import_dma_buf {
+    pub fd: crate::types::arch32::c_int,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_gpuobj_import_useraddr {
+    pub virtaddr: __u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_gpuobj_sync_obj {
+    pub offset: __u64,
+    pub length: __u64,
+    pub id: crate::types::arch32::c_uint,
+    pub op: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_gpuobj_sync {
+    pub objs: __u64,
+    pub obj_len: crate::types::arch32::c_uint,
+    pub count: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_command_object {
+    pub offset: __u64,
+    pub gpuaddr: __u64,
+    pub size: __u64,
+    pub flags: crate::types::arch32::c_uint,
+    pub id: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_command_syncpoint {
+    pub priv_: __u64,
+    pub size: __u64,
+    pub type_: crate::types::arch32::c_uint,
+    pub __bindgen_padding_0: [u8; 4usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_gpu_command {
+    pub flags: __u64,
+    pub cmdlist: __u64,
+    pub cmdsize: crate::types::arch32::c_uint,
+    pub numcmds: crate::types::arch32::c_uint,
+    pub objlist: __u64,
+    pub objsize: crate::types::arch32::c_uint,
+    pub numobjs: crate::types::arch32::c_uint,
+    pub synclist: __u64,
+    pub syncsize: crate::types::arch32::c_uint,
+    pub numsyncs: crate::types::arch32::c_uint,
+    pub context_id: crate::types::arch32::c_uint,
+    pub timestamp: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_preemption_counters_query {
+    pub counters: __u64,
+    pub size_user: crate::types::arch32::c_uint,
+    pub size_priority_level: crate::types::arch32::c_uint,
+    pub max_priority_level: crate::types::arch32::c_uint,
+    pub __bindgen_padding_0: [u8; 4usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_gpuobj_set_info {
+    pub flags: __u64,
+    pub metadata: __u64,
+    pub id: crate::types::arch32::c_uint,
+    pub metadata_len: crate::types::arch32::c_uint,
+    pub type_: crate::types::arch32::c_uint,
+    pub __bindgen_padding_0: [u8; 4usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_sparse_phys_alloc {
+    pub size: __u64,
+    pub pagesize: __u64,
+    pub flags: __u64,
+    pub id: crate::types::arch32::c_uint,
+    pub __bindgen_padding_0: [u8; 4usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_sparse_phys_free {
+    pub id: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_sparse_virt_alloc {
+    pub size: __u64,
+    pub pagesize: __u64,
+    pub flags: __u64,
+    pub gpuaddr: __u64,
+    pub id: crate::types::arch32::c_uint,
+    pub __bindgen_padding_0: [u8; 4usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_sparse_virt_free {
+    pub id: crate::types::arch32::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_sparse_binding_object {
+    pub virtoffset: __u64,
+    pub physoffset: __u64,
+    pub size: __u64,
+    pub flags: __u64,
+    pub id: crate::types::arch32::c_uint,
+    pub __bindgen_padding_0: [u8; 4usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_sparse_bind {
+    pub list: __u64,
+    pub id: crate::types::arch32::c_uint,
+    pub size: crate::types::arch32::c_uint,
+    pub count: crate::types::arch32::c_uint,
+    pub __bindgen_padding_0: [u8; 4usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_gpu_sparse_command {
+    pub flags: __u64,
+    pub sparselist: __u64,
+    pub synclist: __u64,
+    pub sparsesize: crate::types::arch32::c_uint,
+    pub numsparse: crate::types::arch32::c_uint,
+    pub syncsize: crate::types::arch32::c_uint,
+    pub numsyncs: crate::types::arch32::c_uint,
+    pub context_id: crate::types::arch32::c_uint,
+    pub timestamp: crate::types::arch32::c_uint,
+    pub id: crate::types::arch32::c_uint,
+    pub __bindgen_padding_0: [u8; 4usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_gpumem_bind_range {
+    pub child_offset: __u64,
+    pub target_offset: __u64,
+    pub length: __u64,
+    pub child_id: __u32,
+    pub op: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_gpumem_bind_ranges {
+    pub ranges: __u64,
+    pub ranges_nents: __u32,
+    pub ranges_size: __u32,
+    pub id: __u32,
+    pub flags: __u32,
+    pub fence_id: crate::types::arch32::c_int,
+    pub padding: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_gpu_aux_command_bind {
+    pub rangeslist: __u64,
+    pub numranges: __u64,
+    pub rangesize: __u64,
+    pub target: __u32,
+    pub padding: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_gpu_aux_command_generic {
+    pub priv_: __u64,
+    pub size: __u64,
+    pub type_: __u32,
+    pub padding: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_gpu_aux_command {
+    pub flags: __u64,
+    pub cmdlist: __u64,
+    pub cmdsize: __u32,
+    pub numcmds: __u32,
+    pub synclist: __u64,
+    pub syncsize: __u32,
+    pub numsyncs: __u32,
+    pub context_id: __u32,
+    pub timestamp: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_timeline_create {
+    pub seqno: __u64,
+    pub id: __u32,
+    pub padding: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_timeline_val {
+    pub seqno: __u64,
+    pub timeline: __u32,
+    pub padding: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_timeline_wait {
+    pub tv_sec: __s64,
+    pub tv_nsec: __s64,
+    pub timelines: __u64,
+    pub count: __u32,
+    pub timelines_size: __u32,
+    pub flags: __u32,
+    pub padding: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_timeline_signal {
+    pub timelines: __u64,
+    pub count: __u32,
+    pub timelines_size: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_timeline_fence_get {
+    pub seqno: __u64,
+    pub timeline: __u32,
+    pub handle: crate::types::arch32::c_int,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_gpu_aux_command_timeline {
+    pub timelines: __u64,
+    pub count: __u32,
+    pub timelines_size: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_pagefault_report {
+    pub fault_addr: __u64,
+    pub reserved: [__u64; 2usize],
+    pub fault_type: __u32,
+    pub __pad: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_fault {
+    pub fault: __u64,
+    pub type_: __u32,
+    pub count: __u32,
+    pub size: __u32,
+    pub padding: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_fault_report {
+    pub faultlist: __u64,
+    pub faultnents: __u32,
+    pub faultsize: __u32,
+    pub context_id: __u32,
+    pub padding: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_recurring_command {
+    pub flags: __u64,
+    pub cmdlist: __u64,
+    pub cmdsize: __u32,
+    pub numcmds: __u32,
+    pub objlist: __u64,
+    pub objsize: __u32,
+    pub numobjs: __u32,
+    pub context_id: __u32,
+    pub padding: __u32,
+}
+pub const kgsl_calibrated_time_domain_KGSL_CALIBRATED_TIME_DOMAIN_DEVICE:
+    kgsl_calibrated_time_domain = 0;
+pub const kgsl_calibrated_time_domain_KGSL_CALIBRATED_TIME_DOMAIN_MONOTONIC:
+    kgsl_calibrated_time_domain = 1;
+pub const kgsl_calibrated_time_domain_KGSL_CALIBRATED_TIME_DOMAIN_MONOTONIC_RAW:
+    kgsl_calibrated_time_domain = 2;
+pub const kgsl_calibrated_time_domain_KGSL_CALIBRATED_TIME_DOMAIN_MAX: kgsl_calibrated_time_domain =
+    3;
+pub type kgsl_calibrated_time_domain = crate::types::arch32::c_uint;
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct kgsl_read_calibrated_timestamps {
+    pub sources: __u64,
+    pub ts: __u64,
+    pub deviation: __u64,
+    pub count: __u32,
+    pub padding: __u32,
+}
 #[repr(C)]
 #[repr(align(8))]
 #[derive(Debug, Default)]
@@ -17053,6 +18267,50 @@ pub struct vvar_data {
     pub boot_to_utc_reference_ticks: std::sync::atomic::AtomicU32,
     pub boot_to_utc_synthetic_ticks: std::sync::atomic::AtomicU32,
 }
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct sigset64_t {
+    pub sig: [crate::types::arch32::c_ulong; 1usize],
+}
+pub type mcontext_t = sigcontext;
+#[repr(C)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct ucontext {
+    pub uc_flags: crate::types::arch32::c_ulong,
+    pub uc_link: crate::uref32<ucontext>,
+    pub uc_stack: stack_t,
+    pub uc_mcontext: mcontext_t,
+    pub uc_sigmask64: sigset64_t,
+    pub __padding: [crate::types::arch32::c_char; 640usize],
+}
+impl Default for ucontext {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+pub type ucontext_t = ucontext;
+#[repr(C)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct sigaction64 {
+    pub sa_handler: __sighandler_t,
+    pub sa_flags: crate::types::arch32::c_ulong,
+    pub sa_restorer: crate::uaddr32,
+    pub sa_mask: sigset64_t,
+}
+impl Default for sigaction64 {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+pub type sigaction64_t = sigaction64;
 pub const SECCOMP_IOCTL_NOTIF_RECV: __u32 = 3226476800;
 pub const SECCOMP_IOCTL_NOTIF_SEND: __u32 = 3222806785;
 pub const SECCOMP_IOCTL_NOTIF_ID_VALID: __u32 = 1074274562;
@@ -17109,6 +18367,7 @@ pub struct remote_binder_wait_command {
 }
 pub const REMOTE_BINDER_START: __u32 = 2147766785;
 pub const REMOTE_BINDER_WAIT: __u32 = 1073828354;
+pub const FIBMAP: __u32 = 1;
 pub const FIGETBSZ: __u32 = 2;
 pub const FS_IOC_GETVERSION: __u32 = 2147776001;
 pub const FS_IOC_SETVERSION: __u32 = 1074034178;

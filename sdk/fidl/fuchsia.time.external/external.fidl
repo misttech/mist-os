@@ -192,3 +192,35 @@ type Error = strict enum {
 
 /// Device global properties a time source may use to help it sample time.
 type Properties = table {};
+
+/// Report UTC reference adjustment.
+///
+/// Allows components to request corrections to the reported UTC time.  Very few
+/// components should be expected to have access to this capability.
+@discoverable
+closed protocol Adjust {
+    /// Requests that the callee changes its UTC time estimate.
+    ///
+    /// Reports the caller's desired correspondence between the boot timeline,
+    /// and the UTC timeline.
+    ///
+    /// The caller is required to provide both reference points so that any
+    /// FIDL round-trip delays do not affect the callee's interpretation of
+    /// the caller's intentions.  For example, were the callee to use its own
+    /// `boot_reference` value instead of a caller-provided one, long wall time
+    /// delays between the caller's and the callee's sampling of `boot_reference`
+    /// would introduce a skew.  While this is unlikely to happen on a device to
+    /// a meaningful extent, we established that this is the correct way to
+    /// transmit such information.
+    ///
+    /// To wit, we have observed delays in test environments. This is likely
+    /// because test environments run on emulators in shared-resource
+    /// settings, where unusually long delays are relatively common.
+    strict ReportBootToUtcMapping(struct {
+        /// A time instant on the boot timeline, for which the caller is reporting
+        /// a presumed UTC reference instant.
+        boot_reference zx.InstantBoot;
+        /// The time instant on the UTC timeline, corresponding to `boot_reference`.
+        utc_reference zx.Time;
+    }) -> () error Error;
+};

@@ -2,14 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::security;
 use crate::task::CurrentTask;
 use crate::vfs::{ActiveNamespaceNode, CheckAccessReason, Namespace, NamespaceNode};
 use starnix_logging::log_trace;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, RwLock};
 use starnix_uapi::auth::CAP_SYS_CHROOT;
+use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{Access, FileMode};
-use starnix_uapi::{errno, error};
 use std::sync::Arc;
 
 /// The mutable state for an FsContext.
@@ -128,9 +129,7 @@ impl FsContext {
     {
         name.check_access(locked, current_task, Access::EXEC, CheckAccessReason::Chroot)
             .map_err(|_| errno!(EACCES))?;
-        if !current_task.creds().has_capability(CAP_SYS_CHROOT) {
-            return error!(EPERM);
-        }
+        security::check_task_capable(current_task, CAP_SYS_CHROOT)?;
 
         let mut state = self.state.write();
         state.root = name.into_active();

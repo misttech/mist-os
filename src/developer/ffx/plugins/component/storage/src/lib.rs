@@ -7,10 +7,11 @@ use component_debug::cli::{
     storage_copy_cmd, storage_delete_all_cmd, storage_delete_cmd, storage_list_cmd,
     storage_make_directory_cmd,
 };
-use errors::FfxError;
+use errors::ffx_error;
 use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_storage_args::{StorageCommand, SubCommandEnum};
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool};
 use target_holders::RemoteControlProxyHolder;
 
 #[derive(FfxTool)]
@@ -79,7 +80,7 @@ impl FfxMain for StorageTool {
                 .await
             }
         }
-        .map_err(|e| FfxError::Error(e, 1))?;
+        .map_err(|e| ffx_error!(e))?;
         Ok(())
     }
 }

@@ -87,7 +87,9 @@ class VkReadbackTest {
   [[nodiscard]] bool Readback();
 
   vk::Device vulkan_device() const { return ctx_->device().get(); }
-  const vk::DispatchLoaderDynamic& vulkan_loader() const { return ctx_->loader(); }
+
+  const vk::detail::DispatchLoaderDynamic& vulkan_loader() const { return ctx_->loader(); }
+
   vk::PhysicalDevice physical_device() const { return ctx_->physical_device(); }
   VulkanExtensionSupportState timeline_semaphore_support() const {
     return timeline_semaphore_support_;

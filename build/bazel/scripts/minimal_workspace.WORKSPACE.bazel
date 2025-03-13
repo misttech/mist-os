@@ -36,3 +36,9 @@ load(
 fuchsia_build_config_repository(
     name = "fuchsia_build_config",
 )
+
+# Fake build info to avoid depending on any build configuration.
+local_repository(
+    name = "fuchsia_build_info",
+    path = "build/bazel/scripts/fake_build_info",
+)

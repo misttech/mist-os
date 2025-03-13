@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use crate::device::constants::{
-    BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL, FVM_DRIVER_PATH,
-    GPT_DRIVER_PATH, LEGACY_DATA_PARTITION_LABEL, MBR_DRIVER_PATH, NAND_BROKER_DRIVER_PATH,
+    BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL, GPT_DRIVER_PATH,
+    LEGACY_DATA_PARTITION_LABEL, MBR_DRIVER_PATH, NAND_BROKER_DRIVER_PATH,
 };
 use crate::device::{Device, DeviceTag};
 use crate::environment::Environment;
@@ -55,8 +55,8 @@ impl Matchers {
         // Match the system container.
         // On a regular system, we'll mount the container and its inner volumes.
         // On recovery systems, there might be a ramdisk container as well as an on-disk container.
-        // We will mount the ramdisk container and its volumes, but we will only bind the on-disk
-        // container (which allows enumerating volumes) but will mount to its volumes.
+        // We will mount the ramdisk container and its volumes, but we will only mount the on-disk
+        // container (which allows enumerating volumes) and will not mount its volumes.
         if config.fxfs_blob {
             if !config.netboot {
                 matchers.push(Box::new(FxblobMatcher::new(config.ramdisk_image)));
@@ -65,12 +65,10 @@ impl Matchers {
                 matchers.push(Box::new(FxblobOnRecoveryMatcher::new()));
             }
         } else {
-            matchers.push(Box::new(FvmMatcher::new(
-                config.ramdisk_image,
-                config.netboot,
-                config.storage_host,
-            )));
-            if config.ramdisk_image {
+            if !config.netboot {
+                matchers.push(Box::new(FvmMatcher::new(config.ramdisk_image, config.storage_host)));
+            }
+            if config.ramdisk_image || config.netboot {
                 matchers.push(Box::new(FvmOnRecoveryMatcher::new(config.storage_host)));
             }
         }
@@ -219,7 +217,7 @@ impl Matcher for FxblobMatcher {
             return false;
         }
         match device.partition_label().await {
-            Ok(label) => {
+            Ok(label) if !label.is_empty() => {
                 // There are a few different labels used depending on the device. If we don't see
                 // any of them, this isn't the right partition.
                 // TODO(https://fxbug.dev/344018917): Use another mechanism to keep
@@ -228,10 +226,10 @@ impl Matcher for FxblobMatcher {
                     return false;
                 }
             }
-            // If there is an error getting the partition label, it might be because this device
-            // doesn't support labels (like if it's directly on a raw disk in an emulator).
-            // Continue with content sniffing.
-            Err(_) => (),
+            // If there is an error getting the partition label, or if the label is empty, it might
+            // be because this device doesn't support labels (like if it's directly on a raw disk in
+            // an emulator).  Continue with content sniffing.
+            _ => (),
         }
         device.content_format().await.ok() == Some(DiskFormat::Fxfs)
     }
@@ -256,9 +254,6 @@ struct FvmMatcher {
     // True if this partition is required to exist on a ramdisk.
     ramdisk_required: bool,
 
-    // If set, only the driver will bind, not the inner volumes.
-    netboot: bool,
-
     // If set, the FVM component will be launched instead of the legacy FVM driver.
     storage_host: bool,
 
@@ -268,8 +263,8 @@ struct FvmMatcher {
 }
 
 impl FvmMatcher {
-    fn new(ramdisk_required: bool, netboot: bool, storage_host: bool) -> Self {
-        Self { ramdisk_required, netboot, storage_host, already_matched: false }
+    fn new(ramdisk_required: bool, storage_host: bool) -> Self {
+        Self { ramdisk_required, storage_host, already_matched: false }
     }
 
     async fn bind_fvm_component(
@@ -290,9 +285,6 @@ impl FvmMatcher {
     ) -> Result<(), Error> {
         // volume names have the format {label}-p-{index}, e.g. blobfs-p-1
         let volume_names = env.bind_and_enumerate_fvm(device).await?;
-        if self.netboot {
-            return Ok(());
-        }
         if let Some(blob_name) =
             volume_names.iter().find(|name| name.starts_with(BLOBFS_PARTITION_LABEL))
         {
@@ -542,14 +534,16 @@ impl Matcher for FvmOnRecoveryMatcher {
         env: &mut dyn Environment,
     ) -> Result<Option<DeviceTag>, Error> {
         if self.storage_host {
-            // TODO(https://fxbug.dev/388533231): Support recovery mode.  To do this, we'll need to
+            // TODO(https://fxbug.dev/397770032): Support recovery mode.  To do this, we'll need to
             // make FVM components dynamic children so we can have two (one for the ramdisk, one for
             // this).  Alternatively, we can make it so that recovery doesn't bind the FVM
             // component, but we'll need to make sure that works with all recovery flows, and the
-            // fact that volumes don't enumerate won't be an issue.
-            bail!("Recovery mode isn't supported on storage-host yet.");
+            // fact that volumes don't enumerate won't be an issue.  Today, we still process the
+            // device so it gets tagged correctly, but we don't launch anything, which is a subtle
+            // behavior difference from non-storage-host.
+            log::warn!("Launching secondary FVM on recovery is not supported on storage-host yet");
         } else {
-            if let Err(err) = env.attach_driver(device, FVM_DRIVER_PATH).await {
+            if let Err(err) = env.bind_and_enumerate_fvm(device).await {
                 log::error!(err:?; "Failed to bind driver; FVM may be corrupt");
             }
         }
@@ -563,8 +557,8 @@ mod tests {
     use super::{Device, DiskFormat, Environment, Matchers};
     use crate::config::default_config;
     use crate::device::constants::{
-        BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL, FVM_DRIVER_PATH,
-        GPT_DRIVER_PATH, LEGACY_DATA_PARTITION_LABEL, NAND_BROKER_DRIVER_PATH,
+        BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL, GPT_DRIVER_PATH,
+        LEGACY_DATA_PARTITION_LABEL, NAND_BROKER_DRIVER_PATH,
     };
     use crate::device::{DeviceTag, RegisteredDevices};
     use crate::environment::Filesystem;
@@ -915,6 +909,10 @@ mod tests {
         fn get_container(&mut self) -> Option<&mut ServingMultiVolumeFilesystem> {
             unreachable!();
         }
+
+        fn register_filesystem(&mut self, _filesystem: Filesystem) {
+            unreachable!();
+        }
     }
 
     impl Drop for MockEnv {
@@ -1029,7 +1027,7 @@ mod tests {
         let fvm_device = MockDevice::new()
             .set_content_format(DiskFormat::Fvm)
             .set_topological_path("first_prefix");
-        let mut env = MockEnv::new().expect_attach_driver(FVM_DRIVER_PATH);
+        let mut env = MockEnv::new().expect_bind_and_enumerate_fvm();
         assert!(matchers
             .match_device(Box::new(fvm_device.clone()), &mut env)
             .await
@@ -1066,7 +1064,7 @@ mod tests {
         let fvm_device = MockDevice::new()
             .set_content_format(DiskFormat::Fvm)
             .set_topological_path("first_prefix");
-        let mut env = MockEnv::new().expect_attach_driver(FVM_DRIVER_PATH);
+        let mut env = MockEnv::new().expect_bind_and_enumerate_fvm();
         assert!(matchers
             .match_device(Box::new(fvm_device.clone()), &mut env)
             .await
@@ -1092,7 +1090,7 @@ mod tests {
         let fvm_device = MockDevice::new()
             .set_content_format(DiskFormat::Fvm)
             .set_topological_path("first_prefix");
-        let mut env = MockEnv::new().expect_attach_driver(FVM_DRIVER_PATH);
+        let mut env = MockEnv::new().expect_bind_and_enumerate_fvm();
         assert!(matchers
             .match_device(Box::new(fvm_device.clone()), &mut env)
             .await
@@ -1509,7 +1507,7 @@ mod tests {
             Matchers::new(&fshost_config::Config { ramdisk_image: true, ..default_config() });
 
         // The non-ramdisk should match by content format.
-        let mut env = MockEnv::new().expect_attach_driver(FVM_DRIVER_PATH);
+        let mut env = MockEnv::new().expect_bind_and_enumerate_fvm();
         assert!(matchers
             .match_device(Box::new(MockDevice::new().set_content_format(DiskFormat::Fvm)), &mut env)
             .await
@@ -1538,7 +1536,7 @@ mod tests {
 
         // The non-ramdisk FVM should be able to match on label as well.
         for label in ALL_FVM_LABELS {
-            let mut env = MockEnv::new().expect_attach_driver(FVM_DRIVER_PATH);
+            let mut env = MockEnv::new().expect_bind_and_enumerate_fvm();
             matchers =
                 Matchers::new(&fshost_config::Config { ramdisk_image: true, ..default_config() });
             assert!(matchers

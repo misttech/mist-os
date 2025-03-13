@@ -29,7 +29,7 @@ fuchsia_unittest_package("stash_ctl_tests") {
   deps = [ ":bin_test" ]
 }
 
-fuchsia_shell_package("stash_ctl") {
+fuchsia_package("stash_ctl") {
   deps = [ ":bin" ]
 }
 

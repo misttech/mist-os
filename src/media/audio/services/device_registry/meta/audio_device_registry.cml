@@ -22,24 +22,24 @@
     ],
     use: [
         {
-            directory: "dev-audio-input",
-            rights: [ "r*" ],
-            path: "/dev/class/audio-input",
-        },
-        {
-            directory: "dev-audio-output",
-            rights: [ "r*" ],
-            path: "/dev/class/audio-output",
-        },
-        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have been migrated to services. The service capability has been added below.
             directory: "dev-audio-composite",
             rights: [ "r*" ],
             path: "/dev/class/audio-composite",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.audio.CompositeConnectorService",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have been migrated to services. The service capability has been added below.
             directory: "dev-codec",
             rights: [ "r*" ],
             path: "/dev/class/codec",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.audio.CodecConnectorService",
         },
     ],
     expose: [

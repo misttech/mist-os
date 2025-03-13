@@ -305,9 +305,9 @@ namespace fidl {
 #ifdef __Fuchsia__
 
 template <>
-struct IsResource<::test_protocolrequest::ParentGetChildResponse> : public std::true_type{};
+struct IsResource<::test_protocolrequest::ParentGetChildResponse> : public std::true_type {};
 template <>
-struct IsFidlType<::test_protocolrequest::ParentGetChildResponse> : public std::true_type{};
+struct IsFidlType<::test_protocolrequest::ParentGetChildResponse> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_protocolrequest::ParentGetChildResponse> {
@@ -319,7 +319,7 @@ struct TypeTraits<::test_protocolrequest::ParentGetChildResponse> {
 };
 
 template <>
-struct IsStruct<::test_protocolrequest::ParentGetChildResponse> : public std::true_type{};
+struct IsStruct<::test_protocolrequest::ParentGetChildResponse> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocolrequest::ParentGetChildResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
@@ -330,9 +330,9 @@ struct internal::NaturalCodingTraits<::test_protocolrequest::ParentGetChildRespo
 #ifdef __Fuchsia__
 
 template <>
-struct IsResource<::test_protocolrequest::ParentGetChildRequestResponse> : public std::true_type{};
+struct IsResource<::test_protocolrequest::ParentGetChildRequestResponse> : public std::true_type {};
 template <>
-struct IsFidlType<::test_protocolrequest::ParentGetChildRequestResponse> : public std::true_type{};
+struct IsFidlType<::test_protocolrequest::ParentGetChildRequestResponse> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_protocolrequest::ParentGetChildRequestResponse> {
@@ -344,7 +344,7 @@ struct TypeTraits<::test_protocolrequest::ParentGetChildRequestResponse> {
 };
 
 template <>
-struct IsStruct<::test_protocolrequest::ParentGetChildRequestResponse> : public std::true_type{};
+struct IsStruct<::test_protocolrequest::ParentGetChildRequestResponse> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocolrequest::ParentGetChildRequestResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
@@ -355,9 +355,9 @@ struct internal::NaturalCodingTraits<::test_protocolrequest::ParentGetChildReque
 #ifdef __Fuchsia__
 
 template <>
-struct IsResource<::test_protocolrequest::ParentTakeChildRequest> : public std::true_type{};
+struct IsResource<::test_protocolrequest::ParentTakeChildRequest> : public std::true_type {};
 template <>
-struct IsFidlType<::test_protocolrequest::ParentTakeChildRequest> : public std::true_type{};
+struct IsFidlType<::test_protocolrequest::ParentTakeChildRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_protocolrequest::ParentTakeChildRequest> {
@@ -369,7 +369,7 @@ struct TypeTraits<::test_protocolrequest::ParentTakeChildRequest> {
 };
 
 template <>
-struct IsStruct<::test_protocolrequest::ParentTakeChildRequest> : public std::true_type{};
+struct IsStruct<::test_protocolrequest::ParentTakeChildRequest> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocolrequest::ParentTakeChildRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
@@ -380,9 +380,9 @@ struct internal::NaturalCodingTraits<::test_protocolrequest::ParentTakeChildRequ
 #ifdef __Fuchsia__
 
 template <>
-struct IsResource<::test_protocolrequest::ParentTakeChildRequestRequest> : public std::true_type{};
+struct IsResource<::test_protocolrequest::ParentTakeChildRequestRequest> : public std::true_type {};
 template <>
-struct IsFidlType<::test_protocolrequest::ParentTakeChildRequestRequest> : public std::true_type{};
+struct IsFidlType<::test_protocolrequest::ParentTakeChildRequestRequest> : public std::true_type {};
 
 template <>
 struct TypeTraits<::test_protocolrequest::ParentTakeChildRequestRequest> {
@@ -394,7 +394,7 @@ struct TypeTraits<::test_protocolrequest::ParentTakeChildRequestRequest> {
 };
 
 template <>
-struct IsStruct<::test_protocolrequest::ParentTakeChildRequestRequest> : public std::true_type{};
+struct IsStruct<::test_protocolrequest::ParentTakeChildRequestRequest> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocolrequest::ParentTakeChildRequestRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final

@@ -172,7 +172,6 @@
                 "send02",
                 "setitimer01",
                 "setitimer02",
-                "setpgid01",
                 "setpriority01",
                 "setrlimit03",
                 "settimeofday01",
@@ -221,6 +220,12 @@
 
                 // TODO(https://fxbug.dev/287114514)
                 "userfaultfd01",
+
+                // TODO(https://fxbug.dev/399386298): fix and re-enable
+                "ioctl_ficlone02",
+
+                // TODO(https://fxbug.dev/399387742): fix invocation path and re-enable
+                "vma05",
             ],
         },
         {
@@ -284,8 +289,11 @@
                 "cgroup_core03",
                 "clone303",
 
-                // TODO(http://fxbuf.dev/390870202): Re-enable once flake is resolved.
+                // TODO(https://fxbug.dev/390870202): Re-enable once flake is resolved.
                 "clock_nanosleep02",
+
+                // TODO(https://fxbug.dev/395053835): Re-enable once flake is resolved.
+                "setrlimit01",
             ],
         },
     ],

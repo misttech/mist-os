@@ -5,9 +5,11 @@
 //! Types for working with and exposing packet statistic counters.
 
 use net_types::ip::{Ip, Ipv4, Ipv6};
-use netstack3_base::{ContextPair, CounterContext, Inspector};
+use netstack3_base::{ContextPair, CounterContext, Inspector, InspectorExt as _};
 use netstack3_device::ethernet::EthernetDeviceCounters;
+use netstack3_device::socket::DeviceSocketCounters;
 use netstack3_device::{ArpCounters, DeviceCounters};
+use netstack3_ip::gmp::{IgmpCounters, MldCounters};
 use netstack3_ip::icmp::{
     IcmpRxCounters, IcmpRxCountersInner, IcmpTxCounters, IcmpTxCountersInner, NdpCounters,
     NdpRxCounters, NdpTxCounters,
@@ -46,12 +48,15 @@ where
         + CounterContext<IcmpTxCounters<Ipv4>>
         + CounterContext<IcmpTxCounters<Ipv4>>
         + CounterContext<IcmpTxCounters<Ipv6>>
+        + CounterContext<IgmpCounters>
+        + CounterContext<MldCounters>
         + CounterContext<NudCounters<Ipv4>>
         + CounterContext<NudCounters<Ipv6>>
         + CounterContext<NdpCounters>
         + CounterContext<ArpCounters>
         + CounterContext<DeviceCounters>
-        + CounterContext<EthernetDeviceCounters>,
+        + CounterContext<EthernetDeviceCounters>
+        + CounterContext<DeviceSocketCounters>,
 {
     fn core_ctx(&mut self) -> &mut C::CoreContext {
         let Self(pair) = self;
@@ -61,100 +66,106 @@ where
     /// Exposes all of the stack wide counters through `inspector`.
     pub fn inspect_stack_counters<I: Inspector>(&mut self, inspector: &mut I) {
         inspector.record_child("Device", |inspector| {
-            self.core_ctx().with_counters(|counters: &DeviceCounters| {
-                inspector.delegate_inspectable(counters)
-            });
-            self.core_ctx().with_counters(|counters: &EthernetDeviceCounters| {
-                inspector.delegate_inspectable(counters)
-            });
+            inspector
+                .delegate_inspectable(CounterContext::<DeviceCounters>::counters(self.core_ctx()));
+            inspector.delegate_inspectable(CounterContext::<EthernetDeviceCounters>::counters(
+                self.core_ctx(),
+            ));
         });
         inspector.record_child("Arp", |inspector| {
-            self.core_ctx().with_counters(|arp| inspect_arp_counters(inspector, arp));
+            inspect_arp_counters(inspector, self.core_ctx().counters());
         });
         inspector.record_child("NUD", |inspector| {
             inspector.record_child("V4", |inspector| {
-                self.core_ctx().with_counters(|nud| inspect_nud_counters::<Ipv4>(inspector, nud));
+                inspect_nud_counters::<Ipv4>(inspector, self.core_ctx().counters());
             });
             inspector.record_child("V6", |inspector| {
-                self.core_ctx().with_counters(|nud| inspect_nud_counters::<Ipv6>(inspector, nud));
+                inspect_nud_counters::<Ipv6>(inspector, self.core_ctx().counters());
             });
         });
         inspector.record_child("ICMP", |inspector| {
             inspector.record_child("V4", |inspector| {
                 inspector.record_child("Rx", |inspector| {
-                    self.core_ctx()
-                        .with_counters(|icmp| inspect_icmp_rx_counters::<Ipv4>(inspector, icmp));
+                    inspect_icmp_rx_counters::<Ipv4>(inspector, self.core_ctx().counters());
                 });
                 inspector.record_child("Tx", |inspector| {
-                    self.core_ctx()
-                        .with_counters(|icmp| inspect_icmp_tx_counters::<Ipv4>(inspector, icmp));
+                    inspect_icmp_tx_counters::<Ipv4>(inspector, self.core_ctx().counters());
                 });
             });
             inspector.record_child("V6", |inspector| {
                 inspector.record_child("Rx", |inspector| {
-                    self.core_ctx()
-                        .with_counters(|icmp| inspect_icmp_rx_counters::<Ipv6>(inspector, icmp));
+                    inspect_icmp_rx_counters::<Ipv6>(inspector, self.core_ctx().counters());
                     inspector.record_child("NDP", |inspector| {
-                        self.core_ctx().with_counters(|NdpCounters { rx, tx: _ }| {
-                            inspect_ndp_rx_counters(inspector, rx)
-                        });
+                        let NdpCounters { rx, tx: _ } = self.core_ctx().counters();
+                        inspect_ndp_rx_counters(inspector, rx);
                     })
                 });
                 inspector.record_child("Tx", |inspector| {
-                    self.core_ctx()
-                        .with_counters(|icmp| inspect_icmp_tx_counters::<Ipv6>(inspector, icmp));
+                    inspect_icmp_tx_counters::<Ipv6>(inspector, self.core_ctx().counters());
                     inspector.record_child("NDP", |inspector| {
-                        self.core_ctx().with_counters(|NdpCounters { rx: _, tx }| {
-                            inspect_ndp_tx_counters(inspector, tx)
-                        });
+                        let NdpCounters { rx: _, tx } = self.core_ctx().counters();
+                        inspect_ndp_tx_counters(inspector, tx);
                     })
                 });
             });
         });
+        inspector.record_child("IGMP", |inspector| {
+            inspector
+                .delegate_inspectable(CounterContext::<IgmpCounters>::counters(self.core_ctx()));
+        });
+        inspector.record_child("MLD", |inspector| {
+            inspector
+                .delegate_inspectable(CounterContext::<MldCounters>::counters(self.core_ctx()));
+        });
         inspector.record_child("IPv4", |inspector| {
-            self.core_ctx().with_counters(|ip| inspect_ip_counters::<Ipv4>(inspector, ip))
+            inspect_ip_counters::<Ipv4>(inspector, self.core_ctx().counters());
         });
         inspector.record_child("IPv6", |inspector| {
-            self.core_ctx().with_counters(|ip| inspect_ip_counters::<Ipv6>(inspector, ip))
+            inspect_ip_counters::<Ipv6>(inspector, self.core_ctx().counters());
         });
         inspector.record_child("MulticastForwarding", |inspector| {
             inspector.record_child("V4", |inspector| {
-                self.core_ctx().with_counters(|counters: &MulticastForwardingCounters<Ipv4>| {
-                    inspector.delegate_inspectable(counters)
-                })
+                inspector.delegate_inspectable(
+                    CounterContext::<MulticastForwardingCounters<Ipv4>>::counters(self.core_ctx()),
+                );
             });
             inspector.record_child("V6", |inspector| {
-                self.core_ctx().with_counters(|counters: &MulticastForwardingCounters<Ipv6>| {
-                    inspector.delegate_inspectable(counters)
-                })
+                inspector.delegate_inspectable(
+                    CounterContext::<MulticastForwardingCounters<Ipv6>>::counters(self.core_ctx()),
+                );
             });
+        });
+        inspector.record_child("DeviceSockets", |inspector| {
+            inspector.delegate_inspectable(CounterContext::<DeviceSocketCounters>::counters(
+                self.core_ctx(),
+            ));
         });
         inspector.record_child("RawIpSockets", |inspector| {
             inspector.record_child("V4", |inspector| {
-                self.core_ctx().with_counters(|counters: &RawIpSocketCounters<Ipv4>| {
-                    inspector.delegate_inspectable(counters)
-                })
+                inspector.delegate_inspectable(
+                    CounterContext::<RawIpSocketCounters<Ipv4>>::counters(self.core_ctx()),
+                );
             });
             inspector.record_child("V6", |inspector| {
-                self.core_ctx().with_counters(|counters: &RawIpSocketCounters<Ipv6>| {
-                    inspector.delegate_inspectable(counters)
-                })
+                inspector.delegate_inspectable(
+                    CounterContext::<RawIpSocketCounters<Ipv6>>::counters(self.core_ctx()),
+                );
             });
         });
         inspector.record_child("UDP", |inspector| {
             inspector.record_child("V4", |inspector| {
-                self.core_ctx().with_counters(|udp| inspect_udp_counters::<Ipv4>(inspector, udp))
+                inspect_udp_counters::<Ipv4>(inspector, self.core_ctx().counters());
             });
             inspector.record_child("V6", |inspector| {
-                self.core_ctx().with_counters(|udp| inspect_udp_counters::<Ipv6>(inspector, udp))
+                inspect_udp_counters::<Ipv6>(inspector, self.core_ctx().counters());
             });
         });
         inspector.record_child("TCP", |inspector| {
             inspector.record_child("V4", |inspector| {
-                self.core_ctx().with_counters(|tcp| inspect_tcp_counters::<Ipv4>(inspector, tcp))
+                inspect_tcp_counters::<Ipv4>(inspector, self.core_ctx().counters());
             });
             inspector.record_child("V6", |inspector| {
-                self.core_ctx().with_counters(|tcp| inspect_tcp_counters::<Ipv6>(inspector, tcp))
+                inspect_tcp_counters::<Ipv6>(inspector, self.core_ctx().counters());
             });
         });
     }

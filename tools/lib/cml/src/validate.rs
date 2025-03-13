@@ -270,8 +270,9 @@ impl<'a> ValidationContext<'a> {
         // Validate "expose".
         if let Some(exposes) = self.document.expose.as_ref() {
             let mut used_ids = HashMap::new();
+            let mut exposed_to_framework_ids = HashMap::new();
             for expose in exposes.iter() {
-                self.validate_expose(&expose, &mut used_ids)?;
+                self.validate_expose(&expose, &mut used_ids, &mut exposed_to_framework_ids)?;
             }
         }
 
@@ -715,6 +716,7 @@ which is almost certainly a mistake: {}",
         &self,
         expose: &'a Expose,
         used_ids: &mut HashMap<String, CapabilityId<'a>>,
+        exposed_to_framework_ids: &mut HashMap<String, CapabilityId<'a>>,
     ) -> Result<(), Error> {
         expose.capability_type()?;
         for checker in [
@@ -727,17 +729,6 @@ which is almost certainly a mistake: {}",
             self.config_from_self_checker(expose),
         ] {
             checker.validate("exposed")?;
-        }
-
-        // Ensure that if the expose target is framework, the source target is self always.
-        if expose.to == Some(ExposeToRef::Framework) {
-            match &expose.from {
-                OneOrMany::One(ExposeFromRef::Self_) => {}
-                OneOrMany::Many(vec) if vec.iter().all(|from| *from == ExposeFromRef::Self_) => {}
-                _ => {
-                    return Err(Error::validate("Expose to framework can only be done from self."))
-                }
-            }
         }
 
         // Ensure directory rights are valid.
@@ -809,7 +800,11 @@ which is almost certainly a mistake: {}",
         // Ensure we haven't already exposed an entity of the same name.
         let capability_ids = CapabilityId::from_offer_expose(expose)?;
         for capability_id in capability_ids {
-            if used_ids.insert(capability_id.to_string(), capability_id.clone()).is_some() {
+            let mut ids = &mut *used_ids;
+            if expose.to == Some(ExposeToRef::Framework) {
+                ids = &mut *exposed_to_framework_ids;
+            }
+            if ids.insert(capability_id.to_string(), capability_id.clone()).is_some() {
                 if let CapabilityId::Service(_) = capability_id {
                     // Services may have duplicates (aggregation).
                 } else {
@@ -4163,25 +4158,6 @@ mod tests {
             }),
             Ok(())
         ),
-        test_cml_expose_to_framework_invalid(
-            json!({
-                "expose": [
-                    {
-                        "directory": "foo",
-                        "from": "#logger",
-                        "to": "framework"
-                    }
-                ],
-                "children": [
-                    {
-                        "name": "logger",
-                        "url": "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm"
-                    }
-                ]
-            }),
-            Err(Error::Validate { err, .. }) if &err == "Expose to framework can only be done from self."
-        ),
-
         // offer
         test_cml_offer(
             json!({

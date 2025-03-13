@@ -262,6 +262,7 @@ impl<D: ResetMut> ResetMut for Empty<D> {
 /// thread.
 pub(super) struct FifoCache<D = DenyAll> {
     cache: IndexMap<QueryArgs, QueryResult>,
+    capacity: usize,
     oldest_index: usize,
     delegate: D,
     stats: CacheStats,
@@ -277,11 +278,20 @@ impl<D> FifoCache<D> {
         assert!(capacity > 0, "cannot instantiate fixed access vector cache of size 0");
 
         Self {
+            // Request `capacity` plus one element working-space for insertions that trigger
+            // an eviction.
             cache: IndexMap::with_capacity(capacity + 1),
+            capacity,
             oldest_index: 0,
             delegate,
             stats: CacheStats::default(),
         }
+    }
+
+    /// Returns true if the cache has reached capacity.
+    #[inline]
+    fn is_full(&self) -> bool {
+        self.cache.len() == self.capacity
     }
 
     /// Searches the cache and returns the index of a [`QueryAndResult`] matching
@@ -306,35 +316,32 @@ impl<D> FifoCache<D> {
         None
     }
 
-    /// Returns true if the cache has reached capacity.
-    #[cfg(test)]
-    #[inline]
-    fn is_full(&self) -> bool {
-        self.cache.len() == self.cache.capacity() - 1
-    }
-
     /// Inserts the specified `query` and `result` into the cache, evicting the oldest existing
     /// entry if capacity has been reached.
     #[inline]
     fn insert(&mut self, query: QueryArgs, result: QueryResult) -> usize {
         self.stats.allocs += 1;
 
-        // Insert the entry, at the end of the `IndexMap` queue.
-        let (mut index, _) = self.cache.insert_full(query, result);
+        // If the cache is already full then it will be necessary to evict an existing entry.
+        // Eviction is performed after inserting the new entry, to allow the eviction operation to
+        // be implemented via swap-into-place.
+        let must_evict = self.is_full();
 
-        // If the `cache` is now full then remove the oldest element, which is the entry at the
-        // `oldest_index`, and increment it to point to the new oldest element.
-        if self.cache.len() == self.cache.capacity() {
+        // Insert the entry, at the end of the `IndexMap` queue, then evict the oldest element.
+        let (mut index, _) = self.cache.insert_full(query, result);
+        if must_evict {
             // The final element in the ordered container is the newly-added entry, so we can simply
             // swap it with the oldest element, and then remove the final element, to achieve FIFO
             // eviction.
+            assert_eq!(index, self.capacity);
+
             self.cache.swap_remove_index(self.oldest_index);
             self.stats.reclaims += 1;
 
             index = self.oldest_index;
 
             self.oldest_index += 1;
-            if self.oldest_index == self.cache.capacity() - 1 {
+            if self.oldest_index == self.capacity {
                 self.oldest_index = 0;
             }
         }
@@ -732,7 +739,7 @@ impl<SS> Reset for Manager<SS> {
 }
 
 /// Describes the performance statistics of a cache implementation.
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, PartialEq)]
 pub struct CacheStats {
     /// Cumulative count of lookups performed on the cache.
     pub lookups: u64,
@@ -761,8 +768,8 @@ mod testing {
     /// SID to use where any value will do.
     pub(super) static A_TEST_SID: LazyLock<SecurityId> = LazyLock::new(unique_sid);
 
-    /// Default fixed cache size to use in tests.
-    pub(super) const CACHE_ENTRIES: usize = 10;
+    /// Default fixed cache capacity to request in tests.
+    pub(super) const TEST_CAPACITY: usize = 10;
 
     /// Returns a new `SecurityId` with unique id.
     pub(super) fn unique_sid() -> SecurityId {
@@ -852,7 +859,7 @@ mod tests {
 
     #[test]
     fn fixed_access_vector_cache_add_entry() {
-        let mut avc = FifoCache::<_>::new(Counter::<DenyAll>::default(), CACHE_ENTRIES);
+        let mut avc = FifoCache::<_>::new(Counter::<DenyAll>::default(), TEST_CAPACITY);
         assert_eq!(0, avc.delegate.query_count());
         assert_eq!(
             AccessVector::NONE,
@@ -870,7 +877,7 @@ mod tests {
 
     #[test]
     fn fixed_access_vector_cache_reset() {
-        let mut avc = FifoCache::<_>::new(Counter::<DenyAll>::default(), CACHE_ENTRIES);
+        let mut avc = FifoCache::<_>::new(Counter::<DenyAll>::default(), TEST_CAPACITY);
 
         avc.reset();
         assert_eq!(0, avc.oldest_index);
@@ -892,9 +899,9 @@ mod tests {
 
     #[test]
     fn fixed_access_vector_cache_fill() {
-        let mut avc = FifoCache::<_>::new(Counter::<DenyAll>::default(), CACHE_ENTRIES);
+        let mut avc = FifoCache::<_>::new(Counter::<DenyAll>::default(), TEST_CAPACITY);
 
-        for sid in unique_sids(CACHE_ENTRIES) {
+        for sid in unique_sids(avc.capacity) {
             avc.query(sid, A_TEST_SID.clone(), ObjectClass::Process.into());
         }
         assert_eq!(0, avc.oldest_index);
@@ -904,7 +911,7 @@ mod tests {
         assert_eq!(0, avc.oldest_index);
         assert_eq!(false, avc.is_full());
 
-        for sid in unique_sids(CACHE_ENTRIES) {
+        for sid in unique_sids(avc.capacity) {
             avc.query(A_TEST_SID.clone(), sid, ObjectClass::Process.into());
         }
         assert_eq!(0, avc.oldest_index);
@@ -917,16 +924,14 @@ mod tests {
 
     #[test]
     fn fixed_access_vector_cache_full_miss() {
-        let mut avc = FifoCache::<_>::new(Counter::<DenyAll>::default(), CACHE_ENTRIES);
+        let mut avc = FifoCache::<_>::new(Counter::<DenyAll>::default(), TEST_CAPACITY);
 
         // Make the test query, which will trivially miss.
-        let delegate_query_count = avc.delegate.query_count();
         avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into());
-        assert_eq!(delegate_query_count + 1, avc.delegate.query_count());
         assert!(!avc.is_full());
 
         // Fill the cache with new queries, which should evict the test query.
-        for sid in unique_sids(CACHE_ENTRIES) {
+        for sid in unique_sids(avc.capacity) {
             avc.query(sid, A_TEST_SID.clone(), ObjectClass::Process.into());
         }
         assert!(avc.is_full());
@@ -936,9 +941,11 @@ mod tests {
         avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into());
         assert_eq!(delegate_query_count + 1, avc.delegate.query_count());
 
-        // Because the cache is not LRU, making `CACHE_ENTRIES` unique queries, each preceded by
+        // Because the cache is not LRU, making `capacity()` unique queries, each preceded by
         // the test query, will still result in the test query result being evicted.
-        for sid in unique_sids(CACHE_ENTRIES) {
+        // Each test query will hit, and the interleaved queries will miss, with the final of the
+        // interleaved queries evicting the test query.
+        for sid in unique_sids(avc.capacity) {
             avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into());
             avc.query(sid, A_TEST_SID.clone(), ObjectClass::Process.into());
         }
@@ -1046,7 +1053,7 @@ mod starnix_tests {
 
     #[fuchsia::test]
     async fn thread_local_query_access_vector_cache_coherence() {
-        for _ in 0..CACHE_ENTRIES {
+        for _ in 0..TEST_CAPACITY {
             test_thread_local_query_access_vector_cache_coherence().await
         }
     }
@@ -1058,7 +1065,7 @@ mod starnix_tests {
             Arc::new(PolicyServer { policy: active_policy.clone() });
         let cache_version = Arc::new(AtomicVersion::default());
 
-        let fixed_avc = FifoCache::<_>::new(policy_server.clone(), CACHE_ENTRIES);
+        let fixed_avc = FifoCache::<_>::new(policy_server.clone(), TEST_CAPACITY);
         let cache_version_for_avc = cache_version.clone();
         let mut query_avc = ThreadLocalQuery::new(cache_version_for_avc, fixed_avc);
 
@@ -1126,7 +1133,7 @@ mod starnix_tests {
 
         let active_policy: Arc<AtomicU32> = Arc::new(Default::default());
         let policy_server = Arc::new(PolicyServer { policy: active_policy.clone() });
-        let fixed_avc = FifoCache::<_>::new(policy_server.clone(), CACHE_ENTRIES);
+        let fixed_avc = FifoCache::<_>::new(policy_server.clone(), TEST_CAPACITY);
         let avc = Locked::new(fixed_avc);
         let sids = unique_sids(30);
 

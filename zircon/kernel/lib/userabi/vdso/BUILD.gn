@@ -73,11 +73,13 @@ if (toolchain_environment == "user.basic") {
     public_deps = [ "//zircon/vdso:public" ]
     deps = [
       ":syscall-asm",
+      "//sdk/lib/ld:standalone",
       "//src/zircon/lib/zircon:headers",
       "//zircon/kernel/lib/arch:headers",
       "//zircon/kernel/lib/fasttime:headers",
       "//zircon/kernel/lib/userabi:headers",
       "//zircon/system/ulib/affine",
+      "//zircon/system/ulib/concurrent:concurrent_vdso",
       "//zircon/vdso:private",
     ]
 
@@ -147,9 +149,6 @@ if (toolchain_environment == "user.basic") {
     outputs = [ "$target_out_dir/$target_name.ok" ]
 
     script = "verify-abi.sh"
-
-    # This uses absolute paths so the "cp IMPL ABI" message has easily and
-    # universally cut&pastable paths.
     args = rebase_path(sources + outputs, root_build_dir)
 
     metadata = {

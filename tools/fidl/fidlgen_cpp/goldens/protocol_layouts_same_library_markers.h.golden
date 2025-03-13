@@ -30,6 +30,8 @@ class ComposedProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 7960710870216447007;
   };
   class TwoWayAnonComposed final {
     TwoWayAnonComposed() = delete;
@@ -44,6 +46,8 @@ class ComposedProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 8107448265006659060;
   };
   class TwoWayAnonComposedWithError final {
     TwoWayAnonComposedWithError() = delete;
@@ -58,6 +62,8 @@ class ComposedProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5751989932125743144;
   };
   class OnAnonComposed final {
     OnAnonComposed() = delete;
@@ -72,6 +78,8 @@ class ComposedProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5307191872315199016;
   };
   class OneWayNamedComposed final {
     OneWayNamedComposed() = delete;
@@ -86,6 +94,8 @@ class ComposedProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 1159174053475281336;
   };
   class TwoWayNamedComposed final {
     TwoWayNamedComposed() = delete;
@@ -100,6 +110,8 @@ class ComposedProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5022872388073111636;
   };
   class TwoWayNamedComposedWithError final {
     TwoWayNamedComposedWithError() = delete;
@@ -114,6 +126,8 @@ class ComposedProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 4973436213756973807;
   };
   class OnNamedComposed final {
     OnNamedComposed() = delete;
@@ -128,6 +142,8 @@ class ComposedProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 1712755118419701115;
   };
 };
 
@@ -152,6 +168,8 @@ class MainProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 7960710870216447007;
   };
   class TwoWayAnonComposed final {
     TwoWayAnonComposed() = delete;
@@ -166,6 +184,8 @@ class MainProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 8107448265006659060;
   };
   class TwoWayAnonComposedWithError final {
     TwoWayAnonComposedWithError() = delete;
@@ -180,6 +200,8 @@ class MainProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5751989932125743144;
   };
   class OnAnonComposed final {
     OnAnonComposed() = delete;
@@ -194,6 +216,8 @@ class MainProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5307191872315199016;
   };
   class OneWayNamedComposed final {
     OneWayNamedComposed() = delete;
@@ -208,6 +232,8 @@ class MainProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 1159174053475281336;
   };
   class TwoWayNamedComposed final {
     TwoWayNamedComposed() = delete;
@@ -222,6 +248,8 @@ class MainProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5022872388073111636;
   };
   class TwoWayNamedComposedWithError final {
     TwoWayNamedComposedWithError() = delete;
@@ -236,6 +264,8 @@ class MainProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 4973436213756973807;
   };
   class OnNamedComposed final {
     OnNamedComposed() = delete;
@@ -250,6 +280,8 @@ class MainProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 1712755118419701115;
   };
   class OneWayLocal final {
     OneWayLocal() = delete;
@@ -264,6 +296,8 @@ class MainProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 4131125523789731521;
   };
   class TwoWayLocal final {
     TwoWayLocal() = delete;
@@ -278,6 +312,8 @@ class MainProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 2781407403924167255;
   };
   class TwoWayLocalWithError final {
     TwoWayLocalWithError() = delete;
@@ -292,6 +328,8 @@ class MainProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 5367158046384127463;
   };
   class OnLocal final {
     OnLocal() = delete;
@@ -306,6 +344,8 @@ class MainProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 8208103053879750285;
   };
   class OneWayAnon final {
     OneWayAnon() = delete;
@@ -320,6 +360,8 @@ class MainProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 8596232895075765804;
   };
   class TwoWayAnon final {
     TwoWayAnon() = delete;
@@ -334,6 +376,8 @@ class MainProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 4600336371166510638;
   };
   class TwoWayAnonWithError final {
     TwoWayAnonWithError() = delete;
@@ -348,6 +392,8 @@ class MainProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = true;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 2104032160763523653;
   };
   class OnAnon final {
     OnAnon() = delete;
@@ -362,6 +408,8 @@ class MainProtocol final {
     static constexpr bool kHasNonEmptyUserFacingResponse = true;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 977183060572945300;
   };
 };
 
@@ -369,9 +417,9 @@ class MainProtocol final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_protocollayoutssamelibrary::ComposedProtocol> : public std::true_type{};
+struct IsProtocol<::test_protocollayoutssamelibrary::ComposedProtocol> : public std::true_type {};
 
 template <>
-struct IsProtocol<::test_protocollayoutssamelibrary::MainProtocol> : public std::true_type{};
+struct IsProtocol<::test_protocollayoutssamelibrary::MainProtocol> : public std::true_type {};
 
 }  // namespace fidl

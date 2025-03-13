@@ -68,7 +68,7 @@ void RunVerbUp(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
   if (cmd.thread()->GetStack().has_all_frames()) {
     on_has_frames(Err());
   } else {
-    cmd.thread()->GetStack().SyncFrames(false, std::move(on_has_frames));
+    cmd.thread()->GetStack().SyncFrames({}, std::move(on_has_frames));
   }
 }
 

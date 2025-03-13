@@ -15,7 +15,7 @@ use ieee80211::{Bssid, MacAddr, Ssid};
 use log::{debug, error, info, trace, warn};
 use std::fmt;
 use wlan_common::mac::{self, CapabilityInfo};
-use wlan_common::timer::{EventId, Timer};
+use wlan_common::timer::Timer;
 use wlan_common::TimeUnit;
 use zerocopy::SplitByteSlice;
 use {
@@ -162,8 +162,8 @@ impl<D: DeviceOps> crate::MlmeImpl for Ap<D> {
         warn!("Unexpected ScanComplete for AP MLME.");
         return;
     }
-    async fn handle_timeout(&mut self, event_id: EventId, event: TimedEvent) {
-        Self::handle_timed_event(self, event_id, event).await
+    async fn handle_timeout(&mut self, event: TimedEvent) {
+        Self::handle_timed_event(self, event).await
     }
     fn access_device(&mut self) -> &mut Self::Device {
         &mut self.ctx.device
@@ -202,7 +202,7 @@ impl<D> Ap<D> {
 
 impl<D: DeviceOps> Ap<D> {
     // Timer handler functions.
-    pub async fn handle_timed_event(&mut self, event_id: EventId, event: TimedEvent) {
+    pub async fn handle_timed_event(&mut self, event: TimedEvent) {
         let bss = match self.bss.as_mut() {
             Some(bss) => bss,
             None => {
@@ -211,7 +211,7 @@ impl<D: DeviceOps> Ap<D> {
             }
         };
 
-        if let Err(e) = bss.handle_timed_event(&mut self.ctx, event_id, event).await {
+        if let Err(e) = bss.handle_timed_event(&mut self.ctx, event).await {
             error!("failed to handle timed event frame: {}", e)
         }
     }

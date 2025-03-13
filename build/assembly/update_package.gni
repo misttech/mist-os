@@ -118,8 +118,6 @@ template("update_package") {
     ffx_tool_output_name = "ffx-assembly"
 
     args = [
-      "--config",
-      "assembly_enabled=true",
       "assembly",
       "create-update",
       "--partitions",

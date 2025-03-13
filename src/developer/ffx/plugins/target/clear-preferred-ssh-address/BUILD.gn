@@ -21,6 +21,7 @@ ffx_plugin("ffx_target_clear_preferred_ssh_address") {
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/target/holders:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//third_party/rust_crates:async-trait",
   ]
   test_deps = [ "//src/lib/fuchsia-async" ]

@@ -61,10 +61,10 @@ pub fn __track_stub_inner(
     if *context_count == 0 {
         match flags {
             Some(flags) => {
-                log::warn!(tag = "track_stub", location:%; "{bug} {message}: 0x{flags:x}");
+                log::debug!(tag = "track_stub", location:%; "{bug} {message}: 0x{flags:x}");
             }
             None => {
-                log::warn!(tag = "track_stub", location:%; "{bug} {message}");
+                log::debug!(tag = "track_stub", location:%; "{bug} {message}");
             }
         }
     }
@@ -173,6 +173,8 @@ impl BugRef {
             }
         }
 
+        assert!(number != 0, "Zero does not a valid bug number make.");
+
         Some(Self { number })
     }
 }
@@ -180,6 +182,12 @@ impl BugRef {
 impl From<NonZeroU64> for BugRef {
     fn from(value: NonZeroU64) -> Self {
         Self { number: value.get() }
+    }
+}
+
+impl Into<NonZeroU64> for BugRef {
+    fn into(self) -> NonZeroU64 {
+        NonZeroU64::new(self.number).unwrap()
     }
 }
 

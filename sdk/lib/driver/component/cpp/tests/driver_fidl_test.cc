@@ -135,9 +135,10 @@ class TestIncomingAndOutgoingFidlsBase : public ::testing::Test {
     auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
     // [START set_up_outgoing_directory_channel]
-    zx_status_t status = fdio_open3_at(driver_outgoing_.handle()->get(), "/svc",
-                                       static_cast<uint64_t>(fuchsia_io::Flags::kProtocolDirectory),
-                                       server_end.TakeChannel().release());
+    zx_status_t status = fdio_open3_at(
+        driver_outgoing_.handle()->get(), "/svc",
+        uint64_t{fuchsia_io::wire::kPermReadable | fuchsia_io::Flags::kProtocolDirectory},
+        server_end.TakeChannel().release());
     // [END set_up_outgoing_directory_channel]
     EXPECT_EQ(ZX_OK, status);
     return std::move(client_end);

@@ -20,8 +20,19 @@
         },
     ],
     capabilities: [
-        { protocol: "fuchsia.time.test.Rtc" },
-        { protocol: "fuchsia.time.alarms.Wake" },
+        {
+            protocol: [
+                // Program wake alarms.
+                "fuchsia.time.alarms.Wake",
+
+                // Allow adjusting the UTC time estimate. Should be used
+                // sparingly.
+                "fuchsia.time.external.Adjust",
+
+                // Allows turning off UTC adjustiment. Used in tests only.
+                "fuchsia.time.test.Rtc",
+            ],
+        },
     ],
     use: [
         {
@@ -88,14 +99,19 @@
             to: "#timesource",
         },
     ],
+
+    // See the `capabilities` section for details.
     expose: [
         {
-            protocol: [ "fuchsia.time.alarms.Wake" ],
+            protocol: [
+                "fuchsia.time.alarms.Wake",
+                "fuchsia.time.test.Rtc",
+            ],
             from: "self",
             to: "parent",
         },
         {
-            protocol: [ "fuchsia.time.test.Rtc" ],
+            protocol: [ "fuchsia.time.external.Adjust" ],
             from: "self",
             to: "parent",
             availability: "optional",

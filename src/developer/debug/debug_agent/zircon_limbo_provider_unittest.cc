@@ -198,10 +198,11 @@ fidl::ClientEnd<fuchsia_io::Directory> SetupServiceRoot(std::unique_ptr<ServerIm
     async::PostTaskForTime(dispatcher, [dir = std::move(outgoing_dir)]() {}, zx::time::infinite());
   });
   auto [svc_client_end, svc_server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-  EXPECT_ZX_EQ(fdio_open3_at(root_client_end.channel().release(), "svc",
-                             static_cast<uint64_t>(fuchsia_io::Flags::kProtocolDirectory),
-                             svc_server_end.channel().release()),
-               ZX_OK);
+  EXPECT_ZX_EQ(
+      fdio_open3_at(root_client_end.channel().release(), "svc",
+                    uint64_t{fuchsia_io::kPermReadable | fuchsia_io::Flags::kProtocolDirectory},
+                    svc_server_end.channel().release()),
+      ZX_OK);
   return std::move(svc_client_end);
 }
 

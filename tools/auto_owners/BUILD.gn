@@ -40,7 +40,6 @@ if (is_host) {
 
     deps = crate_deps + [
              "//third_party/rust_crates:assert_matches",
-             "//third_party/rust_crates:once_cell",
              "//third_party/rust_crates:pretty_assertions",
              "//third_party/rust_crates:serial_test",
              "//third_party/rust_crates:tempfile",
@@ -83,6 +82,7 @@ if (is_host) {
       "tests/owners/third_party/rust_crates/vendor/bar/BUILD.gn",
       "tests/owners/third_party/rust_crates/vendor/bar/OWNERS",
       "tests/owners/third_party/rust_crates/vendor/foo/BUILD.gn",
+      "tests/owners/third_party/rust_crates/vendor/with-dashes-and-version-0.1.0/BUILD.gn",
       "tests/pass/BUILD.gn",
       "tests/pass/foo/BUILD.gn",
     ]

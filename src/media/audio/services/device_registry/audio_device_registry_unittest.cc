@@ -20,47 +20,38 @@ class AudioDeviceRegistryServerTest : public AudioDeviceRegistryServerTestBase {
 TEST_F(AudioDeviceRegistryServerTest, DeviceInitialization) {
   auto fake_codec = CreateFakeCodecOutput();
   auto fake_composite = CreateFakeComposite();
-  auto fake_stream = CreateFakeStreamConfigOutput();
 
   auto codec_client = fake_codec->Enable();
   auto composite_client = fake_composite->Enable();
-  auto stream_config_client = fake_stream->Enable();
 
   AddDeviceForDetection("test codec", fad::DeviceType::kCodec,
                         fad::DriverClient::WithCodec(std::move(codec_client)));
   AddDeviceForDetection("test composite", fad::DeviceType::kComposite,
                         fad::DriverClient::WithComposite(std::move(composite_client)));
-  AddDeviceForDetection("test output", fad::DeviceType::kOutput,
-                        fad::DriverClient::WithStreamConfig(std::move(stream_config_client)));
 
   RunLoopUntilIdle();
-  EXPECT_EQ(adr_service()->devices().size(), 3u);
+  EXPECT_EQ(adr_service()->devices().size(), 2u);
   EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
 }
 
 TEST_F(AudioDeviceRegistryServerTest, DeviceRemoval) {
   auto fake_codec = CreateFakeCodecInput();
   auto fake_composite = CreateFakeComposite();
-  auto fake_stream = CreateFakeStreamConfigInput();
 
   auto codec_client = fake_codec->Enable();
   auto composite_client = fake_composite->Enable();
-  auto stream_config_client = fake_stream->Enable();
 
   AddDeviceForDetection("test codec", fad::DeviceType::kCodec,
                         fad::DriverClient::WithCodec(std::move(codec_client)));
   AddDeviceForDetection("test composite", fad::DeviceType::kComposite,
                         fad::DriverClient::WithComposite(std::move(composite_client)));
-  AddDeviceForDetection("test input", fad::DeviceType::kInput,
-                        fad::DriverClient::WithStreamConfig(std::move(stream_config_client)));
 
   RunLoopUntilIdle();
-  EXPECT_EQ(adr_service()->devices().size(), 3u);
+  EXPECT_EQ(adr_service()->devices().size(), 2u);
   EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
 
   fake_codec->DropCodec();
   fake_composite->DropComposite();
-  fake_stream->DropStreamConfig();
   RunLoopUntilIdle();
 
   EXPECT_EQ(adr_service()->devices().size(), 0u);
@@ -91,23 +82,6 @@ TEST_F(AudioDeviceRegistryServerTest, FindCompositeByTokenId) {
   auto client = fidl::ClientEnd<fuchsia_hardware_audio::Composite>(fake_driver->Enable());
   AddDeviceForDetection("test composite", fad::DeviceType::kComposite,
                         fad::DriverClient::WithComposite(std::move(client)));
-
-  RunLoopUntilIdle();
-  EXPECT_EQ(adr_service()->devices().size(), 1u);
-  auto token_id = adr_service()->devices().begin()->get()->token_id();
-
-  EXPECT_EQ(adr_service()->FindDeviceByTokenId(token_id).first,
-            AudioDeviceRegistry::DevicePresence::Active);
-}
-
-/////////////////////
-// StreamConfig cases
-TEST_F(AudioDeviceRegistryServerTest, FindStreamConfigByTokenId) {
-  auto fake_driver = CreateFakeStreamConfigInput();
-
-  auto client = fake_driver->Enable();
-  AddDeviceForDetection("test input", fad::DeviceType::kInput,
-                        fad::DriverClient::WithStreamConfig(std::move(client)));
 
   RunLoopUntilIdle();
   EXPECT_EQ(adr_service()->devices().size(), 1u);

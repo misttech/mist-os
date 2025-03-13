@@ -45,7 +45,7 @@ cc_test_executable("memory-pressure-test-executable") {
   ]
 }
 
-fuchsia_shell_package("sysmem-memory-pressure") {
+fuchsia_package("sysmem-memory-pressure") {
   deps = [ ":memory-pressure-executable" ]
 }
 

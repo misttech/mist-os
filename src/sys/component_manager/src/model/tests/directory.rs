@@ -178,7 +178,7 @@ async fn open_requests_go_to_the_same_directory_connection() {
         // Make a few open calls.
         for _ in 0..10 {
             let (_, server_end) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
-            dir.open3(".", *OPEN_FLAGS, &fio::Options::default(), server_end.into_channel())
+            dir.open(".", *OPEN_FLAGS, &fio::Options::default(), server_end.into_channel())
                 .unwrap();
         }
     }

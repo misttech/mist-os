@@ -9,7 +9,8 @@ use ffx_profile_heapdump_common::{
     build_process_selector, check_snapshot_error, connect_to_collector, export_to_pprof,
 };
 use ffx_profile_heapdump_snapshot_args::SnapshotCommand;
-use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{AvailabilityFlag, FfxMain, FfxTool};
 use fidl::endpoints::create_request_stream;
 use fidl_fuchsia_memory_heapdump_client as fheapdump_client;
 use std::io::Write;

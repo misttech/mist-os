@@ -16,9 +16,9 @@ import logging
 import random
 
 import fidl.fuchsia_blackout_test as blackout
-import honeydew.errors
 import honeydew.utils.common
-from honeydew.interfaces.device_classes import fuchsia_device
+from honeydew.fuchsia_device import fuchsia_device
+from honeydew.transports.ffx.errors import FfxCommandError
 from honeydew.typing.custom_types import FidlEndpoint
 from mobly import asserts, test_runner
 from test_case_revive import test_case_revive
@@ -62,7 +62,7 @@ class BlackoutTest(test_case_revive.TestCaseRevive):
                     self.component_name,
                 ]
             )
-        except honeydew.errors.FfxCommandError:
+        except FfxCommandError:
             _LOGGER.warning(
                 "Blackout: Failed to stop component during teardown"
             )

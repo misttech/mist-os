@@ -220,7 +220,7 @@ void ImagePipeSurfaceDisplay::ControllerOnDisplaysChanged(
 
 void ImagePipeSurfaceDisplay::ControllerOnVsync(
     fuchsia_hardware_display_types::DisplayId, zx::time timestamp,
-    fuchsia_hardware_display_types::ConfigStamp applied_config_stamp,
+    fuchsia_hardware_display::ConfigStamp applied_config_stamp,
     fuchsia_hardware_display::VsyncAckCookie cookie) {
   // Minimize the time spent holding the mutex by gathering fences to signal, but not immediately
   // signaling them.
@@ -782,7 +782,7 @@ void ImagePipeSurfaceDisplay::PresentImage(
     }
   }
 
-  const fuchsia_hardware_display_types::ConfigStamp new_config_stamp = NextConfigStamp();
+  const fuchsia_hardware_display::ConfigStamp new_config_stamp = NextConfigStamp();
   {
     std::scoped_lock lock(mutex_);
 

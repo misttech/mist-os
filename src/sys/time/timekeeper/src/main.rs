@@ -43,8 +43,8 @@ use std::sync::Arc;
 use time_metrics_registry::TimeMetricDimensionExperiment;
 use zx::BootTimeline;
 use {
-    fidl_fuchsia_time as ftime, fidl_fuchsia_time_alarms as fta, fidl_fuchsia_time_test as fftt,
-    fuchsia_async as fasync,
+    fidl_fuchsia_time as ftime, fidl_fuchsia_time_alarms as fta,
+    fidl_fuchsia_time_external as ffte, fidl_fuchsia_time_test as fftt, fuchsia_async as fasync,
 };
 
 type UtcTransform = time_util::Transform<BootTimeline, UtcTimeline>;
@@ -63,6 +63,9 @@ pub enum Rpcs {
 
     /// Client request for scheduling alarms.
     Wake(fta::WakeRequestStream),
+
+    /// Client request for adjusting the UTC estimate.
+    Adjust(ffte::AdjustRequestStream),
 }
 
 /// Timekeeper config, populated from build-time generated structured config.
@@ -152,8 +155,16 @@ impl Config {
         self.source_config.has_real_time_clock
     }
 
+    fn has_always_on_counter(&self) -> bool {
+        self.source_config.has_always_on_counter
+    }
+
     fn serve_fuchsia_time_alarms(&self) -> bool {
         self.source_config.serve_fuchsia_time_alarms
+    }
+
+    fn serve_fuchsia_time_external_adjust(&self) -> bool {
+        self.source_config.serve_fuchsia_time_external_adjust
     }
 }
 
@@ -250,22 +261,6 @@ async fn main() -> Result<()> {
         CobaltDiagnostics::new(cobalt_experiment, &primary_track, &monitor_track),
     ));
 
-    info!("connecting to RTC");
-    let optional_rtc = match RtcImpl::only_device(config.has_rtc()).await {
-        Ok(rtc) => {
-            debug!("RTC found.");
-            Some(rtc)
-        }
-        Err(err) => {
-            match err {
-                RtcCreationError::NoDevices => info!("no RTC devices found."),
-                _ => warn!("failed to connect to RTC: {}", err),
-            };
-            diagnostics.record(Event::InitializeRtc { outcome: err.into(), time: None });
-            None
-        }
-    };
-
     let persistence_node = inspector_root.create_child("persistence");
     let persistence_health = Rc::new(RefCell::new(health::Node::new(&persistence_node)));
     persistence_health.borrow_mut().set_ok();
@@ -285,21 +280,57 @@ async fn main() -> Result<()> {
     let cmd_send_clone = cmd_send.clone();
     let serve_test_protocols = config.serve_test_protocols();
     let serve_fuchsia_time_alarms = config.serve_fuchsia_time_alarms();
+    let serve_adjust = config.serve_fuchsia_time_external_adjust();
     let ps = persistent_state.clone();
-    fasync::Task::local(async move {
-        maintain_utc(
-            primary_track,
-            monitor_track,
-            optional_rtc,
-            diagnostics,
-            config,
-            cmd_send_clone,
-            cmd_rcv,
-            ps,
-        )
-        .await;
-    })
-    .detach();
+
+    if config.has_always_on_counter() {
+        // A read only RTC implementation using an always-on counter.
+        let read_only_rtc = rtc::new_read_only_rtc(persistent_state.clone());
+        fasync::Task::local(async move {
+            maintain_utc(
+                primary_track,
+                monitor_track,
+                Some(read_only_rtc),
+                diagnostics,
+                config,
+                cmd_send_clone,
+                cmd_rcv,
+                ps,
+            )
+            .await;
+        })
+        .detach();
+    } else {
+        // A conventional (PC-like) RTC implementation.
+        let optional_rtc: Option<RtcImpl> = match RtcImpl::only_device(config.has_rtc()).await {
+            Ok(rtc) => {
+                debug!("RTC found.");
+                Some(rtc)
+            }
+            Err(err) => {
+                match err {
+                    RtcCreationError::NoDevices => info!("no RTC devices found."),
+                    _ => warn!("failed to connect to RTC: {}", err),
+                };
+                diagnostics.record(Event::InitializeRtc { outcome: err.into(), time: None });
+                None
+            }
+        };
+        fasync::Task::local(async move {
+            maintain_utc(
+                primary_track,
+                monitor_track,
+                optional_rtc,
+                diagnostics,
+                config,
+                cmd_send_clone,
+                cmd_rcv,
+                ps,
+            )
+            .await;
+        })
+        .detach();
+    }
 
     let loop_inspect = inspector_root.create_child("wake_alarms");
 
@@ -317,6 +348,10 @@ async fn main() -> Result<()> {
     if serve_fuchsia_time_alarms {
         fs.dir("svc").add_fidl_service(Rpcs::Wake);
         info!("serving protocol: fuchsia.time.alarms/Wake");
+    }
+    if serve_adjust {
+        fs.dir("svc").add_fidl_service(Rpcs::Adjust);
+        info!("serving protocol: fuchsia.time.alarms/Adjust");
     }
     fs.take_and_serve_directory_handle()?;
 
@@ -346,12 +381,15 @@ async fn main() -> Result<()> {
 
     let rtc_test_server = Rc::new(rtc_testing::Server::new(persistence_health, persistent_state));
 
+    let adjust_server = Rc::new(if serve_adjust { Some(time_adjust::Server::new()) } else { None });
+
     // fuchsia::main can only return () or Result<()>.
     let result = fs
         .for_each_concurrent(MAX_CONCURRENT_HANDLERS, |request: Rpcs| {
             let rtc_test_server = rtc_test_server.clone();
             let time_test_mutex = time_test_mutex.clone();
             let timer_loop = timer_loop.clone();
+            let adjust_server = adjust_server.clone();
             fuchsia_trace::instant!(c"timekeeper", c"request", fuchsia_trace::Scope::Process);
             async move {
                 match request {
@@ -381,6 +419,20 @@ async fn main() -> Result<()> {
                         }
                         Err(ref e) => {
                             warn!("can not serve fuchsia.time.alarms/Wake: {}", e);
+                        }
+                    },
+                    Rpcs::Adjust(stream) => match *adjust_server {
+                        Some(ref server) => {
+                            let _log_and_discard = server.serve(stream).await.map_err(|e| {
+                                error!("error while serving fuchsia.time.external/Adjust: {}", e)
+                            });
+                        }
+                        None => {
+                            // We must never have spurious connections to this endpoint.
+                            // If we do, then something is off.
+                            error!(
+                                "IMPORTANT! not serving fuchsia.time.external/Adjust, but got a connection"
+                            );
                         }
                     },
                 };
@@ -496,7 +548,7 @@ async fn set_clock_from_rtc<R: Rtc, D: Diagnostics>(
 /// The top-level control loop for time synchronization.
 ///
 /// Maintains the utc clock using updates received over the `fuchsia.time.external` protocols.
-async fn maintain_utc<R: 'static, D: 'static>(
+async fn maintain_utc<R: Rtc, D: 'static>(
     primary: PrimaryTrack,
     optional_monitor: Option<MonitorTrack>,
     optional_rtc: Option<R>,
@@ -506,7 +558,6 @@ async fn maintain_utc<R: 'static, D: 'static>(
     cmd_recv: mpsc::Receiver<Command>,
     persistent_state: Rc<RefCell<time_persistence::State>>,
 ) where
-    R: Rtc,
     D: Diagnostics,
 {
     info!("record the state at initialization.");
@@ -692,6 +743,9 @@ mod tests {
             has_real_time_clock: true,
             serve_fuchsia_time_alarms: false,
             has_always_on_counter: false,
+            serve_fuchsia_time_external_adjust: false,
+            utc_max_allowed_delta_future_sec: 0,
+            utc_max_allowed_delta_past_sec: 0,
         }))
     }
 

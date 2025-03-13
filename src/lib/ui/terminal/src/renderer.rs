@@ -460,7 +460,6 @@ mod tests {
     use carnelian::render::{generic, Context as RenderContext, ContextInner};
     use euclid::size2;
     use fuchsia_async as fasync;
-    use once_cell::sync::Lazy;
     use std::collections::BTreeMap;
     use term_model::ansi::Processor;
     use term_model::clipboard::Clipboard;
@@ -486,7 +485,7 @@ mod tests {
     static FONT_DATA: &'static [u8] = include_bytes!(
         "../../../../../prebuilt/third_party/fonts/robotomono/RobotoMono-Regular.ttf"
     );
-    static FONT_SET: Lazy<FontSet> = Lazy::new(|| {
+    static FONT_SET: std::sync::LazyLock<FontSet> = std::sync::LazyLock::new(|| {
         FontSet::new(
             FontFace::new(&FONT_DATA).expect("Failed to create font"),
             None,

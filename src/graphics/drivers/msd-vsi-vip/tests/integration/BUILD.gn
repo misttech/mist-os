@@ -5,6 +5,14 @@
 import("//build/components.gni")
 import("//build/test.gni")
 
+group("integration") {
+  testonly = true
+  deps = [
+    ":magma-conformance-vendor-helper-vsi",
+    ":msd_vsi_vip_integration_tests",
+  ]
+}
+
 source_set("magma_vsi_exec") {
   testonly = true
 
@@ -58,25 +66,13 @@ test("msd_vsi_vip_integration_tests") {
   ]
 }
 
-fuchsia_unittest_package("msd-vsi-vip-integration-tests") {
-  manifest = "meta/msd_vsi_vip_integration_tests.cml"
-  deps = [
-    ":msd_vsi_vip_integration_tests",
-    "//src/graphics/drivers/msd-vsi-vip:msd_vsi_test",
-  ]
-  test_specs = {
-    environments = [
-      sherlock_env,
-      vim3_env,
-    ]
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-  test_type = "device"
-}
-
-group("integration") {
+executable("magma-conformance-vendor-helper-vsi") {
   testonly = true
-  deps = [ ":msd-vsi-vip-integration-tests" ]
+  sources = [ "vendor_helper_vsi.cc" ]
+  deps = [
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/syslog/cpp",
+    "//src/graphics/magma/tests/integration:vendor_helper_interface",
+  ]
 }

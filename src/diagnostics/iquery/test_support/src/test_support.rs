@@ -433,7 +433,7 @@ impl MockDir {
         );
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
-                fio::DirectoryRequest::Open { flags, mode: _, path, object, .. } => {
+                fio::DirectoryRequest::DeprecatedOpen { flags, mode: _, path, object, .. } => {
                     self.clone().open(flags, &path, object);
                 }
                 fio::DirectoryRequest::Rewind { responder, .. } => {
@@ -509,7 +509,13 @@ impl Entry for MockDir {
 
 impl Entry for fio::DirectoryProxy {
     fn open(self: Rc<Self>, flags: fio::OpenFlags, path: &str, object: ServerEnd<fio::NodeMarker>) {
-        let _ = fio::DirectoryProxy::open(&self, flags, fio::ModeType::empty(), path, object);
+        let _ = fio::DirectoryProxy::deprecated_open(
+            &self,
+            flags,
+            fio::ModeType::empty(),
+            path,
+            object,
+        );
     }
 
     fn encode(&self, _buf: &mut Vec<u8>) {

@@ -47,11 +47,8 @@ namespace internal {
 template <typename FidlMethod>
 using NaturalCompleter = typename fidl::internal::NaturalMethodTypes<FidlMethod>::Completer;
 
-// Note: domain error types used in the error syntax are limited to int32,
-// uint32, and enums thereof. Thus the same domain error types are shared
-// between wire and natural domain objects.
 template <typename FidlMethod>
-using NaturalDomainError = typename fidl::internal::WireMethodTypes<FidlMethod>::DomainError;
+using NaturalDomainError = typename fidl::internal::NaturalMethodTypes<FidlMethod>::DomainError;
 
 // |ResponseMessageConverter| converts |fit::result<DomainError, Payload>| in
 // methods using the error syntax into FIDL result unions.

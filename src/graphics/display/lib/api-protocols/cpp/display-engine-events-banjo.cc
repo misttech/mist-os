@@ -14,8 +14,8 @@
 #include <cstdint>
 #include <mutex>
 
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/mode-and-id.h"
 #include "src/graphics/display/lib/api-types/cpp/mode-id.h"
 #include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
@@ -38,25 +38,28 @@ void DisplayEngineEventsBanjo::SetListener(
 
 void DisplayEngineEventsBanjo::OnDisplayAdded(
     display::DisplayId display_id, cpp20::span<const display::ModeAndId> preferred_modes,
-    cpp20::span<const display::PixelFormat> pixel_formats) {
-  ZX_DEBUG_ASSERT(preferred_modes.size() == 1);
+    cpp20::span<const uint8_t> edid_bytes, cpp20::span<const display::PixelFormat> pixel_formats) {
+  ZX_DEBUG_ASSERT(preferred_modes.size() <= 1);
   ZX_DEBUG_ASSERT(pixel_formats.size() == 1);
-
-  ZX_DEBUG_ASSERT(preferred_modes[0].id() == display::ModeId(1));
-
-  const display_mode_t banjo_preferred_mode = preferred_modes[0].mode().ToBanjo();
-  const cpp20::span<const display_mode_t> banjo_preferred_modes(&banjo_preferred_mode, 1);
 
   const fuchsia_images2_pixel_format_enum_value_t banjo_pixel_format = pixel_formats[0].ToBanjo();
   const cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> banjo_pixel_formats(
       &banjo_pixel_format, 1);
 
+  display_mode_t banjo_preferred_mode = {};
+  cpp20::span<const display_mode_t> banjo_preferred_modes;
+  if (!preferred_modes.empty()) {
+    ZX_DEBUG_ASSERT(preferred_modes[0].id() == display::ModeId(1));
+    banjo_preferred_mode = preferred_modes[0].mode().ToBanjo();
+    banjo_preferred_modes = cpp20::span<const display_mode_t>(&banjo_preferred_mode, 1);
+  }
+
   const raw_display_info_t banjo_display_info = {
       .display_id = display::ToBanjoDisplayId(display_id),
       .preferred_modes_list = banjo_preferred_modes.data(),
       .preferred_modes_count = banjo_preferred_modes.size(),
-      .edid_bytes_list = nullptr,
-      .edid_bytes_count = 0,
+      .edid_bytes_list = edid_bytes.data(),
+      .edid_bytes_count = edid_bytes.size(),
       .pixel_formats_list = banjo_pixel_formats.data(),
       .pixel_formats_count = banjo_pixel_formats.size(),
   };
@@ -74,30 +77,31 @@ void DisplayEngineEventsBanjo::OnDisplayRemoved(display::DisplayId display_id) {
 
   std::lock_guard event_lock(event_mutex_);
   if (!display_engine_listener_.is_valid()) {
-    FDF_LOG(WARNING, "OnDisplayAdded() emitted with invalid event listener; event dropped");
+    FDF_LOG(WARNING, "OnDisplayRemoved() emitted with invalid event listener; event dropped");
     return;
   }
   display_engine_listener_.OnDisplayRemoved(banjo_display_id);
 }
 
 void DisplayEngineEventsBanjo::OnDisplayVsync(display::DisplayId display_id, zx::time timestamp,
-                                              display::ConfigStamp config_stamp) {
+                                              display::DriverConfigStamp config_stamp) {
   const uint64_t banjo_display_id = display::ToBanjoDisplayId(display_id);
   const zx_time_t banjo_timestamp = timestamp.get();
-  const config_stamp_t banjo_config_stamp = display::ToBanjoConfigStamp(config_stamp);
+  const config_stamp_t banjo_driver_config_stamp = display::ToBanjoDriverConfigStamp(config_stamp);
 
   std::lock_guard event_lock(event_mutex_);
   if (!display_engine_listener_.is_valid()) {
-    FDF_LOG(WARNING, "OnDisplayAdded() emitted with invalid event listener; event dropped");
+    FDF_LOG(WARNING, "OnDisplayVsync() emitted with invalid event listener; event dropped");
     return;
   }
-  display_engine_listener_.OnDisplayVsync(banjo_display_id, banjo_timestamp, &banjo_config_stamp);
+  display_engine_listener_.OnDisplayVsync(banjo_display_id, banjo_timestamp,
+                                          &banjo_driver_config_stamp);
 }
 
 void DisplayEngineEventsBanjo::OnCaptureComplete() {
   std::lock_guard event_lock(event_mutex_);
   if (!display_engine_listener_.is_valid()) {
-    FDF_LOG(WARNING, "OnDisplayAdded() emitted with invalid event listener; event dropped");
+    FDF_LOG(WARNING, "OnCaptureComplete() emitted with invalid event listener; event dropped");
     return;
   }
   display_engine_listener_.OnCaptureComplete();

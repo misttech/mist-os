@@ -28,8 +28,8 @@
     - fidl: 'fuchsia.bluetooth.gatt'
 
 - name: 'Component Framework'
-  api_primary: 'geb@google.com'
-  api_secondary: 'dgilhooley@google.com'
+  api_primary: 'cgonyeo@google.com'
+  api_secondary: 'quiche@google.com'
   description: |
     The set of APIs that are used to define components, interact with
     components, and integrate with the Component Framework. These are the low
@@ -40,7 +40,6 @@
     - fidl: 'fuchsia.component'
     - fidl: 'fuchsia.component.internal'
     - fidl: 'fuchsia.sys2'
-    - fidl: 'fuchsia.sys'
 
 - name: 'Developer'
   api_primary: 'wilkinsonclay@google.com'
@@ -49,7 +48,7 @@
     Developer tool interfaces, such as the <a
     href='/docs/development/api/cli.md'>Command-line Tools Rubric</a>. APIs that
     affect the developer experience in the host environment such as debugging,
-    forensics, or the development kit.
+    or the development kit.
 
 - name: 'Diagnostics'
   api_primary: 'crjohns@google.com'
@@ -209,8 +208,8 @@
     - fidl: 'fuchsia.identity.authentication'
 
 - name: 'Kernel'
-  api_primary: 'cpu@google.com'
-  api_secondary: 'abarth@google.com'
+  api_primary: 'mcgrathr@google.com'
+  api_secondary: 'rashaeqbal@google.com'
   description: |
     <p>The Fuchsia kernel, whose API surface is:</p>
     <ul>
@@ -255,11 +254,12 @@
   api_secondary: ''
   description: |
     The set of APIs that allow clients to log events that are associated with
-    metrics. These events are collected off-device, and can later be analyzed
-    across many devices.
+    metrics or file crash reports. These events and reports are collected off-device,
+    and can later be analyzed across many devices.
   examples:
     - fidl: 'fuchsia.metrics'
     - fidl: 'fuchsia.cobalt'
+    - fidl: 'fuchsia.feedback'
 
 - name: 'Netstack'
   api_primary: 'brunodalbo@google.com'

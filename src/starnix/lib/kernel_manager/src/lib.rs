@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 pub mod kernels;
+pub mod suspend;
 
 use anyhow::{anyhow, Error};
 use fidl::endpoints::{DiscoverableProtocolMarker, Proxy, ServerEnd};
@@ -18,7 +19,11 @@ use std::future::Future;
 use std::mem::MaybeUninit;
 use std::rc::Rc;
 use std::sync::Arc;
-use zx::{AsHandleRef, Task};
+use suspend::{
+    suspend_container, ResumeEvent, ResumeEvents, SuspendContext, ASLEEP_SIGNAL, AWAKE_SIGNAL,
+    KERNEL_SIGNAL, RUNNER_SIGNAL,
+};
+use zx::AsHandleRef;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_io as fio,
@@ -36,18 +41,6 @@ const KERNEL_COLLECTION: &str = "kernels";
 /// of the fuchsia.component.runner.ComponentRunner protocol used for
 /// running component inside the container.
 const CONTAINER_RUNNER_PROTOCOL: &str = "fuchsia.starnix.container.Runner";
-
-/// The signal that the runner raises when handing over an event to the kernel.
-const RUNNER_SIGNAL: zx::Signals = zx::Signals::USER_0;
-
-/// The signal that the kernel raises to indicate that a message has been handled.
-const KERNEL_SIGNAL: zx::Signals = zx::Signals::USER_1;
-
-/// The signal that the kernel raises to indicate that it's awake.
-const AWAKE_SIGNAL: zx::Signals = zx::Signals::USER_0;
-
-/// The signal that the kernel raises to indicate that it's suspended.
-const ASLEEP_SIGNAL: zx::Signals = zx::Signals::USER_1;
 
 #[allow(dead_code)]
 pub struct StarnixKernel {
@@ -185,22 +178,6 @@ impl StarnixKernel {
     }
 }
 
-struct ResumeEvent {
-    event: zx::EventPair,
-    name: String,
-}
-
-#[derive(Default)]
-pub struct ResumeEvents {
-    events: std::collections::HashMap<zx::Koid, ResumeEvent>,
-}
-
-#[derive(Default)]
-pub struct SuspendContext {
-    resume_events: Arc<Mutex<ResumeEvents>>,
-    wake_watchers: Arc<Mutex<Vec<zx::EventPair>>>,
-}
-
 /// Generate a random name for the kernel.
 ///
 /// We used to include some human-readable parts in the name, but people were
@@ -236,122 +213,6 @@ async fn open_exposed_directory(
             )
         })?;
     Ok(directory_proxy)
-}
-
-async fn suspend_container(
-    payload: fstarnixrunner::ManagerSuspendContainerRequest,
-    suspend_context: &Arc<SuspendContext>,
-    kernels: &Kernels,
-) -> Result<
-    Result<fstarnixrunner::ManagerSuspendContainerResponse, fstarnixrunner::SuspendError>,
-    Error,
-> {
-    fuchsia_trace::duration!(c"power", c"starnix-runner:suspending-container");
-    let Some(container_job) = payload.container_job else {
-        warn!(
-            "error suspending container: could not find container job {:?}",
-            payload.container_job
-        );
-        return Ok(Err(fstarnixrunner::SuspendError::SuspendFailure));
-    };
-
-    // These handles need to kept alive until the end of the block, as they will
-    // resume the kernel when dropped.
-    log::info!("Suspending all container processes.");
-    let _suspend_handles = match suspend_kernel(&container_job).await {
-        Ok(handles) => handles,
-        Err(e) => {
-            warn!("error suspending container {:?}", e);
-            fuchsia_trace::instant!(
-                c"power",
-                c"starnix-runner:suspend-failed-actual",
-                fuchsia_trace::Scope::Process
-            );
-            return Ok(Err(fstarnixrunner::SuspendError::SuspendFailure));
-        }
-    };
-    log::info!("Finished suspending all container processes.");
-
-    let suspend_start = zx::BootInstant::get();
-
-    if let Some(wake_locks) = payload.wake_locks {
-        match wake_locks.wait_handle(zx::Signals::EVENT_SIGNALED, zx::MonotonicInstant::ZERO) {
-            Ok(_) => {
-                // There were wake locks active after suspending all processes, resume
-                // and fail the suspend call.
-                warn!("error suspending container: Linux wake locks exist");
-                fuchsia_trace::instant!(
-                    c"power",
-                    c"starnix-runner:suspend-failed-with-wake-locks",
-                    fuchsia_trace::Scope::Process
-                );
-                return Ok(Err(fstarnixrunner::SuspendError::WakeLocksExist));
-            }
-            Err(_) => {}
-        };
-    }
-
-    {
-        log::info!("Notifying wake watchers of container suspend.");
-        let watchers = suspend_context.wake_watchers.lock();
-        for event in watchers.iter() {
-            let (clear_mask, set_mask) = (AWAKE_SIGNAL, ASLEEP_SIGNAL);
-            event.signal_peer(clear_mask, set_mask)?;
-        }
-    }
-    kernels.drop_wake_lease(&container_job)?;
-
-    let resume_events = suspend_context.resume_events.lock();
-    let mut wait_items: Vec<zx::WaitItem<'_>> = resume_events
-        .events
-        .iter()
-        .map(|(_koid, event)| zx::WaitItem {
-            handle: event.event.as_handle_ref(),
-            waitfor: RUNNER_SIGNAL,
-            pending: zx::Signals::empty(),
-        })
-        .collect();
-
-    // TODO: We will likely have to handle a larger number of wake sources in the
-    // future, at which point we may want to consider a Port-based approach. This
-    // would also allow us to unblock this thread.
-    {
-        fuchsia_trace::duration!(c"power", c"starnix-runner:waiting-on-container-wake");
-        if wait_items.len() > 0 {
-            log::info!("Waiting on container to receive incoming message on wake proxies");
-            match zx::object_wait_many(&mut wait_items, zx::MonotonicInstant::INFINITE) {
-                Ok(_) => (),
-                Err(e) => {
-                    warn!("error waiting for wake event {:?}", e);
-                }
-            };
-        }
-    }
-    log::info!("Finished waiting on container wake proxies.");
-
-    for wait_item in &wait_items {
-        if wait_item.pending.contains(RUNNER_SIGNAL) {
-            let koid = wait_item.handle.get_koid().unwrap();
-            if let Some(event) = resume_events.events.get(&koid) {
-                log::info!("Woke container from sleep for: {}", event.name);
-            }
-        }
-    }
-
-    kernels.acquire_wake_lease(&container_job).await?;
-
-    log::info!("Notifying wake watchers of container wakeup.");
-    let watchers = suspend_context.wake_watchers.lock();
-    for event in watchers.iter() {
-        let (clear_mask, set_mask) = (ASLEEP_SIGNAL, AWAKE_SIGNAL);
-        event.signal_peer(clear_mask, set_mask)?;
-    }
-
-    log::info!("Returning successfully from suspend container");
-    Ok(Ok(fstarnixrunner::ManagerSuspendContainerResponse {
-        suspend_time: Some((zx::BootInstant::get() - suspend_start).into_nanos()),
-        ..Default::default()
-    }))
 }
 
 pub async fn serve_starnix_manager(
@@ -398,7 +259,7 @@ pub async fn serve_starnix_manager(
                             .resume_event
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("failed"),
-                        name: name,
+                        name,
                     },
                 );
                 sender.try_send((proxy, suspend_context.resume_events.clone())).unwrap();
@@ -434,11 +295,16 @@ pub struct ChannelProxy {
     name: String,
 }
 
+const PROXY_ROLE_NAME: &str = "fuchsia.starnix.runner.proxy";
+
 /// Starts a thread that listens for new proxies and runs `start_proxy` on each.
 pub fn run_proxy_thread(
     new_proxies: async_channel::Receiver<(ChannelProxy, Arc<Mutex<ResumeEvents>>)>,
 ) {
     let _ = std::thread::Builder::new().name("proxy_thread".to_string()).spawn(move || {
+        if let Err(e) = fuchsia_scheduler::set_role_for_this_thread(PROXY_ROLE_NAME) {
+            warn!(e:%; "failed to set thread role");
+        }
         let mut executor = fasync::LocalExecutor::new();
         executor.run_singlethreaded(async move {
             let mut tasks = fasync::TaskGroup::new();
@@ -471,11 +337,13 @@ async fn start_proxy(
     >,
 ) {
     // This enum tells us which wait finished first.
+    #[derive(Debug)]
     enum WaitReturn {
         Container,
         Remote,
     }
     'outer: loop {
+        fuchsia_trace::duration!(c"power", c"starnix-runner:start-proxy:loop", "name" => proxy.name.as_str());
         // Wait on messages from both the container and remote channel endpoints.
         let mut container_wait = fasync::OnSignals::new(
             proxy.container_channel.as_handle_ref(),
@@ -489,14 +357,38 @@ async fn start_proxy(
         .fuse();
 
         let (signals, finished_wait) = {
-            fuchsia_trace::duration!(c"power", c"starnix-runner:proxy-waiting-for-messages", "name" => proxy.name.as_str());
+            fuchsia_trace::duration!(c"power", c"starnix-runner:start_proxy:wait_for_messages", "name" => proxy.name.as_str());
             let result = futures::select! {
-                res = container_wait => res.map(|s| (s, WaitReturn::Container)),
-                res = remote_wait => res.map(|s| (s, WaitReturn::Remote)),
+                res = container_wait => {
+                    fuchsia_trace::instant!(
+                        c"power",
+                        c"starnix-runner:start_proxy:channel_readable",
+                        fuchsia_trace::Scope::Process,
+                        "name" => proxy.name.as_str(),
+                        "endpoint" => "container"
+                    );
+                    res.map(|s| (s, WaitReturn::Container))
+                },
+                res = remote_wait => {
+                    fuchsia_trace::instant!(
+                        c"power",
+                        c"starnix-runner:start_proxy:channel_readable",
+                        fuchsia_trace::Scope::Process,
+                        "name" => proxy.name.as_str(),
+                        "endpoint" => "remote"
+                    );
+                    res.map(|s| (s, WaitReturn::Remote))
+                },
             };
             match result {
                 Ok(result) => result,
                 Err(e) => {
+                    fuchsia_trace::instant!(
+                        c"power",
+                        c"starnix-runner:start_proxy:result:error",
+                        fuchsia_trace::Scope::Process,
+                        "name" => proxy.name.as_str()
+                    );
                     log::warn!("Failed to wait on proxied channels in runner: {:?}", e);
                     break 'outer;
                 }
@@ -506,7 +398,7 @@ async fn start_proxy(
         // Forward messages in both directions. Only messages that are entering the container
         // should signal `proxy.resume_event`, since those are the only messages that should
         // wake the container if it's suspended.
-        fuchsia_trace::duration!(c"power", c"starnix-runner:proxy-forwarding-messages", "name" => proxy.name.as_str());
+        fuchsia_trace::duration!(c"power", c"starnix-runner:start_proxy:forwarding", "name" => proxy.name.as_str());
         let name = proxy.name.as_str();
         let result = match finished_wait {
             WaitReturn::Container => forward_message(
@@ -542,6 +434,12 @@ async fn start_proxy(
             break 'outer;
         }
     }
+    fuchsia_trace::instant!(
+        c"power",
+        c"starnix-runner:start-proxy:loop:exit",
+        fuchsia_trace::Scope::Process,
+        "name" => proxy.name.as_str()
+    );
 
     if let Ok(koid) = proxy.resume_event.get_koid() {
         resume_events.lock().events.remove(&koid);
@@ -562,11 +460,25 @@ fn forward_message(
     handles: &mut [MaybeUninit<zx::Handle>; zx::sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize],
     name: &str,
 ) -> Result<(), Error> {
+    fuchsia_trace::duration!(c"power", c"starnix-runner:forward_message", "name" => name);
     if signals.contains(zx::Signals::CHANNEL_READABLE) {
+        fuchsia_trace::instant!(
+            c"power",
+            c"starnix-runner:forward_message:channel_readable",
+            fuchsia_trace::Scope::Process,
+            "name" => name
+        );
         debug!("runner_proxy: {}: 1: entry, event={:?}", name, event);
-        let (actual_bytes, actual_handles) = match read_channel.read_uninit(bytes, handles) {
-            zx::ChannelReadResult::Ok(r) => r,
-            _ => return Err(anyhow!("Failed to read from channel")),
+        let (actual_bytes, actual_handles) = {
+            fuchsia_trace::duration!(
+                c"power",
+                c"starnix-runner:forward_message:read",
+                "name" => name
+            );
+            match read_channel.read_uninit(bytes, handles) {
+                zx::ChannelReadResult::Ok(r) => r,
+                _ => return Err(anyhow!("Failed to read from channel")),
+            }
         };
 
         if let Some(event) = event {
@@ -575,12 +487,30 @@ fn forward_message(
             let (clear_mask, set_mask) = (KERNEL_SIGNAL, RUNNER_SIGNAL);
             event.signal_handle(clear_mask, set_mask)?;
             debug!("runner_proxy: {}: 4: K=0, R=1", name);
+            fuchsia_trace::instant!(
+                c"power",
+                c"starnix-runner:forward_message:signal",
+                fuchsia_trace::Scope::Process,
+                "name" => name,
+                "effect" => "K=0,R=1"
+            );
         }
 
-        write_channel.write(actual_bytes, actual_handles)?;
+        {
+            let event_str = format!("{:?}", event);
+            fuchsia_trace::duration!(c"power", c"forward_message", "name" => name, "event" => &event_str[..]);
+            write_channel.write(actual_bytes, actual_handles)?;
+        }
 
         if let Some(event) = event {
             debug!("{}: 5: wait for K=1", name);
+            fuchsia_trace::instant!(
+            c"power",
+            c"starnix-runner:forward_message:wait_handle",
+            fuchsia_trace::Scope::Process,
+            "name" => name,
+            "wait_for" => "K=1"
+            );
             // Wait for the kernel endpoint to signal that the event has been handled, and
             // that it is now safe to suspend the container again.
             match event.wait_handle(
@@ -598,11 +528,25 @@ fn forward_message(
                 }
             };
             debug!("runner_proxy: {} 6: K=1, R=0", name);
+            fuchsia_trace::instant!(
+                c"power",
+                c"starnix-runner:forward_message:received_signal",
+                fuchsia_trace::Scope::Process,
+                "name" => name,
+                "effect" => "K=1,R=0"
+            );
             // Clear the kernel signal for this message before continuing.
             let (clear_mask, set_mask) = (KERNEL_SIGNAL, zx::Signals::NONE);
             event.signal_handle(clear_mask, set_mask)?;
 
             debug!("runner_proxy: {}: 7: K=0, R=0", name);
+            fuchsia_trace::instant!(
+                c"power",
+                c"starnix-runner:forward_message:clear_signal",
+                fuchsia_trace::Scope::Process,
+                "name" => name,
+                "effect" => "K=0,R=0"
+            );
         }
         debug!("runner_proxy: {}: 9: loop done: event={:?}", name, event);
     }
@@ -611,67 +555,6 @@ fn forward_message(
     } else {
         Ok(())
     }
-}
-
-/// Suspends `kernel` by suspending all the processes in the kernel's job.
-async fn suspend_kernel(kernel_job: &zx::Job) -> Result<Vec<zx::Handle>, Error> {
-    let mut handles = std::collections::HashMap::<zx::Koid, zx::Handle>::new();
-    loop {
-        let process_koids = kernel_job.processes().expect("failed to get processes");
-        let mut found_new_process = false;
-        let mut processes = vec![];
-
-        for process_koid in process_koids {
-            if handles.get(&process_koid).is_some() {
-                continue;
-            }
-
-            found_new_process = true;
-
-            if let Ok(process_handle) = kernel_job.get_child(&process_koid, zx::Rights::SAME_RIGHTS)
-            {
-                let process = zx::Process::from_handle(process_handle);
-                match process.suspend() {
-                    Ok(suspend_handle) => {
-                        handles.insert(process_koid, suspend_handle);
-                    }
-                    Err(zx::Status::BAD_STATE) => {
-                        // The process was already dead or dying, and thus can't be suspended.
-                        continue;
-                    }
-                    Err(e) => {
-                        log::warn!("Failed process suspension: {:?}", e);
-                        return Err(e.into());
-                    }
-                };
-                processes.push(process);
-            }
-        }
-
-        for process in processes {
-            let threads = process.threads().expect("failed to get threads");
-            for thread_koid in &threads {
-                if let Ok(thread) = process.get_child(&thread_koid, zx::Rights::SAME_RIGHTS) {
-                    match thread.wait_handle(
-                        zx::Signals::THREAD_SUSPENDED,
-                        zx::MonotonicInstant::after(zx::MonotonicDuration::INFINITE),
-                    ) {
-                        Err(e) => {
-                            log::warn!("Error waiting for task suspension: {:?}", e);
-                            return Err(e.into());
-                        }
-                        _ => {}
-                    }
-                }
-            }
-        }
-
-        if !found_new_process {
-            break;
-        }
-    }
-
-    Ok(handles.into_values().collect())
 }
 
 #[cfg(test)]

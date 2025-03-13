@@ -93,36 +93,35 @@ if (is_host) {
 
   host_test_data("copy_clippy") {
     sources = [
-      "$root_build_dir/$gen_dir/a.actual.clippy",
-      "$root_build_dir/$gen_dir/a.aux.deps",
-      "$root_build_dir/$gen_dir/a.aux.transdeps",
-      "$root_build_dir/$gen_dir/a_test.actual.clippy",
-      "$root_build_dir/$gen_dir/b.actual.clippy",
-      "$root_build_dir/$gen_dir/b.aux.deps",
-      "$root_build_dir/$gen_dir/c.actual.clippy",
+      "$root_build_dir/$gen_dir/a.aux.deps.deps",
+      "$root_build_dir/$gen_dir/a.aux.deps.transdeps",
+      "$root_build_dir/$gen_dir/a.clippy",
+      "$root_build_dir/$gen_dir/a_test.clippy",
+      "$root_build_dir/$gen_dir/b.aux.deps.deps",
+      "$root_build_dir/$gen_dir/b.clippy",
+      "$root_build_dir/$gen_dir/c.clippy",
     ]
     deps = [
       # explicit dependency on "a" is required so that the metadata walk finds
       # it and its deps even though we never need to build them
       ":a($default_toolchain)",
-      ":a.actual.clippy($default_toolchain)",
       ":a.aux.deps($default_toolchain)",
-      ":a.aux.transdeps($default_toolchain)",
+      ":a.clippy($default_toolchain)",
       ":a_test($default_toolchain)",
-      ":a_test.actual.clippy($default_toolchain)",
-      ":b.actual.clippy($default_toolchain)",
+      ":a_test.clippy($default_toolchain)",
       ":b.aux.deps($default_toolchain)",
-      ":c.actual.clippy($default_toolchain)",
+      ":b.clippy($default_toolchain)",
+      ":c.clippy($default_toolchain)",
     ]
     outputs = [ "$target_gen_dir/out/default/$gen_dir/{{source_file_part}}" ]
   }
 
   host_test_data("copy_other_toolchain") {
-    sources = [ "$root_build_dir/$host/$gen_dir/d.actual.clippy" ]
+    sources = [ "$root_build_dir/$host/$gen_dir/d.clippy" ]
     deps = [
       # "d" dep necessary for metadata collection
       ":d($host_toolchain)",
-      ":d.actual.clippy($host_toolchain)",
+      ":d.clippy($host_toolchain)",
     ]
     outputs =
         [ "$target_gen_dir/out/default/$host/$gen_dir/{{source_file_part}}" ]

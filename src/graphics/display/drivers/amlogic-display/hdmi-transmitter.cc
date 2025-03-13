@@ -9,7 +9,6 @@
 #include <lib/zx/result.h>
 #include <unistd.h>
 #include <zircon/assert.h>
-#include <zircon/status.h>
 #include <zircon/syscalls/smc.h>
 #include <zircon/types.h>
 
@@ -55,7 +54,7 @@ zx::result<> HdmiTransmitter::Reset() {
   // reset hdmi related blocks (HIU, HDMI SYS, HDMI_TX)
   // auto reset0_result = display->reset_register_.WriteRegister32(PRESET0_REGISTER, 1 << 19, 1 <<
   // 19); if ((reset0_result.status() != ZX_OK) || reset0_result->is_error()) {
-  //   FDF_LOG(ERROR, "Reset0 Write failed\n");
+  //   fdf::error( "Reset0 Write failed\n");
   // }
 
   /* FIXME: This will reset the entire HDMI subsystem including the HDCP engine.
@@ -65,12 +64,12 @@ zx::result<> HdmiTransmitter::Reset() {
   // auto reset2_result = display->reset_register_.WriteRegister32(PRESET2_REGISTER, 1 << 15, 1 <<
   // 15); // Will mess up hdcp stuff if ((reset2_result.status() != ZX_OK) ||
   // reset2_result->is_error()) {
-  //   FDF_LOG(ERROR, "Reset2 Write failed\n");
+  //   fdf::error( "Reset2 Write failed\n");
   // }
 
   // auto reset2_result = display->reset_register_.WriteRegister32(PRESET2_REGISTER, 1 << 2, 1 <<
   // 2); if ((reset2_result.status() != ZX_OK) || reset2_result->is_error()) {
-  //   FDF_LOG(ERROR, "Reset2 Write failed\n");
+  //   fdf::error( "Reset2 Write failed\n");
   // }
 
   // Bring HDMI out of reset
@@ -147,8 +146,7 @@ zx::result<> HdmiTransmitter::ModeSet(const display::DisplayTiming& timing,
   if (silicon_provider_service_smc_.is_valid()) {
     zx::result<> hdcp_initialization_result = InitializeHdcp14();
     if (hdcp_initialization_result.is_error()) {
-      FDF_LOG(ERROR, "Failed to initialize HDCP 1.4: %s",
-              hdcp_initialization_result.status_string());
+      fdf::error("Failed to initialize HDCP 1.4: {}", hdcp_initialization_result);
       return hdcp_initialization_result;
     }
   } else {
@@ -156,9 +154,9 @@ zx::result<> HdmiTransmitter::ModeSet(const display::DisplayTiming& timing,
     // resource objects are not yet supported. Once fake SMC is supported, we
     // should enforce `smc_` to be always valid and always issue a
     // `zx_smc_call()` syscall.
-    FDF_LOG(WARNING,
-            "Secure monitor call (SMC) resource is not available. "
-            "Skipping initializing HDCP 1.4.");
+    fdf::warn(
+        "Secure monitor call (SMC) resource is not available. "
+        "Skipping initializing HDCP 1.4.");
   }
 
   WriteTopLevelReg(HDMITX_TOP_INTR_STAT_CLR, 0x0000001f);
@@ -202,12 +200,12 @@ uint32_t HdmiTransmitter::ReadTopLevelReg(uint32_t addr) {
 }
 
 void HdmiTransmitter::PrintRegister(const char* register_name, uint32_t register_address) {
-  FDF_LOG(INFO, "%s (0x%04" PRIx32 "): %" PRIu32, register_name, register_address,
-          ReadTopLevelReg(register_address));
+  fdf::info("{} (0x{:04x}): {}", register_name, register_address,
+            ReadTopLevelReg(register_address));
 }
 
 void HdmiTransmitter::PrintTopLevelRegisters() {
-  FDF_LOG(INFO, "------------Top Registers------------");
+  fdf::info("------------Top Registers------------");
   PrintRegister("HDMITX_TOP_SW_RESET", HDMITX_TOP_SW_RESET);
   PrintRegister("HDMITX_TOP_CLK_CNTL", HDMITX_TOP_CLK_CNTL);
   PrintRegister("HDMITX_TOP_INTR_MASKN", HDMITX_TOP_INTR_MASKN);
@@ -233,7 +231,7 @@ zx::result<> HdmiTransmitter::InitializeHdcp14() {
   zx_smc_result_t result = {};
   zx_status_t status = zx_smc_call(silicon_provider_service_smc_.get(), &params, &result);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to initialize HDCP 1.4: %s", zx_status_get_string(status));
+    fdf::error("Failed to initialize HDCP 1.4: {}", zx::make_result(status));
     return zx::error(status);
   }
   return zx::ok();

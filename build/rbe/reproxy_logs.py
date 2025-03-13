@@ -10,6 +10,7 @@ This requires python protobufs for reproxy LogDump.
 import argparse
 import dataclasses
 import hashlib
+import json
 import math
 import multiprocessing
 import os
@@ -22,11 +23,12 @@ from typing import Callable, Dict, Iterable, Optional, Sequence, Tuple
 import fuchsia
 from api.log import log_pb2
 from go.api.command import command_pb2
+from pb_message_util import proto_message_to_bq_dict
 
 _SCRIPT_BASENAME = Path(__file__).name
 
 
-def msg(text: str):
+def msg(text: str) -> None:
     print(f"[{_SCRIPT_BASENAME}] {text}")
 
 
@@ -242,7 +244,7 @@ class ReproxyLog(object):
 
     def download_profile(
         self, interval_seconds: float
-    ) -> Sequence[Tuple[float, float, float]]:
+    ) -> Sequence[Tuple[float, float]]:
         """Plots download bandwidth at each point in time.
 
         Assumes that for each DownloadResult event time entry in the
@@ -373,7 +375,7 @@ def _action_digest_eq(
     )
 
 
-def _diff_printer(log) -> str:
+def _diff_printer(log: log_pb2.LogRecord) -> str:
     lines = [f"action_digest: {log.remote_metadata.action_digest}"]
     for file, digest in log.remote_metadata.output_file_digests.items():
         lines.extend(
@@ -403,7 +405,7 @@ def parse_logs(reproxy_logs: Sequence[Path]) -> Sequence[ReproxyLog]:
     except OSError:  # in case /dev/shm is not write-able (required)
         if len(reproxy_logs) > 1:
             msg("Warning: downloading sequentially instead of in parallel.")
-        return map(_process_log_mp, reproxy_logs)
+        return list(map(_process_log_mp, reproxy_logs))
 
 
 def diff_logs(args: argparse.Namespace) -> int:
@@ -540,7 +542,7 @@ def filter_and_apply_records(
     records: Iterable[log_pb2.LogRecord],
     predicate: Callable[[log_pb2.LogRecord], bool],
     action: Callable[[log_pb2.LogRecord], None],
-):
+) -> None:
     for record in records:
         if predicate(record):
             action(record)
@@ -551,7 +553,7 @@ def _action_produces_rlib(record: log_pb2.LogRecord) -> bool:
 
 
 def _print_record(record: log_pb2.LogRecord) -> None:
-    print(str(record) + "\n"),
+    print(str(record) + "\n")
 
 
 def filter_rlibs_command(args: argparse.Namespace) -> int:
@@ -565,6 +567,18 @@ def filter_rlibs_command(args: argparse.Namespace) -> int:
         predicate=_action_produces_rlib,
         action=_print_record,
     )
+    return 0
+
+
+def json_export_command(args: argparse.Namespace) -> int:
+    log = parse_log(
+        log_path=args.log,
+        reclient_bindir=fuchsia.RECLIENT_BINDIR,
+        verbose=True,
+    )
+    records = [proto_message_to_bq_dict(record) for record in log.proto.records]
+    with open(args.output, "w") as output:
+        json.dump(records, output, indent=2)
     return 0
 
 
@@ -678,6 +692,22 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         type=Path,
         help="reproxy log (.rpl or .rrpl)",
         metavar="PATH",
+    )
+
+    # command: json
+    json_export_parser = subparsers.add_parser(
+        "json_export",
+        help="Export log records as json for use with tools like jq.",
+    )
+    json_export_parser.set_defaults(func=json_export_command)
+    json_export_parser.add_argument(
+        "log",
+        type=Path,
+        help="reproxy log (.rpl or .rrpl)",
+        metavar="PATH",
+    )
+    json_export_parser.add_argument(
+        "output", type=Path, help="json output file", metavar="OUTPUT"
     )
 
     return parser

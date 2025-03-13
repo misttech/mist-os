@@ -37,7 +37,6 @@
 #include <optional>
 #include <string_view>
 #include <type_traits>
-#include <variant>
 
 #include <fbl/intrusive_hash_table.h>
 #include <fbl/intrusive_single_list.h>
@@ -51,14 +50,16 @@ template <typename T, size_t MaxScans>
 class DevicetreeItemBase {
  public:
   static constexpr size_t kMaxScans = MaxScans;
+  static constexpr bool kMatchOkNodesOnly = true;
 
   constexpr DevicetreeItemBase() = default;
   constexpr DevicetreeItemBase(const char* shim_name, FILE* log)
-      : log_(log), shim_name_(shim_name) {}
-
-  devicetree::ScanState OnNode(const devicetree::NodePath&, const devicetree::PropertyDecoder&) {
-    static_assert(kMaxScans != MaxScans, "Must implement OnNode.");
-    return devicetree::ScanState::kActive;
+      : log_(log), shim_name_(shim_name) {
+    // Note: `T` is incomplete when this template instantiates, so at the time of template
+    // instantiation `T` will not meet the API requirements of `Matcher<T>`. Deferring this to a
+    // static_assert on a function body, delay's the evaluation of `Matcher<T>` until `T` is fully
+    // defined.
+    static_assert(devicetree::Matcher<T>);
   }
 
   void OnError(std::string_view error) {
@@ -76,7 +77,7 @@ class DevicetreeItemBase {
 
   template <typename Shim>
   void Init(const Shim& shim) {
-    static_assert(devicetree::kIsMatcher<T>);
+    static_assert(devicetree::Matcher<T>);
     shim_name_ = shim.shim_name();
     log_ = shim.log();
   }
@@ -704,6 +705,9 @@ class DevicetreeCpuTopologyItem : public DevicetreeItemBase<DevicetreeCpuTopolog
     // Index of |zbi_topology_node_t| in the |ZBI_ITEM_TYPE_CPU_TOPOLOGY| that was generated from
     // this |CpuMapEntry|.
     std::optional<size_t> topology_node_index;
+
+    // Whether this entry should be skipped when generating the zbi output.
+    bool skip = false;
   };
 
   // May only be called after |Init| and a full match sequence has been performed.
@@ -726,6 +730,10 @@ class DevicetreeCpuTopologyItem : public DevicetreeItemBase<DevicetreeCpuTopolog
     return node_name.substr(prefix.length()).find_first_not_of("01234567890") ==
            std::string_view::npos;
   }
+
+  // Remove any entries from the map that point to cpu entries whose status is not okay.
+  // This MUST be called AFTER |UpdateEntryCpuLinks|.
+  fit::result<ItemBase::DataZbi::Error, size_t> MarkSkippedMapEntries() const;
 
   // After both |entries_| and |cpus_| have been filled this routine will fill up
   // the reference from an entry to a 'cpu' node.
@@ -984,24 +992,25 @@ using DevicetreeDtbItem = SingleItem<ZBI_TYPE_DEVICETREE>;
 // used to fill the payload.
 //
 // See '<lib/boot-shim/watchdog.h>' for Watchdog Item API contract.
-template <class... Watchdogs>
+template <Watchdog... Watchdogs>
 class GenericWatchdogItemBase
     : public DevicetreeItemBase<GenericWatchdogItemBase<Watchdogs...>, 1>,
       public SingleOptionalItem<zbi_dcfg_generic32_watchdog_t, ZBI_TYPE_KERNEL_DRIVER,
                                 ZBI_KERNEL_DRIVER_GENERIC32_WATCHDOG> {
+  using Base = DevicetreeItemBase<GenericWatchdogItemBase<Watchdogs...>, 1>;
+
  public:
+  template <typename Shim>
+  void Init(const Shim& shim) {
+    Base::Init(shim);
+    mmio_observer_ = &shim.mmio_observer();
+  }
+
   devicetree::ScanState OnNode(const devicetree::NodePath& path,
                                const devicetree::PropertyDecoder& decoder) {
     auto compatibles =
         decoder.FindAndDecodeProperty<&devicetree::PropertyValue::AsStringList>("compatible");
     if (!compatibles) {
-      return devicetree::ScanState::kActive;
-    }
-
-    auto device_status =
-        decoder.FindAndDecodeProperty<&devicetree::PropertyValue::AsString>("status");
-    // Ignore disabled device nodes and keep looking.
-    if (device_status && device_status.value() == "disabled") {
       return devicetree::ScanState::kActive;
     }
 
@@ -1023,7 +1032,7 @@ class GenericWatchdogItemBase
   bool Match(std::string_view compatible, const devicetree::PropertyDecoder& decoder) {
     for (std::string_view device_compatible : Watchdog::kCompatibleDevices) {
       if (device_compatible == compatible) {
-        if (auto payload = Watchdog::MaybeCreate(decoder); payload) {
+        if (auto payload = Watchdog::MaybeCreate(decoder, mmio_observer_); payload) {
           set_payload(*payload);
         }
         return true;
@@ -1031,10 +1040,35 @@ class GenericWatchdogItemBase
     }
     return false;
   }
+
+  const DevicetreeBootShimMmioObserver* mmio_observer_ = nullptr;
 };
 
 using GenericWatchdogItem = WithAllWatchdogs<GenericWatchdogItemBase>;
 using NvramItem = SingleOptionalItem<zbi_nvram_t, ZBI_TYPE_NVRAM>;
+
+// Serial number can be provided as "serial-number" property in the root node, or as a boot argument
+// in some cases. This matcher will prefer the root-node property if available, or fallback to
+// chosen node's `bootargs` property providing the right item.
+class DevicetreeSerialNumberItem : public DevicetreeItemBase<DevicetreeSerialNumberItem, 1>,
+                                   public SingleItem<ZBI_TYPE_SERIAL_NUMBER> {
+  using Base = DevicetreeItemBase<DevicetreeSerialNumberItem, 1>;
+
+ public:
+  devicetree::ScanState OnNode(const devicetree::NodePath& path,
+                               const devicetree::PropertyDecoder& decoder);
+
+  void InitCmdline(std::string_view cmdline) { cmdline_ = cmdline; }
+
+  template <typename Shim>
+  void Init(const Shim& shim) {
+    Base::Init(shim);
+    cmdline_ = shim.legacy_cmdline();
+  }
+
+ private:
+  std::string_view cmdline_;
+};
 
 }  // namespace boot_shim
 

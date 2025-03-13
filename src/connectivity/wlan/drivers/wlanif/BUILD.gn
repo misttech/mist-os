@@ -57,6 +57,11 @@ fuchsia_cc_driver("wlanif_driver-driver") {
 
   deps = [ ":lib_source" ]
   configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
+
+  # TODO(https://fxbug.dev/42085421): LTO results in wrong TLS access.
+  configs += [ "//build/config/lto" ]
+  configs -= [ "//build/config/lto" ]
+  configs += [ "//build/config/lto:no-lto" ]
 }
 
 fuchsia_driver_component("wlanif_driver") {

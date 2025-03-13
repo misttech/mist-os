@@ -423,7 +423,7 @@ impl Config {
         FuturesUnordered::from_iter(
             files.into_iter().filter_map(|file| file.as_mut()).map(ConfigFile::save),
         )
-        .fold(Ok(()), |res, i| async { res.and_then(|_| i) })
+        .fold(Ok(()), |res, i| async { res.and(i) })
         .await
     }
 

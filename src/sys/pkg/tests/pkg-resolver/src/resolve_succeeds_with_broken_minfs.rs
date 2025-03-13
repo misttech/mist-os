@@ -64,7 +64,7 @@ where
         async move {
             while let Some(req) = stream.next().await {
                 match req.unwrap() {
-                    fio::DirectoryRequest::Open {
+                    fio::DirectoryRequest::DeprecatedOpen {
                         flags,
                         mode: _,
                         path,
@@ -77,7 +77,7 @@ where
                         control_handle,
                         Arc::clone(&self),
                     ),
-                    fio::DirectoryRequest::Open3 {
+                    fio::DirectoryRequest::Open {
                         path,
                         flags,
                         options,
@@ -156,7 +156,7 @@ impl OpenRequestHandler for OpenFailOrTempFs {
                 server_end.into_channel(),
             )
             .unwrap();
-            tempdir_proxy.open(flags, fio::ModeType::empty(), &path, object).unwrap();
+            tempdir_proxy.deprecated_open(flags, fio::ModeType::empty(), &path, object).unwrap();
         }
     }
 
@@ -196,7 +196,7 @@ impl OpenRequestHandler for OpenFailOrTempFs {
             )
             .map_err(|_| Status::INTERNAL)?;
             // The channel will be dropped and closed if the wire call fails.
-            let _ = tempdir_proxy.open3(
+            let _ = tempdir_proxy.open(
                 &path,
                 flags,
                 &object_request.options(),
@@ -271,7 +271,9 @@ impl OpenRequestHandler for WriteFailOrTempFs {
 
         if !self.files_to_fail_writes.contains(&path) {
             // We don't want to intercept file operations, so just open the file normally.
-            self.tempdir_proxy.open(flags, fio::ModeType::empty(), &path, object).unwrap();
+            self.tempdir_proxy
+                .deprecated_open(flags, fio::ModeType::empty(), &path, object)
+                .unwrap();
             return;
         }
 
@@ -288,7 +290,7 @@ impl OpenRequestHandler for WriteFailOrTempFs {
             fidl::endpoints::create_proxy::<fio::NodeMarker>();
 
         self.tempdir_proxy
-            .open(flags, fio::ModeType::empty(), &path, backing_node_server_end)
+            .deprecated_open(flags, fio::ModeType::empty(), &path, backing_node_server_end)
             .expect("open file requested by pkg-resolver");
 
         // All the things pkg-resolver attempts to open in these tests are files,
@@ -330,7 +332,7 @@ impl OpenRequestHandler for WriteFailOrTempFs {
 
         if !self.files_to_fail_writes.contains(&path) {
             // We don't want to intercept file operations, so just open the file normally.
-            let _ = self.tempdir_proxy.open3(
+            let _ = self.tempdir_proxy.open(
                 &path,
                 flags,
                 &object_request.options(),
@@ -351,7 +353,7 @@ impl OpenRequestHandler for WriteFailOrTempFs {
             fidl::endpoints::create_proxy::<fio::NodeMarker>();
 
         self.tempdir_proxy
-            .open3(&path, flags, &object_request.options(), backing_node_server_end.into_channel())
+            .open(&path, flags, &object_request.options(), backing_node_server_end.into_channel())
             .map_err(|_| Status::INTERNAL)?;
 
         // All the things pkg-resolver attempts to open in these tests are files,
@@ -519,7 +521,7 @@ impl OpenRequestHandler for RenameFailOrTempFs {
         )
         .unwrap();
         if !self.should_fail() || path != "." {
-            tempdir_proxy.open(flags, fio::ModeType::empty(), &path, object).unwrap();
+            tempdir_proxy.deprecated_open(flags, fio::ModeType::empty(), &path, object).unwrap();
             return;
         }
 
@@ -554,7 +556,7 @@ impl OpenRequestHandler for RenameFailOrTempFs {
                         fail_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                         responder.send(Err(Status::NOT_FOUND.into_raw())).unwrap();
                     }
-                    fio::DirectoryRequest::Open {
+                    fio::DirectoryRequest::DeprecatedOpen {
                         flags,
                         mode: _,
                         path,
@@ -569,7 +571,7 @@ impl OpenRequestHandler for RenameFailOrTempFs {
                             Arc::clone(&parent.clone()),
                         );
                     }
-                    fio::DirectoryRequest::Open3 {
+                    fio::DirectoryRequest::Open {
                         path,
                         flags,
                         options,
@@ -612,7 +614,7 @@ impl OpenRequestHandler for RenameFailOrTempFs {
         )
         .map_err(|_| Status::INTERNAL)?;
         if !self.should_fail() || path != "." {
-            let _ = tempdir_proxy.open3(
+            let _ = tempdir_proxy.open(
                 &path,
                 flags,
                 &object_request.options(),
@@ -654,7 +656,7 @@ impl OpenRequestHandler for RenameFailOrTempFs {
                         fail_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                         responder.send(Err(Status::NOT_FOUND.into_raw())).unwrap();
                     }
-                    fio::DirectoryRequest::Open {
+                    fio::DirectoryRequest::DeprecatedOpen {
                         flags,
                         mode: _,
                         path,
@@ -669,7 +671,7 @@ impl OpenRequestHandler for RenameFailOrTempFs {
                             Arc::clone(&parent.clone()),
                         );
                     }
-                    fio::DirectoryRequest::Open3 {
+                    fio::DirectoryRequest::Open {
                         path,
                         flags,
                         options,

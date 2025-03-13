@@ -30,7 +30,14 @@ async fn main() {
 
     info!("reading package profile config");
     let profiles_config = std::fs::read_to_string("/pkg/config/profiles/starnix.profiles").unwrap();
-    let profiles_config: ProfilesConfig = serde_json5::from_str(&profiles_config).unwrap();
+    let mut profiles_config: ProfilesConfig = serde_json5::from_str(&profiles_config).unwrap();
+    profiles_config
+        .profiles
+        .insert("first_custom_role".to_string(), ProfileConfig::Flexible { priority: 16 });
+    profiles_config
+        .profiles
+        .insert("second_custom_role".to_string(), ProfileConfig::Flexible { priority: 16 });
+
     let (fake_manager, mut requests) = FakeRoleManager::new(profiles_config);
 
     let builder = RealmBuilder::with_params(
@@ -189,6 +196,31 @@ async fn main() {
         })
         .await;
 
+    stdin_send.write(b"thread-fifo\n").unwrap();
+    info!("waiting for child process' first FIFO thread update");
+    requests
+        .with_next(|koid, role| {
+            assert_eq!(koid, puppet_thread_one_koid);
+            assert_eq!(role, "fuchsia.starnix.realtime");
+        })
+        .await;
+
+    info!("waiting for child process' second FIFO thread update");
+    requests
+        .with_next(|koid, role| {
+            assert_eq!(koid, puppet_thread_one_koid);
+            assert_eq!(role, "first_custom_role");
+        })
+        .await;
+
+    info!("waiting for child process' third FIFO thread update");
+    requests
+        .with_next(|koid, role| {
+            assert_eq!(koid, puppet_thread_one_koid);
+            assert_eq!(role, "second_custom_role");
+        })
+        .await;
+
     info!("waiting for puppet to exit");
     wait_for_puppet_exit.await;
     realm.destroy().await.unwrap();
@@ -200,9 +232,20 @@ struct ProfilesConfig {
 }
 
 #[derive(Clone, Debug, Deserialize)]
-struct ProfileConfig {
-    #[allow(unused)]
-    priority: u8,
+#[serde(untagged)]
+enum ProfileConfig {
+    Flexible {
+        #[allow(unused)]
+        priority: u8,
+    },
+    Constant {
+        #[allow(unused)]
+        capacity: String,
+        #[allow(unused)]
+        deadline: String,
+        #[allow(unused)]
+        period: String,
+    },
 }
 
 #[derive(Clone)]
@@ -210,6 +253,10 @@ struct FakeRoleManager {
     config: ProfilesConfig,
     sender: UnboundedSender<SetRole>,
 }
+
+/// Profiles which are used by the kernel but are not in starnix.profiles because they should be
+/// defined by product integrators.
+const IGNORED_PROFILES: &[&str] = &["fuchsia.starnix.kthread.input_relay"];
 
 impl FakeRoleManager {
     fn new(config: ProfilesConfig) -> (Self, FakeProfileRequests) {
@@ -227,6 +274,10 @@ impl FakeRoleManager {
                 match request.unwrap() {
                     RoleManagerRequest::SetRole { payload, responder } => {
                         let role_name = payload.role.unwrap().role;
+                        if IGNORED_PROFILES.contains(&role_name.as_str()) {
+                            info!(role_name:%; "ignoring role request");
+                            continue;
+                        }
                         let thread = match payload.target.unwrap() {
                             RoleTarget::Thread(t) => t,
                             other => panic!("unexpected request {other:?} for role {role_name}"),

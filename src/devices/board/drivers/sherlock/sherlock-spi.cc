@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.spi.businfo/cpp/fidl.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
@@ -122,29 +123,26 @@ zx_status_t Sherlock::SpiInit() {
       }}),
   }}));
 
-  std::vector<fpbus::Metadata> spi_metadata;
-  spi_metadata.emplace_back([&]() {
-    fpbus::Metadata ret;
-    ret.id() = std::to_string(DEVICE_METADATA_AMLSPI_CONFIG),
-    ret.data() =
-        std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&spi_config),
-                             reinterpret_cast<const uint8_t*>(&spi_config) + sizeof(spi_config));
-    return ret;
-  }());
-
-  auto spi_status = fidl_metadata::spi::SpiChannelsToFidl(SHERLOCK_SPICC0, spi_channels);
-  if (spi_status.is_error()) {
-    zxlogf(ERROR, "%s: failed to encode spi channels to fidl: %d", __func__,
-           spi_status.error_value());
-    return spi_status.error_value();
+  std::vector<uint8_t> encoded_spi_bus_metadata;
+  {
+    zx::result result = fidl_metadata::spi::SpiChannelsToFidl(SHERLOCK_SPICC0, spi_channels);
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to encode spi channels to fidl: %s", result.status_string());
+      return result.error_value();
+    }
+    encoded_spi_bus_metadata = std::move(result.value());
   }
-  auto& data = spi_status.value();
 
-  spi_metadata.emplace_back([&]() {
-    fpbus::Metadata ret;
-    ret.id() = std::to_string(DEVICE_METADATA_SPI_CHANNELS), ret.data() = std::move(data);
-    return ret;
-  }());
+  std::vector<fpbus::Metadata> spi_metadata{
+      {{.id = std::to_string(DEVICE_METADATA_AMLSPI_CONFIG),
+        .data = std::vector<uint8_t>(
+            reinterpret_cast<const uint8_t*>(&spi_config),
+            reinterpret_cast<const uint8_t*>(&spi_config) + sizeof(spi_config))}},
+      // TODO(b/392676138): Remove once no longer referenced.
+      {{.id = std::to_string(DEVICE_METADATA_SPI_CHANNELS), .data = encoded_spi_bus_metadata}},
+      {{.id = fuchsia_hardware_spi_businfo::SpiBusMetadata::kSerializableName,
+        .data = std::move(encoded_spi_bus_metadata)}},
+  };
 
   fpbus::Node spi_dev;
   spi_dev.name() = "spi-0";
@@ -153,7 +151,6 @@ zx_status_t Sherlock::SpiInit() {
   spi_dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_SPI;
   spi_dev.mmio() = spi_mmios;
   spi_dev.irq() = spi_irqs;
-
   spi_dev.metadata() = std::move(spi_metadata);
 
   // TODO(https://fxbug.dev/42109271): fix this clock enable block when the clock driver can handle

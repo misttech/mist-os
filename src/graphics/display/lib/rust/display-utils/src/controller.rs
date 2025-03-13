@@ -63,7 +63,7 @@ pub struct VsyncEvent {
     pub timestamp: zx::MonotonicInstant,
 
     /// The stamp of the latest fully applied display configuration.
-    pub config: display_types::ConfigStamp,
+    pub config: display::ConfigStamp,
 }
 
 impl Coordinator {
@@ -266,7 +266,7 @@ impl Coordinator {
 
         let config_stamp = self.inner.write().next_config_stamp().unwrap();
         let payload = fidl_fuchsia_hardware_display::CoordinatorApplyConfig3Request {
-            stamp: Some(fidl_fuchsia_hardware_display_types::ConfigStamp { value: config_stamp }),
+            stamp: Some(fidl_fuchsia_hardware_display::ConfigStamp { value: config_stamp }),
             ..Default::default()
         };
         match proxy.apply_config3(payload) {
@@ -365,7 +365,7 @@ impl CoordinatorInner {
         &mut self,
         display_id: DisplayId,
         timestamp: zx::MonotonicInstant,
-        applied_config_stamp: display_types::ConfigStamp,
+        applied_config_stamp: display::ConfigStamp,
         cookie: display::VsyncAckCookie,
     ) -> Result<()> {
         self.proxy.acknowledge_vsync(cookie.value)?;
@@ -539,7 +539,7 @@ mod tests {
         let mut vsync = coordinator.add_vsync_listener(None)?;
 
         const ID: DisplayId = DisplayId(1);
-        const STAMP: display_types::ConfigStamp = display_types::ConfigStamp { value: 1 };
+        const STAMP: display::ConfigStamp = display::ConfigStamp { value: 1 };
         let event_handlers = async {
             select! {
                 event = vsync.next() => event.ok_or(format_err!("did not receive vsync event")),
@@ -575,7 +575,7 @@ mod tests {
 
         const ID1: DisplayId = DisplayId(1);
         const ID2: DisplayId = DisplayId(2);
-        const STAMP: display_types::ConfigStamp = display_types::ConfigStamp { value: 1 };
+        const STAMP: display::ConfigStamp = display::ConfigStamp { value: 1 };
 
         // Queue multiple events.
         mock.emit_vsync_event(ID1.0, STAMP)?;
@@ -618,7 +618,7 @@ mod tests {
 
         const ID1: DisplayId = DisplayId(1);
         const ID2: DisplayId = DisplayId(2);
-        const STAMP: display_types::ConfigStamp = display_types::ConfigStamp { value: 1 };
+        const STAMP: display::ConfigStamp = display::ConfigStamp { value: 1 };
 
         // Listen to events from ID2.
         let mut vsync = coordinator.add_vsync_listener(Some(ID2))?;

@@ -232,6 +232,7 @@ void MemoryWatchdog::WorkerThread() {
         }
         mem_event_idx_ = CalculatePressureLevel();
       }
+      printf("memory-pressure: reclaimed to avoid OOM\n");
     }
 
     // Check to see if the PMM has failed any allocations.  If the PMM has ever failed to allocate
@@ -239,7 +240,9 @@ void MemoryWatchdog::WorkerThread() {
     // immediately.  The idea here is that usermode processes may not be able to handle allocation
     // failure and therefore could have become wedged in some way.
     if (gBootOptions->oom_trigger_on_alloc_failure && pmm_has_alloc_failed_no_mem()) {
-      printf("memory-pressure: pmm failed one or more alloc calls, escalating to oom...\n");
+      printf(
+          "memory-pressure: pmm failed one or more alloc calls, escalating to oom...(free memory is %zuMB)\n",
+          pmm_count_free_pages() * PAGE_SIZE / MB);
       mem_event_idx_ = PressureLevel::kOutOfMemory;
     }
 
@@ -275,8 +278,6 @@ void MemoryWatchdog::WorkerThread() {
             (eviction_was_outstanding ? time_now
                                       : zx_time_add_duration(time_now, hysteresis_seconds_ / 2)),
             EvictionTriggerCallback, this);
-        printf("memory-pressure: set target memory to evict %zuMB (free memory is %zuMB)\n",
-               min_free_target_ / MB, free_mem / MB);
       } else if (eviction_strategy_ == EvictionStrategy::Continuous &&
                  mem_event_idx_ > max_eviction_level_) {
         // If we're out of the max configured eviction-eligible memory pressure level, disable

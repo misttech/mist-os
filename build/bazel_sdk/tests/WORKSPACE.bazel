@@ -50,6 +50,7 @@ rules_fuchsia_deps()
 
 fuchsia_sdk_repository(
     name = "fuchsia_sdk",
+    use_rules_fuchsia = True,
 )
 
 # Register the fuchsia_sdk toolchain
@@ -69,7 +70,7 @@ fuchsia_build_config_repository(
 
 load("@fuchsia_build_config//:defs.bzl", "build_config")
 load(
-    "@fuchsia_sdk//fuchsia:clang.bzl",
+    "@rules_fuchsia//fuchsia:clang.bzl",
     "fuchsia_clang_repository",
 )
 

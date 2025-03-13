@@ -22,6 +22,7 @@ ffx_plugin("ffx_audio_gen") {
   deps = [
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//src/media/audio/lib/rust",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",

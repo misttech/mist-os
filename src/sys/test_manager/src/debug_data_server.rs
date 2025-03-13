@@ -212,7 +212,7 @@ pub(crate) async fn serve_iterator(
             .map(|file_name| {
                 let (file, server) = create_proxy::<fio::NodeMarker>();
                 let file = fio::FileProxy::new(file.into_channel().unwrap());
-                directory.open(
+                directory.deprecated_open(
                     fuchsia_fs::OpenFlags::RIGHT_READABLE,
                     fio::ModeType::empty(),
                     &file_name,

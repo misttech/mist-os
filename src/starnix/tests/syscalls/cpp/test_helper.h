@@ -126,7 +126,7 @@ class SignalMaskHelper {
   void waitForSignal(int signal);
 
   // Blocks the execution until the specified signal is received or timed out.
-  int timedWaitForSignal(int signal, time_t sec);
+  int timedWaitForSignal(int signal, time_t msec);
 
   // Sets the signal mask of the process with _sigmaskCopy.
   void restoreSigmask();
@@ -156,6 +156,12 @@ class ScopedTempDir {
  public:
   ScopedTempDir();
   ~ScopedTempDir();
+
+  ScopedTempDir(const ScopedTempDir &) = delete;
+  ScopedTempDir &operator=(const ScopedTempDir &) = delete;
+
+  ScopedTempDir(ScopedTempDir &&) = default;
+  ScopedTempDir &operator=(ScopedTempDir &&) = default;
 
   const std::string &path() const { return path_; }
 
@@ -214,6 +220,8 @@ struct MemoryMappingExt : public MemoryMapping {
     return std::ranges::find(vm_flags, flag) != vm_flags.end();
   }
 };
+
+#define MY_NLMSG_OK(nlh, len) NLMSG_OK((nlh), static_cast<decltype((nlh)->nlmsg_len)>(len))
 
 // Encoder for serializing netlink messages
 class NetlinkEncoder {

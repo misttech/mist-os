@@ -487,7 +487,7 @@ async fn rules_select_correct_table_for_marked_socket<I: Ip>() {
             if let Some(fwmark) = fwmark {
                 socket_proxy
                     .set_mark(
-                        fposix_socket::MarkDomain::Mark1,
+                        fnet::MarkDomain::Mark1,
                         &fposix_socket::OptionalUint32::Value(fwmark),
                     )
                     .await

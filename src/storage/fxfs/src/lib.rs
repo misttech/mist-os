@@ -19,6 +19,7 @@ mod debug_assert_not_too_long;
 pub mod errors;
 pub mod filesystem;
 pub mod fsck;
+pub mod future_with_guard;
 pub mod log;
 pub mod lsm_tree;
 pub mod metrics;

@@ -69,9 +69,8 @@ impl<B: SplitByteSlice> ParsablePacket<B, ()> for PppPacket<B> {
     }
 
     fn parse<BV: BufferView<B>>(mut buffer: BV, _args: ()) -> Result<Self, Self::Error> {
-        let header = buffer
-            .take_obj_front::<PppHeader>()
-            .ok_or_else(|| ParseError::InsufficientHeaderBytes)?;
+        let header =
+            buffer.take_obj_front::<PppHeader>().ok_or(ParseError::InsufficientHeaderBytes)?;
         Ok(Self { header, body: buffer.into_rest() })
     }
 }

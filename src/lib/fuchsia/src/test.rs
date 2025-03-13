@@ -61,9 +61,6 @@ mod test {
     #[fuchsia::test]
     async fn empty_async_test() {}
 
-    #[fuchsia::test(threads = 1)]
-    async fn empty_singlethreaded_test() {}
-
     #[fuchsia::test(threads = 2)]
     async fn empty_multithreaded_test() {}
 
@@ -80,7 +77,7 @@ mod test {
     async fn empty_very_allow_stalls_test() {}
 
     #[cfg(target_os = "fuchsia")]
-    #[fuchsia::test(allow_stalls = true, threads = 1)]
+    #[fuchsia::test(allow_stalls = true)]
     async fn empty_very_singlethreaded_allow_stalls_test() {}
 
     #[fuchsia::main]
@@ -90,10 +87,6 @@ mod test {
     #[fuchsia::main]
     #[test]
     async fn empty_async_component_test() {}
-
-    #[fuchsia::main(threads = 1)]
-    #[test]
-    async fn empty_async_singlethreaded_component_test() {}
 
     #[fuchsia::main(threads = 2)]
     #[test]
@@ -106,11 +99,6 @@ mod test {
 
     #[fuchsia::test]
     async fn empty_async_test_with_result() -> Result<(), Error> {
-        Ok(())
-    }
-
-    #[fuchsia::test(threads = 1)]
-    async fn empty_singlethreaded_test_with_result() -> Result<(), Error> {
         Ok(())
     }
 
@@ -128,12 +116,6 @@ mod test {
     #[cfg(target_os = "fuchsia")]
     #[fuchsia::test(allow_stalls = true)]
     async fn empty_allow_stalls_test_with_result() -> Result<(), Error> {
-        Ok(())
-    }
-
-    #[cfg(target_os = "fuchsia")]
-    #[fuchsia::test(allow_stalls = false, threads = 1)]
-    async fn empty_very_singlethreaded_not_allow_stalls_test_with_result() -> Result<(), Error> {
         Ok(())
     }
 
@@ -171,16 +153,6 @@ mod test {
     #[fuchsia::main]
     #[test]
     async fn empty_async_component_test_with_result() -> Result<(), Error> {
-        Ok(())
-    }
-
-    // TODO(https://fxbug.dev/42161439): We combine #[fuchsia::main] and #[test] here as a kludge to
-    // enable testing of the fuchsia::main code in a unit test.
-    // Real users of the fuchsia library should not do this, and the ability to do so is not
-    // guaranteed to be present in the future.
-    #[fuchsia::main(threads = 1)]
-    #[test]
-    async fn empty_async_singlethreaded_component_test_with_result() -> Result<(), Error> {
         Ok(())
     }
 
@@ -234,6 +206,39 @@ mod test {
         Ok(())
     }
 
+    // TODO(https://fxbug.dev/42161439): We combine #[fuchsia::main] and #[test] here as a kludge to
+    // enable testing of the fuchsia::main code in a unit test.
+    // Real users of the fuchsia library should not do this, and the ability to do so is not
+    // guaranteed to be present in the future.
+    #[fuchsia::main(thread_role = "role.for.test")]
+    #[test]
+    async fn async_component_with_thread_role() {}
+
+    // TODO(https://fxbug.dev/42161439): We combine #[fuchsia::main] and #[test] here as a kludge to
+    // enable testing of the fuchsia::main code in a unit test.
+    // Real users of the fuchsia library should not do this, and the ability to do so is not
+    // guaranteed to be present in the future.
+    #[fuchsia::main(threads = 2, thread_role = "role.for.test")]
+    #[test]
+    async fn async_multithreaded_component_with_thread_role() {}
+
+    // TODO(https://fxbug.dev/42161439): We combine #[fuchsia::main] and #[test] here as a kludge to
+    // enable testing of the fuchsia::main code in a unit test.
+    // Real users of the fuchsia library should not do this, and the ability to do so is not
+    // guaranteed to be present in the future.
+    #[fuchsia::main(thread_role = "role.for.test")]
+    #[test]
+    fn sync_component_with_thread_role() {}
+
+    // TODO(https://fxbug.dev/42161439): We combine #[fuchsia::main] and #[test] here as a kludge to
+    // enable testing of the fuchsia::main code in a unit test.
+    // Real users of the fuchsia library should not do this, and the ability to do so is not
+    // guaranteed to be present in the future.
+    #[fuchsia::main(thread_role = ROLE_NAME_FOR_TEST)]
+    #[test]
+    async fn component_with_const_thread_role() {}
+    const ROLE_NAME_FOR_TEST: &str = "role.for.test";
+
     // fuchsia::main with arguments can't be written as a test
     // (since argh will parse command line arguments and these will be arguments defining
     // the test execution environment)
@@ -249,15 +254,6 @@ mod test {
     #[allow(dead_code)]
     #[fuchsia::main]
     async fn empty_async_component_test_with_argument(opt: Options) {
-        assert_eq!(opt.should_be_false, false);
-    }
-
-    // fuchsia::main with arguments can't be written as a test
-    // (since argh will parse command line arguments and these will be arguments defining
-    // the test execution environment)
-    #[allow(dead_code)]
-    #[fuchsia::main(threads = 1)]
-    async fn empty_async_singlethreaded_component_test_with_argument(opt: Options) {
         assert_eq!(opt.should_be_false, false);
     }
 
@@ -286,18 +282,6 @@ mod test {
     #[allow(dead_code)]
     #[fuchsia::main]
     async fn empty_async_component_test_with_argument_and_result(
-        opt: Options,
-    ) -> Result<(), Error> {
-        assert_eq!(opt.should_be_false, false);
-        Ok(())
-    }
-
-    // fuchsia::main with arguments can't be written as a test
-    // (since argh will parse command line arguments and these will be arguments defining
-    // the test execution environment)
-    #[allow(dead_code)]
-    #[fuchsia::main(threads = 1)]
-    async fn empty_async_singlethreaded_component_test_with_argument_and_result(
         opt: Options,
     ) -> Result<(), Error> {
         assert_eq!(opt.should_be_false, false);

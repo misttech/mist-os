@@ -2,10 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+mod rollback;
+
+use std::pin::{pin, Pin};
+
 use cobalt_client::traits::AsEventCode as _;
+use fuchsia_async::Task;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use fuchsia_inspect::Property as _;
-use futures::StreamExt as _;
+use futures::channel::mpsc;
+use futures::{Stream, StreamExt as _};
 use log::{error, info, warn};
 use networking_metrics_registry::networking_metrics_registry as metrics_registry;
 use {
@@ -58,11 +64,49 @@ impl From<NetstackVersion> for Box<fnet_migration::VersionSetting> {
     }
 }
 
+#[derive(Debug, PartialEq)]
+enum RollbackNetstackVersion {
+    Netstack2,
+    // The automated setting requested Netstack3, but the persisted state
+    // indicates that the previous boot had too many health check failure.
+    // Forcibly use Netstack2.
+    ForceNetstack2,
+    Netstack3,
+}
+
+impl RollbackNetstackVersion {
+    // Convert into a `NetstackVersion`, while honoring the forced setting.
+    fn version(&self) -> NetstackVersion {
+        match self {
+            Self::Netstack2 | Self::ForceNetstack2 => NetstackVersion::Netstack2,
+            Self::Netstack3 => NetstackVersion::Netstack3,
+        }
+    }
+
+    // Convert into a `NetstackVersion`, while ignoring the forced setting.
+    fn version_ignoring_force(&self) -> NetstackVersion {
+        match self {
+            Self::Netstack2 => NetstackVersion::Netstack2,
+            Self::Netstack3 | Self::ForceNetstack2 => NetstackVersion::Netstack3,
+        }
+    }
+}
+
+impl From<NetstackVersion> for RollbackNetstackVersion {
+    fn from(version: NetstackVersion) -> Self {
+        match version {
+            NetstackVersion::Netstack2 => RollbackNetstackVersion::Netstack2,
+            NetstackVersion::Netstack3 => RollbackNetstackVersion::Netstack3,
+        }
+    }
+}
+
 #[derive(Default, Debug, serde::Deserialize, serde::Serialize)]
 #[cfg_attr(test, derive(Eq, PartialEq))]
 struct Persisted {
     automated: Option<NetstackVersion>,
     user: Option<NetstackVersion>,
+    rollback: Option<rollback::Persisted>,
 }
 
 impl Persisted {
@@ -80,12 +124,21 @@ impl Persisted {
     }
 
     // Determine the desired NetstackVersion based on the persisted values
-    fn desired_netstack_version(&self) -> NetstackVersion {
+    fn desired_netstack_version(&self) -> RollbackNetstackVersion {
         match self {
-            Persisted { user: Some(user), automated: _ } => *user,
-            Persisted { user: None, automated: Some(automated) } => *automated,
+            Persisted { user: Some(user), automated: _, rollback: _ } => (*user).into(),
+            Persisted {
+                user: None,
+                rollback: Some(rollback::Persisted::HealthcheckFailures(failures)),
+                automated: Some(NetstackVersion::Netstack3),
+            } if *failures >= rollback::MAX_FAILED_HEALTHCHECKS => {
+                RollbackNetstackVersion::ForceNetstack2
+            }
+            Persisted { user: None, automated: Some(automated), rollback: _ } => {
+                (*automated).into()
+            }
             // Use the default version if nothing is set.
-            Persisted { user: None, automated: None } => DEFAULT_NETSTACK,
+            Persisted { user: None, automated: None, rollback: _ } => DEFAULT_NETSTACK.into(),
         }
     }
 }
@@ -96,7 +149,7 @@ enum ServiceRequest {
 }
 
 struct Migration<P, CR> {
-    current_boot: NetstackVersion,
+    current_boot: RollbackNetstackVersion,
     persisted: Persisted,
     persistence: P,
     collaborative_reboot: CollaborativeReboot<CR>,
@@ -208,6 +261,13 @@ impl<P: PersistenceProvider, CR: CollaborativeRebootScheduler> Migration<P, CR> 
         });
         let current_boot = persisted.desired_netstack_version();
 
+        if current_boot == RollbackNetstackVersion::ForceNetstack2 {
+            warn!(
+                "Previous boot failed to migrate to Netstack3. \
+                Ignoring automated setting and forcibly using Netstack2."
+            );
+        }
+
         Self {
             current_boot,
             persisted,
@@ -242,7 +302,7 @@ impl<P: PersistenceProvider, CR: CollaborativeRebootScheduler> Migration<P, CR> 
 
     async fn update_collaborative_reboot(&mut self) {
         let Self { current_boot, persisted, persistence: _, collaborative_reboot } = self;
-        if persisted.desired_netstack_version() != *current_boot {
+        if persisted.desired_netstack_version().version() != current_boot.version() {
             // When the current boot differs from our desired version, schedule
             // a reboot (if there's not already one).
             collaborative_reboot.schedule().await
@@ -250,6 +310,14 @@ impl<P: PersistenceProvider, CR: CollaborativeRebootScheduler> Migration<P, CR> 
             // When the current_boot matches our desired version, we no longer
             // need reboot. Cancel the outstanding request (if any)
             collaborative_reboot.cancel()
+        }
+    }
+
+    async fn update_rollback_state(&mut self, new_state: rollback::Persisted) {
+        if self.persisted.rollback != Some(new_state) {
+            self.persisted.rollback = Some(new_state);
+            self.update_collaborative_reboot().await;
+            self.persist();
         }
     }
 
@@ -262,7 +330,7 @@ impl<P: PersistenceProvider, CR: CollaborativeRebootScheduler> Migration<P, CR> 
                 let version = Self::map_version_setting(version);
                 let Self {
                     current_boot: _,
-                    persisted: Persisted { automated, user: _ },
+                    persisted: Persisted { automated, user: _, rollback: _ },
                     persistence: _,
                     collaborative_reboot: _,
                 } = self;
@@ -278,7 +346,7 @@ impl<P: PersistenceProvider, CR: CollaborativeRebootScheduler> Migration<P, CR> 
                 let version = Self::map_version_setting(version);
                 let Self {
                     current_boot: _,
-                    persisted: Persisted { automated: _, user },
+                    persisted: Persisted { automated: _, user, rollback: _ },
                     persistence: _,
                     collaborative_reboot: _,
                 } = self;
@@ -296,14 +364,14 @@ impl<P: PersistenceProvider, CR: CollaborativeRebootScheduler> Migration<P, CR> 
     fn handle_state_request(&self, req: fnet_migration::StateRequest) -> Result<(), fidl::Error> {
         let Migration {
             current_boot,
-            persisted: Persisted { user, automated },
+            persisted: Persisted { user, automated, rollback: _ },
             persistence: _,
             collaborative_reboot: _,
         } = self;
         match req {
             fnet_migration::StateRequest::GetNetstackVersion { responder } => {
                 responder.send(&fnet_migration::InEffectVersion {
-                    current_boot: (*current_boot).into(),
+                    current_boot: current_boot.version().into(),
                     user: (*user).map(Into::into),
                     automated: (*automated).map(Into::into),
                 })
@@ -322,12 +390,13 @@ impl<P: PersistenceProvider, CR: CollaborativeRebootScheduler> Migration<P, CR> 
 struct InspectNodes {
     automated_setting: fuchsia_inspect::UintProperty,
     user_setting: fuchsia_inspect::UintProperty,
+    rollback_state: fuchsia_inspect::StringProperty,
 }
 
 impl InspectNodes {
     fn new<P, CR>(inspector: &fuchsia_inspect::Inspector, m: &Migration<P, CR>) -> Self {
         let root = inspector.root();
-        let Migration { current_boot, persisted: Persisted { automated, user }, .. } = m;
+        let Migration { current_boot, persisted: Persisted { automated, user, rollback }, .. } = m;
         let automated_setting = root.create_uint(
             "automated_setting",
             NetstackVersion::optional_inspect_uint_value(automated),
@@ -335,17 +404,25 @@ impl InspectNodes {
         let user_setting =
             root.create_uint("user_setting", NetstackVersion::optional_inspect_uint_value(user));
 
+        let rollback_state = root.create_string("rollback_state", format!("{rollback:?}"));
+
         // The current boot version is immutable, record it once instead of
         // keeping track of a property node.
-        root.record_uint("current_boot", current_boot.inspect_uint_value());
-        Self { automated_setting, user_setting }
+        root.record_uint("current_boot", current_boot.version().inspect_uint_value());
+        root.record_bool(
+            "forced_netstack2",
+            *current_boot == RollbackNetstackVersion::ForceNetstack2,
+        );
+
+        Self { automated_setting, user_setting, rollback_state }
     }
 
     fn update<P, CR>(&self, m: &Migration<P, CR>) {
-        let Migration { persisted: Persisted { automated, user }, .. } = m;
-        let Self { automated_setting, user_setting } = self;
+        let Migration { persisted: Persisted { automated, user, rollback }, .. } = m;
+        let Self { automated_setting, user_setting, rollback_state } = self;
         automated_setting.set(NetstackVersion::optional_inspect_uint_value(automated));
         user_setting.set(NetstackVersion::optional_inspect_uint_value(user));
+        rollback_state.set(&format!("{rollback:?}"));
     }
 }
 
@@ -403,10 +480,10 @@ impl MetricsLogger {
         };
 
         let current_boot = match migration.current_boot {
-            NetstackVersion::Netstack2 => {
+            RollbackNetstackVersion::Netstack2 | RollbackNetstackVersion::ForceNetstack2 => {
                 metrics_registry::StackMigrationCurrentBootMetricDimensionNetstackVersion::Netstack2
             }
-            NetstackVersion::Netstack3 => {
+            RollbackNetstackVersion::Netstack3 => {
                 metrics_registry::StackMigrationCurrentBootMetricDimensionNetstackVersion::Netstack3
             }
         }
@@ -421,12 +498,13 @@ impl MetricsLogger {
             None => metrics_registry::StackMigrationAutomatedSettingMetricDimensionNetstackVersion::NoSelection,
             Some(NetstackVersion::Netstack2) => metrics_registry::StackMigrationAutomatedSettingMetricDimensionNetstackVersion::Netstack2,
             Some(NetstackVersion::Netstack3) => metrics_registry::StackMigrationAutomatedSettingMetricDimensionNetstackVersion::Netstack3,
-        }
-        .as_event_code();
+        }.as_event_code();
+        let rollback_state = compute_state_metric(migration).as_event_code();
         for (metric_id, event_code) in [
             (metrics_registry::STACK_MIGRATION_CURRENT_BOOT_METRIC_ID, current_boot),
             (metrics_registry::STACK_MIGRATION_USER_SETTING_METRIC_ID, user),
             (metrics_registry::STACK_MIGRATION_AUTOMATED_SETTING_METRIC_ID, automated),
+            (metrics_registry::STACK_MIGRATION_STATE_METRIC_ID, rollback_state),
         ] {
             let occurrence_count = 1;
             logger
@@ -439,6 +517,50 @@ impl MetricsLogger {
                     warn!("error logging metric {metric_id} {fidl_error:?}")
                 });
         }
+    }
+}
+
+fn compute_state_metric<P, CR>(
+    migration: &Migration<P, CR>,
+) -> metrics_registry::StackMigrationStateMetricDimensionMigrationState {
+    use metrics_registry::StackMigrationStateMetricDimensionMigrationState as state_metric;
+    let Migration {
+        current_boot,
+        persisted: Persisted { automated, user: _, rollback },
+        persistence: _,
+        collaborative_reboot: _,
+    } = migration;
+
+    match (current_boot, automated, rollback) {
+        (RollbackNetstackVersion::Netstack2, Some(NetstackVersion::Netstack2) | None, _) => {
+            state_metric::NotStarted
+        }
+        (RollbackNetstackVersion::Netstack2, Some(NetstackVersion::Netstack3), _) => {
+            state_metric::Scheduled
+        }
+        (RollbackNetstackVersion::ForceNetstack2, _, _) => state_metric::RolledBack,
+        (RollbackNetstackVersion::Netstack3, Some(NetstackVersion::Netstack2) | None, _) => {
+            state_metric::Canceled
+        }
+        (RollbackNetstackVersion::Netstack3, Some(NetstackVersion::Netstack3), None) => {
+            state_metric::InProgress
+        }
+        (
+            RollbackNetstackVersion::Netstack3,
+            Some(NetstackVersion::Netstack3),
+            Some(rollback::Persisted::HealthcheckFailures(f)),
+        ) => {
+            if *f >= rollback::MAX_FAILED_HEALTHCHECKS {
+                state_metric::Failed
+            } else {
+                state_metric::InProgress
+            }
+        }
+        (
+            RollbackNetstackVersion::Netstack3,
+            Some(NetstackVersion::Netstack3),
+            Some(rollback::Persisted::Success),
+        ) => state_metric::Success,
     }
 }
 
@@ -459,7 +581,27 @@ pub async fn main() {
         fs.take_and_serve_directory_handle().expect("failed to take out directory handle");
 
     let mut migration = Migration::new(DataPersistenceProvider {}, Scheduler {});
+    main_inner(
+        &mut migration,
+        fs.fuse().flatten_unordered(None),
+        rollback::FidlHttpFetcher::new(),
+        rollback::new_healthcheck_stream(),
+    )
+    .await
+}
 
+async fn main_inner<
+    P: PersistenceProvider,
+    CR: CollaborativeRebootScheduler,
+    H: rollback::HttpFetcher + Send + 'static,
+    T: Stream<Item = ()> + Send + 'static,
+    SR: Stream<Item = Result<ServiceRequest, fidl::Error>>,
+>(
+    migration: &mut Migration<P, CR>,
+    service_request_stream: SR,
+    http_fetcher: H,
+    healthcheck_tick: T,
+) {
     let inspector = fuchsia_inspect::component::inspector();
     let _inspect_server =
         inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default())
@@ -468,21 +610,56 @@ pub async fn main() {
 
     let metrics_logger = MetricsLogger::new().await;
 
+    let (desired_version_sender, desired_version_receiver) = mpsc::unbounded();
+    let (rollback_state_sender, rollback_state_receiver) = mpsc::unbounded();
+    let rollback_state =
+        rollback::State::new(migration.persisted.rollback, migration.current_boot.version());
+    // Update rollback persistence immediately in case the device reboots before
+    // the rollback module has time to send an asynchronous update. This is
+    // required for correctness if Netstack3 is crashing on startup, or in the
+    // following case:
+    //
+    // 1. Device fails to migrate to Netstack3 and persists
+    //    HealthcheckFailures(MAX_FAILED_HEALTHCHECKS), which will force
+    //    Netstack2 on subsequent boots.
+    // 2. Device reboots into Netstack2, sees that it should be running
+    //    Netstack3, and schedules a reboot without clearing the failures.
+    // 3. Device reboots back into Netstack3 and sees that it should schedule
+    //    a reboot because the persisted failures are above the limit.
+    migration.update_rollback_state(rollback_state.persisted()).await;
+
+    Task::spawn(async move {
+        rollback::run(
+            rollback_state,
+            http_fetcher,
+            desired_version_receiver,
+            rollback_state_sender,
+            pin!(healthcheck_tick),
+        )
+        .await
+    })
+    .detach();
+
     enum Action {
         ServiceRequest(Result<ServiceRequest, fidl::Error>),
         LogMetrics,
+        UpdateRollbackState(rollback::Persisted),
     }
 
     let metrics_logging_interval = fuchsia_async::MonotonicDuration::from_hours(1);
-    let mut stream = futures::stream::select(
-        // Always log metrics once on startup then periodically log new values so
-        // the aggregation window always contains one sample of the current
-        // settings.
+    let mut stream: futures::stream::SelectAll<Pin<Box<dyn Stream<Item = Action>>>> =
+        futures::stream::SelectAll::new();
+
+    // Always log metrics once on startup then periodically log new values so
+    // the aggregation window always contains one sample of the current
+    // settings.
+    stream.push(Box::pin(Box::new(
         futures::stream::once(futures::future::ready(()))
             .chain(fuchsia_async::Interval::new(metrics_logging_interval))
             .map(|()| Action::LogMetrics),
-        fs.fuse().flatten_unordered(None).map(Action::ServiceRequest),
-    );
+    )));
+    stream.push(Box::pin(Box::new(Box::pin(service_request_stream.map(Action::ServiceRequest)))));
+    stream.push(Box::pin(rollback_state_receiver.map(|state| Action::UpdateRollbackState(state))));
 
     while let Some(action) = stream.next().await {
         match action {
@@ -493,6 +670,21 @@ pub async fn main() {
                 };
                 // Always update inspector state after handling a request.
                 inspect_nodes.update(&migration);
+
+                // Send the desired netstack version to the rollback mechanism,
+                // but ignore the "forced" setting. The "forced" setting comes
+                // from the rollback mechanism, and sending that signal back
+                // into it would cause a the mechanism to incorrectly detect
+                // a cancelation.
+                match desired_version_sender.unbounded_send(
+                    migration.persisted.desired_netstack_version().version_ignoring_force(),
+                ) {
+                    Ok(()) => (),
+                    Err(e) => {
+                        error!("error sending update to rollback module: {:?}", e);
+                    }
+                }
+
                 match result {
                     Ok(()) => (),
                     Err(e) => {
@@ -505,6 +697,12 @@ pub async fn main() {
             Action::LogMetrics => {
                 metrics_logger.log_metrics(&migration).await;
             }
+            Action::UpdateRollbackState(new_state) => {
+                migration.update_rollback_state(new_state).await;
+                // Always update inspector state when the rollback state
+                // changes.
+                inspect_nodes.update(&migration);
+            }
         }
     }
 }
@@ -512,10 +710,16 @@ pub async fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
+    use async_utils::event::{Event, EventWait};
     use diagnostics_assertions::assert_data_tree;
     use fidl::Peered as _;
+    use fidl_fuchsia_net_http as fnet_http;
+    use fuchsia_async::TimeoutExt;
+    use futures::FutureExt;
     use std::cell::RefCell;
     use std::rc::Rc;
+    use std::time::Duration;
     use test_case::test_case;
 
     #[derive(Default, Clone)]
@@ -616,27 +820,38 @@ mod tests {
     #[test_case(Persisted{
         user: Some(NetstackVersion::Netstack2),
         automated: None,
+        rollback: None,
     }; "user_netstack2")]
     #[test_case(Persisted{
         user: Some(NetstackVersion::Netstack3),
         automated: None,
+        rollback: None,
     }; "user_netstack3")]
     #[test_case(Persisted{
         user: None,
         automated: None,
+        rollback: None,
     }; "none")]
     #[test_case(Persisted{
         user: None,
         automated: Some(NetstackVersion::Netstack2),
+        rollback: None,
     }; "automated_netstack2")]
     #[test_case(Persisted{
         user: None,
         automated: Some(NetstackVersion::Netstack3),
+        rollback: None,
     }; "automated_netstack3")]
+    #[test_case(Persisted{
+        user: None,
+        automated: None,
+        rollback: Some(rollback::Persisted::Success),
+    }; "rollback_success")]
     #[test_case(Persisted{
         user: Some(NetstackVersion::Netstack2),
         automated: Some(NetstackVersion::Netstack3),
-    }; "both")]
+        rollback: Some(rollback::Persisted::HealthcheckFailures(5)),
+    }; "all")]
     #[fuchsia::test(add_test_attr = false)]
     fn persist_save_load(v: Persisted) {
         let mut m = InMemory::default();
@@ -649,51 +864,71 @@ mod tests {
         let m = Migration::new(InMemory::default(), NoCollaborativeReboot);
         let Migration {
             current_boot,
-            persisted: Persisted { user, automated },
+            persisted: Persisted { user, automated, rollback: _ },
             persistence: _,
             collaborative_reboot: _,
         } = m;
-        assert_eq!(current_boot, DEFAULT_NETSTACK);
+        assert_eq!(current_boot.version(), DEFAULT_NETSTACK);
         assert_eq!(user, None);
         assert_eq!(automated, None);
     }
 
     #[test_case(
-        None, Some(NetstackVersion::Netstack3), NetstackVersion::Netstack3;
+        None, Some(NetstackVersion::Netstack3), None, NetstackVersion::Netstack3;
         "automated_ns3")]
     #[test_case(
-        None, Some(NetstackVersion::Netstack2), NetstackVersion::Netstack2;
+        None, Some(NetstackVersion::Netstack2), None, NetstackVersion::Netstack2;
         "automated_ns2")]
     #[test_case(
         Some(NetstackVersion::Netstack3),
         Some(NetstackVersion::Netstack2),
+        Some(rollback::Persisted::HealthcheckFailures(rollback::MAX_FAILED_HEALTHCHECKS)),
         NetstackVersion::Netstack3;
         "user_ns3_override")]
     #[test_case(
         Some(NetstackVersion::Netstack2),
         Some(NetstackVersion::Netstack3),
+        Some(rollback::Persisted::Success),
         NetstackVersion::Netstack2;
         "user_ns2_override")]
-    #[test_case(Some(NetstackVersion::Netstack2), None, NetstackVersion::Netstack2; "user_ns2")]
-    #[test_case(Some(NetstackVersion::Netstack3), None, NetstackVersion::Netstack3; "user_ns3")]
-    #[test_case(None, None, DEFAULT_NETSTACK; "default")]
+    #[test_case(
+        Some(NetstackVersion::Netstack2),
+        None,
+        None,
+        NetstackVersion::Netstack2; "user_ns2")]
+    #[test_case(
+        Some(NetstackVersion::Netstack3),
+        None,
+        None,
+        NetstackVersion::Netstack3; "user_ns3")]
+    #[test_case(
+        None,
+        Some(NetstackVersion::Netstack3),
+        Some(rollback::Persisted::HealthcheckFailures(rollback::MAX_FAILED_HEALTHCHECKS)),
+        NetstackVersion::Netstack2; "rollback_to_ns2")]
+    #[test_case(None, None, None, DEFAULT_NETSTACK; "default")]
     #[fuchsia::test]
     async fn get_netstack_version(
         p_user: Option<NetstackVersion>,
         p_automated: Option<NetstackVersion>,
+        p_rollback: Option<rollback::Persisted>,
         expect: NetstackVersion,
     ) {
         let m = Migration::new(
-            InMemory::with_persisted(Persisted { user: p_user, automated: p_automated }),
+            InMemory::with_persisted(Persisted {
+                user: p_user,
+                automated: p_automated,
+                rollback: p_rollback,
+            }),
             NoCollaborativeReboot,
         );
         let Migration {
             current_boot,
-            persisted: Persisted { user, automated },
+            persisted: Persisted { user, automated, rollback: _ },
             persistence: _,
             collaborative_reboot: _,
         } = &m;
-        assert_eq!(*current_boot, expect);
+        assert_eq!(current_boot.version(), expect);
         assert_eq!(*user, p_user);
         assert_eq!(*automated, p_automated);
 
@@ -746,11 +981,11 @@ mod tests {
         let validate_versions = |m: &Migration<_, _>, current| {
             let Migration {
                 current_boot,
-                persisted: Persisted { user, automated },
+                persisted: Persisted { user, automated, rollback: _ },
                 persistence: _,
                 collaborative_reboot: _,
             } = m;
-            assert_eq!(*current_boot, current);
+            assert_eq!(current_boot.version(), current);
             match mechanism {
                 SetMechanism::User => {
                     assert_eq!(*user, Some(set_version));
@@ -781,6 +1016,71 @@ mod tests {
         validate_versions(&migration, set_version);
     }
 
+    #[fuchsia::test]
+    async fn update_rollback_state() {
+        let mut migration = Migration::new(
+            InMemory::with_persisted(Persisted {
+                automated: Some(NetstackVersion::Netstack3),
+                user: None,
+                rollback: None,
+            }),
+            FakeCollaborativeReboot::default(),
+        );
+
+        assert_eq!(migration.current_boot.version(), NetstackVersion::Netstack3);
+        assert!(migration.collaborative_reboot.scheduler.req.is_none());
+
+        // The first update shouldn't schedule a reboot because we haven't
+        // passed the healthcheck threshold yet.
+        migration.update_rollback_state(rollback::Persisted::HealthcheckFailures(1)).await;
+        assert_matches!(
+            migration.persisted.rollback,
+            Some(rollback::Persisted::HealthcheckFailures(1))
+        );
+        assert!(migration.collaborative_reboot.scheduler.req.is_none());
+
+        // This second update should schedule a reboot because we've passed
+        // the healthcheck limit and want to roll back to Netstack2.
+        migration
+            .update_rollback_state(rollback::Persisted::HealthcheckFailures(
+                rollback::MAX_FAILED_HEALTHCHECKS,
+            ))
+            .await;
+        assert_matches!(
+            migration.persisted.rollback,
+            Some(rollback::Persisted::HealthcheckFailures(rollback::MAX_FAILED_HEALTHCHECKS))
+        );
+        assert_eq!(
+            migration
+                .collaborative_reboot
+                .scheduler
+                .req
+                .as_ref()
+                .expect("reboot was not scheduled")
+                .is_closed()
+                .unwrap(),
+            false
+        );
+
+        // This emulates seeing a healthcheck success before rebooting, in which
+        // case we should see the reboot get canceled.
+        migration.update_rollback_state(rollback::Persisted::Success).await;
+        assert_matches!(migration.persisted.rollback, Some(rollback::Persisted::Success));
+        assert!(migration
+            .collaborative_reboot
+            .scheduler
+            .req
+            .as_ref()
+            .unwrap()
+            .is_closed()
+            .unwrap());
+
+        // Ensure that the changes were persisted successfully.
+        let migration =
+            Migration::new(migration.persistence, migration.collaborative_reboot.scheduler);
+        assert_matches!(migration.persisted.rollback, Some(rollback::Persisted::Success));
+    }
+
     #[test_case(SetMechanism::User, Some(NetstackVersion::Netstack2), true)]
     #[test_case(SetMechanism::User, Some(NetstackVersion::Netstack3), false)]
     #[test_case(SetMechanism::User, None, false)]
@@ -794,7 +1094,7 @@ mod tests {
         expect_canceled: bool,
     ) {
         let migration = Migration::new(
-            InMemory::with_persisted(Persisted { user: None, automated: None }),
+            InMemory::with_persisted(Persisted { user: None, automated: None, rollback: None }),
             FakeCollaborativeReboot::default(),
         );
 
@@ -853,6 +1153,7 @@ mod tests {
             InMemory::with_persisted(Persisted {
                 user: Some(PREVIOUS_VERSION),
                 automated: Some(PREVIOUS_VERSION),
+                rollback: None,
             }),
             NoCollaborativeReboot,
         );
@@ -874,11 +1175,11 @@ mod tests {
         let validate_versions = |m: &Migration<_, _>| {
             let Migration {
                 current_boot,
-                persisted: Persisted { user, automated },
+                persisted: Persisted { user, automated, rollback: _ },
                 persistence: _,
                 collaborative_reboot: _,
             } = m;
-            assert_eq!(*current_boot, PREVIOUS_VERSION);
+            assert_eq!(current_boot.version(), PREVIOUS_VERSION);
             match mechanism {
                 SetMechanism::User => {
                     assert_eq!(*user, None);
@@ -904,6 +1205,7 @@ mod tests {
             InMemory::with_persisted(Persisted {
                 user: Some(NetstackVersion::Netstack2),
                 automated: Some(NetstackVersion::Netstack3),
+                rollback: None,
             }),
             NoCollaborativeReboot,
         );
@@ -914,24 +1216,78 @@ mod tests {
                 current_boot: 2u64,
                 user_setting: 2u64,
                 automated_setting: 3u64,
+                rollback_state: "None",
+                forced_netstack2: false,
             }
         );
 
-        m.persisted = Persisted { user: None, automated: Some(NetstackVersion::Netstack2) };
+        m.persisted =
+            Persisted { user: None, automated: Some(NetstackVersion::Netstack2), rollback: None };
         nodes.update(&m);
         assert_data_tree!(inspector,
             root: {
                 current_boot: 2u64,
                 user_setting: 0u64,
                 automated_setting: 2u64,
+                rollback_state: "None",
+                forced_netstack2: false,
+            }
+        );
+    }
+
+    #[fuchsia::test]
+    fn inspect_rollback() {
+        let mut m = Migration::new(
+            InMemory::with_persisted(Persisted {
+                user: None,
+                automated: Some(NetstackVersion::Netstack3),
+                rollback: Some(rollback::Persisted::HealthcheckFailures(
+                    rollback::MAX_FAILED_HEALTHCHECKS,
+                )),
+            }),
+            NoCollaborativeReboot,
+        );
+        let inspector = fuchsia_inspect::component::inspector();
+        let nodes = InspectNodes::new(inspector, &m);
+        assert_data_tree!(inspector,
+            root: {
+                current_boot: 2u64,
+                user_setting: 0u64,
+                automated_setting: 3u64,
+                rollback_state: "Some(HealthcheckFailures(5))",
+                forced_netstack2: true,
+            }
+        );
+
+        m.persisted.rollback =
+            Some(rollback::Persisted::HealthcheckFailures(rollback::MAX_FAILED_HEALTHCHECKS + 1));
+        nodes.update(&m);
+        assert_data_tree!(inspector,
+            root: {
+                current_boot: 2u64,
+                user_setting: 0u64,
+                automated_setting: 3u64,
+                rollback_state: "Some(HealthcheckFailures(6))",
+                forced_netstack2: true,
+            }
+        );
+        m.persisted.rollback = Some(rollback::Persisted::Success);
+        nodes.update(&m);
+        assert_data_tree!(inspector,
+            root: {
+                current_boot: 2u64,
+                user_setting: 0u64,
+                automated_setting: 3u64,
+                rollback_state: "Some(Success)",
+                forced_netstack2: true,
             }
         );
     }
 
     #[test_case::test_matrix(
     [
-        (NetstackVersion::Netstack2, metrics_registry::StackMigrationCurrentBootMetricDimensionNetstackVersion::Netstack2),
-        (NetstackVersion::Netstack3, metrics_registry::StackMigrationCurrentBootMetricDimensionNetstackVersion::Netstack3),
+        (RollbackNetstackVersion::Netstack2, metrics_registry::StackMigrationCurrentBootMetricDimensionNetstackVersion::Netstack2),
+        (RollbackNetstackVersion::Netstack3, metrics_registry::StackMigrationCurrentBootMetricDimensionNetstackVersion::Netstack3),
     ],
     [
         (None, metrics_registry::StackMigrationUserSettingMetricDimensionNetstackVersion::NoSelection),
@@ -947,7 +1303,7 @@ mod tests {
     #[fuchsia::test]
     async fn metrics_logger(
         current_boot: (
-            NetstackVersion,
+            RollbackNetstackVersion,
             metrics_registry::StackMigrationCurrentBootMetricDimensionNetstackVersion,
         ),
         user: (
@@ -963,7 +1319,7 @@ mod tests {
         let (user, user_expect) = user;
         let (automated, automated_expect) = automated;
         let mut m = Migration::new(
-            InMemory::with_persisted(Persisted { user, automated }),
+            InMemory::with_persisted(Persisted { user, automated, rollback: None }),
             NoCollaborativeReboot,
         );
         m.current_boot = current_boot;
@@ -976,15 +1332,22 @@ mod tests {
             let expect = [
                 (
                     metrics_registry::STACK_MIGRATION_CURRENT_BOOT_METRIC_ID,
-                    current_boot_expect.as_event_code(),
+                    Some(current_boot_expect.as_event_code()),
                 ),
                 (
                     metrics_registry::STACK_MIGRATION_USER_SETTING_METRIC_ID,
-                    user_expect.as_event_code(),
+                    Some(user_expect.as_event_code()),
                 ),
                 (
                     metrics_registry::STACK_MIGRATION_AUTOMATED_SETTING_METRIC_ID,
-                    automated_expect.as_event_code(),
+                    Some(automated_expect.as_event_code()),
+                ),
+                (
+                    metrics_registry::STACK_MIGRATION_STATE_METRIC_ID,
+                    // Note: The rollback state doesn't have a flat expectation.
+                    // Don't assert on its value here, and instead we directly
+                    // test it in a separate test case.
+                    None,
                 ),
             ];
             for (id, ev) in expect {
@@ -997,10 +1360,296 @@ mod tests {
                     .expect("bad request");
                 assert_eq!(metric, id);
                 assert_eq!(occurences, 1);
-                assert_eq!(codes, vec![ev]);
+                if let Some(ev) = ev {
+                    assert_eq!(codes, vec![ev]);
+                }
                 responder.send(Ok(())).unwrap();
             }
         })
         .await;
+    }
+
+    #[test_case(
+        RollbackNetstackVersion::Netstack2, None, None =>
+        metrics_registry::StackMigrationStateMetricDimensionMigrationState::NotStarted;
+        "not_started_none"
+    )]
+    #[test_case(
+        RollbackNetstackVersion::Netstack2, Some(NetstackVersion::Netstack2), None =>
+        metrics_registry::StackMigrationStateMetricDimensionMigrationState::NotStarted;
+        "not_started_ns2"
+    )]
+    #[test_case(
+        RollbackNetstackVersion::Netstack2, Some(NetstackVersion::Netstack3), None =>
+        metrics_registry::StackMigrationStateMetricDimensionMigrationState::Scheduled;
+        "scheduled"
+    )]
+    #[test_case(
+        RollbackNetstackVersion::Netstack3, Some(NetstackVersion::Netstack3), None =>
+        metrics_registry::StackMigrationStateMetricDimensionMigrationState::InProgress;
+        "in_progress_none"
+    )]
+    #[test_case(
+        RollbackNetstackVersion::Netstack3, Some(NetstackVersion::Netstack3),
+        Some(rollback::Persisted::HealthcheckFailures(rollback::MAX_FAILED_HEALTHCHECKS - 1)) =>
+        metrics_registry::StackMigrationStateMetricDimensionMigrationState::InProgress;
+        "in_progress_some"
+    )]
+    #[test_case(
+        RollbackNetstackVersion::Netstack3, Some(NetstackVersion::Netstack3),
+        Some(rollback::Persisted::HealthcheckFailures(rollback::MAX_FAILED_HEALTHCHECKS)) =>
+        metrics_registry::StackMigrationStateMetricDimensionMigrationState::Failed;
+        "failed_exact"
+    )]
+    #[test_case(
+        RollbackNetstackVersion::Netstack3, Some(NetstackVersion::Netstack3),
+        Some(rollback::Persisted::HealthcheckFailures(rollback::MAX_FAILED_HEALTHCHECKS + 1)) =>
+        metrics_registry::StackMigrationStateMetricDimensionMigrationState::Failed;
+        "failed_more"
+    )]
+    #[test_case(
+        RollbackNetstackVersion::Netstack3, Some(NetstackVersion::Netstack3),
+        Some(rollback::Persisted::Success) =>
+        metrics_registry::StackMigrationStateMetricDimensionMigrationState::Success;
+        "success"
+    )]
+    #[test_case(
+        RollbackNetstackVersion::Netstack3, None, None =>
+        metrics_registry::StackMigrationStateMetricDimensionMigrationState::Canceled;
+        "canceled_none"
+    )]
+    #[test_case(
+        RollbackNetstackVersion::Netstack3, Some(NetstackVersion::Netstack2), None =>
+        metrics_registry::StackMigrationStateMetricDimensionMigrationState::Canceled;
+        "canceled_ns2"
+    )]
+    #[test_case(
+        RollbackNetstackVersion::ForceNetstack2, Some(NetstackVersion::Netstack3), None =>
+        metrics_registry::StackMigrationStateMetricDimensionMigrationState::RolledBack;
+        "rolled_back"
+    )]
+    #[fuchsia::test]
+    fn test_state_metric(
+        current_boot: RollbackNetstackVersion,
+        automated: Option<NetstackVersion>,
+        rollback: Option<rollback::Persisted>,
+    ) -> metrics_registry::StackMigrationStateMetricDimensionMigrationState {
+        let mut migration = Migration::new(
+            InMemory::with_persisted(Persisted { user: None, automated, rollback }),
+            NoCollaborativeReboot,
+        );
+        migration.current_boot = current_boot;
+        compute_state_metric(&migration)
+    }
+
+    /// An in-memory mock-persistence that triggers an event once the target
+    /// state has been persisted.
+    #[derive(Clone)]
+    struct AwaitPersisted {
+        file: Rc<RefCell<Option<Vec<u8>>>>,
+        target: Vec<u8>,
+        event: Event,
+    }
+
+    impl AwaitPersisted {
+        fn with_persisted(start: Persisted, target: &Persisted) -> (Self, EventWait) {
+            let event = Event::new();
+            let wait = event.wait();
+            let target_bytes = serde_json::to_vec(target).expect("failed to serialize target");
+            let mut s = Self { file: Default::default(), target: target_bytes, event };
+            start.save(s.open_writer().unwrap());
+            (s, wait)
+        }
+    }
+
+    impl PersistenceProvider for AwaitPersisted {
+        type Writer = Self;
+        type Reader = std::io::Cursor<Vec<u8>>;
+
+        fn open_writer(&mut self) -> std::io::Result<Self::Writer> {
+            *self.file.borrow_mut() = Some(Vec::new());
+            Ok(self.clone())
+        }
+
+        fn open_reader(&self) -> std::io::Result<Self::Reader> {
+            self.file
+                .borrow()
+                .clone()
+                .map(std::io::Cursor::new)
+                .ok_or(std::io::ErrorKind::NotFound.into())
+        }
+    }
+
+    impl std::io::Write for AwaitPersisted {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            let r = self.file.borrow_mut().as_mut().expect("no file open").write(buf);
+            if self.file.borrow().as_ref().expect("no_file_open") == &self.target {
+                let _: bool = self.event.signal();
+            }
+            r
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[fuchsia::test]
+    async fn migrate_to_ns3_success() {
+        let start =
+            Persisted { user: None, automated: Some(NetstackVersion::Netstack3), rollback: None };
+        let target = Persisted {
+            user: None,
+            automated: Some(NetstackVersion::Netstack3),
+            rollback: Some(rollback::Persisted::Success),
+        };
+
+        let (persistence, mut wait) = AwaitPersisted::with_persisted(start, &target);
+        let mut migration = Migration::new(persistence, NoCollaborativeReboot);
+        // No service requests.
+        let service_request_stream = futures::stream::pending();
+        // A health check that always succeeds.
+        let mock_healthcheck = rollback::testutil::MockHttpRequester(|| {
+            Ok(fnet_http::Response { error: None, status_code: Some(204), ..Default::default() })
+        });
+        let healthcheck_tick = futures::stream::once(futures::future::ready(()));
+
+        {
+            let main_fut = main_inner(
+                &mut migration,
+                service_request_stream,
+                mock_healthcheck,
+                healthcheck_tick,
+            )
+            .fuse();
+            futures::pin_mut!(main_fut);
+            futures::select!(
+                () = main_fut => unreachable!("main fut should never exit"),
+                () = wait => {}
+            );
+        }
+
+        assert_eq!(migration.persisted.rollback, Some(rollback::Persisted::Success));
+    }
+
+    #[fuchsia::test]
+    async fn migrate_to_ns3_fails() {
+        let start =
+            Persisted { user: None, automated: Some(NetstackVersion::Netstack3), rollback: None };
+        let target = Persisted {
+            user: None,
+            automated: Some(NetstackVersion::Netstack3),
+            rollback: Some(rollback::Persisted::HealthcheckFailures(
+                rollback::MAX_FAILED_HEALTHCHECKS,
+            )),
+        };
+
+        let (persistence, mut wait) = AwaitPersisted::with_persisted(start, &target);
+        let mut migration = Migration::new(persistence, FakeCollaborativeReboot::default());
+        // No service requests.
+        let service_request_stream = futures::stream::pending();
+        // A health check that always fails.
+        let mock_healthcheck = rollback::testutil::MockHttpRequester(|| {
+            Ok(fnet_http::Response { error: None, status_code: Some(500), ..Default::default() })
+        });
+        // Use a non-zero interval so that the Healthcheck code doesn't hog the scheduler.
+        let healthcheck_tick = fuchsia_async::Interval::new(Duration::from_millis(1).into());
+
+        {
+            let main_fut = main_inner(
+                &mut migration,
+                service_request_stream,
+                mock_healthcheck,
+                healthcheck_tick,
+            )
+            .fuse();
+            futures::pin_mut!(main_fut);
+            futures::select!(
+                () = main_fut => unreachable!("main fut should never exit"),
+                () = wait => {}
+            );
+        }
+
+        assert_matches!(
+            migration.persisted.rollback,
+            Some(rollback::Persisted::HealthcheckFailures(f)) if
+            f >= rollback::MAX_FAILED_HEALTHCHECKS
+        );
+        // Verify a failed migration schedules a collaborative reboot.
+        let cr_req = &migration.collaborative_reboot.scheduler.req;
+        assert_eq!(Ok(false), cr_req.as_ref().expect("there should be a request").is_closed())
+    }
+
+    // Regression test for https://fxbug.dev/395913604.
+    //
+    // The original bug would reset the number of failed healthchecks in
+    // persistence from `rollback::MAX_FAILED_HEALTHCHECKS` to 0, if an inbound
+    // service request was received.
+    //
+    // Verify this is no longer the case by triggering a failed healthcheck,
+    // pushing the total to `rollback::MAX_FAILED_HEALTHCHECKS`, then sending
+    // a `fuchsia.net.migration/State.GetNetstackVersion` request.
+    #[fuchsia::test]
+    async fn migrate_to_ns3_rollback_regression_test() {
+        let start = Persisted {
+            user: None,
+            automated: Some(NetstackVersion::Netstack3),
+            rollback: Some(rollback::Persisted::HealthcheckFailures(
+                rollback::MAX_FAILED_HEALTHCHECKS - 1,
+            )),
+        };
+        let target = Persisted {
+            user: None,
+            automated: Some(NetstackVersion::Netstack3),
+            rollback: Some(rollback::Persisted::HealthcheckFailures(0)),
+        };
+
+        let (persistence, wait) = AwaitPersisted::with_persisted(start, &target);
+        let mut migration = Migration::new(persistence, FakeCollaborativeReboot::default());
+        // A health check that always fails.
+        let mock_healthcheck = rollback::testutil::MockHttpRequester(|| {
+            Ok(fnet_http::Response { error: None, status_code: Some(500), ..Default::default() })
+        });
+        let healthcheck_tick = futures::stream::once(futures::future::ready(()));
+        // Send "get" requests, to trigger the bug.
+        let (client, server) =
+            fidl::endpoints::create_proxy_and_stream::<fnet_migration::StateMarker>();
+        let service_request_stream = server.map(|r| r.map(ServiceRequest::State));
+        let client_fut = async move {
+            // Send multiple get requests, to ensure that at least one would occur after the failed
+            // healthcheck.
+            let mut stream = fuchsia_async::Interval::new(Duration::from_millis(1).into());
+            while let Some(()) = stream.next().await {
+                let _ =
+                    client.get_netstack_version().await.expect("failed to get netstack version");
+            }
+        }
+        .fuse();
+
+        // If wait were to fire, the bug has occurred. Instead expect a timeout.
+        // Use 1 second to keep the test runtime short; If CQ has a hiccup and
+        // pauses execution, we'd see a false negative, which isn't a big deal.
+        let wait_fut = wait
+            .map(|()| panic!("unexpectedly observed the persisted healthcheck failures reset to 0"))
+            .on_timeout(Duration::from_secs(1), || ())
+            .fuse();
+
+        {
+            let main_fut = main_inner(
+                &mut migration,
+                service_request_stream,
+                mock_healthcheck,
+                healthcheck_tick,
+            )
+            .fuse();
+            futures::pin_mut!(main_fut);
+            futures::pin_mut!(client_fut);
+            futures::pin_mut!(wait_fut);
+            futures::select!(
+                () = main_fut => unreachable!("main fut should never exit"),
+                () = client_fut => unreachable!("client fut should never exit"),
+                () = wait_fut => {}
+            );
+        }
     }
 }

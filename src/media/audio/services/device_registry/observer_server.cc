@@ -63,56 +63,6 @@ void ObserverServer::DeviceIsRemoved() {
   // We don't explicitly clear our shared_ptr<Device> reference, to ensure we destruct first.
 }
 
-void ObserverServer::WatchGainState(WatchGainStateCompleter::Sync& completer) {
-  ADR_LOG_METHOD(kLogObserverServerMethods);
-
-  if (device_has_error_) {
-    ADR_WARN_METHOD() << "Device encountered an error and will be removed";
-    completer.Reply(fit::error<fad::ObserverWatchGainStateError>(
-        fad::ObserverWatchGainStateError::kDeviceError));
-    return;
-  }
-
-  FX_CHECK(device_);
-  if (!device_->is_stream_config()) {
-    ADR_WARN_METHOD() << "This method is not supported for this device type";
-    completer.Reply(fit::error<fad::ObserverWatchGainStateError>(
-        fad::ObserverWatchGainStateError::kWrongDeviceType));
-    return;
-  }
-
-  if (watch_gain_state_completer_.has_value()) {
-    ADR_WARN_METHOD() << "previous `WatchGainState` request has not yet completed";
-    completer.Reply(fit::error<fad::ObserverWatchGainStateError>(
-        fad::ObserverWatchGainStateError::kAlreadyPending));
-    return;
-  }
-
-  watch_gain_state_completer_ = completer.ToAsync();
-  MaybeCompleteWatchGainState();
-}
-
-void ObserverServer::GainStateIsChanged(const fad::GainState& new_gain_state) {
-  ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods);
-
-  FX_DCHECK(device_->is_stream_config());
-
-  new_gain_state_to_notify_ = new_gain_state;
-  MaybeCompleteWatchGainState();
-}
-
-void ObserverServer::MaybeCompleteWatchGainState() {
-  if (watch_gain_state_completer_.has_value() && new_gain_state_to_notify_.has_value()) {
-    auto completer = std::move(*watch_gain_state_completer_);
-    watch_gain_state_completer_.reset();
-
-    fad::ObserverWatchGainStateResponse response{{.state = std::move(*new_gain_state_to_notify_)}};
-    new_gain_state_to_notify_.reset();
-
-    completer.Reply(fit::success(response));
-  }
-}
-
 void ObserverServer::WatchPlugState(WatchPlugStateCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogObserverServerMethods);
 
@@ -124,7 +74,7 @@ void ObserverServer::WatchPlugState(WatchPlugStateCompleter::Sync& completer) {
   }
 
   FX_CHECK(device_);
-  if (!device_->is_codec() && !device_->is_stream_config()) {
+  if (!device_->is_codec()) {
     ADR_WARN_METHOD() << "This method is not supported for this device type";
     completer.Reply(fit::error<fad::ObserverWatchPlugStateError>(
         fad::ObserverWatchPlugStateError::kWrongDeviceType));
@@ -177,7 +127,7 @@ void ObserverServer::GetReferenceClock(GetReferenceClockCompleter::Sync& complet
   }
 
   FX_CHECK(device_);
-  if (!device_->is_composite() && !device_->is_stream_config()) {
+  if (!device_->is_composite()) {
     ADR_WARN_METHOD() << "This method is not supported for this device type";
     completer.Reply(fit::error<fad::ObserverGetReferenceClockError>(
         fad::ObserverGetReferenceClockError::kWrongDeviceType));
@@ -207,7 +157,7 @@ void ObserverServer::GetElements(GetElementsCompleter::Sync& completer) {
   }
 
   FX_CHECK(device_);
-  if (!device_->is_codec() && !device_->is_composite() && !device_->is_stream_config()) {
+  if (!device_->is_codec() && !device_->is_composite()) {
     ADR_WARN_METHOD() << "This device_type does not support " << __func__;
     completer.Reply(fit::error(ZX_ERR_WRONG_TYPE));
     return;
@@ -235,7 +185,7 @@ void ObserverServer::GetTopologies(GetTopologiesCompleter::Sync& completer) {
   }
 
   FX_CHECK(device_);
-  if (!device_->is_codec() && !device_->is_composite() && !device_->is_stream_config()) {
+  if (!device_->is_codec() && !device_->is_composite()) {
     ADR_WARN_METHOD() << "This device_type does not support " << __func__;
     completer.Reply(fit::error(ZX_ERR_WRONG_TYPE));
     return;
@@ -263,7 +213,7 @@ void ObserverServer::WatchTopology(WatchTopologyCompleter::Sync& completer) {
   }
 
   FX_CHECK(device_);
-  if (!device_->is_codec() && !device_->is_composite() && !device_->is_stream_config()) {
+  if (!device_->is_codec() && !device_->is_composite()) {
     ADR_WARN_METHOD() << "This device_type does not support " << __func__;
     completer.Close(ZX_ERR_WRONG_TYPE);
     return;
@@ -320,7 +270,7 @@ void ObserverServer::WatchElementState(WatchElementStateRequest& request,
   }
 
   FX_CHECK(device_);
-  if (!device_->is_codec() && !device_->is_composite() && !device_->is_stream_config()) {
+  if (!device_->is_codec() && !device_->is_composite()) {
     ADR_WARN_METHOD() << "This device_type does not support " << __func__;
     completer.Close(ZX_ERR_WRONG_TYPE);
     return;

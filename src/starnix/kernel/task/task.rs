@@ -7,17 +7,16 @@ use crate::mutable_state::{state_accessor, state_implementation};
 use crate::security;
 use crate::signals::{KernelSignal, RunState, SignalInfo, SignalState};
 use crate::task::{
-    set_thread_role, AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask,
-    EventHandler, Kernel, ProcessEntryRef, ProcessExitInfo, PtraceEvent, PtraceEventData,
-    PtraceState, PtraceStatus, SchedulerPolicy, SeccompFilterContainer, SeccompState,
-    SeccompStateValue, ThreadGroup, ThreadState, UtsNamespaceHandle, WaitCanceler, Waiter,
-    ZombieProcess,
+    AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, EventHandler, Kernel,
+    ProcessEntryRef, ProcessExitInfo, PtraceEvent, PtraceEventData, PtraceState, PtraceStatus,
+    SchedulerPolicy, SeccompFilterContainer, SeccompState, SeccompStateValue, ThreadGroup,
+    ThreadState, UtsNamespaceHandle, WaitCanceler, Waiter, ZombieProcess,
 };
 use crate::vfs::{FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsNodeHandle, FsString};
 use bitflags::bitflags;
 use fuchsia_inspect_contrib::profile_duration;
 use macro_rules_attribute::apply;
-use starnix_logging::{log_debug, log_warn, set_current_task_info, set_zx_name};
+use starnix_logging::{log_warn, set_current_task_info, set_zx_name};
 use starnix_sync::{LockBefore, Locked, MmDumpable, Mutex, RwLock, TaskRelease};
 use starnix_types::ownership::{
     OwnedRef, Releasable, ReleasableByRef, ReleaseGuard, TempRef, WeakRef,
@@ -34,8 +33,8 @@ use starnix_uapi::signals::{
 use starnix_uapi::user_address::{MultiArchUserRef, UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    errno, error, from_status_like_fdio, pid_t, sigaction_t, sigaltstack, uapi, ucred,
-    CLD_CONTINUED, CLD_DUMPED, CLD_EXITED, CLD_KILLED, CLD_STOPPED, FUTEX_BITSET_MATCH_ANY,
+    errno, from_status_like_fdio, pid_t, sigaction_t, sigaltstack, uapi, ucred, CLD_CONTINUED,
+    CLD_DUMPED, CLD_EXITED, CLD_KILLED, CLD_STOPPED, FUTEX_BITSET_MATCH_ANY,
 };
 use std::collections::VecDeque;
 use std::ffi::CString;
@@ -325,13 +324,13 @@ pub type RobustListHeadPtr =
     MultiArchUserRef<uapi::robust_list_head, uapi::arch32::robust_list_head>;
 pub type RobustListPtr = MultiArchUserRef<uapi::robust_list, uapi::arch32::robust_list>;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct RobustListHead {
     pub list: RobustList,
     pub futex_offset: isize,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct RobustList {
     pub next: RobustListPtr,
 }
@@ -445,9 +444,6 @@ pub struct TaskMutableState {
 
     /// Information that a tracer needs to inspect this process.
     pub captured_thread_state: Option<CapturedThreadState>,
-
-    /// Wait canceler to abort cgroup freeze due to SIGKILL.
-    pub freeze_canceler: Option<WaitCanceler>,
 }
 
 impl TaskMutableState {
@@ -636,7 +632,13 @@ impl TaskMutableState {
 
     /// Thaw the task if has been frozen
     pub fn thaw(&mut self) {
-        self.freeze_canceler.take().map(|canceler| canceler.cancel());
+        if let RunState::Frozen(waiter) = self.run_state() {
+            waiter.notify();
+        }
+    }
+
+    pub fn is_frozen(&self) -> bool {
+        matches!(self.run_state(), RunState::Frozen(_))
     }
 }
 
@@ -1175,7 +1177,6 @@ impl Task {
                 default_timerslack_ns: timerslack_ns,
                 ptrace: None,
                 captured_thread_state: None,
-                freeze_canceler: None,
             }),
             persistent_info: TaskPersistentInfoState::new(id, pid, command, creds, exit_signal),
             seccomp_filter_state,
@@ -1183,8 +1184,10 @@ impl Task {
             proc_pid_directory_cache: Mutex::new(None),
             security_state,
         };
+
         #[cfg(any(test, debug_assertions))]
         {
+            // Note that `Kernel::pids` is already locked by the caller of `Task::new()`.
             let _l1 = task.read();
             let _l2 = task.persistent_info.lock();
         }
@@ -1260,17 +1263,7 @@ impl Task {
             updater(&mut state.scheduler_policy);
             state.scheduler_policy
         };
-
-        let Some(role_manager) = &self.thread_group.kernel.role_manager else {
-            log_debug!("thread role update requested in kernel without ProfileProvider, skipping");
-            return Ok(());
-        };
-        let thread = self.thread.read();
-        let Some(thread) = thread.as_ref() else {
-            log_debug!("thread role update requested for task without thread, skipping");
-            return Ok(());
-        };
-        set_thread_role(role_manager, thread, new_scheduler_policy)?;
+        self.thread_group.kernel.scheduler.set_thread_role(self, new_scheduler_policy)?;
         Ok(())
     }
 
@@ -1321,15 +1314,14 @@ impl Task {
         //      -  The caller has the CAP_SYS_PTRACE capability in the user
         //         namespace of the target.
         let target_creds = target.creds();
-        if !creds.has_capability(CAP_SYS_PTRACE)
-            && !(target_creds.uid == uid
-                && target_creds.euid == uid
-                && target_creds.saved_uid == uid
-                && target_creds.gid == gid
-                && target_creds.egid == gid
-                && target_creds.saved_gid == gid)
+        if !(target_creds.uid == uid
+            && target_creds.euid == uid
+            && target_creds.saved_uid == uid
+            && target_creds.gid == gid
+            && target_creds.egid == gid
+            && target_creds.saved_gid == gid)
         {
-            return error!(EPERM);
+            security::check_task_capable(self, CAP_SYS_PTRACE)?;
         }
 
         // (4)  Deny access if the target process "dumpable" attribute has a
@@ -1338,8 +1330,8 @@ impl Task {
         //      the CAP_SYS_PTRACE capability in the user namespace of the
         //      target process.
         let dumpable = *target.mm().ok_or_else(|| errno!(EINVAL))?.dumpable.lock(locked);
-        if dumpable != DumpPolicy::User && !creds.has_capability(CAP_SYS_PTRACE) {
-            return error!(EPERM);
+        if dumpable != DumpPolicy::User {
+            security::check_task_capable(self, CAP_SYS_PTRACE)?;
         }
 
         // TODO: Implement the LSM security_ptrace_access_check() interface.
@@ -1457,30 +1449,32 @@ impl Task {
         self.creds().as_fscred()
     }
 
-    pub fn can_signal(&self, target: &Task, unchecked_signal: UncheckedSignal) -> bool {
+    pub fn can_signal(
+        &self,
+        target: &Task,
+        unchecked_signal: UncheckedSignal,
+    ) -> Result<(), Errno> {
         // If both the tasks share a thread group the signal can be sent. This is not documented
         // in kill(2) because kill does not support task-level granularity in signal sending.
         if self.thread_group == target.thread_group {
-            return true;
+            return Ok(());
         }
 
         let self_creds = self.creds();
 
-        if self_creds.has_capability(CAP_KILL) {
-            return true;
-        }
-
         if self_creds.has_same_uid(&target.creds()) {
-            return true;
+            return Ok(());
         }
 
         if Signal::try_from(unchecked_signal) == Ok(SIGCONT) {
             let target_session = target.thread_group.read().process_group.session.leader;
             let self_session = self.thread_group.read().process_group.session.leader;
-            return target_session == self_session;
+            if target_session == self_session {
+                return Ok(());
+            }
         }
 
-        false
+        security::check_task_capable(self, CAP_KILL)
     }
 
     /// Interrupts the current task.
@@ -1741,11 +1735,11 @@ mod test {
     #[::fuchsia::test]
     async fn test_root_capabilities() {
         let (_kernel, current_task) = create_kernel_and_task();
-        assert!(current_task.creds().has_capability(CAP_SYS_ADMIN));
+        assert!(security::is_task_capable_noaudit(&current_task, CAP_SYS_ADMIN));
         assert_eq!(current_task.creds().cap_inheritable, Capabilities::empty());
 
         current_task.set_creds(Credentials::with_ids(1, 1));
-        assert!(!current_task.creds().has_capability(CAP_SYS_ADMIN));
+        assert!(!security::is_task_capable_noaudit(&current_task, CAP_SYS_ADMIN));
     }
 
     #[::fuchsia::test]

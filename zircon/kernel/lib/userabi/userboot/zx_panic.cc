@@ -38,7 +38,7 @@ extern "C" __NO_RETURN __PRINTFLIKE(1, 2) void __zx_panic(const char* fmt, ...) 
 }
 
 // Inline functions in libc++ headers call this.
-[[noreturn]] void std::__libcpp_verbose_abort(const char* format, ...) {
+[[noreturn]] void std::__libcpp_verbose_abort(const char* format, ...) noexcept {
   va_list ap;
   va_start(ap, format);
   vpanic(format, ap);

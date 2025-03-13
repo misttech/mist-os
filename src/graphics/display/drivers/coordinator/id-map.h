@@ -27,12 +27,23 @@ class IdMappable {
  public:
   using Map = fbl::HashTable</*KeyType=*/IdType, PtrType, /*BucketType=*/HashTableLinkedListType>;
 
-  static size_t GetHash(IdType id) { return std::hash<IdType>()(id); }
-  IdType GetKey() const { return id; }
+  explicit IdMappable(IdType id) : id_(id) {}
 
-  IdType id;
+  IdMappable(const IdMappable&) = delete;
+  IdMappable(IdMappable&&) = delete;
+  IdMappable& operator=(const IdMappable&) = delete;
+  IdMappable& operator=(IdMappable&&) = delete;
+
+  ~IdMappable() = default;
+
+  IdType id() const { return id_; }
+
+  static size_t GetHash(IdType id) { return std::hash<IdType>()(id); }
+  IdType GetKey() const { return id_; }
 
  private:
+  const IdType id_;
+
   IdMappableNodeState id_mappable_state_;
 };
 

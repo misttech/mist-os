@@ -2,8 +2,8 @@
 
 The Audio Device Registry service enables clients to enumerate, observe and
 control audio devices. It automatically detects audio devices that use the
-device file system (`devfs`) namespaces `dev/class/audio-output` and
-`dev/class/audio-input`, and it exposes interfaces to manually add audio devices
+device file system (`devfs`) namespaces `dev/class/audio-composite` and
+`dev/class/codec`, and it exposes interfaces to manually add audio devices
 that do not use those namespaces.
 
 ## Implications of Being a Mechanism-Only Service
@@ -73,7 +73,7 @@ objects. A `Device` object is created when it is detected (or manually added by
 FIDL call), and `AudioDeviceRegistry` calls `Device/Initialize` to kick off the
 discovery and enumeration of that device's capabilities. In addition to metadata
 about the device's capabilities, this object holds most of the underlying FIDL
-connections to the audio driver (`fuchsia.hardware.audio.StreamConfig`,
+connections to the audio driver (`fuchsia.hardware.audio.Composite`,
 `fuchsia.hardware.audio.Health`,
 `fuchsia.hardware.audio.signalprocessing.SignalProcessing`). This object also
 holds all the connections used to observe or control the device
@@ -147,14 +147,10 @@ above).
 When a device is added, the corresponding `Device` object is created, which
 makes the following calls to fetch device metadata:
 
-*   `StreamConfig/GetProperties` to fetch the unique ID, manufacturer and
+*   `Composite/GetProperties` to fetch the unique ID, manufacturer and
     product strings, gain and plug capabilities, and clock domain;
-*   `StreamConfig/GetSupportedFormats` to retrieve the complete set of formats
+*   `Composite/GetSupportedFormats` to retrieve the complete set of formats
     that the device can support;
-*   `StreamConfig/WatchGainState` to be notified of the initial gain state (and
-    any subsequent gain changes);
-*   `StreamConfig/WatchPlugState` to be notified of the initial plug state (and
-    any subsequent plug changes).
 *   `signal_processing.Reader/GetTopologies` to determine whether the driver
     supports the `SignalProcessing` protocol.
 
@@ -175,7 +171,7 @@ The creation of `RegistryServer` / `ObserverServer` / `ControlCreatorServer` /
 `ControlServer` / `RingBufferServer` / `ProviderServer` instances refer to the
 relevant `Device`(s), and every call to these interfaces is satisfied either
 from `Device` metadata or calls to the underlying driver interfaces
-(`StreamConfig`, `RingBuffer`, `Health`, `SignalProcessing`).
+(`Composite`, `RingBuffer`, `Health`, `SignalProcessing`).
 
 Creating a `Control` is a request to take exclusive control of the specified
 audio device. If this is available and permitted, the request succeeds, marking
@@ -200,11 +196,11 @@ If the underlying `fuchsia.hardware.audio.RingBuffer` is closed, the associated
 `RingBufferServer` and `ControlServer` objects are destroyed, and the `Device`
 reverts to the ***uncontrolled*** state.
 
-If the underlying `fuchsia.hardware.audio.StreamConfig` is closed, the `Device`
+If the underlying `fuchsia.hardware.audio.Composite` is closed, the `Device`
 and all associated FIDL objects are destroyed. `RegistryServer`,
 `ControlCreatorServer` and `ProviderServer` objects are unaffected, other than
 `Registry/WatchDeviceRemoved` callers being notified. `AudioDeviceRegistry` only
-closes the `StreamConfig` in unrecoverable cases; although the device will still
+closes the `Composite` in unrecoverable cases; although the device will still
 exist in `devfs`, we do not attempt to redetect and re-add it.
 
 ### Driver health and device removal
@@ -222,7 +218,7 @@ notifications.
 
 There is no mechanism to detect a device being removed from `devfs`. Other than
 driver health, the only other event that leads us to remove a device is the
-closure of the underlying driver `StreamConfig` FIDL connection.
+closure of the underlying driver `Composite` FIDL connection.
 
 As mentioned earlier (*Other interfaces that were considered -
 RedetectDevices*), upon request we could choose to rerun the device-detection

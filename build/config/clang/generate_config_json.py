@@ -14,7 +14,6 @@ import argparse
 import dataclasses
 import json
 import os
-import re
 import subprocess
 import sys
 import time
@@ -107,7 +106,14 @@ _HOST_TARGETS = [
 _ALL_TARGETS = _FUCHSIA_TARGETS + _HOST_TARGETS + ["fallback"]
 
 
-def fix_clang_runtime_json(runtime_json: T.Any) -> None:
+class Runtime(T.TypedDict):
+    cflags: T.List[str]
+    ldflags: T.List[str]
+    runtime: T.List[T.Dict[str, str]]
+    target: T.List[str]
+
+
+def fix_clang_runtime_json(runtime_json: T.List[Runtime]) -> None:
     """Fix the content of runtime.json."""
 
     # As a special case, on Fuchsia and for ASan builds, libclang_rt.asan.so depends
@@ -143,10 +149,10 @@ def fix_clang_runtime_json(runtime_json: T.Any) -> None:
         entry for entry in runtime_json if "-fuchsia" in entry["target"][0]
     ]
 
-    def match_static_libstdcxx(entry: T.Dict[str, T.Any]) -> bool:
+    def match_static_libstdcxx(entry: Runtime) -> bool:
         return "-static-libstdc++" in entry["ldflags"]
 
-    def match_sanitizer(entry: T.Dict[str, T.Any]) -> bool:
+    def match_sanitizer(entry: Runtime) -> bool:
         return any(
             cflags.startswith("-fsanitize=") for cflags in entry["cflags"]
         )
@@ -213,7 +219,10 @@ def get_shared_static_exts(clang_target: str) -> T.Tuple[str, str]:
         return ".so", ".a"
 
 
-def store_into_dict(d: T.Dict[str, T.Any], path: str, value: T.Any) -> None:
+Tree = T.Dict[str, T.Union[str, "Tree"]]
+
+
+def store_into_dict(d: Tree, path: str, value: str) -> None:
     """Store a value into a tree of string-keyed dictionaries.
 
     Args:
@@ -223,17 +232,21 @@ def store_into_dict(d: T.Dict[str, T.Any], path: str, value: T.Any) -> None:
         value: The value to set.
     """
     components = path.split(".")
-    assert len(components) > 0, f"Trying to use an empty path!"
+    assert len(components) > 0, "Trying to use an empty path!"
 
-    cur_dict = d
-    for cur_field in components[:-1]:
-        assert cur_field, f"Empty component in path: {path}"
-        cur_dict = cur_dict.setdefault(cur_field, {})
+    curr_dict = d
+    for curr_field in components[:-1]:
+        assert curr_field, f"Empty component in {path=}"
+        next_dict = curr_dict.setdefault(curr_field, {})
+        assert isinstance(
+            next_dict, dict
+        ), f"Inconsistent component in {path=}, {next_dict=}"
+        curr_dict = next_dict
 
-    cur_dict[components[-1]] = value
+    curr_dict[components[-1]] = value
 
 
-def dict_to_gn_scope_inplace(v: T.Dict[str, T.Any]) -> None:
+def dict_to_gn_scope_inplace(v: Tree) -> None:
     """Convert a GN scope's object keys to be compatible with GN.
 
     GN cannot read JSON objects whose keys are not valid GN identifiers.
@@ -248,13 +261,6 @@ def dict_to_gn_scope_inplace(v: T.Dict[str, T.Any]) -> None:
             del v[key]
         if isinstance(value, dict):
             dict_to_gn_scope_inplace(value)
-
-
-def run_command_get_output(cmd_args: T.List[str | Path]) -> str:
-    ret = subprocess.run(
-        [str(a) for a in cmd_args], capture_output=True, text=True, check=True
-    )
-    return ret.stdout.strip()
 
 
 class CommandResult(object):
@@ -326,11 +332,8 @@ class ClangFileNamePathResult(ClangRelativePathResult):
 class CommandInfo(object):
     """Record the state of a command in a CommandPool instance."""
 
-    cmd_id: int
     cmd_args: T.List[str]
     cmd_result: CommandResult
-    dest: str
-    proc: T.Optional["subprocess.Popen[str]"]
 
 
 class CommandPool(object):
@@ -339,74 +342,75 @@ class CommandPool(object):
     Usage is:
        - Create instance.
        - Call add_command() as many times as necessary.
-       - Call run() to wait until all commands completed, and get the list of
-         resulting CommandInfo values.
+       - Call run() to iterate over (dest, value) pairs.
     """
 
     def __init__(self, pool_depth: int = 16) -> None:
-        self._commands: T.List[CommandInfo] = []
-        self._wait_ids: T.List[int] = []
-        self._run_ids: T.List[int] = []
-        self._depth = pool_depth
-        self._results: T.Dict[str, CommandInfo] = {}
+        """Initialize instance.
 
-    def reset(self) -> None:
-        self._results = {}
+        Args:
+           pool_depth: Maximum number of commands that will be run in parallel.
+        """
+        self._commands: T.Dict[str, CommandInfo] = {}
+        self._depth = pool_depth
 
     def add_command(
         self, dest: str, cmd_result: CommandResult, cmd_args: T.List[str]
     ) -> None:
-        cmd_id = len(self._commands)
-        info = CommandInfo(cmd_id, cmd_args, cmd_result, dest, None)
-        self._commands.append(info)
-        self._wait_ids.append(cmd_id)
-        self._start_if_possible()
+        """Add new command to the pool.
 
-    def _poll_run_queue(self) -> bool:
-        completed = []
-        for cmd_id in self._run_ids:
-            info = self._commands[cmd_id]
-            assert info.cmd_id == cmd_id
-            assert info.proc
-            returncode = info.proc.poll()
-            if returncode is not None:
-                completed.append(cmd_id)
+        Args:
+            dest: A unique name for this command invocation. This will
+                be included in the tuple yielded from run().
 
-        if not completed:
-            return False
+            cmd_result: A CommandResult instance whose process() method
+                will be called on command completion. Its result will
+                be included in the tuple yielded from run().
 
-        for cmd_id in completed:
-            self._run_ids.remove(cmd_id)
-            info = self._commands[cmd_id]
-            assert info.proc
-            self._results[info.dest] = info
+            cmd_args: The command arguments passed to subprocess.run().
+        """
+        self._commands[dest] = CommandInfo(cmd_args, cmd_result)
 
-        return True
+    def run(self) -> T.Iterator[T.Tuple[str, str]]:
+        """Run all queued commands in parallel.
 
-    def _start_if_possible(self) -> None:
-        # Pool for any existing
-        self._poll_run_queue()
-        while len(self._run_ids) <= self._depth and len(self._wait_ids):
-            cmd_id = self._wait_ids[0]
-            self._wait_ids = self._wait_ids[1:]
-            info = self._commands[cmd_id]
-            assert info.proc is None
-            info.proc = subprocess.Popen(
+        Yields:
+            (dest, value) pairs, where |dest| is the |dest| parameter
+            passed to add_command(), and |value| is the result of
+            calling the corresponding CommandResult.process() method.
+        """
+        running: T.Dict[str, subprocess.Popen[str]] = {}
+
+        def poll_run_queue() -> T.Iterator[T.Tuple[str, str]]:
+            completed = []
+            for dest, proc in running.items():
+                returncode = proc.poll()
+                if returncode is not None:
+                    completed.append((dest, info.cmd_result.process(proc)))
+
+            # Release file descriptors as early as possible.
+            del proc  # Python does not have lexical scopes. 🤦
+            for dest, _ in completed:
+                del running[dest]
+
+            yield from completed
+
+            if not completed:
+                time.sleep(0.01)  # 10ms
+
+        for dest, info in self._commands.items():
+            while len(running) == self._depth:
+                yield from poll_run_queue()
+
+            running[dest] = subprocess.Popen(
                 info.cmd_args,
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
-            self._run_ids.append(cmd_id)
 
-    def run(self) -> T.Sequence[CommandInfo]:
-        while len(self._run_ids) + len(self._wait_ids) > 0:
-            if not self._poll_run_queue():
-                time.sleep(0.01)  # 10ms
-                continue
-            self._start_if_possible()
-
-        return list(self._results.values())
+        while running:
+            yield from poll_run_queue()
 
 
 def main() -> int:
@@ -465,7 +469,7 @@ def main() -> int:
     with runtime_json_path.open("rb") as f:
         runtime_json = json.load(f)
 
-    result: T.Dict[str, T.Any] = {}
+    result: Tree = {}
 
     command_pool = CommandPool(args.jobs)
 
@@ -525,21 +529,16 @@ def main() -> int:
                 )
         # LINT.ThenChange(//build/config/sanitizers/BUILD.gn)
 
-    for info in command_pool.run():
-        proc = info.proc
-        assert proc is not None
-        store_into_dict(result, info.dest, info.cmd_result.process(proc))
+    for dest, value in command_pool.run():
+        store_into_dict(result, dest, value)
 
     def get_dest_path(variant: str, soname: str) -> str:
         return f"lib/{variant}/{soname}"
 
-    # A regular expression used to match .<major>.<minor> and .<major>
-    # suffixes at the end of Fuchsia shared library names.
-    major_minor_re = re.compile(r"(.*\.so)\.[0-9.]+")
-
     # Add empty variants dictionary to all targets that don't have one.
     # This simplifies the GN code paths.
     for clang_target, values in result.items():
+        assert isinstance(values, dict)
         values.setdefault("variants", {})
 
     # LINT.IfChange

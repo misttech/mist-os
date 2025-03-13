@@ -7,9 +7,10 @@ use crate::ServerStartTool;
 use ffx_command_error::{bug, return_user_error, user_error, FfxContext as _, Result};
 use ffx_config::EnvironmentContext;
 use ffx_repository_server_start_args::StartCommand;
-use fho::{Deferred, FfxMain};
+use fho::FfxMain;
 use fidl_fuchsia_developer_ffx as ffx;
 use pkg::{PkgServerInstanceInfo, PkgServerInstances, ServerMode};
+use std::net::SocketAddr;
 use std::time::Duration;
 use target_connector::Connector;
 use target_holders::{RemoteControlProxyHolder, TargetProxyHolder};
@@ -67,7 +68,6 @@ pub async fn run_foreground_server(
     context: EnvironmentContext,
     target_proxy_connector: Connector<TargetProxyHolder>,
     rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
-    repos: Deferred<ffx::RepositoryRegistryProxy>,
     w: <ServerStartTool as FfxMain>::Writer,
     mode: ServerMode,
 ) -> Result<()> {
@@ -90,7 +90,6 @@ pub async fn run_foreground_server(
     serve_impl(
         target_proxy_connector,
         rcs_proxy_connector,
-        repos,
         start_cmd,
         context,
         w.simple_writer(),
@@ -103,7 +102,7 @@ pub(crate) async fn wait_for_start(
     context: EnvironmentContext,
     cmd: StartCommand,
     time_to_wait: Duration,
-) -> Result<()> {
+) -> Result<SocketAddr> {
     let instance_root =
         context.get("repository.process_dir").map_err(|e: ffx_config::api::ConfigError| bug!(e))?;
     let mgr = PkgServerInstances::new(instance_root);
@@ -114,11 +113,11 @@ pub(crate) async fn wait_for_start(
         loop {
             match mgr.list_instances() {
                 Ok(running_instances) => {
-                    if running_instances
+                    if let Some(instance) = running_instances
                         .iter()
-                        .any(|instance| instance.name.starts_with(&repo_base_name))
+                        .find(|instance| instance.name.starts_with(&repo_base_name))
                     {
-                        return Ok(());
+                        return Ok(instance.address.clone());
                     }
                     tracing::debug!(
                         "waiting for {repo_base_name} to start. Got: {running_instances:?}"
@@ -149,7 +148,6 @@ mod test {
         let start_cmd = StartCommand {
             address: Some(([127, 0, 0, 1], 8787).into()),
             background: true,
-            daemon: false,
             foreground: false,
             disconnected: false,
             repository: Some("repo-name".into()),

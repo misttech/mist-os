@@ -9,13 +9,26 @@ import json
 import logging
 import os
 import subprocess
+import tempfile
+import zipfile
 from typing import Any, List, Optional, Text, Tuple
 
 import ffxtestcase
-from honeydew.errors import FfxCommandError
+from honeydew.transports.ffx.errors import FfxCommandError
 from mobly import asserts, test_runner
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+
+
+def parse_json_messages(output: str) -> list[dict[str, Any]]:
+    decoder = json.JSONDecoder()
+    messages = []
+    position = 0
+    while position < len(output):
+        (message, read) = decoder.raw_decode(output[position:])
+        messages.append(message)
+        position = position + read
+    return messages
 
 
 class FfxStrictTest(ffxtestcase.FfxTestCase):
@@ -127,7 +140,8 @@ class FfxStrictTest(ffxtestcase.FfxTestCase):
         if target is not None:
             all_args += ["-t", target]
         all_args += cmd
-        return self.run_ffx_unchecked(all_args)
+        (code, stdout, stderr) = self.run_ffx_unchecked(all_args)
+        return (code, stdout.strip().replace("\n", ""), stderr)
 
     # Run ffx --strict <cmd> with the default configs, and
     # optionally with a target
@@ -257,20 +271,119 @@ class FfxStrictTest(ffxtestcase.FfxTestCase):
             f"{self.dut_ssh_address}",
         )
         # the raw json decoder doesnt like whitespace or newlines
-        output = stdout.strip().replace("\n", "")
-        decoder = json.JSONDecoder()
-        messages = []
-        position = 0
-        while position < len(output):
-            (message, read) = decoder.raw_decode(output[position:])
-            messages.append(message)
-            position = position + read
         asserts.assert_equal(stderr, "")
+        messages = parse_json_messages(stdout)
         # We'll grab the last message to parse
         message = messages[-1]
         asserts.assert_equal(message["type"], "user")
         asserts.assert_equal(message["code"], 1)
         asserts.assert_equal(code, 1)
+
+    def test_target_snapshot_destination_annotations(self) -> None:
+        """Test `ffx --strict target snapshot` with incorrect dir."""
+        (_code, stdout, _stderr) = self._run_strict_ffx_unchecked(
+            [
+                "target",
+                "snapshot",
+                "--dump-annotations",
+            ],
+            f"{self.dut_ssh_address}",
+        )
+        messages = parse_json_messages(stdout)
+        message = messages[-1]
+        asserts.assert_true(
+            message.get("annotations") is not None,
+            f"JSON message doesn't contain 'annotations': {message}",
+        )
+        asserts.assert_true(
+            "board" in message["annotations"]["annotations"],
+            f"message check failed: {message}",
+        )
+
+    def test_target_snapshot_destination_not_directory(self) -> None:
+        """Test `ffx --strict target snapshot` with incorrect dir."""
+        with tempfile.NamedTemporaryFile() as tmp:
+            tmp.write(b"blah blah blah")
+            (_code, stdout, _stderr) = self._run_strict_ffx_unchecked(
+                [
+                    "target",
+                    "snapshot",
+                    "-d",
+                    tmp.name,
+                ],
+                f"{self.dut_ssh_address}",
+            )
+            messages = parse_json_messages(stdout)
+            message = messages[-1]
+            asserts.assert_true(
+                message.get("user_error") is not None,
+                f"JSON message doesn't contain 'user_error': {message}",
+            )
+            asserts.assert_true(
+                "not a directory" in message["user_error"]["message"],
+                f"message check failed: {message}",
+            )
+            asserts.assert_true(
+                tmp.name in message["user_error"]["message"],
+                f"message check failed: {message}",
+            )
+
+    def test_target_snapshot_e2e(self) -> None:
+        """Test `ffx --strict target snapshot` with incorrect dir."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (_code, stdout, _stderr) = self._run_strict_ffx_unchecked(
+                [
+                    "target",
+                    "snapshot",
+                    "-d",
+                    tmpdir,
+                ],
+                f"{self.dut_ssh_address}",
+            )
+            messages = parse_json_messages(stdout)
+            message = messages[-1]
+            # Example expected output:
+            # {"snapshot":{"output_file":"/tmp/snapshots/20250218_150248/snapshot.zip"}}
+            asserts.assert_true(
+                message.get("snapshot") is not None,
+                f"JSON message doesn't contain 'snapshot': {message}",
+            )
+            asserts.assert_true(
+                "zip" in message["snapshot"]["output_file"],
+                f"message check failed: {message}",
+            )
+            output_file = message["snapshot"]["output_file"]
+            output_file_size = os.path.getsize(output_file)
+            asserts.assert_true(output_file_size > 0, "output file is empty")
+            # Example unzip of snapshot contents:
+            # Archive:  snapshot.zip
+            #   inflating: annotations.json
+            #   inflating: build.kernel-boot-options.txt
+            #   inflating: build.snapshot.xml
+            #   inflating: inspect.json
+            #   inflating: log.kernel.txt
+            #   inflating: log.system.txt
+            #   inflating: metadata.json
+            with zipfile.ZipFile(output_file, "r") as output_file_zip:
+                info = output_file_zip.infolist()
+                checks = [
+                    "annotations.json",
+                    "build.kernel-boot-options.txt",
+                    "build.snapshot.xml",
+                    "inspect.json",
+                    "log.kernel.txt",
+                    "log.system.txt",
+                    "metadata.json",
+                ]
+                for check in checks:
+                    asserts.assert_true(
+                        any(map(lambda x: x.filename == check, info)),
+                        f"Expected `{check}` in snapshot: {info}",
+                    )
+
+
+if __name__ == "__main__":
+    test_runner.main()
 
 
 if __name__ == "__main__":

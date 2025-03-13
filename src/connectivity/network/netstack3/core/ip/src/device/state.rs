@@ -35,8 +35,8 @@ use crate::internal::device::{
     IpAddressIdSpec, IpDeviceAddr, IpDeviceTimerId, Ipv4DeviceAddr, Ipv4DeviceTimerId,
     Ipv6DeviceAddr, Ipv6DeviceTimerId, WeakIpAddressId,
 };
-use crate::internal::gmp::igmp::{IgmpConfig, IgmpTimerId, IgmpTypeLayout};
-use crate::internal::gmp::mld::{MldConfig, MldTimerId, MldTypeLayout};
+use crate::internal::gmp::igmp::{IgmpConfig, IgmpCounters, IgmpTimerId, IgmpTypeLayout};
+use crate::internal::gmp::mld::{MldConfig, MldCounters, MldTimerId, MldTypeLayout};
 use crate::internal::gmp::{GmpGroupState, GmpState, GmpTimerId, GmpTypeLayout, MulticastGroupSet};
 use crate::internal::types::RawMetric;
 
@@ -487,6 +487,7 @@ impl<'a, I: Ip + IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> Iterator
 pub struct Ipv4DeviceState<BT: IpDeviceStateBindingsTypes> {
     ip_state: IpDeviceState<Ipv4, BT>,
     config: RwLock<Ipv4DeviceConfiguration>,
+    igmp_counters: IgmpCounters,
 }
 
 impl<BT: IpDeviceStateBindingsTypes> OrderedLockAccess<Ipv4DeviceConfiguration>
@@ -509,7 +510,14 @@ impl<BC: IpDeviceStateBindingsTypes + TimerContext> Ipv4DeviceState<BC> {
                 device_id,
             ),
             config: Default::default(),
+            igmp_counters: Default::default(),
         }
+    }
+}
+
+impl<BT: IpDeviceStateBindingsTypes> Ipv4DeviceState<BT> {
+    fn igmp_counters(&self) -> &IgmpCounters {
+        &self.igmp_counters
     }
 }
 
@@ -703,6 +711,7 @@ pub struct Ipv6DeviceState<BT: IpDeviceStateBindingsTypes> {
     ip_state: IpDeviceState<Ipv6, BT>,
     config: RwLock<Ipv6DeviceConfiguration>,
     slaac_state: Mutex<SlaacState<BT>>,
+    mld_counters: MldCounters,
 }
 
 impl<BC: IpDeviceStateBindingsTypes + TimerContext> Ipv6DeviceState<BC> {
@@ -730,7 +739,14 @@ impl<BC: IpDeviceStateBindingsTypes + TimerContext> Ipv6DeviceState<BC> {
                 bindings_ctx,
                 device_id,
             )),
+            mld_counters: Default::default(),
         }
+    }
+}
+
+impl<BT: IpDeviceStateBindingsTypes> Ipv6DeviceState<BT> {
+    fn mld_counters(&self) -> &MldCounters {
+        &self.mld_counters
     }
 }
 
@@ -810,6 +826,16 @@ impl<BT: IpDeviceStateBindingsTypes> DualStackIpDeviceState<BT> {
             |dual_stack| &dual_stack.ipv4.ip_state,
             |dual_stack| &dual_stack.ipv6.ip_state,
         )
+    }
+
+    /// Access the IGMP counters associated with this specific device state.
+    pub fn igmp_counters(&self) -> &IgmpCounters {
+        self.ipv4.igmp_counters()
+    }
+
+    /// Access the MLD counters associated with this specific device state.
+    pub fn mld_counters(&self) -> &MldCounters {
+        self.ipv6.mld_counters()
     }
 }
 
@@ -1078,6 +1104,13 @@ pub enum SlaacConfig<Instant> {
     Stable {
         /// The lifetime of the address.
         valid_until: Lifetime<Instant>,
+        /// The time at which the address was created.
+        creation_time: Instant,
+        /// The number of times the address has been regenerated to avoid either an
+        /// IANA-reserved IID or an address already assigned to the same interface.
+        regen_counter: u8,
+        /// The number of times the address has been regenerated due to DAD failure.
+        dad_counter: u8,
     },
     /// The address is a temporary address, as specified by [RFC 8981].
     ///
@@ -1089,13 +1122,10 @@ impl<Instant: Copy> SlaacConfig<Instant> {
     /// The lifetime for which the address is valid.
     pub fn valid_until(&self) -> Lifetime<Instant> {
         match self {
-            SlaacConfig::Stable { valid_until } => *valid_until,
-            SlaacConfig::Temporary(TemporarySlaacConfig {
-                valid_until,
-                desync_factor: _,
-                creation_time: _,
-                dad_counter: _,
-            }) => Lifetime::Finite(*valid_until),
+            SlaacConfig::Stable { valid_until, .. } => *valid_until,
+            SlaacConfig::Temporary(TemporarySlaacConfig { valid_until, .. }) => {
+                Lifetime::Finite(*valid_until)
+            }
         }
     }
 }
@@ -1148,18 +1178,7 @@ impl<Instant> From<Ipv6AddrManualConfig<Instant>> for Ipv6AddrConfig<Instant> {
     }
 }
 
-impl<Instant: Copy> Ipv6AddrConfig<Instant> {
-    /// The configuration for a link-local address configured via SLAAC.
-    ///
-    /// Per [RFC 4862 Section 5.3]: "A link-local address has an infinite preferred and valid
-    /// lifetime; it is never timed out."
-    ///
-    /// [RFC 4862 Section 5.3]: https://tools.ietf.org/html/rfc4862#section-5.3
-    pub(crate) const SLAAC_LINK_LOCAL: Self = Self::Slaac(Ipv6AddrSlaacConfig {
-        inner: SlaacConfig::Stable { valid_until: Lifetime::Infinite },
-        preferred_lifetime: PreferredLifetime::Preferred(Lifetime::Infinite),
-    });
-
+impl<Instant: Copy + PartialEq> Ipv6AddrConfig<Instant> {
     /// The lifetime for which the address is valid.
     pub fn valid_until(&self) -> Lifetime<Instant> {
         match self {
@@ -1195,6 +1214,14 @@ impl<Instant: Copy> Ipv6AddrConfig<Instant> {
             Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { temporary, .. }) => *temporary,
         }
     }
+
+    /// Returns true if the address was configured via SLAAC.
+    pub fn is_slaac(&self) -> bool {
+        match self {
+            Ipv6AddrConfig::Slaac(_) => true,
+            Ipv6AddrConfig::Manual(_) => false,
+        }
+    }
 }
 
 /// Flags associated with an IPv6 device address.
@@ -1219,29 +1246,35 @@ impl<Inst: Instant> Inspectable for Ipv6AddressState<Inst> {
         inspector.record_bool("Assigned", *assigned);
 
         if let Some(config) = config {
-            let is_slaac = match config {
-                Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { .. }) => false,
+            match config {
+                Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { .. }) => {}
                 Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { inner, preferred_lifetime: _ }) => {
                     match inner {
-                        SlaacConfig::Stable { valid_until: _ } => {}
+                        SlaacConfig::Stable {
+                            valid_until: _,
+                            creation_time,
+                            regen_counter,
+                            dad_counter,
+                        } => {
+                            inspector.record_inspectable_value("CreationTime", creation_time);
+                            inspector.record_uint("RegenCounter", *regen_counter);
+                            inspector.record_uint("DadCounter", *dad_counter);
+                        }
                         SlaacConfig::Temporary(TemporarySlaacConfig {
                             valid_until: _,
                             desync_factor,
                             creation_time,
                             dad_counter,
                         }) => {
-                            // Record the extra temporary slaac configuration before
-                            // returning.
                             inspector
                                 .record_double("DesyncFactorSecs", desync_factor.as_secs_f64());
                             inspector.record_uint("DadCounter", *dad_counter);
                             inspector.record_inspectable_value("CreationTime", creation_time);
                         }
                     }
-                    true
                 }
             };
-            inspector.record_bool("IsSlaac", is_slaac);
+            inspector.record_bool("IsSlaac", config.is_slaac());
             inspector.record_inspectable_value("ValidUntil", &config.valid_until());
             inspector.record_inspectable_value("PreferredLifetime", &config.preferred_lifetime());
             inspector.record_bool("Temporary", config.is_temporary());
@@ -1308,6 +1341,7 @@ mod tests {
     use super::*;
 
     use netstack3_base::testutil::{FakeBindingsCtx, FakeInstant};
+    use netstack3_base::InstantContext as _;
     use test_case::test_case;
 
     type FakeBindingsCtxImpl = FakeBindingsCtx<(), (), (), ()>;
@@ -1358,7 +1392,12 @@ mod tests {
                     added_extra_transmits_after_detecting_looped_back_ns: false,
                 },
                 Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig {
-                    inner: SlaacConfig::Stable { valid_until },
+                    inner: SlaacConfig::Stable {
+                        valid_until,
+                        creation_time: bindings_ctx.now(),
+                        regen_counter: 0,
+                        dad_counter: 0,
+                    },
                     preferred_lifetime: PreferredLifetime::Preferred(Lifetime::Infinite),
                 }),
             ))

@@ -107,6 +107,7 @@ zx_status_t UsbFunction::UsbFunctionSetInterface(
     delete[] descriptors;
     return ZX_ERR_INTERNAL;
   }
+  num_interfaces_ = 0;
 
   auto status = peripheral_->ValidateFunction(fbl::RefPtr<UsbFunction>(this), descriptors, length,
                                               &num_interfaces_);

@@ -4,8 +4,8 @@
 
 # buildifier: disable=module-docstring
 load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts")
-load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_component", "fuchsia_driver_component", "fuchsia_package", "get_component_manifests", "get_driver_component_manifests")
-load("@fuchsia_sdk//fuchsia:private_defs.bzl", "FuchsiaPackageInfo")
+load("@rules_fuchsia//fuchsia:defs.bzl", "fuchsia_component", "fuchsia_driver_component", "fuchsia_package", "get_component_manifests", "get_driver_component_manifests")
+load("@rules_fuchsia//fuchsia:private_defs.bzl", "FuchsiaPackageInfo")
 load("//fuchsia/packaging:common_utils.bzl", "failure_test", "no_repo_default_api_level_failure_test", "unknown_override_api_level_failure_test", "unknown_repo_default_api_level_failure_test")
 load("//test_utils:make_file.bzl", "make_fake_component_manifest", "make_file")
 
@@ -208,29 +208,29 @@ def _noop_success_test_impl(ctx):
 _no_repo_default_api_level_test = analysistest.make(
     _noop_success_test_impl,
     config_settings = {
-        "@fuchsia_sdk//fuchsia:repository_default_fuchsia_api_level": "",
+        "@fuchsia_sdk//flags:repository_default_fuchsia_api_level": "",
     },
 )
 
 _repo_default_unknown_api_level_test = analysistest.make(
     _noop_success_test_impl,
     config_settings = {
-        "@fuchsia_sdk//fuchsia:repository_default_fuchsia_api_level": "98765",
+        "@fuchsia_sdk//flags:repository_default_fuchsia_api_level": "98765",
     },
 )
 
 _repo_default_api_level_next_test = analysistest.make(
     _noop_success_test_impl,
     config_settings = {
-        "@fuchsia_sdk//fuchsia:repository_default_fuchsia_api_level": "NEXT",
+        "@fuchsia_sdk//flags:repository_default_fuchsia_api_level": "NEXT",
     },
 )
 
 _repo_default_unknown_and_override_next_api_level_test = analysistest.make(
     _noop_success_test_impl,
     config_settings = {
-        "@fuchsia_sdk//fuchsia:repository_default_fuchsia_api_level": "98765",
-        "@fuchsia_sdk//fuchsia:fuchsia_api_level": "NEXT",
+        "@fuchsia_sdk//flags:repository_default_fuchsia_api_level": "98765",
+        "@fuchsia_sdk//flags:fuchsia_api_level": "NEXT",
     },
 )
 

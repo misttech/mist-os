@@ -69,10 +69,9 @@ impl<T> PortSlab<T> {
     pub fn get(&self, port: &Port) -> Option<&T> {
         let Self { slots } = self;
         let Port { base, salt } = port;
-        slots
-            .get(usize::from(*base))
-            .and_then(|s| s.as_ref())
-            .and_then(|Slot { salt: existing_salt, value }| (existing_salt == salt).then(|| value))
+        slots.get(usize::from(*base)).and_then(|s| s.as_ref()).and_then(
+            |Slot { salt: existing_salt, value }| (existing_salt == salt).then_some(value),
+        )
     }
 
     /// Gets a mutable reference to the value indexed by `port`.
@@ -82,10 +81,9 @@ impl<T> PortSlab<T> {
     pub fn get_mut(&mut self, port: &Port) -> Option<&mut T> {
         let Self { slots } = self;
         let Port { base, salt } = port;
-        slots
-            .get_mut(usize::from(*base))
-            .and_then(|s| s.as_mut())
-            .and_then(|Slot { salt: existing_salt, value }| (existing_salt == salt).then(|| value))
+        slots.get_mut(usize::from(*base)).and_then(|s| s.as_mut()).and_then(
+            |Slot { salt: existing_salt, value }| (existing_salt == salt).then_some(value),
+        )
     }
 
     /// Retrieves an [`entry`] indexed by `port`.

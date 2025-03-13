@@ -6,8 +6,7 @@ use crate::handle::handle_type;
 use crate::responder::Responder;
 use crate::{ordinals, Error, Handle};
 use fidl_fuchsia_fdomain as proto;
-use futures::channel::mpsc::UnboundedReceiver;
-use futures::{FutureExt, StreamExt};
+use futures::FutureExt;
 use std::future::Future;
 use std::sync::Arc;
 
@@ -35,23 +34,12 @@ impl SocketDisposition {
 }
 
 impl Socket {
-    /// Read up to `max_bytes` from the socket.
-    pub fn read(&self, max_bytes: usize) -> impl Future<Output = Result<Vec<u8>, Error>> {
+    /// Read up to the given buffer's length from the socket.
+    pub fn read<'a>(&self, buf: &'a mut [u8]) -> impl Future<Output = Result<usize, Error>> + 'a {
         let client = self.0.client();
         let handle = self.0.proto();
-        let result = client.map(|client| {
-            client
-                .transaction(
-                    ordinals::READ_SOCKET,
-                    proto::SocketReadSocketRequest {
-                        handle,
-                        max_bytes: max_bytes.try_into().unwrap_or(u64::MAX),
-                    },
-                    Responder::ReadSocket,
-                )
-                .map(|f| f.map(|x| x.data))
-        });
-        async move { result?.await }
+
+        futures::future::poll_fn(move |ctx| client.poll_socket(handle, ctx, buf))
     }
 
     /// Write all of the given data to the socket.
@@ -61,16 +49,13 @@ impl Socket {
         let hid = self.0.proto();
 
         let client = self.0.client();
-        let result = client.map(|client| {
-            client
-                .transaction(
-                    ordinals::WRITE_SOCKET,
-                    proto::SocketWriteSocketRequest { handle: hid, data },
-                    move |x| Responder::WriteSocket(x, hid),
-                )
-                .map(move |x| x.map(|y| assert!(y.wrote as usize == len)))
-        });
-        async move { result?.await }
+        client
+            .transaction(
+                ordinals::WRITE_SOCKET,
+                proto::SocketWriteSocketRequest { handle: hid, data },
+                move |x| Responder::WriteSocket(x, hid),
+            )
+            .map(move |x| x.map(|y| assert!(y.wrote as usize == len)))
     }
 
     /// Set the disposition of this socket and/or its peer.
@@ -86,14 +71,11 @@ impl Socket {
             .unwrap_or(proto::SocketDisposition::NoChange);
         let client = self.0.client();
         let handle = self.0.proto();
-        let result = client.map(|client| {
-            client.transaction(
-                ordinals::SET_SOCKET_DISPOSITION,
-                proto::SocketSetSocketDispositionRequest { handle, disposition, disposition_peer },
-                Responder::SetSocketDisposition,
-            )
-        });
-        async move { result?.await }
+        client.transaction(
+            ordinals::SET_SOCKET_DISPOSITION,
+            proto::SocketSetSocketDispositionRequest { handle, disposition, disposition_peer },
+            Responder::SetSocketDisposition,
+        )
     }
 
     /// Split this socket into a streaming reader and a writer. This is more
@@ -103,13 +85,12 @@ impl Socket {
     /// lead to memory issues if you don't intend to use the data from the
     /// socket as fast as it comes.
     pub fn stream(self) -> Result<(SocketReadStream, SocketWriter), Error> {
-        let (sender, channel) = futures::channel::mpsc::unbounded();
-        self.0.client()?.start_socket_streaming(self.0.proto(), sender)?;
+        self.0.client().start_socket_streaming(self.0.proto())?;
 
         let a = Arc::new(self);
         let b = Arc::clone(&a);
 
-        Ok((SocketReadStream { socket: a, buf: Vec::new(), channel }, SocketWriter(b)))
+        Ok((SocketReadStream(a), SocketWriter(b)))
     }
 }
 
@@ -124,34 +105,56 @@ impl SocketWriter {
 }
 
 /// A stream of data issuing from a socket.
-pub struct SocketReadStream {
-    socket: Arc<Socket>,
-    buf: Vec<u8>,
-    channel: UnboundedReceiver<Result<Vec<u8>, Error>>,
-}
+pub struct SocketReadStream(Arc<Socket>);
 
 impl SocketReadStream {
     /// Read from the socket into the supplied buffer. Returns the number of bytes read.
     pub async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
-        if self.buf.is_empty() {
-            let Some(payload) = self.channel.next().await else {
-                return Ok(0);
-            };
-
-            self.buf = payload?;
-        }
-
-        let size = std::cmp::min(buf.len(), self.buf.len());
-        buf[..size].copy_from_slice(&self.buf[..size]);
-        self.buf.drain(..size);
-        Ok(size)
+        self.0.read(buf).await
     }
 }
 
 impl Drop for SocketReadStream {
     fn drop(&mut self) {
-        if let Ok(client) = self.socket.0.client() {
-            client.stop_socket_streaming(self.socket.0.proto());
+        if let Some(client) = self.0 .0.client.upgrade() {
+            client.stop_socket_streaming(self.0 .0.proto());
         }
+    }
+}
+
+impl futures::AsyncRead for Socket {
+    fn poll_read(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &mut [u8],
+    ) -> std::task::Poll<std::io::Result<usize>> {
+        let client = self.0.client();
+        client.poll_socket(self.0.proto(), cx, buf).map_err(std::io::Error::other)
+    }
+}
+
+impl futures::AsyncWrite for Socket {
+    fn poll_write(
+        self: std::pin::Pin<&mut Self>,
+        _cx: &mut std::task::Context<'_>,
+        buf: &[u8],
+    ) -> std::task::Poll<std::io::Result<usize>> {
+        let _ = self.write_all(buf);
+        std::task::Poll::Ready(Ok(buf.len()))
+    }
+
+    fn poll_flush(
+        self: std::pin::Pin<&mut Self>,
+        _cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        std::task::Poll::Ready(Ok(()))
+    }
+
+    fn poll_close(
+        mut self: std::pin::Pin<&mut Self>,
+        _cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        self.0 = Handle::invalid();
+        std::task::Poll::Ready(Ok(()))
     }
 }

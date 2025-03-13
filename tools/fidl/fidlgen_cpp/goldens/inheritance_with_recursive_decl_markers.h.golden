@@ -30,6 +30,8 @@ class Parent final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 3973163707930985819;
   };
 };
 
@@ -54,6 +56,8 @@ class Child final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 3973163707930985819;
   };
   class Second final {
     Second() = delete;
@@ -68,6 +72,8 @@ class Child final {
     static constexpr bool kHasNonEmptyUserFacingResponse = false;
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 2545123272820824165;
   };
 };
 
@@ -75,9 +81,9 @@ class Child final {
 namespace fidl {
 
 template <>
-struct IsProtocol<::test_inheritancewithrecursivedecl::Parent> : public std::true_type{};
+struct IsProtocol<::test_inheritancewithrecursivedecl::Parent> : public std::true_type {};
 
 template <>
-struct IsProtocol<::test_inheritancewithrecursivedecl::Child> : public std::true_type{};
+struct IsProtocol<::test_inheritancewithrecursivedecl::Child> : public std::true_type {};
 
 }  // namespace fidl
