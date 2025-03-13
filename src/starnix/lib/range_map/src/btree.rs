@@ -962,7 +962,7 @@ where
                 NodeRef::Internal(internal) => {
                     let index = self.forward.back();
                     if index < internal.children.len() {
-                        self.forward.push(0);
+                        self.forward.push_back(0);
                     } else {
                         self.forward.pop_back();
                         self.forward.increment_back();
@@ -1106,14 +1106,14 @@ where
             // re-insert the part of the old range that extends beyond the end
             // of the given range.
             if old_range.end > range.end {
-                self.insert_at(cursor, range.end..old_range.end, v.clone());
+                self.insert_range_internal(range.end..old_range.end, v.clone());
             }
 
             // If the removed range extends before the start of the given
             // range, re-insert the part of the old range that extends before
             // the start of the given range.
             if old_range.start < range.start {
-                self.insert_at(cursor, old_range.start..range.start, v);
+                self.insert_range_internal(old_range.start..range.start, v);
             }
 
             // Notice that we can end up splitting the old range into two
@@ -1134,7 +1134,7 @@ where
                 // re-insert the part of the old range that extends beyond the end
                 // of the given range.
                 if old_range.end > range.end {
-                    self.insert_at(cursor, range.end..old_range.end, v);
+                    self.insert_range_internal(range.end..old_range.end, v);
                 }
             }
         }
@@ -1184,6 +1184,14 @@ where
                 None
             }
         }
+    }
+
+    /// Insert the given range and value.
+    ///
+    /// Assumes the range is empty and that adjacent ranges have different values.
+    fn insert_range_internal(&mut self, range: Range<K>, value: V) -> Option<V> {
+        let cursor = self.find(&range.start, CursorPosition::Left);
+        self.insert_at(cursor, range, value)
     }
 
     /// Inserts a range with the given value.
@@ -1518,5 +1526,215 @@ mod test {
         map.insert(second.clone(), 2);
 
         assert_eq!(map.remove(first.start..second.end), &[1, 2]);
+    }
+
+    #[::fuchsia::test]
+    fn test_large_insert_and_remove() {
+        let mut map = RangeMap2::<u32, i32>::default();
+        let num_entries = 1000;
+
+        // Insert a large number of entries
+        for i in 0..num_entries {
+            let start = i as u32 * 10;
+            let end = start + 5;
+            let value = i as i32;
+            map.insert(start..end, value);
+        }
+
+        // Verify that all inserted entries can be retrieved
+        for i in 0..num_entries {
+            let start = i as u32 * 10;
+            let end = start + 5;
+            let point = start + 2;
+            if let Some((range, value)) = map.get(point) {
+                assert!(range.start <= point && point < range.end);
+                assert_eq!(*range, start..end);
+                assert_eq!(*value, i as i32);
+            } else {
+                panic!("Expected to find a range for point {}", point);
+            }
+        }
+
+        // Remove a large number of entries
+        for i in 0..num_entries {
+            let start = i as u32 * 10;
+            let end = start + 5;
+            map.remove(start..end);
+        }
+
+        // Verify that the map is empty after removing all entries
+        assert!(map.is_empty());
+    }
+
+    #[::fuchsia::test]
+    fn test_large_insert_and_remove_overlapping() {
+        let mut map = RangeMap2::<u32, i32>::default();
+        let num_entries = 1000;
+
+        // Insert a large number of entries with overlapping ranges
+        for i in 0..num_entries {
+            let start = i as u32 * 5;
+            let end = start + 20;
+            let value = i as i32;
+            map.insert(start..end, value);
+        }
+
+        // Verify that all inserted entries can be retrieved
+        for i in 0..num_entries {
+            let point = i as u32 * 5 + 1;
+            if let Some((range, value)) = map.get(point) {
+                assert!(range.start <= point && point < range.end);
+                assert_eq!(*value, i as i32);
+            } else {
+                panic!("Expected to find a range for point {}", point);
+            }
+        }
+
+        // Remove a large number of entries with overlapping ranges
+        for i in 0..num_entries {
+            let start = i as u32 * 5;
+            let end = start + 20;
+            map.remove(start..end);
+        }
+
+        // Verify that the map is empty after removing all entries
+        assert!(map.is_empty());
+    }
+
+    #[::fuchsia::test]
+    fn test_large_insert_and_get_specific_points() {
+        let mut map = RangeMap2::<u32, i32>::default();
+        let num_entries = 1000;
+        let mut inserted_ranges = Vec::new();
+
+        // Insert a large number of entries
+        for i in 0..num_entries {
+            let start = i as u32 * 10;
+            let end = start + 5;
+            let value = i as i32;
+            map.insert(start..end, value);
+            inserted_ranges.push((start..end, value));
+        }
+
+        // Verify that specific points can be retrieved correctly
+        for (range, value) in &inserted_ranges {
+            let point = range.start + 2;
+            let (retrieved_range, retrieved_value) = map.get(point).unwrap();
+            assert_eq!(retrieved_range, range);
+            assert_eq!(retrieved_value, value);
+        }
+    }
+
+    #[::fuchsia::test]
+    fn test_large_insert_and_iter() {
+        let mut map = RangeMap2::<u32, i32>::default();
+        let num_entries = 1000;
+        let mut inserted_ranges = Vec::new();
+
+        // Insert a large number of entries
+        for i in 0..num_entries {
+            let start = i as u32 * 10;
+            let end = start + 5;
+            let value = i as i32;
+            map.insert(start..end, value);
+            inserted_ranges.push((start..end, value));
+        }
+
+        // Verify that iter() returns all inserted entries
+        let mut iter_ranges: Vec<(&Range<u32>, &i32)> = map.iter().collect();
+        iter_ranges.sort_by_key(|(range, _)| range.start);
+        let mut inserted_ranges_sorted: Vec<(Range<u32>, i32)> = inserted_ranges.clone();
+        inserted_ranges_sorted.sort_by_key(|(range, _)| range.start);
+
+        assert_eq!(iter_ranges.len(), inserted_ranges_sorted.len());
+        for (i, (range, value)) in iter_ranges.iter().enumerate() {
+            assert_eq!(*range, &inserted_ranges_sorted[i].0);
+            assert_eq!(*value, &inserted_ranges_sorted[i].1);
+        }
+    }
+
+    #[::fuchsia::test]
+    fn test_large_insert_and_iter_starting_at() {
+        let mut map = RangeMap2::<u32, i32>::default();
+        let num_entries = 1000;
+
+        // Insert a large number of entries
+        for i in 0..num_entries {
+            let start = i as u32 * 10;
+            let end = start + 5;
+            let value = i as i32;
+            map.insert(start..end, value);
+        }
+
+        // Verify iter_starting_at()
+        let start_point = 5000;
+        let mut iter = map.iter_starting_at(start_point);
+        while let Some((range, _)) = iter.next() {
+            assert!(range.start >= start_point);
+        }
+    }
+
+    #[::fuchsia::test]
+    fn test_large_insert_and_iter_ending_at() {
+        let mut map = RangeMap2::<u32, i32>::default();
+        let num_entries = 1000;
+
+        // Insert a large number of entries
+        for i in 0..num_entries {
+            let start = i as u32 * 10;
+            let end = start + 5;
+            let value = i as i32;
+            map.insert(start..end, value);
+        }
+
+        // Verify iter_ending_at()
+        let end_point = 5000;
+        let mut iter = map.iter_ending_at(end_point);
+        while let Some((range, _)) = iter.next() {
+            assert!(range.start < end_point);
+        }
+    }
+
+    #[::fuchsia::test]
+    fn test_large_insert_and_intersection() {
+        let mut map = RangeMap2::<u32, i32>::default();
+        let num_entries = 1000;
+
+        // Insert a large number of entries
+        for i in 0..num_entries {
+            let start = i as u32 * 10;
+            let end = start + 5;
+            let value = i as i32;
+            map.insert(start..end, value);
+        }
+
+        // Verify intersection()
+        let intersect_start = 4000;
+        let intersect_end = 4050;
+        let mut iter = map.intersection(intersect_start..intersect_end);
+        while let Some((range, _)) = iter.next() {
+            assert!((range.start < intersect_end && range.end > intersect_start));
+        }
+    }
+
+    #[::fuchsia::test]
+    fn test_large_insert_and_last_range() {
+        let mut map = RangeMap2::<u32, i32>::default();
+        let num_entries = 1000;
+        let mut last_range = None;
+
+        // Insert a large number of entries
+        for i in 0..num_entries {
+            let start = i as u32 * 10;
+            let end = start + 5;
+            let value = i as i32;
+            map.insert(start..end, value);
+            last_range = Some(start..end);
+        }
+
+        // Verify last_range()
+        if let Some(expected_last_range) = last_range {
+            assert_eq!(map.last_range().unwrap(), &expected_last_range);
+        }
     }
 }
