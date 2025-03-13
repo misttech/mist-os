@@ -5,7 +5,7 @@
 
 #include "lib/mistos/starnix/testing/testing.h"
 
-#include <lib/handoff/handoff.h>
+#include <lib/mistos/handoff/handoff.h>
 #include <lib/mistos/starnix/kernel/fs/mistos/bootfs.h>
 #include <lib/mistos/starnix/kernel/fs/tmpfs.h>
 #include <lib/mistos/starnix/kernel/mm/flags.h>

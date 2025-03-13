@@ -5,7 +5,7 @@
 
 #include "lib/mistos/starnix/kernel/runner/mounts.h"
 
-#include <lib/handoff/handoff.h>
+#include <lib/mistos/handoff/handoff.h>
 #include <lib/mistos/starnix/kernel/fs/mistos/bootfs.h>
 #include <lib/mistos/starnix/kernel/fs/tmpfs.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>

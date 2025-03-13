@@ -21,6 +21,9 @@
 #include <lib/heap.h>
 #include <lib/jtrace/jtrace.h>
 #include <lib/lockup_detector.h>
+#if __mist_os__
+#include <lib/mistos/handoff/handoff.h>
+#endif
 #include <lib/userabi/userboot.h>
 #include <platform.h>
 #include <string.h>
@@ -203,11 +206,19 @@ static int bootstrap2(void*) {
   // 'finalized' before we run any kernel scripts (e.g., for unit-testing).
   HandoffEnd handoff_end = EndHandoff();
 
+#ifdef __mist_os__
+  mistos_init(ktl::move(handoff_end));
+#endif
+
   // Give the kernel shell an opportunity to run. If it exits this function, continue booting.
   kernel_shell_init();
 
+#ifndef __mist_os__
   dprintf(SPEW, "starting user space\n");
   userboot_init(ktl::move(handoff_end));
+#else
+  // TODO(Herrera): Implement userboot for mist-os.
+#endif
 
   dprintf(SPEW, "moving to last init level\n");
   lk_primary_cpu_init_level(LK_INIT_LEVEL_USER, LK_INIT_LEVEL_LAST);
