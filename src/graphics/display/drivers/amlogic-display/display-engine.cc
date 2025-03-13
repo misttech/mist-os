@@ -458,6 +458,7 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
     // guaranteed to be supported. We only perform the timing check if there
     // is a new `display_timing`.
     if (IsNewDisplayTiming(display_timing) && !vout_->IsDisplayTimingSupported(display_timing)) {
+      fdf::warn("CheckConfig failure: display timing not supported");
       return CONFIG_CHECK_RESULT_UNSUPPORTED_MODES;
     }
   }
@@ -473,6 +474,8 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
   config_check_result_t check_result = [&] {
     if (display_config.layer_count > 1) {
       // We only support 1 layer
+      fdf::warn("CheckConfig failure: {} layers requested, we only support 1",
+                display_config.layer_count);
       return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
 
@@ -483,6 +486,7 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
       if (display_config.cc_flags & COLOR_CONVERSION_PREOFFSET) {
         for (float cc_preoffset : display_config.cc_preoffsets) {
           if (cc_preoffset <= -1 || cc_preoffset >= 1) {
+            fdf::warn("CheckConfig failure: cc_preoffset {} out of range (-1, 1)", cc_preoffset);
             return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
           }
         }
@@ -490,45 +494,58 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
       if (display_config.cc_flags & COLOR_CONVERSION_POSTOFFSET) {
         for (float cc_postoffset : display_config.cc_postoffsets) {
           if (cc_postoffset <= -1 || cc_postoffset >= 1) {
+            fdf::warn("CheckConfig failure: cc_postoffset {} out of range (-1, 1)", cc_postoffset);
             return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
           }
         }
       }
     }
 
-    const uint32_t width = display_timing.horizontal_active_px;
-    const uint32_t height = display_timing.vertical_active_lines;
+    const uint32_t display_width = display_timing.horizontal_active_px;
+    const uint32_t display_height = display_timing.vertical_active_lines;
 
     // Make sure the layer configuration is supported.
     const layer_t& layer = display_config.layer_list[0];
     // TODO(https://fxbug.dev/42080883) Instead of using memcmp() to compare the frame
     // with expected frames, we should use the common type in "api-types-cpp"
     // which supports comparison operators.
-    const rect_u_t display_area = {.x = 0, .y = 0, .width = width, .height = height};
+    const rect_u_t display_area = {
+        .x = 0, .y = 0, .width = display_width, .height = display_height};
 
     if (layer.alpha_mode == ALPHA_PREMULTIPLIED) {
       // we don't support pre-multiplied alpha mode
       layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_ALPHA;
+      fdf::warn("CheckConfig failure: pre-multipled alpha not supported");
       return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
 
     if (layer.image_source_transformation != COORDINATE_TRANSFORMATION_IDENTITY) {
+      fdf::warn("CheckConfig failure: coordinate transformation not supported");
       return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
-    if (layer.image_metadata.dimensions.width != width) {
-      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-    }
-    if (layer.image_metadata.dimensions.height != height) {
+    if (layer.image_metadata.dimensions.width != display_width ||
+        layer.image_metadata.dimensions.height != display_height) {
+      fdf::warn("CheckConfig failure: image metadata dimensions {}x{} do not match {}x{} display",
+                layer.image_metadata.dimensions.width, layer.image_metadata.dimensions.height,
+                display_width, display_height);
       return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
     if (memcmp(&layer.display_destination, &display_area, sizeof(rect_u_t)) != 0) {
+      fdf::warn(
+          "CheckConfig failure: layer output {}x{} at ({}, {}) does not cover entire {}x{} display",
+          layer.display_destination.width, layer.display_destination.height,
+          layer.display_destination.x, layer.display_destination.y, display_width, display_height);
       return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
     if (layer.image_source.width == 0 || layer.image_source.height == 0) {
       // TODO(https://fxbug.dev/401286733): color layers not yet supported.
+      fdf::warn("CheckConfig failure: color layers not supported");
       return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
     if (memcmp(&layer.image_source, &display_area, sizeof(rect_u_t)) != 0) {
+      fdf::warn("CheckConfig failure: image source {}x{} at ({}, {}) requires cropping or scaling",
+                layer.image_source.width, layer.image_source.height, layer.image_source.x,
+                layer.image_source.y);
       return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
     return CONFIG_CHECK_RESULT_OK;
