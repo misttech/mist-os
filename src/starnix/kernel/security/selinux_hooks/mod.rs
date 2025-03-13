@@ -494,25 +494,30 @@ impl FileSystemState {
     /// Example output:
     ///     ",context=foo,root_context=bar"
     /// TODO(357876133): Write "seclabel" when relevant.
-    fn write_mount_options(&self, security_server: &SecurityServer, buf: &mut impl OutputBuffer) {
+    fn write_mount_options(
+        &self,
+        security_server: &SecurityServer,
+        buf: &mut impl OutputBuffer,
+    ) -> Result<(), Errno> {
         let security_state = self.0.lock();
 
-        let mut write_options = |mount_options: &FileSystemMountOptions| {
-            let mut write_option = |prefix: &[u8], option: &Option<Vec<u8>>| {
+        let mut write_options = |mount_options: &FileSystemMountOptions| -> Result<(), Errno> {
+            let mut write_option = |prefix: &[u8], option: &Option<Vec<u8>>| -> Result<(), Errno> {
                 if let Some(value) = option {
-                    let _ = buf.write_all(prefix);
-                    let _ = buf.write_all(value);
+                    let _ = buf.write_all(prefix)?;
+                    let _ = buf.write_all(value)?;
                 }
+                Ok(())
             };
-            write_option(b",context=", &mount_options.context);
-            write_option(b",fscontext=", &mount_options.fs_context);
-            write_option(b",defcontext=", &mount_options.def_context);
-            write_option(b",rootcontext=", &mount_options.root_context);
+            write_option(b",context=", &mount_options.context)?;
+            write_option(b",fscontext=", &mount_options.fs_context)?;
+            write_option(b",defcontext=", &mount_options.def_context)?;
+            write_option(b",rootcontext=", &mount_options.root_context)
         };
 
         match &*security_state {
             FileSystemLabelState::Unlabeled { mount_options, name: _, pending_entries: _ } => {
-                write_options(mount_options);
+                write_options(mount_options)
             }
             FileSystemLabelState::Labeled { label } => {
                 let get_option = |sid_opt: Option<_>| -> Option<Vec<u8>> {
@@ -527,7 +532,7 @@ impl FileSystemState {
                     def_context: get_option(label.mount_sids.def_context),
                     root_context: get_option(label.mount_sids.root_context),
                 };
-                write_options(&mount_options);
+                write_options(&mount_options)
             }
         }
     }

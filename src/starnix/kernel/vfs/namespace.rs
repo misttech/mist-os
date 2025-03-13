@@ -725,8 +725,7 @@ impl CurrentTask {
 // Writes to `sink` the mount flags and LSM mount options for the given `mount`.
 fn write_mount_info(task: &Task, sink: &mut DynamicFileBuf, mount: &Mount) -> Result<(), Errno> {
     write!(sink, "{}", mount.flags())?;
-    security::sb_show_options(&task.kernel(), sink, &mount);
-    Ok(())
+    security::sb_show_options(&task.kernel(), sink, &mount)
 }
 
 struct ProcMountsFileSource(WeakRef<Task>);

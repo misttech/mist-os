@@ -226,7 +226,7 @@ pub fn sb_show_options(
     security_server: &SecurityServer,
     buf: &mut impl OutputBuffer,
     mount: &Mount,
-) {
+) -> Result<(), Errno> {
     mount.security_state().state.write_mount_options(security_server, buf)
 }
 
