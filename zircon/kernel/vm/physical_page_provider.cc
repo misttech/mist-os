@@ -268,7 +268,12 @@ void PhysicalPageProvider::UnloanRange(uint64_t range_offset, uint64_t length, l
             cow_container->ReclaimPageForEviction(page, vmo_backlink.offset);
             // Either we succeeded eviction, or another thread raced and did it first. If another
             // thread did it first then it would have done so under the VMO lock, which we have
-            // since acquired, and so we know the free completed and the page is in the PMM.
+            // since acquired, and so we know the page is either on the way (in a
+            // FreeLoanedPagesHolder) or in the PMM. We can ensure the page is fully migrated to the
+            // PMM by waiting for any holding to be concluded.
+            if (!page->is_free_loaned()) {
+              Pmm::Node().WithLoanedPage(page, [](vm_page_t* page) {});
+            }
           }
         });
       }

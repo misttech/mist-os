@@ -301,6 +301,9 @@ void PmmNode::AllocPageHelperLocked(vm_page_t* page) {
   // acquisition that removes the page from the free list, as both being the free list, or being
   // in the ALLOC state, indicate ownership by the PmmNode.
   page->set_state(vm_page_state::ALLOC);
+  // Used by the FLPH for loaned pages, but cleared here for consistency to ensure no stale pointers
+  // that could be accidentally referenced.
+  page->alloc.owner = nullptr;
 }
 
 void PmmNode::AllocLoanedPageHelperLocked(vm_page_t* page) {
@@ -316,6 +319,7 @@ void PmmNode::AllocLoanedPageHelperLocked(vm_page_t* page) {
   // the same loaned_pages_lock_ acquisition that removes the page from the free list, as both being
   // the free list, or being in the ALLOC state, indicate ownership by the PmmNode.
   page->set_state(vm_page_state::ALLOC);
+  page->alloc.owner = nullptr;
 }
 
 zx::result<vm_page_t*> PmmNode::AllocLoanedPage(
@@ -704,6 +708,7 @@ void PmmNode::FreeLoanedPageHelperLocked(vm_page* page, bool already_filled) {
 
   DEBUG_ASSERT(!page->is_free());
   DEBUG_ASSERT(page->state() != vm_page_state::OBJECT || page->object.pin_count == 0);
+  DEBUG_ASSERT(page->state() != vm_page_state::ALLOC || page->alloc.owner == nullptr);
 
   // mark it free. This makes the page owned the PmmNode and even though it may not be in any page
   // list, since the page is findable via the arena we must ensure the following happens:
@@ -725,13 +730,11 @@ void PmmNode::FreeLoanedPageHelperLocked(vm_page* page, bool already_filled) {
   AsanPoisonPage(page, kAsanPmmFreeMagic);
 }
 
-void PmmNode::FreeLoanedPage(vm_page_t* page, fit::inline_function<void(vm_page_t*)> release_page) {
+void PmmNode::BeginFreeLoanedPage(vm_page_t* page,
+                                  fit::inline_function<void(vm_page_t*)> release_page,
+                                  FreeLoanedPagesHolder& flph) {
   AutoPreemptDisabler preempt_disable;
   DEBUG_ASSERT(page->is_loaned());
-  const bool fill = IsFreeFillEnabledRacy();
-  if (fill) {
-    checker_.FillPattern(page);
-  }
   // On entry we require that the page has a valid backlink.
   DEBUG_ASSERT(page->state() == vm_page_state::OBJECT && page->object.get_object());
 
@@ -741,28 +744,101 @@ void PmmNode::FreeLoanedPage(vm_page_t* page, fit::inline_function<void(vm_page_
   // pages freed individually shouldn't be in a queue
   DEBUG_ASSERT(!list_in_list(&page->queue_node));
 
-  FreeLoanedPageHelperLocked(page, fill);
+  DEBUG_ASSERT(!flph.used_);
+  page->set_state(vm_page_state::ALLOC);
+  page->alloc.owner = &flph;
+  list_add_head(&flph.pages_, &page->queue_node);
+}
 
-  // Add the page to the free loaned list, unless loan_cancelled. The loan_cancelled pages
-  // don't go in any free queue because they shouldn't get re-used until reclaimed by their
-  // underlying contiguous VMO or until that underlying contiguous VMO is deleted.
-  if (page->is_loan_cancelled()) {
+void PmmNode::FinishFreeLoanedPages(FreeLoanedPagesHolder& flph) {
+  if (list_is_empty(&flph.pages_)) {
     return;
   }
-  IncrementFreeLoanedCountLocked(1);
-  if constexpr (!__has_feature(address_sanitizer)) {
-    list_add_head(&free_loaned_list_, &page->queue_node);
-  } else {
-    // If address sanitizer is enabled, put the page at the tail to maximize reuse distance.
-    list_add_tail(&free_loaned_list_, &page->queue_node);
+  const bool fill = IsFreeFillEnabledRacy();
+  if (fill) {
+    vm_page_t* p;
+    list_for_every_entry (&flph.pages_, p, vm_page_t, queue_node) {
+      checker_.FillPattern(p);
+    }
+  }
+  bool waiters;
+  {
+    AutoPreemptDisabler preempt_disable;
+    Guard<Mutex> guard{&loaned_list_lock_};
+    DEBUG_ASSERT(!flph.used_);
+    flph.used_ = true;
+    FreeLoanedListLocked(&flph.pages_, fill, [&](vm_page_t* page) {
+      DEBUG_ASSERT(page->state() == vm_page_state::ALLOC);
+      DEBUG_ASSERT(page->alloc.owner == &flph);
+      page->alloc.owner = nullptr;
+    });
+    // We hold the lock and have removed all the pages from the list (clearing their owner in the
+    // process) and so whatever waiters that presently exist are all the ones that can exist.
+    waiters = flph.num_waiters_ > 0;
+    // If we have waiters then we need to manipulate the event objects while we still hold the lock,
+    // but this can be skipped if there are no waiters.
+    if (waiters) {
+      // Unblock all waiters. As freed_pages_event_ is a regular event, and not AutoUnsignal, this
+      // means that even waiters that have not progress through to the actual |Wait| operation will
+      // not block.
+      flph.freed_pages_event_.Signal();
+    }
+  }
+  // If there were any waiters we must wait for them to complete. This is necessary since
+  // |WithLoanedPage| holds a pointer to |flph|, but has no way to keep the object alive. As such we
+  // must not return until we know that |WithLoanedPage| has ceased holding any references to
+  // |flph|.
+  if (waiters) {
+    // First wait for any waiters to complete. This event gets signalled by the last waiter in
+    // |WithLoanedPage| with the locks held.
+    flph.no_waiters_event_.Wait();
+    // Our signaler in |WithLoanedPage| may still be referencing the no_waiters_event and so we
+    // still cannot return as that is a reference to the |flph| object. Therefore we perform a lock
+    // acquisition which, once it succeeds, tells us that |WithLoanedPage| has concluded its
+    // references to |flph|.
+    Guard<Mutex> guard{&loaned_list_lock_};
   }
 }
 
 void PmmNode::WithLoanedPage(vm_page_t* page, fit::inline_function<void(vm_page_t*)> with_page) {
-  AutoPreemptDisabler preempt_disable;
-  Guard<Mutex> guard{&loaned_list_lock_};
-  DEBUG_ASSERT(page->is_loaned());
-  with_page(page);
+  // Technically users could race with |WithLoanedPage| and re-allocate the page after it gets
+  // migrated to the PmmNode, and then place it back in a new FLPH before a stable state can be
+  // observed. Such behavior almost certainly represents a kernel bug, so if we detect multiple
+  // iterations to track the page down we generate a warning.
+  for (int iterations = 0;; iterations++) {
+    FreeLoanedPagesHolder* flph = nullptr;
+    {
+      AutoPreemptDisabler preempt_disable;
+      Guard<Mutex> guard{&loaned_list_lock_};
+      DEBUG_ASSERT(page->is_loaned());
+      if (page->state() != vm_page_state::ALLOC || !page->alloc.owner) {
+        with_page(page);
+        return;
+      }
+      flph = page->alloc.owner;
+      flph->num_waiters_++;
+    }
+    if (iterations > 0) {
+      printf("WARNING: Required multiple attempts (%d) to track down loaned page %p\n", iterations,
+             page);
+    }
+    // We incremented num_waiters_ under the lock while there were pages in the list, so it is
+    // guaranteed that |FinishFreeLoanedPages| will see this and signal the event.
+    flph->freed_pages_event_.Wait();
+    {
+      AutoPreemptDisabler preempt_disable;
+      Guard<Mutex> guard{&loaned_list_lock_};
+      // With the lock re-acquired indicate we have completed waiting.
+      flph->num_waiters_--;
+      if (flph->num_waiters_ == 0) {
+        // If we were the last thread to complete the wait process signal |FinishFreeLoanedPages| so
+        // that it knows we have (almost) finished any references to |flph|. We still hold one
+        // final reference, the flph->no_waiters_event_, but that will be resolved by
+        // |FinishFreeLoanedPages| waiting for the lock (see comments in that method).
+        flph->no_waiters_event_.Signal();
+      }
+    }
+  }
 }
 
 void PmmNode::FreePage(vm_page* page) {
@@ -833,31 +909,30 @@ void PmmNode::FreeListLocked(list_node* list, bool already_filled) {
   IncrementFreeCountLocked(count);
 }
 
-void PmmNode::FreeLoanedArray(
+void PmmNode::BeginFreeLoanedArray(
     vm_page_t** pages, size_t count,
-    fit::inline_function<void(vm_page_t**, size_t, list_node_t*)> release_list) {
+    fit::inline_function<void(vm_page_t**, size_t, list_node_t*)> release_list,
+    FreeLoanedPagesHolder& flph) {
   AutoPreemptDisabler preempt_disable;
-  const bool fill = IsFreeFillEnabledRacy();
-  if (fill) {
-    ktl::for_each(&pages[0], &pages[count], [&](vm_page_t* p) { checker_.FillPattern(p); });
-  }
   // On entry we expect all pages to have a backlink.
   DEBUG_ASSERT(ktl::all_of(&pages[0], &pages[count], [](vm_page_t* p) {
     return p->state() == vm_page_state::OBJECT && p->object.get_object();
   }));
   Guard<Mutex> guard{&loaned_list_lock_};
+  DEBUG_ASSERT(!flph.used_);
   list_node_t free_list = LIST_INITIAL_VALUE(free_list);
   release_list(pages, count, &free_list);
-  // When freeing the list validate that the callback populated the free list correctly.
+  // Validate that the callback populated the free list correctly.
+  vm_page_t* p;
   size_t expected = 0;
-  auto validate = [&expected, &pages](vm_page_t* page) {
-    DEBUG_ASSERT(pages[expected] == page);
-    // Prevent release builds from complaining that the 'pages' capture is not used.
-    (void)pages;
+  list_for_every_entry (&free_list, p, vm_page_t, queue_node) {
+    p->set_state(vm_page_state::ALLOC);
+    p->alloc.owner = &flph;
+    DEBUG_ASSERT(pages[expected] == p);
     expected++;
-  };
-  FreeLoanedListLocked(&free_list, fill, validate);
+  }
   DEBUG_ASSERT(expected == count);
+  list_splice_after(&free_list, &flph.pages_);
 }
 
 void PmmNode::FreeList(list_node* list) {
@@ -1031,7 +1106,7 @@ void PmmNode::BeginLoan(list_node* page_list) {
   // Callers of BeginLoan() generally won't want the pages loaned to them; the intent is to loan to
   // the rest of the system, so go ahead and free also.  Some callers will basically choose between
   // pmm_begin_loan() and pmm_free().
-  FreeLoanedListLocked(page_list, fill, [](vm_page_t*) {});
+  FreeLoanedListLocked(page_list, fill, [](vm_page_t* p) {});
 }
 
 void PmmNode::CancelLoan(vm_page_t* page) {

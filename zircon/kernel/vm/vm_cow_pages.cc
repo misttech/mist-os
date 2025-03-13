@@ -273,10 +273,14 @@ class BatchPQRemove {
   void Flush() {
     if (count_ > 0) {
       if (is_loaned_) {
-        Pmm::Node().FreeLoanedArray(
-            pages_, count_, [](vm_page_t** pages, size_t count, list_node_t* free_list) {
+        FreeLoanedPagesHolder flph;
+        Pmm::Node().BeginFreeLoanedArray(
+            pages_, count_,
+            [](vm_page_t** pages, size_t count, list_node_t* free_list) {
               pmm_page_queues()->RemoveArrayIntoList(pages, count, free_list);
-            });
+            },
+            flph);
+        Pmm::Node().FinishFreeLoanedPages(flph);
       } else {
         pmm_page_queues()->RemoveArrayIntoList(pages_, count_, freed_list_);
         freed_count_ += count_;
@@ -443,7 +447,10 @@ zx::result<vm_page_t*> VmCowPages::AllocLoanedPage(F allocated) {
 
 void VmCowPages::RemoveAndFreePageLocked(vm_page_t* page, bool freeing_owned_page) {
   if (page->is_loaned()) {
-    Pmm::Node().FreeLoanedPage(page, [](vm_page_t* page) { pmm_page_queues()->Remove(page); });
+    FreeLoanedPagesHolder flph;
+    Pmm::Node().BeginFreeLoanedPage(
+        page, [](vm_page_t* page) { pmm_page_queues()->Remove(page); }, flph);
+    Pmm::Node().FinishFreeLoanedPages(flph);
   } else {
     pmm_page_queues()->Remove(page);
     FreePageLocked(page, freeing_owned_page);
@@ -452,7 +459,10 @@ void VmCowPages::RemoveAndFreePageLocked(vm_page_t* page, bool freeing_owned_pag
 
 void VmCowPages::RemovePageToListLocked(vm_page_t* page, list_node_t* free_list) {
   if (page->is_loaned()) {
-    Pmm::Node().FreeLoanedPage(page, [](vm_page_t* page) { pmm_page_queues()->Remove(page); });
+    FreeLoanedPagesHolder flph;
+    Pmm::Node().BeginFreeLoanedPage(
+        page, [](vm_page_t* page) { pmm_page_queues()->Remove(page); }, flph);
+    Pmm::Node().FinishFreeLoanedPages(flph);
   } else {
     pmm_page_queues()->Remove(page);
     list_add_tail(free_list, &page->queue_node);

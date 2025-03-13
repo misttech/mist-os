@@ -36,6 +36,8 @@ struct Range;
 // may tell it to wait for any reason.
 #define PMM_ALLOC_FLAG_CAN_WAIT (1 << 1)
 
+class FreeLoanedPagesHolder;
+
 // per numa node collection of pmm arenas and worker threads
 class PmmNode {
  public:
@@ -64,8 +66,10 @@ class PmmNode {
   void FreeList(list_node* list);
 
   // Calls the provided function, passing |page| back into it, serialized with any other calls to
-  // |AllocLoanedPage| and |FreeLoanedPage|. This allows caller to know that while the |with_page|
-  // callback is running there are no in progress calls to these methods.
+  // |AllocLoanedPage|, |BeginFreeLoanedPage| and |FinishFreeLoanedPages|. This allows caller to
+  // know that while the |with_page| callback is running there are no in progress calls to these
+  // methods, and that the page is not presently in holding object, i.e. it is either fully owned by
+  // the PmmNode, or fully owned by an object.
   void WithLoanedPage(vm_page_t* page, fit::inline_function<void(vm_page_t*)> with_page);
 
   // Allocates a single page from the loaned pages list. The allocated page will always have
@@ -77,19 +81,31 @@ class PmmNode {
   // During the execution of the callback the page contents must *not* be modified.
   zx::result<vm_page_t*> AllocLoanedPage(fit::inline_function<void(vm_page_t*), 32> allocated);
 
-  // Frees a single page that was allocated by AllocLoanedPage. It is an error to attempt to free a
-  // non loaned page. When this method is called the |page| must have a valid backlink (i.e. be in
-  // the OBJECT state with an owner set). This backlink should be removed by the |release_page|
-  // callback, which is invoked under the loaned pages lock, prior to transition the page into the
-  // FREE_LOANED state.
-  void FreeLoanedPage(vm_page_t* page, fit::inline_function<void(vm_page_t*)> release_page);
+  // Begins freeing a loaned page that was previously allocated by AllocLoanPage by moving into a
+  // holding object. It is an error to attempt to free a non loaned page. When this method is called
+  // the |page| must have a valid backlink (i.e. be in the OBJECT state with an owner set). This
+  // backlink should be removed by the |release_page| callback, which is invoked under the loaned
+  // pages lock, prior to transition the page into the holding state. The caller *must*, at some
+  // point in the future, complete the page freeing process by passing the provided |flph| into a
+  // |FinishFreeLoanedPages| call.
+  void BeginFreeLoanedPage(vm_page_t* page, fit::inline_function<void(vm_page_t*)> release_page,
+                           FreeLoanedPagesHolder& flph);
+  // Completes the freeing of any loaned pages in |flph|, after which |flph| is allowed to be
+  // destructed. Once this method is called on a given |flph| that object is effectively 'dead' and
+  // is not allowed to be passed to any PmmNode methods.
+  void FinishFreeLoanedPages(FreeLoanedPagesHolder& flph);
 
-  // Frees multiple pages that were allocated by AllocLoanedPage. It is an error to attempt to free
-  // any non loaned pages. When this method is called all pages in the array must have a valid
-  // backlink (i.e. be in the OBJECT state with an owner set), and the |release_list| method must
-  // remove the backlink from all pages, and place them in the provided list in the same order.
-  void FreeLoanedArray(vm_page_t** pages, size_t count,
-                       fit::inline_function<void(vm_page_t**, size_t, list_node_t*)> release_list);
+  // Begins freeing multiple pages that were allocated by AllocLoanedPage by moving into a holding
+  // object. It is an error to attempt to free any non loaned pages. When this method is called all
+  // pages in the array must have a valid backlink (i.e. be in the OBJECT state with an owner set),
+  // and the |release_list| method must remove the backlink from all pages, and place them in the
+  // provided list in the same order.
+  // The caller *must*, at some point in the future, complete the page freeing process by passing
+  // the provided |flph| into a |FinishFreeLoanedPages| call.
+  void BeginFreeLoanedArray(
+      vm_page_t** pages, size_t count,
+      fit::inline_function<void(vm_page_t**, size_t, list_node_t*)> release_list,
+      FreeLoanedPagesHolder& flph);
 
   void UnwirePage(vm_page* page);
 
@@ -445,5 +461,49 @@ inline vm_page_t* PmmNode::PaddrToPage(paddr_t addr) TA_NO_THREAD_SAFETY_ANALYSI
   }
   return nullptr;
 }
+
+// Object for managing freeing of loaned pages via a temporary holding object. Can be instantiated
+// on the stack and then passed into different PmmNode methods, the object itself has no publicly
+// available methods.
+// This object is not thread safe, and multiple threads must not pass the same instance of this
+// object into PmmNode methods.
+// A given FreeLoanedPagesHolder, as described in |FinishFreeLoanedPages|, may only be used for a
+// single call to |FinishFreeLoanedPages|, after which it is 'dead', and may not be passed to any
+// other PmmNode methods.
+class FreeLoanedPagesHolder {
+ public:
+  FreeLoanedPagesHolder() : pages_(LIST_INITIAL_VALUE(pages_)) {}
+  ~FreeLoanedPagesHolder() {
+    ASSERT(list_is_empty(&pages_));
+    ASSERT(num_waiters_ == 0);
+  }
+
+ private:
+  // A given FreeLoanedPagesHolder interval is only allowed to be used once to return pages to the
+  // PMM, this tracks whether this has happened or not.
+  // Only permitting a single instance of freeing simplifies any need to reason about a single
+  // FreeLoanedPagesHolder repeatedly having pages moved into it and free'd to the PMM concurrently
+  // with attempts to wait on it.
+  // Although the lock cannot be annotated, this member is guarded by the relevant
+  // PmmNode::loaned_list_lock_.
+  bool used_ = false;
+  // List of pages presently owned by this object. Every page in this list is defined to be in the
+  // ALLOC state with |owner| set to this object.
+  // Although the lock cannot be annotated, this member is guarded by the relevant
+  // PmmNode::loaned_list_lock_.
+  list_node_t pages_;
+  // Count of the number of threads that are in the process of attempting to wait on
+  // |freed_pages_event_| and have not yet completed the method. This is used, along with
+  // |freed_pages_event_| and |no_waiters_event_| so that |withLoanedPage| can ensure the object it
+  // references lives long enough.
+  // See comments in |FinishFreeLoanedPages| and |WithLoanedPage| for more details on how these
+  // work.
+  // Although the lock cannot be annotated, this member is guarded by the relevant
+  // PmmNode::loaned_list_lock_.
+  uint64_t num_waiters_ = 0;
+  Event freed_pages_event_;
+  Event no_waiters_event_;
+  friend PmmNode;
+};
 
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_PMM_NODE_H_
