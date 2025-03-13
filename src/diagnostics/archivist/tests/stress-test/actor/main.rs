@@ -19,7 +19,7 @@ use stress_test_actor::{actor_loop, Action};
 struct WorkerData {
     /// The active log subscription created with Archivist.
     /// Used by the reader action to get logs.
-    pub subscription: Subscription<Data<Logs>>,
+    pub subscription: Subscription,
 }
 
 #[fuchsia::main]

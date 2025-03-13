@@ -59,6 +59,7 @@ impl LogStreamServer {
                 fdiagnostics::LogStreamRequest::Connect { socket, opts, .. } => {
                     let logs = logs_repo.logs_cursor_raw(
                         opts.mode.unwrap_or(StreamMode::SnapshotThenSubscribe),
+                        None,
                         ftrace::Id::random(),
                     );
                     let opts = ExtendRecordOpts::from(opts);
@@ -95,10 +96,10 @@ impl LogStreamServer {
 }
 
 #[derive(Default)]
-struct ExtendRecordOpts {
-    moniker: bool,
-    component_url: bool,
-    rolled_out: bool,
+pub struct ExtendRecordOpts {
+    pub moniker: bool,
+    pub component_url: bool,
+    pub rolled_out: bool,
 }
 
 impl ExtendRecordOpts {
@@ -125,7 +126,7 @@ impl From<fdiagnostics::LogStreamOptions> for ExtendRecordOpts {
     }
 }
 
-fn extend_fxt_record<'a>(
+pub fn extend_fxt_record<'a>(
     fxt_record: &'a [u8],
     identity: &ComponentIdentity,
     rolled_out: u64,

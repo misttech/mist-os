@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{test_topology, utils};
-use diagnostics_data::{Data, ExtendedMoniker, Logs};
+use diagnostics_data::ExtendedMoniker;
 use diagnostics_reader::{ArchiveReader, Subscription};
 use futures::StreamExt;
 use realm_proxy_client::RealmProxyClient;
@@ -76,7 +76,7 @@ async fn timestamp_sorting_for_batches() {
 }
 
 struct Listener {
-    stream: Subscription<Data<Logs>>,
+    stream: Subscription,
 }
 
 impl Listener {

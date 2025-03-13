@@ -5,9 +5,12 @@
 use crate::constants::FORMATTED_CONTENT_CHUNK_SIZE_TARGET;
 use crate::diagnostics::{BatchIteratorConnectionStats, TRACE_CATEGORY};
 use crate::error::AccessorError;
-use crate::formatter::{new_batcher, FormattedStream, JsonPacketSerializer, SerializedVmo};
+use crate::formatter::{
+    new_batcher, FXTPacketSerializer, FormattedStream, JsonPacketSerializer, SerializedVmo,
+};
 use crate::inspect::repository::InspectRepository;
 use crate::inspect::ReaderServer;
+use crate::logs::container::CursorItem;
 use crate::logs::repository::LogsRepository;
 use crate::pipeline::Pipeline;
 use diagnostics_data::{Data, DiagnosticsData, ExtendedMoniker, Metadata};
@@ -151,7 +154,7 @@ impl ArchiveAccessorServer {
         default_batch_timeout_seconds: BatchRetrievalTimeout,
     ) -> Result<(), AccessorError> {
         let format = params.format.ok_or(AccessorError::MissingFormat)?;
-        if !matches!(format, Format::Json | Format::Cbor) {
+        if !matches!(format, Format::Json | Format::Cbor | Format::Fxt) {
             return Err(AccessorError::UnsupportedFormat);
         }
         let mode = params.stream_mode.ok_or(AccessorError::MissingMode)?;
@@ -222,6 +225,10 @@ impl ArchiveAccessorServer {
                 .await
             }
             DataType::Logs => {
+                if format == Format::Cbor {
+                    // CBOR is not supported for logs
+                    return Err(AccessorError::UnsupportedFormat);
+                }
                 let _trace_guard = ftrace::async_enter!(
                     trace_id,
                     TRACE_CATEGORY,
@@ -239,12 +246,34 @@ impl ArchiveAccessorServer {
                     Some(ClientSelectorConfiguration::SelectAll(_)) => None,
                     _ => return Err(AccessorError::InvalidSelectors("unrecognized selectors")),
                 };
-                let logs = log_repo
-                    .logs_cursor(mode, selectors, trace_id)
-                    .map(move |inner: _| (*inner).clone());
-                BatchIterator::new_serving_arrays(logs, requests, mode, stats, trace_id)?
-                    .run()
-                    .await
+                match format {
+                    Format::Fxt => {
+                        let logs = log_repo.logs_cursor_raw(mode, selectors, trace_id);
+                        BatchIterator::new_serving_fxt(
+                            logs,
+                            requests,
+                            mode,
+                            stats,
+                            trace_id,
+                            performance_config,
+                        )?
+                        .run()
+                        .await?;
+                        Ok(())
+                    }
+                    Format::Json => {
+                        let logs = log_repo
+                            .logs_cursor(mode, selectors, trace_id)
+                            .map(move |inner: _| (*inner).clone());
+                        BatchIterator::new_serving_arrays(logs, requests, mode, stats, trace_id)?
+                            .run()
+                            .await?;
+                        Ok(())
+                    }
+                    // TODO(https://fxbug.dev/401548725): Remove this from the FIDL definition.
+                    Format::Text => Err(AccessorError::UnsupportedFormat),
+                    Format::Cbor => unreachable!("CBOR is not supported for logs"),
+                }
             }
         }
     }
@@ -623,6 +652,33 @@ where
             requests,
             stats,
             Some(truncation_counter),
+            parent_trace_id,
+        )
+    }
+
+    pub fn new_serving_fxt<S>(
+        data: S,
+        requests: R,
+        mode: StreamMode,
+        stats: Arc<BatchIteratorConnectionStats>,
+        parent_trace_id: ftrace::Id,
+        performance_config: PerformanceConfig,
+    ) -> Result<Self, AccessorError>
+    where
+        S: Stream<Item = CursorItem> + Send + Unpin + 'static,
+    {
+        let data = FXTPacketSerializer::new(
+            Arc::clone(&stats),
+            performance_config
+                .aggregated_content_limit_bytes
+                .unwrap_or(FORMATTED_CONTENT_CHUNK_SIZE_TARGET),
+            data,
+        );
+        Self::new_inner(
+            new_batcher(data, Arc::clone(&stats), mode),
+            requests,
+            stats,
+            None,
             parent_trace_id,
         )
     }

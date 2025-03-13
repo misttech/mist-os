@@ -593,6 +593,20 @@ impl LogsDataBuilder {
         }
     }
 
+    /// Sets the moniker of the message.
+    #[must_use = "You must call build on your builder to consume its result"]
+    pub fn set_moniker(mut self, value: ExtendedMoniker) -> Self {
+        self.args.moniker = value;
+        self
+    }
+
+    /// Sets the URL of the message.
+    #[must_use = "You must call build on your builder to consume its result"]
+    pub fn set_url(mut self, value: Option<FlyStr>) -> Self {
+        self.args.component_url = value;
+        self
+    }
+
     /// Sets the number of dropped messages.
     /// If value is greater than zero, a DroppedLogs error
     /// will also be added to the list of errors or updated if

@@ -8,7 +8,11 @@
 //! the ArchiveAccessor FIDL protocol.
 
 use async_stream::stream;
-use diagnostics_data::DiagnosticsData;
+use diagnostics_data::{DiagnosticsData, LogsData};
+#[cfg(fuchsia_api_level_less_than = "HEAD")]
+use diagnostics_message as _;
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
+use diagnostics_message::from_extended_record;
 use fidl_fuchsia_diagnostics::{
     ArchiveAccessorMarker, ArchiveAccessorProxy, BatchIteratorMarker, BatchIteratorProxy,
     ClientSelectorConfiguration, Format, FormattedContent, PerformanceConfiguration, ReaderError,
@@ -342,7 +346,7 @@ impl<T: DiagnosticsDataType> ArchiveReader<T> {
     /// Connects to the ArchiveAccessor and returns data matching provided selectors.
     async fn snapshot_shared<D>(&self) -> Result<Vec<Data<D>>, Error>
     where
-        D: DiagnosticsData,
+        D: DiagnosticsData + 'static,
     {
         let data_future = self.snapshot_inner::<D, Data<D>>(FORMAT);
         let data = match self.timeout {
@@ -355,7 +359,7 @@ impl<T: DiagnosticsDataType> ArchiveReader<T> {
     async fn snapshot_inner<D, Y>(&self, format: Format) -> Result<Vec<Y>, Error>
     where
         D: DiagnosticsData,
-        Y: for<'a> Deserialize<'a> + CheckResponse,
+        Y: for<'a> Deserialize<'a> + CheckResponse + Send + 'static,
     {
         loop {
             let iterator = self.batch_iterator::<D>(StreamMode::Snapshot, format)?;
@@ -429,15 +433,40 @@ impl ArchiveReader<Logs> {
         }
     }
 
+    #[inline]
+    fn format(&self) -> Format {
+        #[cfg(fuchsia_api_level_at_least = "HEAD")]
+        let ret = Format::Fxt;
+        #[cfg(fuchsia_api_level_less_than = "HEAD")]
+        let ret = Format::Json;
+        ret
+    }
+
     /// Connects to the ArchiveAccessor and returns data matching provided selectors.
     pub async fn snapshot(&self) -> Result<Vec<Data<Logs>>, Error> {
-        self.snapshot_shared::<Logs>().await
+        loop {
+            let iterator = self.batch_iterator::<Logs>(StreamMode::Snapshot, self.format())?;
+            let result = drain_batch_iterator_for_logs(Arc::new(iterator))
+                .filter_map(|value| ready(value.ok()))
+                .collect::<Vec<_>>()
+                .await;
+
+            if self.retry_config.should_retry(result.len()) {
+                fasync::Timer::new(fasync::MonotonicInstant::after(
+                    zx::MonotonicDuration::from_millis(RETRY_DELAY_MS),
+                ))
+                .await;
+            } else {
+                return Ok(result);
+            }
+        }
     }
 
     /// Connects to the ArchiveAccessor and returns a stream of data containing a snapshot of the
     /// current buffer in the Archivist as well as new data that arrives.
-    pub fn snapshot_then_subscribe(&self) -> Result<Subscription<Data<Logs>>, Error> {
-        let iterator = self.batch_iterator::<Logs>(StreamMode::SnapshotThenSubscribe, FORMAT)?;
+    pub fn snapshot_then_subscribe(&self) -> Result<Subscription, Error> {
+        let iterator =
+            self.batch_iterator::<Logs>(StreamMode::SnapshotThenSubscribe, self.format())?;
         Ok(Subscription::new(iterator))
     }
 }
@@ -475,7 +504,12 @@ impl ArchiveReader<Inspect> {
     /// and use beyond such tests is discouraged.
     pub async fn snapshot_raw<T>(&self) -> Result<T, Error>
     where
-        T: for<'a> Deserialize<'a> + SerializableValue + From<Vec<T>> + CheckResponse,
+        T: for<'a> Deserialize<'a>
+            + SerializableValue
+            + From<Vec<T>>
+            + CheckResponse
+            + 'static
+            + Send,
     {
         let data_future = self.snapshot_inner::<Inspect, T>(T::FORMAT_OF_VALUE);
         let data = match self.timeout {
@@ -523,11 +557,12 @@ enum OneOrMany<T> {
     One(T),
 }
 
-fn drain_batch_iterator<T>(
+fn stream_batch<T>(
     iterator: Arc<BatchIteratorProxy>,
+    process_content: impl Fn(FormattedContent) -> Result<OneOrMany<T>, Error>,
 ) -> impl Stream<Item = Result<T, Error>>
 where
-    T: for<'a> Deserialize<'a>,
+    T: for<'a> Deserialize<'a> + Send + 'static,
 {
     stream! {
         loop {
@@ -541,22 +576,7 @@ where
                 return;
             }
             for formatted_content in next_batch {
-                let output: OneOrMany<T> = match formatted_content {
-                    FormattedContent::Json(data) => {
-                        let mut buf = vec![0; data.size as usize];
-                        data.vmo.read(&mut buf, 0).map_err(Error::ReadVmo)?;
-                        serde_json::from_slice(&buf).map_err(Error::ReadJson)?
-                    }
-                    #[cfg(fuchsia_api_level_at_least = "HEAD")]
-                    FormattedContent::Cbor(vmo) => {
-                        let mut buf =
-                            vec![0; vmo.get_content_size().expect("Always returns Ok") as usize];
-                        vmo.read(&mut buf, 0).map_err(Error::ReadVmo)?;
-                        ciborium::from_reader(buf.as_slice()).map_err(|err| Error::ReadCbor(err.into()))?
-                    }
-                    _ => OneOrMany::Many(vec![]),
-                };
-
+                let output = process_content(formatted_content)?;
                 match output {
                     OneOrMany::One(data) => yield Ok(data),
                     OneOrMany::Many(datas) => {
@@ -570,27 +590,94 @@ where
     }
 }
 
-/// A subscription used for reading diagnostics data.
+fn drain_batch_iterator<T>(
+    iterator: Arc<BatchIteratorProxy>,
+) -> impl Stream<Item = Result<T, Error>>
+where
+    T: for<'a> Deserialize<'a> + Send + 'static,
+{
+    stream_batch(iterator, |formatted_content| match formatted_content {
+        FormattedContent::Json(data) => {
+            let mut buf = vec![0; data.size as usize];
+            data.vmo.read(&mut buf, 0).map_err(Error::ReadVmo)?;
+            serde_json::from_slice(&buf).map_err(Error::ReadJson)
+        }
+        #[cfg(fuchsia_api_level_at_least = "HEAD")]
+        FormattedContent::Cbor(vmo) => {
+            let mut buf = vec![0; vmo.get_content_size().expect("Always returns Ok") as usize];
+            vmo.read(&mut buf, 0).map_err(Error::ReadVmo)?;
+            Ok(ciborium::from_reader(buf.as_slice()).map_err(|err| Error::ReadCbor(err.into()))?)
+        }
+        #[cfg(fuchsia_api_level_at_least = "PLATFORM")]
+        FormattedContent::Text(_) => unreachable!("We never expect Text"),
+        #[cfg(fuchsia_api_level_at_least = "HEAD")]
+        FormattedContent::Fxt(_) => unreachable!("We never expect FXT for Inspect"),
+        FormattedContent::__SourceBreaking { unknown_ordinal: _ } => {
+            unreachable!("Received unrecognized FIDL message")
+        }
+    })
+}
+
+fn drain_batch_iterator_for_logs(
+    iterator: Arc<BatchIteratorProxy>,
+) -> impl Stream<Item = Result<LogsData, Error>> {
+    stream_batch::<LogsData>(iterator, |formatted_content| match formatted_content {
+        FormattedContent::Json(data) => {
+            let mut buf = vec![0; data.size as usize];
+            data.vmo.read(&mut buf, 0).map_err(Error::ReadVmo)?;
+            serde_json::from_slice(&buf).map_err(Error::ReadJson)
+        }
+        #[cfg(fuchsia_api_level_at_least = "HEAD")]
+        FormattedContent::Fxt(vmo) => {
+            let mut buf = vec![0; vmo.get_content_size().expect("Always returns Ok") as usize];
+            vmo.read(&mut buf, 0).map_err(Error::ReadVmo)?;
+            let mut current_slice = buf.as_ref();
+            let mut ret: Option<OneOrMany<LogsData>> = None;
+            loop {
+                let (data, remaining) = from_extended_record(current_slice).unwrap();
+                ret = Some(match ret.take() {
+                    Some(OneOrMany::One(one)) => OneOrMany::Many(vec![one, data]),
+                    Some(OneOrMany::Many(mut many)) => {
+                        many.push(data);
+                        OneOrMany::Many(many)
+                    }
+                    None => OneOrMany::One(data),
+                });
+                if remaining.is_empty() {
+                    break;
+                }
+                current_slice = remaining;
+            }
+            Ok(ret.unwrap())
+        }
+        #[cfg(fuchsia_api_level_at_least = "PLATFORM")]
+        FormattedContent::Text(_) => unreachable!("We never expect Text"),
+        #[cfg(fuchsia_api_level_at_least = "HEAD")]
+        FormattedContent::Cbor(_) => unreachable!("We never expect CBOR"),
+        FormattedContent::__SourceBreaking { unknown_ordinal: _ } => {
+            unreachable!("Received unrecognized FIDL message")
+        }
+    })
+}
+
+/// A subscription used for reading logs.
 #[pin_project]
-pub struct Subscription<T> {
+pub struct Subscription {
     #[pin]
-    recv: Pin<Box<dyn FusedStream<Item = Result<T, Error>> + Send>>,
+    recv: Pin<Box<dyn FusedStream<Item = Result<LogsData, Error>> + Send>>,
     iterator: Arc<BatchIteratorProxy>,
 }
 
 const DATA_CHANNEL_SIZE: usize = 32;
 const ERROR_CHANNEL_SIZE: usize = 2;
 
-impl<T> Subscription<T>
-where
-    T: for<'a> Deserialize<'a> + Send + 'static,
-{
+impl Subscription {
     /// Creates a new subscription stream to a batch iterator.
     /// The stream will return diagnostics data structures.
     pub fn new(iterator: BatchIteratorProxy) -> Self {
         let iterator = Arc::new(iterator);
         Subscription {
-            recv: Box::pin(drain_batch_iterator::<T>(iterator.clone()).fuse()),
+            recv: Box::pin(drain_batch_iterator_for_logs(iterator.clone()).fuse()),
             iterator,
         }
     }
@@ -601,7 +688,7 @@ where
     }
 
     /// Splits the subscription into two separate streams: results and errors.
-    pub fn split_streams(mut self) -> (SubscriptionResultsStream<T>, mpsc::Receiver<Error>) {
+    pub fn split_streams(mut self) -> (SubscriptionResultsStream<LogsData>, mpsc::Receiver<Error>) {
         let (mut errors_sender, errors) = mpsc::channel(ERROR_CHANNEL_SIZE);
         let (mut results_sender, recv) = mpsc::channel(DATA_CHANNEL_SIZE);
         let _drain_task = fasync::Task::spawn(async move {
@@ -616,11 +703,8 @@ where
     }
 }
 
-impl<T> Stream for Subscription<T>
-where
-    T: for<'a> Deserialize<'a>,
-{
-    type Item = Result<T, Error>;
+impl Stream for Subscription {
+    type Item = Result<LogsData, Error>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.project();
@@ -628,10 +712,7 @@ where
     }
 }
 
-impl<T> FusedStream for Subscription<T>
-where
-    T: for<'a> Deserialize<'a>,
-{
+impl FusedStream for Subscription {
     fn is_terminated(&self) -> bool {
         self.recv.is_terminated()
     }

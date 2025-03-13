@@ -277,12 +277,7 @@ mod test {
 
     use super::*;
 
-    async fn wait_for_log(
-        stream: diagnostics_reader::Subscription<
-            diagnostics_reader::Data<diagnostics_reader::Logs>,
-        >,
-        log: &str,
-    ) {
+    async fn wait_for_log(stream: diagnostics_reader::Subscription, log: &str) {
         stream
             .filter_map(|data| {
                 futures::future::ready(

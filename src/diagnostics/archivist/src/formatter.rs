@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 use crate::diagnostics::BatchIteratorConnectionStats;
 use crate::error::AccessorError;
+use crate::logs::container::CursorItem;
+use crate::logs::servers::{extend_fxt_record, ExtendRecordOpts};
 use fidl_fuchsia_diagnostics::{
     DataType, Format, FormattedContent, StreamMode, MAXIMUM_ENTRIES_PER_BATCH,
 };
@@ -176,6 +178,16 @@ pub struct SerializedVmo {
     format: Format,
 }
 
+fn fxt_to_writer<W: std::io::Write>(mut writer: W, item: &CursorItem) -> Result<(), AccessorError> {
+    let value = extend_fxt_record(
+        item.message.bytes(),
+        &item.identity,
+        item.rolled_out,
+        &ExtendRecordOpts { component_url: true, moniker: true, rolled_out: true },
+    );
+    Ok(writer.write_all(&value)?)
+}
+
 impl SerializedVmo {
     pub fn serialize(
         source: &impl Serialize,
@@ -196,6 +208,7 @@ impl SerializedVmo {
             Format::Cbor => ciborium::into_writer(source, batch_writer)
                 .map_err(|err| AccessorError::CborSerialization(err.into()))?,
             Format::Text => unreachable!("We'll never get Text"),
+            Format::Fxt => unreachable!("We'll never get FXT"),
         }
         // Safe to unwrap we should always be able to take the vmo here.
         let (vmo, tail) = writer.finalize().unwrap();
@@ -224,7 +237,93 @@ impl From<SerializedVmo> for FormattedContent {
                     .expect("set_content_size always returns Ok");
                 FormattedContent::Cbor(content.vmo)
             }
+            Format::Fxt => {
+                content
+                    .vmo
+                    .set_content_size(&content.size)
+                    .expect("set_content_size always returns Ok");
+                FormattedContent::Fxt(content.vmo)
+            }
             Format::Text => unreachable!("We'll never get Text"),
+        }
+    }
+}
+
+/// Wraps an iterator over serializable items and yields FormattedContents, packing items
+/// into an FXT array in each VMO up to the size limit provided.
+#[pin_project::pin_project]
+pub struct FXTPacketSerializer<I> {
+    #[pin]
+    items: I,
+    stats: Option<Arc<BatchIteratorConnectionStats>>,
+    max_packet_size: u64,
+    overflow: Option<CursorItem>,
+}
+
+impl<I> FXTPacketSerializer<I> {
+    pub fn new(stats: Arc<BatchIteratorConnectionStats>, max_packet_size: u64, items: I) -> Self {
+        Self { items, stats: Some(stats), max_packet_size, overflow: None }
+    }
+}
+
+impl<I> Stream for FXTPacketSerializer<I>
+where
+    I: Stream<Item = CursorItem> + Unpin,
+{
+    type Item = Result<SerializedVmo, AccessorError>;
+
+    /// Serialize log messages in an FXT array up to the maximum size provided. Returns Ok(None)
+    /// when there are no more messages to serialize.
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut this = self.project();
+        let mut writer = VmoWriter::new(*this.max_packet_size);
+
+        if let Some(item) = this.overflow.take() {
+            let batch_writer = BufWriter::new(writer.clone());
+            fxt_to_writer(batch_writer, &item)?;
+            if let Some(stats) = &this.stats {
+                stats.add_result();
+            }
+        }
+
+        let mut items_is_pending = false;
+        loop {
+            let item = match this.items.poll_next_unpin(cx) {
+                Poll::Ready(Some(item)) => item,
+                Poll::Ready(None) => break,
+                Poll::Pending => {
+                    items_is_pending = true;
+                    break;
+                }
+            };
+
+            let writer_tail = writer.tail();
+            let (last_tail, previous_size) = (writer_tail, writer.capacity());
+            let batch_writer = BufWriter::new(writer.clone());
+            fxt_to_writer(batch_writer, &item)?;
+            let writer_tail = writer.tail();
+
+            if writer_tail > *this.max_packet_size {
+                writer.reset(last_tail, previous_size);
+                *this.overflow = Some(item);
+                break;
+            }
+
+            if let Some(stats) = &this.stats {
+                stats.add_result();
+            }
+        }
+
+        let writer_tail = writer.tail();
+
+        if writer_tail > 2 {
+            // safe to unwrap, the vmo is guaranteed to be present.
+            let (vmo, size) = writer.finalize().unwrap();
+            Poll::Ready(Some(Ok(SerializedVmo { vmo, size, format: Format::Fxt })))
+        } else if items_is_pending {
+            Poll::Pending
+        } else {
+            Poll::Ready(None)
         }
     }
 }

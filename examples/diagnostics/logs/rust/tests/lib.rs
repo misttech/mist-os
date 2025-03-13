@@ -57,7 +57,7 @@ async fn launch_example_and_read_hello_world() {
         },
         "keys":
         {
-            "foo": 1u64,
+            "foo": 1i64,
             "bar": "baz",
         }
     });
