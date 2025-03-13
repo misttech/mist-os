@@ -579,6 +579,13 @@ pub(super) struct BpfMapState {
     sid: SecurityId,
 }
 
+/// Security state for a bpf [`starnix_core::bpf::program::Program`]. instance. This currently just
+/// holds the SID that the [`crate::task::Task`] that created the file object had.
+#[derive(Clone, Debug, PartialEq)]
+pub(super) struct BpfProgState {
+    sid: SecurityId,
+}
+
 /// Sets the cached security id associated with `fs_node` to `sid`. Storing the security id will
 /// cause the security id to *not* be recomputed by the SELinux LSM when determining the effective
 /// security id of this [`FsNode`].

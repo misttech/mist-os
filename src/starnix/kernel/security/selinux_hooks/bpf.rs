@@ -5,7 +5,7 @@
 // TODO(https://github.com/rust-lang/rust/issues/39371): remove
 #![allow(non_upper_case_globals)]
 
-use super::{check_self_permission, BpfMapState};
+use super::{check_self_permission, BpfMapState, BpfProgState};
 
 use crate::task::CurrentTask;
 use selinux::{BpfPermission, SecurityId, SecurityServer};
@@ -17,6 +17,12 @@ use zerocopy::FromBytes;
 /// context of the creating task.
 pub fn bpf_map_alloc(current_task: &CurrentTask) -> BpfMapState {
     BpfMapState { sid: current_task.security_state.lock().current_sid }
+}
+
+/// Returns the security state to be assigned to a BPF program. This is defined as the
+/// security context of the creating task.
+pub fn bpf_prog_alloc(current_task: &CurrentTask) -> BpfProgState {
+    BpfProgState { sid: current_task.security_state.lock().current_sid }
 }
 
 /// Returns whether `current_task` can perform the bpf `cmd`.

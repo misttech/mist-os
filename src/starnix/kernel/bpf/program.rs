@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::bpf::fs::get_bpf_object;
+use crate::security;
 use crate::task::CurrentTask;
 use crate::vfs::{FdNumber, OutputBuffer};
 use ebpf::{
@@ -39,6 +40,9 @@ pub struct Program {
     pub info: ProgramInfo,
     program: VerifiedEbpfProgram,
     maps: Vec<PinnedMap>,
+
+    /// The security state associated with this bpf Program.
+    pub security_state: security::BpfProgState,
 }
 
 fn map_ebpf_error(e: EbpfError) -> Errno {
@@ -71,7 +75,8 @@ impl Program {
             .create_calling_context(info.expected_attach_type, maps_schema)
             .map_err(map_ebpf_api_error)?;
         let program = verify_program(code, calling_context, &mut logger).map_err(map_ebpf_error)?;
-        Ok(Program { info, program, maps })
+        let security_state = security::bpf_prog_alloc(current_task);
+        Ok(Program { info, program, maps, security_state })
     }
 
     pub fn link<C: EbpfProgramContext<Map = PinnedMap>>(

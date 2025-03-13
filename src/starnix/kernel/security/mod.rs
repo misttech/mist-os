@@ -73,5 +73,11 @@ pub struct BpfMapState {
     _state: selinux_hooks::BpfMapState,
 }
 
+/// Opaque structure holding security state for a bpf [`starnix_core::bpf::program::Program`].
+#[derive(Debug)]
+pub struct BpfProgState {
+    _state: selinux_hooks::BpfProgState,
+}
+
 /// Default access-check exceptions configuration for SELinux-enabled Starnix containers.
 pub const DEFAULT_EXCEPTIONS_CONFIG: &str = include_str!("selinux_hooks/default_exceptions_config");
