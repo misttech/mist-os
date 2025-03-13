@@ -289,6 +289,9 @@ class SdmmcBlockDevice : public block_server::Interface {
   struct InspectProperties {
     inspect::UintProperty io_errors_;                    // Only updated from the worker thread.
     inspect::UintProperty io_retries_;                   // Only updated from the worker thread.
+    inspect::UintProperty clock_rate_;                   // Set once by the init thread.
+    inspect::UintProperty bus_width_bits_;               // Set once by the init thread.
+    inspect::StringProperty timing_;                     // Set once by the init thread.
     inspect::UintProperty type_a_lifetime_used_;         // Set once by the init thread.
     inspect::UintProperty type_b_lifetime_used_;         // Set once by the init thread.
     inspect::UintProperty max_lifetime_used_;            // Set once by the init thread.

@@ -505,6 +505,63 @@ zx_status_t SdmmcBlockDevice::ProbeMmcLocked(
 }
 
 void SdmmcBlockDevice::MmcSetInspectProperties() {
+  properties_.clock_rate_ = root_.CreateUint("clock_rate", clock_rate_);
+  uint8_t bus_width_bits;
+  switch (bus_width_) {
+    case SDMMC_BUS_WIDTH_ONE:
+      bus_width_bits = 1;
+      break;
+    case SDMMC_BUS_WIDTH_FOUR:
+      bus_width_bits = 4;
+      break;
+    case SDMMC_BUS_WIDTH_EIGHT:
+      bus_width_bits = 8;
+      break;
+    default:
+      FDF_LOGL(ERROR, logger(), "Unexpected bus width enum: %u", bus_width_);
+      bus_width_bits = 0;
+      break;
+  }
+  properties_.bus_width_bits_ = root_.CreateUint("bus_width_bits", bus_width_bits);
+  std::string timing_string;
+  switch (timing_) {
+    case SDMMC_TIMING_LEGACY:
+      timing_string = "Legacy";
+      break;
+    case SDMMC_TIMING_HS:
+      timing_string = "HS";
+      break;
+    case SDMMC_TIMING_HSDDR:
+      timing_string = "HSDDR";
+      break;
+    case SDMMC_TIMING_HS200:
+      timing_string = "HS200";
+      break;
+    case SDMMC_TIMING_HS400:
+      timing_string = "HS400";
+      break;
+    case SDMMC_TIMING_SDR12:
+      timing_string = "SDR12";
+      break;
+    case SDMMC_TIMING_SDR25:
+      timing_string = "SDR25";
+      break;
+    case SDMMC_TIMING_SDR50:
+      timing_string = "SDR50";
+      break;
+    case SDMMC_TIMING_SDR104:
+      timing_string = "SDR104";
+      break;
+    case SDMMC_TIMING_DDR50:
+      timing_string = "DDR50";
+      break;
+    default:
+      FDF_LOGL(ERROR, logger(), "Unexpected timing enum: %u", timing_);
+      timing_string = "Unknown";
+      break;
+  }
+  properties_.timing_ = root_.CreateString("timing", timing_string);
+
   const uint8_t type_a = std::min<uint8_t>(raw_ext_csd_[MMC_EXT_CSD_DEVICE_LIFE_TIME_EST_TYP_A],
                                            MMC_EXT_CSD_DEVICE_LIFE_TIME_EST_INVALID);
   const uint8_t type_b = std::min<uint8_t>(raw_ext_csd_[MMC_EXT_CSD_DEVICE_LIFE_TIME_EST_TYP_B],
