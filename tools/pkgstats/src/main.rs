@@ -4,6 +4,7 @@
 
 use anyhow::{bail, Context, Result};
 use argh::FromArgs;
+use assembly_manifest::{AssemblyManifest, Image, PackageSetMetadata, PackagesMetadata};
 use camino::{Utf8Path, Utf8PathBuf};
 use fidl_fuchsia_component_decl as fdecl;
 use fuchsia_archive::Reader as FARReader;
@@ -45,25 +46,17 @@ enum CommandArgs {
 #[argh(subcommand, name = "process")]
 /// process an out directory into a JSON representation
 struct ProcessArgs {
-    /// the path under which to look for packages
-    #[argh(positional)]
-    path: Utf8PathBuf,
+    /// the path to the assembly manifest file.
+    #[argh(option)]
+    assembly_manifest: Utf8PathBuf,
 
     /// the path to save the output json file
     #[argh(option)]
-    out: Option<Utf8PathBuf>,
+    out: Utf8PathBuf,
 
     /// if set, process manifests one at a time, for debugging.
     #[argh(switch)]
     debug_no_parallel: bool,
-
-    /// process only this many manifests.
-    #[argh(option)]
-    debug_manifest_limit: Option<usize>,
-
-    /// process only manifests containing this substring.
-    #[argh(option)]
-    debug_manifest_filter: Option<String>,
 }
 
 #[derive(FromArgs)]
@@ -328,80 +321,11 @@ struct DebugDumpOutput {
 }
 
 fn do_process_command(args: ProcessArgs) -> Result<()> {
-    let path = match &args.path {
-        p if p.is_dir() => p,
-        p if p.exists() => bail!("'{p}' is not a directory"),
-        p => bail!("Directory '{p}' does not exist"),
-    };
+    let manifest = AssemblyManifest::try_load_from(&args.assembly_manifest)?;
 
-    let mut manifests = vec![];
-
-    let mut dirs = vec![path.read_dir()?];
-    let mut dir_count = 0;
-    let mut file_count = 0;
-    let start = Instant::now();
-    while let Some(dir) = dirs.pop() {
-        dir_count += 1;
-        for val in dir {
-            let entry = val?;
-            if &entry.file_name() == "package_manifest.json" {
-                file_count += 1;
-                manifests.push(Utf8PathBuf::try_from(entry.path())?);
-            } else if entry.file_type()?.is_dir() {
-                dirs.push(entry.path().read_dir()?);
-            } else {
-                file_count += 1;
-            }
-        }
-    }
-    let duration = Instant::now() - start;
-
-    println!(
-        "Found {} manifests out of {} files in {} dirs in {:?}",
-        manifests.len(),
-        file_count,
-        dir_count,
-        duration
-    );
-
-    let mut debug_mode = false;
-    if let Some(search) = args.debug_manifest_filter {
-        debug_mode = true;
-        manifests.retain(|v| v.to_string().contains(&search));
-    }
-    if let Some(limit) = args.debug_manifest_limit {
-        debug_mode = true;
-        manifests = manifests.into_iter().take(limit).collect();
-    }
     if args.debug_no_parallel {
         ThreadPoolBuilder::new().num_threads(1).build_global().expect("make thread pool");
     }
-    if debug_mode {
-        println!("Filtered down to {} manifests", manifests.len());
-    }
-
-    let get_content_file_path = |relative_path: &str, source_file_path: &Utf8Path| {
-        let filepath = path.join(relative_path);
-        if filepath.exists() {
-            return Ok(filepath);
-        }
-
-        if source_file_path.is_file() {
-            match source_file_path.parent() {
-                Some(v) => Ok(v.join(relative_path)),
-                None => Err(std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    "Could not find the file",
-                )),
-            }
-        } else {
-            Ok(source_file_path.join(relative_path))
-        }
-    };
-
-    let get_content_file = |relative_path: &str, source_file_path: &Utf8Path| {
-        File::open(get_content_file_path(relative_path, source_file_path)?)
-    };
 
     let errors = Errors::default();
     let manifest_count = AtomicUsize::new(0);
@@ -409,212 +333,50 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
     let content_hash_to_path = Mutex::new(HashMap::new());
     let start = Instant::now();
 
-    manifests.par_iter().for_each(|pkg_manifest_path| {
-        debug!("Starting");
-        manifest_count.fetch_add(1, Ordering::Relaxed);
-
-        let manifest = match PackageManifest::try_load_from(pkg_manifest_path) {
-            Ok(m) => m,
-            Err(err) => {
-                errors.log_manifest_error(err, pkg_manifest_path, "loading manifest");
-                return;
-            }
-        };
-
-        let url = match manifest.package_url() {
-            Err(err) => {
-                errors.log_manifest_error(err, pkg_manifest_path, "formatting URL");
-                return;
-            }
-            Ok(None) => {
-                // Package does not have a URL, skip.
-                errors.manifest_errors.fetch_add(1, Ordering::Relaxed);
-                return;
-            }
-            Ok(Some(url)) => url,
-        };
-
-        debug!("Loaded");
-
-        let mut contents = PackageContents::default();
-
-        debug!("Have {} blobs", manifest.blobs().len());
-
-        for blob in manifest.blobs() {
-            if blob.path == "meta/" {
-                // Handle meta
-                let meta_file = match get_content_file(&blob.source_path, pkg_manifest_path) {
-                    Ok(meta_file) => meta_file,
-                    Err(err) => {
-                        errors.log_manifest_file_error(
-                            err,
-                            pkg_manifest_path,
-                            "opening file",
-                            &blob.path,
-                        );
-                        continue;
-                    }
-                };
-                let mut reader = match FARReader::new(meta_file) {
-                    Ok(r) => r,
-                    Err(err) => {
-                        errors.log_manifest_file_error(
-                            err,
-                            pkg_manifest_path,
-                            "opening as FAR file",
-                            &blob.path,
-                        );
-                        continue;
-                    }
-                };
-
-                let mut manifest_paths = vec![];
-                debug!("Loaded manifest, have {} entries", reader.list().len());
-                for entry in reader.list() {
-                    let path = String::from_utf8_lossy(entry.path());
-                    if path.ends_with(".cm") {
-                        debug!("Found a component manifest, {}", path);
-                        manifest_paths.push(entry.path().to_owned());
-                    }
+    let assembly_manifest_dir_path = args.assembly_manifest.parent().unwrap();
+    manifest
+        .images
+        .into_par_iter()
+        .flat_map_iter(|image_manifest| -> Box<dyn Iterator<Item = Utf8PathBuf>> {
+            // TODO(https://fxbug.dev/...): we must extend this with Bootfs packages too.
+            let packages = match image_manifest {
+                Image::Dtbo(_)
+                | Image::FVM(_)
+                | Image::FVMSparse(_)
+                | Image::FVMFastboot(_)
+                | Image::QemuKernel(_)
+                | Image::VBMeta(_)
+                | Image::ZBI { path: _, signed: _ } => return Box::new(std::iter::empty()),
+                // We skip this one, its contents are listed in the blobfs and fxfs contents too.
+                Image::BasePackage(_) => return Box::new(std::iter::empty()),
+                Image::BlobFS { path: _, contents }
+                | Image::Fxfs { path: _, contents }
+                | Image::FxfsSparse { path: _, contents } => contents.packages,
+            };
+            let PackagesMetadata {
+                base: PackageSetMetadata(base_packages),
+                cache: PackageSetMetadata(cache_packages),
+            } = packages;
+            Box::new(base_packages.into_iter().chain(cache_packages.into_iter()).map(|metadata| {
+                // This path is relative to the assembly manifest path.
+                absolute_path_for(&assembly_manifest_dir_path, &metadata.manifest)
+            }))
+        })
+        .for_each(|manifest_path| {
+            manifest_count.fetch_add(1, Ordering::Relaxed);
+            let manifest = match PackageManifest::try_load_from(&manifest_path) {
+                Ok(m) => m,
+                Err(err) => {
+                    errors.log_manifest_error(err, &manifest_path, "loading manifest");
+                    return;
                 }
-
-                for manifest_path in manifest_paths {
-                    debug!("Starting");
-                    let data = match reader.read_file(&manifest_path) {
-                        Ok(d) => d,
-                        Err(err) => {
-                            errors.log_manifest_file_error(
-                                err,
-                                pkg_manifest_path,
-                                "reading component manifest",
-                                String::from_utf8_lossy(&manifest_path),
-                            );
-                            break;
-                        }
-                    };
-                    let manifest: fdecl::Component = match fidl::unpersist(&data) {
-                        Ok(m) => m,
-                        Err(err) => {
-                            errors.log_manifest_file_error(
-                                err,
-                                pkg_manifest_path,
-                                "parsing component manifest",
-                                String::from_utf8_lossy(&manifest_path),
-                            );
-                            break;
-                        }
-                    };
-
-                    let mut component = ComponentContents::default();
-                    for cap in manifest.uses.into_iter().flatten() {
-                        match cap {
-                            fdecl::Use::Protocol(p) => {
-                                let (name, from) = match (p.source_name, p.source) {
-                                    (Some(s), Some(r)) => (s, r),
-                                    _ => continue,
-                                };
-                                match from {
-                                    fdecl::Ref::Parent(_) => {
-                                        component
-                                            .used_from_parent
-                                            .insert(Capability::Protocol(name));
-                                    }
-                                    fdecl::Ref::Child(c) => {
-                                        component
-                                            .used_from_child
-                                            .insert((Capability::Protocol(name), c.name));
-                                    }
-                                    // TODO(https://fxbug.dev/347290357): Handle different types of refs
-                                    e => {
-                                        debug!("Unknown use from ref: {:?}", e);
-                                    }
-                                }
-                            }
-                            // TODO(https://fxbug.dev/347290357): Handle different types of entries
-                            e => {
-                                debug!("Unknown use entry: {:?}", e)
-                                // Skip all else for now
-                            }
-                        }
-                    }
-                    for cap in manifest.exposes.into_iter().flatten() {
-                        match cap {
-                            fdecl::Expose::Protocol(p) => {
-                                let (name, from) = match (p.source_name, p.source) {
-                                    (Some(s), Some(r)) => (s, r),
-                                    _ => continue,
-                                };
-                                match from {
-                                    fdecl::Ref::Self_(_) => {
-                                        component
-                                            .exposed_from_self
-                                            .insert(Capability::Protocol(name));
-                                    }
-                                    fdecl::Ref::Child(c) => {
-                                        component
-                                            .exposed_from_child
-                                            .insert((Capability::Protocol(name), c.name));
-                                    }
-                                    e => {
-                                        // TODO(https://fxbug.dev/347290357): Handle different types of refs
-                                        debug!("Unknown expose from ref: {:?}", e);
-                                    }
-                                }
-                            }
-                            // TODO(https://fxbug.dev/347290357): Handle different types of entries
-                            e => {
-                                debug!("Unknown exposes entry: {:?}", e)
-                                // Skip all else for now
-                            }
-                        }
-                    }
-                    for cap in manifest.offers.into_iter().flatten() {
-                        if let fdecl::Offer::Protocol(p) = cap {
-                            if let (Some(name), Some(from)) = (p.source_name, p.source) {
-                                match from {
-                                    fdecl::Ref::Self_(_) => {
-                                        component
-                                            .offered_from_self
-                                            .insert(Capability::Protocol(name));
-                                    }
-                                    fdecl::Ref::Child(_) => {
-                                        // Do not handle yet
-                                    }
-                                    e => {
-                                        debug!("Unknown offer from ref: {:?}", e);
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    let path = String::from_utf8_lossy(&manifest_path);
-                    let last_segment = path.rfind("/");
-                    let name = match last_segment {
-                        Some(i) => &path[i + 1..],
-                        None => &path,
-                    };
-                    contents.components.insert(name.to_string(), component);
-                }
-            } else if blob.path.starts_with("blobs/") {
-                // This is a referenced blob. Put them in the
-                // separate blobs section so a file entry will reference
-                // the canonical source file rather than the copied blob.
-
-                contents.blobs.push(blob.merkle.to_string());
-            } else {
-                let source_path = get_content_file_path(&blob.source_path, pkg_manifest_path)
-                    .map(|v| v.to_string())
-                    .unwrap_or_default();
-                content_hash_to_path.lock().unwrap().insert(blob.merkle.to_string(), source_path);
-                contents.files.push(PackageFile {
-                    name: blob.path.to_string(),
-                    hash: blob.merkle.to_string(),
-                });
+            };
+            if let Some((url, contents)) =
+                process_package_manifest(manifest, manifest_path, &errors, &content_hash_to_path)
+            {
+                names.lock().unwrap().insert(url, contents);
             }
-        }
-        names.lock().unwrap().insert(url, contents);
-    });
+        });
     let file_infos = Mutex::new(HashMap::new());
     let elf_count = AtomicUsize::new(0);
     let other_count = AtomicUsize::new(0);
@@ -626,7 +388,8 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
     }
 
     content_hash_to_path.lock().unwrap().par_iter().for_each(|(hash, path)| {
-        if path.is_empty() {
+        // Checks for empty paths, Path::new("").parent is always None.
+        if path.parent().is_none() {
             debug!("Skipping, no path");
             return;
         }
@@ -647,13 +410,17 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
 
         debug!("Found canonical path at {path}");
 
-        let f = File::open(&path);
-        if f.is_err() {
-            debug!("Path found");
-            eprintln!("Failed to open {}, skipping: {:?}", path, f.unwrap_err());
+        if !path.exists() {
+            eprintln!("The file '{path}' doesn't exist. Skipping.");
             return;
         }
-        let mut f = f.unwrap();
+        let mut f = match File::open(&path) {
+            Ok(f) => f,
+            Err(err) => {
+                eprintln!("Failed to open {path}, skipping: {err:?}");
+                return;
+            }
+        };
         let mut header_buf = [0u8; 4];
         // Check if this looks like an ELF file, starting with 0x7F 'E' 'L' 'F'
         if f.read_exact(&mut header_buf).is_ok() && header_buf == [0x7fu8, 0x45u8, 0x4cu8, 0x46u8] {
@@ -742,14 +509,19 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
 
     let output = OutputSummary { packages, contents, files, protocol_to_client };
 
-    if let Some(out) = &args.out {
-        let mut file = std::fs::File::create(out)?;
-        serde_json::to_writer(&mut file, &output)?;
-        let dur = Instant::now() - start;
-        println!("Output JSON in {:?}", dur);
-    }
+    let mut file = std::fs::File::create(args.out)?;
+    serde_json::to_writer(&mut file, &output)?;
+    let dur = Instant::now() - start;
+    println!("Output JSON in {:?}", dur);
 
     Ok(())
+}
+
+// Given a file at `../../some/path/file.ext` and a root directory: `/the/root/path/` returns the
+// absolute path for: `/the/root/path/../../some/path/file.ext
+fn absolute_path_for(root_path: &Utf8Path, relative_path: &Utf8Path) -> Utf8PathBuf {
+    Utf8PathBuf::try_from(root_path.join(relative_path).canonicalize().expect("path exists"))
+        .expect("assembly related path must be utf8")
 }
 
 #[derive(Default)]
@@ -780,6 +552,185 @@ impl Errors {
         self.manifest_file_errors.fetch_add(1, Ordering::Relaxed);
         debug!(status = "Failed", step; "");
         eprintln!("[{}] Failed {} for {}: {:?}", manifest_path, step, context.as_ref(), err);
+    }
+}
+
+fn process_package_manifest(
+    manifest: PackageManifest,
+    manifest_path: Utf8PathBuf,
+    errors: &Errors,
+    content_hash_to_path: &Mutex<HashMap<String, Utf8PathBuf>>,
+) -> Option<(UnpinnedAbsolutePackageUrl, PackageContents)> {
+    let url = match manifest.package_url() {
+        Err(err) => {
+            errors.log_manifest_error(err, &manifest_path, "formatting URL");
+            return None;
+        }
+        Ok(None) => {
+            // Package does not have a URL, skip.
+            errors.manifest_errors.fetch_add(1, Ordering::Relaxed);
+            return None;
+        }
+        Ok(Some(url)) => url,
+    };
+
+    let mut contents = PackageContents::default();
+
+    debug!("Have {} blobs", manifest.blobs().len());
+
+    for blob in manifest.blobs() {
+        let blob_source_path = Utf8PathBuf::from(&blob.source_path);
+        if blob.path == "meta/" {
+            process_far(&blob_source_path, &mut contents, &errors, &manifest_path);
+        } else {
+            content_hash_to_path.lock().unwrap().insert(blob.merkle.to_string(), blob_source_path);
+            contents
+                .files
+                .push(PackageFile { name: blob.path.to_string(), hash: blob.merkle.to_string() });
+        }
+    }
+    Some((url, contents))
+}
+
+fn process_far(
+    far_path: &Utf8PathBuf,
+    contents: &mut PackageContents,
+    errors: &Errors,
+    manifest_path: &Utf8PathBuf,
+) {
+    // Handle meta
+    let meta_file = match File::open(far_path) {
+        Ok(meta_file) => meta_file,
+        Err(err) => {
+            errors.log_manifest_file_error(err, &manifest_path, "opening file", &far_path);
+            return;
+        }
+    };
+    let mut reader = match FARReader::new(meta_file) {
+        Ok(r) => r,
+        Err(err) => {
+            errors.log_manifest_file_error(err, &manifest_path, "opening as FAR file", &far_path);
+            return;
+        }
+    };
+    let mut component_manifest_paths = vec![];
+    debug!("Loaded manifest, have {} entries", reader.list().len());
+    for entry in reader.list() {
+        let path = String::from_utf8_lossy(entry.path());
+        if path.ends_with(".cm") {
+            debug!("Found a component manifest, {}", path);
+            component_manifest_paths.push(entry.path().to_owned());
+        }
+    }
+
+    for component_manifest_path in component_manifest_paths {
+        let data = match reader.read_file(&component_manifest_path) {
+            Ok(d) => d,
+            Err(err) => {
+                errors.log_manifest_file_error(
+                    err,
+                    manifest_path,
+                    "reading component manifest",
+                    String::from_utf8_lossy(&component_manifest_path),
+                );
+                break;
+            }
+        };
+        let manifest: fdecl::Component = match fidl::unpersist(&data) {
+            Ok(m) => m,
+            Err(err) => {
+                errors.log_manifest_file_error(
+                    err,
+                    manifest_path,
+                    "parsing component manifest",
+                    String::from_utf8_lossy(&component_manifest_path),
+                );
+                break;
+            }
+        };
+
+        let mut component = ComponentContents::default();
+        for cap in manifest.uses.into_iter().flatten() {
+            match cap {
+                fdecl::Use::Protocol(p) => {
+                    let (name, from) = match (p.source_name, p.source) {
+                        (Some(s), Some(r)) => (s, r),
+                        _ => continue,
+                    };
+                    match from {
+                        fdecl::Ref::Parent(_) => {
+                            component.used_from_parent.insert(Capability::Protocol(name));
+                        }
+                        fdecl::Ref::Child(c) => {
+                            component.used_from_child.insert((Capability::Protocol(name), c.name));
+                        }
+                        // TODO(https://fxbug.dev/347290357): Handle different types of refs
+                        e => {
+                            debug!("Unknown use from ref: {:?}", e);
+                        }
+                    }
+                }
+                // TODO(https://fxbug.dev/347290357): Handle different types of entries
+                e => {
+                    debug!("Unknown use entry: {:?}", e)
+                    // Skip all else for now
+                }
+            }
+        }
+        for cap in manifest.exposes.into_iter().flatten() {
+            match cap {
+                fdecl::Expose::Protocol(p) => {
+                    let (name, from) = match (p.source_name, p.source) {
+                        (Some(s), Some(r)) => (s, r),
+                        _ => continue,
+                    };
+                    match from {
+                        fdecl::Ref::Self_(_) => {
+                            component.exposed_from_self.insert(Capability::Protocol(name));
+                        }
+                        fdecl::Ref::Child(c) => {
+                            component
+                                .exposed_from_child
+                                .insert((Capability::Protocol(name), c.name));
+                        }
+                        e => {
+                            // TODO(https://fxbug.dev/347290357): Handle different types of refs
+                            debug!("Unknown expose from ref: {:?}", e);
+                        }
+                    }
+                }
+                // TODO(https://fxbug.dev/347290357): Handle different types of entries
+                e => {
+                    debug!("Unknown exposes entry: {:?}", e)
+                    // Skip all else for now
+                }
+            }
+        }
+        for cap in manifest.offers.into_iter().flatten() {
+            if let fdecl::Offer::Protocol(p) = cap {
+                if let (Some(name), Some(from)) = (p.source_name, p.source) {
+                    match from {
+                        fdecl::Ref::Self_(_) => {
+                            component.offered_from_self.insert(Capability::Protocol(name));
+                        }
+                        fdecl::Ref::Child(_) => {
+                            // Do not handle yet
+                        }
+                        e => {
+                            debug!("Unknown offer from ref: {:?}", e);
+                        }
+                    }
+                }
+            }
+        }
+
+        let path = String::from_utf8_lossy(&component_manifest_path);
+        let last_segment = path.rfind("/");
+        let name = match last_segment {
+            Some(i) => &path[i + 1..],
+            None => &path,
+        };
+        contents.components.insert(name.to_string(), component);
     }
 }
 
