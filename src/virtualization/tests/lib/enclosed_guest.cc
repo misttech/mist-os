@@ -53,7 +53,6 @@ constexpr char kDebianGuestUrl[] = "debian_guest_manager#meta/debian_guest_manag
 // TODO(https://fxbug.dev/42073215): when fuchsia.component.test/Realm.InitMutableConfigFromPackage
 // works with subpackaged components, make this a subpackage URL.
 constexpr char kTerminaGuestUrl[] = "#meta/termina_guest_manager.cm";
-constexpr auto kDevGpuDirectory = "dev-gpu";
 constexpr auto kGuestManagerName = "guest_manager";
 
 // TODO(https://fxbug.dev/42076670): Use consistent naming for the test utils here.
@@ -179,8 +178,6 @@ std::unique_ptr<sys::ServiceDirectory> EnclosedGuest::StartWithUITestManager(
       Protocol{fuchsia::kernel::HypervisorResource::Name_},
       Protocol{fuchsia::kernel::VmexResource::Name_},
       Protocol{fuchsia::sysinfo::SysInfo::Name_},
-      Directory{
-          .name = kDevGpuDirectory, .rights = fuchsia::io::R_STAR_DIR, .path = "/dev/class/gpu"},
       Storage{.name = "data", .path = "/data"},
   };
 
@@ -278,9 +275,6 @@ void EnclosedGuest::InstallInRealm(component_testing::Realm& realm,
                               Protocol{fuchsia::kernel::HypervisorResource::Name_},
                               Protocol{fuchsia::kernel::VmexResource::Name_},
                               Protocol{fuchsia::sysinfo::SysInfo::Name_},
-                              Directory{.name = kDevGpuDirectory,
-                                        .rights = fuchsia::io::R_STAR_DIR,
-                                        .path = "/dev/class/gpu"},
                               Storage{.name = "data", .path = "/data"},
                           },
                       .source = {ParentRef()},
