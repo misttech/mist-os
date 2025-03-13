@@ -320,9 +320,21 @@ fn compute_new_fs_node_sid(
                 }
             }
 
-            if let Some(fscreate_sid) = current_task.security_state.lock().fscreate_sid {
-                return Ok(Some((fscreate_sid, label)));
-            }
+            // If the task has an "fscreate" (for files) or "sockcreate" (for sockets) context set
+            // then apply it to the new object rather than applying the policy-defined labeling.
+            match new_node_class {
+                FsNodeClass::Socket(_) => {
+                    if let Some(sid) = current_task.security_state.lock().sockcreate_sid {
+                        return Ok(Some((sid, label)));
+                    }
+                }
+                FsNodeClass::File(_) => {
+                    if let Some(fscreate_sid) = current_task.security_state.lock().fscreate_sid {
+                        return Ok(Some((fscreate_sid, label)));
+                    }
+                }
+            };
+
             // TODO: https://fxbug.dev/393086830 For root nodes created when mounting ephemeral
             // filesystems, this should be the kernel sid. However, for parent-less nodes (e.g.
             // pipes in pipefs) this should be the task sid.
