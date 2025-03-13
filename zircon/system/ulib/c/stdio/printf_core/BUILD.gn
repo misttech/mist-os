@@ -4,16 +4,26 @@
 
 import("../../libc.gni")
 
+# TODO(https://fxbug.dev/402907255): soft transition
+_llvm_libc_config = read_file("$llvm_libc/config/config.json", "json")
+_llvm_libc_config_printf = _llvm_libc_config.printf
+old_printf =
+    !defined(_llvm_libc_config_printf.LIBC_CONF_PRINTF_RUNTIME_DISPATCH)
+not_needed([ "_llvm_libc_config_printf" ])  # GN won't count defined() as "used"
+
 llvm_libc_source_set("printf_core") {
+  visibility = [ "../*" ]
   public = [ "printf_main.h" ]
-  sources = [ "printf_main.cpp" ]
-  configs = [ ":printf-options" ]
+  public_configs = [ ":printf-options" ]
   functions = []
-  deps = [
-    ":converter",
-    ":parser",
-    ":writer",
-  ]
+  if (old_printf) {
+    sources = [ "printf_main.cpp" ]
+    deps = [
+      ":converter",
+      ":parser",
+    ]
+    public_deps = [ ":writer" ]
+  }
 }
 
 config("printf-options") {
@@ -27,6 +37,12 @@ config("printf-options") {
     "LIBC_COPT_PRINTF_DISABLE_STRERROR",
   ]
 
+  # TODO(https://fxbug.dev/402907255): stick to old-style runtime dispatch
+  # until transition is complete
+  if (!old_printf) {
+    defines += [ "LIBC_COPT_PRINTF_RUNTIME_DISPATCH" ]
+  }
+
   # Don't support FP types if the toolchain doesn't.
   _no_floating_point = toolchain_variant.tags + [ "no-floating-point" ] -
                        [ "no-floating-point" ] != toolchain_variant.tags
@@ -39,42 +55,51 @@ config("printf-options") {
 # function implementations in each having a corresponding header file and test
 # file in the usual places.
 
-llvm_libc_source_set("converter") {
-  visibility = [ ":*" ]
+if (old_printf) {
+  llvm_libc_source_set("converter") {
+    visibility = [ ":*" ]
 
-  functions = [ "converter" ]
+    functions = [ "converter" ]
 
-  configs = [ ":printf-options" ]
+    configs = [ ":printf-options" ]
 
-  deps = [ ":writer" ]
-}
+    deps = [ ":writer" ]
+  }
 
-llvm_libc_source_set("parser") {
-  visibility = [ ":*" ]
+  llvm_libc_source_set("parser") {
+    visibility = [ ":*" ]
 
-  public = [ "parser.h" ]
-  public_configs = [ ":printf-options" ]
+    public = [ "parser.h" ]
+    public_configs = [ ":printf-options" ]
 
-  functions = []
+    functions = []
 
-  # TODO(https://fxbug.dev/42141211): There are parser tests that can be built though
-  # there is no "parser" source file so the build machinery will have to be
-  # custom for those tests. But that test code requires the fancier test
-  # machinery that we don't yet support since zxtest doesn't have the features.
-}
+    # TODO(https://fxbug.dev/42141211): There are parser tests that can be built though
+    # there is no "parser" source file so the build machinery will have to be
+    # custom for those tests. But that test code requires the fancier test
+    # machinery that we don't yet support since zxtest doesn't have the features.
+  }
 
-llvm_libc_source_set("writer") {
-  functions = [ "writer" ]
-  configs = [ ":printf-options" ]
+  llvm_libc_source_set("writer") {
+    functions = [ "writer" ]
+    configs = [ ":printf-options" ]
+  }
 }
 
 source_set("wrapper") {
   public = [ "wrapper.h" ]
-  public_configs = [ ":printf-options" ]
+  public_configs = [ ":wrapper.config" ]
 
-  # The llvm-libc headers used by wrapper.h need defines and include_dirs as
-  # used for building libc itself.
-  public_configs += [ "../..:llvm-libc-public.config" ]
-
+  sources = [ "wrapper.cc" ]
+  configs += [
+    ":printf-options",
+    "//zircon/system/ulib/c:llvm-libc.config",
+  ]
   deps = [ ":printf_core" ]
+}
+
+config("wrapper.config") {
+  visibility = [ ":wrapper" ]
+  defines = [ "LIBC_NAMESPACE=$libc_namespace" ]
+  include_dirs = [ "//zircon/system/ulib/c" ]
 }

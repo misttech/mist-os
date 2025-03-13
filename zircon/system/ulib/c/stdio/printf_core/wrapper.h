@@ -6,27 +6,9 @@
 #define ZIRCON_SYSTEM_ULIB_C_STDIO_PRINTF_CORE_WRAPPER_H_
 
 #include <cstdarg>
+#include <span>
 #include <string_view>
 #include <type_traits>
-
-// TODO(https://fxbug.dev/42105189): These are defined as macros in
-// <zircon/compiler.h> and used by some other headers such as in libzx.  This
-// conflicts with their use as scoped identifiers in the llvm-libc code reached
-// from this header, when this header is included in someplace that also
-// includes <zircon/compiler.h> and those headers that rely on its macros.
-// <zircon/compiler.h> should not be defining macros in the public namespace
-// this way, but until that's fixed work around the issue by hiding the macros
-// during the evaluation of the llvm-libc headers.
-#pragma push_macro("add_overflow")
-#undef add_overflow
-#pragma push_macro("sub_overflow")
-#undef sub_overflow
-
-#include "src/stdio/printf_core/printf_main.h"
-
-// TODO(https://fxbug.dev/42105189): See comment above.
-#pragma pop_macro("add_overflow")
-#pragma pop_macro("sub_overflow")
 
 namespace LIBC_NAMESPACE::printf_core {
 
@@ -35,11 +17,12 @@ namespace LIBC_NAMESPACE::printf_core {
 
 enum class PrintfNewline : bool { kNo, kYes };
 
-template <size_t BufferSize, PrintfNewline AddNewline = PrintfNewline::kNo, typename T>
-inline int Printf(T&& write, const char* format, internal::ArgList& arg_list) {
-  static_assert(std::is_invocable_r_v<int, T, std::string_view>);
+int PrintfImpl(int (*write)(std::string_view str, void* hook), void* hook, std::span<char> buffer,
+               PrintfNewline newline, const char* format, va_list args);
 
-  constexpr cpp::string_view kNewline = AddNewline == PrintfNewline::kYes ? "\n" : "";
+template <size_t BufferSize, PrintfNewline AddNewline = PrintfNewline::kNo, typename T>
+inline int Printf(T&& write, const char* format, va_list args) {
+  static_assert(std::is_invocable_r_v<int, T, std::string_view>);
 
   struct Wrapper {
     using Pointable = std::remove_reference_t<T>;
@@ -83,38 +66,25 @@ inline int Printf(T&& write, const char* format, internal::ArgList& arg_list) {
       }
     }
 
+    static int Call(std::string_view wrapper_str, void* hook) {
+      std::string_view str{wrapper_str.data(), wrapper_str.size()};
+      return Unerase(hook)(str);
+    }
+
     T value;
   } wrapper{std::forward<T>(write)};
 
   char buffer[BufferSize];
-  WriteBuffer write_buffer{
-      buffer,
-      sizeof(buffer),
-      [](cpp::string_view wrapper_str, void* hook) -> int {
-        std::string_view str{wrapper_str.data(), wrapper_str.size()};
-        return Wrapper::Unerase(hook)(str);
-      },
-      wrapper.Erase(),
-  };
-  Writer writer{&write_buffer};
-  int result = printf_main(&writer, format, arg_list);
-  write_buffer.overflow_write(kNewline);
-  return result;
-}
-
-template <size_t BufferSize, PrintfNewline AddNewline = PrintfNewline::kNo, typename T>
-inline int Printf(T&& write, const char* format, va_list args) {
-  internal::ArgList arg_list{args};
-  return Printf<BufferSize, AddNewline>(std::forward<T>(write), format, arg_list);
+  return PrintfImpl(Wrapper::Call, wrapper.Erase(), std::span{buffer}, AddNewline, format, args);
 }
 
 template <size_t BufferSize, PrintfNewline AddNewline = PrintfNewline::kNo, typename T>
 [[gnu::format(printf, 2, 3)]] inline int Printf(T&& write, const char* format, ...) {
   va_list args;
   va_start(args, format);
-  internal::ArgList arg_list{args};
+  int result = Printf<BufferSize, AddNewline>(std::forward<T>(write), format, args);
   va_end(args);
-  return Printf<BufferSize, AddNewline>(std::forward<T>(write), format, arg_list);
+  return result;
 }
 
 // This returns a move-only lambda the argument is moved into.

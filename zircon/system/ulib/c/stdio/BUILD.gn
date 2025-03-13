@@ -18,8 +18,5 @@ llvm_libc_source_set("snprintf") {
 
   functions = [ "snprintf" ]
 
-  deps = [
-    "printf_core",
-    "printf_core:writer",
-  ]
+  deps = [ "printf_core" ]
 }
