@@ -1737,4 +1737,160 @@ mod test {
             assert_eq!(map.last_range().unwrap(), &expected_last_range);
         }
     }
+
+    #[::fuchsia::test]
+    fn test_large_insert_and_remove_alternating() {
+        let mut map = RangeMap2::<u32, i32>::default();
+        let num_entries = 1000;
+
+        // Insert and remove entries in an alternating pattern
+        for i in 0..num_entries {
+            let start = i as u32 * 10;
+            let end = start + 5;
+            let value = i as i32;
+            map.insert(start..end, value);
+
+            if i % 2 == 0 {
+                // Remove every other entry
+                map.remove(start..end);
+            }
+        }
+
+        // Verify that only the non-removed entries remain
+        for i in 0..num_entries {
+            let start = i as u32 * 10;
+            let end = start + 5;
+            let point = start + 2;
+            if i % 2 != 0 {
+                if let Some((range, value)) = map.get(point) {
+                    assert!(range.start <= point && point < range.end);
+                    assert_eq!(*range, start..end);
+                    assert_eq!(*value, i as i32);
+                } else {
+                    panic!("Expected to find a range for point {}", point);
+                }
+            } else {
+                assert!(map.get(point).is_none());
+            }
+        }
+    }
+
+    #[::fuchsia::test]
+    fn test_large_insert_and_remove_multiple_times() {
+        let mut map = RangeMap2::<u32, i32>::default();
+        let num_entries = 200;
+        let num_iterations = 5;
+
+        for _ in 0..num_iterations {
+            // Insert a large number of entries
+            for i in 0..num_entries {
+                let start = i as u32 * 10;
+                let end = start + 5;
+                let value = i as i32;
+                map.insert(start..end, value);
+            }
+
+            // Remove a large number of entries
+            for i in 0..num_entries {
+                let start = i as u32 * 10;
+                let end = start + 5;
+                map.remove(start..end);
+            }
+        }
+
+        // Verify that the map is empty after multiple insert/remove cycles
+        assert!(map.is_empty());
+    }
+
+    #[::fuchsia::test]
+    fn test_merging_ranges_with_equal_values() {
+        let mut map = RangeMap2::<u32, i32>::default();
+
+        // Insert some initial ranges
+        map.insert(10..20, 100);
+        map.insert(30..40, 200);
+        map.insert(50..60, 100);
+
+        // Merge adjacent ranges with equal values
+        map.insert(20..30, 100);
+        assert_eq!(map.get(15).unwrap(), (&(10..30), &100));
+        assert_eq!(map.get(35).unwrap(), (&(30..40), &200));
+        assert_eq!(map.get(55).unwrap(), (&(50..60), &100));
+
+        // Merge non-adjacent ranges with equal values
+        map.insert(40..50, 100);
+        assert_eq!(map.get(15).unwrap(), (&(10..30), &100));
+        assert_eq!(map.get(35).unwrap(), (&(30..40), &200));
+        assert_eq!(map.get(45).unwrap(), (&(40..60), &100));
+
+        // Insert a range with a different value
+        map.insert(60..70, 300);
+        assert_eq!(map.get(65).unwrap(), (&(60..70), &300));
+
+        // Merge a range with a different value
+        map.insert(70..80, 300);
+        assert_eq!(map.get(65).unwrap(), (&(60..80), &300));
+
+        // Merge a range with a different value at the beginning
+        map.insert(0..10, 400);
+        assert_eq!(map.get(5).unwrap(), (&(0..10), &400));
+
+        // Merge a range with a different value at the end
+        map.insert(80..90, 400);
+        assert_eq!(map.get(85).unwrap(), (&(80..90), &400));
+
+        // Merge a range with a different value in the middle
+        map.insert(90..100, 400);
+        assert_eq!(map.get(95).unwrap(), (&(80..100), &400));
+        map.insert(100..110, 400);
+        assert_eq!(map.get(95).unwrap(), (&(80..110), &400));
+        map.insert(110..120, 400);
+        assert_eq!(map.get(95).unwrap(), (&(80..120), &400));
+
+        // Merge a range with a different value in the middle
+        map.insert(10..90, 400);
+        assert_eq!(map.get(5).unwrap(), (&(0..120), &400));
+    }
+
+    #[::fuchsia::test]
+    fn test_large_insert_and_remove_with_gaps() {
+        let mut map = RangeMap2::<u32, i32>::default();
+        let num_entries = 500;
+
+        // Insert entries with gaps
+        for i in 0..num_entries {
+            let start = i as u32 * 20;
+            let end = start + 5;
+            let value = i as i32;
+            map.insert(start..end, value);
+        }
+
+        // Remove entries with gaps
+        for i in 0..num_entries {
+            if i % 2 == 0 {
+                let start = i as u32 * 20;
+                let end = start + 5;
+                map.remove(start..end);
+            }
+        }
+
+        // Verify the state of the map
+        for i in 0..num_entries {
+            let start = i as u32 * 20;
+            let end = start + 5;
+            let point = start + 2;
+
+            if i % 2 != 0 {
+                if let Some((range, value)) = map.get(point) {
+                    assert!(range.start <= point && point < range.end);
+                    assert_eq!(*range, start..end);
+                    assert_eq!(*value, i as i32);
+                } else {
+                    panic!("Expected to find a range for point {}", point);
+                }
+            } else {
+                assert!(map.get(point).is_none());
+            }
+        }
+    }
 }
