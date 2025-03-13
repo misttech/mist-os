@@ -65,7 +65,7 @@ class ScratchAllocator {
       return *this;
     }
 
-    explicit Holder(size_t size) {
+    Holder(size_t size) {
       fbl::RefPtr<VmObjectPaged> vmo;
       uint64_t aligned_size;
       zx_status_t status = VmObject::RoundSize(size, &aligned_size);
@@ -95,18 +95,16 @@ class ScratchAllocator {
       mapping_ = ktl::move(map_result->mapping);
     }
 
-    // zbitl::View::CopyStorageItem calls this get the scratch memory.
+    // zbitl::View::CopyStorageItem calls this to get the scratch memory.
     void* get() const { return reinterpret_cast<void*>(mapping_->base_locking()); }
 
     ~Holder() {
       if (mapping_) {
         mapping_->Destroy();
-        // pinned_memory_'s destructor will un-pin the pages just unmapped.
       }
     }
 
    private:
-    // zx::unowned_vmar vmar_;
     PinnedVmObject pinned_vmo_;
     fbl::RefPtr<VmMapping> mapping_;
   };
@@ -126,7 +124,6 @@ class ScratchAllocator {
     vprintf(fmt, args);
     va_end(args);
   });
-  // zx_process_exit(-1);
   ZX_PANIC("");
 }
 
