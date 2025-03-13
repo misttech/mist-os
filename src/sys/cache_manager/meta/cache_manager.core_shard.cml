@@ -15,5 +15,10 @@
             from: "#cache",
             to: "#storage_cache_manager",
         },
+        {
+            protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
+            from: "#cobalt",
+            to: "#storage_cache_manager",
+        },
     ],
 }
