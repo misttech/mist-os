@@ -967,9 +967,11 @@ func (f *FFXInstance) GetImageFromPB(ctx context.Context, pbPath string, slot st
 		return nil, fmt.Errorf("either slot and image type should be provided or bootloader "+
 			"should be provided, not both: slot: %s, imageType: %s, bootloader: %s", slot, imageType, bootloader)
 	}
-	raw, err := f.RunAndGetOutput(ctx, args...)
+	i := f.invoker(args).setCaptureOutput().setStrict()
+	err := i.run(ctx)
+	s := i.output.String()
 
-	return processImageFromPBResult(pbPath, raw, err)
+	return processImageFromPBResult(pbPath, strings.TrimSpace(s), err)
 }
 
 func processImageFromPBResult(pbPath string, raw string, err error) (*bootserver.Image, error) {
