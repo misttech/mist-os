@@ -164,7 +164,6 @@ action("invoke_clidoc") {
     "--excludes",
     "device-finder",
     "far",
-    "fuchsia-sdk-run",
     "fvm",
     "merkleroot",
   ]

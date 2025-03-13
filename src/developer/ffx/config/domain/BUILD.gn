@@ -13,12 +13,7 @@ rustc_library("lib") {
   edition = "2021"
   with_unit_tests = true
 
-  visibility = [
-    "//src/developer/ffx/config/*",
-
-    # TODO(https://fxbug.dev/386416011): Remove fuchsia-sdk-run
-    "//tools/fuchsia-sdk-run:*",
-  ]
+  visibility = [ "//src/developer/ffx/config/*" ]
 
   sources = [
     "src/config_domain.rs",

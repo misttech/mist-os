@@ -29,9 +29,6 @@ rustc_library("lib") {
 
     # Reference doc generation based on JSON
     "//tools/clidoc:*",
-
-    # TODO(b/386416011): Deprecate fuchsia-sdk-run.
-    "//tools/fuchsia-sdk-run:*",
   ]
 
   deps = [
