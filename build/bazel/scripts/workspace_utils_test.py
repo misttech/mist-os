@@ -273,6 +273,8 @@ class TestGeneratedWorkspaceFiles(unittest.TestCase):
         self._td = tempfile.TemporaryDirectory()
         self.out = Path(self._td.name)
         (self.out / "elephant").write_text("trumpet!")
+        self.input_file_path = self.out / "input_file"
+        self.input_file_path.write_text("input")
 
     def tearDown(self) -> None:
         self._td.cleanup()
@@ -282,6 +284,7 @@ class TestGeneratedWorkspaceFiles(unittest.TestCase):
         ws_files.record_file_content("zoo/lion", "roar!")
         ws_files.record_symlink("zoo/elephant", self.out / "elephant")
         ws_files.record_input_file_hash("no/such/file/exists")
+        input_content = ws_files.read_text_file(self.input_file_path)
 
         expected_json = r"""{
   "zoo/elephant": {
@@ -297,6 +300,8 @@ class TestGeneratedWorkspaceFiles(unittest.TestCase):
         )
 
         self.assertEqual(ws_files.to_json(), expected_json)
+        self.assertEqual(ws_files.input_files, set([self.input_file_path]))
+        self.assertEqual(input_content, "input")
 
         ws_files.write(self.out / "workspace")
         self.assertEqual(
@@ -317,8 +322,13 @@ class TestGeneratedWorkspaceFiles(unittest.TestCase):
         ws_files.record_file_content("zoo/lion", "roar!")
         ws_files.record_symlink("zoo/elephant", self.out / "elephant")
         ws_files.record_input_file_hash("no/such/file/exists")
+        input_content = ws_files.read_text_file(self.input_file_path)
 
         expected_json = r"""{
+  "@INPUT_FILE_PATH@": {
+    "hash": "SHA256[@INPUT_FILE_PATH@]",
+    "type": "input_file"
+  },
   "no/such/file/exists": {
     "hash": "SHA256[no/such/file/exists]",
     "type": "input_file"
@@ -333,9 +343,13 @@ class TestGeneratedWorkspaceFiles(unittest.TestCase):
   }
 }""".replace(
             "@OUT@", str(self.out)
+        ).replace(
+            "@INPUT_FILE_PATH@", str(self.input_file_path)
         )
 
         self.assertEqual(ws_files.to_json(), expected_json)
+        self.assertEqual(ws_files.input_files, set([self.input_file_path]))
+        self.assertEqual(input_content, "input")
 
         ws_files.write(self.out / "workspace")
         self.assertEqual(

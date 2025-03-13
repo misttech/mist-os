@@ -314,6 +314,7 @@ class GeneratedWorkspaceFiles(object):
     def __init__(self) -> None:
         self._files: T.Dict[str, T.Any] = {}
         self._file_hasher: T.Optional[FileHasherType] = None
+        self._input_files: T.Set[Path] = set()
 
     def set_file_hasher(self, file_hasher: FileHasherType) -> None:
         self._file_hasher = file_hasher
@@ -322,6 +323,27 @@ class GeneratedWorkspaceFiles(object):
         assert path not in self._files, (
             "File entry already in generated list: " + path
         )
+
+    @property
+    def input_files(self) -> T.Set[Path]:
+        """The set of input file Paths that were read through read_text_file()."""
+        return self._input_files
+
+    def read_text_file(self, path: Path) -> str:
+        """Read an input file and return its content as text.
+
+        This also ensures that the file is tracked as an input file
+        to later be returned through the self.input_files property.
+
+        Args:
+            path: Input file path.
+        Returns:
+            content of input path, as a string.
+        """
+        path = path.resolve()
+        self._input_files.add(path)
+        self.record_input_file_hash(path)
+        return path.read_text()
 
     def record_symlink(self, dst_path: str, target_path: str | Path) -> None:
         """Record a new symlink entry.
@@ -519,11 +541,12 @@ def record_fuchsia_workspace(
   Git binary path:        {git_bin_path}"""
         )
 
-    def expand_template_file(filename: str, **kwargs: T.Any) -> str:
+    def expand_template_file(
+        generated: GeneratedWorkspaceFiles, filename: str, **kwargs: T.Any
+    ) -> str:
         """Expand a template file and add it to the set of tracked input files."""
         template_file = templates_dir / filename
-        generated.record_input_file_hash(template_file.resolve())
-        return template_file.read_text().format(**kwargs)
+        return generated.read_text_file(template_file).format(**kwargs)
 
     def record_expanded_template(
         generated: GeneratedWorkspaceFiles,
@@ -542,7 +565,7 @@ def record_fuchsia_workspace(
         """
         executable = kwargs.get("executable", False)
         kwargs.pop("executable", None)
-        content = expand_template_file(template_name, **kwargs)
+        content = expand_template_file(generated, template_name, **kwargs)
         generated.record_file_content(dst_path, content, executable=executable)
 
     # Generate workspace/module files.
@@ -619,6 +642,7 @@ def record_fuchsia_workspace(
     logs_dir = top_dir / "logs"
     logs_dir_from_workspace = os.path.relpath(logs_dir, top_dir / "workspace")
     bazelrc_content = expand_template_file(
+        generated,
         "template.bazelrc",
         workspace_log_file=f"{logs_dir_from_workspace}/workspace_events.log",
         execution_log_file=f"{logs_dir_from_workspace}/exec_log.pb.zstd",
@@ -790,7 +814,7 @@ def generate_fuchsia_workspace(
 
     generated.write(top_dir)
 
-    return input_files
+    return input_files | generated.input_files
 
 
 class GnBuildArgs(object):
@@ -1084,7 +1108,7 @@ def record_gn_targets_dir(
     #  # Generated as src/foo/BUILD.bazel
     #  filegroup(
     #     name = "foo",
-    #     srcs = [ "_files/src/foo/foo.cc.o" ]
+    #     srcs = [ "_files/obj/src/foo/foo.cc.o" ]
     #  )
     #  ```
     #
@@ -1104,7 +1128,7 @@ def record_gn_targets_dir(
 
     # Build a { bazel_package -> { gn_target_name -> entry } } map.
     package_map: T.Dict[str, T.Dict[str, str]] = {}
-    for entry in json.loads(inputs_manifest_path.read_text()):
+    for entry in json.loads(generated.read_text_file(inputs_manifest_path)):
         bazel_package = entry["bazel_package"]
         bazel_name = entry["bazel_name"]
         name_map = package_map.setdefault(bazel_package, {})
