@@ -70,7 +70,7 @@ pub struct FileSystemState {
 /// Opaque structure holding security state for a bpf [`ebpf_api::maps::Map`].
 #[derive(Debug)]
 pub struct BpfMapState {
-    _state: selinux_hooks::BpfMapState,
+    state: selinux_hooks::BpfMapState,
 }
 
 /// Opaque structure holding security state for a bpf [`starnix_core::bpf::program::Program`].

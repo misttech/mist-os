@@ -5,8 +5,10 @@
 // TODO(https://github.com/rust-lang/rust/issues/39371): remove
 #![allow(non_upper_case_globals)]
 
-use super::{check_self_permission, BpfMapState, BpfProgState};
+use super::{check_permission, check_self_permission, BpfMapState, BpfProgState};
 
+use crate::bpf::BpfMap;
+use crate::security::PermissionFlags;
 use crate::task::CurrentTask;
 use selinux::{BpfPermission, SecurityId, SecurityServer};
 use starnix_uapi::errors::Errno;
@@ -43,4 +45,33 @@ pub fn check_bpf_access<Attr: FromBytes>(
         _ => return Ok(()),
     };
     check_self_permission(&security_server.as_permission_check(), sid, permission, audit_context)
+}
+
+/// Returns whether `current_task` can create a bpf_map.
+pub fn check_bpf_map_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    bpf_map: &BpfMap,
+    flags: PermissionFlags,
+) -> Result<(), Errno> {
+    let audit_context = current_task.into();
+
+    let subject_sid = current_task.security_state.lock().current_sid;
+    let mut permissions = Vec::new();
+    if flags.contains(PermissionFlags::READ) {
+        permissions.push(BpfPermission::MapRead);
+    }
+    if flags.contains(PermissionFlags::WRITE) {
+        permissions.push(BpfPermission::MapWrite);
+    }
+    for permission in permissions {
+        check_permission(
+            &security_server.as_permission_check(),
+            subject_sid,
+            bpf_map.security_state.state.sid,
+            permission,
+            audit_context,
+        )?;
+    }
+    Ok(())
 }

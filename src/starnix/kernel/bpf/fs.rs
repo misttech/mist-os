@@ -10,6 +10,7 @@ use crate::bpf::program::Program;
 use crate::bpf::syscalls::BpfTypeFormat;
 use crate::mm::memory::MemoryObject;
 use crate::mm::{ProtectionFlags, PAGE_SIZE};
+use crate::security::{self, PermissionFlags};
 use crate::task::{
     CurrentTask, EventHandler, SignalHandler, SignalHandlerInner, Task, WaitCanceler, Waiter,
 };
@@ -83,6 +84,18 @@ impl BpfHandle {
             Self::Program(_) | Self::ProgramStub(_) => "bpf-prog",
             Self::BpfTypeFormat(_) => "bpf-type",
         }
+    }
+
+    /// Performs security-related checks when opening a BPF map.
+    pub(super) fn security_check_open_fd(&self, current_task: &CurrentTask) -> Result<(), Errno> {
+        if let BpfHandle::Map(ref bpf_map) = self {
+            security::check_bpf_map_access(
+                current_task,
+                &bpf_map,
+                PermissionFlags::from_bpf_flags(bpf_map.flags),
+            )?;
+        }
+        Ok(())
     }
 }
 

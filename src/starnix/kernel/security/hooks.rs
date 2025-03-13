@@ -6,6 +6,7 @@ use super::{
     selinux_hooks, BpfMapState, BpfProgState, FileObjectState, FileSystemState, ResolvedElfState,
     TaskState,
 };
+use crate::bpf::BpfMap;
 use crate::security::KernelState;
 use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::fs_args::MountParams;
@@ -28,7 +29,7 @@ use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::signals::Signal;
 use starnix_uapi::unmount_flags::UnmountFlags;
-use starnix_uapi::{bpf_cmd, errno, error};
+use starnix_uapi::{bpf_cmd, errno, error, BPF_F_RDONLY, BPF_F_WRONLY};
 use std::sync::Arc;
 use syncio::zxio_node_attr_has_t;
 use zerocopy::FromBytes;
@@ -82,6 +83,18 @@ impl From<OpenFlags> for PermissionFlags {
             permissions |= PermissionFlags::APPEND;
         }
         permissions
+    }
+}
+
+impl PermissionFlags {
+    pub fn from_bpf_flags(bpf_flags: u32) -> Self {
+        if bpf_flags & BPF_F_RDONLY == 0 {
+            PermissionFlags::READ
+        } else if bpf_flags & BPF_F_WRONLY == 0 {
+            PermissionFlags::WRITE
+        } else {
+            PermissionFlags::READ | PermissionFlags::WRITE
+        }
     }
 }
 
@@ -585,7 +598,7 @@ pub fn file_alloc_security(current_task: &CurrentTask) -> FileObjectState {
 /// Corresponds to the `bpf_map_alloc_security()` LSM hook.
 pub fn bpf_map_alloc(current_task: &CurrentTask) -> BpfMapState {
     track_hook_duration!(c"security.hooks.bpf_map_alloc");
-    BpfMapState { _state: selinux_hooks::bpf::bpf_map_alloc(current_task) }
+    BpfMapState { state: selinux_hooks::bpf::bpf_map_alloc(current_task) }
 }
 
 /// Returns the security context to be assigned to a BPM program object, based on the task
@@ -1279,6 +1292,20 @@ pub fn check_bpf_access<Attr: FromBytes>(
     profile_duration!("security.hooks.check_bpf_access");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::bpf::check_bpf_access(security_server, current_task, cmd, attr, attr_size)
+    })
+}
+
+/// Checks whether `current_task` can create a bpf_map. This hook is called from the
+/// `sys_bpf()` syscall when the kernel tries to generate and return a file descriptor for maps.
+/// Corresponds to the `bpf_map()` LSM hook.
+pub fn check_bpf_map_access(
+    current_task: &CurrentTask,
+    bpf_map: &BpfMap,
+    flags: PermissionFlags,
+) -> Result<(), Errno> {
+    profile_duration!("security.hooks.check_bpf_access");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::bpf::check_bpf_map_access(security_server, current_task, bpf_map, flags)
     })
 }
 
