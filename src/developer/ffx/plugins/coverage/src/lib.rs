@@ -5,7 +5,7 @@
 use anyhow::{anyhow, Context, Result};
 use ffx_coverage_args::CoverageCommand;
 use ffx_writer::SimpleWriter;
-use fho::{AvailabilityFlag, FfxMain, FfxTool};
+use fho::{FfxMain, FfxTool};
 use glob::glob;
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -25,7 +25,6 @@ struct ExportParams<'a> {
 }
 
 #[derive(FfxTool)]
-#[check(AvailabilityFlag("coverage"))]
 pub struct CoverageTool {
     #[command]
     cmd: CoverageCommand,
