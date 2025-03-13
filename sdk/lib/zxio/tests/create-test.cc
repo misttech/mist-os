@@ -439,7 +439,7 @@ TEST_F(CreateDirectoryTest, DirectoryWithTypeWrapper) {
 using CreateDirectoryWithRepresentationTest = CreateTestBase<SyncNodeServer>;
 
 TEST_F(CreateDirectoryWithRepresentationTest, Directory) {
-  ASSERT_NO_FATAL_FAILURE(SendRepresentation(fuchsia_io::Representation::WithConnector({})));
+  ASSERT_NO_FATAL_FAILURE(SendRepresentation(fuchsia_io::Representation::WithNode({})));
   ASSERT_OK(zxio_create_with_on_representation(TakeClientChannel().release(), nullptr, storage()));
   StartServerThread();
   EXPECT_OK(zxio_sync(zxio()));

@@ -82,7 +82,7 @@ async fn validate_open_with_node_reference_and_describe(path: &str) -> Result<()
             info.ok_or(OpenError::MissingOnOpenInfo)?;
         }
         fio::NodeEvent::OnRepresentation { payload } => match payload {
-            fio::Representation::Connector(fio::ConnectorInfo { .. }) => {}
+            fio::Representation::Node(fio::NodeInfo { .. }) => {}
             fio::Representation::File(fio::FileInfo { .. }) => {}
             fio::Representation::Directory(fio::DirectoryInfo { .. }) => {}
             fio::Representation::Symlink(fio::SymlinkInfo { .. }) => {}

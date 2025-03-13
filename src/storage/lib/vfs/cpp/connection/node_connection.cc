@@ -144,7 +144,11 @@ void NodeConnection::QueryFilesystem(QueryFilesystemCompleter::Sync& completer) 
 zx::result<> NodeConnection::WithRepresentation(
     fit::callback<zx::result<>(fio::wire::Representation)> handler,
     std::optional<fio::NodeAttributesQuery> query) const {
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  using NodeRepresentation = fio::wire::NodeInfo;
+#else
   using NodeRepresentation = fio::wire::ConnectorInfo;
+#endif
   fidl::WireTableFrame<NodeRepresentation> representation_frame;
   auto builder = NodeRepresentation::ExternalBuilder(
       fidl::ObjectView<fidl::WireTableFrame<NodeRepresentation>>::FromExternal(
@@ -161,8 +165,13 @@ zx::result<> NodeConnection::WithRepresentation(
   }
 #endif
   auto representation = builder.Build();
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  return handler(fuchsia_io::wire::Representation::WithNode(
+      fidl::ObjectView<NodeRepresentation>::FromExternal(&representation)));
+#else
   return handler(fuchsia_io::wire::Representation::WithConnector(
       fidl::ObjectView<NodeRepresentation>::FromExternal(&representation)));
+#endif
 }
 
 zx_status_t NodeConnection::WithNodeInfoDeprecated(

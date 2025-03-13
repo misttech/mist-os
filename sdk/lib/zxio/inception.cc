@@ -70,7 +70,12 @@ zx_status_t zxio_create_with_allocator(fidl::ClientEnd<fuchsia_io::Node> node,
     case fio::wire::Representation::Tag::kFile:
       type = ZXIO_OBJECT_TYPE_FILE;
       break;
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+    case fio::wire::Representation::Tag::kNode:
+
+#else
     case fio::wire::Representation::Tag::kConnector:
+#endif
       type = ZXIO_OBJECT_TYPE_NODE;
       break;
 #if FUCHSIA_API_LEVEL_AT_LEAST(18)

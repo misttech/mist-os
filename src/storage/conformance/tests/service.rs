@@ -68,7 +68,7 @@ async fn open_service_as_node() {
             )
             .await
             .unwrap();
-        assert_matches!(representation, fio::Representation::Connector(_));
+        assert_matches!(representation, fio::Representation::Node(_));
         let (_, attrs) = proxy
             .get_attributes(fio::NodeAttributesQuery::PROTOCOLS)
             .await

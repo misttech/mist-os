@@ -20,7 +20,7 @@ async fn test_open_node_on_directory() {
         )
         .await
         .unwrap();
-    assert_matches!(on_representation, fio::Representation::Connector(fio::ConnectorInfo { .. }));
+    assert_matches!(on_representation, fio::Representation::Node(fio::NodeInfo { .. }));
 
     // If other protocol types are specified, the target must match at least one.
     let error: zx::Status = dir
@@ -49,7 +49,7 @@ async fn test_open_node_on_file() {
         )
         .await
         .unwrap();
-    assert_matches!(representation, fio::Representation::Connector(fio::ConnectorInfo { .. }));
+    assert_matches!(representation, fio::Representation::Node(fio::NodeInfo { .. }));
 
     // If other protocol types are specified, the target must match at least one.
     let error: zx::Status = dir
@@ -169,7 +169,7 @@ async fn test_open_node_with_attributes() {
         .unwrap();
 
     assert_matches!(representation,
-        fio::Representation::Connector(fio::ConnectorInfo {
+        fio::Representation::Node(fio::NodeInfo {
             attributes: Some(fio::NodeAttributes2 { mutable_attributes, immutable_attributes }),
             ..
         })

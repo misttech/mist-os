@@ -304,6 +304,22 @@ impl<N: Node> Connection<N> {
 impl<N: Node> Representation for Connection<N> {
     type Protocol = fio::NodeMarker;
 
+    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    async fn get_representation(
+        &self,
+        requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::Representation, Status> {
+        Ok(fio::Representation::Node(fio::NodeInfo {
+            attributes: if requested_attributes.is_empty() {
+                None
+            } else {
+                Some(self.node.get_attributes(requested_attributes).await?)
+            },
+            ..Default::default()
+        }))
+    }
+
+    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
     async fn get_representation(
         &self,
         requested_attributes: fio::NodeAttributesQuery,

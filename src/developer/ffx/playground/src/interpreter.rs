@@ -532,6 +532,9 @@ impl InterpreterInner {
                     return Err(FSError::UnexpectedOnOpenEvent(path.to_owned()).into())
                 }
                 fio::NodeEvent::OnRepresentation { payload } => match payload {
+                    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+                    fidl_fuchsia_io::Representation::Node(info) => info.attributes,
+                    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
                     fidl_fuchsia_io::Representation::Connector(info) => info.attributes,
                     fidl_fuchsia_io::Representation::Directory(info) => info.attributes,
                     fidl_fuchsia_io::Representation::File(info) => info.attributes,

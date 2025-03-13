@@ -743,12 +743,12 @@ mod tests {
     #[test]
     fn extract_stream_from_on_representation_event_not_a_file() {
         let event = fio::FileEvent::OnRepresentation {
-            payload: fio::Representation::Connector(fio::ConnectorInfo::default()),
+            payload: fio::Representation::Directory(Default::default()),
         };
         let result = extract_stream_from_on_open_event(event);
         assert_matches!(
             result,
-            Err(OpenError::UnexpectedNodeKind { expected: Kind::File, actual: Kind::Service })
+            Err(OpenError::UnexpectedNodeKind { expected: Kind::File, actual: Kind::Directory })
         );
     }
 

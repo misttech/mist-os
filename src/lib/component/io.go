@@ -128,9 +128,7 @@ func (*Service) DescribeDeprecated() io.NodeInfoDeprecated {
 }
 
 func (*Service) Representation() io.Representation {
-	var repr io.Representation
-	repr.SetConnector(io.ConnectorInfo{})
-	return repr
+	return io.Representation{}
 }
 
 func (*Service) GetConnectionInfo(fidl.Context) (io.ConnectionInfo, error) {

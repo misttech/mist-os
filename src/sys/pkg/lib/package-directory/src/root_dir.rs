@@ -1201,7 +1201,7 @@ mod tests {
                 fio::NodeEvent::_UnknownEvent { ordinal, .. } => panic!("unknown event {ordinal}"),
             };
             assert_matches!(representation,
-                fio::Representation::Connector(fio::ConnectorInfo {
+                fio::Representation::Node(fio::NodeInfo {
                     attributes: Some(node_attributes),
                     ..
                 })

@@ -7,6 +7,12 @@ library fuchsia.io;
 using fuchsia.unknown;
 using zx;
 
+/// Information that describes the target node.
+@available(added=NEXT)
+type NodeInfo = table {
+    1: attributes NodeAttributes2;
+};
+
 /// The maximum size for an extended attribute name.
 @available(added=18)
 const MAX_ATTRIBUTE_NAME uint64 = 255;
@@ -514,59 +520,33 @@ open protocol Node {
         }>;
     });
 
-    /// An event produced eagerly by the server if requested by
-    /// [`NodeFlags.GET_REPRESENTATION`]. This event will be the first message
-    /// from the server, and is sent exactly once.
+    /// An event produced eagerly by the server if requested by [`Flags.FLAG_SEND_REPRESENTATION`].
+    /// This event will be sent as the first message from the server, and is sent exactly once.
     ///
-    /// The active variant corresponds to one of the supported protocols of
-    /// the node, and represents the result of the connection-time
-    /// negotiation. Provides auxiliary handles if applicable.
-    ///
-    /// If the client specified more than one protocol in `protocols` during
-    /// [`Directory.Open`], the [`Representation`] carries additionally the
-    /// result of the connection-time negotiation via its tag.
-    ///
-    /// The elements have one-to-one correspondence with the members of
-    /// [`NodeProtocolKinds`].
-    ///
-    /// This is a special case of [`fuchsia.unknown/Queryable.Query`] +
-    /// inherent `Describe` methods on the specific protocols. It exists as
-    /// an optimization to avoid an additional round trip.
+    /// The active variant corresponds to the negotiated protocol for the target node (i.e. the
+    /// protocol which this channel now speaks). Additionally, auxiliary handles and requested
+    /// attributes are also returned in the event.
     @selector("fuchsia.io/Node.OnRepresentation")
     strict -> OnRepresentation(@generated_name("Representation") flexible resource union {
-        /// Auxiliary data for the connector representation of a node, used
-        /// for protocol discovery and connection.
-        ///
-        /// It supports connecting to arbitrary protocols exported by the
-        /// filesystem server at a path, including ones that do not compose
-        /// [`Node`].
-        ///
-        /// See [`NodeProtocolKinds.CONNECTOR`].
+        /// The [`Node`] protocol was negotiated for this connection.
+        @available(replaced=NEXT, renamed="node")
         1: connector @generated_name("ConnectorInfo") table {
             /// Requested attributes for the object. This is only populated if requested.
             @available(added=18)
             1: attributes NodeAttributes2;
         };
 
-        /// Auxiliary data for the directory representation of a node. The
-        /// selection of this variant in [`Representation`] implies that the
-        /// connection speaks the [`Directory`] protocol.
-        ///
-        /// See [`NodeProtocolKinds.DIRECTORY`].
+        /// The [`Node`] protocol was negotiated for this connection.
+        @available(added=NEXT)
+        1: node NodeInfo;
+
+        /// The [`File`] protocol was negotiated for this connection.
         2: directory DirectoryInfo;
 
-        /// Auxiliary data for the file representation of a node. The
-        /// selection of this variant in [`Representation`] implies that the
-        /// connection speaks the [`File`] protocol.
-        ///
-        /// See [`NodeProtocolKinds.FILE`].
+        /// The [`File`] protocol was negotiated for this connection.
         3: file FileInfo;
 
-        /// Auxilliary data for the symlink representation of a node. The
-        /// selection of this variant in [`Representation`] implies that the
-        /// connection speaks the [`Symlink`] protocol.
-        ///
-        /// See [`NodeProtocolKinds.SYMLINK`].
+        /// The [`Symlink`] protocol was negotiated for this connection.
         @available(added=18)
         4: symlink SymlinkInfo;
     });
