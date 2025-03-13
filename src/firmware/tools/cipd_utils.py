@@ -410,6 +410,57 @@ def copy(source_package: str, source_version: str, dest_package: str) -> None:
         subprocess.run(command, check=True)
 
 
+def upload(package: str, contents_dir: str) -> str:
+    """Uploads a CIPD package.
+
+    Adds CIPD tags using the manifest.json file in the contents_dir, and also marks
+    the package with the standard "latest" ref.
+
+    Args:
+        package: package name.
+        content_dir: path to the directory containing the contents.
+
+    Returns:
+        The created package version ID.
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        json_out_path = os.path.join(temp_dir, "cipd_out.json")
+        command = [
+            CIPD_TOOL,
+            "create",
+            "-name",
+            package,
+            "-in",
+            contents_dir,
+            "-install-mode",
+            "copy",
+            "-ref",
+            "latest",
+            "-json-output",
+            json_out_path,
+        ]
+
+        # Add revision tags from the manifest file.
+        with open(os.path.join(contents_dir, "manifest.json"), "r") as file:
+            manifest = json.load(file)
+        for project, revision in manifest.items():
+            # CIPD tags can't have slashes, so replace them with underscores.
+            command += ["-tag", f"{project.replace('/', '_')}:{revision}"]
+
+        subprocess.run(command, check=True)
+
+        # The output json looks like:
+        # {
+        #     "result": {
+        #         "package": "package_name",
+        #         "instance_id": "cipd_version"
+        #     }
+        # }
+        with open(json_out_path, "r") as file:
+            output = json.load(file)
+        return output["result"]["instance_id"]
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -468,6 +519,20 @@ def _parse_args() -> argparse.Namespace:
         " local testing and verification",
     )
 
+    create_parser = subparsers.add_parser(
+        "upload", help="Uploads a CIPD package"
+    )
+    create_parser.add_argument("package", help="CIPD package name")
+    create_parser.add_argument(
+        "contents",
+        help="Path to the directory containing the package contents; must contain a"
+        " manifest.json file which will be translated into CIPD tags",
+    )
+    create_parser.add_argument(
+        "--version-out",
+        help="Path to a file to write the new version string to",
+    )
+
     return parser.parse_args()
 
 
@@ -523,6 +588,12 @@ def main() -> None:
                 repo.manifest(args.allow_dirty), indent=2, sort_keys=True
             )
         )
+
+    elif args.action == "upload":
+        new_version = upload(args.package, args.contents)
+        if args.version_out:
+            with open(args.version_out, "w") as file:
+                file.write(new_version)
 
     else:
         raise NotImplementedError(f"Unimplemented command: {args.action}")
