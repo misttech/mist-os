@@ -33,7 +33,8 @@ pub use diagnostics_log_types_serde::Severity;
 pub use moniker::ExtendedMoniker;
 
 #[cfg(target_os = "fuchsia")]
-mod logs_legacy;
+#[doc(hidden)]
+pub mod logs_legacy;
 
 #[cfg(feature = "json_schema")]
 use schemars::JsonSchema;

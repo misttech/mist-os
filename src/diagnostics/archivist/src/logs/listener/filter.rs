@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
 use super::ListenerError;
+use diagnostics_data::logs_legacy::filter_by_tags;
 use diagnostics_data::{LogsData, Severity};
 use fidl_fuchsia_logger::{LogFilterOptions, LogLevelFilter};
 use std::collections::HashSet;
@@ -77,32 +78,9 @@ impl MessageFilter {
         let reject_tid = self.tid.map(|t| log_message.tid() != Some(t)).unwrap_or(false);
         let reject_severity =
             self.min_severity.map(|m| m > log_message.severity()).unwrap_or(false);
-        let reject_tags = if self.tags.is_empty() {
-            false
-        } else if log_message.tags().map(|t| t.is_empty()).unwrap_or(true) {
-            !self.tags.contains(log_message.component_name().as_ref())
-        } else {
-            !log_message
-                .tags()
-                .map(|tags| {
-                    tags.iter().any(|tag| self.tags.contains(tag) || self.include_tag_prefix(tag))
-                })
-                .unwrap_or(false)
-        };
+        let reject_tags = filter_by_tags(log_message, &self.tags);
 
         !(reject_pid || reject_tid || reject_severity || reject_tags)
-    }
-
-    // Rust uses tags of the form "<foo>::<bar>" so if we have a filter for "<foo>" we should
-    // include messages that have "<foo>" as a prefix.
-    fn include_tag_prefix(&self, tag: &str) -> bool {
-        if tag.contains("::") {
-            self.tags.iter().any(|t| {
-                tag.len() > t.len() + 2 && &tag[t.len()..t.len() + 2] == "::" && tag.starts_with(t)
-            })
-        } else {
-            false
-        }
     }
 }
 
