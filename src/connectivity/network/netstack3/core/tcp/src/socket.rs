@@ -64,7 +64,7 @@ use netstack3_ip::socket::{
     DeviceIpSocketHandler, IpSock, IpSockCreateAndSendError, IpSockCreationError, IpSocketHandler,
 };
 use netstack3_ip::{self as ip, BaseTransportIpContext, TransportIpContext};
-use netstack3_trace::trace_duration;
+use netstack3_trace::{trace_duration, TraceResourceId};
 use packet_formats::ip::IpProto;
 use smallvec::{smallvec, SmallVec};
 use thiserror::Error;
@@ -77,7 +77,8 @@ use crate::internal::socket::accept_queue::{AcceptQueue, ListenerNotifier};
 use crate::internal::socket::demux::tcp_serialize_segment;
 use crate::internal::socket::isn::IsnGenerator;
 use crate::internal::state::{
-    CloseError, CloseReason, Closed, Initial, NewlyClosed, State, Takeable, TakeableRef,
+    CloseError, CloseReason, Closed, Initial, NewlyClosed, State, StateMachineDebugId, Takeable,
+    TakeableRef,
 };
 
 /// A marker trait for dual-stack socket features.
@@ -1865,6 +1866,19 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> TcpSocket
         });
         let socket = Self(PrimaryRc::clone_strong(&primary));
         (socket, primary)
+    }
+
+    pub(crate) fn trace_id(&self) -> TraceResourceId<'_> {
+        let Self(inner) = self;
+        inner.trace_id()
+    }
+}
+
+impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> StateMachineDebugId
+    for TcpSocketId<I, D, BT>
+{
+    fn trace_id(&self) -> TraceResourceId<'_> {
+        self.trace_id()
     }
 }
 
@@ -3672,7 +3686,6 @@ where
         };
         let (core_ctx, bindings_ctx) = self.contexts();
         debug!("handle_timer on {id:?}");
-        trace_duration!(c"tcp::handle_timer");
         // Alias refs so we can move weak_id to the closure.
         let id_alias = &id;
         let bindings_ctx_alias = &mut *bindings_ctx;
@@ -3680,6 +3693,7 @@ where
             core_ctx.with_socket_mut_transport_demux(&id, move |core_ctx, socket_state| {
                 let TcpSocketState { socket_state, ip_options: _ } = socket_state;
                 let id = id_alias;
+                trace_duration!(c"tcp::handle_timer", "id" => id.trace_id());
                 let bindings_ctx = bindings_ctx_alias;
                 let (conn, timer) = assert_matches!(
                     socket_state,
@@ -4701,6 +4715,7 @@ where
 {
     let newly_closed = loop {
         match conn.state.poll_send(
+            conn_id,
             core_ctx.counters(),
             u32::MAX,
             bindings_ctx.now(),

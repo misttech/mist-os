@@ -22,6 +22,7 @@ use netstack3_core::device::{
     EthernetLinkDevice, LoopbackDeviceId, PureIpDevice, WeakDeviceId,
 };
 use netstack3_core::sync::RwLock as CoreRwLock;
+use netstack3_core::trace::trace_duration;
 use netstack3_core::types::WorkQueueReport;
 
 use {
@@ -526,6 +527,11 @@ pub(crate) async fn tx_task(
                 }
             }
         };
+
+        trace_duration!(c"devices::tx_task",
+            "iface" => device_id.bindings_id().id.get(),
+            "batch" => usize::from(batch_size)
+        );
 
         let r = match &device_id {
             DeviceId::Loopback(_) => {

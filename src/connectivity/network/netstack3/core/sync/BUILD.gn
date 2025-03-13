@@ -22,6 +22,7 @@ rustc_library_with_features("netstack3-sync") {
   deps = [
     "//src/connectivity/lib/net-types",
     "//src/connectivity/network/netstack3/core/lock-order",
+    "//src/connectivity/network/netstack3/core/trace:netstack3-trace",
     "//third_party/rust_crates:derivative",
   ]
 

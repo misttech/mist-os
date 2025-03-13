@@ -195,6 +195,10 @@ impl<I: Instant> CongestionControl<I> {
         cwnd
     }
 
+    pub(super) fn slow_start_threshold(&self) -> u32 {
+        self.params.ssthresh
+    }
+
     /// Returns the starting sequence number of the segment that needs to be
     /// retransmitted, if any.
     pub(super) fn fast_retransmit(&mut self) -> Option<SeqNum> {

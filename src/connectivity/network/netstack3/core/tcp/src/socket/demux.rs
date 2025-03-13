@@ -647,6 +647,7 @@ where
         }
     }
     let (reply, passive_open, data_acked, newly_closed) = state.on_segment::<_, BC>(
+        conn_id,
         core_ctx.counters(),
         incoming,
         bindings_ctx.now(),
@@ -978,6 +979,10 @@ where
     // We might end up discarding the reply in case we can't instantiate this
     // new connection.
     let result = state.on_segment::<_, BC>(
+        // NB: This is a bit of a lie, we're passing the listener ID to process
+        // the first segment because we don't have an ID allocated yet. This is
+        // okay because the state machine ID is only for debugging purposes.
+        listener_id,
         core_ctx.counters(),
         incoming,
         bindings_ctx.now(),

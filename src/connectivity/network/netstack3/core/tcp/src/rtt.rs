@@ -74,6 +74,13 @@ impl Estimator {
             }
         }
     }
+
+    pub(super) fn srtt(&self) -> Option<Duration> {
+        match self {
+            Self::NoSample => None,
+            Self::Measured { srtt, rtt_var: _ } => Some(*srtt),
+        }
+    }
 }
 
 #[cfg(test)]
