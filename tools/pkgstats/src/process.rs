@@ -6,13 +6,15 @@ use crate::types::{
     Capability, ComponentContents, ElfContents, FileInfo, FileMetadata, OtherContents,
     OutputSummary, PackageContents, PackageFile, ProtocolToClientMap,
 };
-use anyhow::Result;
+use anyhow::{Context, Result};
 use argh::FromArgs;
 use assembly_manifest::{AssemblyManifest, Image, PackageSetMetadata, PackagesMetadata};
 use camino::{Utf8Path, Utf8PathBuf};
 use fidl_fuchsia_component_decl as fdecl;
 use fuchsia_archive::Reader as FARReader;
 use fuchsia_pkg::PackageManifest;
+use fuchsia_repo::repo_client::RepoClient;
+use fuchsia_repo::repository::PmRepository;
 use fuchsia_url::UnpinnedAbsolutePackageUrl;
 use log::debug;
 use rayon::prelude::*;
@@ -35,6 +37,10 @@ pub struct ProcessCommand {
     #[argh(option)]
     assembly_manifest: Utf8PathBuf,
 
+    /// the path to the TUF repository for universe packages.
+    #[argh(option)]
+    tuf_repository: Option<Utf8PathBuf>,
+
     /// the path to save the output json file
     #[argh(option)]
     out: Utf8PathBuf,
@@ -45,7 +51,7 @@ pub struct ProcessCommand {
 }
 
 impl ProcessCommand {
-    pub fn execute(self) -> Result<()> {
+    pub async fn execute(self) -> Result<()> {
         let manifest = AssemblyManifest::try_load_from(&self.assembly_manifest)?;
 
         if self.debug_no_parallel {
@@ -91,22 +97,32 @@ impl ProcessCommand {
             })
             .for_each(|manifest_path| {
                 manifest_count.fetch_add(1, Ordering::Relaxed);
+                let package_errors = errors.for_package(PackageContext::Manifest(&manifest_path));
                 let manifest = match PackageManifest::try_load_from(&manifest_path) {
                     Ok(m) => m,
                     Err(err) => {
-                        errors.log_manifest_error(err, &manifest_path, "loading manifest");
+                        package_errors.log_manifest_error(err, "loading manifest");
                         return;
                     }
                 };
-                if let Some((url, contents)) = process_package_manifest(
-                    manifest,
-                    manifest_path,
-                    &errors,
-                    &content_hash_to_path,
-                ) {
+                if let Some((url, contents)) =
+                    process_package_manifest(manifest, package_errors, &content_hash_to_path)
+                {
                     names.lock().unwrap().insert(url, contents);
                 }
             });
+
+        if let Some(tuf_repository) = self.tuf_repository {
+            process_universe(
+                tuf_repository,
+                &errors,
+                &names,
+                &content_hash_to_path,
+                &manifest_count,
+            )
+            .await?;
+        }
+
         let file_infos = Mutex::new(HashMap::new());
         let elf_count = AtomicUsize::new(0);
         let other_count = AtomicUsize::new(0);
@@ -262,6 +278,20 @@ fn absolute_path_for(root_path: &Utf8Path, relative_path: &Utf8Path) -> Utf8Path
         .expect("assembly related path must be utf8")
 }
 
+enum PackageContext<'a> {
+    Manifest(&'a Utf8PathBuf),
+    Universe(&'a str),
+}
+
+impl std::fmt::Display for PackageContext<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PackageContext::Manifest(m) => write!(f, "{}", m),
+            PackageContext::Universe(p) => write!(f, "{}", p),
+        }
+    }
+}
+
 #[derive(Default)]
 struct Errors {
     manifest_errors: AtomicUsize,
@@ -269,44 +299,54 @@ struct Errors {
 }
 
 impl Errors {
-    fn log_manifest_error<E>(&self, err: E, manifest_path: &Utf8PathBuf, step: &str)
+    fn for_package<'a>(&'a self, package_context: PackageContext<'a>) -> PackageErrors<'a> {
+        PackageErrors { errors: &self, package_context }
+    }
+}
+
+struct PackageErrors<'a> {
+    errors: &'a Errors,
+    package_context: PackageContext<'a>,
+}
+
+impl PackageErrors<'_> {
+    fn log_no_package_url(&self) {
+        debug!("[{}] No package URL", self.package_context);
+        self.errors.manifest_errors.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn log_manifest_error<E>(&self, err: E, step: &str)
     where
         E: Debug,
     {
-        self.manifest_errors.fetch_add(1, Ordering::Relaxed);
+        self.errors.manifest_errors.fetch_add(1, Ordering::Relaxed);
         debug!(status = "Failed", step; "");
-        eprintln!("[{}] Failed {}: {:?}", manifest_path, step, err);
+        eprintln!("[{}] Failed {}: {:?}", self.package_context, step, err);
     }
 
-    fn log_manifest_file_error<E>(
-        &self,
-        err: E,
-        manifest_path: &Utf8PathBuf,
-        step: &str,
-        context: impl AsRef<str>,
-    ) where
+    fn log_manifest_file_error<E>(&self, err: E, step: &str, context: impl AsRef<str>)
+    where
         E: Debug,
     {
-        self.manifest_file_errors.fetch_add(1, Ordering::Relaxed);
+        self.errors.manifest_file_errors.fetch_add(1, Ordering::Relaxed);
         debug!(status = "Failed", step; "");
-        eprintln!("[{}] Failed {} for {}: {:?}", manifest_path, step, context.as_ref(), err);
+        eprintln!("[{}] Failed {} for {}: {:?}", self.package_context, step, context.as_ref(), err);
     }
 }
 
 fn process_package_manifest(
     manifest: PackageManifest,
-    manifest_path: Utf8PathBuf,
-    errors: &Errors,
+    errors: PackageErrors<'_>,
     content_hash_to_path: &Mutex<HashMap<String, Utf8PathBuf>>,
 ) -> Option<(UnpinnedAbsolutePackageUrl, PackageContents)> {
     let url = match manifest.package_url() {
         Err(err) => {
-            errors.log_manifest_error(err, &manifest_path, "formatting URL");
+            errors.log_manifest_error(err, "formatting URL");
             return None;
         }
         Ok(None) => {
             // Package does not have a URL, skip.
-            errors.manifest_errors.fetch_add(1, Ordering::Relaxed);
+            errors.log_no_package_url();
             return None;
         }
         Ok(Some(url)) => url,
@@ -319,7 +359,7 @@ fn process_package_manifest(
     for blob in manifest.blobs() {
         let blob_source_path = Utf8PathBuf::from(&blob.source_path);
         if blob.path == "meta/" {
-            process_far(&blob_source_path, &mut contents, &errors, &manifest_path);
+            process_far(&blob_source_path, &mut contents, &errors);
         } else {
             content_hash_to_path.lock().unwrap().insert(blob.merkle.to_string(), blob_source_path);
             contents
@@ -330,24 +370,19 @@ fn process_package_manifest(
     Some((url, contents))
 }
 
-fn process_far(
-    far_path: &Utf8PathBuf,
-    contents: &mut PackageContents,
-    errors: &Errors,
-    manifest_path: &Utf8PathBuf,
-) {
+fn process_far(far_path: &Utf8PathBuf, contents: &mut PackageContents, errors: &PackageErrors<'_>) {
     // Handle meta
     let meta_file = match File::open(far_path) {
         Ok(meta_file) => meta_file,
         Err(err) => {
-            errors.log_manifest_file_error(err, &manifest_path, "opening file", &far_path);
+            errors.log_manifest_file_error(err, "opening file", &far_path);
             return;
         }
     };
     let mut reader = match FARReader::new(meta_file) {
         Ok(r) => r,
         Err(err) => {
-            errors.log_manifest_file_error(err, &manifest_path, "opening as FAR file", &far_path);
+            errors.log_manifest_file_error(err, "opening as FAR file", &far_path);
             return;
         }
     };
@@ -367,7 +402,6 @@ fn process_far(
             Err(err) => {
                 errors.log_manifest_file_error(
                     err,
-                    manifest_path,
                     "reading component manifest",
                     String::from_utf8_lossy(&component_manifest_path),
                 );
@@ -379,7 +413,6 @@ fn process_far(
             Err(err) => {
                 errors.log_manifest_file_error(
                     err,
-                    manifest_path,
                     "parsing component manifest",
                     String::from_utf8_lossy(&component_manifest_path),
                 );
@@ -470,6 +503,58 @@ fn process_far(
         };
         contents.components.insert(name.to_string(), component);
     }
+}
+
+async fn process_universe(
+    repo_path: Utf8PathBuf,
+    errors: &Errors,
+    names: &Mutex<HashMap<UnpinnedAbsolutePackageUrl, PackageContents>>,
+    content_hash_to_path: &Mutex<HashMap<String, Utf8PathBuf>>,
+    manifest_count: &AtomicUsize,
+) -> Result<()> {
+    let repo_path = repo_path
+        .canonicalize_utf8()
+        .with_context(|| format!("canonicalizing repo path {:?}", repo_path))?;
+    let blobs_path = repo_path.join("repository/blobs");
+    let repository = PmRepository::new(repo_path);
+    let mut repo_client = RepoClient::from_trusted_remote(Box::new(repository) as Box<_>)
+        .await
+        .with_context(|| format!("Creating repo client using default trusted root"))?;
+    repo_client.update().await.context("updating the repository metadata")?;
+
+    for package in repo_client.list_packages().await? {
+        manifest_count.fetch_add(1, Ordering::Relaxed);
+        let package_errors = errors.for_package(PackageContext::Universe(&package.name));
+        let Ok(url) = UnpinnedAbsolutePackageUrl::parse(&format!(
+            "fuchsia-pkg://fuchsia.com/{}",
+            package.name
+        )) else {
+            package_errors.log_no_package_url();
+            continue;
+        };
+        let mut contents = PackageContents::default();
+        let entries = repo_client.show_package(&package.name, true).await?;
+        if let Some(entries) = entries {
+            for entry in entries {
+                // If hash=None, it's part of the meta.far which we process on its
+                // own to be able to extract the CM contents.
+                if let Some(hash) = entry.hash {
+                    let path = blobs_path.join(hash.to_string());
+                    if entry.path == "meta.far" {
+                        process_far(
+                            &path,
+                            &mut contents,
+                            &errors.for_package(PackageContext::Universe(&package.name)),
+                        );
+                    } else {
+                        content_hash_to_path.lock().unwrap().insert(hash.to_string(), path);
+                    }
+                }
+            }
+        }
+        names.lock().unwrap().insert(url, contents);
+    }
+    Ok(())
 }
 
 #[derive(Clone)]

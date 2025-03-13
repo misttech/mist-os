@@ -28,12 +28,16 @@ enum CommandArgs {
     Print(PrintCommand),
 }
 
-#[fuchsia::main]
-fn main() -> Result<()> {
+fn num_threads() -> u8 {
+    std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1).try_into().unwrap_or(u8::MAX)
+}
+
+#[fuchsia::main(threads = num_threads())]
+async fn main() -> Result<()> {
     let args: Args = argh::from_env();
 
     match args.cmd {
-        CommandArgs::Process(cmnd) => cmnd.execute(),
+        CommandArgs::Process(cmnd) => cmnd.execute().await,
         CommandArgs::Html(cmnd) => cmnd.execute(),
         CommandArgs::Print(cmnd) => cmnd.execute(),
     }

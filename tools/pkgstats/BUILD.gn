@@ -22,6 +22,7 @@ if (is_host) {
       "//src/lib/fuchsia-url",
       "//src/sys/pkg/lib/far/rust:fuchsia-archive",
       "//src/sys/pkg/lib/fuchsia-pkg",
+      "//src/sys/pkg/lib/fuchsia-repo",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:argh",
       "//third_party/rust_crates:camino",
