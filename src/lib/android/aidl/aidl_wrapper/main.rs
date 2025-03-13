@@ -4,7 +4,7 @@
 
 use anyhow::Error;
 use argh::FromArgs;
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
@@ -54,8 +54,8 @@ where
     Ok(BufReader::new(file).lines().collect::<Result<T, _>>()?)
 }
 
-fn read_path_bufs(filename: PathBuf) -> Result<HashSet<PathBuf>, Error> {
-    Ok(read_file::<HashSet<String>>(filename)?.iter().map(PathBuf::from).collect())
+fn read_path_bufs(filename: PathBuf) -> Result<BTreeSet<PathBuf>, Error> {
+    Ok(read_file::<BTreeSet<String>>(filename)?.iter().map(PathBuf::from).collect())
 }
 
 fn write_file<'a, T>(filename: PathBuf, content: impl Iterator<Item = T>) -> Result<(), Error>
@@ -79,18 +79,18 @@ const HASH_FILE: &'static str = ".hash";
 
 fn main() -> Result<(), Error> {
     let opt: AidlWrapperArgs = argh::from_env();
-    let mut packages = HashSet::<String>::new();
-    let mut dependencies = HashSet::<PathBuf>::new();
+    let mut packages = BTreeSet::<String>::new();
+    let mut dependencies = BTreeSet::<PathBuf>::new();
     for base in &opt.base {
         dependencies.insert(base.clone());
     }
     let mut glue_args = vec![];
     for deps in opt.deps {
-        for package in read_file::<HashSet<String>>(deps.join(PACKAGE_FILE))? {
+        for package in read_file::<BTreeSet<String>>(deps.join(PACKAGE_FILE))? {
             glue_args.push("-I".to_owned());
             glue_args.push(package.replace(".", "_").to_owned());
         }
-        for base in read_file::<HashSet<String>>(deps.join(BASES_FILE))? {
+        for base in read_file::<BTreeSet<String>>(deps.join(BASES_FILE))? {
             dependencies.insert(base.into());
         }
     }
