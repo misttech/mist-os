@@ -56,4 +56,37 @@ TEST(AllocCheckerTests, ArmWithSmartPointer) {
   ASSERT_FALSE(ac.check());
 }
 
+TEST(AllocCheckerTests, MakeUniqueChecked) {
+  fbl::AllocChecker ac;
+  std::unique_ptr<int> ptr = fbl::make_unique_checked<int>(ac, 23);
+  ASSERT_TRUE(ac.check());
+  EXPECT_EQ(*ptr, 23);
+}
+
+TEST(AllocCheckerTests, MakeUniqueCheckedArray) {
+  fbl::AllocChecker ac;
+  std::unique_ptr<int[]> ptr = fbl::make_unique_checked<int[]>(ac, 2);
+  ASSERT_TRUE(ac.check());
+  EXPECT_EQ(ptr[0], 0);
+  EXPECT_EQ(ptr[1], 0);
+}
+
+TEST(AllocCheckerTests, MakeUniqueForOverwriteChecked) {
+  fbl::AllocChecker ac;
+  std::unique_ptr<int> ptr = fbl::make_unique_for_overwrite_checked<int>(ac);
+  ASSERT_TRUE(ac.check());
+  *ptr = 23;
+  EXPECT_EQ(*ptr, 23);
+}
+
+TEST(AllocCheckerTests, MakeUniqueForOverwriteCheckedArray) {
+  fbl::AllocChecker ac;
+  std::unique_ptr<int[]> ptr = fbl::make_unique_for_overwrite_checked<int[]>(ac, 2);
+  ASSERT_TRUE(ac.check());
+  ptr[0] = 17;
+  ptr[1] = 23;
+  EXPECT_EQ(ptr[0], 17);
+  EXPECT_EQ(ptr[1], 23);
+}
+
 }  // namespace

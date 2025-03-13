@@ -10,8 +10,10 @@
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 
+#include <concepts>
 #include <memory>
 #include <new>
+#include <type_traits>
 #include <utility>
 
 namespace fbl {
@@ -67,16 +69,6 @@ class AllocChecker {
 
 namespace internal {
 
-template <typename T>
-struct unique_type {
-  using single = std::unique_ptr<T>;
-};
-
-template <typename T>
-struct unique_type<T[]> {
-  using incomplete_array = std::unique_ptr<T[]>;
-};
-
 inline void* checked(size_t size, AllocChecker& ac, void* mem) {
   ac.arm(size, mem != nullptr);
   return mem;
@@ -86,8 +78,41 @@ inline void* checked(size_t size, AllocChecker& ac, void* mem) {
 
 // A version of std::make_unique that accepts an AllocChecker as its first argument.
 template <typename T, typename... Args>
-typename internal::unique_type<T>::single make_unique_checked(AllocChecker* ac, Args&&... args) {
+  requires(!std::is_array_v<T>)
+std::unique_ptr<T> make_unique_checked(AllocChecker& ac, Args&&... args) {
   return std::unique_ptr<T>(new (ac) T(std::forward<Args>(args)...));
+}
+
+template <typename T, typename... Args>
+  requires(!std::is_array_v<T>)
+std::unique_ptr<T> make_unique_checked(AllocChecker* ac, Args&&... args) {
+  return make_unique_checked<T>(*ac, std::forward<Args>(args)...);
+}
+
+template <typename T, typename... Args>
+  requires(std::is_unbounded_array_v<T>)
+std::unique_ptr<T> make_unique_checked(AllocChecker& ac, size_t size) {
+  static_assert(std::is_constructible_v<std::remove_extent_t<T>>);
+  return std::unique_ptr<T>(new (ac) std::remove_extent_t<T>[size]());
+}
+
+template <std::constructible_from<> T, typename... Args>
+  requires(std::is_unbounded_array_v<T>)
+std::unique_ptr<T> make_unique_checked(AllocChecker* ac, size_t size) {
+  return make_unique_checked<T>(*ac, size);
+}
+
+// Likewise for std::make_unique_for_overwrite.
+template <std::default_initializable T>
+  requires(!std::is_array_v<T>)
+std::unique_ptr<T> make_unique_for_overwrite_checked(AllocChecker& ac) {
+  return std::unique_ptr<T>(new (ac) T);
+}
+
+template <typename T>
+  requires(std::is_unbounded_array_v<T> && std::default_initializable<std::remove_extent_t<T>>)
+std::unique_ptr<T> make_unique_for_overwrite_checked(AllocChecker& ac, size_t size) {
+  return std::unique_ptr<T>(new (ac) std::remove_extent_t<T>[size]);
 }
 
 }  // namespace fbl
