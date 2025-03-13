@@ -239,12 +239,14 @@ type FFXInstance struct {
 	ctx     context.Context
 	ffxPath string
 
-	runner     *subprocess.Runner
-	cmdBuilder ffxCmdBuilder
-	stdout     io.Writer
-	stderr     io.Writer
-	target     string
-	env        []string
+	runner         *subprocess.Runner
+	cmdBuilder     ffxCmdBuilder
+	stdout         io.Writer
+	stderr         io.Writer
+	target         string
+	env            []string
+	sshInfo        SSHInfo
+	sshKeysChecked bool
 }
 
 // ConfigSettings contains settings to apply to the ffx configs at the specified config level.
@@ -307,18 +309,28 @@ func FFXWithTarget(ffx *FFXInstance, target string) *FFXInstance {
 	}
 }
 
+// SSHInfo contains the pathnames of private and public keys. The requirements
+// on the fields depened depend on the invoke-mode. When in strict, SshPriv
+// must be specified, but SshPub can be empty. When in legacy mode, if either
+// field is empty, the corresponding path will be inferred from ffx config.
+type SSHInfo struct {
+	SshPriv string
+	SshPub  string
+}
+
 // NewFFXInstance creates an isolated FFXInstance.
 func NewFFXInstance(
 	ctx context.Context,
 	ffxPath string,
 	processDir string,
 	env []string,
-	target, sshKey string,
+	target string,
+	sshInfo *SSHInfo,
 	outputDir string,
 	invokeMode FFXInvokeMode,
 	extraConfigSettings ...ConfigSettings,
 ) (*FFXInstance, error) {
-	logger.Debugf(ctx, "NewFFXInstance: ffx=%s dir=%s target=%s sshKey=%s oDir=%s", ffxPath, processDir, target, sshKey, outputDir)
+	logger.Debugf(ctx, "NewFFXInstance: ffx=%s dir=%s target=%s sshInfo=%v oDir=%s", ffxPath, processDir, target, sshInfo, outputDir)
 	if ffxPath == "" {
 		return nil, nil
 	}
@@ -361,25 +373,79 @@ func NewFFXInstance(
 		target:     target,
 		env:        env,
 	}
-	// Always make sure we have a private key
-	if sshKey == "" {
-		sshKey, err = ffx.GetSshPrivateKey(ctx)
-		if err != nil {
-			return nil, err
-		}
-	}
-	sshKey, err = filepath.Abs(sshKey)
+	// Always make sure we have the ssh keys
+	sshInfo, err = getOrBuildSshKeys(ctx, invokeMode, sshInfo, ffx)
 	if err != nil {
 		return nil, err
 	}
-	userConfig, globalConfig := buildConfigs(absOutputDir, absFFXPath, sshKey, extraConfigSettings)
+	sshPriv, err := filepath.Abs(sshInfo.SshPriv)
+	if err != nil {
+		return nil, err
+	}
+	sshPub, err := filepath.Abs(sshInfo.SshPub)
+	if err != nil {
+		return nil, err
+	}
+	// Cache the ssh keys
+	ffx.sshInfo = SSHInfo{SshPriv: sshPriv, SshPub: sshPub}
+	userConfig, globalConfig := buildConfigs(absOutputDir, absFFXPath, ffx.sshInfo, extraConfigSettings)
 	if err := cmdBuilder.setConfigMap(userConfig, globalConfig); err != nil {
 		return nil, err
 	}
 	return ffx, nil
 }
 
-func buildConfigs(absOutputDir string, absFFXPath string, absSshKeyPath string, extraConfigSettings []ConfigSettings) (user, global map[string]any) {
+// Make sure we have valid ssh keys. The specific logic depends on whether the
+// client has the keys to us or not, as well as whether we were invoked in
+// "strict" mode.
+func getOrBuildSshKeys(ctx context.Context, invokeMode FFXInvokeMode, sshInfo *SSHInfo, ffx *FFXInstance) (*SSHInfo, error) {
+	if invokeMode != UseFFXStrict {
+		// In legacy mode, we can build the keys ourselves, or the caller can provide
+		// the private key, or both keys
+		if sshInfo == nil {
+			envInfo, err := ffx.getSshKeysFromEnvironment(ctx)
+			if err != nil {
+				return nil, err
+			}
+			sshInfo = &envInfo
+		} else {
+			if sshInfo.SshPriv == "" {
+				privPath, err := ffx.getSshKeyFromEnvironment(ctx, "ssh.priv")
+				if err != nil {
+					return nil, fmt.Errorf("Couldn't get ssh private key from config: %w", err)
+				}
+				sshInfo.SshPriv = privPath
+			}
+			if sshInfo.SshPub == "" {
+				pubPath, err := ffx.getSshKeyFromEnvironment(ctx, "ssh.pub")
+				if pubPath == "" {
+					pubPath = sshInfo.SshPriv + ".pub"
+					logger.Debugf(ctx, "No ssh public key (%s), using %s", err, pubPath)
+				}
+				sshInfo.SshPub = pubPath
+			}
+		}
+	} else {
+		// In strict mode, the caller must provide the private key, and if they don't provide the public
+		// key we'll assume it's <private> + ".pub"
+		if sshInfo == nil {
+			return nil, fmt.Errorf("SSH Key information must be provided when in strict mode")
+		}
+		if sshInfo.SshPriv == "" {
+			return nil, fmt.Errorf("SSH Private Key information must be provided when in strict mode")
+		}
+		if sshInfo.SshPub == "" {
+			sshInfo.SshPub = sshInfo.SshPriv + ".pub"
+		}
+	}
+	// Make sure the keys exist and match
+	if err := ffx.checkSpecificSshKeys(ctx, sshInfo.SshPriv, sshInfo.SshPub); err != nil {
+		return nil, err
+	}
+	return sshInfo, nil
+}
+
+func buildConfigs(absOutputDir string, absFFXPath string, sshInfo SSHInfo, extraConfigSettings []ConfigSettings) (user, global map[string]any) {
 	// Set these fields in the global config for tests that don't use this library
 	// and don't set their own isolated env config.
 	globalConfigSettings := map[string]any{
@@ -392,9 +458,8 @@ func buildConfigs(absOutputDir string, absFFXPath string, absSshKeyPath string, 
 		"ffx.subtool-search-paths":     filepath.Dir(absFFXPath),
 		"test.experimental_json_input": true,
 		"emu.instance_dir":             filepath.Join(absOutputDir, "emu/instances"),
-	}
-	if absSshKeyPath != "" {
-		userConfigSettings["ssh.priv"] = absSshKeyPath
+		"ssh.priv":                     sshInfo.SshPriv,
+		"ssh.pub":                      sshInfo.SshPub,
 	}
 	for _, settings := range extraConfigSettings {
 		if settings.Level == "global" {
@@ -501,7 +566,6 @@ type ffxInvoker struct {
 	ffx            *FFXInstance
 	args           []string
 	target         string
-	configs        map[string]string
 	timeout        *time.Duration
 	captureOutput  bool
 	output         *bytes.Buffer
@@ -515,10 +579,6 @@ func (f *ffxInvoker) cmd() *exec.Cmd {
 	args := f.args
 	if f.target != "" {
 		args = append([]string{"--target", f.target}, args...)
-	}
-	// Add command-specific configs
-	for k, v := range f.configs {
-		args = append([]string{"-c", fmt.Sprintf("%s=%v", k, v)}, args...)
 	}
 	ffx_cmd := f.ffx.cmdBuilder.command(f.ffx.ffxPath, f.supportsStrict, args)
 	if f.noMachine {
@@ -568,11 +628,6 @@ func (f *ffxInvoker) run(ctx context.Context) error {
 
 func (i *ffxInvoker) setTarget(target string) *ffxInvoker {
 	i.target = target
-	return i
-}
-
-func (i *ffxInvoker) setConfigs(configs map[string]string) *ffxInvoker {
-	i.configs = configs
 	return i
 }
 
@@ -745,9 +800,8 @@ func (f *FFXInstance) TargetWait(ctx context.Context, args ...string) error {
 
 // EmuStart returns an invoker to start the emulator with the specified
 // commands.
-func (f *FFXInstance) EmuStart(pubPath string, args ...string) *ffxInvoker {
-	configs := map[string]string{"ssh.pub": pubPath}
-	return f.invoker(append([]string{"emu", "start"}, args...)).setStrict().setConfigs(configs)
+func (f *FFXInstance) EmuStart(args ...string) *ffxInvoker {
+	return f.invoker(append([]string{"emu", "start"}, args...)).setStrict()
 }
 
 func (f *FFXInstance) EmuStop(ctx context.Context, args ...string) error {
@@ -821,36 +875,52 @@ func (f *FFXInstance) GetConfig(ctx context.Context) error {
 	}
 }
 
-func (f *FFXInstance) getSshKey(ctx context.Context, configKey string) (string, error) {
+func (f *FFXInstance) checkSpecificSshKeys(ctx context.Context, privPath, pubPath string) error {
 	// Check that the keys exist and are valid
-	args := []string{"config", "check-ssh-keys"}
-	err := f.invoker(args).setNoMachine().run(ctx)
-	if err != nil {
-		return "", err
+	cfgs := fmt.Sprintf("ssh.priv=%s,ssh.pub=%s", privPath, pubPath)
+	args := []string{"-c", cfgs, "config", "check-ssh-keys"}
+	if err := f.invoker(args).setStrict().run(ctx); err != nil {
+		return err
 	}
-	args = []string{"config", "get", configKey}
-	// TODO(slgrady): when `ffx --machine json config get` works, parse
-	// the json output
-	i := f.invoker(args).setCaptureOutput().setNoMachine()
-	err = i.run(ctx)
-	if err != nil {
-		return "", err
-	}
-	key := i.output.String()
-
-	// strip quotes if present.
-	key = strings.Replace(strings.TrimSpace(key), "\"", "", -1)
-	return key, nil
+	return nil
 }
 
 // GetSshPrivateKey returns the file path for the ssh private key.
-func (f *FFXInstance) GetSshPrivateKey(ctx context.Context) (string, error) {
-	return f.getSshKey(ctx, "ssh.priv")
+func (f *FFXInstance) GetSshPrivateKey() string {
+	return f.sshInfo.SshPriv
 }
 
 // GetSshAuthorizedKeys returns the file path for the ssh auth keys.
-func (f *FFXInstance) GetSshAuthorizedKeys(ctx context.Context) (string, error) {
-	return f.getSshKey(ctx, "ssh.pub")
+func (f *FFXInstance) GetSshAuthorizedKeys() string {
+	return f.sshInfo.SshPub
+}
+
+func (f *FFXInstance) getSshKeyFromEnvironment(ctx context.Context, key string) (string, error) {
+	args := []string{"config", "get", key}
+	// TODO(slgrady): when `ffx --machine json config get` works, parse
+	// the json output
+	i := f.invoker(args).setCaptureOutput().setNoMachine()
+	err := i.run(ctx)
+	if err != nil {
+		return "", err
+	}
+	val := i.output.String()
+
+	// strip quotes if present.
+	val = strings.Replace(strings.TrimSpace(val), "\"", "", -1)
+	return val, nil
+}
+
+func (f *FFXInstance) getSshKeysFromEnvironment(ctx context.Context) (SSHInfo, error) {
+	sshPriv, err := f.getSshKeyFromEnvironment(ctx, "ssh.priv")
+	if err != nil {
+		return SSHInfo{}, err
+	}
+	sshPub, err := f.getSshKeyFromEnvironment(ctx, "ssh.pub")
+	if err != nil {
+		return SSHInfo{}, err
+	}
+	return SSHInfo{SshPriv: sshPriv, SshPub: sshPub}, nil
 }
 
 // GetPBArtifacts returns a list of the artifacts required for the specified artifactsGroup (flash or emu).

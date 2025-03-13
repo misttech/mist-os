@@ -123,15 +123,12 @@ func GetCoverageDataFromTest(t *testing.T, outDir string, config *Config) []stri
 	defer cancel()
 
 	runnerCtx := context.Background()
-	ffxInstance, err := ffxutil.NewFFXInstance(runnerCtx, config.Bin.Ffx, "", os.Environ(), defaultNodename, "", outDir, ffxutil.UseFFXLegacy)
+	ffxInstance, err := ffxutil.NewFFXInstance(runnerCtx, config.Bin.Ffx, "", os.Environ(), defaultNodename, nil, outDir, ffxutil.UseFFXLegacy)
 	if err != nil {
 		t.Fatalf("Cannot create Ffx instance. Reason: %s", err)
 	}
 
-	hostPathAuthorizedKeys, err := ffxInstance.GetSshAuthorizedKeys(ctx)
-	if err != nil {
-		t.Fatalf("Cannot get authorized key path. Reason: %s", err)
-	}
+	hostPathAuthorizedKeys := ffxInstance.GetSshAuthorizedKeys()
 	i := distro.CreateContextWithAuthorizedKeys(ctx, device, config.Bin.ZbiHostTool, hostPathAuthorizedKeys)
 	i.Start()
 	i.WaitForLogMessage("initializing platform")

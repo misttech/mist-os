@@ -160,6 +160,7 @@ func NewFfxInstance(
 		return nil, err
 	}
 
+	sshKeys := ffxutil.SSHInfo{SshPriv: sshKey, SshPub: sshAuthKey}
 	ffxInstance, err :=
 		ffxutil.NewFFXInstance(
 			ctx,
@@ -173,7 +174,7 @@ func NewFfxInstance(
 			/* env= */
 			[]string{},
 			/* target= */ options.Target,
-			sshKey,
+			&sshKeys,
 			wrapperFfxInstance.outputDir,
 			ffxutil.UseFFXLegacy)
 	if err != nil {
@@ -188,7 +189,6 @@ func NewFfxInstance(
 	cfgs := map[string]string{
 		"sdk.root": sdkRoot,
 		"sdk.type": "in-tree",
-		"ssh.pub":  sshAuthKey,
 	}
 
 	for key, value := range cfgs {

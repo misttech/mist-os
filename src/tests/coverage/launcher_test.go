@@ -281,7 +281,9 @@ func getTargetTest() testsharder.Test {
 func getTargetTester(t *testing.T, testOutDir string) testrunner.Tester {
 	ctx := context.Background()
 	// Create a new fuchsia tester that is responsible for executing the test.
-	ffx, err := ffxutil.NewFFXInstance(ctx, *ffxPath, "", os.Environ(), os.Getenv(constants.DeviceAddrEnvKey), os.Getenv(constants.SSHKeyEnvKey), testOutDir, ffxutil.UseFFXLegacy, ffxutil.ConfigSettings{})
+	sshPriv := os.Getenv(constants.SSHKeyEnvKey)
+	sshKeys := ffxutil.SSHInfo{SshPriv: sshPriv}
+	ffx, err := ffxutil.NewFFXInstance(ctx, *ffxPath, "", os.Environ(), os.Getenv(constants.DeviceAddrEnvKey), &sshKeys, testOutDir, ffxutil.UseFFXLegacy, ffxutil.ConfigSettings{})
 	if err != nil {
 		t.Fatalf("failed to initialize ffx instance: %s", err)
 	}
