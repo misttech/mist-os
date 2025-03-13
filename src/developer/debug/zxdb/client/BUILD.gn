@@ -25,6 +25,7 @@ static_library("client") {
     "client_object.h",
     "component_observer.h",
     "disassembler.h",
+    "elf_memory_region.h",
     "exception_settings.h",
     "execution_scope.h",
     "file_memory_region.h",
@@ -94,6 +95,7 @@ static_library("client") {
     "disassembler.cc",
     "download_manager.cc",
     "download_manager.h",
+    "elf_memory_region.cc",
     "exception_settings.cc",
     "exception_settings.h",
     "execution_scope.cc",
@@ -186,6 +188,7 @@ static_library("client") {
     "//third_party/crashpad/src/util",
     "//third_party/mini_chromium/src/base",
     "//third_party/rapidjson",
+    "//third_party/zstd",
   ]
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
@@ -272,6 +275,7 @@ source_set("tests") {
     "client_eval_context_impl_unittest.cc",
     "disassembler_unittest.cc",
     "download_manager_unittest.cc",
+    "elf_memory_region_unittest.cc",
     "filter_unittest.cc",
     "finish_physical_frame_thread_controller_unittest.cc",
     "finish_thread_controller_unittest.cc",
@@ -313,6 +317,9 @@ source_set("tests") {
     ":fake_home($host_toolchain)",
     ":sample_core($host_toolchain)",
     ":test_data($host_toolchain)",
+
+    # Used for elf_memory_region_unittest.
+    "//src/developer/debug/zxdb/symbols/test_data/cpp:zxdb_symbol_test(${default_toolchain}-shared)",
   ]
 
   deps = [
