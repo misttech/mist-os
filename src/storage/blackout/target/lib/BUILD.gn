@@ -54,9 +54,6 @@ rustc_library("blackout-target") {
     "src/lib.rs",
     "src/static_tree.rs",
   ]
-
-  # TODO(https://fxbug.dev/390250858): Re-enable when lld issue is fixed.
-  exclude_toolchain_tags = [ "profile" ]
 }
 
 # These tests are broken out into their own components because they don't respond well when they

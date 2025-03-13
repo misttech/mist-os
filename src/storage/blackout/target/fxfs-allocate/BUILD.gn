@@ -36,9 +36,6 @@ rustc_binary("blackout-fxfs-allocate-bin") {
     "//src/storage/fxfs",
   ]
   sources = [ "src/main.rs" ]
-
-  # TODO(https://fxbug.dev/390250858): Re-enable when lld issue is fixed.
-  exclude_toolchain_tags = [ "profile" ]
 }
 
 fuchsia_component("blackout-fxfs-allocate-component") {
