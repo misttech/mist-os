@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -71,7 +72,7 @@ func TestGetSubbuildSubdirs(t *testing.T) {
     "build_dir": "subbuild.2"
   }
 ]`)
-	if err := os.WriteFile(subbuildJSONFile, contents, 0600); err != nil {
+	if err := os.WriteFile(subbuildJSONFile, contents, 0o600); err != nil {
 		t.Fatalf("Got unexpected error writing file: %s", err)
 	}
 	ctx := context.Background()
@@ -113,7 +114,7 @@ func TestBuild(t *testing.T) {
 			return nil
 		}
 		// prog == "ninja"
-		if contains(cmd, "-t") { // for compdb and graph
+		if slices.Contains(cmd, "-t") { // for compdb and graph
 			return nil
 		}
 		return fmt.Errorf("failed to run command: %s", cmd)
@@ -397,7 +398,7 @@ func TestBuild(t *testing.T) {
 			staticSpec:     &fintpb.Static{},
 			ninjaNoopCheck: true,
 			runnerFunc: func(cmd []string, stdout io.Writer) error {
-				if contains(cmd, "-n") { // -n indicates ninja dry run.
+				if slices.Contains(cmd, "-n") { // -n indicates ninja dry run.
 					stdout.Write([]byte(noWorkString))
 				}
 				return nil
@@ -411,7 +412,7 @@ func TestBuild(t *testing.T) {
 				ArtifactDir: artifactDir,
 			},
 			runnerFunc: func(cmd []string, stdout io.Writer) error {
-				if contains(cmd, "graph") {
+				if slices.Contains(cmd, "graph") {
 					return fmt.Errorf("failed to run command: %s", cmd)
 				}
 				return nil
@@ -426,7 +427,7 @@ func TestBuild(t *testing.T) {
 				ArtifactDir: artifactDir,
 			},
 			runnerFunc: func(cmd []string, stdout io.Writer) error {
-				if contains(cmd, "compdb") {
+				if slices.Contains(cmd, "compdb") {
 					return fmt.Errorf("failed to run command: %s", cmd)
 				}
 				return nil
@@ -459,7 +460,7 @@ func TestBuild(t *testing.T) {
 			// compdb` and `ninja graph`.
 			runnerFunc: func(cmd []string, stdout io.Writer) error {
 				if filepath.Base(cmd[0]) == "ninja" {
-					if !contains(cmd, "-t") {
+					if !slices.Contains(cmd, "-t") {
 						stdout.Write([]byte("[1/1](1) CXX c.o d.o\nFAILED: c.o d.o\nsomeoutput\n"))
 					}
 					return fmt.Errorf("failed to run command: %s", cmd)
@@ -754,7 +755,7 @@ func TestBuild(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Failed to marshal to JSON: %v", subbuildEntries)
 				}
-				if err := os.WriteFile(subbuildJSONFile, contents, 0600); err != nil {
+				if err := os.WriteFile(subbuildJSONFile, contents, 0o600); err != nil {
 					t.Fatalf("Got unexpected error writing JSON file: %s", err)
 				}
 			}
@@ -793,7 +794,6 @@ func TestBuild(t *testing.T) {
 					expectedBuildStampStatus = BuildSuccessStampMissing
 				} else {
 					expectedBuildStampStatus = BuildSuccessStampExists
-
 				}
 			}
 			if checkFileExists(filepath.Join(buildDir, buildSuccessStampName)) {
@@ -809,7 +809,6 @@ func TestBuild(t *testing.T) {
 				if expectedBuildStampStatus == BuildSuccessStampExists {
 					t.Errorf("Build success stamp file missing after successful build!")
 				}
-
 			}
 
 			ninjaTargets := findNinjaTargets(runner.commandsRun)
@@ -862,7 +861,7 @@ func TestBuild(t *testing.T) {
 func findNinjaTargets(cmds [][]string) []string {
 	for _, cmd := range cmds {
 		// Ignore non-ninja commands and ninja tool invocations.
-		if filepath.Base(cmd[0]) != "ninja" || contains(cmd, "-t") {
+		if filepath.Base(cmd[0]) != "ninja" || slices.Contains(cmd, "-t") {
 			continue
 		}
 		// Skip over each `-flag value` pair until we reach the list of targets.

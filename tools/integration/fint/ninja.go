@@ -15,6 +15,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -508,7 +509,7 @@ func affectedTestsNoWork(
 	for _, test := range allTests {
 		// Ignore any tests that shouldn't be considered affected.
 		labelNoToolchain := strings.Split(test.Label, "(")[0]
-		if contains(neverAffectedTestLabels, labelNoToolchain) {
+		if slices.Contains(neverAffectedTestLabels, labelNoToolchain) {
 			continue
 		}
 

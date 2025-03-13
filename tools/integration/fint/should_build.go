@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"go.fuchsia.dev/fuchsia/tools/lib/jsonutil"
@@ -98,7 +99,7 @@ func isSupportedFileType(path string) bool {
 		".yaml",
 	}
 	extension := filepath.Ext(path)
-	return contains(supportedExtensions, extension)
+	return slices.Contains(supportedExtensions, extension)
 }
 
 // shouldBuild runs `gn analyze` on the given files to determine
