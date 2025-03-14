@@ -13,10 +13,11 @@
 
 #include <list>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "ftdi.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace ftdi_mpsse {
 
@@ -86,7 +87,7 @@ class FakeSerial : public ftdi_serial::FtdiSerial {
   std::list<std::vector<uint8_t>> expected_writes_;
 };
 
-class FtdiI2cTest : public zxtest::Test {
+class FtdiI2cTest : public testing::Test {
  public:
   void SetUp() override { fake_parent_ = MockDevice::FakeRootParent(); }
 
@@ -217,8 +218,8 @@ TEST_F(FtdiI2cTest, ReadTest) {
       .Then([](fdf::WireUnownedResult<fuchsia_hardware_i2cimpl::Device::Transact>& result) {
         ASSERT_TRUE(result.ok());
         ASSERT_TRUE(result->is_ok());
-        ASSERT_EQ(result->value()->read.count(), 1);
-        ASSERT_EQ(result->value()->read[0].data.count(), 1);
+        ASSERT_EQ(result->value()->read.count(), 1u);
+        ASSERT_EQ(result->value()->read[0].data.count(), 1u);
         EXPECT_EQ(result->value()->read[0].data[0], 0xDE);
         mock_ddk::GetDriverRuntime()->Quit();
       });
@@ -299,10 +300,10 @@ TEST_F(FtdiI2cTest, MetadataTest) {
   ASSERT_TRUE(decoded.is_ok());
 
   ASSERT_TRUE(decoded->has_bus_id());
-  EXPECT_EQ(decoded->bus_id(), 0);
+  EXPECT_EQ(decoded->bus_id(), 0u);
 
   ASSERT_TRUE(decoded->has_channels());
-  ASSERT_EQ(decoded->channels().count(), 1);
+  ASSERT_EQ(decoded->channels().count(), 1u);
 
   ASSERT_TRUE(decoded->channels()[0].has_address());
   ASSERT_TRUE(decoded->channels()[0].has_vid());
@@ -311,9 +312,9 @@ TEST_F(FtdiI2cTest, MetadataTest) {
 
   // Should match the I2cDevice passed above.
   EXPECT_EQ(decoded->channels()[0].address(), 0x3c);
-  EXPECT_EQ(decoded->channels()[0].vid(), 0);
-  EXPECT_EQ(decoded->channels()[0].pid(), 0);
-  EXPECT_EQ(decoded->channels()[0].did(), 31);
+  EXPECT_EQ(decoded->channels()[0].vid(), 0u);
+  EXPECT_EQ(decoded->channels()[0].pid(), 0u);
+  EXPECT_EQ(decoded->channels()[0].did(), 31u);
 }
 
 }  // namespace ftdi_mpsse

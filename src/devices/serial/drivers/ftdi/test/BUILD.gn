@@ -15,7 +15,8 @@ test("ftdi-i2c-test") {
     "//src/devices/serial/drivers/ftdi:common",
     "//src/devices/testing/mock-ddk",
     "//src/lib/ddk",
-    "//zircon/system/ulib/zxtest",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
   ]
 }
 
