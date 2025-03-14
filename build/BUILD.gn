@@ -15,6 +15,7 @@ group("tests") {
   testonly = true
 
   deps = [
+    ":bazel2gn_verifications(${host_toolchain})",
     ":build_tests_json_tests",
     ":regenerator_tests",
     "bazel:tests",
@@ -29,6 +30,28 @@ group("tests") {
     "tools:tests",
     "tracer:tests",
   ]
+}
+
+if (is_host) {
+  group("bazel2gn_verifications") {
+    testonly = true
+    deps = [
+      "//build/tools/bazel2gn:verify_bazel2gn",
+      "//tools/fidl/fidlgen_cpp:verify_bazel2gn",
+      "//tools/fidl/fidlgen_cpp/codegen:verify_bazel2gn",
+      "//tools/fidl/fidlgen_hlcpp:verify_bazel2gn",
+      "//tools/fidl/fidlgen_hlcpp/codegen:verify_bazel2gn",
+      "//tools/fidl/fidlgen_hlcpp/coding_tables:verify_bazel2gn",
+      "//tools/fidl/lib/fidlgen:verify_bazel2gn",
+      "//tools/fidl/lib/fidlgen_cpp:verify_bazel2gn",
+      "//tools/lib/color:verify_bazel2gn",
+      "//tools/lib/isatty:verify_bazel2gn",
+      "//tools/lib/logger:verify_bazel2gn",
+      "//tools/net/device-finder:verify_bazel2gn",
+      "//tools/net/mdns:verify_bazel2gn",
+      "//tools/net/netboot:verify_bazel2gn",
+    ]
+  }
 }
 
 python_build_time_tests("regenerator_tests") {

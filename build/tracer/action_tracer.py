@@ -785,6 +785,14 @@ def _tool_is_python(tool: str) -> bool:
     return base == "python" or base.startswith("python3")
 
 
+def get_intended_tool(command: ToolCommand) -> str:
+    if python_script := get_python_script(command):
+        return python_script
+    if os.path.basename(command.tool) == "gn_run_binary.sh":
+        return command.args[1]
+    return command.tool
+
+
 def get_python_script(command: ToolCommand) -> Optional[str]:
     """If the script being invoked is python, return the relevant .py file"""
     # Cover both cases when the tool:
@@ -863,12 +871,10 @@ def main():
         command = command.unwrap()
 
     # Identify the intended tool from the original command.
-    script = command.tool
-    if python_script := get_python_script(command):
-        script = python_script
+    tool = get_intended_tool(command)
 
-    # Scripts with known issues
-    ignored_scripts = {
+    # Tools with known issues
+    ignored_tools = {
         # Because the clippy linter is effectively the same as the rust compiler,
         # and we don't enforce hemeticity on rustc, we also exempt clippy.
         "clippy_wrapper.sh",
@@ -879,10 +885,13 @@ def main():
         # deletes the old files. It has to read directories to delete all the files
         # in them, and those files arent listed in the generated depfile.
         "copy_tree.py",
+        # fsatrace hangs on Go binaries, so avoid wrapping Go binaries with it.
+        # See https://fxbug.dev/402649338.
+        "bazel2gn",
     }
     # Skip tracing for ignored scripts, making it possible to skip binaries that
     # are incompatible with fsatrace. For example: https://fxbug.dev/402649338.
-    if os.path.basename(script) in ignored_scripts:
+    if os.path.basename(tool) in ignored_tools:
         return subprocess.call(command.tokens)
 
     # Ensure trace_output directory exists
