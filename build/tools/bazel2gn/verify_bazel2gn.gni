@@ -38,5 +38,11 @@ template("verify_bazel2gn") {
       rebase_path(outputs[0], root_build_dir),
       "--check_only",
     ]
+    metadata = {
+      # Path from repository root to where this target is defined.
+      #
+      # For example: //build/tools/bazel2gn -> build/tools/bazel2gn.
+      bazel2gn_dir = [ rebase_path(".", "//") ]
+    }
   }
 }

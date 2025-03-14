@@ -32,6 +32,15 @@ group("tests") {
   ]
 }
 
+# Collect a list of directories with bazel2gn synced GN and Bazel build files
+# for `fx bazel2gn`.
+generated_file("bazel2gn_dir_list") {
+  testonly = true
+  outputs = [ "${root_out_dir}/bazel2gn_dir_list" ]
+  data_keys = [ "bazel2gn_dir" ]
+  deps = [ ":bazel2gn_verifications(${host_toolchain})" ]
+}
+
 if (is_host) {
   group("bazel2gn_verifications") {
     testonly = true

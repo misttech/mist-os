@@ -21,24 +21,7 @@ fx-config-read
 
 declare -r BAZEL2GN_TARGET="host-tools/bazel2gn"
 declare -r BAZEL2GN_BIN="${FUCHSIA_BUILD_DIR}/host-tools/bazel2gn"
-
-# TODO(jayzhuang): Detect this list instead of hardcoding.
-declare -r DIRS_TO_SYNC=(
-  'build/tools/bazel2gn'
-  'tools/fidl/fidlgen_cpp'
-  'tools/fidl/fidlgen_cpp/codegen'
-  'tools/fidl/fidlgen_hlcpp'
-  'tools/fidl/fidlgen_hlcpp/codegen'
-  'tools/fidl/fidlgen_hlcpp/coding_tables'
-  'tools/fidl/lib/fidlgen'
-  'tools/fidl/lib/fidlgen_cpp'
-  'tools/lib/color'
-  'tools/lib/isatty'
-  'tools/lib/logger'
-  'tools/net/device-finder'
-  'tools/net/mdns'
-  'tools/net/netboot'
-)
+declare -r BAZEL2GN_DIR_LIST="${FUCHSIA_BUILD_DIR}/bazel2gn_dir_list"
 
 function main {
   local build=true
@@ -63,14 +46,13 @@ function main {
     fx-run-ninja false "${PREBUILT_NINJA}" -C "${FUCHSIA_BUILD_DIR}" "${BAZEL2GN_TARGET}"
   fi
 
-  for dir in "${DIRS_TO_SYNC[@]}"
-  do
+  while IFS= read -r dir; do
     build_gn="${FUCHSIA_DIR}/${dir}/BUILD.gn"
     "${BAZEL2GN_BIN}" \
       --bazel_input_path "${FUCHSIA_DIR}/${dir}/BUILD.bazel" \
       --gn_output_path "${build_gn}" \
       --gn_bin "${PREBUILT_GN}"
-  done
+  done < "${BAZEL2GN_DIR_LIST}"
 }
 
 main "$@"

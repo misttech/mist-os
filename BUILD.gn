@@ -1914,6 +1914,7 @@ group("default") {
     "//:host",
     "//:product_bundles.check",
     "//:test-list",
+    "//build:bazel2gn_dir_list",
     "//build/assembly:validate_product_defs",
     "//bundles/assembly",
 
