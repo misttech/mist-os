@@ -182,7 +182,7 @@ if (current_toolchain == default_toolchain) {
     outputs = [ output_file ]
 
     metadata = {
-      ctf_fidl_method_summary = [ output_file ]
+      ctf_fidl_method_summary = [ rebase_path(output_file, root_build_dir) ]
     }
 
     args = [
