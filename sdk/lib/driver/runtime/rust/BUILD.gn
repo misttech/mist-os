@@ -39,6 +39,7 @@ group("tests") {
   testonly = true
   deps = [
     ":fdf_rust_tests",
+    "env:tests",
     "fdf_sys:tests",
   ]
 }

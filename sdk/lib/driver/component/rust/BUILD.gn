@@ -31,6 +31,7 @@ rustc_library("rust") {
   test_deps = [
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_rust",
     "//sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo_rust",
+    "//sdk/lib/driver/runtime/rust/env",
     "//src/lib/fuchsia",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",

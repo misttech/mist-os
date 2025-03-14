@@ -22,16 +22,20 @@ use futures::task::{waker_ref, ArcWake};
 
 pub use fdf_sys::fdf_dispatcher_t;
 
-pub trait ShutdownObserverFn: Fn(DispatcherRef<'_>) + Send + Sync + 'static {}
-impl<T> ShutdownObserverFn for T where T: Fn(DispatcherRef<'_>) + Send + Sync + 'static {}
+pub trait ShutdownObserverFn: FnOnce(DispatcherRef<'_>) + Send + Sync + 'static {}
+impl<T> ShutdownObserverFn for T where T: FnOnce(DispatcherRef<'_>) + Send + Sync + 'static {}
 
 /// A builder for [`Dispatcher`]s
 #[derive(Default)]
 pub struct DispatcherBuilder {
-    options: u32,
-    name: String,
-    scheduler_role: String,
-    shutdown_observer: Option<ShutdownObserver>,
+    #[doc(hidden)]
+    pub options: u32,
+    #[doc(hidden)]
+    pub name: String,
+    #[doc(hidden)]
+    pub scheduler_role: String,
+    #[doc(hidden)]
+    pub shutdown_observer: Option<ShutdownObserver>,
 }
 
 impl DispatcherBuilder {
@@ -161,8 +165,13 @@ impl Dispatcher {
     /// Caller is responsible for ensuring that the given handle is valid and
     /// not owned by any other wrapper that will free it at an arbitrary
     /// time.
-    pub(crate) unsafe fn from_raw(handle: NonNull<fdf_dispatcher_t>) -> Self {
+    pub unsafe fn from_raw(handle: NonNull<fdf_dispatcher_t>) -> Self {
         Self(handle)
+    }
+
+    #[doc(hidden)]
+    pub fn inner<'a>(&'a self) -> &'a NonNull<fdf_dispatcher_t> {
+        &self.0
     }
 
     fn get_raw_flags(&self) -> u32 {
@@ -359,7 +368,8 @@ impl TaskFunc {
 /// `*mut fdf_dispatcher_shutdown_observer` and a `*mut ShutdownObserver`. To that end,
 /// it is important that this struct stay both `#[repr(C)]` and that `observer` be its first member.
 #[repr(C)]
-struct ShutdownObserver {
+#[doc(hidden)]
+pub struct ShutdownObserver {
     observer: fdf_dispatcher_shutdown_observer,
     shutdown_fn: Box<dyn ShutdownObserverFn>,
 }
@@ -367,7 +377,7 @@ struct ShutdownObserver {
 impl ShutdownObserver {
     /// Creates a new [`ShutdownObserver`] with `f` as the callback to run when a dispatcher
     /// finishes shutting down.
-    fn new<F: ShutdownObserverFn>(f: F) -> Self {
+    pub fn new<F: ShutdownObserverFn>(f: F) -> Self {
         let shutdown_fn = Box::new(f);
         Self {
             observer: fdf_dispatcher_shutdown_observer { handler: Some(Self::handler) },
@@ -378,7 +388,7 @@ impl ShutdownObserver {
     /// Turns this object into a stable pointer suitable for passing to [`fdf_dispatcher_create`]
     /// by wrapping it in a [`Box`] and leaking it to be reconstituded by [`Self::handler`] when
     /// the dispatcher is shut down.
-    fn into_ptr(self) -> *mut fdf_dispatcher_shutdown_observer {
+    pub fn into_ptr(self) -> *mut fdf_dispatcher_shutdown_observer {
         // Note: this relies on the assumption that `self.observer` is at the beginning of the
         // struct.
         Box::leak(Box::new(self)) as *mut _ as *mut _

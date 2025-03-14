@@ -64,7 +64,6 @@ void fdf_env_dispatcher_get_dump_deprecated(fdf_dispatcher_t* dispatcher, char**
 // after all the dispatcher's shutdown observers have been called, and will be running
 // on the thread of the final dispatcher which has been shutdown.
 //
-// after all dispatcher's shutdown observers have had their handlers called.
 // While a driver is shutting down, no new dispatchers can be created by the driver.
 //
 // If this succeeds, you must keep the |observer| object alive until the

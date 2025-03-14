@@ -201,8 +201,8 @@ mod tests {
     use super::*;
     use std::sync::mpsc;
 
-    use fdf::test::with_raw_dispatcher;
     use fdf::Arena;
+    use fdf_env::test::with_raw_dispatcher;
     use zx::Status;
 
     #[derive(Default)]
