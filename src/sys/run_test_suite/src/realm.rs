@@ -161,7 +161,7 @@ pub async fn parse_provided_realm(
     if test_collection.contains(":") {
         (moniker, test_collection) = match realm_str.rsplit_once(':') {
             Some(s @ (moniker_head, collection_name)) => {
-                println!(
+                eprintln!(
                     "You are using old realm format. Please switch to standard realm moniker format: '{}/{}'",
                     moniker_head, collection_name
                 );

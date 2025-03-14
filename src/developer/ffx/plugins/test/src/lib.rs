@@ -266,7 +266,7 @@ async fn run_test<W: 'static + Write + Send + Sync>(
         || outcome == run_test_suite_lib::Outcome::DidNotFinish;
     tracing::info!("ffx test duration: {:?}", start_time.elapsed().as_secs_f32());
     if hermetic_test && show_realm_warning {
-        println!(
+        eprintln!(
             "The test was executed in the hermetic realm. If your test depends on system \
 capabilities, pass in correct realm. See https://fuchsia.dev/go/components/non-hermetic-tests"
         );
