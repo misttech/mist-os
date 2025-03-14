@@ -2316,16 +2316,16 @@ pub trait MemoryAccessorExt: MemoryAccessor {
 
     /// Read an instance of T64 from `user` where the object has a different representation in 32
     /// and 64 bits.
-    fn read_multi_arch_object<T, T64: FromBytes + Into<T>, T32: FromBytes + Into<T>>(
+    fn read_multi_arch_object<T, T64: FromBytes + TryInto<T>, T32: FromBytes + TryInto<T>>(
         &self,
         user: MappingMultiArchUserRef<T, T64, T32>,
     ) -> Result<T, Errno> {
         match user {
             MappingMultiArchUserRef::<T, T64, T32>::Arch64(user, _) => {
-                self.read_object(user).map(T64::into)
+                self.read_object(user)?.try_into().map_err(|_| errno!(EINVAL))
             }
             MappingMultiArchUserRef::<T, T64, T32>::Arch32(user) => {
-                self.read_object(user).map(T32::into)
+                self.read_object(user)?.try_into().map_err(|_| errno!(EINVAL))
             }
         }
     }
@@ -2449,12 +2449,12 @@ pub trait MemoryAccessorExt: MemoryAccessor {
     /// Read exactly `iovec_count` `UserBuffer`s from `iovec_addr`.
     ///
     /// Fails if `iovec_count` is greater than `UIO_MAXIOV`.
-    fn read_iovec(
+    fn read_iovec<T: Copy + Eq + IntoBytes + FromBytes + Immutable + TryInto<usize>>(
         &self,
         iovec_addr: IOVecPtr,
-        iovec_count: UserValue<i32>,
+        iovec_count: UserValue<T>,
     ) -> Result<UserBuffers, Errno> {
-        let iovec_count: usize = iovec_count.try_into().map_err(|_| errno!(EINVAL))?;
+        let iovec_count = iovec_count.raw().try_into().map_err(|_| errno!(EINVAL))?;
         if iovec_count > UIO_MAXIOV as usize {
             return error!(EINVAL);
         }

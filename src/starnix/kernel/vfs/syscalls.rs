@@ -3164,7 +3164,7 @@ mod arch32 {
     use starnix_uapi::signals::SigSet;
     use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
     use starnix_uapi::vfs::EpollEvent;
-    use starnix_uapi::{error, uapi, AT_REMOVEDIR};
+    use starnix_uapi::{errno, error, uapi, AT_REMOVEDIR};
 
     pub fn sys_arch32_open(
         locked: &mut Locked<'_, Unlocked>,
@@ -3191,7 +3191,7 @@ mod arch32 {
         arch32_stat_buf: UserRef<uapi::arch32::stat64>,
     ) -> Result<(), Errno> {
         let stat_buffer = node.stat(locked, current_task)?;
-        let result: uapi::arch32::stat64 = stat_buffer.into();
+        let result: uapi::arch32::stat64 = stat_buffer.try_into().map_err(|_| errno!(EINVAL))?;
         // Now we copy to the arch32 version and write.
         current_task.write_object(arch32_stat_buf, &result)?;
         Ok(())

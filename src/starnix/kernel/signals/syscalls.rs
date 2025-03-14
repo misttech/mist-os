@@ -70,7 +70,7 @@ fn rt_sigaction<Arch32SigAction>(
 ) -> Result<(), Errno>
 where
     Arch32SigAction:
-        IntoBytes + FromBytes + Immutable + TryFrom<uapi::sigaction_t> + Into<uapi::sigaction_t>,
+        IntoBytes + FromBytes + Immutable + TryFrom<uapi::sigaction_t> + TryInto<uapi::sigaction_t>,
 {
     let signal = Signal::try_from(signum)?;
 
