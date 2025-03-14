@@ -21,14 +21,22 @@ impl std::fmt::Display for Capability {
     }
 }
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PackageContents {
+    /// The URL of this package.
+    pub url: UnpinnedAbsolutePackageUrl,
     /// The named files included in this package.
     pub files: Vec<PackageFile>,
     /// The named components included in this package.
     pub components: HashMap<String, ComponentContents>,
     /// The blobs referenced by this package as "blobs/*" files.
     pub blobs: Vec<String>,
+}
+
+impl PackageContents {
+    pub fn new(url: UnpinnedAbsolutePackageUrl) -> Self {
+        Self { url, files: Vec::new(), components: HashMap::new(), blobs: Vec::new() }
+    }
 }
 
 #[derive(Default, Debug, Serialize, Deserialize)]
@@ -48,14 +56,13 @@ pub struct ComponentContents {
 
 #[derive(Serialize, Deserialize)]
 pub struct OutputSummary {
-    pub packages: BTreeMap<UnpinnedAbsolutePackageUrl, PackageContents>,
+    pub packages: BTreeMap<Hash, PackageContents>,
     pub contents: BTreeMap<Hash, FileInfo>,
     pub files: BTreeMap<u32, FileMetadata>,
     pub protocol_to_client: ProtocolToClientMap,
 }
 
-pub type ProtocolToClientMap =
-    HashMap<String, HashMap<UnpinnedAbsolutePackageUrl, HashSet<String>>>;
+pub type ProtocolToClientMap = HashMap<String, HashMap<Hash, HashSet<String>>>;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct FileMetadata {

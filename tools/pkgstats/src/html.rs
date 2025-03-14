@@ -2,15 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::types::{Capability, FileInfo, OutputSummary, ProtocolToClientMap};
+use crate::types::{Capability, FileInfo, OutputSummary, PackageContents, ProtocolToClientMap};
 use anyhow::{bail, Context, Result};
 use argh::FromArgs;
 use camino::Utf8PathBuf;
+use fuchsia_url::Hash;
 use handlebars::{
     handlebars_helper, Handlebars, Helper, HelperResult, Output, RenderContext, RenderError,
 };
 use rayon::prelude::*;
 use serde::Serialize;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
@@ -50,14 +52,15 @@ impl HtmlCommand {
         handlebars_helper!(capability_str: |capability: Capability| {
             capability.to_string()
         });
-        handlebars_helper!(capability_target_list: |capability: Capability, map: ProtocolToClientMap| {
+        handlebars_helper!(capability_target_list: |capability: Capability, map: ProtocolToClientMap, packages: HashMap<Hash, PackageContents>| {
             let Capability::Protocol(protocol_name) = capability;
             let mut result = Vec::new();
             write!(&mut result, r#"<ul class="capability-targets">"#).unwrap();
-            if let Some(url_to_coverage)  = map.get(&protocol_name) {
-                for (package_url, component_to_coverage) in url_to_coverage.iter() {
+            if let Some(hash_to_coverage)  = map.get(&protocol_name) {
+                for (hash, component_to_coverage) in hash_to_coverage.iter() {
+                    let package_url = packages.get(hash).unwrap().url.to_string();
                     for component in component_to_coverage.iter() {
-                        let uri = package_page_url(package_url.to_string());
+                        let uri = package_page_url(&hash.to_string());
                         write!(&mut result, "<li><a href='{uri}'>{package_url}#meta/{component}</a></li>").unwrap();
                     }
                 }
@@ -92,21 +95,22 @@ impl HtmlCommand {
         input
             .packages
             .par_iter()
-            .map(|(package_name, package)| -> Result<()> {
-                let data = (package_name, package, &input.protocol_to_client);
+            .map(|(package_hash, package)| -> Result<()> {
+                let data =
+                    (package.url.clone(), package, &input.protocol_to_client, &input.packages);
                 let body_content = hb.render("package", &data).context("rendering package")?;
 
                 render_page(
                     &hb,
                     BaseTemplateArgs {
-                        page_title: &format!("Package: {package_name}"),
+                        page_title: &format!("Package: {}", package.url),
                         css_path: "../style.css",
                         root_link: "../",
                         body_content: &body_content,
                     },
                     self.output.join("packages").join(format!(
                         "{}.html",
-                        simplify_name_for_linking(&package_name.to_string())
+                        simplify_name_for_linking(&package_hash.to_string())
                     )),
                 )?;
                 Ok(())
@@ -222,11 +226,11 @@ fn package_link_helper(
     Ok(())
 }
 
-fn package_page_url(package_name: impl AsRef<str>) -> String {
+fn package_page_url(package_hash: impl AsRef<str>) -> String {
     format!(
         "{}packages/{}.html",
         *RENDER_PATH.lock().unwrap(),
-        simplify_name_for_linking(package_name.as_ref())
+        simplify_name_for_linking(package_hash.as_ref())
     )
 }
 

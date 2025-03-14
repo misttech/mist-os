@@ -32,7 +32,12 @@ impl PrintCommand {
         let mut packages = data
             .packages
             .iter()
-            .flat_map(|(k, v)| v.files.iter().map(|f| (k.name(), &f.name, &f.hash)))
+            .flat_map(|(_hash, package_contents)| {
+                package_contents
+                    .files
+                    .iter()
+                    .map(|f| (package_contents.url.name(), &f.name, &f.hash))
+            })
             .collect::<Vec<_>>();
         packages.sort();
 

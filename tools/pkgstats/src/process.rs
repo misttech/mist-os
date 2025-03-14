@@ -105,10 +105,11 @@ impl ProcessCommand {
                         return;
                     }
                 };
-                if let Some((url, contents)) =
+                let hash = manifest.hash();
+                if let Some(contents) =
                     process_package_manifest(manifest, package_errors, &content_hash_to_path)
                 {
-                    names.lock().unwrap().insert(url, contents);
+                    names.lock().unwrap().insert(hash, contents);
                 }
             });
 
@@ -244,7 +245,7 @@ impl ProcessCommand {
 
         // Populate a Protocol->(Package, component) client mapping.
         let mut protocol_to_client: ProtocolToClientMap = HashMap::new();
-        for (url, package) in packages.iter_mut() {
+        for (hash, package) in packages.iter_mut() {
             for (component_name, component) in package.components.iter_mut() {
                 for Capability::Protocol(protocol) in component
                     .used_from_parent
@@ -254,7 +255,7 @@ impl ProcessCommand {
                     let protocol_to_packages =
                         protocol_to_client.entry(protocol.clone()).or_default();
                     let package_to_components =
-                        protocol_to_packages.entry(url.clone()).or_default();
+                        protocol_to_packages.entry(hash.clone()).or_default();
                     package_to_components.insert(component_name.clone());
                 }
             }
@@ -338,7 +339,7 @@ fn process_package_manifest(
     manifest: PackageManifest,
     errors: PackageErrors<'_>,
     content_hash_to_path: &Mutex<HashMap<Hash, Utf8PathBuf>>,
-) -> Option<(UnpinnedAbsolutePackageUrl, PackageContents)> {
+) -> Option<PackageContents> {
     let url = match manifest.package_url() {
         Err(err) => {
             errors.log_manifest_error(err, "formatting URL");
@@ -352,7 +353,7 @@ fn process_package_manifest(
         Ok(Some(url)) => url,
     };
 
-    let mut contents = PackageContents::default();
+    let mut contents = PackageContents::new(url);
 
     debug!("Have {} blobs", manifest.blobs().len());
 
@@ -367,7 +368,7 @@ fn process_package_manifest(
                 .push(PackageFile { name: blob.path.to_string(), hash: blob.merkle.to_string() });
         }
     }
-    Some((url, contents))
+    Some(contents)
 }
 
 fn process_far(far_path: &Utf8PathBuf, contents: &mut PackageContents, errors: &PackageErrors<'_>) {
@@ -508,7 +509,7 @@ fn process_far(far_path: &Utf8PathBuf, contents: &mut PackageContents, errors: &
 async fn process_universe(
     repo_path: Utf8PathBuf,
     errors: &Errors,
-    names: &Mutex<HashMap<UnpinnedAbsolutePackageUrl, PackageContents>>,
+    names: &Mutex<HashMap<Hash, PackageContents>>,
     content_hash_to_path: &Mutex<HashMap<Hash, Utf8PathBuf>>,
     manifest_count: &AtomicUsize,
 ) -> Result<()> {
@@ -532,7 +533,7 @@ async fn process_universe(
             package_errors.log_no_package_url();
             continue;
         };
-        let mut contents = PackageContents::default();
+        let mut contents = PackageContents::new(url);
         let entries = repo_client.show_package(&package.name, true).await?;
         if let Some(entries) = entries {
             for entry in entries {
@@ -546,13 +547,14 @@ async fn process_universe(
                             &mut contents,
                             &errors.for_package(PackageContext::Universe(&package.name)),
                         );
+                        names.lock().unwrap().insert(hash, contents);
+                        break;
                     } else {
                         content_hash_to_path.lock().unwrap().insert(hash, path);
                     }
                 }
             }
         }
-        names.lock().unwrap().insert(url, contents);
     }
     Ok(())
 }
