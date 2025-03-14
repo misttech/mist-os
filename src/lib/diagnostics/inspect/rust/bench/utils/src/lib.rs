@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_inspect::{TreeMarker, TreeProxy};
+use fuchsia_async::{Scope, Task};
 use fuchsia_criterion::{criterion, FuchsiaCriterion};
 use fuchsia_inspect::hierarchy::{DiagnosticsHierarchy, DiagnosticsHierarchyGetter};
 use fuchsia_inspect::Inspector;
-use futures::future::BoxFuture;
-use futures::FutureExt;
+use futures::{future, FutureExt};
 use inspect_runtime::service::handle_request_stream;
 use inspect_runtime::TreeServerSendPreference;
 use rand::distributions::Uniform;
@@ -15,16 +15,22 @@ use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use std::borrow::Cow;
 use std::collections::{HashSet, VecDeque};
+use std::future::IntoFuture;
 use std::time::Duration;
 
 /// Spawns a tree server for the test purposes.
 pub fn spawn_server(
     inspector: Inspector,
-) -> Result<(TreeProxy, BoxFuture<'static, Result<(), anyhow::Error>>), anyhow::Error> {
+) -> Result<(TreeProxy, Task<Result<(), anyhow::Error>>), anyhow::Error> {
     let (tree, request_stream) = fidl::endpoints::create_proxy_and_stream::<TreeMarker>();
-    let tree_server_fut =
-        handle_request_stream(inspector, TreeServerSendPreference::default(), request_stream);
-    Ok((tree, tree_server_fut.boxed()))
+    let scope = Scope::new_with_name("tree_server_scope");
+    let tree_server_task = scope.compute(handle_request_stream(
+        inspector,
+        TreeServerSendPreference::default(),
+        request_stream,
+        scope.new_child_with_name("tree_server"),
+    ));
+    Ok((tree, Task::spawn(future::join(tree_server_task, scope.into_future()).map(|(r, _)| r))))
 }
 
 pub struct CriterionConfig {

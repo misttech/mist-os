@@ -12,7 +12,10 @@ use fuchsia_inspect::{
 use futures::FutureExt;
 use std::ops::AddAssign;
 use structopt::StructOpt;
-use {fidl_fuchsia_inspect as finspect, fidl_fuchsia_inspect_deprecated as fdeprecated};
+use {
+    fidl_fuchsia_inspect as finspect, fidl_fuchsia_inspect_deprecated as fdeprecated,
+    fuchsia_async as fasync,
+};
 
 pub mod deprecated_fidl_server;
 pub mod table;
@@ -107,9 +110,15 @@ pub async fn serve_deprecated_inspect(stream: fdeprecated::InspectRequestStream,
 }
 
 pub async fn serve_inspect_tree(stream: finspect::TreeRequestStream, inspector: &Inspector) {
+    let scope = fasync::Scope::new_with_name("serve_inspect_tree");
     let settings = inspect_runtime::TreeServerSendPreference::default();
-    inspect_runtime::service::spawn_tree_server_with_stream(inspector.clone(), settings, stream)
-        .await;
+    inspect_runtime::service::spawn_tree_server_with_stream(
+        inspector.clone(),
+        settings,
+        stream,
+        &scope,
+    );
+    scope.join().await;
 }
 
 pub fn new_example_table(node: &Node) -> Table {

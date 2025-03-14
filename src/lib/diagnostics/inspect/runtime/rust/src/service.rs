@@ -14,7 +14,7 @@ use fidl_fuchsia_mem::Buffer;
 use fuchsia_async as fasync;
 use fuchsia_inspect::reader::ReadableTree;
 use fuchsia_inspect::Inspector;
-use futures::{TryFutureExt, TryStreamExt};
+use futures::{FutureExt, TryStreamExt};
 use log::warn;
 use zx::sys::ZX_CHANNEL_MAX_MSG_BYTES;
 
@@ -24,6 +24,7 @@ pub async fn handle_request_stream(
     inspector: Inspector,
     settings: TreeServerSendPreference,
     mut stream: TreeRequestStream,
+    scope: fasync::Scope,
 ) -> Result<(), Error> {
     while let Some(request) = stream.try_next().await? {
         match request {
@@ -51,12 +52,20 @@ pub async fn handle_request_stream(
             TreeRequest::ListChildNames { tree_iterator, .. } => {
                 let values = inspector.tree_names().await?;
                 let request_stream = tree_iterator.into_stream();
-                spawn_tree_name_iterator_server(values, request_stream)
+                scope.spawn(run_tree_name_iterator_server(values, request_stream).map(|e| {
+                    e.unwrap_or_else(
+                        |err: Error| warn!(err:?; "failed to run tree name iterator server"),
+                    )
+                }));
             }
             TreeRequest::OpenChild { child_name, tree, .. } => {
                 if let Ok(inspector) = inspector.read_tree(&child_name).await {
-                    spawn_tree_server_with_stream(inspector, settings.clone(), tree.into_stream())
-                        .detach()
+                    spawn_tree_server_with_stream(
+                        inspector,
+                        settings.clone(),
+                        tree.into_stream(),
+                        scope.as_handle(),
+                    );
                 }
             }
             TreeRequest::_UnknownMethod { ordinal, method_type, .. } => {
@@ -64,6 +73,9 @@ pub async fn handle_request_stream(
             }
         }
     }
+
+    scope.join().await;
+
     Ok(())
 }
 
@@ -77,12 +89,21 @@ pub fn spawn_tree_server_with_stream(
     inspector: Inspector,
     settings: TreeServerSendPreference,
     stream: TreeRequestStream,
-) -> fasync::Task<()> {
-    fasync::Task::spawn(async move {
-        handle_request_stream(inspector, settings, stream).await.unwrap_or_else(
-            |err: Error| warn!(err:?; "failed to run `fuchsia.inspect.Tree` server"),
-        );
-    })
+    scope: &fasync::ScopeHandle,
+) {
+    scope.spawn(
+        handle_request_stream(
+            inspector,
+            settings,
+            stream,
+            scope.new_child_with_name("tree_server"),
+        )
+        .map(|e| {
+            e.unwrap_or_else(
+                |err: Error| warn!(err:?; "failed to run `fuchsia.inspect.Tree` server"),
+            );
+        }),
+    );
 }
 
 /// Spawns a `fuchsia.inspect.Tree` server and returns the task handling
@@ -90,52 +111,50 @@ pub fn spawn_tree_server_with_stream(
 pub fn spawn_tree_server(
     inspector: Inspector,
     settings: TreeServerSendPreference,
-) -> Result<(fasync::Task<()>, fidl::endpoints::ClientEnd<TreeMarker>), Error> {
+    scope: &fasync::ScopeHandle,
+) -> fidl::endpoints::ClientEnd<TreeMarker> {
     let (tree, server_end) = fidl::endpoints::create_endpoints::<TreeMarker>();
-    let task = spawn_tree_server_with_stream(inspector, settings, server_end.into_stream());
-    Ok((task, tree))
+    spawn_tree_server_with_stream(inspector, settings, server_end.into_stream(), scope);
+    tree
 }
 
 /// Runs a server for the `fuchsia.inspect.TreeNameIterator` protocol. This protocol returns the
 /// given list of values by chunks.
-fn spawn_tree_name_iterator_server(values: Vec<String>, mut stream: TreeNameIteratorRequestStream) {
-    fasync::Task::spawn(
-        async move {
-            let mut values_iter = values.into_iter().peekable();
-            while let Some(request) = stream.try_next().await? {
-                match request {
-                    TreeNameIteratorRequest::GetNext { responder } => {
-                        let mut bytes_used: usize = 32; // Page overhead of message header + vector
-                        let mut result = vec![];
-                        loop {
-                            match values_iter.peek() {
-                                None => break,
-                                Some(value) => {
-                                    bytes_used += 16; // String overhead
-                                    bytes_used += fidl::encoding::round_up_to_align(value.len(), 8);
-                                    if bytes_used > ZX_CHANNEL_MAX_MSG_BYTES as usize {
-                                        break;
-                                    }
-                                    result.push(values_iter.next().unwrap());
-                                }
+async fn run_tree_name_iterator_server(
+    values: Vec<String>,
+    mut stream: TreeNameIteratorRequestStream,
+) -> Result<(), anyhow::Error> {
+    let mut values_iter = values.into_iter().peekable();
+    while let Some(request) = stream.try_next().await? {
+        match request {
+            TreeNameIteratorRequest::GetNext { responder } => {
+                let mut bytes_used: usize = 32; // Page overhead of message header + vector
+                let mut result = vec![];
+                loop {
+                    match values_iter.peek() {
+                        None => break,
+                        Some(value) => {
+                            bytes_used += 16; // String overhead
+                            bytes_used += fidl::encoding::round_up_to_align(value.len(), 8);
+                            if bytes_used > ZX_CHANNEL_MAX_MSG_BYTES as usize {
+                                break;
                             }
+                            result.push(values_iter.next().unwrap());
                         }
-                        if result.is_empty() {
-                            responder.send(&[])?;
-                            return Ok(());
-                        }
-                        responder.send(&result)?;
-                    }
-                    TreeNameIteratorRequest::_UnknownMethod { ordinal, method_type, .. } => {
-                        warn!(ordinal, method_type:?; "Unknown request");
                     }
                 }
+                if result.is_empty() {
+                    responder.send(&[])?;
+                    return Ok(());
+                }
+                responder.send(&result)?;
             }
-            Ok(())
+            TreeNameIteratorRequest::_UnknownMethod { ordinal, method_type, .. } => {
+                warn!(ordinal, method_type:?; "Unknown request");
+            }
         }
-        .unwrap_or_else(|err: Error| warn!(err:?; "failed to run tree name iterator server")),
-    )
-    .detach()
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -145,6 +164,7 @@ mod tests {
     use fidl_fuchsia_inspect::{TreeNameIteratorMarker, TreeNameIteratorProxy, TreeProxy};
     use fuchsia_async::DurationExt;
     use fuchsia_inspect::reader::{read_with_timeout, DiagnosticsHierarchy, PartialNodeHierarchy};
+    use std::sync::Arc;
 
     use futures::FutureExt;
     use std::time::Duration;
@@ -154,14 +174,15 @@ mod tests {
     pub fn spawn_server_proxy(
         inspector: Inspector,
         settings: TreeServerSendPreference,
-    ) -> Result<(fasync::Task<()>, TreeProxy), Error> {
-        spawn_tree_server(inspector, settings).map(|(t, p)| (t, p.into_proxy()))
+    ) -> (Arc<fasync::Scope>, TreeProxy) {
+        let scope = Arc::new(fasync::Scope::new());
+        (scope.clone(), spawn_tree_server(inspector, settings, scope.as_handle()).into_proxy())
     }
 
     #[fuchsia::test]
     async fn get_contents() -> Result<(), Error> {
         let (_server, tree) =
-            spawn_server_proxy(test_inspector(), TreeServerSendPreference::default())?;
+            spawn_server_proxy(test_inspector(), TreeServerSendPreference::default());
         let tree_content = tree.get_content().await?;
         let hierarchy = parse_content(tree_content)?;
         assert_data_tree!(hierarchy, root: {
@@ -173,7 +194,7 @@ mod tests {
     #[fuchsia::test]
     async fn list_child_names() -> Result<(), Error> {
         let (_server, tree) =
-            spawn_server_proxy(test_inspector(), TreeServerSendPreference::default())?;
+            spawn_server_proxy(test_inspector(), TreeServerSendPreference::default());
         let (name_iterator, server_end) = fidl::endpoints::create_proxy::<TreeNameIteratorMarker>();
         tree.list_child_names(server_end)?;
         verify_iterator(name_iterator, vec!["lazy-0".to_string()]).await?;
@@ -183,7 +204,7 @@ mod tests {
     #[fuchsia::test]
     async fn open_children() -> Result<(), Error> {
         let (_server, tree) =
-            spawn_server_proxy(test_inspector(), TreeServerSendPreference::default())?;
+            spawn_server_proxy(test_inspector(), TreeServerSendPreference::default());
         let (child_tree, server_end) = fidl::endpoints::create_proxy::<TreeMarker>();
         tree.open_child("lazy-0", server_end)?;
         let tree_content = child_tree.get_content().await?;
@@ -213,7 +234,7 @@ mod tests {
     async fn default_snapshots_are_private_on_success() -> Result<(), Error> {
         let inspector = test_inspector();
         let (_server, tree_copy) =
-            spawn_server_proxy(inspector.clone(), TreeServerSendPreference::default())?;
+            spawn_server_proxy(inspector.clone(), TreeServerSendPreference::default());
         let tree_content_copy = tree_copy.get_content().await?;
 
         inspector.root().record_int("new", 6);
@@ -230,9 +251,9 @@ mod tests {
     async fn force_live_snapshot() -> Result<(), Error> {
         let inspector = test_inspector();
         let (_server1, tree_cow) =
-            spawn_server_proxy(inspector.clone(), TreeServerSendPreference::default())?;
+            spawn_server_proxy(inspector.clone(), TreeServerSendPreference::default());
         let (_server2, tree_live) =
-            spawn_server_proxy(inspector.clone(), TreeServerSendPreference::Live)?;
+            spawn_server_proxy(inspector.clone(), TreeServerSendPreference::Live);
         let tree_content_live = tree_live.get_content().await?;
         let tree_content_cow = tree_cow.get_content().await?;
 
@@ -270,7 +291,7 @@ mod tests {
 
         root.record_int("int", 3);
 
-        let (_server, proxy) = spawn_server_proxy(inspector, TreeServerSendPreference::default())?;
+        let (_server, proxy) = spawn_server_proxy(inspector, TreeServerSendPreference::default());
         let result = read_with_timeout(&proxy, Duration::from_secs(5)).await?;
         assert_json_diff!(result, root: {
             child: "value",
