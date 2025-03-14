@@ -7,7 +7,7 @@ use core::mem::replace;
 use crate::fuchsia::{HandleDecoder, HandleEncoder, WireHandle, WireOptionalHandle};
 use crate::{
     munge, Decode, DecodeError, Encodable, EncodableOption, Encode, EncodeError, EncodeOption,
-    Slot, TakeFrom, ZeroPadding,
+    Slot, TakeFrom,
 };
 
 use zx::sys::zx_handle_t;
@@ -18,15 +18,6 @@ use zx::{Channel, Handle};
 #[repr(transparent)]
 pub struct WireChannel {
     handle: WireHandle,
-}
-
-unsafe impl ZeroPadding for WireChannel {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            WireHandle::zero_padding(ptr.cast());
-        }
-    }
 }
 
 impl WireChannel {
@@ -71,15 +62,6 @@ impl TakeFrom<WireChannel> for Channel {
 #[repr(transparent)]
 pub struct WireOptionalChannel {
     handle: WireOptionalHandle,
-}
-
-unsafe impl ZeroPadding for WireOptionalChannel {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            WireOptionalHandle::zero_padding(ptr.cast());
-        }
-    }
 }
 
 impl WireOptionalChannel {

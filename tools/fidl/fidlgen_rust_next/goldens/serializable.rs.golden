@@ -74,11 +74,6 @@ impl ::fidl_next::TakeFrom<WireSerializableStruct> for SerializableStruct {
 #[repr(C)]
 pub struct WireSerializableStruct {}
 
-unsafe impl ::fidl_next::ZeroPadding for WireSerializableStruct {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSerializableStruct
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -153,15 +148,6 @@ impl ::fidl_next::TakeFrom<WireSerializableTable> for SerializableTable {
 #[repr(C)]
 pub struct WireSerializableTable {
     table: ::fidl_next::WireTable,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireSerializableTable {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::WireTable::zero_padding(ptr.cast());
-        }
-    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSerializableTable
@@ -281,15 +267,6 @@ pub struct WireSerializableUnion {
     raw: ::fidl_next::RawWireUnion,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireSerializableUnion {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
-    }
-}
-
 pub mod serializable_union {
     pub enum Ref<'union> {
         Unused(&'union bool),
@@ -349,15 +326,6 @@ impl ::core::fmt::Debug for WireSerializableUnion {
 #[repr(transparent)]
 pub struct WireOptionalSerializableUnion {
     raw: ::fidl_next::RawWireUnion,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireOptionalSerializableUnion {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
-    }
 }
 
 impl WireOptionalSerializableUnion {

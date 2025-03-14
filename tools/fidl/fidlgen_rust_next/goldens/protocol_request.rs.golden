@@ -200,11 +200,6 @@ pub struct WireParentGetChildResponse {
     pub c: ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireHandle, crate::Child>,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireParentGetChildResponse {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireParentGetChildResponse
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -325,11 +320,6 @@ impl ::fidl_next::TakeFrom<WireParentGetChildRequestResponse> for ParentGetChild
 #[repr(C)]
 pub struct WireParentGetChildRequestResponse {
     pub r: ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireHandle, crate::Child>,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireParentGetChildRequestResponse {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireParentGetChildRequestResponse
@@ -454,11 +444,6 @@ pub struct WireParentTakeChildRequest {
     pub c: ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireHandle, crate::Child>,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireParentTakeChildRequest {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireParentTakeChildRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -579,11 +564,6 @@ impl ::fidl_next::TakeFrom<WireParentTakeChildRequestRequest> for ParentTakeChil
 #[repr(C)]
 pub struct WireParentTakeChildRequestRequest {
     pub r: ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireHandle, crate::Child>,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireParentTakeChildRequestRequest {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireParentTakeChildRequestRequest

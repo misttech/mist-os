@@ -89,13 +89,6 @@ pub struct {{ wire_name }} {
     value: {{ wire_int }},
 }
 
-unsafe impl ::fidl_next::ZeroPadding for {{ wire_name }} {
-    #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
-        // Wire enums have no padding
-    }
-}
-
 impl {{ wire_name }} {
     {% for member in enm.members %}
         pub const {{ member.name.screaming_snake()|ident }}: {{ wire_name }} = {{ wire_name }} {

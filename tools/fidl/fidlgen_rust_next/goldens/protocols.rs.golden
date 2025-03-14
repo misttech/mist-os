@@ -206,11 +206,6 @@ pub struct WireChannelProtocolMethodARequest {
     pub b: ::fidl_next::WireI64,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireChannelProtocolMethodARequest {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireChannelProtocolMethodARequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -331,11 +326,6 @@ pub struct WireChannelProtocolEventARequest {
     pub a: ::fidl_next::WireI64,
 
     pub b: ::fidl_next::WireI64,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireChannelProtocolEventARequest {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireChannelProtocolEventARequest
@@ -460,11 +450,6 @@ pub struct WireChannelProtocolMethodBRequest {
     pub b: ::fidl_next::WireI64,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireChannelProtocolMethodBRequest {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireChannelProtocolMethodBRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -572,11 +557,6 @@ impl ::fidl_next::TakeFrom<WireChannelProtocolMethodBResponse> for ChannelProtoc
 #[repr(C)]
 pub struct WireChannelProtocolMethodBResponse {
     pub result: ::fidl_next::WireI64,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireChannelProtocolMethodBResponse {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireChannelProtocolMethodBResponse
@@ -689,11 +669,6 @@ impl ::fidl_next::TakeFrom<WireChannelProtocolTakeHandleRequest>
 #[repr(C)]
 pub struct WireChannelProtocolTakeHandleRequest {
     pub h: ::fidl_next::fuchsia::WireHandle,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireChannelProtocolTakeHandleRequest {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireChannelProtocolTakeHandleRequest
@@ -810,11 +785,6 @@ pub struct WireChannelProtocolMutateSocketRequest {
     pub a: ::fidl_next::fuchsia::WireHandle,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireChannelProtocolMutateSocketRequest {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireChannelProtocolMutateSocketRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -927,11 +897,6 @@ impl ::fidl_next::TakeFrom<WireChannelProtocolMutateSocketResponse>
 #[repr(C)]
 pub struct WireChannelProtocolMutateSocketResponse {
     pub b: ::fidl_next::fuchsia::WireHandle,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireChannelProtocolMutateSocketResponse {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireChannelProtocolMutateSocketResponse
@@ -1554,13 +1519,6 @@ pub struct WireErrorEnum {
     value: ::fidl_next::WireU32,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireErrorEnum {
-    #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
-        // Wire enums have no padding
-    }
-}
-
 impl WireErrorEnum {
     pub const ERR_FOO: WireErrorEnum = WireErrorEnum { value: ::fidl_next::WireU32(1) };
 
@@ -1687,11 +1645,6 @@ pub struct WireHandleRightsProtocolNoResponseMethodRequest {
     pub h: ::fidl_next::fuchsia::WireHandle,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireHandleRightsProtocolNoResponseMethodRequest {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireHandleRightsProtocolNoResponseMethodRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -1804,11 +1757,6 @@ impl ::fidl_next::TakeFrom<WireHandleRightsProtocolResponseMethodRequest>
 #[repr(C)]
 pub struct WireHandleRightsProtocolResponseMethodRequest {
     pub h: ::fidl_next::fuchsia::WireHandle,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireHandleRightsProtocolResponseMethodRequest {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireHandleRightsProtocolResponseMethodRequest
@@ -1925,11 +1873,6 @@ pub struct WireHandleRightsProtocolResponseMethodResponse {
     pub h: ::fidl_next::fuchsia::WireHandle,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireHandleRightsProtocolResponseMethodResponse {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireHandleRightsProtocolResponseMethodResponse
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -2042,11 +1985,6 @@ impl ::fidl_next::TakeFrom<WireHandleRightsProtocolAnEventRequest>
 #[repr(C)]
 pub struct WireHandleRightsProtocolAnEventRequest {
     pub h: ::fidl_next::fuchsia::WireHandle,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireHandleRightsProtocolAnEventRequest {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireHandleRightsProtocolAnEventRequest
@@ -2588,11 +2526,6 @@ pub struct WireManyParametersFifteenRequest {
     pub p15: bool,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireManyParametersFifteenRequest {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireManyParametersFifteenRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -2902,15 +2835,6 @@ pub struct WireTheUnion {
     raw: ::fidl_next::RawWireUnion,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireTheUnion {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
-    }
-}
-
 pub mod the_union {
     pub enum Ref<'union> {
         V(&'union ::fidl_next::WireU32),
@@ -2972,15 +2896,6 @@ impl ::core::fmt::Debug for WireTheUnion {
 #[repr(transparent)]
 pub struct WireOptionalTheUnion {
     raw: ::fidl_next::RawWireUnion,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireOptionalTheUnion {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
-    }
 }
 
 impl WireOptionalTheUnion {
@@ -3130,11 +3045,6 @@ pub struct WireMethodWithUnionUnionMethodRequest {
     pub u: crate::WireTheUnion,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireMethodWithUnionUnionMethodRequest {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireMethodWithUnionUnionMethodRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -3243,11 +3153,6 @@ impl ::fidl_next::TakeFrom<WireMethodWithUnionUnionMethodResponse>
 #[repr(C)]
 pub struct WireMethodWithUnionUnionMethodResponse {
     pub u: crate::WireOptionalTheUnion,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireMethodWithUnionUnionMethodResponse {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireMethodWithUnionUnionMethodResponse
@@ -3712,11 +3617,6 @@ pub struct WireProtocolEnds {
     >,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireProtocolEnds {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireProtocolEnds
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -3845,11 +3745,6 @@ pub struct WireSyscallProtocolMethodCRequest {
     pub a: ::fidl_next::WireI64,
 
     pub b: ::fidl_next::WireI64,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireSyscallProtocolMethodCRequest {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSyscallProtocolMethodCRequest
@@ -4107,13 +4002,6 @@ pub struct WireWithAndWithoutRequestResponseNoRequestWithResponseResponse {
     pub ret: ::fidl_next::WireString,
 }
 
-unsafe impl ::fidl_next::ZeroPadding
-    for WireWithAndWithoutRequestResponseNoRequestWithResponseResponse
-{
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireWithAndWithoutRequestResponseNoRequestWithResponseResponse
 where
@@ -4216,13 +4104,6 @@ impl ::fidl_next::TakeFrom<WireWithAndWithoutRequestResponseWithRequestNoRespons
 #[repr(C)]
 pub struct WireWithAndWithoutRequestResponseWithRequestNoResponseRequest {
     pub arg: ::fidl_next::WireString,
-}
-
-unsafe impl ::fidl_next::ZeroPadding
-    for WireWithAndWithoutRequestResponseWithRequestNoResponseRequest
-{
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D>
@@ -4330,13 +4211,6 @@ pub struct WireWithAndWithoutRequestResponseWithRequestEmptyResponseRequest {
     pub arg: ::fidl_next::WireString,
 }
 
-unsafe impl ::fidl_next::ZeroPadding
-    for WireWithAndWithoutRequestResponseWithRequestEmptyResponseRequest
-{
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireWithAndWithoutRequestResponseWithRequestEmptyResponseRequest
 where
@@ -4439,13 +4313,6 @@ impl ::fidl_next::TakeFrom<WireWithAndWithoutRequestResponseWithRequestWithRespo
 #[repr(C)]
 pub struct WireWithAndWithoutRequestResponseWithRequestWithResponseRequest {
     pub arg: ::fidl_next::WireString,
-}
-
-unsafe impl ::fidl_next::ZeroPadding
-    for WireWithAndWithoutRequestResponseWithRequestWithResponseRequest
-{
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D>
@@ -4553,13 +4420,6 @@ pub struct WireWithAndWithoutRequestResponseWithRequestWithResponseResponse {
     pub ret: ::fidl_next::WireString,
 }
 
-unsafe impl ::fidl_next::ZeroPadding
-    for WireWithAndWithoutRequestResponseWithRequestWithResponseResponse
-{
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireWithAndWithoutRequestResponseWithRequestWithResponseResponse
 where
@@ -4660,11 +4520,6 @@ impl ::fidl_next::TakeFrom<WireWithAndWithoutRequestResponseOnWithResponseReques
 #[repr(C)]
 pub struct WireWithAndWithoutRequestResponseOnWithResponseRequest {
     pub ret: ::fidl_next::WireString,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireWithAndWithoutRequestResponseOnWithResponseRequest {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D>
@@ -5351,11 +5206,6 @@ pub struct WireWithErrorSyntaxResponseAsStructResponse {
     pub c: ::fidl_next::WireI64,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireWithErrorSyntaxResponseAsStructResponse {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireWithErrorSyntaxResponseAsStructResponse
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -5457,11 +5307,6 @@ impl ::fidl_next::TakeFrom<WireWithErrorSyntaxErrorAsPrimitiveResponse>
 #[repr(C)]
 pub struct WireWithErrorSyntaxErrorAsPrimitiveResponse {}
 
-unsafe impl ::fidl_next::ZeroPadding for WireWithErrorSyntaxErrorAsPrimitiveResponse {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireWithErrorSyntaxErrorAsPrimitiveResponse
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -5553,11 +5398,6 @@ impl ::fidl_next::TakeFrom<WireWithErrorSyntaxErrorAsEnumResponse>
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireWithErrorSyntaxErrorAsEnumResponse {}
-
-unsafe impl ::fidl_next::ZeroPadding for WireWithErrorSyntaxErrorAsEnumResponse {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireWithErrorSyntaxErrorAsEnumResponse
 where
@@ -5666,11 +5506,6 @@ impl ::fidl_next::TakeFrom<WireWithErrorSyntaxHandleInResultResponse>
 #[repr(C)]
 pub struct WireWithErrorSyntaxHandleInResultResponse {
     pub h: ::fidl_next::fuchsia::WireHandle,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireWithErrorSyntaxHandleInResultResponse {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireWithErrorSyntaxHandleInResultResponse
@@ -6098,11 +5933,6 @@ pub struct WireWithProtocolEndsClientEndsRequest {
     pub in_: ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireHandle, crate::DiscoverableProtocol>,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireWithProtocolEndsClientEndsRequest {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireWithProtocolEndsClientEndsRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -6227,11 +6057,6 @@ pub struct WireWithProtocolEndsClientEndsResponse {
         ::fidl_next::fuchsia::WireOptionalHandle,
         crate::DiscoverableProtocol,
     >,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireWithProtocolEndsClientEndsResponse {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireWithProtocolEndsClientEndsResponse
@@ -6360,11 +6185,6 @@ pub struct WireWithProtocolEndsServerEndsRequest {
     >,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireWithProtocolEndsServerEndsRequest {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireWithProtocolEndsServerEndsRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -6485,11 +6305,6 @@ pub struct WireWithProtocolEndsServerEndsResponse {
     pub out: ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireHandle, crate::DiscoverableProtocol>,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireWithProtocolEndsServerEndsResponse {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireWithProtocolEndsServerEndsResponse
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -6602,11 +6417,6 @@ pub struct WireWithProtocolEndsStructContainingEndsRequest {
     pub in_: crate::WireProtocolEnds,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireWithProtocolEndsStructContainingEndsRequest {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireWithProtocolEndsStructContainingEndsRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -6717,11 +6527,6 @@ impl ::fidl_next::TakeFrom<WireWithProtocolEndsStructContainingEndsResponse>
 #[repr(C)]
 pub struct WireWithProtocolEndsStructContainingEndsResponse {
     pub out: crate::WireProtocolEnds,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireWithProtocolEndsStructContainingEndsResponse {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireWithProtocolEndsStructContainingEndsResponse

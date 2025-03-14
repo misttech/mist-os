@@ -74,13 +74,6 @@ pub struct {{ wire_name }} {
     value: {{ wire_subtype }},
 }
 
-unsafe impl ::fidl_next::ZeroPadding for {{ wire_name }} {
-    #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
-        // Wire bits have no padding
-    }
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for {{ wire_name }}
 where
     ___D: ?Sized,

@@ -8,7 +8,6 @@ use crate::decoder::InternalHandleDecoder;
 use crate::encoder::InternalHandleEncoder;
 use crate::{
     Decode, DecodeError, Decoder, Encode, EncodeError, Encoder, Slot, WireEnvelope, WireU64,
-    ZeroPadding,
 };
 
 /// A raw FIDL union
@@ -16,13 +15,6 @@ use crate::{
 pub struct RawWireUnion {
     ordinal: WireU64,
     envelope: WireEnvelope,
-}
-
-unsafe impl ZeroPadding for RawWireUnion {
-    #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
-        // Wire unions have no padding
-    }
 }
 
 impl RawWireUnion {

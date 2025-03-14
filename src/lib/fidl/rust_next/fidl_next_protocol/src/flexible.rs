@@ -7,7 +7,7 @@ use core::marker::PhantomData;
 
 use fidl_next_codec::{
     munge, Decode, DecodeError, Decoder, Encodable, Encode, EncodeError, Encoder, RawWireUnion,
-    Slot, TakeFrom, ZeroPadding,
+    Slot, TakeFrom,
 };
 
 use crate::{FrameworkError, WireFrameworkError};
@@ -26,15 +26,6 @@ pub enum Flexible<T> {
 pub struct WireFlexible<T> {
     raw: RawWireUnion,
     _phantom: PhantomData<T>,
-}
-
-unsafe impl<T> ZeroPadding for WireFlexible<T> {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            RawWireUnion::zero_padding(ptr.cast());
-        }
-    }
 }
 
 const ORD_OK: u64 = 1;

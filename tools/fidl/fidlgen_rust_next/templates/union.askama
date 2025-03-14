@@ -137,15 +137,6 @@ pub struct {{ wire_name }} {
     raw: ::fidl_next::RawWireUnion,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for {{ wire_name }} {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
-    }
-}
-
 {% let access_params %}
 {% let access_args %}
 {% if union.members.is_empty() %}
@@ -258,15 +249,6 @@ where
 #[repr(transparent)]
 pub struct WireOptional{{ name }} {
     raw: ::fidl_next::RawWireUnion,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireOptional{{ name }} {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
-    }
 }
 
 impl WireOptional{{ name }} {

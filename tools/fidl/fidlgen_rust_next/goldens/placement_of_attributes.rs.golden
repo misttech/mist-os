@@ -64,13 +64,6 @@ pub struct WireExampleBits {
     value: ::fidl_next::WireU32,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireExampleBits {
-    #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
-        // Wire bits have no padding
-    }
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleBits
 where
     ___D: ?Sized,
@@ -149,13 +142,6 @@ impl ::fidl_next::TakeFrom<WireExampleEnum> for ExampleEnum {
 #[repr(transparent)]
 pub struct WireExampleEnum {
     value: ::fidl_next::WireU32,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireExampleEnum {
-    #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
-        // Wire enums have no padding
-    }
 }
 
 impl WireExampleEnum {
@@ -282,11 +268,6 @@ impl ::fidl_next::TakeFrom<WireExampleProtocolMethodRequest> for ExampleProtocol
 #[repr(C)]
 pub struct WireExampleProtocolMethodRequest {
     pub arg: ::fidl_next_test_exampleusing::WireEmpty,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireExampleProtocolMethodRequest {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleProtocolMethodRequest
@@ -546,11 +527,6 @@ pub struct WireExampleStruct {
     pub member: ::fidl_next::WireU32,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireExampleStruct {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleStruct
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -646,15 +622,6 @@ impl ::fidl_next::TakeFrom<WireExampleTable> for ExampleTable {
 #[repr(C)]
 pub struct WireExampleTable {
     table: ::fidl_next::WireTable,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireExampleTable {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::WireTable::zero_padding(ptr.cast());
-        }
-    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleTable
@@ -787,15 +754,6 @@ pub struct WireExampleUnion {
     raw: ::fidl_next::RawWireUnion,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireExampleUnion {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
-    }
-}
-
 pub mod example_union {
     pub enum Ref<'union> {
         Variant(&'union ::fidl_next::WireU32),
@@ -855,15 +813,6 @@ impl ::core::fmt::Debug for WireExampleUnion {
 #[repr(transparent)]
 pub struct WireOptionalExampleUnion {
     raw: ::fidl_next::RawWireUnion,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireOptionalExampleUnion {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
-    }
 }
 
 impl WireOptionalExampleUnion {

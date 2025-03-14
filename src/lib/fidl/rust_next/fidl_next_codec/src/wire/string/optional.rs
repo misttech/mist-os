@@ -9,22 +9,13 @@ use munge::munge;
 
 use crate::{
     Decode, DecodeError, Decoder, EncodableOption, EncodeError, EncodeOption, Encoder, Slot,
-    TakeFrom, WireOptionalVector, WireString, WireVector, ZeroPadding,
+    TakeFrom, WireOptionalVector, WireString, WireVector,
 };
 
 /// An optional FIDL string
 #[repr(transparent)]
 pub struct WireOptionalString {
     vec: WireOptionalVector<u8>,
-}
-
-unsafe impl ZeroPadding for WireOptionalString {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            WireOptionalVector::<u8>::zero_padding(ptr.cast());
-        }
-    }
 }
 
 impl WireOptionalString {

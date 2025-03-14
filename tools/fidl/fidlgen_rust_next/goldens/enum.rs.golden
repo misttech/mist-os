@@ -53,13 +53,6 @@ pub struct WireMyEmptyFlexibleEnum {
     value: ::fidl_next::WireU32,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireMyEmptyFlexibleEnum {
-    #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
-        // Wire enums have no padding
-    }
-}
-
 impl WireMyEmptyFlexibleEnum {}
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireMyEmptyFlexibleEnum
@@ -143,13 +136,6 @@ impl ::fidl_next::TakeFrom<WireMyFlexibleEnum> for MyFlexibleEnum {
 #[repr(transparent)]
 pub struct WireMyFlexibleEnum {
     value: ::fidl_next::WireU32,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireMyFlexibleEnum {
-    #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
-        // Wire enums have no padding
-    }
 }
 
 impl WireMyFlexibleEnum {
@@ -254,13 +240,6 @@ pub struct WireMyFlexibleEnumWithCustomUnknown {
     value: ::fidl_next::WireU32,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireMyFlexibleEnumWithCustomUnknown {
-    #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
-        // Wire enums have no padding
-    }
-}
-
 impl WireMyFlexibleEnumWithCustomUnknown {
     pub const FOO: WireMyFlexibleEnumWithCustomUnknown =
         WireMyFlexibleEnumWithCustomUnknown { value: ::fidl_next::WireU32(1) };
@@ -360,13 +339,6 @@ impl ::fidl_next::TakeFrom<WireMyStrictEnum> for MyStrictEnum {
 #[repr(transparent)]
 pub struct WireMyStrictEnum {
     value: ::fidl_next::WireU32,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireMyStrictEnum {
-    #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
-        // Wire enums have no padding
-    }
 }
 
 impl WireMyStrictEnum {

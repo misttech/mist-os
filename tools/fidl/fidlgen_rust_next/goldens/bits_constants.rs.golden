@@ -59,13 +59,6 @@ pub struct WireBitsType {
     value: ::fidl_next::WireU32,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireBitsType {
-    #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
-        // Wire bits have no padding
-    }
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireBitsType
 where
     ___D: ?Sized,

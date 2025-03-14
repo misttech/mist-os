@@ -100,11 +100,6 @@ pub struct WireTwoWayAddRequest {
     pub addend2: ::fidl_next::WireU16,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireTwoWayAddRequest {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireTwoWayAddRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -212,11 +207,6 @@ impl ::fidl_next::TakeFrom<WireTwoWayAddResponse> for TwoWayAddResponse {
 #[repr(C)]
 pub struct WireTwoWayAddResponse {
     pub sum: ::fidl_next::WireU16,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireTwoWayAddResponse {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireTwoWayAddResponse

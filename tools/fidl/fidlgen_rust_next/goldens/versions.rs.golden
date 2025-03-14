@@ -66,13 +66,6 @@ pub struct WireBits {
     value: ::fidl_next::WireU32,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireBits {
-    #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
-        // Wire bits have no padding
-    }
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireBits
 where
     ___D: ?Sized,
@@ -147,13 +140,6 @@ impl ::fidl_next::TakeFrom<WireEnum> for Enum {
 #[repr(transparent)]
 pub struct WireEnum {
     value: ::fidl_next::WireU32,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireEnum {
-    #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
-        // Wire enums have no padding
-    }
 }
 
 impl WireEnum {
@@ -548,11 +534,6 @@ pub struct WireStruct {
     pub x: ::fidl_next::WireU32,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireStruct {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStruct
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -652,15 +633,6 @@ impl ::fidl_next::TakeFrom<WireTable> for Table {
 #[repr(C)]
 pub struct WireTable {
     table: ::fidl_next::WireTable,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireTable {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::WireTable::zero_padding(ptr.cast());
-        }
-    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireTable
@@ -803,15 +775,6 @@ pub struct WireUnion {
     raw: ::fidl_next::RawWireUnion,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireUnion {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
-    }
-}
-
 pub mod union_ {
     pub enum Ref<'union> {
         X(&'union ::fidl_next::WireU32),
@@ -865,15 +828,6 @@ impl ::core::fmt::Debug for WireUnion {
 #[repr(transparent)]
 pub struct WireOptionalUnion {
     raw: ::fidl_next::RawWireUnion,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireOptionalUnion {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
-    }
 }
 
 impl WireOptionalUnion {

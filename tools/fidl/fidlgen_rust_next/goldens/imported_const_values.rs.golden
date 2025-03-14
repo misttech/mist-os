@@ -84,11 +84,6 @@ impl ::fidl_next::TakeFrom<WireMyStruct> for MyStruct {
 #[repr(C)]
 pub struct WireMyStruct {}
 
-unsafe impl ::fidl_next::ZeroPadding for WireMyStruct {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireMyStruct
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,

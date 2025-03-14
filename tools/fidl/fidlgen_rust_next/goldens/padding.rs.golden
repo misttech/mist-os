@@ -85,15 +85,6 @@ pub struct WirePadding1ByteEnd {
     pub b: u8,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WirePadding1ByteEnd {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ptr.cast::<u8>().add(3).write_bytes(0, 1);
-        }
-    }
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding1ByteEnd
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -199,15 +190,6 @@ pub struct WirePadding1ByteMiddle {
     pub a: u8,
 
     pub b: ::fidl_next::WireU16,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WirePadding1ByteMiddle {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ptr.cast::<u8>().add(1).write_bytes(0, 1);
-        }
-    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding1ByteMiddle
@@ -326,19 +308,6 @@ pub struct WirePadding2ByteAlignmentLength6 {
     pub c: u8,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WirePadding2ByteAlignmentLength6 {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ptr.cast::<u8>().add(5).write_bytes(0, 1);
-        }
-
-        unsafe {
-            ptr.cast::<u8>().add(1).write_bytes(0, 1);
-        }
-    }
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding2ByteAlignmentLength6
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -449,15 +418,6 @@ pub struct WirePadding2ByteEnd {
     pub b: ::fidl_next::WireU16,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WirePadding2ByteEnd {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ptr.cast::<u8>().add(6).write_bytes(0, 2);
-        }
-    }
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding2ByteEnd
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -563,15 +523,6 @@ pub struct WirePadding2ByteMiddle {
     pub a: ::fidl_next::WireU16,
 
     pub b: ::fidl_next::WireU32,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WirePadding2ByteMiddle {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ptr.cast::<u8>().add(2).write_bytes(0, 2);
-        }
-    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding2ByteMiddle
@@ -681,15 +632,6 @@ pub struct WirePadding3ByteEnd {
     pub b: u8,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WirePadding3ByteEnd {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ptr.cast::<u8>().add(5).write_bytes(0, 3);
-        }
-    }
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding3ByteEnd
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -795,15 +737,6 @@ pub struct WirePadding3ByteMiddle {
     pub a: u8,
 
     pub b: ::fidl_next::WireU32,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WirePadding3ByteMiddle {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ptr.cast::<u8>().add(1).write_bytes(0, 3);
-        }
-    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding3ByteMiddle
@@ -931,19 +864,6 @@ pub struct WirePadding4ByteAlignmentLength12 {
     pub d: ::fidl_next::WireU16,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WirePadding4ByteAlignmentLength12 {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ptr.cast::<u8>().add(10).write_bytes(0, 2);
-        }
-
-        unsafe {
-            ptr.cast::<u8>().add(5).write_bytes(0, 1);
-        }
-    }
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding4ByteAlignmentLength12
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -1057,15 +977,6 @@ pub struct WirePadding4ByteEnd {
     pub b: ::fidl_next::WireU32,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WirePadding4ByteEnd {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ptr.cast::<u8>().add(12).write_bytes(0, 4);
-        }
-    }
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding4ByteEnd
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -1171,15 +1082,6 @@ pub struct WirePadding4ByteMiddle {
     pub a: ::fidl_next::WireU32,
 
     pub b: ::fidl_next::WireU64,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WirePadding4ByteMiddle {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ptr.cast::<u8>().add(4).write_bytes(0, 4);
-        }
-    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding4ByteMiddle
@@ -1296,15 +1198,6 @@ pub struct WirePadding5ByteEnd {
     pub b: ::fidl_next::WireU16,
 
     pub c: u8,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WirePadding5ByteEnd {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ptr.cast::<u8>().add(11).write_bytes(0, 5);
-        }
-    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding5ByteEnd
@@ -1426,15 +1319,6 @@ pub struct WirePadding5ByteMiddle {
     pub c: ::fidl_next::WireU64,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WirePadding5ByteMiddle {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ptr.cast::<u8>().add(3).write_bytes(0, 5);
-        }
-    }
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding5ByteMiddle
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -1545,15 +1429,6 @@ pub struct WirePadding6ByteEnd {
     pub b: ::fidl_next::WireU16,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WirePadding6ByteEnd {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ptr.cast::<u8>().add(10).write_bytes(0, 6);
-        }
-    }
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding6ByteEnd
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -1659,15 +1534,6 @@ pub struct WirePadding6ByteMiddle {
     pub a: ::fidl_next::WireU16,
 
     pub b: ::fidl_next::WireU64,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WirePadding6ByteMiddle {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ptr.cast::<u8>().add(2).write_bytes(0, 6);
-        }
-    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding6ByteMiddle
@@ -1777,15 +1643,6 @@ pub struct WirePadding7ByteEnd {
     pub b: u8,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WirePadding7ByteEnd {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ptr.cast::<u8>().add(9).write_bytes(0, 7);
-        }
-    }
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding7ByteEnd
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -1891,15 +1748,6 @@ pub struct WirePadding7ByteMiddle {
     pub a: u8,
 
     pub b: ::fidl_next::WireU64,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WirePadding7ByteMiddle {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ptr.cast::<u8>().add(1).write_bytes(0, 7);
-        }
-    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding7ByteMiddle

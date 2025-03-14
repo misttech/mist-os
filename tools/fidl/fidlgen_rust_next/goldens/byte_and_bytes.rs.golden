@@ -87,11 +87,6 @@ pub struct WireByteAndBytes {
     pub single_byte: u8,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireByteAndBytes {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireByteAndBytes
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,

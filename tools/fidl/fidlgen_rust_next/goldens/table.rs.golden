@@ -60,15 +60,6 @@ pub struct WireEmptyTable {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireEmptyTable {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::WireTable::zero_padding(ptr.cast());
-        }
-    }
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireEmptyTable
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -153,15 +144,6 @@ impl ::fidl_next::TakeFrom<WireExtensionTable> for ExtensionTable {
 #[repr(C)]
 pub struct WireExtensionTable {
     table: ::fidl_next::WireTable,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireExtensionTable {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::WireTable::zero_padding(ptr.cast());
-        }
-    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireExtensionTable
@@ -310,15 +292,6 @@ pub struct WireNewerSimpleTable {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireNewerSimpleTable {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::WireTable::zero_padding(ptr.cast());
-        }
-    }
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireNewerSimpleTable
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -464,15 +437,6 @@ impl ::fidl_next::TakeFrom<WireOlderSimpleTable> for OlderSimpleTable {
 #[repr(C)]
 pub struct WireOlderSimpleTable {
     table: ::fidl_next::WireTable,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireOlderSimpleTable {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::WireTable::zero_padding(ptr.cast());
-        }
-    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireOlderSimpleTable
@@ -632,15 +596,6 @@ impl ::fidl_next::TakeFrom<WireReverseOrdinalTable> for ReverseOrdinalTable {
 #[repr(C)]
 pub struct WireReverseOrdinalTable {
     table: ::fidl_next::WireTable,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireReverseOrdinalTable {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::WireTable::zero_padding(ptr.cast());
-        }
-    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireReverseOrdinalTable
@@ -810,15 +765,6 @@ impl ::fidl_next::TakeFrom<WireSimpleTable> for SimpleTable {
 #[repr(C)]
 pub struct WireSimpleTable {
     table: ::fidl_next::WireTable,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireSimpleTable {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::WireTable::zero_padding(ptr.cast());
-        }
-    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSimpleTable
@@ -2213,15 +2159,6 @@ pub struct WireSixtyFourOrdinalTable {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireSixtyFourOrdinalTable {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::WireTable::zero_padding(ptr.cast());
-        }
-    }
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSixtyFourOrdinalTable
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -3221,15 +3158,6 @@ impl ::fidl_next::TakeFrom<WireTableWithAttributes> for TableWithAttributes {
 #[repr(C)]
 pub struct WireTableWithAttributes {
     table: ::fidl_next::WireTable,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireTableWithAttributes {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::WireTable::zero_padding(ptr.cast());
-        }
-    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireTableWithAttributes

@@ -7,7 +7,7 @@ use core::marker::PhantomData;
 
 use crate::{
     munge, Decode, DecodeError, Decoder, Encodable, Encode, EncodeError, Encoder, RawWireUnion,
-    Slot, TakeFrom, ZeroPadding,
+    Slot, TakeFrom,
 };
 
 /// A FIDL result union.
@@ -15,15 +15,6 @@ use crate::{
 pub struct WireResult<T, E> {
     raw: RawWireUnion,
     _phantom: PhantomData<(T, E)>,
-}
-
-unsafe impl<T, E> ZeroPadding for WireResult<T, E> {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            RawWireUnion::zero_padding(ptr.cast());
-        }
-    }
 }
 
 const ORD_OK: u64 = 1;

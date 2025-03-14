@@ -8,7 +8,7 @@ use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 use core::slice::from_mut;
 
-use crate::{Chunk, Encode, EncodeError, Slot, WireU64, ZeroPadding, CHUNK_SIZE};
+use crate::{Chunk, Encode, EncodeError, Slot, WireU64, CHUNK_SIZE};
 
 /// An encoder for FIDL handles (internal).
 pub trait InternalHandleEncoder {
@@ -138,13 +138,10 @@ impl<E: Encoder + ?Sized> EncoderExt for E {
         let mut slots = self.preallocate::<T::Encoded>(values.len());
 
         let mut backing = MaybeUninit::<T::Encoded>::uninit();
-        unsafe {
-            <T::Encoded as ZeroPadding>::zero_padding(backing.as_mut_ptr());
-        }
-        let mut slot = unsafe { Slot::new_unchecked(backing.as_mut_ptr()) };
         for value in values {
+            let mut slot = Slot::new(&mut backing);
             value.encode(slots.encoder, slot.as_mut())?;
-            slots.write_next(slot.as_mut());
+            slots.write_next(slot);
         }
 
         Ok(())

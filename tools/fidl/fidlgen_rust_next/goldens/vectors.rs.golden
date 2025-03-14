@@ -93,11 +93,6 @@ pub struct WireExampleUseOfVectors {
     pub vector_of_vector_of_bool: ::fidl_next::WireVector<::fidl_next::WireVector<bool>>,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireExampleUseOfVectors {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleUseOfVectors
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,

@@ -99,11 +99,6 @@ pub struct WireClientEndWrapper {
     pub value: ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireHandle, crate::DriverProtocol>,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireClientEndWrapper {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireClientEndWrapper
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -327,15 +322,6 @@ pub struct WireT {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireT {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::WireTable::zero_padding(ptr.cast());
-        }
-    }
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireT
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -477,11 +463,6 @@ impl ::fidl_next::TakeFrom<WireHandlesInProtocolSendHandlesRequest>
 #[repr(C)]
 pub struct WireHandlesInProtocolSendHandlesRequest {
     pub t: crate::WireT,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireHandlesInProtocolSendHandlesRequest {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireHandlesInProtocolSendHandlesRequest
@@ -756,11 +737,6 @@ impl ::fidl_next::TakeFrom<WireServerEndWrapper> for ServerEndWrapper {
 #[repr(C)]
 pub struct WireServerEndWrapper {
     pub value: ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireHandle, crate::DriverProtocol>,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireServerEndWrapper {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireServerEndWrapper

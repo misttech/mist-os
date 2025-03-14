@@ -10,22 +10,13 @@ use munge::munge;
 
 use crate::{
     Decode, DecodeError, Decoder, Encodable, Encode, EncodeError, Encoder, Slot, TakeFrom,
-    WireVector, ZeroPadding,
+    WireVector,
 };
 
 /// A FIDL string
 #[repr(transparent)]
 pub struct WireString {
     vec: WireVector<u8>,
-}
-
-unsafe impl ZeroPadding for WireString {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            WireVector::<u8>::zero_padding(ptr.cast());
-        }
-    }
 }
 
 impl WireString {

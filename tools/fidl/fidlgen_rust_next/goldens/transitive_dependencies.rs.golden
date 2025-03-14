@@ -89,11 +89,6 @@ pub struct WireBaz {
     pub g: ::fidl_next_test_middle::WireBar,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireBaz {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireBaz
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,

@@ -85,15 +85,6 @@ pub struct WireInt16Int8 {
     pub b: i8,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireInt16Int8 {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ptr.cast::<u8>().add(3).write_bytes(0, 1);
-        }
-    }
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireInt16Int8
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -188,11 +179,6 @@ impl ::fidl_next::TakeFrom<WireArrayInt16Int8> for ArrayInt16Int8 {
 #[repr(C)]
 pub struct WireArrayInt16Int8 {
     pub arr: [crate::WireInt16Int8; 3],
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireArrayInt16Int8 {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireArrayInt16Int8
@@ -297,15 +283,6 @@ pub struct WireInt8Int32 {
     pub a: i8,
 
     pub b: ::fidl_next::WireI32,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireInt8Int32 {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ptr.cast::<u8>().add(1).write_bytes(0, 3);
-        }
-    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireInt8Int32
@@ -417,15 +394,6 @@ pub struct WireNonInlineStructTestStruct {
     pub element: ::fidl_next::WireBox<crate::WireInt16Int8>,
 
     pub h: ::fidl_next::fuchsia::WireHandle,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireNonInlineStructTestStruct {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ptr.cast::<u8>().add(12).write_bytes(0, 4);
-        }
-    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireNonInlineStructTestStruct
@@ -548,11 +516,6 @@ pub struct WireStructPaddingTestStruct {
     pub array: crate::WireArrayInt16Int8,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireStructPaddingTestStruct {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructPaddingTestStruct
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -665,11 +628,6 @@ pub struct WireTopLevelStruct {
     pub a: crate::WireStructPaddingTestStruct,
 
     pub b: crate::WireNonInlineStructTestStruct,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireTopLevelStruct {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireTopLevelStruct

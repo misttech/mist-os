@@ -87,11 +87,6 @@ pub struct WirePayload {
     pub value: ::fidl_next::WireU32,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WirePayload {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
-}
-
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePayload
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -196,11 +191,6 @@ impl ::fidl_next::TakeFrom<WireOneWaySendRequest> for OneWaySendRequest {
 #[repr(C)]
 pub struct WireOneWaySendRequest {
     pub payload: crate::WirePayload,
-}
-
-unsafe impl ::fidl_next::ZeroPadding for WireOneWaySendRequest {
-    #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireOneWaySendRequest
