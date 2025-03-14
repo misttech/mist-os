@@ -106,7 +106,7 @@ public:
 
   {{- if .IsFlexible }}
   constexpr inline {{ .Name }} unknown_bits() const {
-    return *this & {{ .Name }}(~kMask.value_);
+    return *this & {{ .Name }}(static_cast<{{ .Type }}>(~kMask.value_));
   }
   constexpr inline bool has_unknown_bits() const { return static_cast<bool>(unknown_bits()); }
   {{- end }}
