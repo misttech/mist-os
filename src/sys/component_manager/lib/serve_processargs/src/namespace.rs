@@ -178,9 +178,8 @@ mod tests {
     use std::sync::Arc;
     use test_case::test_case;
     use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
-    use vfs::directory::entry_container::Directory as VfsDirectory;
     use vfs::remote::RemoteLike;
-    use vfs::{path, pseudo_directory, ObjectRequest, ObjectRequestRef};
+    use vfs::{path, pseudo_directory, ObjectRequestRef};
     use zx::AsHandleRef;
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
@@ -448,18 +447,6 @@ mod tests {
     #[test_case(fio::PERM_READABLE | fio::Flags::PERM_INHERIT_WRITE | fio::Flags::PERM_INHERIT_EXECUTE)]
     #[fuchsia::test]
     async fn test_directory_rights(rights: fio::Flags) {
-        fn serve_vfs_dir(
-            root: Arc<impl VfsDirectory>,
-            rights: fio::Flags,
-        ) -> ClientEnd<fio::DirectoryMarker> {
-            let scope = ExecutionScope::new();
-            let (client, server) = endpoints::create_endpoints::<fio::DirectoryMarker>();
-            ObjectRequest::new(rights, &fio::Options::default(), server.into_channel()).handle(
-                |request| root.open3(scope.clone(), vfs::path::Path::dot(), rights, request),
-            );
-            client
-        }
-
         let (open_tx, mut open_rx) = mpsc::channel::<()>(1);
 
         struct MockDir {
@@ -506,7 +493,7 @@ mod tests {
         let fs = pseudo_directory! {
             "foo" => mock,
         };
-        let dir = Directory::from(serve_vfs_dir(fs, rights));
+        let dir = Directory::from(vfs::directory::serve(fs, rights).into_client_end().unwrap());
 
         let scope = ExecutionScope::new();
         let mut namespace = NamespaceBuilder::new(scope, ignore_not_found());
@@ -530,16 +517,6 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_directory_non_executable() {
-        fn serve_vfs_dir(root: Arc<impl VfsDirectory>) -> ClientEnd<fio::DirectoryMarker> {
-            let scope = ExecutionScope::new();
-            let (client, server) = endpoints::create_endpoints::<fio::DirectoryMarker>();
-            let flags = fio::PERM_READABLE;
-            ObjectRequest::new(flags, &fio::Options::default(), server.into_channel()).handle(
-                |request| root.open3(scope.clone(), vfs::path::Path::dot(), flags, request),
-            );
-            client
-        }
-
         let (open_tx, mut open_rx) = mpsc::channel::<()>(1);
 
         struct MockDir(mpsc::Sender<()>);
@@ -585,7 +562,9 @@ mod tests {
         let fs = pseudo_directory! {
             "foo" => mock,
         };
-        let dir = Directory::from(serve_vfs_dir(fs));
+        let dir = Directory::from(
+            vfs::directory::serve(fs, fio::PERM_READABLE).into_client_end().unwrap(),
+        );
 
         let scope = ExecutionScope::new();
         let mut namespace = NamespaceBuilder::new(scope, ignore_not_found());

@@ -14,7 +14,6 @@ use futures::{SinkExt, StreamExt, TryStream, TryStreamExt};
 use log::info;
 use std::sync::Arc;
 use vfs::directory::entry_container::Directory;
-use vfs::directory::spawn_directory;
 
 // #! Library for common utilities (mocks, definitions) for the manifest integration tests.
 
@@ -85,7 +84,7 @@ pub async fn mock_dev(
     dev_directory: Arc<dyn Directory>,
 ) -> Result<(), Error> {
     let mut fs = ServiceFs::new();
-    let _ = fs.add_remote("dev", spawn_directory(dev_directory));
+    let _ = fs.add_remote("dev", vfs::directory::serve_read_only(dev_directory));
     let _ = fs.serve_connection(handles.outgoing_dir)?;
     fs.collect::<()>().await;
     Ok(())

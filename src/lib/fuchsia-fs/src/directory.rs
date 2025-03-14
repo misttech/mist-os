@@ -775,12 +775,11 @@ mod tests {
     use vfs::directory::entry_container::Directory;
     use vfs::execution_scope::ExecutionScope;
     use vfs::file::vmo::read_only;
+    use vfs::pseudo_directory;
     use vfs::remote::remote_dir;
-    use vfs::{pseudo_directory, ObjectRequest};
 
     const DATA_FILE_CONTENTS: &str = "Hello World!\n";
 
-    #[cfg(target_os = "fuchsia")]
     #[cfg(target_os = "fuchsia")]
     const LONG_DURATION: MonotonicDuration = MonotonicDuration::from_seconds(30);
 
@@ -986,15 +985,8 @@ mod tests {
             },
             "rw" => remote_dir(dir)
         };
-        let (example_dir_proxy, example_dir_service) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        let scope = ExecutionScope::new();
-        let example_dir_flags =
-            fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE;
-        ObjectRequest::new(example_dir_flags, &fio::Options::default(), example_dir_service.into())
-            .handle(|request| {
-                example_dir.open3(scope, vfs::path::Path::dot(), example_dir_flags, request)
-            });
+        let example_dir_proxy =
+            vfs::directory::serve(example_dir, fio::PERM_READABLE | fio::PERM_WRITABLE);
 
         for (file_name, flags, should_succeed) in vec![
             ("ro/read_only", fio::PERM_READABLE, true),

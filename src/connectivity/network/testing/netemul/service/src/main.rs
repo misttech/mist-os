@@ -1041,7 +1041,7 @@ async fn handle_sandbox(
                         let index = realm_index.fetch_add(1, Ordering::SeqCst);
                         let prefix = format!("{}{}", sandbox_name, index);
                         let devfs = vfs::directory::immutable::simple::simple();
-                        let devfs_proxy = vfs::directory::spawn_directory(devfs.clone());
+                        let devfs_proxy = vfs::directory::serve_read_only(devfs.clone());
                         match create_realm_instance(
                             options,
                             &prefix,

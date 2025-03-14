@@ -213,7 +213,6 @@ mod tests {
     use std::str::FromStr;
     use std::sync::Arc;
     use vfs::directory::entry_container::Directory;
-    use vfs::execution_scope::ExecutionScope;
     use vfs::file::vmo::read_only;
     use {fidl_fuchsia_device as fdev, fuchsia_async as fasync};
 
@@ -244,16 +243,7 @@ mod tests {
             "device_controller" => create_controller_service("/dev/test2/y/dev"),
           },
         };
-
-        let (dir_proxy, remote) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        let scope = ExecutionScope::new();
-        let flags: fio::Flags = fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE;
-        let object_request =
-            vfs::ObjectRequest::new(flags, &Default::default(), remote.into_channel());
-        object_request.handle(|object_request| {
-            dir.open3(scope, vfs::path::Path::dot(), flags, object_request)
-        });
-
+        let dir_proxy = vfs::directory::serve_read_only(dir);
         let path = wait_for_device_with(&dir_proxy, |DeviceInfo { filename, topological_path }| {
             (topological_path == "/dev/test2/x/dev").then(|| filename.to_string())
         })
@@ -269,14 +259,7 @@ mod tests {
           "b" => read_only(b"/b"),
         };
 
-        let (dir_proxy, remote) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        let scope = ExecutionScope::new();
-        let flags: fio::Flags = fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE;
-        let object_request =
-            vfs::ObjectRequest::new(flags, &Default::default(), remote.into_channel());
-        object_request.handle(|object_request| {
-            dir.open3(scope, vfs::path::Path::dot(), flags, object_request)
-        });
+        let dir_proxy = vfs::directory::serve_read_only(dir);
 
         let stream = watch_for_files(&dir_proxy).await.unwrap();
         futures::pin_mut!(stream);
@@ -305,15 +288,7 @@ mod tests {
           "3" => read_only("file 3"),
         };
 
-        let (dir_proxy, remote) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        let scope = ExecutionScope::new();
-        let flags: fio::Flags = fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE;
-        let object_request =
-            vfs::ObjectRequest::new(flags, &Default::default(), remote.into_channel());
-        object_request.handle(|object_request| {
-            dir.open3(scope, vfs::path::Path::dot(), flags, object_request)
-        });
-
+        let dir_proxy = vfs::directory::serve_read_only(dir);
         let path = wait_for_device_with(&dir_proxy, |DeviceInfo { filename, topological_path }| {
             (topological_path == "/dev/test2/x/dev").then(|| filename.to_string())
         })

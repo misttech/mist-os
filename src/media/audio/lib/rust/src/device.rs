@@ -820,7 +820,7 @@ mod test {
             },
         };
 
-        let dev_class = vfs::directory::spawn_directory(dev_class_vfs);
+        let dev_class = vfs::directory::serve_read_only(dev_class_vfs);
         let selectors = list_devfs(&dev_class).await.unwrap();
 
         assert_eq!(

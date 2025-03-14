@@ -47,7 +47,7 @@ async fn read_abi_revision(
     dir: &fio::DirectoryProxy,
     path: &str,
 ) -> Result<AbiRevision, AbiRevisionFileError> {
-    let file = fuchsia_fs::directory::open_file(&dir, path, fio::Flags::PERM_READ).await?;
+    let file = fuchsia_fs::directory::open_file(&dir, path, fio::PERM_READABLE).await?;
     let bytes: [u8; 8] = fuchsia_fs::file::read(&file)
         .await?
         .try_into()
@@ -134,7 +134,7 @@ mod tests {
     // Read this test package's ABI revision.
     #[fuchsia::test]
     async fn read_test_pkg_abi_revision() -> Result<(), AbiRevisionFileError> {
-        let dir_proxy = open_in_namespace("/pkg", fio::Flags::PERM_READ).unwrap();
+        let dir_proxy = open_in_namespace("/pkg", fio::PERM_READABLE).unwrap();
         let abi_revision = read_abi_revision(&dir_proxy, AbiRevision::PATH)
             .await
             .expect("test package doesn't contain an ABI revision");

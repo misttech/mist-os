@@ -22,7 +22,6 @@ use futures::lock::Mutex;
 use futures::{FutureExt, StreamExt, TryStreamExt};
 use std::collections::HashMap;
 use std::sync::Arc;
-use vfs::directory::{spawn_directory_with_options, DirectoryOptions};
 use vfs::{pseudo_directory, service};
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
@@ -285,11 +284,9 @@ impl LightRealm {
                 }
             }
         };
-
-        let dir_options = DirectoryOptions::new(fio::R_STAR_DIR | fio::W_STAR_DIR);
-
         let mut fs = ServiceFs::new();
-        let _ = fs.add_remote("dev", spawn_directory_with_options(dir, dir_options));
+        let _ = fs
+            .add_remote("dev", vfs::directory::serve(dir, fio::PERM_READABLE | fio::PERM_WRITABLE));
         let _ = fs.serve_connection(handles.outgoing_dir).expect("failed to serve dev");
         fs.collect::<()>().await;
         Ok(())
