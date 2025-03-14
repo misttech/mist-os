@@ -4,7 +4,6 @@
 
 use crate::client::roaming::lib::*;
 use crate::client::roaming::roam_monitor::{RoamMonitorApi, RoamTriggerDataOutcome};
-use crate::client::types;
 use anyhow::format_err;
 
 pub struct DefaultRoamMonitor {}
@@ -31,13 +30,11 @@ impl RoamMonitorApi for DefaultRoamMonitor {
         // Default response to noop. Metrics for default devices can be added here.
         Ok(RoamTriggerDataOutcome::Noop)
     }
-    fn should_send_roam_request(
-        &self,
-        candidate: types::ScannedCandidate,
-    ) -> Result<bool, anyhow::Error> {
+    fn should_send_roam_request(&self, request: PolicyRoamRequest) -> Result<bool, anyhow::Error> {
         Err(format_err!(
-            "Default roam monitor unexpectedly received a roam candidate: {}",
-            candidate.to_string_without_pii()
+            "Default roam monitor unexpectedly received a roam candidate: {}, roam reasons: {:?}",
+            request.candidate.to_string_without_pii(),
+            request.reasons
         ))
     }
 }
@@ -69,6 +66,9 @@ mod test {
 
         // Send a candidate and verify an error is returned
         let candidate = generate_random_scanned_candidate();
-        assert_variant!(monitor.should_send_roam_request(candidate), Err(_));
+        assert_variant!(
+            monitor.should_send_roam_request(PolicyRoamRequest { candidate, reasons: vec![] }),
+            Err(_)
+        );
     }
 }

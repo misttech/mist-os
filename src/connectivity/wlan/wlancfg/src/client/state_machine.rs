@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::client::roaming::lib::ROAMING_CHANNEL_BUFFER_SIZE;
+use crate::client::roaming::lib::{PolicyRoamRequest, ROAMING_CHANNEL_BUFFER_SIZE};
 use crate::client::roaming::local_roam_manager::RoamManager;
 use crate::client::roaming::roam_monitor::RoamDataSender;
 use crate::client::types;
@@ -561,7 +561,7 @@ struct ConnectedOptions {
     initial_signal: types::Signal,
     tracked_signals: HistoricalList<types::TimestampedSignal>,
     roam_monitor_sender: RoamDataSender,
-    roam_receiver: mpsc::Receiver<types::ScannedCandidate>,
+    roam_request_receiver: mpsc::Receiver<PolicyRoamRequest>,
     post_connect_metric_timer: Pin<Box<fasync::Timer>>,
     bss_connect_duration_metric_timer: Pin<Box<fasync::Timer>>,
 }
@@ -585,12 +585,13 @@ impl ConnectedOptions {
         });
 
         // Initialize roam monitor with roam manager service.
-        let (sender, roam_receiver) = mpsc::channel(ROAMING_CHANNEL_BUFFER_SIZE);
+        let (roam_request_sender, roam_request_receiver) =
+            mpsc::channel(ROAMING_CHANNEL_BUFFER_SIZE);
         let roam_monitor_sender = common_options.roam_manager.initialize_roam_monitor(
             (*ap_state).clone(),
             network_identifier.clone(),
             credential.clone(),
-            sender,
+            roam_request_sender,
         );
         Self {
             ap_state,
@@ -605,7 +606,7 @@ impl ConnectedOptions {
             initial_signal,
             tracked_signals: HistoricalList::new(NUM_PAST_SCORES),
             roam_monitor_sender,
-            roam_receiver,
+            roam_request_receiver,
             post_connect_metric_timer: Box::pin(fasync::Timer::new(
                 AVERAGE_SCORE_DELTA_MINIMUM_DURATION.after_now(),
             )),
@@ -682,8 +683,8 @@ async fn connected_state(
                         fidl_sme::ConnectTransactionEvent::OnChannelSwitched { info } => {
                             options.ap_state.tracked.channel.primary = info.new_channel;
                             // Re-initialize roam monitor for new channel
-                            let (sender, roam_receiver) = mpsc::channel(ROAMING_CHANNEL_BUFFER_SIZE);
-                            options.roam_receiver = roam_receiver;
+                            let (sender, roam_request_receiver) = mpsc::channel(ROAMING_CHANNEL_BUFFER_SIZE);
+                            options.roam_request_receiver = roam_request_receiver;
                             options.roam_monitor_sender =
                                 common_options.roam_manager.initialize_roam_monitor(
                                     (*options.ap_state).clone(),
@@ -787,12 +788,10 @@ async fn connected_state(
                     signals: options.tracked_signals.get_before(fasync::MonotonicInstant::now())
                 });
             }
-            roam_request = options.roam_receiver.select_next_some() => {
+            roam_request = options.roam_request_receiver.select_next_some() => {
                 let _ = common_options
                 .proxy
-                .roam(&fidl_sme::RoamRequest {
-                    bss_description: Sequestered::release(roam_request.bss.bss_description)
-                })
+                .roam(&roam_request.into())
                 .inspect_err(|e| {
                     error!("Error sending sme roam request: {}", e);
                 });
@@ -1074,7 +1073,7 @@ fn update_internal_state_on_roam_success(
         Box::pin(fasync::Timer::new(METRICS_SHORT_CONNECT_DURATION.after_now()));
     // Re-initialize roam monitor for new BSS
     let (sender, roam_receiver) = mpsc::channel(ROAMING_CHANNEL_BUFFER_SIZE);
-    options.roam_receiver = roam_receiver;
+    options.roam_request_receiver = roam_receiver;
     options.roam_monitor_sender = common_options.roam_manager.initialize_roam_monitor(
         (*options.ap_state).clone(),
         options.network_identifier.clone(),
@@ -1106,7 +1105,7 @@ pub fn convert_manual_connect_to_disconnect_reason(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::client::roaming::lib::RoamTriggerData;
+    use crate::client::roaming::lib::{PolicyRoamRequest, RoamTriggerData};
     use crate::client::roaming::local_roam_manager::RoamServiceRequest;
     use crate::config_management::network_config::{self, Credential};
     use crate::config_management::PastConnectionList;
@@ -3086,7 +3085,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn connected_state_on_roam_request() {
+    fn connected_state_on_roam_selection() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
@@ -3119,17 +3118,19 @@ mod tests {
         // Run the state machine.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
-        // Verify roam monitor request was sent.
-        let mut roam_request_sender;
+        // Verify roam monitor selection was sent.
+        let mut roam_sender;
         assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
-            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { roam_sender, .. } => {
-                roam_request_sender = roam_sender;
+            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { roam_request_sender, .. } => {
+                roam_sender = roam_request_sender;
             });
         });
 
         // Send a roam request to state machine.
         let roam_candidate = generate_random_scanned_candidate();
-        roam_request_sender.try_send(roam_candidate.clone()).unwrap();
+        roam_sender
+            .try_send(PolicyRoamRequest { candidate: roam_candidate.clone(), reasons: vec![] })
+            .unwrap();
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
