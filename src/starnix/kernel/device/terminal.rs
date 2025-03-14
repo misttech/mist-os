@@ -52,7 +52,7 @@ const BACKSPACE_CHAR: u8 = 8; // \b
 const CONTROL_OFFSET: u8 = 0x40;
 
 /// Global state of the devpts filesystem.
-pub struct TTYState {
+pub struct TtyState {
     /// The terminal objects indexed by their identifier.
     pub terminals: RwLock<HashMap<u32, Weak<Terminal>>>,
 
@@ -60,7 +60,7 @@ pub struct TTYState {
     pts_ids_set: Mutex<PtsIdsSet>,
 }
 
-impl TTYState {
+impl TtyState {
     /// Returns the next available terminal.
     pub fn get_next_terminal(
         self: &Arc<Self>,
@@ -83,7 +83,7 @@ impl TTYState {
     }
 }
 
-impl Default for TTYState {
+impl Default for TtyState {
     fn default() -> Self {
         Self {
             terminals: RwLock::new(HashMap::new()),
@@ -160,7 +160,7 @@ pub struct TerminalMutableState {
 pub struct Terminal {
     /// The global devpts state.
     #[derivative(Debug = "ignore")]
-    state: Arc<TTYState>,
+    state: Arc<TtyState>,
 
     /// The owner of the terminal.
     pub fscred: FsCred,
@@ -173,7 +173,7 @@ pub struct Terminal {
 }
 
 impl Terminal {
-    pub fn new(state: Arc<TTYState>, fscred: FsCred, id: u32) -> Self {
+    pub fn new(state: Arc<TtyState>, fscred: FsCred, id: u32) -> Self {
         Self { state, fscred, id, mutable_state: RwLock::new(Default::default()) }
     }
 
@@ -215,26 +215,24 @@ impl Terminal {
     pub fn main_read<L>(
         &self,
         _locked: &mut Locked<'_, L>,
-        current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno>
     where
         L: LockBefore<ProcessGroupState>,
     {
-        self.write().main_read(current_task, data)
+        self.write().main_read(data)
     }
 
     /// `write` implementation of the main side of the terminal.
     pub fn main_write<L>(
         &self,
         locked: &mut Locked<'_, L>,
-        current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno>
     where
         L: LockBefore<ProcessGroupState>,
     {
-        let (bytes, signals) = self.write().main_write(current_task, data)?;
+        let (bytes, signals) = self.write().main_write(data)?;
         self.send_signals(locked, signals);
         Ok(bytes)
     }
@@ -268,26 +266,24 @@ impl Terminal {
     pub fn replica_read<L>(
         &self,
         _locked: &mut Locked<'_, L>,
-        current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno>
     where
         L: LockBefore<ProcessGroupState>,
     {
-        self.write().replica_read(current_task, data)
+        self.write().replica_read(data)
     }
 
     /// `write` implementation of the replica side of the terminal.
     pub fn replica_write<L>(
         &self,
         _locked: &mut Locked<'_, L>,
-        current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno>
     where
         L: LockBefore<ProcessGroupState>,
     {
-        self.write().replica_write(current_task, data)
+        self.write().replica_write(data)
     }
 
     /// Send the pending signals to the associated foreground process groups if they exist.
@@ -429,26 +425,18 @@ impl TerminalMutableState<Base = Terminal> {
     }
 
     /// `read` implementation of the main side of the terminal.
-    fn main_read(
-        &mut self,
-        current_task: &CurrentTask,
-        data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
+    fn main_read(&mut self, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
         if self.is_replica_closed() && self.output_queue().readable_size() == 0 {
             return error!(EIO);
         }
-        let result = with_queue!(self.output_queue.read(self.as_mut(), current_task, data))?;
+        let result = with_queue!(self.output_queue.read(self.as_mut(), data))?;
         self.notify_waiters();
         Ok(result)
     }
 
     /// `write` implementation of the main side of the terminal.
-    fn main_write(
-        &mut self,
-        current_task: &CurrentTask,
-        data: &mut dyn InputBuffer,
-    ) -> Result<(usize, PendingSignals), Errno> {
-        let result = with_queue!(self.input_queue.write(self.as_mut(), current_task, data))?;
+    fn main_write(&mut self, data: &mut dyn InputBuffer) -> Result<(usize, PendingSignals), Errno> {
+        let result = with_queue!(self.input_queue.write(self.as_mut(), data))?;
         self.notify_waiters();
         Ok(result)
     }
@@ -487,30 +475,22 @@ impl TerminalMutableState<Base = Terminal> {
     }
 
     /// `read` implementation of the replica side of the terminal.
-    fn replica_read(
-        &mut self,
-        current_task: &CurrentTask,
-        data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
+    fn replica_read(&mut self, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
         if self.is_main_closed() {
             return Ok(0);
         }
-        let result = with_queue!(self.input_queue.read(self.as_mut(), current_task, data))?;
+        let result = with_queue!(self.input_queue.read(self.as_mut(), data))?;
         self.notify_waiters();
         Ok(result)
     }
 
     /// `write` implementation of the replica side of the terminal.
-    fn replica_write(
-        &mut self,
-        current_task: &CurrentTask,
-        data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
+    fn replica_write(&mut self, data: &mut dyn InputBuffer) -> Result<usize, Errno> {
         if self.is_main_closed() {
             return error!(EIO);
         }
         let (read_from_userspace, signals) =
-            with_queue!(self.output_queue.write(self.as_mut(), current_task, data))?;
+            with_queue!(self.output_queue.write(self.as_mut(), data))?;
         assert!(signals.signals().is_empty());
         self.notify_waiters();
         Ok(read_from_userspace)
@@ -1076,7 +1056,6 @@ impl Queue {
     pub fn read(
         &mut self,
         terminal: TerminalStateMutRef<'_>,
-        _current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         if !self.readable {
@@ -1099,7 +1078,6 @@ impl Queue {
     pub fn write(
         &mut self,
         terminal: TerminalStateMutRef<'_>,
-        _current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
     ) -> Result<(usize, PendingSignals), Errno> {
         let room = WAIT_BUFFER_MAX_BYTES - self.total_wait_buffer_length;

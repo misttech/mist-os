@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::device::kobject::DeviceMetadata;
-use crate::device::terminal::{TTYState, Terminal};
+use crate::device::terminal::{Terminal, TtyState};
 use crate::device::{DeviceMode, DeviceOps};
 use crate::fs::devtmpfs::{devtmpfs_create_symlink, devtmpfs_mkdir, devtmpfs_remove_node};
 use crate::mm::MemoryAccessorExt;
@@ -108,7 +108,7 @@ fn init_devpts(
     kernel: &Arc<Kernel>,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
-    let state = kernel.expando.get::<TTYState>();
+    let state = kernel.expando.get::<TtyState>();
 
     let uid =
         options.params.get(b"uid").map(|uid| fs_args::parse::<uid_t>(uid.as_ref())).transpose()?;
@@ -130,7 +130,7 @@ where
     L: LockBefore<FileOpsCore>,
 {
     let kernel = current_task.kernel();
-    let state = kernel.expando.get::<TTYState>();
+    let state = kernel.expando.get::<TtyState>();
     let device = DevPtsDevice::new(state);
 
     let registry = &kernel.device_registry;
@@ -204,7 +204,7 @@ pub fn get_device_type_for_pts(id: u32) -> DeviceType {
 }
 
 struct DevPtsRootDir {
-    state: Arc<TTYState>,
+    state: Arc<TtyState>,
 }
 
 impl FsNodeOps for DevPtsRootDir {
@@ -279,11 +279,11 @@ impl FsNodeOps for DevPtsRootDir {
 }
 
 struct DevPtsDevice {
-    state: Arc<TTYState>,
+    state: Arc<TtyState>,
 }
 
 impl DevPtsDevice {
-    pub fn new(state: Arc<TTYState>) -> Arc<Self> {
+    pub fn new(state: Arc<TtyState>) -> Arc<Self> {
         Arc::new(Self { state })
     }
 }
@@ -324,7 +324,7 @@ impl DeviceOps for Arc<DevPtsDevice> {
                                 .clone();
                         Ok(Box::new(DevPtmxFile::new(dev_pts_root, controlling_terminal.terminal)))
                     } else {
-                        Ok(Box::new(DevPtsFile::new(controlling_terminal.terminal)))
+                        Ok(Box::new(TtyFile::new(controlling_terminal.terminal)))
                     }
                 } else {
                     error!(ENXIO)
@@ -359,7 +359,7 @@ impl DeviceOps for Arc<DevPtsDevice> {
                         flags.can_read(),
                     );
                 }
-                Ok(Box::new(DevPtsFile::new(terminal)))
+                Ok(Box::new(TtyFile::new(terminal)))
             }
         }
     }
@@ -406,7 +406,7 @@ impl FileOps for DevPtmxFile {
             current_task,
             FdEvents::POLLIN | FdEvents::POLLHUP,
             None,
-            |locked| self.terminal.main_read(locked, current_task, data),
+            |locked| self.terminal.main_read(locked, data),
         )
     }
 
@@ -424,7 +424,7 @@ impl FileOps for DevPtmxFile {
             current_task,
             FdEvents::POLLOUT | FdEvents::POLLHUP,
             None,
-            |locked| self.terminal.main_write(locked, current_task, data),
+            |locked| self.terminal.main_write(locked, data),
         )
     }
 
@@ -460,7 +460,7 @@ impl FileOps for DevPtmxFile {
         let user_addr = UserAddress::from(arg);
         match request {
             TIOCGPTN => {
-                // Get the therminal id.
+                // Get the terminal id.
                 let value: u32 = self.terminal.id;
                 current_task.write_object(UserRef::<u32>::new(user_addr), &value)?;
                 Ok(SUCCESS)
@@ -482,18 +482,18 @@ impl FileOps for DevPtmxFile {
     }
 }
 
-struct DevPtsFile {
+struct TtyFile {
     terminal: Arc<Terminal>,
 }
 
-impl DevPtsFile {
+impl TtyFile {
     pub fn new(terminal: Arc<Terminal>) -> Self {
         terminal.replica_open();
         Self { terminal }
     }
 }
 
-impl FileOps for DevPtsFile {
+impl FileOps for TtyFile {
     fileops_impl_nonseekable!();
     fileops_impl_noop_sync!();
 
@@ -520,7 +520,7 @@ impl FileOps for DevPtsFile {
             current_task,
             FdEvents::POLLIN | FdEvents::POLLHUP,
             None,
-            |locked| self.terminal.replica_read(locked, current_task, data),
+            |locked| self.terminal.replica_read(locked, data),
         )
     }
 
@@ -538,7 +538,7 @@ impl FileOps for DevPtsFile {
             current_task,
             FdEvents::POLLOUT | FdEvents::POLLHUP,
             None,
-            |locked| self.terminal.replica_write(locked, current_task, data),
+            |locked| self.terminal.replica_write(locked, data),
         )
     }
 
