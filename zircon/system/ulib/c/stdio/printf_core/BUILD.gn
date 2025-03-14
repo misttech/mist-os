@@ -4,26 +4,33 @@
 
 import("../../libc.gni")
 
-# TODO(https://fxbug.dev/402907255): soft transition
-_llvm_libc_config = read_file("$llvm_libc/config/config.json", "json")
-_llvm_libc_config_printf = _llvm_libc_config.printf
-old_printf =
-    !defined(_llvm_libc_config_printf.LIBC_CONF_PRINTF_RUNTIME_DISPATCH)
-not_needed([ "_llvm_libc_config_printf" ])  # GN won't count defined() as "used"
-
 llvm_libc_source_set("printf_core") {
   visibility = [ "../*" ]
-  public = [ "printf_main.h" ]
+  public = [
+    "printf_main.h",
+    "writer.h",
+  ]
   public_configs = [ ":printf-options" ]
   functions = []
-  if (old_printf) {
-    sources = [ "printf_main.cpp" ]
-    deps = [
-      ":converter",
-      ":parser",
-    ]
-    public_deps = [ ":writer" ]
-  }
+
+  # The implementation is entirely in headers, but they are all used only via
+  # the single printf_main.h header.
+  sources = [
+    "converter.h",
+    "core_structs.h",
+    "parser.h",
+  ]
+
+  # Each implementation pieces has its own tests.
+  test_sources = [
+    "converter_test.cpp",
+    "writer_test.cpp",
+
+    # TODO(https://fxbug.dev/42141211): This test code requires the fancier
+    # test machinery that we don't yet support since zxtest doesn't have the
+    # features.
+    #"parser_test.cpp",
+  ]
 }
 
 config("printf-options") {
@@ -37,12 +44,6 @@ config("printf-options") {
     "LIBC_COPT_PRINTF_DISABLE_STRERROR",
   ]
 
-  # TODO(https://fxbug.dev/402907255): stick to old-style runtime dispatch
-  # until transition is complete
-  if (!old_printf) {
-    defines += [ "LIBC_COPT_PRINTF_RUNTIME_DISPATCH" ]
-  }
-
   # Don't support FP types if the toolchain doesn't.
   _no_floating_point = toolchain_variant.tags + [ "no-floating-point" ] -
                        [ "no-floating-point" ] != toolchain_variant.tags
@@ -51,55 +52,19 @@ config("printf-options") {
   }
 }
 
-# These aren't really functions, but they follow the pattern of the actual libc
-# function implementations in each having a corresponding header file and test
-# file in the usual places.
+libc_source_set("wrapper") {
+  visibility = [ "//sdk/lib/ld/*" ]
 
-if (old_printf) {
-  llvm_libc_source_set("converter") {
-    visibility = [ ":*" ]
-
-    functions = [ "converter" ]
-
-    configs = [ ":printf-options" ]
-
-    deps = [ ":writer" ]
-  }
-
-  llvm_libc_source_set("parser") {
-    visibility = [ ":*" ]
-
-    public = [ "parser.h" ]
-    public_configs = [ ":printf-options" ]
-
-    functions = []
-
-    # TODO(https://fxbug.dev/42141211): There are parser tests that can be built though
-    # there is no "parser" source file so the build machinery will have to be
-    # custom for those tests. But that test code requires the fancier test
-    # machinery that we don't yet support since zxtest doesn't have the features.
-  }
-
-  llvm_libc_source_set("writer") {
-    functions = [ "writer" ]
-    configs = [ ":printf-options" ]
-  }
-}
-
-source_set("wrapper") {
   public = [ "wrapper.h" ]
   public_configs = [ ":wrapper.config" ]
 
   sources = [ "wrapper.cc" ]
-  configs += [
-    ":printf-options",
-    "//zircon/system/ulib/c:llvm-libc.config",
-  ]
+  configs = [ ":printf-options" ]
   deps = [ ":printf_core" ]
 }
 
 config("wrapper.config") {
-  visibility = [ ":wrapper" ]
+  visibility = [ ":*" ]
   defines = [ "LIBC_NAMESPACE=$libc_namespace" ]
-  include_dirs = [ "//zircon/system/ulib/c" ]
+  include_dirs = [ libc ]
 }

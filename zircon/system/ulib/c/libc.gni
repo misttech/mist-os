@@ -579,7 +579,6 @@ template("llvm_libc_source_set") {
                              "basic_abi",
                              "configs",
                              "defines",
-                             "friend",
                              "global_symbols",
                              "include_dirs",
                              "local_sources",
@@ -593,6 +592,12 @@ template("llvm_libc_source_set") {
                              "undefined_symbols",
                              "visibility",
                            ])
+
+    # The test target can always use private headers from $sources.
+    friend = [ ":$test_target" ]
+    if (defined(invoker.friend)) {
+      friend += invoker.friend
+    }
 
     if (defined(basic_abi) && basic_abi && !defined(global_symbols)) {
       global_symbols = invoker.functions
