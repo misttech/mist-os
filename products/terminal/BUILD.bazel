@@ -180,11 +180,10 @@ fuchsia_elf_sizes(
 
 fuchsia_product_bundle(
     name = "product_bundle.x64",
-    board_name = "x64",
     default_virtual_device = "//build/bazel/assembly/virtual_devices:x64-emu-recommended",
     main = ":image.x64",
     partitions_config = "//build/bazel/assembly/partitions_configurations:x64",
-    product_bundle_name = "fuchsia",
+    product_bundle_name = "terminal.x64",
     recovery = "//products/zedboot:x64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
@@ -211,11 +210,10 @@ fuchsia_elf_sizes(
 
 fuchsia_product_bundle(
     name = "product_bundle_with_netstack2.x64",
-    board_name = "x64",
     default_virtual_device = "//build/bazel/assembly/virtual_devices:x64-emu-recommended",
     main = ":image_with_netstack2.x64",
     partitions_config = "//build/bazel/assembly/partitions_configurations:x64",
-    product_bundle_name = "fuchsia",
+    product_bundle_name = "terminal_with_netstack2.x64",
     recovery = "//products/zedboot:x64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
@@ -242,11 +240,10 @@ fuchsia_elf_sizes(
 
 fuchsia_product_bundle(
     name = "product_bundle.x64_reduced_perf_variation",
-    board_name = "x64",
     default_virtual_device = "//build/bazel/assembly/virtual_devices:x64-emu-recommended",
     main = ":image.x64_reduced_perf_variation",
     partitions_config = "//build/bazel/assembly/partitions_configurations:x64",
-    product_bundle_name = "fuchsia",
+    product_bundle_name = "terminal.x64_reduced_perf_variation",
     recovery = "//products/zedboot:x64_reduced_perf_variation",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
@@ -273,11 +270,10 @@ fuchsia_elf_sizes(
 
 fuchsia_product_bundle(
     name = "product_bundle_with_netstack2.x64_reduced_perf_variation",
-    board_name = "x64",
     default_virtual_device = "//build/bazel/assembly/virtual_devices:x64-emu-recommended",
     main = ":image_with_netstack2.x64_reduced_perf_variation",
     partitions_config = "//build/bazel/assembly/partitions_configurations:x64",
-    product_bundle_name = "fuchsia",
+    product_bundle_name = "terminal.x64_reduced_perf_variation",
     recovery = "//products/zedboot:x64_reduced_perf_variation",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
@@ -304,11 +300,10 @@ fuchsia_elf_sizes(
 
 fuchsia_product_bundle(
     name = "product_bundle.arm64",
-    board_name = "arm64",
     default_virtual_device = "//build/bazel/assembly/virtual_devices:arm64-emu-recommended",
     main = ":image.arm64",
     partitions_config = "//build/bazel/assembly/partitions_configurations:arm64",
-    product_bundle_name = "fuchsia",
+    product_bundle_name = "terminal.arm64",
     recovery = "//products/zedboot:arm64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
@@ -335,11 +330,10 @@ fuchsia_elf_sizes(
 
 fuchsia_product_bundle(
     name = "product_bundle_with_netstack2.arm64",
-    board_name = "arm64",
     default_virtual_device = "//build/bazel/assembly/virtual_devices:arm64-emu-recommended",
     main = ":image_with_netstack2.arm64",
     partitions_config = "//build/bazel/assembly/partitions_configurations:arm64",
-    product_bundle_name = "fuchsia",
+    product_bundle_name = "terminal_with_netstack2.arm64",
     recovery = "//products/zedboot:arm64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
@@ -366,11 +360,10 @@ fuchsia_elf_sizes(
 
 fuchsia_product_bundle(
     name = "product_bundle.qemu-arm64",
-    board_name = "qemu-arm64",
     default_virtual_device = "//build/bazel/assembly/virtual_devices:arm64-emu-recommended",
     main = ":image.qemu-arm64",
     partitions_config = "//build/bazel/assembly/partitions_configurations:qemu-arm64",
-    product_bundle_name = "fuchsia",
+    product_bundle_name = "terminal.qemu-arm64",
     recovery = "//products/zedboot:qemu-arm64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
@@ -397,11 +390,10 @@ fuchsia_elf_sizes(
 
 fuchsia_product_bundle(
     name = "product_bundle_with_netstack2.qemu-arm64",
-    board_name = "qemu-arm64",
     default_virtual_device = "//build/bazel/assembly/virtual_devices:arm64-emu-recommended",
     main = ":image_with_netstack2.qemu-arm64",
     partitions_config = "//build/bazel/assembly/partitions_configurations:qemu-arm64",
-    product_bundle_name = "fuchsia",
+    product_bundle_name = "terminal_with_netstack2.qemu-arm64",
     recovery = "//products/zedboot:qemu-arm64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
@@ -428,11 +420,10 @@ fuchsia_elf_sizes(
 
 fuchsia_product_bundle(
     name = "product_bundle.vim3",
-    board_name = "vim3",
     default_virtual_device = "//build/bazel/assembly/virtual_devices:arm64-emu-recommended",
     main = ":image.vim3",
     partitions_config = "//build/bazel/assembly/partitions_configurations:vim3",
-    product_bundle_name = "fuchsia",
+    product_bundle_name = "terminal.vim3",
     recovery = "//products/zedboot:vim3",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
@@ -459,11 +450,10 @@ fuchsia_elf_sizes(
 
 fuchsia_product_bundle(
     name = "product_bundle_with_netstack2.vim3",
-    board_name = "vim3",
     default_virtual_device = "//build/bazel/assembly/virtual_devices:arm64-emu-recommended",
     main = ":image_with_netstack2.vim3",
     partitions_config = "//build/bazel/assembly/partitions_configurations:vim3",
-    product_bundle_name = "fuchsia",
+    product_bundle_name = "terminal_with_netstack2.vim3",
     recovery = "//products/zedboot:vim3",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
@@ -508,11 +498,10 @@ fuchsia_elf_sizes(
 
 fuchsia_product_bundle(
     name = "product_bundle.vim3_reduced_perf_variation",
-    board_name = "vim3",
     default_virtual_device = "//build/bazel/assembly/virtual_devices:arm64-emu-recommended",
     main = ":image.vim3_reduced_perf_variation",
     partitions_config = "//build/bazel/assembly/partitions_configurations:vim3",
-    product_bundle_name = "fuchsia",
+    product_bundle_name = "terminal.vim3_reduced_perf_variation",
     recovery = "//products/zedboot:vim3_reduced_perf_variation",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
@@ -564,11 +553,10 @@ fuchsia_elf_sizes(
 
 fuchsia_product_bundle(
     name = "product_bundle_with_netstack2.vim3_reduced_perf_variation",
-    board_name = "vim3",
     default_virtual_device = "//build/bazel/assembly/virtual_devices:arm64-emu-recommended",
     main = ":image_with_netstack2.vim3_reduced_perf_variation",
     partitions_config = "//build/bazel/assembly/partitions_configurations:vim3",
-    product_bundle_name = "fuchsia",
+    product_bundle_name = "terminal_with_netstack2.vim3_reduced_perf_variation",
     recovery = "//products/zedboot:vim3_reduced_perf_variation",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",

@@ -62,11 +62,10 @@ fuchsia_elf_sizes(
 
 fuchsia_product_bundle(
     name = "product_bundle.x64",
-    board_name = "x64",
     default_virtual_device = "//build/bazel/assembly/virtual_devices:x64-emu-recommended",
     main = ":image.x64",
     partitions_config = "//build/bazel/assembly/partitions_configurations:x64",
-    product_bundle_name = "fuchsia",
+    product_bundle_name = "minimal.x64",
     recovery = "//products/zedboot:x64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
@@ -94,11 +93,10 @@ fuchsia_elf_sizes(
 
 fuchsia_product_bundle(
     name = "product_bundle.arm64",
-    board_name = "arm64",
     default_virtual_device = "//build/bazel/assembly/virtual_devices:arm64-emu-recommended",
     main = ":image.arm64",
     partitions_config = "//build/bazel/assembly/partitions_configurations:arm64",
-    product_bundle_name = "fuchsia",
+    product_bundle_name = "minimal.arm64",
     recovery = "//products/zedboot:arm64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
@@ -126,10 +124,9 @@ fuchsia_elf_sizes(
 
 fuchsia_product_bundle(
     name = "product_bundle.vim3",
-    board_name = "vim3",
     main = ":image.vim3",
     partitions_config = "//build/bazel/assembly/partitions_configurations:vim3",
-    product_bundle_name = "fuchsia",
+    product_bundle_name = "minimal.vim3",
     recovery = "//products/zedboot:vim3",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
@@ -152,10 +149,9 @@ fuchsia_elf_sizes(
 
 fuchsia_product_bundle(
     name = "product_bundle.emac",
-    board_name = "emac",
     main = ":image.emac",
     partitions_config = "//build/bazel/assembly/partitions_configurations:vim3",
-    product_bundle_name = "fuchsia",
+    product_bundle_name = "minimal.emac",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
     update_version_file = "//build/info:version",
@@ -177,11 +173,10 @@ fuchsia_elf_sizes(
 
 fuchsia_product_bundle(
     name = "product_bundle.riscv64",
-    board_name = "riscv64",
     default_virtual_device = "//build/bazel/assembly/virtual_devices:riscv64-emu-recommended",
     main = ":image.riscv64",
     partitions_config = "//build/bazel/assembly/partitions_configurations:riscv64",
-    product_bundle_name = "fuchsia",
+    product_bundle_name = "minimal.riscv64",
     recovery = "//products/zedboot:riscv64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
