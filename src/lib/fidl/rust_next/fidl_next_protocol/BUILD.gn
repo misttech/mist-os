@@ -13,6 +13,8 @@ rustc_library("fidl_next_protocol") {
     "src/buffer.rs",
     "src/client.rs",
     "src/error.rs",
+    "src/flexible.rs",
+    "src/flexible_result.rs",
     "src/framework_error.rs",
     "src/lib.rs",
     "src/lockers.rs",

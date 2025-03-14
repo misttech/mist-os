@@ -287,7 +287,8 @@ where
     ___T: ::fidl_next::Transport,
     ___H: SuperClientHandler<___T>,
 
-    crate::WireSuperFooResponse: ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
+    <super_::Foo as ::fidl_next::Method>::Response:
+        ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
     fn on_event(
         handler: &mut ___H,
@@ -446,7 +447,8 @@ where
     ___T: ::fidl_next::Transport,
     ___H: SubClientHandler<___T>,
 
-    crate::WireSuperFooResponse: ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
+    <sub::Foo as ::fidl_next::Method>::Response:
+        ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
     fn on_event(
         handler: &mut ___H,

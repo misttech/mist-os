@@ -23,7 +23,10 @@
         {% when DeclType::Table %}
             {{ self.table(schema.table_declarations[ident]) }}
         {% when DeclType::Union %}
-            {{ self.union(schema.union_declarations[ident]) }}
+            {% let union = schema.union_declarations[ident] %}
+            {% if !union.is_result %}
+                {{ self.union(union) }}
+            {% endif %}
         {% when DeclType::NewType %} {{ todo!("newtypes are not supported yet") }}
         {% when DeclType::Overlay %} {{ todo!("overlays are not supported yet") }}
         {% when DeclType::Protocol %}

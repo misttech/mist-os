@@ -418,7 +418,7 @@ where
     ___T: ::fidl_next::Transport,
     ___H: SimpleProtocolClientHandler<___T>,
 
-    crate::WireSimpleProtocolAddResponse:
+    <simple_protocol::Add as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
     fn on_event(

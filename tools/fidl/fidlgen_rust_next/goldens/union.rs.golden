@@ -4989,10 +4989,10 @@ where
     ___T: ::fidl_next::Transport,
     ___H: TestProtocolClientHandler<___T>,
 
-    crate::WireTestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse:
+    <test_protocol::StrictUnionHenceResponseMayBeStackAllocated as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 
-    crate::WireTestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse:
+    <test_protocol::FlexibleUnionHenceResponseMustBeHeapAllocated as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
     fn on_event(

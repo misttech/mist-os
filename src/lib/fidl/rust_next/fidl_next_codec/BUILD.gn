@@ -27,6 +27,7 @@ rustc_library("fidl_next_codec") {
     "src/wire/envelope.rs",
     "src/wire/mod.rs",
     "src/wire/ptr.rs",
+    "src/wire/result.rs",
     "src/wire/string/mod.rs",
     "src/wire/string/optional.rs",
     "src/wire/string/required.rs",

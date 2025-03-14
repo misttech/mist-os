@@ -19,6 +19,7 @@ pub struct Union {
     pub name: CompIdent,
     #[serde(rename = "resource")]
     pub is_resource: bool,
+    pub is_result: bool,
     #[serde(rename = "strict")]
     pub is_strict: bool,
     #[serde(rename = "type_shape_v2")]

@@ -205,222 +205,6 @@ where
     }
 }
 
-#[derive(Clone, Debug)]
-pub enum ExampleFooResult {
-    Response(crate::ExampleFooResponse),
-
-    Err(u32),
-}
-
-impl ::fidl_next::Encodable for ExampleFooResult {
-    type Encoded = WireExampleFooResult;
-}
-
-impl<___E> ::fidl_next::Encode<___E> for ExampleFooResult
-where
-    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
-
-    ___E: ::fidl_next::Encoder,
-{
-    #[inline]
-    fn encode(
-        &mut self,
-        encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
-    ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireExampleFooResult { raw } = slot);
-
-        match self {
-            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as::<
-                ___E,
-                crate::ExampleFooResponse,
-            >(value, 1, encoder, raw)?,
-
-            Self::Err(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, u32>(value, 2, encoder, raw)?
-            }
-        }
-
-        Ok(())
-    }
-}
-
-impl ::fidl_next::EncodableOption for Box<ExampleFooResult> {
-    type EncodedOption = WireOptionalExampleFooResult;
-}
-
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<ExampleFooResult>
-where
-    ___E: ?Sized,
-    ExampleFooResult: ::fidl_next::Encode<___E>,
-{
-    #[inline]
-    fn encode_option(
-        this: Option<&mut Self>,
-        encoder: &mut ___E,
-        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
-    ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalExampleFooResult { raw } = slot.as_mut());
-
-        if let Some(inner) = this {
-            let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, slot)?;
-        } else {
-            ::fidl_next::RawWireUnion::encode_absent(raw);
-        }
-
-        Ok(())
-    }
-}
-
-impl ::fidl_next::TakeFrom<WireExampleFooResult> for ExampleFooResult {
-    #[inline]
-    fn take_from(from: &WireExampleFooResult) -> Self {
-        match from.raw.ordinal() {
-            1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
-            })),
-
-            2 => Self::Err(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
-            })),
-
-            _ => unsafe { ::core::hint::unreachable_unchecked() },
-        }
-    }
-}
-
-impl ::fidl_next::TakeFrom<WireOptionalExampleFooResult> for Option<Box<ExampleFooResult>> {
-    #[inline]
-    fn take_from(from: &WireOptionalExampleFooResult) -> Self {
-        if let Some(inner) = from.as_ref() {
-            Some(::fidl_next::TakeFrom::take_from(inner))
-        } else {
-            None
-        }
-    }
-}
-
-/// The wire type corresponding to [`ExampleFooResult`].
-#[repr(transparent)]
-pub struct WireExampleFooResult {
-    raw: ::fidl_next::RawWireUnion,
-}
-
-pub mod example_foo_result {
-    pub enum Ref<'union> {
-        Response(&'union crate::WireExampleFooResponse),
-
-        Err(&'union ::fidl_next::WireU32),
-    }
-}
-
-impl WireExampleFooResult {
-    pub fn as_ref(&self) -> crate::example_foo_result::Ref<'_> {
-        match self.raw.ordinal() {
-            1 => crate::example_foo_result::Ref::Response(unsafe {
-                self.raw.get().deref_unchecked()
-            }),
-
-            2 => crate::example_foo_result::Ref::Err(unsafe { self.raw.get().deref_unchecked() }),
-
-            _ => unsafe { ::core::hint::unreachable_unchecked() },
-        }
-    }
-}
-
-unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleFooResult
-where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
-
-    ___D: ::fidl_next::Decoder,
-{
-    fn decode(
-        mut slot: ::fidl_next::Slot<'_, Self>,
-        decoder: &mut ___D,
-    ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
-        match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, crate::WireExampleFooResponse>(
-                raw, decoder,
-            )?,
-
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireU32>(raw, decoder)?,
-
-            ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
-        }
-
-        Ok(())
-    }
-}
-
-impl ::core::fmt::Debug for WireExampleFooResult {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        match self.raw.ordinal() {
-            1 => unsafe {
-                self.raw.get().deref_unchecked::<crate::WireExampleFooResponse>().fmt(f)
-            },
-            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireU32>().fmt(f) },
-            _ => unsafe { ::core::hint::unreachable_unchecked() },
-        }
-    }
-}
-
-#[repr(transparent)]
-pub struct WireOptionalExampleFooResult {
-    raw: ::fidl_next::RawWireUnion,
-}
-
-impl WireOptionalExampleFooResult {
-    pub fn is_some(&self) -> bool {
-        self.raw.is_some()
-    }
-
-    pub fn is_none(&self) -> bool {
-        self.raw.is_none()
-    }
-
-    pub fn as_ref(&self) -> Option<&WireExampleFooResult> {
-        if self.is_some() {
-            Some(unsafe { &*(self as *const Self).cast() })
-        } else {
-            None
-        }
-    }
-}
-
-unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalExampleFooResult
-where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
-
-    ___D: ::fidl_next::Decoder,
-{
-    fn decode(
-        mut slot: ::fidl_next::Slot<'_, Self>,
-        decoder: &mut ___D,
-    ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
-        match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, crate::WireExampleFooResponse>(
-                raw, decoder,
-            )?,
-
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireU32>(raw, decoder)?,
-
-            0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
-            _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
-        }
-
-        Ok(())
-    }
-}
-
-impl ::core::fmt::Debug for WireOptionalExampleFooResult {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        self.as_ref().fmt(f)
-    }
-}
-
 /// The type corresponding to the Example protocol.
 #[derive(Debug)]
 pub struct Example;
@@ -446,7 +230,8 @@ pub mod example {
 
         type Request = crate::WireExampleFooRequest;
 
-        type Response = crate::WireExampleFooResult;
+        type Response =
+            ::fidl_next::WireResult<crate::WireExampleFooResponse, ::fidl_next::WireU32>;
     }
 }
 
@@ -503,7 +288,8 @@ where
     ___T: ::fidl_next::Transport,
     ___H: ExampleClientHandler<___T>,
 
-    crate::WireExampleFooResult: ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
+    <example::Foo as ::fidl_next::Method>::Response:
+        ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
     fn on_event(
         handler: &mut ___H,

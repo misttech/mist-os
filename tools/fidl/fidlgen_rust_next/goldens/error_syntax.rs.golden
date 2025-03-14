@@ -209,234 +209,6 @@ where
     }
 }
 
-#[derive(Clone, Debug)]
-pub enum ExampleUseOfErrorSyntaxCallWhichMayFailResult {
-    Response(crate::ExampleUseOfErrorSyntaxCallWhichMayFailResponse),
-
-    Err(u32),
-}
-
-impl ::fidl_next::Encodable for ExampleUseOfErrorSyntaxCallWhichMayFailResult {
-    type Encoded = WireExampleUseOfErrorSyntaxCallWhichMayFailResult;
-}
-
-impl<___E> ::fidl_next::Encode<___E> for ExampleUseOfErrorSyntaxCallWhichMayFailResult
-where
-    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
-
-    ___E: ::fidl_next::Encoder,
-{
-    #[inline]
-    fn encode(
-        &mut self,
-        encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
-    ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireExampleUseOfErrorSyntaxCallWhichMayFailResult { raw } = slot);
-
-        match self {
-            Self::Response(value) => ::fidl_next::RawWireUnion::encode_as::<
-                ___E,
-                crate::ExampleUseOfErrorSyntaxCallWhichMayFailResponse,
-            >(value, 1, encoder, raw)?,
-
-            Self::Err(value) => {
-                ::fidl_next::RawWireUnion::encode_as::<___E, u32>(value, 2, encoder, raw)?
-            }
-        }
-
-        Ok(())
-    }
-}
-
-impl ::fidl_next::EncodableOption for Box<ExampleUseOfErrorSyntaxCallWhichMayFailResult> {
-    type EncodedOption = WireOptionalExampleUseOfErrorSyntaxCallWhichMayFailResult;
-}
-
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<ExampleUseOfErrorSyntaxCallWhichMayFailResult>
-where
-    ___E: ?Sized,
-    ExampleUseOfErrorSyntaxCallWhichMayFailResult: ::fidl_next::Encode<___E>,
-{
-    #[inline]
-    fn encode_option(
-        this: Option<&mut Self>,
-        encoder: &mut ___E,
-        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
-    ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalExampleUseOfErrorSyntaxCallWhichMayFailResult { raw } = slot.as_mut());
-
-        if let Some(inner) = this {
-            let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, slot)?;
-        } else {
-            ::fidl_next::RawWireUnion::encode_absent(raw);
-        }
-
-        Ok(())
-    }
-}
-
-impl ::fidl_next::TakeFrom<WireExampleUseOfErrorSyntaxCallWhichMayFailResult>
-    for ExampleUseOfErrorSyntaxCallWhichMayFailResult
-{
-    #[inline]
-    fn take_from(from: &WireExampleUseOfErrorSyntaxCallWhichMayFailResult) -> Self {
-        match from.raw.ordinal() {
-            1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
-            })),
-
-            2 => Self::Err(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
-            })),
-
-            _ => unsafe { ::core::hint::unreachable_unchecked() },
-        }
-    }
-}
-
-impl ::fidl_next::TakeFrom<WireOptionalExampleUseOfErrorSyntaxCallWhichMayFailResult>
-    for Option<Box<ExampleUseOfErrorSyntaxCallWhichMayFailResult>>
-{
-    #[inline]
-    fn take_from(from: &WireOptionalExampleUseOfErrorSyntaxCallWhichMayFailResult) -> Self {
-        if let Some(inner) = from.as_ref() {
-            Some(::fidl_next::TakeFrom::take_from(inner))
-        } else {
-            None
-        }
-    }
-}
-
-/// The wire type corresponding to [`ExampleUseOfErrorSyntaxCallWhichMayFailResult`].
-#[repr(transparent)]
-pub struct WireExampleUseOfErrorSyntaxCallWhichMayFailResult {
-    raw: ::fidl_next::RawWireUnion,
-}
-
-pub mod example_use_of_error_syntax_call_which_may_fail_result {
-    pub enum Ref<'union> {
-        Response(&'union crate::WireExampleUseOfErrorSyntaxCallWhichMayFailResponse),
-
-        Err(&'union ::fidl_next::WireU32),
-    }
-}
-
-impl WireExampleUseOfErrorSyntaxCallWhichMayFailResult {
-    pub fn as_ref(&self) -> crate::example_use_of_error_syntax_call_which_may_fail_result::Ref<'_> {
-        match self.raw.ordinal() {
-            1 => crate::example_use_of_error_syntax_call_which_may_fail_result::Ref::Response(
-                unsafe { self.raw.get().deref_unchecked() },
-            ),
-
-            2 => crate::example_use_of_error_syntax_call_which_may_fail_result::Ref::Err(unsafe {
-                self.raw.get().deref_unchecked()
-            }),
-
-            _ => unsafe { ::core::hint::unreachable_unchecked() },
-        }
-    }
-}
-
-unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleUseOfErrorSyntaxCallWhichMayFailResult
-where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
-
-    ___D: ::fidl_next::Decoder,
-{
-    fn decode(
-        mut slot: ::fidl_next::Slot<'_, Self>,
-        decoder: &mut ___D,
-    ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
-        match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<
-                ___D,
-                crate::WireExampleUseOfErrorSyntaxCallWhichMayFailResponse,
-            >(raw, decoder)?,
-
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireU32>(raw, decoder)?,
-
-            ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
-        }
-
-        Ok(())
-    }
-}
-
-impl ::core::fmt::Debug for WireExampleUseOfErrorSyntaxCallWhichMayFailResult {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        match self.raw.ordinal() {
-            1 => unsafe {
-                self.raw
-                    .get()
-                    .deref_unchecked::<crate::WireExampleUseOfErrorSyntaxCallWhichMayFailResponse>()
-                    .fmt(f)
-            },
-            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireU32>().fmt(f) },
-            _ => unsafe { ::core::hint::unreachable_unchecked() },
-        }
-    }
-}
-
-#[repr(transparent)]
-pub struct WireOptionalExampleUseOfErrorSyntaxCallWhichMayFailResult {
-    raw: ::fidl_next::RawWireUnion,
-}
-
-impl WireOptionalExampleUseOfErrorSyntaxCallWhichMayFailResult {
-    pub fn is_some(&self) -> bool {
-        self.raw.is_some()
-    }
-
-    pub fn is_none(&self) -> bool {
-        self.raw.is_none()
-    }
-
-    pub fn as_ref(&self) -> Option<&WireExampleUseOfErrorSyntaxCallWhichMayFailResult> {
-        if self.is_some() {
-            Some(unsafe { &*(self as *const Self).cast() })
-        } else {
-            None
-        }
-    }
-}
-
-unsafe impl<___D> ::fidl_next::Decode<___D>
-    for WireOptionalExampleUseOfErrorSyntaxCallWhichMayFailResult
-where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
-
-    ___D: ::fidl_next::Decoder,
-{
-    fn decode(
-        mut slot: ::fidl_next::Slot<'_, Self>,
-        decoder: &mut ___D,
-    ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
-        match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<
-                ___D,
-                crate::WireExampleUseOfErrorSyntaxCallWhichMayFailResponse,
-            >(raw, decoder)?,
-
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireU32>(raw, decoder)?,
-
-            0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
-            _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
-        }
-
-        Ok(())
-    }
-}
-
-impl ::core::fmt::Debug for WireOptionalExampleUseOfErrorSyntaxCallWhichMayFailResult {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        self.as_ref().fmt(f)
-    }
-}
-
 /// The type corresponding to the ExampleUseOfErrorSyntax protocol.
 #[derive(Debug)]
 pub struct ExampleUseOfErrorSyntax;
@@ -467,7 +239,23 @@ pub mod example_use_of_error_syntax {
 
         type Request = ::fidl_next_test_errorsyntax_parent::WireParentUsesErrorSyntaxComposedCallWhichMayFailRequest;
 
-        type Response = ::fidl_next_test_errorsyntax_parent::WireParentUsesErrorSyntaxComposedCallWhichMayFailResult;
+        type Response =
+
+
+
+                                ::fidl_next::WireResult
+
+                            <
+
+                                ::fidl_next_test_errorsyntax_parent::WireParentUsesErrorSyntaxComposedCallWhichMayFailResponse,
+
+
+                                ::fidl_next::WireU32,
+
+                            >
+
+
+                ;
     }
 
     pub struct CallWhichMayFail;
@@ -479,7 +267,10 @@ pub mod example_use_of_error_syntax {
 
         type Request = crate::WireExampleUseOfErrorSyntaxCallWhichMayFailRequest;
 
-        type Response = crate::WireExampleUseOfErrorSyntaxCallWhichMayFailResult;
+        type Response = ::fidl_next::WireResult<
+            crate::WireExampleUseOfErrorSyntaxCallWhichMayFailResponse,
+            ::fidl_next::WireU32,
+        >;
     }
 }
 
@@ -586,10 +377,10 @@ where
     ___T: ::fidl_next::Transport,
     ___H: ExampleUseOfErrorSyntaxClientHandler<___T>,
 
-    ::fidl_next_test_errorsyntax_parent::WireParentUsesErrorSyntaxComposedCallWhichMayFailResult:
+    <example_use_of_error_syntax::ComposedCallWhichMayFail as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 
-    crate::WireExampleUseOfErrorSyntaxCallWhichMayFailResult:
+    <example_use_of_error_syntax::CallWhichMayFail as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
     fn on_event(

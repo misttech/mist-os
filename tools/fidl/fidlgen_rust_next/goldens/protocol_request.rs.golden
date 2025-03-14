@@ -762,10 +762,10 @@ where
     ___T: ::fidl_next::Transport,
     ___H: ParentClientHandler<___T>,
 
-    crate::WireParentGetChildResponse:
+    <parent::GetChild as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 
-    crate::WireParentGetChildRequestResponse:
+    <parent::GetChildRequest as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
     fn on_event(
