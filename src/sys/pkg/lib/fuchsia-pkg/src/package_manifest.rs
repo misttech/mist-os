@@ -30,31 +30,38 @@ impl PackageManifest {
     /// Blob path used in package manifests to indicate the `meta.far`.
     pub const META_FAR_BLOB_PATH: &'static str = "meta/";
 
+    /// Return a reference vector of blobs in this PackageManifest.
+    ///
+    /// NB: Does not include blobs referenced by possible subpackages.
     pub fn blobs(&self) -> &[BlobInfo] {
         match &self.0 {
             VersionedPackageManifest::Version1(manifest) => &manifest.blobs,
         }
     }
 
+    /// Returns a reference vector of SubpackageInfo in this PackageManifest.
     pub fn subpackages(&self) -> &[SubpackageInfo] {
         match &self.0 {
             VersionedPackageManifest::Version1(manifest) => &manifest.subpackages,
         }
     }
 
+    /// Returns a vector of the blobs in the current PackageManifest.
     pub fn into_blobs(self) -> Vec<BlobInfo> {
         match self.0 {
             VersionedPackageManifest::Version1(manifest) => manifest.blobs,
         }
     }
 
-    /// Returns the current packages blobs and subpackages.
+    /// Returns a tuple of the current PackageManifest's blobs and subpackages.
+    /// `blobs` does not include blobs referenced by the subpackages.
     pub fn into_blobs_and_subpackages(self) -> (Vec<BlobInfo>, Vec<SubpackageInfo>) {
         match self.0 {
             VersionedPackageManifest::Version1(manifest) => (manifest.blobs, manifest.subpackages),
         }
     }
 
+    /// Returns the name from the PackageMetadata.
     pub fn name(&self) -> &PackageName {
         match &self.0 {
             VersionedPackageManifest::Version1(manifest) => &manifest.package.name,
@@ -99,6 +106,7 @@ impl PackageManifest {
         Ok(())
     }
 
+    /// Returns a `PackagePath` formatted from the metadata of the PackageManifest.
     pub fn package_path(&self) -> PackagePath {
         match &self.0 {
             VersionedPackageManifest::Version1(manifest) => PackagePath::from_name_and_variant(
@@ -330,6 +338,7 @@ impl PackageManifest {
         PackageManifest::from_blobs_dir(blobs_dir, None, meta_far_hash, out_manifest_dir)
     }
 
+    /// Given a Package, verify that all blob and subpackage paths are valid and return the PackageManifest.
     pub(crate) fn from_package(
         package: Package,
         repository: Option<String>,
@@ -662,7 +671,7 @@ impl PackageManifestV1 {
 /// working dir, and can be used directly as a path.
 ///
 /// If 'RelativeTo::File', then the path is relative to the file that contained
-/// the path.  To use the path, it must be resolved against the path to the
+/// the path. To use the path, it must be resolved against the path of the
 /// file.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, Default)]
 pub enum RelativeTo {
