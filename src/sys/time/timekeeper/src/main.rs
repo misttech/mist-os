@@ -40,6 +40,7 @@ use log::{debug, error, info, warn};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
+use time_adjust::Command;
 use time_metrics_registry::TimeMetricDimensionExperiment;
 use zx::BootTimeline;
 use {
@@ -48,13 +49,6 @@ use {
 };
 
 type UtcTransform = time_util::Transform<BootTimeline, UtcTimeline>;
-
-/// A command sent from various FIDL clients.
-#[derive(Debug)]
-pub enum Command {
-    /// A power management command.
-    PowerManagement,
-}
 
 /// The type union of FIDL messages served by Timekeeper.
 pub enum Rpcs {
@@ -381,7 +375,12 @@ async fn main() -> Result<()> {
 
     let rtc_test_server = Rc::new(rtc_testing::Server::new(persistence_health, persistent_state));
 
-    let adjust_server = Rc::new(if serve_adjust { Some(time_adjust::Server::new()) } else { None });
+    let adjust_server = Rc::new(if serve_adjust {
+        let cmd_send_clone = cmd_send.clone();
+        Some(time_adjust::Server::new(cmd_send_clone))
+    } else {
+        None
+    });
 
     // fuchsia::main can only return () or Result<()>.
     let result = fs

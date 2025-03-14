@@ -9,7 +9,7 @@ use crate::enums::{
 use crate::estimator::Estimator;
 use crate::rtc::Rtc;
 use crate::time_source_manager::{KernelBootTimeProvider, TimeSourceManager};
-use crate::{Command, Config, UtcTransform};
+use crate::{Config, UtcTransform};
 use chrono::prelude::*;
 use fuchsia_runtime::{UtcClock, UtcClockUpdate, UtcDuration, UtcInstant};
 use futures::channel::mpsc;
@@ -20,6 +20,7 @@ use std::cmp;
 use std::fmt::{self, Debug};
 use std::rc::Rc;
 use std::sync::Arc;
+use time_adjust::Command;
 use zx::AsHandleRef;
 use {fidl_fuchsia_time as fft, fuchsia_async as fasync};
 
@@ -468,6 +469,9 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
                         }
                         None => {
                             debug!("unexpected `None`");
+                        }
+                        Some(ref cmd) => {
+                            warn!("clock_manager.rs: unrecognized command: {:?}", cmd);
                         }
                     }
                     // If a test signaler is present, acknowledge command receipt.

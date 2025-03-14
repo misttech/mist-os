@@ -26,9 +26,19 @@ rustc_library("time_adjust") {
 
   deps = [
     "//sdk/fidl/fuchsia.time.external:fuchsia.time.external_rust",
+    "//sdk/rust/zx",
+    "//src/lib/fuchsia-runtime",
+    "//src/lib/trace/rust:trace",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:log",
+    "//third_party/rust_crates:scopeguard",
+  ]
+
+  test_deps = [
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
   ]
 }
 
