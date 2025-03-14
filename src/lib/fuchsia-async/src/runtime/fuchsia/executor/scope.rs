@@ -310,6 +310,27 @@ where
     }
 }
 
+/// Trait for things that can be spawned on to a scope.  There is a blanket implementation
+/// below for futures.
+pub trait Spawnable {
+    /// The type of value produced on completion.
+    type Output;
+
+    /// Converts to a task that can be spawned directly.
+    fn into_task(self, scope: ScopeHandle) -> TaskHandle;
+}
+
+impl<F: Future + Send + 'static> Spawnable for F
+where
+    F::Output: Send + 'static,
+{
+    type Output = F::Output;
+
+    fn into_task(self, scope: ScopeHandle) -> TaskHandle {
+        scope.new_task(None, self)
+    }
+}
+
 /// A handle to a scope, which may be used to spawn tasks.
 ///
 /// ## Ownership and cycles
@@ -370,11 +391,11 @@ impl ScopeHandle {
     /// Spawn a new task on the scope.
     // This does not have the must_use attribute because it's common to detach and the lifetime of
     // the task is bound to the scope: when the scope is dropped, the task will be cancelled.
-    pub fn spawn(&self, future: impl Future<Output = ()> + Send + 'static) -> JoinHandle<()> {
-        let task = self.new_task(None, future);
-        let id = task.id();
+    pub fn spawn(&self, future: impl Spawnable<Output = ()>) -> JoinHandle<()> {
+        let task = future.into_task(self.clone());
+        let task_id = task.id();
         self.insert_task(task, false);
-        JoinHandle::new(self.clone(), id)
+        JoinHandle::new(self.clone(), task_id)
     }
 
     /// Spawn a new task on the scope of a thread local executor.
@@ -394,9 +415,9 @@ impl ScopeHandle {
     /// *cancelled*.
     pub fn compute<T: Send + 'static>(
         &self,
-        future: impl Future<Output = T> + Send + 'static,
+        future: impl Spawnable<Output = T> + Send + 'static,
     ) -> crate::Task<T> {
-        let task = self.new_task(None, future);
+        let task = future.into_task(self.clone());
         let id = task.id();
         self.insert_task(task, false);
         JoinHandle::new(self.clone(), id).into()
@@ -636,13 +657,23 @@ impl<R> Borrow<ScopeHandle> for ScopeStream<R> {
     }
 }
 
+impl<F: Spawnable<Output = R>, R: Send + 'static> FromIterator<F> for ScopeStream<R> {
+    fn from_iter<T: IntoIterator<Item = F>>(iter: T) -> Self {
+        let (stream, handle) = ScopeStream::new();
+        for fut in iter {
+            handle.push(fut);
+        }
+        stream.close();
+        stream
+    }
+}
+
 #[derive(Clone)]
 pub struct ScopeStreamHandle<R>(ScopeHandle, PhantomData<R>);
 
 impl<R: Send> ScopeStreamHandle<R> {
-    pub fn push(&self, future: impl Future<Output = R> + Send + 'static) {
-        let task = self.0.new_task(None, future);
-        self.0.insert_task(task, true);
+    pub fn push(&self, future: impl Spawnable<Output = R>) {
+        self.0.insert_task(future.into_task(self.0.clone()), true);
     }
 }
 
@@ -1281,7 +1312,7 @@ impl<R: Send + 'static> Results for ResultsStream<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{EHandle, LocalExecutor, SendExecutor, Task, TestExecutor, Timer};
+    use crate::{EHandle, LocalExecutor, SendExecutor, SpawnableFuture, Task, TestExecutor, Timer};
     use assert_matches::assert_matches;
     use fuchsia_sync::{Condvar, Mutex};
     use futures::channel::mpsc;
@@ -2190,6 +2221,19 @@ mod tests {
 
             // This will wait forever if the tasks aren't cancelled.
             assert_eq!(rx.next().await, None);
+        });
+    }
+
+    #[test]
+    fn test_scope_stream_collect() {
+        let mut executor = SendExecutor::new(2);
+        executor.run(async move {
+            let stream: ScopeStream<_> = (0..10).into_iter().map(|i| async move { i }).collect();
+            assert_eq!(stream.collect::<HashSet<u32>>().await, HashSet::from_iter(0..10));
+
+            let stream: ScopeStream<_> =
+                (0..10).into_iter().map(|i| SpawnableFuture::new(async move { i })).collect();
+            assert_eq!(stream.collect::<HashSet<u32>>().await, HashSet::from_iter(0..10));
         });
     }
 }

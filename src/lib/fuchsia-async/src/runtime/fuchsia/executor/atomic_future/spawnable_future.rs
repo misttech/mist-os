@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use super::super::common::TaskHandle;
 use super::{AtomicFutureHandle, Bomb, Meta, DONE, RESULT_TAKEN};
-use crate::{JoinHandle, ScopeHandle, Task};
+use crate::scope::Spawnable;
+use crate::ScopeHandle;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
@@ -36,31 +38,20 @@ impl<'a, O> SpawnableFuture<'a, O> {
     }
 }
 
-impl SpawnableFuture<'static, ()> {
-    /// Spawns the future on the specified scope.
-    pub fn spawn_on(mut self, scope: ScopeHandle) -> JoinHandle<()> {
+impl<O> Spawnable for SpawnableFuture<'static, O> {
+    type Output = O;
+
+    fn into_task(mut self, scope: ScopeHandle) -> TaskHandle {
         let meta = self.meta();
-        meta.scope = Some(scope.clone());
-        let task_id = scope.executor().next_task_id();
-        meta.id = task_id;
-        scope.insert_task(self.0, false);
-        JoinHandle::new(scope, task_id)
+        meta.id = scope.executor().next_task_id();
+        meta.scope = Some(scope);
+        self.0
     }
 }
 
-impl<O> SpawnableFuture<'static, O> {
-    /// Like `spawn` but for tasks that return a result.  See `Scope::compute` for drop semantics.
-    pub fn compute_on(mut self, scope: ScopeHandle) -> Task<O> {
-        let meta = self.meta();
-        meta.scope = Some(scope.clone());
-        let task_id = scope.executor().next_task_id();
-        meta.id = task_id;
-        scope.insert_task(self.0, false);
-        JoinHandle::new(scope, task_id).into()
-    }
-}
-
-impl<O> Future for SpawnableFuture<'_, O> {
+// This is intentionally &mut as otherwise we can't have a specialized implementation of
+// `Spawnable`. This should work just the same because of Rust's autoref behaviour.
+impl<O> Future for &mut SpawnableFuture<'_, O> {
     type Output = O;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -111,7 +102,7 @@ mod tests {
             assert!(futures::poll!(&mut task1).is_pending());
             assert_eq!(counter.load(Relaxed), old + 1);
 
-            task1.spawn_on(Scope::current()).await;
+            Scope::current().spawn(task1).await;
 
             assert_eq!(counter.load(Relaxed), old + 2);
         });
