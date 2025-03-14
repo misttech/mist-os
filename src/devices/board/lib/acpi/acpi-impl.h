@@ -4,10 +4,10 @@
 
 #ifndef SRC_DEVICES_BOARD_LIB_ACPI_ACPI_IMPL_H_
 #define SRC_DEVICES_BOARD_LIB_ACPI_ACPI_IMPL_H_
-#include <optional>
-#include <vector>
 
 #include <acpica/acpi.h>
+#include <fbl/vector.h>
+#include <ktl/optional.h>
 
 #include "src/devices/board/lib/acpi/acpi.h"
 #include "src/devices/board/lib/acpi/status.h"
@@ -30,13 +30,13 @@ class AcpiImpl : public Acpi {
 
   acpi::status<acpi::UniquePtr<ACPI_OBJECT>> EvaluateObject(
       ACPI_HANDLE object, const char* pathname,
-      std::optional<std::vector<ACPI_OBJECT>> args) override;
+      ktl::optional<fbl::Vector<ACPI_OBJECT>> args) override;
 
   acpi::status<acpi::UniquePtr<ACPI_DEVICE_INFO>> GetObjectInfo(ACPI_HANDLE obj) override;
 
   acpi::status<ACPI_HANDLE> GetParent(ACPI_HANDLE child) override;
   acpi::status<ACPI_HANDLE> GetHandle(ACPI_HANDLE parent, const char* pathname) override;
-  acpi::status<std::string> GetPath(ACPI_HANDLE object) override;
+  acpi::status<ktl::string_view> GetPath(ACPI_HANDLE object) override;
 
   acpi::status<> InstallNotifyHandler(ACPI_HANDLE object, uint32_t mode,
                                       NotifyHandlerCallable callable, void* context) override;

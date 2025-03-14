@@ -7,7 +7,9 @@
 
 #include <lib/zx/result.h>
 #include <stdint.h>
+#ifndef __mist_os__
 #include <zircon/status.h>
+#endif
 #include <zircon/types.h>
 
 #include <exception>

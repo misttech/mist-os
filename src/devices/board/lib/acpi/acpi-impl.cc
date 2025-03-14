@@ -4,12 +4,13 @@
 
 #include "src/devices/board/lib/acpi/acpi-impl.h"
 
-#include <lib/ddk/debug.h>
+#include <trace.h>
 
-#include <string>
-#include <vector>
+#include <fbl/vector.h>
 
 #include "src/devices/board/lib/acpi/status.h"
+
+#define LOCAL_TRACE 0
 
 namespace acpi {
 namespace {
@@ -65,7 +66,7 @@ acpi::status<> AcpiImpl::GetDevices(const char* hid, DeviceCallable cbk) {
 }
 
 acpi::status<acpi::UniquePtr<ACPI_OBJECT>> AcpiImpl::EvaluateObject(
-    ACPI_HANDLE object, const char* pathname, std::optional<std::vector<ACPI_OBJECT>> args) {
+    ACPI_HANDLE object, const char* pathname, ktl::optional<fbl::Vector<ACPI_OBJECT>> args) {
   ACPI_OBJECT_LIST params;
   ACPI_OBJECT_LIST* params_ptr = nullptr;
   if (args.has_value()) {
@@ -117,14 +118,14 @@ acpi::status<ACPI_HANDLE> AcpiImpl::GetHandle(ACPI_HANDLE parent, const char* pa
   return acpi::ok(out);
 }
 
-acpi::status<std::string> AcpiImpl::GetPath(ACPI_HANDLE object) {
+acpi::status<ktl::string_view> AcpiImpl::GetPath(ACPI_HANDLE object) {
   AcpiBuffer<char> out;
   ACPI_STATUS status = AcpiGetName(object, ACPI_FULL_PATHNAME, &out);
   if (status != AE_OK) {
     return acpi::error(status);
   }
 
-  std::string ret(static_cast<char*>(out.Pointer));
+  ktl::string_view ret(static_cast<char*>(out.Pointer));
   return acpi::ok(std::move(ret));
 }
 
@@ -193,37 +194,37 @@ acpi::status<> AcpiImpl::InitializeAcpi() {
   // of the ACPICA developer's reference.
   ACPI_STATUS status = AcpiInitializeSubsystem();
   if (status != AE_OK) {
-    zxlogf(WARNING, "Could not initialize ACPI: %d", status);
+    LTRACEF("Could not initialize ACPI: %d\n", status);
     return acpi::make_status(status);
   }
 
   status = AcpiInitializeTables(NULL, kAcpiMaxInitTables, FALSE);
   if (status == AE_NOT_FOUND) {
-    zxlogf(WARNING, "Could not find ACPI tables");
+    LTRACEF("Could not find ACPI tables\n");
     return acpi::make_status(status);
   } else if (status == AE_NO_MEMORY) {
-    zxlogf(WARNING, "Could not initialize ACPI tables");
+    LTRACEF("Could not initialize ACPI tables\n");
     return acpi::make_status(status);
   } else if (status != AE_OK) {
-    zxlogf(WARNING, "Could not initialize ACPI tables for unknown reason");
+    LTRACEF("Could not initialize ACPI tables for unknown reason\n");
     return acpi::make_status(status);
   }
 
   status = AcpiLoadTables();
   if (status != AE_OK) {
-    zxlogf(WARNING, "Could not load ACPI tables: %d", status);
+    LTRACEF("Could not load ACPI tables: %d\n", status);
     return acpi::make_status(status);
   }
 
   status = AcpiEnableSubsystem(ACPI_FULL_INITIALIZATION);
   if (status != AE_OK) {
-    zxlogf(WARNING, "Could not enable ACPI: %d", status);
+    LTRACEF("Could not enable ACPI: %d\n", status);
     return acpi::make_status(status);
   }
 
   status = AcpiInitializeObjects(ACPI_FULL_INITIALIZATION);
   if (status != AE_OK) {
-    zxlogf(WARNING, "Could not initialize ACPI objects: %d", status);
+    LTRACEF("Could not initialize ACPI objects: %d\n", status);
     return acpi::make_status(status);
   }
 
@@ -231,10 +232,10 @@ acpi::status<> AcpiImpl::InitializeAcpi() {
   if (apic_status.status_value() == AE_NOT_FOUND) {
 #ifdef __x86_64__
     // Only warn on x86, since this is unlikely to be an issue on ARM.
-    zxlogf(WARNING, "Could not find ACPI IRQ mode switch");
+    LTRACEF("Could not find ACPI IRQ mode switch\n");
 #endif
   } else if (apic_status.is_error()) {
-    zxlogf(WARNING, "Failed to set APIC IRQ mode: %d", apic_status.status_value());
+    LTRACEF("Failed to set APIC IRQ mode: %d\n", apic_status.status_value());
     return apic_status.take_error();
   }
 
@@ -242,11 +243,11 @@ acpi::status<> AcpiImpl::InitializeAcpi() {
   // if it fails for some reason we don't want to block booting the system.
   auto wake_status = DiscoverWakeGpes();
   if (wake_status.is_error()) {
-    zxlogf(WARNING, "Failed to discover wake GPEs: %d", wake_status.status_value());
+    LTRACEF("Failed to discover wake GPEs: %d\n", wake_status.status_value());
   }
   status = AcpiUpdateAllGpes();
   if (status != AE_OK) {
-    zxlogf(WARNING, "Could not initialize ACPI GPEs: %d", status);
+    LTRACEF("Could not initialize ACPI GPEs: %d\n", status);
     return acpi::make_status(status);
   }
 

@@ -4,9 +4,12 @@
 
 #include "src/devices/board/lib/acpi/acpi.h"
 
-#include <lib/ddk/debug.h>
+#include <trace.h>
 
-#include <vector>
+#include <fbl/vector.h>
+#include <ktl/move.h>
+
+#define LOCAL_TRACE 0
 
 namespace acpi {
 namespace {
@@ -68,7 +71,13 @@ acpi::status<uint16_t> Acpi::CallSeg(ACPI_HANDLE obj) {
 acpi::status<> Acpi::SetApicIrqMode() {
   ACPI_OBJECT selector = acpi::MakeAcpiObject(1);
 
-  auto result = EvaluateObject(nullptr, "\\_PIC", std::vector({selector}));
+  fbl::Vector<ACPI_OBJECT> vec;
+  fbl::AllocChecker ac;
+  vec.push_back(selector, &ac);
+  if (!ac.check()) {
+    return acpi::error(AE_NO_MEMORY);
+  }
+  auto result = EvaluateObject(nullptr, "\\_PIC", ktl::move(vec));
   if (result.is_error()) {
     return result.take_error();
   }
@@ -129,7 +138,7 @@ acpi::status<> Acpi::DiscoverWakeGpes() {
         }
         auto wake_status = SetupGpeForWake(obj, gpe_block, gpe_bit);
         if (wake_status.is_error()) {
-          zxlogf(ERROR, "ACPI failed to setup wake GPE: %d", wake_status.status_value());
+          LTRACEF("ACPI failed to setup wake GPE: %d\n", wake_status.status_value());
         }
         return acpi::ok();
       });
