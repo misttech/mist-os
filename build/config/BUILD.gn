@@ -948,6 +948,7 @@ config("Wno-vla-cxx-extension") {
     "//src/ui/input/drivers/hid:*",
     "//src/ui/input/drivers/hid-input-report:*",
     "//src/ui/scenic/lib/flatland/renderer/tests:*",
+    "//third_party/lk/lib/bio:*",
     "//third_party/openweave-core/src/lib/profiles:*",
     "//tools/fidl/fidlc:*",
     "//vendor/arm/camera/driver/fuchsia/wrappers:*",

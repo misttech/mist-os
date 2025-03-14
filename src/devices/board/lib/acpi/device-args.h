@@ -5,23 +5,17 @@
 #ifndef SRC_DEVICES_BOARD_LIB_ACPI_DEVICE_ARGS_H_
 #define SRC_DEVICES_BOARD_LIB_ACPI_DEVICE_ARGS_H_
 
-#include <lib/ddk/device.h>
-
 #include <vector>
 
 #include <acpica/acpi.h>
 
 #include "src/devices/board/lib/acpi/manager.h"
 
-#ifdef __Fuchsia__
-#include <fuchsia/hardware/pciroot/cpp/banjo.h>
-#else
 using pci_bdf_t = struct pci_bdf {
   uint8_t bus_id;
   uint8_t device_id;
   uint8_t function_id;
 };
-#endif
 
 namespace acpi {
 
@@ -39,9 +33,7 @@ inline const char* BusTypeToString(BusType t) {
 }
 
 struct DeviceArgs {
-  zx_device_t* parent_;
   acpi::Manager* manager_;
-  async_dispatcher_t* dispatcher_;
   ACPI_HANDLE handle_;
 
   // Bus metadata
@@ -50,11 +42,9 @@ struct DeviceArgs {
   uint32_t bus_id_ = UINT32_MAX;
 
   // PCI metadata
-  std::vector<pci_bdf_t> bdfs_;
+  fbl::Vector<pci_bdf_t> bdfs_;
 
-  DeviceArgs(zx_device_t* parent, acpi::Manager* manager, async_dispatcher_t* dispatcher,
-             ACPI_HANDLE handle)
-      : parent_(parent), manager_(manager), dispatcher_(dispatcher), handle_(handle) {}
+  DeviceArgs(acpi::Manager* manager, ACPI_HANDLE handle) : manager_(manager), handle_(handle) {}
   DeviceArgs(DeviceArgs&) = delete;
 
   DeviceArgs& SetBusMetadata(BusMetadata metadata, BusType bus_type, uint32_t bus_id) {
@@ -63,7 +53,7 @@ struct DeviceArgs {
     bus_id_ = bus_id;
     return *this;
   }
-  DeviceArgs& SetPciMetadata(std::vector<pci_bdf_t> bdfs) {
+  DeviceArgs& SetPciMetadata(fbl::Vector<pci_bdf_t> bdfs) {
     bdfs_ = std::move(bdfs);
     return *this;
   }

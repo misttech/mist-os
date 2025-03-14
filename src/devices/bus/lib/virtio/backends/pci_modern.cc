@@ -1,19 +1,128 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2017 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/mmio-ptr/mmio-ptr.h>
-#include <lib/mmio/mmio-buffer.h>
+#include <inttypes.h>
+#include <lib/ddk/hw/reg.h>
 #include <lib/virtio/backends/pci.h>
-#include <zircon/errors.h>
-#include <zircon/types.h>
+#include <trace.h>
 
 #include <cstdint>
-#include <mutex>
 
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
+#include <dev/pcie_caps.h>
+#include <fbl/algorithm.h>
+#include <fbl/auto_lock.h>
+#include <vm/vm_object_physical.h>
+
+#include <ktl/enforce.h>
+
+#define LOCAL_TRACE 0
 
 namespace {
+
+zx_status_t pci_get_next_capability(const fbl::RefPtr<PcieDevice>& device, uint8_t cap_id,
+                                    uint8_t offset, uint8_t* out_offset) {
+  // If we're looking for the first capability then we read from the offset
+  // since it contains 0x34 which ppints to the start of the list. Otherwise, we
+  // have an existing capability's offset and need to advance one byte to its
+  // next pointer.
+  if (offset != PciConfig::kCapabilitiesPtr.offset()) {
+    offset++;
+  }
+
+  // Walk the capability list looking for the type requested.  limit acts as a
+  // barrier in case of an invalid capability pointer list that causes us to
+  // iterate forever otherwise.
+  uint8_t limit = 64;
+  uint32_t cap_offset = 0;
+
+  cap_offset = device->config()->Read(PciReg8(offset));
+  while (cap_offset != 0 && cap_offset != 0xFF && limit--) {
+    uint32_t type_id = device->config()->Read(PciReg8(cap_offset));
+    if (type_id == cap_id) {
+      *out_offset = static_cast<uint8_t>(cap_offset);
+      return ZX_OK;
+    }
+
+    // We didn't find the right type, move on, but ensure we're still within the
+    // first 256 bytes of standard config space.
+    if (cap_offset >= UINT8_MAX) {
+      LTRACEF("pci: %#x is an invalid capability offset!\n", cap_offset);
+      break;
+    }
+
+    cap_offset = device->config()->Read(PciReg8(cap_offset + 1));
+  }
+  return ZX_ERR_NOT_FOUND;
+}
+
+zx_status_t GetCapabilities(const fbl::RefPtr<PcieDevice>& device,
+                            fbl::Vector<uint8_t>& out_offsets) {
+  uint8_t offset = PciConfig::kCapabilitiesPtr.offset();
+  uint8_t out_offset;
+  while (true) {
+    zx_status_t status = pci_get_next_capability(device, PCIE_CAP_ID_VENDOR, offset, &out_offset);
+    if (status == ZX_ERR_NOT_FOUND) {
+      break;
+    } else if (status != ZX_OK) {
+      return status;
+    }
+    fbl::AllocChecker ac;
+    out_offsets.push_back(out_offset, &ac);
+    if (!ac.check()) {
+      return ZX_ERR_NO_MEMORY;
+    }
+    offset = out_offset;
+  }
+  return ZX_OK;
+}
+
+zx_status_t GetFirstCapability(const fbl::RefPtr<PcieDevice>& device, uint8_t id,
+                               uint8_t* out_offset) {
+  fbl::Vector<uint8_t> offsets;
+  zx_status_t status = GetCapabilities(device, offsets);
+  if (status != ZX_OK) {
+    return status;
+  }
+  *out_offset = offsets[0];
+  return ZX_OK;
+}
+
+zx_status_t GetNextCapability(const fbl::RefPtr<PcieDevice>& device, uint8_t id,
+                              uint8_t start_offset, uint8_t* out_offset) {
+  fbl::Vector<uint8_t> offsets;
+  zx_status_t status = GetCapabilities(device, offsets);
+  if (status != ZX_OK) {
+    return status;
+  }
+  for (uint64_t i = 0; i < offsets.size() - 1; i++) {
+    if (offsets[i] == start_offset) {
+      *out_offset = offsets[i + 1];
+      return ZX_OK;
+    }
+  }
+  return ZX_ERR_NOT_FOUND;
+}
+
+template <typename T>
+zx_status_t ReadConfig(const fbl::RefPtr<PcieDevice>& device, uint16_t offset, T* out_value) {
+  auto config = device->config();
+  switch (sizeof(T)) {
+    case 1u:
+      *out_value = static_cast<T>(config->Read(PciReg8(offset)));
+      break;
+    case 2u:
+      *out_value = static_cast<T>(config->Read(PciReg16(offset)));
+      break;
+    case 4u:
+      *out_value = static_cast<T>(config->Read(PciReg32(offset)));
+      break;
+    default:
+      return ZX_ERR_INVALID_ARGS;
+  }
+  return ZX_OK;
+}
 
 // MMIO reads and writes are abstracted out into template methods that
 // ensure fields are only accessed with the right size.
@@ -88,78 +197,98 @@ uint64_t GetLength64(virtio_pci_cap64 cap64) {
 
 namespace virtio {
 
-#define CHECK_RESULT(result)                                  \
-  if ((result).is_error()) {                                  \
-    if ((result).error_value().is_domain_error()) {           \
-      return (result).error_value().domain_error();           \
-    }                                                         \
-    return (result).error_value().framework_error().status(); \
+#define CHECK_RESULT(result) \
+  if (result != ZX_OK) {     \
+    return (result);         \
   }
 
 // For reading the virtio specific vendor capabilities that can be PIO or MMIO space
 #define cap_field(offset, field) static_cast<uint8_t>((offset) + offsetof(virtio_pci_cap_t, field))
 zx_status_t PciModernBackend::ReadVirtioCap(uint8_t offset, virtio_pci_cap* cap) {
-  fidl::Result result = fidl::Call(pci())->ReadConfig8(cap_field(offset, cap_vndr));
-  CHECK_RESULT(result);
-  cap->cap_vndr = result->value();
-  result = fidl::Call(pci())->ReadConfig8(cap_field(offset, cap_next));
-  CHECK_RESULT(result);
-  cap->cap_next = result->value();
-  result = fidl::Call(pci())->ReadConfig8(cap_field(offset, cap_len));
-  CHECK_RESULT(result);
-  cap->cap_len = result->value();
-  result = fidl::Call(pci())->ReadConfig8(cap_field(offset, cfg_type));
-  CHECK_RESULT(result);
-  cap->cfg_type = result->value();
-  result = fidl::Call(pci())->ReadConfig8(cap_field(offset, bar));
-  CHECK_RESULT(result);
-  cap->bar = result->value();
-  result = fidl::Call(pci())->ReadConfig8(cap_field(offset, id));
-  CHECK_RESULT(result);
-  cap->id = result->value();
+  zx_status_t status;
+  uint8_t value8;
+  status = ReadConfig<uint8_t>(pci().device(), cap_field(offset, cap_vndr), &value8);
+  if (status != ZX_OK) {
+    return status;
+  }
+  cap->cap_vndr = value8;
+  status = ReadConfig<uint8_t>(pci().device(), cap_field(offset, cap_next), &value8);
+  if (status != ZX_OK) {
+    return status;
+  }
+  cap->cap_next = value8;
+  status = ReadConfig<uint8_t>(pci().device(), cap_field(offset, cap_len), &value8);
+  if (status != ZX_OK) {
+    return status;
+  }
+  cap->cap_len = value8;
+  status = ReadConfig<uint8_t>(pci().device(), cap_field(offset, cfg_type), &value8);
+  if (status != ZX_OK) {
+    return status;
+  }
+  cap->cfg_type = value8;
+  status = ReadConfig<uint8_t>(pci().device(), cap_field(offset, bar), &value8);
+  if (status != ZX_OK) {
+    return status;
+  }
+  cap->bar = value8;
+  status = ReadConfig<uint8_t>(pci().device(), cap_field(offset, id), &value8);
+  if (status != ZX_OK) {
+    return status;
+  }
+  cap->id = value8;
 
-  fidl::Result result2 = fidl::Call(pci())->ReadConfig32(cap_field(offset, offset));
-  CHECK_RESULT(result2);
-  cap->offset = result2->value();
-  result2 = fidl::Call(pci())->ReadConfig32(cap_field(offset, length));
-  CHECK_RESULT(result)
-  cap->length = result2->value();
+  uint32_t value32;
+  status = ReadConfig<uint32_t>(pci().device(), cap_field(offset, offset), &value32);
+  if (status != ZX_OK) {
+    return status;
+  }
+  cap->offset = value32;
+  status = ReadConfig<uint32_t>(pci().device(), cap_field(offset, length), &value32);
+  if (status != ZX_OK) {
+    return status;
+  }
+  cap->length = value32;
   return ZX_OK;
 }
 #undef cap_field
 
 zx_status_t PciModernBackend::ReadVirtioCap64(uint8_t cap_config_offset, virtio_pci_cap& cap,
                                               virtio_pci_cap64* cap64_out) {
-  fidl::Result offset_hi =
-      fidl::Call(pci())->ReadConfig32(cap_config_offset + sizeof(virtio_pci_cap_t));
-  CHECK_RESULT(offset_hi);
-
-  fidl::Result length_hi = fidl::Call(pci())->ReadConfig32(
-      cap_config_offset + sizeof(virtio_pci_cap_t) + sizeof(offset_hi));
-  CHECK_RESULT(length_hi);
+  uint32_t offset_hi;
+  if (zx_status_t status = ReadConfig<uint32_t>(
+          pci().device(), cap_config_offset + sizeof(virtio_pci_cap_t), &offset_hi);
+      status != ZX_OK) {
+    return status;
+  }
+  uint32_t length_hi;
+  if (zx_status_t status = ReadConfig<uint32_t>(
+          pci().device(), cap_config_offset + sizeof(virtio_pci_cap_t) + sizeof(offset_hi),
+          &length_hi);
+      status != ZX_OK) {
+    return status;
+  }
 
   cap64_out->cap = cap;
-  cap64_out->offset_hi = offset_hi->value();
-  cap64_out->length_hi = length_hi->value();
+  cap64_out->offset_hi = offset_hi;
+  cap64_out->length_hi = length_hi;
 
   return ZX_OK;
 }
 
 zx_status_t PciModernBackend::Init() {
-  std::lock_guard guard(lock());
+  fbl::AutoLock guard(&lock());
 
   // try to parse capabilities
-  fidl::Result capabilities =
-      fidl::Call(pci())->GetCapabilities(fuchsia_hardware_pci::CapabilityId::kVendor);
-  if (capabilities.is_error()) {
-    return capabilities.error_value().status();
-  }
-  for (const auto& off : capabilities->offsets()) {
+  uint8_t off = 0;
+  zx_status_t st;
+  for (st = GetFirstCapability(pci().device(), PCIE_CAP_ID_VENDOR, &off); st == ZX_OK;
+       st = GetNextCapability(pci().device(), PCIE_CAP_ID_VENDOR, off, &off)) {
     virtio_pci_cap_t cap;
 
-    zx_status_t st = ReadVirtioCap(off, &cap);
+    st = ReadVirtioCap(off, &cap);
     if (st != ZX_OK) {
-      zxlogf(ERROR, "Failed to read PCI capabilities");
+      LTRACEF("Failed to read PCI capabilities\n");
       return st;
     }
     switch (cap.cfg_type) {
@@ -169,10 +298,9 @@ zx_status_t PciModernBackend::Init() {
       case VIRTIO_PCI_CAP_NOTIFY_CFG: {
         // Virtio 1.0 section 4.1.4.4
         // notify_off_multiplier is a 32bit field following this capability
-        fidl::Result result =
-            fidl::Call(pci())->ReadConfig32(static_cast<uint8_t>(off + sizeof(virtio_pci_cap_t)));
+        auto result = ReadConfig<uint32_t>(
+            pci().device(), static_cast<uint8_t>(off + sizeof(virtio_pci_cap_t)), &notify_off_mul_);
         CHECK_RESULT(result);
-        notify_off_mul_ = result->value();
         NotifyCfgCallbackLocked(cap);
         break;
       }
@@ -187,7 +315,7 @@ zx_status_t PciModernBackend::Init() {
         break;
       case VIRTIO_PCI_CAP_SHARED_MEMORY_CFG: {
         virtio_pci_cap64 cap64;
-        if (zx_status_t st = ReadVirtioCap64(off, cap, &cap64); st != ZX_OK) {
+        if (st = ReadVirtioCap64(off, cap, &cap64); st != ZX_OK) {
           return st;
         }
         uint64_t offset = GetOffset64(cap64);
@@ -200,52 +328,52 @@ zx_status_t PciModernBackend::Init() {
 
   // Ensure we found needed capabilities during parsing
   if (common_cfg_ == nullptr || isr_status_ == nullptr || device_cfg_ == 0 || notify_base_ == 0) {
-    zxlogf(ERROR, "%s: failed to bind, missing capabilities", tag());
+    LTRACEF("Failed to bind, missing capabilities\n");
     return ZX_ERR_BAD_STATE;
   }
 
-  zxlogf(TRACE, "virtio: modern pci backend successfully initialized");
+  LTRACEF("virtio: modern pci backend successfully initialized\n");
   return ZX_OK;
 }
 
 // value pointers are used to maintain type safety with field width
 void PciModernBackend::ReadDeviceConfig(uint16_t offset, uint8_t* value) {
-  std::lock_guard guard(lock());
+  fbl::AutoLock guard(&lock());
   MmioRead(reinterpret_cast<MMIO_PTR volatile uint8_t*>(device_cfg_ + offset), value);
 }
 
 void PciModernBackend::ReadDeviceConfig(uint16_t offset, uint16_t* value) {
-  std::lock_guard guard(lock());
+  fbl::AutoLock guard(&lock());
   MmioRead(reinterpret_cast<MMIO_PTR volatile uint16_t*>(device_cfg_ + offset), value);
 }
 
 void PciModernBackend::ReadDeviceConfig(uint16_t offset, uint32_t* value) {
-  std::lock_guard guard(lock());
+  fbl::AutoLock guard(&lock());
   MmioRead(reinterpret_cast<MMIO_PTR volatile uint32_t*>(device_cfg_ + offset), value);
 }
 
 void PciModernBackend::ReadDeviceConfig(uint16_t offset, uint64_t* value) {
-  std::lock_guard guard(lock());
+  fbl::AutoLock guard(&lock());
   MmioRead(reinterpret_cast<MMIO_PTR volatile uint64_t*>(device_cfg_ + offset), value);
 }
 
 void PciModernBackend::WriteDeviceConfig(uint16_t offset, uint8_t value) {
-  std::lock_guard guard(lock());
+  fbl::AutoLock guard(&lock());
   MmioWrite(reinterpret_cast<MMIO_PTR volatile uint8_t*>(device_cfg_ + offset), value);
 }
 
 void PciModernBackend::WriteDeviceConfig(uint16_t offset, uint16_t value) {
-  std::lock_guard guard(lock());
+  fbl::AutoLock guard(&lock());
   MmioWrite(reinterpret_cast<MMIO_PTR volatile uint16_t*>(device_cfg_ + offset), value);
 }
 
 void PciModernBackend::WriteDeviceConfig(uint16_t offset, uint32_t value) {
-  std::lock_guard guard(lock());
+  fbl::AutoLock guard(&lock());
   MmioWrite(reinterpret_cast<MMIO_PTR volatile uint32_t*>(device_cfg_ + offset), value);
 }
 
 void PciModernBackend::WriteDeviceConfig(uint16_t offset, uint64_t value) {
-  std::lock_guard guard(lock());
+  fbl::AutoLock guard(&lock());
   MmioWrite(reinterpret_cast<MMIO_PTR volatile uint64_t*>(device_cfg_ + offset), value);
 }
 
@@ -253,7 +381,7 @@ void PciModernBackend::WriteDeviceConfig(uint16_t offset, uint64_t value) {
 // mapped and we have stored a valid handle in the structure then just return
 // ZX_OK.
 zx_status_t PciModernBackend::MapBar(uint8_t bar) {
-  if (bar >= std::size(bar_)) {
+  if (bar >= ktl::size(bar_)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -261,69 +389,83 @@ zx_status_t PciModernBackend::MapBar(uint8_t bar) {
     return ZX_OK;
   }
 
-  fidl::Result result = fidl::Call(pci())->GetBar(bar);
-  CHECK_RESULT(result);
+  mmio_buffer_t mmio;
+  pcie_bar_info_t bar_info;
+  if (GetBar(bar, &bar_info) != ZX_OK) {
+    return ZX_ERR_INVALID_ARGS;
+  }
 
-  if (result->result().result().Which() != fuchsia_hardware_pci::BarResult::Tag::kVmo) {
+  if (!bar_info.is_mmio) {
     return ZX_ERR_WRONG_TYPE;
   }
 
-  auto& bar_result = result->result();
+  // Set the name of the vmo for tracking
+  char name[32];
+  auto dev = pci().device();
+  snprintf(name, sizeof(name), "pci-%02x:%02x.%1x-bar%u", dev->bus_id(), dev->dev_id(),
+           dev->func_id(), bar);
 
-  zx::result mmio =
-      fdf::MmioBuffer::Create(0, bar_result.size(), zx::vmo(bar_result.result().vmo()->release()),
-                              ZX_CACHE_POLICY_UNCACHED_DEVICE);
-  if (mmio.is_error()) {
-    zxlogf(ERROR, "%s: Failed to map bar %u: %s", tag(), bar, mmio.status_string());
-    return mmio.status_value();
+  void* vaddr;
+  zx_status_t res = VmAspace::kernel_aspace()->AllocPhysical(
+      name, ktl::max<uint64_t>(bar_info.size, PAGE_SIZE), /* size */
+      &vaddr,                                             /* returned virtual address */
+      PAGE_SIZE_SHIFT,                                    /* alignment log2 */
+      bar_info.bus_addr,                                  /* physical address */
+      0,                                                  /* vmm flags */
+      ARCH_MMU_FLAG_UNCACHED_DEVICE | ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE);
+  if (res != ZX_OK) {
+    LTRACEF("failed to map bar %u\n", bar);
+    return res;
   }
 
-  bar_[bar] = std::move(*mmio);
-  zxlogf(DEBUG, "%s: bar %u mapped to %p", tag(), bar, bar_[bar]->get());
+  mmio.vaddr = (MMIO_PTR void*)vaddr;
+
+  bar_[bar] = ktl::move(mmio);
+  LTRACEF("%s: bar %u mapped to %p\n", tag(), bar, bar_[bar]->vaddr);
   return ZX_OK;
 }
 
 void PciModernBackend::CommonCfgCallbackLocked(const virtio_pci_cap_t& cap) {
-  zxlogf(DEBUG, "%s: common cfg found in bar %u offset %#x", tag(), cap.bar, cap.offset);
+  LTRACEF("common cfg found in bar %u offset %#x\n", cap.bar, cap.offset);
   if (MapBar(cap.bar) != ZX_OK) {
     return;
   }
 
   // Common config is a structure of type virtio_pci()common_cfg_t located at an
   // the bar and offset specified by the capability.
-  auto addr = reinterpret_cast<uintptr_t>(bar_[cap.bar]->get()) + cap.offset;
+  auto addr = reinterpret_cast<uintptr_t>(bar_[cap.bar]->vaddr) + cap.offset;
   common_cfg_ = reinterpret_cast<MMIO_PTR volatile virtio_pci_common_cfg_t*>(addr);
 
   // Cache this when we find the config for kicking the queues later
 }
 
 void PciModernBackend::NotifyCfgCallbackLocked(const virtio_pci_cap_t& cap) {
-  zxlogf(DEBUG, "%s: notify cfg found in bar %u offset %#x", tag(), cap.bar, cap.offset);
+  LTRACEF("notify cfg found in bar %u offset %#x\n", cap.bar, cap.offset);
   if (MapBar(cap.bar) != ZX_OK) {
     return;
   }
 
-  notify_base_ = reinterpret_cast<uintptr_t>(bar_[cap.bar]->get()) + cap.offset;
+  notify_base_ = reinterpret_cast<uintptr_t>(bar_[cap.bar]->vaddr) + cap.offset;
 }
 
 void PciModernBackend::IsrCfgCallbackLocked(const virtio_pci_cap_t& cap) {
-  zxlogf(DEBUG, "%s: isr cfg found in bar %u offset %#x", tag(), cap.bar, cap.offset);
+  LTRACEF("isr cfg found in bar %u offset %#x\n", cap.bar, cap.offset);
   if (MapBar(cap.bar) != ZX_OK) {
     return;
   }
 
   // interrupt status is directly read from the register at this address
   isr_status_ = reinterpret_cast<volatile uint32_t*>(
-      reinterpret_cast<uintptr_t>(bar_[cap.bar]->get()) + cap.offset);
+      reinterpret_cast<uintptr_t>(bar_[cap.bar]->vaddr) + cap.offset);
 }
 
 void PciModernBackend::DeviceCfgCallbackLocked(const virtio_pci_cap_t& cap) {
-  zxlogf(DEBUG, "%s: device cfg found in bar %u offset %#x", tag(), cap.bar, cap.offset);
+  LTRACEF("device cfg found in bar %u offset %#x\n", cap.bar, cap.offset);
   if (MapBar(cap.bar) != ZX_OK) {
     return;
   }
 
-  device_cfg_ = reinterpret_cast<uintptr_t>(bar_[cap.bar]->get()) + cap.offset;
+  device_cfg_ = reinterpret_cast<uintptr_t>(bar_[cap.bar]->vaddr) + cap.offset;
 }
 
 void PciModernBackend::SharedMemoryCfgCallbackLocked(const virtio_pci_cap_t& cap, uint64_t offset,
@@ -341,19 +483,19 @@ void PciModernBackend::PciCfgCallbackLocked(const virtio_pci_cap_t& cap) {
 
 // Get the ring size of a specific index
 uint16_t PciModernBackend::GetRingSize(uint16_t index) {
-  std::lock_guard guard(lock());
+  fbl::AutoLock guard(&lock());
 
   uint16_t queue_size = 0;
   MmioWrite(&common_cfg_->queue_select, index);
   MmioRead(&common_cfg_->queue_size, &queue_size);
-  zxlogf(TRACE, "QueueSize: %#x", queue_size);
+  LTRACEF("QueueSize: %#x\n", queue_size);
   return queue_size;
 }
 
 // Set up ring descriptors with the backend.
 zx_status_t PciModernBackend::SetRing(uint16_t index, uint16_t count, zx_paddr_t pa_desc,
                                       zx_paddr_t pa_avail, zx_paddr_t pa_used) {
-  std::lock_guard guard(lock());
+  fbl::AutoLock guard(&lock());
 
   // These offsets are wrong and this should be changed
   MmioWrite(&common_cfg_->queue_select, index);
@@ -362,19 +504,19 @@ zx_status_t PciModernBackend::SetRing(uint16_t index, uint16_t count, zx_paddr_t
   MmioWrite(&common_cfg_->queue_avail, pa_avail);
   MmioWrite(&common_cfg_->queue_used, pa_used);
 
-  if (irq_mode() == fuchsia_hardware_pci::InterruptMode::kMsiX) {
+  if (irq_mode() == PCIE_IRQ_MODE_MSI_X) {
     uint16_t vector = 0;
     MmioWrite(&common_cfg_->config_msix_vector, PciBackend::kMsiConfigVector);
     MmioRead(&common_cfg_->config_msix_vector, &vector);
     if (vector != PciBackend::kMsiConfigVector) {
-      zxlogf(ERROR, "MSI-X config vector in invalid state after write: %#x", vector);
+      LTRACEF("MSI-X config vector in invalid state after write: %#x\n", vector);
       return ZX_ERR_BAD_STATE;
     }
 
     MmioWrite(&common_cfg_->queue_msix_vector, PciBackend::kMsiQueueVector);
     MmioRead(&common_cfg_->queue_msix_vector, &vector);
     if (vector != PciBackend::kMsiQueueVector) {
-      zxlogf(ERROR, "MSI-X queue vector in invalid state after write: %#x", vector);
+      LTRACEF("MSI-X queue vector in invalid state after write: %#x\n", vector);
       return ZX_ERR_BAD_STATE;
     }
   }
@@ -384,7 +526,7 @@ zx_status_t PciModernBackend::SetRing(uint16_t index, uint16_t count, zx_paddr_t
   uint16_t queue_notify_off;
   MmioRead(&common_cfg_->queue_notify_off, &queue_notify_off);
   if (queue_notify_off != index) {
-    zxlogf(ERROR, "Virtio queue notify setup failed");
+    LTRACEF("Virtio queue notify setup failed\n");
     return ZX_ERR_BAD_STATE;
   }
 
@@ -392,7 +534,7 @@ zx_status_t PciModernBackend::SetRing(uint16_t index, uint16_t count, zx_paddr_t
 }
 
 void PciModernBackend::RingKick(uint16_t ring_index) {
-  std::lock_guard guard(lock());
+  fbl::AutoLock guard(&lock());
 
   // Virtio 1.0 Section 4.1.4.4
   // The address to notify for a queue is calculated using information from
@@ -403,7 +545,7 @@ void PciModernBackend::RingKick(uint16_t ring_index) {
   // equal to the ring index.
   auto addr = notify_base_ + ring_index * notify_off_mul_;
   auto ptr = reinterpret_cast<volatile uint16_t*>(addr);
-  zxlogf(TRACE, "%s: kick %u addr %p", tag(), ring_index, ptr);
+  LTRACEF("kick %u addr %p\n", ring_index, ptr);
   *ptr = ring_index;
 }
 
@@ -411,7 +553,7 @@ uint64_t PciModernBackend::ReadFeatures() {
   auto read_subset_features = [this](uint32_t select) {
     uint32_t val;
     {
-      std::lock_guard guard(lock());
+      fbl::AutoLock guard(&lock());
       MmioWrite(&common_cfg_->device_feature_select, select);
       MmioRead(&common_cfg_->device_feature, &val);
     }
@@ -425,12 +567,12 @@ uint64_t PciModernBackend::ReadFeatures() {
 
 void PciModernBackend::SetFeatures(uint64_t bitmap) {
   auto write_subset_features = [this](uint32_t select, uint32_t sub_bitmap) {
-    std::lock_guard guard(lock());
+    fbl::AutoLock guard(&lock());
     MmioWrite(&common_cfg_->driver_feature_select, select);
     uint32_t val;
     MmioRead(&common_cfg_->driver_feature, &val);
     MmioWrite(&common_cfg_->driver_feature, val | sub_bitmap);
-    zxlogf(DEBUG, "%s: feature bits %08uh now set at offset %u", tag(), sub_bitmap, 32 * select);
+    LTRACEF("feature bits %08uh now set at offset %u\n", sub_bitmap, 32 * select);
   };
 
   uint32_t sub_bitmap = bitmap & UINT32_MAX;
@@ -444,7 +586,7 @@ void PciModernBackend::SetFeatures(uint64_t bitmap) {
 }
 
 zx_status_t PciModernBackend::ConfirmFeatures() {
-  std::lock_guard guard(lock());
+  fbl::AutoLock guard(&lock());
   uint8_t val;
 
   MmioRead(&common_cfg_->device_status, &val);
@@ -461,13 +603,13 @@ zx_status_t PciModernBackend::ConfirmFeatures() {
 }
 
 void PciModernBackend::DeviceReset() {
-  std::lock_guard guard(lock());
+  fbl::AutoLock guard(&lock());
 
   MmioWrite<uint8_t>(&common_cfg_->device_status, 0u);
 }
 
 void PciModernBackend::WaitForDeviceReset() {
-  std::lock_guard guard(lock());
+  fbl::AutoLock guard(&lock());
 
   uint8_t device_status = 0xFF;
   while (device_status != 0) {
@@ -476,7 +618,7 @@ void PciModernBackend::WaitForDeviceReset() {
 }
 
 void PciModernBackend::DriverStatusOk() {
-  std::lock_guard guard(lock());
+  fbl::AutoLock guard(&lock());
 
   uint8_t device_status;
   MmioRead(&common_cfg_->device_status, &device_status);
@@ -485,7 +627,7 @@ void PciModernBackend::DriverStatusOk() {
 }
 
 void PciModernBackend::DriverStatusAck() {
-  std::lock_guard guard(lock());
+  fbl::AutoLock guard(&lock());
 
   uint8_t device_status;
   MmioRead(&common_cfg_->device_status, &device_status);
@@ -497,25 +639,39 @@ uint32_t PciModernBackend::IsrStatus() {
   return (*isr_status_ & (VIRTIO_ISR_QUEUE_INT | VIRTIO_ISR_DEV_CFG_INT));
 }
 
-zx_status_t PciModernBackend::GetBarVmo(uint8_t bar_id, zx::vmo* vmo_out) {
-  fidl::Result result = fidl::Call(pci())->GetBar(bar_id);
-  CHECK_RESULT(result);
+zx_status_t PciModernBackend::GetBar(uint8_t bar_id, pcie_bar_info_t* info_out) {
+  // Extracted sys_pci_get_bar
 
-  CHECK_RESULT(result);
-
-  if (result->result().result().Which() != fuchsia_hardware_pci::BarResult::Tag::kVmo) {
-    return ZX_ERR_WRONG_TYPE;
+  // Get bar info from the device via the dispatcher and make sure it makes sense
+  const pcie_bar_info_t* info = pci().GetBar(bar_id);
+  if (info == nullptr || info->size == 0) {
+    return ZX_ERR_NOT_FOUND;
   }
 
-  *vmo_out = zx::vmo(result->result().result().vmo()->release());
+  // MMIO based bars are passed back using a VMO. If we end up creating one here
+  // without errors then later a handle will be passed back to the caller.
+  if (info->is_mmio) {
+    pci().EnableMmio(true);
+  } else {
+    DEBUG_ASSERT(info->bus_addr != 0);
+    pci().EnablePio(true);
+  }
+
+  // Extracted zx_ioports_request
+  if (!info->is_mmio) {
+    LTRACEF("addr 0x%lx len 0x%lx\n", info->bus_addr, info->size);
+
+    return IoBitmap::GetCurrent()->SetIoBitmap(info->bus_addr, info->size, /*enable=*/true);
+  }
+
+  info_out->bus_addr = info->bus_addr;
+  info_out->size = info->size;
+  info_out->is_mmio = info->is_mmio;
+  info_out->is_64bit = info->is_64bit;
+  info_out->is_prefetchable = info->is_prefetchable;
+  info_out->first_bar_reg = info->first_bar_reg;
+
   return ZX_OK;
-}
-
-zx_status_t PciModernBackend::GetSharedMemoryVmo(zx::vmo* vmo_out) {
-  if (!shared_memory_bar_) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  return GetBarVmo(*shared_memory_bar_, vmo_out);
 }
 
 }  // namespace virtio

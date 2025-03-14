@@ -4,22 +4,21 @@
 
 #include "src/devices/board/lib/acpi/manager.h"
 
-#include <fidl/fuchsia.hardware.spi.businfo/cpp/wire.h>
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
 #include <lib/zx/result.h>
+#include <trace.h>
 #include <zircon/compiler.h>
-#include <zircon/status.h>
 
 #include <memory>
 
 #include <acpica/acpi.h>
 
 #include "src/devices/board/lib/acpi/acpi.h"
+#include "src/devices/board/lib/acpi/device-args.h"
 #include "src/devices/board/lib/acpi/pci.h"
 #include "src/devices/board/lib/acpi/power-resource.h"
 #include "src/devices/board/lib/acpi/util.h"
+
+#define LOCAL_TRACE 0
 
 namespace acpi {
 
@@ -27,11 +26,11 @@ acpi::status<> Manager::DiscoverDevices() {
   // Make sure our "ACPI root device" corresponds to the root of the ACPI tree.
   auto root = acpi_->GetHandle(nullptr, "\\");
   if (root.is_error()) {
-    zxlogf(WARNING, "Failed to get ACPI root object: %d", root.error_value());
+    LTRACEF("Failed to get ACPI root object: %d\n", root.error_value());
     return root.take_error();
   }
 
-  devices_.emplace(root.value(), DeviceBuilder::MakeRootDevice(root.value(), acpi_root_));
+  devices_.emplace(root.value(), DeviceBuilder::MakeRootDevice(root.value()));
   uint32_t ignored_depth = Acpi::kMaxNamespaceDepth + 1;
   return acpi_->WalkNamespace(ACPI_TYPE_DEVICE, ACPI_ROOT_OBJECT, Acpi::kMaxNamespaceDepth,
                               [this, &ignored_depth](ACPI_HANDLE handle, uint32_t depth,
@@ -51,10 +50,10 @@ acpi::status<> Manager::DiscoverDevices() {
                                 auto status = DiscoverDevice(handle);
                                 if (status.is_error()) {
                                   auto path = acpi_->GetPath(handle).value_or("(get path failed)");
-                                  zxlogf(WARNING,
-                                         "Failed to discover device '%s': %d. Any children will "
-                                         "not be enumerated, the system may not function fully.",
-                                         path.data(), status.error_value());
+                                  LTRACEF(
+                                      "Failed to discover device '%s': %d. Any children will "
+                                      "not be enumerated, the system may not function fully.\n",
+                                      path.data(), status.error_value());
                                   // We failed to enumerate this device, so we don't enumerate any
                                   // of its children.
                                   ignored_depth = depth;
@@ -98,7 +97,7 @@ acpi::status<> Manager::ConfigureDiscoveredDevices() {
             } else if (bbn_result.is_ok()) {
               bus_id = bbn_result.value();
             } else {
-              zxlogf(ERROR, "Failed to get BBN for PCI bus '%s'", b->name());
+              LTRACEF("Failed to get BBN for PCI bus '%s'\n", b->name());
               return -1;
             }
           } else {
@@ -108,32 +107,30 @@ acpi::status<> Manager::ConfigureDiscoveredDevices() {
           return child_index;
         });
     if (result.is_error()) {
-      zxlogf(WARNING, "Failed to InferBusTypes for %s: %d", device->name(), result.error_value());
+      LTRACEF("Failed to InferBusTypes for %s: %d\n", device->name(), result.error_value());
     }
   }
 
   return acpi::ok();
 }
 
-acpi::status<> Manager::PublishDevices(zx_device_t* platform_bus,
-                                       async_dispatcher_t* device_dispatcher) {
+acpi::status<> Manager::PublishDevices() {
   for (auto handle : device_publish_order_) {
     DeviceBuilder* d = LookupDevice(handle);
     if (d == nullptr) {
       continue;
     }
 
-    auto status = d->Build(this, device_dispatcher);
+    auto status = d->Build(this);
     if (status.is_error()) {
       return acpi::error(AE_ERROR);
     }
-    zx_devices_.emplace(handle, status.value());
 
     uint32_t bus_type = d->GetBusType();
     if (bus_type == BusType::kPci) {
-      auto status = PublishPciBus(platform_bus, d);
-      if (status.is_error()) {
-        return status.take_error();
+      auto s = PublishPciBus(d);
+      if (s.is_error()) {
+        return s.take_error();
       }
     }
   }
@@ -141,7 +138,7 @@ acpi::status<> Manager::PublishDevices(zx_device_t* platform_bus,
 }
 
 const PowerResource* Manager::AddPowerResource(ACPI_HANDLE power_resource_handle) {
-  std::scoped_lock lock(power_resource_lock_);
+  Guard<Mutex> lock(&power_resources_lock_);
   auto power_resource_entry = power_resources_.find(power_resource_handle);
   if (power_resource_entry == power_resources_.end()) {
     PowerResource power_resource = PowerResource(acpi_, power_resource_handle);
@@ -156,8 +153,8 @@ const PowerResource* Manager::AddPowerResource(ACPI_HANDLE power_resource_handle
 }
 
 zx_status_t Manager::ReferencePowerResources(
-    const std::vector<ACPI_HANDLE>& power_resource_handles) {
-  std::scoped_lock lock(power_resource_lock_);
+    const fbl::Vector<ACPI_HANDLE>& power_resource_handles) {
+  Guard<Mutex> lock(&power_resources_lock_);
 
   for (auto it = power_resource_handles.begin(); it != power_resource_handles.end(); ++it) {
     auto power_resource = power_resources_.find(*it);
@@ -168,8 +165,8 @@ zx_status_t Manager::ReferencePowerResources(
       // Re-dereference all the successfully referenced power resources.
       while (it != power_resource_handles.begin()) {
         --it;
-        auto power_resource = power_resources_.find(*it);
-        power_resource->second.Dereference();
+        auto pr = power_resources_.find(*it);
+        pr->second.Dereference();
       }
       return status;
     }
@@ -179,9 +176,10 @@ zx_status_t Manager::ReferencePowerResources(
 }
 
 zx_status_t Manager::DereferencePowerResources(
-    const std::vector<ACPI_HANDLE>& power_resource_handles) {
-  std::scoped_lock lock(power_resource_lock_);
+    const fbl::Vector<ACPI_HANDLE>& power_resource_handles) {
+  Guard<Mutex> lock(&power_resources_lock_);
 
+#if 0
   for (auto rit = power_resource_handles.rbegin(); rit != power_resource_handles.rend(); ++rit) {
     auto power_resource = power_resources_.find(*rit);
     ZX_ASSERT_MSG(power_resource != power_resources_.end(),
@@ -191,12 +189,13 @@ zx_status_t Manager::DereferencePowerResources(
       // Re-reference all the successfully dereferenced power resources.
       while (rit != power_resource_handles.rbegin()) {
         --rit;
-        auto power_resource = power_resources_.find(*rit);
-        power_resource->second.Reference();
+        auto pr = power_resources_.find(*rit);
+        pr->second.Reference();
       }
       return status;
     }
   }
+#endif
 
   return ZX_OK;
 }
@@ -204,7 +203,7 @@ zx_status_t Manager::DereferencePowerResources(
 acpi::status<bool> Manager::DiscoverDevice(ACPI_HANDLE handle) {
   auto result = acpi_->GetObjectInfo(handle);
   if (result.is_error()) {
-    zxlogf(INFO, "get object info failed");
+    LTRACEF("get object info failed\n");
     return result.take_error();
   }
   UniquePtr<ACPI_DEVICE_INFO> info = std::move(result.value());
@@ -220,7 +219,7 @@ acpi::status<bool> Manager::DiscoverDevice(ACPI_HANDLE handle) {
     examine_children = true;
   } else if (state_result.is_ok()) {
     if (state_result->Type != ACPI_TYPE_INTEGER) {
-      zxlogf(ERROR, "%s returned incorrect object type for _STA", name.data());
+      LTRACEF("%s returned incorrect object type for _STA\n", name.data());
       return acpi::error(AE_BAD_VALUE);
     }
     state = state_result->Integer.Value;
@@ -231,7 +230,7 @@ acpi::status<bool> Manager::DiscoverDevice(ACPI_HANDLE handle) {
 
   // See ACPI 6.4, Table 6.66.
   if (!examine_children) {
-    zxlogf(DEBUG, "device '%s' not present, so not enumerating.", name.data());
+    LTRACEF("device '%s' not present, so not enumerating.\n", name.data());
     return acpi::ok(true);
   }
 
@@ -240,13 +239,13 @@ acpi::status<bool> Manager::DiscoverDevice(ACPI_HANDLE handle) {
   do {
     parent = acpi_->GetParent(*parent);
     if (parent.is_error()) {
-      zxlogf(ERROR, "Device '%s' failed to get parent: %d", name.data(), parent.status_value());
+      LTRACEF("Device '%s' failed to get parent: %d\n", name.data(), parent.status_value());
       return parent.take_error();
     }
 
     auto parent_info = acpi_->GetObjectInfo(*parent);
     if (parent_info.is_error()) {
-      zxlogf(ERROR, "Failed to get object info: %d", parent_info.status_value());
+      LTRACEF("Failed to get object info: %d\n", parent_info.status_value());
       return parent_info.take_error();
     }
 
@@ -258,7 +257,7 @@ acpi::status<bool> Manager::DiscoverDevice(ACPI_HANDLE handle) {
   if (parent_ptr == nullptr) {
     // Our parent should have been visited before us (since we're descending down the tree),
     // so this should never happen.
-    zxlogf(ERROR, "Device %s has no discovered parent? (%p)", name.data(), parent.value());
+    LTRACEF("Device %s has no discovered parent? (%p)\n", name.data(), parent.value());
     return acpi::error(AE_NOT_FOUND);
   }
 
@@ -267,13 +266,15 @@ acpi::status<bool> Manager::DiscoverDevice(ACPI_HANDLE handle) {
   if (info->Flags & ACPI_PCI_ROOT_BRIDGE) {
     device.SetBusType(BusType::kPci);
   }
-  device_publish_order_.emplace_back(handle);
+  fbl::AllocChecker ac;
+  device_publish_order_.push_back(handle, &ac);
+  ZX_ASSERT(ac.check());
   devices_.emplace(handle, std::move(device));
 
   return acpi::ok(false);
 }
 
-acpi::status<> Manager::PublishPciBus(zx_device_t* platform_bus, DeviceBuilder* device) {
+acpi::status<> Manager::PublishPciBus(DeviceBuilder* device) {
   if (published_pci_bus_) {
     return acpi::ok();
   }
@@ -289,31 +290,34 @@ acpi::status<> Manager::PublishPciBus(zx_device_t* platform_bus, DeviceBuilder* 
   }
 
   const DeviceChildData& children = device->GetBusChildren();
-  const std::vector<PciTopo>* vec_ptr = nullptr;
+  const fbl::Vector<PciTopo>* vec_ptr = nullptr;
   if (device->HasBusChildren()) {
-    vec_ptr = std::get_if<std::vector<PciTopo>>(&children);
+    vec_ptr = std::get_if<fbl::Vector<PciTopo>>(&children);
     if (!vec_ptr) {
-      zxlogf(ERROR, "PCI bus had non-PCI children.");
+      LTRACEF("PCI bus had non-PCI children.\n");
       return acpi::error(AE_BAD_DATA);
     }
   }
-  std::vector<pci_bdf_t> bdfs;
+  fbl::Vector<pci_bdf_t> bdfs;
   if (vec_ptr) {
     // If we have children, generate a list of them to pass to the PCI driver.
     for (uint64_t df : *vec_ptr) {
       uint32_t dev_id = (df & (0xffff0000)) >> 16;
       uint32_t func_id = df & 0x0000ffff;
 
-      bdfs.emplace_back(pci_bdf_t{
-          .bus_id = static_cast<uint8_t>(device->GetBusId()),
-          .device_id = static_cast<uint8_t>(dev_id),
-          .function_id = static_cast<uint8_t>(func_id),
-      });
+      fbl::AllocChecker ac;
+      bdfs.push_back(
+          pci_bdf_t{
+              .bus_id = static_cast<uint8_t>(device->GetBusId()),
+              .device_id = static_cast<uint8_t>(dev_id),
+              .function_id = static_cast<uint8_t>(func_id),
+          },
+          &ac);
+      ZX_ASSERT(ac.check());
     }
   }
 
-  if (pci_init(platform_bus, device->handle(), std::move(info.value()), this, std::move(bdfs)) ==
-      ZX_OK) {
+  if (pci_init(device->handle(), std::move(info.value()), this, std::move(bdfs)) == ZX_OK) {
     published_pci_bus_ = true;
   }
   return acpi::ok();

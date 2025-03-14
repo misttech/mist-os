@@ -201,8 +201,8 @@ zx_status_t resource_parse_irq(ACPI_RESOURCE* res, resource_irq_t* out) {
   return ZX_OK;
 }
 
-acpi::status<fuchsia_hardware_spi_businfo::SpiChannel> resource_parse_spi(
-    acpi::Acpi* acpi, ACPI_HANDLE device, ACPI_RESOURCE* res, ACPI_HANDLE* resource_source) {
+acpi::status<> resource_parse_spi(acpi::Acpi* acpi, ACPI_HANDLE device, ACPI_RESOURCE* res,
+                                  ACPI_HANDLE* resource_source) {
   auto& spi_bus = res->Data.SpiSerialBus;
 
   // Figure out which bus the SPI device belongs to.
@@ -211,22 +211,11 @@ acpi::status<fuchsia_hardware_spi_businfo::SpiChannel> resource_parse_spi(
     return found_result.take_error();
   }
   *resource_source = found_result.value();
-
-  fuchsia_hardware_spi_businfo::SpiChannel spi_channel{{
-      .cs = spi_bus.DeviceSelection,
-      .cs_polarity_high = spi_bus.DevicePolarity == ACPI_SPI_ACTIVE_HIGH,
-      .word_length_bits = spi_bus.DataBitLength,
-      .is_bus_controller = spi_bus.SlaveMode == ACPI_CONTROLLER_INITIATED,
-      .clock_polarity_high = spi_bus.ClockPolarity == ACPI_SPI_START_HIGH,
-      .clock_phase = spi_bus.ClockPhase == ACPI_SPI_FIRST_PHASE
-                         ? fuchsia_hardware_spi_businfo::SpiClockPhase::kClockPhaseFirst
-                         : fuchsia_hardware_spi_businfo::SpiClockPhase::kClockPhaseSecond,
-  }};
-  return zx::ok(std::move(spi_channel));
+  return zx::ok();
 }
 
-acpi::status<fuchsia_hardware_i2c_businfo::I2CChannel> resource_parse_i2c(
-    acpi::Acpi* acpi, ACPI_HANDLE device, ACPI_RESOURCE* res, ACPI_HANDLE* resource_source) {
+acpi::status<> resource_parse_i2c(acpi::Acpi* acpi, ACPI_HANDLE device, ACPI_RESOURCE* res,
+                                  ACPI_HANDLE* resource_source) {
   auto& i2c_bus = res->Data.I2cSerialBus;
 
   // Figure out which bus the I2C device belongs to.
@@ -235,12 +224,5 @@ acpi::status<fuchsia_hardware_i2c_businfo::I2CChannel> resource_parse_i2c(
     return found_result.take_error();
   }
   *resource_source = found_result.value();
-
-  fuchsia_hardware_i2c_businfo::I2CChannel i2c_channel{{
-      .address = i2c_bus.SlaveAddress,
-      .is_bus_controller = i2c_bus.SlaveMode == ACPI_CONTROLLER_INITIATED,
-      .is_ten_bit = i2c_bus.AccessMode == ACPI_I2C_10BIT_MODE,
-      .bus_speed = i2c_bus.ConnectionSpeed,
-  }};
-  return zx::ok(std::move(i2c_channel));
+  return zx::ok();
 }

@@ -15,8 +15,12 @@ static inline bool KernelPciEnabled() {
 #if defined(__aarch64__)
   return gBootOptions->arm64_kernel_pci;
 #else
+#if defined(__mist_os__)
+  return true;
+#else
   // Kernel PCI support is disabled on non-aarch64 platforms.
   return false;
+#endif
 #endif
 }
 

@@ -1,3 +1,5 @@
+
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -6,26 +8,33 @@
 
 #include <acpica/acpi.h>
 #include <fbl/alloc_checker.h>
+#include <kernel/thread.h>
+#include <object/handle.h>
+#include <object/interrupt_dispatcher.h>
+#include <object/interrupt_event_dispatcher.h>
 
-#include "zircon/system/ulib/acpica/osfuchsia.h"
+#include "zircon/system/ulib/acpica/oszircon.h"
 
 // Wrapper structs for interfacing between our interrupt handler convention and
 // ACPICA's
 struct AcpiIrqThread {
-  thrd_t thread;
+  Thread* thread;
   ACPI_OSD_HANDLER handler;
-  zx_handle_t irq_handle;
+  KernelHandle<InterruptDispatcher> irq_handle;
   UINT32 interrupt_number;
   void* context;
 };
+
 static int acpi_irq_thread(void* arg) {
   auto real_arg = static_cast<AcpiIrqThread*>(arg);
   while (1) {
-    zx_status_t status = zx_interrupt_wait(real_arg->irq_handle, NULL);
+    zx_time_t timestamp;
+    zx_status_t status = real_arg->irq_handle.dispatcher()->WaitForInterrupt(&timestamp);
     if (status != ZX_OK) {
       break;
     }
-    // TODO: Should we do something with the return value from the handler?
+
+    //  TODO: Should we do something with the return value from the handler?
     real_arg->handler(real_arg->context);
   }
   return 0;
@@ -69,21 +78,22 @@ ACPI_STATUS AcpiOsInstallInterruptHandler(UINT32 InterruptLevel, ACPI_OSD_HANDLE
     return AE_NO_MEMORY;
   }
 
-  zx_handle_t handle;
+  zx_rights_t rights;
+  KernelHandle<InterruptDispatcher> handle;
   zx_status_t status =
-      zx_interrupt_create(irq_resource_handle, InterruptLevel, ZX_INTERRUPT_REMAP_IRQ, &handle);
+      InterruptEventDispatcher::Create(&handle, &rights, InterruptLevel, ZX_INTERRUPT_REMAP_IRQ);
   if (status != ZX_OK) {
     return AE_ERROR;
   }
   arg->handler = Handler;
   arg->context = Context;
-  arg->irq_handle = handle;
+  arg->irq_handle = ktl::move(handle);
   // |InterruptLevel| in the spec appears to be the interrupt number based on
   // the errors returned in ACPICA 9.5.1, despite the name.
   arg->interrupt_number = InterruptLevel;
 
-  int ret = thrd_create_with_name(&arg->thread, acpi_irq_thread, arg.get(), "acpi_irq");
-  if (ret != 0) {
+  arg->thread = Thread::Create("acpi_irq", acpi_irq_thread, arg.get(), DEFAULT_PRIORITY);
+  if (arg->thread == nullptr) {
     return AE_ERROR;
   }
 
@@ -108,8 +118,8 @@ ACPI_STATUS AcpiOsRemoveInterruptHandler(UINT32 InterruptNumber, ACPI_OSD_HANDLE
   ZX_DEBUG_ASSERT(sci_irq != nullptr);
   ZX_DEBUG_ASSERT_MSG(sci_irq->interrupt_number == InterruptNumber, "%#x != %#x",
                       sci_irq->interrupt_number, InterruptNumber);
-  zx_interrupt_destroy(sci_irq->irq_handle);
-  thrd_join(sci_irq->thread, nullptr);
+  sci_irq->irq_handle.dispatcher()->Destroy();
+  sci_irq->thread->Join(nullptr, ZX_TIME_INFINITE);
   sci_irq.reset();
   return AE_OK;
 }

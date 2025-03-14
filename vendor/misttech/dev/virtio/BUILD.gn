@@ -1,0 +1,16 @@
+# Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/zircon/zx_library.gni")
+
+zx_library("virtio") {
+  sources = [ "bind.cc" ]
+  deps = [
+    "//src/devices/block/drivers/virtio:block_lib",
+    "//src/devices/bus/lib/virtio",
+    "//zircon/kernel/lib/init",
+    "//zircon/system/ulib/virtio",
+  ]
+  configs += [ "//build/config:default_include_dirs" ]
+}

@@ -1,15 +1,20 @@
+// Copyright 2025 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <mutex>
+#include <lib/mistos/sync/condvar.h>
 
 #include <acpica/acpi.h>
 #include <fbl/intrusive_double_list.h>
+#include <kernel/event.h>
+#include <kernel/mutex.h>
+#include <kernel/thread.h>
+#include <ktl/unique_ptr.h>
 
 /* Structures used for implementing AcpiOsExecute and
  * AcpiOsWaitEventsComplete */
-struct AcpiOsTaskCtx : public fbl::DoublyLinkedListable<std::unique_ptr<AcpiOsTaskCtx>> {
+struct AcpiOsTaskCtx : public fbl::DoublyLinkedListable<ktl::unique_ptr<AcpiOsTaskCtx>> {
   ACPI_OSD_EXEC_CALLBACK func;
   void* ctx;
 };
@@ -19,64 +24,61 @@ static int AcpiOsExecuteTask(void* arg);
 
 /* Data used for implementing AcpiOsExecute and
  * AcpiOsWaitEventsComplete */
-static struct {
-  thrd_t thread;
-  std::condition_variable cond;
-  std::condition_variable idle_cond;
-  std::mutex lock;
+static struct os_execute_state_t {
+  Thread* thread;
+  sync::CondVar cond;
+  sync::CondVar idle_cond;
+  DECLARE_MUTEX(os_execute_state_t) lock;
   bool shutdown = false;
   bool idle = true;
 
-  fbl::DoublyLinkedList<std::unique_ptr<AcpiOsTaskCtx>> tasks;
+  fbl::DoublyLinkedList<ktl::unique_ptr<AcpiOsTaskCtx>> tasks;
 } os_execute_state;
 
-static ACPI_STATUS thrd_status_to_acpi_status(int status) {
-  switch (status) {
-    case thrd_success:
-      return AE_OK;
-    case thrd_nomem:
-      return AE_NO_MEMORY;
-    case thrd_timedout:
-      return AE_TIME;
-    default:
-      return AE_ERROR;
+static ACPI_STATUS thrd_status_to_acpi_status(Thread* status) {
+  if (status == nullptr) {
+    return AE_ERROR;
   }
+  return AE_OK;
 }
 
 ACPI_STATUS AcpiTaskThreadStart() {
-  return thrd_status_to_acpi_status(
-      thrd_create_with_name(&os_execute_state.thread, AcpiOsExecuteTask, nullptr, "acpi_os_task"));
+  os_execute_state.thread =
+      Thread::Create("acpi_os_task", AcpiOsExecuteTask, nullptr, DEFAULT_PRIORITY);
+  return thrd_status_to_acpi_status(os_execute_state.thread);
 }
 
 ACPI_STATUS AcpiTaskThreadTerminate() {
   {
-    std::lock_guard lock(os_execute_state.lock);
+    Guard<Mutex> lock(&os_execute_state.lock);
     os_execute_state.shutdown = true;
   }
-  os_execute_state.cond.notify_all();
-  thrd_join(os_execute_state.thread, nullptr);
+  os_execute_state.cond.Broadcast();
+  os_execute_state.thread->Join(nullptr, ZX_TIME_INFINITE);
   return AE_OK;
 }
 
 static int AcpiOsExecuteTask(void* arg) {
   while (1) {
-    std::unique_ptr<AcpiOsTaskCtx> task;
+    ktl::unique_ptr<AcpiOsTaskCtx> task;
 
     {
-      std::unique_lock lock(os_execute_state.lock);
+      os_execute_state.lock.lock().Acquire();
       while ((task = os_execute_state.tasks.pop_front()) == nullptr) {
         os_execute_state.idle = true;
         // If anything is waiting for the queue to empty, notify it.
-        os_execute_state.idle_cond.notify_one();
+        os_execute_state.idle_cond.Signal();
 
         // If we're waiting to shutdown, do it now that there's no more work
         if (os_execute_state.shutdown) {
+          os_execute_state.lock.lock().Release();
           return 0;
         }
 
-        os_execute_state.cond.wait(lock);
+        os_execute_state.cond.Wait(&os_execute_state.lock.lock());
       }
       os_execute_state.idle = false;
+      os_execute_state.lock.lock().Release();
     }
 
     task->func(task->ctx);
@@ -123,10 +125,10 @@ ACPI_STATUS AcpiOsExecute(ACPI_EXECUTE_TYPE Type, ACPI_OSD_EXEC_CALLBACK Functio
   task->ctx = Context;
 
   {
-    std::lock_guard lock(os_execute_state.lock);
-    os_execute_state.tasks.push_back(std::move(task));
+    Guard<Mutex> lock(&os_execute_state.lock);
+    os_execute_state.tasks.push_back(ktl::move(task));
   }
-  os_execute_state.cond.notify_one();
+  os_execute_state.cond.Signal();
 
   return AE_OK;
 }
@@ -138,8 +140,9 @@ ACPI_STATUS AcpiOsExecute(ACPI_EXECUTE_TYPE Type, ACPI_OSD_EXEC_CALLBACK Functio
  * AcpiOsExecute have completed.
  */
 void AcpiOsWaitEventsComplete(void) {
-  std::unique_lock lock(os_execute_state.lock);
+  os_execute_state.lock.lock().Acquire();
   while (!os_execute_state.idle) {
-    os_execute_state.idle_cond.wait(lock);
+    os_execute_state.idle_cond.Wait(&os_execute_state.lock.lock());
   }
+  os_execute_state.lock.lock().Release();
 }

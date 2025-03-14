@@ -1,14 +1,14 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/hardware/pciroot/c/banjo.h>
 #include <lib/pci/pio.h>
 #include <limits.h>
 
 #include <acpica/acpi.h>
 
-#include "zircon/system/ulib/acpica/osfuchsia.h"
+#include "zircon/system/ulib/acpica/oszircon.h"
 
 namespace {
 const size_t PCIE_MAX_DEVICES_PER_BUS = 32;
@@ -29,10 +29,8 @@ const size_t PCIE_MAX_FUNCTIONS_PER_DEVICE = 8;
  */
 static ACPI_STATUS AcpiOsReadWritePciConfiguration(ACPI_PCI_ID* PciId, UINT32 Register,
                                                    UINT64* Value, UINT32 Width, bool Write) {
-  if (LOCAL_TRACE) {
-    printf("ACPIOS: %s PCI Config %x:%x:%x:%x register %#x width %u\n", Write ? "write" : "read",
-           PciId->Segment, PciId->Bus, PciId->Device, PciId->Function, Register, Width);
-  }
+  LTRACEF("ACPIOS: %s PCI Config %x:%x:%x:%x register %#x width %u\n", Write ? "write" : "read",
+          PciId->Segment, PciId->Bus, PciId->Device, PciId->Function, Register, Width);
 
   // Only segment 0 is supported for now
   if (PciId->Segment != 0) {
@@ -57,37 +55,22 @@ static ACPI_STATUS AcpiOsReadWritePciConfiguration(ACPI_PCI_ID* PciId, UINT32 Re
     *Value = 0;
   }
 
-#if __x86_64__
   uint8_t bus = static_cast<uint8_t>(PciId->Bus);
   uint8_t dev = static_cast<uint8_t>(PciId->Device);
   uint8_t func = static_cast<uint8_t>(PciId->Function);
   uint8_t offset = static_cast<uint8_t>(Register);
-  zx_status_t st;
-  pci_bdf_t addr = {bus, dev, func};
-  switch (Width) {
-    case 8u:
-      (Write) ? st = pci_pio_write8(addr, offset, static_cast<uint8_t>(*Value))
-              : st = pci_pio_read8(addr, offset, reinterpret_cast<uint8_t*>(Value));
-      break;
-    case 16u:
-      (Write) ? st = pci_pio_write16(addr, offset, static_cast<uint16_t>(*Value))
-              : st = pci_pio_read16(addr, offset, reinterpret_cast<uint16_t*>(Value));
-      break;
-    // assume 32bit by default since 64 bit reads on IO ports are not a thing supported by the
-    // spec
-    default:
-      (Write) ? st = pci_pio_write32(addr, offset, static_cast<uint32_t>(*Value))
-              : st = pci_pio_read32(addr, offset, reinterpret_cast<uint32_t*>(Value));
-  }
+  zx_status_t st = (Write)
+                       ? Pci::PioCfgWrite(bus, dev, func, offset, static_cast<uint32_t>(*Value),
+                                          static_cast<uint8_t>(Width))
+                       : Pci::PioCfgRead(bus, dev, func, offset, reinterpret_cast<uint32_t*>(Value),
+                                         static_cast<uint8_t>(Width));
+
 #ifdef ACPI_DEBUG_OUTPUT
   if (st != ZX_OK) {
     printf("ACPIOS: pci rw error: %d\n", st);
   }
 #endif  // ACPI_DEBUG_OUTPUT
   return (st == ZX_OK) ? AE_OK : AE_ERROR;
-#endif  // __x86_64__
-
-  return AE_NOT_IMPLEMENTED;
 }
 /**
  * @brief Read a value from a PCI configuration register.

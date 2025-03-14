@@ -8,7 +8,6 @@
 #include <zircon/types.h>
 
 #include <cstdint>
-#include <unordered_set>
 
 #include "src/devices/board/lib/acpi/acpi.h"
 #include "third_party/acpica/source/include/actypes.h"

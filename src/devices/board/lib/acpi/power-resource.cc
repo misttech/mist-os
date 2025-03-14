@@ -4,15 +4,16 @@
 
 #include "src/devices/board/lib/acpi/power-resource.h"
 
-#include <fidl/fuchsia.hardware.acpi/cpp/wire.h>
-#include <lib/ddk/debug.h>
+#include <trace.h>
+
+#define LOCAL_TRACE 0
 
 namespace acpi {
 
 zx_status_t PowerResource::Init() {
   auto power_resource = acpi_->EvaluateObject(acpi_handle_, nullptr, std::nullopt);
   if (power_resource.is_error()) {
-    zxlogf(ERROR, "Failed to evaluate ACPI PowerResource object: %d", power_resource.error_value());
+    TRACEF("Failed to evaluate ACPI PowerResource object: %d\n", power_resource.error_value());
     return power_resource.zx_status_value();
   }
 
@@ -31,8 +32,7 @@ zx_status_t PowerResource::Reference() {
   if (ref_count_ == 0) {
     auto status = acpi_->EvaluateObject(acpi_handle_, "_ON", std::nullopt);
     if (status.is_error()) {
-      zxlogf(ERROR, "Failed to call _ON on an ACPI power resource: %s",
-             zx_status_get_string(status.zx_status_value()));
+      TRACEF("Failed to call _ON on an ACPI power resource: %d\n", status.zx_status_value());
       return status.zx_status_value();
     }
     is_on_ = true;
@@ -49,8 +49,7 @@ zx_status_t PowerResource::Dereference() {
   if (ref_count_ == 1) {
     auto status = acpi_->EvaluateObject(acpi_handle_, "_OFF", std::nullopt);
     if (status.is_error()) {
-      zxlogf(ERROR, "Failed to call _OFF on an ACPI power resource: %s",
-             zx_status_get_string(status.zx_status_value()));
+      TRACEF("Failed to call _OFF on an ACPI power resource: %d\n", status.zx_status_value());
       return status.zx_status_value();
     }
     is_on_ = false;

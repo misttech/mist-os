@@ -8,10 +8,10 @@
 #include <lib/stdcompat/span.h>
 
 #include <functional>
-#include <optional>
-#include <vector>
 
 #include <acpica/acpi.h>
+#include <fbl/vector.h>
+#include <ktl/optional.h>
 
 #include "src/devices/board/lib/acpi/object.h"
 #include "src/devices/board/lib/acpi/status.h"
@@ -51,7 +51,7 @@ class Acpi {
   virtual acpi::status<> GetDevices(const char* hid, DeviceCallable cbk) = 0;
 
   virtual acpi::status<acpi::UniquePtr<ACPI_OBJECT>> EvaluateObject(
-      ACPI_HANDLE object, const char* pathname, std::optional<std::vector<ACPI_OBJECT>> args) = 0;
+      ACPI_HANDLE object, const char* pathname, ktl::optional<fbl::Vector<ACPI_OBJECT>> args) = 0;
 
   // Get the ACPI_DEVICE_INFO for the given object.
   virtual acpi::status<acpi::UniquePtr<ACPI_DEVICE_INFO>> GetObjectInfo(ACPI_HANDLE obj) = 0;
@@ -63,7 +63,7 @@ class Acpi {
   virtual acpi::status<ACPI_HANDLE> GetHandle(ACPI_HANDLE parent, const char* pathname) = 0;
 
   // Get the absolute path to the given object.
-  virtual acpi::status<std::string> GetPath(ACPI_HANDLE object) = 0;
+  virtual acpi::status<ktl::string_view> GetPath(ACPI_HANDLE object) = 0;
 
   using NotifyHandlerCallable = ACPI_NOTIFY_HANDLER;
   virtual acpi::status<> InstallNotifyHandler(ACPI_HANDLE object, uint32_t mode,

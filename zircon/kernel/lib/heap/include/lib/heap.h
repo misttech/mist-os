@@ -26,6 +26,9 @@ __BEGIN_CDECLS
 void* malloc(size_t size) __MALLOC __ALLOC_SIZE(1);
 void* memalign(size_t alignment, size_t size) __MALLOC __ALLOC_SIZE(2);
 void* calloc(size_t count, size_t size) __MALLOC __ALLOC_SIZE(1, 2);
+#if __mist_os__
+void* realloc(void* ptr, size_t size) __MALLOC __ALLOC_SIZE(2);
+#endif
 void free(void* ptr);
 void sized_free(void* ptr, size_t s);
 

@@ -1,3 +1,4 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2017 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -5,23 +6,27 @@
 #ifndef SRC_DEVICES_BUS_LIB_VIRTIO_INCLUDE_LIB_VIRTIO_BACKENDS_PCI_H_
 #define SRC_DEVICES_BUS_LIB_VIRTIO_INCLUDE_LIB_VIRTIO_BACKENDS_PCI_H_
 
-#include <fidl/fuchsia.hardware.pci/cpp/fidl.h>
-#include <lib/mmio/mmio.h>
 #include <lib/virtio/backends/backend.h>
-#include <lib/zx/port.h>
 #include <zircon/compiler.h>
+#include <zircon/syscalls/pci.h>
 
-#include <mutex>
 #include <optional>
 
-#include <fbl/macros.h>
+#include <dev/pcie_device.h>
+#include <object/handle.h>
+#include <object/pci_device_dispatcher.h>
+#include <object/port_dispatcher.h>
+#include <object/vm_object_dispatcher.h>
 
 namespace virtio {
 
+typedef struct {
+  MMIO_PTR void* vaddr;
+} mmio_buffer_t;
+
 class PciBackend : public Backend {
  public:
-  PciBackend(fidl::ClientEnd<fuchsia_hardware_pci::Device> pci,
-             fuchsia_hardware_pci::DeviceInfo info);
+  PciBackend(KernelHandle<PciDeviceDispatcher> pci, zx_pcie_device_info_t info);
   zx_status_t Bind() final;
   virtual zx_status_t Init() = 0;
   const char* tag() { return tag_; }
@@ -36,16 +41,16 @@ class PciBackend : public Backend {
   static constexpr uint16_t kMsiQueueVector = 1;
 
  protected:
-  fidl::UnownedClientEnd<fuchsia_hardware_pci::Device> pci() { return pci_.borrow(); }
-  const fuchsia_hardware_pci::DeviceInfo& info() const { return info_; }
-  std::mutex& lock() { return lock_; }
-  zx::port& wait_port() { return wait_port_; }
+  PciDeviceDispatcher& pci() { return *pci_.dispatcher(); }
+  zx_pcie_device_info_t info() { return info_; }
+  fbl::Mutex& lock() { return lock_; }
+  KernelHandle<PortDispatcher>& wait_port() { return wait_port_; }
 
  private:
-  fidl::ClientEnd<fuchsia_hardware_pci::Device> pci_;
-  fuchsia_hardware_pci::DeviceInfo info_;
-  std::mutex lock_;
-  zx::port wait_port_;
+  KernelHandle<PciDeviceDispatcher> pci_;
+  zx_pcie_device_info_t info_;
+  fbl::Mutex lock_;
+  KernelHandle<PortDispatcher> wait_port_;
   char tag_[16];  // pci[XX:XX.X] + \0, aligned to 8
   DISALLOW_COPY_ASSIGN_AND_MOVE(PciBackend);
 };
@@ -90,12 +95,11 @@ class PciLegacyIoInterface : public LegacyIoInterface {
 // configuration structures when MSI-X is enabled.
 class PciLegacyBackend : public PciBackend {
  public:
-  PciLegacyBackend(fidl::ClientEnd<fuchsia_hardware_pci::Device> pci,
-                   fuchsia_hardware_pci::DeviceInfo info)
-      : PciBackend(std::move(pci), std::move(info)), legacy_io_(PciLegacyIoInterface::Get()) {}
-  PciLegacyBackend(fidl::ClientEnd<fuchsia_hardware_pci::Device> pci,
-                   fuchsia_hardware_pci::DeviceInfo info, LegacyIoInterface* interface)
-      : PciBackend(std::move(pci), std::move(info)), legacy_io_(interface) {}
+  PciLegacyBackend(KernelHandle<PciDeviceDispatcher> pci, zx_pcie_device_info_t info)
+      : PciBackend(std::move(pci), info), legacy_io_(PciLegacyIoInterface::Get()) {}
+  PciLegacyBackend(KernelHandle<PciDeviceDispatcher> pci, zx_pcie_device_info_t info,
+                   LegacyIoInterface* interface)
+      : PciBackend(std::move(pci), info), legacy_io_(interface) {}
   PciLegacyBackend(const PciLegacyBackend&) = delete;
   PciLegacyBackend& operator=(const PciLegacyBackend&) = delete;
   ~PciLegacyBackend() override = default;
@@ -142,9 +146,8 @@ class PciLegacyBackend : public PciBackend {
 // PciModernBackend is for v1.0+ Virtio using MMIO mapped bars and PCI capabilities.
 class PciModernBackend : public PciBackend {
  public:
-  PciModernBackend(fidl::ClientEnd<fuchsia_hardware_pci::Device> pci,
-                   fuchsia_hardware_pci::DeviceInfo info)
-      : PciBackend(std::move(pci), std::move(info)) {}
+  PciModernBackend(KernelHandle<PciDeviceDispatcher> pci, zx_pcie_device_info_t info)
+      : PciBackend(std::move(pci), info) {}
   // The dtor handles cleanup of allocated bars because we cannot tear down
   // the mappings safely while the virtio device is being used by a driver.
   ~PciModernBackend() override = default;
@@ -161,8 +164,6 @@ class PciModernBackend : public PciBackend {
   zx_status_t ReadVirtioCap(uint8_t offset, virtio_pci_cap* cap);
   zx_status_t ReadVirtioCap64(uint8_t cap_config_offset, virtio_pci_cap& cap,
                               virtio_pci_cap64* cap64_out);
-
-  zx_status_t GetSharedMemoryVmo(zx::vmo* vmo_out) override;
 
   // These handle writing to/from a device's device config to allow derived
   // virtio devices to work with fields only they know about.
@@ -192,17 +193,17 @@ class PciModernBackend : public PciBackend {
   void RingKick(uint16_t ring_index) final;
 
  private:
-  zx_status_t GetBarVmo(uint8_t bar, zx::vmo* vmo_out);
+  zx_status_t GetBar(uint8_t bar_id, pcie_bar_info_t* bar_out);
   zx_status_t MapBar(uint8_t bar);
 
-  std::optional<fdf::MmioBuffer> bar_[6];
+  std::optional<mmio_buffer_t> bar_[6];
 
   uintptr_t notify_base_ = 0;
   volatile uint32_t* isr_status_ = nullptr;
   uintptr_t device_cfg_ __TA_GUARDED(lock()) = 0;
   MMIO_PTR volatile virtio_pci_common_cfg_t* common_cfg_ __TA_GUARDED(lock()) = nullptr;
   uint32_t notify_off_mul_;
-  std::optional<uint8_t> shared_memory_bar_;
+  ktl::optional<uint8_t> shared_memory_bar_;
 
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(PciModernBackend);
 };

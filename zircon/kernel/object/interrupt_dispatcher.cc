@@ -68,7 +68,9 @@ zx_status_t InterruptDispatcher::WaitForInterrupt(zx_time_t* out_timestamp) {
     }
 
     {
+#ifndef __mist_os__
       ThreadDispatcher::AutoBlocked by(ThreadDispatcher::Blocked::INTERRUPT);
+#endif
       zx_status_t status = event_.Wait(Deadline::infinite());
       if (status != ZX_OK) {
         // The Event::Wait call was interrupted and we need to retry
