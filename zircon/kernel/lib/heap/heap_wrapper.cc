@@ -227,6 +227,22 @@ void* calloc(size_t count, size_t size) {
   return ptr;
 }
 
+#if __mist_os__
+void* realloc(void* ptr, size_t size) {
+  DEBUG_ASSERT(!arch_blocking_disallowed());
+  DEBUG_ASSERT(Thread::Current::memory_allocation_state().IsEnabled());
+
+  LTRACEF("ptr %p, size %zu\n", ptr, size);
+
+  void* new_ptr = cmpct_realloc(ptr, size);
+  add_alloc_stat(__GET_CALLER(), size, new_ptr);
+  if (unlikely(heap_trace)) {
+    printf("caller %p realloc %p, %zu -> %p\n", __GET_CALLER(), ptr, size, new_ptr);
+  }
+  return new_ptr;
+}
+#endif
+
 void free(void* ptr) {
   DEBUG_ASSERT(!arch_blocking_disallowed());
 
