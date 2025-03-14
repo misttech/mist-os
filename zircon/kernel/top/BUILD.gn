@@ -40,6 +40,9 @@ source_set("top") {
     # LK
     "//third_party/lk/lib/bio",
     "//third_party/lk/lib/fs/fat",
+
+    # Board Drivers
+    "//vendor/misttech/devices/board/drivers/x86",
   ]
 
   if (is_mistos) {
