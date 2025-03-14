@@ -238,7 +238,7 @@ void MsiInterruptDispatcherImpl::UnmaskInterrupt() {
 
   if (has_cap_pvm_) {
     Guard<SpinLock, IrqSave> guard{&allocation()->lock()};
-    const uint32_t mask = ~(1 << msi_id());
+    const uint32_t mask = static_cast<uint32_t>(~(1 << msi_id()));
     if (has_64bit_) {
       capability_->mask_bits_64 = capability_->mask_bits_64 & mask;
     } else {
