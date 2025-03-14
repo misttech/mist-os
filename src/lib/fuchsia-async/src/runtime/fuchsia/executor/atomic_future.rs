@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+pub mod spawnable_future;
+
 use crate::ScopeHandle;
 use futures::ready;
 use std::borrow::Borrow;
@@ -60,7 +62,7 @@ struct Meta {
     // Holds the reference count and state bits (INACTIVE, READY, etc.).
     state: AtomicUsize,
 
-    scope: ScopeHandle,
+    scope: Option<ScopeHandle>,
     id: usize,
 }
 
@@ -72,8 +74,12 @@ impl Meta {
     unsafe fn wake(&self) {
         if self.state.fetch_or(READY, Relaxed) & (INACTIVE | READY | DONE) == INACTIVE {
             self.retain();
-            self.scope.executor().task_is_ready(AtomicFutureHandle(self.into(), PhantomData));
+            self.scope().executor().task_is_ready(AtomicFutureHandle(self.into(), PhantomData));
         }
+    }
+
+    fn scope(&self) -> &ScopeHandle {
+        self.scope.as_ref().unwrap()
     }
 
     fn retain(&self) {
@@ -244,7 +250,7 @@ pub enum CancelAndDetachResult {
 
 impl<'a> AtomicFutureHandle<'a> {
     /// Create a new `AtomicFuture`.
-    pub fn new<F: Future + Send + 'a>(scope: ScopeHandle, id: usize, future: F) -> Self
+    pub fn new<F: Future + Send + 'a>(scope: Option<ScopeHandle>, id: usize, future: F) -> Self
     where
         F::Output: Send + 'a,
     {
@@ -257,7 +263,11 @@ impl<'a> AtomicFutureHandle<'a> {
     /// # Safety
     ///
     /// The caller must uphold the Send requirements.
-    pub unsafe fn new_local<F: Future + 'a>(scope: ScopeHandle, id: usize, future: F) -> Self
+    pub unsafe fn new_local<F: Future + 'a>(
+        scope: Option<ScopeHandle>,
+        id: usize,
+        future: F,
+    ) -> Self
     where
         F::Output: 'a,
     {
@@ -289,7 +299,7 @@ impl<'a> AtomicFutureHandle<'a> {
 
     /// Returns the associated scope.
     pub fn scope(&self) -> &ScopeHandle {
-        &self.meta().scope
+        &self.meta().scope()
     }
 
     /// Attempt to poll the underlying future.
@@ -335,13 +345,6 @@ impl<'a> AtomicFutureHandle<'a> {
         }
 
         // We cannot recover from panics.
-        struct Bomb;
-        impl Drop for Bomb {
-            fn drop(&mut self) {
-                std::process::abort();
-            }
-        }
-
         let bomb = Bomb;
 
         // SAFETY: We have exclusive access because we cleared the INACTIVE state bit.
@@ -496,7 +499,7 @@ impl AtomicFutureHandle<'static> {
             let meta = unsafe { &*(raw_meta as *const Meta) };
             if meta.state.fetch_or(READY, Relaxed) & (INACTIVE | READY | DONE) == INACTIVE {
                 // This consumes the reference count.
-                meta.scope.executor().task_is_ready(AtomicFutureHandle(
+                meta.scope().executor().task_is_ready(AtomicFutureHandle(
                     // SAFETY: We know raw_meta is not null.
                     unsafe { NonNull::new_unchecked(raw_meta as *mut Meta) },
                     PhantomData,
@@ -590,3 +593,10 @@ impl PartialEq for AtomicFutureHandle<'static> {
 }
 
 impl Eq for AtomicFutureHandle<'static> {}
+
+struct Bomb;
+impl Drop for Bomb {
+    fn drop(&mut self) {
+        std::process::abort();
+    }
+}

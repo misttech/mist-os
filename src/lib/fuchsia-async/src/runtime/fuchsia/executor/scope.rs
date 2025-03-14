@@ -482,7 +482,7 @@ impl ScopeHandle {
         Fut::Output: Send,
     {
         AtomicFutureHandle::new(
-            self.clone(),
+            Some(self.clone()),
             id.unwrap_or_else(|| self.executor().next_task_id()),
             fut,
         )
@@ -507,7 +507,7 @@ impl ScopeHandle {
         // so the Send requirements that `new_local` requires should be met.
         unsafe {
             AtomicFutureHandle::new_local(
-                self.clone(),
+                Some(self.clone()),
                 id.unwrap_or_else(|| self.executor().next_task_id()),
                 fut,
             )
