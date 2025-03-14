@@ -220,6 +220,8 @@ where
     completion_responder: CompletionResponder,
 
     current_channel: Option<String>,
+
+    valid_service_url: bool,
 }
 
 pub enum IncomingServices {
@@ -245,6 +247,7 @@ where
         channel_configs: Option<ChannelConfigs>,
         metrics_reporter: Box<dyn ApiMetricsReporter>,
         current_channel: Option<String>,
+        valid_service_url: bool,
     ) -> Self {
         let state = State {
             manager_state: state_machine::State::Idle,
@@ -271,6 +274,7 @@ where
             metrics_reporter,
             completion_responder,
             current_channel,
+            valid_service_url,
         }
     }
 
@@ -336,11 +340,12 @@ where
             IncomingServices::HealthCheck(mut stream) => {
                 let app_set = Rc::clone(&server.borrow().app_set);
                 let app_set_health = app_set.lock().await.all_valid();
+                let valid_url = server.borrow().valid_service_url;
 
                 while let Some(ComponentOtaHealthCheckRequest::GetHealthStatus { responder }) =
                     stream.try_next().await.expect("error running health check service")
                 {
-                    if app_set_health {
+                    if app_set_health && valid_url {
                         responder
                             .send(HealthStatus::Healthy)
                             .expect("failed to send healthy status");
@@ -874,6 +879,7 @@ mod stub {
         state_machine_control: Option<MockStateMachineController>,
         time_source: Option<MockTimeSource>,
         current_channel: Option<String>,
+        valid_service_url: bool,
     }
 
     impl FidlServerBuilder {
@@ -886,6 +892,7 @@ mod stub {
                 state_machine_control: None,
                 time_source: None,
                 current_channel: None,
+                valid_service_url: false,
             }
         }
     }
@@ -908,6 +915,11 @@ mod stub {
 
         pub fn with_channel_configs(mut self, channel_configs: ChannelConfigs) -> Self {
             self.channel_configs = Some(channel_configs);
+            self
+        }
+
+        pub fn with_service_url(mut self) -> Self {
+            self.valid_service_url = true;
             self
         }
 
@@ -975,6 +987,7 @@ mod stub {
                 self.channel_configs,
                 Box::new(StubApiMetricsReporter),
                 self.current_channel,
+                self.valid_service_url,
             )));
 
             let schedule_node = ScheduleNode::new(root.create_child("schedule"));
@@ -1499,7 +1512,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_get_health_check_status() {
-        let fidl = FidlServerBuilder::new().build().await;
+        let fidl = FidlServerBuilder::new().with_service_url().build().await;
 
         let proxy =
             spawn_fidl_server::<ComponentOtaHealthCheckMarker>(fidl, IncomingServices::HealthCheck);
@@ -1513,7 +1526,17 @@ mod tests {
             App::builder().id("id").version([0]).build(),
             AppMetadata { appid_source: AppIdSource::ChannelConfig },
         );
-        let fidl = FidlServerBuilder::new().with_app_set(app_set).build().await;
+        let fidl = FidlServerBuilder::new().with_service_url().with_app_set(app_set).build().await;
+
+        let proxy =
+            spawn_fidl_server::<ComponentOtaHealthCheckMarker>(fidl, IncomingServices::HealthCheck);
+
+        assert_eq!(HealthStatus::Unhealthy, proxy.get_health_status().await.unwrap());
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_get_health_check_status_bad_service_url() {
+        let fidl = FidlServerBuilder::new().build().await;
 
         let proxy =
             spawn_fidl_server::<ComponentOtaHealthCheckMarker>(fidl, IncomingServices::HealthCheck);
