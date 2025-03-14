@@ -15,6 +15,8 @@ use std::sync::Arc;
 use vfs::directory::entry_container::Directory;
 use {fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg};
 
+const FLAGS: fio::Flags = fio::PERM_READABLE.union(fio::PERM_EXECUTABLE);
+
 pub(crate) async fn serve_request_stream(
     mut stream: fpkg::PackageResolverRequestStream,
     base_packages: Arc<HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>>,
@@ -216,16 +218,13 @@ pub(crate) async fn resolve_package(
     let hash = get_package_hash(url, base_packages, upgradable_packages)
         .await
         .ok_or_else(|| ResolverError::PackageNotInBase(url.clone().into()))?;
-    let () = open_packages
+    let root = open_packages
         .get_or_insert(hash, None)
         .await
-        .map_err(ResolverError::ServePackageDirectory)?
-        .open(
-            scope,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-            vfs::path::Path::dot(),
-            dir.into_channel().into(),
-        );
+        .map_err(ResolverError::ServePackageDirectory)?;
+
+    let request = vfs::ObjectRequest::new(FLAGS, &Default::default(), dir.into_channel());
+    request.handle(|request| root.open3(scope, vfs::path::Path::dot(), FLAGS, request));
     Ok(hash)
 }
 
@@ -265,16 +264,12 @@ async fn resolve_subpackage(
         .subpackages()
         .get(package_url)
         .ok_or_else(|| ResolverError::SubpackageNotFound)?;
-    let () = open_packages
+    let root = open_packages
         .get_or_insert(subpackage, None)
         .await
-        .map_err(ResolverError::ServePackageDirectory)?
-        .open(
-            scope,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-            vfs::path::Path::dot(),
-            dir.into_channel().into(),
-        );
+        .map_err(ResolverError::ServePackageDirectory)?;
+    let request = vfs::ObjectRequest::new(FLAGS, &Default::default(), dir.into_channel());
+    request.handle(|request| root.open3(scope, vfs::path::Path::dot(), FLAGS, request));
     Ok(authenticator.create(&subpackage))
 }
 
