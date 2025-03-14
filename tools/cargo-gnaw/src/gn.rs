@@ -125,7 +125,7 @@ pub fn write_fuchsia_sdk_metadata<W: io::Write>(
         r#" if (_generating_sdk{constraint}) {{
             sdk_atom("{group_name}_sdk") {{
                 id = "sdk://${{_sdk_prefix}}third_party/rust_crates/{group_name}"
-                category = "partner_internal"
+                category = "partner"
                 meta = {{
                     value = {{
                         type = "{sdk_atom_type}"
