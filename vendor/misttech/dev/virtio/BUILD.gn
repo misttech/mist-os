@@ -7,6 +7,7 @@ import("//build/zircon/zx_library.gni")
 zx_library("virtio") {
   sources = [ "bind.cc" ]
   deps = [
+    "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice_lib",
     "//src/devices/block/drivers/virtio:block_lib",
     "//src/devices/bus/lib/virtio",
     "//zircon/kernel/lib/init",

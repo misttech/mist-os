@@ -16,6 +16,7 @@
 #include <virtio/block.h>
 #include <virtio/virtio.h>
 
+#include "src/connectivity/ethernet/drivers/virtio/netdevice.h"
 #include "src/devices/block/drivers/virtio/block.h"
 
 void virtio_scan(uint level) {
@@ -48,7 +49,7 @@ void virtio_scan(uint level) {
           break;
         case VIRTIO_DEV_TYPE_T_NETWORK:
         case VIRTIO_DEV_TYPE_NETWORK:
-          dprintf(INFO, "found virtio network device\n");
+          virtio::CreateAndBind<virtio::NetworkDevice>(nullptr, std::move(handle), info);
           break;
         default:
           break;
