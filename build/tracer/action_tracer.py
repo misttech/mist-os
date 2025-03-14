@@ -862,20 +862,6 @@ def main():
     while is_known_wrapper(command):
         command = command.unwrap()
 
-    # Ensure trace_output directory exists
-    trace_output_dir = os.path.dirname(args.trace_output)
-    os.makedirs(trace_output_dir, exist_ok=True)
-
-    retval = subprocess.call(
-        [
-            args.fsatrace_path,
-            "rwmdt",
-            args.trace_output,
-            "--",
-        ]
-        + command.tokens
-    )
-
     # Identify the intended tool from the original command.
     script = command.tool
     if python_script := get_python_script(command):
@@ -894,8 +880,24 @@ def main():
         # in them, and those files arent listed in the generated depfile.
         "copy_tree.py",
     }
+    # Skip tracing for ignored scripts, making it possible to skip binaries that
+    # are incompatible with fsatrace. For example: https://fxbug.dev/402649338.
     if os.path.basename(script) in ignored_scripts:
-        return retval
+        return subprocess.call(command.tokens)
+
+    # Ensure trace_output directory exists
+    trace_output_dir = os.path.dirname(args.trace_output)
+    os.makedirs(trace_output_dir, exist_ok=True)
+
+    retval = subprocess.call(
+        [
+            args.fsatrace_path,
+            "rwmdt",
+            args.trace_output,
+            "--",
+        ]
+        + command.tokens
+    )
 
     hermetic_inputs = []
     implicit_inputs = []
