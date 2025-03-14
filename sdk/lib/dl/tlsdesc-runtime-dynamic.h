@@ -6,6 +6,7 @@
 #define LIB_DL_TLSDESC_RUNTIME_DYNAMIC_H_
 
 #include <lib/elfldltl/layout.h>
+#include <lib/ld/tls.h>
 #include <lib/ld/tlsdesc.h>
 
 #include <cstddef>
@@ -57,6 +58,12 @@ extern ld::TlsdescCallback _dl_tlsdesc_runtime_dynamic_split;
 extern ld::TlsdescCallback _dl_tlsdesc_runtime_dynamic_indirect;
 
 }  // extern "C"
+
+// Return a reference to a thread's dl::_dl_tlsdesc_runtime_dynamic_blocks.
+inline decltype(_dl_tlsdesc_runtime_dynamic_blocks)& TpToTlsdescRuntimeDynamicBlocks(void* tp) {
+  ptrdiff_t offset = ld::TpRelativeToOffset(&_dl_tlsdesc_runtime_dynamic_blocks);
+  return *ld::TpRelative<decltype(_dl_tlsdesc_runtime_dynamic_blocks)>(offset, tp);
+}
 
 }  // namespace dl
 

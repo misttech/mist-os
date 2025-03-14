@@ -54,6 +54,7 @@ test("dl-unittests") {
       ":tls-desc-resolver-tests",
       ":tlsdesc-runtime-dynamic-tests",
       "..:runtime",
+      "..:tlsdesc-runtime-dynamic",
       "//sdk/lib/fit",
       "//sdk/lib/ld/testing",
       "//src/lib/elfldltl/testing",

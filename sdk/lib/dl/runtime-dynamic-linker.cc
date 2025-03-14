@@ -4,7 +4,37 @@
 
 #include "runtime-dynamic-linker.h"
 
+#include <lib/fit/defer.h>
+
+#include <fbl/array.h>
+
+#include "tlsdesc-runtime-dynamic.h"
+
 namespace dl {
+
+// This is the type used to refer to a single tls block.
+using TlsBlock = std::byte*;
+// This refers to the array of pointers to tls blocks.
+using TlsArray = TlsBlock*;
+
+namespace {
+
+// This will destroy all the allocated blocks in `blocks`, before free-ing
+// the `blocks` container itself. This function takes in a span to free the
+// underlying memory region. While spans are non-owning, the owner of the memory
+// will always be the caller of this function.
+constexpr void DestroyTlsBlocks(std::span<TlsBlock> blocks) {
+  if (blocks.data()) {
+    for (size_t i = 0; i < blocks.size(); ++i) {
+      if (blocks[i]) {
+        operator delete[](blocks[i]);
+      }
+    }
+    delete[] (blocks.data());
+  }
+}
+
+}  // namespace
 
 void RuntimeDynamicLinker::AddNewModules(ModuleList modules) {
   loaded_ += modules.size();
@@ -106,7 +136,9 @@ std::unique_ptr<RuntimeDynamicLinker> RuntimeDynamicLinker::Create(const ld::abi
     if (!populate_ac.check()) [[unlikely]] {
       return result(nullptr);
     }
-    dynamic_linker->max_static_tls_modid_ = abi.static_tls_modules.size();
+    size_t max_static_tls_modid = abi.static_tls_modules.size();
+    dynamic_linker->max_static_tls_modid_ = max_static_tls_modid;
+    dynamic_linker->next_tls_modid_ = max_static_tls_modid + 1;
   }
 
   return result(std::move(dynamic_linker));
@@ -124,6 +156,74 @@ int RuntimeDynamicLinker::IteratePhdrInfo(DlIteratePhdrCallback* callback, void*
     }
   }
   return 0;
+}
+
+inline size_t RuntimeDynamicLinker::DynamicTlsCount() const {
+  return next_tls_modid_ - max_static_tls_modid_ - 1;
+}
+
+[[nodiscard]] fit::result<Error> RuntimeDynamicLinker::PrepareTlsBlocksForThread(void* tp) const {
+  dl::Diagnostics diag;
+  fbl::Array<TlsBlock> allocated_blocks;
+  size_t allocated_count = 0;
+
+  auto dealloc_on_error =
+      fit::defer([blocks = std::span{allocated_blocks}] { DestroyTlsBlocks(blocks); });
+
+  auto result = [&dealloc_on_error](Diagnostics& diag, bool success) -> fit::result<Error> {
+    if (success) {
+      dealloc_on_error.cancel();
+      return diag.ok();
+    }
+    return diag.take_error();
+  };
+
+  size_t dynamic_tls_count = DynamicTlsCount();
+  fbl::AllocChecker block_ac;
+  allocated_blocks = fbl::MakeArray<TlsBlock>(&block_ac, dynamic_tls_count);
+  if (!block_ac.check()) {
+    diag.OutOfMemory("Dynamic TLS block container", sizeof(TlsBlock) * dynamic_tls_count);
+    return result(diag, false);
+  }
+
+  // TODO(https://fxbug.dev/403350238): this loop needs to be optimized to only
+  // loop through TLS modules while avoiding multiple O(N) scans.
+  // Iterate through every `RuntimeModule` with dynamic TLS and copy its TLS
+  // data into its respective index in `allocated_blocks`.
+  for (const RuntimeModule& module : modules_) {
+    // Skip non-tls or static-tls modules.
+    if (module.tls_module_id() <= max_static_tls_modid_) {
+      continue;
+    }
+    // Stop if there are no more TLS modules to initialize.
+    if (allocated_count >= dynamic_tls_count) {
+      break;
+    }
+
+    auto tls_module = module.tls_module();
+
+    fbl::AllocChecker tls_ac;
+    TlsBlock block = static_cast<TlsBlock>(operator new[](
+        tls_module.tls_size(), static_cast<std::align_val_t>(tls_module.tls_alignment.get()),
+        tls_ac));
+    if (!tls_ac.check()) {
+      diag.OutOfMemory("Dynamic TLS block", tls_module.tls_size());
+      return result(diag, false);
+    }
+
+    ld::TlsModuleInit(tls_module, std::span{block, tls_module.tls_size()});
+
+    allocated_blocks[allocated_count++] = block;
+  }
+
+  TlsArray& thread_tls = TpToTlsdescRuntimeDynamicBlocks(tp);
+  thread_tls = allocated_blocks.release();
+
+  return result(diag, true);
+}
+
+void RuntimeDynamicLinker::DestroyTlsBlocksForThread(void* tp) const {
+  DestroyTlsBlocks(std::span<TlsBlock>{TpToTlsdescRuntimeDynamicBlocks(tp), DynamicTlsCount()});
 }
 
 }  // namespace dl

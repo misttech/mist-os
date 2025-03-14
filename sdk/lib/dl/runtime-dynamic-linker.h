@@ -147,6 +147,16 @@ class RuntimeDynamicLinker {
   // returned to the caller.
   int IteratePhdrInfo(DlIteratePhdrCallback* callback, void* data) const;
 
+  // Allocate and initialize the thread's dynamic TLS blocks. This will iterate
+  // through all the currently loaded modules with dynamic TLS and populate this
+  // thread's _dl_tlsdesc_runtime_dynamic_blocks variable with their TLS data.
+  // This function will fail if allocation fails.
+  [[nodiscard]] fit::result<Error> PrepareTlsBlocksForThread(void* tp) const;
+
+  // Free the TLS blocks stored in dl::_dl_tlsdesc_runtime_dynamic_blocks and
+  // the containing array.
+  void DestroyTlsBlocksForThread(void* tp) const;
+
  private:
   // A The RuntimeDynamicLinker can only be created with RuntimeDynamicLinker::Create...).
   RuntimeDynamicLinker() = default;
@@ -174,6 +184,12 @@ class RuntimeDynamicLinker {
     return {.adds = loaded_, .subs = loaded_ - modules_.size()};
   }
 
+  // The number of dynamic TLS modules that are loaded.
+  inline size_t DynamicTlsCount() const;
+
+  // Return a pointer to the beginning of a module's TLS block in the thread.
+  constexpr uintptr_t GetTlsBlock(const RuntimeModule& module) const;
+
   // The RuntimeDynamicLinker owns the list of all 'live' modules that have been
   // loaded into the system image.
   ModuleList modules_;
@@ -182,6 +198,11 @@ class RuntimeDynamicLinker {
   // creation and passed to LinkinSessions to be able to detect TLS modules
   // during relocation.
   size_type max_static_tls_modid_ = 0;
+
+  // The next TLS modid is the modid that will be assigned to a TLS module when
+  // it is loaded. This gets set to max_static_tls_modid_ + 1 when startup TLS
+  // modules are loaded and gets incremented when a new TLS module is dlopen-ed.
+  size_type next_tls_modid_ = 0;
 
   // This is incremented every time a module is loaded into the system. This
   // number only ever increases and includes startup modules.

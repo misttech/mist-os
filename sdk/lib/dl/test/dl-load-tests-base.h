@@ -75,6 +75,8 @@ class DlLoadTestsBase : public DlTestsBase {
 
   constexpr ModuleMap& opened_modules() { return opened_modules_; }
 
+  void PrepareForTlsAccess();
+
  private:
   // Track the files that are dlopened and dlclosed by tests.
   ModuleMap opened_modules_;

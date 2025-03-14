@@ -8,6 +8,7 @@
 #include <lib/fit/defer.h>
 
 #include "../runtime-dynamic-linker.h"
+#include "../tlsdesc-runtime-dynamic.h"
 #include "dl-load-tests-base.h"
 
 #ifdef __Fuchsia__
@@ -42,6 +43,10 @@ class DlImplTests : public Base {
     dynamic_linker_ = RuntimeDynamicLinker::Create(gStartupLdAbi, ac);
     ASSERT_TRUE(ac.check());
   }
+
+  // DestroyTls() on the main thread at the end of the test to ensure there is
+  // a clean-state for the next test.
+  void TearDown() override { destructor_hook.DestroyTls(); }
 
   fit::result<Error, void*> DlOpen(const char* file, int mode) {
     // Check that all Needed/Expect* expectations for loaded objects were
@@ -89,7 +94,43 @@ class DlImplTests : public Base {
   // its modules list, so there is no need to do any extra clean up operation.
   void CleanUpOpenedFile(void* ptr) override {}
 
+  // A test will call this function before the running thread accesses a TLS
+  // variable. This function will allocate and initialize TLS data on the thread
+  // so the thread can access that data.
+  void PrepareForTlsAccess() {
+    ASSERT_EQ(dl::_dl_tlsdesc_runtime_dynamic_blocks, nullptr);
+    ASSERT_NO_FATAL_FAILURE(destructor_hook.set_dynamic_linker(dynamic_linker_.get()));
+    ASSERT_TRUE(dynamic_linker_->PrepareTlsBlocksForThread(__builtin_thread_pointer()).is_ok());
+  }
+
  private:
+  // This destructor cleans up the per-thread allocations made by PrepareForTlsAccess.
+  // An instance of this class is kept in a thread-local variable, so that
+  // every thread in a multi-threaded test will have its own destructor.
+  class TlsDestructor {
+   public:
+    // This will call DestroyTLS on the thread when the thread is joined. This
+    // is safe for tests using jthreads, which do not outlive the test.
+    ~TlsDestructor() { DestroyTls(); }
+
+    void set_dynamic_linker(RuntimeDynamicLinker* dynamic_linker) {
+      ASSERT_FALSE(dl_ref_);
+      dl_ref_ = dynamic_linker;
+    }
+    void DestroyTls() {
+      if (dl_ref_) {
+        dl_ref_->DestroyTlsBlocksForThread(__builtin_thread_pointer());
+        dl::_dl_tlsdesc_runtime_dynamic_blocks = nullptr;
+        dl_ref_ = nullptr;
+      }
+    }
+
+   private:
+    RuntimeDynamicLinker* dl_ref_ = nullptr;
+  };
+
+  inline constinit static thread_local TlsDestructor destructor_hook{};
+
   std::unique_ptr<RuntimeDynamicLinker> dynamic_linker_;
 };
 

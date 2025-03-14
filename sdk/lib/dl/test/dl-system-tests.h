@@ -58,6 +58,10 @@ class DlSystemTests : public DlSystemLoadTestsBase {
 
   void CleanUpOpenedFile(void* ptr) override { ASSERT_TRUE(DlClose(ptr).is_ok()); }
 
+  // This function is a no-op for system tests, since they manage their own TLS
+  // setup.
+  void PrepareForTlsAccess() {}
+
  private:
   // This will call the system dlopen in an OS-specific context. This method is
   // defined directly on this test fixture rather than its OS-tailored base

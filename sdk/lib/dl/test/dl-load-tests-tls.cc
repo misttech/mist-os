@@ -331,7 +331,8 @@ void DynamicTlsFastPath(Test& self, const TlsLoadedSymbolNames& names, const Tls
     AccessEarlyLoadedVar(early_module);
   };
 
-  auto access_tls_vars = [&names, &mod = std::as_const(mod), &ctx]() {
+  auto access_tls_vars = [&self, &names, &mod = std::as_const(mod), &ctx]() {
+    self.PrepareForTlsAccess();
     EXPECT_THAT(mod.template TryAccess<int>(names.data_symbol),
                 std::optional(std::pair{ctx.tls_data_initial_val, ctx.tls_data_initial_val + 1}));
     EXPECT_THAT(mod.template TryAccess<char>(names.bss_symbol), std::optional(std::pair{0, 1}));
@@ -497,7 +498,8 @@ void DynamicTlsSlowPath(Test& self, const TlsLoadedSymbolNames& names, const Tls
 
   OpenModule mod(self);
 
-  auto access_tls_vars = [&names, &mod = std::as_const(mod), &ctx]() {
+  auto access_tls_vars = [&self, &names, &mod = std::as_const(mod), &ctx]() {
+    self.PrepareForTlsAccess();
     EXPECT_THAT(mod.template TryAccess<int>(names.data_symbol),
                 std::optional(std::pair{ctx.tls_data_initial_val, ctx.tls_data_initial_val + 1}));
     EXPECT_THAT(mod.template TryAccess<char>(names.bss_symbol), std::optional(std::pair{0, 1}));
@@ -712,6 +714,22 @@ TYPED_TEST(DlTests, TlsGetAddrLocalDynamicReloc) {
   };
 
   DynamicTlsGetAddrRelocTest(*this, kModuleNames);
+}
+
+void PerThreadTlsTest(auto& self) {
+  auto do_nothing = []() {};
+  auto allocate_and_init_tls = [&]() { ASSERT_NO_FATAL_FAILURE(self.PrepareForTlsAccess()); };
+
+  TestThreadRunner tr;
+  tr.StartWorkersNow(do_nothing, allocate_and_init_tls, do_nothing);
+  tr.MainWaitForWorkerDone();
+  tr.MainLetWorkersFinish();
+}
+
+// This is a basic test for per-thread TLS set up and tear down.
+TYPED_TEST(DlTests, PrepareTlsBlocksForThread) {
+  ASSERT_NO_FATAL_FAILURE(this->PrepareForTlsAccess());
+  PerThreadTlsTest(*this);
 }
 
 }  // namespace
