@@ -55,6 +55,7 @@ config("suppress-warning.config") {
     "//third_party/zstd/*",
     "//vendor/google/*",
     "//vendor/misttech/*",
+    "//zircon/dev/lib/*",
     "//zircon/kernel/*",
     "//zircon/system/ulib/*",
     "//zircon/third_party/lib/*",

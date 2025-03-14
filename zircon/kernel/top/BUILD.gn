@@ -43,6 +43,9 @@ source_set("top") {
 
     # Board Drivers
     "//vendor/misttech/devices/board/drivers/x86",
+
+    # Virtio Support
+    "//vendor/misttech/dev/virtio",
   ]
 
   if (is_mistos) {
