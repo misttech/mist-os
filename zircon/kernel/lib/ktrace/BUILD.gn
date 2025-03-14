@@ -40,6 +40,7 @@ config("suppress-warning.config") {
     "//sdk/lib/iob/*",
     "//sdk/lib/stdcompat/*",
     "//sdk/lib/zbi-format/*",
+    "//src/devices/block/drivers/virtio/*",
     "//src/devices/block/lib/common/*",
     "//src/devices/board/lib/acpi/*",
     "//src/devices/bus/lib/virtio/*",
