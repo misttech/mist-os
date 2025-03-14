@@ -7,19 +7,18 @@ mod suite_definition;
 
 use crate::connector::RunConnector;
 use crate::suite_definition::TestParamsOptions;
-use anyhow::{anyhow, format_err, Context, Result};
+use anyhow::{format_err, Context, Result};
 use async_trait::async_trait;
 use either::Either;
 use errors::{ffx_bail, ffx_bail_with_code, ffx_error, ffx_error_with_code, FfxError};
 use ffx_test_args::{
     EarlyBootProfileCommand, ListCommand, RunCommand, TestCommand, TestSubCommand,
 };
-use ffx_writer::VerifiedMachineWriter;
-use fho::{FfxMain, FfxTool};
+use ffx_writer::{ToolIO, VerifiedMachineWriter};
+use fho::{return_user_error, FfxContext, FfxMain, FfxTool};
 use fidl::endpoints::create_proxy;
 use futures::FutureExt;
 use itertools::Itertools;
-use lazy_static::lazy_static;
 use run_test_suite_lib::output::Reporter;
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -28,18 +27,18 @@ use signal_hook::iterator::Signals;
 use std::fmt::Debug;
 use std::io::{stdout, Write};
 use std::ops::Deref as _;
+use std::sync::{Arc, LazyLock, Mutex};
 use target_holders::RemoteControlProxyHolder;
 use {
     fidl_fuchsia_developer_remotecontrol as fremotecontrol,
     fidl_fuchsia_test_manager as ftest_manager,
 };
 
-lazy_static! {
-    /// Error code returned if connecting to Test Manager fails.
-    pub static ref SETUP_FAILED_CODE: i32 = -fidl::Status::UNAVAILABLE.into_raw();
-    /// Error code returned if tests time out.
-    pub static ref TIMED_OUT_CODE: i32 = -fidl::Status::TIMED_OUT.into_raw();
-}
+/// Error code returned if connecting to Test Manager fails.
+pub static SETUP_FAILED_CODE: LazyLock<i32> =
+    LazyLock::new(|| -fidl::Status::UNAVAILABLE.into_raw());
+/// Error code returned if tests time out.
+pub static TIMED_OUT_CODE: LazyLock<i32> = LazyLock::new(|| -fidl::Status::TIMED_OUT.into_raw());
 
 /// Max number of test suites to run using a single RunBuilder connection.
 /// Since we need to make n SuiteController channels when running tests on a
@@ -60,27 +59,63 @@ pub struct TestTool {
 
 fho::embedded_plugin!(TestTool);
 
+/// A simple Sync + Send buffer for use with machine output when we want to collect
+/// the entirety of the string output.
+///
+/// TODO(403376806): This should not be the full solution for printing machine output. This misses
+/// a lot of information that could be used for presentation purposes in machine-readable contexts.
+#[derive(Clone, Default)]
+struct SyncBuffer {
+    inner: Arc<Mutex<Vec<u8>>>,
+}
+
+impl SyncBuffer {
+    fn contents(&self) -> String {
+        let inner = self.inner.lock().expect("sync buffer lock");
+        str::from_utf8(&*inner).expect("compatible utf8 string").to_owned()
+    }
+}
+
+impl Write for SyncBuffer {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let mut inner = self.inner.lock().expect("sync buffer lock");
+        inner.write(buf)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        let mut inner = self.inner.lock().expect("sync buffer lock");
+        inner.flush()
+    }
+}
+
 #[async_trait(?Send)]
 impl FfxMain for TestTool {
     type Writer = VerifiedMachineWriter<TestToolMessage>;
 
     // TODO(https://fxbug.dev/42078544): use Writer when it becomes possible.
-    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
-        let writer = Box::new(stdout());
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
         let remote_control =
             self.rcs.await.map_err(|e| ffx_error_with_code!(*SETUP_FAILED_CODE, "{:?}", e))?;
         match self.cmd.subcommand {
             TestSubCommand::Run(run) => {
-                run_test(remote_control.deref().clone(), writer, run).await?
+                let output_string = SyncBuffer::default();
+                let test_run_writer: Box<dyn Write + Sync + Send + 'static> = if writer.is_machine()
+                {
+                    Box::new(output_string.clone())
+                } else {
+                    Box::new(stdout())
+                };
+                run_test(remote_control.deref().clone(), test_run_writer, run).await?;
+                if writer.is_machine() {
+                    writer.machine(&TestToolMessage::TestResults(output_string.contents()))?;
+                }
+                Ok(())
             }
-            TestSubCommand::List(list) => {
-                get_tests(&remote_control, _writer, list).await?;
-            }
+            TestSubCommand::List(list) => get_tests(&remote_control, writer, list).await,
             TestSubCommand::EarlyBootProfile(cmd) => {
-                early_boot_profile(remote_control.deref().clone(), _writer, cmd).await?;
+                early_boot_profile(remote_control.deref().clone(), writer, cmd).await
             }
         }
-        Ok(())
     }
 }
 
@@ -106,6 +141,7 @@ impl std::fmt::Display for TestName {
 pub enum TestToolMessage {
     CannotCreateDirectory { err: String },
     ListTests { tests: Vec<TestName> },
+    TestResults(String),
 }
 
 struct Experiment {
@@ -142,7 +178,7 @@ async fn early_boot_profile(
     remote_control: fremotecontrol::RemoteControlProxy,
     mut writer: VerifiedMachineWriter<TestToolMessage>,
     cmd: EarlyBootProfileCommand,
-) -> Result<()> {
+) -> fho::Result<()> {
     let early_boot_profile_proxy = testing_lib::connect_to_early_boot_profile(&remote_control)
         .await
         .map_err(|e| ffx_error_with_code!(*SETUP_FAILED_CODE, "{:?}", e))?;
@@ -155,7 +191,8 @@ async fn early_boot_profile(
     let reporter = run_test_suite_lib::output::DirectoryReporter::new(
         cmd.output_directory,
         run_test_suite_lib::output::SchemaVersion::V1,
-    )?;
+    )
+    .bug()?;
 
     match reporter.new_directory_artifact(
         &run_test_suite_lib::output::EntityId::TestRun,
@@ -168,21 +205,21 @@ async fn early_boot_profile(
                 &TestToolMessage::CannotCreateDirectory { err: e.to_string() },
                 format!("Cannot create output directory: {}", e),
             )?;
-            // writeln!(writer, "Cannot create output directory: {}", e)?;
-            return Err(e.into());
+            eprintln!("Cannot create output directory: {}", e);
+            return Err(fho::Error::User(e.into()));
         }
     };
     // save summary
-    reporter.entity_finished(&run_test_suite_lib::output::EntityId::TestRun)?;
+    reporter.entity_finished(&run_test_suite_lib::output::EntityId::TestRun).bug()?;
 
     Ok(())
 }
 
 async fn run_test<W: 'static + Write + Send + Sync>(
     remote_control: fremotecontrol::RemoteControlProxy,
-    mut writer: W,
+    writer: W,
     cmd: RunCommand,
-) -> Result<()> {
+) -> fho::Result<()> {
     let experiments = Experiments::from_env().await;
 
     let min_log_severity = cmd.min_severity_logs.clone();
@@ -190,11 +227,10 @@ async fn run_test<W: 'static + Write + Send + Sync>(
 
     let output_directory = match (cmd.disable_output_directory, &cmd.output_directory) {
         (true, maybe_dir) => {
-            writeln!(
-                writer,
+            eprintln!(
                 "WARN: --disable-output-directory is now a no-op and will soon be \
                 removed, please remove it from your invocation."
-            )?;
+            );
             maybe_dir.clone().map(Into::into)
         }
         (false, Some(directory)) => Some(directory.clone().into()), // an override directory is specified.
@@ -205,15 +241,18 @@ async fn run_test<W: 'static + Write + Send + Sync>(
     let reporter =
         run_test_suite_lib::create_reporter(cmd.filter_ansi, output_directory_options, writer)?;
 
+    let timeout_key = "test.timeout_grace_seconds";
     let run_params = run_test_suite_lib::RunParams {
         timeout_behavior: match cmd.continue_on_timeout {
             false => run_test_suite_lib::TimeoutBehavior::TerminateRemaining,
             true => run_test_suite_lib::TimeoutBehavior::Continue,
         },
-        timeout_grace_seconds: ffx_config::get::<u64, _>("test.timeout_grace_seconds")? as u32,
+        timeout_grace_seconds: ffx_config::get::<u64, _>(timeout_key)
+            .user_message(format!("Could not load timeout from config at {timeout_key}"))?
+            as u32,
         stop_after_failures: match cmd.stop_after_failures.map(std::num::NonZeroU32::new) {
             None => None,
-            Some(None) => ffx_bail!("--stop-after-failures should be greater than zero."),
+            Some(None) => return_user_error!("--stop-after-failures should be greater than zero."),
             Some(Some(stop_after)) => Some(stop_after),
         },
         experimental_parallel_execution: match (
@@ -222,7 +261,7 @@ async fn run_test<W: 'static + Write + Send + Sync>(
         ) {
             (None, _) => None,
             (Some(max_parallel_suites), true) => Some(max_parallel_suites),
-            (_, false) => ffx_bail!(
+            (_, false) => return_user_error!(
               "Parallel test suite execution is experimental and is subject to breaking changes. \
               To enable parallel test suite execution, run: \n \
               'ffx config set {} true'",
@@ -290,10 +329,10 @@ capabilities, pass in correct realm. See https://fuchsia.dev/go/components/non-h
                     ffx_bail!("There were insufficient resources to launch the test.")
                 }
                 ftest_manager::LaunchError::InstanceCannotResolve => {
-                    ffx_bail!("Cannot resolve test URL.")
+                    return_user_error!("Cannot resolve test URL.")
                 }
                 ftest_manager::LaunchError::InvalidArgs => {
-                    ffx_bail!("One or more invalid arguments passed.")
+                    return_user_error!("One or more invalid arguments passed.")
                 }
                 ftest_manager::LaunchError::FailedToConnectToTestSuite => {
                     ffx_bail!("Failed to connect to test suite.")
@@ -305,15 +344,15 @@ capabilities, pass in correct realm. See https://fuchsia.dev/go/components/non-h
                     ffx_bail!("An internal error occurred. Please check logs and report bug.")
                 }
                 ftest_manager::LaunchError::NoMatchingCases => {
-                    ffx_bail!("No test cases match specified test filters.")
+                    return_user_error!("No test cases match specified test filters.")
                 }
                 ftest_manager::LaunchError::InvalidManifest => {
-                    ffx_bail!("Test manifest is invalid.")
+                    return_user_error!("Test manifest is invalid.")
                 }
                 other => ffx_bail!("Launch error: {:?}.", other),
             },
             other if other.is_internal_error() => {
-                Err(anyhow!("There was an internal error running tests: {:?}", other))
+                ffx_bail!("There was an internal error running tests: {:?}", other)
             }
             other => ffx_bail!("There was an error running tests: {:?}", other),
         },
@@ -410,7 +449,7 @@ async fn get_tests(
     remote_control: &fremotecontrol::RemoteControlProxy,
     mut writer: VerifiedMachineWriter<TestToolMessage>,
     cmd: ListCommand,
-) -> Result<()> {
+) -> fho::Result<()> {
     let query_proxy = testing_lib::connect_to_query(&remote_control)
         .await
         .map_err(|e| ffx_error_with_code!(*SETUP_FAILED_CODE, "{:?}", e))?;
@@ -463,7 +502,7 @@ async fn get_tests(
 
     let mut machine_cases = vec![];
     loop {
-        let cases = iterator_proxy.get_next().await?;
+        let cases = iterator_proxy.get_next().await.bug()?;
         if cases.is_empty() {
             break;
         }
@@ -477,7 +516,7 @@ async fn get_tests(
         machine_cases.append(&mut m_cases);
     }
     let cases_str = machine_cases.clone().into_iter().map(|c| format!("{}", c)).join("\n");
-    writer.machine_or(&TestToolMessage::ListTests { tests: machine_cases }, cases_str)?;
+    writer.machine_or(&TestToolMessage::ListTests { tests: machine_cases }, cases_str).bug()?;
     Ok(())
 }
 
@@ -491,7 +530,6 @@ mod test {
         DebugData, DebugDataIteratorMarker, EarlyBootProfileMarker, EarlyBootProfileRequestStream,
     };
     use futures::prelude::*;
-    use lazy_static::lazy_static;
     use std::io::Read;
     use std::num::NonZeroU32;
     use std::sync::Arc;
@@ -500,8 +538,8 @@ mod test {
     const VALID_INPUT_FILENAME: &str = "valid_defs.json";
     const INVALID_INPUT_FILENAME: &str = "invalid_defs.json";
 
-    lazy_static! {
-        static ref VALID_INPUT_FORMAT: String = serde_json::to_string(&serde_json::json!({
+    static VALID_INPUT_FORMAT: LazyLock<String> = LazyLock::new(|| {
+        serde_json::to_string(&serde_json::json!({
           "schema_id": "experimental",
           "data": [
             {
@@ -541,11 +579,11 @@ mod test {
                 }],
             }
         ]}))
-        .expect("serialize json");
-        static ref VALID_FILE_INPUT: Vec<u8> =
-            VALID_INPUT_FORMAT.replace("{}", "file").into_bytes();
-        static ref INVALID_INPUT: Vec<u8> = vec![1u8; 64];
-    }
+        .expect("serialize json")
+    });
+    static VALID_FILE_INPUT: LazyLock<Vec<u8>> =
+        LazyLock::new(|| VALID_INPUT_FORMAT.replace("{}", "file").into_bytes());
+    static INVALID_INPUT: LazyLock<Vec<u8>> = LazyLock::new(|| vec![1u8; 64]);
 
     struct FakeRemoteControllerProvider {
         controller: Arc<fremotecontrol::RemoteControlProxy>,
