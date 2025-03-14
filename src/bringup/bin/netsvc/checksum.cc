@@ -32,5 +32,5 @@ uint16_t ip6_header_checksum(const ip6_hdr_t& ip, uint8_t type) {
 }
 
 uint16_t ip6_finalize_checksum(uint16_t header_checksum, const void* payload, size_t len) {
-  return ~checksum(payload, len, header_checksum);
+  return static_cast<uint16_t>(~checksum(payload, len, header_checksum));
 }
