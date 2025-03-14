@@ -4,16 +4,21 @@
 
 use super::{DecodedRequest, DeviceInfo, IntoSessionManager, Operation, SessionHelper};
 use anyhow::Error;
-use block_protocol::{BlockFifoRequest, WriteOptions};
-use fuchsia_async::{self as fasync, FifoReadable as _, FifoWritable as _};
-use futures::stream::StreamExt as _;
-use futures::FutureExt;
+use block_protocol::{BlockFifoRequest, BlockFifoResponse, WriteOptions};
+use fuchsia_async::{self as fasync, FifoReadable as _};
+use futures::future::Fuse;
+use futures::stream::FuturesUnordered;
+use futures::{select_biased, FutureExt, StreamExt};
 use std::borrow::Cow;
-use std::future::Future;
+use std::future::{poll_fn, Future};
 use std::mem::MaybeUninit;
 use std::num::NonZero;
+use std::pin::pin;
 use std::sync::Arc;
+use std::task::{ready, Poll};
 use {fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume};
+
+pub(crate) const FIFO_MAX_REQUESTS: usize = 64;
 
 pub trait Interface: Send + Sync + Unpin + 'static {
     /// Called whenever a VMO is attached, prior to the VMO's usage in any other methods.  Whilst
@@ -109,6 +114,84 @@ impl<I: Interface> SessionManager<I> {
     }
 }
 
+// A task loop for receiving and responding to FIFO requests.
+async fn run_fifo<I: Interface>(
+    fifo: zx::Fifo<BlockFifoRequest, BlockFifoResponse>,
+    interface: Arc<I>,
+    helper: Arc<SessionHelper<SessionManager<I>>>,
+) -> Result<(), zx::Status> {
+    // The FIFO has to be processed by a single task due to implementation constraints on
+    // fuchsia_async::Fifo.  Thus, we use an event loop to drive the FIFO.  FIFO reads and writes
+    // can happen in batch, and request processing is parallel.
+    // The general flow is:
+    //  - Read messages from the FIFO, write into `requests`.
+    //  - Read `requests`, decode them, and spawn a task to process them in `active_requests`, which
+    //    will eventually write them into `responses`.
+    //  - Read `responses` and write out to the FIFO.
+    let fifo = fasync::Fifo::from_fifo(fifo);
+    let mut requests = [MaybeUninit::<BlockFifoRequest>::uninit(); FIFO_MAX_REQUESTS];
+    let mut active_requests = FuturesUnordered::new();
+    let mut responses = vec![];
+
+    loop {
+        let new_requests = {
+            // We provide some flow control by limiting how many in-flight requests we will allow.
+            let pending_requests = active_requests.len() + responses.len();
+            let count = requests.len() - pending_requests;
+            let mut receive_requests = pin!(if count == 0 {
+                Fuse::terminated()
+            } else {
+                fifo.read_entries(&mut requests[..count]).fuse()
+            });
+            let mut send_responses = pin!(if responses.is_empty() {
+                Fuse::terminated()
+            } else {
+                poll_fn(|cx| -> Poll<Result<(), zx::Status>> {
+                    match ready!(fifo.try_write(cx, &responses[..])) {
+                        Ok(written) => {
+                            responses.drain(..written);
+                            Poll::Ready(Ok(()))
+                        }
+                        Err(status) => Poll::Ready(Err(status)),
+                    }
+                })
+                .fuse()
+            });
+
+            // Order is important here.  We want to prioritize sending results on the FIFO and
+            // processing FIFO messages over receiving new ones, to provide flow control.
+            select_biased!(
+                res = send_responses => {
+                    res?;
+                    0
+                },
+                response = active_requests.select_next_some() => {
+                    responses.extend(response);
+                    0
+                }
+                count = receive_requests => {
+                    count?
+                }
+            )
+        };
+        // NB: It is very important that there are no `await`s for the rest of the loop body, as
+        // otherwise active requests might become stalled.
+        for request in &requests[..new_requests] {
+            if let Some(decoded_request) =
+                helper.decode_fifo_request(unsafe { request.assume_init_ref() })
+            {
+                let interface = interface.clone();
+                let helper = helper.clone();
+                active_requests.push(async move {
+                    let tracking = decoded_request.request_tracking;
+                    let status = process_fifo_request(interface, decoded_request).await.into();
+                    helper.finish_fifo_request(tracking, status)
+                });
+            }
+        }
+    }
+}
+
 impl<I: Interface> super::SessionManager for SessionManager<I> {
     async fn on_attach_vmo(self: Arc<Self>, vmo: &Arc<zx::Vmo>) -> Result<(), zx::Status> {
         self.interface.on_attach_vmo(vmo).await
@@ -124,34 +207,14 @@ impl<I: Interface> super::SessionManager for SessionManager<I> {
         let interface = self.interface.clone();
 
         let mut stream = stream.fuse();
-        let fifo = Arc::new(fasync::Fifo::from_fifo(fifo));
 
         let scope = fasync::Scope::new();
-        let scope_ref = scope.clone();
         let helper_clone = helper.clone();
         let mut fifo_task = scope
             .spawn(async move {
-                let mut requests = [MaybeUninit::<BlockFifoRequest>::uninit(); 64];
-                while let Ok(count) = fifo.read_entries(&mut requests[..]).await {
-                    for request in &requests[..count] {
-                        if let Some(decoded_request) =
-                            helper.decode_fifo_request(unsafe { request.assume_init_ref() })
-                        {
-                            let interface = interface.clone();
-                            let fifo = fifo.clone();
-                            let helper = helper.clone();
-                            scope_ref.spawn(async move {
-                                let tracking = decoded_request.request_tracking;
-                                let status =
-                                    process_fifo_request(interface, decoded_request).await.into();
-                                if let Some(response) = helper.finish_fifo_request(tracking, status)
-                                {
-                                    if let Err(_) = fifo.write_entries(&response).await {
-                                        return;
-                                    }
-                                }
-                            });
-                        }
+                if let Err(status) = run_fifo(fifo, interface, helper).await {
+                    if status != zx::Status::PEER_CLOSED {
+                        log::error!(status:?; "FIFO error");
                     }
                 }
             })

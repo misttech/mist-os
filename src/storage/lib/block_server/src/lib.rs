@@ -737,6 +737,7 @@ impl From<RequestId> for GroupOrRequest {
 #[cfg(test)]
 mod tests {
     use super::{BlockServer, DeviceInfo, PartitionInfo};
+    use crate::async_interface::FIFO_MAX_REQUESTS;
     use block_protocol::{BlockFifoCommand, BlockFifoRequest, BlockFifoResponse, WriteOptions};
     use fidl_fuchsia_hardware_block_driver::{BlockIoFlag, BlockOpcode};
     use fuchsia_async::{FifoReadable as _, FifoWritable as _};
@@ -747,7 +748,7 @@ mod tests {
     use std::future::poll_fn;
     use std::num::NonZero;
     use std::pin::pin;
-    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
     use std::sync::{Arc, Mutex};
     use std::task::{Context, Poll};
     use zx::{AsHandleRef as _, HandleBased as _};
@@ -1257,6 +1258,7 @@ mod tests {
                     },
                     vmoid: vmo_id.id,
                     length: 1,
+                    reqid: 1,
                     ..Default::default()
                 })
                 .await
@@ -1273,6 +1275,7 @@ mod tests {
                     },
                     vmoid: vmo_id.id,
                     length: 1,
+                    reqid: 2,
                     ..Default::default()
                 })
                 .await
@@ -1287,6 +1290,7 @@ mod tests {
                         opcode: BlockOpcode::Flush.into_primitive(),
                         ..Default::default()
                     },
+                    reqid: 3,
                     ..Default::default()
                 })
                 .await
@@ -1301,6 +1305,7 @@ mod tests {
                         opcode: BlockOpcode::Trim.into_primitive(),
                         ..Default::default()
                     },
+                    reqid: 4,
                     ..Default::default()
                 })
                 .await
@@ -1878,5 +1883,115 @@ mod tests {
         let _ = tx.send(());
 
         assert!(fasync::TestExecutor::poll_until_stalled(&mut fut).await.is_ready());
+    }
+
+    #[fuchsia::test]
+    async fn test_request_flow_control() {
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>();
+
+        // The client will ensure that MAX_REQUESTS are queued up before firing `event`, and the
+        // server will block until that happens.
+        const MAX_REQUESTS: u64 = FIFO_MAX_REQUESTS as u64;
+        let event = Arc::new((event_listener::Event::new(), AtomicBool::new(false)));
+        let event_clone = event.clone();
+        futures::join!(
+            async move {
+                let block_server = BlockServer::new(
+                    BLOCK_SIZE,
+                    Arc::new(MockInterface {
+                        read_hook: Some(Box::new(move |_, _, _, _| {
+                            let event_clone = event_clone.clone();
+                            Box::pin(async move {
+                                if !event_clone.1.load(Ordering::SeqCst) {
+                                    event_clone.0.listen().await;
+                                }
+                                Ok(())
+                            })
+                        })),
+                    }),
+                );
+                block_server.handle_requests(stream).await.unwrap();
+            },
+            async move {
+                let (session_proxy, server) = fidl::endpoints::create_proxy();
+
+                proxy.open_session(server).unwrap();
+
+                let vmo = zx::Vmo::create(zx::system_get_page_size() as u64).unwrap();
+                let vmo_id = session_proxy
+                    .attach_vmo(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap())
+                    .await
+                    .unwrap()
+                    .unwrap();
+
+                let fifo =
+                    fasync::Fifo::from_fifo(session_proxy.get_fifo().await.unwrap().unwrap());
+
+                for i in 0..MAX_REQUESTS {
+                    fifo.write_entries(&BlockFifoRequest {
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::Read.into_primitive(),
+                            ..Default::default()
+                        },
+                        reqid: (i + 1) as u32,
+                        dev_offset: i,
+                        vmoid: vmo_id.id,
+                        length: 1,
+                        ..Default::default()
+                    })
+                    .await
+                    .unwrap();
+                }
+                assert!(futures::poll!(fifo.write_entries(&BlockFifoRequest {
+                    command: BlockFifoCommand {
+                        opcode: BlockOpcode::Read.into_primitive(),
+                        ..Default::default()
+                    },
+                    reqid: u32::MAX,
+                    dev_offset: MAX_REQUESTS,
+                    vmoid: vmo_id.id,
+                    length: 1,
+                    ..Default::default()
+                }))
+                .is_pending());
+                // OK, let the server start to process.
+                event.1.store(true, Ordering::SeqCst);
+                event.0.notify(usize::MAX);
+                // For each entry we read, make sure we can write a new one in.
+                let mut finished_reqids = vec![];
+                for i in MAX_REQUESTS..2 * MAX_REQUESTS {
+                    let response: BlockFifoResponse = fifo.read_entry().await.unwrap();
+                    assert_eq!(response.status, zx::sys::ZX_OK);
+                    finished_reqids.push(response.reqid);
+                    fifo.write_entries(&BlockFifoRequest {
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::Read.into_primitive(),
+                            ..Default::default()
+                        },
+                        reqid: (i + 1) as u32,
+                        dev_offset: i,
+                        vmoid: vmo_id.id,
+                        length: 1,
+                        ..Default::default()
+                    })
+                    .await
+                    .unwrap();
+                }
+                for _ in 0..MAX_REQUESTS {
+                    let response: BlockFifoResponse = fifo.read_entry().await.unwrap();
+                    assert_eq!(response.status, zx::sys::ZX_OK);
+                    finished_reqids.push(response.reqid);
+                }
+                // Verify that we got a response for each request.  Note that we can't assume FIFO
+                // ordering.
+                finished_reqids.sort();
+                assert_eq!(finished_reqids.len(), 2 * MAX_REQUESTS as usize);
+                let mut i = 1;
+                for reqid in finished_reqids {
+                    assert_eq!(reqid, i);
+                    i += 1;
+                }
+            }
+        );
     }
 }
