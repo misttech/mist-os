@@ -1,0 +1,20 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//src/lib/android/aidl/aidl.gni")
+
+aidl("1") {
+  base = "//third_party/android/platform/hardware/interfaces/uwb/aidl/aidl_api/android.hardware.uwb/1"
+  stability = "vintf"
+  version = "1"
+  parcelables = [
+    base + "/android/hardware/uwb/UwbEvent.aidl",
+    base + "/android/hardware/uwb/UwbStatus.aidl",
+  ]
+  interfaces = [
+    base + "/android/hardware/uwb/IUwb.aidl",
+    base + "/android/hardware/uwb/IUwbChip.aidl",
+    base + "/android/hardware/uwb/IUwbClientCallback.aidl",
+  ]
+}
