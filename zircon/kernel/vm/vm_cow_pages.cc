@@ -4201,13 +4201,16 @@ int64_t VmCowPages::ChangeSingleHighPriorityCountLocked(int64_t delta) {
 void VmCowPages::ChangeHighPriorityCountLocked(int64_t delta) {
   canary_.Assert();
 
-  VmCowPages* cur = this;
-  AssertHeld(cur->lock_ref());
+  LockedPtr cur;
   // Any change to or from zero requires updating a count in the parent, so we need to walk up the
   // parent chain as long as a transition is happening.
-  while (cur && delta != 0) {
-    delta = cur->ChangeSingleHighPriorityCountLocked(delta);
-    cur = cur->parent_.get();
+  while (delta != 0) {
+    delta = cur.locked_or(this).ChangeSingleHighPriorityCountLocked(delta);
+    VmCowPages* parent = cur.locked_or(this).parent_.get();
+    if (!parent) {
+      break;
+    }
+    cur = LockedPtr(parent, VmLockAcquireMode::Reentrant);
   }
 }
 
