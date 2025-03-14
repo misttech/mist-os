@@ -322,7 +322,9 @@ zx_status_t PortDispatcher::Dequeue(const Deadline& deadline, zx_port_packet_t* 
   while (true) {
     // Wait until one of the queues has a packet.
     {
+#ifndef __mist_os__
       ThreadDispatcher::AutoBlocked by(ThreadDispatcher::Blocked::PORT);
+#endif
       zx_status_t st = sema_.Wait(deadline);
       if (st != ZX_OK)
         return st;
