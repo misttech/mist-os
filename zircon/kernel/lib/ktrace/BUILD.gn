@@ -45,6 +45,7 @@ config("suppress-warning.config") {
     "//src/lib/ubsan-custom/*",
     "//src/lib/zbitl/*",
     "//src/performance/lib/fxt/*",
+    "//third_party/lk/*",
     "//third_party/zstd/*",
     "//vendor/google/*",
     "//vendor/misttech/*",
