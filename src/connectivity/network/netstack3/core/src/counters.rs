@@ -18,7 +18,7 @@ use netstack3_ip::multicast_forwarding::MulticastForwardingCounters;
 use netstack3_ip::nud::{NudCounters, NudCountersInner};
 use netstack3_ip::raw::RawIpSocketCounters;
 use netstack3_ip::{FragmentationCounters, IpCounters, IpLayerIpExt};
-use netstack3_tcp::{TcpCounters, TcpCountersInner};
+use netstack3_tcp::TcpCounters;
 use netstack3_udp::{UdpCounters, UdpCountersInner};
 
 /// An API struct for accessing all stack counters.
@@ -162,10 +162,14 @@ where
         });
         inspector.record_child("TCP", |inspector| {
             inspector.record_child("V4", |inspector| {
-                inspect_tcp_counters::<Ipv4>(inspector, self.core_ctx().counters());
+                inspector.delegate_inspectable(
+                    CounterContext::<TcpCounters<Ipv4>>::counters(self.core_ctx()).as_ref(),
+                );
             });
             inspector.record_child("V6", |inspector| {
-                inspect_tcp_counters::<Ipv6>(inspector, self.core_ctx().counters());
+                inspector.delegate_inspectable(
+                    CounterContext::<TcpCounters<Ipv6>>::counters(self.core_ctx()).as_ref(),
+                );
             });
         });
     }
@@ -373,77 +377,4 @@ fn inspect_udp_counters<I: Ip>(inspector: &mut impl Inspector, counters: &UdpCou
         inspector.record_counter("Errors", tx_error);
     });
     inspector.record_counter("IcmpErrors", rx_icmp_error);
-}
-
-fn inspect_tcp_counters<I: Ip>(inspector: &mut impl Inspector, counters: &TcpCounters<I>) {
-    let TcpCountersInner {
-        invalid_ip_addrs_received,
-        invalid_segments_received,
-        valid_segments_received,
-        received_segments_dispatched,
-        received_segments_no_dispatch,
-        listener_queue_overflow,
-        segment_send_errors,
-        segments_sent,
-        passive_open_no_route_errors,
-        passive_connection_openings,
-        active_open_no_route_errors,
-        active_connection_openings,
-        failed_connection_attempts,
-        failed_port_reservations,
-        checksum_errors,
-        resets_received,
-        resets_sent,
-        syns_received,
-        syns_sent,
-        fins_received,
-        fins_sent,
-        timeouts,
-        retransmits,
-        slow_start_retransmits,
-        fast_retransmits,
-        fast_recovery,
-        established_closed,
-        established_resets,
-        established_timedout,
-    } = counters.as_ref();
-    inspector.record_child("Rx", |inspector| {
-        inspector.record_counter("ValidSegmentsReceived", valid_segments_received);
-        inspector.record_counter("ReceivedSegmentsDispatched", received_segments_dispatched);
-        inspector.record_counter("ResetsReceived", resets_received);
-        inspector.record_counter("SynsReceived", syns_received);
-        inspector.record_counter("FinsReceived", fins_received);
-        inspector.record_child("Errors", |inspector| {
-            inspector.record_counter("InvalidIpAddrsReceived", invalid_ip_addrs_received);
-            inspector.record_counter("InvalidSegmentsReceived", invalid_segments_received);
-            inspector.record_counter("ReceivedSegmentsNoDispatch", received_segments_no_dispatch);
-            inspector.record_counter("ListenerQueueOverflow", listener_queue_overflow);
-            inspector.record_counter("PassiveOpenNoRouteErrors", passive_open_no_route_errors);
-            inspector.record_counter("ChecksumErrors", checksum_errors);
-        })
-    });
-    inspector.record_child("Tx", |inspector| {
-        inspector.record_counter("SegmentsSent", segments_sent);
-        inspector.record_counter("ResetsSent", resets_sent);
-        inspector.record_counter("SynsSent", syns_sent);
-        inspector.record_counter("FinsSent", fins_sent);
-        inspector.record_counter("Timeouts", timeouts);
-        inspector.record_counter("Retransmits", retransmits);
-        inspector.record_counter("SlowStartRetransmits", slow_start_retransmits);
-        inspector.record_counter("FastRetransmits", fast_retransmits);
-        inspector.record_child("Errors", |inspector| {
-            inspector.record_counter("SegmentSendErrors", segment_send_errors);
-            inspector.record_counter("ActiveOpenNoRouteErrors", active_open_no_route_errors);
-        });
-    });
-    inspector.record_counter("PassiveConnectionOpenings", passive_connection_openings);
-    inspector.record_counter("ActiveConnectionOpenings", active_connection_openings);
-    inspector.record_counter("FastRecovery", fast_recovery);
-    inspector.record_counter("EstablishedClosed", established_closed);
-    inspector.record_counter("EstablishedResets", established_resets);
-    inspector.record_counter("EstablishedTimedout", established_timedout);
-    inspector.record_child("Errors", |inspector| {
-        inspector.record_counter("FailedConnectionOpenings", failed_connection_attempts);
-        inspector.record_counter("FailedPortReservations", failed_port_reservations);
-    })
 }

@@ -7,10 +7,10 @@
 use core::num::NonZeroU8;
 use core::time::Duration;
 
-use net_types::ip::{GenericOverIp, Ip, IpMarked, Mtu};
+use net_types::ip::{GenericOverIp, Ip, Mtu};
 use net_types::SpecifiedAddr;
 use netstack3_base::{
-    Counter, IcmpErrorCode, Icmpv4ErrorCode, Icmpv6ErrorCode, IpExt, UnscaledWindowSize,
+    IcmpErrorCode, Icmpv4ErrorCode, Icmpv6ErrorCode, IpExt, UnscaledWindowSize,
     WeakDeviceIdentifier, WindowSize,
 };
 use netstack3_ip::socket::{RouteResolutionOptions, SendOptions};
@@ -23,6 +23,7 @@ use packet_formats::utils::NonZeroDuration;
 use rand::Rng;
 
 use crate::internal::buffer::BufferLimits;
+use crate::internal::counters::TcpCounters;
 use crate::internal::socket::isn::IsnGenerator;
 use crate::internal::socket::{DualStackIpExt, Sockets, TcpBindingsTypes};
 use crate::internal::state::DEFAULT_MAX_SYN_RETRIES;
@@ -355,89 +356,6 @@ impl Default for KeepAlive {
             enabled: false,
         }
     }
-}
-
-/// TCP Counters.
-///
-/// Accrued for the entire stack, rather than on a per connection basis.
-///
-/// Note that for dual stack sockets, all events will be attributed to the IPv6
-/// counters.
-pub type TcpCounters<I> = IpMarked<I, TcpCountersInner>;
-
-/// The IP agnostic version of [`TcpCounters`].
-#[derive(Default)]
-// TODO(https://fxbug.dev/42052878): Add counters for SYN cookies.
-// TODO(https://fxbug.dev/42078221): Add counters for SACK.
-pub struct TcpCountersInner {
-    /// Count of received IP packets that were dropped because they had
-    /// unexpected IP addresses (either src or dst).
-    pub invalid_ip_addrs_received: Counter,
-    /// Count of received TCP segments that were dropped because they could not
-    /// be parsed.
-    pub invalid_segments_received: Counter,
-    /// Count of received TCP segments that were valid.
-    pub valid_segments_received: Counter,
-    /// Count of received TCP segments that were successfully dispatched to a
-    /// socket.
-    pub received_segments_dispatched: Counter,
-    /// Count of received TCP segments that were not associated with any
-    /// existing sockets.
-    pub received_segments_no_dispatch: Counter,
-    /// Count of received TCP segments that were dropped because the listener
-    /// queue was full.
-    pub listener_queue_overflow: Counter,
-    /// Count of TCP segments that failed to send.
-    pub segment_send_errors: Counter,
-    /// Count of TCP segments that were sent.
-    pub segments_sent: Counter,
-    /// Count of passive open attempts that failed because the stack doesn't
-    /// have route to the peer.
-    pub passive_open_no_route_errors: Counter,
-    /// Count of passive connections that have been opened.
-    pub passive_connection_openings: Counter,
-    /// Count of active open attempts that have failed because the stack doesn't
-    /// have a route to the peer.
-    pub active_open_no_route_errors: Counter,
-    /// Count of active connections that have been opened.
-    pub active_connection_openings: Counter,
-    /// Count of all failed connection attempts, including both passive and
-    /// active opens.
-    pub failed_connection_attempts: Counter,
-    /// Count of port reservation attempts that failed.
-    pub failed_port_reservations: Counter,
-    /// Count of received segments whose checksums were invalid.
-    pub checksum_errors: Counter,
-    /// Count of received segments with the RST flag set.
-    pub resets_received: Counter,
-    /// Count of sent segments with the RST flag set.
-    pub resets_sent: Counter,
-    /// Count of received segments with the SYN flag set.
-    pub syns_received: Counter,
-    /// Count of sent segments with the SYN flag set.
-    pub syns_sent: Counter,
-    /// Count of received segments with the FIN flag set.
-    pub fins_received: Counter,
-    /// Count of sent segments with the FIN flag set.
-    pub fins_sent: Counter,
-    /// Count of retransmission timeouts.
-    pub timeouts: Counter,
-    /// Count of retransmissions of segments.
-    pub retransmits: Counter,
-    /// Count of retransmissions of segments while in slow start.
-    pub slow_start_retransmits: Counter,
-    /// Count of retransmissions of segments while in fast recovery.
-    pub fast_retransmits: Counter,
-    /// Count of times fast recovery was initiated to recover from packet loss.
-    pub fast_recovery: Counter,
-    /// Count of times an established TCP connection transitioned to CLOSED.
-    pub established_closed: Counter,
-    /// Count of times an established TCP connection transitioned to CLOSED due
-    /// to a RST segment.
-    pub established_resets: Counter,
-    /// Count of times an established TCP connection transitioned to CLOSED due
-    /// to a timeout (e.g. a keep-alive or retransmit timeout).
-    pub established_timedout: Counter,
 }
 
 #[cfg(test)]

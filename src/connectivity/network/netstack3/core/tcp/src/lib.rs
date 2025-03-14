@@ -16,6 +16,7 @@ mod internal {
     pub(super) mod base;
     pub(super) mod buffer;
     pub(super) mod congestion;
+    pub(super) mod counters;
     pub(super) mod rtt;
     pub(super) mod socket;
     pub(super) mod state;
@@ -23,10 +24,10 @@ mod internal {
 }
 
 pub use internal::base::{
-    BufferSizes, ConnectionError, SocketOptions, TcpCounters, TcpCountersInner, TcpState,
-    DEFAULT_FIN_WAIT2_TIMEOUT,
+    BufferSizes, ConnectionError, SocketOptions, TcpState, DEFAULT_FIN_WAIT2_TIMEOUT,
 };
 pub use internal::buffer::{Buffer, BufferLimits, IntoBuffers, ReceiveBuffer, SendBuffer};
+pub use internal::counters::TcpCounters;
 pub use internal::socket::accept_queue::ListenerNotifier;
 pub use internal::socket::isn::IsnGenerator;
 pub use internal::socket::{

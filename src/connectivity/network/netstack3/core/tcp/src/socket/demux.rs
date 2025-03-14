@@ -36,9 +36,8 @@ use packet_formats::tcp::{
     TcpSegmentBuilderWithOptions,
 };
 
-use crate::internal::base::{
-    BufferSizes, ConnectionError, SocketOptions, TcpCounters, TcpIpSockOptions,
-};
+use crate::internal::base::{BufferSizes, ConnectionError, SocketOptions, TcpIpSockOptions};
+use crate::internal::counters::TcpCounters;
 use crate::internal::socket::isn::IsnGenerator;
 use crate::internal::socket::{
     self, AsThisStack as _, BoundSocketState, Connection, DemuxState, DeviceIpSocketHandler,

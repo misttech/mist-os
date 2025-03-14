@@ -16,6 +16,7 @@ rustc_library_with_features("netstack3-tcp") {
     "src/buffer.rs",
     "src/congestion.rs",
     "src/congestion/cubic.rs",
+    "src/counters.rs",
     "src/lib.rs",
     "src/rtt.rs",
     "src/socket.rs",

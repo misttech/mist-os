@@ -70,9 +70,10 @@ use smallvec::{smallvec, SmallVec};
 use thiserror::Error;
 
 use crate::internal::base::{
-    BufferSizes, BuffersRefMut, ConnectionError, SocketOptions, TcpCounters, TcpIpSockOptions,
+    BufferSizes, BuffersRefMut, ConnectionError, SocketOptions, TcpIpSockOptions,
 };
 use crate::internal::buffer::{Buffer, IntoBuffers, ReceiveBuffer, SendBuffer};
+use crate::internal::counters::TcpCounters;
 use crate::internal::socket::accept_queue::{AcceptQueue, ListenerNotifier};
 use crate::internal::socket::demux::tcp_serialize_segment;
 use crate::internal::socket::isn::IsnGenerator;

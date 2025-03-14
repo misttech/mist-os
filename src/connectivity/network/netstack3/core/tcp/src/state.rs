@@ -26,10 +26,11 @@ use packet_formats::utils::NonZeroDuration;
 use replace_with::{replace_with, replace_with_and};
 
 use crate::internal::base::{
-    BufferSizes, BuffersRefMut, ConnectionError, KeepAlive, SocketOptions, TcpCountersInner,
+    BufferSizes, BuffersRefMut, ConnectionError, KeepAlive, SocketOptions,
 };
 use crate::internal::buffer::{Assembler, BufferLimits, IntoBuffers, ReceiveBuffer, SendBuffer};
 use crate::internal::congestion::CongestionControl;
+use crate::internal::counters::TcpCountersInner;
 use crate::internal::rtt::Estimator;
 
 /// Per RFC 793 (https://tools.ietf.org/html/rfc793#page-81):
