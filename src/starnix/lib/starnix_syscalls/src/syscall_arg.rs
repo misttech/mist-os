@@ -5,7 +5,7 @@
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::signals::UncheckedSignal;
-use starnix_uapi::user_address::{MultiArchFrom, MultiArchUserRef, UserAddress, UserRef};
+use starnix_uapi::user_address::{MappingMultiArchUserRef, MultiArchFrom, UserAddress, UserRef};
 use starnix_uapi::user_value::UserValue;
 
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
@@ -94,11 +94,11 @@ impl<T> From<SyscallArg> for UserRef<T> {
     }
 }
 
-impl<T64, T32> MultiArchFrom<SyscallArg> for MultiArchUserRef<T64, T32> {
+impl<T, T64, T32> MultiArchFrom<SyscallArg> for MappingMultiArchUserRef<T, T64, T32> {
     fn from_64(value: SyscallArg) -> Self {
-        MultiArchUserRef::<T64, T32>::from(UserRef::<T64>::from(value))
+        Self::from(UserRef::<T64>::from(value))
     }
     fn from_32(value: SyscallArg) -> Self {
-        MultiArchUserRef::<T64, T32>::from_32(UserRef::<T32>::from(value))
+        Self::from_32(UserRef::<T32>::from(value))
     }
 }

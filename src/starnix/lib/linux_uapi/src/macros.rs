@@ -115,6 +115,7 @@ macro_rules! check_arch_independent_same_layout {
 macro_rules! translate_data {
     {} => {};
     {
+        $(#[$meta:meta])*
         BidiFrom<$type_name1:ty, $type_name2:ty> {
             $(
                 $field1:ident = $field2:ident;
@@ -124,10 +125,12 @@ macro_rules! translate_data {
         $($token:tt)*
     } => {
         $crate::translate_data! {
+            $(#[$meta])*
             From<$type_name1> for $type_name2 {
                 $( $field2 = $field1; )*
                 $($(..$d2)?)?
             }
+            $(#[$meta])*
             From<$type_name2> for $type_name1 {
                 $( $field1 = $field2; )*
                 $($(..$d1)?)?
@@ -136,6 +139,7 @@ macro_rules! translate_data {
         $crate::translate_data! { $($token)* }
     };
     {
+        $(#[$meta:meta])*
         BidiTryFrom<$type_name1:ty, $type_name2:ty> {
             $(
                 $field1:ident = $field2:ident;
@@ -145,10 +149,12 @@ macro_rules! translate_data {
         $($token:tt)*
     } => {
         $crate::translate_data! {
+            $(#[$meta])*
             TryFrom<$type_name1> for $type_name2 {
                 $( $field2 = $field1; )*
                 $($(..$d2)?)?
             }
+            $(#[$meta])*
             TryFrom<$type_name2> for $type_name1 {
                 $( $field1 = $field2; )*
                 $($(..$d1)?)?
@@ -157,6 +163,7 @@ macro_rules! translate_data {
         $crate::translate_data! { $($token)* }
     };
     {
+        $(#[$meta:meta])*
         From<$type_name1:ty> for $type_name2:ty {
             $(
                 $field2:ident = $field1:ident;
@@ -165,6 +172,7 @@ macro_rules! translate_data {
         }
         $($token:tt)*
     } => {
+        $(#[$meta])*
         impl From<$type_name1> for $type_name2 {
             fn from(src: $type_name1) -> Self {
                 Self {
@@ -176,6 +184,7 @@ macro_rules! translate_data {
         $crate::translate_data! { $($token)* }
     };
     {
+        $(#[$meta:meta])*
         TryFrom<$type_name1:ty> for $type_name2:ty {
             $(
                 $field2:ident = $field1:ident;
@@ -184,6 +193,7 @@ macro_rules! translate_data {
         }
         $($token:tt)*
     } => {
+        $(#[$meta])*
         impl TryFrom<$type_name1> for $type_name2 {
             type Error = ();
             fn try_from(src: $type_name1) -> Result<Self, ()> {
@@ -235,6 +245,7 @@ macro_rules! arch_translate_data {
         $($token:tt)*
     } => {
         $crate::translate_data! {
+            #[cfg(feature = "arch32")]
             TryFrom<$crate::$type_name> for $crate::arch32::$type_name {
                 $(
                     $field = $field;
@@ -252,6 +263,7 @@ macro_rules! arch_translate_data {
         $($token:tt)*
     } => {
         $crate::translate_data! {
+            #[cfg(feature = "arch32")]
             From<$crate::arch32::$type_name> for $crate::$type_name {
                 $(
                     $field = $field;
@@ -260,5 +272,37 @@ macro_rules! arch_translate_data {
             }
         }
         $crate::arch_translate_data! { $($token)* }
+    };
+}
+
+/// Implement TryFrom between 2 uapi struct of different ABI with a common type.
+#[macro_export]
+macro_rules! arch_map_data {
+    {} => {};
+    {
+        BidiTryFrom<$type_name1:ty, $type_name2:ident> {
+            $(
+                $field1:ident = $field2:ident;
+            )*
+            $(..$d:expr)?
+        }
+        $($token:tt)*
+    } => {
+        $crate::translate_data! {
+            BidiTryFrom<$type_name1, $crate::$type_name2> {
+                $(
+                    $field1 = $field2;
+                )*
+                ..$($d)?, Default::default()
+            }
+            #[cfg(feature = "arch32")]
+            BidiTryFrom<$type_name1, $crate::arch32::$type_name2> {
+                $(
+                    $field1 = $field2;
+                )*
+                ..$($d)?, Default::default()
+            }
+        }
+        $crate::arch_map_data! { $($token)* }
     };
 }

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::{MemoryAccessor, MemoryAccessorExt};
+use crate::mm::{IOVecPtr, MemoryAccessor, MemoryAccessorExt};
 use crate::security;
 use crate::task::{CurrentTask, IpTables, Task, WaitCallback, Waiter};
 use crate::vfs::buffers::{
@@ -14,6 +14,8 @@ use crate::vfs::socket::{
     SA_FAMILY_SIZE, SA_STORAGE_SIZE,
 };
 use crate::vfs::{FdFlags, FdNumber, FileHandle, FsString, LookupContext};
+use starnix_uapi::user_address::{ArchSpecific, MappingMultiArchUserRef};
+use starnix_uapi::user_value::UserValue;
 
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{FileOpsCore, LockBefore, Locked, Unlocked};
@@ -27,11 +29,68 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    cmsghdr, errno, error, mmsghdr, msghdr, socklen_t, timespec, MSG_CTRUNC, MSG_DONTWAIT,
-    MSG_TRUNC, MSG_WAITFORONE, SHUT_RD, SHUT_RDWR, SHUT_WR, SOCK_CLOEXEC, SOCK_NONBLOCK,
-    UIO_MAXIOV,
+    cmsghdr, errno, error, socklen_t, timespec, uapi, MSG_CTRUNC, MSG_DONTWAIT, MSG_TRUNC,
+    MSG_WAITFORONE, SHUT_RD, SHUT_RDWR, SHUT_WR, SOCK_CLOEXEC, SOCK_NONBLOCK, UIO_MAXIOV,
 };
-use std::mem::size_of;
+
+uapi::check_arch_independent_layout! {
+    sockaddr {
+        sa_family,
+        sa_data,
+    }
+}
+uapi::check_arch_independent_layout! {
+    sockaddr_in {
+        sin_family,
+        sin_port,
+        sin_addr,
+    }
+}
+uapi::check_arch_independent_layout! {
+    sockaddr_in6 {
+        sin6_family,
+        sin6_port,
+        sin6_flowinfo,
+        sin6_addr,
+        sin6_scope_id
+    }
+}
+
+pub type MsgHdrPtr = MappingMultiArchUserRef<MsgHdr, uapi::msghdr, uapi::arch32::msghdr>;
+
+pub struct MsgHdr {
+    name: UserAddress,
+    name_len: socklen_t,
+    iov: IOVecPtr,
+    iovlen: UserValue<usize>,
+    control: UserAddress,
+    control_len: usize,
+    flags: u32,
+}
+
+pub type MMsgHdrPtr = MappingMultiArchUserRef<MMsgHdr, uapi::mmsghdr, uapi::arch32::mmsghdr>;
+
+pub struct MMsgHdr {
+    hdr: MsgHdr,
+    len: usize,
+}
+
+uapi::arch_map_data! {
+    BidiTryFrom<MsgHdr, msghdr> {
+        name = msg_name;
+        name_len = msg_namelen;
+        iov = msg_iov;
+        iovlen = msg_iovlen;
+        control = msg_control;
+        control_len = msg_controllen;
+        flags = msg_flags;
+    }
+
+    BidiTryFrom<MMsgHdr, mmsghdr> {
+        hdr = msg_hdr;
+        len = msg_len;
+    }
+}
 
 pub fn sys_socket(
     locked: &mut Locked<'_, Unlocked>,
@@ -435,32 +494,55 @@ pub fn sys_socketpair(
 
 fn read_iovec_from_msghdr(
     current_task: &CurrentTask,
-    message_header: &msghdr,
+    message_header: &MsgHdr,
 ) -> Result<UserBuffers, Errno> {
-    let iovec_count = message_header.msg_iovlen;
+    let iovec_count = message_header.iovlen;
 
     // In `CurrentTask::read_iovec()` the same check fails with `EINVAL`. This works for all
     // syscalls that use `iovec`, except `sendmsg()` and `recvmsg()`, which need to fail with
     // EMSGSIZE.
-    if iovec_count > UIO_MAXIOV as u64 {
+    if iovec_count.raw() > UIO_MAXIOV as usize {
         return error!(EMSGSIZE);
     }
 
-    current_task.read_iovec(message_header.msg_iov.into(), (iovec_count as i32).into())
+    current_task.read_iovec(message_header.iov, iovec_count)
 }
 
 fn recvmsg_internal<L>(
     locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     file: &FileHandle,
-    user_message_header: UserRef<msghdr>,
+    user_message_header: MsgHdrPtr,
     flags: u32,
     deadline: Option<zx::MonotonicInstant>,
 ) -> Result<usize, Errno>
 where
     L: LockBefore<FileOpsCore>,
 {
-    let mut message_header = current_task.read_object(user_message_header.clone())?;
+    let mut message_header = current_task.read_multi_arch_object(user_message_header)?;
+    let result = recvmsg_internal_with_header(
+        locked,
+        current_task,
+        file,
+        &mut message_header,
+        flags,
+        deadline,
+    )?;
+    current_task.write_multi_arch_object(user_message_header, message_header)?;
+    Ok(result)
+}
+
+fn recvmsg_internal_with_header<L>(
+    locked: &mut Locked<'_, L>,
+    current_task: &CurrentTask,
+    file: &FileHandle,
+    message_header: &mut MsgHdr,
+    flags: u32,
+    deadline: Option<zx::MonotonicInstant>,
+) -> Result<usize, Errno>
+where
+    L: LockBefore<FileOpsCore>,
+{
     let iovec = read_iovec_from_msghdr(current_task, &message_header)?;
 
     let flags = SocketMessageFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL))?;
@@ -474,11 +556,11 @@ where
         deadline,
     )?;
 
-    message_header.msg_flags = 0;
+    message_header.flags = 0;
 
-    let cmsg_buffer_size = message_header.msg_controllen as usize;
+    let cmsg_buffer_size = message_header.control_len;
     let mut cmsg_bytes_written = 0;
-    let header_size = size_of::<cmsghdr>();
+    let header_size = std::mem::size_of::<cmsghdr>();
 
     for ancillary_data in info.ancillary_data {
         if ancillary_data.total_size() == 0 {
@@ -499,7 +581,7 @@ where
         // some of the message is missing.
         let truncated = message_bytes.len() < expected_size;
         if truncated {
-            message_header.msg_flags |= MSG_CTRUNC;
+            message_header.flags |= MSG_CTRUNC;
         }
 
         if message_bytes.len() < header_size {
@@ -508,37 +590,33 @@ where
         }
 
         if !message_bytes.is_empty() {
-            current_task.write_memory(
-                UserAddress::from(message_header.msg_control) + cmsg_bytes_written,
-                &message_bytes,
-            )?;
+            current_task
+                .write_memory(message_header.control + cmsg_bytes_written, &message_bytes)?;
             cmsg_bytes_written += message_bytes.len();
             if !truncated {
-                cmsg_bytes_written = round_up_to_increment(cmsg_bytes_written, size_of::<usize>())?;
+                cmsg_bytes_written = cmsg_align(current_task, cmsg_bytes_written)?;
             }
         }
     }
 
-    message_header.msg_controllen = cmsg_bytes_written as u64;
+    message_header.control_len = cmsg_bytes_written;
 
-    let msg_name = UserAddress::from(message_header.msg_name);
+    let msg_name = message_header.name;
     if !msg_name.is_null() {
-        if message_header.msg_namelen > i32::MAX as u32 {
+        if message_header.name_len > i32::MAX as u32 {
             return error!(EINVAL);
         }
         let bytes = info.address.map(|a| a.to_bytes()).unwrap_or_else(|| vec![]);
-        let num_bytes = std::cmp::min(message_header.msg_namelen as usize, bytes.len());
-        message_header.msg_namelen = bytes.len() as u32;
+        let num_bytes = std::cmp::min(message_header.name_len as usize, bytes.len());
+        message_header.name_len = bytes.len() as u32;
         if num_bytes > 0 {
             current_task.write_memory(msg_name, &bytes[..num_bytes])?;
         }
     }
 
     if info.bytes_read != info.message_length {
-        message_header.msg_flags |= MSG_TRUNC;
+        message_header.flags |= MSG_TRUNC;
     }
-
-    current_task.write_object(user_message_header, &message_header)?;
 
     if flags.contains(SocketMessageFlags::TRUNC) {
         Ok(info.message_length)
@@ -551,7 +629,7 @@ pub fn sys_recvmsg(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
-    user_message_header: UserRef<msghdr>,
+    user_message_header: MsgHdrPtr,
     flags: u32,
 ) -> Result<usize, Errno> {
     let file = current_task.files.get(fd)?;
@@ -565,7 +643,7 @@ pub fn sys_recvmmsg(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
-    user_mmsgvec: UserRef<mmsghdr>,
+    user_mmsgvec: MMsgHdrPtr,
     vlen: u32,
     mut flags: u32,
     user_timeout: UserRef<timespec>,
@@ -588,9 +666,16 @@ pub fn sys_recvmmsg(
 
     let mut index = 0usize;
     while index < vlen as usize {
-        let user_mmsghdr = user_mmsgvec.at(index);
-        let user_msghdr = user_mmsghdr.cast::<msghdr>();
-        match recvmsg_internal(locked, current_task, &file, user_msghdr, flags, deadline) {
+        let current_ptr = user_mmsgvec.at(index);
+        let mut current_mmsghdr = current_task.read_multi_arch_object(current_ptr)?;
+        match recvmsg_internal_with_header(
+            locked,
+            current_task,
+            &file,
+            &mut current_mmsghdr.hdr,
+            flags,
+            deadline,
+        ) {
             Err(error) => {
                 if index == 0 {
                     return Err(error);
@@ -598,9 +683,8 @@ pub fn sys_recvmmsg(
                 break;
             }
             Ok(bytes_read) => {
-                let msg_len = bytes_read as u32;
-                let user_msg_len = UserRef::<u32>::new(user_mmsghdr.addr() + size_of::<msghdr>());
-                current_task.write_object(user_msg_len, &msg_len)?;
+                current_mmsghdr.len = bytes_read;
+                current_task.write_multi_arch_object(current_ptr, current_mmsghdr)?;
             }
         }
         index += 1;
@@ -653,35 +737,45 @@ fn sendmsg_internal<L>(
     locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     file: &FileHandle,
-    user_message_header: UserRef<msghdr>,
+    user_message_header: MsgHdrPtr,
     flags: u32,
 ) -> Result<usize, Errno>
 where
     L: LockBefore<FileOpsCore>,
 {
-    let message_header = current_task.read_object(user_message_header)?;
+    let message_header = current_task.read_multi_arch_object(user_message_header)?;
+    sendmsg_internal_with_header(locked, current_task, file, &message_header, flags)
+}
 
-    if message_header.msg_namelen > i32::MAX as u32 {
+fn sendmsg_internal_with_header<L>(
+    locked: &mut Locked<'_, L>,
+    current_task: &CurrentTask,
+    file: &FileHandle,
+    message_header: &MsgHdr,
+    flags: u32,
+) -> Result<usize, Errno>
+where
+    L: LockBefore<FileOpsCore>,
+{
+    if message_header.name_len > i32::MAX as u32 {
         return error!(EINVAL);
     }
     let dest_address = maybe_parse_socket_address(
         current_task,
-        UserAddress::from(message_header.msg_name),
-        message_header.msg_namelen as usize,
+        message_header.name,
+        message_header.name_len as usize,
     )?;
     let iovec = read_iovec_from_msghdr(current_task, &message_header)?;
 
     let mut next_message_offset: usize = 0;
     let mut ancillary_data = Vec::new();
-    let header_size = size_of::<cmsghdr>();
+    let header_size = std::mem::size_of::<cmsghdr>();
     loop {
-        let space = (message_header.msg_controllen as usize).saturating_sub(next_message_offset);
+        let space = message_header.control_len.saturating_sub(next_message_offset);
         if space < header_size {
             break;
         }
-        let cmsg_ref = UserRef::<cmsghdr>::from(
-            UserAddress::from(message_header.msg_control) + next_message_offset,
-        );
+        let cmsg_ref = UserRef::<cmsghdr>::from(message_header.control + next_message_offset);
         let cmsg = current_task.read_object(cmsg_ref)?;
         // If the message header is not long enough to fit the required fields of the
         // control data, return EINVAL.
@@ -691,10 +785,10 @@ where
 
         let data_size = std::cmp::min(cmsg.cmsg_len as usize - header_size, space);
         let data = current_task.read_memory_to_vec(
-            UserAddress::from(message_header.msg_control) + next_message_offset + header_size,
+            message_header.control + next_message_offset + header_size,
             data_size,
         )?;
-        next_message_offset += round_up_to_increment(header_size + data.len(), size_of::<usize>())?;
+        next_message_offset += cmsg_align(current_task, header_size + data.len())?;
         let data = AncillaryData::from_cmsg(
             current_task,
             ControlMsg::new(cmsg.cmsg_level, cmsg.cmsg_type, data),
@@ -722,7 +816,7 @@ pub fn sys_sendmsg(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
-    user_message_header: UserRef<msghdr>,
+    user_message_header: MsgHdrPtr,
     flags: u32,
 ) -> Result<usize, Errno> {
     let file = current_task.files.get(fd)?;
@@ -736,7 +830,7 @@ pub fn sys_sendmmsg(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
-    user_mmsgvec: UserRef<mmsghdr>,
+    user_mmsgvec: MMsgHdrPtr,
     mut vlen: u32,
     flags: u32,
 ) -> Result<usize, Errno> {
@@ -752,9 +846,10 @@ pub fn sys_sendmmsg(
 
     let mut index = 0usize;
     while index < vlen as usize {
-        let user_mmsghdr = user_mmsgvec.at(index);
-        let user_msghdr = user_mmsghdr.cast::<msghdr>();
-        match sendmsg_internal(locked, current_task, &file, user_msghdr, flags) {
+        let current_ptr = user_mmsgvec.at(index);
+        let mut current_mmsghdr = current_task.read_multi_arch_object(current_ptr)?;
+        match sendmsg_internal_with_header(locked, current_task, &file, &current_mmsghdr.hdr, flags)
+        {
             Err(error) => {
                 if index == 0 {
                     return Err(error);
@@ -762,9 +857,8 @@ pub fn sys_sendmmsg(
                 break;
             }
             Ok(bytes_read) => {
-                let msg_len = bytes_read as u32;
-                let user_msg_len = UserRef::<u32>::new(user_mmsghdr.addr() + size_of::<msghdr>());
-                current_task.write_object(user_msg_len, &msg_len)?;
+                current_mmsghdr.len = bytes_read;
+                current_task.write_multi_arch_object(current_ptr, current_mmsghdr)?;
             }
         }
         index += 1;
@@ -872,6 +966,11 @@ pub fn sys_shutdown(
     };
     socket.shutdown(locked, how)?;
     Ok(())
+}
+
+pub fn cmsg_align(current_task: &CurrentTask, value: usize) -> Result<usize, Errno> {
+    let alignment = if current_task.is_arch32() { 4 } else { 8 };
+    round_up_to_increment(value, alignment)
 }
 
 // Syscalls for arch32 usage

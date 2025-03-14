@@ -9,7 +9,7 @@ use crate::mm::{
     read_to_object_as_bytes, DesiredAddress, IOVecPtr, MappingName, MappingOptions, ProtectionFlags,
 };
 use crate::task::CurrentTask;
-use crate::vfs::socket::syscalls::{sys_recvfrom, sys_recvmsg, sys_sendmsg, sys_sendto};
+use crate::vfs::socket::syscalls::{sys_recvfrom, sys_recvmsg, sys_sendmsg, sys_sendto, MsgHdrPtr};
 use crate::vfs::syscalls::{
     sys_pread64, sys_preadv2, sys_pwrite64, sys_pwritev2, sys_read, sys_write,
 };
@@ -713,7 +713,7 @@ impl IoUringFileObject {
                 locked,
                 current_task,
                 entry.fd(),
-                entry.address().into(),
+                MsgHdrPtr::new(current_task, entry.address()),
                 entry.op_flags,
             )
             .map(Into::into),
@@ -721,7 +721,7 @@ impl IoUringFileObject {
                 locked,
                 current_task,
                 entry.fd(),
-                entry.address().into(),
+                MsgHdrPtr::new(current_task, entry.address()),
                 entry.op_flags,
             )
             .map(Into::into),
