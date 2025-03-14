@@ -748,10 +748,6 @@ template("fidl_library") {
       files = all_files
 
       metadata = {
-        # Metadata to allow us to query all FIDL IR and source files.
-        fidl_json = [ rebase_path(invoker.fidl_ir_json, root_build_dir) ]
-        generated_sources = fidl_json
-
         # For libraries included in an IDK, add the metadata to the list used to
         # generate documentation.
         # Historically, libraries in the  "partner_internal" SDK category have
