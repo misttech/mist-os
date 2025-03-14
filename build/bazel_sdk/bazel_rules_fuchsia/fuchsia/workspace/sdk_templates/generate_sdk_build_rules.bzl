@@ -1745,30 +1745,8 @@ def _generate_sdk_build_rules(
     }
     runtime.file_copier(files_to_copy)
 
-def _merge_rules_fuchsia(runtime):
+def _ensure_build_id_file(runtime):
     ctx = runtime.ctx
-    rules_fuchsia_root = runtime.label_to_path("//:BUILD.bazel").dirname
-
-    rules_fuchsia_build = ctx.read(
-        rules_fuchsia_root.get_child("BUILD.bazel"),
-    ).split("\n")
-    start, end = [
-        i
-        for i, s in enumerate(rules_fuchsia_build)
-        if "__BEGIN_FUCHSIA_SDK_INCLUDE__" in s or
-           "__END_FUCHSIA_SDK_INCLUDE__" in s
-    ]
-    rules_fuchsia_build_fragment = "\n".join(
-        rules_fuchsia_build[start:end + 1],
-    )
-    ctx.template(
-        "BUILD.bazel",
-        "BUILD.bazel",
-        substitutions = {
-            "{{__FUCHSIA_SDK_INCLUDE__}}": rules_fuchsia_build_fragment,
-        },
-        executable = False,
-    )
 
     # BUILD.bazel references //:.build-id in a fuchsia_debug_symbol()
     # target declaration. This directory may not exist when the input
@@ -1811,7 +1789,7 @@ def generate_sdk_repository(runtime, manifests, use_rules_fuchsia):
             the "root" key, which has a string path value (absolute) pointing to an input IDK export
             directory, and the "manifest" key, which has a path string, relative to the root, pointing
             to the IDK manifest (which is typically just "meta/manifest.json").
-        rules_fuchsia_name: Name of the repository used to load rule definitions in the generated
+        use_rules_fuchsia: Name of the repository used to load rule definitions in the generated
             repository. Bazel projects whose build files already all target definitions from @rules_fuchsia
             can set this to "rules_fuchsia", otherwise this should be set to "fuchsia_sdk" for
             backwards compatibility.
@@ -1835,11 +1813,11 @@ def generate_sdk_repository(runtime, manifests, use_rules_fuchsia):
         executable = False,
     )
 
-    # TODO(https://fxbug.dev/42068729): Allow _generate_sdk_build_rules to provide
-    # substitutions directly to the call to ctx.template above.
+    # Generates all of the BUILD.bazel files and related content for the sdk
     _generate_sdk_build_rules(runtime, manifests, constants, rules_fuchsia_name)
 
-    _merge_rules_fuchsia(runtime)
+    # We need to make sure that there is a build id directory at the root
+    _ensure_build_id_file(runtime)
 
     # Should only be called after all BUILD.bazel files have been added.
     _export_all_files(runtime)

@@ -141,5 +141,3 @@ sdk_host_tool(name = "fssh")
 sdk_host_tool(name = "cmc")
 
 sdk_host_tool(name = "funnel")
-
-{{__FUCHSIA_SDK_INCLUDE__}}
