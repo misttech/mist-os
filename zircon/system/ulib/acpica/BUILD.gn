@@ -13,7 +13,7 @@ config("acpica-config") {
   cflags_c = [ "-fno-sanitize=alignment" ]
 }
 
-if (is_fuchsia || is_mistos) {
+if (is_fuchsia) {
   source_set("acpica-fuchsia") {
     deps = [
       "//src/devices/pci/lib/pci",
@@ -43,7 +43,46 @@ if (is_fuchsia || is_mistos) {
       defines += [ "ACPI_DEBUG_OUTPUT" ]
     }
   }
+} else if (is_mistos) {
+  source_set("acpica-zircon") {
+    deps = [
+      "//third_party/acpica:headers",
+      "//vendor/misttech/zircon/kernel/lib/mistos/util:sync-headers",
+      "//zircon/kernel/lib/kpci",
+      "//zircon/kernel/object",
+      "//zircon/kernel/vm:headers",
+      "//zircon/system/ulib/bitmap",
+      "//zircon/system/ulib/fbl",
+      "//zircon/system/ulib/zircon-internal",
+    ]
+
+    public_configs = [ ":acpica-config" ]
+
+    sources = [
+      "ioport.cc",
+      "irq.cc",
+      "mmio.cc",
+      "mutex.cc",
+      "oszircon.cc",
+      "pci.cc",
+      "semaphore.cc",
+      "task.cc",
+    ]
+
+    defines = [ "_ALL_SOURCE" ]
+
+    if (acpica_debug_output) {
+      defines += [ "ACPI_DEBUG_OUTPUT" ]
+    }
+
+    configs += [
+      "//build/config:default_include_dirs",
+      "//src/lib/ddk:include",
+    ]
+  }
 } else {
   group("acpica-fuchsia") {
+  }
+  group("acpica-zircon") {
   }
 }

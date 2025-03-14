@@ -1,11 +1,12 @@
+// Copyright 2025 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/sync/condition.h>
-#include <lib/sync/mutex.h>
+#include <lib/mistos/sync/condvar.h>
 
 #include <acpica/acpi.h>
+#include <kernel/semaphore.h>
 
 // Semaphore implementation using condvar + mutex.
 struct AcpiSemaphore {
@@ -13,45 +14,43 @@ struct AcpiSemaphore {
   explicit AcpiSemaphore(uint32_t initial_count) : count_(initial_count) {}
 
   void Wait(uint32_t units) {
-    sync_mutex_lock(&mutex_);
+    mutex_.lock().Acquire();
     while (count_ < units) {
-      sync_condition_wait(&condition_, &mutex_);
+      condition_.Wait(&mutex_.lock());
     }
-    sync_mutex_unlock(&mutex_);
+    mutex_.lock().Release();
   }
 
   ACPI_STATUS WaitWithDeadline(uint32_t units, zx_instant_mono_t deadline) {
-    zx_status_t result = sync_mutex_timedlock(&mutex_, deadline);
-    if (result == ZX_ERR_TIMED_OUT) {
-      return AE_TIME;
-    }
-    sync_mutex_assert_held(&mutex_);
-    while (result != ZX_ERR_TIMED_OUT && count_ < units && zx_clock_get_monotonic() < deadline) {
-      result = sync_condition_timedwait(&condition_, &mutex_, deadline);
+    mutex_.lock().Acquire();
+    zx_status_t result = ZX_OK;
+    ZX_ASSERT(mutex_.lock().IsHeld());
+    while (result != ZX_ERR_TIMED_OUT && count_ < units && current_mono_time() < deadline) {
+      result = condition_.Wait(&mutex_.lock(), Deadline(deadline, TimerSlack::none()));
     }
     if (result == ZX_ERR_TIMED_OUT) {
-      sync_mutex_unlock(&mutex_);
+      mutex_.lock().Release();
       return AE_TIME;
     }
     count_ -= units;
-    sync_mutex_unlock(&mutex_);
+    mutex_.lock().Release();
     return AE_OK;
   }
 
   void Signal(uint32_t units) {
-    sync_mutex_lock(&mutex_);
+    mutex_.lock().Acquire();
     count_ += units;
     if (units == 1) {
-      sync_condition_signal(&condition_);
+      condition_.Signal();
     } else {
-      sync_condition_broadcast(&condition_);
+      condition_.Broadcast();
     }
-    sync_mutex_unlock(&mutex_);
+    mutex_.lock().Release();
   }
 
  private:
-  sync_condition_t condition_;
-  sync_mutex_t mutex_;
+  sync::CondVar condition_;
+  DECLARE_MUTEX(AcpiSemaphore) mutex_;
   uint32_t count_ __TA_GUARDED(mutex_);
 };
 
@@ -71,8 +70,9 @@ struct AcpiSemaphore {
  * @return AE_NO_MEMORY Insufficient memory to create the semaphore.
  */
 ACPI_STATUS AcpiOsCreateSemaphore(UINT32 MaxUnits, UINT32 InitialUnits, ACPI_SEMAPHORE* OutHandle) {
-  AcpiSemaphore* sem = new AcpiSemaphore(InitialUnits);
-  if (!sem) {
+  fbl::AllocChecker ac;
+  AcpiSemaphore* sem = new (&ac) AcpiSemaphore(InitialUnits);
+  if (!ac.check()) {
     return AE_NO_MEMORY;
   }
   *OutHandle = sem;
@@ -112,8 +112,7 @@ ACPI_STATUS AcpiOsWaitSemaphore(ACPI_SEMAPHORE Handle, UINT32 Units, UINT16 Time
     return AE_OK;
   }
 
-  zx_instant_mono_t deadline = zx_deadline_after(ZX_MSEC(Timeout));
-  return Handle->WaitWithDeadline(Units, deadline);
+  return Handle->WaitWithDeadline(Units, current_mono_time() + ZX_MSEC(Timeout));
 }
 
 /**
@@ -127,6 +126,9 @@ ACPI_STATUS AcpiOsWaitSemaphore(ACPI_SEMAPHORE Handle, UINT32 Units, UINT16 Time
  * @return AE_BAD_PARAMETER The Handle is invalid.
  */
 ACPI_STATUS AcpiOsSignalSemaphore(ACPI_SEMAPHORE Handle, UINT32 Units) {
-  Handle->Signal(Units);
-  return AE_OK;
+  if (Units == 1) {
+    ((Semaphore*)Handle)->Post();
+    return AE_OK;
+  }
+  return AE_NOT_IMPLEMENTED;
 }
