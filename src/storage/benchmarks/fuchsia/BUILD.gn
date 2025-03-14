@@ -100,9 +100,6 @@ rustc_binary("fuchsia-storage-benchmarks") {
     "//third_party/rust_crates:rand_xorshift",
     "//third_party/rust_crates:regex",
   ]
-
-  # TODO(https://fxbug.dev/390250858): Re-enable when lld issue is fixed.
-  exclude_toolchain_tags = [ "profile" ]
 }
 
 fuchsia_component_manifest("fuchsia-storage-benchmarks-component-manifest") {
