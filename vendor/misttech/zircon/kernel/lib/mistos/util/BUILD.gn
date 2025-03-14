@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/cpp/library_headers.gni")
 import("//build/zircon/migrated_targets.gni")
 
 zx_library("util") {
@@ -23,4 +24,12 @@ zx_library("util") {
     "//zircon/kernel/lib/crypto",
     "//zircon/system/ulib/explicit-memory",
   ]
+
+  public_deps = [ "//zircon/kernel/lib/ktl" ]
+}
+
+library_headers("sync-headers") {
+  headers = [ "include/lib/mistos/sync/condvar.h" ]
+
+  public_deps = [ "//zircon/kernel/lib/ktl" ]
 }
