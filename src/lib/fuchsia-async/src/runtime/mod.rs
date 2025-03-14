@@ -43,7 +43,7 @@ pub mod scope {
     pub use super::implementation::scope::{Scope, ScopeHandle};
 
     #[cfg(target_os = "fuchsia")]
-    pub use super::implementation::scope::Join;
+    pub use super::implementation::scope::{Join, ScopeStream};
 }
 
 pub use scope::{Scope, ScopeHandle};

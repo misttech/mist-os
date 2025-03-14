@@ -7,18 +7,22 @@ use super::atomic_future::{AtomicFutureHandle, CancelAndDetachResult};
 use super::common::{Executor, TaskHandle};
 use crate::condition::{Condition, ConditionGuard, WakerEntry};
 use crate::EHandle;
+use fuchsia_sync::Mutex;
+use futures::Stream;
 use pin_project_lite::pin_project;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use state::{JoinResult, ScopeState, ScopeWaker, Status};
+use std::any::Any;
 use std::borrow::Borrow;
 use std::collections::hash_map::Entry;
 use std::collections::hash_set;
 use std::future::{Future, IntoFuture};
+use std::marker::PhantomData;
 use std::mem::{self, ManuallyDrop};
 use std::ops::{Deref, DerefMut};
 use std::pin::Pin;
 use std::sync::{Arc, Weak};
-use std::task::{Context, Poll, Waker};
+use std::task::{ready, Context, Poll, Waker};
 use std::{fmt, hash};
 
 //
@@ -331,7 +335,11 @@ impl ScopeHandle {
         let child = ScopeHandle {
             inner: Arc::new(ScopeInner {
                 executor: self.inner.executor.clone(),
-                state: Condition::new(ScopeState::new(Some(self.clone()), state.status())),
+                state: Condition::new(ScopeState::new(
+                    Some(self.clone()),
+                    state.status(),
+                    JoinResults::default().into(),
+                )),
                 name: String::new(),
             }),
         };
@@ -346,7 +354,11 @@ impl ScopeHandle {
         let child = ScopeHandle {
             inner: Arc::new(ScopeInner {
                 executor: self.inner.executor.clone(),
-                state: Condition::new(ScopeState::new(Some(self.clone()), state.status())),
+                state: Condition::new(ScopeState::new(
+                    Some(self.clone()),
+                    state.status(),
+                    JoinResults::default().into(),
+                )),
                 name: name.to_string(),
             }),
         };
@@ -361,7 +373,7 @@ impl ScopeHandle {
     pub fn spawn(&self, future: impl Future<Output = ()> + Send + 'static) -> JoinHandle<()> {
         let task = self.new_task(None, future);
         let id = task.id();
-        task.spawn();
+        self.insert_task(task, false);
         JoinHandle::new(self.clone(), id)
     }
 
@@ -372,7 +384,7 @@ impl ScopeHandle {
     pub fn spawn_local(&self, future: impl Future<Output = ()> + 'static) -> JoinHandle<()> {
         let task = self.new_local_task(None, future);
         let id = task.id();
-        task.spawn();
+        self.insert_task(task, false);
         JoinHandle::new(self.clone(), id)
     }
 
@@ -386,7 +398,7 @@ impl ScopeHandle {
     ) -> crate::Task<T> {
         let task = self.new_task(None, future);
         let id = task.id();
-        task.spawn();
+        self.insert_task(task, false);
         JoinHandle::new(self.clone(), id).into()
     }
 
@@ -403,7 +415,7 @@ impl ScopeHandle {
     ) -> crate::Task<T> {
         let task = self.new_local_task(None, future);
         let id = task.id();
-        task.spawn();
+        self.insert_task(task, false);
         JoinHandle::new(self.clone(), id).into()
     }
 
@@ -411,7 +423,11 @@ impl ScopeHandle {
         ScopeHandle {
             inner: Arc::new(ScopeInner {
                 executor,
-                state: Condition::new(ScopeState::new(None, Status::default())),
+                state: Condition::new(ScopeState::new(
+                    None,
+                    Status::default(),
+                    JoinResults::default().into(),
+                )),
                 name: "root".to_string(),
             }),
         }
@@ -505,6 +521,131 @@ impl fmt::Debug for ScopeHandle {
     }
 }
 
+/// Similar to a scope but all futures spawned on the scope *must* finish with the same result type.
+/// That allows the scope to return a stream of results. Attempting to spawn tasks using
+/// `ScopeHandle::spawn` (or similar) will result in tasks that are immediately dropped (just as if
+/// the scope was closed).  Like a regular scope, the scope can be closed, at which point the stream
+/// will terminate once all the tasks have finished.  This is designed to be a fairly close drop-in
+/// replacement to `FuturesUnordered`, the principle difference being that the tasks run in parallel
+/// rather than just concurrently.  Another difference is that the futures don't need to be the same
+/// type; only the outputs do.  In all other respects, the scope operates like a regular scope i.e.
+/// it can have children, you can join them, cancel them, etc.
+pub struct ScopeStream<R> {
+    inner: ScopeHandle,
+    stream: Arc<Mutex<ResultsStreamInner<R>>>,
+}
+
+impl<R: Send + 'static> ScopeStream<R> {
+    /// Creates a new scope stream.
+    ///
+    /// The returned scope stream is a child of the current scope.
+    ///
+    /// # Panics
+    ///
+    /// May panic if not called in the context of an executor (e.g. within a
+    /// call to [`run`][crate::SendExecutor::run]).
+    pub fn new() -> (Self, ScopeStreamHandle<R>) {
+        Self::new_with_name(String::new())
+    }
+
+    /// Creates a new scope stream with a name.
+    ///
+    /// The returned scope stream is a child of the current scope.
+    ///
+    /// # Panics
+    ///
+    /// May panic if not called in the context of an executor (e.g. within a
+    /// call to [`run`][crate::SendExecutor::run]).
+    pub fn new_with_name(name: String) -> (Self, ScopeStreamHandle<R>) {
+        let this = ScopeHandle::with_current(|handle| {
+            let mut state = handle.lock();
+            let stream = Arc::default();
+            let child = ScopeHandle {
+                inner: Arc::new(ScopeInner {
+                    executor: handle.executor().clone(),
+                    state: Condition::new(ScopeState::new(
+                        Some(handle.clone()),
+                        state.status(),
+                        Box::new(ResultsStream { inner: Arc::clone(&stream) }),
+                    )),
+                    name,
+                }),
+            };
+            let weak = child.downgrade();
+            state.insert_child(weak);
+            ScopeStream { inner: child, stream }
+        });
+        let handle = ScopeStreamHandle(this.inner.clone(), PhantomData);
+        (this, handle)
+    }
+}
+
+impl<R> Drop for ScopeStream<R> {
+    fn drop(&mut self) {
+        // Cancel all tasks in the scope. Each task has a strong reference to the ScopeState,
+        // which will be dropped after all the tasks in the scope are dropped.
+
+        // TODO(https://fxbug.dev/340638625): Ideally we would drop all tasks
+        // here, but we cannot do that without either:
+        // - Sync drop support in AtomicFuture, or
+        // - The ability to reparent tasks, which requires atomic_arc or
+        //   acquiring a mutex during polling.
+        self.inner.cancel_all_tasks();
+    }
+}
+
+impl<R: Send + 'static> Stream for ScopeStream<R> {
+    type Item = R;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut stream_inner = self.stream.lock();
+        match stream_inner.results.pop() {
+            Some(result) => Poll::Ready(Some(result)),
+            None => {
+                // Lock ordering: when results are posted, the state lock is taken first, so we must
+                // do the same.
+                drop(stream_inner);
+                let state = self.inner.lock();
+                let mut stream_inner = self.stream.lock();
+                match stream_inner.results.pop() {
+                    Some(result) => Poll::Ready(Some(result)),
+                    None => {
+                        if state.has_tasks() {
+                            stream_inner.waker = Some(cx.waker().clone());
+                            Poll::Pending
+                        } else {
+                            Poll::Ready(None)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl<R> Deref for ScopeStream<R> {
+    type Target = ScopeHandle;
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<R> Borrow<ScopeHandle> for ScopeStream<R> {
+    fn borrow(&self) -> &ScopeHandle {
+        &*self
+    }
+}
+
+#[derive(Clone)]
+pub struct ScopeStreamHandle<R>(ScopeHandle, PhantomData<R>);
+
+impl<R: Send> ScopeStreamHandle<R> {
+    pub fn push(&self, future: impl Future<Output = R> + Send + 'static) {
+        let task = self.0.new_task(None, future);
+        self.0.insert_task(task, true);
+    }
+}
+
 //
 // # Internal API
 //
@@ -550,12 +691,12 @@ mod state {
         children: HashSet<WeakScopeHandle>,
         all_tasks: HashSet<TaskHandle>,
         // LINT.ThenChange(//src/developer/debug/zxdb/console/commands/verb_async_backtrace.cc)
-        /// Wakers/results for joining each task.
-        pub join_results: HashMap<usize, JoinResult>,
         /// The number of children that transitively contain tasks, plus one for
         /// this scope if it directly contains tasks.
         subscopes_with_tasks: u32,
         status: Status,
+        /// Wakers/results for joining each task.
+        pub results: Box<dyn Results>,
     }
 
     pub enum JoinResult {
@@ -594,32 +735,39 @@ mod state {
     }
 
     impl ScopeState {
-        pub fn new(parent: Option<ScopeHandle>, status: Status) -> Self {
+        pub fn new(
+            parent: Option<ScopeHandle>,
+            status: Status,
+            results: Box<impl Results>,
+        ) -> Self {
             Self {
                 parent,
                 children: Default::default(),
                 all_tasks: Default::default(),
-                join_results: Default::default(),
                 subscopes_with_tasks: 0,
                 status,
+                results,
             }
         }
+    }
 
+    impl ScopeState {
         pub fn all_tasks(&self) -> &HashSet<TaskHandle> {
             &self.all_tasks
         }
 
-        /// Attempts to add a task to the scope. Returns false if the scope cannot accept a task.
-        #[must_use]
-        pub fn insert_task(&mut self, task: TaskHandle) -> bool {
-            if !self.status.can_spawn() {
-                return false;
+        /// Attempts to add a task to the scope. Returns the task if the scope cannot accept a task
+        /// (since it isn't safe to drop the task whilst the lock is held).
+        pub fn insert_task(&mut self, task: TaskHandle, for_stream: bool) -> Option<TaskHandle> {
+            if !self.status.can_spawn() || (!for_stream && !self.results.can_spawn()) {
+                return Some(task);
             }
             if self.all_tasks.is_empty() && !self.register_first_task() {
-                return false;
+                return Some(task);
             }
+            task.wake();
             assert!(self.all_tasks.insert(task));
-            true
+            None
         }
 
         pub fn children(&self) -> &HashSet<WeakScopeHandle> {
@@ -741,38 +889,23 @@ mod state {
             if let Some(task) = self.all_tasks.take(&id) {
                 self.on_task_removed(1);
                 if !task.is_detached() {
-                    match self.join_results.entry(id) {
-                        Entry::Occupied(mut o) => {
-                            let JoinResult::Waker(waker) =
-                                std::mem::replace(o.get_mut(), JoinResult::Result(task))
-                            else {
-                                // It can't be JoinResult::Result because this function is the only
-                                // function that sets that, and `task_did_finish` won't get called
-                                // twice.
-                                unreachable!()
-                            };
-                            self.1 .0.push(waker);
-                        }
-                        Entry::Vacant(v) => {
-                            v.insert(JoinResult::Result(task));
-                        }
-                    }
+                    let maybe_waker = self.results.task_did_finish(task);
+                    self.1 .0.extend(maybe_waker);
                 }
             }
         }
 
         pub fn set_closed_and_drain(
             &mut self,
-        ) -> (HashSet<TaskHandle>, HashMap<usize, JoinResult>, hash_set::Drain<'_, WeakScopeHandle>)
-        {
+        ) -> (HashSet<TaskHandle>, Box<dyn Any>, hash_set::Drain<'_, WeakScopeHandle>) {
             self.close();
             let all_tasks = std::mem::take(&mut self.all_tasks);
-            let join_results = std::mem::take(&mut self.join_results);
+            let results = self.results.take();
             if !all_tasks.is_empty() {
                 self.on_task_removed(0)
             }
             let children = self.children.drain();
-            (all_tasks, join_results, children)
+            (all_tasks, results, children)
         }
 
         fn on_task_removed(&mut self, num_wakers_hint: usize) {
@@ -840,11 +973,13 @@ impl ScopeHandle {
 
     /// Marks the task as detached.
     pub(crate) fn detach(&self, task_id: usize) {
-        let mut state = self.lock();
-        if let Some(task) = state.all_tasks().get(&task_id) {
-            task.detach();
-        }
-        state.join_results.remove(&task_id);
+        let _maybe_task = {
+            let mut state = self.lock();
+            if let Some(task) = state.all_tasks().get(&task_id) {
+                task.detach();
+            }
+            state.results.detach(task_id)
+        };
     }
 
     /// Cancels the task.
@@ -854,7 +989,8 @@ impl ScopeHandle {
     /// The caller must guarantee that `R` is the correct type.
     pub(crate) unsafe fn cancel_task<R>(&self, task_id: usize) -> Option<R> {
         let mut state = self.lock();
-        if let Some(JoinResult::Result(task)) = state.join_results.remove(&task_id) {
+        if let Some(task) = state.results.detach(task_id) {
+            drop(state);
             return task.take_result();
         }
         state.all_tasks().get(&task_id).and_then(|task| {
@@ -867,18 +1003,20 @@ impl ScopeHandle {
 
     /// Cancels and detaches the task.
     pub(crate) fn cancel_and_detach(&self, task_id: usize) {
-        let mut state = ScopeWaker::from(self.lock());
-        state.join_results.remove(&task_id);
-        if let Some(task) = state.all_tasks().get(&task_id) {
-            match task.cancel_and_detach() {
-                CancelAndDetachResult::Done => {
-                    state.take_task(task_id);
+        let _tasks = {
+            let mut state = ScopeWaker::from(self.lock());
+            let maybe_task1 = state.results.detach(task_id);
+            let mut maybe_task2 = None;
+            if let Some(task) = state.all_tasks().get(&task_id) {
+                match task.cancel_and_detach() {
+                    CancelAndDetachResult::Done => maybe_task2 = state.take_task(task_id),
+                    CancelAndDetachResult::AddToRunQueue => {
+                        self.inner.executor.ready_tasks.push(task.clone());
+                    }
+                    CancelAndDetachResult::Pending => {}
                 }
-                CancelAndDetachResult::AddToRunQueue => {
-                    self.inner.executor.ready_tasks.push(task.clone());
-                }
-                CancelAndDetachResult::Pending => {}
             }
+            (maybe_task1, maybe_task2)
         };
     }
 
@@ -892,23 +1030,14 @@ impl ScopeHandle {
         task_id: usize,
         cx: &mut Context<'_>,
     ) -> Poll<R> {
-        let mut state = self.lock();
-        match state.join_results.entry(task_id) {
-            Entry::Occupied(mut o) => match o.get_mut() {
-                JoinResult::Waker(waker) => *waker = cx.waker().clone(),
-                JoinResult::Result(task) => {
-                    if let Some(result) = task.take_result() {
-                        o.remove();
-                        return Poll::Ready(result);
-                    }
-                    // The task has been cancelled so all we can do is forever return pending.
-                }
-            },
-            Entry::Vacant(v) => {
-                v.insert(JoinResult::Waker(cx.waker().clone()));
+        let task = ready!(self.lock().results.poll_join_result(task_id, cx));
+        match task.take_result() {
+            Some(result) => Poll::Ready(result),
+            None => {
+                // The task has been cancelled so all we can do is forever return pending.
+                Poll::Pending
             }
         }
-        Poll::Pending
     }
 
     /// Polls for the task to be cancelled.
@@ -917,26 +1046,13 @@ impl ScopeHandle {
         task_id: usize,
         cx: &mut Context<'_>,
     ) -> Poll<Option<R>> {
-        let mut state = self.lock();
-        match state.join_results.entry(task_id) {
-            Entry::Occupied(mut o) => match o.get_mut() {
-                JoinResult::Waker(waker) => *waker = cx.waker().clone(),
-                JoinResult::Result(task) => {
-                    let result = task.take_result();
-                    o.remove();
-                    return Poll::Ready(result);
-                }
-            },
-            Entry::Vacant(v) => {
-                v.insert(JoinResult::Waker(cx.waker().clone()));
-            }
-        }
-        Poll::Pending
+        let task = self.lock().results.poll_join_result(task_id, cx);
+        task.map(|task| task.take_result())
     }
 
-    #[must_use]
-    pub(super) fn insert_task(&self, task: TaskHandle) -> bool {
-        self.lock().insert_task(task)
+    pub(super) fn insert_task(&self, task: TaskHandle, for_stream: bool) -> bool {
+        let returned_task = self.lock().insert_task(task, for_stream);
+        returned_task.is_none()
     }
 
     /// Drops the specified task.
@@ -1033,19 +1149,150 @@ impl hash::Hash for PtrKey {
     }
 }
 
+#[derive(Default)]
+struct JoinResults(HashMap<usize, JoinResult>);
+
+trait Results: Send + Sync + 'static {
+    /// Returns true if we allow spawning futures with arbitrary outputs on the scope.
+    fn can_spawn(&self) -> bool;
+
+    /// Polls for the specified task having finished.
+    fn poll_join_result(&mut self, task_id: usize, cx: &mut Context<'_>) -> Poll<TaskHandle>;
+
+    /// Called when a task finishes.
+    fn task_did_finish(&mut self, task: TaskHandle) -> Option<Waker>;
+
+    /// Called to drop any results for a particular task.
+    fn detach(&mut self, task_id: usize) -> Option<TaskHandle>;
+
+    /// Takes *all* the stored results.
+    fn take(&mut self) -> Box<dyn Any>;
+
+    /// Used only for testing.  Returns true if there are any results registered.
+    #[cfg(test)]
+    fn is_empty(&self) -> bool;
+}
+
+impl Results for JoinResults {
+    fn can_spawn(&self) -> bool {
+        true
+    }
+
+    fn poll_join_result(&mut self, task_id: usize, cx: &mut Context<'_>) -> Poll<TaskHandle> {
+        match self.0.entry(task_id) {
+            Entry::Occupied(mut o) => match o.get_mut() {
+                JoinResult::Waker(waker) => *waker = cx.waker().clone(),
+                JoinResult::Result(_) => {
+                    let JoinResult::Result(task) = o.remove() else { unreachable!() };
+                    return Poll::Ready(task);
+                }
+            },
+            Entry::Vacant(v) => {
+                v.insert(JoinResult::Waker(cx.waker().clone()));
+            }
+        }
+        Poll::Pending
+    }
+
+    fn task_did_finish(&mut self, task: TaskHandle) -> Option<Waker> {
+        match self.0.entry(task.id()) {
+            Entry::Occupied(mut o) => {
+                let JoinResult::Waker(waker) =
+                    std::mem::replace(o.get_mut(), JoinResult::Result(task))
+                else {
+                    // It can't be JoinResult::Result because this function is the only
+                    // function that sets that, and `task_did_finish` won't get called
+                    // twice.
+                    unreachable!()
+                };
+                Some(waker)
+            }
+            Entry::Vacant(v) => {
+                v.insert(JoinResult::Result(task));
+                None
+            }
+        }
+    }
+
+    fn detach(&mut self, task_id: usize) -> Option<TaskHandle> {
+        match self.0.remove(&task_id) {
+            Some(JoinResult::Result(task)) => Some(task),
+            _ => None,
+        }
+    }
+
+    fn take(&mut self) -> Box<dyn Any> {
+        Box::new(Self(std::mem::take(&mut self.0)))
+    }
+
+    #[cfg(test)]
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+#[derive(Default)]
+struct ResultsStream<R> {
+    inner: Arc<Mutex<ResultsStreamInner<R>>>,
+}
+
+struct ResultsStreamInner<R> {
+    results: Vec<R>,
+    waker: Option<Waker>,
+}
+
+impl<R> Default for ResultsStreamInner<R> {
+    fn default() -> Self {
+        Self { results: Vec::new(), waker: None }
+    }
+}
+
+impl<R: Send + 'static> Results for ResultsStream<R> {
+    fn can_spawn(&self) -> bool {
+        false
+    }
+
+    fn poll_join_result(&mut self, _task_id: usize, _cx: &mut Context<'_>) -> Poll<TaskHandle> {
+        Poll::Pending
+    }
+
+    fn task_did_finish(&mut self, task: TaskHandle) -> Option<Waker> {
+        let mut inner = self.inner.lock();
+        // SAFETY: R is guaranteed to be the same return type as all futures finishing on this
+        // scope.
+        inner.results.extend(unsafe { task.take_result() });
+        inner.waker.take()
+    }
+
+    fn detach(&mut self, _task_id: usize) -> Option<TaskHandle> {
+        None
+    }
+
+    fn take(&mut self) -> Box<dyn Any> {
+        Box::new(std::mem::take(&mut self.inner.lock().results))
+    }
+
+    #[cfg(test)]
+    fn is_empty(&self) -> bool {
+        false
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{EHandle, LocalExecutor, SendExecutor, Task, TestExecutor, Timer};
     use assert_matches::assert_matches;
     use fuchsia_sync::{Condvar, Mutex};
+    use futures::channel::mpsc;
     use futures::future::join_all;
-    use futures::FutureExt;
+    use futures::{FutureExt, StreamExt};
     use std::future::{pending, poll_fn};
     use std::pin::{pin, Pin};
     use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
     use std::sync::Arc;
     use std::task::{Context, Poll};
+    use std::time::Duration;
 
     #[derive(Default)]
     struct RemoteControlFuture(Mutex<RCFState>);
@@ -1190,7 +1437,7 @@ mod tests {
 
         assert_eq!(executor.run_until_stalled(&mut pending::<()>()), Poll::Pending);
         assert_eq!(scope.lock().all_tasks().len(), 0);
-        assert_eq!(scope.lock().join_results.len(), 0);
+        assert!(scope.lock().results.is_empty());
     }
 
     #[test]
@@ -1709,7 +1956,7 @@ mod tests {
             }
         });
 
-        assert!(e.ehandle.root_scope.lock().join_results.is_empty());
+        assert!(e.ehandle.root_scope.lock().results.is_empty());
     }
 
     #[test]
@@ -1760,7 +2007,7 @@ mod tests {
             assert_eq!(task.cancel().await, Some(()));
         });
 
-        assert!(e.ehandle.root_scope.lock().join_results.is_empty());
+        assert!(e.ehandle.root_scope.lock().results.is_empty());
     }
 
     #[test]
@@ -1825,7 +2072,7 @@ mod tests {
             let scope = ehandle.global_scope();
 
             // The only way of testing for this is to poll.
-            while scope.lock().all_tasks().len() > 1 || scope.lock().join_results.len() > 0 {
+            while scope.lock().all_tasks().len() > 1 || !scope.lock().results.is_empty() {
                 Timer::new(std::time::Duration::from_millis(1)).await;
             }
 
@@ -1853,6 +2100,96 @@ mod tests {
     fn test_detach_cleans_up() {
         test_clean_up(|task| {
             task.detach();
+        });
+    }
+
+    #[test]
+    fn test_scope_stream() {
+        let mut executor = SendExecutor::new(2);
+        executor.run(async move {
+            let (stream, handle) = ScopeStream::new();
+            handle.push(async { 1 });
+            handle.push(async { 2 });
+            stream.close();
+            let results: HashSet<_> = stream.collect().await;
+            assert_eq!(results, HashSet::from_iter([1, 2]));
+        });
+    }
+
+    #[test]
+    fn test_scope_stream_wakes_properly() {
+        let mut executor = SendExecutor::new(2);
+        executor.run(async move {
+            let (stream, handle) = ScopeStream::new();
+            handle.push(async {
+                Timer::new(Duration::from_millis(10)).await;
+                1
+            });
+            handle.push(async {
+                Timer::new(Duration::from_millis(10)).await;
+                2
+            });
+            stream.close();
+            let results: HashSet<_> = stream.collect().await;
+            assert_eq!(results, HashSet::from_iter([1, 2]));
+        });
+    }
+
+    #[test]
+    fn test_scope_stream_drops_spawned_tasks() {
+        let mut executor = SendExecutor::new(2);
+        executor.run(async move {
+            let (stream, handle) = ScopeStream::new();
+            handle.push(async { 1 });
+            let _task = stream.compute(async { "foo" });
+            stream.close();
+            let results: HashSet<_> = stream.collect().await;
+            assert_eq!(results, HashSet::from_iter([1]));
+        });
+    }
+
+    #[test]
+    fn test_nested_scope_stream() {
+        let mut executor = SendExecutor::new(2);
+        executor.run(async move {
+            let (mut stream, handle) = ScopeStream::new();
+            handle.clone().push(async move {
+                handle.clone().push(async move {
+                    handle.clone().push(async move { 3 });
+                    2
+                });
+                1
+            });
+            let mut results = HashSet::default();
+            while let Some(item) = stream.next().await {
+                results.insert(item);
+                if results.len() == 3 {
+                    stream.close();
+                }
+            }
+            assert_eq!(results, HashSet::from_iter([1, 2, 3]));
+        });
+    }
+
+    #[test]
+    fn test_dropping_scope_stream_cancels_all_tasks() {
+        let mut executor = SendExecutor::new(2);
+        executor.run(async move {
+            let (stream, handle) = ScopeStream::new();
+            let (tx1, mut rx) = mpsc::unbounded::<()>();
+            let tx2 = tx1.clone();
+            handle.push(async move {
+                let _tx1 = tx1;
+                let () = pending().await;
+            });
+            handle.push(async move {
+                let _tx2 = tx2;
+                let () = pending().await;
+            });
+            drop(stream);
+
+            // This will wait forever if the tasks aren't cancelled.
+            assert_eq!(rx.next().await, None);
         });
     }
 }

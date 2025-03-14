@@ -105,7 +105,7 @@ impl SendExecutor {
             }),
         );
         task.detach();
-        assert!(task.spawn());
+        assert!(self.root_scope.insert_task(task, false));
 
         // Start worker threads, handing off timers from the current thread.
         self.inner.done.store(false, Ordering::SeqCst);

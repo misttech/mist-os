@@ -84,12 +84,13 @@ impl LocalExecutor {
             std::mem::transmute(obj)
         }
 
-        let task = self.ehandle.root_scope.new_local_task(Some(MAIN_TASK_ID), main_future);
+        let scope = &self.ehandle.root_scope;
+        let task = scope.new_local_task(Some(MAIN_TASK_ID), main_future);
 
         // SAFETY: Erasing the lifetime is safe because we make sure to drop the main task within
         // the required lifetime.
         unsafe {
-            remove_lifetime(task).spawn();
+            scope.insert_task(remove_lifetime(task), false);
         }
 
         struct DropMainTask<'a>(&'a EHandle);

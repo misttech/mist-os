@@ -768,17 +768,6 @@ impl EHandle {
 // it safe.
 pub type TaskHandle = AtomicFutureHandle<'static>;
 
-impl TaskHandle {
-    pub fn spawn(self) -> bool {
-        if self.scope().insert_task(self.clone()) {
-            self.wake();
-            true
-        } else {
-            false
-        }
-    }
-}
-
 thread_local! {
     static CURRENT_TASK: Cell<*const TaskHandle> = const { Cell::new(std::ptr::null()) };
 }
