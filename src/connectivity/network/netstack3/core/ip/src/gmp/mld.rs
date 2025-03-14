@@ -749,33 +749,37 @@ fn send_mld_v1_packet<
         .map_err(|_| MldError::SendFailure { addr: group_addr.into() })
 }
 
+/// Inspect Counters for MLD.
+pub type MldCounters = MldCountersInner<Counter>;
+
 /// Statistics about MLD.
 #[derive(Debug, Default)]
-pub struct MldCounters {
+#[cfg_attr(test, derive(PartialEq))]
+pub struct MldCountersInner<C> {
     /// Count of MLDv1 queries received.
-    rx_mldv1_query: Counter,
+    rx_mldv1_query: C,
     /// Count of MLDv2 queries received.
-    rx_mldv2_query: Counter,
+    rx_mldv2_query: C,
     /// Count of MLDv1 reports received.
-    rx_mldv1_report: Counter,
+    rx_mldv1_report: C,
     /// Count of MLDv2 reports received.
-    rx_mldv2_report: Counter,
+    rx_mldv2_report: C,
     /// Count of Leave Group messages received.
-    rx_leave_group: Counter,
+    rx_leave_group: C,
     /// Count of MLD messages received with an invalid source address.
-    rx_err_bad_src_addr: Counter,
+    rx_err_bad_src_addr: C,
     /// Count of MLD messages received with an invalid hop limit.
-    rx_err_bad_hop_limit: Counter,
+    rx_err_bad_hop_limit: C,
     /// Count of MLD messages received without the Router Alert option.
-    rx_err_missing_router_alert: Counter,
+    rx_err_missing_router_alert: C,
     /// Count of MLDv1 reports sent.
-    tx_mldv1_report: Counter,
+    tx_mldv1_report: C,
     /// Count of MLDv2 reports sent.
-    tx_mldv2_report: Counter,
+    tx_mldv2_report: C,
     /// Count of Leave Group messages sent.
-    tx_leave_group: Counter,
+    tx_leave_group: C,
     /// Count of MLD messages that could not be sent.
-    tx_err: Counter,
+    tx_err: C,
 }
 
 impl Inspectable for MldCounters {
@@ -1055,22 +1059,7 @@ mod tests {
         }
     }
 
-    // Like [`MldCounters`], but supports test asserts with `PartialEq`.
-    #[derive(Debug, Default, PartialEq)]
-    struct CounterExpectations {
-        rx_mldv1_query: u64,
-        rx_mldv2_query: u64,
-        rx_mldv1_report: u64,
-        rx_mldv2_report: u64,
-        rx_leave_group: u64,
-        rx_err_missing_router_alert: u64,
-        rx_err_bad_src_addr: u64,
-        rx_err_bad_hop_limit: u64,
-        tx_mldv1_report: u64,
-        tx_mldv2_report: u64,
-        tx_leave_group: u64,
-        tx_err: u64,
-    }
+    type CounterExpectations = MldCountersInner<u64>;
 
     impl CounterExpectations {
         #[track_caller]
