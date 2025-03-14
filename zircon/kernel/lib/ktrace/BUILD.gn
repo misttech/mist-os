@@ -35,6 +35,7 @@ config("suppress-warning.config") {
 
     # TODO(https://fxbug.dev/42121444): Referenced in environment configs.
     "//build/config/*",
+    "//sdk/fidl/fuchsia.hardware.block.driver/*",
     "//sdk/fidl/zbi:*",
     "//sdk/lib/fit/*",
     "//sdk/lib/iob/*",

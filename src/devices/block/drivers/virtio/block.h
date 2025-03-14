@@ -2,9 +2,11 @@
 // Copyright 2016 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_VIRTIO_BLOCK_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_VIRTIO_BLOCK_H_
 
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/bio.h>
 #include <lib/virtio/backends/backend.h>
 #include <lib/virtio/device.h>
@@ -23,70 +25,6 @@
 #include "zircon/listnode.h"
 
 namespace virtio {
-
-// Performs a regular data read or write from the device. The operation may
-// be cached internally.
-#define BLOCK_OPCODE_READ 1
-#define BLOCK_OPCODE_WRITE 2
-// Write any controller or device cached data to nonvolatile storage.
-#define BLOCK_OPCODE_FLUSH 3
-// Instructs the device to invalidate a number of blocks, making them  usable
-// for storing something else. This is basically a "delete" optimization,
-// where the device is in charge of discarding the old content without
-// clients having to write a given pattern. The operation may be cached
-// internally.
-#define BLOCK_OPCODE_TRIM 4
-/// Detaches the VMO from the block device.
-#define BLOCK_OPCODE_CLOSE_VMO 5
-
-// Associate the following request with `group`.
-#define BLOCK_IO_FLAG_GROUP_ITEM 0x00000001
-// Only respond after this request (and all previous within group) have
-// completed. Only valid with `GROUP_ITEM`.
-#define BLOCK_IO_FLAG_GROUP_LAST 0x00000002
-// Mark this operation as "Force Unit Access" (FUA), indicating that
-// it should not complete until the data is written to the non-volatile
-// medium (write), and that reads should bypass any on-device caches.
-#define BLOCK_IO_FLAG_FORCE_ACCESS 0x00000004
-
-struct BlockCommand {
-  uint8_t opcode;
-  uint32_t flags;
-};
-
-struct BlockReadWrite {
-  // Opcode and flags.
-  BlockCommand command;
-  // Available for temporary use.
-  uint32_t extra;
-  // data to read or write.
-  vaddr_t buf;
-  // Transfer length in blocks (0 is invalid).
-  uint32_t length;
-  // Device offset in blocks.
-  uint64_t offset_dev;
-  // offset in blocks.
-  uint64_t offset;
-};
-
-struct BlockTrim {
-  // Opcode and flags.
-  BlockCommand command;
-  // Transfer length in blocks (0 is invalid).
-  uint32_t length;
-  // Device offset in blocks.
-  uint64_t offset_dev;
-};
-
-union block_op_t {
-  // All Commands
-  BlockCommand command;
-  // Read and Write ops use rw for parameters.
-  BlockReadWrite rw;
-  BlockTrim trim;
-};
-
-using block_impl_queue_callback = void (*)(void* cookie, zx_status_t status, block_op_t* op);
 
 struct block_txn_t {
   block_op_t op;

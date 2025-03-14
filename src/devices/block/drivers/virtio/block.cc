@@ -197,7 +197,7 @@ zx_status_t BlockDevice::Init() {
     memset(&txn, 0, sizeof(txn));
     txn.op.rw.command.opcode = BLOCK_OPCODE_READ;
     txn.op.rw.length = static_cast<uint32_t>(length);
-    txn.op.rw.buf = (vaddr_t)buf;
+    txn.op.rw.vaddr = (vaddr_t)buf;
     txn.op.rw.offset_dev = block;
 
     thiz->BlockImplQueue(
@@ -503,7 +503,7 @@ static zx_status_t pin_pages(block_txn_t* txn, size_t bytes, zx_paddr_t* pages, 
       return ZX_ERR_INTERNAL;
     }*/
 #endif
-  vaddr_t va = (vaddr_t)txn->op.rw.buf;
+  vaddr_t va = (vaddr_t)txn->op.rw.vaddr;
   pages[0] = vaddr_to_paddr((void*)va);
   *num_pages = 1;
 
