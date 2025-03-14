@@ -108,8 +108,9 @@ std::string NumberToString(NumberType number, Base base) {
   // for n a negative int32_t, |static_cast<uint32_t>(n)| = 2^32 - n and for a
   // uint32_t m, |-m| = 2^32 - m.
   bool number_is_negative = (number < static_cast<NumberType>(0));
-  UnsignedNumberType abs_number = number_is_negative ? -static_cast<UnsignedNumberType>(number)
-                                                     : static_cast<UnsignedNumberType>(number);
+  UnsignedNumberType abs_number =
+      number_is_negative ? static_cast<UnsignedNumberType>(-static_cast<UnsignedNumberType>(number))
+                         : static_cast<UnsignedNumberType>(number);
 
   char buf[50];  // Big enough to hold the result from even a 128-bit number.
   size_t i = sizeof(buf);
