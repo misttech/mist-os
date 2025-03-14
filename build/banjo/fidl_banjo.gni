@@ -82,6 +82,11 @@ template("_fidl_banjo_c") {
       # files from the libraries (that aren't generated).
       "//src/lib/ddk",
     ]
+
+    if (is_mistos) {
+      public_deps -= [ "//src/lib/ddk" ]
+    }
+
     if (defined(invoker.public_deps)) {
       foreach(dep, invoker.public_deps) {
         _name = get_label_info(dep, "name")
@@ -230,6 +235,13 @@ template("_fidl_banjo_cpp") {
       "//zircon/system/ulib/zx",
     ]
 
+    if (is_mistos) {
+      public_deps -= [
+        "//src/lib/ddk",
+        "//src/lib/ddktl",
+      ]
+    }
+
     if (defined(invoker.public_deps)) {
       foreach(dep, invoker.public_deps) {
         _name = get_label_info(dep, "name")
@@ -254,6 +266,13 @@ template("_fidl_banjo_cpp") {
       "//zircon/system/ulib/mock-function",
       "//zircon/system/ulib/zxtest",
     ]
+
+    if (is_mistos) {
+      public_deps -= [
+        "//zircon/system/ulib/mock-function",
+        "//zircon/system/ulib/zxtest",
+      ]
+    }
 
     if (defined(invoker.public_deps)) {
       foreach(dep, invoker.public_deps) {
