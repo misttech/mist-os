@@ -56,6 +56,13 @@ pub struct WireEmptyBits {
     value: ::fidl_next::WireU32,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireEmptyBits {
+    #[inline]
+    unsafe fn zero_padding(_: *mut Self) {
+        // Wire bits have no padding
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireEmptyBits
 where
     ___D: ?Sized,
@@ -128,6 +135,13 @@ impl ::fidl_next::TakeFrom<WireFlexibleBits> for FlexibleBits {
 #[repr(transparent)]
 pub struct WireFlexibleBits {
     value: ::fidl_next::WireU64,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireFlexibleBits {
+    #[inline]
+    unsafe fn zero_padding(_: *mut Self) {
+        // Wire bits have no padding
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireFlexibleBits
@@ -203,6 +217,13 @@ impl ::fidl_next::TakeFrom<WireMyBits> for MyBits {
 #[repr(transparent)]
 pub struct WireMyBits {
     value: ::fidl_next::WireU32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireMyBits {
+    #[inline]
+    unsafe fn zero_padding(_: *mut Self) {
+        // Wire bits have no padding
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireMyBits
@@ -286,6 +307,13 @@ impl ::fidl_next::TakeFrom<WireStrictBits> for StrictBits {
 #[repr(transparent)]
 pub struct WireStrictBits {
     value: ::fidl_next::WireU64,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireStrictBits {
+    #[inline]
+    unsafe fn zero_padding(_: *mut Self) {
+        // Wire bits have no padding
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStrictBits

@@ -10,13 +10,22 @@ use munge::munge;
 use super::raw::RawWireVector;
 use crate::{
     Decode, DecodeError, Decoder, DecoderExt as _, Encodable, EncodableOption, Encode, EncodeError,
-    EncodeOption, Encoder, EncoderExt as _, Slot, TakeFrom, WirePointer, WireVector,
+    EncodeOption, Encoder, EncoderExt as _, Slot, TakeFrom, WirePointer, WireVector, ZeroPadding,
 };
 
 /// An optional FIDL vector
 #[repr(transparent)]
 pub struct WireOptionalVector<T> {
     raw: RawWireVector<T>,
+}
+
+unsafe impl<T> ZeroPadding for WireOptionalVector<T> {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            RawWireVector::<T>::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl<T> Drop for WireOptionalVector<T> {

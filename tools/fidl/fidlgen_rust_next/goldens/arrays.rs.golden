@@ -87,6 +87,11 @@ pub struct WireStructLargeArray {
     pub a: [::fidl_next::WireU32; 100],
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireStructLargeArray {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructLargeArray
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -193,6 +198,11 @@ pub struct WireStructSmallArray {
     pub a: [::fidl_next::WireU32; 2],
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireStructSmallArray {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructSmallArray
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -288,6 +298,15 @@ impl ::fidl_next::TakeFrom<WireTableLargeArray> for TableLargeArray {
 #[repr(C)]
 pub struct WireTableLargeArray {
     table: ::fidl_next::WireTable,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireTableLargeArray {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireTableLargeArray
@@ -405,6 +424,15 @@ impl ::fidl_next::TakeFrom<WireTableSmallArray> for TableSmallArray {
 #[repr(C)]
 pub struct WireTableSmallArray {
     table: ::fidl_next::WireTable,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireTableSmallArray {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireTableSmallArray
@@ -539,6 +567,15 @@ pub struct WireUnionLargeArray {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireUnionLargeArray {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod union_large_array {
     pub enum Ref<'union> {
         A(&'union [::fidl_next::WireU32; 100]),
@@ -590,6 +627,15 @@ impl ::core::fmt::Debug for WireUnionLargeArray {
 #[repr(transparent)]
 pub struct WireOptionalUnionLargeArray {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireOptionalUnionLargeArray {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalUnionLargeArray {
@@ -731,6 +777,15 @@ pub struct WireUnionSmallArray {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireUnionSmallArray {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod union_small_array {
     pub enum Ref<'union> {
         A(&'union [::fidl_next::WireU32; 2]),
@@ -782,6 +837,15 @@ impl ::core::fmt::Debug for WireUnionSmallArray {
 #[repr(transparent)]
 pub struct WireOptionalUnionSmallArray {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireOptionalUnionSmallArray {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalUnionSmallArray {

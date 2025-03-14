@@ -12,13 +12,22 @@ use munge::munge;
 use super::raw::RawWireVector;
 use crate::{
     Decode, DecodeError, Decoder, DecoderExt as _, Encodable, Encode, EncodeError, Encoder,
-    EncoderExt as _, Slot, TakeFrom, WirePointer,
+    EncoderExt as _, Slot, TakeFrom, WirePointer, ZeroPadding,
 };
 
 /// A FIDL vector
 #[repr(transparent)]
 pub struct WireVector<T> {
     raw: RawWireVector<T>,
+}
+
+unsafe impl<T> ZeroPadding for WireVector<T> {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            RawWireVector::<T>::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl<T> Drop for WireVector<T> {

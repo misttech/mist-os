@@ -175,6 +175,27 @@ impl ProtocolTemplate<'_> {
     }
 }
 
+struct ZeroPaddingRange {
+    offset: u32,
+    width: u32,
+}
+
+impl StructTemplate<'_> {
+    fn zero_padding_ranges(&self) -> Vec<ZeroPaddingRange> {
+        let mut ranges = Vec::new();
+        let mut end = self.strct.shape.inline_size;
+        for member in self.strct.members.iter().rev() {
+            let padding = member.field_shape.padding;
+            if padding != 0 {
+                ranges.push(ZeroPaddingRange { offset: end - padding, width: padding });
+            }
+            end = member.field_shape.offset;
+        }
+
+        ranges
+    }
+}
+
 struct UnionTemplateStrings {
     decode_unknown: &'static str,
     decode_as: &'static str,

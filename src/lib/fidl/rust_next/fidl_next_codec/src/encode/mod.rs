@@ -50,6 +50,55 @@ impl<T: ?Sized> CopyOptimization<T> {
     }
 }
 
+/// Zeroes the padding of this type.
+///
+/// # Safety
+///
+/// `zero_padding` must write zeroes to at least the padding bytes of the pointed-to memory.
+pub unsafe trait ZeroPadding {
+    /// Writes zeroes to the padding for this type, if any.
+    ///
+    /// # Safety
+    ///
+    /// `ptr` must point to memory suitable for holding this type.
+    unsafe fn zero_padding(ptr: *mut Self);
+}
+
+unsafe impl<T: ZeroPadding, const N: usize> ZeroPadding for [T; N] {
+    #[inline]
+    unsafe fn zero_padding(backing: *mut Self) {
+        for i in 0..N {
+            unsafe {
+                T::zero_padding(backing.cast::<T>().add(i));
+            }
+        }
+    }
+}
+
+macro_rules! impl_zero_padding_for_primitive {
+    ($ty:ty) => {
+        unsafe impl ZeroPadding for $ty {
+            #[inline]
+            unsafe fn zero_padding(_: *mut Self) {}
+        }
+    };
+}
+
+macro_rules! impl_zero_padding_for_primitives {
+    ($($ty:ty),* $(,)?) => {
+        $(
+            impl_zero_padding_for_primitive!($ty);
+        )*
+    }
+}
+
+impl_zero_padding_for_primitives! {
+    (), bool, i8, u8,
+    WireI16, WireI32, WireI64,
+    WireU16, WireU32, WireU64,
+    WireF32, WireF64,
+}
+
 /// A type which can be encoded as FIDL.
 pub trait Encodable {
     /// An optimization flag that allows the bytes of this type to be copied directly during
@@ -61,7 +110,7 @@ pub trait Encodable {
     const COPY_OPTIMIZATION: CopyOptimization<Self> = CopyOptimization::disable();
 
     /// The wire type for the value.
-    type Encoded;
+    type Encoded: ZeroPadding;
 }
 
 /// Encodes a value.
@@ -74,7 +123,7 @@ pub trait Encode<E: ?Sized>: Encodable {
 /// A type which can be encoded as FIDL when optional.
 pub trait EncodableOption {
     /// The wire type for the optional value.
-    type EncodedOption;
+    type EncodedOption: ZeroPadding;
 }
 
 /// Encodes an optional value.
@@ -87,7 +136,7 @@ pub trait EncodeOption<E: ?Sized>: EncodableOption {
     ) -> Result<(), EncodeError>;
 }
 
-macro_rules! impl_primitive {
+macro_rules! impl_encode_for_primitive {
     ($ty:ty, $enc:ty) => {
         impl Encodable for $ty {
             // Copy optimization for primitives is enabled if their size is <= 1 or the target is
@@ -137,15 +186,15 @@ macro_rules! impl_primitive {
     };
 }
 
-macro_rules! impl_primitives {
+macro_rules! impl_encode_for_primitives {
     ($($ty:ty, $enc:ty);* $(;)?) => {
         $(
-            impl_primitive!($ty, $enc);
+            impl_encode_for_primitive!($ty, $enc);
         )*
     }
 }
 
-impl_primitives! {
+impl_encode_for_primitives! {
     (), (); bool, bool; i8, i8; u8, u8;
 
     i16, WireI16; i32, WireI32; i64, WireI64;

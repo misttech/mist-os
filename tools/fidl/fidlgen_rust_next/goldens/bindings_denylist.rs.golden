@@ -89,6 +89,11 @@ pub struct WireShouldNeverAppearInAnyBinding4 {
     pub a: bool,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireShouldNeverAppearInAnyBinding4 {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireShouldNeverAppearInAnyBinding4
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -184,6 +189,15 @@ impl ::fidl_next::TakeFrom<WireShouldNeverAppearInAnyBinding5> for ShouldNeverAp
 #[repr(C)]
 pub struct WireShouldNeverAppearInAnyBinding5 {
     table: ::fidl_next::WireTable,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireShouldNeverAppearInAnyBinding5 {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireShouldNeverAppearInAnyBinding5
@@ -321,6 +335,15 @@ pub struct WireShouldNeverAppearInAnyBinding6 {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireShouldNeverAppearInAnyBinding6 {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod should_never_appear_in_any_binding6 {
     pub enum Ref<'union> {
         A(&'union bool),
@@ -382,6 +405,15 @@ impl ::core::fmt::Debug for WireShouldNeverAppearInAnyBinding6 {
 #[repr(transparent)]
 pub struct WireOptionalShouldNeverAppearInAnyBinding6 {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireOptionalShouldNeverAppearInAnyBinding6 {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalShouldNeverAppearInAnyBinding6 {
@@ -554,6 +586,15 @@ pub struct WireAllowedDeniedResponse {
     pub should_never_appear_in_any_binding_5: crate::WireShouldNeverAppearInAnyBinding5,
 
     pub should_never_appear_in_any_binding_6: crate::WireShouldNeverAppearInAnyBinding6,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireAllowedDeniedResponse {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ptr.cast::<u8>().add(1).write_bytes(0, 7);
+        }
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireAllowedDeniedResponse
@@ -917,6 +958,11 @@ pub struct WireShouldNeverAppearInAnyBinding1 {
     pub a: bool,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireShouldNeverAppearInAnyBinding1 {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireShouldNeverAppearInAnyBinding1
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -1012,6 +1058,15 @@ impl ::fidl_next::TakeFrom<WireShouldNeverAppearInAnyBinding2> for ShouldNeverAp
 #[repr(C)]
 pub struct WireShouldNeverAppearInAnyBinding2 {
     table: ::fidl_next::WireTable,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireShouldNeverAppearInAnyBinding2 {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireShouldNeverAppearInAnyBinding2
@@ -1149,6 +1204,15 @@ pub struct WireShouldNeverAppearInAnyBinding3 {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireShouldNeverAppearInAnyBinding3 {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod should_never_appear_in_any_binding3 {
     pub enum Ref<'union> {
         A(&'union bool),
@@ -1210,6 +1274,15 @@ impl ::core::fmt::Debug for WireShouldNeverAppearInAnyBinding3 {
 #[repr(transparent)]
 pub struct WireOptionalShouldNeverAppearInAnyBinding3 {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireOptionalShouldNeverAppearInAnyBinding3 {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalShouldNeverAppearInAnyBinding3 {
@@ -1384,6 +1457,15 @@ pub struct WireDeniedShouldNeverAppearInAnyBindingRequest {
     pub should_never_appear_in_any_binding_2: crate::WireShouldNeverAppearInAnyBinding2,
 
     pub should_never_appear_in_any_binding_3: crate::WireShouldNeverAppearInAnyBinding3,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireDeniedShouldNeverAppearInAnyBindingRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ptr.cast::<u8>().add(1).write_bytes(0, 7);
+        }
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireDeniedShouldNeverAppearInAnyBindingRequest
@@ -1651,6 +1733,11 @@ pub struct WireShouldNeverAppearInAnyBinding7 {
     pub a: bool,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireShouldNeverAppearInAnyBinding7 {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireShouldNeverAppearInAnyBinding7
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -1746,6 +1833,15 @@ impl ::fidl_next::TakeFrom<WireShouldNeverAppearInAnyBinding8> for ShouldNeverAp
 #[repr(C)]
 pub struct WireShouldNeverAppearInAnyBinding8 {
     table: ::fidl_next::WireTable,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireShouldNeverAppearInAnyBinding8 {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireShouldNeverAppearInAnyBinding8
@@ -1883,6 +1979,15 @@ pub struct WireShouldNeverAppearInAnyBinding9 {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireShouldNeverAppearInAnyBinding9 {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod should_never_appear_in_any_binding9 {
     pub enum Ref<'union> {
         A(&'union bool),
@@ -1944,6 +2049,15 @@ impl ::core::fmt::Debug for WireShouldNeverAppearInAnyBinding9 {
 #[repr(transparent)]
 pub struct WireOptionalShouldNeverAppearInAnyBinding9 {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireOptionalShouldNeverAppearInAnyBinding9 {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalShouldNeverAppearInAnyBinding9 {
@@ -2118,6 +2232,15 @@ pub struct WireDeniedAnonymous {
     pub should_never_appear_in_any_binding_9: crate::WireShouldNeverAppearInAnyBinding9,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireDeniedAnonymous {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ptr.cast::<u8>().add(1).write_bytes(0, 7);
+        }
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireDeniedAnonymous
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -2234,6 +2357,11 @@ pub struct WireDenyEachBindingOnlyDenyCppRequest {
     pub a: bool,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireDenyEachBindingOnlyDenyCppRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireDenyEachBindingOnlyDenyCppRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -2340,6 +2468,11 @@ impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyCppResponse>
 #[repr(C)]
 pub struct WireDenyEachBindingOnlyDenyCppResponse {
     pub b: ::fidl_next::WireI32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireDenyEachBindingOnlyDenyCppResponse {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireDenyEachBindingOnlyDenyCppResponse
@@ -2450,6 +2583,11 @@ pub struct WireDenyEachBindingOnlyDenyDartRequest {
     pub a: bool,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireDenyEachBindingOnlyDenyDartRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireDenyEachBindingOnlyDenyDartRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -2556,6 +2694,11 @@ impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyDartResponse>
 #[repr(C)]
 pub struct WireDenyEachBindingOnlyDenyDartResponse {
     pub b: ::fidl_next::WireI32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireDenyEachBindingOnlyDenyDartResponse {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireDenyEachBindingOnlyDenyDartResponse
@@ -2666,6 +2809,11 @@ pub struct WireDenyEachBindingOnlyDenyGoRequest {
     pub a: bool,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireDenyEachBindingOnlyDenyGoRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireDenyEachBindingOnlyDenyGoRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -2772,6 +2920,11 @@ impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyGoResponse>
 #[repr(C)]
 pub struct WireDenyEachBindingOnlyDenyGoResponse {
     pub b: ::fidl_next::WireI32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireDenyEachBindingOnlyDenyGoResponse {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireDenyEachBindingOnlyDenyGoResponse
@@ -2882,6 +3035,11 @@ pub struct WireDenyEachBindingOnlyDenyLibfuzzerRequest {
     pub a: bool,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireDenyEachBindingOnlyDenyLibfuzzerRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireDenyEachBindingOnlyDenyLibfuzzerRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -2988,6 +3146,11 @@ impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyLibfuzzerResponse>
 #[repr(C)]
 pub struct WireDenyEachBindingOnlyDenyLibfuzzerResponse {
     pub b: ::fidl_next::WireI32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireDenyEachBindingOnlyDenyLibfuzzerResponse {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireDenyEachBindingOnlyDenyLibfuzzerResponse
@@ -3098,6 +3261,11 @@ pub struct WireDenyEachBindingOnlyDenyRustRequest {
     pub a: bool,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireDenyEachBindingOnlyDenyRustRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireDenyEachBindingOnlyDenyRustRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -3204,6 +3372,11 @@ impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyRustResponse>
 #[repr(C)]
 pub struct WireDenyEachBindingOnlyDenyRustResponse {
     pub b: ::fidl_next::WireI32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireDenyEachBindingOnlyDenyRustResponse {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireDenyEachBindingOnlyDenyRustResponse
@@ -3314,6 +3487,11 @@ pub struct WireDenyEachBindingOnlyDenySyzkallerRequest {
     pub a: bool,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireDenyEachBindingOnlyDenySyzkallerRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireDenyEachBindingOnlyDenySyzkallerRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -3420,6 +3598,11 @@ impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenySyzkallerResponse>
 #[repr(C)]
 pub struct WireDenyEachBindingOnlyDenySyzkallerResponse {
     pub b: ::fidl_next::WireI32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireDenyEachBindingOnlyDenySyzkallerResponse {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireDenyEachBindingOnlyDenySyzkallerResponse
@@ -4274,6 +4457,11 @@ pub struct WireMemberOnlyAppearsInImportingLibrary {
     pub a: bool,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireMemberOnlyAppearsInImportingLibrary {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireMemberOnlyAppearsInImportingLibrary
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -4396,6 +4584,11 @@ impl ::fidl_next::TakeFrom<WireOnlyAppearsInImportingLibrary> for OnlyAppearsInI
 #[repr(C)]
 pub struct WireOnlyAppearsInImportingLibrary {
     pub member_only_appears_in_importing_library: crate::WireMemberOnlyAppearsInImportingLibrary,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireOnlyAppearsInImportingLibrary {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireOnlyAppearsInImportingLibrary
@@ -4571,6 +4764,13 @@ pub struct WireOnlyDart {
     value: ::fidl_next::WireU32,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireOnlyDart {
+    #[inline]
+    unsafe fn zero_padding(_: *mut Self) {
+        // Wire enums have no padding
+    }
+}
+
 impl WireOnlyDart {
     pub const A: WireOnlyDart = WireOnlyDart { value: ::fidl_next::WireU32(1) };
 }
@@ -4673,6 +4873,11 @@ impl ::fidl_next::TakeFrom<WireOnlyGo> for OnlyGo {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireOnlyGo {}
+
+unsafe impl ::fidl_next::ZeroPadding for WireOnlyGo {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireOnlyGo
 where
@@ -4904,6 +5109,15 @@ pub struct WireOnlyLlcpp {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireOnlyLlcpp {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod only_llcpp {
     pub enum Ref<'union> {
         X(&'union ::fidl_next::WireU32),
@@ -4963,6 +5177,15 @@ impl ::core::fmt::Debug for WireOnlyLlcpp {
 #[repr(transparent)]
 pub struct WireOptionalOnlyLlcpp {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireOptionalOnlyLlcpp {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalOnlyLlcpp {
@@ -5083,6 +5306,15 @@ pub struct WireOnlyRust {
     table: ::fidl_next::WireTable,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireOnlyRust {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireOnlyRust
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -5164,6 +5396,13 @@ impl ::fidl_next::TakeFrom<WireOnlySyzkaller> for OnlySyzkaller {
 #[repr(transparent)]
 pub struct WireOnlySyzkaller {
     value: ::fidl_next::WireU32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireOnlySyzkaller {
+    #[inline]
+    unsafe fn zero_padding(_: *mut Self) {
+        // Wire bits have no padding
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireOnlySyzkaller

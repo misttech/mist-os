@@ -6,7 +6,7 @@ use core::marker::PhantomData;
 
 use fidl_next_codec::{
     munge, Decode, DecodeError, Encodable, EncodableOption, Encode, EncodeError, EncodeOption,
-    Slot, TakeFrom,
+    Slot, TakeFrom, ZeroPadding,
 };
 
 macro_rules! endpoint {
@@ -20,6 +20,15 @@ macro_rules! endpoint {
         pub struct $name<T, P> {
             transport: T,
             _protocol: PhantomData<P>,
+        }
+
+        unsafe impl<T: ZeroPadding, P> ZeroPadding for $name<T, P> {
+            #[inline]
+            unsafe fn zero_padding(ptr: *mut Self) {
+                unsafe {
+                    T::zero_padding(ptr.cast());
+                }
+            }
         }
 
         impl<T, P> $name<T, P> {

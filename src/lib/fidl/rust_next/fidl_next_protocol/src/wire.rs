@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fidl_next_codec::{
-    Decode, DecodeError, Encodable, Encode, EncodeError, Slot, WireU32, WireU64,
+    Decode, DecodeError, Encodable, Encode, EncodeError, Slot, WireU32, WireU64, ZeroPadding,
 };
 
 use zerocopy::IntoBytes;
@@ -20,6 +20,13 @@ pub struct WireMessageHeader {
     pub magic_number: u8,
     /// The ordinal of the message following this header
     pub ordinal: WireU64,
+}
+
+unsafe impl ZeroPadding for WireMessageHeader {
+    #[inline]
+    unsafe fn zero_padding(_: *mut Self) {
+        // Wire message headers have no padding
+    }
 }
 
 /// The flag 0 bit indicating that the wire format is v2.
