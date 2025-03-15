@@ -1461,7 +1461,6 @@ dependencies = [
  "async-ringbuf",
  "async-stream",
  "async-trait",
- "atty",
  "base64 0.22.1",
  "bincode",
  "bit-set",

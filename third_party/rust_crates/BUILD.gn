@@ -95,10 +95,6 @@ group("async-trait") {
   public_deps = [ ":async-trait-v0_1_71($host_toolchain)" ]
 }
 
-group("atty") {
-  public_deps = [ ":atty-v0_2_11" ]
-}
-
 group("base64") {
   public_deps = [ ":base64-v0_22_1" ]
 }
