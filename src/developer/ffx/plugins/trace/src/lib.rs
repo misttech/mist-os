@@ -88,7 +88,7 @@ fn handle_fidl_error<T>(res: Result<T, fidl::Error>) -> Result<T> {
 
 fn handle_peer_closed(err: fidl::Error) -> errors::FfxError {
     match err {
-        fidl::Error::ClientChannelClosed { status, protocol_name, reason } => {
+        fidl::Error::ClientChannelClosed { status, protocol_name, reason, .. } => {
             errors::ffx_error!("An attempt to access {} resulted in a bad status: {} reason: {}.
 This can happen if tracing is not supported on the product configuration you are running or if it is missing from the base image.", protocol_name, status, reason.as_ref().map(String::as_str).unwrap_or("not given"))
         }

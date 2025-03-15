@@ -444,6 +444,7 @@ mod tests {
             .unbounded_send(Err(Error::Unexpected(fidl::Error::ClientChannelClosed {
                 status: zx::Status::PEER_CLOSED,
                 protocol_name: "",
+                epitaph: None,
             })))
             .expect("Should be able to queue requests");
 

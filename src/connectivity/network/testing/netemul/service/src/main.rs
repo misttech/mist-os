@@ -1418,6 +1418,7 @@ mod tests {
             Err(fidl::Error::ClientChannelClosed {
                 status,
                 protocol_name: <CounterMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
+                ..
             }) if status == zx::Status::NOT_FOUND => (),
             event => panic!(
                 "expected channel close with epitaph NOT_FOUND, got \
@@ -2124,6 +2125,7 @@ mod tests {
                     status,
                     protocol_name:
                         <ManagedRealmMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
+                    ..
                 }) if status == epitaph => (),
                 event => panic!(
                     "test case failed: \"{}\": expected channel close with epitaph {}, got \
@@ -2603,7 +2605,7 @@ mod tests {
             counter.increment().await.expect_err("increment call on stopped child should fail");
         assert_matches::assert_matches!(
             err,
-            fidl::Error::ClientChannelClosed { status, protocol_name }
+            fidl::Error::ClientChannelClosed { status, protocol_name, .. }
                 if status == zx::Status::PEER_CLOSED &&
                     protocol_name == CounterMarker::PROTOCOL_NAME
         );

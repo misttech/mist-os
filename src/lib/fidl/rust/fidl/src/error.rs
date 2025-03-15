@@ -192,6 +192,10 @@ pub enum Error {
         status: Status,
         /// The name of the protocol at the other end of the channel.
         protocol_name: &'static str,
+        /// The epitaph, if any. This can be used to discriminate channel closure with a
+        /// `Status::PEER_CLOSED` epitaph from a channel closure with no epitaph. Note that here,
+        /// the epitaph is treated as an opaque 32-bit integer.
+        epitaph: Option<u32>,
         /// Further details on why exactly the channel closed.
         reason: Option<String>,
     },
@@ -204,6 +208,10 @@ pub enum Error {
         status: Status,
         /// The name of the protocol at the other end of the channel.
         protocol_name: &'static str,
+        /// The epitaph, if any. This can be used to discriminate channel closure with a
+        /// `Status::PEER_CLOSED` epitaph from a channel closure with no epitaph. Note that here,
+        /// the epitaph is treated as an opaque 32-bit integer.
+        epitaph: Option<u32>,
     },
 
     #[error("There was an error attaching a FIDL channel to the async executor: {0}")]

@@ -60,7 +60,7 @@ fn get_test_parent_property_list() -> Option<[fdf::NodeProperty; 3]> {
 }
 
 fn assert_not_found_error(error: fidl::Error) {
-    if let fidl::Error::ClientChannelClosed { status, protocol_name: _ } = error {
+    if let fidl::Error::ClientChannelClosed { status, .. } = error {
         assert_eq!(status, zx_status::Status::NOT_FOUND);
     } else {
         panic!("Expcted ClientChannelClosed error");

@@ -72,7 +72,7 @@ pub(crate) async fn serve_client_provider(
     stream
         .filter_map(|result| {
             futures::future::ready(result.map(Some).unwrap_or_else(|error| match error {
-                fidl::Error::ClientChannelClosed { status: _, protocol_name: _ } => None,
+                fidl::Error::ClientChannelClosed { .. } => None,
                 error => {
                     panic!("unexpected FIDL error in client provider request stream: {error:?}")
                 }

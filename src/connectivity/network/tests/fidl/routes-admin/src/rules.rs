@@ -152,10 +152,7 @@ async fn add_remove_rules<I: FidlRuleAdminIpExt + FidlRouteAdminIpExt + FidlRout
     let mut err_stream = rule_set_err_stream::<I>(new_rule_set);
     assert_matches!(
         err_stream.next().await,
-        Some(fidl::Error::ClientChannelClosed {
-            status: zx::Status::ALREADY_EXISTS,
-            protocol_name: _,
-        })
+        Some(fidl::Error::ClientChannelClosed { status: zx::Status::ALREADY_EXISTS, .. })
     );
     assert_matches!(err_stream.next().await, None);
 

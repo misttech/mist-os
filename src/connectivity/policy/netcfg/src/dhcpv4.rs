@@ -48,7 +48,7 @@ pub(super) type ConfigurationStream =
 pub(super) async fn probe_for_presence(provider: &fnet_dhcp::ClientProviderProxy) -> bool {
     match provider.check_presence().await {
         Ok(()) => true,
-        Err(fidl::Error::ClientChannelClosed { status: _, protocol_name: _ }) => false,
+        Err(fidl::Error::ClientChannelClosed { .. }) => false,
         Err(e) => panic!("unexpected error while probing: {e}"),
     }
 }

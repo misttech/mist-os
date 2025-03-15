@@ -395,7 +395,7 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
         let grant = match control.get_authorization_for_interface().await {
             Ok(grant) => grant,
             Err(fnet_interfaces_ext::admin::TerminalError::Fidl(
-                fidl::Error::ClientChannelClosed { status, protocol_name },
+                fidl::Error::ClientChannelClosed { status, protocol_name, .. },
             )) => {
                 log_debug!(
                     "{}: netstack dropped the {} channel, interface {} does not exist",

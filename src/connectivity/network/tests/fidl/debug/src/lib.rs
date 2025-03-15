@@ -203,10 +203,7 @@ async fn get_port<N: Netstack>(name: &str) {
         debug_interfaces.get_port(id + 100, server_end).expect("calling get_port");
         assert_matches!(
             port.get_info().await,
-            Err(fidl::Error::ClientChannelClosed {
-                status: zx::Status::NOT_FOUND,
-                protocol_name: _
-            })
+            Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_FOUND, .. })
         );
     }
 }

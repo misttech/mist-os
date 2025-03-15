@@ -699,6 +699,7 @@ impl<D: ResourceDialect> ClientInner<D> {
                     return Err(Error::ClientChannelClosed {
                         status: zx_status::Status::PEER_CLOSED,
                         protocol_name: self.protocol_name,
+                        epitaph: None,
                         #[cfg(not(target_os = "fuchsia"))]
                         reason: self.channel.closed_reason(),
                     });
@@ -722,6 +723,7 @@ impl<D: ResourceDialect> ClientInner<D> {
                 return Err(Error::ClientChannelClosed {
                     status: epitaph_body.error,
                     protocol_name: self.protocol_name,
+                    epitaph: Some(epitaph_body.error.into_raw() as u32),
                     #[cfg(not(target_os = "fuchsia"))]
                     reason: self.channel.closed_reason(),
                 });
@@ -988,8 +990,26 @@ pub mod sync {
                     Ok(()) => {
                         // We succeeded in reading the message. Check that it is
                         // an event not a two-way method reply.
-                        let (header, _) = decode_transaction_header(buf.bytes())
+                        let (header, body_bytes) = decode_transaction_header(buf.bytes())
                             .map_err(|_| Error::InvalidHeader)?;
+                        if header.is_epitaph() {
+                            // Received an epitaph. For the sync bindings, epitaphs are only
+                            // reported by wait_for_event.
+                            let handles = &mut [];
+                            let mut epitaph_body =
+                                Decode::<EpitaphBody, DefaultFuchsiaResourceDialect>::new_empty();
+                            Decoder::<DefaultFuchsiaResourceDialect>::decode_into::<EpitaphBody>(
+                                &header,
+                                body_bytes,
+                                handles,
+                                &mut epitaph_body,
+                            )?;
+                            return Err(Error::ClientChannelClosed {
+                                status: epitaph_body.error,
+                                protocol_name: self.protocol_name,
+                                epitaph: Some(epitaph_body.error.into_raw() as u32),
+                            });
+                        }
                         if header.tx_id != 0 {
                             return Err(Error::UnexpectedSyncResponse);
                         }
@@ -1018,6 +1038,7 @@ pub mod sync {
                 Error::ClientChannelClosed {
                     status: zx_status::Status::PEER_CLOSED,
                     protocol_name: self.protocol_name,
+                    epitaph: None,
                 }
             } else {
                 variant(err)
@@ -1256,15 +1277,16 @@ mod tests {
             Err(crate::Error::ClientChannelClosed {
                 status: zx_status::Status::PEER_CLOSED,
                 protocol_name: "test_protocol",
+                epitaph: None,
             })
         );
         Ok(())
     }
 
     // TODO(https://fxbug.dev/42153053): When the sync client supports epitaphs, rename
-    // this and change the assert to expect zx_status::Status::UNAVAILABLE.
+    // these tests and change the asserts to expect zx_status::Status::UNAVAILABLE.
     #[test]
-    fn sync_client_does_not_receive_epitaphs() -> Result<(), Error> {
+    fn sync_client_send_does_not_receive_epitaphs() -> Result<(), Error> {
         let (client_end, server_end) = zx::Channel::create();
         let client = sync::Client::new(client_end, "test_protocol");
         // Close the server channel with an epitaph.
@@ -1281,7 +1303,29 @@ mod tests {
             Err(crate::Error::ClientChannelClosed {
                 status: zx_status::Status::PEER_CLOSED,
                 protocol_name: "test_protocol",
+                epitaph: None,
             })
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn sync_client_wait_for_events_does_receive_epitaphs() -> Result<(), Error> {
+        let (client_end, server_end) = zx::Channel::create();
+        let client = sync::Client::new(client_end, "test_protocol");
+        // Close the server channel with an epitaph.
+        server_end
+            .close_with_epitaph(zx_status::Status::UNAVAILABLE)
+            .expect("failed to write epitaph");
+        assert_matches!(
+            client.wait_for_event(zx::MonotonicInstant::after(
+                zx::MonotonicDuration::from_seconds(5)
+            )),
+            Err(crate::Error::ClientChannelClosed {
+                status: zx_status::Status::UNAVAILABLE,
+                protocol_name: "test_protocol",
+                epitaph: Some(epitaph),
+            }) if epitaph == zx_types::ZX_ERR_UNAVAILABLE as u32
         );
         Ok(())
     }
@@ -1387,8 +1431,9 @@ mod tests {
                 result,
                 Err(crate::Error::ClientChannelClosed {
                     status: zx_status::Status::UNAVAILABLE,
-                    protocol_name: "test_protocol"
-                })
+                    protocol_name: "test_protocol",
+                    epitaph: Some(epitaph),
+                }) if epitaph == zx_types::ZX_ERR_UNAVAILABLE as u32
             );
         };
         // add a timeout to sender so if test is broken it doesn't take forever
@@ -1464,8 +1509,9 @@ mod tests {
             stream.next().await,
             Some(Err(crate::Error::ClientChannelClosed {
                 status: zx_status::Status::UNAVAILABLE,
-                protocol_name: "test_protocol"
-            }))
+                protocol_name: "test_protocol",
+                epitaph: Some(epitaph),
+            })) if epitaph == zx_types::ZX_ERR_UNAVAILABLE as u32
         );
         assert_matches!(stream.next().await, None);
         // this should panic
@@ -1736,8 +1782,9 @@ mod tests {
             response1_future.poll_unpin(response1_cx),
             Poll::Ready(Err(crate::Error::ClientChannelClosed {
                 status: zx_status::Status::UNAVAILABLE,
-                protocol_name: "test_protocol"
-            }))
+                protocol_name: "test_protocol",
+                epitaph: Some(epitaph),
+            })) if epitaph == zx_types::ZX_ERR_UNAVAILABLE as u32
         );
 
         // get event loop to deliver readiness notifications to channels
@@ -1748,8 +1795,9 @@ mod tests {
             response2_future.poll_unpin(response2_cx),
             Poll::Ready(Err(crate::Error::ClientChannelClosed {
                 status: zx_status::Status::UNAVAILABLE,
-                protocol_name: "test_protocol"
-            }))
+                protocol_name: "test_protocol",
+                epitaph: Some(epitaph),
+            })) if epitaph == zx_types::ZX_ERR_UNAVAILABLE as u32
         );
 
         // poll the event stream to completion.
@@ -1852,7 +1900,8 @@ mod tests {
                     Some(crate::Error::ClientChannelClosed {
                         status: zx_status::Status::UNAVAILABLE,
                         protocol_name: "test_protocol",
-                    }) => assert!(
+                        epitaph: Some(epitaph),
+                    }) if epitaph == zx_types::ZX_ERR_UNAVAILABLE as u32 => assert!(
                         action.should_report_epitaph(),
                         "got epitaph unexpectedly.\n{details}",
                     ),
@@ -1911,7 +1960,8 @@ mod tests {
             executor.run_singlethreaded(&mut checked_fut),
             Err(crate::Error::ClientChannelClosed {
                 status: zx_status::Status::PEER_CLOSED,
-                protocol_name: "test_protocol"
+                protocol_name: "test_protocol",
+                epitaph: None,
             })
         );
     }

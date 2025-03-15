@@ -49,6 +49,7 @@ mod tests {
         let fidl_error = fidl::Error::ClientChannelClosed {
             status: zx::Status::PEER_CLOSED,
             protocol_name: "TestService",
+            epitaph: None,
         };
         let fidl_result: Result<Result<i32, zx::sys::zx_status_t>, fidl::Error> =
             Err(fidl_error.clone());

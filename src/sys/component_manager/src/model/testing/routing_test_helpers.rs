@@ -788,7 +788,7 @@ impl RoutingTestModel for RoutingTest {
                         assert_eq!(expected_res, ExpectedResult::Ok);
                         response
                     }
-                    Err(fidl::Error::ClientChannelClosed { status, protocol_name: _ }) => {
+                    Err(fidl::Error::ClientChannelClosed { status, .. }) => {
                         let ExpectedResult::Err(expected_status) = expected_res else {
                             panic!("StorageAdmin client channel closed: {:?}", status);
                         };
@@ -1219,7 +1219,7 @@ pub mod capability_util {
             // `open_directory` could fail if service capability routing fails.
             .map_err(|e| match e {
                 OpenError::OpenError(status) => {
-                    fidl::Error::ClientChannelClosed { status, protocol_name: "" }
+                    fidl::Error::ClientChannelClosed { status, protocol_name: "", epitaph: None }
                 }
                 _ => panic!("Unexpected open error {:?}", e),
             })?;
@@ -1228,9 +1228,11 @@ pub mod capability_util {
             fuchsia_fs::directory::open_directory(&service_dir, instance, fio::Flags::empty())
                 .await
                 .map_err(|e| match e {
-                    OpenError::OpenError(status) => {
-                        fidl::Error::ClientChannelClosed { status, protocol_name: "" }
-                    }
+                    OpenError::OpenError(status) => fidl::Error::ClientChannelClosed {
+                        status,
+                        protocol_name: "",
+                        epitaph: None,
+                    },
                     _ => panic!("Unexpected open error {:?}", e),
                 })?;
         Ok(connect_to_named_protocol_at_dir_root::<T>(&instance_dir, member)

@@ -46,7 +46,7 @@ impl<D: Borrow<fio::DirectoryProxy>, P: DiscoverableProtocolMarker> ProtocolConn
             // the protocol does not exist.
             Err(fuchsia_fs::directory::EnumerateError::Fidl(
                 _,
-                fidl::Error::ClientChannelClosed { status, protocol_name: _ },
+                fidl::Error::ClientChannelClosed { status, .. },
             )) if status == zx::Status::PEER_CLOSED => Ok(false),
             Err(e) => Err(Error::new(e).context("error checking for service entry in directory")),
         }

@@ -677,7 +677,7 @@ async fn verify_meta_as_file_opened(
 async fn verify_open_failed(node: fio::NodeProxy) -> Result<(), Error> {
     match node.query().await {
         Ok(protocol) => Err(anyhow!("node should be closed: {:?}", protocol)),
-        Err(fidl::Error::ClientChannelClosed { status: _, protocol_name: _ }) => Ok(()),
+        Err(fidl::Error::ClientChannelClosed { .. }) => Ok(()),
         Err(e) => Err(e).context("failed with unexpected error"),
     }
 }

@@ -2031,6 +2031,7 @@ mod tests {
             Err(fidl::Error::ClientChannelClosed {
                 status: zx_status::Status::ALREADY_BOUND,
                 protocol_name: "test",
+                epitaph: Some(zx_status::Status::ALREADY_BOUND.into_raw() as u32),
             })
         }))
         .await;

@@ -1670,10 +1670,7 @@ async fn route_set_closed_when_table_removed<I: FidlRouteAdminIpExt + FidlRouteI
         let mut err_stream = route_set_err_stream::<I>(user_route_set);
         assert_matches!(
             err_stream.next().await,
-            Some(fidl::Error::ClientChannelClosed {
-                status: zx::Status::UNAVAILABLE,
-                protocol_name: _,
-            })
+            Some(fidl::Error::ClientChannelClosed { status: zx::Status::UNAVAILABLE, .. })
         );
         assert_matches!(err_stream.next().await, None);
 
