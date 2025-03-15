@@ -217,6 +217,8 @@ template("fidl") {
   # These bindings are not:
   enable_banjo = defined(invoker.enable_banjo) && invoker.enable_banjo
   enable_hlcpp = defined(invoker.enable_hlcpp) && invoker.enable_hlcpp
+  enable_python = defined(invoker._enable_experimental_python) &&
+                  invoker._enable_experimental_python
   enable_rust_next =
       defined(invoker.enable_rust_next) && invoker.enable_rust_next
   enable_zither = defined(invoker.enable_zither) && invoker.enable_zither
@@ -231,6 +233,7 @@ template("fidl") {
                "enable_rust_next",
                "enable_banjo",
                "enable_hlcpp",
+               "enable_python",
                "enable_zither",
              ])
 
@@ -663,5 +666,22 @@ template("fidl") {
         (is_host && current_toolchain == toolchain_variant.base) ||
         (enable_rust && toolchain_variant.supports_rust))) {
     not_needed([ "marker_category" ])
+  }
+
+  if (enable_python && (is_fidl_toolchain || is_host)) {
+    import("//build/python/fidl_python.gni")
+
+    # Define the Python bindings.
+    fidl_python("${target_name}_python") {
+      forward_variables_from(invoker,
+                             [
+                               "applicable_licenses",
+                               "testonly",
+                               "visibility",
+                               "public_deps",
+                             ])
+      forward_variables_from(common_parameters, "*")
+      fidl_gen_dir += "/python"
+    }
   }
 }

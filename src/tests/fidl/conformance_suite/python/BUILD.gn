@@ -1,0 +1,50 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/compiled_action.gni")
+import("//build/fidl/fidl.gni")
+
+# Create a series of targets that rename the library in each conformance suite
+# FIDL file to test.conformance.python. This allows the ..:conformance_fidl
+# and :conformance_python_fidl targets to co-exist.
+conformance_python_fidl_source_basenames = [ "empty_struct.test.fidl" ]
+foreach(source_basename, conformance_python_fidl_source_basenames) {
+  compiled_action("conformance_python_fidl_transplant__${source_basename}") {
+    tool = "//src/tests/fidl/conformance_suite/transplant_fidl"
+    visibility = [
+      ":*",
+      "//:developer_host_tools(//build/toolchain/fuchsia:x64)",
+    ]
+    sources = [ "//src/tests/fidl/conformance_suite/${source_basename}" ]
+    outputs = [ "${target_gen_dir}/${source_basename}" ]
+    args = [
+      "--original-library",
+      "test.conformance",
+      "--new-library",
+      "test.conformance.python",
+      "--input-file",
+      rebase_path("//src/tests/fidl/conformance_suite/${source_basename}",
+                  root_build_dir),
+      "--output-file",
+      rebase_path(outputs[0], root_build_dir),
+    ]
+  }
+}
+
+fidl("conformance_python_fidl") {
+  name = "test.conformance.python"
+
+  testonly = true
+
+  _enable_experimental_python = true
+
+  non_fidl_deps = []
+  sources = []
+  foreach(source_basename, conformance_python_fidl_source_basenames) {
+    transplant_target = ":conformance_python_fidl_transplant__${source_basename}(//build/toolchain:host_x64)"
+    non_fidl_deps += [ transplant_target ]
+    sources += [ get_label_info(transplant_target, "target_gen_dir") +
+                 "/${source_basename}" ]
+  }
+}

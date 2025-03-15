@@ -17,6 +17,13 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 )
 
+type FidlgenMode int
+
+const (
+	Dynamic FidlgenMode = iota
+	Static
+)
+
 var (
 	//go:embed conformance.tmpl
 	conformanceTmplText string
@@ -24,6 +31,7 @@ var (
 )
 
 type conformanceTmplInput struct {
+	StaticFidlgen      bool
 	EncodeSuccessCases []encodeSuccessCase
 	DecodeSuccessCases []decodeSuccessCase
 	EncodeFailureCases []encodeFailureCase
@@ -42,7 +50,15 @@ type encodeFailureCase struct{}
 
 type decodeFailureCase struct{}
 
-func GenerateConformanceTests(gidl ir.All, fidl fidlgen.Root, config config.GeneratorConfig) ([]byte, error) {
+func GenerateConformanceTestsStatic(gidl ir.All, fidl fidlgen.Root, config config.GeneratorConfig) ([]byte, error) {
+	return GenerateConformanceTests(gidl, fidl, config, Static)
+}
+
+func GenerateConformanceTestsDynamic(gidl ir.All, fidl fidlgen.Root, config config.GeneratorConfig) ([]byte, error) {
+	return GenerateConformanceTests(gidl, fidl, config, Dynamic)
+}
+
+func GenerateConformanceTests(gidl ir.All, fidl fidlgen.Root, config config.GeneratorConfig, mode FidlgenMode) ([]byte, error) {
 	schema := mixer.BuildSchema(fidl)
 	encodeSuccessCases, err := encodeSuccessCases(gidl.EncodeSuccess, schema)
 	if err != nil {
@@ -54,6 +70,7 @@ func GenerateConformanceTests(gidl ir.All, fidl fidlgen.Root, config config.Gene
 	}
 	var buf bytes.Buffer
 	err = conformanceTmpl.Execute(&buf, conformanceTmplInput{
+		StaticFidlgen:      mode == Static,
 		EncodeSuccessCases: encodeSuccessCases,
 		DecodeSuccessCases: decodeSuccessCases,
 	})

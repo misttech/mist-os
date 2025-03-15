@@ -69,7 +69,13 @@ def make_default_obj_from_ident(ident: str) -> Any:
     split = ident.split("/")
     library = "fidl." + split[0].replace(".", "_")
     ty = split[1]
-    mod = sys.modules[library]
+    try:
+        mod = sys.modules[library]
+    except KeyError:
+        # Try using fidl_ as the prefix because static FIDL bindings may
+        # be available.
+        library = "fidl_" + split[0].replace(".", "_")
+        mod = sys.modules[library]
     obj_ty = getattr(mod, ty)
     return obj_ty.make_default()
 

@@ -25,13 +25,15 @@ var generators = map[ir.OutputType]map[ir.Language]cli.Generator{
 	ir.OutputTypeConformance: {
 		ir.LanguageCpp:               cpp.GenerateConformanceTests,
 		ir.LanguageDynfidl:           dynfidl.GenerateConformanceTests,
-		ir.LanguageFuchsiaController: fuchsia_controller.GenerateConformanceTests,
+		ir.LanguageFuchsiaController: fuchsia_controller.GenerateConformanceTestsDynamic,
 		ir.LanguageFuzzerCorpus:      fuzzer_corpus.GenerateConformanceTests,
 		ir.LanguageGo:                golang.GenerateConformanceTests,
 		ir.LanguageHlcpp:             hlcpp.GenerateConformanceTests,
 		ir.LanguageLlcpp:             llcpp.GenerateConformanceTests,
-		ir.LanguageRust:              rust.GenerateConformanceTests,
-		ir.LanguageRustCodec:         rust_codec.GenerateConformanceTests,
+		// TODO(https://fxbug.dev/325654974): This backend should eventually be named python.
+		ir.LanguagePython:    fuchsia_controller.GenerateConformanceTestsStatic,
+		ir.LanguageRust:      rust.GenerateConformanceTests,
+		ir.LanguageRustCodec: rust_codec.GenerateConformanceTests,
 	},
 	ir.OutputTypeBenchmark: {
 		ir.LanguageCpp:         cpp.GenerateBenchmarks,

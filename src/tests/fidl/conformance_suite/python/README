@@ -1,0 +1,15 @@
+# Bring-Up Testing for fidlgen_python
+
+The fidlgen_python program for generating Python FIDL bindings is incomplete and
+can only compile a subset of the test.conformance FIDL library. This directory
+contains a GN target that builds a test.conformance.python FIDL library that is
+a subset of test.conformance.
+
+The test.conformance.python subset of test.conformance is created by running the
+custom transplant_fidl build action on a subset of the .fidl files that define
+the test.conformance FIDL library. The transplant_fidl build action works by
+searching for the declared FIDL library in a .fidl file and substituting it with
+another. This effectively transplants the FIDL definitions from one FIDL library
+library into another. (This is technically somwehere between a transplant and a
+clone. The word "transplant" felt more appropriate because only part of FIDL
+library is being copied into another.)

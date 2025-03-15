@@ -1,0 +1,30 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/go/go_binary.gni")
+
+go_library("codegen") {
+  source_dir = "codegen"
+  deps = [ "//tools/fidl/lib/fidlgen" ]
+  sources = [
+    "codegen.go",
+    "ir.go",
+    "sourcefile.tmpl",
+    "struct.tmpl",
+  ]
+}
+
+go_binary("fidlgen_python") {
+  sources = [ "main.go" ]
+  deps = [
+    ":codegen",
+    "//tools/fidl/lib/fidlgen",
+  ]
+  sdk_category = "partner"
+}
+
+install_host_tools("host") {
+  deps = [ ":fidlgen_python" ]
+  outputs = [ "fidlgen_python" ]
+}
