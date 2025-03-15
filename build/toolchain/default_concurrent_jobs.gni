@@ -16,6 +16,7 @@ _args = [
 _args += [
   "--memory-per-job",
   "local=1GB",
+  "highmem=32GB",
 ]
 
 default_concurrent_jobs =

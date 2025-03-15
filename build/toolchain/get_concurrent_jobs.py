@@ -15,27 +15,24 @@ import os
 import re
 import subprocess
 import sys
+from typing import Tuple
 
 UNITS = {"B": 1, "KB": 2**10, "MB": 2**20, "GB": 2**30, "TB": 2**40}
 
 
-def parse_size(string):
+def parse_size(string: str) -> int:
     i = next(i for (i, c) in enumerate(string) if not c.isdigit())
     number = string[:i].strip()
     unit = string[i:].strip()
     return int(float(number) * UNITS[unit])
 
 
-class ParseSize(argparse.Action):
-    def __call__(self, parser, args, values, option_string=None):
-        sizes = getattr(args, self.dest, [])
-        for value in values:
-            (k, v) = value.split("=", 1)
-            sizes.append((k, parse_size(v)))
-        setattr(args, self.dest, sizes)
+def parse_job(value: str) -> Tuple[str, int]:
+    (k, v) = value.split("=", 1)
+    return (k, parse_size(v))
 
 
-def get_total_memory():
+def get_total_memory() -> float:
     if sys.platform.startswith("linux"):
         if os.path.exists("/proc/meminfo"):
             with open("/proc/meminfo") as meminfo:
@@ -49,14 +46,13 @@ def get_total_memory():
             return int(subprocess.check_output(["sysctl", "-n", "hw.memsize"]))
         except Exception:
             return 0
-    else:
-        return 0
+    return 0
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--memory-per-job", action=ParseSize, default=[], nargs="*"
+        "--memory-per-job", type=parse_job, default=[], nargs="*"
     )
     parser.add_argument("--reserve-memory", type=parse_size, default=0)
     args = parser.parse_args()

@@ -1524,7 +1524,7 @@ if (current_toolchain == default_toolchain) {
   # The largest LTO link actions may fall into this category.
   # See https://fxbug.dev/42062387 for context.
   pool("highmem") {
-    depth = 1
+    depth = default_concurrent_jobs.highmem
   }
 }
 
