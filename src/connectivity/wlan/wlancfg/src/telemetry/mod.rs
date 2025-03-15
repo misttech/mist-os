@@ -7,6 +7,7 @@ mod inspect_time_series;
 mod windowed_stats;
 
 use crate::client;
+use crate::client::roaming::lib::RoamReason;
 use crate::mode_management::{Defect, IfaceFailure};
 use crate::telemetry::inspect_time_series::TimeSeriesStats;
 use crate::telemetry::windowed_stats::WindowedStats;
@@ -289,7 +290,9 @@ pub enum TelemetryEvent {
     },
     /// Notify telemetry that there was a decision to look for networks to roam to after evaluating
     /// the existing connection.
-    RoamingScan,
+    PolicyRoamScan {
+        reasons: Vec<RoamReason>,
+    },
     /// Proactive roams do not happen yet, but we want to analyze metrics for when they would
     /// happen. Roams are set up to log metrics when disconnects happen to roam, so this event
     /// covers when roams would happen but no actual disconnect happens.
@@ -1430,8 +1433,8 @@ impl Telemetry {
                         .await;
                 }
             }
-            TelemetryEvent::RoamingScan => {
-                self.stats_logger.log_roaming_scan_metrics().await;
+            TelemetryEvent::PolicyRoamScan { reasons } => {
+                self.stats_logger.log_policy_roam_scan_metrics(reasons).await;
             }
             TelemetryEvent::WouldRoamConnect => {
                 self.stats_logger.log_would_roam_connect().await;
@@ -3046,7 +3049,7 @@ impl StatsLogger {
         ));
     }
 
-    async fn log_roaming_scan_metrics(&mut self) {
+    async fn log_policy_roam_scan_metrics(&mut self, reasons: Vec<RoamReason>) {
         self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
             self.cobalt_1dot1_proxy,
             log_occurrence,
@@ -3054,6 +3057,15 @@ impl StatsLogger {
             1,
             &[],
         ));
+        for reason in reasons {
+            self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
+                self.cobalt_1dot1_proxy,
+                log_occurrence,
+                metrics::POLICY_ROAM_SCAN_COUNT_BY_ROAM_REASON_METRIC_ID,
+                1,
+                &[convert::convert_roam_reason_dimension(reason) as u32],
+            ));
+        }
     }
 
     /// Log metrics that will be used to analyze when roaming would happen before roams are
@@ -7849,13 +7861,30 @@ mod tests {
         let (mut test_helper, mut test_fut) = setup_test();
 
         // Send a roaming scan event
-        test_helper.telemetry_sender.send(TelemetryEvent::RoamingScan);
+        test_helper.telemetry_sender.send(TelemetryEvent::PolicyRoamScan {
+            reasons: vec![RoamReason::RssiBelowThreshold, RoamReason::SnrBelowThreshold],
+        });
         test_helper.drain_cobalt_events(&mut test_fut);
 
         // Check that the event was logged to cobalt.
         let metrics = test_helper.get_logged_metrics(metrics::POLICY_ROAM_SCAN_COUNT_METRIC_ID);
         assert_eq!(metrics.len(), 1);
         assert_eq!(metrics[0].payload, MetricEventPayload::Count(1));
+
+        // Check that an event was logged for each roam reason.
+        let metrics = test_helper
+            .get_logged_metrics(metrics::POLICY_ROAM_SCAN_COUNT_BY_ROAM_REASON_METRIC_ID);
+        assert_eq!(metrics.len(), 2);
+        assert_eq!(metrics[0].payload, MetricEventPayload::Count(1));
+        assert_eq!(
+            metrics[0].event_codes,
+            vec![convert::convert_roam_reason_dimension(RoamReason::RssiBelowThreshold) as u32]
+        );
+        assert_eq!(metrics[1].payload, MetricEventPayload::Count(1));
+        assert_eq!(
+            metrics[1].event_codes,
+            vec![convert::convert_roam_reason_dimension(RoamReason::SnrBelowThreshold) as u32]
+        );
     }
 
     #[fuchsia::test]

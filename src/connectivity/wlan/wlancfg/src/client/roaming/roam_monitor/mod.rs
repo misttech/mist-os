@@ -74,7 +74,7 @@ pub async fn serve_roam_monitor(
             trigger_data = trigger_data_receiver.next() => if let Some(data) = trigger_data {
                 match roam_monitor.handle_roam_trigger_data(data).await {
                     Ok(RoamTriggerDataOutcome::RoamSearch { scan_type, network_identifier, credential, reasons}) => {
-                        telemetry_sender.send(TelemetryEvent::RoamingScan);
+                        telemetry_sender.send(TelemetryEvent::PolicyRoamScan { reasons: reasons.clone() });
                         info!("Performing scan to find proactive local roaming candidates.");
                         let roam_search_fut = get_roaming_connection_selection_future(
                             connection_selection_requester.clone(),
@@ -266,7 +266,7 @@ mod test {
                 // Verify metric was sent for upcoming roam scan
                 assert_variant!(
                     test_values.telemetry_receiver.try_next(),
-                    Ok(Some(TelemetryEvent::RoamingScan))
+                    Ok(Some(TelemetryEvent::PolicyRoamScan { .. }))
                 );
                 // Verify that a roam search request was sent after monitor responded true.
                 assert_variant!(
@@ -348,7 +348,7 @@ mod test {
         // Verify metric was sent for upcoming roam scan
         assert_variant!(
             test_values.telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::RoamingScan))
+            Ok(Some(TelemetryEvent::PolicyRoamScan { .. }))
         );
 
         if response_to_should_send_roam_request && roaming_mode == RoamingMode::CanRoam {

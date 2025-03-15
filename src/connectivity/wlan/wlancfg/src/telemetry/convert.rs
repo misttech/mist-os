@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::client::roaming::lib::RoamReason;
 use wlan_common::bss::Protection as BssProtection;
 use {fidl_fuchsia_wlan_sme as fidl_sme, wlan_metrics_registry as metrics};
 
@@ -100,5 +101,15 @@ pub fn convert_snr_bucket(snr: i8) -> metrics::ConnectivityWlanMetricDimensionSn
         26..=40 => From26To40,
         41..=127 => MoreThan40,
         _ => _0,
+    }
+}
+
+pub fn convert_roam_reason_dimension(
+    reason: RoamReason,
+) -> metrics::PolicyRoamConnectedDurationBeforeRoamAttemptMetricDimensionReason {
+    use metrics::PolicyRoamConnectedDurationBeforeRoamAttemptMetricDimensionReason::*;
+    match reason {
+        RoamReason::RssiBelowThreshold => RssiBelowThreshold,
+        RoamReason::SnrBelowThreshold => SnrBelowThreshold,
     }
 }
