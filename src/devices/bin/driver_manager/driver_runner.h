@@ -170,6 +170,10 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
                                             : nullptr;
   }
 
+  const fbl::DoublyLinkedList<std::unique_ptr<DriverHostComponent>>& driver_hosts() const {
+    return driver_hosts_;
+  }
+
  private:
   // NodeManager interface.
   // Attempt to bind `node`. A nullptr for result_tracker is acceptable if the caller doesn't intend

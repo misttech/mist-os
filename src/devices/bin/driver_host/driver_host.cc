@@ -107,6 +107,8 @@ void DriverHost::GetProcessInfo(GetProcessInfoCompleter::Sync& completer) {
   completer.Reply(zx::ok(fuchsia_driver_host::ProcessInfo{{
       .job_koid = job_koid,
       .process_koid = process_koid,
+      .threads = {},
+      .dispatchers = {},
   }}));
 }
 

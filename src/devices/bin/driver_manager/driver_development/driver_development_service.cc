@@ -259,6 +259,9 @@ void DriverDevelopmentService::GetCompositeNodeSpecs(
   }
 }
 
+void DriverDevelopmentService::GetDriverHostInfo(GetDriverHostInfoRequestView request,
+                                                 GetDriverHostInfoCompleter::Sync& completer) {}
+
 void DriverDevelopmentService::DisableDriver(DisableDriverRequestView request,
                                              DisableDriverCompleter::Sync& completer) {
   auto driver_index_client = component::Connect<fuchsia_driver_index::DevelopmentManager>();

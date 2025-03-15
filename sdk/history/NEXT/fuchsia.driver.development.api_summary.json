@@ -87,6 +87,86 @@
         "name": "fuchsia.driver.development/CompositeNodeSpecIteratorGetNextResponse"
     },
     {
+        "kind": "table/member",
+        "name": "fuchsia.driver.development/DispatcherInfo.driver",
+        "ordinal": "1",
+        "type": "string:4096"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.development/DispatcherInfo.name",
+        "ordinal": "2",
+        "type": "string"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.development/DispatcherInfo.options",
+        "ordinal": "3",
+        "type": "uint32"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.development/DispatcherInfo.scheduler_role",
+        "ordinal": "4",
+        "type": "string"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.driver.development/DispatcherInfo"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.development/DriverHostInfo.dispatchers",
+        "ordinal": "4",
+        "type": "vector<fuchsia.driver.development/DispatcherInfo>"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.development/DriverHostInfo.drivers",
+        "ordinal": "3",
+        "type": "vector<string:4096>"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.development/DriverHostInfo.process_koid",
+        "ordinal": "1",
+        "type": "uint64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.development/DriverHostInfo.threads",
+        "ordinal": "2",
+        "type": "vector<fuchsia.driver.development/ThreadInfo>"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.driver.development/DriverHostInfo"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.driver.development/DriverHostInfoIterator.GetNext",
+        "strictness": "strict",
+        "ordinal": "53859464570616454",
+        "direction": "two_way",
+        "response": "fuchsia.driver.development/DriverHostInfoIteratorGetNextResponse"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.driver.development/DriverHostInfoIterator",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.driver.development/DriverHostInfoIteratorGetNextResponse.driver_hosts",
+        "ordinal": "1",
+        "type": "vector<fuchsia.driver.development/DriverHostInfo>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.driver.development/DriverHostInfoIteratorGetNextResponse"
+    },
+    {
         "kind": "protocol/member",
         "name": "fuchsia.driver.development/DriverInfoIterator.GetNext",
         "strictness": "strict",
@@ -176,6 +256,14 @@
         "ordinal": "2703638379030327951",
         "direction": "one_way",
         "request": "fuchsia.driver.development/ManagerGetCompositeNodeSpecsRequest"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.driver.development/Manager.GetDriverHostInfo",
+        "strictness": "flexible",
+        "ordinal": "3921276571827323221",
+        "direction": "one_way",
+        "request": "fuchsia.driver.development/ManagerGetDriverHostInfoRequest"
     },
     {
         "kind": "protocol/member",
@@ -294,6 +382,17 @@
     {
         "kind": "struct",
         "name": "fuchsia.driver.development/ManagerGetCompositeNodeSpecsRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.driver.development/ManagerGetDriverHostInfoRequest.iterator",
+        "ordinal": "1",
+        "type": "server_end:fuchsia.driver.development/DriverHostInfoIterator"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.driver.development/ManagerGetDriverHostInfoRequest",
         "resourceness": "resource"
     },
     {
@@ -534,6 +633,28 @@
     {
         "kind": "table",
         "name": "fuchsia.driver.development/TestNodeAddArgs"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.development/ThreadInfo.koid",
+        "ordinal": "1",
+        "type": "uint64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.development/ThreadInfo.name",
+        "ordinal": "2",
+        "type": "string"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.development/ThreadInfo.scheduler_role",
+        "ordinal": "3",
+        "type": "string"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.driver.development/ThreadInfo"
     },
     {
         "kind": "library",

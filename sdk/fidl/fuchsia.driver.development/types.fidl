@@ -80,6 +80,51 @@ type CompositeNodeInfo = table {
     3: composite CompositeInfo;
 };
 
+/// Contains information for a thread.
+@available(added=NEXT)
+type ThreadInfo = table {
+    /// The koid for the thread.
+    1: koid zx.Koid;
+
+    /// The name of the thread.
+    2: name string:MAX;
+
+    /// The scheduler role of the thread.
+    3: scheduler_role string:MAX;
+};
+
+/// Contains information for a dispatcher.
+@available(added=NEXT)
+type DispatcherInfo = table {
+    /// The driver which created this dispatcher.
+    1: driver fuchsia.url.Url;
+
+    /// The name of the dispatcher.
+    2: name string:MAX;
+
+    /// The options the dispatcher was created with.
+    3: options uint32;
+
+    /// The scheduler role of the dispatcher.
+    4: scheduler_role string:MAX;
+};
+
+/// Contains information for a driver host.
+@available(added=NEXT)
+type DriverHostInfo = table {
+    /// The process KOID of the driver host.
+    1: process_koid zx.Koid;
+
+    /// The list of threads of the driver host.
+    2: threads vector<ThreadInfo>:MAX;
+
+    /// List of drivers loaded into this driver host.
+    3: drivers vector<fuchsia.url.Url>:MAX;
+
+    /// List of dispatchers .
+    4: dispatchers vector<DispatcherInfo>:MAX;
+};
+
 type TestNodeAddArgs = table {
     /// Name of the node.
     1: name string:NODE_MONIKER_MAX;

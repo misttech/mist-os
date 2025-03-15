@@ -67,6 +67,13 @@ open protocol Manager {
         iterator server_end:CompositeInfoIterator;
     });
 
+
+    /// Returns a list of all driver hosts that are known to the system.
+    @available(added=NEXT)
+    flexible GetDriverHostInfo(resource struct {
+        iterator server_end:DriverHostInfoIterator;
+    });
+
     /// Restarts all driver hosts containing the driver specified by the `driver_url`,
     /// and returns the number of driver hosts that were restarted.
     /// The |rematch_flags| will be used to decide for which restarting nodes the existing driver

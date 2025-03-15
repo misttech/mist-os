@@ -32,10 +32,27 @@ closed protocol Driver {
     strict Stop();
 };
 
+/// Information about the driver host's threads. Used for debugging.
+type DispatcherInfo = struct {
+    driver string:MAX;
+    name string:MAX;
+    options uint32;
+    scheduler_role string:MAX;
+};
+
+/// Information about the driver host's threads. Used for debugging.
+type ThreadInfo = struct {
+    koid uint64;
+    name string:MAX;
+    scheduler_role string:MAX;
+};
+
 /// Information about the driver host. Used for debugging.
 type ProcessInfo = struct {
     job_koid uint64;
     process_koid uint64;
+    threads vector<ThreadInfo>:MAX;
+    dispatchers vector<DispatcherInfo>:MAX;
 };
 
 /// Protocol through which a driver host can be managed.
