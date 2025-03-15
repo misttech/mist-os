@@ -14,7 +14,7 @@
 use anyhow::Result;
 use cfg_if::cfg_if;
 use serde::{Deserialize, Serialize};
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{stdout, BufRead, BufReader, Read, Write};
 use unicode_segmentation::UnicodeSegmentation;
 
 // Magic terminal escape codes.
@@ -361,18 +361,15 @@ pub struct InnerTextUi<'a> {
     overwrite_line_count: usize,
 }
 
-#[allow(dead_code)]
-mod mock_atty {
-    pub(super) fn always_a_tty(_: atty::Stream) -> bool {
-        true
-    }
-}
-
 cfg_if! {
     if #[cfg(test)] {
-        use mock_atty::always_a_tty as is;
+        fn is_tty(_t: impl std::io::IsTerminal) -> bool {
+            true
+        }
     } else {
-        use atty::is;
+        fn is_tty(t: impl std::io::IsTerminal) -> bool {
+            t.is_terminal()
+        }
     }
 }
 
@@ -400,7 +397,7 @@ impl<'a> TextUi<'a> {
     fn present_progress(&self, progress: &Progress) -> Result<Response> {
         // We only print the progress text if it's going to a TTY terminal,
         // since the shell control sequences don't make sense otherwise.
-        if !is(atty::Stream::Stdout) {
+        if !is_tty(stdout()) {
             return Ok(Response::Default);
         }
         let mut inner = self.inner.lock().expect("present_progress lock");
@@ -452,9 +449,9 @@ impl<'a> TextUi<'a> {
     }
 
     fn present_string_prompt(&self, element: &SimplePresentation) -> Result<Response> {
-        if !is(atty::Stream::Stdout) {
-            // If the terminal is non-interactive, it's not reasonable to prompt
-            // the user.
+        // If the terminal is non-interactive, it's not reasonable to prompt
+        // the user.
+        if !is_tty(stdout()) {
             return Ok(Response::NoChoice);
         }
         let mut inner = self.inner.lock().expect("present_string_prompt lock");

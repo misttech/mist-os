@@ -11,7 +11,6 @@ rustc_library("lib") {
 
   deps = [
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:atty",
     "//third_party/rust_crates:cfg-if",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:termion",
