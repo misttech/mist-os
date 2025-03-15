@@ -286,6 +286,14 @@ function fx-export-default-target {
   fi
 }
 
+# Forces the command to fail if a user specifies the -d flag
+function fx-fail-if-device-specified {
+  if [[ -n "${FUCHSIA_NODENAME_SET_BY_FX_FLAG}" ]]; then
+    fx-error "The -d flag is not supported when calling this function"
+    exit 1
+  fi
+}
+
 # Sets FUCHSIA_BUILD_DIR once, to an absolute path.
 function fx-build-dir-if-present {
   if [[ -n "${FUCHSIA_BUILD_DIR:-}" ]]; then
