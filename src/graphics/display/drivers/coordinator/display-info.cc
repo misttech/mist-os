@@ -105,10 +105,18 @@ zx::result<std::unique_ptr<DisplayInfo>> DisplayInfo::Create(AddedDisplayInfo ad
     fit::result<const char*, edid::Edid> edid_result =
         edid::Edid::Create(added_display_info.edid_bytes);
     if (edid_result.is_error()) {
-      fdf::error("Failed to initialize EDID: {}", edid_result.error_value());
-      return zx::error(ZX_ERR_INTERNAL);
+      fdf::warn("Failed to initialize EDID: {}. Skipping EDID on display creation.",
+                edid_result.error_value());
+    } else {
+      edid_info.emplace(std::move(edid_result).value());
     }
-    edid_info.emplace(std::move(edid_result).value());
+  }
+
+  if (preferred_modes.is_empty() && !edid_info.has_value()) {
+    fdf::error(
+        "Failed to create DisplayInfo: The display doesn't provide "
+        "a valid EDID nor valid preferred modes.");
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   fbl::AllocChecker alloc_checker;
