@@ -36,7 +36,7 @@ class Bitmap {
   void Clear(uint32_t offset) {
     uint32_t* bits = GetBits(offset);
     uint32_t shift = offset % 32;
-    *bits &= ~(1 << shift);
+    *bits &= static_cast<uint32_t>(~(1 << shift));
   }
 
   // Clear all values in the bitmap to 0.
