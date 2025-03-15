@@ -53,6 +53,7 @@ group_with_no_dir_target_deps("workbench_x64_stable_tests") {
     "//src/storage/blackout/host:blackout_emulator_stable",
     "//src/tests/end_to_end/diagnostics:diagnostics_test($host_toolchain)",
     "//src/tests/end_to_end/snapshot:snapshot_test($host_toolchain)",
+    "//src/tests/end_to_end/timekeeper:timekeeper_test($host_toolchain)",
   ]
 }
 
@@ -84,6 +85,7 @@ group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
     "//src/tests/end_to_end/diagnostics:diagnostics_test($host_toolchain)",
     "//src/tests/end_to_end/rtc:rtc_conformance_test($host_toolchain)",
     "//src/tests/end_to_end/snapshot:snapshot_test($host_toolchain)",
+    "//src/tests/end_to_end/timekeeper:timekeeper_test($host_toolchain)",
   ]
 }
 
@@ -137,6 +139,7 @@ group_with_no_dir_target_deps("starnix_arm64_stable_tests") {
   public_deps = [
     "//src/tests/end_to_end/diagnostics:diagnostics_test($host_toolchain)",
     "//src/tests/end_to_end/snapshot:snapshot_test($host_toolchain)",
+    "//src/tests/end_to_end/timekeeper:timekeeper_test($host_toolchain)",
   ]
 }
 
