@@ -172,7 +172,7 @@ config("target") {
 }
 
 config("cap_lints") {
-  if (rust_rbe_exec_strategy == "local") {
+  if (rust_rbe_enable && rust_rbe_exec_strategy == "local") {
     # The local exec strategy tries to see if there's an RBE cache hit before running the command
     # locally. The RBE cache is often populated by infra builders which never have this flag, so we
     # want to include it *only* when checking for a cache hit. This flag doesn't affect the output
@@ -184,7 +184,7 @@ config("cap_lints") {
 }
 
 config("cap_lints_warn") {
-  if (rust_rbe_exec_strategy == "local") {
+  if (rust_rbe_enable && rust_rbe_exec_strategy == "local") {
     # The local exec strategy tries to see if there's an RBE cache hit before running the command
     # locally. The RBE cache is often populated by infra builders which never have this flag, so we
     # want to include it *only* when checking for a cache hit. This flag doesn't affect the output
@@ -196,7 +196,7 @@ config("cap_lints_warn") {
 }
 
 config("cap_lints_allow") {
-  if (rust_rbe_exec_strategy == "local") {
+  if (rust_rbe_enable && rust_rbe_exec_strategy == "local") {
     # The local exec strategy tries to see if there's an RBE cache hit before running the command
     # locally. The RBE cache is often populated by infra builders which never have this flag, so we
     # want to include it *only* when checking for a cache hit. This flag doesn't affect the output
