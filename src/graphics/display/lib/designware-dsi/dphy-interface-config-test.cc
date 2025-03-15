@@ -239,8 +239,9 @@ TEST(InvalidDphyInterfaceConfigTest, EscapeModeClockLaneFrequencyNonPositive) {
   EXPECT_FALSE(kInvalidDphyInterfaceConfigWithZeroFrequency.IsValid());
 }
 
-TEST(InvalidDphyInterfaceConfigTest,
-     EscapeModeClockLaneFrequencyDoesNotDivideHighSpeedModeByteClockFrequency) {
+TEST(
+    InvalidDphyInterfaceConfigTest,
+    EscapeModeClockLaneFrequencyDoesNotDivideHighSpeedModeByteClockFrequencyWithPositiveErrorValid) {
   static constexpr DphyInterfaceConfig kInvalidDphyInterfaceConfig = {
       .data_lane_count = 4,
       .clock_lane_mode_automatic_control_enabled = true,
@@ -255,6 +256,46 @@ TEST(InvalidDphyInterfaceConfigTest,
   };
 
   EXPECT_EQ(kInvalidDphyInterfaceConfig.high_speed_mode_data_lane_bytes_per_second(), 100'000'001);
+  EXPECT_TRUE(kInvalidDphyInterfaceConfig.IsValid());
+}
+
+TEST(
+    InvalidDphyInterfaceConfigTest,
+    EscapeModeClockLaneFrequencyDoesNotDivideHighSpeedModeByteClockFrequencyWithNegativeErrorValid) {
+  static constexpr DphyInterfaceConfig kInvalidDphyInterfaceConfig = {
+      .data_lane_count = 4,
+      .clock_lane_mode_automatic_control_enabled = true,
+
+      .high_speed_mode_clock_lane_frequency_hz = 399'999'996,
+      .escape_mode_clock_lane_frequency_hz = 10'000'000,
+
+      .max_data_lane_hs_to_lp_transition_duration_lane_byte_clock_cycles = 10,
+      .max_data_lane_lp_to_hs_transition_duration_lane_byte_clock_cycles = 20,
+      .max_clock_lane_hs_to_lp_transition_duration_lane_byte_clock_cycles = 30,
+      .max_clock_lane_lp_to_hs_transition_duration_lane_byte_clock_cycles = 40,
+  };
+
+  EXPECT_EQ(kInvalidDphyInterfaceConfig.high_speed_mode_data_lane_bytes_per_second(), 99'999'999);
+  EXPECT_TRUE(kInvalidDphyInterfaceConfig.IsValid());
+}
+
+TEST(
+    InvalidDphyInterfaceConfigTest,
+    EscapeModeClockLaneFrequencyDoesNotDivideHighSpeedModeByteClockFrequencyWithTooLargeErrorInvalid) {
+  static constexpr DphyInterfaceConfig kInvalidDphyInterfaceConfig = {
+      .data_lane_count = 4,
+      .clock_lane_mode_automatic_control_enabled = true,
+
+      .high_speed_mode_clock_lane_frequency_hz = 450'000'000,
+      .escape_mode_clock_lane_frequency_hz = 10'000'000,
+
+      .max_data_lane_hs_to_lp_transition_duration_lane_byte_clock_cycles = 10,
+      .max_data_lane_lp_to_hs_transition_duration_lane_byte_clock_cycles = 20,
+      .max_clock_lane_hs_to_lp_transition_duration_lane_byte_clock_cycles = 30,
+      .max_clock_lane_lp_to_hs_transition_duration_lane_byte_clock_cycles = 40,
+  };
+
+  EXPECT_EQ(kInvalidDphyInterfaceConfig.high_speed_mode_data_lane_bytes_per_second(), 112'500'000);
   EXPECT_FALSE(kInvalidDphyInterfaceConfig.IsValid());
 }
 
