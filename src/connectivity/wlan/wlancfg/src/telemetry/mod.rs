@@ -7,7 +7,7 @@ mod inspect_time_series;
 mod windowed_stats;
 
 use crate::client;
-use crate::client::roaming::lib::RoamReason;
+use crate::client::roaming::lib::{PolicyRoamRequest, RoamReason};
 use crate::mode_management::{Defect, IfaceFailure};
 use crate::telemetry::inspect_time_series::TimeSeriesStats;
 use crate::telemetry::windowed_stats::WindowedStats;
@@ -292,6 +292,11 @@ pub enum TelemetryEvent {
     /// the existing connection.
     PolicyRoamScan {
         reasons: Vec<RoamReason>,
+    },
+    /// Notify telemetry that the roam monitor has decided to attempt a roam to a candidate.
+    PolicyRoamAttempt {
+        request: PolicyRoamRequest,
+        connected_duration: zx::MonotonicDuration,
     },
     /// Proactive roams do not happen yet, but we want to analyze metrics for when they would
     /// happen. Roams are set up to log metrics when disconnects happen to roam, so this event
@@ -1435,6 +1440,11 @@ impl Telemetry {
             }
             TelemetryEvent::PolicyRoamScan { reasons } => {
                 self.stats_logger.log_policy_roam_scan_metrics(reasons).await;
+            }
+            TelemetryEvent::PolicyRoamAttempt { request, connected_duration } => {
+                self.stats_logger
+                    .log_policy_roam_attempt_metrics(request, connected_duration)
+                    .await;
             }
             TelemetryEvent::WouldRoamConnect => {
                 self.stats_logger.log_would_roam_connect().await;
@@ -3063,6 +3073,36 @@ impl StatsLogger {
                 log_occurrence,
                 metrics::POLICY_ROAM_SCAN_COUNT_BY_ROAM_REASON_METRIC_ID,
                 1,
+                &[convert::convert_roam_reason_dimension(reason) as u32],
+            ));
+        }
+    }
+
+    async fn log_policy_roam_attempt_metrics(
+        &mut self,
+        request: PolicyRoamRequest,
+        connected_duration: zx::MonotonicDuration,
+    ) {
+        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
+            self.cobalt_1dot1_proxy,
+            log_occurrence,
+            metrics::POLICY_ROAM_ATTEMPT_COUNT_METRIC_ID,
+            1,
+            &[],
+        ));
+        for reason in request.reasons {
+            self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
+                self.cobalt_1dot1_proxy,
+                log_occurrence,
+                metrics::POLICY_ROAM_ATTEMPT_COUNT_BY_ROAM_REASON_METRIC_ID,
+                1,
+                &[convert::convert_roam_reason_dimension(reason) as u32],
+            ));
+            self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
+                self.cobalt_1dot1_proxy,
+                log_integer,
+                metrics::POLICY_ROAM_CONNECTED_DURATION_BEFORE_ROAM_ATTEMPT_METRIC_ID,
+                connected_duration.into_minutes(),
                 &[convert::convert_roam_reason_dimension(reason) as u32],
             ));
         }
@@ -7881,6 +7921,58 @@ mod tests {
             vec![convert::convert_roam_reason_dimension(RoamReason::RssiBelowThreshold) as u32]
         );
         assert_eq!(metrics[1].payload, MetricEventPayload::Count(1));
+        assert_eq!(
+            metrics[1].event_codes,
+            vec![convert::convert_roam_reason_dimension(RoamReason::SnrBelowThreshold) as u32]
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_log_policy_roam_attempt() {
+        let (mut test_helper, mut test_fut) = setup_test();
+
+        // Send a roaming scan event
+        let candidate = generate_random_scanned_candidate();
+        test_helper.telemetry_sender.send(TelemetryEvent::PolicyRoamAttempt {
+            request: PolicyRoamRequest {
+                candidate,
+                reasons: vec![RoamReason::RssiBelowThreshold, RoamReason::SnrBelowThreshold],
+            },
+            connected_duration: zx::Duration::from_hours(1),
+        });
+        test_helper.drain_cobalt_events(&mut test_fut);
+
+        let metrics = test_helper.get_logged_metrics(metrics::POLICY_ROAM_ATTEMPT_COUNT_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].payload, MetricEventPayload::Count(1));
+
+        // Check that an event was logged for each roam reason.
+        let metrics = test_helper
+            .get_logged_metrics(metrics::POLICY_ROAM_ATTEMPT_COUNT_BY_ROAM_REASON_METRIC_ID);
+        assert_eq!(metrics.len(), 2);
+        assert_eq!(metrics[0].payload, MetricEventPayload::Count(1));
+        assert_eq!(
+            metrics[0].event_codes,
+            vec![convert::convert_roam_reason_dimension(RoamReason::RssiBelowThreshold) as u32]
+        );
+        assert_eq!(metrics[1].payload, MetricEventPayload::Count(1));
+        assert_eq!(
+            metrics[1].event_codes,
+            vec![convert::convert_roam_reason_dimension(RoamReason::SnrBelowThreshold) as u32]
+        );
+
+        // Check that a metric was logged for the connedted duration before roaming
+        let metrics = test_helper.get_logged_metrics(
+            metrics::POLICY_ROAM_CONNECTED_DURATION_BEFORE_ROAM_ATTEMPT_METRIC_ID,
+        );
+        assert_eq!(metrics.len(), 2);
+        assert_eq!(metrics.len(), 2);
+        assert_eq!(metrics[0].payload, MetricEventPayload::IntegerValue(60));
+        assert_eq!(
+            metrics[0].event_codes,
+            vec![convert::convert_roam_reason_dimension(RoamReason::RssiBelowThreshold) as u32]
+        );
+        assert_eq!(metrics[1].payload, MetricEventPayload::IntegerValue(60));
         assert_eq!(
             metrics[1].event_codes,
             vec![convert::convert_roam_reason_dimension(RoamReason::SnrBelowThreshold) as u32]

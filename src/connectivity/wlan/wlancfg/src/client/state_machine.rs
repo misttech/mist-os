@@ -789,11 +789,16 @@ async fn connected_state(
                 });
             }
             roam_request = options.roam_request_receiver.select_next_some() => {
+
                 let _ = common_options
                 .proxy
-                .roam(&roam_request.into())
+                .roam(&roam_request.clone().into())
                 .inspect_err(|e| {
                     error!("Error sending sme roam request: {}", e);
+                });
+                common_options.telemetry_sender.send(TelemetryEvent::PolicyRoamAttempt {
+                    request: roam_request,
+                    connected_duration: fasync::MonotonicInstant::now() - options.bss_connect_start_time,
                 });
             }
         }
@@ -940,6 +945,7 @@ async fn handle_roam_result(
             .await;
         info!("Roam attempt failed, original association not maintained, disconnecting");
     }
+
     notify_on_roam_result(common_options, options, result).await;
     Ok(())
 }
@@ -3139,9 +3145,19 @@ mod tests {
         assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Roam{ req, ..}) => {
-                assert_eq!(req.bss_description, Sequestered::release(roam_candidate.bss.bss_description));
+                assert_eq!(req.bss_description, Sequestered::release(roam_candidate.clone().bss.bss_description));
             }
         );
+
+        // Verify roam attempt telemetry event.
+        assert_variant!(test_values.telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_variant!(event, TelemetryEvent::PolicyRoamAttempt { request, connected_duration } => {
+                assert_eq!(request.candidate, roam_candidate);
+                assert_eq!(request.reasons, vec![]);
+                assert_eq!(connected_duration, zx::Duration::from_minutes(0));
+
+            });
+        });
     }
 
     #[fuchsia::test]
