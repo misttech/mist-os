@@ -117,7 +117,7 @@ class BlockDevice : public virtio::Device {
     return i;
   }
 
-  void free_blk_req(size_t i) { blk_req_bitmap_ &= ~(1 << i); }
+  void free_blk_req(size_t i) { blk_req_bitmap_ &= static_cast<uint32_t>(~(1 << i)); }
 
   // Pending txns and completion signal.
   std::mutex txn_lock_;
