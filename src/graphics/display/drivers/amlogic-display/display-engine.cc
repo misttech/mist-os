@@ -762,6 +762,8 @@ zx_status_t DisplayEngine::DisplayEngineSetDisplayPower(uint64_t display_id, boo
     return ZX_ERR_NOT_FOUND;
   }
 
+  fdf::info("Powering {} Display {}", power_on ? "on" : "off", display_id);
+
   if (vout_->type() == VoutType::kHdmi) {
     // TODO(https://fxbug.dev/335303016): This is a workaround to not trigger
     // display disconnection interrupts on HDMI display power off. It doesn't
