@@ -82,6 +82,13 @@ class Riscv64ArchVmAspace final : public ArchVmAspaceInterface {
   uint16_t asid() const { return asid_; }
   void arch_set_asid(uint16_t asid) {}
 
+  // Note: these load/fetch_or calls use the seq_cst memory ordering. Although some of the call
+  // sites of these methods *may* be able to tolerate more relaxed orderings, most of them require
+  // strong orderings and this should not be changed.
+  cpu_mask_t active_cpus() const { return active_cpus_.load(); }
+  cpu_mask_t asid_dirty_cpus() const { return asid_dirty_cpus_.load(); }
+  cpu_mask_t MarkAsidDirtyCpus(cpu_mask_t mask) { return asid_dirty_cpus_.fetch_or(mask); }
+
   static void ContextSwitch(Riscv64ArchVmAspace* from, Riscv64ArchVmAspace* to);
 
   static void HandoffPageTablesFromPhysboot(list_node_t* mmu_pages);
@@ -155,9 +162,9 @@ class Riscv64ArchVmAspace final : public ArchVmAspaceInterface {
   zx_status_t ProtectPages(vaddr_t vaddr, size_t size, pte_t attrs) TA_REQ(lock_);
   zx_status_t QueryLocked(vaddr_t vaddr, paddr_t* paddr, uint* mmu_flags) TA_REQ(lock_);
 
-  void FlushTLBEntryRun(vaddr_t vaddr, size_t page_count) const TA_REQ(lock_);
+  void FlushTLBEntryRun(vaddr_t vaddr, size_t page_count) TA_REQ(lock_);
 
-  void FlushAsid() const TA_REQ(lock_);
+  void FlushAsid() TA_REQ(lock_);
 
   // Returns true if the given level corresponds to the top level page table.
   static bool IsTopLevel(uint level) { return level == (RISCV64_MMU_PT_LEVELS - 1); }
@@ -242,8 +249,15 @@ class Riscv64ArchVmAspace final : public ArchVmAspaceInterface {
   // Number of CPUs this aspace is currently active on.
   ktl::atomic<uint32_t> num_active_cpus_ = 0;
 
+  // CPUs that are currently executing in this aspace.
+  ktl::atomic<cpu_mask_t> active_cpus_{0};
+
   // Whether not this has been active since |ActiveSinceLastCheck| was called.
   ktl::atomic<bool> active_since_last_check_ = false;
+
+  // A bitmap of cpus where the current ASID that was assigned is now dirty and should
+  // be flushed on the next context switch.
+  ktl::atomic<cpu_mask_t> asid_dirty_cpus_{0};
 };
 
 class Riscv64VmICacheConsistencyManager final : public ArchVmICacheConsistencyManagerInterface {

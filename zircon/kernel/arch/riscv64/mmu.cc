@@ -468,7 +468,7 @@ class Riscv64ArchVmAspace::ConsistencyManager {
   list_node to_free_ = LIST_INITIAL_VALUE(to_free_);
 
   // The aspace we are invalidating TLBs for.
-  const Riscv64ArchVmAspace& aspace_;
+  Riscv64ArchVmAspace& aspace_;
 
   // Perform a full flush of the entire ASID (or all ASIDs if a kernel aspace) in these cases:
   // 1) We've accumulated more than kMaxPendingTlbRuns run of pages, which are expensive to perform
@@ -619,7 +619,7 @@ zx_status_t Riscv64ArchVmAspace::SplitLargePage(vaddr_t vaddr, uint level, vaddr
 
 // Use the appropriate TLB flush instruction to globally flush the modified run of pages
 // in the appropriate ASID, or across all ASIDs if the run is in the kernel or in a shared aspace.
-void Riscv64ArchVmAspace::FlushTLBEntryRun(vaddr_t vaddr, size_t count) const {
+void Riscv64ArchVmAspace::FlushTLBEntryRun(vaddr_t vaddr, size_t count) {
   LTRACEF("vaddr %#lx, count %#lx, asid %#hx, kernel %u\n", vaddr, count, asid_, IsKernel());
 
   kcounter_add(cm_page_run_invalidate, 1);
@@ -646,7 +646,7 @@ void Riscv64ArchVmAspace::FlushTLBEntryRun(vaddr_t vaddr, size_t count) const {
 }
 
 // Flush an entire ASID on all cpus.
-void Riscv64ArchVmAspace::FlushAsid() const {
+void Riscv64ArchVmAspace::FlushAsid() {
   LTRACEF("asid %#hx, kernel %u\n", asid_, IsKernel());
 
   if (IsKernel() || IsShared()) {
@@ -658,10 +658,18 @@ void Riscv64ArchVmAspace::FlushAsid() const {
     // Perform a full flush of all cpus of a single ASID
     SfenceVmaArgs args{.asid = asid_};
     // If this is a restricted aspace, we must also flush the associated unified aspace's ASID.
+    cpu_mask_t target_mask = active_cpus();
+    MarkAsidDirtyCpus(~target_mask);
+    target_mask |= active_cpus();
+    cpu_mask_t target_unified_mask = 0;
     if (IsRestricted()) {
       args.unified_asid = get_unified_aspace()->asid();
+      target_unified_mask = get_unified_aspace()->active_cpus();
+      get_unified_aspace()->MarkAsidDirtyCpus(~target_unified_mask);
+      target_unified_mask |= get_unified_aspace()->active_cpus();
     }
-    mp_sync_exec(MP_IPI_TARGET_ALL, /* cpu_mask */ 0, &SfenceVma, &args);
+
+    mp_sync_exec(MP_IPI_TARGET_MASK, target_mask | target_unified_mask, &SfenceVma, &args);
     kcounter_add(cm_asid_invalidate, 1);
   }
 }
@@ -1375,6 +1383,7 @@ zx_status_t Riscv64ArchVmAspace::Init() {
           return status.status_value();
         }
         asid_ = status.value();
+        MarkAsidDirtyCpus(CPU_MASK_ALL);
       } else {
         asid_ = MMU_RISCV64_UNUSED_ASID;
       }
@@ -1615,11 +1624,28 @@ zx_status_t Riscv64ArchVmAspace::DestroyIndividual() {
 // mmu context on hardware. Assumes old_aspace != aspace and optimizes as such.
 void Riscv64ArchVmAspace::ContextSwitch(Riscv64ArchVmAspace* old_aspace,
                                         Riscv64ArchVmAspace* aspace) {
+  cpu_mask_t cpu_bit = cpu_num_to_mask(arch_curr_cpu_num());
+
   uint64_t satp;
 
   if (likely(aspace)) {
     aspace->canary_.Assert();
     DEBUG_ASSERT(aspace->type_ == Riscv64AspaceType::kUser);
+
+    if (old_aspace) {
+      [[maybe_unused]] uint32_t prev = old_aspace->active_cpus_.fetch_and(~cpu_bit);
+      // Make sure we were actually previously running on this CPU.
+      DEBUG_ASSERT(prev & cpu_bit);
+    }
+
+    {
+      // Set ourselves as active on this CPU prior to clearing the dirty bit. This ensures that TLB
+      // invalidation code will either see us as active, and know to IPI us, or we will see the
+      // dirty bit and clear the tlb here.
+      [[maybe_unused]] uint32_t prev = aspace->active_cpus_.fetch_or(cpu_bit);
+      // Should not already be running on this CPU.
+      DEBUG_ASSERT(!(prev & cpu_bit));
+    }
 
     // Load the user space SATP with the translation table and user space ASID.
     satp = (RISCV64_SATP_MODE_SV39 << RISCV64_SATP_MODE_SHIFT) |
@@ -1637,11 +1663,20 @@ void Riscv64ArchVmAspace::ContextSwitch(Riscv64ArchVmAspace* old_aspace,
       aspace->get_restricted_aspace()->active_since_last_check_.store(true,
                                                                       ktl::memory_order_relaxed);
     }
+    const cpu_mask_t dirty_mask = aspace->asid_dirty_cpus_.fetch_and(~cpu_bit);
+    if (dirty_mask & cpu_bit) {
+      riscv64_tlb_flush_asid(aspace->asid_);
+    }
   } else {
     // Switching to the null aspace, which means kernel address space only.
     satp = (RISCV64_SATP_MODE_SV39 << RISCV64_SATP_MODE_SHIFT) |
            (static_cast<uint64_t>(kernel_asid()) << RISCV64_SATP_ASID_SHIFT) |
            (kernel_virt_to_phys(riscv64_kernel_translation_table) >> PAGE_SIZE_SHIFT);
+    if (old_aspace != nullptr) {
+      [[maybe_unused]] uint32_t prev = old_aspace->active_cpus_.fetch_and(~cpu_bit);
+      // Make sure we were actually previously running on this CPU
+      DEBUG_ASSERT(prev & cpu_bit);
+    }
   }
   if (likely(old_aspace != nullptr)) {
     [[maybe_unused]] uint32_t prev =
