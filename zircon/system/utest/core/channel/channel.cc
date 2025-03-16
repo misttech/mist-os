@@ -17,6 +17,7 @@
 #pragma GCC diagnostic ignored "-Wnonnull"
 #include <lib/zx/channel.h>
 #pragma GCC diagnostic pop
+#include <lib/arch/intrin.h>
 #include <lib/fit/defer.h>
 #include <lib/zx/event.h>
 #include <lib/zx/fifo.h>
@@ -1492,6 +1493,7 @@ TEST(ChannelTest, NoSpuriousReadableSignalWhenRacing) {
       b.write(0, &msg, sizeof(msg), nullptr, 0);
       // Wait for the next attempt.
       while (running.load() && attempt.load() == curr) {
+        arch::Yield();
       }
     }
   };
