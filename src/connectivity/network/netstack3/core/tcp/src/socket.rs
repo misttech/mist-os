@@ -73,7 +73,7 @@ use crate::internal::base::{
     BufferSizes, BuffersRefMut, ConnectionError, SocketOptions, TcpIpSockOptions,
 };
 use crate::internal::buffer::{Buffer, IntoBuffers, ReceiveBuffer, SendBuffer};
-use crate::internal::counters::TcpCounters;
+use crate::internal::counters::{TcpCounters, TcpCountersRefs};
 use crate::internal::socket::accept_queue::{AcceptQueue, ListenerNotifier};
 use crate::internal::socket::demux::tcp_serialize_segment;
 use crate::internal::socket::isn::IsnGenerator;
@@ -1758,7 +1758,8 @@ impl<
         error: IcmpErrorCode,
     ) -> NewlyClosed {
         let Connection { soft_error, state, .. } = self;
-        let (new_soft_error, newly_closed) = state.on_icmp_error(core_ctx.counters(), error, seq);
+        let (new_soft_error, newly_closed) =
+            state.on_icmp_error(&TcpCountersRefs::from_ctx(core_ctx), error, seq);
         *soft_error = soft_error.or(new_soft_error);
         newly_closed
     }
@@ -2981,7 +2982,7 @@ where
 
                             conn.defunct = true;
                             let newly_closed = match conn.state.close(
-                                core_ctx.counters(),
+                                &TcpCountersRefs::from_ctx(core_ctx),
                                 CloseReason::Close { now: bindings_ctx.now() },
                                 &conn.socket_options,
                             ) {
@@ -3135,7 +3136,7 @@ where
                             }
 
                             match conn.state.close(
-                                core_ctx.counters(),
+                                &TcpCountersRefs::from_ctx(core_ctx),
                                 CloseReason::Shutdown,
                                 &conn.socket_options,
                             ) {
@@ -4641,7 +4642,7 @@ fn close_pending_socket<WireI, SockI, DC, BC>(
     BC: TcpBindingsContext,
 {
     debug!("aborting pending socket {sock_id:?}");
-    let (maybe_reset, newly_closed) = conn.state.abort(core_ctx.counters());
+    let (maybe_reset, newly_closed) = conn.state.abort(&TcpCountersRefs::from_ctx(core_ctx));
     handle_newly_closed(core_ctx, bindings_ctx, newly_closed, demux_id, conn_addr, timer);
     if let Some(reset) = maybe_reset {
         let ConnAddr { ip, device: _ } = conn_addr;
@@ -4717,7 +4718,7 @@ where
     let newly_closed = loop {
         match conn.state.poll_send(
             conn_id,
-            core_ctx.counters(),
+            &TcpCountersRefs::from_ctx(core_ctx),
             u32::MAX,
             bindings_ctx.now(),
             &conn.socket_options,

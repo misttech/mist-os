@@ -37,7 +37,7 @@ use packet_formats::tcp::{
 };
 
 use crate::internal::base::{BufferSizes, ConnectionError, SocketOptions, TcpIpSockOptions};
-use crate::internal::counters::TcpCounters;
+use crate::internal::counters::{TcpCounters, TcpCountersRefs};
 use crate::internal::socket::isn::IsnGenerator;
 use crate::internal::socket::{
     self, AsThisStack as _, BoundSocketState, Connection, DemuxState, DeviceIpSocketHandler,
@@ -647,7 +647,7 @@ where
     }
     let (reply, passive_open, data_acked, newly_closed) = state.on_segment::<_, BC>(
         conn_id,
-        core_ctx.counters(),
+        &TcpCountersRefs::from_ctx(core_ctx),
         incoming,
         bindings_ctx.now(),
         socket_options,
@@ -982,7 +982,7 @@ where
         // the first segment because we don't have an ID allocated yet. This is
         // okay because the state machine ID is only for debugging purposes.
         listener_id,
-        core_ctx.counters(),
+        &TcpCountersRefs::from_ctx(core_ctx),
         incoming,
         bindings_ctx.now(),
         &SocketOptions::default(),
