@@ -5,8 +5,6 @@
 # shell- and fx-related utilities.
 per-file fuchsia-vendored-python*,fx,fx-*,hermetic-env = crjohns@google.com
 
-per-file bazel_tool.py = file://build/OWNERS
-
 # FIDL-related scripts.
 per-file generate-fidl-* = file://tools/fidl/OWNERS
 

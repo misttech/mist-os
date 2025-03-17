@@ -120,7 +120,7 @@ def cmd_set_gn_targets(args: argparse.Namespace) -> int:
     """Implement the set_gn_targets command."""
 
     # Lazy import of workspace_utils.py and gn_targets_utils.py
-    sys.path.insert(0, f"{args.fuchsia_dir}/build/bazel/scripts")
+    sys.path.insert(0, str(Path(__file__).parent))
     import gn_targets_utils
     import workspace_utils
 
