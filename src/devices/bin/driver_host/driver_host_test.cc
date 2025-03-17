@@ -126,7 +126,7 @@ struct StartDriverResult {
 
 class DriverHostTest : public testing::Test {
  protected:
-  void SetUp() override { fdf_env_start(); }
+  void SetUp() override { fdf_env_start(0); }
 
   async::Loop& loop() { return loop_; }
   fidl::Server<fdh::DriverHost>& driver_host() { return *driver_host_; }

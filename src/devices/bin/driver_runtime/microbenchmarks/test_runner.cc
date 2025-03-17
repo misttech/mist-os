@@ -7,7 +7,7 @@
 #include <perftest/perftest.h>
 
 int main(int argc, char** argv) {
-  if (zx_status_t status = fdf_env_start(); status != ZX_OK) {
+  if (zx_status_t status = fdf_env_start(0); status != ZX_OK) {
     return status;
   }
   return perftest::PerfTestMain(argc, argv, "fuchsia.driver_runtime");

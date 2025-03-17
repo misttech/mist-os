@@ -11,7 +11,7 @@ namespace network::tun {
 zx::result<std::unique_ptr<MinimalDriverRuntime>> MinimalDriverRuntime::Create() {
   // Call this before creating the MinimalDriverRuntime object. This ensures that fdf_env_reset is
   // only called if fdf_env_start succeeds.
-  zx_status_t status = fdf_env_start();
+  zx_status_t status = fdf_env_start(0);
   if (status != ZX_OK) {
     return zx::error(status);
   }

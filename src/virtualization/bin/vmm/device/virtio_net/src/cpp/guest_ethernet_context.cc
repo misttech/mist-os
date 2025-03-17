@@ -8,7 +8,7 @@
 #include <lib/syslog/cpp/macros.h>
 
 zx::result<std::unique_ptr<GuestEthernetContext>> GuestEthernetContext::Create() {
-  zx_status_t status = fdf_env_start();
+  zx_status_t status = fdf_env_start(0);
   if (status != ZX_OK) {
     return zx::error(status);
   }

@@ -732,7 +732,7 @@ const _: () = {
         [::core::mem::offset_of!(fdf_env_driver_shutdown_observer, handler) - 0usize];
 };
 unsafe extern "C" {
-    pub fn fdf_env_start() -> zx_status_t;
+    pub fn fdf_env_start(options: u32) -> zx_status_t;
 }
 unsafe extern "C" {
     pub fn fdf_env_reset();

@@ -13,6 +13,7 @@
 #include <lib/async/trap.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdf/dispatcher.h>
+#include <lib/fdf/env.h>
 #include <lib/fit/defer.h>
 #include <lib/trace/event.h>
 #include <lib/zx/clock.h>
@@ -25,6 +26,7 @@
 #include <zircon/listnode.h>
 #include <zircon/status.h>
 #include <zircon/syscalls.h>
+#include <zircon/system/public/zircon/compiler.h>
 
 #include <memory>
 #include <string>
@@ -1536,12 +1538,15 @@ void AllowedSchedulerRoles::AddForDriver(const void* driver, std::string_view ro
   allowed_roles_[driver].emplace(role);
 }
 
+bool g_enforce_allowed_scheduler_roles = false;
+
 bool AllowedSchedulerRoles::IsAllowed(std::string_view role) {
-  // TODO(https://fxbug.dev/42180471): Enabled this to start restricting.
-  // fbl::AutoLock guard(&lock_);
-  // auto iter = allowed_roles_.find(thread_context::GetCurrentDriver());
-  // return iter != allowed_roles_.end() && iter->second.contains(std::string(role));
-  return true;
+  if (unlikely(!g_enforce_allowed_scheduler_roles)) {
+    return true;
+  }
+  fbl::AutoLock guard(&lock_);
+  auto iter = allowed_roles_.find(thread_context::GetCurrentDriver());
+  return iter != allowed_roles_.end() && iter->second.contains(std::string(role));
 }
 
 // static
@@ -1830,7 +1835,8 @@ void DispatcherCoordinator::RemoveDispatcher(Dispatcher& dispatcher) {
   }
 }
 
-zx_status_t DispatcherCoordinator::Start() {
+zx_status_t DispatcherCoordinator::Start(uint32_t options) {
+  g_enforce_allowed_scheduler_roles = options & FDF_ENV_ENFORCE_ALLOWED_SCHEDULER_ROLES;
   DispatcherCoordinator& coordinator = GetDispatcherCoordinator();
   fbl::AutoLock lock(&coordinator.lock_);
   auto thread_pool = coordinator.default_thread_pool();

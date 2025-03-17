@@ -41,7 +41,7 @@ class TokenTest : public RuntimeTestCase {
 void TokenTest::SetUp() {
   // Make sure each test starts with exactly one thread.
   driver_runtime::GetDispatcherCoordinator().Reset();
-  ASSERT_EQ(ZX_OK, driver_runtime::GetDispatcherCoordinator().Start());
+  ASSERT_EQ(ZX_OK, driver_runtime::GetDispatcherCoordinator().Start(0));
 
   {
     thread_context::PushDriver(CreateFakeDriver());

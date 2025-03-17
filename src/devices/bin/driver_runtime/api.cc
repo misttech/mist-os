@@ -180,7 +180,9 @@ __EXPORT zx_status_t fdf_token_transfer(zx_handle_t token, fdf_handle_t handle) 
   return driver_runtime::DispatcherCoordinator::TokenTransfer(token, handle);
 }
 
-__EXPORT zx_status_t fdf_env_start() { return driver_runtime::DispatcherCoordinator::Start(); }
+__EXPORT zx_status_t fdf_env_start(uint32_t options) {
+  return driver_runtime::DispatcherCoordinator::Start(options);
+}
 
 __EXPORT void fdf_env_reset() { return driver_runtime::DispatcherCoordinator::EnvReset(); }
 

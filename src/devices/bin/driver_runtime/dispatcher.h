@@ -872,7 +872,7 @@ class DispatcherCoordinator {
   void NotifyDispatcherShutdown(driver_runtime::Dispatcher& dispatcher,
                                 fdf_dispatcher_shutdown_observer_t* dispatcher_shutdown_observer);
   void RemoveDispatcher(Dispatcher& dispatcher);
-  static zx_status_t Start();
+  static zx_status_t Start(uint32_t options);
   static void EnvReset();
 
   bool AreAllDriversDestroyedLocked() __TA_REQUIRES(&lock_) {

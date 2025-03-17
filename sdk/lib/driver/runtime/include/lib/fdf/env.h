@@ -31,8 +31,12 @@ struct fdf_env_driver_shutdown_observer {
   fdf_env_driver_shutdown_handler_t* handler;
 };
 
+// When new dispatchers are created, enforce that scheduler_roles specified must line up with
+// roles previously registered via the `fdf_env_add_allowed_scheduler_role_for_driver` API.
+#define FDF_ENV_ENFORCE_ALLOWED_SCHEDULER_ROLES ((uint32_t)1u << 0)
+
 // Start the driver runtime. This sets up the initial thread that the dispatchers run on.
-zx_status_t fdf_env_start();
+zx_status_t fdf_env_start(uint32_t options);
 
 // Resets the driver runtime to zero threads. This may only be called when there are no
 // existing dispatchers.

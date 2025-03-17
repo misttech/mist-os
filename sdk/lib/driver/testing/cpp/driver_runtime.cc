@@ -24,7 +24,7 @@ thread_local DriverRuntime* g_instance = nullptr;
 namespace internal {
 
 DriverRuntimeEnv::DriverRuntimeEnv() {
-  zx_status_t status = fdf_env_start();
+  zx_status_t status = fdf_env_start(0);
   ZX_ASSERT_MSG(ZX_OK == status, "Failed to initialize driver runtime env: %s",
                 zx_status_get_string(status));
 }

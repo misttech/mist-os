@@ -96,7 +96,7 @@ class DispatcherTest : public RuntimeTestCase {
 void DispatcherTest::SetUp() {
   // Make sure each test starts with exactly one thread.
   driver_runtime::GetDispatcherCoordinator().Reset();
-  ASSERT_EQ(ZX_OK, driver_runtime::GetDispatcherCoordinator().Start());
+  ASSERT_EQ(ZX_OK, driver_runtime::GetDispatcherCoordinator().Start(0));
 
   ASSERT_EQ(ZX_OK, fdf_channel_create(0, &local_ch_, &remote_ch_));
   ASSERT_EQ(ZX_OK, fdf_channel_create(0, &local_ch2_, &remote_ch2_));
@@ -1315,7 +1315,7 @@ TEST_F(DispatcherTest, ShutdownDispatcherQueueChannelReadCallback) {
 
   fdf_dispatcher.ShutdownAsync();
 
-  ASSERT_OK(fdf_env_start());
+  ASSERT_OK(fdf_env_start(0));
 
   ASSERT_OK(read_complete.Wait(zx::time::infinite()));
   ASSERT_OK(observer.WaitUntilShutdown());

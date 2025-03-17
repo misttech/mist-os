@@ -233,10 +233,10 @@ pub struct Environment;
 
 impl Environment {
     /// Start the driver runtime. This sets up the initial thread that the dispatchers run on.
-    pub fn start() -> Result<Environment, Status> {
+    pub fn start(options: u32) -> Result<Environment, Status> {
         // SAFETY: calling fdf_env_start, which does not have any soundness
         // concerns for rust code. It may be called multiple times without any problems.
-        Status::ok(unsafe { fdf_env_start() })?;
+        Status::ok(unsafe { fdf_env_start(options) })?;
         Ok(Self)
     }
 
@@ -356,7 +356,7 @@ pub mod test {
         unsynchronized: bool,
         p: impl for<'a> FnOnce(DispatcherRef<'static>) -> T,
     ) -> T {
-        let env = Arc::new(Environment::start().unwrap());
+        let env = Arc::new(Environment::start(0).unwrap());
         let env_clone = env.clone();
 
         let (shutdown_tx, shutdown_rx) = mpsc::channel();

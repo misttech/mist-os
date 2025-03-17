@@ -17,7 +17,7 @@ __EXPORT int main(int argc, char** argv) {
   // TODO(https://fxbug.dev/42073486): Remove this once the elf runner no longer
   // fools libc into block-buffering stdout.
   setlinebuf(stdout);
-  if (zx_status_t status = fdf_env_start(); status != ZX_OK) {
+  if (zx_status_t status = fdf_env_start(0); status != ZX_OK) {
     return status;
   }
   const void* driver = reinterpret_cast<void*>(0x12345678);

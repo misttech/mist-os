@@ -436,7 +436,7 @@ pub mod test {
             // SAFETY: calling fdf_env_start, which does not have any soundness
             // concerns for rust code, and this is only used in tests.
             unsafe {
-                assert_eq!(fdf_env_start(), ZX_OK);
+                assert_eq!(fdf_env_start(0), ZX_OK);
             }
         });
     }
