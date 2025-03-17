@@ -51,7 +51,6 @@ if (is_host) {
   python_host_test("minimal_workspace_test") {
     main_source = "minimal_workspace_test.py"
     sources = [
-      "check_ninja_build_plan.py",
       "compute_content_hash.py",
       "get_git_head_commit.py",
       "minimal_workspace.py",
