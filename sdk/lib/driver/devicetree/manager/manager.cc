@@ -4,7 +4,6 @@
 
 #include "lib/driver/devicetree/manager/manager.h"
 
-#include <fidl/fuchsia.boot/cpp/fidl.h>
 #include <lib/devicetree/devicetree.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
 #include <lib/zbi-format/zbi.h>
@@ -55,7 +54,8 @@ namespace fdf_devicetree {
 zx::result<Manager> Manager::CreateFromNamespace(fdf::Namespace& ns) {
   zx::result client = ns.Connect<fuchsia_hardware_platform_bus::Service::Firmware>();
   if (client.is_error()) {
-    FDF_LOG(ERROR, "Failed to connect to fuchsia.boot.Items: %s", client.status_string());
+    FDF_LOG(ERROR, "Failed to connect to fuchsia.hardware.platform.bus.Firmware: %s",
+            client.status_string());
     return client.take_error();
   }
 
