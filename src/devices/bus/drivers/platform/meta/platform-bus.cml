@@ -84,10 +84,7 @@
             ],
         },
         {
-            protocol: [
-                "fuchsia.boot.Arguments",
-                "fuchsia.kernel.IommuResource",
-            ],
+            protocol: [ "fuchsia.kernel.IommuResource" ],
             availability: "optional",
         },
     ],
