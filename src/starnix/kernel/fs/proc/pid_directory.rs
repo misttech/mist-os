@@ -10,12 +10,12 @@ use crate::task::{
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
     default_seek, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
-    fileops_impl_noop_sync, fs_node_impl_dir_readonly, parse_i32_file, serialize_for_file,
-    BytesFile, BytesFileOps, CallbackSymlinkNode, DirectoryEntryType, DirentSink, DynamicFile,
-    DynamicFileBuf, DynamicFileSource, FdNumber, FileObject, FileOps, FileSystemHandle, FsNode,
-    FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, ProcMountinfoFile, ProcMountsFile,
-    SeekTarget, SimpleFileNode, StaticDirectory, StaticDirectoryBuilder, StubEmptyFile,
-    SymlinkTarget, VecDirectory, VecDirectoryEntry,
+    fileops_impl_noop_sync, fs_node_impl_dir_readonly, parse_i32_file, parse_unsigned_file,
+    serialize_for_file, BytesFile, BytesFileOps, CallbackSymlinkNode, DirectoryEntryType,
+    DirentSink, DynamicFile, DynamicFileBuf, DynamicFileSource, FdNumber, FileObject, FileOps,
+    FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
+    ProcMountinfoFile, ProcMountsFile, SeekTarget, SimpleFileNode, StaticDirectory,
+    StaticDirectoryBuilder, StubEmptyFile, SymlinkTarget, VecDirectory, VecDirectoryEntry,
 };
 
 use itertools::Itertools;
@@ -24,7 +24,7 @@ use starnix_logging::{bug_ref, track_stub};
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_types::ownership::{OwnedRef, TempRef, WeakRef};
 use starnix_types::time::duration_to_scheduler_clock;
-use starnix_uapi::auth::{Credentials, CAP_SYS_RESOURCE};
+use starnix_uapi::auth::{Credentials, CAP_SYS_NICE, CAP_SYS_RESOURCE};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
@@ -311,6 +311,12 @@ fn static_directory_builder_with_common_task_entries<'a>(
         "oom_score_adj",
         OomScoreAdjFile::new_node(task.into()),
         mode!(IFREG, 0o744),
+    );
+    dir.entry(
+        current_task,
+        "timerslack_ns",
+        TimerslackNsFile::new_node(task.into()),
+        mode!(IFREG, 0o666),
     );
     // TODO(https://fxbug.dev/378715232): For now, we return '0' to allow tools that
     // attempt to dump process information to read this value, but later work should
@@ -1326,6 +1332,41 @@ impl BytesFileOps for OomScoreAdjFile {
         let task = Task::from_weak(&self.0)?;
         let oom_score_adj = task.read().oom_score_adj;
         Ok(serialize_for_file(oom_score_adj).into())
+    }
+}
+
+struct TimerslackNsFile(WeakRef<Task>);
+
+impl TimerslackNsFile {
+    fn new_node(task: WeakRef<Task>) -> impl FsNodeOps {
+        BytesFile::new_node(Self(task))
+    }
+}
+
+impl BytesFileOps for TimerslackNsFile {
+    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+        let target_task = Task::from_weak(&self.0)?;
+        let same_task = current_task.task.thread_group.leader == target_task.thread_group.leader;
+        if !same_task {
+            security::check_task_capable(current_task, CAP_SYS_NICE)?;
+            security::check_setsched_access(current_task, &target_task)?;
+        };
+
+        let value = parse_unsigned_file(&data)?;
+        target_task.write().set_timerslack_ns(value);
+        Ok(())
+    }
+
+    fn read(&self, current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        let target_task = Task::from_weak(&self.0)?;
+        let same_task = current_task.task.thread_group.leader == target_task.thread_group.leader;
+        if !same_task {
+            security::check_task_capable(current_task, CAP_SYS_NICE)?;
+            security::check_getsched_access(current_task, &target_task)?;
+        };
+
+        let timerslack_ns = target_task.read().timerslack_ns;
+        Ok(serialize_for_file(timerslack_ns).into())
     }
 }
 

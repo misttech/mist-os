@@ -14,6 +14,8 @@
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
+#include "src/lib/files/file.h"
+
 void WriteContents(const std::string& file, const std::string& contents, bool create) {
   auto fd = fbl::unique_fd(open(file.c_str(), O_WRONLY | (create ? O_CREAT : 0), 0777));
   ASSERT_THAT(fd.get(), SyscallSucceeds()) << "while opening file for writing: " << file;
@@ -53,4 +55,22 @@ std::string ReadFile(const std::string& name) {
   }
   EXPECT_THAT(read_len, SyscallSucceeds()) << "error reading " << name;
   return contents;
+}
+
+ScopedEnforcement ScopedEnforcement::SetEnforcing() {
+  return ScopedEnforcement(/*enforcing=*/true);
+}
+
+ScopedEnforcement ScopedEnforcement::SetPermissive() {
+  return ScopedEnforcement(/*enforcing=*/false);
+}
+
+ScopedEnforcement::ScopedEnforcement(bool enforcing) {
+  EXPECT_TRUE(files::ReadFileToString("/sys/fs/selinux/enforce", &previous_state_));
+  std::string new_state = enforcing ? "1" : 0;
+  EXPECT_TRUE(files::WriteFile("/sys/fs/selinux/enforce", new_state));
+}
+
+ScopedEnforcement::~ScopedEnforcement() {
+  EXPECT_TRUE(files::WriteFile("/sys/fs/selinux/enforce", previous_state_));
 }

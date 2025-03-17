@@ -20,6 +20,47 @@ void WriteContents(const std::string& file, const std::string& contents, bool cr
 // Reads |file|, or fail the test.
 std::string ReadFile(const std::string& file);
 
+// Runs the given action in a forked process after transitioning to |label|. This requires some
+// rules to be set-up. For transitions from unconfined_t (the starting label for tests), giving
+// them the `test_a` attribute from `test_policy.conf` is sufficient.
+template <typename T>
+::testing::AssertionResult RunAs(const std::string& label, T action) {
+  pid_t pid;
+  if ((pid = fork()) == 0) {
+    WriteContents("/proc/thread-self/attr/current", label.c_str());
+    action();
+    _exit(testing::Test::HasFailure());
+  }
+  if (pid == -1) {
+    return ::testing::AssertionFailure() << "fork failed: " << strerror(errno);
+  } else {
+    int wstatus;
+    pid_t ret = waitpid(pid, &wstatus, 0);
+    if (ret == -1) {
+      return ::testing::AssertionFailure() << "waitpid failed: " << strerror(errno);
+    }
+    if (!WIFEXITED(wstatus) || WEXITSTATUS(wstatus) != 0) {
+      return ::testing::AssertionFailure()
+             << "forked process existed with status: " << WEXITSTATUS(wstatus) << " and signal "
+             << WTERMSIG(wstatus);
+    }
+    return ::testing::AssertionSuccess();
+  }
+}
+
+// Enables (or disables) enforcement while in scope, then restores enforcement to the previous
+// state.
+class ScopedEnforcement {
+ public:
+  static ScopedEnforcement SetEnforcing();
+  static ScopedEnforcement SetPermissive();
+  ~ScopedEnforcement();
+
+ private:
+  explicit ScopedEnforcement(bool enforcing);
+  std::string previous_state_;
+};
+
 MATCHER(SyscallSucceeds, "syscall succeeds") {
   if (arg != -1) {
     return true;
