@@ -7,14 +7,15 @@ use ffx_config::EnvironmentContext;
 use ffx_target_repository_register_args::RegisterCommand;
 use ffx_writer::VerifiedMachineWriter;
 use fho::{bug, return_user_error, user_error, Error, FfxContext, FfxMain, FfxTool, Result};
-use fidl_fuchsia_developer_ffx::{RepositoryTarget, TargetInfo};
-use fidl_fuchsia_developer_ffx_ext::RepositoryTarget as FfxRepositoryTarget;
+use fidl_fuchsia_developer_ffx::TargetInfo;
 use fidl_fuchsia_pkg::RepositoryManagerProxy;
+use fidl_fuchsia_pkg_ext::RepositoryTarget;
 use fidl_fuchsia_pkg_rewrite::EngineProxy;
 use pkg::repo::register_target_with_repo_instance;
 use pkg::{PkgServerInfo, PkgServerInstanceInfo as _, PkgServerInstances};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 use std::time::Duration;
 use target_holders::{moniker, TargetProxyHolder};
 use timeout::timeout;
@@ -111,11 +112,10 @@ impl RegisterTool {
         }
 
         let repository_target = RepositoryTarget {
-            repo_name: Some(repo_name.clone()),
+            repo_name: repo_name.clone(),
             target_identifier: target_spec.clone(),
-            aliases: Some(self.cmd.alias.clone()),
-            storage_type: self.cmd.storage_type,
-            ..Default::default()
+            aliases: Some(BTreeSet::from_iter(self.cmd.alias.iter().map(|a| a.to_string()))),
+            storage_type: self.cmd.storage_type.clone(),
         };
 
         if let Some(server_info) = pkg_server_info {
@@ -140,9 +140,6 @@ impl RegisterTool {
             Some(aliases) => Some(aliases),
         };
 
-        let ffx_repo_target_info =
-            FfxRepositoryTarget::try_from(repo_target_info).map_err(|e| bug!(e))?;
-
         let target_info: TargetInfo = timeout(Duration::from_secs(2), self.target_proxy.identity())
             .await
             .bug_context("Timed out getting target identity")?
@@ -153,11 +150,11 @@ impl RegisterTool {
         register_target_with_repo_instance(
             self.repo_proxy.clone(),
             self.engine_proxy.clone(),
-            &ffx_repo_target_info,
+            &repo_target_info,
             &target_info,
             repo_server_listen_addr,
             &info,
-            self.cmd.alias_conflict_mode.into(),
+            self.cmd.alias_conflict_mode.clone(),
         )
         .await
         .map_err(|e| bug!("Failed to register repository: {:?}", e))
@@ -173,9 +170,11 @@ mod test {
     use ffx_config::ConfigLevel;
     use ffx_target::TargetProxy;
     use ffx_writer::{Format, TestBuffers};
-    use fidl_fuchsia_developer_ffx::{RepositoryStorageType, SshHostAddrInfo, TargetRequest};
+    use fidl_fuchsia_developer_ffx::{SshHostAddrInfo, TargetRequest};
     use fidl_fuchsia_pkg::{MirrorConfig, RepositoryConfig, RepositoryManagerRequest};
-    use fidl_fuchsia_pkg_ext::{RepositoryConfigBuilder, RepositoryRegistrationAliasConflictMode};
+    use fidl_fuchsia_pkg_ext::{
+        RepositoryConfigBuilder, RepositoryRegistrationAliasConflictMode, RepositoryStorageType,
+    };
     use fidl_fuchsia_pkg_rewrite::{
         EditTransactionRequest, EngineRequest, LiteralRule, Rule, RuleIteratorRequest,
     };
@@ -251,11 +250,7 @@ mod test {
                     }
                 }
                 if return_error {
-                    let err: i32 =
-                        fidl_fuchsia_developer_ffx::RepositoryError::TargetCommunicationFailure
-                            .into_primitive()
-                            .try_into()
-                            .unwrap();
+                    let err: i32 = 2;
                     responder.send(Err(err)).unwrap();
                 } else {
                     responder.send(Ok(())).unwrap();
@@ -439,8 +434,7 @@ mod test {
                 port: None,
                 alias: aliases.clone(),
                 storage_type: None,
-                alias_conflict_mode:
-                    fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace,
+                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
             },
             context: env.context.clone(),
             repo_proxy,
@@ -516,8 +510,7 @@ mod test {
                 port: None,
                 alias: vec![],
                 storage_type: None,
-                alias_conflict_mode:
-                    fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace,
+                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
             },
             context: env.context.clone(),
             repo_proxy,
@@ -566,8 +559,7 @@ mod test {
                 port: None,
                 alias: vec![],
                 storage_type: None,
-                alias_conflict_mode:
-                    fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace,
+                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
             },
             context: env.context.clone(),
             repo_proxy,
@@ -613,8 +605,7 @@ mod test {
                 port: None,
                 alias: aliases.clone(),
                 storage_type: Some(RepositoryStorageType::Persistent),
-                alias_conflict_mode:
-                    fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace,
+                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
             },
             context: env.context.clone(),
             repo_proxy,
@@ -658,8 +649,7 @@ mod test {
                 port: None,
                 alias: vec![],
                 storage_type: None,
-                alias_conflict_mode:
-                    fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace,
+                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
             },
             context: env.context.clone(),
             repo_proxy,
@@ -701,8 +691,7 @@ mod test {
                 port: None,
                 alias: vec![],
                 storage_type: None,
-                alias_conflict_mode:
-                    fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace,
+                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
             },
             context: env.context.clone(),
             repo_proxy,
@@ -747,8 +736,7 @@ mod test {
                 port: None,
                 alias: vec![],
                 storage_type: None,
-                alias_conflict_mode:
-                    fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace,
+                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
             },
             context: env.context.clone(),
             repo_proxy,
@@ -804,8 +792,7 @@ mod test {
                 port: None,
                 alias: aliases.clone(),
                 storage_type: None,
-                alias_conflict_mode:
-                    fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace,
+                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
             },
             context: env.context.clone(),
             repo_proxy,

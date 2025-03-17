@@ -15,12 +15,12 @@ ffx_plugin("ffx_target_repository_register") {
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/fho:lib",
-    "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
     "//src/developer/ffx/lib/pkg",
     "//src/developer/ffx/lib/target:lib",
     "//src/developer/ffx/lib/target/holders:lib",
     "//src/developer/ffx/lib/timeout:lib",
     "//src/developer/ffx/lib/writer:lib",
+    "//src/sys/lib/fidl-fuchsia-pkg-ext",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:schemars",
     "//third_party/rust_crates:serde",
@@ -39,7 +39,7 @@ ffx_plugin("ffx_target_repository_register") {
   ]
   args_deps = [
     "//src/developer/ffx/core:lib",
-    "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
+    "//src/sys/lib/fidl-fuchsia-pkg-ext",
     "//third_party/rust_crates:argh",
   ]
 

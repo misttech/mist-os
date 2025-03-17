@@ -4,7 +4,6 @@
 
 use anyhow::{anyhow, Context, Result};
 use ffx_config::ConfigLevel;
-
 const CONFIG_KEY_DEFAULT_REPOSITORY: &str = "repository.default";
 const CONFIG_KEY_SERVER_LISTEN: &str = "repository.server.listen";
 

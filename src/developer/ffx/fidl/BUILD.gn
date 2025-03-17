@@ -15,7 +15,6 @@ fidl("fuchsia.developer.ffx") {
     "fastboot.fidl",
     "mdns.fidl",
     "overview.fidl",
-    "repo.fidl",
     "target.fidl",
     "testing.fidl",
     "tracing.fidl",

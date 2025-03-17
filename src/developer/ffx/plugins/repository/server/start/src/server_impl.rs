@@ -417,15 +417,6 @@ pub async fn serve_impl<W: Write + 'static>(
     };
 
     let server_addr = server.local_addr().clone();
-    let storage_type: Option<fidl_fuchsia_pkg_ext::RepositoryStorageType> = match cmd.storage_type {
-        Some(fidl_fuchsia_developer_ffx::RepositoryStorageType::Ephemeral) => {
-            Some(fidl_fuchsia_pkg_ext::RepositoryStorageType::Ephemeral)
-        }
-        Some(fidl_fuchsia_developer_ffx::RepositoryStorageType::Persistent) => {
-            Some(fidl_fuchsia_pkg_ext::RepositoryStorageType::Persistent)
-        }
-        None => None,
-    };
 
     // Write out the instance data
     for (name, repo_client) in repo_manager.repositories() {
@@ -438,7 +429,7 @@ pub async fn serve_impl<W: Write + 'static>(
         let repo_config = repo_client
             .read()
             .await
-            .get_config(repo_url, mirror_url, storage_type.clone())
+            .get_config(repo_url, mirror_url, cmd.storage_type.clone())
             .map_err(|e| bug!("{e}"))?;
         let repo_spec = repo_client.read().await.spec();
         if let Err(e) = write_instance_info(
@@ -447,15 +438,10 @@ pub async fn serve_impl<W: Write + 'static>(
             &name,
             &server_addr,
             repo_spec,
-            storage_type.clone().unwrap_or(fidl_fuchsia_pkg_ext::RepositoryStorageType::Ephemeral),
-            match cmd.alias_conflict_mode {
-                fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::ErrorOut => {
-                    fidl_fuchsia_pkg_ext::RepositoryRegistrationAliasConflictMode::ErrorOut
-                }
-                fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace => {
-                    fidl_fuchsia_pkg_ext::RepositoryRegistrationAliasConflictMode::Replace
-                }
-            },
+            cmd.storage_type
+                .clone()
+                .unwrap_or(fidl_fuchsia_pkg_ext::RepositoryStorageType::Ephemeral),
+            cmd.alias_conflict_mode.clone(),
             repo_config,
         )
         .await
@@ -544,9 +530,8 @@ pub async fn serve_impl<W: Write + 'static>(
 // tests
 #[cfg(test)]
 mod test {
-    use crate::ServerStartTool;
-
     use super::*;
+    use crate::ServerStartTool;
     use assert_matches::assert_matches;
     use ffx_config::keys::TARGET_DEFAULT_KEY;
     use ffx_config::{ConfigLevel, TestEnv};
@@ -555,8 +540,8 @@ mod test {
     use fho::{user_error, FfxMain, FhoConnectionBehavior, FhoEnvironment, TryFromEnv};
     use fidl::endpoints::DiscoverableProtocolMarker;
     use fidl_fuchsia_developer_ffx::{
-        RemoteControlState, RepositoryRegistrationAliasConflictMode, RepositoryStorageType,
-        SshHostAddrInfo, TargetAddrInfo, TargetInfo, TargetIpPort, TargetRequest, TargetState,
+        RemoteControlState, SshHostAddrInfo, TargetAddrInfo, TargetInfo, TargetIpPort,
+        TargetRequest, TargetState,
     };
     use fidl_fuchsia_developer_remotecontrol::{self as frcs, RemoteControlProxy};
     use fidl_fuchsia_net::{IpAddress, Ipv4Address};
@@ -564,7 +549,9 @@ mod test {
         MirrorConfig, RepositoryConfig, RepositoryManagerMarker, RepositoryManagerRequest,
         RepositoryManagerRequestStream,
     };
-    use fidl_fuchsia_pkg_ext::RepositoryConfigBuilder;
+    use fidl_fuchsia_pkg_ext::{
+        RepositoryConfigBuilder, RepositoryRegistrationAliasConflictMode, RepositoryStorageType,
+    };
     use fidl_fuchsia_pkg_rewrite::{
         EditTransactionRequest, EngineMarker, EngineRequest, EngineRequestStream,
         RuleIteratorRequest,

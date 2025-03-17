@@ -13,7 +13,6 @@
 //! (e.g. status queries, shutdown commands, etc.), this is where that functionality will be
 //! exposed.
 use fho::{bug, return_bug, Result};
-use fidl_fuchsia_developer_ffx::MAX_PATH;
 use nix::NixPath;
 use std::env;
 use std::ffi::OsStr;
@@ -22,6 +21,10 @@ use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::sync::mpsc::Sender;
 use std::thread::{spawn, JoinHandle};
+
+/// Maximum path length for Linux. This is used to check the length of the socket addresses, if
+/// needed.
+const MAX_PATH: u64 = 4095;
 
 trait CommsBackend<T>
 where

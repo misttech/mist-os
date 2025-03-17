@@ -5,11 +5,11 @@
 use crate::PkgServerInfo;
 use async_lock::RwLock;
 use fidl_fuchsia_developer_ffx as ffx;
-use fidl_fuchsia_developer_ffx_ext::{
-    RepositoryError, RepositoryRegistrationAliasConflictMode, RepositoryTarget,
-};
 use fidl_fuchsia_pkg::RepositoryManagerProxy;
-use fidl_fuchsia_pkg_ext::{MirrorConfigBuilder, RepositoryConfigBuilder};
+use fidl_fuchsia_pkg_ext::{
+    MirrorConfigBuilder, RepositoryConfigBuilder, RepositoryError,
+    RepositoryRegistrationAliasConflictMode, RepositoryTarget,
+};
 use fidl_fuchsia_pkg_rewrite::EngineProxy;
 use fidl_fuchsia_pkg_rewrite_ext::{do_transaction, Rule};
 use fuchsia_hyper::HttpsClient;
@@ -44,12 +44,12 @@ pub fn repo_spec_to_backend(
                     metadata_repo_url,
                     err
                 );
-                ffx::RepositoryError::InvalidUrl
+                RepositoryError::InvalidUrl
             })?;
 
             let blob_repo_url = Url::parse(blob_repo_url.as_str()).map_err(|err| {
                 tracing::error!("Unable to parse blob repo url {}: {:#}", blob_repo_url, err);
-                ffx::RepositoryError::InvalidUrl
+                RepositoryError::InvalidUrl
             })?;
 
             Ok(Box::new(HttpRepository::new(
@@ -70,15 +70,15 @@ pub fn repo_spec_to_backend(
 async fn update_repository(
     repo_name: &str,
     repo: &RwLock<RepoClient<Box<dyn RepoProvider>>>,
-) -> Result<bool, ffx::RepositoryError> {
+) -> Result<bool, RepositoryError> {
     repo.write().await.update().await.map_err(|err| {
         tracing::error!("Unable to update repository {}: {:#?}", repo_name, err);
 
         match err {
             repository::Error::Tuf(tuf::Error::ExpiredMetadata { .. }) => {
-                ffx::RepositoryError::ExpiredRepositoryMetadata
+                RepositoryError::ExpiredRepositoryMetadata
             }
-            _ => ffx::RepositoryError::IoError,
+            _ => RepositoryError::IoError,
         }
     })
 }
@@ -91,7 +91,7 @@ pub async fn register_target_with_repo_instance(
     repo_server_listen_addr: SocketAddr,
     repo_instance: &PkgServerInfo,
     alias_conflict_mode: RepositoryRegistrationAliasConflictMode,
-) -> Result<(), ffx::RepositoryError> {
+) -> Result<(), RepositoryError> {
     let repo_name: &str = &repo_target_info.repo_name;
     let target_ssh_host_address = target.ssh_host_address.clone();
 
@@ -112,7 +112,7 @@ pub async fn register_target_with_repo_instance(
                 "target {:?} does not have a host address",
                 repo_target_info.target_identifier
             );
-            ffx::RepositoryError::TargetCommunicationFailure
+            RepositoryError::TargetCommunicationFailure
         })?,
     );
 
@@ -135,7 +135,7 @@ pub async fn register_target_with_repo_instance(
                             "Alias registration conflict for {alias} replaced by {} ",
                             repos.join(", ")
                         );
-                        return Err(ffx::RepositoryError::ConflictingRegistration);
+                        return Err(RepositoryError::ConflictingRegistration);
                     }
                 }
             }
@@ -153,19 +153,19 @@ pub async fn register_target_with_repo_instance(
     let mirror_url = format!("http://{repo_host_addr}/{}", repo_instance.name);
     let mirror_url: http::Uri = mirror_url.parse().map_err(|err| {
         tracing::error!("failed to parse mirror url {}: {:#}", mirror_url, err);
-        ffx::RepositoryError::InvalidUrl
+        RepositoryError::InvalidUrl
     })?;
 
     let mut mirror = MirrorConfigBuilder::new(mirror_url.clone()).map_err(|err| {
         tracing::error!("failed to parse mirror url {}: {:#}", mirror_url, err);
-        ffx::RepositoryError::InvalidUrl
+        RepositoryError::InvalidUrl
     })?;
     mirror = mirror.subscribe(subscribe);
 
     let mut config = RepositoryConfigBuilder::new(
         RepositoryUrl::parse_host(repo_name.to_string()).map_err(|err| {
             tracing::error!("failed to parse repo url {}: {:#}", repo_name, err);
-            ffx::RepositoryError::InvalidUrl
+            RepositoryError::InvalidUrl
         })?,
     )
     .add_mirror(mirror)
@@ -182,11 +182,11 @@ pub async fn register_target_with_repo_instance(
         Ok(Ok(())) => {}
         Ok(Err(err)) => {
             tracing::error!("failed to add config: {:#?}", Status::from_raw(err));
-            return Err(ffx::RepositoryError::RepositoryManagerError);
+            return Err(RepositoryError::RepositoryManagerError);
         }
         Err(err) => {
             tracing::error!("failed to add config: {:#?}", err);
-            return Err(ffx::RepositoryError::TargetCommunicationFailure);
+            return Err(RepositoryError::TargetCommunicationFailure);
         }
     }
     if !aliases.is_empty() {
@@ -199,12 +199,12 @@ pub async fn register_target_with_repo_instance(
 /// Reads the alias mappings from the device via the EngineProxy.
 async fn read_alias_repos(
     engine_proxy: EngineProxy,
-) -> Result<HashMap<String, Vec<String>>, ffx::RepositoryError> {
+) -> Result<HashMap<String, Vec<String>>, RepositoryError> {
     let (rule_iterator, rule_iterator_server) = fidl::endpoints::create_proxy();
 
     engine_proxy.list(rule_iterator_server).map_err(|e| {
         tracing::error!("Failed to list rules: {e}");
-        ffx::RepositoryError::RewriteEngineError
+        RepositoryError::RewriteEngineError
     })?;
 
     let mut alias_to_repo: HashMap<String, Vec<String>> = HashMap::new();
@@ -213,7 +213,7 @@ async fn read_alias_repos(
     loop {
         let rule = rule_iterator.next().await.map_err(|e| {
             tracing::error!("Failed iterating while listing rules: {e}");
-            ffx::RepositoryError::RewriteEngineError
+            RepositoryError::RewriteEngineError
         })?;
         if rule.is_empty() {
             break;
@@ -242,7 +242,7 @@ pub async fn register_target_with_fidl_proxies(
     repo_server_listen_addr: SocketAddr,
     repo: &Arc<RwLock<RepoClient<Box<dyn RepoProvider>>>>,
     _alias_conflict_mode: RepositoryRegistrationAliasConflictMode,
-) -> Result<(), ffx::RepositoryError> {
+) -> Result<(), RepositoryError> {
     let repo_name: &str = &repo_target_info.repo_name;
     let target_ssh_host_address = target.ssh_host_address.clone();
 
@@ -263,7 +263,7 @@ pub async fn register_target_with_fidl_proxies(
                 "target {:?} does not have a host address",
                 repo_target_info.target_identifier
             );
-            ffx::RepositoryError::TargetCommunicationFailure
+            RepositoryError::TargetCommunicationFailure
         })?,
     );
 
@@ -272,13 +272,13 @@ pub async fn register_target_with_fidl_proxies(
 
     let repo_url = RepositoryUrl::parse_host(repo_name.to_owned()).map_err(|err| {
         tracing::error!("failed to parse repository name {}: {:#}", repo_name, err);
-        ffx::RepositoryError::InvalidUrl
+        RepositoryError::InvalidUrl
     })?;
 
     let mirror_url = format!("http://{}/{}", repo_host, repo_name);
     let mirror_url = mirror_url.parse().map_err(|err| {
         tracing::error!("failed to parse mirror url {}: {:#}", mirror_url, err);
-        ffx::RepositoryError::InvalidUrl
+        RepositoryError::InvalidUrl
     })?;
 
     let (config, aliases) = {
@@ -295,7 +295,7 @@ pub async fn register_target_with_fidl_proxies(
             )
             .map_err(|e| {
                 tracing::error!("failed to get config: {}", e);
-                return ffx::RepositoryError::RepositoryManagerError;
+                return RepositoryError::RepositoryManagerError;
             })?;
 
         // Use the repository aliases if the registration doesn't have any.
@@ -312,11 +312,11 @@ pub async fn register_target_with_fidl_proxies(
         Ok(Ok(())) => {}
         Ok(Err(err)) => {
             tracing::error!("failed to add config: {:#?}", Status::from_raw(err));
-            return Err(ffx::RepositoryError::RepositoryManagerError);
+            return Err(RepositoryError::RepositoryManagerError);
         }
         Err(err) => {
             tracing::error!("failed to add config: {:#?}", err);
-            return Err(ffx::RepositoryError::TargetCommunicationFailure);
+            return Err(RepositoryError::TargetCommunicationFailure);
         }
     }
 
@@ -330,7 +330,7 @@ pub async fn register_target_with_fidl_proxies(
 fn aliases_to_rules(
     repo_name: &str,
     aliases: &BTreeSet<String>,
-) -> Result<Vec<Rule>, ffx::RepositoryError> {
+) -> Result<Vec<Rule>, RepositoryError> {
     let rules = aliases
         .iter()
         .map(|alias| {
@@ -347,7 +347,7 @@ fn aliases_to_rules(
         .collect::<Result<Vec<_>, _>>()
         .map_err(|err| {
             tracing::warn!("failed to construct rule: {:#?}", err);
-            ffx::RepositoryError::RewriteEngineError
+            RepositoryError::RewriteEngineError
         })?;
 
     Ok(rules)
@@ -357,7 +357,7 @@ async fn create_aliases_fidl(
     rewrite_proxy: EngineProxy,
     repo_name: &str,
     aliases: &BTreeSet<String>,
-) -> Result<(), ffx::RepositoryError> {
+) -> Result<(), RepositoryError> {
     let alias_rules = aliases_to_rules(repo_name, &aliases)?;
 
     // Check flag here for "overwrite" style
@@ -387,7 +387,7 @@ async fn create_aliases_fidl(
     .await
     .map_err(|err| {
         tracing::warn!("failed to create transactions: {:#?}", err);
-        ffx::RepositoryError::RewriteEngineError
+        RepositoryError::RewriteEngineError
     })?;
 
     Ok(())

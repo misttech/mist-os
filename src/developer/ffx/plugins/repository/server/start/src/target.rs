@@ -9,19 +9,17 @@ use camino::Utf8Path;
 use ffx_command_error::{return_user_error, Result};
 use ffx_repository_server_start_args::StartCommand;
 use ffx_target::knock_target;
-use fidl_fuchsia_developer_ffx::{
-    RepositoryStorageType, RepositoryTarget as FfxCliRepositoryTarget, TargetInfo,
-};
-use fidl_fuchsia_developer_ffx_ext::{
-    RepositoryRegistrationAliasConflictMode as FfxRepositoryRegistrationAliasConflictMode,
-    RepositoryTarget as FfxDaemonRepositoryTarget,
-};
+use fidl_fuchsia_developer_ffx::TargetInfo;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_pkg::RepositoryManagerMarker;
+use fidl_fuchsia_pkg_ext::{
+    RepositoryRegistrationAliasConflictMode, RepositoryStorageType, RepositoryTarget,
+};
 use fidl_fuchsia_pkg_rewrite::EngineMarker;
 use fuchsia_repo::manager::RepositoryManager;
 use futures::{pin_mut, select, FutureExt, StreamExt};
 use pkg::repo::register_target_with_fidl_proxies;
+use std::collections::BTreeSet;
 use std::io::Write;
 use std::sync::Arc;
 use std::time::Duration;
@@ -42,7 +40,7 @@ async fn connect_to_target(
     connect_timeout: std::time::Duration,
     repo_manager: Arc<RepositoryManager>,
     rcs_proxy: &RemoteControlProxy,
-    alias_conflict_mode: FfxRepositoryRegistrationAliasConflictMode,
+    alias_conflict_mode: RepositoryRegistrationAliasConflictMode,
 ) -> Result<(), anyhow::Error> {
     let repo_proxy = rcs::connect_to_protocol::<RepositoryManagerMarker>(
         connect_timeout,
@@ -59,20 +57,19 @@ async fn connect_to_target(
 
     for (repo_name, repo) in repo_manager.repositories() {
         let repo_spec = repo.read().await.spec();
-        let repo_target = FfxCliRepositoryTarget {
-            repo_name: Some(repo_name),
+        let repo_target = RepositoryTarget {
+            repo_name: repo_name.clone(),
             target_identifier: target_spec.clone(),
             aliases: if aliases.is_empty() {
                 Some(repo_spec.aliases().iter().map(ToString::to_string).collect())
             } else {
-                Some(aliases.clone())
+                Some(BTreeSet::from_iter(aliases.iter().map(|a| a.clone())))
             },
-            storage_type,
-            ..Default::default()
+            storage_type: storage_type.clone(),
         };
 
         // Construct RepositoryTarget from same args as `ffx target repository register`
-        let repo_target_info = FfxDaemonRepositoryTarget::try_from(repo_target)
+        let repo_target_info = RepositoryTarget::try_from(repo_target)
             .map_err(|e| anyhow!("Failed to build RepositoryTarget: {:?}", e))?;
 
         register_target_with_fidl_proxies(
@@ -158,12 +155,12 @@ async fn inner_connect_loop(
         target_spec_from_rcs_proxy.clone(),
         target_info,
         cmd.alias.clone(),
-        cmd.storage_type,
+        cmd.storage_type.clone(),
         server_addr,
         connect_timeout,
         Arc::clone(&repo_manager),
         &rcs_proxy,
-        cmd.alias_conflict_mode.into(),
+        cmd.alias_conflict_mode.clone(),
     )
     .await;
     match connection {

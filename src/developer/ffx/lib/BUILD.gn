@@ -17,7 +17,6 @@ if (is_host) {
     "fastboot",
     "fastboot_file_discovery",
     "fho",
-    "fidl-fuchsia-developer-ffx-ext",
     "isolate",
     "manual_targets",
     "mdns_discovery",

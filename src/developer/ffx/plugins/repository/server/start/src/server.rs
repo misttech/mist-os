@@ -8,7 +8,7 @@ use ffx_command_error::{bug, return_user_error, user_error, FfxContext as _, Res
 use ffx_config::EnvironmentContext;
 use ffx_repository_server_start_args::StartCommand;
 use fho::FfxMain;
-use fidl_fuchsia_developer_ffx as ffx;
+use fidl_fuchsia_pkg_ext::{RepositoryRegistrationAliasConflictMode, RepositoryStorageType};
 use pkg::{PkgServerInstanceInfo, PkgServerInstances, ServerMode};
 use std::net::SocketAddr;
 use std::time::Duration;
@@ -24,8 +24,8 @@ pub(crate) fn to_argv(cmd: &StartCommand) -> Vec<String> {
         argv.extend_from_slice(&["--alias".into(), a.to_string()]);
     }
     let mode = match cmd.alias_conflict_mode {
-        ffx::RepositoryRegistrationAliasConflictMode::ErrorOut => "error-out".to_string(),
-        ffx::RepositoryRegistrationAliasConflictMode::Replace => "replace".to_string(),
+        RepositoryRegistrationAliasConflictMode::ErrorOut => "error-out".to_string(),
+        RepositoryRegistrationAliasConflictMode::Replace => "replace".to_string(),
     };
     argv.extend_from_slice(&["--alias-conflict-mode".into(), mode]);
 
@@ -43,10 +43,10 @@ pub(crate) fn to_argv(cmd: &StartCommand) -> Vec<String> {
     if let Some(name) = &cmd.repository {
         argv.extend_from_slice(&["--repository".into(), name.to_string()]);
     }
-    if let Some(s) = cmd.storage_type {
+    if let Some(s) = &cmd.storage_type {
         let st = match s {
-            ffx::RepositoryStorageType::Ephemeral => "ephemeral",
-            ffx::RepositoryStorageType::Persistent => "persistent",
+            RepositoryStorageType::Ephemeral => "ephemeral",
+            RepositoryStorageType::Persistent => "persistent",
         };
         argv.extend_from_slice(&["--storage-type".into(), st.to_string()]);
     }
@@ -140,7 +140,6 @@ pub(crate) async fn wait_for_start(
 mod test {
     use super::*;
     use camino::Utf8PathBuf;
-    use ffx::{RepositoryRegistrationAliasConflictMode, RepositoryStorageType};
     use std::str::FromStr as _;
 
     #[fuchsia::test]

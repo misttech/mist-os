@@ -115,10 +115,10 @@ mod tests {
     use super::*;
     use camino::Utf8PathBuf;
     use ffx_config::{ConfigLevel, TestEnv};
-    use fidl_fuchsia_developer_ffx_ext::RepositorySpec;
     use fidl_fuchsia_pkg_ext::{
         RepositoryConfigBuilder, RepositoryRegistrationAliasConflictMode, RepositoryStorageType,
     };
+    use fuchsia_repo::repository::RepositorySpec;
     use pkg::ServerMode;
     use std::collections::BTreeSet;
     use std::fs;
