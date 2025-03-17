@@ -1,9 +1,10 @@
+# Copyright 2025 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
 import("//build/dist/resource.gni")
-import("//vendor/misttech/zircon/kernel/lib/linux-rt/kernel/linux-rt.gni")
+import("//vendor/misttech/linux-rt/kernel/linux-rt.gni")
 
 # Build a C++ Linux executable so that it can be included in a Fuchsia package for use in Starnix.
 #
@@ -39,7 +40,7 @@ template("linux_executable") {
 
       visibility = [ ":${_resource_label}" ]
 
-      #configs -= [ "//build/config/linux:implicit-host-libs" ]
+      configs -= [ "//build/config/linux:implicit-host-libs" ]
     }
   } else {
     not_needed(invoker, "*")
