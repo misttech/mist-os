@@ -305,6 +305,10 @@ pub struct Kernel {
     /// Whether this kernel is shutting down. When shutting down, new processes may not be spawned.
     shutting_down: AtomicBool,
 
+    /// True to disable syslog access to unprivileged callers.  This also controls whether read
+    /// access to /dev/kmsg requires privileged capabilities.
+    pub restrict_dmesg: AtomicBool,
+
     /// Control handle to the running container's ComponentController.
     pub container_control_handle: Mutex<Option<ComponentControllerControlHandle>>,
 
@@ -426,6 +430,7 @@ impl Kernel {
             next_file_object_id: Default::default(),
             system_limits: SystemLimits::default(),
             ptrace_scope: AtomicU8::new(0),
+            restrict_dmesg: AtomicBool::new(true),
             build_version: OnceCell::new(),
             stats: Arc::new(KernelStats::default()),
             psi_provider: PsiProvider::default(),

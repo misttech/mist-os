@@ -9,8 +9,8 @@ use crate::task::{
 };
 use crate::vfs::inotify::InotifyLimits;
 use crate::vfs::{
-    fs_args, inotify, BytesFile, BytesFileOps, FileSystemHandle, FsNodeHandle, FsNodeInfo,
-    FsNodeOps, FsString, SimpleFileNode, StaticDirectoryBuilder,
+    fs_args, inotify, parse_unsigned_file, BytesFile, BytesFileOps, FileSystemHandle, FsNodeHandle,
+    FsNodeInfo, FsNodeOps, FsString, SimpleFileNode, StaticDirectoryBuilder,
 };
 use starnix_logging::bug_ref;
 use starnix_sync::Mutex;
@@ -290,6 +290,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             ),
             mode,
         );
+        dir.entry(current_task, "dmesg_restrict", DmesgRestrict::new_node(), mode);
         dir.entry(
             current_task,
             "kptr_restrict",
@@ -1164,6 +1165,28 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
         );
     });
     dir.build(current_task)
+}
+
+struct DmesgRestrict {}
+
+impl DmesgRestrict {
+    fn new_node() -> impl FsNodeOps {
+        BytesFile::new_node(Self {})
+    }
+}
+
+impl BytesFileOps for DmesgRestrict {
+    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+        security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
+        let restrict = parse_unsigned_file::<u32>(&data)? != 0;
+        current_task.kernel().restrict_dmesg.store(restrict, Ordering::Relaxed);
+        Ok(())
+    }
+    fn read(&self, current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        Ok(format!("{}\n", current_task.kernel().restrict_dmesg.load(Ordering::Relaxed) as u32)
+            .into_bytes()
+            .into())
+    }
 }
 
 struct SeccompActionsLogged {}

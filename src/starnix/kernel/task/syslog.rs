@@ -16,6 +16,7 @@ use starnix_uapi::vfs::FdEvents;
 use std::cmp;
 use std::collections::VecDeque;
 use std::io::{self, Write};
+use std::sync::atomic::Ordering;
 use std::sync::{mpsc, Arc, OnceLock};
 
 const BUFFER_SIZE: i32 = 1_049_000;
@@ -32,20 +33,24 @@ impl Syslog {
         Ok(())
     }
 
-    // TODO(b/316630310): for now, all actions on the syslog are privileged.
-    // READ_ALL and SIZE_BUFFER should be granted unprivileged access if
-    // `/proc/sys/kernel/dmesg_restrict` is 0, which also allows to read /dev/kmsg.
     pub fn access(&self, current_task: &CurrentTask) -> Result<GrantedSyslog<'_>, Errno> {
         Self::validate_access(current_task)?;
         let syscall_subscription = self.subscription()?;
         Ok(GrantedSyslog { syscall_subscription })
     }
 
+    /// Validates that syslog access is unrestricted, or that the `current_task` has the relevant
+    /// capability, or global admin capability.
     pub fn validate_access(current_task: &CurrentTask) -> Result<(), Errno> {
-        if !security::is_task_capable_noaudit(current_task, CAP_SYS_ADMIN) {
-            security::check_task_capable(current_task, CAP_SYSLOG)?;
+        if !current_task.kernel().restrict_dmesg.load(Ordering::Relaxed) {
+            // TODO(b/316630310): Should unrestricted access only apply to specific operations, e.g.
+            // READ_ALL and SIZE_BUFFER, when /proc/sys/kernel/dmesg_restrict` is 0?
+            return Ok(());
         }
-        Ok(())
+        if security::is_task_capable_noaudit(current_task, CAP_SYS_ADMIN) {
+            return Ok(());
+        }
+        security::check_task_capable(current_task, CAP_SYSLOG)
     }
 
     pub fn snapshot_then_subscribe(current_task: &CurrentTask) -> Result<LogSubscription, Errno> {
