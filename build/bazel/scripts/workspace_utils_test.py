@@ -803,5 +803,77 @@ filegroup(
         )
 
 
+class CheckRegeneratorInputsUpdatesTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self._td = tempfile.TemporaryDirectory()
+        self._root = Path(self._td.name)
+        self.build_dir = self._root / "build_dir"
+        self.build_dir.mkdir()
+
+    def tearDown(self) -> None:
+        self._td.cleanup()
+
+    def test_missing_inputs_file(self) -> None:
+        self.build_dir / "inputs.txt"
+        updates = workspace_utils.check_regenerator_inputs_updates(
+            self.build_dir, "inputs.txt"
+        )
+        self.assertSetEqual(updates, {"inputs.txt"})
+
+    def test_no_inputs_changed(self) -> None:
+        input1 = self._root / "input1"
+        input1.write_text("hi")
+        input2 = self._root / "input2"
+        input2.write_text("hello")
+
+        inputs_path = self.build_dir / "inputs.txt"
+        inputs_path.write_text("../input1\n../input2\n")
+
+        updates = workspace_utils.check_regenerator_inputs_updates(
+            self.build_dir, "inputs.txt"
+        )
+
+        self.assertSetEqual(updates, set())
+
+    def test_inputs_changed(self) -> None:
+        input1 = self._root / "input1"
+        input1.write_text("hi")
+        input2 = self._root / "input2"
+        input2.write_text("hello")
+
+        inputs_path = self.build_dir / "inputs.txt"
+        inputs_path.write_text("../input1\n../input2\n")
+
+        inputs_ts = inputs_path.stat().st_mtime
+        new_ts = inputs_ts + 1.5
+
+        # Force a timestamp update on the first input file.
+        os.utime(input1, times=(new_ts, new_ts))
+
+        updates = workspace_utils.check_regenerator_inputs_updates(
+            self.build_dir, "inputs.txt"
+        )
+
+        self.assertSetEqual(updates, {"../input1"})
+
+        # Do the same for the second input file.
+        os.utime(input2, times=(new_ts, new_ts))
+
+        updates = workspace_utils.check_regenerator_inputs_updates(
+            self.build_dir, "inputs.txt"
+        )
+
+        self.assertSetEqual(updates, {"../input1", "../input2"})
+
+        # Update the inputs.txt timestamp too.
+        os.utime(inputs_path, times=(new_ts, new_ts))
+
+        updates = workspace_utils.check_regenerator_inputs_updates(
+            self.build_dir, "inputs.txt"
+        )
+
+        self.assertSetEqual(updates, set())
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -30,12 +30,10 @@ fx-get-bazel () {
 # Note that this also regenerates the Ninja build plan if necessary.
 fx-update-bazel-workspace () {
   # First, refresh Ninja build plan if needed.
-  local check_script="${FUCHSIA_DIR}/build/bazel/scripts/check_ninja_build_plan.py"
+  local check_script="${FUCHSIA_DIR}/build/bazel/scripts/check_regenerator_inputs.py"
   if ! "${PREBUILT_PYTHON3}" -S "${check_script}" --quiet "${FUCHSIA_BUILD_DIR}"; then
-    # Calling fx build is needed to ensure RBE environment variables are
-    # properly set when generating the Ninja build plan. See b/315393497
-    echo "fx-bazel: Regenerating Ninja build plan to ensure all workspace dependencies are correct!"
-    fx-command-run build -- build.ninja
+    echo "fx-bazel: Regenerating workspace due to input file changes!"
+    fx-command-run gen
   fi
 }
 

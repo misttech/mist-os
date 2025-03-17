@@ -1239,3 +1239,39 @@ license(
     generated.record_file_content(
         "MODULE.bazel", 'module(name = "gn_targets", version = "1")\n'
     )
+
+
+def check_regenerator_inputs_updates(
+    build_dir: Path,
+    inputs_file: str = "regenerator_outputs/regenerator_inputs.txt",
+) -> T.Set[str]:
+    """Check whether any regenerator input has changed.
+
+    Args:
+        build_dir: Ninja build directory path.
+        inputs_file: Optional path string to the file listing all inputs,
+           relative to build_dir. Default value is
+           regenerator_outputs/regenerator_inputs.txt.
+
+    Returns:
+        A set of file paths, relative to build_dir, whose timestamp is
+        newer than that of the inputs_file file itself.
+    """
+    inputs_path = build_dir / inputs_file
+    if not inputs_path.exists():
+        # If the file does not exist, a regeneration is required.
+        return {inputs_file}
+
+    inputs_timestamp = inputs_path.stat().st_mtime
+    changed_inputs: T.Set[str] = set()
+    for dep in inputs_path.read_text().splitlines():
+        dep_path = build_dir / dep
+        if not dep_path.exists():
+            changed_inputs.add(dep)
+            continue
+
+        dep_timestamp = dep_path.stat().st_mtime
+        if dep_timestamp > inputs_timestamp:
+            changed_inputs.add(dep)
+
+    return changed_inputs
