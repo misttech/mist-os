@@ -26,15 +26,6 @@ pub async fn driver(
                 .await
                 .context("Conformance subcommand failed")?;
         }
-        DriverSubCommand::DebugBind(subcmd) => {
-            let driver_development_proxy = driver_connector
-                .get_driver_development_proxy(subcmd.select)
-                .await
-                .context("Failed to get driver development proxy")?;
-            subcommands::debug_bind::debug_bind(subcmd, writer, driver_development_proxy)
-                .await
-                .context("Debug-bind subcommand failed")?;
-        }
         DriverSubCommand::Device(subcmd) => {
             let dev = driver_connector
                 .get_dev_proxy(subcmd.select)
