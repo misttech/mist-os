@@ -103,8 +103,6 @@ def main():
     )
     env["RUSTDOCFLAGS"] = "-Z unstable-options --enable-index-page"
     env["RUST_BACKTRACE"] = "1"
-    env["RUSTFLAGS"] = "-C --cfg=zerocopy_derive_union_into_bytes"
-
     # Ideally this would somehow be automatically handled by the Cargo.toml
     # generator reading the gn BUILD config. It doesn't do that today because
     # we're re-using the third_party Cargo manifests, so we hardcode it instead
