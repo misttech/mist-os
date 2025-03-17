@@ -19,7 +19,6 @@
     ],
     use: [
         { protocol: "fuchsia.kernel.MmioResource" },
-        { protocol: "fuchsia.boot.Arguments" },
         { service: "fuchsia.hardware.platform.bus.Service" },
     ],
     expose: [
