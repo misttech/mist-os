@@ -53,7 +53,7 @@ fn get_fs_relative_path(dir_entry: &DirEntryHandle) -> FsString {
 
 /// Verifies that the file system labelling is `FsUse`, and if so then it attempts to
 /// apply the given context string to the node.
-pub fn fs_node_notify_security_context(
+pub(in crate::security) fn fs_node_notify_security_context(
     security_server: &SecurityServer,
     fs_node: &FsNode,
     security_context: &FsStr,
@@ -77,7 +77,7 @@ pub fn fs_node_notify_security_context(
 /// Called by the VFS to initialize the security state for an `FsNode` that is being linked at
 /// `dir_entry`. If `locked_or_no_xattr` is `None`, xattrs will not be read - this makes sense
 /// for entries containing anonymous nodes, that will not have an associated filesystem entry.
-pub fn fs_node_init_with_dentry(
+pub(in crate::security) fn fs_node_init_with_dentry(
     locked_or_no_xattr: Option<&mut Locked<'_, FileOpsCore>>,
     security_server: &SecurityServer,
     current_task: &CurrentTask,
@@ -369,7 +369,7 @@ fn compute_new_fs_node_sid(
 }
 
 /// Called by file-system implementations when creating the `FsNode` for a new file.
-pub fn fs_node_init_on_create(
+pub(in crate::security) fn fs_node_init_on_create(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     new_node: &FsNode,
@@ -425,7 +425,7 @@ pub fn fs_node_init_on_create(
 
 /// Called to label file nodes not linked in any filesystem's directory structure, e.g.
 /// usereventfds, etc.
-pub fn fs_node_init_anon(
+pub(in crate::security) fn fs_node_init_anon(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     new_node: &FsNode,
@@ -622,7 +622,7 @@ fn may_unlink_or_rmdir(
 
 /// Validate that `current_task` has permission to create a regular file in the `parent` directory,
 /// with the specified file `mode`.
-pub fn check_fs_node_create_access(
+pub(in crate::security) fn check_fs_node_create_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     parent: &FsNode,
@@ -634,7 +634,7 @@ pub fn check_fs_node_create_access(
 
 /// Validate that `current_task` has permission to create a symlink to `old_path` in the `parent`
 /// directory.
-pub fn check_fs_node_symlink_access(
+pub(in crate::security) fn check_fs_node_symlink_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     parent: &FsNode,
@@ -646,7 +646,7 @@ pub fn check_fs_node_symlink_access(
 
 /// Validate that `current_task` has permission to create a new directory in the `parent` directory,
 /// with the specified file `mode`.
-pub fn check_fs_node_mkdir_access(
+pub(in crate::security) fn check_fs_node_mkdir_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     parent: &FsNode,
@@ -658,7 +658,7 @@ pub fn check_fs_node_mkdir_access(
 
 /// Validate that `current_task` has permission to create a new special file, socket or pipe, in the
 /// `parent` directory, and with the specified file `mode` and `device_id`.
-pub fn check_fs_node_mknod_access(
+pub(in crate::security) fn check_fs_node_mknod_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     parent: &FsNode,
@@ -670,7 +670,7 @@ pub fn check_fs_node_mknod_access(
 }
 
 /// Validate that `current_task` has the permission to create a new hard link to a file.
-pub fn check_fs_node_link_access(
+pub(in crate::security) fn check_fs_node_link_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     target_directory: &FsNode,
@@ -680,7 +680,7 @@ pub fn check_fs_node_link_access(
 }
 
 /// Validate that `current_task` has the permission to remove a hard link to a file.
-pub fn check_fs_node_unlink_access(
+pub(in crate::security) fn check_fs_node_unlink_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     parent: &FsNode,
@@ -692,7 +692,7 @@ pub fn check_fs_node_unlink_access(
 }
 
 /// Validate that `current_task` has the permission to remove a directory.
-pub fn check_fs_node_rmdir_access(
+pub(in crate::security) fn check_fs_node_rmdir_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     parent: &FsNode,
@@ -704,7 +704,7 @@ pub fn check_fs_node_rmdir_access(
 }
 
 /// Validates that `current_task` has the permissions to move `moving_node`.
-pub fn check_fs_node_rename_access(
+pub(in crate::security) fn check_fs_node_rename_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     old_parent: &FsNode,
@@ -800,7 +800,7 @@ pub fn check_fs_node_rename_access(
 }
 
 /// Validates that `current_task` has the permissions to read the symbolic link `fs_node`.
-pub fn check_fs_node_read_link_access(
+pub(in crate::security) fn check_fs_node_read_link_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     fs_node: &FsNode,
@@ -818,7 +818,7 @@ pub fn check_fs_node_read_link_access(
 }
 
 /// Validates that the `current_task` has the permissions to access `fs_node`.
-pub fn fs_node_permission(
+pub(in crate::security) fn fs_node_permission(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     fs_node: &FsNode,
@@ -836,7 +836,7 @@ pub fn fs_node_permission(
     )
 }
 
-pub fn check_fs_node_getattr_access(
+pub(in crate::security) fn check_fs_node_getattr_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     fs_node: &FsNode,
@@ -855,7 +855,7 @@ pub fn check_fs_node_getattr_access(
 }
 
 /// Checks whether `current_task` can set attributes on `node`.
-pub fn check_fs_node_setattr_access(
+pub(in crate::security) fn check_fs_node_setattr_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     fs_node: &FsNode,
@@ -885,7 +885,7 @@ pub fn check_fs_node_setattr_access(
     )
 }
 
-pub fn check_fs_node_setxattr_access(
+pub(in crate::security) fn check_fs_node_setxattr_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     fs_node: &FsNode,
@@ -905,7 +905,7 @@ pub fn check_fs_node_setxattr_access(
     )
 }
 
-pub fn check_fs_node_getxattr_access(
+pub(in crate::security) fn check_fs_node_getxattr_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     fs_node: &FsNode,
@@ -923,7 +923,7 @@ pub fn check_fs_node_getxattr_access(
     )
 }
 
-pub fn check_fs_node_listxattr_access(
+pub(in crate::security) fn check_fs_node_listxattr_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     fs_node: &FsNode,
@@ -940,7 +940,7 @@ pub fn check_fs_node_listxattr_access(
     )
 }
 
-pub fn check_fs_node_removexattr_access(
+pub(in crate::security) fn check_fs_node_removexattr_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     fs_node: &FsNode,
@@ -960,14 +960,17 @@ pub fn check_fs_node_removexattr_access(
     )
 }
 
-pub fn fs_node_copy_up<'a>(current_task: &'a CurrentTask, fs_node: &FsNode) -> ScopedFsCreate<'a> {
+pub(in crate::security) fn fs_node_copy_up<'a>(
+    current_task: &'a CurrentTask,
+    fs_node: &FsNode,
+) -> ScopedFsCreate<'a> {
     let file_sid = fs_node_effective_sid_and_class(fs_node).sid;
     scoped_fs_create(current_task, file_sid)
 }
 
 /// If `fs_node` is in a filesystem without xattr support, returns the xattr name for the security
 /// label (i.e. "security.selinux"). Otherwise returns None.
-pub fn fs_node_listsecurity(fs_node: &FsNode) -> Option<FsString> {
+pub(in crate::security) fn fs_node_listsecurity(fs_node: &FsNode) -> Option<FsString> {
     if fs_node.fs().security_state.state.supports_xattr() {
         None
     } else {
@@ -977,7 +980,7 @@ pub fn fs_node_listsecurity(fs_node: &FsNode) -> Option<FsString> {
 
 /// Returns the Security Context corresponding to the SID with which `FsNode`
 /// is labelled, otherwise delegates to the node's [`crate::vfs::FsNodeOps`].
-pub fn fs_node_getsecurity<L>(
+pub(in crate::security) fn fs_node_getsecurity<L>(
     locked: &mut Locked<'_, L>,
     security_server: &SecurityServer,
     current_task: &CurrentTask,
@@ -1012,7 +1015,7 @@ where
 
 /// Sets the `name`d security attribute on `fs_node` and updates internal
 /// kernel state.
-pub fn fs_node_setsecurity<L>(
+pub(in crate::security) fn fs_node_setsecurity<L>(
     locked: &mut Locked<'_, L>,
     security_server: &SecurityServer,
     current_task: &CurrentTask,

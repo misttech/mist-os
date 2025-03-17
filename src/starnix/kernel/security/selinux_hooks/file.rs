@@ -22,12 +22,12 @@ use starnix_uapi::{
 };
 
 /// Returns the security state for a new file object created by `current_task`.
-pub fn file_alloc_security(current_task: &CurrentTask) -> FileObjectState {
+pub(in crate::security) fn file_alloc_security(current_task: &CurrentTask) -> FileObjectState {
     FileObjectState { sid: current_task.security_state.lock().current_sid }
 }
 
 /// Checks whether the `current_task`` has the permissions specified by `mask` to the `file`.
-pub fn file_permission(
+pub(in crate::security) fn file_permission(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     file: &FileObject,
@@ -60,7 +60,7 @@ pub fn file_permission(
 }
 
 /// Returns whether the `current_task` can receive `file` via a socket IPC.
-pub fn file_receive(
+pub(in crate::security) fn file_receive(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     file: &FileObject,
@@ -80,7 +80,7 @@ pub fn file_receive(
 }
 
 /// Returns whether `current_task` can issue an ioctl to `file`.
-pub fn check_file_ioctl_access(
+pub(in crate::security) fn check_file_ioctl_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     file: &FileObject,
@@ -115,7 +115,7 @@ pub fn check_file_ioctl_access(
 }
 
 /// Returns whether `current_task` can perform a lock operation on the given `file`.
-pub fn check_file_lock_access(
+pub(in crate::security) fn check_file_lock_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     file: &FileObject,
@@ -134,7 +134,7 @@ pub fn check_file_lock_access(
 
 /// This hook is called by the `fcntl` syscall. Returns whether `current_task` can perform
 /// `fcntl_cmd` on the given file.
-pub fn check_file_fcntl_access(
+pub(in crate::security) fn check_file_fcntl_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     file: &FileObject,

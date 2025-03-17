@@ -6,7 +6,7 @@ use crate::vfs::socket::{NetlinkFamily, Socket, SocketDomain, SocketProtocol, So
 use crate::vfs::FsNode;
 use selinux::SocketClass;
 
-pub fn socket_post_create(socket: &Socket, socket_node: &FsNode) {
+pub(in crate::security) fn socket_post_create(socket: &Socket, socket_node: &FsNode) {
     let security_class = match socket.domain {
         SocketDomain::Unix => match socket.socket_type {
             SocketType::Stream | SocketType::SeqPacket => SocketClass::UnixStream,

@@ -17,18 +17,18 @@ use zerocopy::FromBytes;
 
 /// Returns the security state to be assigned to a BPF map. This is defined as the security
 /// context of the creating task.
-pub fn bpf_map_alloc(current_task: &CurrentTask) -> BpfMapState {
+pub(in crate::security) fn bpf_map_alloc(current_task: &CurrentTask) -> BpfMapState {
     BpfMapState { sid: current_task.security_state.lock().current_sid }
 }
 
 /// Returns the security state to be assigned to a BPF program. This is defined as the
 /// security context of the creating task.
-pub fn bpf_prog_alloc(current_task: &CurrentTask) -> BpfProgState {
+pub(in crate::security) fn bpf_prog_alloc(current_task: &CurrentTask) -> BpfProgState {
     BpfProgState { sid: current_task.security_state.lock().current_sid }
 }
 
 /// Returns whether `current_task` can perform the bpf `cmd`.
-pub fn check_bpf_access<Attr: FromBytes>(
+pub(in crate::security) fn check_bpf_access<Attr: FromBytes>(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     cmd: bpf_cmd,
@@ -48,7 +48,7 @@ pub fn check_bpf_access<Attr: FromBytes>(
 }
 
 /// Returns whether `current_task` can create a bpf_map.
-pub fn check_bpf_map_access(
+pub(in crate::security) fn check_bpf_map_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     bpf_map: &BpfMap,
