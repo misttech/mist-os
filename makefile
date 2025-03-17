@@ -54,6 +54,9 @@ args: ## Set up build dir and arguments file
 	$(NOECHO)echo "rust_incremental = \"incremental\"" >> $(OUTPUT)/args.gn
 	$(NOECHO)echo "host_labels = [ \"//build/rust:cargo_toml_gen\" ]" >> $(OUTPUT)/args.gn
 	$(NOECHO)echo "rbe_mode = \"off\"" >> $(OUTPUT)/args.gn
+	$(NOECHO)if [ -f vendor/misttech/additional_default_targets.gni ]; then \
+		cat vendor/misttech/additional_default_targets.gni >> $(OUTPUT)/args.gn; \
+	fi
 .PHONY: args
 
 debug: args ## Set debug arguments
