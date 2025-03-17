@@ -4,7 +4,6 @@
 
 use super::*;
 use assert_matches::assert_matches;
-use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
 use futures::stream::StreamExt as _;
 use std::io::Write as _;
@@ -64,39 +63,35 @@ async fn blobfs() -> Result<(), Error> {
 async fn open_blob(
     blobfs: &fio::DirectoryProxy,
     merkle: &str,
-    mut flags: fio::OpenFlags,
+    mut flags: fio::Flags,
 ) -> Result<(fio::FileProxy, zx::Event), zx::Status> {
     let (file, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
-    let server_end = ServerEnd::new(server_end.into_channel());
 
-    flags |= fio::OpenFlags::DESCRIBE;
-    blobfs.deprecated_open(flags, fio::ModeType::empty(), merkle, server_end).expect("open blob");
+    flags |= fio::Flags::FLAG_SEND_REPRESENTATION;
+    blobfs.open(merkle, flags, &Default::default(), server_end.into_channel()).expect("open blob");
 
-    let mut events = file.take_event_stream();
-    let event = match events
+    let event = file
+        .take_event_stream()
         .next()
         .await
-        .expect("fio::FileEvent stream to be non-empty")
-        .expect("fio::FileEvent stream not to FIDL error")
-    {
-        fio::FileEvent::OnOpen_ { s: status, info } => {
-            Status::ok(status)?;
-            match *info.expect("fio::FileEvent to have fio::NodeInfoDeprecated") {
-                fio::NodeInfoDeprecated::File(fio::FileObject { event: Some(event), .. }) => event,
-                other => panic!(
-                    "fio::NodeInfoDeprecated from fio::FileEventStream to be File variant with event: {other:?}"
-                ),
-            }
+        .expect("fio::FileEvent stream must be non empty!")
+        .map_err(|e| match e {
+            fidl::Error::ClientChannelClosed { status, .. } => status,
+            _ => panic!("fio::FileEvent stream contained fidl error"),
+        })?;
+    let observer = match event {
+        fio::FileEvent::OnOpen_ { .. } => {
+            panic!("Expected OnRepresentation event, got OnOpen instead!");
         }
         fio::FileEvent::OnRepresentation { payload } => match payload {
-            fio::Representation::File(fio::FileInfo { observer: Some(event), .. }) => event,
+            fio::Representation::File(fio::FileInfo { observer: Some(observer), .. }) => observer,
             other => panic!(
                 "ConnectionInfo from fio::FileEventStream to be File variant with event: {other:?}"
             ),
         },
         fio::FileEvent::_UnknownEvent { ordinal, .. } => panic!("Unknown file event {ordinal}"),
     };
-    Ok((file, event))
+    Ok((file, observer))
 }
 
 async fn write_blob(blob: &fio::FileProxy, bytes: &[u8]) -> Result<(), Error> {
@@ -121,13 +116,17 @@ async fn create_blob(
     merkle: &str,
     contents: &[u8],
 ) -> Result<(), Error> {
-    let (blob, _) =
-        open_blob(blobfs, merkle, fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE).await?;
+    let (blob, _) = open_blob(
+        blobfs,
+        merkle,
+        fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE | fio::PERM_WRITABLE,
+    )
+    .await?;
     let () = blob.resize(contents.len() as u64).await?.map_err(Status::from_raw)?;
     write_blob(&blob, contents).await?;
     blob.close().await?.map_err(Status::from_raw)?;
 
-    let (blob, _) = open_blob(blobfs, merkle, fio::OpenFlags::RIGHT_READABLE).await?;
+    let (blob, _) = open_blob(blobfs, merkle, fio::PERM_READABLE).await?;
     verify_blob(&blob, contents).await?;
     Ok(())
 }
@@ -141,9 +140,12 @@ async fn create_blob(
 // can fail with ACCESS_DENIED in step 3, unless we wait.
 async fn wait_for_blob_to_be_creatable(blobfs: &fio::DirectoryProxy, merkle: &str) {
     for _ in 0..50 {
-        let res =
-            open_blob(blobfs, merkle, fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE)
-                .await;
+        let res = open_blob(
+            blobfs,
+            merkle,
+            fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE | fio::PERM_WRITABLE,
+        )
+        .await;
         match res {
             Err(zx::Status::ACCESS_DENIED) => {
                 fuchsia_async::Timer::new(Duration::from_millis(10)).await;
@@ -170,9 +172,12 @@ async fn open_for_create_create() -> Result<(), Error> {
     let blobfs_server = BlobfsRamdisk::start().await?;
     let root_dir = blobfs_server.root_dir_proxy()?;
 
-    let (_blob, _) =
-        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE)
-            .await?;
+    let (_blob, _) = open_blob(
+        &root_dir,
+        BLOB_MERKLE,
+        fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE | fio::PERM_WRITABLE,
+    )
+    .await?;
 
     create_blob(&root_dir, BLOB_MERKLE, BLOB_CONTENTS).await?;
 
@@ -184,9 +189,12 @@ async fn open_resize_drop_create() -> Result<(), Error> {
     let blobfs_server = BlobfsRamdisk::start().await?;
     let root_dir = blobfs_server.root_dir_proxy()?;
 
-    let (blob, _) =
-        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE)
-            .await?;
+    let (blob, _) = open_blob(
+        &root_dir,
+        BLOB_MERKLE,
+        fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE | fio::PERM_WRITABLE,
+    )
+    .await?;
     let () = blob.resize(BLOB_CONTENTS.len() as u64).await?.map_err(Status::from_raw)?;
     drop(blob);
     wait_for_blob_to_be_creatable(&root_dir, BLOB_MERKLE).await;
@@ -201,9 +209,12 @@ async fn open_partial_write_drop_create() -> Result<(), Error> {
     let blobfs_server = BlobfsRamdisk::start().await?;
     let root_dir = blobfs_server.root_dir_proxy()?;
 
-    let (blob, _) =
-        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE)
-            .await?;
+    let (blob, _) = open_blob(
+        &root_dir,
+        BLOB_MERKLE,
+        fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE | fio::PERM_WRITABLE,
+    )
+    .await?;
     let () = blob.resize(BLOB_CONTENTS.len() as u64).await?.map_err(Status::from_raw)?;
     write_blob(&blob, &BLOB_CONTENTS[0..1]).await?;
     drop(blob);
@@ -219,9 +230,12 @@ async fn open_partial_write_close_create() -> Result<(), Error> {
     let blobfs_server = BlobfsRamdisk::start().await?;
     let root_dir = blobfs_server.root_dir_proxy()?;
 
-    let (blob, _) =
-        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE)
-            .await?;
+    let (blob, _) = open_blob(
+        &root_dir,
+        BLOB_MERKLE,
+        fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE | fio::PERM_WRITABLE,
+    )
+    .await?;
     let () = blob.resize(BLOB_CONTENTS.len() as u64).await?.map_err(Status::from_raw)?;
     write_blob(&blob, &BLOB_CONTENTS[0..1]).await?;
     blob.close().await?.map_err(Status::from_raw)?;
@@ -236,14 +250,20 @@ async fn open_resize_open_for_create_fails() -> Result<(), Error> {
     let blobfs_server = BlobfsRamdisk::start().await?;
     let root_dir = blobfs_server.root_dir_proxy()?;
 
-    let (blob, _) =
-        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE)
-            .await?;
+    let (blob, _) = open_blob(
+        &root_dir,
+        BLOB_MERKLE,
+        fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE | fio::PERM_WRITABLE,
+    )
+    .await?;
     let () = blob.resize(BLOB_CONTENTS.len() as u64).await?.map_err(Status::from_raw)?;
 
-    let res =
-        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE)
-            .await;
+    let res = open_blob(
+        &root_dir,
+        BLOB_MERKLE,
+        fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE | fio::PERM_WRITABLE,
+    )
+    .await;
 
     assert_matches!(res, Err(zx::Status::ACCESS_DENIED));
 
@@ -255,12 +275,18 @@ async fn open_open_resize_resize_fails() -> Result<(), Error> {
     let blobfs_server = BlobfsRamdisk::start().await?;
     let root_dir = blobfs_server.root_dir_proxy()?;
 
-    let (blob0, _) =
-        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE)
-            .await?;
-    let (blob1, _) =
-        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE)
-            .await?;
+    let (blob0, _) = open_blob(
+        &root_dir,
+        BLOB_MERKLE,
+        fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE | fio::PERM_WRITABLE,
+    )
+    .await?;
+    let (blob1, _) = open_blob(
+        &root_dir,
+        BLOB_MERKLE,
+        fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE | fio::PERM_WRITABLE,
+    )
+    .await?;
     let () = blob0.resize(BLOB_CONTENTS.len() as u64).await?.map_err(Status::from_raw)?;
     let result = blob1.resize(BLOB_CONTENTS.len() as u64).await?.map_err(Status::from_raw);
     assert_matches!(result, Err(zx::Status::BAD_STATE));
@@ -273,20 +299,25 @@ async fn open0_open1_resize1_write1_succeeds() {
     let blobfs_server = BlobfsRamdisk::start().await.unwrap();
     let root_dir = blobfs_server.root_dir_proxy().unwrap();
 
-    let (_blob0, _) =
-        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE)
-            .await
-            .unwrap();
+    let (_blob0, _) = open_blob(
+        &root_dir,
+        BLOB_MERKLE,
+        fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE | fio::PERM_WRITABLE,
+    )
+    .await
+    .unwrap();
 
-    let (blob1, _) =
-        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE)
-            .await
-            .unwrap();
+    let (blob1, _) = open_blob(
+        &root_dir,
+        BLOB_MERKLE,
+        fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE | fio::PERM_WRITABLE,
+    )
+    .await
+    .unwrap();
     let () = blob1.resize(BLOB_CONTENTS.len() as u64).await.unwrap().unwrap();
     let () = write_blob(&blob1, BLOB_CONTENTS).await.unwrap();
 
-    let (blob2, _) =
-        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::RIGHT_READABLE).await.unwrap();
+    let (blob2, _) = open_blob(&root_dir, BLOB_MERKLE, fio::PERM_READABLE).await.unwrap();
     let () = verify_blob(&blob2, BLOB_CONTENTS).await.unwrap();
 
     let () = blobfs_server.stop().await.unwrap();
@@ -297,21 +328,26 @@ async fn open0_open1_resize0_write0_succeeds() {
     let blobfs_server = BlobfsRamdisk::start().await.unwrap();
     let root_dir = blobfs_server.root_dir_proxy().unwrap();
 
-    let (blob0, _) =
-        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE)
-            .await
-            .unwrap();
+    let (blob0, _) = open_blob(
+        &root_dir,
+        BLOB_MERKLE,
+        fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE | fio::PERM_WRITABLE,
+    )
+    .await
+    .unwrap();
 
-    let (_blob1, _) =
-        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE)
-            .await
-            .unwrap();
+    let (_blob1, _) = open_blob(
+        &root_dir,
+        BLOB_MERKLE,
+        fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE | fio::PERM_WRITABLE,
+    )
+    .await
+    .unwrap();
 
     let () = blob0.resize(BLOB_CONTENTS.len() as u64).await.unwrap().unwrap();
     let () = write_blob(&blob0, BLOB_CONTENTS).await.unwrap();
 
-    let (blob2, _) =
-        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::RIGHT_READABLE).await.unwrap();
+    let (blob2, _) = open_blob(&root_dir, BLOB_MERKLE, fio::PERM_READABLE).await.unwrap();
     let () = verify_blob(&blob2, BLOB_CONTENTS).await.unwrap();
 
     let () = blobfs_server.stop().await.unwrap();
@@ -327,15 +363,21 @@ async fn open0_open1_resize0_close0_open2_fails() {
     let blobfs_server = BlobfsRamdisk::start().await.unwrap();
     let root_dir = blobfs_server.root_dir_proxy().unwrap();
 
-    let (blob0, _) =
-        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE)
-            .await
-            .unwrap();
+    let (blob0, _) = open_blob(
+        &root_dir,
+        BLOB_MERKLE,
+        fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE | fio::PERM_WRITABLE,
+    )
+    .await
+    .unwrap();
 
-    let (blob1, _) =
-        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE)
-            .await
-            .unwrap();
+    let (blob1, _) = open_blob(
+        &root_dir,
+        BLOB_MERKLE,
+        fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE | fio::PERM_WRITABLE,
+    )
+    .await
+    .unwrap();
 
     let () = blob0.resize(BLOB_CONTENTS.len() as u64).await.unwrap().unwrap();
 
@@ -344,23 +386,29 @@ async fn open0_open1_resize0_close0_open2_fails() {
     // The outstanding blob1 write connection keeps the partially written blob alive, preventing new
     // write attempts.
     assert_matches!(
-        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE)
-            .await,
+        open_blob(
+            &root_dir,
+            BLOB_MERKLE,
+            fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE | fio::PERM_WRITABLE
+        )
+        .await,
         Err(zx::Status::ACCESS_DENIED)
     );
 
     // Closing the outstanding connection allows the blob to be created.
     let () = blob1.close().await.unwrap().unwrap();
 
-    let (blob2, _) =
-        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE)
-            .await
-            .unwrap();
+    let (blob2, _) = open_blob(
+        &root_dir,
+        BLOB_MERKLE,
+        fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE | fio::PERM_WRITABLE,
+    )
+    .await
+    .unwrap();
     let () = blob2.resize(BLOB_CONTENTS.len() as u64).await.unwrap().unwrap();
     let () = write_blob(&blob2, BLOB_CONTENTS).await.unwrap();
 
-    let (blob3, _) =
-        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::RIGHT_READABLE).await.unwrap();
+    let (blob3, _) = open_blob(&root_dir, BLOB_MERKLE, fio::PERM_READABLE).await.unwrap();
     let () = verify_blob(&blob3, BLOB_CONTENTS).await.unwrap();
 
     let () = blobfs_server.stop().await.unwrap();
@@ -371,11 +419,14 @@ async fn open_resize_open_read_fails() -> Result<(), Error> {
     let blobfs_server = BlobfsRamdisk::start().await?;
     let root_dir = blobfs_server.root_dir_proxy()?;
 
-    let (blob0, _) =
-        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE)
-            .await?;
+    let (blob0, _) = open_blob(
+        &root_dir,
+        BLOB_MERKLE,
+        fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE | fio::PERM_WRITABLE,
+    )
+    .await?;
     let () = blob0.resize(BLOB_CONTENTS.len() as u64).await?.map_err(Status::from_raw)?;
-    let (blob1, _) = open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::RIGHT_READABLE).await?;
+    let (blob1, _) = open_blob(&root_dir, BLOB_MERKLE, fio::PERM_READABLE).await?;
 
     let result = blob1.read_at(1, 0).await?.map_err(zx::Status::from_raw);
 
@@ -389,10 +440,13 @@ async fn open_for_create_wait_for_signal() -> Result<(), Error> {
     let blobfs_server = BlobfsRamdisk::start().await?;
     let root_dir = blobfs_server.root_dir_proxy()?;
 
-    let (blob0, _) =
-        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE)
-            .await?;
-    let (blob1, event) = open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::RIGHT_READABLE).await?;
+    let (blob0, _) = open_blob(
+        &root_dir,
+        BLOB_MERKLE,
+        fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE | fio::PERM_WRITABLE,
+    )
+    .await?;
+    let (blob1, event) = open_blob(&root_dir, BLOB_MERKLE, fio::PERM_READABLE).await?;
     let () = blob0.resize(BLOB_CONTENTS.len() as u64).await?.map_err(Status::from_raw)?;
     assert_matches!(
         event.wait_handle(
@@ -420,11 +474,14 @@ async fn open_resize_wait_for_signal() -> Result<(), Error> {
     let blobfs_server = BlobfsRamdisk::start().await?;
     let root_dir = blobfs_server.root_dir_proxy()?;
 
-    let (blob0, _) =
-        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE)
-            .await?;
+    let (blob0, _) = open_blob(
+        &root_dir,
+        BLOB_MERKLE,
+        fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE | fio::PERM_WRITABLE,
+    )
+    .await?;
     let () = blob0.resize(BLOB_CONTENTS.len() as u64).await?.map_err(Status::from_raw)?;
-    let (blob1, event) = open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::RIGHT_READABLE).await?;
+    let (blob1, event) = open_blob(&root_dir, BLOB_MERKLE, fio::PERM_READABLE).await?;
     assert_matches!(
         event.wait_handle(
             zx::Signals::all(),
@@ -453,14 +510,16 @@ async fn empty_blob_readable_after_resize() {
     let blobfs_server = BlobfsRamdisk::start().await.unwrap();
     let root_dir = blobfs_server.root_dir_proxy().unwrap();
 
-    let (blob0, _) =
-        open_blob(&root_dir, &empty_hash, fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE)
-            .await
-            .unwrap();
+    let (blob0, _) = open_blob(
+        &root_dir,
+        &empty_hash,
+        fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE | fio::PERM_WRITABLE,
+    )
+    .await
+    .unwrap();
     let () = blob0.resize(0).await.unwrap().map_err(Status::from_raw).unwrap();
 
-    let (blob1, event) =
-        open_blob(&root_dir, &empty_hash, fio::OpenFlags::RIGHT_READABLE).await.unwrap();
+    let (blob1, event) = open_blob(&root_dir, &empty_hash, fio::PERM_READABLE).await.unwrap();
     assert_matches!(
         event.wait_handle(
             zx::Signals::all(),
@@ -478,7 +537,7 @@ async fn open_missing_fails() -> Result<(), Error> {
     let blobfs_server = BlobfsRamdisk::start().await?;
     let root_dir = blobfs_server.root_dir_proxy()?;
 
-    let res = open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::RIGHT_READABLE).await;
+    let res = open_blob(&root_dir, BLOB_MERKLE, fio::PERM_READABLE).await;
 
     assert_matches!(res, Err(zx::Status::NOT_FOUND));
 
@@ -495,10 +554,13 @@ async fn readdirents_only_returns_valid_blobs() {
     // Blob doesn't appear until it is fully written.
     assert_eq!(blobfs_server.list_blobs().unwrap(), BTreeSet::new());
 
-    let (blob0, _) =
-        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE)
-            .await
-            .unwrap();
+    let (blob0, _) = open_blob(
+        &root_dir,
+        BLOB_MERKLE,
+        fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE | fio::PERM_WRITABLE,
+    )
+    .await
+    .unwrap();
     assert_eq!(blobfs_server.list_blobs().unwrap(), BTreeSet::new());
 
     let () = blob0.resize(BLOB_CONTENTS.len() as u64).await.unwrap().unwrap();
@@ -512,8 +574,7 @@ async fn readdirents_only_returns_valid_blobs() {
 
     // Blob disappears once a deletion request has been received, even if an outstanding connection
     // is keeping it alive.
-    let (blob1, _) =
-        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::RIGHT_READABLE).await.unwrap();
+    let (blob1, _) = open_blob(&root_dir, BLOB_MERKLE, fio::PERM_READABLE).await.unwrap();
 
     let client = blobfs_server.client();
     let () = client.delete_blob(&BLOB_MERKLE.parse().unwrap()).await.unwrap();
@@ -533,9 +594,12 @@ async fn corrupt_create_fails_on_last_byte_write() -> Result<(), Error> {
     let blobfs_server = BlobfsRamdisk::start().await?;
     let root_dir = blobfs_server.root_dir_proxy()?;
 
-    let (blob, _) =
-        open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE)
-            .await?;
+    let (blob, _) = open_blob(
+        &root_dir,
+        BLOB_MERKLE,
+        fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE | fio::PERM_WRITABLE,
+    )
+    .await?;
     let () = blob.resize(BLOB_CONTENTS.len() as u64).await?.map_err(Status::from_raw)?;
 
     write_blob(&blob, &BLOB_CONTENTS[..BLOB_CONTENTS.len() - 1]).await?;
