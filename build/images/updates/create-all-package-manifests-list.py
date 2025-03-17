@@ -27,7 +27,7 @@ def main():
             with open(package_manifest_list_path, "r") as f:
                 package_manifest_list = json.load(f)
                 manifest_paths.update(
-                    package_manifest_list["content"]["manifests"]
+                    package_manifest_list["content"].get("manifests", [])
                 )
         out_package_manifest_list = {
             "content": {"manifests": sorted(manifest_paths)},
