@@ -491,24 +491,12 @@ mod test {
     }
 
     use assert_matches::assert_matches;
-    use vfs::directory::entry_container::Directory;
-    use vfs::{execution_scope, pseudo_directory};
-
-    fn serve_dir(root: Arc<impl Directory>) -> fio::DirectoryProxy {
-        let (dir_proxy, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        root.open(
-            execution_scope::ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-            vfs::path::Path::dot().into(),
-            fidl::endpoints::ServerEnd::new(dir_server.into_channel()),
-        );
-        dir_proxy
-    }
+    use vfs::pseudo_directory;
 
     #[fuchsia::test]
     async fn no_rtc_configured() {
         let dir = pseudo_directory! {};
-        let dir_proxy = serve_dir(dir);
+        let dir_proxy = vfs::directory::serve_read_only(dir);
         let dir_provider = || Ok(dir_proxy);
         let result = RtcImpl::only_device_for_test(/*has_rtc*/ false, dir_provider).await;
         assert_matches!(result, Err(RtcCreationError::NotConfigured))
@@ -517,7 +505,7 @@ mod test {
     #[fuchsia::test]
     async fn no_rtc_detected() {
         let dir = pseudo_directory! {};
-        let dir_proxy = serve_dir(dir);
+        let dir_proxy = vfs::directory::serve_read_only(dir);
         let dir_provider = || Ok(dir_proxy);
         let result = RtcImpl::only_device_for_test(/*has_rtc*/ true, dir_provider).await;
         assert_matches!(result, Err(RtcCreationError::NoDevices))
@@ -529,7 +517,7 @@ mod test {
                 "deadbeef" => pseudo_directory! {
             },
         };
-        let dir_proxy = serve_dir(dir);
+        let dir_proxy = vfs::directory::serve_read_only(dir);
         let dir_provider = || Ok(dir_proxy);
         let result = RtcImpl::only_device_for_test(/*has_rtc*/ true, dir_provider).await;
         // Connection fails because it's a dir, not a service, but we expected
