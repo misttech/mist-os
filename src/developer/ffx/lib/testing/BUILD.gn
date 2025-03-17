@@ -4,6 +4,8 @@
 
 import("//build/rust/rustc_library.gni")
 
+assert(is_host, "testing_lib is for use with the host toolchain only")
+
 rustc_library("lib") {
   name = "testing_lib"
   version = "0.1.0"

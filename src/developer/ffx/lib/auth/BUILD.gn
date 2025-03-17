@@ -2,27 +2,27 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-if (is_host) {
-  import("//build/rust/rustc_library.gni")
-  import("//build/rust/rustc_test.gni")
+assert(is_host, "auth is for use with the host toolchain only")
 
-  rustc_library("lib") {
-    name = "auth"
-    edition = "2021"
+import("//build/rust/rustc_library.gni")
+import("//build/rust/rustc_test.gni")
 
-    deps = [
-      "//src/developer/ffx/lib/fho:lib",
+rustc_library("lib") {
+  name = "auth"
+  edition = "2021"
 
-      # TODO(b/302078392): remove this when AuthFlowChoice is moved out of PBMS.
-      "//src/developer/ffx/lib/pbms:lib",
-      "//src/developer/lib/credentials:lib",
-      "//src/lib/gcs",
-      "//src/lib/structured_ui",
-      "//third_party/rust_crates:anyhow",
-      "//third_party/rust_crates:thiserror",
-      "//third_party/rust_crates:tracing",
-    ]
+  deps = [
+    "//src/developer/ffx/lib/fho:lib",
 
-    sources = [ "src/lib.rs" ]
-  }
+    # TODO(b/302078392): remove this when AuthFlowChoice is moved out of PBMS.
+    "//src/developer/ffx/lib/pbms:lib",
+    "//src/developer/lib/credentials:lib",
+    "//src/lib/gcs",
+    "//src/lib/structured_ui",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:thiserror",
+    "//third_party/rust_crates:tracing",
+  ]
+
+  sources = [ "src/lib.rs" ]
 }

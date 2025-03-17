@@ -4,6 +4,10 @@
 
 import("//build/rust/rustc_library.gni")
 
+assert(
+    is_host,
+    "ffx_daemon_protocol_target_collection is for use with the host toolchain only")
+
 rustc_library("ffx_daemon_protocol_target_collection") {
   version = "0.1.0"
   edition = "2021"
@@ -64,5 +68,5 @@ rustc_library("ffx_daemon_protocol_target_collection") {
 
 group("tests") {
   testonly = true
-  deps = [ ":ffx_daemon_protocol_target_collection_test($host_toolchain)" ]
+  deps = [ ":ffx_daemon_protocol_target_collection_test" ]
 }

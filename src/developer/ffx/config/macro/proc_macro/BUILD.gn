@@ -7,6 +7,8 @@ import("//build/toolchain/rbe.gni")
 import("//build/tools/json_merge/json_merge.gni")
 import("//src/developer/ffx/config.gni")
 
+assert(is_host, "config_proc_macros is for use with the host toolchain only")
+
 config_target = "//src/developer/ffx:ffx-defaults.json"
 config_path =
     get_label_info(config_target, "target_out_dir") + "/ffx-defaults.json"

@@ -4,43 +4,49 @@
 
 import("//build/rust/rustc_library.gni")
 
-if (is_host) {
-  rustc_library("lib") {
-    name = "mdns_discovery"
-    version = "0.1.0"
-    edition = "2021"
-    with_unit_tests = true
+assert(is_host, "mdns_discovery is for use with the host toolchain only")
 
-    deps = [
-      "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
-      "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
-      "//src/developer/ffx/lib/netext:lib",
-      "//src/developer/ffx/lib/netext:lib",
-      "//src/developer/ffx/lib/timeout:lib",
-      "//src/lib/fuchsia-async",
-      "//src/lib/mdns/rust:mdns",
-      "//src/lib/network/packet",
-      "//third_party/rust_crates:anyhow",
-      "//third_party/rust_crates:async-channel",
-      "//third_party/rust_crates:async-lock",
-      "//third_party/rust_crates:async-trait",
-      "//third_party/rust_crates:futures",
-      "//third_party/rust_crates:lazy_static",
-      "//third_party/rust_crates:socket2",
-      "//third_party/rust_crates:tokio",
-      "//third_party/rust_crates:tracing",
-      "//third_party/rust_crates:zerocopy",
-    ]
+rustc_library("lib") {
+  name = "mdns_discovery"
+  version = "0.1.0"
+  edition = "2021"
+  with_unit_tests = true
 
-    sources = [ "src/lib.rs" ]
-  }
+  visibility = [
+    ":*",
+    "////src/developer/ffx/lib/discovery:*",
+    "//src/developer/ffx/daemon/protocols/mdns:*",
+  ]
+
+  deps = [
+    "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
+    "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
+    "//src/developer/ffx/lib/netext:lib",
+    "//src/developer/ffx/lib/netext:lib",
+    "//src/developer/ffx/lib/timeout:lib",
+    "//src/lib/fuchsia-async",
+    "//src/lib/mdns/rust:mdns",
+    "//src/lib/network/packet",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-channel",
+    "//third_party/rust_crates:async-lock",
+    "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:lazy_static",
+    "//third_party/rust_crates:socket2",
+    "//third_party/rust_crates:tokio",
+    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:zerocopy",
+  ]
+
+  sources = [ "src/lib.rs" ]
 }
 
 group("mdns_discovery") {
-  public_deps = [ ":lib($host_toolchain)" ]
+  public_deps = [ ":lib" ]
 }
 
 group("tests") {
   testonly = true
-  deps = [ ":lib_test($host_toolchain)" ]
+  deps = [ ":lib_test" ]
 }

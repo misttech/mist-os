@@ -4,6 +4,8 @@
 
 import("//build/rust/rustc_library.gni")
 
+assert(is_host, "ffx_trace is for use with the host toolchain only")
+
 rustc_library("lib") {
   name = "ffx_trace"
   version = "0.1.0"

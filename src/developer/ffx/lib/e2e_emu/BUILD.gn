@@ -6,6 +6,8 @@ import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 import("//src/sys/pkg/repositories/devhost/devhost.gni")
 
+# e2e_emu is used by cross toolchain targets.
+
 # For this library's own tests we need to make something available in the universe package
 # set without relying on the overall build system to do so via dependencies. Most test packages
 # are put in the base package set on infra builders so if we want continuous validation of

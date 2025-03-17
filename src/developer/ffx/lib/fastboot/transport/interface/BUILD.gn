@@ -6,10 +6,21 @@ import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
 import("//build/testing/test_spec.gni")
 
+assert(
+    is_host,
+    "ffx_fastboot_transport_interface is for use with the host toolchain only")
+
 rustc_library("lib") {
   name = "ffx_fastboot_transport_interface"
   edition = "2021"
   with_unit_tests = true
+
+  visibility = [
+    ":*",
+    "//src/developer/ffx/lib/fastboot:*",
+    "//src/developer/ffx/lib/fastboot/transport/factory:*",
+    "//src/developer/ffx/lib/manual_targets:*",
+  ]
 
   deps = [
     "//src/developer/ffx/lib/netext:lib",

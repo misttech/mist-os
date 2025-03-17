@@ -4,14 +4,14 @@
 
 import("//build/rust/rustc_library.gni")
 
-if (is_host) {
-  rustc_library("config-macros") {
-    name = "config_macros"
-    version = "0.1.0"
-    edition = "2021"
+assert(is_host, "config_macros is for use with the host toolchain only")
 
-    deps = [ "proc_macro:config-proc-macros" ]
+rustc_library("config-macros") {
+  name = "config_macros"
+  version = "0.1.0"
+  edition = "2021"
 
-    sources = [ "src/lib.rs" ]
-  }
+  deps = [ "proc_macro:config-proc-macros" ]
+
+  sources = [ "src/lib.rs" ]
 }

@@ -5,44 +5,44 @@
 import("//build/config/sanitizers/sanitizer_default_options.gni")
 import("//build/rust/rustc_library.gni")
 
-if (is_host) {
-  rustc_library("symbolize") {
-    name = "ffx_symbolize"
-    edition = "2021"
-    with_unit_tests = true
-    sources = [
-      "src/global_init.rs",
-      "src/lib.rs",
-    ]
-    deps = [
-      "//src/developer/ffx/config:lib",
-      "//src/developer/ffx/lib/symbol-index",
-      "//src/developer/ffx/lib/symbolize/sys",
-      "//third_party/rust_crates:anyhow",
-      "//third_party/rust_crates:bitflags",
-      "//third_party/rust_crates:hex",
-      "//third_party/rust_crates:thiserror",
-    ]
+assert(is_host, "ffx_symbolize is for use with the host toolchain only")
 
-    # Tokio sets up a sigaltstack that is not page-aligned, and the asan runtime tries to unmap
-    # that when tearing down a thread which fails. Work around this mismatch by disabling asan's use
-    # of sigaltstack.
-    deps += [ ":asan_dont_use_sigaltstack" ]
-  }
+rustc_library("symbolize") {
+  name = "ffx_symbolize"
+  edition = "2021"
+  with_unit_tests = true
+  sources = [
+    "src/global_init.rs",
+    "src/lib.rs",
+  ]
+  deps = [
+    "//src/developer/ffx/config:lib",
+    "//src/developer/ffx/lib/symbol-index",
+    "//src/developer/ffx/lib/symbolize/sys",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:bitflags",
+    "//third_party/rust_crates:hex",
+    "//third_party/rust_crates:thiserror",
+  ]
 
-  sanitizer_extra_options("asan_dont_use_sigaltstack") {
-    args = [ "use_sigaltstack=0" ]
-    sanitizer = "asan"
-    tags = [ "asan" ]
-  }
+  # Tokio sets up a sigaltstack that is not page-aligned, and the asan runtime tries to unmap
+  # that when tearing down a thread which fails. Work around this mismatch by disabling asan's use
+  # of sigaltstack.
+  deps += [ ":asan_dont_use_sigaltstack" ]
+}
 
-  group("tests") {
-    testonly = true
-    deps = [ ":symbolize_test" ]
-  }
+sanitizer_extra_options("asan_dont_use_sigaltstack") {
+  args = [ "use_sigaltstack=0" ]
+  sanitizer = "asan"
+  tags = [ "asan" ]
+}
 
-  group("host_tests") {
-    testonly = true
-    deps = [ "tests:host_tests" ]
-  }
+group("tests") {
+  testonly = true
+  deps = [ ":symbolize_test" ]
+}
+
+group("host_tests") {
+  testonly = true
+  deps = [ "tests:host_tests" ]
 }

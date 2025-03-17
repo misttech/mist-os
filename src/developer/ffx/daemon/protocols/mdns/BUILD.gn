@@ -4,6 +4,9 @@
 
 import("//build/rust/rustc_library.gni")
 
+assert(is_host,
+       "ffx_daemon_protocol_mdns is for use with the host toolchain only")
+
 rustc_library("ffx_daemon_protocol_mdns") {
   version = "0.1.0"
   edition = "2021"

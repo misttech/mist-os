@@ -5,38 +5,39 @@
 import("//build/rust/rustc_library.gni")
 import("//build/sdk/sdk_data.gni")
 
-if (is_host) {
-  rustc_library("lib") {
-    name = "symbol-index"
-    version = "0.1.0"
-    edition = "2021"
-    with_unit_tests = true
-    sources = [ "src/lib.rs" ]
-    deps = [
-      ":symbol_index_json($default_toolchain)",
-      "//src/developer/ffx/lib/errors:lib",
-      "//src/developer/ffx/lib/sdk:lib",
-      "//third_party/rust_crates:anyhow",
-      "//third_party/rust_crates:glob",
-      "//third_party/rust_crates:home",
-      "//third_party/rust_crates:serde",
-      "//third_party/rust_crates:serde_json",
-    ]
+# "symbol-index is used cross toolchain with
+#  //sdk.
 
-    test_deps = [
-      ":test_data($host_toolchain)",
-      "//third_party/rust_crates:tempfile",
-    ]
-  }
+rustc_library("lib") {
+  name = "symbol-index"
+  version = "0.1.0"
+  edition = "2021"
+  with_unit_tests = true
+  sources = [ "src/lib.rs" ]
+  deps = [
+    ":symbol_index_json($default_toolchain)",
+    "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/lib/sdk:lib",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:glob",
+    "//third_party/rust_crates:home",
+    "//third_party/rust_crates:serde",
+    "//third_party/rust_crates:serde_json",
+  ]
 
-  group("symbol-index") {
-    public_deps = [ ":lib" ]
-  }
-  group("tests") {
-    testonly = true
+  test_deps = [
+    ":test_data($host_toolchain)",
+    "//third_party/rust_crates:tempfile",
+  ]
+}
 
-    deps = [ ":lib_test" ]
-  }
+group("symbol-index") {
+  public_deps = [ ":lib" ]
+}
+group("tests") {
+  testonly = true
+
+  deps = [ ":lib_test" ]
 }
 
 # Use $root_build_dir instead of $root_out_dir because

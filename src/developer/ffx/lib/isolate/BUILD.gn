@@ -6,6 +6,8 @@ import("//build/host.gni")
 import("//build/rust/rustc_library.gni")
 import("//src/developer/ffx/config.gni")
 
+assert(is_host, "ffx_isolate is for use with the host toolchain only")
+
 rustc_library("lib") {
   name = "ffx_isolate"
   version = "0.1.0"

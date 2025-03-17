@@ -12,7 +12,7 @@ import("//sdk/categories/compatibility.gni")
 import("//src/tests/fidl/conformance_suite/gidl-conformance-suite.gni")
 import("//tools/fidl/gidl/gidl.gni")
 
-assert(is_host)
+assert(is_host, "The fuchsia-controller framework is for host tools only")
 
 visibility = [
   ":*",
