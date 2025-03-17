@@ -88,9 +88,9 @@ impl From<OpenFlags> for PermissionFlags {
 
 impl PermissionFlags {
     pub fn from_bpf_flags(bpf_flags: u32) -> Self {
-        if bpf_flags & BPF_F_RDONLY == 0 {
+        if bpf_flags & BPF_F_RDONLY > 0 {
             PermissionFlags::READ
-        } else if bpf_flags & BPF_F_WRONLY == 0 {
+        } else if bpf_flags & BPF_F_WRONLY > 0 {
             PermissionFlags::WRITE
         } else {
             PermissionFlags::READ | PermissionFlags::WRITE
