@@ -25,8 +25,8 @@ impl NanohubCommsDirectory {
         Self { base_dir: DeviceDirectory::new(device) }
     }
 
-    fn create_file_ops_entries() -> Vec<VecDirectoryEntry> {
-        let mut entries = DeviceDirectory::create_file_ops_entries();
+    fn create_file_ops_entries(&self) -> Vec<VecDirectoryEntry> {
+        let mut entries = self.base_dir.create_file_ops_entries();
         entries.push(VecDirectoryEntry {
             entry_type: DirectoryEntryType::REG,
             name: b"display_panel_name".into(),
@@ -86,7 +86,7 @@ impl FsNodeOps for NanohubCommsDirectory {
         _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(VecDirectory::new_file(Self::create_file_ops_entries()))
+        Ok(VecDirectory::new_file(self.create_file_ops_entries()))
     }
 
     fn lookup(

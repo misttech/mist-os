@@ -68,6 +68,11 @@ impl KObjectStore {
         self.get_or_create_class("block".into(), self.virtual_bus())
     }
 
+    /// The device class used for virtual thermal devices.
+    pub fn virtual_thermal_class(&self) -> Class {
+        self.get_or_create_class("thermal".into(), self.virtual_bus())
+    }
+
     /// The device class used for virtual graphics devices.
     pub fn graphics_class(&self) -> Class {
         self.get_or_create_class("graphics".into(), self.virtual_bus())
@@ -133,7 +138,7 @@ impl KObjectStore {
     pub(super) fn create_device<F, N>(
         &self,
         name: &FsStr,
-        metadata: DeviceMetadata,
+        metadata: Option<DeviceMetadata>,
         class: Class,
         create_device_sysfs_ops: F,
     ) -> Device
@@ -153,16 +158,20 @@ impl KObjectStore {
 
         // Insert the newly created device into various views.
         class.collection.kobject().insert_child(device_kobject.clone());
-        let device_number = metadata.device_type.to_string().into();
-        match metadata.mode {
-            DeviceMode::Block => {
-                self.block.insert_child(device_kobject.clone());
-                self.dev_block.insert_child_with_name(device_number, device_kobject.clone())
-            }
-            DeviceMode::Char => {
-                self.dev_char.insert_child_with_name(device_number, device_kobject.clone())
+
+        if let Some(metadata) = &metadata {
+            let device_number = metadata.device_type.to_string().into();
+            match metadata.mode {
+                DeviceMode::Block => {
+                    self.block.insert_child(device_kobject.clone());
+                    self.dev_block.insert_child_with_name(device_number, device_kobject.clone())
+                }
+                DeviceMode::Char => {
+                    self.dev_char.insert_child_with_name(device_number, device_kobject.clone())
+                }
             }
         }
+
         if let Some(bus_collection) = &class.bus.collection {
             bus_collection.kobject().insert_child(device_kobject.clone());
         }
@@ -183,14 +192,16 @@ impl KObjectStore {
         if let Some(bus_collection) = &device.class.bus.collection {
             bus_collection.kobject().remove_child(name);
         }
-        let device_number: FsString = device.metadata.device_type.to_string().into();
-        match device.metadata.mode {
-            DeviceMode::Block => {
-                self.dev_block.remove_child(device_number.as_ref());
-                self.block.remove_child(name);
-            }
-            DeviceMode::Char => {
-                self.dev_char.remove_child(device_number.as_ref());
+        if let Some(metadata) = &device.metadata {
+            let device_number: FsString = metadata.device_type.to_string().into();
+            match metadata.mode {
+                DeviceMode::Block => {
+                    self.dev_block.remove_child(device_number.as_ref());
+                    self.block.remove_child(name);
+                }
+                DeviceMode::Char => {
+                    self.dev_char.remove_child(device_number.as_ref());
+                }
             }
         }
         device.class.collection.kobject().remove_child(name);

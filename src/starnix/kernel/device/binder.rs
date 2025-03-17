@@ -4568,14 +4568,18 @@ impl BinderFsDir {
             "remote-binder".into(),
             RemoteBinderDevice {},
         )?;
-        devices.insert("remote".into(), remote_device.metadata.device_type);
+        devices.insert(
+            "remote".into(),
+            remote_device.metadata.expect("misc devices have metadata").device_type,
+        );
 
         for name in DEFAULT_BINDERS {
             let driver = BinderDevice::default();
             let device =
                 registry.register_misc_device(locked, current_task, name.into(), driver.clone())?;
-            devices.insert(name.into(), device.metadata.device_type);
-            kernel.binders.write().insert(device.metadata.device_type, driver);
+            let metadata = device.metadata.expect("misc devices have metadata");
+            devices.insert(name.into(), metadata.device_type);
+            kernel.binders.write().insert(metadata.device_type, driver);
         }
 
         Ok(Self { devices })

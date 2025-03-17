@@ -30,24 +30,29 @@ impl DeviceDirectory {
         Self { device }
     }
 
-    fn device_type(&self) -> DeviceType {
-        self.device.metadata.device_type
+    fn device_type(&self) -> Option<DeviceType> {
+        self.device.metadata.as_ref().map(|metadata| metadata.device_type)
     }
 
-    pub fn create_file_ops_entries() -> Vec<VecDirectoryEntry> {
-        // TODO(https://fxbug.dev/42072346): Add power and subsystem nodes.
-        vec![
-            VecDirectoryEntry {
+    pub fn create_file_ops_entries(&self) -> Vec<VecDirectoryEntry> {
+        let mut entries = vec![];
+
+        if self.device_type().is_some() {
+            entries.push(VecDirectoryEntry {
                 entry_type: DirectoryEntryType::REG,
                 name: "dev".into(),
                 inode: None,
-            },
-            VecDirectoryEntry {
-                entry_type: DirectoryEntryType::REG,
-                name: "uevent".into(),
-                inode: None,
-            },
-        ]
+            });
+        }
+
+        entries.push(VecDirectoryEntry {
+            entry_type: DirectoryEntryType::REG,
+            name: "uevent".into(),
+            inode: None,
+        });
+
+        // TODO(https://fxbug.dev/42072346): Add power and subsystem nodes.
+        entries
     }
 
     pub fn kobject(&self) -> KObjectHandle {
@@ -65,7 +70,7 @@ impl FsNodeOps for DeviceDirectory {
         _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(VecDirectory::new_file(Self::create_file_ops_entries()))
+        Ok(VecDirectory::new_file(self.create_file_ops_entries()))
     }
 
     fn lookup(
@@ -76,11 +81,17 @@ impl FsNodeOps for DeviceDirectory {
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         match &**name {
-            b"dev" => Ok(node.fs().create_node(
-                current_task,
-                BytesFile::new_node(format!("{}\n", self.device_type()).into_bytes()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            )),
+            b"dev" => {
+                if let Some(device_type) = self.device_type() {
+                    Ok(node.fs().create_node(
+                        current_task,
+                        BytesFile::new_node(format!("{}\n", device_type).into_bytes()),
+                        FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                    ))
+                } else {
+                    error!(ENOENT)
+                }
+            }
             b"uevent" => Ok(node.fs().create_node(
                 current_task,
                 UEventFsNode::new(self.device.clone()),
@@ -107,9 +118,9 @@ impl BlockDeviceDirectory {
 }
 
 impl BlockDeviceDirectory {
-    pub fn create_file_ops_entries() -> Vec<VecDirectoryEntry> {
+    pub fn create_file_ops_entries(&self) -> Vec<VecDirectoryEntry> {
         // Start with the entries provided by the base directory and then add our own.
-        let mut entries = DeviceDirectory::create_file_ops_entries();
+        let mut entries = self.base_dir.create_file_ops_entries();
         entries.push(VecDirectoryEntry {
             entry_type: DirectoryEntryType::DIR,
             name: b"queue".into(),
@@ -138,7 +149,7 @@ impl FsNodeOps for BlockDeviceDirectory {
         _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(VecDirectory::new_file(Self::create_file_ops_entries()))
+        Ok(VecDirectory::new_file(self.create_file_ops_entries()))
     }
 
     fn lookup(

@@ -763,6 +763,9 @@ impl SocketOps for UEventNetlinkSocket {
 
 impl DeviceListener for Arc<Mutex<NetlinkSocketInner>> {
     fn on_device_event(&self, action: UEventAction, device: Device, context: UEventContext) {
+        let Some(metadata) = &device.metadata else {
+            return;
+        };
         let kobject = device.kobject();
         let subsystem = kobject.parent().unwrap();
         let subsystem = subsystem.name();
@@ -779,10 +782,10 @@ impl DeviceListener for Arc<Mutex<NetlinkSocketInner>> {
                             MINOR={minor}\0\
                             SEQNUM={seqnum}\0",
             path = kobject.path(),
-            name = device.metadata.devname,
+            name = metadata.devname,
             subsystem = subsystem,
-            major = device.metadata.device_type.major(),
-            minor = device.metadata.device_type.minor(),
+            major = metadata.device_type.major(),
+            minor = metadata.device_type.minor(),
             seqnum = context.seqnum,
         );
         let ancillary_data = AncillaryData::Unix(UnixControlData::Credentials(Default::default()));
