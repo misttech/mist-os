@@ -8,6 +8,7 @@
 
 use anyhow::{anyhow, Result};
 use nix::sys::socket::{connect, socket, AddressFamily, SockFlag, SockType, VsockAddr};
+use rand::{distributions, thread_rng, Rng as _};
 use std::fs::File;
 use std::io::{BufRead, ErrorKind, Write};
 use std::os::fd::AsRawFd;
@@ -17,6 +18,9 @@ use std::path::PathBuf;
 pub mod config;
 pub mod process;
 pub mod tuntap;
+
+const VSOCK_PORT: u32 = 22;
+const VSOCK_CID_BOUNDS: (u32, u32) = (3, u32::MAX); // Inclusive
 
 /// A utility function for checking whether the host OS is MacOS.
 pub fn host_is_mac() -> bool {
@@ -63,24 +67,37 @@ fn connect_with_cid_port(cid: u32, port: u32) -> std::io::Result<()> {
 }
 
 pub fn find_unused_vsock_cid() -> Result<u32> {
-    for cid_to_try in 3..1024 {
-        match connect_with_cid_port(cid_to_try, 22) {
+    // With the random generation of CIDs, collision is already highly
+    // improbable. Subsequent collisions would be even more so, but better to
+    // be defensive with a bit of retry logic.
+    const ATTEMPTS: u32 = 3;
+
+    let dist = distributions::Uniform::new_inclusive(VSOCK_CID_BOUNDS.0, VSOCK_CID_BOUNDS.1);
+    let mut cids = thread_rng().sample_iter(dist);
+
+    for _ in 0..ATTEMPTS {
+        let cid = cids.next().unwrap();
+        match connect_with_cid_port(cid, VSOCK_PORT) {
             // A successful connection indicates the CID is valid and there was even something
             // listening to it inside the VM.
             Ok(_) => continue,
-            Err(e) => {
-                if e.kind() == ErrorKind::ConnectionReset {
+            Err(err) => {
+                if err.kind() == ErrorKind::ConnectionReset {
                     // ConnectionReset means the CID was valid, but nothing was listening to the
                     // port in the VM.
                     continue;
                 }
-                if let Some(os_err) = e.raw_os_error() {
-                    if os_err == nix::libc::ENODEV {
+                if let Some(os_err) = err.raw_os_error() {
+                    match os_err {
                         // ENODEV indicates that the CID is unused.
-                        return Ok(cid_to_try);
+                        nix::libc::ENODEV => return Ok(cid),
+                        nix::libc::EAFNOSUPPORT => {
+                            return Err(anyhow!("host does not support vsock"))
+                        }
+                        _ => {}
                     }
                 }
-                eprintln!("Unexpected err {e:?}")
+                eprintln!("Unexpected error: {err:?}")
             }
         };
     }
