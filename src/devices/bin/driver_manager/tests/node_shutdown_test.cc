@@ -261,10 +261,10 @@ class NodeShutdownTest : public DriverManagerTestBase {
     RunLoopUntilIdle();
     auto node = nodes_[node_name].lock();
     ASSERT_TRUE(node);
-    ASSERT_EQ(expected_state, node->GetShutdownHelper().node_state())
+    ASSERT_EQ(expected_state, node->GetNodeShutdownCoordinator().node_state())
         << "Node: " << node_name
-        << "  Expected: " << ShutdownHelper::NodeStateAsString(expected_state)
-        << "  Actual: " << node->GetShutdownHelper().NodeStateAsString();
+        << "  Expected: " << NodeShutdownCoordinator::NodeStateAsString(expected_state)
+        << "  Actual: " << node->GetNodeShutdownCoordinator().NodeStateAsString();
   }
 
   void VerifyStates(std::map<std::string, NodeState> expected_states) {

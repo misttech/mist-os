@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_SHUTDOWN_SHUTDOWN_HELPER_H_
-#define SRC_DEVICES_BIN_DRIVER_MANAGER_SHUTDOWN_SHUTDOWN_HELPER_H_
+#ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_SHUTDOWN_NODE_SHUTDOWN_COORDINATOR_H_
+#define SRC_DEVICES_BIN_DRIVER_MANAGER_SHUTDOWN_NODE_SHUTDOWN_COORDINATOR_H_
 
 #include <lib/async_patterns/cpp/task_scope.h>
 #include <stdint.h>
@@ -83,12 +83,13 @@ class NodeShutdownBridge {
 };
 
 // Coordinates and keeps track of the node's shutdown process.
-class ShutdownHelper {
+class NodeShutdownCoordinator {
  public:
-  explicit ShutdownHelper(NodeShutdownBridge* bridge, async_dispatcher_t* dispatcher,
-                          bool enable_test_shutdown_delays, std::weak_ptr<std::mt19937> rng_gen);
+  explicit NodeShutdownCoordinator(NodeShutdownBridge* bridge, async_dispatcher_t* dispatcher,
+                                   bool enable_test_shutdown_delays,
+                                   std::weak_ptr<std::mt19937> rng_gen);
 
-  ~ShutdownHelper() = default;
+  ~NodeShutdownCoordinator() = default;
 
   static const char* NodeStateAsString(NodeState state);
 
@@ -125,7 +126,9 @@ class ShutdownHelper {
 
   bool IsShuttingDown() const;
 
-  const char* NodeStateAsString() const { return ShutdownHelper::NodeStateAsString(node_state_); }
+  const char* NodeStateAsString() const {
+    return NodeShutdownCoordinator::NodeStateAsString(node_state_);
+  }
 
   NodeState node_state() const { return node_state_; }
 
@@ -150,10 +153,10 @@ class ShutdownHelper {
 
   ShutdownIntent shutdown_intent_ = ShutdownIntent::kRemoval;
 
-  // Owner. Must outlive ShutdownHelper.
+  // Owner. Must outlive NodeShutdownCoordinator.
   NodeShutdownBridge* bridge_;
 
-  // Set to true when the ShutdownHelper is in the process of transitioning
+  // Set to true when the NodeShutdownCoordinator is in the process of transitioning
   // node states. Only set if |enable_test_shutdown_delays_| is enabled. Used to prevent
   // multiple state transitions from happening at the same time.
   bool is_transition_pending_ = false;
@@ -170,4 +173,4 @@ class ShutdownHelper {
 
 }  // namespace driver_manager
 
-#endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_SHUTDOWN_SHUTDOWN_HELPER_H_
+#endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_SHUTDOWN_NODE_SHUTDOWN_COORDINATOR_H_

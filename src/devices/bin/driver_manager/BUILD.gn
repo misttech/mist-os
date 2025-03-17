@@ -93,8 +93,8 @@ source_set("driver_runner") {
     "runner.h",
     "shutdown/node_removal_tracker.cc",
     "shutdown/node_removal_tracker.h",
-    "shutdown/shutdown_helper.cc",
-    "shutdown/shutdown_helper.h",
+    "shutdown/node_shutdown_coordinator.cc",
+    "shutdown/node_shutdown_coordinator.h",
     "shutdown/shutdown_manager.cc",
     "shutdown/shutdown_manager.h",
   ]

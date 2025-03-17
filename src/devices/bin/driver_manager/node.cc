@@ -442,7 +442,7 @@ Node::~Node() {
   // before shutdown is complete.
   if (GetNodeState() != NodeState::kStopped) {
     LOGF(INFO, "Node %s deallocating while at state %s", MakeComponentMoniker().c_str(),
-         GetShutdownHelper().NodeStateAsString());
+         GetNodeShutdownCoordinator().NodeStateAsString());
   }
 
   CloseIfExists(controller_ref_);
@@ -545,7 +545,7 @@ void Node::CompleteBind(zx::result<> result) {
     completer.value()(result);
   }
 
-  GetShutdownHelper().CheckNodeState();
+  GetNodeShutdownCoordinator().CheckNodeState();
 }
 
 void Node::AddToParents() {
@@ -559,16 +559,16 @@ void Node::AddToParents() {
   }
 }
 
-ShutdownHelper& Node::GetShutdownHelper() {
-  if (!shutdown_helper_) {
+NodeShutdownCoordinator& Node::GetNodeShutdownCoordinator() {
+  if (!node_shutdown_coordinator_) {
     bool is_shutdown_test_delay_enabled =
         node_manager_.has_value() && node_manager_.value()->IsTestShutdownDelayEnabled();
     auto shutdown_rng = node_manager_.has_value() ? node_manager_.value()->GetShutdownTestRng()
                                                   : std::weak_ptr<std::mt19937>();
-    shutdown_helper_ = std::make_unique<ShutdownHelper>(
+    node_shutdown_coordinator_ = std::make_unique<NodeShutdownCoordinator>(
         this, dispatcher_, is_shutdown_test_delay_enabled, shutdown_rng);
   }
-  return *shutdown_helper_.get();
+  return *node_shutdown_coordinator_.get();
 }
 
 // TODO(https://fxbug.dev/42075799): If the node invoking this function cannot multibind to
@@ -583,13 +583,13 @@ void Node::RemoveChild(const std::shared_ptr<Node>& child) {
     }
     unbinding_children_completers_.clear();
   }
-  GetShutdownHelper().CheckNodeState();
+  GetNodeShutdownCoordinator().CheckNodeState();
 }
 
 void Node::FinishShutdown(fit::callback<void()> shutdown_callback) {
   ZX_ASSERT_MSG(GetNodeState() == NodeState::kWaitingOnDriverComponent,
                 "FinishShutdown called in invalid node state: %s",
-                GetShutdownHelper().NodeStateAsString());
+                GetNodeShutdownCoordinator().NodeStateAsString());
   if (shutdown_intent() == ShutdownIntent::kRestart) {
     LOGF(DEBUG, "Node: %s finishing restart", name().c_str());
     shutdown_callback();
@@ -638,7 +638,7 @@ void Node::FinishRestart() {
   ZX_ASSERT_MSG(shutdown_intent() == ShutdownIntent::kRestart,
                 "FinishRestart called when node is not restarting.");
 
-  GetShutdownHelper().ResetShutdown();
+  GetNodeShutdownCoordinator().ResetShutdown();
 
   // Store previous url before we reset the driver_component_.
   std::string previous_url = driver_url();
@@ -665,7 +665,7 @@ void Node::FinishQuarantine() {
   ZX_ASSERT_MSG(shutdown_intent() == ShutdownIntent::kQuarantine,
                 "FinishQuarantine called when node is not quarantining.");
 
-  GetShutdownHelper().ResetShutdown();
+  GetNodeShutdownCoordinator().ResetShutdown();
 
   // |QuarantineNode()| sets this.
   ZX_ASSERT_MSG(quarantine_driver_url_.has_value(), "Node::quarantine_driver_url_ was not set");
@@ -700,11 +700,11 @@ void Node::ClearHostDriver() {
 // a removal is taking place, but this node will not be removed yet, even if all its children
 // are removed.
 void Node::Remove(RemovalSet removal_set, NodeRemovalTracker* removal_tracker) {
-  GetShutdownHelper().Remove(shared_from_this(), removal_set, removal_tracker);
+  GetNodeShutdownCoordinator().Remove(shared_from_this(), removal_set, removal_tracker);
 }
 
 void Node::RestartNode() {
-  GetShutdownHelper().set_shutdown_intent(ShutdownIntent::kRestart);
+  GetNodeShutdownCoordinator().set_shutdown_intent(ShutdownIntent::kRestart);
   Remove(RemovalSet::kAll, nullptr);
 }
 
@@ -713,7 +713,7 @@ void Node::QuarantineNode() {
   std::string prev_url = driver_url();
   quarantine_driver_url_.emplace(std::move(prev_url));
 
-  GetShutdownHelper().set_shutdown_intent(ShutdownIntent::kQuarantine);
+  GetNodeShutdownCoordinator().set_shutdown_intent(ShutdownIntent::kQuarantine);
   Remove(RemovalSet::kAll, nullptr);
 }
 
@@ -749,7 +749,7 @@ void Node::RemoveCompositeNodeForRebind(fit::callback<void(zx::result<>)> comple
   }
 
   composite_rebind_completer_ = std::move(completer);
-  GetShutdownHelper().set_shutdown_intent(ShutdownIntent::kRebindComposite);
+  GetNodeShutdownCoordinator().set_shutdown_intent(ShutdownIntent::kRebindComposite);
   Remove(RemovalSet::kAll, nullptr);
 }
 
@@ -843,7 +843,7 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
     LOGF(WARNING, "Failed to add Node, as this Node '%s' was removed", name().data());
     return fit::as_error(fdf::wire::NodeError::kNodeRemoved);
   }
-  if (GetShutdownHelper().IsShuttingDown()) {
+  if (GetNodeShutdownCoordinator().IsShuttingDown()) {
     LOGF(WARNING, "Failed to add Node, as this Node '%s' is being removed", name().c_str());
     return fit::as_error(fdf::wire::NodeError::kNodeRemoved);
   }
@@ -1045,7 +1045,7 @@ void Node::WaitForChildToExit(
     if (child->name() != name) {
       continue;
     }
-    if (!child->GetShutdownHelper().IsShuttingDown()) {
+    if (!child->GetNodeShutdownCoordinator().IsShuttingDown()) {
       LOGF(ERROR, "Failed to add Node '%.*s', name already exists among siblings",
            static_cast<int>(name.size()), name.data());
       callback(fit::as_error(fdf::wire::NodeError::kNameAlreadyExists));
@@ -1435,7 +1435,7 @@ std::pair<std::string, Collection> Node::GetRemovalTrackerInfo() {
 void Node::StopDriver() {
   ZX_ASSERT_MSG(GetNodeState() == NodeState::kWaitingOnChildren,
                 "StopDriverComponent called in invalid node state: %s",
-                GetShutdownHelper().NodeStateAsString());
+                GetNodeShutdownCoordinator().NodeStateAsString());
   if (!HasDriver()) {
     return;
   }
@@ -1460,7 +1460,7 @@ void Node::StopDriver() {
 void Node::StopDriverComponent() {
   ZX_ASSERT_MSG(GetNodeState() == NodeState::kWaitingOnDriver,
                 "StopDriverComponent called in invalid node state: %s",
-                GetShutdownHelper().NodeStateAsString());
+                GetNodeShutdownCoordinator().NodeStateAsString());
 
   if (!driver_component_) {
     return;
@@ -1490,7 +1490,7 @@ void Node::StopDriverComponent() {
 
         LOGF(INFO, "Destroyed driver component for %s", self->MakeComponentMoniker().c_str());
         self->driver_component_->state = DriverState::kStopped;
-        self->GetShutdownHelper().CheckNodeState();
+        self->GetNodeShutdownCoordinator().CheckNodeState();
       });
 }
 
@@ -1508,7 +1508,7 @@ void Node::on_fidl_error(fidl::UnbindInfo info) {
 
   if (GetNodeState() == NodeState::kWaitingOnDriver) {
     LOGF(INFO, "Node: %s: realm channel had expected shutdown.", MakeComponentMoniker().c_str());
-    GetShutdownHelper().CheckNodeState();
+    GetNodeShutdownCoordinator().CheckNodeState();
     return;
   }
 
@@ -1517,7 +1517,7 @@ void Node::on_fidl_error(fidl::UnbindInfo info) {
     if (driver_component_) {
       driver_component_->state = DriverState::kStopped;
     }
-    GetShutdownHelper().CheckNodeState();
+    GetNodeShutdownCoordinator().CheckNodeState();
     return;
   }
 

@@ -25,7 +25,7 @@
 #include "src/devices/bin/driver_manager/devfs/devfs.h"
 #include "src/devices/bin/driver_manager/driver_host.h"
 #include "src/devices/bin/driver_manager/inspect.h"
-#include "src/devices/bin/driver_manager/shutdown/shutdown_helper.h"
+#include "src/devices/bin/driver_manager/shutdown/node_shutdown_coordinator.h"
 
 namespace driver_manager {
 
@@ -249,9 +249,9 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // requests that may have originated from the node.
   void CompleteBind(zx::result<> result);
 
-  ShutdownHelper& GetShutdownHelper();
+  NodeShutdownCoordinator& GetNodeShutdownCoordinator();
 
-  NodeState GetNodeState() { return GetShutdownHelper().node_state(); }
+  NodeState GetNodeState() { return GetNodeShutdownCoordinator().node_state(); }
 
   const std::string& name() const { return name_; }
 
@@ -337,7 +337,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   }
   std::vector<fuchsia_driver_framework::BusInfo> GetBusTopology() const;
 
-  ShutdownIntent shutdown_intent() { return GetShutdownHelper().shutdown_intent(); }
+  ShutdownIntent shutdown_intent() { return GetNodeShutdownCoordinator().shutdown_intent(); }
 
  private:
   struct DriverComponent {
@@ -528,7 +528,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // The device's inspect information.
   DeviceInspect inspect_;
 
-  std::unique_ptr<ShutdownHelper> shutdown_helper_;
+  std::unique_ptr<NodeShutdownCoordinator> node_shutdown_coordinator_;
 
   // This represents the node's presence in devfs, both it's topological path and it's class path.
   DevfsDevice devfs_device_;

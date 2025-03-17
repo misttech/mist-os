@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/bin/driver_manager/shutdown/shutdown_helper.h"
+#include "src/devices/bin/driver_manager/shutdown/node_shutdown_coordinator.h"
 
 #include "src/devices/bin/driver_manager/node.h"
 #include "src/devices/bin/driver_manager/shutdown/node_removal_tracker.h"
@@ -18,17 +18,18 @@ constexpr uint32_t kMaxTestDelayMs = 5;
 
 }  // namespace
 
-ShutdownHelper::ShutdownHelper(NodeShutdownBridge* bridge, async_dispatcher_t* dispatcher,
-                               bool enable_test_shutdown_delays,
-                               std::weak_ptr<std::mt19937> rng_gen)
+NodeShutdownCoordinator::NodeShutdownCoordinator(NodeShutdownBridge* bridge,
+                                                 async_dispatcher_t* dispatcher,
+                                                 bool enable_test_shutdown_delays,
+                                                 std::weak_ptr<std::mt19937> rng_gen)
     : bridge_(bridge),
       enable_test_shutdown_delays_(enable_test_shutdown_delays),
       rng_gen_(rng_gen),
       distribution_(kMinTestDelayMs, kMaxTestDelayMs),
       tasks_(dispatcher) {}
 
-void ShutdownHelper::Remove(std::shared_ptr<Node> node, RemovalSet removal_set,
-                            NodeRemovalTracker* removal_tracker) {
+void NodeShutdownCoordinator::Remove(std::shared_ptr<Node> node, RemovalSet removal_set,
+                                     NodeRemovalTracker* removal_tracker) {
   std::stack<std::shared_ptr<Node>> nodes_to_check_for_removal;
   std::stack<std::pair<std::shared_ptr<Node>, RemovalSet>> nodes =
       std::stack<std::pair<std::shared_ptr<Node>, RemovalSet>>({{node, removal_set}});
@@ -38,8 +39,8 @@ void ShutdownHelper::Remove(std::shared_ptr<Node> node, RemovalSet removal_set,
     std::shared_ptr<Node> node = removal_record.first;
     RemovalSet removal_set = removal_record.second;
 
-    ShutdownHelper& shutdown_helper = node->GetShutdownHelper();
-    if (!removal_tracker && shutdown_helper.removal_tracker_) {
+    NodeShutdownCoordinator& node_shutdown_coordinator = node->GetNodeShutdownCoordinator();
+    if (!removal_tracker && node_shutdown_coordinator.removal_tracker_) {
       // TODO(https://fxbug.dev/42066485): Change this to an error when we track shutdown steps
       // better.
       LOGF(WARNING, "Untracked Node::Remove() called on %s, indicating an error during shutdown",
@@ -47,20 +48,20 @@ void ShutdownHelper::Remove(std::shared_ptr<Node> node, RemovalSet removal_set,
     }
 
     if (removal_tracker) {
-      shutdown_helper.SetRemovalTracker(removal_tracker);
+      node_shutdown_coordinator.SetRemovalTracker(removal_tracker);
     }
 
     LOGF(DEBUG, "Remove called on Node: %s", node->name().c_str());
     // Two cases where we will transition state and take action:
     // Removing kAll, and state is Running or Prestop
     // Removing kPkg, and state is Running
-    if ((shutdown_helper.node_state() != NodeState::kPrestop &&
-         shutdown_helper.node_state() != NodeState::kRunning) ||
-        (shutdown_helper.node_state() == NodeState::kPrestop &&
+    if ((node_shutdown_coordinator.node_state() != NodeState::kPrestop &&
+         node_shutdown_coordinator.node_state() != NodeState::kRunning) ||
+        (node_shutdown_coordinator.node_state() == NodeState::kPrestop &&
          removal_set == RemovalSet::kPackage)) {
       if (node->parents().size() <= 1) {
         LOGF(WARNING, "Node::Remove() %s called late, already in state %s",
-             node->MakeComponentMoniker().c_str(), shutdown_helper.NodeStateAsString());
+             node->MakeComponentMoniker().c_str(), node_shutdown_coordinator.NodeStateAsString());
       }
       continue;
     }
@@ -69,16 +70,16 @@ void ShutdownHelper::Remove(std::shared_ptr<Node> node, RemovalSet removal_set,
     // Set the new state
     if (removal_set == RemovalSet::kPackage &&
         (node->collection() == Collection::kBoot || node->collection() == Collection::kNone)) {
-      shutdown_helper.node_state_ = NodeState::kPrestop;
+      node_shutdown_coordinator.node_state_ = NodeState::kPrestop;
     } else {
-      shutdown_helper.node_state_ = NodeState::kWaitingOnDriverBind;
+      node_shutdown_coordinator.node_state_ = NodeState::kWaitingOnDriverBind;
       // Either removing kAll, or is package driver and removing kPackage.
       // All children should be removed regardless as they block removal of this node.
       removal_set = RemovalSet::kAll;
     }
 
     // Propagate removal message to children
-    shutdown_helper.NotifyRemovalTracker();
+    node_shutdown_coordinator.NotifyRemovalTracker();
 
     // Ask each of our children to remove themselves.
     for (auto& child : node->children()) {
@@ -90,20 +91,20 @@ void ShutdownHelper::Remove(std::shared_ptr<Node> node, RemovalSet removal_set,
   }
 
   while (!nodes_to_check_for_removal.empty()) {
-    nodes_to_check_for_removal.top()->GetShutdownHelper().CheckNodeState();
+    nodes_to_check_for_removal.top()->GetNodeShutdownCoordinator().CheckNodeState();
     nodes_to_check_for_removal.pop();
   }
 }
 
-void ShutdownHelper::ResetShutdown() {
+void NodeShutdownCoordinator::ResetShutdown() {
   ZX_ASSERT_MSG(node_state_ == NodeState::kStopped,
-                "ShutdownHelper::ResetShutdown called in invalid node state: %s",
+                "NodeShutdownCoordinator::ResetShutdown called in invalid node state: %s",
                 NodeStateAsString());
   node_state_ = NodeState::kRunning;
   shutdown_intent_ = ShutdownIntent::kRemoval;
 }
 
-void ShutdownHelper::CheckNodeState() {
+void NodeShutdownCoordinator::CheckNodeState() {
   if (is_transition_pending_) {
     return;
   }
@@ -132,11 +133,12 @@ void ShutdownHelper::CheckNodeState() {
   }
 }
 
-void ShutdownHelper::CheckWaitingOnDriverBind() {
+void NodeShutdownCoordinator::CheckWaitingOnDriverBind() {
   ZX_ASSERT(!is_transition_pending_);
-  ZX_ASSERT_MSG(node_state_ == NodeState::kWaitingOnDriverBind,
-                "ShutdownHelper::CheckWaitingOnDriverBind called in invalid node state: %s",
-                NodeStateAsString());
+  ZX_ASSERT_MSG(
+      node_state_ == NodeState::kWaitingOnDriverBind,
+      "NodeShutdownCoordinator::CheckWaitingOnDriverBind called in invalid node state: %s",
+      NodeStateAsString());
   // Remain on this state if the node still has children.
   if (bridge_->IsPendingBind()) {
     return;
@@ -144,10 +146,10 @@ void ShutdownHelper::CheckWaitingOnDriverBind() {
   PerformTransition([this]() mutable { UpdateAndNotifyState(NodeState::kWaitingOnChildren); });
 }
 
-void ShutdownHelper::CheckWaitingOnChildren() {
+void NodeShutdownCoordinator::CheckWaitingOnChildren() {
   ZX_ASSERT(!is_transition_pending_);
   ZX_ASSERT_MSG(node_state_ == NodeState::kWaitingOnChildren,
-                "ShutdownHelper::CheckWaitingOnChildren called in invalid node state: %s",
+                "NodeShutdownCoordinator::CheckWaitingOnChildren called in invalid node state: %s",
                 NodeStateAsString());
   // Remain on this state if the node still has children.
   if (bridge_->HasChildren()) {
@@ -159,10 +161,10 @@ void ShutdownHelper::CheckWaitingOnChildren() {
   });
 }
 
-void ShutdownHelper::CheckWaitingOnDriver() {
+void NodeShutdownCoordinator::CheckWaitingOnDriver() {
   ZX_ASSERT(!is_transition_pending_);
   ZX_ASSERT_MSG(node_state_ == NodeState::kWaitingOnDriver,
-                "ShutdownHelper::CheckWaitingOnDriver called in invalid node state: %s",
+                "NodeShutdownCoordinator::CheckWaitingOnDriver called in invalid node state: %s",
                 NodeStateAsString());
 
   // Remain on this state if the node still has a driver set to it.
@@ -175,11 +177,12 @@ void ShutdownHelper::CheckWaitingOnDriver() {
   });
 }
 
-void ShutdownHelper::CheckWaitingOnDriverComponent() {
+void NodeShutdownCoordinator::CheckWaitingOnDriverComponent() {
   ZX_ASSERT(!is_transition_pending_);
-  ZX_ASSERT_MSG(node_state_ == NodeState::kWaitingOnDriverComponent,
-                "ShutdownHelper::CheckWaitingOnDriverComponent called in invalid node state: %s",
-                NodeStateAsString());
+  ZX_ASSERT_MSG(
+      node_state_ == NodeState::kWaitingOnDriverComponent,
+      "NodeShutdownCoordinator::CheckWaitingOnDriverComponent called in invalid node state: %s",
+      NodeStateAsString());
 
   // Remain on this state if the node still has a driver component.
   if (bridge_->HasDriverComponent()) {
@@ -191,7 +194,7 @@ void ShutdownHelper::CheckWaitingOnDriverComponent() {
   });
 }
 
-void ShutdownHelper::PerformTransition(fit::function<void()> action) {
+void NodeShutdownCoordinator::PerformTransition(fit::function<void()> action) {
   ZX_ASSERT(!is_transition_pending_);
 
   // Generate a test delay. If there is none, perform the action and return.
@@ -209,23 +212,23 @@ void ShutdownHelper::PerformTransition(fit::function<void()> action) {
   });
 }
 
-void ShutdownHelper::UpdateAndNotifyState(NodeState state) {
+void NodeShutdownCoordinator::UpdateAndNotifyState(NodeState state) {
   node_state_ = state;
   is_transition_pending_ = false;
   NotifyRemovalTracker();
   CheckNodeState();
 }
 
-void ShutdownHelper::NotifyRemovalTracker() {
+void NodeShutdownCoordinator::NotifyRemovalTracker() {
   if (!removal_tracker_ || removal_id_ == std::nullopt) {
     return;
   }
   removal_tracker_->Notify(removal_id_.value(), node_state_);
 }
 
-bool ShutdownHelper::IsShuttingDown() const { return node_state_ != NodeState::kRunning; }
+bool NodeShutdownCoordinator::IsShuttingDown() const { return node_state_ != NodeState::kRunning; }
 
-const char* ShutdownHelper::NodeStateAsString(NodeState state) {
+const char* NodeShutdownCoordinator::NodeStateAsString(NodeState state) {
   switch (state) {
     case NodeState::kWaitingOnDriverBind:
       return "kWaitingOnDriverBind";
@@ -244,7 +247,7 @@ const char* ShutdownHelper::NodeStateAsString(NodeState state) {
   }
 }
 
-void ShutdownHelper::SetRemovalTracker(NodeRemovalTracker* removal_tracker) {
+void NodeShutdownCoordinator::SetRemovalTracker(NodeRemovalTracker* removal_tracker) {
   ZX_ASSERT(removal_tracker);
   if (removal_tracker_) {
     // We should never have two competing trackers
@@ -260,7 +263,7 @@ void ShutdownHelper::SetRemovalTracker(NodeRemovalTracker* removal_tracker) {
   });
 }
 
-std::optional<uint32_t> ShutdownHelper::GenerateTestDelayMs() {
+std::optional<uint32_t> NodeShutdownCoordinator::GenerateTestDelayMs() {
   if (!enable_test_shutdown_delays_) {
     return std::nullopt;
   }
