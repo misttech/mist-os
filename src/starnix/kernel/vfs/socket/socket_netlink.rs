@@ -73,6 +73,10 @@ pub fn new_netlink_socket(
         NetlinkFamily::Route => Box::new(RouteNetlinkSocket::new(kernel)?),
         NetlinkFamily::Generic => Box::new(GenericNetlinkSocket::new(kernel)?),
         NetlinkFamily::SockDiag => Box::new(DiagnosticNetlinkSocket::new(kernel)?),
+        NetlinkFamily::Audit => {
+            track_stub!(TODO("https://fxbug.dev/403540244"), "NETLINK_AUDIT");
+            return error!(EPROTONOSUPPORT);
+        }
         _ => Box::new(BaseNetlinkSocket::new(family)),
     };
     Ok(ops)
