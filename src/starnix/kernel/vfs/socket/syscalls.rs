@@ -34,26 +34,7 @@ use starnix_uapi::{
 };
 
 uapi::check_arch_independent_layout! {
-    sockaddr {
-        sa_family,
-        sa_data,
-    }
-}
-uapi::check_arch_independent_layout! {
-    sockaddr_in {
-        sin_family,
-        sin_port,
-        sin_addr,
-    }
-}
-uapi::check_arch_independent_layout! {
-    sockaddr_in6 {
-        sin6_family,
-        sin6_port,
-        sin6_flowinfo,
-        sin6_addr,
-        sin6_scope_id
-    }
+    socklen_t {}
 }
 
 pub type MsgHdrPtr = MappingMultiArchUserRef<MsgHdr, uapi::msghdr, uapi::arch32::msghdr>;

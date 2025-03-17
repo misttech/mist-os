@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use bitflags::bitflags;
-use zerocopy::{FromBytes, IntoBytes};
-
+use crate::vfs::socket::NetlinkAddress;
 use crate::vfs::FsString;
+use bitflags::bitflags;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{
     error, sockaddr_in, sockaddr_in6, sockaddr_ll, sockaddr_nl, sockaddr_un, sockaddr_vm, uapi,
@@ -15,9 +14,30 @@ use starnix_uapi::{
     MSG_TRUNC, MSG_TRYHARD, MSG_WAITALL, MSG_WAITFORONE, SOCK_DCCP, SOCK_DGRAM, SOCK_PACKET,
     SOCK_RAW, SOCK_RDM, SOCK_SEQPACKET, SOCK_STREAM,
 };
+use zerocopy::{FromBytes, IntoBytes};
+
 pub use syncio::ZxioShutdownFlags as SocketShutdownFlags;
 
-use super::NetlinkAddress;
+uapi::check_arch_independent_layout! {
+    sockaddr {
+        sa_family,
+        sa_data,
+    }
+
+    sockaddr_in {
+        sin_family,
+        sin_port,
+        sin_addr,
+    }
+
+    sockaddr_in6 {
+        sin6_family,
+        sin6_port,
+        sin6_flowinfo,
+        sin6_addr,
+        sin6_scope_id
+    }
+}
 
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

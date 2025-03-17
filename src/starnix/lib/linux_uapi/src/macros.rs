@@ -17,6 +17,7 @@
 /// ```
 #[macro_export]
 macro_rules! check_same_layout {
+    {} => {};
     {
         $type_name1:ty = $type_name2:ty
         {
@@ -25,6 +26,7 @@ macro_rules! check_same_layout {
             ),*
             $(,)?
         }
+        $($token:tt)*
     } => {
         static_assertions::assert_eq_size!($type_name1, $type_name2);
         $(
@@ -33,7 +35,8 @@ macro_rules! check_same_layout {
                 std::mem::offset_of!($type_name2, $($field2).+)
             );
         )*
-    }
+        $crate::check_same_layout! { $($token)* }
+    };
 }
 
 /// Ensure a uapi type has the same layout in 32 and 64 bits.
@@ -51,11 +54,13 @@ macro_rules! check_same_layout {
 /// ```
 #[macro_export]
 macro_rules! check_arch_independent_layout {
+    {} => {};
     {
         $type_name:ident {
             $( $($field:ident).+ ),*
             $(,)?
         }
+        $($token:tt)*
     }=> {
         $crate::check_same_layout! {
             $crate::$type_name = $crate::arch32::$type_name {
@@ -64,7 +69,8 @@ macro_rules! check_arch_independent_layout {
                 )*
             }
         }
-    }
+        $crate::check_arch_independent_layout! { $($token)* }
+    };
 }
 
 /// Ensure a custom type has the same layout as an ABI independant uapi type
@@ -82,6 +88,7 @@ macro_rules! check_arch_independent_layout {
 /// ```
 #[macro_export]
 macro_rules! check_arch_independent_same_layout {
+    {} => {};
     {
         $type_name1:ty = $type_name2:ident
         {
@@ -90,6 +97,7 @@ macro_rules! check_arch_independent_same_layout {
             ),*
             $(,)?
         }
+        $($token:tt)*
     } => {
         $crate::check_same_layout! {
             $type_name1 = $crate::$type_name2
@@ -103,7 +111,8 @@ macro_rules! check_arch_independent_same_layout {
                 $($($field1).+ => $($field2).+,)*
             }
         }
-    }
+        $crate::check_arch_independent_same_layout! { $($token)* }
+    };
 }
 
 /// Implement From/TryFrom between 2 structs.
