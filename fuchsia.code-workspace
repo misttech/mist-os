@@ -171,7 +171,7 @@
     // Remap the diagnostics results from RA to handle the change in working dir
     // from the workspace root to the root_build_dir in GN/Ninja.
     "rust-analyzer.diagnostics.remapPrefix": {
-      "../../": "${workspaceFolder}",
+      "../../": "${workspaceFolder}/",
     },
 
     ////////
@@ -416,6 +416,7 @@
     // Disable task auto-detection for supported project configuration files
     // (e.g. NPM's project.json). This significantly speeds up task running.
     "task.autoDetect": "off",
+    "rust-analyzer.runnables.command": null,
   },
 
   // Tasks run with the "Tasks: Run Task" command (bind a shortcut!).
