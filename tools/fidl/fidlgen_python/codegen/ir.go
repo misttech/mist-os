@@ -94,6 +94,17 @@ func (c *compiler) compileType(val fidlgen.Type, maybeAlias *fidlgen.PartialType
 	switch val.Kind {
 	case fidlgen.IdentifierType:
 		name += *c.compileDeclIdentifier(val.Identifier)
+	case fidlgen.PrimitiveType:
+		subtype := string(val.PrimitiveSubtype)
+		if strings.HasPrefix(subtype, "int") || strings.HasPrefix(subtype, "uint") {
+			name += "int"
+		} else if strings.HasPrefix(subtype, "float") {
+			name += "float"
+		} else if subtype == "bool" {
+			name += "bool"
+		} else {
+			log.Fatalf("Unknown primitive subtype: %v", val)
+		}
 	case fidlgen.VectorType, fidlgen.ArrayType:
 		element_type_ptr := c.compileType(*val.ElementType, val.MaybeFromAlias)
 		if element_type_ptr == nil {
@@ -102,7 +113,7 @@ func (c *compiler) compileType(val fidlgen.Type, maybeAlias *fidlgen.PartialType
 		element_type := *element_type_ptr
 		name += fmt.Sprintf("typing.Sequence[%s]", element_type.PythonName)
 	default:
-		log.Fatalf("Unknown kind: %v", val.Kind)
+		log.Fatalf("Unknown kind: %v", val)
 	}
 	if val.Nullable {
 		name += "]"

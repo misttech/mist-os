@@ -8,7 +8,10 @@ import("//build/fidl/fidl.gni")
 # Create a series of targets that rename the library in each conformance suite
 # FIDL file to test.conformance.python. This allows the ..:conformance_fidl
 # and :conformance_python_fidl targets to co-exist.
-conformance_python_fidl_source_basenames = [ "empty_struct.test.fidl" ]
+conformance_python_fidl_source_basenames = [
+  "empty_struct.test.fidl",
+  "primitives.test.fidl",
+]
 foreach(source_basename, conformance_python_fidl_source_basenames) {
   compiled_action("conformance_python_fidl_transplant__${source_basename}") {
     tool = "//src/tests/fidl/conformance_suite/transplant_fidl"
