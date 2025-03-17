@@ -2217,5 +2217,6 @@ mod tests {
         )
         .await
         .expect("fsck_volume failed");
+        filesystem.close().await.expect("Filesystem close");
     }
 }
