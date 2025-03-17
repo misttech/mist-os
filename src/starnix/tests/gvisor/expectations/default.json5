@@ -1207,6 +1207,11 @@
 
                 // TODO(https://fxbug.dev/397205797): Fix and re-enable
                 "ExecTest.Setpgid",
+
+                // TODO(https://fxbug.dev/404199474): Fix and re-enable
+                "PtyTest.PacketModeWriteMasterToReplica",
+                "PtyTest.PacketModeWriteReplicaToMaster",
+                "PtyTest.PacketModeFailsOnReplica",
             ],
         },
     ],
