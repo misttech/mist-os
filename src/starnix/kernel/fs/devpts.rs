@@ -482,7 +482,7 @@ impl FileOps for DevPtmxFile {
     }
 }
 
-struct TtyFile {
+pub struct TtyFile {
     terminal: Arc<Terminal>,
 }
 

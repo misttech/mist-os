@@ -191,7 +191,7 @@ impl Terminal {
         self.write().main_close();
     }
 
-    /// Called when a new reference to the replica side of this terminal is made.
+    /// Called when a new reference to the main side of this terminal is made.
     pub fn main_open(&self) {
         self.write().main_open();
     }
@@ -397,7 +397,7 @@ impl TerminalMutableState<Base = Terminal> {
         self.notify_waiters();
     }
 
-    /// Called when a new reference to the replica side of this terminal is made.
+    /// Called when a new reference to the main side of this terminal is made.
     pub fn main_open(&mut self) {
         self.main_references = Some(self.main_references.unwrap_or(0) + 1);
     }
