@@ -282,7 +282,9 @@ class ScreenshotImageTest(unittest.TestCase):
             param(
                 pixels1=[WHITE, RED, TRANSPARENT, GREEN],
                 pixels2=[RED, WHITE, BLUE, BLACK],
-                expected_similarity=0.5,
+                # TODO(b/399391948): Temporarily expect 0.75 similarity while we ignore pixel alpha
+                # values. When we eventually revert this, expected_similarity will return to 0.5.
+                expected_similarity=0.75,
             ),
             param(
                 pixels1=[RED, RED, WHITE, WHITE],
