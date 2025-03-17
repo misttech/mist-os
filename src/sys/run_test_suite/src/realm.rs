@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use cm_rust::{ExposeDeclCommon, NativeIntoFidl, OfferDeclCommon};
-use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, ServerEnd};
+use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker};
 use fidl_fuchsia_component_decl::Offer;
 use moniker::Moniker;
 use thiserror::Error;
@@ -72,12 +72,11 @@ impl Realm {
     pub fn get_realm_client(&self) -> Result<ClientEnd<fcomponent::RealmMarker>, fidl::Error> {
         let (realm_client, server_end) =
             fidl::endpoints::create_endpoints::<fcomponent::RealmMarker>();
-        let server_end = ServerEnd::new(server_end.into_channel());
-        self.exposed_dir.deprecated_open(
-            fio::OpenFlags::empty(),
-            fio::ModeType::empty(),
+        self.exposed_dir.open(
             fcomponent::RealmMarker::PROTOCOL_NAME,
-            server_end,
+            fio::Flags::PROTOCOL_SERVICE,
+            &Default::default(),
+            server_end.into_channel(),
         )?;
         Ok(realm_client)
     }
