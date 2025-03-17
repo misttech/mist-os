@@ -54,6 +54,7 @@ ffx_subtool_fidl_allowlist = [
   "//sdk/fidl/fuchsia.net.dhcpv6:fuchsia.net.dhcpv6",
 
   # used by ffx net
+  "//sdk/fidl/fuchsia.ebpf:fuchsia.ebpf",
   "//sdk/fidl/fuchsia.net.filter:fuchsia.net.filter",
   "//sdk/fidl/fuchsia.net.filter.deprecated:fuchsia.net.filter.deprecated",
   "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin",
