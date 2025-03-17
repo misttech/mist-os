@@ -200,8 +200,14 @@ tables_generator_tests_*.txt
 /third_party/Vulkan-ValidationLayers/src
 
 /tmp/
+
 /vendor/*
 !/vendor/misttech
+/vendor/misttech/third_party/*
+!/vendor/misttech/third_party/linux_uapi
+!/vendor/misttech/third_party/lwip
+/vendor/misttech/third_party/lwip/src
+
 /build/secondary/third_party/ffmpeg
 /build/secondary/third_party/protobuf
 
