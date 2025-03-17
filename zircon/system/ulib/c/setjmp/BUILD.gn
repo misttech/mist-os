@@ -14,7 +14,7 @@ llvm_libc_source_set("setjmp") {
 
   # The Fuchsia versions are implemented locally in assembly and have
   # internal preempt headers to use LIBC_ASM_LINKAGE.
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     asm_functions = functions
     os_functions = functions
 

@@ -128,7 +128,7 @@ static_library("zxtest-streams") {
   ]
   deps = zxtest_deps
 
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     sources += [ "death-statement.cc" ]
 
     public_deps += [ "//zircon/system/ulib/zx" ]

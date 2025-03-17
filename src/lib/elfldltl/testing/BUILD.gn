@@ -67,7 +67,7 @@ static_library("elfldltl-zxtest") {
 
   public_deps = [ ":headers.zxtest" ]
 
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     sources = [ "get-test-lib-vmo.cc" ]
     deps = [
       "//sdk/fidl/fuchsia.ldsvc:fuchsia.ldsvc_cpp",

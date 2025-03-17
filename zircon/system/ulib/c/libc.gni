@@ -637,9 +637,11 @@ template("llvm_libc_source_set") {
 
       if (prefix == "fuchsia/") {
         local_sources += [ "$function.$extension" ]
+      } else if (prefix == "fuchsia/$clang_cpu/") {
+        local_sources += [ "fuchsia/$clang_cpu/$function.$extension" ]
       } else if (prefix == "mistos/") {
         local_sources += [ "$function.$extension" ]
-      } else if (prefix == "fuchsia/$clang_cpu/") {
+      } else if (prefix == "mistos/$clang_cpu/") {
         local_sources += [ "fuchsia/$clang_cpu/$function.$extension" ]
       } else {
         if (extension == "cc") {
