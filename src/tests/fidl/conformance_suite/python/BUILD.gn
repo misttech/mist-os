@@ -12,6 +12,7 @@ conformance_python_fidl_source_basenames = [
   "alignment.test.fidl",
   "empty_struct.test.fidl",
   "primitives.test.fidl",
+  "strings.test.fidl",
 ]
 foreach(source_basename, conformance_python_fidl_source_basenames) {
   compiled_action("conformance_python_fidl_transplant__${source_basename}") {

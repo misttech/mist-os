@@ -105,6 +105,8 @@ func (c *compiler) compileType(val fidlgen.Type, maybeAlias *fidlgen.PartialType
 		} else {
 			log.Fatalf("Unknown primitive subtype: %v", val)
 		}
+	case fidlgen.StringType:
+		name += "str"
 	case fidlgen.VectorType, fidlgen.ArrayType:
 		element_type_ptr := c.compileType(*val.ElementType, val.MaybeFromAlias)
 		if element_type_ptr == nil {
