@@ -22,7 +22,6 @@ var initMessages []string = []string{
 	// Make sure the shell is ready to accept commands over serial.
 	"console.shell: enabled",
 	"fshost: lifecycle handler ready",
-	"driver_manager loader loop started",
 	"driver_manager main loop is running",
 	"archivist: Entering core loop"}
 

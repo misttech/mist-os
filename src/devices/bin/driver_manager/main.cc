@@ -159,9 +159,6 @@ int main(int argc, char** argv) {
   driver_manager::ShutdownManager shutdown_manager(&driver_runner, loop.dispatcher());
   shutdown_manager.Publish(outgoing);
 
-  // TODO(https://fxbug.dev/42181480) Remove this when this issue is fixed.
-  LOGF(INFO, "driver_manager loader loop started");
-
   fs::SynchronousVfs vfs(loop.dispatcher());
 
   // Add the devfs folder to the tree:
