@@ -6,10 +6,11 @@
 #### CATEGORY=Source tree
 ### Syncs BUILD.gn and BUILD.bazel for targets that are dual-building in both.
 
-## usage: fx bazel2gn [-h|--help] [--no-build]
+## usage: fx bazel2gn [-d|--directory <path/to/dir>]... [-h|--help] [--no-build]
 ##
-##   -h|--help     Print out this message.
-##   --no-build    Skip building required dependencies.
+##   -h|--help       Print out this message.
+##   -d|--directory  Directory to sync, repeatable.
+##   --no-build      Skip building required dependencies.
 ##
 ## Updates BUILD.gn listed in this script based on the BUILD.bazel files in
 ## their directories.
@@ -25,8 +26,13 @@ declare -r BAZEL2GN_DIR_LIST="${FUCHSIA_BUILD_DIR}/bazel2gn_dir_list"
 
 function main {
   local build=true
+  local directories=()
   while [[ "${#}" -ge 1 ]]; do
     case "${1}" in
+      -d|--directory)
+        shift
+        directories+=("${1}")
+        ;;
       -h|--help)
         fx-command-help
         exit 0
@@ -42,17 +48,25 @@ function main {
     shift
   done
 
+  # If no directories are provided by user, sync all known directories.
+  # Read known directories to sync from $BAZEL2GN_DIR_LIST.
+  if [[ -z "${directories}" ]]; then
+    while IFS= read -r dir; do
+      directories+=("${dir}")
+    done < "${BAZEL2GN_DIR_LIST}"
+  fi
+
   if [[ "${build}" == "true" ]]; then
     fx-run-ninja false "${PREBUILT_NINJA}" -C "${FUCHSIA_BUILD_DIR}" "${BAZEL2GN_TARGET}"
   fi
 
-  while IFS= read -r dir; do
+  for dir in "${directories[@]}"; do
     build_gn="${FUCHSIA_DIR}/${dir}/BUILD.gn"
     "${BAZEL2GN_BIN}" \
       --bazel_input_path "${FUCHSIA_DIR}/${dir}/BUILD.bazel" \
       --gn_output_path "${build_gn}" \
       --gn_bin "${PREBUILT_GN}"
-  done < "${BAZEL2GN_DIR_LIST}"
+  done
 }
 
 main "$@"
