@@ -45,6 +45,13 @@ Logger::Logger(async_dispatcher_t* dispatcher, std::optional<monitor::HighWater*
       config_(config),
       root_node_(std::move(node)),
       inspect_bucket_digest_node_(root_node_.CreateChild(kMeasurementsKey), kMeasurementsCapacity) {
+  // Ensure that all delays are above 0, otherwise the logger risks busy
+  // looping, which is all the more problematic because it typically runs on
+  // memory_monitor's main thread, blocking it entirely.
+  FX_CHECK(config->imminent_oom_capture_delay_s() > 0);
+  FX_CHECK(config->critical_capture_delay_s() > 0);
+  FX_CHECK(config->warning_capture_delay_s() > 0);
+  FX_CHECK(config->normal_capture_delay_s() > 0);
 }
 
 void Logger::SetPressureLevel(pressure_signaler::Level l) {

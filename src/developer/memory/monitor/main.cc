@@ -13,6 +13,7 @@
 #include <memory>
 
 #include "src/developer/memory/metrics/capture.h"
+#include "src/developer/memory/monitor/imminent_oom_observer.h"
 #include "src/developer/memory/monitor/monitor.h"
 
 namespace {
@@ -66,6 +67,15 @@ int main(int argc, const char** argv) {
     FX_LOGS(ERROR) << "Error getting root job: " << root_job.status();
     exit(-1);
   }
+  zx_handle_t imminent_oom_event_handle;
+  zx_status_t imminent_oom_status = zx_system_get_event(
+      root_job->job.get(), ZX_SYSTEM_EVENT_IMMINENT_OUT_OF_MEMORY, &imminent_oom_event_handle);
+  if (imminent_oom_status != ZX_OK) {
+    FX_LOGS(ERROR) << "zx_system_get_event [IMMINENT-OOM] returned "
+                   << zx_status_get_string(imminent_oom_status);
+    exit(-1);
+  }
+  monitor::ImminentOomEventObserver imminent_oom_observer{imminent_oom_event_handle};
 
   std::optional<fidl::Client<fuchsia_metrics::MetricEventLoggerFactory>> factory;
   {
@@ -78,7 +88,7 @@ int main(int argc, const char** argv) {
   }
   auto app = std::make_unique<monitor::Monitor>(
       loop.dispatcher(), memory_monitor_config::Config::TakeFromStartupHandle(), std::move(*maker),
-      std::move(pressure_provider), root_job->job.get(), std::move(factory),
+      std::move(pressure_provider), &imminent_oom_observer, std::move(factory),
       GetRamDevice(loop.dispatcher()));
   component::OutgoingDirectory outgoing = component::OutgoingDirectory(loop.dispatcher());
   zx::result result = outgoing.AddProtocol<fuchsia_memory_inspection::Collector>(std::move(app));

@@ -122,7 +122,7 @@ std::vector<memory::BucketMatch> CreateBucketMatchesFromConfigData() {
 Monitor::Monitor(async_dispatcher_t* dispatcher, memory_monitor_config::Config config,
                  memory::CaptureMaker capture_maker,
                  std::optional<fidl::Client<fuchsia_memorypressure::Provider>> pressure_provider,
-                 std::optional<zx_handle_t> root_job,
+                 ImminentOomObserver* imminent_oom_observer,
                  std::optional<fidl::Client<fuchsia_metrics::MetricEventLoggerFactory>> factory,
                  std::optional<fidl::Client<fuchsia_hardware_ram_metrics::Device>> ram_device)
     : capture_maker_(std::move(capture_maker)),
@@ -143,7 +143,8 @@ Monitor::Monitor(async_dispatcher_t* dispatcher, memory_monitor_config::Config c
       bucket_matches_(CreateBucketMatchesFromConfigData()),
       digester_(bucket_matches_),
       ram_device_(std::move(ram_device)),
-      level_(pressure_signaler::Level::kNumLevels) {
+      level_(pressure_signaler::Level::kNumLevels),
+      imminent_oom_observer_(imminent_oom_observer) {
   if (metric_event_logger_factory_)
     CreateMetrics();
 
@@ -166,21 +167,6 @@ Monitor::Monitor(async_dispatcher_t* dispatcher, memory_monitor_config::Config c
       FX_LOGS(ERROR) << "Error registering to memory pressure changes: " << result.error_value();
       exit(-1);
     }
-  }
-
-  // Imminent OOM monitoring
-  if (root_job) {
-    zx_status_t status = zx_system_get_event(*root_job, ZX_SYSTEM_EVENT_IMMINENT_OUT_OF_MEMORY,
-                                             &imminent_oom_event_handle_);
-    if (status != ZX_OK) {
-      FX_LOGS(ERROR) << "zx_system_get_event [IMMINENT-OOM] returned "
-                     << zx_status_get_string(status);
-      exit(-1);
-    }
-
-    // Start imminent oom monitoring on a new named thread.
-    imminent_oom_loop_.StartThread("imminent-oom-loop");
-    watch_task_.Post(imminent_oom_loop_.dispatcher());
   }
 
   // Bandwidth monitoring
@@ -529,6 +515,14 @@ pressure_signaler::Level ConvertPressureLevel(fuchsia_memorypressure::Level leve
 }  // namespace
 
 void Monitor::OnLevelChanged(pressure_signaler::Level level) {
+  // In case of imminent oom, pressure_signaler reports a critical memory level;
+  // it falls on memory_monitor to disambiguate.
+  if (level == pressure_signaler::Level::kCritical && imminent_oom_observer_ &&
+      imminent_oom_observer_->IsImminentOom()) {
+    level = pressure_signaler::Level::kImminentOOM;
+  }
+
+  // Don't do anything if the level has not changed.
   if (level == level_) {
     return;
   }
@@ -545,23 +539,6 @@ void Monitor::OnLevelChanged(OnLevelChangedRequest& request,
                              OnLevelChangedCompleter::Sync& completer) {
   completer.Reply();
   OnLevelChanged(ConvertPressureLevel(request.level()));
-}
-
-void Monitor::WaitForImminentOom() {
-  zx_signals_t observed;
-  zx_status_t status = zx_object_wait_one(imminent_oom_event_handle_, ZX_EVENT_SIGNALED,
-                                          ZX_TIME_INFINITE, &observed);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "zx_object_wait_one returned " << zx_status_get_string(status);
-    return;
-  }
-
-  OnLevelChanged(pressure_signaler::Level::kImminentOOM);
-}
-
-void Monitor::WatchForImminentOom() {
-  WaitForImminentOom();
-  watch_task_.Post(imminent_oom_loop_.dispatcher());
 }
 
 }  // namespace monitor

@@ -106,13 +106,18 @@ class MemoryBandwidthInspectTest : public gtest::TestLoopFixture {
     auto ram_endpoints = fidl::CreateEndpoints<fuchsia_hardware_ram_metrics::Device>();
     fidl::BindServer<fuchsia_hardware_ram_metrics::Device>(
         dispatcher(), std::move(ram_endpoints->server), &fake_device_);
-    monitor_ =
-        std::make_unique<Monitor>(dispatcher(), memory_monitor_config::Config{},
-                                  *memory::CaptureMaker::Create(memory::CreateDefaultOS()),
-                                  /* pressure_provider */ std::nullopt, /* root_job */ std::nullopt,
-                                  fidl::Client<fuchsia_metrics::MetricEventLoggerFactory>{
-                                      std::move(logger_endpoints->client), dispatcher()},
-                                  fidl::Client(std::move(ram_endpoints->client), dispatcher()));
+    monitor_ = std::make_unique<Monitor>(
+        dispatcher(),
+        // Arbitrary non-zero delays
+        memory_monitor_config::Config{{.critical_capture_delay_s = 10,
+                                       .imminent_oom_capture_delay_s = 10,
+                                       .normal_capture_delay_s = 10,
+                                       .warning_capture_delay_s = 10}},
+        *memory::CaptureMaker::Create(memory::CreateDefaultOS()),
+        /* pressure_provider */ std::nullopt, /* imminent_oom_observer */ nullptr,
+        fidl::Client<fuchsia_metrics::MetricEventLoggerFactory>{std::move(logger_endpoints->client),
+                                                                dispatcher()},
+        fidl::Client(std::move(ram_endpoints->client), dispatcher()));
     RunLoopUntilIdle();
   }
 
