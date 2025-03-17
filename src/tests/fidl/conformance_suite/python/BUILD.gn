@@ -9,6 +9,7 @@ import("//build/fidl/fidl.gni")
 # FIDL file to test.conformance.python. This allows the ..:conformance_fidl
 # and :conformance_python_fidl targets to co-exist.
 conformance_python_fidl_source_basenames = [
+  "alignment.test.fidl",
   "empty_struct.test.fidl",
   "primitives.test.fidl",
 ]
