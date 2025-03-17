@@ -108,8 +108,8 @@ The desired result is `PersistResult::QUEUED`.
 
 # Use the published data {#use-published-data}
 
-On the next boot, the stored data will be published to Inspect after a delay
-(currently 120 seconds).
+On the next boot, the stored data will be published to Inspect as soon as the
+software update check completes.
 
 For a selector of `INSPECT:core/test_component:root/path:number` with a service
 of `my-service` and a tag of `my-tag`, the data will be found under
