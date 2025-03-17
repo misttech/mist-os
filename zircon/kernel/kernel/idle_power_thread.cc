@@ -357,7 +357,7 @@ zx_status_t IdlePowerThread::TransitionAllActiveToSuspend(zx_instant_boot_t resu
       // TODO(eieio): Check that at least one wake source is configured if no resume time is set.
       // Maybe this check needs require at least one wake source if the resume time is too far in
       // the future?
-      dprintf(INFO, "No resume timer set. System will not resume.\n");
+      dprintf(INFO, "No kernel resume timeout set. System will only resume by wake vector.\n");
     }
 
     dprintf(INFO, "Attempting to suspend boot CPU...\n");
