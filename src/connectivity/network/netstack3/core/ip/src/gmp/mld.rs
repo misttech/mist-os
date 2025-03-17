@@ -749,13 +749,12 @@ fn send_mld_v1_packet<
         .map_err(|_| MldError::SendFailure { addr: group_addr.into() })
 }
 
-/// Inspect Counters for MLD.
-pub type MldCounters = MldCountersInner<Counter>;
-
 /// Statistics about MLD.
+///
+/// The counter type `C` is generic to facilitate testing.
 #[derive(Debug, Default)]
 #[cfg_attr(test, derive(PartialEq))]
-pub struct MldCountersInner<C> {
+pub struct MldCounters<C = Counter> {
     /// Count of MLDv1 queries received.
     rx_mldv1_query: C,
     /// Count of MLDv2 queries received.
@@ -1059,7 +1058,7 @@ mod tests {
         }
     }
 
-    type CounterExpectations = MldCountersInner<u64>;
+    type CounterExpectations = MldCounters<u64>;
 
     impl CounterExpectations {
         #[track_caller]

@@ -927,13 +927,12 @@ impl gmp::v2::ProtocolConfig for IgmpConfig {
     }
 }
 
-/// Inspect Counters for IGMP.
-pub type IgmpCounters = IgmpCountersInner<Counter>;
-
 /// Statistics about IGMP.
+///
+/// The counter type `C` is generic to facilitate testing.
 #[derive(Debug, Default)]
 #[cfg_attr(test, derive(PartialEq))]
-pub struct IgmpCountersInner<C> {
+pub struct IgmpCounters<C = Counter> {
     // Count of IGMPv1 queries received.
     rx_igmpv1_query: C,
     // Count of IGMPv2 queries received.
@@ -1243,7 +1242,7 @@ mod tests {
         }
     }
 
-    type CounterExpectations = IgmpCountersInner<u64>;
+    type CounterExpectations = IgmpCounters<u64>;
 
     impl CounterExpectations {
         #[track_caller]
