@@ -10,7 +10,6 @@ sdk_source_set("board-test-helper") {
   include_base = "//sdk"
 
   deps = [
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/driver/component/cpp",

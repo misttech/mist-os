@@ -51,6 +51,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.driver.test/RealmArgs.devicetree",
+        "ordinal": "20",
+        "type": "zx/Handle:VMO"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.driver.test/RealmArgs.driver_bind_eager",
         "ordinal": "9",
         "type": "vector<string>"
@@ -96,6 +102,18 @@
         "name": "fuchsia.driver.test/RealmArgs.dtr_offers",
         "ordinal": "14",
         "type": "vector<fuchsia.component.test/Capability>"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.test/RealmArgs.platform_pid",
+        "ordinal": "22",
+        "type": "uint32"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.test/RealmArgs.platform_vid",
+        "ordinal": "21",
+        "type": "uint32"
     },
     {
         "kind": "table/member",

@@ -171,6 +171,18 @@ type RealmArgs = resource table {
     /// Default: empty
     @available(added=24)
     19: boot_driver_components vector<string:MAX>:MAX;
+
+    /// Devicetree blob that should be handed to the board driver.
+    @available(added=NEXT)
+    20: devicetree zx.Handle:VMO;
+
+    /// Platform Vendor ID which should be specified to the platform bus driver.
+    @available(added=NEXT)
+    21: platform_vid uint32;
+
+    /// Platform ID which should be specified to the platform bus driver.
+    @available(added=NEXT)
+    22: platform_pid uint32;
 };
 
 /// This protocol is for the DriverTestRealm. It is an integration test
