@@ -104,6 +104,7 @@ impl WireEnvelope {
             encoder.encode_next(value)?;
 
             **maybe_num_bytes = (encoder.bytes_written() - bytes_before).try_into().unwrap();
+            **flags = 0;
         }
 
         **num_handles = (encoder.__internal_handle_count() - handles_before).try_into().unwrap();

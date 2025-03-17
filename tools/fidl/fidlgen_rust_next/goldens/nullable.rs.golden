@@ -87,6 +87,11 @@ pub struct WireInt32Wrapper {
     pub val: ::fidl_next::WireI32,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireInt32Wrapper {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireInt32Wrapper
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -206,6 +211,11 @@ pub struct WireSimpleProtocolAddRequest {
     pub b: ::fidl_next::WireI32,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireSimpleProtocolAddRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSimpleProtocolAddRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -313,6 +323,11 @@ impl ::fidl_next::TakeFrom<WireSimpleProtocolAddResponse> for SimpleProtocolAddR
 #[repr(C)]
 pub struct WireSimpleProtocolAddResponse {
     pub sum: ::fidl_next::WireI32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireSimpleProtocolAddResponse {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSimpleProtocolAddResponse
@@ -603,6 +618,15 @@ pub struct WireSimpleUnion {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireSimpleUnion {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod simple_union {
     pub enum Ref<'union> {
         A(&'union ::fidl_next::WireI32),
@@ -673,6 +697,15 @@ impl ::core::fmt::Debug for WireSimpleUnion {
 #[repr(transparent)]
 pub struct WireOptionalSimpleUnion {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireOptionalSimpleUnion {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalSimpleUnion {
@@ -838,6 +871,11 @@ pub struct WireStructWithNullableHandle {
     pub val: ::fidl_next::fuchsia::WireOptionalHandle,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireStructWithNullableHandle {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableHandle
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -956,6 +994,11 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableProtocol> for StructWithNullabl
 pub struct WireStructWithNullableProtocol {
     pub val:
         ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireOptionalHandle, crate::SimpleProtocol>,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireStructWithNullableProtocol {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableProtocol
@@ -1078,6 +1121,11 @@ pub struct WireStructWithNullableRequest {
         ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireOptionalHandle, crate::SimpleProtocol>,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireStructWithNullableRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -1175,6 +1223,11 @@ pub struct WireStructWithNullableString {
     pub val: ::fidl_next::WireOptionalString,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireStructWithNullableString {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableString
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -1270,6 +1323,11 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableStruct> for StructWithNullableS
 #[repr(C)]
 pub struct WireStructWithNullableStruct {
     pub val: ::fidl_next::WireBox<crate::WireInt32Wrapper>,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireStructWithNullableStruct {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableStruct
@@ -1382,6 +1440,11 @@ pub struct WireStructWithNullableUnion {
     pub val: crate::WireOptionalSimpleUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireStructWithNullableUnion {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableUnion
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -1475,6 +1538,11 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableVector> for StructWithNullableV
 #[repr(C)]
 pub struct WireStructWithNullableVector {
     pub val: ::fidl_next::WireOptionalVector<::fidl_next::WireI32>,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireStructWithNullableVector {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableVector

@@ -76,6 +76,11 @@ impl ::fidl_next::TakeFrom<WireEmptyResourceStruct> for EmptyResourceStruct {
 #[repr(C)]
 pub struct WireEmptyResourceStruct {}
 
+unsafe impl ::fidl_next::ZeroPadding for WireEmptyResourceStruct {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireEmptyResourceStruct
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -154,6 +159,15 @@ impl ::fidl_next::TakeFrom<WireEmptyResourceTable> for EmptyResourceTable {
 #[repr(C)]
 pub struct WireEmptyResourceTable {
     table: ::fidl_next::WireTable,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireEmptyResourceTable {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireEmptyResourceTable
@@ -273,6 +287,15 @@ pub struct WireEmptyResourceUnion {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireEmptyResourceUnion {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod empty_resource_union {
     pub enum Ref {
         UnknownOrdinal_(u64),
@@ -317,6 +340,15 @@ impl ::core::fmt::Debug for WireEmptyResourceUnion {
 #[repr(transparent)]
 pub struct WireOptionalEmptyResourceUnion {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireOptionalEmptyResourceUnion {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalEmptyResourceUnion {
@@ -419,6 +451,13 @@ impl ::fidl_next::TakeFrom<WireObjType> for ObjType {
 #[repr(transparent)]
 pub struct WireObjType {
     value: ::fidl_next::WireU32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireObjType {
+    #[inline]
+    unsafe fn zero_padding(_: *mut Self) {
+        // Wire enums have no padding
+    }
 }
 
 impl WireObjType {
@@ -532,6 +571,15 @@ impl ::fidl_next::TakeFrom<WireTableWithHandle> for TableWithHandle {
 #[repr(C)]
 pub struct WireTableWithHandle {
     table: ::fidl_next::WireTable,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireTableWithHandle {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireTableWithHandle
@@ -675,6 +723,15 @@ pub struct WireUnionWithHandle {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireUnionWithHandle {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod union_with_handle {
     pub enum Ref<'union> {
         H(&'union ::fidl_next::fuchsia::WireHandle),
@@ -731,6 +788,15 @@ impl ::core::fmt::Debug for WireUnionWithHandle {
 #[repr(transparent)]
 pub struct WireOptionalUnionWithHandle {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireOptionalUnionWithHandle {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalUnionWithHandle {
@@ -909,6 +975,19 @@ pub struct WireHandlesInTypes {
     pub table_with_handle: crate::WireTableWithHandle,
 
     pub union_with_handle: crate::WireUnionWithHandle,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireHandlesInTypes {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ptr.cast::<u8>().add(44).write_bytes(0, 4);
+        }
+
+        unsafe {
+            ptr.cast::<u8>().add(4).write_bytes(0, 4);
+        }
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireHandlesInTypes

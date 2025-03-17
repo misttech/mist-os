@@ -6,6 +6,7 @@ use munge::munge;
 
 use crate::{
     DecodeError, Decoder, DecoderExt as _, Owned, Slot, WireEnvelope, WirePointer, WireU64,
+    ZeroPadding,
 };
 
 /// A FIDL table
@@ -13,6 +14,13 @@ use crate::{
 pub struct WireTable {
     len: WireU64,
     ptr: WirePointer<WireEnvelope>,
+}
+
+unsafe impl ZeroPadding for WireTable {
+    #[inline]
+    unsafe fn zero_padding(_: *mut Self) {
+        // Wire tables have no padding
+    }
 }
 
 impl WireTable {

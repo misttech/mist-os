@@ -7,6 +7,7 @@ use core::hint::unreachable_unchecked;
 
 use fidl_next_codec::{
     munge, Decode, DecodeError, Encodable, Encode, EncodeError, Slot, TakeFrom, WireI32,
+    ZeroPadding,
 };
 
 /// An internal framework error.
@@ -22,6 +23,11 @@ pub enum FrameworkError {
 #[repr(transparent)]
 pub struct WireFrameworkError {
     inner: WireI32,
+}
+
+unsafe impl ZeroPadding for WireFrameworkError {
+    #[inline]
+    unsafe fn zero_padding(_: *mut Self) {}
 }
 
 impl fmt::Debug for WireFrameworkError {

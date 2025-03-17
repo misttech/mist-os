@@ -76,6 +76,11 @@ pub struct WireExampleFooRequest {
     pub s: ::fidl_next::WireString,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireExampleFooRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleFooRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -182,6 +187,11 @@ impl ::fidl_next::TakeFrom<WireExampleFooResponse> for ExampleFooResponse {
 #[repr(C)]
 pub struct WireExampleFooResponse {
     pub y: ::fidl_next::WireI64,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireExampleFooResponse {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleFooResponse

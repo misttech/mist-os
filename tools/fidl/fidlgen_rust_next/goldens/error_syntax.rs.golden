@@ -78,6 +78,11 @@ pub struct WireExampleUseOfErrorSyntaxCallWhichMayFailRequest {
     pub s: ::fidl_next::WireString,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireExampleUseOfErrorSyntaxCallWhichMayFailRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleUseOfErrorSyntaxCallWhichMayFailRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -186,6 +191,11 @@ impl ::fidl_next::TakeFrom<WireExampleUseOfErrorSyntaxCallWhichMayFailResponse>
 #[repr(C)]
 pub struct WireExampleUseOfErrorSyntaxCallWhichMayFailResponse {
     pub value: ::fidl_next::WireI64,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireExampleUseOfErrorSyntaxCallWhichMayFailResponse {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleUseOfErrorSyntaxCallWhichMayFailResponse

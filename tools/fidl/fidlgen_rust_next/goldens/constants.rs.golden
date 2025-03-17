@@ -59,6 +59,13 @@ pub struct WireBits {
     value: ::fidl_next::WireU32,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireBits {
+    #[inline]
+    unsafe fn zero_padding(_: *mut Self) {
+        // Wire bits have no padding
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireBits
 where
     ___D: ?Sized,
@@ -145,6 +152,13 @@ pub struct WireBitsType {
     value: ::fidl_next::WireU32,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireBitsType {
+    #[inline]
+    unsafe fn zero_padding(_: *mut Self) {
+        // Wire bits have no padding
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireBitsType
 where
     ___D: ?Sized,
@@ -223,6 +237,13 @@ impl ::fidl_next::TakeFrom<WireEnum> for Enum {
 #[repr(transparent)]
 pub struct WireEnum {
     value: ::fidl_next::WireU32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireEnum {
+    #[inline]
+    unsafe fn zero_padding(_: *mut Self) {
+        // Wire enums have no padding
+    }
 }
 
 impl WireEnum {
@@ -312,6 +333,13 @@ impl ::fidl_next::TakeFrom<WireEnumType> for EnumType {
 #[repr(transparent)]
 pub struct WireEnumType {
     value: ::fidl_next::WireI32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireEnumType {
+    #[inline]
+    unsafe fn zero_padding(_: *mut Self) {
+        // Wire enums have no padding
+    }
 }
 
 impl WireEnumType {
@@ -473,6 +501,19 @@ pub struct WireStruct {
     pub enum_with_default: crate::WireEnum,
 
     pub bits_with_default: crate::WireBits,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireStruct {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ptr.cast::<u8>().add(36).write_bytes(0, 4);
+        }
+
+        unsafe {
+            ptr.cast::<u8>().add(25).write_bytes(0, 3);
+        }
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStruct

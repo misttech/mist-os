@@ -13,7 +13,6 @@ pub struct TypeShape {
     #[expect(dead_code)]
     pub has_flexible_envelope: bool,
     pub has_padding: bool,
-    #[expect(dead_code)]
     pub inline_size: u32,
     #[expect(dead_code)]
     pub max_handles: u32,

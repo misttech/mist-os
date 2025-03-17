@@ -80,6 +80,13 @@ pub struct WireObjType {
     value: ::fidl_next::WireU32,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireObjType {
+    #[inline]
+    unsafe fn zero_padding(_: *mut Self) {
+        // Wire enums have no padding
+    }
+}
+
 impl WireObjType {
     pub const NONE: WireObjType = WireObjType { value: ::fidl_next::WireU32(0) };
 
@@ -295,6 +302,19 @@ pub struct WireExampleOfUseOfAliases {
     pub field_of_client_end: ::fidl_next::fuchsia::WireHandle,
 
     pub field_of_nullable_client_end: ::fidl_next::fuchsia::WireOptionalHandle,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireExampleOfUseOfAliases {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ptr.cast::<u8>().add(84).write_bytes(0, 4);
+        }
+
+        unsafe {
+            ptr.cast::<u8>().add(4).write_bytes(0, 4);
+        }
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleOfUseOfAliases

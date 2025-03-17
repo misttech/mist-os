@@ -87,6 +87,15 @@ pub struct WireBasicStruct {
     pub y: ::fidl_next::WireString,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireBasicStruct {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ptr.cast::<u8>().add(4).write_bytes(0, 4);
+        }
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireBasicStruct
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -209,6 +218,11 @@ pub struct WireSimple {
     pub f1: u8,
 
     pub f2: bool,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireSimple {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSimple

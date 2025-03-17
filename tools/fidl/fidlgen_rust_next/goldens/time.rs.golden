@@ -122,6 +122,11 @@ pub struct WireAllInstants {
     pub boot_ticks: ::fidl_next::WireI64,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireAllInstants {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireAllInstants
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -288,6 +293,15 @@ impl ::fidl_next::TakeFrom<WireComplexInstants> for ComplexInstants {
 #[repr(C)]
 pub struct WireComplexInstants {
     table: ::fidl_next::WireTable,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireComplexInstants {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireComplexInstants

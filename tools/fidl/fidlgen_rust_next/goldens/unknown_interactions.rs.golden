@@ -96,6 +96,13 @@ pub struct WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse {
     pub some_field: ::fidl_next::WireI32,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse
 where
@@ -227,6 +234,17 @@ pub struct WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod unknown_interactions_ajar_driver_protocol_strict_two_way_union_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::WireI32),
@@ -297,6 +315,17 @@ impl ::core::fmt::Debug for WireUnknownInteractionsAjarDriverProtocolStrictTwoWa
 #[repr(transparent)]
 pub struct WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse {
@@ -447,6 +476,17 @@ pub struct WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse {
     table: ::fidl_next::WireTable,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse
 where
@@ -570,6 +610,13 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarDriverProtocolStrictTwoWay
 #[repr(C)]
 pub struct WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse {}
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse
 where
@@ -682,6 +729,13 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarDriverProtocolStrictTwoWay
 #[repr(C)]
 pub struct WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse {
     pub some_field: ::fidl_next::WireI32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D>
@@ -816,6 +870,17 @@ pub struct WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::WireI32),
@@ -886,6 +951,17 @@ impl ::core::fmt::Debug for WireUnknownInteractionsAjarDriverProtocolStrictTwoWa
 #[repr(transparent)]
 pub struct WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse {
@@ -1034,6 +1110,17 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarDriverProtocolStrictTwoWay
 #[repr(C)]
 pub struct WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse {
     table: ::fidl_next::WireTable,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D>
@@ -1877,6 +1964,13 @@ pub struct WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse {
     pub some_field: ::fidl_next::WireI32,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse
 where
@@ -2003,6 +2097,17 @@ pub struct WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod unknown_interactions_ajar_protocol_strict_two_way_union_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::WireI32),
@@ -2072,6 +2177,17 @@ impl ::core::fmt::Debug for WireUnknownInteractionsAjarProtocolStrictTwoWayUnion
 #[repr(transparent)]
 pub struct WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
@@ -2215,6 +2331,17 @@ pub struct WireUnknownInteractionsAjarProtocolStrictTwoWayTableResponse {
     table: ::fidl_next::WireTable,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsAjarProtocolStrictTwoWayTableResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictTwoWayTableResponse
 where
@@ -2335,6 +2462,13 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictTwoWayErrRes
 #[repr(C)]
 pub struct WireUnknownInteractionsAjarProtocolStrictTwoWayErrResponse {}
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsAjarProtocolStrictTwoWayErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictTwoWayErrResponse
 where
@@ -2444,6 +2578,13 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictTwoWayFields
 #[repr(C)]
 pub struct WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse {
     pub some_field: ::fidl_next::WireI32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D>
@@ -2572,6 +2713,17 @@ pub struct WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod unknown_interactions_ajar_protocol_strict_two_way_union_err_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::WireI32),
@@ -2641,6 +2793,17 @@ impl ::core::fmt::Debug for WireUnknownInteractionsAjarProtocolStrictTwoWayUnion
 #[repr(transparent)]
 pub struct WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
@@ -2788,6 +2951,17 @@ pub struct WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse {
     table: ::fidl_next::WireTable,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse
 where
@@ -2921,6 +3095,13 @@ pub struct WireUnknownInteractionsAjarProtocolStrictEventFieldsRequest {
     pub some_field: ::fidl_next::WireI32,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsAjarProtocolStrictEventFieldsRequest
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictEventFieldsRequest
 where
@@ -3045,6 +3226,17 @@ pub struct WireUnknownInteractionsAjarProtocolStrictEventUnionRequest {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsAjarProtocolStrictEventUnionRequest
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod unknown_interactions_ajar_protocol_strict_event_union_request {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::WireI32),
@@ -3114,6 +3306,17 @@ impl ::core::fmt::Debug for WireUnknownInteractionsAjarProtocolStrictEventUnionR
 #[repr(transparent)]
 pub struct WireOptionalUnknownInteractionsAjarProtocolStrictEventUnionRequest {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireOptionalUnknownInteractionsAjarProtocolStrictEventUnionRequest
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalUnknownInteractionsAjarProtocolStrictEventUnionRequest {
@@ -3257,6 +3460,17 @@ pub struct WireUnknownInteractionsAjarProtocolStrictEventTableRequest {
     table: ::fidl_next::WireTable,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsAjarProtocolStrictEventTableRequest
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictEventTableRequest
 where
@@ -3392,6 +3606,13 @@ pub struct WireUnknownInteractionsAjarProtocolFlexibleEventFieldsRequest {
     pub some_field: ::fidl_next::WireI32,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsAjarProtocolFlexibleEventFieldsRequest
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolFlexibleEventFieldsRequest
 where
@@ -3518,6 +3739,17 @@ pub struct WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod unknown_interactions_ajar_protocol_flexible_event_union_request {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::WireI32),
@@ -3587,6 +3819,17 @@ impl ::core::fmt::Debug for WireUnknownInteractionsAjarProtocolFlexibleEventUnio
 #[repr(transparent)]
 pub struct WireOptionalUnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireOptionalUnknownInteractionsAjarProtocolFlexibleEventUnionRequest
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalUnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
@@ -3728,6 +3971,17 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolFlexibleEventTable
 #[repr(C)]
 pub struct WireUnknownInteractionsAjarProtocolFlexibleEventTableRequest {
     table: ::fidl_next::WireTable,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsAjarProtocolFlexibleEventTableRequest
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D>
@@ -4935,6 +5189,13 @@ pub struct WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse
     pub some_field: ::fidl_next::WireI32,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse
 where
@@ -5067,6 +5328,17 @@ pub struct WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse 
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod unknown_interactions_closed_driver_protocol_strict_two_way_union_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::WireI32),
@@ -5137,6 +5409,17 @@ impl ::core::fmt::Debug for WireUnknownInteractionsClosedDriverProtocolStrictTwo
 #[repr(transparent)]
 pub struct WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse {
@@ -5287,6 +5570,17 @@ pub struct WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse 
     table: ::fidl_next::WireTable,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse
 where
@@ -5412,6 +5706,13 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedDriverProtocolStrictTwoW
 #[repr(C)]
 pub struct WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse {}
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse
 where
@@ -5526,6 +5827,13 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedDriverProtocolStrictTwoW
 #[repr(C)]
 pub struct WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse {
     pub some_field: ::fidl_next::WireI32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D>
@@ -5662,6 +5970,17 @@ pub struct WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrRespon
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod unknown_interactions_closed_driver_protocol_strict_two_way_union_err_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::WireI32),
@@ -5734,6 +6053,17 @@ impl ::core::fmt::Debug
 #[repr(transparent)]
 pub struct WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse {
@@ -5884,6 +6214,17 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedDriverProtocolStrictTwoW
 #[repr(C)]
 pub struct WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse {
     table: ::fidl_next::WireTable,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D>
@@ -6687,6 +7028,13 @@ pub struct WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse {
     pub some_field: ::fidl_next::WireI32,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse
 where
@@ -6813,6 +7161,17 @@ pub struct WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod unknown_interactions_closed_protocol_strict_two_way_union_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::WireI32),
@@ -6882,6 +7241,17 @@ impl ::core::fmt::Debug for WireUnknownInteractionsClosedProtocolStrictTwoWayUni
 #[repr(transparent)]
 pub struct WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
@@ -7027,6 +7397,17 @@ pub struct WireUnknownInteractionsClosedProtocolStrictTwoWayTableResponse {
     table: ::fidl_next::WireTable,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsClosedProtocolStrictTwoWayTableResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictTwoWayTableResponse
 where
@@ -7149,6 +7530,13 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictTwoWayErrR
 #[repr(C)]
 pub struct WireUnknownInteractionsClosedProtocolStrictTwoWayErrResponse {}
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsClosedProtocolStrictTwoWayErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictTwoWayErrResponse
 where
@@ -7260,6 +7648,13 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictTwoWayFiel
 #[repr(C)]
 pub struct WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse {
     pub some_field: ::fidl_next::WireI32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D>
@@ -7390,6 +7785,17 @@ pub struct WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod unknown_interactions_closed_protocol_strict_two_way_union_err_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::WireI32),
@@ -7460,6 +7866,17 @@ impl ::core::fmt::Debug for WireUnknownInteractionsClosedProtocolStrictTwoWayUni
 #[repr(transparent)]
 pub struct WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
@@ -7608,6 +8025,17 @@ pub struct WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse {
     table: ::fidl_next::WireTable,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse
 where
@@ -7743,6 +8171,13 @@ pub struct WireUnknownInteractionsClosedProtocolStrictEventFieldsRequest {
     pub some_field: ::fidl_next::WireI32,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsClosedProtocolStrictEventFieldsRequest
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictEventFieldsRequest
 where
@@ -7869,6 +8304,17 @@ pub struct WireUnknownInteractionsClosedProtocolStrictEventUnionRequest {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsClosedProtocolStrictEventUnionRequest
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod unknown_interactions_closed_protocol_strict_event_union_request {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::WireI32),
@@ -7938,6 +8384,17 @@ impl ::core::fmt::Debug for WireUnknownInteractionsClosedProtocolStrictEventUnio
 #[repr(transparent)]
 pub struct WireOptionalUnknownInteractionsClosedProtocolStrictEventUnionRequest {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireOptionalUnknownInteractionsClosedProtocolStrictEventUnionRequest
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalUnknownInteractionsClosedProtocolStrictEventUnionRequest {
@@ -8079,6 +8536,17 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictEventTable
 #[repr(C)]
 pub struct WireUnknownInteractionsClosedProtocolStrictEventTableRequest {
     table: ::fidl_next::WireTable,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsClosedProtocolStrictEventTableRequest
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D>
@@ -9029,6 +9497,13 @@ pub struct WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse {
     pub some_field: ::fidl_next::WireI32,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse
 where
@@ -9155,6 +9630,17 @@ pub struct WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod unknown_interactions_driver_protocol_strict_two_way_union_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::WireI32),
@@ -9224,6 +9710,17 @@ impl ::core::fmt::Debug for WireUnknownInteractionsDriverProtocolStrictTwoWayUni
 #[repr(transparent)]
 pub struct WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
@@ -9369,6 +9866,17 @@ pub struct WireUnknownInteractionsDriverProtocolStrictTwoWayTableResponse {
     table: ::fidl_next::WireTable,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsDriverProtocolStrictTwoWayTableResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolStrictTwoWayTableResponse
 where
@@ -9491,6 +9999,13 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolStrictTwoWayErrR
 #[repr(C)]
 pub struct WireUnknownInteractionsDriverProtocolStrictTwoWayErrResponse {}
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsDriverProtocolStrictTwoWayErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolStrictTwoWayErrResponse
 where
@@ -9602,6 +10117,13 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolStrictTwoWayFiel
 #[repr(C)]
 pub struct WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse {
     pub some_field: ::fidl_next::WireI32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D>
@@ -9732,6 +10254,17 @@ pub struct WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod unknown_interactions_driver_protocol_strict_two_way_union_err_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::WireI32),
@@ -9802,6 +10335,17 @@ impl ::core::fmt::Debug for WireUnknownInteractionsDriverProtocolStrictTwoWayUni
 #[repr(transparent)]
 pub struct WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse {
@@ -9950,6 +10494,17 @@ pub struct WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse {
     table: ::fidl_next::WireTable,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse
 where
@@ -10070,6 +10625,13 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayRe
 #[repr(C)]
 pub struct WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse {}
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse
 where
@@ -10179,6 +10741,13 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayFi
 #[repr(C)]
 pub struct WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse {
     pub some_field: ::fidl_next::WireI32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D>
@@ -10308,6 +10877,17 @@ pub struct WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod unknown_interactions_driver_protocol_flexible_two_way_union_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::WireI32),
@@ -10377,6 +10957,17 @@ impl ::core::fmt::Debug for WireUnknownInteractionsDriverProtocolFlexibleTwoWayU
 #[repr(transparent)]
 pub struct WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
@@ -10525,6 +11116,17 @@ pub struct WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse {
     table: ::fidl_next::WireTable,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse
 where
@@ -10647,6 +11249,13 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayEr
 #[repr(C)]
 pub struct WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse {}
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse
 where
@@ -10758,6 +11367,13 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayFi
 #[repr(C)]
 pub struct WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse {
     pub some_field: ::fidl_next::WireI32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D>
@@ -10892,6 +11508,17 @@ pub struct WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod unknown_interactions_driver_protocol_flexible_two_way_union_err_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::WireI32),
@@ -10962,6 +11589,17 @@ impl ::core::fmt::Debug for WireUnknownInteractionsDriverProtocolFlexibleTwoWayU
 #[repr(transparent)]
 pub struct WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse {
@@ -11110,6 +11748,17 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayTa
 #[repr(C)]
 pub struct WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse {
     table: ::fidl_next::WireTable,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D>
@@ -12471,6 +13120,11 @@ pub struct WireUnknownInteractionsProtocolStrictTwoWayFieldsResponse {
     pub some_field: ::fidl_next::WireI32,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireUnknownInteractionsProtocolStrictTwoWayFieldsResponse {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictTwoWayFieldsResponse
 where
@@ -12593,6 +13247,15 @@ pub struct WireUnknownInteractionsProtocolStrictTwoWayUnionResponse {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireUnknownInteractionsProtocolStrictTwoWayUnionResponse {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod unknown_interactions_protocol_strict_two_way_union_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::WireI32),
@@ -12662,6 +13325,17 @@ impl ::core::fmt::Debug for WireUnknownInteractionsProtocolStrictTwoWayUnionResp
 #[repr(transparent)]
 pub struct WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionResponse {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionResponse {
@@ -12805,6 +13479,15 @@ pub struct WireUnknownInteractionsProtocolStrictTwoWayTableResponse {
     table: ::fidl_next::WireTable,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireUnknownInteractionsProtocolStrictTwoWayTableResponse {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictTwoWayTableResponse
 where
@@ -12925,6 +13608,11 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictTwoWayErrRespons
 #[repr(C)]
 pub struct WireUnknownInteractionsProtocolStrictTwoWayErrResponse {}
 
+unsafe impl ::fidl_next::ZeroPadding for WireUnknownInteractionsProtocolStrictTwoWayErrResponse {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictTwoWayErrResponse
 where
@@ -13033,6 +13721,13 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictTwoWayFieldsErrR
 #[repr(C)]
 pub struct WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResponse {
     pub some_field: ::fidl_next::WireI32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D>
@@ -13159,6 +13854,17 @@ pub struct WireUnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsProtocolStrictTwoWayUnionErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod unknown_interactions_protocol_strict_two_way_union_err_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::WireI32),
@@ -13228,6 +13934,17 @@ impl ::core::fmt::Debug for WireUnknownInteractionsProtocolStrictTwoWayUnionErrR
 #[repr(transparent)]
 pub struct WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
@@ -13371,6 +14088,17 @@ pub struct WireUnknownInteractionsProtocolStrictTwoWayTableErrResponse {
     table: ::fidl_next::WireTable,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsProtocolStrictTwoWayTableErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictTwoWayTableErrResponse
 where
@@ -13491,6 +14219,11 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayResponse
 #[repr(C)]
 pub struct WireUnknownInteractionsProtocolFlexibleTwoWayResponse {}
 
+unsafe impl ::fidl_next::ZeroPadding for WireUnknownInteractionsProtocolFlexibleTwoWayResponse {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayResponse
 where
@@ -13597,6 +14330,13 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayFieldsRe
 #[repr(C)]
 pub struct WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResponse {
     pub some_field: ::fidl_next::WireI32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D>
@@ -13723,6 +14463,17 @@ pub struct WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod unknown_interactions_protocol_flexible_two_way_union_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::WireI32),
@@ -13792,6 +14543,17 @@ impl ::core::fmt::Debug for WireUnknownInteractionsProtocolFlexibleTwoWayUnionRe
 #[repr(transparent)]
 pub struct WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
@@ -13935,6 +14697,17 @@ pub struct WireUnknownInteractionsProtocolFlexibleTwoWayTableResponse {
     table: ::fidl_next::WireTable,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsProtocolFlexibleTwoWayTableResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayTableResponse
 where
@@ -14055,6 +14828,11 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayErrRespo
 #[repr(C)]
 pub struct WireUnknownInteractionsProtocolFlexibleTwoWayErrResponse {}
 
+unsafe impl ::fidl_next::ZeroPadding for WireUnknownInteractionsProtocolFlexibleTwoWayErrResponse {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayErrResponse
 where
@@ -14163,6 +14941,13 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayFieldsEr
 #[repr(C)]
 pub struct WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse {
     pub some_field: ::fidl_next::WireI32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D>
@@ -14291,6 +15076,17 @@ pub struct WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod unknown_interactions_protocol_flexible_two_way_union_err_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::WireI32),
@@ -14360,6 +15156,17 @@ impl ::core::fmt::Debug for WireUnknownInteractionsProtocolFlexibleTwoWayUnionEr
 #[repr(transparent)]
 pub struct WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
@@ -14503,6 +15310,17 @@ pub struct WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResponse {
     table: ::fidl_next::WireTable,
 }
 
+unsafe impl ::fidl_next::ZeroPadding
+    for WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResponse
 where
@@ -14636,6 +15454,11 @@ pub struct WireUnknownInteractionsProtocolStrictEventFieldsRequest {
     pub some_field: ::fidl_next::WireI32,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireUnknownInteractionsProtocolStrictEventFieldsRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictEventFieldsRequest
 where
@@ -14758,6 +15581,15 @@ pub struct WireUnknownInteractionsProtocolStrictEventUnionRequest {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireUnknownInteractionsProtocolStrictEventUnionRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod unknown_interactions_protocol_strict_event_union_request {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::WireI32),
@@ -14827,6 +15659,17 @@ impl ::core::fmt::Debug for WireUnknownInteractionsProtocolStrictEventUnionReque
 #[repr(transparent)]
 pub struct WireOptionalUnknownInteractionsProtocolStrictEventUnionRequest {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireOptionalUnknownInteractionsProtocolStrictEventUnionRequest
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalUnknownInteractionsProtocolStrictEventUnionRequest {
@@ -14970,6 +15813,15 @@ pub struct WireUnknownInteractionsProtocolStrictEventTableRequest {
     table: ::fidl_next::WireTable,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireUnknownInteractionsProtocolStrictEventTableRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictEventTableRequest
 where
@@ -15103,6 +15955,11 @@ pub struct WireUnknownInteractionsProtocolFlexibleEventFieldsRequest {
     pub some_field: ::fidl_next::WireI32,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireUnknownInteractionsProtocolFlexibleEventFieldsRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleEventFieldsRequest
 where
@@ -15225,6 +16082,15 @@ pub struct WireUnknownInteractionsProtocolFlexibleEventUnionRequest {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireUnknownInteractionsProtocolFlexibleEventUnionRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod unknown_interactions_protocol_flexible_event_union_request {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::WireI32),
@@ -15294,6 +16160,17 @@ impl ::core::fmt::Debug for WireUnknownInteractionsProtocolFlexibleEventUnionReq
 #[repr(transparent)]
 pub struct WireOptionalUnknownInteractionsProtocolFlexibleEventUnionRequest {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireOptionalUnknownInteractionsProtocolFlexibleEventUnionRequest
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalUnknownInteractionsProtocolFlexibleEventUnionRequest {
@@ -15435,6 +16312,15 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleEventTableRequ
 #[repr(C)]
 pub struct WireUnknownInteractionsProtocolFlexibleEventTableRequest {
     table: ::fidl_next::WireTable,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireUnknownInteractionsProtocolFlexibleEventTableRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D>

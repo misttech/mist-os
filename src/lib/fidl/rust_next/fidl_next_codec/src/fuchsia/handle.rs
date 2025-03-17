@@ -12,7 +12,7 @@ use zx::{Handle, HandleBased as _};
 use crate::fuchsia::{HandleDecoder, HandleEncoder};
 use crate::{
     munge, Decode, DecodeError, Encodable, EncodableOption, Encode, EncodeError, EncodeOption,
-    Slot, TakeFrom, WireU32,
+    Slot, TakeFrom, WireU32, ZeroPadding,
 };
 
 /// A Zircon handle.
@@ -25,6 +25,13 @@ pub union WireHandle {
 impl Drop for WireHandle {
     fn drop(&mut self) {
         drop(self.take());
+    }
+}
+
+unsafe impl ZeroPadding for WireHandle {
+    #[inline]
+    unsafe fn zero_padding(_: *mut Self) {
+        // Wire handles have no padding
     }
 }
 
@@ -90,6 +97,15 @@ impl TakeFrom<WireHandle> for Handle {
 #[repr(transparent)]
 pub struct WireOptionalHandle {
     handle: WireHandle,
+}
+
+unsafe impl ZeroPadding for WireOptionalHandle {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            WireHandle::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalHandle {

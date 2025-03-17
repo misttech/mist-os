@@ -177,6 +177,31 @@ pub struct WireArrayBasic {
     pub array_opt_string: [::fidl_next::WireOptionalString; 5],
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireArrayBasic {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ptr.cast::<u8>().add(180).write_bytes(0, 4);
+        }
+
+        unsafe {
+            ptr.cast::<u8>().add(116).write_bytes(0, 4);
+        }
+
+        unsafe {
+            ptr.cast::<u8>().add(85).write_bytes(0, 1);
+        }
+
+        unsafe {
+            ptr.cast::<u8>().add(36).write_bytes(0, 4);
+        }
+
+        unsafe {
+            ptr.cast::<u8>().add(5).write_bytes(0, 1);
+        }
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireArrayBasic
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -288,6 +313,13 @@ pub struct WireBits {
     value: ::fidl_next::WireU32,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireBits {
+    #[inline]
+    unsafe fn zero_padding(_: *mut Self) {
+        // Wire bits have no padding
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireBits
 where
     ___D: ?Sized,
@@ -360,6 +392,13 @@ impl ::fidl_next::TakeFrom<WireEnum> for Enum {
 #[repr(transparent)]
 pub struct WireEnum {
     value: ::fidl_next::WireU32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireEnum {
+    #[inline]
+    unsafe fn zero_padding(_: *mut Self) {
+        // Wire enums have no padding
+    }
 }
 
 impl WireEnum {
@@ -460,6 +499,11 @@ impl ::fidl_next::TakeFrom<WireStruct> for Struct {
 #[repr(C)]
 pub struct WireStruct {}
 
+unsafe impl ::fidl_next::ZeroPadding for WireStruct {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStruct
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -534,6 +578,15 @@ impl ::fidl_next::TakeFrom<WireTable> for Table {
 #[repr(C)]
 pub struct WireTable {
     table: ::fidl_next::WireTable,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireTable {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireTable
@@ -659,6 +712,15 @@ pub struct WireUnion {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireUnion {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod union_ {
     pub enum Ref<'union> {
         B(&'union bool),
@@ -718,6 +780,15 @@ impl ::core::fmt::Debug for WireUnion {
 #[repr(transparent)]
 pub struct WireOptionalUnion {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireOptionalUnion {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalUnion {
@@ -908,6 +979,15 @@ pub struct WireArrayCompound {
     pub array_opt_union: [crate::WireOptionalUnion; 5],
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireArrayCompound {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ptr.cast::<u8>().add(45).write_bytes(0, 3);
+        }
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireArrayCompound
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -1050,6 +1130,15 @@ pub struct WireArrayVectorNested {
     pub vector_array_uint8: ::fidl_next::WireVector<[u8; 5]>,
 
     pub vector_vector_uint8: ::fidl_next::WireVector<::fidl_next::WireVector<u8>>,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireArrayVectorNested {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ptr.cast::<u8>().add(25).write_bytes(0, 7);
+        }
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireArrayVectorNested
@@ -1259,6 +1348,23 @@ pub struct WireBasic {
     pub opt_string: ::fidl_next::WireOptionalString,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireBasic {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ptr.cast::<u8>().add(36).write_bytes(0, 4);
+        }
+
+        unsafe {
+            ptr.cast::<u8>().add(17).write_bytes(0, 1);
+        }
+
+        unsafe {
+            ptr.cast::<u8>().add(1).write_bytes(0, 1);
+        }
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireBasic
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -1443,6 +1549,15 @@ pub struct WireCompound {
     pub opt_struct: ::fidl_next::WireBox<crate::WireStruct>,
 
     pub opt_union: crate::WireOptionalUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireCompound {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ptr.cast::<u8>().add(9).write_bytes(0, 7);
+        }
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireCompound
@@ -1661,6 +1776,11 @@ pub struct WireVectorBasic {
     pub vector_opt_string: ::fidl_next::WireVector<::fidl_next::WireOptionalString>,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireVectorBasic {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireVectorBasic
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -1847,6 +1967,11 @@ pub struct WireVectorCompound {
     pub vector_opt_union: ::fidl_next::WireVector<crate::WireOptionalUnion>,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireVectorCompound {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireVectorCompound
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -1996,6 +2121,11 @@ pub struct WireVectorOptional {
         ::fidl_next::WireOptionalVector<::fidl_next::WireBox<crate::WireStruct>>,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireVectorOptional {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireVectorOptional
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -2102,6 +2232,11 @@ impl ::fidl_next::TakeFrom<WireResourceStruct> for ResourceStruct {
 #[repr(C)]
 pub struct WireResourceStruct {}
 
+unsafe impl ::fidl_next::ZeroPadding for WireResourceStruct {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireResourceStruct
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -2180,6 +2315,15 @@ impl ::fidl_next::TakeFrom<WireResourceTable> for ResourceTable {
 #[repr(C)]
 pub struct WireResourceTable {
     table: ::fidl_next::WireTable,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireResourceTable {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireResourceTable
@@ -2309,6 +2453,15 @@ pub struct WireResourceUnion {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireResourceUnion {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod resource_union {
     pub enum Ref<'union> {
         B(&'union bool),
@@ -2360,6 +2513,15 @@ impl ::core::fmt::Debug for WireResourceUnion {
 #[repr(transparent)]
 pub struct WireOptionalResourceUnion {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireOptionalResourceUnion {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalResourceUnion {
@@ -2732,6 +2894,19 @@ pub struct WireResource {
     pub vector_table: ::fidl_next::WireVector<crate::WireResourceTable>,
 
     pub vector_union: ::fidl_next::WireVector<crate::WireResourceUnion>,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireResource {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ptr.cast::<u8>().add(181).write_bytes(0, 3);
+        }
+
+        unsafe {
+            ptr.cast::<u8>().add(17).write_bytes(0, 7);
+        }
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireResource

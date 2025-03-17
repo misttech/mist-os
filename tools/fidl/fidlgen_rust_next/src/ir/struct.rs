@@ -36,4 +36,12 @@ pub struct StructMember {
     pub name: Ident,
     #[serde(rename = "type")]
     pub ty: Type,
+    #[serde(rename = "field_shape_v2")]
+    pub field_shape: FieldShape,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct FieldShape {
+    pub offset: u32,
+    pub padding: u32,
 }

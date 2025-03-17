@@ -469,6 +469,15 @@ pub struct WireTesting {
     pub aa3: [[::fidl_next::WireU64; 2]; 3],
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireTesting {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ptr.cast::<u8>().add(316).write_bytes(0, 4);
+        }
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireTesting
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,

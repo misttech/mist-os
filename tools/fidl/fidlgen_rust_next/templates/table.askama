@@ -94,6 +94,15 @@ pub struct {{ wire_name }} {
     table: ::fidl_next::WireTable,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for {{ wire_name }} {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for {{ wire_name }}
 where
     ___D: ::fidl_next::Decoder + ?Sized,

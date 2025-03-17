@@ -9,7 +9,7 @@ use munge::munge;
 
 use crate::{
     Decode, DecodeError, Decoder, DecoderExt as _, Encodable, EncodableOption, Encode, EncodeError,
-    EncodeOption, Slot, TakeFrom, WirePointer,
+    EncodeOption, Slot, TakeFrom, WirePointer, ZeroPadding,
 };
 
 /// A boxed (optional) FIDL value.
@@ -32,6 +32,13 @@ impl<T> Drop for WireBox<T> {
                 self.ptr.as_ptr().drop_in_place();
             }
         }
+    }
+}
+
+unsafe impl<T> ZeroPadding for WireBox<T> {
+    #[inline]
+    unsafe fn zero_padding(_: *mut Self) {
+        // Wire boxes have no padding
     }
 }
 

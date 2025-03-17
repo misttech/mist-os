@@ -6,12 +6,19 @@ use core::ptr::slice_from_raw_parts_mut;
 
 use munge::munge;
 
-use crate::{Slot, WirePointer, WireU64};
+use crate::{Slot, WirePointer, WireU64, ZeroPadding};
 
 #[repr(C)]
 pub struct RawWireVector<T> {
     pub len: WireU64,
     pub ptr: WirePointer<T>,
+}
+
+unsafe impl<T> ZeroPadding for RawWireVector<T> {
+    #[inline]
+    unsafe fn zero_padding(_: *mut Self) {
+        // Wire vectors have no padding bytes
+    }
 }
 
 // SAFETY: `RawWireVector` doesn't add any restrictions on sending across thread boundaries, and so

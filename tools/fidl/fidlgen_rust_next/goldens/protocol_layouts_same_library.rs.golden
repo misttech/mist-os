@@ -80,6 +80,15 @@ pub struct WireComposedProtocolOneWayAnonComposedRequest {
     table: ::fidl_next::WireTable,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireComposedProtocolOneWayAnonComposedRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireComposedProtocolOneWayAnonComposedRequest
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -214,6 +223,15 @@ pub struct WireComposedProtocolTwoWayAnonComposedRequest {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireComposedProtocolTwoWayAnonComposedRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod composed_protocol_two_way_anon_composed_request {
     pub enum Ref<'union> {
         B(&'union bool),
@@ -273,6 +291,15 @@ impl ::core::fmt::Debug for WireComposedProtocolTwoWayAnonComposedRequest {
 #[repr(transparent)]
 pub struct WireOptionalComposedProtocolTwoWayAnonComposedRequest {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireOptionalComposedProtocolTwoWayAnonComposedRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalComposedProtocolTwoWayAnonComposedRequest {
@@ -414,6 +441,15 @@ pub struct WireComposedProtocolTwoWayAnonComposedResponse {
     table: ::fidl_next::WireTable,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireComposedProtocolTwoWayAnonComposedResponse {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireComposedProtocolTwoWayAnonComposedResponse
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -531,6 +567,15 @@ impl ::fidl_next::TakeFrom<WireComposedProtocolTwoWayAnonComposedWithErrorReques
 #[repr(C)]
 pub struct WireComposedProtocolTwoWayAnonComposedWithErrorRequest {
     table: ::fidl_next::WireTable,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireComposedProtocolTwoWayAnonComposedWithErrorRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D>
@@ -671,6 +716,15 @@ pub struct WireComposedProtocolTwoWayAnonComposedWithErrorResponse {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireComposedProtocolTwoWayAnonComposedWithErrorResponse {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod composed_protocol_two_way_anon_composed_with_error_response {
     pub enum Ref<'union> {
         B(&'union bool),
@@ -735,6 +789,17 @@ impl ::core::fmt::Debug for WireComposedProtocolTwoWayAnonComposedWithErrorRespo
 #[repr(transparent)]
 pub struct WireOptionalComposedProtocolTwoWayAnonComposedWithErrorResponse {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding
+    for WireOptionalComposedProtocolTwoWayAnonComposedWithErrorResponse
+{
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalComposedProtocolTwoWayAnonComposedWithErrorResponse {
@@ -891,6 +956,15 @@ pub struct WireComposedProtocolOnAnonComposedRequest {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireComposedProtocolOnAnonComposedRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod composed_protocol_on_anon_composed_request {
     pub enum Ref<'union> {
         B(&'union bool),
@@ -950,6 +1024,15 @@ impl ::core::fmt::Debug for WireComposedProtocolOnAnonComposedRequest {
 #[repr(transparent)]
 pub struct WireOptionalComposedProtocolOnAnonComposedRequest {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireOptionalComposedProtocolOnAnonComposedRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalComposedProtocolOnAnonComposedRequest {
@@ -1088,6 +1171,15 @@ pub struct WireTablePayload {
     table: ::fidl_next::WireTable,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireTablePayload {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireTablePayload
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -1218,6 +1310,15 @@ pub struct WireUnionPayload {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireUnionPayload {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod union_payload {
     pub enum Ref<'union> {
         B(&'union bool),
@@ -1275,6 +1376,15 @@ impl ::core::fmt::Debug for WireUnionPayload {
 #[repr(transparent)]
 pub struct WireOptionalUnionPayload {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireOptionalUnionPayload {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalUnionPayload {
@@ -2003,6 +2113,15 @@ pub struct WireMainProtocolOneWayAnonRequest {
     table: ::fidl_next::WireTable,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireMainProtocolOneWayAnonRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireMainProtocolOneWayAnonRequest
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -2141,6 +2260,15 @@ pub struct WireMainProtocolTwoWayAnonRequest {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireMainProtocolTwoWayAnonRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod main_protocol_two_way_anon_request {
     pub enum Ref<'union> {
         B(&'union bool),
@@ -2202,6 +2330,15 @@ impl ::core::fmt::Debug for WireMainProtocolTwoWayAnonRequest {
 #[repr(transparent)]
 pub struct WireOptionalMainProtocolTwoWayAnonRequest {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireOptionalMainProtocolTwoWayAnonRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalMainProtocolTwoWayAnonRequest {
@@ -2340,6 +2477,15 @@ pub struct WireMainProtocolTwoWayAnonResponse {
     table: ::fidl_next::WireTable,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireMainProtocolTwoWayAnonResponse {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireMainProtocolTwoWayAnonResponse
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -2457,6 +2603,15 @@ impl ::fidl_next::TakeFrom<WireMainProtocolTwoWayAnonWithErrorRequest>
 #[repr(C)]
 pub struct WireMainProtocolTwoWayAnonWithErrorRequest {
     table: ::fidl_next::WireTable,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireMainProtocolTwoWayAnonWithErrorRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::WireTable::zero_padding(ptr.cast());
+        }
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireMainProtocolTwoWayAnonWithErrorRequest
@@ -2599,6 +2754,15 @@ pub struct WireMainProtocolTwoWayAnonWithErrorResponse {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireMainProtocolTwoWayAnonWithErrorResponse {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod main_protocol_two_way_anon_with_error_response {
     pub enum Ref<'union> {
         B(&'union bool),
@@ -2662,6 +2826,15 @@ impl ::core::fmt::Debug for WireMainProtocolTwoWayAnonWithErrorResponse {
 #[repr(transparent)]
 pub struct WireOptionalMainProtocolTwoWayAnonWithErrorResponse {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireOptionalMainProtocolTwoWayAnonWithErrorResponse {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalMainProtocolTwoWayAnonWithErrorResponse {
@@ -2821,6 +2994,15 @@ pub struct WireMainProtocolOnAnonRequest {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireMainProtocolOnAnonRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
+}
+
 pub mod main_protocol_on_anon_request {
     pub enum Ref<'union> {
         B(&'union bool),
@@ -2882,6 +3064,15 @@ impl ::core::fmt::Debug for WireMainProtocolOnAnonRequest {
 #[repr(transparent)]
 pub struct WireOptionalMainProtocolOnAnonRequest {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireOptionalMainProtocolOnAnonRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {
+        unsafe {
+            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
+        }
+    }
 }
 
 impl WireOptionalMainProtocolOnAnonRequest {

@@ -97,6 +97,11 @@ pub struct WireFoo {
     pub field: ::fidl_next_test_dependent::WireMyEnum,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireFoo {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireFoo
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,

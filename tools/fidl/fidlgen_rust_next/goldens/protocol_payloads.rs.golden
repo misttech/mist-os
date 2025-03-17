@@ -100,6 +100,11 @@ pub struct WireLocalStructPayload {
     pub b: ::fidl_next::WireU32,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireLocalStructPayload {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireLocalStructPayload
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -220,6 +225,11 @@ pub struct WireMainProtocolOneWayAnonRequest {
     pub a: ::fidl_next::WireU32,
 
     pub b: ::fidl_next::WireU32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireMainProtocolOneWayAnonRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireMainProtocolOneWayAnonRequest
@@ -344,6 +354,11 @@ pub struct WireMainProtocolTwoWayAnonRequest {
     pub b: ::fidl_next::WireU32,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireMainProtocolTwoWayAnonRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireMainProtocolTwoWayAnonRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -464,6 +479,11 @@ pub struct WireMainProtocolTwoWayAnonResponse {
     pub a: ::fidl_next::WireU32,
 
     pub b: ::fidl_next::WireU32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireMainProtocolTwoWayAnonResponse {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireMainProtocolTwoWayAnonResponse
@@ -590,6 +610,11 @@ pub struct WireMainProtocolTwoWayAnonWithErrorRequest {
     pub b: ::fidl_next::WireU32,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireMainProtocolTwoWayAnonWithErrorRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireMainProtocolTwoWayAnonWithErrorRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -714,6 +739,11 @@ pub struct WireMainProtocolTwoWayAnonWithErrorResponse {
     pub b: ::fidl_next::WireU32,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireMainProtocolTwoWayAnonWithErrorResponse {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
+}
+
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireMainProtocolTwoWayAnonWithErrorResponse
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -834,6 +864,11 @@ pub struct WireMainProtocolOnAnonRequest {
     pub a: ::fidl_next::WireU32,
 
     pub b: ::fidl_next::WireU32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireMainProtocolOnAnonRequest {
+    #[inline]
+    unsafe fn zero_padding(ptr: *mut Self) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireMainProtocolOnAnonRequest
