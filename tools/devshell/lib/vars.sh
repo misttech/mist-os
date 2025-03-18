@@ -1054,20 +1054,23 @@ function fx-run-ninja {
   local -r build_uuid="$(fx-uuid)"
   local -a user_rbe_env=()
 
+  [[ "${FX_BUILD_AUTO_AUTH:-NOT_SET}" == "NOT_SET" ]] || {
+    fx-warn "FX_BUILD_AUTO_AUTH is no longer used from the environment."
+    cat <<EOF
+To disable gcert-based authentication in build tools, manually set in .fx/auth-config:
+
+  loas_cert_type=restricted
+
+You can confirm that authentication still works with 'fx rbe auth'.
+EOF
+  }
+
   local -a rbe_wrapper_loas_args=()
   if fx-build-needs-auth
   then
-    # TODO(b/342026853): automatic use of gcert for authentication in bazel
-    # is now the default, and is opt-out with FX_BUILD_AUTO_AUTH=0.
-    # Eventually, this will become permanent.
-    # gcert authentication for reclient already works.
     local -r loas_type_detected="$(fx-command-run rbe _check_loas_type)"
     local -r loas_type_for_reclient="$loas_type_detected"
-    local loas_type_for_bazel
-    if [[ "$FX_BUILD_AUTO_AUTH" != 0 ]]
-    then loas_type_for_bazel="$loas_type_detected"
-    else loas_type_for_bazel="restricted"
-    fi
+    local -r loas_type_for_bazel="$loas_type_detected"
     rbe_wrapper_loas_args+=( --loas-type="$loas_type_for_reclient" )
     user_rbe_env+=(
       # Automatic auth with gcert (from re-client bootstrap) needs $USER.
@@ -1162,7 +1165,6 @@ function fx-run-ninja {
     ${TMPDIR+"TMPDIR=$TMPDIR"}
     ${CLICOLOR_FORCE+"CLICOLOR_FORCE=$CLICOLOR_FORCE"}
     ${FX_BUILD_RBE_STATS+"FX_BUILD_RBE_STATS=$FX_BUILD_RBE_STATS"}
-    ${FX_BUILD_AUTO_AUTH+"FX_BUILD_AUTO_AUTH=$FX_BUILD_AUTO_AUTH"}
   )
 
   if [[ "${have_jobs}" ]]; then

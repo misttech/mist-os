@@ -168,11 +168,7 @@ function setup_bazel_workspace() {
 }
 
 function get_loas_cert_type_for_bazel() {
-  local loas_cert_type=restricted
-  if [[ "$FX_BUILD_AUTO_AUTH" != 0 ]]
-  then loas_cert_type="$(get_loas_cert_type)"
-  fi
-  echo "$loas_cert_type"
+  get_loas_cert_type
 }
 
 function ensure_adc_file_exists() {
@@ -188,10 +184,6 @@ function test_bazel_rbe() {
   # Shutdown any bazel server each time to prevent it from caching
   # stale credentials, and force it to refresh.
   # Limit the number of upload retries to make this operation fail-fast.
-
-  # TODO(b/342026853): using gcert for bazel authentication is now the default
-  # where applicable.  Opt-out with FX_BUILD_AUTO_AUTH=0.
-  # Eventually this will become permanent.
   local -r loas_cert_type="$(get_loas_cert_type_for_bazel)"
   local -a auth_config_args=()
   if [[ "$loas_cert_type" == "unrestricted" ]]
