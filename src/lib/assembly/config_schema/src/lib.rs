@@ -6,6 +6,7 @@ pub mod assembly_config;
 
 /// Configuration that's provided to Assembly by the Board
 pub mod board_config;
+mod board_input_bundle_set;
 
 pub mod common;
 pub mod developer_overrides;
@@ -16,6 +17,7 @@ pub mod product_config;
 
 pub use assembly_config::AssemblyConfig;
 pub use board_config::{BoardInformation, BoardInputBundle, BoardProvidedConfig};
+pub use board_input_bundle_set::{BoardInputBundleEntry, BoardInputBundleSet};
 pub use common::{
     DriverDetails, FeatureControl, PackageDetails, PackageSet, PackagedDriverDetails,
 };

@@ -22,6 +22,7 @@
         }
     },
     "input_bundles": {
+        "testing_bib_set::testing_board_input_bundle": "input_bundles/testing_bib_set/testing_board_input_bundle",
         "testing_board_input_bundle": "input_bundles/testing_board_input_bundle",
         "empty_bib": "input_bundles/empty_bib"
     },

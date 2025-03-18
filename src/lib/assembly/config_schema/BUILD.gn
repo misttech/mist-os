@@ -62,6 +62,7 @@ rustc_library("config_schema") {
   sources = [
     "src/assembly_config.rs",
     "src/board_config.rs",
+    "src/board_input_bundle_set.rs",
     "src/common.rs",
     "src/developer_overrides.rs",
     "src/image_assembly_config.rs",

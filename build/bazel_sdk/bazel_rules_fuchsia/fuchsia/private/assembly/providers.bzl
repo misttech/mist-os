@@ -41,6 +41,14 @@ FuchsiaBoardInputBundleInfo = provider(
     },
 )
 
+FuchsiaBoardInputBundleSetInfo = provider(
+    doc = "A provider used to containing the board input bundle set directory",
+    fields = {
+        "directory": "Directory of the board input bundle set",
+        "build_id_dirs": "Directories containing the debug symbols",
+    },
+)
+
 FuchsiaBoardConfigInfo = provider(
     doc = "A board info used to containing the board_configuration.json and its associated files",
     fields = {

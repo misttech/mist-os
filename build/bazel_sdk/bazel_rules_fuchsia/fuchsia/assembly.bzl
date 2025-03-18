@@ -25,6 +25,11 @@ load(
     _fuchsia_prebuilt_board_input_bundle = "fuchsia_prebuilt_board_input_bundle",
 )
 load(
+    "//fuchsia/private/assembly:fuchsia_board_input_bundle_set.bzl",
+    _fuchsia_board_input_bundle_set = "fuchsia_board_input_bundle_set",
+    _fuchsia_prebuilt_board_input_bundle_set = "fuchsia_prebuilt_board_input_bundle_set",
+)
+load(
     "//fuchsia/private/assembly:fuchsia_bootloader_partition.bzl",
     _fuchsia_bootloader_partition = "fuchsia_bootloader_partition",
 )
@@ -145,6 +150,8 @@ fuchsia_virtual_device = _fuchsia_virtual_device
 fuchsia_board_configuration = _fuchsia_board_configuration
 fuchsia_board_input_bundle = _fuchsia_board_input_bundle
 fuchsia_prebuilt_board_input_bundle = _fuchsia_prebuilt_board_input_bundle
+fuchsia_board_input_bundle_set = _fuchsia_board_input_bundle_set
+fuchsia_prebuilt_board_input_bundle_set = _fuchsia_prebuilt_board_input_bundle_set
 fuchsia_prebuilt_board_configuration = _fuchsia_prebuilt_board_configuration
 fuchsia_hybrid_board_configuration = _fuchsia_hybrid_board_configuration
 fuchsia_hybrid_product_configuration = _fuchsia_hybrid_product_configuration
