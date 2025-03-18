@@ -60,7 +60,6 @@ alias(
 generate_bazel_sdk(
     name = "bazel_in_tree_sdk",
     idk_export_dir = "@gn_targets//sdk:bazel_in_tree_idk",
-    use_rules_fuchsia = True,
 )
 
 # A target used to force the creation of the @fuchsia_sdk repository,
@@ -99,7 +98,6 @@ compare_bazel_sdk_contents(
 generate_bazel_sdk(
     name = "final_fuchsia_in_tree_sdk",
     idk_export_label = "@fuchsia_in_tree_idk//:final_idk",
-    use_rules_fuchsia = True,
 )
 
 # Compare the content of :final_fuchsia_in_tree_sdk with the one generated

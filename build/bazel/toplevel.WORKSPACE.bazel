@@ -292,7 +292,6 @@ fuchsia_sdk_repository(
     local_paths = ["@fuchsia_in_tree_idk"],
     # The @fuchsia_sdk repository is populated from the same content as @fuchsia_in_tree_idk.
     local_sdk_version_file = fuchsia_in_tree_idk_hash_label,
-    use_rules_fuchsia = True,
     buildifier = "//:prebuilt/third_party/buildifier/%s/buildifier" % fuchsia_host_tag,
 )
 
@@ -306,7 +305,6 @@ fuchsia_sdk_repository(
     local_sdk_version_file = fuchsia_internal_only_idk_hash_label,
     parent_sdk = "@fuchsia_sdk",
     parent_sdk_local_paths = ["@fuchsia_in_tree_idk"],
-    use_rules_fuchsia = True,
 )
 
 # buildifier: disable=load-on-top

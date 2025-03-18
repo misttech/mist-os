@@ -363,7 +363,6 @@ def _generate_bind_library_build_rules(
                 meta["sources"],
                 remove_prefix = lib_base_path,
             ),
-            "{{rules_fuchsia}}": process_context.rules_fuchsia,
         },
     )
     process_context.files_to_copy[meta["_meta_sdk_root"]].extend(
@@ -411,7 +410,6 @@ def _generate_sysroot_build_rules(
         _sdk_template_path(runtime, "sysroot"),
         {
             "{{relative_dir}}": relative_dir,
-            "{{rules_fuchsia}}": process_context.rules_fuchsia,
         },
     )
 
@@ -462,7 +460,6 @@ def _generate_sysroot_build_rules(
             {
                 "{{srcs}}": _get_starlark_dict(runtime, srcs),
                 "{{strip_prefix}}": strip_prefix,
-                "{{rules_fuchsia}}": process_context.rules_fuchsia,
             },
         )
 
@@ -611,7 +608,6 @@ def _generate_companion_host_tool_build_rules(
         {
             "{{name}}": name,
             "{{files}}": _get_starlark_list(runtime, tool_files),
-            "{{rules_fuchsia}}": process_context.rules_fuchsia,
         },
     )
 
@@ -738,7 +734,6 @@ def _generate_fidl_library_build_rules(
                 "",
                 "_llcpp_cc",
             ),
-            "{{rules_fuchsia}}": process_context.rules_fuchsia,
         },
     )
     process_context.files_to_copy[meta["_meta_sdk_root"]].extend(
@@ -778,7 +773,6 @@ def _generate_component_manifest_rules(
                         "{{name}}": name,
                         "{{source}}": shard_name,
                         "{{include_path}}": include_path,
-                        "{{rules_fuchsia}}": process_context.rules_fuchsia,
                     },
                 )
                 process_context.files_to_copy[meta["_meta_sdk_root"]].append(f)
@@ -897,7 +891,6 @@ def _generate_cc_source_library_build_rules(
             "{{copts}}": _get_starlark_list(runtime, copts),
             "{{alwayslink}}": str(alwayslink),
             "{{verify_cc_head_api_level_name}}": verify_cc_head_api_level_name,
-            "{{rules_fuchsia}}": process_context.rules_fuchsia,
         },
     )
     process_context.files_to_copy[meta["_meta_sdk_root"]].extend(
@@ -1015,7 +1008,6 @@ def _generate_cc_prebuilt_library_build_rules(
                 {
                     "{{link_lib}}": _final_bazel_path(linklib),
                     "{{library_type}}": meta["format"],
-                    "{{rules_fuchsia}}": process_context.rules_fuchsia,
                 },
             )
             process_context.files_to_copy[meta["_meta_sdk_root"]].append(linklib)
@@ -1036,7 +1028,6 @@ def _generate_cc_prebuilt_library_build_rules(
                         {
                             "{{dist_lib}}": _final_bazel_path(dist_lib),
                             "{{dist_path}}": meta["binaries"][arch]["dist_path"],
-                            "{{rules_fuchsia}}": process_context.rules_fuchsia,
                         },
                     )
                 else:
@@ -1051,7 +1042,6 @@ def _generate_cc_prebuilt_library_build_rules(
                             "{{stripped_file}}": _final_bazel_path(dist_lib),
                             "{{unstripped_file}}": _final_bazel_path(debug_lib),
                             "{{dist_path}}": meta["binaries"][arch]["dist_path"],
-                            "{{rules_fuchsia}}": process_context.rules_fuchsia,
                         },
                     )
                     if debug_lib != dist_lib:
@@ -1107,7 +1097,6 @@ def _generate_cc_prebuilt_library_build_rules(
             {
                 "{{link_lib}}": _final_bazel_path(variant.link_lib),
                 "{{library_type}}": meta["format"],
-                "{{rules_fuchsia}}": process_context.rules_fuchsia,
             },
         )
         process_context.files_to_copy[meta["_meta_sdk_root"]].append(
@@ -1129,7 +1118,6 @@ def _generate_cc_prebuilt_library_build_rules(
                     {
                         "{{dist_lib}}": _final_bazel_path(dist_lib),
                         "{{dist_path}}": variant.dist_lib_dest,
-                        "{{rules_fuchsia}}": process_context.rules_fuchsia,
                     },
                 )
             else:
@@ -1144,7 +1132,6 @@ def _generate_cc_prebuilt_library_build_rules(
                         "{{stripped_file}}": _final_bazel_path(dist_lib),
                         "{{unstripped_file}}": _final_bazel_path(debug_lib),
                         "{{dist_path}}": variant.dist_lib_dest,
-                        "{{rules_fuchsia}}": process_context.rules_fuchsia,
                     },
                 )
                 if debug_lib != dist_lib:
@@ -1169,7 +1156,6 @@ def _generate_cc_prebuilt_library_build_rules(
         {
             "{{prebuilt_select}}": prebuilt_select_str,
             "{{dist_select}}": dist_select_str,
-            "{{rules_fuchsia}}": process_context.rules_fuchsia,
         },
     )
     _merge_template(
@@ -1206,7 +1192,7 @@ def _generate_package_build_rules(
             constraint = "is_%s_api_%s" %
                          (variant["arch"], _get_api_level(variant)),
             os = "@platforms//os:fuchsia",
-            cpu = _FUCHSIA_CPU_CONSTRAINT_MAP[variant["arch"]].replace("@fuchsia_sdk", "@" + process_context.rules_fuchsia),
+            cpu = _FUCHSIA_CPU_CONSTRAINT_MAP[variant["arch"]],
             api_level = "//constraints:api_level_%s" % _get_api_level(variant),
         )
         for variant in meta["variants"]
@@ -1231,7 +1217,6 @@ def _generate_package_build_rules(
                     relative_dir,
                     variant.manifest,
                 ),
-                "{{rules_fuchsia}}": process_context.rules_fuchsia,
             },
         )
         process_context.files_to_copy[meta["_meta_sdk_root"]].extend(
@@ -1336,7 +1321,6 @@ def _generate_python_e2e_test_rules(
                 "{{test_binary}}": "%s_bin" % name,
                 "{{data}}": _get_starlark_list(runtime, files),
                 "{{deprecation}}": _api_level_deprecation_message(api_level),
-                "{{rules_fuchsia}}": process_context.rules_fuchsia,
             },
         )
 
@@ -1399,7 +1383,6 @@ def _generate_loadable_module_build_rules(
                     ],
                 ),
                 "{{dest}}": dest_prefix,
-                "{{rules_fuchsia}}": process_context.rules_fuchsia,
             },
         )
 
@@ -1420,7 +1403,6 @@ def _generate_loadable_module_build_rules(
                 ],
             ),
             "{{dest}}": dest_prefix,
-            "{{rules_fuchsia}}": process_context.rules_fuchsia,
         },
     )
 
@@ -1496,7 +1478,6 @@ def _write_cmc_includes(runtime, process_context):
         {
             "{{name}}": "cmc_includes",
             "{{deps}}": str(process_context.component_manifest_targets),
-            "{{rules_fuchsia}}": process_context.rules_fuchsia,
         },
     )
 
@@ -1661,7 +1642,6 @@ def _generate_sdk_build_rules(
         runtime,
         manifests,
         constants,
-        rules_fuchsia_name,
         filter_types = None,
         exclude_types = None):
     """Generates BUILD.bazel rules from the sdk metadata
@@ -1670,8 +1650,6 @@ def _generate_sdk_build_rules(
         runtime: A runtime value describing the current repository context and runtime environment.
         manifests: a list of paths to the meta data manifests.
         constants: A struct returned by generated_sdk_constants
-        rules_fuchsia_name: The name of the repository containing SDK rules.
-           This should be either "rules_fuchsia" or "fuchsia_sdk".
         filter_types: tuple of sdk element types. If given, do not process any sdk element types that are not in this tuple
         exclude_types: tuple of sdk element types. If given, do not process any sdk element types in this tuple
     """
@@ -1723,7 +1701,6 @@ def _generate_sdk_build_rules(
         files_to_copy = files_to_copy,
         component_manifest_targets = [],
         constants = constants,
-        rules_fuchsia = rules_fuchsia_name,
     )
 
     for dir in dir_to_meta.keys():
@@ -1780,7 +1757,7 @@ def _export_all_files(runtime):
         executable = False,
     )
 
-def generate_sdk_repository(runtime, manifests, use_rules_fuchsia):
+def generate_sdk_repository(runtime, manifests):
     """Populate the current repository directory.
 
     Args:
@@ -1789,14 +1766,8 @@ def generate_sdk_repository(runtime, manifests, use_rules_fuchsia):
             the "root" key, which has a string path value (absolute) pointing to an input IDK export
             directory, and the "manifest" key, which has a path string, relative to the root, pointing
             to the IDK manifest (which is typically just "meta/manifest.json").
-        use_rules_fuchsia: Name of the repository used to load rule definitions in the generated
-            repository. Bazel projects whose build files already all target definitions from @rules_fuchsia
-            can set this to "rules_fuchsia", otherwise this should be set to "fuchsia_sdk" for
-            backwards compatibility.
     """
     constants = _generate_sdk_constants(runtime, manifests)
-
-    rules_fuchsia_name = "rules_fuchsia" if use_rules_fuchsia else "fuchsia_sdk"
 
     ctx = runtime.ctx
 
@@ -1808,13 +1779,12 @@ def generate_sdk_repository(runtime, manifests, use_rules_fuchsia):
         substitutions = {
             "{{HOST_CPU}}": constants.host_cpus[0],
             "{{SDK_ID}}": _sdk_id_from_manifests(runtime, manifests),
-            "{{rules_fuchsia}}": rules_fuchsia_name,
         },
         executable = False,
     )
 
     # Generates all of the BUILD.bazel files and related content for the sdk
-    _generate_sdk_build_rules(runtime, manifests, constants, rules_fuchsia_name)
+    _generate_sdk_build_rules(runtime, manifests, constants)
 
     # We need to make sure that there is a build id directory at the root
     _ensure_build_id_file(runtime)

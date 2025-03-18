@@ -527,7 +527,6 @@ def main() -> int:
         generate_sdk_repository(
             runtime,
             manifests,
-            bool(args.use_rules_fuchsia),
         )
 
         if args.depfile:
