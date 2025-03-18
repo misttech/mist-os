@@ -329,7 +329,7 @@ petgraph = { version = "0.6.2" }
 proc-macro2 = { version = "1.0.86", features = ["span-locations"] }
 pulldown-cmark = { version = "0.9.3", features = ["serde"] }
 quote = "1.0.38"
-rustfix = "0.6.1"
+rustfix = "0.9.0"
 rustls-native-certs = "0.6.3"
 semver = "1.0.23"
 serde_yaml = "0.9.14" # To use on Fuchsia, serde_yaml and unsafe-libyaml will need to be re-audited.
@@ -1035,7 +1035,7 @@ visibility = [
 [gn.package.thiserror."2.0.11"]
 # Has build script but no config needed.
 
-[gn.package.thiserror."1.0.57"]
+[gn.package.thiserror."1.0.69"]
 # Has build script but no config needed.
 
 # Not actually used in the gn build at all, just for the rules_rust bazel rules.
