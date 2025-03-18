@@ -12,7 +12,7 @@
 vvar_data vvar;
 
 namespace {
-int64_t reference_value;
+int64_t reference_boot_instant_value_nsec;
 const int64_t INITIAL_REFERENCE_TIME_VALUE = 10'000;
 const int64_t REFERENCE_INCREMENT_SIZE = 100;
 
@@ -41,7 +41,7 @@ VvarTransform transform2 = {.boot_to_utc_reference_offset = 160,
 class VdsoCalculateUtcTest : public ::testing::Test {
  protected:
   void SetUp() override {
-    reference_value = INITIAL_REFERENCE_TIME_VALUE;
+    reference_boot_instant_value_nsec = INITIAL_REFERENCE_TIME_VALUE;
     // Seq_num says that data can be read.
     vvar.seq_num.store(4, std::memory_order_release);
     vvar.boot_to_utc_reference_offset.store(transform1.boot_to_utc_reference_offset,
@@ -76,15 +76,15 @@ void writer_thread(std::atomic_bool *should_stop) {
 }
 }  // namespace
 
-// Custom function which replaces the normal calculate_monotonic_time_nsec.
-// By adjusting the value of monotonic_value, the monotonic time can be custom set.
-int64_t calculate_monotonic_time_nsec() { return reference_value; }
+// Custom function which replaces the normal calculate_boot_time_nsec.
+// By adjusting reference_value, the boot time can be custom set.
+int64_t calculate_boot_time_nsec() { return reference_boot_instant_value_nsec; }
 
 TEST_F(VdsoCalculateUtcTest, ValidVvarAccess) {
-  int64_t expected_value =
-      (calculate_monotonic_time_nsec() - transform1.boot_to_utc_reference_offset) *
-          transform1.boot_to_utc_synthetic_ticks / transform1.boot_to_utc_reference_ticks +
-      transform1.boot_to_utc_synthetic_offset;
+  int64_t expected_value = (calculate_boot_time_nsec() - transform1.boot_to_utc_reference_offset) *
+                               transform1.boot_to_utc_synthetic_ticks /
+                               transform1.boot_to_utc_reference_ticks +
+                           transform1.boot_to_utc_synthetic_offset;
   int64_t utc_result = calculate_utc_time_nsec();
   ASSERT_EQ(utc_result, expected_value);
 }
@@ -101,7 +101,7 @@ TEST_F(VdsoCalculateUtcTest, UtcCalculationIncreasesWithMono) {
   ASSERT_NE(prev_utc_value, kUtcInvalid);
   for (int i = 0; i < 100; i++) {
     // Reference time increases. Check that utc time also increases.
-    reference_value += REFERENCE_INCREMENT_SIZE;
+    reference_boot_instant_value_nsec += REFERENCE_INCREMENT_SIZE;
     int64_t current_utc_value = calculate_utc_time_nsec();
     ASSERT_NE(current_utc_value, kUtcInvalid);
     ASSERT_GT(current_utc_value, prev_utc_value);
