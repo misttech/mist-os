@@ -25,6 +25,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/lib/hostplatform"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 
+	"go.fuchsia.dev/fuchsia/tools/integration/testsharder/metadata"
 	"google.golang.org/protobuf/encoding/prototext"
 )
 
@@ -188,7 +189,7 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 	// actually applied by recipes. Centralize the default values in the build
 	// system.
 	testSpecs := m.TestSpecs()
-	metadataMap, err := testsharder.GetMetadata(testSpecs, checkoutDir)
+	metadataMap, err := metadata.GetMetadata(testSpecs, checkoutDir)
 	if err != nil {
 		return err
 	}

@@ -115,6 +115,7 @@ func BaseTestResultFromTest(test testsharder.Test) *TestResult {
 		Result:    runtests.TestFailure,
 		DataSinks: runtests.DataSinkReference{},
 		Tags:      test.Tags,
+		Metadata:  test.Metadata,
 	}
 }
 

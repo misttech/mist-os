@@ -15,6 +15,7 @@ import (
 
 	"go.fuchsia.dev/fuchsia/tools/build"
 	fintpb "go.fuchsia.dev/fuchsia/tools/integration/fint/proto"
+	"go.fuchsia.dev/fuchsia/tools/integration/testsharder/metadata"
 	"go.fuchsia.dev/fuchsia/tools/lib/jsonutil"
 )
 
@@ -61,9 +62,9 @@ func makeTest(id int, os string) Test {
 	}
 }
 
-func makeTestWithMetadata(id int, os string, metadata TestMetadata) Test {
+func makeTestWithMetadata(id int, os string, testMetadata metadata.TestMetadata) Test {
 	test := makeTest(id, os)
-	test.Metadata = metadata
+	test.Metadata = testMetadata
 	return test
 }
 
@@ -79,8 +80,8 @@ func fuchsiaShard(env build.Environment, ids ...int) *Shard {
 	return shard(env, "fuchsia", ids...)
 }
 
-func fuchsiaShardWithMetadata(env build.Environment, metadata TestMetadata, ids ...int) *Shard {
-	return shardWithMetadata(env, "fuchsia", metadata, ids...)
+func fuchsiaShardWithMetadata(env build.Environment, testMetadata metadata.TestMetadata, ids ...int) *Shard {
+	return shardWithMetadata(env, "fuchsia", testMetadata, ids...)
 }
 
 func shard(env build.Environment, os string, ids ...int) *Shard {
@@ -96,10 +97,10 @@ func shard(env build.Environment, os string, ids ...int) *Shard {
 	}
 }
 
-func shardWithMetadata(env build.Environment, os string, metadata TestMetadata, ids ...int) *Shard {
+func shardWithMetadata(env build.Environment, os string, testMetadata metadata.TestMetadata, ids ...int) *Shard {
 	var tests []Test
 	for _, id := range ids {
-		tests = append(tests, makeTestWithMetadata(id, os, metadata))
+		tests = append(tests, makeTestWithMetadata(id, os, testMetadata))
 	}
 	return &Shard{
 		Name:       environmentName(env),
@@ -145,28 +146,26 @@ func TestMakeShards(t *testing.T) {
 			[]build.TestSpec{spec(1, env1, env2), spec(2, env1, env3), spec(3, env3)},
 			nil,
 			basicOpts,
-			make(map[string]TestMetadata),
+			make(map[string]metadata.TestMetadata),
 		)
 		expected := []*Shard{fuchsiaShard(env1, 1, 2), fuchsiaShard(env2, 1), fuchsiaShard(env3, 2, 3)}
 		assertEqual(t, expected, actual)
 	})
 
 	t.Run("metadata is added to tests", func(t *testing.T) {
-		metadata := TestMetadata{
+		testMetadata := metadata.TestMetadata{
 			Owners:      []string{"carverforbes@google.com"},
 			ComponentID: 1478143,
 		}
-		metadataMap :=
-			map[string]TestMetadata{
-				"fuchsia-pkg://fuchsia.com/test4": metadata,
-			}
+		metadataMap := make(map[string]metadata.TestMetadata)
+		metadataMap["fuchsia-pkg://fuchsia.com/test4"] = testMetadata
 		actual := MakeShards(
 			[]build.TestSpec{spec(1, env1, env2), spec(2, env1, env3), spec(3, env3), spec(4, env4)},
 			nil,
 			basicOpts,
 			metadataMap,
 		)
-		expected := []*Shard{fuchsiaShard(env1, 1, 2), fuchsiaShard(env2, 1), fuchsiaShard(env3, 2, 3), fuchsiaShardWithMetadata(env4, metadata, 4)}
+		expected := []*Shard{fuchsiaShard(env1, 1, 2), fuchsiaShard(env2, 1), fuchsiaShard(env3, 2, 3), fuchsiaShardWithMetadata(env4, testMetadata, 4)}
 		assertEqual(t, expected, actual)
 	})
 
@@ -175,7 +174,7 @@ func TestMakeShards(t *testing.T) {
 			[]build.TestSpec{spec(1, env1), spec(1, env1), spec(1, env1)},
 			nil,
 			basicOpts,
-			make(map[string]TestMetadata),
+			make(map[string]metadata.TestMetadata),
 		)
 		expected := []*Shard{fuchsiaShard(env1, 1, 1, 1)}
 		assertEqual(t, expected, actual)
@@ -189,7 +188,7 @@ func TestMakeShards(t *testing.T) {
 			[]build.TestSpec{spec(1, env2, env3), spec(2, env1), spec(3, env3)},
 			nil,
 			basicOpts,
-			make(map[string]TestMetadata),
+			make(map[string]metadata.TestMetadata),
 		)
 		expected := []*Shard{fuchsiaShard(env2, 1), fuchsiaShard(env3, 1, 3), fuchsiaShard(env1, 2)}
 		assertEqual(t, expected, actual)
@@ -214,7 +213,7 @@ func TestMakeShards(t *testing.T) {
 			&ShardOptions{
 				Tags: []string{"A", "C"},
 			},
-			make(map[string]TestMetadata),
+			make(map[string]metadata.TestMetadata),
 		)
 		expected := []*Shard{
 			// "C", "A" and "A", "C" should define the same tags.
@@ -238,7 +237,7 @@ func TestMakeShards(t *testing.T) {
 			},
 			nil,
 			basicOpts,
-			make(map[string]TestMetadata),
+			make(map[string]metadata.TestMetadata),
 		)
 		expected := []*Shard{
 			fuchsiaShard(env1, 1),
@@ -262,7 +261,7 @@ func TestMakeShards(t *testing.T) {
 			},
 			nil,
 			basicOpts,
-			make(map[string]TestMetadata),
+			make(map[string]metadata.TestMetadata),
 		)
 		expected := []*Shard{
 			fuchsiaShard(env1, 1),
@@ -287,7 +286,7 @@ func TestMakeShards(t *testing.T) {
 			},
 			nil,
 			basicOpts,
-			make(map[string]TestMetadata),
+			make(map[string]metadata.TestMetadata),
 		)
 
 		isolateShard := func(shard *Shard, index int) *Shard {
@@ -328,7 +327,7 @@ func TestMakeShards(t *testing.T) {
 				fullTestName(1, "fuchsia"): testListEntry,
 			},
 			basicOpts,
-			make(map[string]TestMetadata),
+			make(map[string]metadata.TestMetadata),
 		)
 
 		makeTestWithTagsAndRealm := func(id int, tags []build.TestTag, realm string) Test {
@@ -408,7 +407,7 @@ func TestMakeShards(t *testing.T) {
 			},
 			nil,
 			basicOpts,
-			make(map[string]TestMetadata),
+			make(map[string]metadata.TestMetadata),
 		)
 
 		// Create regular blob.

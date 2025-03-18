@@ -19,6 +19,7 @@ import (
 
 	"go.fuchsia.dev/fuchsia/tools/build"
 	fintpb "go.fuchsia.dev/fuchsia/tools/integration/fint/proto"
+	"go.fuchsia.dev/fuchsia/tools/integration/testsharder/metadata"
 	"go.fuchsia.dev/fuchsia/tools/lib/jsonutil"
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 )
@@ -263,7 +264,7 @@ type ShardOptions struct {
 
 // MakeShards returns the list of shards associated with a given build.
 // A single output shard will contain only tests that have the same environment.
-func MakeShards(specs []build.TestSpec, testListEntries map[string]build.TestListEntry, opts *ShardOptions, metadataMap map[string]TestMetadata) []*Shard {
+func MakeShards(specs []build.TestSpec, testListEntries map[string]build.TestListEntry, opts *ShardOptions, metadataMap map[string]metadata.TestMetadata) []*Shard {
 	// We don't want to crash if we've passed a nil testListEntries map.
 	if testListEntries == nil {
 		testListEntries = make(map[string]build.TestListEntry)

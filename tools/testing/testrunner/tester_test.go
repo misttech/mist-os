@@ -24,6 +24,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/botanist"
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/integration/testsharder"
+	"go.fuchsia.dev/fuchsia/tools/integration/testsharder/metadata"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
 	ffxutilconstants "go.fuchsia.dev/fuchsia/tools/lib/ffxutil/constants"
 	"go.fuchsia.dev/fuchsia/tools/lib/iomisc"
@@ -1117,4 +1118,45 @@ func (pe *joinedPipeEnds) Close() error {
 		return err
 	}
 	return pe.w.Close()
+}
+
+func TestBaseTestResultFromTest(t *testing.T) {
+	test := testsharder.Test{
+		Test: build.Test{
+			Name:  "fuchsia-pkg://fuchsia.com/sparky-sparky-boom-test#meta/sparky-sparky-boom-test.cm",
+			Label: "//src/sys:foo_test(//build/toolchain/fuchsia:x64)",
+		},
+		Tags: []build.TestTag{
+			{
+				Key:   "key",
+				Value: "value",
+			},
+		},
+		Metadata: metadata.TestMetadata{
+			Owners:      []string{"carverforbes@google.com"},
+			ComponentID: 1478143,
+		},
+	}
+	expected := TestResult{
+		Name:      "fuchsia-pkg://fuchsia.com/sparky-sparky-boom-test#meta/sparky-sparky-boom-test.cm",
+		GNLabel:   "//src/sys:foo_test(//build/toolchain/fuchsia:x64)",
+		Result:    runtests.TestFailure,
+		DataSinks: runtests.DataSinkReference{},
+		Tags: []build.TestTag{
+			{
+				Key:   "key",
+				Value: "value",
+			},
+		},
+		// This is necessary for LUCI analysis to know where (which component) to
+		// file the bug.
+		Metadata: metadata.TestMetadata{
+			Owners:      []string{"carverforbes@google.com"},
+			ComponentID: 1478143,
+		},
+	}
+	testResult := *BaseTestResultFromTest(test)
+	if diff := cmp.Diff(expected, testResult); diff != "" {
+		t.Errorf("BaseTestResultFromTest() failed: (-want +got): \n%s", diff)
+	}
 }

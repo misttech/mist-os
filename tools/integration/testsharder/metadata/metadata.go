@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-package testsharder
+package metadata
 
 import (
 	"errors"
@@ -26,6 +26,14 @@ var includeRegex = regexp.MustCompile(`^include (\S+)$`)
 // OWNERS file lines that match this regex (a very crude email matcher) will be
 // considered to represent owners.
 var ownerRegex = regexp.MustCompile(`^\S+@\S+$`)
+
+type TestMetadata struct {
+	// A list of owners for this directory.
+	Owners []string `json:"owners,omitempty"`
+
+	// The Google Issue Tracker component ID.
+	ComponentID int `json:"component_id,omitempty"`
+}
 
 func GetMetadata(testSpecs []build.TestSpec, checkoutDir string) (map[string]TestMetadata, error) {
 	resultMap := make(map[string]TestMetadata)

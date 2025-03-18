@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"go.fuchsia.dev/fuchsia/tools/build"
+	"go.fuchsia.dev/fuchsia/tools/integration/testsharder/metadata"
 )
 
 // RunAlgorithm describes how to run a test using the test's `Runs` field.
@@ -24,14 +25,6 @@ const (
 	// and to break on the first success.
 	StopOnSuccess RunAlgorithm = "STOP_ON_SUCCESS"
 )
-
-type TestMetadata struct {
-	// A list of owners for this directory.
-	Owners []string `json:"owners,omitempty"`
-
-	// The Google Issue Tracker component ID.
-	ComponentID int `json:"component_id,omitempty"`
-}
 
 // Test is a struct used to hold information about a build.Test and how to run it.
 type Test struct {
@@ -62,7 +55,7 @@ type Test struct {
 	Tags []build.TestTag `json:"tags,omitempty"`
 
 	// Test owner information and other metadata
-	Metadata TestMetadata `json:"metadata,omitempty"`
+	Metadata metadata.TestMetadata `json:"metadata,omitempty"`
 }
 
 func (t *Test) applyModifier(m TestModifier) {

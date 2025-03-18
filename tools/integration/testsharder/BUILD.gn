@@ -32,8 +32,6 @@ go_library("testsharder_lib") {
     "ffx_deps_test.go",
     "images.go",
     "images_test.go",
-    "metadata.go",
-    "metadata_test.go",
     "postprocess.go",
     "postprocess_test.go",
     "preprocess.go",
@@ -46,6 +44,7 @@ go_library("testsharder_lib") {
   ]
 
   deps = [
+    ":metadata",
     ":proto_lib",
     "//third_party/golibs:golang.org/x/exp/maps",
     "//third_party/golibs:golang.org/x/exp/slices",
@@ -56,6 +55,18 @@ go_library("testsharder_lib") {
     "//tools/lib/logger",
     "//tools/metadata:proto_lib",
     "//tools/testing/runtests",
+  ]
+}
+
+go_library("metadata") {
+  source_dir = "metadata"
+  sources = [
+    "metadata.go",
+    "metadata_test.go",
+  ]
+  deps = [
+    "//tools/build",
+    "//tools/metadata:proto_lib",
   ]
 }
 
@@ -79,6 +90,11 @@ go_binary("testsharder") {
 if (is_host) {
   go_test("testsharder_lib_tests") {
     library = ":testsharder_lib"
+    deps = [ "//third_party/golibs:github.com/google/go-cmp" ]
+  }
+
+  go_test("testsharder_metadata_tests") {
+    library = ":metadata"
     deps = [ "//third_party/golibs:github.com/google/go-cmp" ]
   }
 
@@ -137,6 +153,7 @@ group("tests") {
   testonly = true
   deps = [
     ":testsharder_lib_tests($host_toolchain)",
+    ":testsharder_metadata_tests($host_toolchain)",
     ":testsharder_tests($host_toolchain)",
   ]
 }
