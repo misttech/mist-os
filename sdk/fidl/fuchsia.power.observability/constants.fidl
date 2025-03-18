@@ -8,8 +8,8 @@
 /// in Inspect output associate well with their meaning.
 ///
 /// Some conventions used for uniform reporting:
-/// - All timestamps are expressed in nanoseconds.
-/// - All durations are expressed in nanoseconds.
+/// - All timestamps are expressed in nanoseconds, and suffixed with "_ns".
+/// - All durations are expressed in nanoseconds, and suffixed with "_ns".
 /// - All plain counters are suffixed with `_count`.
 /// - All node constant names are suffixed with `_NODE`.
 @available(added=HEAD)
@@ -28,7 +28,7 @@ const SUSPEND_STATS_NODE string = "suspend_stats";
 /// Timestamp in nanos for when at least one suspend blocker is acquired.
 /// This occurs when an internal procedure needs to prevent suspension.
 /// For example, when servicing a wake lease request, system-activity-governor
-///  will acquire a suspend blocker for the lifetime of the wake lease token.
+/// will acquire a suspend blocker for the lifetime of the wake lease token.
 /// This prevents suspension even while the underlying power broker lease is
 /// pending.
 const SUSPEND_BLOCKER_ACQUIRED_AT string = "suspend_blocker_acquired_at_ns";
@@ -99,7 +99,7 @@ const SUSPEND_FAIL_COUNT string = "fail_count";
 
 // System Activity Governor (SAG)
 
-// // Wake leases
+// // SAG: Wake leases
 
 /// The current state of wake leases, as tracked by SAG.
 /// The wake lease event history is tracked separately in SUSPEND_EVENTS_NODE.
@@ -141,3 +141,25 @@ const WAKE_LEASE_ITEM_STATUS_FAILED_SATISFACTION string = "failed";
 /// The error message. For example, if the underlying power broker lease failed
 /// to be satisfied.
 const WAKE_LEASE_ITEM_ERROR string = "error";
+
+// // SAG: Suspend callbacks
+
+/// Timestamp in nanos, for the start of suspend callback processing.
+/// Suspend is gated on phase completion.
+/// Event is recorded in SUSPEND_EVENTS_NODE.
+const SUSPEND_CALLBACK_PHASE_START_AT string = "suspend_callbacks_started_at_ns";
+
+/// Timestamp in nanos, for the end of suspend callback processing.
+/// Suspend is gated on phase completion.
+/// Event is recorded in SUSPEND_EVENTS_NODE.
+const SUSPEND_CALLBACK_PHASE_END_AT string = "suspend_callbacks_ended_at_ns";
+
+/// Timestamp in nanos, for the start of resume callback processing.
+/// Resume is not gated on phase completion.
+/// Event is recorded in SUSPEND_EVENTS_NODE.
+const RESUME_CALLBACK_PHASE_START_AT string = "resume_callbacks_started_at_ns";
+
+/// Timestamp in nanos, for the end of resume callback processing.
+/// Resume is not gated on phase completion.
+/// Event is recorded in SUSPEND_EVENTS_NODE.
+const RESUME_CALLBACK_PHASE_END_AT string = "resume_callbacks_ended_at_ns";

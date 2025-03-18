@@ -38,6 +38,14 @@ pub enum SagEvent {
     WakeLeaseSatisfied { name: String },
     /// A wake lease was dropped and is no longer active.
     WakeLeaseDropped { name: String },
+    /// Suspend callback processing started.
+    SuspendCallbackPhaseStarted,
+    /// Suspend callback processing ended.
+    SuspendCallbackPhaseEnded,
+    /// Resume callback processing started.
+    ResumeCallbackPhaseStarted,
+    /// Resume callback processing ended.
+    ResumeCallbackPhaseEnded,
 }
 
 /// A logger for SagEvent objects that inserts the event into a circular buffer
@@ -99,6 +107,18 @@ impl SagEventLogger {
                 SagEvent::WakeLeaseDropped { name } => {
                     node.record_int(fobs::WAKE_LEASE_DROPPED_AT, time);
                     node.record_string(fobs::WAKE_LEASE_ITEM_NAME, name);
+                }
+                SagEvent::SuspendCallbackPhaseStarted => {
+                    node.record_int(fobs::SUSPEND_CALLBACK_PHASE_START_AT, time);
+                }
+                SagEvent::SuspendCallbackPhaseEnded => {
+                    node.record_int(fobs::SUSPEND_CALLBACK_PHASE_END_AT, time);
+                }
+                SagEvent::ResumeCallbackPhaseStarted => {
+                    node.record_int(fobs::RESUME_CALLBACK_PHASE_START_AT, time);
+                }
+                SagEvent::ResumeCallbackPhaseEnded => {
+                    node.record_int(fobs::RESUME_CALLBACK_PHASE_END_AT, time);
                 }
             };
         });

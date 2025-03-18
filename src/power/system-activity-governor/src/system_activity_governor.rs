@@ -419,6 +419,8 @@ pub struct SystemActivityGovernor {
     resume_control_lease: Rc<RefCell<Option<fbroker::LeaseControlProxy>>>,
     /// Temporarily holds the boot_control lease.
     booting_lease: Rc<RefCell<Option<fidl::endpoints::ClientEnd<fbroker::LeaseControlMarker>>>>,
+    /// Logger for system-wide activity governor events.
+    sag_event_logger: SagEventLogger,
 }
 
 impl SystemActivityGovernor {
@@ -484,7 +486,7 @@ impl SystemActivityGovernor {
 
         let lease_manager = LeaseManager::new(
             inspect_root.create_child(fobs::WAKE_LEASES_NODE),
-            sag_event_logger,
+            sag_event_logger.clone(),
             topology.clone(),
             execution_state.lessor.clone(),
             application_activity.assertive_dependency_token().expect("token not registered"),
@@ -554,6 +556,7 @@ impl SystemActivityGovernor {
             resume_control_lease: Rc::new(RefCell::new(None)),
             is_running_signal: async_lock::OnceCell::new(),
             booting_lease: Rc::new(RefCell::new(None)),
+            sag_event_logger,
         }))
     }
 
@@ -978,6 +981,7 @@ impl SuspendResumeListener for SystemActivityGovernor {
         let listeners: Vec<_> = self.listeners.borrow_mut().clone();
 
         log::info!("Running on-suspend callbacks ({} listeners)", listeners.len());
+        self.sag_event_logger.log(SagEvent::SuspendCallbackPhaseStarted);
 
         // Run the callbacks concurrently.
         // TODO(b/393212343): Include listeners' names in log messages once we have names for them.
@@ -997,6 +1001,7 @@ impl SuspendResumeListener for SystemActivityGovernor {
                 let _ = listener.on_suspend_started().await;
             })
             .await;
+        self.sag_event_logger.log(SagEvent::SuspendCallbackPhaseEnded);
     }
 
     async fn notify_on_resume(&self) {
@@ -1005,6 +1010,7 @@ impl SuspendResumeListener for SystemActivityGovernor {
         let listeners: Vec<_> = self.listeners.borrow_mut().clone();
 
         log::info!("Running on-resume callbacks ({} listeners)", listeners.len());
+        self.sag_event_logger.log(SagEvent::ResumeCallbackPhaseStarted);
 
         // Run the callbacks concurrently.
         // TODO(b/393212343): Include listeners' names in log messages once we have names for them.
@@ -1025,6 +1031,7 @@ impl SuspendResumeListener for SystemActivityGovernor {
                 let _ = listener.on_resume().await;
             })
             .await;
+        self.sag_event_logger.log(SagEvent::ResumeCallbackPhaseEnded);
     }
 }
 
