@@ -774,12 +774,17 @@ func (f *FFXInstance) Stop() error {
 }
 
 // BootloaderBoot RAM boots the target.
-func (f *FFXInstance) BootloaderBoot(ctx context.Context, target, productBundle string) error {
+func (f *FFXInstance) BootloaderBoot(ctx context.Context, target, productBundle string, tcpFlash bool) error {
+	logger.Infof(ctx, "running bootloader boot with tcp flash: %t ", tcpFlash)
 	args := []string{
-		"--target", target,
-		"--config", "{\"ffx\": {\"fastboot\": {\"inline_target\": true}}}",
-		"target", "bootloader",
+		"--target", target, "-c", "discovery.mdns.enabled=false", "-c", "fastboot.usb.disabled=true", "-c", "discovery.timeout=12000",
 	}
+
+	if !tcpFlash {
+		args = append(args, "--config", "{\"ffx\": {\"fastboot\": {\"inline_target\": true}}}")
+	}
+
+	args = append(args, "target", "bootloader")
 	args = append(args, "--product-bundle", productBundle)
 	args = append(args, "boot")
 	return f.RunWithTimeout(ctx, 0, args...)

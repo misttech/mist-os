@@ -345,7 +345,7 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 			for attempt := 1; attempt <= maxAllowedAttempts; attempt++ {
 				logger.Debugf(ctx, "Starting flash attempt %d/%d", attempt, maxAllowedAttempts)
 				if t.opts.Netboot {
-					if err = t.ffx.BootloaderBoot(ctx, target, pbPath); err == nil {
+					if err = t.ffx.BootloaderBoot(ctx, target, pbPath, tcpFlash); err == nil {
 						// If successful, early exit.
 						break
 					}
