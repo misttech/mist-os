@@ -60,6 +60,9 @@ if (is_host) {
       "//third_party/googletest:gmock",
       "//third_party/googletest:gtest",
     ]
+
+    # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
+    configs += [ "//build/config:Wno-conversion" ]
   }
 
   host_test_data("e2e_test_cases") {

@@ -54,7 +54,7 @@ DataForSyscallTest::DataForSyscallTest(debug::Arch arch) : arch_(arch) {
   header2_.ordinal = kOrdinal2;
 
   for (int i = 0; i < 100; ++i) {
-    large_bytes_.push_back(static_cast<uint8_t>(i * i));
+    large_bytes_.push_back(i * i);
   }
   sp_ = stack_ + kMaxStackSizeInWords;
 }

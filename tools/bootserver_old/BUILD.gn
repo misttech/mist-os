@@ -16,6 +16,9 @@ executable("bootserver") {
     "//zircon/system/ulib/tftp",
   ]
   configs += [
+    # TODO(https://fxbug.dev/42136089): delete the below and fix conversion warnings
+    "//build/config:Wno-conversion",
+
     # TODO(https://fxbug.dev/353575163): delete the below and fix folding-constant warnings
     "//build/config:Wno-gnu-folding-constant",
   ]

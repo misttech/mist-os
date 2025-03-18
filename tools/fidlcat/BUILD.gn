@@ -73,6 +73,9 @@ if (is_host) {
       "//third_party/googletest:gtest",
       "//zircon/system/ulib/cmdline",
     ]
+
+    # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
+    configs += [ "//build/config:Wno-conversion" ]
   }
 }
 

@@ -156,7 +156,7 @@ std::unique_ptr<SystemCallTest> ZxProcessReadMemory(int64_t result, std::string_
 #define PROCESS_READ_MEMORY_DISPLAY_TEST_CONTENT(result, expected)                                 \
   zx_vaddr_t vaddr = 0x123456789;                                                                  \
   std::vector<uint8_t> buffer;                                                                     \
-  for (uint8_t i = 0; i < 10; ++i) {                                                               \
+  for (int i = 0; i < 10; ++i) {                                                                   \
     buffer.push_back(i);                                                                           \
   }                                                                                                \
   size_t actual = buffer.size();                                                                   \
@@ -208,7 +208,7 @@ std::unique_ptr<SystemCallTest> ZxProcessWriteMemory(int64_t result, std::string
 #define PROCESS_WRITE_MEMORY_DISPLAY_TEST_CONTENT(result, expected)                       \
   zx_vaddr_t vaddr = 0x123456789;                                                         \
   std::vector<uint8_t> buffer;                                                            \
-  for (uint8_t i = 0; i < 10; ++i) {                                                      \
+  for (int i = 0; i < 10; ++i) {                                                          \
     buffer.push_back(i);                                                                  \
   }                                                                                       \
   size_t actual = buffer.size();                                                          \

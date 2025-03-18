@@ -1444,21 +1444,21 @@ class ZxPacketGuestVcpu : public Class<zx_packet_guest_vcpu_t> {
   static const zx_packet_guest_vcpu_startup_t* startup(const zx_packet_guest_vcpu_t* from) {
     return reinterpret_cast<const zx_packet_guest_vcpu_startup_t*>(&from->startup);
   }
-  static uint32_t type(const zx_packet_guest_vcpu_t* from) { return from->type; }
+  static uint8_t type(const zx_packet_guest_vcpu_t* from) { return from->type; }
   static uint64_t reserved(const zx_packet_guest_vcpu_t* from) { return from->reserved; }
 
  private:
   ZxPacketGuestVcpu() : Class("zx_packet_guest_vcpu_t") {
-    auto type_field = AddField(std::make_unique<ClassField<zx_packet_guest_vcpu_t, uint32_t>>(
+    auto type_field = AddField(std::make_unique<ClassField<zx_packet_guest_vcpu_t, uint8_t>>(
         "type", SyscallType::kPacketGuestVcpuType, type));
     AddField(
         std::make_unique<ClassClassField<zx_packet_guest_vcpu_t, zx_packet_guest_vcpu_interrupt_t>>(
             "interrupt", interrupt, ZxPacketGuestVcpuInterrupt::GetClass()))
-        ->DisplayIfEqual(type_field, ZX_PKT_GUEST_VCPU_INTERRUPT);
+        ->DisplayIfEqual(type_field, uint8_t(ZX_PKT_GUEST_VCPU_INTERRUPT));
     AddField(
         std::make_unique<ClassClassField<zx_packet_guest_vcpu_t, zx_packet_guest_vcpu_startup_t>>(
             "startup", startup, ZxPacketGuestVcpuStartup::GetClass()))
-        ->DisplayIfEqual(type_field, ZX_PKT_GUEST_VCPU_STARTUP);
+        ->DisplayIfEqual(type_field, uint8_t(ZX_PKT_GUEST_VCPU_STARTUP));
     AddField(std::make_unique<ClassField<zx_packet_guest_vcpu_t, uint64_t>>(
         "reserved", SyscallType::kUint64, reserved));
   }
@@ -1566,13 +1566,13 @@ class ZxPciBar : public Class<zx_pci_bar_t> {
     auto type_field = AddField(std::make_unique<ClassField<zx_pci_bar_t, uint32_t>>(
         "type", SyscallType::kPciBarType, type));
     AddField(std::make_unique<ClassField<zx_pci_bar_t, size_t>>("size", SyscallType::kSize, size))
-        ->DisplayIfEqual(type_field, ZX_PCI_BAR_TYPE_PIO);
+        ->DisplayIfEqual(type_field, uint32_t(ZX_PCI_BAR_TYPE_PIO));
     AddField(
         std::make_unique<ClassField<zx_pci_bar_t, uintptr_t>>("addr", SyscallType::kUintptr, addr))
-        ->DisplayIfEqual(type_field, ZX_PCI_BAR_TYPE_PIO);
+        ->DisplayIfEqual(type_field, uint32_t(ZX_PCI_BAR_TYPE_PIO));
     AddField(std::make_unique<ClassField<zx_pci_bar_t, zx_handle_t>>("handle", SyscallType::kHandle,
                                                                      handle))
-        ->DisplayIfEqual(type_field, ZX_PCI_BAR_TYPE_MMIO);
+        ->DisplayIfEqual(type_field, uint32_t(ZX_PCI_BAR_TYPE_MMIO));
   }
   ZxPciBar(const ZxPciBar&) = delete;
   ZxPciBar& operator=(const ZxPciBar&) = delete;
