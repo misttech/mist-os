@@ -29,6 +29,11 @@ add_ir_path(_ir_path)
 {{ end -}}
 
 
+{{ range .PythonEnums }}
+{{- template "EnumDeclaration" . -}}
+{{ end -}}
+
+
 {{ range .PythonBits }}
 {{- template "BitsDeclaration" . -}}
 {{ end -}}

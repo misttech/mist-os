@@ -153,6 +153,21 @@ def unwrap_innermost_type(
         ty_args_mut.remove(type(None))
         return unwrap_innermost_type(ty_args_mut[0], _original_ty=_original_ty)
 
+    # Meta-typing layer that allows unions of IntEnum, IntFlag, and int because IntEnum and IntFlag
+    # are subclasses of int. This special case is an affordance made to support decode into static
+    # FIDL binding types.
+    if (
+        len(ty_args) == 2
+        and typing.get_origin(ty) in (Union, UnionType)
+        and all(issubclass(x, int) for x in ty_args)
+    ):
+        assert ty_args[0].__module__.startswith(
+            "fidl_"
+        ), f"Encountered union of int with non-static FIDL binding type: {_original_ty}"
+        ty_args_mut = list(ty_args)
+        ty_args_mut.remove(int)  # Retain the static FIDL binding type.
+        return unwrap_innermost_type(ty_args_mut[0], _original_ty=_original_ty)
+
     # The meta-typing layer is not an Optional, not an instance of ForwardRef, and has multiple
     # arguments.
     raise RuntimeError(

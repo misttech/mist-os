@@ -13,6 +13,8 @@ conformance_python_fidl_source_basenames = [
   "bits_flexible.test.fidl",
   "bits_strict.test.fidl",
   "empty_struct.test.fidl",
+  "enums_flexible.test.fidl",
+  "enums_strict.test.fidl",
   "memcpy_compatibility.test.fidl",
   "ported_from_walker_strings.test.fidl",
   "primitives.test.fidl",

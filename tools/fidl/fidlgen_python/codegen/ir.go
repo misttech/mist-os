@@ -30,6 +30,20 @@ type PythonBitsMember struct {
 	PythonValue string
 }
 
+type PythonEnum struct {
+	fidlgen.Enum
+	PythonName    string
+	PythonMembers []PythonEnumMember
+	Empty         bool
+	HasZero       bool
+}
+
+type PythonEnumMember struct {
+	fidlgen.EnumMember
+	PythonName  string
+	PythonValue string
+}
+
 type PythonStruct struct {
 	fidlgen.Struct
 	Library       string
@@ -55,6 +69,7 @@ type PythonRoot struct {
 	PythonStructs    []PythonStruct
 	PythonAliases    []PythonAlias
 	PythonBits       []PythonBits
+	PythonEnums      []PythonEnum
 }
 
 type compiler struct {
@@ -116,9 +131,10 @@ func (c *compiler) compileType(val fidlgen.Type, maybeAlias *fidlgen.PartialType
 	case fidlgen.IdentifierType:
 		// TODO(https://fxbug.dev/394421154): This should be changed to use the enum type itself
 		// when we start making breaking changes for these bindings.
-		if c.decls[val.Identifier].Type == fidlgen.BitsDeclType {
+		switch c.decls[val.Identifier].Type {
+		case fidlgen.BitsDeclType, fidlgen.EnumDeclType:
 			name += "int"
-		} else {
+		default:
 			name += *c.compileDeclIdentifier(val.Identifier)
 		}
 	case fidlgen.PrimitiveType:
@@ -202,6 +218,33 @@ func (c *compiler) compileBits(val fidlgen.Bits) PythonBits {
 	return e
 }
 
+func (c *compiler) compileEnum(val fidlgen.Enum) PythonEnum {
+	e := PythonEnum{
+		Enum:          val,
+		PythonName:    *c.compileDeclIdentifier(val.Name),
+		PythonMembers: []PythonEnumMember{},
+		Empty:         len(val.Members) == 0,
+		HasZero:       false,
+	}
+	for _, member_val := range val.Members {
+		var value string
+		switch member_val.Value.Kind {
+		case fidlgen.LiteralConstant:
+			value = *c.compileLiteral(*member_val.Value.Literal)
+			e.HasZero = e.HasZero || (value == "0")
+		default:
+			log.Fatalf("Unknown enum member kind: %v", member_val)
+		}
+
+		e.PythonMembers = append(e.PythonMembers, PythonEnumMember{
+			EnumMember:  member_val,
+			PythonName:  compileScreamingSnakeIdentifier(member_val.Name),
+			PythonValue: value,
+		})
+	}
+	return e
+}
+
 func (c *compiler) compileStructMember(val fidlgen.StructMember) PythonStructMember {
 	t := c.compileType(val.Type, val.MaybeFromAlias)
 	if t == nil {
@@ -260,6 +303,10 @@ func Compile(root fidlgen.Root) PythonRoot {
 	// of bits declarations.
 	for _, v := range root.Bits {
 		python_root.PythonBits = append(python_root.PythonBits, c.compileBits(v))
+	}
+
+	for _, v := range root.Enums {
+		python_root.PythonEnums = append(python_root.PythonEnums, c.compileEnum(v))
 	}
 
 	return python_root

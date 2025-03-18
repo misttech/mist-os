@@ -10,6 +10,7 @@ go_library("codegen") {
   sources = [
     "bits.tmpl",
     "codegen.go",
+    "enum.tmpl",
     "ir.go",
     "sourcefile.tmpl",
     "struct.tmpl",
