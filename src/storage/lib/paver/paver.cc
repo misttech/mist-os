@@ -316,15 +316,8 @@ zx::result<> PartitionPave(const DevicePartitioner& partitioner, zx::vmo payload
   //
   // If payload_vmo is pager-backed, committing its pages guarantees that they will remain in memory
   // and not be evicted only if it's a clone of a pager-backed VMO, and not a root pager-backed VMO
-  // (directly backed by a pager source). Blobfs only hands out clones of root pager-backed VMOs.
-  // Assert that that is indeed the case. This will cause us to fail deterministically if that
-  // invariant does not hold. Otherwise, if pages get evicted in the midst of the partition write,
-  // the block server can deadlock due to a read fault, putting the device in an unrecoverable
-  // state.
-  //
-  // TODO(https://fxbug.dev/42124970): If it's possible for payload_vmo to be a root pager-backed
-  // VMO, we will need to lock it instead of simply committing its pages, to opt it out of eviction.
-  // The assert below verifying that it's a pager-backed clone will need to be removed as well.
+  // (directly backed by a pager source). To ensure this is the case we create our own local clone
+  // of the payload_vmo, guaranteeing it is not the root, or a reference to the root.
   zx_info_vmo_t info;
   zx::result status =
       zx::make_result(payload_vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
@@ -333,8 +326,18 @@ zx::result<> PartitionPave(const DevicePartitioner& partitioner, zx::vmo payload
           status.status_string());
     return status.take_error();
   }
-  // If payload_vmo is pager-backed, it is a clone (has a parent).
-  ZX_ASSERT(!(info.flags & ZX_INFO_VMO_PAGER_BACKED) || info.parent_koid);
+  // If payload_vmo is pager-backed then create a clone.
+  if (info.flags & ZX_INFO_VMO_PAGER_BACKED) {
+    zx::vmo clone;
+    status = zx::make_result(
+        payload_vmo.create_child(ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE, 0, payload_size, &clone));
+    if (status.is_error()) {
+      ERROR("Failed to create clone of paylod VMO for partition \"%s\": %s\n",
+            spec.ToString().c_str(), status.status_string());
+      return status.take_error();
+    }
+    payload_vmo = std::move(clone);
+  }
 
   status = zx::make_result(payload_vmo.op_range(ZX_VMO_OP_COMMIT, 0, payload_size, nullptr, 0));
   if (status.is_error()) {
