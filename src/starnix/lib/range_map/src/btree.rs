@@ -219,30 +219,39 @@ enum InsertResult<K: Ord + Copy, V: Clone> {
     SplitInternal(K, Arc<NodeInternal<K, V>>),
 }
 
+/// State information returned from the removal operation.
+struct RemoveState<K: Ord + Copy, V: Clone> {
+    /// The minimal key for this subtree, if available.
+    ///
+    /// If the minimal key for this subtree is not available, then the minimal key is guaranteed
+    /// to be unchanged by this operation.
+    maybe_split_key: Option<K>,
+
+    /// The value previously stored at this key.
+    removed_value: V,
+}
+
 /// The intermediate result of a remove operation.
 ///
 /// The root of the CowTree converts this result value into `Option<T>`, per the usual map
 /// interface.
-enum RemoveResult<V: Clone> {
+enum RemoveResult<K: Ord + Copy, V: Clone> {
     /// The key the client asked to remove was not found in the map.
     NotFound,
 
     /// The key was successfully removed from the map.
     ///
-    /// Returns the value previously stored at this key. No further processing is required.
-    Removed(V),
+    Removed(RemoveState<K, V>),
 
     /// The key was removed from the map but the node that previously contained that node no longer
     /// has sufficient children.
-    ///
-    /// Returns the value previousoly stored at this key.
     ///
     /// The caller is responsible for rebalancing its children to ensure that each node has at
     /// least this minimum number of children. If the balance invariant can be resolved locally,
     /// the caller should return `Removed` to its caller. If rebalancing the local children
     /// causes this node to have fewer than the minimum number of children, the caller should
     /// return `Underflow` to its caller.
-    Underflow(V),
+    Underflow(RemoveState<K, V>),
 }
 
 impl<K, V> NodeLeaf<K, V>
@@ -346,14 +355,15 @@ where
     }
 
     /// Remove the entry indicated by `cursor`.
-    fn remove(&mut self, cursor: Cursor) -> RemoveResult<V> {
+    fn remove(&mut self, cursor: Cursor) -> RemoveResult<K, V> {
         if let Some(index) = self.get_index(cursor) {
             self.keys.remove(index);
-            let value = self.values.remove(index);
+            let removed_value = self.values.remove(index);
+            let maybe_split_key = self.keys.first().map(|range| range.start);
             if self.keys.len() < NODE_CAPACITY / 2 {
-                RemoveResult::Underflow(value)
+                RemoveResult::Underflow(RemoveState { maybe_split_key, removed_value })
             } else {
-                RemoveResult::Removed(value)
+                RemoveResult::Removed(RemoveState { maybe_split_key, removed_value })
             }
         } else {
             RemoveResult::NotFound
@@ -770,7 +780,7 @@ where
     }
 
     /// Remove the entry indicated by `cursor`.
-    fn remove(&mut self, mut cursor: Cursor) -> RemoveResult<V> {
+    fn remove(&mut self, mut cursor: Cursor) -> RemoveResult<K, V> {
         let index = cursor.pop().expect("valid cursor");
         let result = match &mut self.children {
             ChildList::Leaf(children) => Arc::make_mut(&mut children[index]).remove(cursor),
@@ -778,13 +788,27 @@ where
         };
         match result {
             RemoveResult::NotFound => RemoveResult::NotFound,
-            RemoveResult::Removed(value) => RemoveResult::Removed(value),
-            RemoveResult::Underflow(value) => {
+            RemoveResult::Removed(RemoveState { mut maybe_split_key, removed_value }) => {
+                if let Some(key) = maybe_split_key {
+                    if index > 0 {
+                        self.keys[index - 1] = key;
+                        maybe_split_key = None;
+                    }
+                }
+                RemoveResult::Removed(RemoveState { maybe_split_key, removed_value })
+            }
+            RemoveResult::Underflow(RemoveState { mut maybe_split_key, removed_value }) => {
+                if let Some(key) = maybe_split_key {
+                    if index > 0 {
+                        self.keys[index - 1] = key;
+                        maybe_split_key = None;
+                    }
+                }
                 self.rebalance_child(index);
                 if self.children.len() < NODE_CAPACITY / 2 {
-                    RemoveResult::Underflow(value)
+                    RemoveResult::Underflow(RemoveState { maybe_split_key, removed_value })
                 } else {
-                    RemoveResult::Removed(value)
+                    RemoveResult::Removed(RemoveState { maybe_split_key, removed_value })
                 }
             }
         }
@@ -864,7 +888,7 @@ where
     }
 
     /// Remove the entry indicated by `cursor`.
-    fn remove(&mut self, cursor: Cursor) -> RemoveResult<V> {
+    fn remove(&mut self, cursor: Cursor) -> RemoveResult<K, V> {
         match self {
             Node::Internal(node) => Arc::make_mut(node).remove(cursor),
             Node::Leaf(node) => Arc::make_mut(node).remove(cursor),
@@ -1092,15 +1116,13 @@ where
     pub fn remove(&mut self, range: Range<K>) -> Vec<V> {
         let mut removed_values = vec![];
 
-        if range.is_empty() {
+        if range.end <= range.start {
             return removed_values;
         }
 
         if let Some((cursor, old_range, v)) = self.get_cursor_key_value(&range.start) {
             // Remove that range from the map.
-            if let Some(value) = self.remove_at(cursor) {
-                removed_values.push(value);
-            };
+            removed_values.push(self.remove_at(cursor).expect("entry should exist"));
 
             // If the removed range extends after the end of the given range,
             // re-insert the part of the old range that extends beyond the end
@@ -1126,9 +1148,7 @@ where
             // TODO: Optimize with replace once available.
             if old_range.start < range.end {
                 // Remove that range from the map.
-                if let Some(value) = self.remove_at(cursor) {
-                    removed_values.push(value);
-                }
+                removed_values.push(self.remove_at(cursor).expect("entry should exist"));
 
                 // If the removed range extends after the end of the given range,
                 // re-insert the part of the old range that extends beyond the end
@@ -1190,6 +1210,7 @@ where
     ///
     /// Assumes the range is empty and that adjacent ranges have different values.
     fn insert_range_internal(&mut self, range: Range<K>, value: V) -> Option<V> {
+        assert!(range.end > range.start);
         let cursor = self.find(&range.start, CursorPosition::Left);
         self.insert_at(cursor, range, value)
     }
@@ -1207,7 +1228,7 @@ where
     /// If the inserted range is directly adjacent to another range with an equal value, the
     /// inserted range will be merged with the adjacent ranges.
     pub fn insert(&mut self, mut range: Range<K>, value: V) {
-        if range.is_empty() {
+        if range.end <= range.start {
             return;
         }
         self.remove(range.clone());
@@ -1231,8 +1252,7 @@ where
             }
         }
 
-        let cursor = self.find(&range.start, CursorPosition::Left);
-        self.insert_at(cursor, range, value);
+        self.insert_range_internal(range, value);
     }
 
     /// Remove the entry with the given cursor from the map.
@@ -1240,8 +1260,8 @@ where
         let result = self.node.remove(cursor);
         match result {
             RemoveResult::NotFound => None,
-            RemoveResult::Removed(value) => Some(value),
-            RemoveResult::Underflow(value) => {
+            RemoveResult::Removed(RemoveState { removed_value, .. }) => Some(removed_value),
+            RemoveResult::Underflow(RemoveState { removed_value, .. }) => {
                 match &mut self.node {
                     Node::Leaf(_) => {
                         // Nothing we can do about an underflow of a single leaf node at the root.
@@ -1253,7 +1273,7 @@ where
                         }
                     }
                 }
-                Some(value)
+                Some(removed_value)
             }
         }
     }
@@ -1292,7 +1312,7 @@ where
     }
 
     /// Iterate through the keys and values stored in the given range in the map.
-    pub fn range(&self, bounds: impl RangeBounds<K>) -> Iter<'_, K, V> {
+    fn range(&self, bounds: impl RangeBounds<K>) -> Iter<'_, K, V> {
         let forward = self.find_start_bound(&bounds);
         let backward = self.find_end_bound(&bounds);
         Iter { forward, backward, root: &self.node }
@@ -1308,7 +1328,10 @@ where
         self.range(..key)
     }
 
-    pub fn intersection(&self, range: impl Borrow<Range<K>>) -> Iter<'_, K, V> {
+    pub fn intersection(
+        &self,
+        range: impl Borrow<Range<K>>,
+    ) -> impl DoubleEndedIterator<Item = (&Range<K>, &V)> {
         let range = range.borrow();
         self.range(range.start..range.end)
     }
@@ -1891,6 +1914,45 @@ mod test {
             } else {
                 assert!(map.get(point).is_none());
             }
+        }
+    }
+
+    #[::fuchsia::test]
+    fn test_critical_removal() {
+        fn range_for(i: u32) -> Range<u32> {
+            let start = i * 20;
+            let end = start + 5;
+            start..end
+        }
+
+        // Index 0 cannot be the critical index.
+        for critial_index in 1..100 {
+            let mut map = RangeMap2::<u32, i32>::default();
+
+            // Insert enough entries for force a split somewhere.
+            for i in 0..100 {
+                let value = i as i32;
+                map.insert(range_for(i), value);
+            }
+
+            // We don't know whether the split will occur at the critical index, but we try all the
+            // possible indices to ensure that we test an index at which a split occurred.
+            let critical_range = range_for(critial_index);
+            map.remove(critical_range.clone());
+
+            // We now insert a range that spans the critical point. This range will be inserted to
+            // left of the split.
+            let value = -10 as i32;
+            let spanning_range = (critical_range.start - 2)..(critical_range.start + 2);
+            map.insert(spanning_range.clone(), value);
+
+            // Check to see if we can find the range by looking before the critical point.
+            let key_before_split = critical_range.start - 1;
+            assert_eq!(map.get(key_before_split), Some((&spanning_range, &value)));
+
+            // Check to see if we can find the range by looking after the critical point.
+            let key_after_split = critical_range.start + 1;
+            assert_eq!(map.get(key_after_split), Some((&spanning_range, &value)));
         }
     }
 }
