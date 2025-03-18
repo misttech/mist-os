@@ -394,6 +394,58 @@ where
     }
 }
 
+/// Statistic for keeping the most recent sample.
+#[derive(Clone, Debug, Default)]
+pub struct Last<T> {
+    /// The most recent sample.
+    last: Option<T>,
+}
+
+impl<T> Last<T> {
+    pub fn with_sample(sample: T) -> Self {
+        Last { last: Some(sample) }
+    }
+}
+
+impl<T> Fill<T> for Last<T>
+where
+    Self: Sampler<T, Error = OverflowError>,
+    T: Num + NumCast,
+{
+    fn fill(&mut self, sample: T, _n: NonZeroUsize) -> Result<(), Self::Error> {
+        self.fold(sample)
+    }
+}
+
+impl<T> Sampler<T> for Last<T>
+where
+    T: Copy + Num,
+{
+    type Error = OverflowError;
+
+    fn fold(&mut self, sample: T) -> Result<(), Self::Error> {
+        self.last = Some(sample);
+        Ok(())
+    }
+}
+
+impl<T> Statistic for Last<T>
+where
+    T: Copy + Zero + Num + NumCast + Default,
+{
+    type Semantic = Gauge;
+    type Sample = T;
+    type Aggregation = T;
+
+    fn reset(&mut self) {
+        *self = Default::default();
+    }
+
+    fn aggregation(&self) -> Option<Self::Aggregation> {
+        self.last
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Union<T> {
     bits: T,
@@ -657,8 +709,8 @@ mod tests {
     use std::num::NonZeroUsize;
 
     use crate::experimental::series::statistic::{
-        ArithmeticMean, LatchMax, Max, Min, OverflowError, PostAggregation, Reset, Statistic, Sum,
-        Union,
+        ArithmeticMean, Last, LatchMax, Max, Min, OverflowError, PostAggregation, Reset, Statistic,
+        Sum, Union,
     };
     use crate::experimental::series::{Fill, Sampler};
 
@@ -791,6 +843,24 @@ mod tests {
         let mut max = Max::<u64>::default();
         max.fill(42, NonZeroUsize::new(1000).unwrap()).unwrap();
         let aggregation = max.aggregation().unwrap();
+        assert_eq!(aggregation, 42);
+    }
+
+    #[test]
+    fn last_aggregation() {
+        let mut last = Last::<u64>::default();
+        last.fold(0).unwrap();
+        last.fold(1337).unwrap();
+        last.fold(42).unwrap();
+        let aggregation = last.aggregation().unwrap();
+        assert_eq!(aggregation, 42);
+    }
+
+    #[test]
+    fn last_aggregation_fill() {
+        let mut last = Last::<u64>::default();
+        last.fill(42, NonZeroUsize::new(1000).unwrap()).unwrap();
+        let aggregation = last.aggregation().unwrap();
         assert_eq!(aggregation, 42);
     }
 
