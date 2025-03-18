@@ -284,6 +284,61 @@ impl Statistic for Sum<i64> {
     }
 }
 
+/// Minimum statistic.
+#[derive(Clone, Debug, Default)]
+pub struct Min<T> {
+    /// The minimum of samples.
+    min: Option<T>,
+}
+
+impl<T> Min<T> {
+    pub fn with_min(min: T) -> Self {
+        Min { min: Some(min) }
+    }
+}
+
+impl<T> Fill<T> for Min<T>
+where
+    Self: Sampler<T, Error = OverflowError>,
+    T: Num + NumCast,
+{
+    fn fill(&mut self, sample: T, _n: NonZeroUsize) -> Result<(), Self::Error> {
+        self.fold(sample)
+    }
+}
+
+impl<T> Sampler<T> for Min<T>
+where
+    T: Ord + Copy + Num,
+{
+    type Error = OverflowError;
+
+    fn fold(&mut self, sample: T) -> Result<(), Self::Error> {
+        self.min = Some(match self.min {
+            Some(min) => cmp::min(min, sample),
+            _ => sample,
+        });
+        Ok(())
+    }
+}
+
+impl<T> Statistic for Min<T>
+where
+    T: Ord + Copy + Zero + Num + NumCast + Default,
+{
+    type Semantic = Gauge;
+    type Sample = T;
+    type Aggregation = T;
+
+    fn reset(&mut self) {
+        *self = Default::default();
+    }
+
+    fn aggregation(&self) -> Option<Self::Aggregation> {
+        self.min
+    }
+}
+
 /// Maximum statistic.
 #[derive(Clone, Debug, Default)]
 pub struct Max<T> {
@@ -602,7 +657,8 @@ mod tests {
     use std::num::NonZeroUsize;
 
     use crate::experimental::series::statistic::{
-        ArithmeticMean, LatchMax, Max, OverflowError, PostAggregation, Reset, Statistic, Sum, Union,
+        ArithmeticMean, LatchMax, Max, Min, OverflowError, PostAggregation, Reset, Statistic, Sum,
+        Union,
     };
     use crate::experimental::series::{Fill, Sampler};
 
@@ -700,6 +756,24 @@ mod tests {
         let mut sum = Sum::<i64> { sum: i64::MAX };
         let result = sum.fold(1);
         assert_eq!(result, Err(OverflowError));
+    }
+
+    #[test]
+    fn min_aggregation() {
+        let mut min = Min::<u64>::default();
+        min.fold(10).unwrap();
+        min.fold(1337).unwrap();
+        min.fold(42).unwrap();
+        let aggregation = min.aggregation().unwrap();
+        assert_eq!(aggregation, 10);
+    }
+
+    #[test]
+    fn min_aggregation_fill() {
+        let mut min = Min::<u64>::default();
+        min.fill(42, NonZeroUsize::new(1000).unwrap()).unwrap();
+        let aggregation = min.aggregation().unwrap();
+        assert_eq!(aggregation, 42);
     }
 
     #[test]
