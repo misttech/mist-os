@@ -584,19 +584,106 @@ void VmCowPages::TransitionToAliveLocked() {
   life_cycle_ = LifeCycle::Alive;
 }
 
-fbl::RefPtr<VmCowPages> VmCowPages::MaybeDeadTransitionLocked(Guard<VmoLockType>& guard) {
-  if (!paged_ref_ && children_list_len_ == 0 && life_cycle_ == LifeCycle::Alive) {
-    return DeadTransitionLocked(guard);
-  }
-  return nullptr;
-}
-
 fbl::RefPtr<VmCowPages> VmCowPages::MaybeDeadTransition() {
-  Guard<VmoLockType> guard{lock()};
-  return MaybeDeadTransitionLocked(guard);
+  // We perform a dead transition if |should_dead_transition_locked| is true, but in order to do the
+  // transition we require holding multiple locks. Due to races with either other attempts at dead
+  // transitions, or other creation and deletions modifying the tree, we may need to attempt the
+  // lock acquisitions multiple times until we can get a stable snapshot.
+  // The purpose of acquiring all the locks here is to ensure that once we begin a dead transition
+  // we can continuously hold all the locks that lead to that decision (namely our own), otherwise
+  // we would need to reason about our state potentially changing mid way through after dropping our
+  // lock.
+  // The locks we need to be holding to do a dead transition are: our own, our parent (if we have
+  // one) and our sibling (if we have one). The sibling is a bit nuanced as we generally only want
+  // the right sibling (i.e. next in parents child list), and if no right sibling can skip. The
+  // exception being when our parent is hidden and has exactly two children, in which case the left
+  // sibling is required to perform the hidden parent merge step.
+  while (true) {
+    fbl::RefPtr<VmCowPages> sibling_ref;
+    VmCowPages* parent_raw;
+    // Use a subscope as we potentially need to drop and then reacquire the locks.
+    {
+      Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+      // With the lock now held check if we even need to do a dead transition.
+      if (!should_dead_transition_locked()) {
+        return nullptr;
+      }
+      // If no parent, then there can be no sibling, so can just do the transition.
+      if (!parent_) {
+        return DeadTransitionLocked(LockedPtr(), LockedPtr());
+      }
+      LockedPtr parent(parent_.get(), VmLockAcquireMode::Reentrant);
+      // If we are the only child, then no need to check for siblings.
+      if (parent.locked().children_list_len_ == 1) {
+        return DeadTransitionLocked(ktl::move(parent), LockedPtr());
+      }
+      // First check if there is a sibling to our right.
+      auto sibling_iter = ++parent.locked().children_list_.make_iterator(*this);
+      if (sibling_iter.IsValid()) {
+        // We found a sibling to our right, and so we can acquire its lock without dropping our own.
+        // However, we do need to drop the parent lock to do so. To do this we take a RefPtr to the
+        // sibling to ensure it stays alive, before dropping the parent lock, acquiring the sibling
+        // lock and reacquiring the parent lock. A new LockedPtr is used for the parent acquisition
+        // simply to allow the default destruction order to correctly release the locks in order.
+        sibling_ref = fbl::MakeRefPtrUpgradeFromRaw(&*sibling_iter, parent.locked().lock());
+        parent.release();
+        LockedPtr sibling =
+            LockedPtr(sibling_ref.get(), lock_order() + 1, VmLockAcquireMode::Reentrant);
+        LockedPtr parent2(parent_.get(), VmLockAcquireMode::Reentrant);
+        // We have continuously held our lock, so we know that parent_ is unchanged for us, but
+        // check if this is still our sibling or not by recalculating and comparing.
+        sibling_iter = ++parent.locked().children_list_.make_iterator(*this);
+        if (!sibling_iter.IsValid() || sibling.get() != &*sibling_iter) {
+          // We raced and this sibling has gone away. For simplicity we just try again from the top.
+          continue;
+        }
+        return DeadTransitionLocked(parent2, sibling);
+      }
+      // There is no right sibling, so check if we need to get the left sibling. The left sibling is
+      // needed only if the parent is hidden and we are one of exactly two children.
+      if (!parent->is_hidden() || parent.locked().children_list_len_ != 2) {
+        return DeadTransitionLocked(parent, LockedPtr());
+      }
+      // Create a RefPtr to hold the sibling alive and stash the current raw value of parent_ (so we
+      // can detect any races later) then drop all the locks.
+      sibling_ref = fbl::MakeRefPtrUpgradeFromRaw(&parent.locked().children_list_.front(),
+                                                  parent.locked().lock());
+      DEBUG_ASSERT(sibling_ref.get() != this);
+      parent_raw = parent_.get();
+    }
+
+    // Reacquire the locks, sibling first as it is to the 'left' in list order.
+    LockedPtr sibling = LockedPtr(sibling_ref.get(), VmLockAcquireMode::First);
+    // We could have the same lock order as our sibling, so we use the gap in the lock orders to
+    // acquire.
+    Guard<VmoLockType> guard{AssertOrderedLock, lock(), sibling_ref->lock_order() + 1,
+                             VmLockAcquireMode::Reentrant};
+    // With our lock reacquired, check that this still needs a dead transition, as it could already
+    // have been done by someone else.
+    if (!should_dead_transition_locked()) {
+      return nullptr;
+    }
+
+    // With both us and our sibling locked check that they are indeed still our sibling by ensuring
+    // we both have the same original parent. This check failing would imply that our sibling got
+    // dead transitioned and we merged with the parent. We might still need a dead transition, but
+    // the locks we need are now all different so we just retry from the top.
+    if (parent_.get() != parent_raw || sibling.locked().parent_.get() != parent_raw) {
+      continue;
+    }
+    LockedPtr parent(parent_.get(), VmLockAcquireMode::Reentrant);
+    // Even if parent didn't change it could have gained new children and we might be needing to
+    // acquire a right sibling instead. For simplicity just retry.
+    if (parent.locked().children_list_len_ != 2) {
+      continue;
+    }
+
+    return DeadTransitionLocked(parent, sibling);
+  }
 }
 
-fbl::RefPtr<VmCowPages> VmCowPages::DeadTransitionLocked(Guard<VmoLockType>& guard) {
+fbl::RefPtr<VmCowPages> VmCowPages::DeadTransitionLocked(const LockedPtr& parent,
+                                                         const LockedPtr& sibling) {
   canary_.Assert();
   DEBUG_ASSERT(life_cycle_ == LifeCycle::Alive);
   // Change our life cycle to the dying state so that if we need to drop the lock no other attempts
@@ -626,13 +713,12 @@ fbl::RefPtr<VmCowPages> VmCowPages::DeadTransitionLocked(Guard<VmoLockType>& gua
     // Clear out all content that we can see. This means dropping references to any pages in our
     // parents, as well as removing any pages in our own page list.
     ScopedPageFreedList freed_list;
-    ReleaseOwnedPagesLocked(0, &freed_list);
+    ReleaseOwnedPagesLocked(0, parent, &freed_list);
     freed_list.FreePagesLocked(this);
 
+    DEBUG_ASSERT(parent.get() == parent_.get());
     if (parent_) {
-      Guard<VmoLockType> parent_guard{AssertOrderedLock, parent_->lock(), parent_->lock_order(),
-                                      VmLockAcquireMode::Reentrant};
-      parent_->RemoveChildLocked(this);
+      parent.locked().RemoveChildLocked(this, sibling);
 
       // We removed a child from the parent, and so it may also need to be cleaned.
       // Avoid recursing destructors and dead transitions when we delete our parent by using the
@@ -1380,13 +1466,14 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CreateCloneLocked(SnapshotType 
       child_range.grandparent);
 }
 
-void VmCowPages::RemoveChildLocked(VmCowPages* removed) {
+void VmCowPages::RemoveChildLocked(VmCowPages* removed, const LockedPtr& sibling) {
   canary_.Assert();
 
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
 
   if (!is_hidden() || children_list_len_ > 2) {
+    // TODO(https://fxbug.dev/338300943): Make use of the |sibling|.
     DropChildLocked(removed);
     // Things should be consistent after dropping the child.
     VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
@@ -1400,19 +1487,16 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed) {
   DropChildLocked(removed);
   MergeContentWithChildLocked();
 
-  VmCowPages* child = &children_list_.front();
-  DEBUG_ASSERT(child);
+  DEBUG_ASSERT(sibling.get() == &children_list_.front());
 
   // The child which removed itself and led to the invocation should have a reference
   // to us, in addition to child.parent_ which we are about to clear.
   DEBUG_ASSERT(ref_count_debug() >= 2);
 
-  AssertHeld(child->lock_ref());
-
   // We can have a priority count of at most 1, and only if the remaining child is the one
   // contributing to it.
   DEBUG_ASSERT(high_priority_count_ == 0 ||
-               (high_priority_count_ == 1 && child->high_priority_count_ > 0));
+               (high_priority_count_ == 1 && sibling.locked().high_priority_count_ > 0));
   // Similarly if we have a priority count, and we have a parent, then our parent must have a
   // non-zero count.
   LockedPtr locked_parent;
@@ -1432,11 +1516,11 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed) {
 
   // Drop the child from our list, but don't recurse back into this function. Then
   // remove ourselves from the clone tree.
-  DropChildLocked(child);
+  DropChildLocked(&sibling.locked());
   if (locked_parent) {
-    locked_parent.locked().ReplaceChildLocked(this, child);
+    locked_parent.locked().ReplaceChildLocked(this, &sibling.locked());
   }
-  child->parent_ = ktl::move(parent_);
+  sibling.locked().parent_ = ktl::move(parent_);
   // We have lost our parent which, if we had a parent, could lead us to now be violating the
   // invariant that parent_limit_ being non-zero implies we have a parent. Although this generally
   // should not matter, we have not transitioned to being dead yet, so we should maintain the
@@ -1445,9 +1529,9 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed) {
 
   // Things should be consistent after dropping one child and merging with the other.
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
-  VMO_VALIDATION_ASSERT(child->DebugValidateHierarchyLocked());
+  VMO_VALIDATION_ASSERT(sibling.locked().DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
-  VMO_FRUGAL_VALIDATION_ASSERT(child->DebugValidateVmoPageBorrowingLocked());
+  VMO_FRUGAL_VALIDATION_ASSERT(sibling.locked().DebugValidateVmoPageBorrowingLocked());
 }
 
 void VmCowPages::MergeContentWithChildLocked() {
@@ -2034,7 +2118,8 @@ zx_status_t VmCowPages::CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* f
   return ZX_OK;
 }
 
-void VmCowPages::ReleaseOwnedPagesLocked(uint64_t start, ScopedPageFreedList* freed_list) {
+void VmCowPages::ReleaseOwnedPagesLocked(uint64_t start, const LockedPtr& parent,
+                                         ScopedPageFreedList* freed_list) {
   DEBUG_ASSERT(!is_hidden());
   DEBUG_ASSERT(start <= size_);
 
@@ -2090,7 +2175,7 @@ void VmCowPages::ReleaseOwnedPagesLocked(uint64_t start, ScopedPageFreedList* fr
         }
         return ZX_ERR_NEXT;
       },
-      start, size_ - start, LockedPtr());
+      start, size_ - start, parent);
   DEBUG_ASSERT(status == ZX_OK);
 
   // This node can no longer see into its parent in the range we just released.
@@ -4496,7 +4581,7 @@ zx_status_t VmCowPages::ResizeLocked(uint64_t s) {
     DEBUG_ASSERT(parent_limit_ <= end);
 
     ScopedPageFreedList freed_list;
-    ReleaseOwnedPagesLocked(start, &freed_list);
+    ReleaseOwnedPagesLocked(start, LockedPtr(), &freed_list);
     freed_list.FreePagesLocked(this);
 
     // If the tail of a parent disappears, the children shouldn't be able to see that region again,

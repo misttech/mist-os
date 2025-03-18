@@ -817,9 +817,6 @@ class VmCowPages final : public VmHierarchyBase,
   // prior to dropping the RefPtr, giving the VmCowPages a chance to transition.
   // If a VmCowPages is returned then this is a parent that needs to have MaybeDeadTransition called
   // on it.
-  fbl::RefPtr<VmCowPages> MaybeDeadTransitionLocked(Guard<VmoLockType>& guard) TA_REQ(lock());
-
-  // Unlocked helper around MaybeDeadTransitionLocked
   fbl::RefPtr<VmCowPages> MaybeDeadTransition();
 
   // Helper to allocate a new page for the VMO, filling out the page request if necessary.
@@ -954,12 +951,18 @@ class VmCowPages final : public VmHierarchyBase,
     Guard<VmoLockType>::Adoptable lock_;
   };
 
+  // Helper for determining whether the current node should perform a dead transition or not.
+  bool should_dead_transition_locked() const TA_REQ(lock()) {
+    return !paged_ref_ && children_list_len_ == 0 && life_cycle_ == LifeCycle::Alive;
+  }
+
   // Transitions from Alive->Dead, freeing pages and cleaning up state. Responsibility of the caller
-  // to validate that it is correct to be doing this transition. May drop the lock during its
-  // execution.
+  // to validate that it is correct to be doing this transition. If there is a parent_ then |parent|
+  // is locked pointer to it and |sibling| must be as documented in |RemoveChildLocked|
   // Might return its parent_ RefPtr, which the caller must check if a dead transition is needed and
   // then release the RefPtr.
-  fbl::RefPtr<VmCowPages> DeadTransitionLocked(Guard<VmoLockType>& guard) TA_REQ(lock());
+  fbl::RefPtr<VmCowPages> DeadTransitionLocked(const LockedPtr& parent, const LockedPtr& sibling)
+      TA_REQ(lock());
 
   bool is_hidden() const { return !!(options_ & VmCowPagesOptions::kHidden); }
   bool can_decommit_zero_pages() const {
@@ -1411,7 +1414,10 @@ class VmCowPages final : public VmHierarchyBase,
   // If applicable this method will update the parent_limit_ to reflect that it has removed any
   // reference to its parent range.
   // The caller is responsible for actually freeing the pages, which are returned in freed_list.
-  void ReleaseOwnedPagesLocked(uint64_t start, ScopedPageFreedList* freed_list) TA_REQ(lock());
+  // If the caller has locked the immediate parent, then it can pass it in as |parent| to avoid
+  // double locking, otherwise if no parent or not locked a nullptr can be given.
+  void ReleaseOwnedPagesLocked(uint64_t start, const LockedPtr& parent,
+                               ScopedPageFreedList* freed_list) TA_REQ(lock());
 
   // When cleaning up a hidden vmo, merges the hidden vmo's content (e.g. page list, view
   // of the parent) into the remaining child.
@@ -1460,7 +1466,11 @@ class VmCowPages final : public VmHierarchyBase,
   // updates that need to happen as a result. This does not modify the |parent_| member of the
   // removed child and if this is not being called due to |removed| being destructed it is the
   // callers responsibility to correct parent_.
-  void RemoveChildLocked(VmCowPages* removed) TA_REQ(lock()) TA_REQ(removed->lock());
+  // If |removed| has a sibling to its right (i.e. next in the children_list_) then |sibling| must
+  // be a locked pointer to it. The exception being if this is a hidden node with two children, in
+  // which case if |removed| is the right child then |sibling| should be set to the left child.
+  void RemoveChildLocked(VmCowPages* removed, const LockedPtr& sibling) TA_REQ(lock())
+      TA_REQ(removed->lock());
 
   // Inserts a newly created VmCowPages into this hierarchy as a child of this VmCowPages.
   // Initializes child members based on the passed in values that only have meaning when an object
@@ -1593,11 +1603,11 @@ class VmCowPages final : public VmHierarchyBase,
   // a lock order to satisfy lockdep. Here the gaps created by kLockOrderDelta can be used as the
   // order for these newly created nodes.
   //
-  // During a dead transition where a hidden node merge needs to happen we need to hold locks of
-  // three nodes: the hidden node and both of its children. Here the order is that the children must
-  // be acquired in list order, and then the parent. When acquiring the second child, since its
-  // lock order would be equal to the first child, the guaranteed gap between the first child and
-  // the parent lock order is used instead.
+  // During a dead transition we potentially need to hold locks of three nodes: the parent node and
+  // two of its children. Here the order is that the children must be acquired in list order, and
+  // then the parent. When acquiring the second child, since its lock order would be equal to the
+  // first child, the guaranteed gap between the first child and the parent lock order is used
+  // instead.
   static constexpr uint64_t kLockOrderDelta = 3;
   static constexpr uint64_t kLockOrderRoot = UINT64_MAX - kLockOrderDelta;
   static constexpr uint64_t kLockOrderFirstAnon = UINT64_MAX / 2;

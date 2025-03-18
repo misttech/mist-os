@@ -124,7 +124,7 @@ void VmObjectPaged::DestructorHelper() {
                                              reference_list_);
     }
     DEBUG_ASSERT(reference_list_.is_empty());
-    deferred = cow_pages_locked()->MaybeDeadTransitionLocked(guard);
+    deferred = cow_pages_;
   }
   while (deferred) {
     deferred = deferred->MaybeDeadTransition();
