@@ -378,15 +378,6 @@ assert(
         _partner_idk_fidl_libraries_targets_list,
     "A FIDL library appears in more than one SDK category list. If adding a library to a category, remove it from the other.")
 
-group("internal_only_idk_libs_allowlist") {
-  visibility = []
-
-  # The "internal_only_idk" SDK category is deprecated - do not add to this list.
-  # TODO(https://fxbug.dev/333907192): Promote this library to "partner" or
-  # "partner_internal" and delete this group.
-  visibility += [ "//sdk/fidl/fuchsia.boot($fidl_toolchain)" ]
-}
-
 group("tests") {
   testonly = true
   deps = [ ":compatibility_tests" ]
