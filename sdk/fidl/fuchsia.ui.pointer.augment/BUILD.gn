@@ -5,6 +5,10 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.ui.pointer.augment") {
+  sdk_category = "compat_test"
+  stable = true
+  sdk_area = "HCI"
+
   sources = [ "augment.fidl" ]
 
   public_deps = [

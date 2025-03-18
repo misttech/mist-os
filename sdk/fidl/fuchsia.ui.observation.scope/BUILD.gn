@@ -5,7 +5,11 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.ui.observation.scope") {
-  # Do not increase visibility by adding `sdk_category`.
+  # Do not increase visibility by changing `sdk_category`.
+  sdk_category = "compat_test"
+  stable = true
+  sdk_area = "View System"
+
   sources = [ "registry.fidl" ]
   public_deps = [
     "//sdk/fidl/fuchsia.ui.observation.geometry",

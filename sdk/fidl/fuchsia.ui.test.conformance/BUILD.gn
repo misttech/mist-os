@@ -5,6 +5,11 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.ui.test.conformance") {
+  testonly = true
+  sdk_category = "compat_test"
+  stable = true
+  sdk_area = "View System"
+
   sources = [ "puppet.fidl" ]
 
   public_deps = [

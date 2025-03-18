@@ -338,6 +338,11 @@ _compat_test_fidl_libraries_targets_list = [
   "//sdk/ctf/tests/fidl/fuchsia.settings/testing/fidl:fuchsia.settings.test",
   "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness",
   "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus",
+  "//sdk/fidl/fuchsia.ui.observation.scope:fuchsia.ui.observation.scope",
+  "//sdk/fidl/fuchsia.ui.observation.test:fuchsia.ui.observation.test",
+  "//sdk/fidl/fuchsia.ui.pointer.augment:fuchsia.ui.pointer.augment",
+  "//sdk/fidl/fuchsia.ui.test.conformance:fuchsia.ui.test.conformance",
+  "//sdk/fidl/fuchsia.ui.test.context:fuchsia.ui.test.context",
   "//src/diagnostics/archivist/tests/integration/realm_factory/fidl:fuchsia.archivist.test",
 
   # keep-sorted: end
