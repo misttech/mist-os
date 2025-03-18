@@ -199,8 +199,6 @@ impl Statistic for ArithmeticMean<f32> {
 /// The sum directly computes the aggregation in the domain of samples.
 ///
 /// This statistic is sensitive to overflow in the sum of samples.
-///
-/// TODO(https://fxbug.dev/370821318): Implement Statistic for Sum<i64>
 #[derive(Clone, Debug)]
 pub struct Sum<T> {
     /// The sum of samples.
@@ -251,6 +249,30 @@ impl Statistic for Sum<u64> {
     type Semantic = Gauge;
     type Sample = u64;
     type Aggregation = u64;
+
+    fn reset(&mut self) {
+        *self = Default::default();
+    }
+
+    fn aggregation(&self) -> Option<Self::Aggregation> {
+        let sum = self.sum;
+        Some(sum)
+    }
+}
+
+impl Sampler<i64> for Sum<i64> {
+    type Error = OverflowError;
+
+    fn fold(&mut self, sample: i64) -> Result<(), Self::Error> {
+        // TODO(https://fxbug.dev/351848566): Saturate `self.sum` on overflow.
+        self.sum.checked_add(sample).inspect(|sum| self.sum = *sum).map(|_| ()).ok_or(OverflowError)
+    }
+}
+
+impl Statistic for Sum<i64> {
+    type Semantic = Gauge;
+    type Sample = i64;
+    type Aggregation = i64;
 
     fn reset(&mut self) {
         *self = Default::default();
@@ -644,6 +666,38 @@ mod tests {
     #[test]
     fn sum_overflow() {
         let mut sum = Sum::<u64> { sum: u64::MAX };
+        let result = sum.fold(1);
+        assert_eq!(result, Err(OverflowError));
+    }
+
+    #[test]
+    fn sum_i64_aggregation() {
+        let mut sum = Sum::<i64>::default();
+        sum.fold(1).unwrap();
+        sum.fold(1).unwrap();
+        sum.fold(1).unwrap();
+        let aggregation = sum.aggregation().unwrap();
+        assert_eq!(aggregation, 3);
+
+        let mut sum = Sum::<i64>::default();
+        sum.fold(0).unwrap();
+        sum.fold(1).unwrap();
+        sum.fold(2).unwrap();
+        let aggregation = sum.aggregation().unwrap();
+        assert_eq!(aggregation, 3);
+    }
+
+    #[test]
+    fn sum_i64_aggregation_fill() {
+        let mut sum = Sum::<i64>::default();
+        sum.fill(10, NonZeroUsize::new(1000).unwrap()).unwrap();
+        let aggregation = sum.aggregation().unwrap();
+        assert_eq!(aggregation, 10_000);
+    }
+
+    #[test]
+    fn sum_i64_overflow() {
+        let mut sum = Sum::<i64> { sum: i64::MAX };
         let result = sum.fold(1);
         assert_eq!(result, Err(OverflowError));
     }
