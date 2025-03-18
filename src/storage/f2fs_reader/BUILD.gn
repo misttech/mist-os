@@ -1,0 +1,45 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/rust/rustc_library.gni")
+import("//build/rust/rustc_test.gni")
+
+f2fs_reader_source = [
+  "src/checkpoint.rs",
+  "src/lib.rs",
+  "src/reader.rs",
+  "src/superblock.rs",
+]
+
+f2fs_reader_deps = [
+  "//src/storage/lib/storage_device",
+  "//third_party/rust_crates:anyhow",
+  "//third_party/rust_crates:zerocopy",
+]
+
+rustc_library("lib") {
+  name = "f2fs_reader"
+  edition = "2021"
+  deps = f2fs_reader_deps
+  sources = f2fs_reader_source
+}
+
+if (is_host) {
+  rustc_test("f2fs-reader-test") {
+    disable_clippy = true
+    edition = "2021"
+    sources = f2fs_reader_source
+    deps = f2fs_reader_deps + [
+             "//src/lib/fuchsia",
+             "//src/storage/f2fs_reader/testdata:images",
+             "//third_party/rust_crates:zstd",
+             "//third_party/zstd",
+           ]
+  }
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":f2fs-reader-test($host_toolchain)" ]
+}
