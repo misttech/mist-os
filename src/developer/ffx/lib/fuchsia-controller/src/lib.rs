@@ -494,6 +494,8 @@ mod test {
 
     static mut SCRATCH: [u8; 1024] = [0; 1024];
     fn testing_lib_context() -> *const LibContext {
+        let raw = std::ptr::addr_of_mut!(SCRATCH) as *mut u8;
+        let mut ctx: *const LibContext = std::ptr::null_mut();
         // SAFETY: This is unsafe because it is a static location, which can
         // then be potentially accessed by multiple threads. So far this is not
         // actually read by anything and any data clobbering should not be an
@@ -501,11 +503,6 @@ mod test {
         // the tests, this must be changed so that each data buffer is declared
         // in each individual test (either that or just a re-design of the
         // library context).
-        // TODO(357638987): Remove this allow once the Rust compiler rolls and
-        // it recognizes the unsafe as unnecessary.
-        #[allow(unused_unsafe)]
-        let raw = unsafe { std::ptr::addr_of_mut!(SCRATCH) as *mut u8 };
-        let mut ctx: *const LibContext = std::ptr::null_mut();
         unsafe {
             create_ffx_lib_context(&mut ctx, raw, 1024);
         }
