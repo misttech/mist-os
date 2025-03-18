@@ -389,9 +389,25 @@ impl<T, T64, T32> MappingMultiArchUserRef<T, T64, T32> {
     }
 }
 
+impl<T: TryInto<T64> + TryInto<T32>, T64: Immutable + IntoBytes, T32: Immutable + IntoBytes>
+    MappingMultiArchUserRef<T, T64, T32>
+{
+    pub fn into_bytes<Arch: ArchSpecific>(arch: &Arch, value: T) -> Result<Vec<u8>, ()> {
+        if arch.is_arch32() {
+            TryInto::<T32>::try_into(value).map(|v| v.as_bytes().to_owned()).map_err(|_| ())
+        } else {
+            TryInto::<T64>::try_into(value).map(|v| v.as_bytes().to_owned()).map_err(|_| ())
+        }
+    }
+}
+
 impl<T, T64: IntoBytes, T32: IntoBytes> MappingMultiArchUserRef<T, T64, T32> {
     pub fn size_of_object(&self) -> usize {
-        if self.is_arch32() {
+        Self::size_of_object_for(self)
+    }
+
+    pub fn size_of_object_for<A: ArchSpecific>(a: &A) -> usize {
+        if a.is_arch32() {
             std::mem::size_of::<T32>()
         } else {
             std::mem::size_of::<T64>()

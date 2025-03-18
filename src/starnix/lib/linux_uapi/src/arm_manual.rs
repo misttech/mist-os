@@ -50,6 +50,12 @@ arch_translate_data! {
         ss_flags,
         ss_size
     }
+
+    BidiFrom<cmsghdr> {
+        cmsg_len,
+        cmsg_level,
+        cmsg_type,
+    }
 }
 
 translate_data! {

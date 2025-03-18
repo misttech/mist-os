@@ -4,6 +4,7 @@
 
 use crate::mm::{IOVecPtr, MemoryAccessor, MemoryAccessorExt};
 use crate::security;
+use crate::syscalls::time::TimeSpecPtr;
 use crate::task::{CurrentTask, IpTables, Task, WaitCallback, Waiter};
 use crate::vfs::buffers::{
     AncillaryData, ControlMsg, UserBuffersInputBuffer, UserBuffersOutputBuffer,
@@ -14,7 +15,7 @@ use crate::vfs::socket::{
     SA_FAMILY_SIZE, SA_STORAGE_SIZE,
 };
 use crate::vfs::{FdFlags, FdNumber, FileHandle, FsString, LookupContext};
-use starnix_uapi::user_address::{ArchSpecific, MappingMultiArchUserRef};
+use starnix_uapi::user_address::{ArchSpecific, MappingMultiArchUserRef, MultiArchUserRef};
 use starnix_uapi::user_value::UserValue;
 
 use starnix_logging::{log_trace, track_stub};
@@ -29,8 +30,8 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    cmsghdr, errno, error, socklen_t, timespec, uapi, MSG_CTRUNC, MSG_DONTWAIT, MSG_TRUNC,
-    MSG_WAITFORONE, SHUT_RD, SHUT_RDWR, SHUT_WR, SOCK_CLOEXEC, SOCK_NONBLOCK, UIO_MAXIOV,
+    errno, error, socklen_t, uapi, MSG_CTRUNC, MSG_DONTWAIT, MSG_TRUNC, MSG_WAITFORONE, SHUT_RD,
+    SHUT_RDWR, SHUT_WR, SOCK_CLOEXEC, SOCK_NONBLOCK, UIO_MAXIOV,
 };
 
 uapi::check_arch_independent_layout! {
@@ -72,6 +73,8 @@ uapi::arch_map_data! {
         len = msg_len;
     }
 }
+
+pub type CMsgHdrPtr = MultiArchUserRef<uapi::cmsghdr, uapi::arch32::cmsghdr>;
 
 pub fn sys_socket(
     locked: &mut Locked<'_, Unlocked>,
@@ -541,7 +544,7 @@ where
 
     let cmsg_buffer_size = message_header.control_len;
     let mut cmsg_bytes_written = 0;
-    let header_size = std::mem::size_of::<cmsghdr>();
+    let header_size = CMsgHdrPtr::size_of_object_for(current_task);
 
     for ancillary_data in info.ancillary_data {
         if ancillary_data.total_size() == 0 {
@@ -627,7 +630,7 @@ pub fn sys_recvmmsg(
     user_mmsgvec: MMsgHdrPtr,
     vlen: u32,
     mut flags: u32,
-    user_timeout: UserRef<timespec>,
+    user_timeout: TimeSpecPtr,
 ) -> Result<usize, Errno> {
     let file = current_task.files.get(fd)?;
     if !file.node().is_sock() {
@@ -641,7 +644,7 @@ pub fn sys_recvmmsg(
     let deadline = if user_timeout.is_null() {
         None
     } else {
-        let ts = current_task.read_object(user_timeout)?;
+        let ts = current_task.read_multi_arch_object(user_timeout)?;
         Some(zx::MonotonicInstant::after(duration_from_timespec(ts)?))
     };
 
@@ -750,14 +753,14 @@ where
 
     let mut next_message_offset: usize = 0;
     let mut ancillary_data = Vec::new();
-    let header_size = std::mem::size_of::<cmsghdr>();
+    let header_size = CMsgHdrPtr::size_of_object_for(current_task);
     loop {
         let space = message_header.control_len.saturating_sub(next_message_offset);
         if space < header_size {
             break;
         }
-        let cmsg_ref = UserRef::<cmsghdr>::from(message_header.control + next_message_offset);
-        let cmsg = current_task.read_object(cmsg_ref)?;
+        let cmsg_ref = CMsgHdrPtr::new(current_task, message_header.control + next_message_offset);
+        let cmsg = current_task.read_multi_arch_object(cmsg_ref)?;
         // If the message header is not long enough to fit the required fields of the
         // control data, return EINVAL.
         if (cmsg.cmsg_len as usize) < header_size {

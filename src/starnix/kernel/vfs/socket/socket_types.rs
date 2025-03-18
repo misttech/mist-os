@@ -19,6 +19,10 @@ use zerocopy::{FromBytes, IntoBytes};
 pub use syncio::ZxioShutdownFlags as SocketShutdownFlags;
 
 uapi::check_arch_independent_layout! {
+    __kernel_sa_family_t {}
+
+    sockaddr_storage {}
+
     sockaddr {
         sa_family,
         sa_data,
