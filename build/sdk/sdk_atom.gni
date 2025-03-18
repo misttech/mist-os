@@ -215,9 +215,8 @@ template("sdk_atom") {
             # solution for the Firmware SDK is implemented.
             (type == "documentation" &&
                  target_label == "//sdk/docs/firmware:firmware") ||
-            # TODO(https://fxbug.dev/333907192): Remove once in "partner".
-            (type == "fidl_library" && target_label == "//sdk/fidl/fuchsia.boot/fuchsia.boot_sdk:fuchsia.boot_sdk") ||
-            # TODO(https://fxbug.dev/343059325): Remove once devicetree is in "partner".
+            # TODO(https://fxbug.dev/343059325): Remove once devicetree is in
+            # "partner" or no longer using loadable modules.
             (type == "loadable_module" &&
                  target_label !=
                      string_replace(target_label, "devicetree", "", 1)),

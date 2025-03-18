@@ -166,10 +166,7 @@ template("fidl") {
   assert(defined(invoker.sdk_category) == defined(invoker.stable),
          "`stable` must be specified when specifying `sdk_category`.")
   assert(!defined(invoker.sdk_category) || invoker.stable == true ||
-             invoker.sdk_category == "partner" ||
-             # TODO(https://fxbug.dev/333907192): Remove the "internal_only_idk"
-             # exception when fuchsia.boot is promoted.
-             target_name == "fuchsia.boot",
+             invoker.sdk_category == "partner",
          "`stable` must be true unless the category is 'partner'.")
 
   # Define values that will be used to generate other variables here so that
@@ -244,11 +241,8 @@ template("fidl") {
 
   # Use SDK category markers to enable detection of targets that use FIDL
   # libraries in non-permissible categories.
-  # TODO(https://fxbug.dev/333907192): Remove the "internal_only_idk" exception
-  # when fuchsia.boot is promoted.
   _not_in_sdk_category = "not-in-idk"
-  if (defined(invoker.sdk_category) &&
-      invoker.sdk_category != "internal_only_idk") {
+  if (defined(invoker.sdk_category)) {
     if (invoker.stable) {
       marker_category = invoker.sdk_category
       not_needed([ "_not_in_sdk_category" ])
