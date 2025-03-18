@@ -33,9 +33,7 @@ use structopt::StructOpt;
 struct Args {
     #[structopt(
         long = "empty",
-        raw(
-            conflicts_with_all = r#"&["all_fonts", "local_fonts", "font_pkgs", "font_catalog", "product_config", "font_dir", "fake_code_points"]"#
-        ),
+        conflicts_with_all = &["all_fonts", "local_fonts", "font_pkgs", "font_catalog", "product_config", "font_dir", "fake_code_points"],
         help = "If true, generates an empty manifest"
     )]
     empty: bool,

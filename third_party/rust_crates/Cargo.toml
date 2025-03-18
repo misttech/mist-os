@@ -220,7 +220,7 @@ socket2 = { version = "0.5.5", features = ["all"] }
 splines = "2.2.0"
 static_assertions = "1.1.0"
 strsim = "0.11.1"
-structopt = "0.2.14"
+structopt = "0.3.26"
 strum = "0.25.0"
 strum_macros = "0.25.3"
 tempfile = "3.2"
@@ -811,9 +811,6 @@ rustflags = ["--cfg=use_fallback"]
 [gn.package.proc-macro-error-attr."1.0.4"]
 rustflags = ["--cfg=use_fallback"]
 
-[gn.package.proc-macro2."0.4.27"]
-rustflags = ["--cfg=u128", "--cfg=use_proc_macro", "--cfg=wrap_proc_macro"]
-
 # cargo-gnaw suggested "--cfg=proc_macro_span" as well but proc_macro_span is still an unstable feature.
 [gn.package.proc-macro2."1.0.86"]
 rustflags = ["--cfg=span_locations", "--cfg=wrap_proc_macro"]
@@ -978,13 +975,6 @@ rustflags = []
 [gn.package.slab."0.4.9"]
 rustflags = []
 
-[gn.package.syn."0.15.26"]
-rustflags = [
-  "--cfg=feature=\\\"extra-traits\\\"",
-  "--cfg=feature=\\\"full\\\"",
-  "--cfg=feature=\\\"visit\\\"",
-]
-
 [gn.package.syn."1.0.98"]
 # Has build script but no config needed.
 # FIXME(https://fxbug.dev/332277415): temporarily allow legacy targets to
@@ -1130,9 +1120,6 @@ license_files = ["LICENSE-APACHE"]
 license_files = ["LICENSE-APACHE"]
 
 [gn.package.unicode-width."0.2.0"]
-license_files = ["LICENSE-APACHE"]
-
-[gn.package.unicode-xid."0.1.0"]
 license_files = ["LICENSE-APACHE"]
 
 [gn.package.unicode-xid."0.2.0"]

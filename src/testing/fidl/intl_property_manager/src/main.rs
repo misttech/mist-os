@@ -232,11 +232,11 @@ struct Opts {
     /// If set to `true`, the starting profile will be created based on the
     /// flag settings like `--locale_ids=...`.
     set_initial_profile: bool,
-    #[structopt(long, raw(use_delimiter = "true"))]
+    #[structopt(long, use_delimiter = true)]
     /// A list of comma-separated BCP-47 locale ID strings to serve initially, in the order of
     /// priority.
     locale_ids: Vec<String>,
-    #[structopt(long, raw(use_delimiter = "true"))]
+    #[structopt(long, use_delimiter = true)]
     /// A list of comma-separated BCP-47 timezone IDs (e.g. und-tz-usnyc) to serve initially, in
     /// order of preference.
     timezone_ids: Vec<String>,

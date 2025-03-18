@@ -246,19 +246,19 @@ template("fuchsia_test_package") {
           final_output_config_path,
         ]
         args = [
-          "--bin_path",
+          "--bin-path",
           host_executable_rebased,
-          "--test_pilot",
+          "--test-pilot",
           test_pilot_executable_rebased,
-          "--component_manifest_path",
+          "--component-manifest-path",
           rebase_path(manifest_path[0], root_build_dir),
-          "--partial_test_config",
+          "--partial-test-config",
           rebase_path(output_config, root_build_dir),
-          "--test_component_config",
+          "--test-component-config",
           rebase_path(test_component_output, root_build_dir),
-          "--script_output_filename",
+          "--script-output-filename",
           script_output_path_rebased,
-          "--test_config_output_filename",
+          "--test-config-output-filename",
           final_output_config_path_rebased,
         ]
         inputs = [

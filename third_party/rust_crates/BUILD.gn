@@ -1017,7 +1017,7 @@ group("strsim") {
 }
 
 group("structopt") {
-  public_deps = [ ":structopt-v0_2_14" ]
+  public_deps = [ ":structopt-v0_3_26" ]
 }
 
 group("strum") {
@@ -12013,42 +12013,6 @@ rust_library("prettytable-rs-v0_8_0") {
   applicable_licenses = [ ":prettytable-rs-v0_8_0.license" ]
 }
 
-license("proc-macro2-v0_4_27.license") {
-  public_package_name = "proc_macro2"
-  license_files = [
-    "//third_party/rust_crates/vendor/proc-macro2-0.4.27/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/proc-macro2-0.4.27/LICENSE-MIT",
-  ]
-}
-
-rust_library("proc-macro2-v0_4_27") {
-  crate_name = "proc_macro2"
-  crate_root = "//third_party/rust_crates/vendor/proc-macro2-0.4.27/src/lib.rs"
-  output_name = "proc_macro2-b6435296c5b4a378"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":unicode-xid-v0_1_0" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=b6435296c5b4a378",
-    "-Cextra-filename=-b6435296c5b4a378",
-    "--cfg=feature=\"default\"",
-    "--cfg=feature=\"proc-macro\"",
-    "--cfg=u128",
-    "--cfg=use_proc_macro",
-    "--cfg=wrap_proc_macro",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":proc-macro2-v0_4_27.license" ]
-}
-
 license("proc-macro2-v1_0_86.license") {
   public_package_name = "proc_macro2"
   license_files = [
@@ -12481,39 +12445,6 @@ rust_library("quick-error-v1_2_2") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":quick-error-v1_2_2.license" ]
-}
-
-license("quote-v0_6_11.license") {
-  public_package_name = "quote"
-  license_files = [
-    "//third_party/rust_crates/vendor/quote-0.6.11/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/quote-0.6.11/LICENSE-MIT",
-  ]
-}
-
-rust_library("quote-v0_6_11") {
-  crate_name = "quote"
-  crate_root = "//third_party/rust_crates/vendor/quote-0.6.11/src/lib.rs"
-  output_name = "quote-4a6a7c47667b0a02"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":proc-macro2-v0_4_27" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=4a6a7c47667b0a02",
-    "-Cextra-filename=-4a6a7c47667b0a02",
-    "--cfg=feature=\"default\"",
-    "--cfg=feature=\"proc-macro\"",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":quote-v0_6_11.license" ]
 }
 
 license("quote-v1_0_38.license") {
@@ -16075,72 +16006,74 @@ rust_library("strsim-v0_8_0") {
   applicable_licenses = [ ":strsim-v0_8_0.license" ]
 }
 
-license("structopt-v0_2_14.license") {
+license("structopt-v0_3_26.license") {
   public_package_name = "structopt"
   license_files = [
-    "//third_party/rust_crates/vendor/structopt-0.2.14/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/structopt-0.2.14/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/structopt-0.3.26/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/structopt-0.3.26/LICENSE-MIT",
   ]
 }
 
-rust_library("structopt-v0_2_14") {
+rust_library("structopt-v0_3_26") {
   crate_name = "structopt"
-  crate_root = "//third_party/rust_crates/vendor/structopt-0.2.14/src/lib.rs"
-  output_name = "structopt-282f1735ac1cc133"
+  crate_root = "//third_party/rust_crates/vendor/structopt-0.3.26/src/lib.rs"
+  output_name = "structopt-c8f5333808475d91"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":clap-v2_34_0" ]
-  deps += [ ":structopt-derive-v0_2_14($host_toolchain)" ]
+  deps += [ ":lazy_static-v1_4_0" ]
+  deps += [ ":structopt-derive-v0_4_18($host_toolchain)" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=282f1735ac1cc133",
-    "-Cextra-filename=-282f1735ac1cc133",
+    "--edition=2018",
+    "-Cmetadata=c8f5333808475d91",
+    "-Cextra-filename=-c8f5333808475d91",
     "--cfg=feature=\"default\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":structopt-v0_2_14.license" ]
+  applicable_licenses = [ ":structopt-v0_3_26.license" ]
 }
 
-license("structopt-derive-v0_2_14.license") {
+license("structopt-derive-v0_4_18.license") {
   public_package_name = "structopt_derive"
   license_files = [
-    "//third_party/rust_crates/vendor/structopt-derive-0.2.14/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/structopt-derive-0.2.14/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/structopt-derive-0.4.18/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/structopt-derive-0.4.18/LICENSE-MIT",
   ]
 }
 
-rust_proc_macro("structopt-derive-v0_2_14") {
+rust_proc_macro("structopt-derive-v0_4_18") {
   crate_name = "structopt_derive"
   crate_root =
-      "//third_party/rust_crates/vendor/structopt-derive-0.2.14/src/lib.rs"
-  output_name = "structopt_derive-809c043d87d920da"
+      "//third_party/rust_crates/vendor/structopt-derive-0.4.18/src/lib.rs"
+  output_name = "structopt_derive-303af66fbcb8c4c1"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":heck-v0_3_1" ]
-  deps += [ ":proc-macro2-v0_4_27" ]
-  deps += [ ":quote-v0_6_11" ]
-  deps += [ ":syn-v0_15_26" ]
+  deps += [ ":proc-macro-error-v1_0_4" ]
+  deps += [ ":proc-macro2-v1_0_86" ]
+  deps += [ ":quote-v1_0_38" ]
+  deps += [ ":syn-v1_0_98" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=809c043d87d920da",
-    "-Cextra-filename=-809c043d87d920da",
+    "--edition=2018",
+    "-Cmetadata=303af66fbcb8c4c1",
+    "-Cextra-filename=-303af66fbcb8c4c1",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":structopt-derive-v0_2_14.license" ]
+  applicable_licenses = [ ":structopt-derive-v0_4_18.license" ]
 }
 
 license("strum-v0_25_0.license") {
@@ -16231,49 +16164,6 @@ rust_library("subtle-v2_6_1") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":subtle-v2_6_1.license" ]
-}
-
-license("syn-v0_15_26.license") {
-  public_package_name = "syn"
-  license_files = [
-    "//third_party/rust_crates/vendor/syn-0.15.26/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/syn-0.15.26/LICENSE-MIT",
-  ]
-}
-
-rust_library("syn-v0_15_26") {
-  crate_name = "syn"
-  crate_root = "//third_party/rust_crates/vendor/syn-0.15.26/src/lib.rs"
-  output_name = "syn-45b33f047f6103c6"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":proc-macro2-v0_4_27" ]
-  deps += [ ":quote-v0_6_11" ]
-  deps += [ ":unicode-xid-v0_1_0" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=45b33f047f6103c6",
-    "-Cextra-filename=-45b33f047f6103c6",
-    "--cfg=feature=\"clone-impls\"",
-    "--cfg=feature=\"default\"",
-    "--cfg=feature=\"derive\"",
-    "--cfg=feature=\"parsing\"",
-    "--cfg=feature=\"printing\"",
-    "--cfg=feature=\"proc-macro\"",
-    "--cfg=feature=\"quote\"",
-    "--cfg=feature=\"extra-traits\"",
-    "--cfg=feature=\"full\"",
-    "--cfg=feature=\"visit\"",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":syn-v0_15_26.license" ]
 }
 
 license("syn-v1_0_98.license") {
@@ -18434,35 +18324,6 @@ rust_library("unicode-width-v0_2_0") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":unicode-width-v0_2_0.license" ]
-}
-
-license("unicode-xid-v0_1_0.license") {
-  public_package_name = "unicode_xid"
-  license_files =
-      [ "//third_party/rust_crates/vendor/unicode-xid-0.1.0/LICENSE-APACHE" ]
-}
-
-rust_library("unicode-xid-v0_1_0") {
-  crate_name = "unicode_xid"
-  crate_root = "//third_party/rust_crates/vendor/unicode-xid-0.1.0/src/lib.rs"
-  output_name = "unicode_xid-8c0b837e1e0cd2cd"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=8c0b837e1e0cd2cd",
-    "-Cextra-filename=-8c0b837e1e0cd2cd",
-    "--cfg=feature=\"default\"",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":unicode-xid-v0_1_0.license" ]
 }
 
 license("unicode-xid-v0_2_0.license") {

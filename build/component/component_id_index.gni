@@ -97,11 +97,11 @@ template("component_id_index_config") {
     ]
     depfile = "${target_out_dir}/${target_name}.d"
     args = [
-      "--input_manifest",
+      "--input-manifest",
       rebase_path(component_id_index_input_manifest_path, root_build_dir),
-      "--output_index_json",
+      "--output-index-json",
       rebase_path(component_id_index_merged_index_json_path, root_build_dir),
-      "--output_index_fidl",
+      "--output-index-fidl",
       rebase_path(component_id_index_merged_index_fidl_path, root_build_dir),
       "--depfile",
       rebase_path(depfile, root_build_dir),

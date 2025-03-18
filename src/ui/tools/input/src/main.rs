@@ -60,7 +60,7 @@ enum Command {
         /// Input text to inject
         input: String,
     },
-    #[structopt(name = "keyevent", raw(help = "KEYEVENT_HELP"))]
+    #[structopt(name = "keyevent", help = KEYEVENT_HELP)]
     KeyboardEvent {
         #[structopt(short = "d", long = "duration", default_value = "0")]
         /// Duration of the event(s) in milliseconds
@@ -129,22 +129,22 @@ enum Command {
     #[structopt(name = "media_button")]
     /// Injects a MediaButton event
     MediaButton {
-        #[structopt(parse(try_from_str = "parse_bool"))]
+        #[structopt(parse(try_from_str = parse_bool))]
         /// 0 or 1
         mic_mute: bool,
-        #[structopt(parse(try_from_str = "parse_bool"))]
+        #[structopt(parse(try_from_str = parse_bool))]
         /// 0 or 1
         volume_up: bool,
-        #[structopt(parse(try_from_str = "parse_bool"))]
+        #[structopt(parse(try_from_str = parse_bool))]
         /// 0 or 1
         volume_down: bool,
-        #[structopt(parse(try_from_str = "parse_bool"))]
+        #[structopt(parse(try_from_str = parse_bool))]
         /// 0 or 1
         reset: bool,
-        #[structopt(parse(try_from_str = "parse_bool"))]
+        #[structopt(parse(try_from_str = parse_bool))]
         /// 0 or 1
         pause: bool,
-        #[structopt(parse(try_from_str = "parse_bool"))]
+        #[structopt(parse(try_from_str = parse_bool))]
         /// 0 or 1
         camera_disable: bool,
     },
