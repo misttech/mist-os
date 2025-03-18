@@ -14,6 +14,7 @@
 #include <ranges>
 #include <string>
 
+#include <fbl/array.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -48,18 +49,67 @@ extern "C" ptrdiff_t CallTlsdesc(const dl::TlsDescGot& got, Regs& expected_regs,
 
 namespace {
 
+constexpr std::vector<std::byte> CmpBytes(std::span<const std::byte> bytes) {
+  return std::vector<std::byte>{bytes.begin(), bytes.end()};
+}
+
 // The test fixture ensures that the thread_local variable is always left
 // containing nullptr between tests.  Each test can call SetBlocks() to set it
-// to some local test data.
+// to some local test data (once).
 class DlTlsRuntimeTests : public ::testing::Test {
  public:
   void SetUp() override { ASSERT_EQ(dl::_dl_tlsdesc_runtime_dynamic_blocks, nullptr); }
 
-  static void SetBlocks(const std::byte* const* blocks) {
-    dl::_dl_tlsdesc_runtime_dynamic_blocks = const_cast<std::byte**>(blocks);
+  void SetBlocks(fbl::Array<dl::DynamicTlsPtr> blocks) {
+    dl::RawDynamicTlsArray old_blocks =
+        std::exchange(dl::_dl_tlsdesc_runtime_dynamic_blocks, nullptr);
+    ASSERT_EQ(old_blocks, test_blocks_.data());
+    test_blocks_ = std::move(blocks);
+    dl::_dl_tlsdesc_runtime_dynamic_blocks = test_blocks_.data();
   }
 
-  void TearDown() override { dl::_dl_tlsdesc_runtime_dynamic_blocks = nullptr; }
+  void TearDown() override {
+    SetBlocks({});
+    ASSERT_EQ(dl::_dl_tlsdesc_runtime_dynamic_blocks, nullptr);
+  }
+
+  static fbl::Array<dl::DynamicTlsPtr> MakeTestBlocks() {
+    fbl::AllocChecker ac;
+    fbl::Array<dl::DynamicTlsPtr> blocks = fbl::MakeArray<dl::DynamicTlsPtr>(&ac, 2);
+    EXPECT_TRUE(ac.check());
+    if (blocks) {
+      blocks[0] = dl::DynamicTlsPtr::New(ac, kTlsModule0);
+      EXPECT_TRUE(ac.check());
+      blocks[1] = dl::DynamicTlsPtr::New(ac, kTlsModule1);
+      EXPECT_TRUE(ac.check());
+      if (blocks[0]) {
+        std::span block = blocks[0].contents(kTlsModule0.tls_initial_data.size_bytes());
+        EXPECT_EQ(CmpBytes(block), CmpBytes(kTlsModule0.tls_initial_data));
+      }
+      if (blocks[1]) {
+        std::span block = blocks[1].contents(kTlsModule1.tls_initial_data.size_bytes());
+        EXPECT_EQ(CmpBytes(block), CmpBytes(kTlsModule1.tls_initial_data));
+      }
+    }
+    return blocks;
+  }
+
+ protected:
+  static constexpr std::byte kData0[] = {std::byte{0xaa}, std::byte{0xbb}};
+  static constexpr std::byte kData1[] = {std::byte{0xcc}, std::byte{0xdd}};
+  static constexpr ld::abi::Abi<>::TlsModule kTlsModule0 = {
+      .tls_initial_data{kData0},
+      .tls_bss_size = 3,
+      .tls_alignment = 1,
+  };
+  static constexpr ld::abi::Abi<>::TlsModule kTlsModule1 = {
+      .tls_initial_data{kData1},
+      .tls_bss_size = 5,
+      .tls_alignment = 1,
+  };
+
+ private:
+  fbl::Array<dl::DynamicTlsPtr> test_blocks_;
 };
 
 // Underlying integer type of the GOT value slot.
@@ -246,32 +296,34 @@ MATCHER_P(TlsdescYields, expected_offset,
   return result;
 }
 
-// Some test data.  Only the pointers to these are actually used, so the
-// contents don't matter.  Not even the size really matters, but it's
-// convenient to have a size more than one to calculate pointers within.
-constexpr std::byte kData0[] = {std::byte{0xaa}, std::byte{0xbb}};
-constexpr std::byte kData1[] = {std::byte{0xcc}, std::byte{0xdd}};
-
 TEST_F(DlTlsRuntimeTests, TlsdescRuntimeDynamicSplit) {
-  constexpr const std::byte* kBlocks[] = {kData0, kData1};
-  SetBlocks(kBlocks);
-  EXPECT_THAT(SplitGot(0, 0), TlsdescYields(TpOffset(&kData0[0])));
-  EXPECT_THAT(SplitGot(0, 1), TlsdescYields(TpOffset(&kData0[1])));
-  EXPECT_THAT(SplitGot(1, 0), TlsdescYields(TpOffset(&kData1[0])));
-  EXPECT_THAT(SplitGot(1, 1), TlsdescYields(TpOffset(&kData1[1])));
-  EXPECT_THAT(SplitGot(0, kSplitMaxValue), TlsdescYields(TpOffset(kData0, kSplitMaxValue)));
-  EXPECT_THAT(SplitGot(1, kSplitMaxValue), TlsdescYields(TpOffset(kData1, kSplitMaxValue)));
+  fbl::Array blocks = MakeTestBlocks();
+  ASSERT_EQ(blocks.size(), 2u);
+  std::span block0 = blocks[0].contents(2);
+  std::span block1 = blocks[1].contents(kTlsModule1);
+  SetBlocks(std::move(blocks));
+
+  EXPECT_THAT(SplitGot(0, 0), TlsdescYields(TpOffset(&block0[0])));
+  EXPECT_THAT(SplitGot(0, 1), TlsdescYields(TpOffset(&block0[1])));
+  EXPECT_THAT(SplitGot(1, 0), TlsdescYields(TpOffset(&block1[0])));
+  EXPECT_THAT(SplitGot(1, 1), TlsdescYields(TpOffset(&block1[1])));
+  EXPECT_THAT(SplitGot(0, kSplitMaxValue), TlsdescYields(TpOffset(block0.data(), kSplitMaxValue)));
+  EXPECT_THAT(SplitGot(1, kSplitMaxValue), TlsdescYields(TpOffset(block1.data(), kSplitMaxValue)));
 }
 
 TEST_F(DlTlsRuntimeTests, TlsdescRuntimeDynamicIndirect) {
-  constexpr const std::byte* kBlocks[] = {kData0, kData1};
-  SetBlocks(kBlocks);
-  EXPECT_THAT(IndirectGot({0, 0}), TlsdescYields(TpOffset(&kData0[0])));
-  EXPECT_THAT(IndirectGot({0, 1}), TlsdescYields(TpOffset(&kData0[1])));
-  EXPECT_THAT(IndirectGot({1, 0}), TlsdescYields(TpOffset(&kData1[0])));
-  EXPECT_THAT(IndirectGot({1, 1}), TlsdescYields(TpOffset(&kData1[1])));
-  EXPECT_THAT(IndirectGot({0, kOffsetMax}), TlsdescYields(TpOffset(kData0, kOffsetMax)));
-  EXPECT_THAT(IndirectGot({1, kOffsetMax}), TlsdescYields(TpOffset(kData1, kOffsetMax)));
+  fbl::Array blocks = MakeTestBlocks();
+  ASSERT_EQ(blocks.size(), 2u);
+  std::span block0 = blocks[0].contents(2);
+  std::span block1 = blocks[1].contents(kTlsModule1);
+  SetBlocks(std::move(blocks));
+
+  EXPECT_THAT(IndirectGot({0, 0}), TlsdescYields(TpOffset(&block0[0])));
+  EXPECT_THAT(IndirectGot({0, 1}), TlsdescYields(TpOffset(&block0[1])));
+  EXPECT_THAT(IndirectGot({1, 0}), TlsdescYields(TpOffset(&block1[0])));
+  EXPECT_THAT(IndirectGot({1, 1}), TlsdescYields(TpOffset(&block1[1])));
+  EXPECT_THAT(IndirectGot({0, kOffsetMax}), TlsdescYields(TpOffset(block0.data(), kOffsetMax)));
+  EXPECT_THAT(IndirectGot({1, kOffsetMax}), TlsdescYields(TpOffset(block1.data(), kOffsetMax)));
 }
 
 }  // namespace

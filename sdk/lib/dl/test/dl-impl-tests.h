@@ -19,9 +19,42 @@ namespace dl::testing {
 
 extern const ld::abi::Abi<>& gStartupLdAbi;
 
-// The Base class provides testing facilities and logic specific to the platform
-// the test is running on. DlImplTests invokes Base methods when functions
-// need to operate differently depending on the OS.
+// This handles TLS runtime test support that need not be templated like the
+// rest of DlImplTests.  The only instance of this (empty) class is its own
+// private thread_local that ensures per-thread cleanup.
+class DlImplTestsTls {
+ public:
+  // Ensure this thread is ready for a TLSDESC access.  This stands in for the
+  // integration of thread startup with RuntimeDynamicLinker, and for the
+  // synchronization regime for existing threads when dlopen expands the
+  // _dl_tlsdesc_runtime_dynamic_blocks arrays.
+  static void Prepare(size_t dynamic_tls_size);
+
+  // This happens at the end of each test, which is only on the main thread.
+  // Always leave a clean slate for the next test.
+  static void Cleanup();
+
+ private:
+  constexpr DlImplTestsTls() = default;
+
+  ~DlImplTestsTls() { Cleanup(); }
+
+  // This just exists to get the destructor run in each thread as it exits.  On
+  // the main thread, this doesn't happen until process exit; it's almost
+  // always a no-op because the last ~DlImplTestsTls() run after the end of a
+  // test left things clear anyway.  Other threads are from std::jthread used
+  // inside a test, so those are all joined and this have already run this
+  // destructor before the governing test ended (and hit its Cleanup() call).
+  static thread_local DlImplTestsTls cleanup_at_thread_exit_;
+
+  // This tracks the last-allocated blocks in case of expansion.
+  // Its ownership is "shared" with _dl_tlsdesc_runtime_dynamic_blocks.
+  SizedDynamicTlsArray blocks_;
+};
+
+// The Base class provides testing facilities and logic specific to the
+// platform the test is running on. DlImplTests invokes Base methods when
+// functions need to operate differently depending on the OS.
 template <class Base>
 class DlImplTests : public Base {
  public:
@@ -44,9 +77,7 @@ class DlImplTests : public Base {
     ASSERT_TRUE(ac.check());
   }
 
-  // DestroyTls() on the main thread at the end of the test to ensure there is
-  // a clean-state for the next test.
-  void TearDown() override { destructor_hook.DestroyTls(); }
+  void TearDown() override { DlImplTestsTls::Cleanup(); }
 
   fit::result<Error, void*> DlOpen(const char* file, int mode) {
     // Check that all Needed/Expect* expectations for loaded objects were
@@ -90,47 +121,17 @@ class DlImplTests : public Base {
     return dynamic_linker_->IteratePhdrInfo(callback, data);
   }
 
-  // The `dynamic_linker_-> dtor will also destroy and unmap modules remaining in
-  // its modules list, so there is no need to do any extra clean up operation.
+  // The `dynamic_linker_-> dtor will also destroy and unmap modules remaining
+  // in its modules list, so there is no need to do any extra clean up
+  // operation.
   void CleanUpOpenedFile(void* ptr) override {}
 
   // A test will call this function before the running thread accesses a TLS
-  // variable. This function will allocate and initialize TLS data on the thread
-  // so the thread can access that data.
-  void PrepareForTlsAccess() {
-    ASSERT_EQ(dl::_dl_tlsdesc_runtime_dynamic_blocks, nullptr);
-    ASSERT_NO_FATAL_FAILURE(destructor_hook.set_dynamic_linker(dynamic_linker_.get()));
-    ASSERT_TRUE(dynamic_linker_->PrepareTlsBlocksForThread(__builtin_thread_pointer()).is_ok());
-  }
+  // variable. This function will allocate and initialize TLS data on the
+  // thread so the thread can access that data.
+  void PrepareForTlsAccess() { DlImplTestsTls::Prepare(dynamic_linker_->DynamicTlsCount()); }
 
  private:
-  // This destructor cleans up the per-thread allocations made by PrepareForTlsAccess.
-  // An instance of this class is kept in a thread-local variable, so that
-  // every thread in a multi-threaded test will have its own destructor.
-  class TlsDestructor {
-   public:
-    // This will call DestroyTLS on the thread when the thread is joined. This
-    // is safe for tests using jthreads, which do not outlive the test.
-    ~TlsDestructor() { DestroyTls(); }
-
-    void set_dynamic_linker(RuntimeDynamicLinker* dynamic_linker) {
-      ASSERT_FALSE(dl_ref_);
-      dl_ref_ = dynamic_linker;
-    }
-    void DestroyTls() {
-      if (dl_ref_) {
-        dl_ref_->DestroyTlsBlocksForThread(__builtin_thread_pointer());
-        dl::_dl_tlsdesc_runtime_dynamic_blocks = nullptr;
-        dl_ref_ = nullptr;
-      }
-    }
-
-   private:
-    RuntimeDynamicLinker* dl_ref_ = nullptr;
-  };
-
-  inline constinit static thread_local TlsDestructor destructor_hook{};
-
   std::unique_ptr<RuntimeDynamicLinker> dynamic_linker_;
 };
 

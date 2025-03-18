@@ -112,10 +112,13 @@ constexpr void TlsModuleInit(const Module& module, std::span<std::byte> segment,
                              bool known_zero = false) {
   std::span<const std::byte> initial_data = module.tls_initial_data;
   if (!initial_data.empty()) {
-    memcpy(segment.data(), initial_data.data(), initial_data.size());
+    std::span dest = segment.subspan(0, initial_data.size());
+    segment = segment.subspan(dest.size());
+    memcpy(dest.data(), initial_data.data(), dest.size());
   }
+  assert(segment.size() >= module.tls_bss_size);
   if (module.tls_bss_size != 0 && !known_zero) {
-    memset(segment.data() + initial_data.size(), 0, module.tls_bss_size);
+    memset(segment.data(), 0, module.tls_bss_size);
   }
 }
 

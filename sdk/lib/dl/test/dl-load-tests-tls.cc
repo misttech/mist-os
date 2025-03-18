@@ -717,17 +717,24 @@ TYPED_TEST(DlTests, TlsGetAddrLocalDynamicReloc) {
 }
 
 void PerThreadTlsTest(auto& self) {
-  auto do_nothing = []() {};
-  auto allocate_and_init_tls = [&]() { ASSERT_NO_FATAL_FAILURE(self.PrepareForTlsAccess()); };
+  constexpr auto do_nothing = [] {};
+  auto prepare_thread_for_tls_access = [&self]() {
+    ASSERT_NO_FATAL_FAILURE(self.PrepareForTlsAccess());
+  };
 
   TestThreadRunner tr;
-  tr.StartWorkersNow(do_nothing, allocate_and_init_tls, do_nothing);
+  tr.StartWorkersNow(do_nothing, prepare_thread_for_tls_access, do_nothing);
   tr.MainWaitForWorkerDone();
   tr.MainLetWorkersFinish();
 }
 
-// This is a basic test for per-thread TLS set up and tear down.
-TYPED_TEST(DlTests, PrepareTlsBlocksForThread) {
+// This is a basic test for per-thread TLS set-up and tear-down.
+TYPED_TEST(DlTests, PrepareForTlsAccess) {
+  // Open a module with a PT_TLS so there will be something to allocate.
+  OpenModule tls_dep{*this};
+  ASSERT_NO_FATAL_FAILURE(tls_dep.InitModule(  //
+      "tls-desc-dep-module.so", RTLD_NOW | RTLD_LOCAL, {}));
+
   ASSERT_NO_FATAL_FAILURE(this->PrepareForTlsAccess());
   PerThreadTlsTest(*this);
 }

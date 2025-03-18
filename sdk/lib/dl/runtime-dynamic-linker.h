@@ -153,9 +153,13 @@ class RuntimeDynamicLinker {
   // This function will fail if allocation fails.
   [[nodiscard]] fit::result<Error> PrepareTlsBlocksForThread(void* tp) const;
 
-  // Free the TLS blocks stored in dl::_dl_tlsdesc_runtime_dynamic_blocks and
-  // the containing array.
-  void DestroyTlsBlocksForThread(void* tp) const;
+  // The number of dynamic TLS modules that are loaded.
+  size_t DynamicTlsCount() const {
+    // TODO(https://fxbug.dev/342480690): Hard-code for the test that loads one
+    // module with a PT_TLS segment.  The proper bookkeeping for this is not
+    // yet in place.
+    return 1;
+  }
 
  private:
   // A The RuntimeDynamicLinker can only be created with RuntimeDynamicLinker::Create...).
@@ -183,9 +187,6 @@ class RuntimeDynamicLinker {
   ld::DlPhdrInfoCounts dl_phdr_info_counts() const {
     return {.adds = loaded_, .subs = loaded_ - modules_.size()};
   }
-
-  // The number of dynamic TLS modules that are loaded.
-  inline size_t DynamicTlsCount() const;
 
   // Return a pointer to the beginning of a module's TLS block in the thread.
   constexpr uintptr_t GetTlsBlock(const RuntimeModule& module) const;

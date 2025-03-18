@@ -51,7 +51,7 @@ const Addr kIndirectFunction = reinterpret_cast<uintptr_t>(_dl_tlsdesc_runtime_d
 // The assembly code reads from this.  It's defined here since this has the
 // references that link in the assembly code that requires it.  Separate code
 // must ensure that it's been set in each thread before any TLSDESC callbacks.
-constinit thread_local std::byte** _dl_tlsdesc_runtime_dynamic_blocks;
+constinit thread_local RawDynamicTlsArray _dl_tlsdesc_runtime_dynamic_blocks;
 
 // The operator() code has determined this is a dynamic TLS case and reduced
 // the module ID to an index into _dl_tlsdesc_runtime_dynamic_blocks.  Choose
