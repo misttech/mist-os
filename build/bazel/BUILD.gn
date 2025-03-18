@@ -195,6 +195,7 @@ group("bazel_action_allowlist") {
   ]
 
   visibility += [ "//vendor/*" ]
+  visibility += [ "//local/*" ]
 
   visibility += [
     "//boards/vim3:bazel_drivers",
