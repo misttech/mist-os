@@ -1147,6 +1147,13 @@ class VmMapping final : public VmAddressRegionOrMapping {
     };
   }
 
+  // TODO(https://fxbug.dev/42106188): Informs the mapping that a write is going to be performed to
+  // the backing VMO, even if the VMO is not writable. This gives the mapping an opportunity to
+  // create a private clone of the VMO if necessary and use that to back the mapping instead,
+  // providing a way to 'safely' perform the write.
+  // This may change the underlying VMO and invalidates any previous calls to |vmo| or |vmo_locked|.
+  zx_status_t ForceWritableLocked() TA_REQ(lock());
+
  protected:
   ~VmMapping() override;
   friend fbl::RefPtr<VmMapping>;
@@ -1256,6 +1263,11 @@ class VmMapping final : public VmAddressRegionOrMapping {
   // Whether this mapping may be merged with other adjacent mappings. A mergeable mapping is just a
   // region that can be represented by any VmMapping object, not specifically this one.
   Mergeable mergeable_ TA_GUARDED(lock()) = Mergeable::NO;
+
+  // TODO(https://fxbug.dev/42106188): Tracks whether this mapping has been transitioned into a
+  // private clone to allow for writes to safely be done without modifying a VMO that the mapping
+  // does not have permission to.
+  bool private_clone_ TA_GUARDED(lock()) = false;
 
   fbl::WAVLTreeNodeState<VmMapping*> vmo_mapping_node_ TA_GUARDED(object_->lock());
   VmMappingSubtreeState mapping_subtree_state_ TA_GUARDED(object_->lock());

@@ -1387,6 +1387,58 @@ void VmMapping::CommitHighMemoryPriority() {
   MapRange(offset, len, false, true);
 }
 
+zx_status_t VmMapping::ForceWritableLocked() {
+  canary_.Assert();
+  if (state_ != LifeCycleState::ALIVE) {
+    return ZX_ERR_BAD_STATE;
+  }
+  DEBUG_ASSERT(object_);
+  // If we have already re-directed to a private clone then there is no need to do so again.
+  if (private_clone_) {
+    return ZX_OK;
+  }
+  // If the mapping is already possible to write to (even if disabled by current protections), then
+  // writing is already safe.
+  if (is_valid_mapping_flags(ARCH_MMU_FLAG_PERM_WRITE)) {
+    return ZX_OK;
+  }
+  // A physical VMO cannot be cloned and so we cannot make this safe, just allow the write.
+  if (!object_->is_paged()) {
+    return ZX_OK;
+  }
+  // Create a clone of our VMO that covers the size of our mapping.
+  fbl::RefPtr<VmObject> clone;
+  zx_status_t status = object_->CreateClone(Resizability::NonResizable, SnapshotType::OnWrite,
+                                            object_offset_locked(), size_locked(), true, &clone);
+  if (status != ZX_OK) {
+    return status;
+  }
+  {
+    Guard<VmoLockType> guard{object_->lock()};
+    // Clear out all mappings from the previous object, Must be done the object lock to prevent
+    // mappings being modified in between.
+    status = aspace_->arch_aspace().Unmap(base_, size_ / PAGE_SIZE, aspace_->EnlargeArchUnmap(),
+                                          nullptr);
+    if (status != ZX_OK) {
+      return status;
+    }
+    // Finally unlink from the object_.
+    object_->RemoveMappingLocked(this);
+    // We created the clone started at object_offset_ in the old object, so that makes the
+    // equivalent object_offset_ start at 0 in the clone.
+    object_offset_ = 0;
+  }
+  // Reset object_ outside its lock in case we trigger its destructor.
+  object_.reset();
+  // Take the lock for the clone so we can install it.
+  Guard<VmoLockType> guard{clone->lock()};
+  clone->AddMappingLocked(this);
+  object_ = ktl::move(clone);
+  // Set private_clone_ so that we do not repeatedly create clones of clones for no reason.
+  private_clone_ = true;
+  return ZX_OK;
+}
+
 template <typename F>
 zx_status_t MappingProtectionRanges::UpdateProtectionRange(vaddr_t mapping_base,
                                                            size_t mapping_size, vaddr_t base,
