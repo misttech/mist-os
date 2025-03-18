@@ -58,4 +58,18 @@ TEST_fx-unset-device-fails-with-device-flag() {
     BT_EXPECT_FAIL ${fx} -d foo unset-device foo 2>/dev/null
 }
 
+# test that we warn the user if the set command will be a noop
+TEST_fx-unset-device-warns-if-nodename-env-var-set-already() {
+    local out="${BT_TEMP_DIR}/_fx_set_device_output"
+    export FUCHSIA_NODENAME="bar"
+
+    # Do not fail, just warn
+    BT_EXPECT ${fx} unset-device >"$out" 2>&1
+
+    # Check that the output contains the text
+    BT_EXPECT_FILE_CONTAINS_SUBSTRING "${out}" "WARNING: FUCHSIA_NODENAME is already set to ${FUCHSIA_NODENAME}"
+    BT_EXPECT_FILE_CONTAINS_SUBSTRING "${out}" "WARNING: Calling fx unset-device will remove the <build-dir>.device file but it will not"
+    BT_EXPECT_FILE_CONTAINS_SUBSTRING "${out}" "unset FUCHSIA_NODENAME meaning that the default target will still be set"
+}
+
 BT_RUN_TESTS "$@"
