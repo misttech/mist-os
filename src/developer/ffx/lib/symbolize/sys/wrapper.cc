@@ -53,7 +53,15 @@ void symbolizer_resolve_address(symbolizer::SymbolizerImpl* symbolizer, uint64_t
         if (location.symbol().is_valid()) {
           auto symbol = location.symbol().Get();
           auto function = symbol->template As<zxdb::Function>();
-          function_name = zxdb::FormatFunctionName(function, {}).AsString();
+          // There are some functions that are not considered zxdb::Function, e.g., functions in
+          // vDSO and functions in crt1.S.
+          // TODO(https://fxbug.dev/404336927): Investigate why cast doesn't work here for some
+          // functions
+          if (function) {
+            function_name = zxdb::FormatFunctionName(function, {}).AsString();
+          } else {
+            function_name = symbol->GetFullName();
+          }
           output_location.function = function_name.c_str();
           output_location.function_len = function_name.size();
         }

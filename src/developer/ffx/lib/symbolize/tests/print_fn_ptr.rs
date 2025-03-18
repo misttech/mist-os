@@ -20,6 +20,7 @@ fn main() {
         // points to code from whatever other function immediately precedes this one in the object.
         fn_one_addr: to_be_symbolized_one as *const () as u64 + 1,
         fn_two_addr: to_be_symbolized_two as *const () as u64 + 1,
+        fn_sys_inc_addr: zx::sys::zx_channel_create as *const () as u64 + 1,
 
         // Make sure we can resolve symbols from libraries too.
         libc_addr: libc::open as *const () as u64 + 1,

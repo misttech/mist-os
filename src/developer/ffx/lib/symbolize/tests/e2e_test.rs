@@ -85,6 +85,16 @@ async fn symbolize_fn_ptr() {
     assert_eq!(libc_location.function.as_ref().unwrap(), "open(const char*, int)");
     assert_eq!(libc_location.file_and_line.as_ref().unwrap().0, "../../sdk/lib/fdio/unistd.cc");
     assert_eq!(libc_location.library.as_ref().unwrap(), "libfdio.so");
+
+    let symbol_sys_inc = symbolizer.resolve_addr(outputs.fn_sys_inc_addr).unwrap();
+    assert_eq!(symbol_sys_inc.len(), 1);
+    let sys_inc_location = &symbol_sys_inc[0];
+    assert_eq!(sys_inc_location.function.as_ref().unwrap(), "SYSCALL_zx_channel_create");
+    assert_eq!(
+        sys_inc_location.file_and_line.as_ref().unwrap().0,
+        "fidling/gen/zircon/vdso/zx/zither/kernel/lib/syscalls/syscalls.inc"
+    );
+    assert_eq!(sys_inc_location.library.as_ref().unwrap(), "<vDSO>");
 }
 
 async fn run_print_fn_ptr(emu: &IsolatedEmulator) -> SymbolizationTestOutputs {

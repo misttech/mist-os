@@ -107,9 +107,6 @@ impl Symbolizer {
     }
 
     /// Resolve a single address.
-    ///
-    /// If you have more than one address to resolve, consider using `resolve_addresses` to batch
-    /// them together since each call spawns a subprocess.
     pub fn resolve_addr(&self, addr: u64) -> Result<Vec<ResolvedLocation>, ResolveError> {
         type LocationCallbackContext = Vec<ResolvedLocation>;
         let mut locations: LocationCallbackContext = vec![];
