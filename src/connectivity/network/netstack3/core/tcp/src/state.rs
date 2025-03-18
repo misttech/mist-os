@@ -31,7 +31,7 @@ use crate::internal::base::{
 use crate::internal::buffer::{Assembler, BufferLimits, IntoBuffers, ReceiveBuffer, SendBuffer};
 use crate::internal::congestion::CongestionControl;
 use crate::internal::counters::TcpCountersRefs;
-use crate::internal::rtt::Estimator;
+use crate::internal::rtt::{Estimator, RttSampler};
 
 /// Per RFC 793 (https://tools.ietf.org/html/rfc793#page-81):
 /// MSL
@@ -486,7 +486,7 @@ impl<I: Instant + 'static, ActiveOpen> SynSent<I, ActiveOpen> {
                                     wl1: seg_seq,
                                     wl2: seg_ack,
                                     buffer: (),
-                                    last_seq_ts: None,
+                                    rtt_sampler: RttSampler::default(),
                                     rtt_estimator,
                                     timer: None,
                                     congestion_control: CongestionControl::cubic_with_mss(smss),
@@ -671,8 +671,7 @@ pub(crate) struct Send<I, S, const FIN_QUEUED: bool> {
     wnd_max: WindowSize,
     wl1: SeqNum,
     wl2: SeqNum,
-    // The last sequence number sent out and its timestamp when sent.
-    last_seq_ts: Option<(SeqNum, I)>,
+    rtt_sampler: RttSampler<I>,
     rtt_estimator: Estimator,
     timer: Option<SendTimer<I>>,
     #[derivative(PartialEq = "ignore")]
@@ -691,7 +690,7 @@ impl<I> Send<I, (), false> {
             wnd_max,
             wl1,
             wl2,
-            last_seq_ts,
+            rtt_sampler,
             rtt_estimator,
             timer,
             congestion_control,
@@ -706,7 +705,7 @@ impl<I> Send<I, (), false> {
             wnd_max,
             wl1,
             wl2,
-            last_seq_ts,
+            rtt_sampler,
             rtt_estimator,
             timer,
             congestion_control,
@@ -1283,7 +1282,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             buffer,
             wl1: _,
             wl2: _,
-            last_seq_ts,
+            rtt_sampler,
             rtt_estimator,
             timer,
             congestion_control,
@@ -1539,19 +1538,8 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             "available" => available,
         );
         let seq_max = next_seg + seg.len();
-        match *last_seq_ts {
-            Some((seq, _ts)) => {
-                if seq_max.after(seq) {
-                    *last_seq_ts = Some((seq_max, now));
-                } else {
-                    // If the recorded sequence number is ahead of us, we are
-                    // in retransmission, we should discard the timestamp and
-                    // abort the estimation.
-                    *last_seq_ts = None;
-                }
-            }
-            None => *last_seq_ts = Some((seq_max, now)),
-        }
+        rtt_sampler.on_will_send_segment(now, next_seg..seq_max, *snd_max);
+
         if seq_max.after(*snd_nxt) {
             *snd_nxt = seq_max;
         }
@@ -1609,7 +1597,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             wl2: snd_wl2,
             wnd_max,
             buffer,
-            last_seq_ts,
+            rtt_sampler,
             rtt_estimator,
             timer,
             congestion_control,
@@ -1692,12 +1680,19 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                 }
                 // If the incoming segment acks the sequence number that we used
                 // for RTT estimate, feed the sample to the estimator.
-                if let Some((seq_max, timestamp)) = *last_seq_ts {
-                    if !seg_ack.before(seq_max) {
-                        rtt_estimator.sample(now.saturating_duration_since(timestamp));
-                    }
+                if let Some(rtt) = rtt_sampler.on_ack(now, seg_ack) {
+                    rtt_estimator.sample(rtt);
                 }
-                congestion_control.on_ack(acked, now, rtt_estimator.rto());
+
+                // It is possible, however unlikely, that we get here without an
+                // RTT estimation - in case the first data segment that we send
+                // out gets retransmitted. In that case, simply don't update
+                // congestion control which at worst causes slow start to take
+                // one extra step.
+                if let Some(rtt) = rtt_estimator.srtt() {
+                    congestion_control.on_ack(acked, now, rtt);
+                }
+
                 // At least one byte of data was ACKed by the peer.
                 (true, DataAcked::Yes)
             } else {
@@ -1786,7 +1781,7 @@ impl<I: Instant, S: SendBuffer> Send<I, S, { FinQueued::NO }> {
             wl1,
             wl2,
             buffer,
-            last_seq_ts,
+            rtt_sampler,
             rtt_estimator,
             timer,
             congestion_control,
@@ -1801,7 +1796,7 @@ impl<I: Instant, S: SendBuffer> Send<I, S, { FinQueued::NO }> {
             wl1,
             wl2,
             buffer,
-            last_seq_ts,
+            rtt_sampler,
             rtt_estimator,
             timer,
             congestion_control,
@@ -2453,7 +2448,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                                     wl1: seg_seq,
                                     wl2: seg_ack,
                                     buffer: snd_buffer,
-                                    last_seq_ts: None,
+                                    rtt_sampler: RttSampler::default(),
                                     rtt_estimator,
                                     timer: None,
                                     congestion_control: CongestionControl::cubic_with_mss(*smss),
@@ -3159,7 +3154,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                         wl1: *iss,
                         wl2: *irs,
                         buffer: snd_buffer,
-                        last_seq_ts: None,
+                        rtt_sampler: RttSampler::default(),
                         rtt_estimator: Estimator::NoSample,
                         timer: None,
                         congestion_control: CongestionControl::cubic_with_mss(*smss),
@@ -3483,8 +3478,9 @@ mod test {
 
     impl SocketOptions {
         fn default_for_state_tests() -> Self {
-            // In testing, it is convenient to disable delayed ack by default.
-            Self { delayed_ack: false, ..Default::default() }
+            // In testing, it is convenient to disable delayed ack and nagle by
+            // default.
+            Self { delayed_ack: false, nagle_enabled: false, ..Default::default() }
         }
     }
 
@@ -3642,6 +3638,11 @@ mod test {
                 | State::FinWait1(FinWait1 { rcv, .. }) => Some(rcv.get_mut()),
                 State::FinWait2(FinWait2 { rcv, .. }) => Some(rcv),
             }
+        }
+
+        #[track_caller]
+        fn assert_established(&mut self) -> &mut Established<FakeInstant, R, S> {
+            assert_matches!(self, State::Established(e) => e)
         }
     }
 
@@ -3909,7 +3910,7 @@ mod test {
                         srtt: RTT,
                         rtt_var: RTT / 2,
                     },
-                    last_seq_ts: None,
+                    rtt_sampler: RttSampler::default(),
                     timer: None,
                     congestion_control: CongestionControl::cubic_with_mss(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
                     wnd_scale: WindowScale::default(),
@@ -3965,7 +3966,7 @@ mod test {
                     srtt: RTT,
                     rtt_var: RTT / 2,
                 },
-                last_seq_ts: None,
+                rtt_sampler: RttSampler::default(),
                 timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
                     wnd_scale: WindowScale::default(),
@@ -4049,7 +4050,7 @@ mod test {
                 wl1: ISS_2 + 1,
                 wl2: ISS_1 + 1,
                 rtt_estimator: Estimator::default(),
-                last_seq_ts: None,
+                rtt_sampler: RttSampler::default(),
                 timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
                     wnd_scale: WindowScale::default(),
@@ -4076,7 +4077,7 @@ mod test {
                 wl1: ISS_2 + 1,
                 wl2: ISS_1 + 1,
                 rtt_estimator: Estimator::default(),
-                last_seq_ts: None,
+                rtt_sampler: RttSampler::default(),
                 timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
                     wnd_scale: WindowScale::default(),
@@ -4112,7 +4113,7 @@ mod test {
                 wl1: ISS_2 + 1,
                 wl2: ISS_1 + 1,
                 rtt_estimator: Estimator::default(),
-                last_seq_ts: None,
+                rtt_sampler: RttSampler::default(),
                 timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(
                     DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
@@ -4164,7 +4165,7 @@ mod test {
             wl1: ISS_2 + 1,
             wl2: ISS_1 + 1,
             rtt_estimator: Estimator::default(),
-            last_seq_ts: None,
+            rtt_sampler: RttSampler::default(),
             timer: None,
             congestion_control: CongestionControl::cubic_with_mss(
                 DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
@@ -4234,7 +4235,7 @@ mod test {
             wl1: ISS_2 + 1,
             wl2: ISS_1 + 1,
             rtt_estimator: Estimator::default(),
-            last_seq_ts: None,
+            rtt_sampler: RttSampler::default(),
             timer: None,
             congestion_control: CongestionControl::cubic_with_mss(
                 DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
@@ -4371,7 +4372,7 @@ mod test {
                 wl1: ISS_2 + 1,
                 wl2: ISS_1 + 1,
                 rtt_estimator: Estimator::default(),
-                last_seq_ts: None,
+                rtt_sampler: RttSampler::default(),
                 timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(
                     DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
@@ -4531,7 +4532,7 @@ mod test {
                     wl1: ISS_2,
                     wl2: ISS_1 + 1,
                     rtt_estimator: Estimator::Measured { srtt: RTT, rtt_var: RTT / 2 },
-                    last_seq_ts: None,
+                    rtt_sampler: RttSampler::default(),
                     timer: None,
                     congestion_control: CongestionControl::cubic_with_mss(
                         DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE
@@ -4578,7 +4579,7 @@ mod test {
                     wl1: ISS_1 + 1,
                     wl2: ISS_2 + 1,
                     rtt_estimator: Estimator::Measured { srtt: RTT, rtt_var: RTT / 2 },
-                    last_seq_ts: None,
+                    rtt_sampler: RttSampler::default(),
                     timer: None,
                     congestion_control: CongestionControl::cubic_with_mss(
                         DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE
@@ -4773,7 +4774,7 @@ mod test {
                     wl1: ISS_2 + 1,
                     wl2: ISS_1 + 1,
                     rtt_estimator: Estimator::Measured { srtt: RTT, rtt_var: RTT / 2 },
-                    last_seq_ts: None,
+                    rtt_sampler: RttSampler::default(),
                     timer: None,
                     congestion_control: CongestionControl::cubic_with_mss(
                         DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE
@@ -4812,7 +4813,7 @@ mod test {
                     wl1: ISS_1 + 1,
                     wl2: ISS_2 + 1,
                     rtt_estimator: Estimator::Measured { srtt: RTT, rtt_var: RTT / 2 },
-                    last_seq_ts: None,
+                    rtt_sampler: RttSampler::default(),
                     timer: None,
                     congestion_control: CongestionControl::cubic_with_mss(
                         DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE
@@ -4856,7 +4857,7 @@ mod test {
                 wl1: ISS_2 + 1,
                 wl2: ISS_1 + 1,
                 rtt_estimator: Estimator::default(),
-                last_seq_ts: None,
+                rtt_sampler: RttSampler::default(),
                 timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(Mss(
                     NonZeroU16::new(5).unwrap()
@@ -4980,7 +4981,7 @@ mod test {
                 buffer: send_buffer,
                 wl1: ISS_2,
                 wl2: ISS_1,
-                last_seq_ts: None,
+                rtt_sampler: RttSampler::default(),
                 rtt_estimator: Estimator::default(),
                 timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(
@@ -5253,7 +5254,7 @@ mod test {
                 buffer: send_buffer.clone(),
                 wl1: ISS_2,
                 wl2: ISS_1,
-                last_seq_ts: None,
+                rtt_sampler: RttSampler::default(),
                 rtt_estimator: Estimator::default(),
                 timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(
@@ -5316,7 +5317,7 @@ mod test {
                     buffer: send_buffer,
                     wl1: ISS_2 + 1,
                     wl2: ISS_1 + 1,
-                    last_seq_ts: None,
+                    rtt_sampler: RttSampler::default(),
                     rtt_estimator: Estimator::default(),
                     timer: None,
                     congestion_control: CongestionControl::cubic_with_mss(
@@ -5454,7 +5455,7 @@ mod test {
                 buffer: send_buffer.clone(),
                 wl1: ISS_2,
                 wl2: ISS_1,
-                last_seq_ts: None,
+                rtt_sampler: RttSampler::default(),
                 rtt_estimator: Estimator::default(),
                 timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(Mss(
@@ -5674,7 +5675,7 @@ mod test {
                 buffer: NullBuffer,
                 wl1: ISS_2,
                 wl2: ISS_1,
-                last_seq_ts: None,
+                rtt_sampler: RttSampler::default(),
                 rtt_estimator: Estimator::default(),
                 timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(
@@ -5733,7 +5734,7 @@ mod test {
                 buffer: send_buffer.clone(),
                 wl1: ISS_2,
                 wl2: ISS_1,
-                last_seq_ts: None,
+                rtt_sampler: RttSampler::default(),
                 rtt_estimator: Estimator::default(),
                 timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(
@@ -5885,7 +5886,7 @@ mod test {
                 wl1: ISS_2,
                 wl2: ISS_1,
                 rtt_estimator: Estimator::Measured { srtt: RTT, rtt_var: RTT / 2 },
-                last_seq_ts: None,
+                rtt_sampler: RttSampler::default(),
                 timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
                 wnd_scale: WindowScale::default(),
@@ -5966,7 +5967,7 @@ mod test {
                 wl1: ISS_2,
                 wl2: ISS_1,
                 rtt_estimator: Estimator::Measured { srtt: RTT, rtt_var: RTT / 2 },
-                last_seq_ts: None,
+                rtt_sampler: RttSampler::default(),
                 timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(
                     DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
@@ -6097,7 +6098,7 @@ mod test {
                 wl1: ISS_2,
                 wl2: ISS_1,
                 rtt_estimator: Estimator::Measured { srtt: RTT, rtt_var: RTT / 2 },
-                last_seq_ts: None,
+                rtt_sampler: RttSampler::default(),
                 timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(
                     DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
@@ -6272,7 +6273,7 @@ mod test {
                 wl1: ISS_2,
                 wl2: ISS_1,
                 rtt_estimator: Estimator::Measured { srtt: RTT, rtt_var: RTT / 2 },
-                last_seq_ts: None,
+                rtt_sampler: RttSampler::default(),
                 timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(
                     DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
@@ -6340,7 +6341,7 @@ mod test {
                 buffer: send_buffer.clone(),
                 wl1: ISS_2,
                 wl2: ISS_1,
-                last_seq_ts: None,
+                rtt_sampler: RttSampler::default(),
                 rtt_estimator: Estimator::default(),
                 timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(
@@ -6455,7 +6456,7 @@ mod test {
                 buffer: send_buffer.clone(),
                 wl1: ISS_2,
                 wl2: ISS_1,
-                last_seq_ts: None,
+                rtt_sampler: RttSampler::default(),
                 rtt_estimator: Estimator::default(),
                 timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(
@@ -6479,7 +6480,8 @@ mod test {
             }
             .into(),
         });
-        let mut socket_options = SocketOptions::default_for_state_tests();
+        let mut socket_options =
+            SocketOptions { nagle_enabled: true, ..SocketOptions::default_for_state_tests() };
         assert_eq!(
             state.poll_send(
                 &FakeStateMachineDebugId,
@@ -6611,7 +6613,7 @@ mod test {
                 buffer: send_buffer.clone(),
                 wl1: ISS_2 + 1,
                 wl2: ISS_1 + 1,
-                last_seq_ts: None,
+                rtt_sampler: RttSampler::default(),
                 rtt_estimator: Estimator::Measured { srtt: rtt, rtt_var: Duration::ZERO },
                 timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(
@@ -6747,7 +6749,7 @@ mod test {
                 buffer: RingBuffer::new(BUFFER_SIZE),
                 wl1: ISS_2,
                 wl2: ISS_1,
-                last_seq_ts: None,
+                rtt_sampler: RttSampler::default(),
                 rtt_estimator: Estimator::Measured {
                     srtt: Estimator::RTO_INIT,
                     rtt_var: Duration::ZERO,
@@ -6788,7 +6790,7 @@ mod test {
                 buffer: RingBuffer::new(BUFFER_SIZE),
                 wl1: ISS_2,
                 wl2: ISS_1,
-                last_seq_ts: None,
+                rtt_sampler: RttSampler::default(),
                 rtt_estimator: Estimator::Measured {
                     srtt: Estimator::RTO_INIT,
                     rtt_var: Duration::ZERO,
@@ -6963,7 +6965,7 @@ mod test {
                 buffer: RingBuffer::new(BUFFER_SIZE),
                 wl1: ISS_2,
                 wl2: ISS_1,
-                last_seq_ts: None,
+                rtt_sampler: RttSampler::default(),
                 rtt_estimator: Estimator::Measured {
                     srtt: Estimator::RTO_INIT,
                     rtt_var: Duration::ZERO,
@@ -7356,7 +7358,7 @@ mod test {
                 buffer: RingBuffer::with_data(TEST_BYTES.len(), TEST_BYTES),
                 reserved_bytes: RESERVED_BYTES,
             },
-            last_seq_ts: None,
+            rtt_sampler: RttSampler::default(),
             rtt_estimator: Estimator::default(),
             timer: None,
             congestion_control: CongestionControl::cubic_with_mss(
@@ -7461,7 +7463,7 @@ mod test {
             wl1: ISS_2 + 1,
             wl2: ISS_1 + 1,
             rtt_estimator: Estimator::default(),
-            last_seq_ts: None,
+            rtt_sampler: RttSampler::default(),
             timer: None,
             congestion_control: CongestionControl::cubic_with_mss(
                 DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
@@ -7529,7 +7531,7 @@ mod test {
             wl1: ISS_1,
             wl2: ISS_2,
             buffer: RingBuffer::new(CAP),
-            last_seq_ts: None,
+            rtt_sampler: RttSampler::default(),
             rtt_estimator: Estimator::default(),
             timer: None,
             congestion_control: CongestionControl::cubic_with_mss(Mss(NonZeroU16::new(
@@ -7761,7 +7763,7 @@ mod test {
             wl1: ISS_1,
             wl2: ISS_2,
             buffer: RingBuffer::new(CAP),
-            last_seq_ts: None,
+            rtt_sampler: RttSampler::default(),
             rtt_estimator: Estimator::default(),
             timer: None,
             congestion_control: CongestionControl::cubic_with_mss(Mss(NonZeroU16::new(
@@ -7871,7 +7873,7 @@ mod test {
                 buffer,
                 wl1: ISS_1,
                 wl2: ISS_1,
-                last_seq_ts: None,
+                rtt_sampler: RttSampler::default(),
                 rtt_estimator: Estimator::NoSample,
                 timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(mss),
@@ -8035,7 +8037,7 @@ mod test {
             wl1: ISS_2 + 1,
             wl2: ISS_1 + 1,
             rtt_estimator: Estimator::default(),
-            last_seq_ts: None,
+            rtt_sampler: RttSampler::default(),
             timer: None,
             congestion_control: CongestionControl::cubic_with_mss(MSS),
             wnd_scale: WindowScale::default(),
@@ -8176,7 +8178,7 @@ mod test {
                 wl1: ISS_2 + 1,
                 wl2: ISS_1 + 1,
                 rtt_estimator: Estimator::default(),
-                last_seq_ts: None,
+                rtt_sampler: RttSampler::default(),
                 timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(DEVICE_MAXIMUM_SEGMENT_SIZE),
                 wnd_scale: WindowScale::default(),
@@ -8259,7 +8261,7 @@ mod test {
                 wl1: ISS_2 + 1,
                 wl2: ISS_1 + 1,
                 rtt_estimator: Estimator::default(),
-                last_seq_ts: None,
+                rtt_sampler: RttSampler::default(),
                 timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(DEVICE_MAXIMUM_SEGMENT_SIZE),
                 wnd_scale: WindowScale::default(),
@@ -8320,7 +8322,7 @@ mod test {
                 wl1: ISS_2 + 1,
                 wl2: ISS_1 + 1,
                 rtt_estimator: Estimator::default(),
-                last_seq_ts: None,
+                rtt_sampler: RttSampler::default(),
                 timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(DEVICE_MAXIMUM_SEGMENT_SIZE),
                 wnd_scale: WindowScale::default(),
@@ -8383,7 +8385,7 @@ mod test {
                 wl1: ISS_2 + 1,
                 wl2: ISS_1 + 1,
                 rtt_estimator: Estimator::default(),
-                last_seq_ts: None,
+                rtt_sampler: RttSampler::default(),
                 timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(DEVICE_MAXIMUM_SEGMENT_SIZE),
                 wnd_scale: WindowScale::default(),
@@ -8480,5 +8482,162 @@ mod test {
         let sack_blocks =
             assert_matches!(&seg.header.options, Options::Segment(o) => &o.sack_blocks);
         assert_eq!(sack_blocks, &SackBlocks::default());
+    }
+
+    #[derive(Debug)]
+    enum RttTestScenario {
+        AckOne,
+        AckTwo,
+        Retransmit,
+        AckPartial,
+    }
+
+    // Tests integration of the RTT sampler with the TCP state machine.
+    #[test_case(RttTestScenario::AckOne)]
+    #[test_case(RttTestScenario::AckTwo)]
+    #[test_case(RttTestScenario::Retransmit)]
+    #[test_case(RttTestScenario::AckPartial)]
+    fn rtt(scenario: RttTestScenario) {
+        let mut state = State::Established(Established::<FakeInstant, _, _> {
+            snd: Send {
+                nxt: ISS_1 + 1,
+                max: ISS_1 + 1,
+                una: ISS_1 + 1,
+                wnd: WindowSize::DEFAULT,
+                wnd_max: WindowSize::DEFAULT,
+                buffer: RingBuffer::default(),
+                wl1: ISS_2 + 1,
+                wl2: ISS_1 + 1,
+                rtt_estimator: Estimator::default(),
+                rtt_sampler: RttSampler::default(),
+                timer: None,
+                congestion_control: CongestionControl::cubic_with_mss(DEVICE_MAXIMUM_SEGMENT_SIZE),
+                wnd_scale: WindowScale::default(),
+            }
+            .into(),
+            rcv: Recv {
+                buffer: RecvBufferState::Open {
+                    buffer: RingBuffer::default(),
+                    assembler: Assembler::new(ISS_2 + 1),
+                },
+                timer: None,
+                mss: DEVICE_MAXIMUM_SEGMENT_SIZE,
+                // quickacks start at zero.
+                remaining_quickacks: 0,
+                last_segment_at: None,
+                wnd_scale: WindowScale::default(),
+                last_window_update: (ISS_2 + 1, WindowSize::DEFAULT),
+                sack_permitted: SACK_PERMITTED,
+            }
+            .into(),
+        });
+
+        const CLOCK_STEP: Duration = Duration::from_millis(1);
+
+        let data = "Hello World".as_bytes();
+        let data_len_u32 = data.len().try_into().unwrap();
+        let mut clock = FakeInstantCtx::default();
+        let counters = FakeTcpCounters::default();
+        for _ in 0..3 {
+            assert_eq!(
+                state.buffers_mut().into_send_buffer().unwrap().enqueue_data(data),
+                data.len()
+            );
+        }
+
+        assert_eq!(state.assert_established().snd.rtt_sampler, RttSampler::NotTracking);
+        let seg = state
+            .poll_send_with_default_options(data_len_u32, clock.now(), &counters.refs())
+            .expect("generate segment");
+        assert_eq!(seg.header.seq, ISS_1 + 1);
+        assert_eq!(seg.len(), data_len_u32);
+        let expect_sampler = RttSampler::Tracking {
+            range: (ISS_1 + 1)..(ISS_1 + 1 + seg.len()),
+            timestamp: clock.now(),
+        };
+        assert_eq!(state.assert_established().snd.rtt_sampler, expect_sampler);
+        // Send more data that is present in the buffer.
+        clock.sleep(CLOCK_STEP);
+        let seg = state
+            .poll_send_with_default_options(data_len_u32, clock.now(), &counters.refs())
+            .expect("generate segment");
+        assert_eq!(seg.header.seq, ISS_1 + 1 + data.len());
+        assert_eq!(seg.len(), data_len_u32);
+        // The probe for RTT doesn't change.
+        let established = state.assert_established();
+        assert_eq!(established.snd.rtt_sampler, expect_sampler);
+
+        // No RTT estimation yet.
+        assert_eq!(established.snd.rtt_estimator.srtt(), None);
+
+        let (retransmit, ack_number) = match scenario {
+            RttTestScenario::AckPartial => (false, ISS_1 + 1 + 1),
+            RttTestScenario::AckOne => (false, ISS_1 + 1 + data.len()),
+            RttTestScenario::AckTwo => (false, ISS_1 + 1 + data.len() * 2),
+            RttTestScenario::Retransmit => (true, ISS_1 + 1 + data.len() * 2),
+        };
+
+        if retransmit {
+            // No ack, retransmit should clear things.
+            let timeout = state.poll_send_at().expect("timeout should be present");
+            clock.time = timeout;
+            let seg = state
+                .poll_send_with_default_options(data_len_u32, clock.now(), &counters.refs())
+                .expect("generate segment");
+            // First segment is retransmitted.
+            assert_eq!(seg.header.seq, ISS_1 + 1);
+            // Retransmit should've cleared the mark.
+            assert_eq!(state.assert_established().snd.rtt_sampler, RttSampler::NotTracking);
+        } else {
+            clock.sleep(CLOCK_STEP);
+        }
+
+        assert_eq!(
+            state.on_segment_with_default_options::<(), ClientlessBufferProvider>(
+                Segment::ack(ISS_2 + 1, ack_number, WindowSize::DEFAULT >> WindowScale::default()),
+                clock.now(),
+                &counters.refs()
+            ),
+            (None, None)
+        );
+        let established = state.assert_established();
+        // No outstanding RTT estimate remains.
+        assert_eq!(established.snd.rtt_sampler, RttSampler::NotTracking);
+        if retransmit {
+            // No estimation was generated on retransmission.
+            assert_eq!(established.snd.rtt_estimator.srtt(), None);
+        } else {
+            // Receiving a segment that acks any of the sent data should
+            // generate an RTT calculation.
+            assert_eq!(established.snd.rtt_estimator.srtt(), Some(CLOCK_STEP * 2));
+        }
+
+        clock.sleep(CLOCK_STEP);
+        let seg = state
+            .poll_send_with_default_options(data_len_u32, clock.now(), &counters.refs())
+            .expect("generate segment");
+        let seq = seg.header.seq;
+        assert_eq!(seq, ISS_1 + 1 + data.len() * 2);
+        let expect_sampler =
+            RttSampler::Tracking { range: seq..(seq + seg.len()), timestamp: clock.now() };
+        assert_eq!(state.assert_established().snd.rtt_sampler, expect_sampler);
+
+        // Ack the second segment again now (which may be a new ACK in the one
+        // ACK scenario), in all cases this should not move the target seq for
+        // RTT.
+        clock.sleep(CLOCK_STEP);
+        assert_eq!(
+            state.on_segment_with_default_options::<(), ClientlessBufferProvider>(
+                Segment::ack(
+                    ISS_2 + 1,
+                    ISS_1 + 1 + data.len() * 2,
+                    WindowSize::DEFAULT >> WindowScale::default()
+                ),
+                clock.now(),
+                &counters.refs()
+            ),
+            (None, None)
+        );
+        assert_eq!(state.assert_established().snd.rtt_sampler, expect_sampler);
     }
 }

@@ -3,9 +3,12 @@
 // found in the LICENSE file.
 
 //! TCP RTT estimation per [RFC 6298](https://tools.ietf.org/html/rfc6298).
+use core::ops::Range;
 use core::time::Duration;
 
-#[derive(Debug, Clone, Copy)]
+use netstack3_base::{Instant, SeqNum};
+
+#[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub(super) enum Estimator {
     NoSample,
@@ -83,10 +86,94 @@ impl Estimator {
     }
 }
 
+/// RTT sampler keeps track of the current segment that is keeping track of RTT
+/// calculations.
+#[derive(Debug, Default)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+pub(super) enum RttSampler<I> {
+    #[default]
+    NotTracking,
+    Tracking {
+        range: Range<SeqNum>,
+        timestamp: I,
+    },
+}
+
+impl<I: Instant> RttSampler<I> {
+    /// Updates the `RttSampler` with a new segment that is about to be sent.
+    ///
+    /// - `now` is the current timestamp.
+    /// - `range` is the sequence number range in the newly produced segment.
+    /// - `snd_max` is the SND.MAX value *not considering* the new segment in `range`.
+    pub(super) fn on_will_send_segment(&mut self, now: I, range: Range<SeqNum>, snd_max: SeqNum) {
+        match self {
+            Self::NotTracking => {
+                // If we're currently not tracking any segments, we can consider
+                // this segment for RTT IFF at least part of `range` is new
+                // bytes.
+                if !range.end.after(snd_max) {
+                    return;
+                }
+                // The segment could be partially retransmitting some data, so
+                // the left edge of our tracking must be the latest between the
+                // start and snd_max.
+                let start = if range.start.before(snd_max) { snd_max } else { range.start };
+                *self = Self::Tracking { range: start..range.end, timestamp: now }
+            }
+            Self::Tracking { range: tracking, timestamp: _ } => {
+                // We need to discard this tracking segment if we retransmit
+                // anything prior to the right edge of the tracked segment.
+                if range.start.before(tracking.end) {
+                    *self = Self::NotTracking;
+                }
+            }
+        }
+    }
+
+    /// Updates the `RttSampler` with a new ack that arrived for the connection.
+    ///
+    /// - `now` is the current timestamp.
+    /// - `ack` is the acknowledgement number in the ACK segment.
+    ///
+    /// If the sampler was able to produce a new RTT sample, `Some` is returned.
+    ///
+    /// This function assumes that `ack` is a valid ACK number and is within the
+    /// window the sender is expecting to receive (i.e. it's not an ACK for data
+    /// we did not send).
+    pub(super) fn on_ack(&mut self, now: I, ack: SeqNum) -> Option<Duration> {
+        match self {
+            Self::NotTracking => None,
+            Self::Tracking { range, timestamp } => {
+                if ack.after(range.start) {
+                    // Any acknowledgement that is at or after the tracked range
+                    // is a valid rtt sample.
+                    let rtt = now.saturating_duration_since(*timestamp);
+                    // Segment has been acked, we're not going to be tracking it
+                    // anymore.
+                    *self = Self::NotTracking;
+                    Some(rtt)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
+    use netstack3_base::testutil::FakeInstant;
     use test_case::test_case;
+
+    impl RttSampler<FakeInstant> {
+        fn from_range(Range { start, end }: Range<u32>) -> Self {
+            Self::Tracking {
+                range: SeqNum::new(start)..SeqNum::new(end),
+                timestamp: FakeInstant::default(),
+            }
+        }
+    }
 
     #[test_case(Estimator::NoSample, Duration::from_secs(2) => Estimator::Measured {
         srtt: Duration::from_secs(2),
@@ -118,5 +205,113 @@ mod test {
     } => Duration::from_secs(9))]
     fn calculate_rto(estimator: Estimator) -> Duration {
         estimator.rto()
+    }
+
+    // Useful for representing wrapping-around TCP seqnum ranges.
+    #[allow(clippy::reversed_empty_ranges)]
+    #[test_case(
+        RttSampler::NotTracking, 1..10, 1 => RttSampler::from_range(1..10)
+        ; "segment after SND.MAX"
+    )]
+    #[test_case(
+        RttSampler::NotTracking, 1..10, 10 => RttSampler::NotTracking
+        ; "segment before SND.MAX"
+    )]
+    #[test_case(
+        RttSampler::NotTracking, 1..10, 5 => RttSampler::from_range(5..10)
+        ; "segment contains SND.MAX"
+    )]
+    #[test_case(
+        RttSampler::from_range(1..10), 10..20, 10 => RttSampler::from_range(1..10)
+        ; "send further segments"
+    )]
+    #[test_case(
+        RttSampler::from_range(10..20), 1..10, 20 => RttSampler::NotTracking
+        ; "retransmit prior segments"
+    )]
+    #[test_case(
+        RttSampler::from_range(1..10), 1..10, 10 => RttSampler::NotTracking
+        ; "retransmit same segment"
+    )]
+    #[test_case(
+        RttSampler::from_range(1..10), 5..15, 15 => RttSampler::NotTracking
+        ; "retransmit same partial 1"
+    )]
+    #[test_case(
+        RttSampler::from_range(10..20), 5..15, 20 => RttSampler::NotTracking
+        ; "retransmit same partial 2"
+    )]
+    #[test_case(
+        RttSampler::NotTracking, (u32::MAX - 5)..5,
+        u32::MAX - 5 => RttSampler::from_range((u32::MAX - 5)..5)
+        ; "SND.MAX wraparound good"
+    )]
+    #[test_case(
+        RttSampler::NotTracking, (u32::MAX - 5)..5,
+        5 => RttSampler::NotTracking
+        ; "SND.MAX wraparound retransmit not tracking"
+    )]
+    #[test_case(
+        RttSampler::from_range(u32::MAX - 5..5), (u32::MAX - 5)..5,
+        5 => RttSampler::NotTracking
+        ; "SND.MAX wraparound retransmit tracking"
+    )]
+    #[test_case(
+        RttSampler::NotTracking, (u32::MAX - 5)..5, u32::MAX => RttSampler::from_range(u32::MAX..5)
+        ; "SND.MAX wraparound partial 1"
+    )]
+    #[test_case(
+        RttSampler::NotTracking, (u32::MAX - 5)..5, 1 => RttSampler::from_range(1..5)
+        ; "SND.MAX wraparound partial 2"
+    )]
+    fn rtt_sampler_on_segment(
+        mut sampler: RttSampler<FakeInstant>,
+        range: Range<u32>,
+        snd_max: u32,
+    ) -> RttSampler<FakeInstant> {
+        sampler.on_will_send_segment(
+            FakeInstant::default(),
+            SeqNum::new(range.start)..SeqNum::new(range.end),
+            SeqNum::new(snd_max),
+        );
+        sampler
+    }
+
+    const ACK_DELAY: Duration = Duration::from_millis(10);
+
+    #[test_case(
+        RttSampler::NotTracking, 10 => (None, RttSampler::NotTracking)
+        ; "not tracking"
+    )]
+    #[test_case(
+        RttSampler::from_range(1..10), 10 => (Some(ACK_DELAY), RttSampler::NotTracking)
+        ; "ack segment"
+    )]
+    #[test_case(
+        RttSampler::from_range(1..10), 20 => (Some(ACK_DELAY), RttSampler::NotTracking)
+        ; "ack after"
+    )]
+    #[test_case(
+        RttSampler::from_range(10..20), 9 => (None, RttSampler::from_range(10..20))
+        ; "ack before 1"
+    )]
+    #[test_case(
+        RttSampler::from_range(10..20), 10 => (None, RttSampler::from_range(10..20))
+        ; "ack before 2"
+    )]
+    #[test_case(
+        RttSampler::from_range(10..20), 11 => (Some(ACK_DELAY), RttSampler::NotTracking)
+        ; "ack single"
+    )]
+    #[test_case(
+        RttSampler::from_range(10..20), 15 => (Some(ACK_DELAY), RttSampler::NotTracking)
+        ; "ack partial"
+    )]
+    fn rtt_sampler_on_ack(
+        mut sampler: RttSampler<FakeInstant>,
+        ack: u32,
+    ) -> (Option<Duration>, RttSampler<FakeInstant>) {
+        let res = sampler.on_ack(FakeInstant::default() + ACK_DELAY, SeqNum::new(ack));
+        (res, sampler)
     }
 }
