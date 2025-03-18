@@ -98,7 +98,7 @@ class KTracer<Level, ktl::enable_if_t<(Level == KernelMutexTracingLevel::Contest
  private:
   void KernelMutexTrace(const fxt::InternedString& event_name, const void* mutex_id,
                         const Thread* t, uint32_t waiter_count) {
-    if (ktrace_thunks::category_enabled("kernel:sched"_category)) {
+    if (ktrace_category_enabled("kernel:sched"_category)) {
       auto tid_type = fxt::StringRef{(t == nullptr                  ? "none"_intern
                                       : t->user_thread() == nullptr ? "kernel_mode"_intern
                                                                     : "user_mode"_intern)};
