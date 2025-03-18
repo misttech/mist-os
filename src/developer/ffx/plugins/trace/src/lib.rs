@@ -234,7 +234,9 @@ impl TraceProcessor {
 
     fn check_record(&mut self, record: Result<TraceRecord, ParseError>) -> Result<()> {
         if let Some(event_per_category_counter) = &mut self.event_per_category_counter {
-            event_per_category_counter.increment_category(&record);
+            if let Ok(TraceRecord::Event(fxt::EventRecord { ref category, .. })) = record {
+                event_per_category_counter.increment_category(&category);
+            }
         }
 
         if let Some(symbolizer) = &mut self.symbolizer {
@@ -452,13 +454,17 @@ impl CategoryCounter {
         Self { category_counter, input_categories }
     }
 
-    fn increment_category(&mut self, record: &Result<TraceRecord, ParseError>) {
-        if let Ok(TraceRecord::Event(fxt::EventRecord { category, .. })) = record {
-            *self.category_counter.entry(category.to_string()).or_insert(0) += 1;
+    fn increment_category(&mut self, category: &str) {
+        *self.category_counter.entry(category.to_string()).or_insert(0) += 1;
+
+        // The "kernel" category is a special meta category that enables all "kernel:*" categories.
+        // If we see any "kernel:" category, also consider "kernel" to be seen.
+        if category.starts_with("kernel:") {
+            *self.category_counter.entry("kernel".into()).or_insert(0) += 1;
         }
     }
 
-    fn get_invalid_category_list(&mut self) -> Vec<String> {
+    fn get_invalid_category_list(&self) -> Vec<String> {
         self.category_counter
             .iter()
             .filter(|(_, &count)| count == 0)
@@ -1770,5 +1776,31 @@ Current tracing status:
                 );
             }
         }
+    }
+
+    #[fuchsia::test]
+    async fn test_verify_missing() {
+        let mut counter =
+            CategoryCounter::new(vec!["some".into(), "other".into(), "categories".into()]);
+        counter.increment_category("some");
+        counter.increment_category("other");
+        let missing = counter.get_invalid_category_list();
+        assert_eq!(missing.len(), 1);
+        assert_eq!(missing[0], "categories");
+    }
+
+    #[fuchsia::test]
+    async fn test_verify_kernel_category() {
+        let mut counter = CategoryCounter::new(vec![
+            "kernel".into(),
+            "some".into(),
+            "other".into(),
+            "categories".into(),
+        ]);
+        counter.increment_category("some");
+        counter.increment_category("other");
+        counter.increment_category("categories");
+        counter.increment_category("kernel:meta");
+        assert!(counter.get_invalid_category_list().is_empty());
     }
 }
