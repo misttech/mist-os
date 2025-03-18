@@ -52,6 +52,7 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/inspect/device_inspect.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/linuxisms.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/soc.h"
+#include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/stats.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/timer.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/workqueue.h"
 
@@ -3302,6 +3303,30 @@ void brcmf_sdio_log_stats(struct brcmf_bus* bus_if) {
       bus->tx_queue->tx_queue.size(1 << 2), bus->tx_queue->tx_queue.size(1 << 3));
 }
 
+std::vector<fuchsia_wlan_stats::wire::UnnamedCounter> brcmf_sdio_get_counters(
+    struct brcmf_bus* bus_if) {
+  struct brcmf_sdio_dev* sdiodev = bus_if->bus_priv.sdio;
+  struct brcmf_sdio* bus = sdiodev->bus;
+
+  std::vector<fuchsia_wlan_stats::wire::UnnamedCounter> counters;
+  counters.push_back(CounterConfigs::SDIO_FLOW_CONTROL_EVENTS.unnamed(bus->sdcnt.fc_rcvd));
+  counters.push_back(CounterConfigs::SDIO_TX_CTRL_FRAME_GOOD.unnamed(bus->sdcnt.tx_ctlpkts));
+  counters.push_back(CounterConfigs::SDIO_TX_CTRL_FRAME_BAD.unnamed(bus->sdcnt.tx_ctlerrs));
+  counters.push_back(CounterConfigs::SDIO_RX_CTRL_FRAME_GOOD.unnamed(bus->sdcnt.rx_ctlpkts));
+  counters.push_back(CounterConfigs::SDIO_RX_CTRL_FRAME_BAD.unnamed(bus->sdcnt.rx_ctlerrs));
+  counters.push_back(CounterConfigs::SDIO_RX_OUT_OF_BUFS.unnamed(bus->sdcnt.rx_outofbufs));
+  counters.push_back(CounterConfigs::SDIO_INTERRUPTS.unnamed(bus->sdcnt.intrcount));
+  counters.push_back(CounterConfigs::SDIO_RX_HEADERS_READ.unnamed(bus->sdcnt.f2rxhdrs));
+  counters.push_back(CounterConfigs::SDIO_RX_PACKETS_READ.unnamed(bus->sdcnt.f2rxdata));
+  counters.push_back(CounterConfigs::SDIO_TX_PACKETS_WRITE.unnamed(bus->sdcnt.f2txdata));
+  counters.push_back(CounterConfigs::SDIO_TX_QUEUE_FULL_COUNT.unnamed(bus->sdcnt.tx_qfull));
+
+  std::lock_guard lock(bus->tx_queue->txq_lock);
+  counters.push_back(CounterConfigs::SDIO_TX_ENQUEUE_COUNT.unnamed(bus->tx_queue->enqueue_count));
+
+  return counters;
+}
+
 void brcmf_sdio_oob_irqhandler(brcmf_sdio_dev* sdiodev) {
   struct brcmf_sdio* bus = sdiodev->bus;
   zx_status_t status;
@@ -3787,6 +3812,7 @@ static const struct brcmf_bus_ops brcmf_sdio_bus_ops = {
     .get_tail_length = brcmf_sdio_get_tail_length,
     .recovery = brcmf_sdio_recovery,
     .log_stats = brcmf_sdio_log_stats,
+    .get_counters = brcmf_sdio_get_counters,
     .prepare_vmo = brcmf_sdio_prepare_vmo,
     .release_vmo = brcmf_sdio_release_vmo,
     .queue_rx_space = brcmf_sdio_queue_rx_space,

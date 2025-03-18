@@ -140,6 +140,7 @@ source_set("core") {
     "fwil_types.h",
     "proto.h",
     "soc.h",
+    "stats.h",
     "wlan_interface.h",
   ]
   deps = [
