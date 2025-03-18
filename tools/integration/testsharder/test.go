@@ -25,6 +25,14 @@ const (
 	StopOnSuccess RunAlgorithm = "STOP_ON_SUCCESS"
 )
 
+type TestMetadata struct {
+	// A list of owners for this directory.
+	Owners []string `json:"owners,omitempty"`
+
+	// The Google Issue Tracker component ID.
+	ComponentID int `json:"component_id,omitempty"`
+}
+
 // Test is a struct used to hold information about a build.Test and how to run it.
 type Test struct {
 	build.Test
@@ -52,6 +60,9 @@ type Test struct {
 
 	// Tags are test metadata copied over from test-list.json.
 	Tags []build.TestTag `json:"tags,omitempty"`
+
+	// Test owner information and other metadata
+	Metadata TestMetadata `json:"metadata,omitempty"`
 }
 
 func (t *Test) applyModifier(m TestModifier) {

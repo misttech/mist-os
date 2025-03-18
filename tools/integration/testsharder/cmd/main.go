@@ -186,6 +186,10 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 	// actually applied by recipes. Centralize the default values in the build
 	// system.
 	testSpecs := m.TestSpecs()
+	metadataMap, err := testsharder.GetMetadata(testSpecs, checkoutDir)
+	if err != nil {
+		return err
+	}
 	var defaultCPU string
 	if err := m.Args().Get("target_cpu", &defaultCPU); err != nil {
 		return fmt.Errorf("failed to look up value of target_cpu arg: %w", err)
@@ -201,7 +205,7 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 			}
 		}
 	}
-	shards := testsharder.MakeShards(m.TestSpecs(), testListEntries, opts)
+	shards := testsharder.MakeShards(m.TestSpecs(), testListEntries, opts, metadataMap)
 
 	if perTestTimeout > 0 {
 		testsharder.ApplyTestTimeouts(shards, perTestTimeout)

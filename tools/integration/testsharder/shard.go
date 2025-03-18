@@ -263,7 +263,7 @@ type ShardOptions struct {
 
 // MakeShards returns the list of shards associated with a given build.
 // A single output shard will contain only tests that have the same environment.
-func MakeShards(specs []build.TestSpec, testListEntries map[string]build.TestListEntry, opts *ShardOptions) []*Shard {
+func MakeShards(specs []build.TestSpec, testListEntries map[string]build.TestListEntry, opts *ShardOptions, metadataMap map[string]TestMetadata) []*Shard {
 	// We don't want to crash if we've passed a nil testListEntries map.
 	if testListEntries == nil {
 		testListEntries = make(map[string]build.TestListEntry)
@@ -316,6 +316,10 @@ func MakeShards(specs []build.TestSpec, testListEntries map[string]build.TestLis
 			testListEntry, exists := testListEntries[spec.Test.Name]
 			if exists {
 				test.updateFromTestList(testListEntry)
+			}
+			testMetadata, exists := metadataMap[spec.Test.Name]
+			if exists {
+				test.Metadata = testMetadata
 			}
 			if spec.Test.Isolated || spec.IsBootTest {
 				name := fmt.Sprintf("%s-%s", environmentName(e), normalizeTestName(spec.Test.Name))

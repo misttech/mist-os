@@ -32,6 +32,8 @@ go_library("testsharder_lib") {
     "ffx_deps_test.go",
     "images.go",
     "images_test.go",
+    "metadata.go",
+    "metadata_test.go",
     "postprocess.go",
     "postprocess_test.go",
     "preprocess.go",
@@ -52,6 +54,7 @@ go_library("testsharder_lib") {
     "//tools/lib/color",
     "//tools/lib/ffxutil",
     "//tools/lib/logger",
+    "//tools/metadata:proto_lib",
     "//tools/testing/runtests",
   ]
 }
