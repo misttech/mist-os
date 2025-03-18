@@ -2330,6 +2330,32 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         }
     }
 
+    /// Read exactly `len` objects from `user`, returning them as a Vec.
+    fn read_multi_arch_objects_to_vec<
+        T,
+        T64: FromBytes + TryInto<T>,
+        T32: FromBytes + TryInto<T>,
+    >(
+        &self,
+        user: MappingMultiArchUserRef<T, T64, T32>,
+        len: usize,
+    ) -> Result<Vec<T>, Errno> {
+        match user {
+            MappingMultiArchUserRef::<T, T64, T32>::Arch64(user, _) => self
+                .read_objects_to_vec(user, len)?
+                .into_iter()
+                .map(TryInto::<T>::try_into)
+                .collect::<Result<Vec<T>, _>>()
+                .map_err(|_| errno!(EINVAL)),
+            MappingMultiArchUserRef::<T, T64, T32>::Arch32(user) => self
+                .read_objects_to_vec(user, len)?
+                .into_iter()
+                .map(TryInto::<T>::try_into)
+                .collect::<Result<Vec<T>, _>>()
+                .map_err(|_| errno!(EINVAL)),
+        }
+    }
+
     /// Reads the first `partial` bytes of an object, leaving any remainder 0-filled.
     ///
     /// This is used for reading size-versioned structures where the user can specify an older
@@ -2389,7 +2415,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
     }
 
     /// Read exactly `len` objects from `user`, returning them as a Vec.
-    fn read_objects_to_vec<T: Clone + FromBytes>(
+    fn read_objects_to_vec<T: FromBytes>(
         &self,
         user: UserRef<T>,
         len: usize,

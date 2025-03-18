@@ -960,10 +960,40 @@ pub fn cmsg_align(current_task: &CurrentTask, value: usize) -> Result<usize, Err
 // Syscalls for arch32 usage
 #[cfg(feature = "arch32")]
 mod arch32 {
+    use crate::vfs::{CurrentTask, FdNumber};
+    use starnix_sync::{Locked, Unlocked};
+    use starnix_uapi::errors::Errno;
+    use starnix_uapi::user_address::UserAddress;
+
     pub use super::{
-        sys_recvfrom as sys_arch32_recvfrom, sys_setsockopt as sys_arch32_setsockopt,
+        sys_accept as sys_arch32_accept, sys_bind as sys_arch32_bind,
+        sys_getsockname as sys_arch32_getsockname, sys_getsockopt as sys_arch32_getsockopt,
+        sys_listen as sys_arch32_listen, sys_recvfrom as sys_arch32_recvfrom,
+        sys_recvmmsg as sys_arch32_recvmmsg, sys_recvmsg as sys_arch32_recvmsg,
+        sys_sendmsg as sys_arch32_sendmsg, sys_sendto as sys_arch32_sendto,
+        sys_setsockopt as sys_arch32_setsockopt, sys_shutdown as sys_arch32_shutdown,
         sys_socketpair as sys_arch32_socketpair,
     };
+
+    pub fn sys_arch32_recv(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        fd: FdNumber,
+        user_buffer: UserAddress,
+        buffer_length: usize,
+        flags: u32,
+    ) -> Result<usize, Errno> {
+        super::sys_recvfrom(
+            locked,
+            current_task,
+            fd,
+            user_buffer,
+            buffer_length,
+            flags,
+            Default::default(),
+            Default::default(),
+        )
+    }
 }
 
 #[cfg(feature = "arch32")]

@@ -16,10 +16,11 @@ use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_types::user_buffer::UserBuffer;
 use starnix_uapi::errors::{Errno, ErrnoCode, ENOTSUP};
+use starnix_uapi::user_address::{MappingMultiArchUserRef, MultiArchUserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    c_int, errno, errno_from_zxio_code, error, from_status_like_fdio, sock_filter, sock_fprog,
-    uapi, ucred, AF_PACKET, BPF_MAXINSNS, MSG_DONTWAIT, MSG_WAITALL, SO_ATTACH_FILTER,
+    c_int, errno, errno_from_zxio_code, error, from_status_like_fdio, sock_filter, uapi, ucred,
+    AF_PACKET, BPF_MAXINSNS, MSG_DONTWAIT, MSG_WAITALL, SO_ATTACH_FILTER,
 };
 
 use ebpf::convert_and_verify_cbpf;
@@ -47,6 +48,22 @@ const ZXIO_SOCKET_MARK_SO_MARK: u8 = ZXIO_SOCKET_MARK_DOMAIN_1;
 
 /// Connects to the appropriate `fuchsia_posix_socket_*::Provider` protocol.
 struct SocketProviderServiceConnector;
+
+type SockFilterPtr = MultiArchUserRef<uapi::sock_filter, uapi::arch32::sock_filter>;
+
+struct SockFProg {
+    len: u32,
+    filter: SockFilterPtr,
+}
+
+uapi::arch_map_data! {
+    BidiTryFrom<SockFProg, sock_fprog> {
+        len = len;
+        filter = filter;
+    }
+}
+
+type SockFProfPtr = MappingMultiArchUserRef<SockFProg, uapi::sock_fprog, uapi::arch32::sock_fprog>;
 
 impl ServiceConnector for SocketProviderServiceConnector {
     fn connect(service_name: &str) -> Result<&'static zx::Channel, zx::Status> {
@@ -514,12 +531,16 @@ impl SocketOps for ZxioBackedSocket {
     ) -> Result<(), Errno> {
         match (level, optname) {
             (SOL_SOCKET, SO_ATTACH_FILTER) => {
-                let fprog = current_task.read_object::<sock_fprog>(user_opt.try_into()?)?;
-                if u32::from(fprog.len) > BPF_MAXINSNS || fprog.len == 0 {
+                let fprog_ptr = SockFProfPtr::new(current_task, user_opt.address);
+                if fprog_ptr.size_of_object() < user_opt.length {
                     return error!(EINVAL);
                 }
-                let code: Vec<sock_filter> =
-                    current_task.read_objects_to_vec(fprog.filter.into(), fprog.len as usize)?;
+                let fprog = current_task.read_multi_arch_object(fprog_ptr)?;
+                if fprog.len > BPF_MAXINSNS || fprog.len == 0 {
+                    return error!(EINVAL);
+                }
+                let code: Vec<sock_filter> = current_task
+                    .read_multi_arch_objects_to_vec(fprog.filter, fprog.len as usize)?;
                 self.attach_cbpf_filter(current_task, code)
             }
             (SOL_IP, IP_RECVERR) => {

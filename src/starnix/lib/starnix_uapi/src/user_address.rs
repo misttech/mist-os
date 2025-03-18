@@ -401,7 +401,7 @@ impl<T: TryInto<T64> + TryInto<T32>, T64: Immutable + IntoBytes, T32: Immutable 
     }
 }
 
-impl<T, T64: IntoBytes, T32: IntoBytes> MappingMultiArchUserRef<T, T64, T32> {
+impl<T, T64: FromBytes, T32: FromBytes> MappingMultiArchUserRef<T, T64, T32> {
     pub fn size_of_object(&self) -> usize {
         Self::size_of_object_for(self)
     }

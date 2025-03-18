@@ -56,6 +56,13 @@ arch_translate_data! {
         cmsg_level,
         cmsg_type,
     }
+
+    BidiFrom<sock_filter> {
+        code,
+        jt,
+        jf,
+        k,
+    }
 }
 
 translate_data! {
