@@ -43,13 +43,9 @@ __BEGIN_CDECLS
 // |storage->io|. The caller is responsible for calling zxio_close() on this
 // object when done with it.
 //
-// Always consumes |handle|. If zxio does not know how to wrap a handle, returns
-// ZX_ERR_NOT_SUPPORTED and initializes a zxio_t into |storage|. The caller
-// can extract |handle| with zxio_release() or close the handle and object
-// with zxio_close().
-//
-// In other error cases, consumes |handle| and initializes a null zxio into
-// |storage|.
+// If |handle| is valid but is not a type that zxio recognizes the zxio_t
+// instance will support at least zxio_close() and zxio_release() to close and
+// retrieve the contained value.
 //
 // May block to communicate with the server about the state of the object.
 ZXIO_EXPORT zx_status_t zxio_create(zx_handle_t handle, zxio_storage_t* storage);

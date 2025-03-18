@@ -40,7 +40,7 @@ TEST(Create, NotSupported) {
   zx::event event;
   ASSERT_OK(zx::event::create(0u, &event));
   zxio_storage_t storage;
-  ASSERT_STATUS(zxio_create(event.release(), &storage), ZX_ERR_NOT_SUPPORTED);
+  ASSERT_OK(zxio_create(event.release(), &storage));
   zxio_t* io = &storage.io;
   zx::handle handle;
   ASSERT_OK(zxio_release(io, handle.reset_and_get_address()));
