@@ -12,6 +12,24 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 )
 
+type PythonType struct {
+	fidlgen.Type
+	PythonName string
+}
+
+type PythonBits struct {
+	fidlgen.Bits
+	PythonName    string
+	PythonMembers []PythonBitsMember
+	Empty         bool
+}
+
+type PythonBitsMember struct {
+	fidlgen.BitsMember
+	PythonName  string
+	PythonValue string
+}
+
 type PythonStruct struct {
 	fidlgen.Struct
 	Library       string
@@ -36,6 +54,7 @@ type PythonRoot struct {
 	PythonModuleName string
 	PythonStructs    []PythonStruct
 	PythonAliases    []PythonAlias
+	PythonBits       []PythonBits
 }
 
 type compiler struct {
@@ -83,9 +102,8 @@ func compileSnakeIdentifier(val fidlgen.Identifier) string {
 	return fidlgen.ToSnakeCase(string(val))
 }
 
-type PythonType struct {
-	fidlgen.Type
-	PythonName string
+func compileScreamingSnakeIdentifier(val fidlgen.Identifier) string {
+	return fidlgen.ConstNameToAllCapsSnake(string(val))
 }
 
 func (c *compiler) compileType(val fidlgen.Type, maybeAlias *fidlgen.PartialTypeConstructor) *PythonType {
@@ -96,7 +114,13 @@ func (c *compiler) compileType(val fidlgen.Type, maybeAlias *fidlgen.PartialType
 
 	switch val.Kind {
 	case fidlgen.IdentifierType:
-		name += *c.compileDeclIdentifier(val.Identifier)
+		// TODO(https://fxbug.dev/394421154): This should be changed to use the enum type itself
+		// when we start making breaking changes for these bindings.
+		if c.decls[val.Identifier].Type == fidlgen.BitsDeclType {
+			name += "int"
+		} else {
+			name += *c.compileDeclIdentifier(val.Identifier)
+		}
 	case fidlgen.PrimitiveType:
 		subtype := string(val.PrimitiveSubtype)
 		if strings.HasPrefix(subtype, "int") || strings.HasPrefix(subtype, "uint") {
@@ -142,6 +166,42 @@ func (c *compiler) compileAlias(val fidlgen.Alias) PythonAlias {
 	}
 }
 
+// TODO(https://fxbug.dev/396552135): Add literal tests to conformance test suite.
+func (c *compiler) compileLiteral(val fidlgen.Literal) *string {
+	switch val.Kind {
+	case fidlgen.NumericLiteral:
+		return &val.Value
+	default:
+		log.Fatalf("unknown literal kind: %v", val)
+	}
+	return nil
+}
+
+func (c *compiler) compileBits(val fidlgen.Bits) PythonBits {
+	e := PythonBits{
+		Bits:          val,
+		PythonName:    *c.compileDeclIdentifier(val.Name),
+		PythonMembers: []PythonBitsMember{},
+		Empty:         len(val.Members) == 0,
+	}
+	for _, member_val := range val.Members {
+		var value string
+		switch member_val.Value.Kind {
+		case fidlgen.LiteralConstant:
+			value = *c.compileLiteral(*member_val.Value.Literal)
+		default:
+			log.Fatalf("Unknown bits member kind: %v", member_val)
+		}
+
+		e.PythonMembers = append(e.PythonMembers, PythonBitsMember{
+			BitsMember:  member_val,
+			PythonName:  compileScreamingSnakeIdentifier(member_val.Name),
+			PythonValue: value,
+		})
+	}
+	return e
+}
+
 func (c *compiler) compileStructMember(val fidlgen.StructMember) PythonStructMember {
 	t := c.compileType(val.Type, val.MaybeFromAlias)
 	if t == nil {
@@ -178,6 +238,7 @@ func Compile(root fidlgen.Root) PythonRoot {
 		Root:             root,
 		PythonModuleName: ToPythonModuleName(root.Name),
 		PythonStructs:    []PythonStruct{},
+		PythonBits:       []PythonBits{},
 	}
 	c := compiler{
 		decls:   root.DeclInfo(),
@@ -193,6 +254,12 @@ func Compile(root fidlgen.Root) PythonRoot {
 
 	for _, v := range root.Aliases {
 		python_root.PythonAliases = append(python_root.PythonAliases, c.compileAlias(v))
+	}
+
+	// TODO(https://fxbug.dev/396552135): Extend the test suite to cover the different variations
+	// of bits declarations.
+	for _, v := range root.Bits {
+		python_root.PythonBits = append(python_root.PythonBits, c.compileBits(v))
 	}
 
 	return python_root

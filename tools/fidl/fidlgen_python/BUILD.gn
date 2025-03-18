@@ -8,6 +8,7 @@ go_library("codegen") {
   source_dir = "codegen"
   deps = [ "//tools/fidl/lib/fidlgen" ]
   sources = [
+    "bits.tmpl",
     "codegen.go",
     "ir.go",
     "sourcefile.tmpl",

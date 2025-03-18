@@ -10,6 +10,8 @@ import("//build/fidl/fidl.gni")
 # and :conformance_python_fidl targets to co-exist.
 conformance_python_fidl_source_basenames = [
   "alignment.test.fidl",
+  "bits_flexible.test.fidl",
+  "bits_strict.test.fidl",
   "empty_struct.test.fidl",
   "memcpy_compatibility.test.fidl",
   "ported_from_walker_strings.test.fidl",

@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from fidl_codec import add_ir_path, encode_fidl_object # type: ignore
 import sys
 import typing
+import enum
 
 import fidl
 _ir_path = fidl._library.get_fidl_ir_map()["{{ .Name }}"]
@@ -27,10 +28,16 @@ add_ir_path(_ir_path)
 {{- template "StructDeclaration" . -}}
 {{ end -}}
 
+
+{{ range .PythonBits }}
+{{- template "BitsDeclaration" . -}}
+{{ end -}}
+
+
 {{- if .PythonAliases }}
 # Generated aliases
 {{ end -}}
 {{- range .PythonAliases -}}
 {{.PythonName }} = {{ .PythonAliasedName }}
+{{ end -}}
 {{ end }}
-{{- end }}
