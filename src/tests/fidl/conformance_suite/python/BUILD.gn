@@ -48,7 +48,7 @@ fidl("conformance_python_fidl") {
   _enable_experimental_python = true
 
   non_fidl_deps = []
-  sources = []
+  sources = [ "//src/tests/fidl/conformance_suite/python/aliases.test.fidl" ]
   foreach(source_basename, conformance_python_fidl_source_basenames) {
     transplant_target = ":conformance_python_fidl_transplant__${source_basename}(//build/toolchain:host_x64)"
     non_fidl_deps += [ transplant_target ]

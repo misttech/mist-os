@@ -152,6 +152,7 @@ gidl("static_conformance_tests_py") {
     "//src/tests/fidl/conformance_suite/strings.gidl",
     "//src/tests/fidl/conformance_suite/strings_utf8.gen.gidl",
     "//src/tests/fidl/conformance_suite/vectors.gidl",
+    "//src/tests/fidl/conformance_suite/python/aliases.gidl",
   ]
   fidl = "//src/tests/fidl/conformance_suite/python:conformance_python_fidl"
   output = conformance_test_source

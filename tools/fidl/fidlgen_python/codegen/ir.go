@@ -25,10 +25,17 @@ type PythonStructMember struct {
 	PythonName string
 }
 
+type PythonAlias struct {
+	fidlgen.Alias
+	PythonAliasedName string
+	PythonName        string
+}
+
 type PythonRoot struct {
 	fidlgen.Root
 	PythonModuleName string
 	PythonStructs    []PythonStruct
+	PythonAliases    []PythonAlias
 }
 
 type compiler struct {
@@ -82,10 +89,6 @@ type PythonType struct {
 }
 
 func (c *compiler) compileType(val fidlgen.Type, maybeAlias *fidlgen.PartialTypeConstructor) *PythonType {
-	if maybeAlias != nil {
-		log.Fatalf("PartialTypeConstructor not supported")
-	}
-
 	name := ""
 	if val.Nullable {
 		name = "typing.Optional["
@@ -123,6 +126,19 @@ func (c *compiler) compileType(val fidlgen.Type, maybeAlias *fidlgen.PartialType
 	return &PythonType{
 		Type:       val,
 		PythonName: name,
+	}
+}
+
+func (c *compiler) compileAlias(val fidlgen.Alias) PythonAlias {
+	t := c.compileType(val.Type, val.MaybeFromAlias)
+	if t == nil {
+		log.Fatalf("Type not supported")
+	}
+
+	return PythonAlias{
+		Alias:             val,
+		PythonAliasedName: t.PythonName,
+		PythonName:        *c.compileDeclIdentifier(val.Name),
 	}
 }
 
@@ -173,6 +189,10 @@ func Compile(root fidlgen.Root) PythonRoot {
 			continue
 		}
 		python_root.PythonStructs = append(python_root.PythonStructs, c.compileStruct(v))
+	}
+
+	for _, v := range root.Aliases {
+		python_root.PythonAliases = append(python_root.PythonAliases, c.compileAlias(v))
 	}
 
 	return python_root

@@ -26,4 +26,11 @@ add_ir_path(_ir_path)
 {{ range .PythonStructs }}
 {{- template "StructDeclaration" . -}}
 {{ end -}}
+
+{{- if .PythonAliases }}
+# Generated aliases
+{{ end -}}
+{{- range .PythonAliases -}}
+{{.PythonName }} = {{ .PythonAliasedName }}
+{{ end }}
 {{- end }}
