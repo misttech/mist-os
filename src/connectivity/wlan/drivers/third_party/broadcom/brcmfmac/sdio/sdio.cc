@@ -115,8 +115,13 @@ struct rte_console {
    one scheduling */
 #define BRCMF_RXBOUND 50
 
-/* Default for max tx frames in one scheduling */
-#define BRCMF_TXBOUND 40
+// Default for max tx frames in one scheduling. Set this to match the max number of frames that can
+// be TX glommed. Note that this behavior deviates from the original vendor driver where this value
+// was set to 20 and was ignored when TX glomming was enabled. Because of the workaround for CRC
+// errors where we set bus->txbound = 1 we can't safely do that, we have to respect bus->txbound at
+// all times to ensure we can recover from those CRC errors. Previously this value was set to 40,
+// deviating from the vendor driver anyway.
+#define BRCMF_TXBOUND kMaxTxGlomFrames
 
 #define BRCMF_TXMINMAX 1 /* Max tx frames if rx still pending */
 
@@ -1789,7 +1794,7 @@ static zx_status_t brcmf_sdio_tx_frame_hdr_align(struct brcmf_sdio* bus,
 }
 
 static uint16_t brcmf_sdio_compute_tail_pad(struct brcmf_sdio* bus, uint32_t frame_size,
-                                            bool last_frame, uint16_t total_size) {
+                                            bool last_frame, uint32_t total_size) {
   uint32_t alignment = last_frame ? bus->sdiodev->func2->blocksize : bus->sgentry_align;
   // For individual frames we align the frame size, for the last frame we align the entire chain
   uint32_t size = last_frame ? total_size : frame_size;
@@ -1801,7 +1806,7 @@ static zx_status_t brcmf_sdio_tx_frames_prep(struct brcmf_sdio* bus,
                                              uint8_t channel) {
   TRACE_DURATION("brcmfmac:isr", "sdio_tx_frames_prep");
 
-  uint16_t total_size = 0;
+  size_t total_size = 0;
   uint8_t tx_seq = bus->tx_seq;
   for (auto frameIt = frames.begin(); frameIt != frames.end(); ++frameIt) {
     auto& frame = *frameIt;
@@ -1841,7 +1846,15 @@ static zx_status_t brcmf_sdio_tx_frames_prep(struct brcmf_sdio* bus,
     brcmf_sdio_hdpack(bus, data, &hd_info);
   }
   if (bus->txglom) {
-    brcmf_sdio_update_hwhdr(frames.begin()->Data(), total_size);
+    if (total_size > std::numeric_limits<uint16_t>::max()) {
+      // TODO(https://fxbug.dev/403335051): Recover more gracefully from this. Right now we drop all
+      // frames, ideally we would only drop individual frames or even better not take frames out of
+      // the queue (or put them back) if the transfer size exceeds the max value.
+      BRCMF_ERR("TX glom size %u exceeds maximum value %u", total_size,
+                std::numeric_limits<uint16_t>());
+      return ZX_ERR_IO_OVERRUN;
+    }
+    brcmf_sdio_update_hwhdr(frames.begin()->Data(), static_cast<uint16_t>(total_size));
   }
 
   return ZX_OK;
