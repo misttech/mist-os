@@ -5,6 +5,11 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.pkg.test") {
+  testonly = true
+  sdk_category = "compat_test"
+  stable = true
+  sdk_area = "Software Delivery"
+
   sources = [ "realm_factory.test.fidl" ]
   public_deps = [
     "//sdk/fidl/fuchsia.component.sandbox",

@@ -333,6 +333,7 @@ group("sdk_partner_internal_libs_allowlist") {
 #   git rm sdk/history/*/<library_name>.api_summary.json
 _compat_test_fidl_libraries_targets_list = [
   # keep-sorted: begin
+  "//examples/fidl/fuchsia.examples:fuchsia.examples",
   "//sdk/ctf/tests/fidl/fuchsia.element/testing/fidl:fuchsia.element.test",
   "//sdk/ctf/tests/fidl/fuchsia.intl/testing/fidl:fuchsia.intl.test",
   "//sdk/ctf/tests/fidl/fuchsia.settings/testing/fidl:fuchsia.settings.test",
@@ -344,6 +345,7 @@ _compat_test_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.ui.test.conformance:fuchsia.ui.test.conformance",
   "//sdk/fidl/fuchsia.ui.test.context:fuchsia.ui.test.context",
   "//src/diagnostics/archivist/tests/integration/realm_factory/fidl:fuchsia.archivist.test",
+  "//src/sys/pkg/tests/pkgdir/test_realm_proxy/fidl:fuchsia.pkg.test",
 
   # keep-sorted: end
 ]

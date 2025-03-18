@@ -199,23 +199,17 @@ template("fidl_library") {
   # unstable. CTF tests, which target `NEXT`, similarly build code that depends
   # on unstable libraries.
   # Treat such libraries as unversioned until each is resolved.
-  _unversioned_libraries_used_by_sdk_prebuilts_or_ctf = [
+  _libraries_in_unsupported_scenarios = [
     # Do not add to this list without discussing with the FIDL team.
     # It is likely that only instances of the scenarios described in
     # https://fxbug.dev/369892217 should be added.
 
     # TODO(https://fxbug.dev/364294648): Resolve heapdump instrumentation dependency on library.
     "fuchsia.memory.heapdump.process",
-
-    # TODO(https://fxbug.dev/365602428): For each of these libraries, either
-    # remove the dependency from the CTF tests or make the library stable then
-    # remove the library from the list below.
-    "fuchsia.examples",
-    "fuchsia.pkg.test",
   ]
-  _is_unversioned_libraries_used_by_sdk_prebuilts_or_ctf =
-      _unversioned_libraries_used_by_sdk_prebuilts_or_ctf + [ library_name ] -
-      [ library_name ] != _unversioned_libraries_used_by_sdk_prebuilts_or_ctf
+  _is_libraries_in_unsupported_scenarios =
+      _libraries_in_unsupported_scenarios + [ library_name ] -
+      [ library_name ] != _libraries_in_unsupported_scenarios
 
   # TODO(https://fxbug.dev/364422340): Remove when the internal "zx" library is properly versioned.
   _is_internal_zx_library =
@@ -273,7 +267,7 @@ template("fidl_library") {
       # Temporary exceptions to the above rule. See the TODOs where each
       # variable is declared. Update the comment about "temporary exceptions" in
       # fidl.gni when removing the last one.
-      if (_is_unversioned_libraries_used_by_sdk_prebuilts_or_ctf) {
+      if (_is_libraries_in_unsupported_scenarios) {
         fidlc_versioned_arg = "unversioned"
       } else if (_is_banjo_sysmem) {
         fidlc_versioned_arg = "fuchsia"
@@ -292,7 +286,7 @@ template("fidl_library") {
 
   # These are used in conditions, including within asserts, that are not always executed.
   not_needed([
-               "_is_unversioned_libraries_used_by_sdk_prebuilts_or_ctf",
+               "_is_libraries_in_unsupported_scenarios",
                "_is_internal_zx_library",
                "_is_banjo_sysmem",
                "_is_documentation_example",
@@ -309,7 +303,7 @@ template("fidl_library") {
           (fidlc_versioned_arg == "fuchsia:HEAD" && !is_stable &&
                requires_compatibility_tests == defined(invoker.sdk_category)) ||
           (fidlc_versioned_arg == "unversioned" &&
-               _is_unversioned_libraries_used_by_sdk_prebuilts_or_ctf) ||
+               _is_libraries_in_unsupported_scenarios) ||
           (fidlc_versioned_arg == "unversioned" && !is_stable &&
                !requires_compatibility_tests &&
                (!defined(invoker.sdk_category) || is_unversioned_vendor_sdk)) ||
