@@ -46,6 +46,9 @@ source_set("top") {
 
     # Virtio Support
     "//vendor/misttech/dev/virtio",
+
+    # LWIP
+    "//vendor/misttech/third_party/lwip",
   ]
 
   if (is_mistos) {

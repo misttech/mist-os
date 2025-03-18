@@ -1,0 +1,137 @@
+# Copyright 2025 Mist Tecnologia LTDA. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/zircon/migrated_targets.gni")
+
+config("include_dirs") {
+  include_dirs = [
+    ".",
+    "src/src/include",
+  ]
+}
+
+config("disable_warnings") {
+  visibility = [ ":*" ]
+
+  cflags = [ "-Wno-conversion" ]
+}
+
+# The minimum set of files needed for lwIP.
+source_set("corefiles") {
+  # NOSORT
+  sources = [
+    "src/src/core/init.c",
+    "src/src/core/def.c",
+    "src/src/core/dns.c",
+    "src/src/core/inet_chksum.c",
+    "src/src/core/ip.c",
+    "src/src/core/mem.c",
+    "src/src/core/memp.c",
+    "src/src/core/netif.c",
+    "src/src/core/pbuf.c",
+    "src/src/core/raw.c",
+    "src/src/core/stats.c",
+    "src/src/core/sys.c",
+    "src/src/core/altcp.c",
+    "src/src/core/altcp_alloc.c",
+    "src/src/core/altcp_tcp.c",
+    "src/src/core/tcp.c",
+    "src/src/core/tcp_in.c",
+    "src/src/core/tcp_out.c",
+    "src/src/core/timeouts.c",
+    "src/src/core/udp.c",
+  ]
+
+  configs += [ ":include_dirs" ]
+}
+
+source_set("core4files") {
+  # NOSORT
+  sources = [
+    "src/src/core/ipv4/acd.c",
+    "src/src/core/ipv4/autoip.c",
+    "src/src/core/ipv4/dhcp.c",
+    "src/src/core/ipv4/etharp.c",
+    "src/src/core/ipv4/icmp.c",
+    "src/src/core/ipv4/igmp.c",
+    "src/src/core/ipv4/ip4_frag.c",
+    "src/src/core/ipv4/ip4.c",
+    "src/src/core/ipv4/ip4_addr.c",
+  ]
+
+  configs += [
+    ":include_dirs",
+    ":disable_warnings",
+  ]
+}
+
+source_set("core6files") {
+  # NOSORT
+  sources = [
+    "src/src/core/ipv6/dhcp6.c",
+    "src/src/core/ipv6/ethip6.c",
+    "src/src/core/ipv6/icmp6.c",
+    "src/src/core/ipv6/inet6.c",
+    "src/src/core/ipv6/ip6.c",
+    "src/src/core/ipv6/ip6_addr.c",
+    "src/src/core/ipv6/ip6_frag.c",
+    "src/src/core/ipv6/mld6.c",
+    "src/src/core/ipv6/nd6.c",
+  ]
+
+  configs += [ ":include_dirs" ]
+}
+
+# APIFILES: The files which implement the sequential and socket APIs.
+source_set("api_files") {
+  # NOSORT
+  sources = [
+    "src/src/api/api_lib.c",
+    "src/src/api/api_msg.c",
+    "src/src/api/err.c",
+    "src/src/api/if_api.c",
+    "src/src/api/netbuf.c",
+    "src/src/api/netdb.c",
+    "src/src/api/netifapi.c",
+    "src/src/api/sockets.c",
+    "src/src/api/tcpip.c",
+  ]
+
+  configs += [
+    ":include_dirs",
+    ":disable_warnings",
+  ]
+
+  deps = [ "//vendor/misttech/third_party/linux_uapi" ]
+}
+
+# Files implementing various generic network interface functions
+source_set("netif_files") {
+  # NOSORT
+  sources = [
+    "src/src/netif/ethernet.c",
+    #"src/src/netif/bridgeif.c",
+    #"src/src/netif/bridgeif_fdb.c",
+    #"src/src/netif/slipif.c",
+  ]
+
+  configs += [ ":include_dirs" ]
+}
+
+# LWIPNOAPPSFILES: All LWIP files without apps
+zx_library("lwip") {
+  configs += [ ":include_dirs" ]
+
+  deps = [
+    ":api_files",
+    ":core4files",
+    ":core6files",
+    ":corefiles",
+    ":netif_files",
+  ]
+
+  deps += [ "//zircon/kernel/lib/init" ]
+
+  sources = [ "sys_arch.cc" ]
+}
