@@ -17,7 +17,8 @@ bool ImminentOomEventObserver::IsImminentOom() {
   zx_signals_t observed;
   zx_status_t status = zx_object_wait_one(imminent_oom_event_handle_, ZX_EVENT_SIGNALED,
                                           ZX_TIME_INFINITE_PAST, &observed);
-  if (status != ZX_OK) {
+  // With a deadline of ZX_TIME_INFINITE_PAST, it is expected that this call times out.
+  if (status != ZX_OK && status != ZX_ERR_TIMED_OUT) {
     FX_LOGS(ERROR) << "zx_object_wait_one returned " << zx_status_get_string(status);
     return false;
   }
