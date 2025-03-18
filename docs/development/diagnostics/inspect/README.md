@@ -12,13 +12,13 @@ that expose information.
 
 **Not sure where to start?**
 
-* [Quickstart](quickstart.md) – A get-started guide for component inspection.
-* [`ffx inspect`][ffx-inspect] – The `ffx` command for inspecting components.
-* [Codelab](codelab.md) – A full codelab in C++ and Rust.
+* [Quickstart](quickstart.md): A get-started guide for component inspection.
+* [`ffx inspect`][ffx-inspect]: The `ffx` command for inspecting components.
+* [Codelab](codelab.md): A full codelab in C++ and Rust.
 * API reference for [C++](https://fuchsia-docs.firebaseapp.com/cpp/inspect/index.html),
   [Rust](https://fuchsia-docs.firebaseapp.com/rust/fuchsia_inspect/index.html).
 
-* [Health checks] – Describes the health check subsystem.
+* [Health checks]: Describes the health check subsystem.
 
 ## Concepts
 
@@ -183,6 +183,8 @@ language libraries.
 
 ## Userspace tools
 
+### ffx inspect
+
 To examine the inspect hierarchies of components, you can use the
 [`ffx inspect show`][ffx-inspect-show] command:
 
@@ -199,9 +201,48 @@ To examine the inspect hierarchies of components, you can use the
    ffx inspect show core/font_provider
    ```
 
-Or run [`ffx target snapshot`][ffx-target-snapshot]
-to generate a ZIP archive containing the system's diagnostic information, which
-includes inspect:
+`ffx inspect show` also does fuzzy matching on its inputs. For example:
+
+```posix-terminal
+ffx inspect show archivist.cm
+```
+
+This prints all of the Inspect for `bootstrap/archivist` as long as this is the only component
+that exposes Inspect in the system whose URL ends with `archivist.cm`.
+
+Fuzzy matching will fail if the input is insufficiently specific to identify an individual
+component; in that case, the tool will print a list of monikers that matched the query.
+
+In general, this command accepts the following:
+
+- A component moniker, for example, `core/network/netstack`. If only the moniker is passed,
+  collection markers don't need to be escaped, though they optionally can be.
+
+- A fuzzy search parameter, corresponding to a URL fragment, manifest fragment, or
+  moniker fragment. Ie `ffx inspect show archivist.cm` for `bootstrap/archivist` with
+  the manifest `archivist.cm`.
+
+- A component selector, for example, `core/network/*`.
+
+- A full diagnostics selector, for example, `core/network/netstack:root/path/to/*:property`. In
+  the full selector case, escaping must be performed to create a valid selector.
+
+Suppose you have the component `bootstrap/driver-hosts:driver-host-337`. An ergonomic way to avoid
+escaping things as much as possible when you want a specific property might look like the following:
+
+```posix-terminal
+ffx inspect driver-host-337 --data root/stats:my_stat
+```
+
+<!-- if you are reading the source, be aware that `\\` is escaping itself for markdown rendering -->
+Note: The following characters in a selector must be escaped with `\\` when writing an actual
+diagnostics selector: `*`, `:`, `\\`, `/`, and whitespace. To learn more about selectors
+see [the selector format docs][selectors].
+
+### ffx target snapshot
+
+[`ffx target snapshot`][ffx-target-snapshot] generates a ZIP archive that contains the system's
+diagnostic information, which includes inspect:
 
 ```posix-terminal
 ffx target snapshot
@@ -229,3 +270,4 @@ ffx target snapshot
 [ffx-inspect]: https://fuchsia.dev/reference/tools/sdk/ffx.md#inspect
 [ffx-inspect-show]: https://fuchsia.dev/reference/tools/sdk/ffx.md#show_3
 [ffx-target-snapshot]: https://fuchsia.dev/reference/tools/sdk/ffx.md#snapshot
+[selectors]: /docs/reference/diagnostics/selectors.md

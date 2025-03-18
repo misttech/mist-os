@@ -123,8 +123,8 @@ async fn test_selectors_filter_serve_fs() {
         iquery_args: vec![
             "--accessor",
             "archivist:fuchsia.diagnostics.ArchiveAccessor",
-            "--component",
             "basic_component.cm",
+            "--data",
             "root/fuchsia.inspect.Health",
         ],
         opts: vec![AssertionOption::Retry],
@@ -141,8 +141,8 @@ async fn test_selectors_filter() {
         iquery_args: vec![
             "--accessor",
             "archivist:fuchsia.diagnostics.ArchiveAccessor",
-            "--component",
             "basic_component.cm",
+            "--data",
             "root/fuchsia.inspect.Health",
         ],
         opts: vec![AssertionOption::Retry],
@@ -205,8 +205,8 @@ async fn show_filter_manifest_serve_fs() {
         iquery_args: vec![
             "--accessor",
             "archivist:fuchsia.diagnostics.ArchiveAccessor",
-            "--component",
             "basic_component.cm",
+            "--data",
             "root/fuchsia.inspect.Health",
         ],
         opts: vec![AssertionOption::Retry],
@@ -223,8 +223,8 @@ async fn show_filter_manifest() {
         iquery_args: vec![
             "--accessor",
             "archivist:fuchsia.diagnostics.ArchiveAccessor",
-            "--component",
             "basic_component.cm",
+            "--data",
             "root/fuchsia.inspect.Health",
         ],
         opts: vec![AssertionOption::Retry],
@@ -241,7 +241,6 @@ async fn show_filter_manifest_no_selectors_serve_fs() {
         iquery_args: vec![
             "--accessor",
             "archivist:fuchsia.diagnostics.ArchiveAccessor",
-            "--component",
             "basic_component.cm",
         ],
         opts: vec![AssertionOption::Retry],
@@ -258,7 +257,6 @@ async fn show_filter_manifest_no_selectors() {
         iquery_args: vec![
             "--accessor",
             "archivist:fuchsia.diagnostics.ArchiveAccessor",
-            "--component",
             "basic_component.cm",
         ],
         opts: vec![AssertionOption::Retry],

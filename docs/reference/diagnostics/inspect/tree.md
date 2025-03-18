@@ -128,8 +128,8 @@ what selectors can be used:
 
 These modes could be used together as follows:
 
-```
-$ iquery show `iquery list | grep component_name`
+```posix-terminal
+iquery show component_name
 ```
 
 Alternatively `iquery` also allows to print the inspect data at a location. A
@@ -141,22 +141,21 @@ iquery's secondary mode of operation (triggered by `list-files`) recursively
 identifies locations for Inspect data from the given directory path. The
 two modes may be used together as follows:
 
-```
-$ iquery list-files [component_moniker]
+```posix-terminal
+iquery list-files [component_moniker]
 bootstrap/driver_manager
   class/display-coordinator/000.inspect
   ... additional output
 
-
-$ iquery show --file 'class/display-coordinator/000.inspect'
+iquery show --file 'class/display-coordinator/000.inspect'
 ```
 
 In the example above, `iquery list-files` is ran to find a list of Inspect
 locations. Then, `iquery` is ran on one of the output to
 recursively list data in the matching locations. You may instead write:
 
-```
-$ fx iquery show --component component_name
+```posix-terminal
+iquery show component_name
 ```
 
 ### Archivist {#archivist}

@@ -26,7 +26,7 @@ async fn test_selectors_no_parameters() {
     let expected_responses = Rc::new(vec![]);
     let test_buffers = TestBuffers::default();
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
-    let cmd = SelectorsCommand { component: None, selectors: vec![], accessor: None };
+    let cmd = SelectorsCommand { data: vec![], selectors: vec![], accessor: None };
     assert!(run_command(
         setup_fake_rcs(vec![]),
         setup_fake_archive_accessor(vec![FakeAccessorData::new(
@@ -55,9 +55,9 @@ async fn test_selectors_with_unknown_component_search() {
     let test_buffers = TestBuffers::default();
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
     let cmd = SelectorsCommand {
-        component: Some(String::from("some-bad-moniker")),
-        selectors: vec![],
+        selectors: vec!["some-bad-moniker".to_string()],
         accessor: None,
+        data: vec![],
     };
     assert!(run_command(
         setup_fake_rcs(vec![]),
@@ -87,9 +87,9 @@ async fn test_selectors_with_unknown_manifest() {
     let test_buffers = TestBuffers::default();
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
     let cmd = SelectorsCommand {
-        component: Some(String::from("some-bad-moniker")),
-        selectors: vec![],
+        selectors: vec!["some-bad-moniker".to_string()],
         accessor: None,
+        data: vec![],
     };
     assert!(run_command(
         setup_fake_rcs(vec![]),
@@ -110,11 +110,8 @@ async fn test_selectors_with_unknown_manifest() {
 async fn test_selectors_with_succesful_component_search() {
     let test_buffers = TestBuffers::default();
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
-    let cmd = SelectorsCommand {
-        component: Some(String::from("moniker1")),
-        selectors: vec![],
-        accessor: None,
-    };
+    let cmd =
+        SelectorsCommand { selectors: vec!["moniker1".to_string()], accessor: None, data: vec![] };
     let lifecycle_data = inspect_accessor_data(
         ClientSelectorConfiguration::SelectAll(true),
         make_inspects_for_lifecycle(),
@@ -153,11 +150,8 @@ async fn test_selectors_with_succesful_component_search() {
 async fn test_selectors_with_manifest_that_exists() {
     let test_buffers = TestBuffers::default();
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
-    let cmd = SelectorsCommand {
-        component: Some(String::from("moniker1")),
-        selectors: vec![],
-        accessor: None,
-    };
+    let cmd =
+        SelectorsCommand { selectors: vec!["moniker1".to_string()], accessor: None, data: vec![] };
     let lifecycle_data = inspect_accessor_data(
         ClientSelectorConfiguration::SelectAll(true),
         make_inspects_for_lifecycle(),
@@ -197,7 +191,7 @@ async fn test_selectors_with_selectors() {
     let test_buffers = TestBuffers::default();
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
     let cmd = SelectorsCommand {
-        component: None,
+        data: vec![],
         selectors: vec![String::from("test/moniker1:name:hello_3")],
         accessor: None,
     };

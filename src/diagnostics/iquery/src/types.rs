@@ -87,9 +87,14 @@ pub enum Error {
     FuzzyMatchTooManyMatches(FuzzyMatchErrorWrapper),
 
     #[error(
-        "hint: selectors paired with --component must not include component selector segment: {0}"
+        "hint: positional selectors paired with --data must not include tree/node selector segment: {0}"
     )]
     PartialSelectorHint(#[source] selectors::Error),
+
+    #[error(
+        "When using --data, there must be exactly one component query as a positional argument"
+    )]
+    WrongNumberOfSearchQueriesForDataFlag,
 }
 
 #[derive(Debug)]

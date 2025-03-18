@@ -25,10 +25,10 @@ pub struct SelectorsCommand {
     pub selectors: Vec<String>,
 
     #[argh(option)]
-    /// a fuzzy-search query. May include URL, moniker, or manifest fragments. No selector-escaping
-    /// for moniker is needed in this query. Selectors following --component should omit the
-    /// component selector, as they will be spliced together by the tool with the correct escaping.
-    pub component: Option<String>,
+    /// tree selectors to splice onto a component query specified as a positional argument
+    ///
+    /// For example, `show foo.cm --data root:bar` becomes the selector `path/to/foo:root:bar`.
+    pub data: Vec<String>,
 
     #[argh(option)]
     /// A string specifying what `fuchsia.diagnostics.ArchiveAccessor` to connect to.
@@ -42,19 +42,22 @@ impl Command for SelectorsCommand {
     type Result = SelectorsResult;
 
     async fn execute<P: DiagnosticsProvider>(self, provider: &P) -> Result<Self::Result, Error> {
-        if self.selectors.is_empty() && self.component.is_none() {
+        if self.selectors.is_empty() && self.data.is_empty() {
             return Err(Error::invalid_arguments("Expected 1 or more selectors. Got zero."));
         }
 
-        let mut selectors = if let Some(component) = self.component {
+        let mut selectors = if self.data.is_empty() {
+            utils::process_fuzzy_inputs(self.selectors, provider).await?
+        } else {
+            if self.selectors.len() != 1 {
+                return Err(Error::WrongNumberOfSearchQueriesForDataFlag);
+            }
             utils::process_component_query_with_partial_selectors(
-                component,
-                self.selectors.into_iter(),
+                &self.selectors[0],
+                self.data.into_iter(),
                 provider,
             )
             .await?
-        } else {
-            utils::process_fuzzy_inputs(self.selectors, provider).await?
         };
 
         utils::ensure_tree_field_is_set(&mut selectors, None)?;

@@ -14,13 +14,13 @@
     {
       "kind": {
         "Option": {
-          "arg_name": "component"
+          "arg_name": "data"
         }
       },
-      "optionality": "optional",
-      "long": "--component",
+      "optionality": "repeating",
+      "long": "--data",
       "short": null,
-      "description": "a fuzzy-search query. May include URL, moniker, or manifest fragments. No selector-escaping for moniker is needed in this query. Selectors following --component should omit the component selector, as they will be spliced together by the tool with the correct escaping.",
+      "description": "tree selectors to splice onto a component query specified as a positional argument For example, `show foo.cm --data root:bar` becomes the selector `path/to/foo:root:bar`.",
       "hidden": false
     },
     {
