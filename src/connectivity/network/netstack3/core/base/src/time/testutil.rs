@@ -141,6 +141,14 @@ impl FakeInstantCtx {
     pub fn sleep(&mut self, dur: Duration) {
         self.time.offset += dur;
     }
+
+    /// Advance the current time to the given instant.
+    ///
+    /// Panics if `instant` is not in the future compared to current time.
+    pub fn sleep_until(&mut self, instant: FakeInstant) {
+        assert!(instant > self.time, "sleep until the past not allowed");
+        self.time = instant;
+    }
 }
 
 impl InstantBindingsTypes for FakeInstantCtx {

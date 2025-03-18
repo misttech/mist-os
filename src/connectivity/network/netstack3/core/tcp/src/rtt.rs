@@ -29,10 +29,9 @@ impl Default for Estimator {
 impl Estimator {
     /// The following constants are defined in [RFC 6298 Section 2]:
     ///
-    /// [RFC 6298]: https://tools.ietf.org/html/rfc6298#section-2
+    /// [RFC 6298 Section 2]: https://tools.ietf.org/html/rfc6298#section-2
     const K: u32 = 4;
     const G: Duration = Duration::from_millis(100);
-    pub(super) const RTO_INIT: Duration = Duration::from_secs(1);
 
     /// Updates the estimates with a newly sampled RTT.
     pub(super) fn sample(&mut self, rtt: Duration) {
@@ -61,19 +60,19 @@ impl Estimator {
     }
 
     /// Returns the current retransmission timeout.
-    pub(super) fn rto(&self) -> Duration {
+    pub(super) fn rto(&self) -> Rto {
         //   Until a round-trip time (RTT) measurement has been made for a
         //   segment sent between the sender and receiver, the sender SHOULD
         //   set RTO <- 1 second;
         //   ...
         //   RTO <- SRTT + max (G, K*RTTVAR)
         match *self {
-            Estimator::NoSample => Self::RTO_INIT,
+            Estimator::NoSample => Rto::DEFAULT,
             Estimator::Measured { srtt, rtt_var } => {
                 // `Duration::MAX` is 2^64 seconds which is about 6 * 10^11
                 // years. If the following expression panics due to overflow,
                 // we must have some serious errors in the estimator itself.
-                srtt + Self::G.max(rtt_var * Self::K)
+                Rto::new(srtt + Self::G.max(rtt_var * Self::K))
             }
         }
     }
@@ -83,6 +82,77 @@ impl Estimator {
             Self::NoSample => None,
             Self::Measured { srtt, rtt_var: _ } => Some(*srtt),
         }
+    }
+}
+
+/// A retransmit timeout value.
+///
+/// This type serves as a witness for a valid retransmit timeout value that is
+/// clamped to the interval `[Rto::MIN, Rto::MAX]`. It can be transformed into a
+/// [`Duration`].
+#[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Copy, Clone)]
+pub(super) struct Rto(Duration);
+
+impl Rto {
+    /// The minimum retransmit timeout value.
+    ///
+    /// [RFC 6298 Section 2] states:
+    ///
+    /// > Whenever RTO is computed, if it is less than 1 second, then the RTO
+    /// > SHOULD be rounded up to 1 second. [...] Therefore, this specification
+    /// > requires a large minimum RTO as a conservative approach, while at the
+    /// > same time acknowledging that at some future point, research may show
+    /// > that a smaller minimum RTO is acceptable or superior.
+    ///
+    /// We hard code the default value used by [Linux] here.
+    ///
+    /// [RFC 6298 Section 2]: https://datatracker.ietf.org/doc/html/rfc6298#section-2
+    /// [Linux]: https://github.com/torvalds/linux/blob/4701f33a10702d5fc577c32434eb62adde0a1ae1/include/net/tcp.h#L148
+    pub(super) const MIN: Rto = Rto(Duration::from_millis(200));
+
+    /// The maximum retransmit timeout value.
+    ///
+    /// [RFC 67298 Section 2] states:
+    ///
+    /// > (2.5) A maximum value MAY be placed on RTO provided it is at least 60
+    /// > seconds.
+    ///
+    /// We hard code the default value used by [Linux] here.
+    ///
+    /// [RFC 6298 Section 2]: https://datatracker.ietf.org/doc/html/rfc6298#section-2
+    /// [Linux]: https://github.com/torvalds/linux/blob/4701f33a10702d5fc577c32434eb62adde0a1ae1/include/net/tcp.h#L147
+    pub(super) const MAX: Rto = Rto(Duration::from_secs(120));
+
+    /// The default RTO value.
+    pub(super) const DEFAULT: Rto = Rto(Duration::from_secs(1));
+
+    /// Creates a new [`Rto`] by clamping `duration` to the allowed range.
+    pub(super) fn new(duration: Duration) -> Self {
+        Self(duration).clamp(Self::MIN, Self::MAX)
+    }
+
+    pub(super) fn get(&self) -> Duration {
+        let Self(inner) = self;
+        *inner
+    }
+
+    /// Returns the result of doubling this RTO value and saturating to the
+    /// valid range.
+    pub(super) fn double(&self) -> Self {
+        let Self(d) = self;
+        Self(d.saturating_mul(2)).min(Self::MAX)
+    }
+}
+
+impl From<Rto> for Duration {
+    fn from(Rto(value): Rto) -> Self {
+        value
+    }
+}
+
+impl Default for Rto {
+    fn default() -> Self {
+        Self::DEFAULT
     }
 }
 
@@ -198,13 +268,13 @@ mod test {
         estimator
     }
 
-    #[test_case(Estimator::NoSample => Estimator::RTO_INIT)]
+    #[test_case(Estimator::NoSample => Rto::DEFAULT.get())]
     #[test_case(Estimator::Measured {
         srtt: Duration::from_secs(1),
         rtt_var: Duration::from_secs(2),
     } => Duration::from_secs(9))]
     fn calculate_rto(estimator: Estimator) -> Duration {
-        estimator.rto()
+        estimator.rto().get()
     }
 
     // Useful for representing wrapping-around TCP seqnum ranges.

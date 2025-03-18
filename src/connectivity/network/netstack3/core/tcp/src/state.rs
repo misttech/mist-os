@@ -31,7 +31,7 @@ use crate::internal::base::{
 use crate::internal::buffer::{Assembler, BufferLimits, IntoBuffers, ReceiveBuffer, SendBuffer};
 use crate::internal::congestion::CongestionControl;
 use crate::internal::counters::TcpCountersRefs;
-use crate::internal::rtt::{Estimator, RttSampler};
+use crate::internal::rtt::{Estimator, Rto, RttSampler};
 
 /// Per RFC 793 (https://tools.ietf.org/html/rfc793#page-81):
 /// MSL
@@ -39,10 +39,13 @@ use crate::internal::rtt::{Estimator, RttSampler};
 ///       the internetwork system.  Arbitrarily defined to be 2 minutes.
 pub(super) const MSL: Duration = Duration::from_secs(2 * 60);
 
-const DEFAULT_MAX_RETRIES: NonZeroU8 = NonZeroU8::new(12).unwrap();
-/// Assuming a 200ms RTT, with 12 retries, the timeout should be at least 0.2 * (2 ^ 12 - 1) = 819s.
-/// Rounding it up to have some extra buffer.
-const DEFAULT_USER_TIMEOUT: Duration = Duration::from_secs(900);
+/// The default number of retransmits before a timeout is called.
+///
+/// This value is picked so that at [`Rto::MIN`] initial RTO the timeout happens
+/// in about 15min. This value is achieved by calculating the sum of the
+/// geometric progression of doubling timeouts starting at [`Rto::MIN`] and
+/// capped at [`Rto::MAX`].
+const DEFAULT_MAX_RETRIES: NonZeroU8 = NonZeroU8::new(15).unwrap();
 
 /// Default maximum SYN's to send before giving up an attempt to connect.
 // TODO(https://fxbug.dev/42077087): Make these constants configurable.
@@ -72,17 +75,6 @@ const SWS_BUFFER_FACTOR: u32 = 2;
 /// Whether netstack3 senders support receiving selective acks.
 // TODO(https://fxbug.dev/42078221): Tell the peer we can do SACK.
 const SACK_PERMITTED: bool = false;
-
-/// A helper trait for duration socket options that use 0 to indicate default.
-trait NonZeroDurationOptionExt {
-    fn get_or_default(&self, default: Duration) -> Duration;
-}
-
-impl NonZeroDurationOptionExt for Option<NonZeroDuration> {
-    fn get_or_default(&self, default: Duration) -> Duration {
-        self.map(NonZeroDuration::get).unwrap_or(default)
-    }
-}
 
 /// A trait abstracting an identifier for a state machine.
 ///
@@ -138,7 +130,6 @@ impl Closed<Initial> {
             ip_options: _,
         }: &SocketOptions,
     ) -> (SynSent<I, ActiveOpen>, Segment<()>) {
-        let user_timeout = user_timeout.get_or_default(DEFAULT_USER_TIMEOUT);
         let rcv_wnd_scale = buffer_sizes.rwnd().scale();
         // RFC 7323 Section 2.2:
         //  The window field in a segment where the SYN bit is set (i.e., a
@@ -150,8 +141,8 @@ impl Closed<Initial> {
                 timestamp: Some(now),
                 retrans_timer: RetransTimer::new(
                     now,
-                    Estimator::RTO_INIT,
-                    user_timeout,
+                    Rto::DEFAULT,
+                    *user_timeout,
                     *max_syn_retries,
                 ),
                 active_open,
@@ -291,7 +282,6 @@ impl Listen {
             //   not be repeated.
             // Note: We don't support data being tranmistted in this state, so
             // there is no need to store these the RCV and SND variables.
-            let user_timeout = user_timeout.get_or_default(DEFAULT_USER_TIMEOUT);
             let rcv_wnd_scale = buffer_sizes.rwnd().scale();
             // RFC 7323 Section 2.2:
             //  The window field in a segment where the SYN bit is set (i.e., a
@@ -319,7 +309,7 @@ impl Listen {
                     timestamp: Some(now),
                     retrans_timer: RetransTimer::new(
                         now,
-                        Estimator::RTO_INIT,
+                        Rto::DEFAULT,
                         user_timeout,
                         DEFAULT_MAX_SYNACK_RETRIES,
                     ),
@@ -518,7 +508,7 @@ impl<I: Instant + 'static, ActiveOpen> SynSent<I, ActiveOpen> {
                         }
                     }
                     None => {
-                        if now < user_timeout_until {
+                        if user_timeout_until.is_none_or(|t| now < t) {
                             // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-68):
                             //   Otherwise enter SYN-RECEIVED, form a SYN,ACK
                             //   segment
@@ -548,10 +538,10 @@ impl<I: Instant + 'static, ActiveOpen> SynSent<I, ActiveOpen> {
                                     iss,
                                     irs: seg_seq,
                                     timestamp: Some(now),
-                                    retrans_timer: RetransTimer::new(
+                                    retrans_timer: RetransTimer::new_with_user_deadline(
                                         now,
-                                        Estimator::RTO_INIT,
-                                        user_timeout_until.saturating_duration_since(now),
+                                        Rto::DEFAULT,
+                                        user_timeout_until,
                                         DEFAULT_MAX_SYNACK_RETRIES,
                                     ),
                                     // This should be set to active_open by the caller:
@@ -717,37 +707,45 @@ impl<I> Send<I, (), false> {
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 struct RetransTimer<I> {
-    user_timeout_until: I,
+    user_timeout_until: Option<I>,
     remaining_retries: Option<NonZeroU8>,
     at: I,
-    rto: Duration,
+    rto: Rto,
 }
 
 impl<I: Instant> RetransTimer<I> {
-    fn new(now: I, rto: Duration, user_timeout: Duration, max_retries: NonZeroU8) -> Self {
-        let wakeup_after = rto.min(user_timeout);
-        let at = now.panicking_add(wakeup_after);
-        let user_timeout_until = now.saturating_add(user_timeout);
+    fn new(
+        now: I,
+        rto: Rto,
+        user_timeout: Option<NonZeroDuration>,
+        max_retries: NonZeroU8,
+    ) -> Self {
+        let user_timeout_until = user_timeout.map(|t| now.saturating_add(t.get()));
+        Self::new_with_user_deadline(now, rto, user_timeout_until, max_retries)
+    }
+
+    fn new_with_user_deadline(
+        now: I,
+        rto: Rto,
+        user_timeout_until: Option<I>,
+        max_retries: NonZeroU8,
+    ) -> Self {
+        let rto_at = now.panicking_add(rto.get());
+        let at = user_timeout_until.map(|i| i.min(rto_at)).unwrap_or(rto_at);
         Self { at, rto, user_timeout_until, remaining_retries: Some(max_retries) }
     }
 
     fn backoff(&mut self, now: I) {
         let Self { at, rto, user_timeout_until, remaining_retries } = self;
         *remaining_retries = remaining_retries.and_then(|r| NonZeroU8::new(r.get() - 1));
-        *rto = rto.saturating_mul(2);
-        let remaining = if now < *user_timeout_until {
-            user_timeout_until.saturating_duration_since(now)
-        } else {
-            // `now` has already passed  `user_timeout_until`, just update the
-            // timer to expire as soon as possible.
-            Duration::ZERO
-        };
-        *at = now.panicking_add(core::cmp::min(*rto, remaining));
+        *rto = rto.double();
+        let rto_at = now.panicking_add(rto.get());
+        *at = user_timeout_until.map(|i| i.min(rto_at)).unwrap_or(rto_at);
     }
 
     fn timed_out(&self, now: I) -> bool {
         let RetransTimer { user_timeout_until, remaining_retries, at, rto: _ } = self;
-        (remaining_retries.is_none() && now >= *at) || now >= *user_timeout_until
+        (remaining_retries.is_none() && now >= *at) || user_timeout_until.is_some_and(|t| now >= t)
     }
 }
 
@@ -1368,11 +1366,10 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             match timer {
                 Some(SendTimer::ZeroWindowProbe(_)) => {}
                 _ => {
-                    let user_timeout = user_timeout.get_or_default(DEFAULT_USER_TIMEOUT);
                     *timer = Some(SendTimer::ZeroWindowProbe(RetransTimer::new(
                         now,
                         rtt_estimator.rto(),
-                        user_timeout,
+                        *user_timeout,
                         DEFAULT_MAX_RETRIES,
                     )));
 
@@ -1554,11 +1551,10 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
         match timer {
             Some(SendTimer::Retrans(_)) | Some(SendTimer::ZeroWindowProbe(_)) => {}
             Some(SendTimer::KeepAlive(_)) | Some(SendTimer::SWSProbe { at: _ }) | None => {
-                let user_timeout = user_timeout.get_or_default(DEFAULT_USER_TIMEOUT);
                 *timer = Some(SendTimer::Retrans(RetransTimer::new(
                     now,
                     rtt_estimator.rto(),
-                    user_timeout,
+                    *user_timeout,
                     DEFAULT_MAX_RETRIES,
                 )))
             }
@@ -1621,11 +1617,10 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                 if seg_ack == *snd_max {
                     *timer = None;
                 } else if seg_ack.before(*snd_max) && seg_ack.after(*snd_una) {
-                    let user_timeout = user_timeout.get_or_default(DEFAULT_USER_TIMEOUT);
                     *retrans_timer = RetransTimer::new(
                         now,
                         rtt_estimator.rto(),
-                        user_timeout,
+                        *user_timeout,
                         DEFAULT_MAX_RETRIES,
                     );
                 }
@@ -2645,7 +2640,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             //     <SEQ=SND.NXT><ACK=RCV.NXT><CTL=ACK>
             //   This acknowledgment should be piggybacked on a segment being
             //   transmitted if possible without incurring undue delay.
-            let maybe_ack_to_text = |rcv: &mut Recv<I, R>, rto: Duration| {
+            let maybe_ack_to_text = |rcv: &mut Recv<I, R>, rto: Rto| {
                 if !needs_ack {
                     return (None, rcv.nxt());
                 }
@@ -2654,7 +2649,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                 // it's above RTO in case the sender has entered slow start
                 // again.
                 if let Some(last) = rcv.last_segment_at.replace(now) {
-                    if now.saturating_duration_since(last) >= rto {
+                    if now.saturating_duration_since(last) >= rto.get() {
                         rcv.reset_quickacks();
                     }
                 }
@@ -2738,7 +2733,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                     maybe_ack_to_text(rcv.get_mut(), snd.rtt_estimator.rto())
                 }
                 State::FinWait2(FinWait2 { last_seq: _, rcv, timeout_at: _ }) => {
-                    maybe_ack_to_text(rcv, Estimator::RTO_INIT)
+                    maybe_ack_to_text(rcv, Rto::DEFAULT)
                 }
                 State::CloseWait(CloseWait { closed_rcv, .. })
                 | State::LastAck(LastAck { closed_rcv, .. })
@@ -3676,12 +3671,7 @@ mod test {
                 iss: ISS_2,
                 irs: ISS_1,
                 timestamp: Some(instant),
-                retrans_timer: RetransTimer::new(
-                    instant,
-                    Estimator::RTO_INIT,
-                    DEFAULT_USER_TIMEOUT,
-                    DEFAULT_MAX_RETRIES,
-                ),
+                retrans_timer: RetransTimer::new(instant, Rto::DEFAULT, None, DEFAULT_MAX_RETRIES),
                 simultaneous_open: Some(()),
                 buffer_sizes: Default::default(),
                 smss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
@@ -3769,8 +3759,8 @@ mod test {
             timestamp: Some(FakeInstant::from(RTT)),
             retrans_timer: RetransTimer::new(
                 FakeInstant::from(RTT),
-                Estimator::RTO_INIT,
-                DEFAULT_USER_TIMEOUT - RTT,
+                Rto::DEFAULT,
+                NonZeroDuration::new(TEST_USER_TIMEOUT.get() - RTT),
                 DEFAULT_MAX_SYNACK_RETRIES
             ),
             simultaneous_open: None,
@@ -3792,7 +3782,7 @@ mod test {
     => SynSentOnSegmentDisposition::Ignore; "acceptable ACK(ISS) without RST")]
     #[test_case(
         Segment::syn(ISS_2, UnscaledWindowSize::from(u16::MAX), HandshakeOptions::default().into()),
-        DEFAULT_USER_TIMEOUT
+        TEST_USER_TIMEOUT.get()
     => SynSentOnSegmentDisposition::EnterClosed(Closed {
         reason: None
     }); "syn but timed out")]
@@ -3805,8 +3795,8 @@ mod test {
             timestamp: Some(FakeInstant::default()),
             retrans_timer: RetransTimer::new(
                 FakeInstant::default(),
-                Estimator::RTO_INIT,
-                DEFAULT_USER_TIMEOUT,
+                Rto::DEFAULT,
+                Some(TEST_USER_TIMEOUT),
                 DEFAULT_MAX_RETRIES,
             ),
             active_open: (),
@@ -3842,8 +3832,8 @@ mod test {
                 timestamp: Some(FakeInstant::default()),
                 retrans_timer: RetransTimer::new(
                     FakeInstant::default(),
-                    Estimator::RTO_INIT,
-                    DEFAULT_USER_TIMEOUT,
+                    Rto::DEFAULT,
+                    None,
                     DEFAULT_MAX_SYNACK_RETRIES,
                 ),
                 simultaneous_open: None,
@@ -4434,8 +4424,8 @@ mod test {
                 timestamp: Some(clock.now()),
                 retrans_timer: RetransTimer::new(
                     clock.now(),
-                    Estimator::RTO_INIT,
-                    DEFAULT_USER_TIMEOUT,
+                    Rto::DEFAULT,
+                    None,
                     DEFAULT_MAX_SYN_RETRIES,
                 ),
                 active_open: (),
@@ -4490,8 +4480,8 @@ mod test {
             timestamp: Some(clock.now()),
             retrans_timer: RetransTimer::new(
                 clock.now(),
-                Estimator::RTO_INIT,
-                DEFAULT_USER_TIMEOUT,
+                Rto::DEFAULT,
+                None,
                 DEFAULT_MAX_SYNACK_RETRIES,
             ),
             simultaneous_open: None,
@@ -4609,7 +4599,6 @@ mod test {
     fn simultaneous_open() {
         let mut clock = FakeInstantCtx::default();
         let counters = FakeTcpCounters::default();
-        let start = clock.now();
         let (syn_sent1, syn1) = Closed::<Initial>::connect(
             ISS_1,
             clock.now(),
@@ -4706,15 +4695,14 @@ mod test {
             )
         );
 
-        let elapsed = clock.now() - start;
         assert_matches!(state1, State::SynRcvd(ref syn_rcvd) if syn_rcvd == &SynRcvd {
             iss: ISS_1,
             irs: ISS_2,
             timestamp: Some(clock.now()),
             retrans_timer: RetransTimer::new(
                 clock.now(),
-                Estimator::RTO_INIT,
-                DEFAULT_USER_TIMEOUT - elapsed,
+                Rto::DEFAULT,
+                None,
                 DEFAULT_MAX_SYNACK_RETRIES,
             ),
             simultaneous_open: Some(()),
@@ -4730,8 +4718,8 @@ mod test {
             timestamp: Some(clock.now()),
             retrans_timer: RetransTimer::new(
                 clock.now(),
-                Estimator::RTO_INIT,
-                DEFAULT_USER_TIMEOUT - elapsed,
+                Rto::DEFAULT,
+                None,
                 DEFAULT_MAX_SYNACK_RETRIES,
             ),
             simultaneous_open: Some(()),
@@ -5086,8 +5074,8 @@ mod test {
         );
         let mut state = State::<_, RingBuffer, RingBuffer, ()>::SynSent(syn_sent);
         // Retransmission timer should be installed.
-        assert_eq!(state.poll_send_at(), Some(FakeInstant::from(Estimator::RTO_INIT)));
-        clock.sleep(Estimator::RTO_INIT);
+        assert_eq!(state.poll_send_at(), Some(FakeInstant::from(Rto::DEFAULT.get())));
+        clock.sleep(Rto::DEFAULT.get());
         // The SYN segment should be retransmitted.
         assert_eq!(
             state.poll_send_with_default_options(u32::MAX, clock.now(), &counters.refs()),
@@ -5104,8 +5092,8 @@ mod test {
         let syn_ack = seg.expect("expected SYN-ACK");
         assert_eq!(passive_open, None);
         // Retransmission timer should be installed.
-        assert_eq!(state.poll_send_at(), Some(clock.now() + Estimator::RTO_INIT));
-        clock.sleep(Estimator::RTO_INIT);
+        assert_eq!(state.poll_send_at(), Some(clock.now() + Rto::DEFAULT.get()));
+        clock.sleep(Rto::DEFAULT.get());
         // The SYN-ACK segment should be retransmitted.
         assert_eq!(
             state.poll_send_with_default_options(u32::MAX, clock.now(), &counters.refs()),
@@ -5151,8 +5139,8 @@ mod test {
                     FragmentedPayload::new_contiguous(TEST_BYTES),
                 ))
             );
-            assert_eq!(state.poll_send_at(), Some(clock.now() + (1 << i) * Estimator::RTO_INIT));
-            clock.sleep((1 << i) * Estimator::RTO_INIT);
+            assert_eq!(state.poll_send_at(), Some(clock.now() + (1 << i) * Rto::DEFAULT.get()));
+            clock.sleep((1 << i) * Rto::DEFAULT.get());
             CounterExpectations {
                 retransmits: i,
                 slow_start_retransmits: i,
@@ -5176,8 +5164,8 @@ mod test {
         );
         // The timer is rearmed with the the current RTO estimate, which still should
         // be RTO_INIT.
-        assert_eq!(state.poll_send_at(), Some(clock.now() + Estimator::RTO_INIT));
-        clock.sleep(Estimator::RTO_INIT);
+        assert_eq!(state.poll_send_at(), Some(clock.now() + Rto::DEFAULT.get()));
+        clock.sleep(Rto::DEFAULT.get());
         assert_eq!(
             state.poll_send_with_default_options(1, clock.now(), &counters.refs(),),
             Some(Segment::data(
@@ -5210,7 +5198,7 @@ mod test {
             ..Default::default()
         }
         .assert_counters(&counters);
-        assert_eq!(state.poll_send_at(), Some(clock.now() + Estimator::RTO_INIT));
+        assert_eq!(state.poll_send_at(), Some(clock.now() + Rto::DEFAULT.get()));
         assert_eq!(
             state.poll_send_with_default_options(1, clock.now(), &counters.refs()),
             Some(Segment::data(
@@ -5362,8 +5350,8 @@ mod test {
             ),
             (None, None)
         );
-        assert_eq!(state.poll_send_at(), Some(clock.now() + Estimator::RTO_INIT));
-        clock.sleep(Estimator::RTO_INIT);
+        assert_eq!(state.poll_send_at(), Some(clock.now() + Rto::DEFAULT.get()));
+        clock.sleep(Rto::DEFAULT.get());
         // The FIN should be retransmitted.
         assert_eq!(
             state.poll_send_with_default_options(u32::MAX, clock.now(), &counters.refs()),
@@ -5408,8 +5396,8 @@ mod test {
             timestamp: None,
             retrans_timer: RetransTimer {
                 at: FakeInstant::default(),
-                rto: Duration::new(0, 0),
-                user_timeout_until: FakeInstant::from(DEFAULT_USER_TIMEOUT),
+                rto: Rto::MIN,
+                user_timeout_until: None,
                 remaining_retries: Some(DEFAULT_MAX_RETRIES),
             },
             simultaneous_open: Some(()),
@@ -5551,10 +5539,10 @@ mod test {
         );
 
         // The retrans timer should be installed correctly.
-        assert_eq!(state.poll_send_at(), Some(clock.now() + Estimator::RTO_INIT));
+        assert_eq!(state.poll_send_at(), Some(clock.now() + Rto::DEFAULT.get()));
 
         // Because only the first byte was acked, we need to retransmit.
-        clock.sleep(Estimator::RTO_INIT);
+        clock.sleep(Rto::DEFAULT.get());
         assert_eq!(
             state.poll_send_with_default_options(u32::MAX, clock.now(), &counters.refs()),
             Some(Segment::piggybacked_fin(
@@ -5915,8 +5903,8 @@ mod test {
             timestamp: None,
             retrans_timer: RetransTimer {
                 at: FakeInstant::default(),
-                rto: Duration::new(0, 0),
-                user_timeout_until: FakeInstant::from(DEFAULT_USER_TIMEOUT),
+                rto: Rto::MIN,
+                user_timeout_until: None,
                 remaining_retries: Some(DEFAULT_MAX_RETRIES),
             },
             simultaneous_open: None,
@@ -6369,10 +6357,10 @@ mod test {
             state.poll_send_with_default_options(u32::MAX, clock.now(), &counters.refs()),
             None
         );
-        assert_eq!(state.poll_send_at(), Some(clock.now().panicking_add(Estimator::RTO_INIT)));
+        assert_eq!(state.poll_send_at(), Some(clock.now().panicking_add(Rto::DEFAULT.get())));
 
         // Send the first probe after first RTO.
-        clock.sleep(Estimator::RTO_INIT);
+        clock.sleep(Rto::DEFAULT.get());
         assert_eq!(
             state.poll_send_with_default_options(u32::MAX, clock.now(), &counters.refs()),
             Some(Segment::data(
@@ -6397,17 +6385,17 @@ mod test {
             state.poll_send_with_default_options(u32::MAX, clock.now(), &counters.refs()),
             None
         );
-        assert_eq!(state.poll_send_at(), Some(clock.now().panicking_add(Estimator::RTO_INIT * 2)));
+        assert_eq!(state.poll_send_at(), Some(clock.now().panicking_add(Rto::DEFAULT.get() * 2)));
 
         // No probe should be sent before the timeout.
-        clock.sleep(Estimator::RTO_INIT);
+        clock.sleep(Rto::DEFAULT.get());
         assert_eq!(
             state.poll_send_with_default_options(u32::MAX, clock.now(), &counters.refs()),
             None
         );
 
         // Probe sent after the timeout.
-        clock.sleep(Estimator::RTO_INIT);
+        clock.sleep(Rto::DEFAULT.get());
         assert_eq!(
             state.poll_send_with_default_options(u32::MAX, clock.now(), &counters.refs()),
             Some(Segment::data(
@@ -6637,17 +6625,18 @@ mod test {
             }
             .into(),
         });
-        let mut times = 1;
+        let mut times = 0;
         let start = clock.now();
+        let socket_options = SocketOptions {
+            user_timeout: (!max_retries).then_some(TEST_USER_TIMEOUT),
+            ..SocketOptions::default_for_state_tests()
+        };
         while let Ok(seg) = state.poll_send(
             &FakeStateMachineDebugId,
             &counters.refs(),
             u32::MAX,
             clock.now(),
-            &SocketOptions {
-                user_timeout: Some(TEST_USER_TIMEOUT),
-                ..SocketOptions::default_for_state_tests()
-            },
+            &socket_options,
         ) {
             if zero_window_probe {
                 let zero_window_ack = Segment::ack(
@@ -6661,10 +6650,7 @@ mod test {
                         &counters.refs(),
                         zero_window_ack,
                         clock.now(),
-                        &SocketOptions {
-                            user_timeout: Some(TEST_USER_TIMEOUT),
-                            ..SocketOptions::default_for_state_tests()
-                        },
+                        &socket_options,
                         false,
                     ),
                     (None, None, DataAcked::No, _newly_closed)
@@ -6680,10 +6666,7 @@ mod test {
                         &counters.refs(),
                         u32::MAX,
                         clock.now(),
-                        &SocketOptions {
-                            user_timeout: Some(TEST_USER_TIMEOUT),
-                            ..SocketOptions::default_for_state_tests()
-                        },
+                        &socket_options,
                     ),
                     Err(NewlyClosed::No)
                 );
@@ -6696,10 +6679,10 @@ mod test {
             times += 1;
         }
         let elapsed = clock.now().checked_duration_since(start).unwrap();
-        assert_eq!(elapsed, TEST_USER_TIMEOUT.get());
         if max_retries {
-            assert_eq!(times, DEFAULT_MAX_RETRIES.get());
+            assert_eq!(times, 1 + DEFAULT_MAX_RETRIES.get());
         } else {
+            assert_eq!(elapsed, TEST_USER_TIMEOUT.get());
             assert!(times < DEFAULT_MAX_RETRIES.get());
         }
         assert_eq!(state, State::Closed(Closed { reason: Some(ConnectionError::TimedOut) }));
@@ -6723,19 +6706,19 @@ mod test {
         let mut clock = FakeInstantCtx::default();
         let mut timer = RetransTimer::new(
             clock.now(),
-            Duration::from_secs(1),
-            DEFAULT_USER_TIMEOUT,
+            Rto::DEFAULT,
+            Some(TEST_USER_TIMEOUT),
             DEFAULT_MAX_RETRIES,
         );
-        clock.sleep(DEFAULT_USER_TIMEOUT);
+        assert_eq!(timer.at, FakeInstant::from(Rto::DEFAULT.get()));
+        clock.sleep(TEST_USER_TIMEOUT.get());
         timer.backoff(clock.now());
-        assert_eq!(timer.at, FakeInstant::from(DEFAULT_USER_TIMEOUT));
+        assert_eq!(timer.at, FakeInstant::from(TEST_USER_TIMEOUT.get()));
         clock.sleep(Duration::from_secs(1));
         // The current time is now later than the timeout deadline,
         timer.backoff(clock.now());
-        // The timer should adjust its expiration time to be the current time
-        // instead of panicking.
-        assert_eq!(timer.at, clock.now());
+        // Firing time does not change.
+        assert_eq!(timer.at, FakeInstant::from(TEST_USER_TIMEOUT.get()));
     }
 
     #[test_case(
@@ -6751,7 +6734,7 @@ mod test {
                 wl2: ISS_1,
                 rtt_sampler: RttSampler::default(),
                 rtt_estimator: Estimator::Measured {
-                    srtt: Estimator::RTO_INIT,
+                    srtt: Rto::DEFAULT.get(),
                     rtt_var: Duration::ZERO,
                 },
                 timer: None,
@@ -6792,7 +6775,7 @@ mod test {
                 wl2: ISS_1,
                 rtt_sampler: RttSampler::default(),
                 rtt_estimator: Estimator::Measured {
-                    srtt: Estimator::RTO_INIT,
+                    srtt: Rto::DEFAULT.get(),
                     rtt_var: Duration::ZERO,
                 },
                 timer: None,
@@ -6967,7 +6950,7 @@ mod test {
                 wl2: ISS_1,
                 rtt_sampler: RttSampler::default(),
                 rtt_estimator: Estimator::Measured {
-                    srtt: Estimator::RTO_INIT,
+                    srtt: Rto::DEFAULT.get(),
                     rtt_var: Duration::ZERO,
                 },
                 timer: None,
@@ -7124,28 +7107,28 @@ mod test {
     }
 
     #[test_case(RetransTimer {
-        user_timeout_until: FakeInstant::from(Duration::from_secs(100)),
+        user_timeout_until: Some(FakeInstant::from(Duration::from_secs(100))),
         remaining_retries: None,
         at: FakeInstant::from(Duration::from_secs(1)),
-        rto: Duration::from_secs(1),
+        rto: Rto::new(Duration::from_secs(1)),
     }, FakeInstant::from(Duration::from_secs(1)) => true)]
     #[test_case(RetransTimer {
-        user_timeout_until: FakeInstant::from(Duration::from_secs(100)),
+        user_timeout_until: Some(FakeInstant::from(Duration::from_secs(100))),
         remaining_retries: None,
         at: FakeInstant::from(Duration::from_secs(2)),
-        rto: Duration::from_secs(1),
+        rto: Rto::new(Duration::from_secs(1)),
     }, FakeInstant::from(Duration::from_secs(1)) => false)]
     #[test_case(RetransTimer {
-        user_timeout_until: FakeInstant::from(Duration::from_secs(100)),
+        user_timeout_until: Some(FakeInstant::from(Duration::from_secs(100))),
         remaining_retries: Some(NonZeroU8::new(1).unwrap()),
         at: FakeInstant::from(Duration::from_secs(2)),
-        rto: Duration::from_secs(1),
+        rto: Rto::new(Duration::from_secs(1)),
     }, FakeInstant::from(Duration::from_secs(1)) => false)]
     #[test_case(RetransTimer {
-        user_timeout_until: FakeInstant::from(Duration::from_secs(1)),
+        user_timeout_until: Some(FakeInstant::from(Duration::from_secs(1))),
         remaining_retries: Some(NonZeroU8::new(1).unwrap()),
         at: FakeInstant::from(Duration::from_secs(1)),
-        rto: Duration::from_secs(1),
+        rto: Rto::new(Duration::from_secs(1)),
     }, FakeInstant::from(Duration::from_secs(1)) => true)]
     fn send_timed_out(timer: RetransTimer<FakeInstant>, now: FakeInstant) -> bool {
         timer.timed_out(now)
@@ -7157,8 +7140,8 @@ mod test {
             timestamp: Some(FakeInstant::default()),
             retrans_timer: RetransTimer::new(
                 FakeInstant::default(),
-                Duration::from_millis(1),
-                Duration::from_secs(60),
+                Rto::MIN,
+                NonZeroDuration::from_secs(60),
                 DEFAULT_MAX_SYN_RETRIES,
             ),
             active_open: (),
@@ -7175,8 +7158,8 @@ mod test {
             timestamp: Some(FakeInstant::default()),
             retrans_timer: RetransTimer::new(
                 FakeInstant::default(),
-                Duration::from_millis(1),
-                Duration::from_secs(60),
+                Rto::MIN,
+                NonZeroDuration::from_secs(60),
                 DEFAULT_MAX_SYNACK_RETRIES,
             ),
             simultaneous_open: None,
@@ -7191,12 +7174,12 @@ mod test {
         let mut clock = FakeInstantCtx::default();
         let counters = FakeTcpCounters::default();
         let mut retransmissions = 0;
-        clock.sleep(Duration::from_millis(1));
+        clock.sleep_until(state.poll_send_at().expect("must have a retransmission timer"));
         while let Some(_seg) =
             state.poll_send_with_default_options(u32::MAX, clock.now(), &counters.refs())
         {
             let deadline = state.poll_send_at().expect("must have a retransmission timer");
-            clock.sleep(deadline.checked_duration_since(clock.now()).unwrap());
+            clock.sleep_until(deadline);
             retransmissions += 1;
         }
         assert_eq!(state, State::Closed(Closed { reason: Some(ConnectionError::TimedOut) }));
@@ -7320,8 +7303,8 @@ mod test {
             timestamp: None,
             retrans_timer: RetransTimer::new(
                 FakeInstant::default(),
-                Estimator::RTO_INIT,
-                Duration::from_secs(10),
+                Rto::DEFAULT,
+                NonZeroDuration::from_secs(10),
                 DEFAULT_MAX_SYNACK_RETRIES,
             ),
             simultaneous_open: None,
@@ -7611,12 +7594,12 @@ mod test {
             Some(SendTimer::ZeroWindowProbe(RetransTimer::new(
                 clock.now(),
                 snd.rtt_estimator.rto(),
-                DEFAULT_USER_TIMEOUT,
+                None,
                 DEFAULT_MAX_RETRIES,
             )))
         );
 
-        clock.sleep(Duration::from_millis(100));
+        clock.sleep_until(snd.timer.as_ref().unwrap().expiry());
 
         assert_eq!(
             snd.poll_send(
@@ -7917,7 +7900,7 @@ mod test {
         );
 
         // Retransmit, now snd.nxt = TEST.BYTES.len() + 1.
-        clock.sleep(Estimator::RTO_INIT);
+        clock.sleep(Rto::DEFAULT.get());
         assert_eq!(
             state.poll_send_with_default_options(u32::MAX, clock.now(), &counters.refs()),
             Some(Segment::data(
@@ -7963,8 +7946,8 @@ mod test {
             timestamp: Some(FakeInstant::default()),
             retrans_timer: RetransTimer::new(
                 FakeInstant::default(),
-                Estimator::RTO_INIT,
-                DEFAULT_USER_TIMEOUT,
+                Rto::DEFAULT,
+                None,
                 DEFAULT_MAX_SYN_RETRIES,
             ),
             active_open: (),
@@ -7980,8 +7963,8 @@ mod test {
                 timestamp: Some(FakeInstant::default()),
                 retrans_timer: RetransTimer::new(
                     FakeInstant::default(),
-                    Estimator::RTO_INIT,
-                    DEFAULT_USER_TIMEOUT,
+                    Rto::DEFAULT,
+                    None,
                     DEFAULT_MAX_SYN_RETRIES,
                 ),
                 active_open: (),
@@ -7997,8 +7980,8 @@ mod test {
             timestamp: None,
             retrans_timer: RetransTimer::new(
                 FakeInstant::default(),
-                Estimator::RTO_INIT,
-                Duration::from_secs(10),
+                Rto::DEFAULT,
+                NonZeroDuration::from_secs(10),
                 DEFAULT_MAX_SYNACK_RETRIES,
             ),
             simultaneous_open: None,
@@ -8354,7 +8337,7 @@ mod test {
             WindowSize::ZERO >> WindowScale::default(),
             &data[..],
         );
-        clock.sleep(Estimator::RTO_INIT);
+        clock.sleep(Rto::DEFAULT.get());
         let (seg, passive_open) = state
             .on_segment_with_default_options::<_, ClientlessBufferProvider>(
                 segment,
