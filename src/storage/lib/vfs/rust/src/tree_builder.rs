@@ -215,12 +215,12 @@ impl TreeBuilder {
             Vec<&'components str>,
         ) -> Result<(), Error>,
     {
-        if name.len() as u64 >= fio::MAX_FILENAME {
+        if name.len() as u64 >= fio::MAX_NAME_LENGTH {
             return Err(Error::ComponentNameTooLong {
                 path: full_path.to_string(),
                 component: name.to_string(),
                 component_len: name.len(),
-                max_len: (fio::MAX_FILENAME - 1) as usize,
+                max_len: (fio::MAX_NAME_LENGTH - 1) as usize,
             });
         }
 
@@ -746,7 +746,7 @@ mod tests {
     fn error_component_name_too_long() {
         let mut tree = TreeBuilder::empty_dir();
 
-        let long_component = "abcdefghij".repeat(fio::MAX_FILENAME as usize / 10 + 1);
+        let long_component = "abcdefghij".repeat(fio::MAX_NAME_LENGTH as usize / 10 + 1);
 
         let path: &[&str] = &["a", &long_component, "b"];
         let err = tree
@@ -758,7 +758,7 @@ mod tests {
                 path: format!("a/{}/b", long_component),
                 component: long_component.clone(),
                 component_len: long_component.len(),
-                max_len: (fio::MAX_FILENAME - 1) as usize,
+                max_len: (fio::MAX_NAME_LENGTH - 1) as usize,
             }
         );
     }

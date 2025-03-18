@@ -182,7 +182,7 @@ zx_status_t WatcherContainer::WatchDir(FuchsiaVfs* vfs, Vnode* vn, fio::wire::Wa
 }
 
 void WatcherContainer::Notify(std::string_view name, fio::wire::WatchEvent event) {
-  if (name.length() > fio::wire::kMaxFilename) {
+  if (name.length() > fio::wire::kMaxNameLength) {
     return;
   }
 
@@ -192,7 +192,7 @@ void WatcherContainer::Notify(std::string_view name, fio::wire::WatchEvent event
     return;
   }
 
-  uint8_t msg[sizeof(vfs_watch_msg_t) + fio::wire::kMaxFilename];
+  uint8_t msg[sizeof(vfs_watch_msg_t) + fio::wire::kMaxNameLength];
   size_t msg_length = sizeof(vfs_watch_msg_t) + name.length();
   vfs_watch_msg_t* vmsg = reinterpret_cast<vfs_watch_msg_t*>(msg);
   vmsg->event = static_cast<uint8_t>(event);

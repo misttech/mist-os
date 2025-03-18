@@ -1004,7 +1004,7 @@ fn add_entry_too_long_error() {
 
     // It is annoying to have to write `as u64` or `as usize` everywhere.  Converting
     // `MAX_FILENAME` to `usize` aligns the types.
-    let max_filename = fio::MAX_FILENAME as usize;
+    let max_filename = fio::MAX_NAME_LENGTH as usize;
 
     let root = Simple::new();
     let name = {

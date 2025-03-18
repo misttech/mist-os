@@ -222,7 +222,7 @@ pub(crate) fn encode_name(buffer: &mut Vec<u8>, event: fio::WatchEvent, name: &s
     }
 
     // We are going to encode the file name length as u8.
-    debug_assert!(u8::max_value() as u64 >= fio::MAX_FILENAME);
+    debug_assert!(u8::max_value() as u64 >= fio::MAX_NAME_LENGTH);
 
     buffer.push(event.into_primitive());
     buffer.push(name.len() as u8);

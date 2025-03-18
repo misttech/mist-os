@@ -105,7 +105,7 @@ TEST(FidlTestCase, BasicDevZero) {
 using watch_buffer_t = struct {
   // Buffer containing cached messages
   uint8_t buf[fio::wire::kMaxBuf];
-  uint8_t name_buf[fio::wire::kMaxFilename + 1];
+  uint8_t name_buf[fio::wire::kMaxNameLength + 1];
   // Offset into 'buf' of next message
   uint8_t* ptr;
   // Maximum size of buffer

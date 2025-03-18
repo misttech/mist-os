@@ -215,7 +215,7 @@ class DirentIteratorImpl {
     }
 
     // Check that the name length is within bounds.
-    if (packed_entry.size > fio::wire::kMaxFilename) {
+    if (packed_entry.size > fio::wire::kMaxNameLength) {
       return ZX_ERR_INVALID_ARGS;
     }
 

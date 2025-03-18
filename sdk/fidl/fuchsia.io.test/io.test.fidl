@@ -70,20 +70,20 @@ type HarnessConfig = struct {
 
 /// Directory entries should support opening with any combination of read/write/execute rights.
 type Directory = resource struct {
-    name string:fuchsia.io.MAX_NAME_LENGTH;
+    name fuchsia.io.Name;
     entries vector<DirectoryEntry:optional>:MAX;
 };
 
 /// Remote directory which forwards FIDL requests from the server to the specified directory.
 type RemoteDirectory = resource struct {
-    name string:fuchsia.io.MAX_NAME_LENGTH;
+    name fuchsia.io.Name;
     remote_client client_end:fuchsia.io.Directory;
 };
 
 /// File object which supports reading and writing. Use [`ExecutableFile`] if execute rights are
 /// required.
 type File = struct {
-    name string:fuchsia.io.MAX_NAME_LENGTH;
+    name fuchsia.io.Name;
     contents vector<uint8>:MAX;
 };
 
@@ -93,7 +93,7 @@ type File = struct {
 /// Enabled via the `supports_executable_file` configuration option. `ExecutableFile` objects should
 /// support fuchsia.io/File.GetBackingMemory.
 type ExecutableFile = struct {
-    name string:fuchsia.io.MAX_NAME_LENGTH;
+    name fuchsia.io.Name;
 };
 
 type DirectoryEntry = strict resource union {

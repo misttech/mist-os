@@ -27,13 +27,13 @@ closed protocol Admin {
     /// configuration.
     strict Mount(resource struct {
         device client_end:fuchsia.hardware.block.Block;
-        name string:fuchsia.io.MAX_FILENAME;
+        name fuchsia.io.Name;
         options MountOptions;
     }) -> () error zx.Status;
 
     /// Unmounts a previously mounted filesystem.
     strict Unmount(struct {
-        name string:fuchsia.io.MAX_FILENAME;
+        name fuchsia.io.Name;
     }) -> () error zx.Status;
 
     /// Returns the device path for the filesystem with the given fs_id.

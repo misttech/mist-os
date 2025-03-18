@@ -184,7 +184,7 @@ closed protocol Volumes {
     /// creating the volume. `outgoing_directory` will be connected to the root directory of the
     /// volume.
     strict Create(resource struct {
-        name string:fuchsia.io.MAX_FILENAME;
+        name fuchsia.io.Name;
         outgoing_directory server_end:fuchsia.io.Directory;
         create_options CreateOptions;
         mount_options MountOptions;
@@ -193,6 +193,6 @@ closed protocol Volumes {
     /// Permanently deletes a volume identified by `name`.  If the volume is mounted, this call will
     /// fail.
     strict Remove(struct {
-        name string:fuchsia.io.MAX_FILENAME;
+        name fuchsia.io.Name;
     }) -> () error zx.Status;
 };

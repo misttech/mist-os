@@ -329,7 +329,7 @@ Declarations generally fall into one of two categories:
 
 * There is a constraint inherent to the data. For example, a string containing
   a filesystem name component must not be longer than
-  `fuchsia.io.MAX_FILENAME`.
+  `fuchsia.io.MAX_NAME_LENGTH`.
 * There is no constraint other than "as much as possible." In these cases, you
   should use the built-in constant `MAX`.
 

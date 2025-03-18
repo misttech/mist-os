@@ -73,11 +73,11 @@ impl DirentsSameInodeBuilder {
 
     pub fn add(&mut self, type_: fio::DirentType, name: &[u8]) -> &mut Self {
         assert!(
-            name.len() <= fio::MAX_FILENAME as usize,
+            name.len() <= fio::MAX_NAME_LENGTH as usize,
             "Expected entry name should not exceed MAX_FILENAME ({}) bytes.\n\
              Got: {:?}\n\
              Length: {} bytes",
-            fio::MAX_FILENAME,
+            fio::MAX_NAME_LENGTH,
             name,
             name.len()
         );

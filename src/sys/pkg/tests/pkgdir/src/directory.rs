@@ -933,7 +933,7 @@ async fn assert_read_dirents_overflow(
         ('a'..='z')
             .chain('A'..='E')
             .map(|seed| DirEntry {
-                name: repeat_by_n(seed, fio::MAX_FILENAME.try_into().unwrap()),
+                name: repeat_by_n(seed, fio::MAX_NAME_LENGTH.try_into().unwrap()),
                 kind: DirentKind::File
             })
             .chain(additional_contents)

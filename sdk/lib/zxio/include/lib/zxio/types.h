@@ -375,7 +375,7 @@ typedef struct zxio_dirent_iterator {
   uint8_t opaque[ZX_CHANNEL_MAX_MSG_BYTES + 48];
 } zxio_dirent_iterator_t;
 
-// Matches fuchsia.io/MAX_FILENAME
+// Matches fuchsia.io/MAX_NAME_LENGTH
 #define ZXIO_MAX_FILENAME 255
 
 // An entry in a directory.

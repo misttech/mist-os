@@ -789,7 +789,7 @@ pub fn info_to_filesystem_info(
         free_shared_pool_bytes: 0,
         fs_id,
         block_size: block_size as u32,
-        max_filename_size: fio::MAX_FILENAME as u32,
+        max_filename_size: fio::MAX_NAME_LENGTH as u32,
         fs_type: fidl_fuchsia_fs::VfsType::Fxfs.into_primitive(),
         padding: 0,
         name: FXFS_INFO_NAME_FIDL,

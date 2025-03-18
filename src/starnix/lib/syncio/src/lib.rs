@@ -139,7 +139,7 @@ impl Iterator for DirentIterator<'_> {
             return None;
         }
         let mut entry = zxio_dirent_t::default();
-        let mut name_buffer = Vec::with_capacity(fio::MAX_FILENAME as usize);
+        let mut name_buffer = Vec::with_capacity(fio::MAX_NAME_LENGTH as usize);
         // The FFI interface expects a pointer to c_char which is i8 on x86_64.
         // The Rust str and OsStr types expect raw character data to be stored in a buffer u8 values.
         // The types are equivalent for all practical purposes and Rust permits casting between the types,

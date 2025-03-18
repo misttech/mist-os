@@ -84,7 +84,7 @@ struct local_connection : public fdio_t {
 
   zx_status_t dirent_iterator_init(zxio_dirent_iterator_t* iterator, zxio_t* directory) override {
     auto* dir_iterator = new (iterator) local_dir_dirent_iterator;
-    size_t capacity_of_one = sizeof(zxio_dirent_t) + fio::wire::kMaxFilename + 1;
+    size_t capacity_of_one = sizeof(zxio_dirent_t) + fio::wire::kMaxNameLength + 1;
     dir_iterator->buffer = malloc(capacity_of_one);
     dir_iterator->capacity = capacity_of_one;
     return ZX_OK;
