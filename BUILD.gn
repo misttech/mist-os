@@ -159,6 +159,22 @@ assert(
     current_toolchain == default_toolchain,
     "The root build file (//BUILD.gn) can only be processed in the `default_toolchain`.")
 
+if (base_package_labels != [] || cache_package_labels != []) {
+  print()
+  print(
+      "WARNING:  The 'base_package_labels' and 'cache_package_labels' GN build arguments")
+  print("          have been deprecated and will some become non-functional.")
+  print()
+  print(
+      "  To add tests, use '--with-test' or the 'developer_test_labels' GN arg.")
+  print()
+  print(
+      "  To add base and cache packages, switch to using developer overrides for assembly:")
+  print(
+      "  https://fuchsia.dev/fuchsia-src/development/build/assembly_developer_overrides#add-package")
+  print()
+}
+
 ###
 ### fx integration.
 ###
