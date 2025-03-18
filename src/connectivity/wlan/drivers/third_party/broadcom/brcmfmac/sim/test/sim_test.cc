@@ -334,6 +334,14 @@ void SimInterface::QuerySpectrumManagementSupport(
   *out_resp = result->value()->resp;
 }
 
+void SimInterface::QueryTelemetrySupport(fuchsia_wlan_stats::wire::TelemetrySupport* out_resp) {
+  auto result = client_.buffer(test_arena_)->QueryTelemetrySupport();
+  ZX_ASSERT(result.ok());
+  ZX_ASSERT(!result->is_error());
+
+  *out_resp = result->value()->resp;
+}
+
 void SimInterface::GetMacAddr(common::MacAddr* out_macaddr) {
   fuchsia_wlan_fullmac::WlanFullmacImplQueryResponse info = Query();
   ZX_ASSERT(info.sta_addr().has_value());

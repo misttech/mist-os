@@ -67,4 +67,33 @@ TEST_F(SimTest, ClientIfcQuerySpectrumManagementSupport) {
   EXPECT_TRUE(resp.dfs.supported);
 }
 
+// Verify that there's no duplicate counter ID or counter name returned in QueryTelemetrySupport
+TEST_F(SimTest, ClientIfcQueryTelemetrySupport_NoDuplicate) {
+  ASSERT_EQ(Init(), ZX_OK);
+
+  SimInterface client_ifc;
+  ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc, kDefaultMac), ZX_OK);
+
+  fuchsia_wlan_stats::wire::TelemetrySupport resp;
+  env_->ScheduleNotification(std::bind(&SimInterface::QueryTelemetrySupport, &client_ifc, &resp),
+                             zx::sec(1));
+  env_->Run(kSimulatedClockDuration);
+
+  auto counter_configs = resp.inspect_counter_configs();
+  std::set<uint16_t> counter_ids;
+  std::set<std::string> counter_names;
+  for (auto config : counter_configs) {
+    if (counter_ids.contains(config.counter_id())) {
+      ASSERT_TRUE(false, "Duplicate counter id %u", config.counter_id());
+    }
+    counter_ids.insert(config.counter_id());
+
+    std::string counter_name(config.counter_name().get());
+    if (counter_names.contains(counter_name)) {
+      ASSERT_TRUE(false, "Duplicate counter name %s", counter_name.c_str());
+    }
+    counter_names.insert(counter_name);
+  }
+}
+
 }  // namespace wlan::brcmfmac

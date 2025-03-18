@@ -5090,6 +5090,31 @@ struct Counters {
   static constexpr std::tuple<uint16_t, const char*> WME_BK_RX_BAD{25, "wme_bk_rx_bad"};
   static constexpr std::tuple<uint16_t, const char*> WME_BK_TX_GOOD{26, "wme_bk_tx_good"};
   static constexpr std::tuple<uint16_t, const char*> WME_BK_TX_BAD{27, "wme_bk_tx_bad"};
+  static constexpr std::tuple<uint16_t, const char*> FW_TX_RETRANSMITS{29, "fw_tx_retransmits"};
+  static constexpr std::tuple<uint16_t, const char*> FW_TX_DATA_ERRORS{30, "fw_tx_data_errors"};
+  static constexpr std::tuple<uint16_t, const char*> FW_TX_STATUS_ERRORS{31, "fw_tx_status_errors"};
+  static constexpr std::tuple<uint16_t, const char*> FW_TX_NO_BUFFER{32, "fw_tx_no_buffer"};
+  static constexpr std::tuple<uint16_t, const char*> FW_TX_RUNT_FRAMES{33, "fw_tx_runt_frames"};
+  static constexpr std::tuple<uint16_t, const char*> FW_TX_UNDERFLOW{34, "fw_tx_underflow"};
+  static constexpr std::tuple<uint16_t, const char*> FW_TX_PHY_ERRORS{35, "fw_tx_phy_errors"};
+  static constexpr std::tuple<uint16_t, const char*> FW_TX_DOT11_FAILURES{36,
+                                                                          "fw_tx_dot11_failures"};
+  static constexpr std::tuple<uint16_t, const char*> FW_TX_NO_ASSOC{37, "fw_tx_no_assoc"};
+  static constexpr std::tuple<uint16_t, const char*> FW_TX_NO_ACK{38, "fw_tx_no_ack"};
+  static constexpr std::tuple<uint16_t, const char*> FW_RX_DATA_ERRORS{39, "fw_rx_data_errors"};
+  static constexpr std::tuple<uint16_t, const char*> FW_RX_OVERFLOW{40, "fw_rx_overflow"};
+  static constexpr std::tuple<uint16_t, const char*> FW_RX_NO_BUFFER{41, "fw_rx_no_buffer"};
+  static constexpr std::tuple<uint16_t, const char*> FW_RX_RUNT_FRAMES{42, "fw_rx_runt_frames"};
+  static constexpr std::tuple<uint16_t, const char*> FW_RX_FRAGMENTATION_ERRORS{
+      43, "fw_rx_fragmentation_errors"};
+  static constexpr std::tuple<uint16_t, const char*> FW_RX_BAD_PLCP{44, "fw_rx_bad_plcp"};
+  static constexpr std::tuple<uint16_t, const char*> FW_RX_CRS_GLITCH{45, "fw_rx_crs_glitch"};
+  static constexpr std::tuple<uint16_t, const char*> FW_RX_BAD_FCS{46, "fw_rx_bad_fcs"};
+  static constexpr std::tuple<uint16_t, const char*> FW_RX_GIANT_FRAMES{47, "fw_rx_giant_frames"};
+  static constexpr std::tuple<uint16_t, const char*> FW_RX_NO_SCB{48, "fw_rx_no_scb"};
+  static constexpr std::tuple<uint16_t, const char*> FW_RX_BAD_SRC_MAC{49, "fw_rx_bad_src_mac"};
+  static constexpr std::tuple<uint16_t, const char*> FW_RX_DECRYPT_FAILURES{
+      50, "fw_rx_decrypt_failures"};
 };
 
 static fuchsia_wlan_stats::wire::InspectCounterConfig to_inspect_counter_config(
@@ -5133,6 +5158,33 @@ void brcmf_if_query_telemetry_support(net_device* ndev,
   inspect_counter_configs.push_back(to_inspect_counter_config(Counters::WME_BK_RX_BAD, arena));
   inspect_counter_configs.push_back(to_inspect_counter_config(Counters::WME_BK_TX_GOOD, arena));
   inspect_counter_configs.push_back(to_inspect_counter_config(Counters::WME_BK_TX_BAD, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::FW_TX_RETRANSMITS, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::FW_TX_DATA_ERRORS, arena));
+  inspect_counter_configs.push_back(
+      to_inspect_counter_config(Counters::FW_TX_STATUS_ERRORS, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::FW_TX_NO_BUFFER, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::FW_TX_RUNT_FRAMES, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::FW_TX_UNDERFLOW, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::FW_TX_PHY_ERRORS, arena));
+  inspect_counter_configs.push_back(
+      to_inspect_counter_config(Counters::FW_TX_DOT11_FAILURES, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::FW_TX_NO_ASSOC, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::FW_TX_NO_ACK, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::FW_RX_DATA_ERRORS, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::FW_RX_OVERFLOW, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::FW_RX_NO_BUFFER, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::FW_RX_RUNT_FRAMES, arena));
+  inspect_counter_configs.push_back(
+      to_inspect_counter_config(Counters::FW_RX_FRAGMENTATION_ERRORS, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::FW_RX_BAD_PLCP, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::FW_RX_CRS_GLITCH, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::FW_RX_BAD_FCS, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::FW_RX_GIANT_FRAMES, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::FW_RX_NO_SCB, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::FW_RX_BAD_SRC_MAC, arena));
+  inspect_counter_configs.push_back(
+      to_inspect_counter_config(Counters::FW_RX_DECRYPT_FAILURES, arena));
+
   *resp = fuchsia_wlan_stats::wire::TelemetrySupport::Builder(arena)
               .inspect_counter_configs(fidl::VectorView(arena, inspect_counter_configs))
               .Build();
@@ -5411,6 +5463,41 @@ zx_status_t brcmf_if_get_iface_counter_stats(net_device* ndev,
     driver_counters.push_back(unnamed_counter(Counters::WME_BK_TX_GOOD, wme_cnt.tx[AC_BK].packets));
     driver_counters.push_back(
         unnamed_counter(Counters::WME_BK_TX_BAD, wme_cnt.tx_failed[AC_BK].packets));
+  }
+
+  uint8_t cnt_buf[BRCMF_DCMD_MAXLEN] = {0};
+  // The version # in the counters struct returned by FW is set to 10 currently but its
+  // corresponding struct definition is not available. It appears each new version is a superset
+  // of the previous one. So tell FW the size of the struct is that of wl_cnt_ver_11_t which is >=
+  // "wl_cnt_ver_10_t".
+  status = brcmf_fil_iovar_data_get(ifp, "counters", cnt_buf, sizeof(wl_cnt_ver_11_t), &fw_err);
+  if (status != ZX_OK) {
+    BRCMF_WARN("Unable to get fw counters err: %s fw_err %d", zx_status_get_string(status), fw_err);
+  } else {
+    wl_cnt_ver_6_t* counters = reinterpret_cast<wl_cnt_ver_6_t*>(cnt_buf);
+    driver_counters.push_back(unnamed_counter(Counters::FW_TX_RETRANSMITS, counters->txretrans));
+    driver_counters.push_back(unnamed_counter(Counters::FW_TX_DATA_ERRORS, counters->txerror));
+    driver_counters.push_back(unnamed_counter(Counters::FW_TX_STATUS_ERRORS, counters->txserr));
+    driver_counters.push_back(unnamed_counter(Counters::FW_TX_NO_BUFFER, counters->txnobuf));
+    driver_counters.push_back(unnamed_counter(Counters::FW_TX_RUNT_FRAMES, counters->txrunt));
+    driver_counters.push_back(unnamed_counter(Counters::FW_TX_UNDERFLOW, counters->txuflo));
+    driver_counters.push_back(unnamed_counter(Counters::FW_TX_PHY_ERRORS, counters->txphyerr));
+    driver_counters.push_back(unnamed_counter(Counters::FW_TX_DOT11_FAILURES, counters->txfail));
+    driver_counters.push_back(unnamed_counter(Counters::FW_TX_NO_ASSOC, counters->txnoassoc));
+    driver_counters.push_back(unnamed_counter(Counters::FW_TX_NO_ACK, counters->txnoack));
+    driver_counters.push_back(unnamed_counter(Counters::FW_RX_DATA_ERRORS, counters->rxerror));
+    driver_counters.push_back(unnamed_counter(Counters::FW_RX_OVERFLOW, counters->rxoflo));
+    driver_counters.push_back(unnamed_counter(Counters::FW_RX_NO_BUFFER, counters->rxnobuf));
+    driver_counters.push_back(unnamed_counter(Counters::FW_RX_RUNT_FRAMES, counters->rxrunt));
+    driver_counters.push_back(
+        unnamed_counter(Counters::FW_RX_FRAGMENTATION_ERRORS, counters->rxfragerr));
+    driver_counters.push_back(unnamed_counter(Counters::FW_RX_BAD_PLCP, counters->rxbadplcp));
+    driver_counters.push_back(unnamed_counter(Counters::FW_RX_CRS_GLITCH, counters->rxcrsglitch));
+    driver_counters.push_back(unnamed_counter(Counters::FW_RX_BAD_FCS, counters->rxbadfcs));
+    driver_counters.push_back(unnamed_counter(Counters::FW_RX_GIANT_FRAMES, counters->rxgiant));
+    driver_counters.push_back(unnamed_counter(Counters::FW_RX_NO_SCB, counters->rxnoscb));
+    driver_counters.push_back(unnamed_counter(Counters::FW_RX_BAD_SRC_MAC, counters->rxbadsrcmac));
+    driver_counters.push_back(unnamed_counter(Counters::FW_RX_DECRYPT_FAILURES, counters->rxundec));
   }
 
   connection_counters_builder.driver_specific_counters(fidl::VectorView(arena, driver_counters));
