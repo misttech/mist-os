@@ -875,7 +875,7 @@ bool Vp9UncompressedHeaderParser::ReadSegmentationParams() {
                                << " if abs_or_delta_update is 1";
                 return false;
               }
-              data = -data;
+              data = static_cast<int16_t>(-data);
             }
         }
         segmentation.feature_data[i][j] = data;
