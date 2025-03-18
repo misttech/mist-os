@@ -31,6 +31,10 @@ void srand(unsigned int seed);
 // Note: POSIX.1 specifies unsigned int, but we use uintptr_t instead.
 int rand_r(uintptr_t *seed);
 
+#ifdef __mist_os__
+int atoi(const char *num);
+#endif
+
 __END_CDECLS
 
 #endif  // ZIRCON_KERNEL_LIB_LIBC_INCLUDE_STDLIB_H_

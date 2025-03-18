@@ -42,6 +42,10 @@ static_library("libc") {
   if (toolchain_environment == "kernel") {
     deps += [ "//zircon/kernel/lib/heap" ]
   }
+
+  if (is_mistos || is_kernel) {
+    sources += [ "atoi.cc" ]
+  }
 }
 
 config("headers.after") {
