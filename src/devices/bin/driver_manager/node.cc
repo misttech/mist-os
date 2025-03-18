@@ -1428,8 +1428,13 @@ bool Node::EvaluateRematchFlags(fuchsia_driver_development::RestartRematchFlags 
   return true;
 }
 
-std::pair<std::string, Collection> Node::GetRemovalTrackerInfo() {
-  return {MakeComponentMoniker(), collection_};
+NodeInfo Node::GetRemovalTrackerInfo() {
+  return NodeInfo{
+      .name = MakeComponentMoniker(),
+      .driver_url = driver_url(),
+      .collection = collection_,
+      .state = GetNodeState(),
+  };
 }
 
 void Node::StopDriver() {

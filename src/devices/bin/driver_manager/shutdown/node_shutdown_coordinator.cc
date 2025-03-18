@@ -255,12 +255,7 @@ void NodeShutdownCoordinator::SetRemovalTracker(NodeRemovalTracker* removal_trac
     return;
   }
   removal_tracker_ = removal_tracker;
-  std::pair<std::string, Collection> node_info = bridge_->GetRemovalTrackerInfo();
-  removal_id_ = removal_tracker->RegisterNode(NodeRemovalTracker::Node{
-      .name = node_info.first,
-      .collection = node_info.second,
-      .state = node_state_,
-  });
+  removal_id_ = removal_tracker->RegisterNode(bridge_->GetRemovalTrackerInfo());
 }
 
 std::optional<uint32_t> NodeShutdownCoordinator::GenerateTestDelayMs() {

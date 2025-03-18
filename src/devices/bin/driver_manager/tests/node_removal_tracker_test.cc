@@ -11,8 +11,9 @@
 struct NodeBank {
   NodeBank(driver_manager::NodeRemovalTracker *tracker) : tracker_(tracker) {}
   void AddNode(driver_manager::Collection collection, driver_manager::NodeState state) {
-    ids_.insert(tracker_->RegisterNode(driver_manager::NodeRemovalTracker::Node{
+    ids_.insert(tracker_->RegisterNode(driver_manager::NodeInfo{
         .name = "node",
+        .driver_url = "driver",
         .collection = collection,
         .state = state,
     }));
@@ -32,8 +33,9 @@ class NodeRemovalTrackerTest : public gtest::TestLoopFixture {};
 
 TEST_F(NodeRemovalTrackerTest, RegisterOneNode) {
   driver_manager::NodeRemovalTracker tracker(dispatcher());
-  driver_manager::NodeId id = tracker.RegisterNode(driver_manager::NodeRemovalTracker::Node{
+  driver_manager::NodeId id = tracker.RegisterNode(driver_manager::NodeInfo{
       .name = "node",
+      .driver_url = "driver",
       .collection = driver_manager::Collection::kBoot,
       .state = driver_manager::NodeState::kRunning,
   });
@@ -102,8 +104,9 @@ TEST_F(NodeRemovalTrackerTest, CallbacksCallOrder) {
 // during the pkg_callback without causing a deadlock.
 TEST_F(NodeRemovalTrackerTest, CallbackDeadlock) {
   driver_manager::NodeRemovalTracker tracker(dispatcher());
-  driver_manager::NodeId id = tracker.RegisterNode(driver_manager::NodeRemovalTracker::Node{
+  driver_manager::NodeId id = tracker.RegisterNode(driver_manager::NodeInfo{
       .name = "node",
+      .driver_url = "driver",
       .collection = driver_manager::Collection::kBoot,
       .state = driver_manager::NodeState::kRunning,
   });

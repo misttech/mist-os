@@ -84,6 +84,7 @@ source_set("driver_runner") {
     "driver_runner.h",
     "node.cc",
     "node.h",
+    "node_types.h",
     "offer_injection.cc",
     "offer_injection.h",
     "parent_set_collector.cc",

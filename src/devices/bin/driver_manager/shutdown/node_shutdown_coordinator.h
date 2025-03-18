@@ -14,11 +14,13 @@
 #include <string>
 #include <utility>
 
+#include "src/devices/bin/driver_manager/node_types.h"
+
 namespace driver_manager {
 
 class Node;
+struct NodeInfo;
 class NodeRemovalTracker;
-enum class Collection : uint8_t;
 
 using NodeId = uint32_t;
 
@@ -40,24 +42,12 @@ enum class ShutdownIntent : uint8_t {
                      // registered that matches it.
 };
 
-enum class NodeState : uint8_t {
-  kRunning,              // Normal running state.
-  kPrestop,              // Still running, but will remove soon. usually because the node
-                         // received Remove(kPackage), but is a boot driver.
-  kWaitingOnDriverBind,  // Waiting for the driver to complete binding.
-  kWaitingOnChildren,    // Received Remove, and waiting for children to be removed.
-
-  kWaitingOnDriver,           // Waiting for driver to respond from Stop() command.
-  kWaitingOnDriverComponent,  // Waiting driver component to be destroyed.
-  kStopped,                   // Node finished shutdown.
-};
-
 // Bridge class for node-related interactions.
 class NodeShutdownBridge {
  public:
   // Returns a pair that contains the node's component moniker and collection. Used to
   // register the node to the NodeRemovalTracker.
-  virtual std::pair<std::string, Collection> GetRemovalTrackerInfo() = 0;
+  virtual NodeInfo GetRemovalTrackerInfo() = 0;
 
   // Sends a Stop request to the driver. Invoked when transitioning to kWaitingOnDriver.
   virtual void StopDriver() = 0;
