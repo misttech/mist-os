@@ -11,6 +11,8 @@ import("//build/fidl/fidl.gni")
 conformance_python_fidl_source_basenames = [
   "alignment.test.fidl",
   "empty_struct.test.fidl",
+  "memcpy_compatibility.test.fidl",
+  "ported_from_walker_strings.test.fidl",
   "primitives.test.fidl",
   "strings.test.fidl",
   "vectors.test.fidl",

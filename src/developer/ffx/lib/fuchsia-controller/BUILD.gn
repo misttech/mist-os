@@ -147,6 +147,8 @@ gidl("static_conformance_tests_py") {
     "//src/tests/fidl/conformance_suite/empty_struct.gidl",
     "//src/tests/fidl/conformance_suite/float.gidl",
     "//src/tests/fidl/conformance_suite/integer.gidl",
+    "//src/tests/fidl/conformance_suite/memcpy_compatibility.gidl",
+    "//src/tests/fidl/conformance_suite/ported_from_walker_strings.gidl",
     "//src/tests/fidl/conformance_suite/strings.gidl",
     "//src/tests/fidl/conformance_suite/strings_utf8.gen.gidl",
     "//src/tests/fidl/conformance_suite/vectors.gidl",
