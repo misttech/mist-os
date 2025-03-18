@@ -36,16 +36,17 @@ Shards tests produced by a build.
 }
 
 type testsharderFlags struct {
-	buildDir                 string
-	checkoutDir              string
-	outputFile               string
-	modifiersPath            string
-	affectedTestsPath        string
-	affectedTestsMaxAttempts int
-	affectedOnly             bool
-	skipUnaffected           bool
-	testsharderParamsFile    string
-	depsFile                 string
+	buildDir                    string
+	checkoutDir                 string
+	outputFile                  string
+	modifiersPath               string
+	affectedTestsPath           string
+	affectedTestsMaxAttempts    int
+	affectedOnly                bool
+	skipUnaffected              bool
+	testsharderParamsFile       string
+	depsFile                    string
+	ignoreMultiplyIsolatedLimit bool
 }
 
 func parseFlags() testsharderFlags {
@@ -60,6 +61,7 @@ func parseFlags() testsharderFlags {
 	flag.BoolVar(&flags.skipUnaffected, "skip-unaffected", false, "whether the shards should ignore hermetic, unaffected tests")
 	flag.StringVar(&flags.testsharderParamsFile, "params-file", "", "path to the testsharder params file")
 	flag.StringVar(&flags.depsFile, "deps-file", "", "path to a file to write all the builder deps to in the format expected from `cas archive -paths-json`.")
+	flag.BoolVar(&flags.ignoreMultiplyIsolatedLimit, "ignore-multiply-limit", false, "whether to ignore the limit on multiplied runs per isolated test")
 
 	flag.Usage = usage
 
@@ -327,8 +329,8 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 	if newTargetDuration > targetDuration {
 		targetDuration = newTargetDuration
 	}
-	multipliedShards = testsharder.SplitOutMultipliers(ctx, multipliedShards, testDurations, targetDuration, int(params.TargetTestCount), testsharder.MaxMultipliedRunsPerShard, testsharder.MultipliedShardPrefix)
-	multipliedAffectedShards = testsharder.SplitOutMultipliers(ctx, multipliedAffectedShards, testDurations, targetDuration, int(params.TargetTestCount), testsharder.MaxMultipliedRunsPerShard, testsharder.AffectedShardPrefix)
+	multipliedShards = testsharder.SplitOutMultipliers(ctx, multipliedShards, testDurations, targetDuration, int(params.TargetTestCount), testsharder.MaxMultipliedRunsPerShard, testsharder.MultipliedShardPrefix, flags.ignoreMultiplyIsolatedLimit)
+	multipliedAffectedShards = testsharder.SplitOutMultipliers(ctx, multipliedAffectedShards, testDurations, targetDuration, int(params.TargetTestCount), testsharder.MaxMultipliedRunsPerShard, testsharder.AffectedShardPrefix, flags.ignoreMultiplyIsolatedLimit)
 	shards = append(multipliedAffectedShards, shards...)
 	shards = append(shards, multipliedShards...)
 

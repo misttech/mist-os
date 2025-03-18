@@ -37,6 +37,17 @@ func affectedShard(env build.Environment, os string, ids ...int) *Shard {
 	}
 }
 
+func isolatedShard(env build.Environment, os string, id int) *Shard {
+	test := makeTest(id, os)
+	test.Isolated = true
+	return &Shard{
+		Name:       fmt.Sprintf("%s-%s", environmentName(env), test.Name),
+		Tests:      []Test{test},
+		Env:        env,
+		ExpectsSSH: true,
+	}
+}
+
 func TestSplitOutMultipliers(t *testing.T) {
 	env1 := build.Environment{
 		Dimensions: build.DimensionSet{"device_type": "QEMU"},
@@ -89,6 +100,15 @@ func TestSplitOutMultipliers(t *testing.T) {
 		return shard
 	}
 
+	isolatedMultShard := func(env build.Environment, os string, timeoutSecs, shardIndex, id int) *Shard {
+		shard := isolatedShard(env, os, id)
+		shard.Tests[0].Runs = 1
+		shard.Tests[0].RunAlgorithm = StopOnFailure
+		shard.Name = fmt.Sprintf("%s-(%d)", shard.Name, shardIndex)
+		shard.TimeoutSecs = int(computeShardTimeout(subshard{time.Duration(timeoutSecs) * time.Second, shard.Tests}).Seconds())
+		return shard
+	}
+
 	withStopRepeatingAfterSecs := func(shard *Shard, indexToStopRepeatingAfterSecs map[int]int) *Shard {
 		for i, stopRepeatingAfterSecs := range indexToStopRepeatingAfterSecs {
 			shard.Tests[i].StopRepeatingAfterSecs = stopRepeatingAfterSecs
@@ -106,13 +126,14 @@ func TestSplitOutMultipliers(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name            string
-		shards          []*Shard
-		multipliers     []ModifierMatch
-		testDurations   TestDurationsMap
-		targetDuration  time.Duration
-		targetTestCount int
-		expected        []*Shard
+		name                string
+		shards              []*Shard
+		multipliers         []ModifierMatch
+		testDurations       TestDurationsMap
+		targetDuration      time.Duration
+		targetTestCount     int
+		expected            []*Shard
+		ignoreMultiplyLimit bool
 	}{
 		{
 			name: "empty env matches any env",
@@ -206,6 +227,69 @@ func TestSplitOutMultipliers(t *testing.T) {
 			expected: []*Shard{
 				multShard(env1, "fuchsia", multipliedTestMaxRuns, multipliedTestMaxRuns+10, 1),
 			},
+		},
+		{
+			name: "creates new shards for multiplied isolated tests",
+			shards: []*Shard{
+				isolatedShard(env1, "fuchsia", 1),
+			},
+			multipliers: []ModifierMatch{
+				makeModifierMatch(1, env1, 0),
+			},
+			testDurations: TestDurationsMap{
+				"*": {MedianDuration: time.Second},
+			},
+			targetDuration: time.Minute,
+			expected: []*Shard{
+				isolatedMultShard(env1, "fuchsia", 60, 1, 1),
+				isolatedMultShard(env1, "fuchsia", 60, 2, 1),
+				isolatedMultShard(env1, "fuchsia", 60, 3, 1),
+				isolatedMultShard(env1, "fuchsia", 60, 4, 1),
+				isolatedMultShard(env1, "fuchsia", 60, 5, 1),
+			},
+		},
+		{
+			name: "does not exceed max shards for multiplied isolated tests",
+			shards: []*Shard{
+				isolatedShard(env1, "fuchsia", 1),
+			},
+			multipliers: []ModifierMatch{
+				makeModifierMatch(1, env1, 7),
+			},
+			testDurations: TestDurationsMap{
+				"*": {MedianDuration: time.Second},
+			},
+			targetDuration: time.Minute,
+			expected: []*Shard{
+				isolatedMultShard(env1, "fuchsia", 60, 1, 1),
+				isolatedMultShard(env1, "fuchsia", 60, 2, 1),
+				isolatedMultShard(env1, "fuchsia", 60, 3, 1),
+				isolatedMultShard(env1, "fuchsia", 60, 4, 1),
+				isolatedMultShard(env1, "fuchsia", 60, 5, 1),
+			},
+		},
+		{
+			name: "ignores multiply limit for multiplied isolated tests",
+			shards: []*Shard{
+				isolatedShard(env1, "fuchsia", 1),
+			},
+			multipliers: []ModifierMatch{
+				makeModifierMatch(1, env1, 7),
+			},
+			testDurations: TestDurationsMap{
+				"*": {MedianDuration: time.Second},
+			},
+			targetDuration: time.Minute,
+			expected: []*Shard{
+				isolatedMultShard(env1, "fuchsia", 60, 1, 1),
+				isolatedMultShard(env1, "fuchsia", 60, 2, 1),
+				isolatedMultShard(env1, "fuchsia", 60, 3, 1),
+				isolatedMultShard(env1, "fuchsia", 60, 4, 1),
+				isolatedMultShard(env1, "fuchsia", 60, 5, 1),
+				isolatedMultShard(env1, "fuchsia", 60, 6, 1),
+				isolatedMultShard(env1, "fuchsia", 60, 7, 1),
+			},
+			ignoreMultiplyLimit: true,
 		},
 		{
 			name: "runs at least once even if duration is longer than target duration",
@@ -463,6 +547,7 @@ func TestSplitOutMultipliers(t *testing.T) {
 				// production value.
 				2000,
 				MultipliedShardPrefix,
+				tc.ignoreMultiplyLimit,
 			)
 			assertEqual(t, tc.expected, actual)
 		})

@@ -97,6 +97,9 @@ func (t *Test) minRequiredRuns() int {
 
 func (t *Test) maxRuns() int {
 	if t.Runs == 0 {
+		if t.Isolated {
+			return maxMultipliedShardsPerIsolatedTest
+		}
 		return multipliedTestMaxRuns
 	}
 	return t.Runs

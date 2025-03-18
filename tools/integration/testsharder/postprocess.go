@@ -36,6 +36,11 @@ const (
 	// The maximum number of multiplied shards allowed per environment.
 	maxMultipliedShardsPerEnv = 3
 
+	// The maximum number of multiplied shards to run per isolated test (1 run per shard).
+	// This applies if the number of runs are not specified or if -ignore-mulitply-limit
+	// is not set.
+	maxMultipliedShardsPerIsolatedTest = 5
+
 	// The prefix added to the names of shards that run affected hermetic tests.
 	AffectedShardPrefix = "affected:"
 
@@ -131,6 +136,7 @@ func SplitOutMultipliers(
 	targetTestCount int,
 	maxMultipliedRunsPerShard int,
 	prefix string,
+	ignoreMultiplyIsolatedLimit bool,
 ) []*Shard {
 	shardIdxToMatches := make([]map[int]struct{}, len(shards))
 
@@ -157,7 +163,7 @@ func SplitOutMultipliers(
 			shards = shards[:len(shards)-1]
 			shardRemoved = true
 		}
-		var multipliedTests []Test
+		var multipliedTests, multipliedIsolatedTests []Test
 		totalTestsDuration := 0
 		maxTestsDuration := 0
 		totalTestCount := 0
@@ -169,17 +175,21 @@ func SplitOutMultipliers(
 				continue
 			}
 			test := shard.Tests[ti]
-			if targetDuration > 0 {
-				expectedDuration := testDurations.Get(test).MedianDuration
-				totalTestsDuration += int(expectedDuration) * max(1, test.Runs)
-				maxTestsDuration += int(expectedDuration) * test.maxRuns()
-			} else if targetTestCount > 0 {
-				totalTestCount += max(1, test.Runs)
-				maxTestCount += test.maxRuns()
+			if test.Isolated {
+				multipliedIsolatedTests = append(multipliedIsolatedTests, test)
 			} else {
-				test.Runs = max(test.Runs, 1)
+				if targetDuration > 0 {
+					expectedDuration := testDurations.Get(test).MedianDuration
+					totalTestsDuration += int(expectedDuration) * max(1, test.Runs)
+					maxTestsDuration += int(expectedDuration) * test.maxRuns()
+				} else if targetTestCount > 0 {
+					totalTestCount += max(1, test.Runs)
+					maxTestCount += test.maxRuns()
+				} else {
+					test.Runs = max(test.Runs, 1)
+				}
+				multipliedTests = append(multipliedTests, test)
 			}
-			multipliedTests = append(multipliedTests, test)
 			if shardRemoved {
 				continue
 			}
@@ -189,6 +199,22 @@ func SplitOutMultipliers(
 
 		}
 
+		if len(multipliedIsolatedTests) > 0 {
+			for _, test := range multipliedIsolatedTests {
+				totalRuns := test.maxRuns()
+				if !ignoreMultiplyIsolatedLimit {
+					totalRuns = min(totalRuns, maxMultipliedShardsPerIsolatedTest)
+				}
+				test.Runs = 1
+				for i := 1; i <= totalRuns; i++ {
+					multShard := *shard
+					multShard.Name = fmt.Sprintf("%s-(%d)", shard.Name, i)
+					multShard.Tests = []Test{test}
+					multShard.TimeoutSecs = int(computeShardTimeout(subshard{targetDuration, multShard.Tests}).Seconds())
+					shards = append(shards, &multShard)
+				}
+			}
+		}
 		if len(multipliedTests) > 0 {
 			maxMultipliedShards := maxMultipliedShardsPerEnv
 			if targetDuration > 0 {
