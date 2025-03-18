@@ -1116,6 +1116,19 @@ func NewFuchsiaSerialTester(ctx context.Context, serialSocketPath string) (Teste
 	if err != nil {
 		return nil, err
 	}
+
+	// Test logs get interleaved with other serial logs and while most can be parsed
+	// out by the parseOutKernelReader, that assumes the log starts with a timestamp
+	// which some of the early logs at bootup don't have. For that reason, try to
+	// wait until most of those logs are written to serial before starting to run tests.
+	// In the case that the search string was already written before we started searching
+	// for it, don't fail if we time out looking for it.
+	socket.SetIOTimeout(30 * time.Second)
+	startedCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	if _, err := iomisc.ReadUntilMatchString(startedCtx, socket, "[driver_manager.cm] INFO: Bootup completed"); err != nil {
+		logger.Debugf(ctx, "%s", err)
+	}
 	return &FuchsiaSerialTester{socket: socket}, nil
 }
 
