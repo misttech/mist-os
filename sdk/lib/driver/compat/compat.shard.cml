@@ -38,11 +38,6 @@
                 "fuchsia.system.state.SystemStateTransition",
             ],
         },
-        {
-            // Not available in tests.
-            protocol: [ "fuchsia.boot.Arguments" ],
-            availability: "optional",
-        },
         { service: "fuchsia.driver.compat.Service" },
     ],
     expose: [
