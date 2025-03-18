@@ -18,6 +18,7 @@ use {fidl_fuchsia_developer_remotecontrol as rcs, fuchsia_async as fasync};
 
 mod fdomain;
 mod usb;
+mod vsock;
 
 async fn exec_server(config: &Config) -> Result<(), Error> {
     diagnostics_log::initialize(PublishOptions::default().tags(&["remote-control"]))?;
@@ -90,13 +91,21 @@ async fn exec_server(config: &Config) -> Result<(), Error> {
         sc.serve_stream(rcs::RemoteControlRequestStream::from_channel(chan))
     });
 
-    let weak_router = Arc::downgrade(&router);
+    let weak_router_usb = Arc::downgrade(&router);
+    let weak_router_vsock = Arc::downgrade(&router);
     std::mem::drop(router);
     let usb_fut = async move {
         // TODO(https://fxbug.dev/296283299): Change this info! to error! Once
         // we can return normally if USB support is disabled
-        if let Err(e) = usb::run_usb_links(weak_router.clone()).await {
+        if let Err(e) = usb::run_usb_links(weak_router_usb).await {
             info!("USB scanner failed with error {e:?}");
+        }
+    };
+    let vsock_fut = async move {
+        // TODO(https://fxbug.dev/296283299): Change this info! to error! Once
+        // we can return normally if VSOCK support is disabled
+        if let Err(e) = vsock::run_vsocks(weak_router_vsock).await {
+            info!("VSOCK serving failed with error {e:?}");
         }
     };
 
@@ -113,7 +122,7 @@ async fn exec_server(config: &Config) -> Result<(), Error> {
     fs.take_and_serve_directory_handle()?;
     let fidl_fut = fs.collect::<()>();
 
-    join!(fidl_fut, onet_fut, usb_fut);
+    join!(fidl_fut, onet_fut, usb_fut, vsock_fut);
     Ok(())
 }
 

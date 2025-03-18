@@ -89,6 +89,7 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//sdk/fidl/fuchsia.hardware.overnet:fuchsia.hardware.overnet_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.vsock:fuchsia.vsock_rust",
     "//src/connectivity/overnet/lib/circuit",
     "//src/connectivity/overnet/lib/core",
     "//src/lib/diagnostics/log/rust",
@@ -105,6 +106,7 @@ rustc_binary("bin") {
     "src/fdomain.rs",
     "src/main.rs",
     "src/usb.rs",
+    "src/vsock.rs",
   ]
 }
 
