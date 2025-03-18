@@ -51,6 +51,8 @@ if (is_host) {
       "//tools/fidl/fidlgen_hlcpp:verify_bazel2gn",
       "//tools/fidl/fidlgen_hlcpp/codegen:verify_bazel2gn",
       "//tools/fidl/fidlgen_hlcpp/coding_tables:verify_bazel2gn",
+      "//tools/fidl/fidlgen_rust:verify_bazel2gn",
+      "//tools/fidl/fidlgen_rust/codegen:verify_bazel2gn",
       "//tools/fidl/lib/fidlgen:verify_bazel2gn",
       "//tools/fidl/lib/fidlgen_cpp:verify_bazel2gn",
       "//tools/lib/color:verify_bazel2gn",
