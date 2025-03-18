@@ -57,6 +57,11 @@ import("//build/compiled_action.gni")
 #    isn't a board_input_bundle() target, it will cause an error such as:
 #      "no dependency provides the input <target_name>/board_input_bundle.json"
 #
+#  board_input_bundle_sets (optional; default=[])
+#    [list; GN labels] The GN labels of board_input_bundle_set()s which may
+#    provide BIBs to include. board_input_bundle_names lists which BIBs from
+#    the sets to include.
+#
 #  filesystems (optional)
 #    [scope] A GN scope that describes configuration to use for various
 #    different filesystems in order to use them with this board.  This doesn't
@@ -125,6 +130,9 @@ template("board_configuration") {
 
     # The directory of input bundles
     input_bundle_dirs = []
+
+    # The directories of the board input bundle sets.
+    board_input_bundle_set_dirs = []
   }
 
   if (defined(invoker.input_bundles)) {
@@ -140,6 +148,14 @@ template("board_configuration") {
       _input_bundle_input_dir = get_label_info(input_bundle, "target_out_dir") +
                                 "/" + _input_bundle_name
       files.input_bundle_dirs += [ _input_bundle_input_dir ]
+    }
+  }
+
+  if (defined(invoker.board_input_bundle_sets)) {
+    foreach(set, invoker.board_input_bundle_sets) {
+      _set_name = get_label_info(set, "name")
+      _set_dir = get_label_info(set, "target_out_dir") + "/" + _set_name
+      files.board_input_bundle_set_dirs += [ _set_dir ]
     }
   }
 
@@ -217,7 +233,8 @@ template("board_configuration") {
     # directories that are not added back (on an incremental build, if an item
     # is removed from one of these sets)
     hermetic_action_ignored_prefixes =
-        [ "${files.board_config_dir}" ] + files.input_bundle_dirs
+        [ "${files.board_config_dir}" ] + files.input_bundle_dirs +
+        files.board_input_bundle_set_dirs
 
     tool = "//build/assembly/tools/generate_config"
     tool_output_name = "assembly_generate_config"
@@ -239,11 +256,20 @@ template("board_configuration") {
         rebase_path(board_input_bundle, root_build_dir),
       ]
     }
+    foreach(board_input_bundle_set, files.board_input_bundle_set_dirs) {
+      args += [
+        "--board-input-bundle-sets",
+        rebase_path(board_input_bundle_set, root_build_dir),
+      ]
+    }
 
     public_deps = [ ":${labels.base_info}" ]
     deps = []
     if (defined(invoker.input_bundles)) {
       deps += invoker.input_bundles
+    }
+    if (defined(invoker.board_input_bundle_sets)) {
+      deps += invoker.board_input_bundle_sets
     }
     if (defined(invoker.devicetree)) {
       deps += [ invoker.devicetree ]

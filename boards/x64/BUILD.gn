@@ -4,6 +4,7 @@
 
 import("//build/assembly/board_configuration.gni")
 import("//build/assembly/board_input_bundle.gni")
+import("//build/assembly/board_input_bundle_set.gni")
 
 assert(current_toolchain == default_toolchain,
        "The x64 board can only be defined in the default toolchain.")
@@ -40,6 +41,10 @@ common_board_configuration = {
     ":paver",
     "//boards/emulation/virtio",
   ]
+
+  # TODO(https://fxbug.dev/388852272): Enable this once vendor repos properly
+  # swap both the independent BIBs and the BIBs from sets.
+  # board_input_bundle_sets = [ ":x64_bibs" ]
 
   filesystems = {
     vbmeta = {
@@ -303,4 +308,13 @@ board_input_bundle("x64_common") {
 
 board_input_bundle("paver") {
   bootfs_packages = [ "//src/bringup/bin/paver:package-uefi" ]
+}
+
+board_input_bundle_set("x64_bibs") {
+  board_input_bundles = [
+    ":paver",
+    ":x64_common",
+    ":main_bundle",
+    "//boards/emulation/virtio",
+  ]
 }
