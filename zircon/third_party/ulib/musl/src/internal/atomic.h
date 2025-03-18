@@ -13,6 +13,10 @@ static inline int a_cas_shim(_Atomic(int) * p, int t, int s) {
 
 #if defined(__x86_64__)
 static inline void a_spin(void) { __asm__ __volatile__("pause" : : : "memory"); }
+#elif defined(__aarch64__)
+static inline void a_spin(void) { __asm__ __volatile__("yield" : : : "memory"); }
+#elif defined(__riscv)
+static inline void a_spin(void) { __asm__ __volatile__("pause" : : : "memory"); }
 #else
-#define a_spin() atomic_thread_fence(memory_order_seq_cst)
+#error "Unknown architecture"
 #endif
