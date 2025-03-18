@@ -136,9 +136,6 @@ executable("cgpt") {
     "//third_party/vboot_reference/firmware/lib:headers",
   ]
   configs += [ ":internal_config" ]
-
-  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
 }
 
 # The upstream makefile actually generates this source, but for simplicities
@@ -193,9 +190,6 @@ executable("futility") {
   }
   deps += [ "//third_party/boringssl:crypto" ]
   configs += [ ":internal_config" ]
-
-  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
 }
 
 config("internal_config") {

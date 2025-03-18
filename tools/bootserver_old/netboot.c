@@ -94,7 +94,7 @@ static int io_send(int s, netboot_message_header_t* msg, size_t len) {
     bool retry_allowed = i + 1 < MAX_SEND_RETRIES;
 #endif
 
-    int r = write(s, msg, len);
+    ssize_t r = write(s, msg, len);
     if (r < 0) {
 #if defined(__APPLE__)
       if (retry_allowed && errno == ENOBUFS) {
@@ -282,7 +282,7 @@ int netboot_xfer(struct sockaddr_in6* addr, const char* fn, const char* name) {
   }
 
   msg->cmd = NETBOOT_COMMAND_SEND_FILE;
-  msg->arg = sz;
+  msg->arg = (uint32_t)sz;
   strcpy((void*)msg_data, name);
   if (io(s, msg, sizeof(netboot_message_header_t) + strlen(name) + 1, ack, true)) {
     fprintf(stderr, "%s: error: Failed to start transfer\n", appname);
@@ -361,7 +361,7 @@ int netboot_xfer(struct sockaddr_in6* addr, const char* fn, const char* name) {
       current_pos += r;
     }
 
-    msg->arg = current_pos;
+    msg->arg = (uint32_t)current_pos;
   } while (!completed);
 
   status = 0;

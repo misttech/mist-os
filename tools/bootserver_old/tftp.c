@@ -204,7 +204,7 @@ int transport_recv(void* data, size_t len, bool block, void* cookie) {
     memcpy(&state->target_addr, &connection_addr, sizeof(state->target_addr));
     state->connected = true;
   }
-  return recv_result;
+  return (int)recv_result;
 }
 
 int transport_timeout_set(uint32_t timeout_ms, void* cookie) {

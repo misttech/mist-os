@@ -67,8 +67,8 @@ TEST_F(CommandLineOptionsTest, ArgfileTest) {
   DecodeOptions decode_options;
   DisplayOptions display_options;
   std::vector<std::string> params;
-  auto error = ParseCommandLine(argv.size(), argv.data(), &options, &decode_options,
-                                &display_options, &params);
+  auto error = ParseCommandLine(static_cast<int>(argv.size()), argv.data(), &options,
+                                &decode_options, &display_options, &params);
   ASSERT_TRUE(error.empty());
   ASSERT_EQ(0U, params.size()) << "Expected 0 params, got (at least) " << params[0];
 
@@ -100,8 +100,8 @@ TEST_F(CommandLineOptionsTest, BadOptionsTest) {
   DecodeOptions decode_options;
   DisplayOptions display_options;
   std::vector<std::string> params;
-  auto error = ParseCommandLine(argv.size(), argv.data(), &options, &decode_options,
-                                &display_options, &params);
+  auto error = ParseCommandLine(static_cast<int>(argv.size()), argv.data(), &options,
+                                &decode_options, &display_options, &params);
   ASSERT_TRUE(error.empty());
   ASSERT_EQ(0U, params.size()) << "Expected 0 params, got (at least) " << params[0];
 
@@ -166,8 +166,8 @@ TEST_F(CommandLineOptionsTest, SimpleParseCommandLineTest) {
   DecodeOptions decode_options;
   DisplayOptions display_options;
   std::vector<std::string> params;
-  auto error = ParseCommandLine(argv.size(), argv.data(), &options, &decode_options,
-                                &display_options, &params);
+  auto error = ParseCommandLine(static_cast<int>(argv.size()), argv.data(), &options,
+                                &decode_options, &display_options, &params);
   ASSERT_TRUE(error.empty());
   ASSERT_EQ(2U, params.size()) << "Expected 0 params, got (at least) " << params[0];
   ASSERT_EQ(connect, *options.connect);
@@ -215,8 +215,8 @@ TEST_F(CommandLineOptionsTest, CanHavePidAndFilter) {
   DecodeOptions decode_options;
   DisplayOptions display_options;
   std::vector<std::string> params;
-  auto error = ParseCommandLine(argv.size(), argv.data(), &options, &decode_options,
-                                &display_options, &params);
+  auto error = ParseCommandLine(static_cast<int>(argv.size()), argv.data(), &options,
+                                &decode_options, &display_options, &params);
   ASSERT_TRUE(error.empty());
   ASSERT_EQ(1U, options.remote_name.size());
   ASSERT_EQ("echo_client", options.remote_name[0]);
@@ -234,8 +234,8 @@ TEST_F(CommandLineOptionsTest, CanHaveRemoteAndExtra) {
   DecodeOptions decode_options;
   DisplayOptions display_options;
   std::vector<std::string> params;
-  auto error = ParseCommandLine(argv.size(), argv.data(), &options, &decode_options,
-                                &display_options, &params);
+  auto error = ParseCommandLine(static_cast<int>(argv.size()), argv.data(), &options,
+                                &decode_options, &display_options, &params);
   ASSERT_TRUE(error.empty());
   ASSERT_EQ(1U, options.remote_name.size());
   ASSERT_EQ("echo_client", options.remote_name[0]);
@@ -251,8 +251,8 @@ TEST_F(CommandLineOptionsTest, MustHaveRemoteWithExtra) {
   DecodeOptions decode_options;
   DisplayOptions display_options;
   std::vector<std::string> params;
-  auto error = ParseCommandLine(argv.size(), argv.data(), &options, &decode_options,
-                                &display_options, &params);
+  auto error = ParseCommandLine(static_cast<int>(argv.size()), argv.data(), &options,
+                                &decode_options, &display_options, &params);
   ASSERT_TRUE(!error.empty());
   ASSERT_EQ(1U, options.extra_name.size());
   ASSERT_EQ("appmgr", options.extra_name[0]);
@@ -270,8 +270,8 @@ TEST_F(CommandLineOptionsTest, NoActionMeansFailure) {
   DecodeOptions decode_options;
   DisplayOptions display_options;
   std::vector<std::string> params;
-  auto error = ParseCommandLine(argv.size(), argv.data(), &options, &decode_options,
-                                &display_options, &params);
+  auto error = ParseCommandLine(static_cast<int>(argv.size()), argv.data(), &options,
+                                &decode_options, &display_options, &params);
   ASSERT_TRUE(!error.empty());
 }
 
@@ -299,8 +299,8 @@ TEST_F(CommandLineOptionsTest, QuietTrumpsVerbose) {
   DecodeOptions decode_options;
   DisplayOptions display_options;
   std::vector<std::string> params;
-  auto error = ParseCommandLine(argv.size(), argv.data(), &options, &decode_options,
-                                &display_options, &params);
+  auto error = ParseCommandLine(static_cast<int>(argv.size()), argv.data(), &options,
+                                &decode_options, &display_options, &params);
   ASSERT_TRUE(fuchsia_logging::IsSeverityEnabled(fuchsia_logging::LogSeverity::Error));
   ASSERT_FALSE(fuchsia_logging::IsSeverityEnabled(fuchsia_logging::LogSeverity::Info));
 }
