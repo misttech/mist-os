@@ -53,11 +53,6 @@
             to: "#full-drivers",
         },
         {
-            protocol: "fuchsia.boot.Arguments",
-            from: "parent",
-            to: "#full-drivers",
-        },
-        {
             protocol: [ "fuchsia.scheduler.RoleManager" ],
             from: "#role_manager",
             to: "#full-drivers",

@@ -34,11 +34,6 @@
             to: "#base-drivers",
         },
         {
-            protocol: "fuchsia.boot.Arguments",
-            from: "parent",
-            to: "#base-drivers",
-        },
-        {
             protocol: [ "fuchsia.scheduler.RoleManager" ],
             from: "#role_manager",
             to: "#base-drivers",
