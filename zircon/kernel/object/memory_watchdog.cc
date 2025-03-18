@@ -239,9 +239,12 @@ void MemoryWatchdog::WorkerThread() {
     // because it was out of memory, then escalate the pressure level to trigger an OOM response
     // immediately.  The idea here is that usermode processes may not be able to handle allocation
     // failure and therefore could have become wedged in some way.
-    if (gBootOptions->oom_trigger_on_alloc_failure && pmm_has_alloc_failed_no_mem()) {
+    if (gBootOptions->oom_trigger_on_alloc_failure && PmmNode::has_alloc_failed_no_mem()) {
+      PmmNode::AllocFailure first_failure = Pmm::Node().GetFirstAllocFailure();
       printf(
-          "memory-pressure: pmm failed one or more alloc calls, escalating to oom...(free memory is %zuMB)\n",
+          "memory-pressure: failed one or more allocations (first reported type: %s size: %zu)"
+          ", escalating to oom...(free memory is %zuMB)\n",
+          PmmNode::AllocFailure::TypeToString(first_failure.type), first_failure.size,
           pmm_count_free_pages() * PAGE_SIZE / MB);
       mem_event_idx_ = PressureLevel::kOutOfMemory;
     }
@@ -347,7 +350,7 @@ void MemoryWatchdog::WaitForMemChange(const Deadline& deadline) {
       // After having successfully set the event check again for any allocation failures. This is to
       // ensure that if an allocation failure happened while we did not have an event set that it is
       // not missed.
-      if (gBootOptions->oom_trigger_on_alloc_failure && pmm_has_alloc_failed_no_mem()) {
+      if (gBootOptions->oom_trigger_on_alloc_failure && PmmNode::has_alloc_failed_no_mem()) {
         return;
       }
       status = mem_state_signal_.Wait(deadline);

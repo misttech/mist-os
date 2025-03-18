@@ -227,8 +227,25 @@ class PmmNode {
   void SeedRandomShouldWait();
 
   // Tell this PmmNode that we've failed a user-visible allocation.  Calling this method will
-  // (optionally) trigger an asynchronous OOM response.
-  void ReportAllocFailure() TA_EXCL(lock_);
+  // (optionally) trigger an asynchronous OOM response. To improve diagnostics some information
+  // about the source of the failure can be provided.
+  struct AllocFailure {
+    enum class Type : uint8_t {
+      None,
+      Pmm,
+      Heap,
+      Handle,
+      Other,
+    };
+    static const char* TypeToString(Type type);
+    Type type = Type::None;
+    size_t size = 0;
+  };
+  void ReportAllocFailure(AllocFailure failure) TA_EXCL(lock_);
+
+  // Retrieves information given to |ReportAllocFailure|. Due to book keeping limitations this will
+  // only return information from the first failure.
+  AllocFailure GetFirstAllocFailure() TA_EXCL(lock_);
 
  private:
   zx_status_t InitArena(const PmmArenaSelection& selected);
@@ -307,7 +324,7 @@ class PmmNode {
 
   // This method should be called when the PMM fails to allocate in a user-visible way and will
   // (optionally) trigger an asynchronous OOM response.
-  void ReportAllocFailureLocked() TA_REQ(lock_);
+  void ReportAllocFailureLocked(AllocFailure failure) TA_REQ(lock_);
 
   fbl::Canary<fbl::magic("PNOD")> canary_;
 
@@ -371,6 +388,9 @@ class PmmNode {
   // Event is signaled whenever allocations are allowed to happen based on the |should_wait_| state.
   // Whenever in the |UntilReset| state, this event will be Unsignaled causing waiters to block.
   Event free_pages_evt_;
+
+  // A record of the first time an allocation failure is reported to aid in diagnostics.
+  AllocFailure first_alloc_failure_ TA_GUARDED(lock_);
 
   // If mem_signal_ is not null, then once the available free memory falls outside of the defined
   // lower and upper bound the signal is raised. This is a one-shot signal and is cleared after

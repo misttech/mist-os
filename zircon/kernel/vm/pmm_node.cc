@@ -381,7 +381,7 @@ zx::result<vm_page_t*> PmmNode::AllocPage(uint alloc_flags) {
     page = list_remove_head_type(&free_list_, vm_page, queue_node);
     if (!page) {
       // Allocation failures from the regular free list are likely to become user-visible.
-      ReportAllocFailureLocked();
+      ReportAllocFailureLocked(AllocFailure{.type = AllocFailure::Type::Pmm, .size = 1});
       return zx::error(ZX_ERR_NO_MEMORY);
     }
 
@@ -435,7 +435,7 @@ zx_status_t PmmNode::AllocPages(size_t count, uint alloc_flags, list_node* list)
         return ZX_ERR_SHOULD_WAIT;
       }
       // Allocation failures from the regular free list are likely to become user-visible.
-      ReportAllocFailureLocked();
+      ReportAllocFailureLocked(AllocFailure{.type = AllocFailure::Type::Pmm, .size = count});
       return ZX_ERR_NO_MEMORY;
     }
 
@@ -1173,7 +1173,7 @@ void PmmNode::EndLoan(vm_page_t* page) {
   }
 }
 
-void PmmNode::ReportAllocFailureLocked() {
+void PmmNode::ReportAllocFailureLocked(AllocFailure failure) {
   kcounter_add(pmm_alloc_failed, 1);
 
   // Update before signaling the MemoryWatchdog to ensure it observes the update.
@@ -1182,14 +1182,22 @@ void PmmNode::ReportAllocFailureLocked() {
   // every failure, but that's wasteful and we don't want to spam any underlying Event (or the
   // thread lock or the MemoryWatchdog).
   const bool first_time = !alloc_failed_no_mem.exchange(true, ktl::memory_order_relaxed);
+  if (first_time) {
+    first_alloc_failure_ = failure;
+  }
   if (first_time && mem_signal_) {
     SignalFreeMemoryChangeLocked();
   }
 }
 
-void PmmNode::ReportAllocFailure() {
+void PmmNode::ReportAllocFailure(AllocFailure failure) {
   Guard<Mutex> guard{&lock_};
-  ReportAllocFailureLocked();
+  ReportAllocFailureLocked(failure);
+}
+
+PmmNode::AllocFailure PmmNode::GetFirstAllocFailure() {
+  Guard<Mutex> guard{&lock_};
+  return first_alloc_failure_;
 }
 
 void PmmNode::SeedRandomShouldWait() {
@@ -1207,4 +1215,20 @@ zx_status_t PmmNode::SetPageCompression(fbl::RefPtr<VmCompression> compression) 
   }
   page_compression_ = ktl::move(compression);
   return ZX_OK;
+}
+
+const char* PmmNode::AllocFailure::TypeToString(Type type) {
+  switch (type) {
+    case Type::None:
+      return "None";
+    case Type::Pmm:
+      return "PMM";
+    case Type::Heap:
+      return "Heap";
+    case Type::Handle:
+      return "Handle";
+    case Type::Other:
+      return "Other";
+  }
+  return "UNKNOWN";
 }

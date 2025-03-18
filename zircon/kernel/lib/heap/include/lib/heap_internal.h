@@ -15,6 +15,6 @@
 // internal apis used by the heap implementation to get/return pages to the VM
 void* heap_page_alloc(size_t pages) TA_REQ(TheHeapLock::Get());
 void heap_page_free(void* ptr, size_t pages) TA_REQ(TheHeapLock::Get());
-void heap_report_alloc_failure() TA_EXCL(TheHeapLock::Get());
+void heap_report_alloc_failure(size_t size) TA_EXCL(TheHeapLock::Get());
 
 #endif  // ZIRCON_KERNEL_LIB_HEAP_INCLUDE_LIB_HEAP_INTERNAL_H_

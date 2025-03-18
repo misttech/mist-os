@@ -1058,7 +1058,8 @@ zx_status_t ProcessDispatcher::MakeAndAddHandle(fbl::RefPtr<Dispatcher> dispatch
     // cases (see https://fxbug.dev//379936010#comment8).  Second, usermode programs are generally
     // not equipped to deal with handle allocation failure.  The system is likely hosed if we get
     // here.
-    pmm_report_alloc_failure();
+    Pmm::Node().ReportAllocFailure(
+        PmmNode::AllocFailure{.type = PmmNode::AllocFailure::Type::Handle, .size = 1});
     return ZX_ERR_NO_MEMORY;
   }
   *out = handle_table().MapHandleToValue(handle);
@@ -1071,7 +1072,8 @@ zx_status_t ProcessDispatcher::MakeAndAddHandle(KernelHandle<Dispatcher> kernel_
   HandleOwner handle = Handle::Make(ktl::move(kernel_handle), rights);
   if (!handle) {
     // See comment in the other MakeAndAddHandle overload above.
-    pmm_report_alloc_failure();
+    Pmm::Node().ReportAllocFailure(
+        PmmNode::AllocFailure{.type = PmmNode::AllocFailure::Type::Handle, .size = 1});
     return ZX_ERR_NO_MEMORY;
   }
   *out = handle_table().MapHandleToValue(handle);

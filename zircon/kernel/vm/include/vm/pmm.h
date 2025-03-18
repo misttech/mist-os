@@ -171,14 +171,6 @@ void pmm_checker_check_all_free_pages();
 // incredibly expensive operation and should be used with care.
 void pmm_asan_poison_all_free_pages();
 
-int64_t pmm_get_alloc_failed_count();
-
-// Returns true if the PMM has ever failed an allocation with ZX_ERR_NO_MEMORY.
-bool pmm_has_alloc_failed_no_mem();
-
 void pmm_print_physical_page_borrowing_stats();
-
-// See PmmNode::ReportAllocFailure.
-void pmm_report_alloc_failure();
 
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_PMM_H_

@@ -928,7 +928,7 @@ NO_ASAN void* cmpct_alloc(size_t size) {
     while (!heap_grow(growby)) {
       if (growby <= rounded_up) {
         guard.Release();
-        heap_report_alloc_failure();
+        heap_report_alloc_failure(rounded_up);
         return NULL;
       }
       growby = std::max(growby >> 1, rounded_up);

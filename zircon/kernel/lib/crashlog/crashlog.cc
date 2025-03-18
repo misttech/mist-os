@@ -177,7 +177,7 @@ size_t crashlog_to_string(ktl::span<char> target, zircon_crash_reason_t reason) 
     fprintf(&outfile,
             "counters: haf=%" PRId64 " paf=%" PRId64 " pvf=%" PRId64 " lcs=%" PRId64 " lhb=%" PRId64
             " cf=%" PRId64 " \n",
-            HandleTableArena::get_alloc_failed_count(), pmm_get_alloc_failed_count(),
+            HandleTableArena::get_alloc_failed_count(), PmmNode::get_alloc_failed_count(),
             PmmChecker::get_validation_failed_count(), lockup_get_critical_section_oops_count(),
             lockup_get_no_heartbeat_oops_count(), ChannelDispatcher::get_channel_full_count());
   }
