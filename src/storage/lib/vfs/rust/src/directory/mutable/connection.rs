@@ -14,6 +14,7 @@ use crate::execution_scope::ExecutionScope;
 use crate::name::validate_name;
 use crate::node::OpenNode;
 use crate::path::Path;
+use crate::request_handler::{RequestHandler, RequestListener};
 use crate::token_registry::{TokenInterface, TokenRegistry, Tokenizable};
 use crate::{ObjectRequestRef, ProtocolsExt};
 
@@ -21,15 +22,13 @@ use anyhow::Error;
 use fidl::endpoints::ServerEnd;
 use fidl::Handle;
 use fidl_fuchsia_io as fio;
-use futures::{pin_mut, TryStreamExt as _};
-use pin_project::pin_project;
 use std::future::Future;
+use std::ops::ControlFlow;
 use std::pin::Pin;
 use std::sync::Arc;
 use storage_trace::{self as trace, TraceFutureExt};
 use zx_status::Status;
 
-#[pin_project]
 pub struct MutableConnection<DirectoryType: MutableDirectory> {
     base: BaseConnection<DirectoryType>,
 }
@@ -51,7 +50,7 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
         let object_request = object_request.take();
         Ok(async move {
             if let Ok(requests) = object_request.into_request_stream(&connection.base).await {
-                connection.handle_requests(requests).await
+                RequestListener::new(requests, Tokenizable::new(connection)).await;
             }
         })
     }
@@ -62,7 +61,7 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
     ) -> Result<ConnectionState, Error> {
         match request {
             fio::DirectoryRequest::Unlink { name, options, responder } => {
-                let result = this.as_mut().handle_unlink(name, options).await;
+                let result = this.handle_unlink(name, options).await;
                 responder.send(result.map_err(Status::into_raw))?;
             }
             fio::DirectoryRequest::GetToken { responder } => {
@@ -78,7 +77,6 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
             }
             fio::DirectoryRequest::SetAttr { flags, attributes, responder } => {
                 let status = match this
-                    .as_mut()
                     .handle_update_attributes(io1_to_io2_attrs(flags, attributes))
                     .await
                 {
@@ -99,8 +97,7 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
                     responder.send(Err(Status::INVALID_ARGS.into_raw()))?;
                 } else {
                     responder.send(
-                        this.as_mut()
-                            .base
+                        this.base
                             .directory
                             .create_symlink(name, target, connection)
                             .await
@@ -148,10 +145,7 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
             fio::DirectoryRequest::UpdateAttributes { payload, responder } => {
                 async move {
                     responder.send(
-                        this.as_mut()
-                            .handle_update_attributes(payload)
-                            .await
-                            .map_err(Status::into_raw),
+                        this.handle_update_attributes(payload).await.map_err(Status::into_raw),
                     )
                 }
                 .trace(trace::trace_future_args!(c"storage", c"Directory::UpdateAttributes"))
@@ -165,7 +159,7 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
     }
 
     async fn handle_update_attributes(
-        self: Pin<&mut Self>,
+        &self,
         attributes: fio::MutableNodeAttributes,
     ) -> Result<(), Status> {
         if !self.base.options.rights.contains(fio::Operations::UPDATE_ATTRIBUTES) {
@@ -176,11 +170,7 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
         self.base.directory.update_attributes(attributes).await
     }
 
-    async fn handle_unlink(
-        self: Pin<&mut Self>,
-        name: String,
-        options: fio::UnlinkOptions,
-    ) -> Result<(), Status> {
+    async fn handle_unlink(&self, name: String, options: fio::UnlinkOptions) -> Result<(), Status> {
         if !self.base.options.rights.contains(fio::Rights::MODIFY_DIRECTORY) {
             return Err(Status::BAD_HANDLE);
         }
@@ -277,18 +267,23 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
     async fn handle_remove_extended_attribute(&self, name: Vec<u8>) -> Result<(), Status> {
         self.base.directory.remove_extended_attribute(name).await
     }
+}
 
-    async fn handle_requests(self, mut requests: fio::DirectoryRequestStream) {
-        let this = Tokenizable::new(self);
-        pin_mut!(this);
-        while let Ok(Some(request)) = requests.try_next().await {
-            let _guard = this.base.scope.active_guard();
-            if !matches!(
-                Self::handle_request(Pin::as_mut(&mut this), request).await,
-                Ok(ConnectionState::Alive)
-            ) {
-                break;
+impl<DirectoryType: MutableDirectory> RequestHandler
+    for Tokenizable<MutableConnection<DirectoryType>>
+{
+    type Request = Result<fio::DirectoryRequest, fidl::Error>;
+
+    async fn handle_request(self: Pin<&mut Self>, request: Self::Request) -> ControlFlow<()> {
+        let _guard = self.base.scope.active_guard();
+        match request {
+            Ok(request) => {
+                match MutableConnection::<DirectoryType>::handle_request(self, request).await {
+                    Ok(ConnectionState::Alive) => ControlFlow::Continue(()),
+                    Ok(ConnectionState::Closed) | Err(_) => ControlFlow::Break(()),
+                }
             }
+            Err(_) => ControlFlow::Break(()),
         }
     }
 }

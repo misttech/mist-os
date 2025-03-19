@@ -22,6 +22,7 @@ pub mod node;
 pub mod object_request;
 mod protocols;
 pub mod remote;
+mod request_handler;
 pub mod service;
 pub mod symlink;
 pub mod temp_clone;

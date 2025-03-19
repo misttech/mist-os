@@ -12,11 +12,13 @@ use crate::execution_scope::ExecutionScope;
 use crate::name::parse_name;
 use crate::node::Node;
 use crate::object_request::Representation;
+use crate::request_handler::{RequestHandler, RequestListener};
 use crate::{ObjectRequest, ObjectRequestRef, ProtocolsExt, ToObjectRequest};
 use fidl::endpoints::{ControlHandle as _, Responder, ServerEnd};
 use fidl_fuchsia_io as fio;
-use futures::StreamExt;
 use std::future::{ready, Future};
+use std::ops::ControlFlow;
+use std::pin::Pin;
 use std::sync::Arc;
 use zx_status::Status;
 
@@ -64,7 +66,7 @@ impl<T: Symlink> Connection<T> {
         Self { scope, symlink }
     }
 
-    /// Upon success, returns a future that will proceess requests for the connection.
+    /// Upon success, returns a future that will process requests for the connection.
     pub fn create(
         scope: ExecutionScope,
         symlink: Arc<T>,
@@ -75,16 +77,11 @@ impl<T: Symlink> Connection<T> {
         Ok(Connection::new(scope, symlink).run(object_request.take()))
     }
 
-    /// Process requests until either `shutdown` is notfied, the connection is closed, or an error
+    /// Process requests until either `shutdown` is notified, the connection is closed, or an error
     /// with the connection is encountered.
-    pub async fn run(mut self, object_request: ObjectRequest) {
-        if let Ok(mut requests) = object_request.into_request_stream(&self).await {
-            while let Some(Ok(request)) = requests.next().await {
-                let _guard = self.scope.active_guard();
-                if self.handle_request(request).await.unwrap_or(true) {
-                    break;
-                }
-            }
+    pub async fn run(self, object_request: ObjectRequest) {
+        if let Ok(requests) = object_request.into_request_stream(&self).await {
+            RequestListener::new(requests, self).await;
         }
     }
 
@@ -313,6 +310,22 @@ impl<T: Symlink> Connection<T> {
 
     async fn handle_remove_extended_attribute(&self, name: Vec<u8>) -> Result<(), Status> {
         self.symlink.remove_extended_attribute(name).await
+    }
+}
+
+impl<T: Symlink> RequestHandler for Connection<T> {
+    type Request = Result<fio::SymlinkRequest, fidl::Error>;
+
+    async fn handle_request(self: Pin<&mut Self>, request: Self::Request) -> ControlFlow<()> {
+        let this = self.get_mut();
+        let _guard = this.scope.active_guard();
+        match request {
+            Ok(request) => match this.handle_request(request).await {
+                Ok(false) => ControlFlow::Continue(()),
+                Ok(true) | Err(_) => ControlFlow::Break(()),
+            },
+            Err(_) => ControlFlow::Break(()),
+        }
     }
 }
 

@@ -13,15 +13,16 @@ use crate::name::parse_name;
 use crate::node::OpenNode;
 use crate::object_request::Representation;
 use crate::protocols::ToFileOptions;
+use crate::request_handler::{RequestHandler, RequestListener};
 use crate::{ObjectRequestRef, ProtocolsExt, ToObjectRequest};
 use anyhow::Error;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
-use futures::stream::StreamExt;
 use static_assertions::assert_eq_size;
 use std::convert::TryInto as _;
 use std::future::Future;
-use std::ops::{Deref, DerefMut};
+use std::ops::{ControlFlow, Deref, DerefMut};
+use std::pin::Pin;
 use std::sync::Arc;
 use storage_trace::{self as trace, TraceFutureExt};
 use zx_status::Status;
@@ -35,7 +36,10 @@ use {
 };
 
 /// Initializes a file connection and returns a future which will process the connection.
-fn create_connection<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>(
+fn create_connection<
+    T: 'static + File,
+    U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler + Unpin,
+>(
     scope: ExecutionScope,
     file: U,
     options: FileOptions,
@@ -62,7 +66,7 @@ fn create_connection<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMu
 
         let connection = FileConnection { scope: scope.clone(), file, options };
         if let Ok(requests) = object_request.into_request_stream(&connection).await {
-            connection.handle_requests(requests).await
+            RequestListener::new(requests, Some(connection)).await
         }
     })
 }
@@ -505,63 +509,9 @@ struct FileConnection<U> {
     options: FileOptions,
 }
 
-impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler> FileConnection<U> {
-    async fn handle_requests(mut self, mut requests: fio::FileRequestStream) {
-        while let Some(request) = requests.next().await {
-            let _guard = self.scope.active_guard();
-
-            let state = match request {
-                Err(_) => {
-                    // FIDL level error, such as invalid message format and alike.  Close the
-                    // connection on any unexpected error.
-                    // TODO: Send an epitaph.
-                    ConnectionState::Dropped
-                }
-                Ok(request) => {
-                    self.handle_request(request)
-                        .await
-                        // Protocol level error.  Close the connection on any unexpected error.
-                        // TODO: Send an epitaph.
-                        .unwrap_or(ConnectionState::Dropped)
-                }
-            };
-
-            match state {
-                ConnectionState::Alive => (),
-                ConnectionState::Closed(responder) => {
-                    async move {
-                        let _ = responder.send({
-                            let result = if self.options.rights.intersects(
-                                fio::Operations::WRITE_BYTES | fio::Operations::UPDATE_ATTRIBUTES,
-                            ) {
-                                self.file.sync(SyncMode::PreClose).await.map_err(Status::into_raw)
-                            } else {
-                                Ok(())
-                            };
-                            // The file gets closed when we drop `self`, so we should do that before
-                            // sending the response.
-                            std::mem::drop(self);
-                            result
-                        });
-                    }
-                    .trace(trace::trace_future_args!(c"storage", c"File::Close"))
-                    .await;
-                    return;
-                }
-                ConnectionState::Dropped => break,
-            }
-        }
-
-        if self
-            .options
-            .rights
-            .intersects(fio::Operations::WRITE_BYTES | fio::Operations::UPDATE_ATTRIBUTES)
-        {
-            let _guard = self.scope.active_guard();
-            let _ = self.file.sync(SyncMode::PreClose).await;
-        }
-    }
-
+impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler + Unpin>
+    FileConnection<U>
+{
     /// Handle a [`FileRequest`]. This function is responsible for handing all the file operations
     /// that operate on the connection-specific buffer.
     async fn handle_request(&mut self, req: fio::FileRequest) -> Result<ConnectionState, Error> {
@@ -887,7 +837,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
             object_request.take().spawn(&self.scope, |object_request| {
                 Box::pin(async move {
                     let requests = object_request.take().into_request_stream(&connection).await?;
-                    Ok(connection.handle_requests(requests))
+                    Ok(RequestListener::new(requests, Some(connection)))
                 })
             });
 
@@ -903,10 +853,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                 return;
             }
         };
-        self.scope.spawn(async move {
-            let requests = server_end.into_stream();
-            connection.handle_requests(requests).await;
-        });
+        self.scope.spawn(RequestListener::new(server_end.into_stream(), Some(connection)));
     }
 
     async fn handle_read(&mut self, count: u64) -> Result<Vec<u8>, Status> {
@@ -1066,6 +1013,77 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
         mode: fio::AllocateMode,
     ) -> Result<(), Status> {
         self.file.allocate(offset, length, mode).await
+    }
+
+    fn should_sync_before_close(&self) -> bool {
+        self.options
+            .rights
+            .intersects(fio::Operations::WRITE_BYTES | fio::Operations::UPDATE_ATTRIBUTES)
+    }
+}
+
+// The `FileConnection` is wrapped in an `Option` so it can be dropped before responding to a Close
+// request.
+impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler + Unpin>
+    RequestHandler for Option<FileConnection<U>>
+{
+    type Request = Result<fio::FileRequest, fidl::Error>;
+
+    async fn handle_request(self: Pin<&mut Self>, request: Self::Request) -> ControlFlow<()> {
+        let option_this = self.get_mut();
+        let this = option_this.as_mut().unwrap();
+        let _guard = this.scope.active_guard();
+        let state = match request {
+            Ok(request) => {
+                this.handle_request(request)
+                    .await
+                    // Protocol level error.  Close the connection on any unexpected error.
+                    // TODO: Send an epitaph.
+                    .unwrap_or(ConnectionState::Dropped)
+            }
+            Err(_) => {
+                // FIDL level error, such as invalid message format and alike.  Close the
+                // connection on any unexpected error.
+                // TODO: Send an epitaph.
+                ConnectionState::Dropped
+            }
+        };
+        match state {
+            ConnectionState::Alive => ControlFlow::Continue(()),
+            ConnectionState::Dropped => {
+                if this.should_sync_before_close() {
+                    let _ = this.file.sync(SyncMode::PreClose).await;
+                }
+                ControlFlow::Break(())
+            }
+            ConnectionState::Closed(responder) => {
+                async move {
+                    let this = option_this.as_mut().unwrap();
+                    let _ = responder.send({
+                        let result = if this.should_sync_before_close() {
+                            this.file.sync(SyncMode::PreClose).await.map_err(Status::into_raw)
+                        } else {
+                            Ok(())
+                        };
+                        // The file gets closed when we drop the connection, so we should do that
+                        // before sending the response.
+                        std::mem::drop(option_this.take());
+                        result
+                    });
+                }
+                .trace(trace::trace_future_args!(c"storage", c"File::Close"))
+                .await;
+                ControlFlow::Break(())
+            }
+        }
+    }
+
+    async fn stream_closed(self: Pin<&mut Self>) {
+        let this = self.get_mut().as_mut().unwrap();
+        if this.should_sync_before_close() {
+            let _guard = this.scope.active_guard();
+            let _ = this.file.sync(SyncMode::PreClose).await;
+        }
     }
 }
 

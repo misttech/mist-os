@@ -11,13 +11,15 @@ use crate::execution_scope::ExecutionScope;
 use crate::name::Name;
 use crate::object_request::Representation;
 use crate::protocols::ToNodeOptions;
+use crate::request_handler::{RequestHandler, RequestListener};
 use crate::{node, ObjectRequestRef, ToObjectRequest};
 use anyhow::Error;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
-use futures::stream::StreamExt;
 use libc::{S_IRUSR, S_IWUSR};
 use std::future::{ready, Future};
+use std::ops::ControlFlow;
+use std::pin::Pin;
 use std::sync::Arc;
 use zx_status::Status;
 
@@ -133,32 +135,9 @@ impl<N: Node> Connection<N> {
         Ok(async move {
             let connection = Connection { scope: scope.clone(), node, options };
             if let Ok(requests) = object_request.into_request_stream(&connection).await {
-                connection.handle_requests(requests).await
+                RequestListener::new(requests, connection).await
             }
         })
-    }
-
-    async fn handle_requests(mut self, mut requests: fio::NodeRequestStream) {
-        while let Some(request_or_err) = requests.next().await {
-            match request_or_err {
-                Err(_) => {
-                    // FIDL level error, such as invalid message format and alike.  Close the
-                    // connection on any unexpected error.
-                    // TODO: Send an epitaph.
-                    break;
-                }
-                Ok(request) => {
-                    match self.handle_request(request).await {
-                        Ok(ConnectionState::Alive) => (),
-                        Ok(ConnectionState::Closed) | Err(_) => {
-                            // Err(_) means a protocol level error.  Close the connection on any
-                            // unexpected error.  TODO: Send an epitaph.
-                            break;
-                        }
-                    }
-                }
-            }
-        }
     }
 
     /// Handle a [`NodeRequest`].
@@ -277,9 +256,9 @@ impl<N: Node> Connection<N> {
                 Self { scope: self.scope.clone(), node: OpenNode::new(self.node.clone()), options };
 
             object_request.take().spawn(&self.scope, |object_request| {
-                Box::pin(async {
+                Box::pin(async move {
                     let requests = object_request.take().into_request_stream(&connection).await?;
-                    Ok(connection.handle_requests(requests))
+                    Ok(async move { RequestListener::new(requests, connection).await })
                 })
             });
 
@@ -294,10 +273,23 @@ impl<N: Node> Connection<N> {
             node: OpenNode::new(self.node.clone()),
             options: self.options,
         };
-        self.scope.spawn(async move {
-            let requests = server_end.into_stream();
-            connection.handle_requests(requests).await;
-        });
+        self.scope.spawn(RequestListener::new(server_end.into_stream(), connection));
+    }
+}
+
+impl<N: Node> RequestHandler for Connection<N> {
+    type Request = Result<fio::NodeRequest, fidl::Error>;
+
+    async fn handle_request(self: Pin<&mut Self>, request: Self::Request) -> ControlFlow<()> {
+        let this = self.get_mut();
+        let _guard = this.scope.active_guard();
+        match request {
+            Ok(request) => match this.handle_request(request).await {
+                Ok(ConnectionState::Alive) => ControlFlow::Continue(()),
+                Ok(ConnectionState::Closed) | Err(_) => ControlFlow::Break(()),
+            },
+            Err(_) => ControlFlow::Break(()),
+        }
     }
 }
 

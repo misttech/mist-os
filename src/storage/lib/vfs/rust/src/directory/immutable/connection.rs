@@ -9,13 +9,14 @@ use crate::directory::connection::{BaseConnection, ConnectionState};
 use crate::directory::entry_container::Directory;
 use crate::execution_scope::ExecutionScope;
 use crate::node::OpenNode;
+use crate::request_handler::{RequestHandler, RequestListener};
 use crate::{ObjectRequestRef, ProtocolsExt};
 
 use fidl_fuchsia_io as fio;
 use fio::DirectoryRequest;
-use futures::TryStreamExt;
 use std::future::Future;
-use std::pin::pin;
+use std::ops::ControlFlow;
+use std::pin::Pin;
 use std::sync::Arc;
 use zx_status::Status;
 
@@ -24,19 +25,6 @@ pub struct ImmutableConnection<DirectoryType: Directory> {
 }
 
 impl<DirectoryType: Directory> ImmutableConnection<DirectoryType> {
-    async fn handle_requests<RS>(mut self, mut requests: RS)
-    where
-        RS: futures::stream::Stream<Item = Result<DirectoryRequest, fidl::Error>>,
-    {
-        let mut requests = pin!(requests);
-        while let Ok(Some(request)) = requests.try_next().await {
-            let _guard = self.base.scope.active_guard();
-            if !matches!(self.base.handle_request(request).await, Ok(ConnectionState::Alive)) {
-                break;
-            }
-        }
-    }
-
     pub fn create(
         scope: ExecutionScope,
         directory: Arc<DirectoryType>,
@@ -81,8 +69,24 @@ impl<DirectoryType: Directory> ImmutableConnection<DirectoryType> {
         let object_request = object_request.take();
         Ok(async move {
             if let Ok(requests) = object_request.into_request_stream(&connection.base).await {
-                connection.handle_requests(transform(requests)).await;
+                RequestListener::new(transform(requests), connection).await;
             }
         })
+    }
+}
+
+impl<DirectoryType: Directory> RequestHandler for ImmutableConnection<DirectoryType> {
+    type Request = Result<DirectoryRequest, fidl::Error>;
+
+    async fn handle_request(self: Pin<&mut Self>, request: Self::Request) -> ControlFlow<()> {
+        let this = self.get_mut();
+        let _guard = this.base.scope.active_guard();
+        match request {
+            Ok(request) => match this.base.handle_request(request).await {
+                Ok(ConnectionState::Alive) => ControlFlow::Continue(()),
+                Ok(ConnectionState::Closed) | Err(_) => ControlFlow::Break(()),
+            },
+            Err(_) => ControlFlow::Break(()),
+        }
     }
 }

@@ -70,6 +70,7 @@ common_vfs_args = {
     "src/pseudo_directory.rs",
     "src/remote.rs",
     "src/remote/tests.rs",
+    "src/request_handler.rs",
     "src/service.rs",
     "src/service/tests.rs",
     "src/service/tests/direct_connection.rs",
