@@ -15,9 +15,15 @@ const (
 
 type {{ $protocol.ProxyName }} _bindings.{{ $protocol.ProxyType }}
 {{ range $method := $protocol.Methods }}
-{{ if $method.IsStrict }}
 {{ range $comment := $method.DocComments }}
 //{{ $comment }}
+{{- end }}
+{{- if not $method.IsStrict }}
+{{- if $method.IsEvent }}
+// WARNING: flexible event {{ $protocol.Name}}.{{ $method.Name }} is treated as strict in Go!
+{{- else }}
+// WARNING: flexible method {{ $protocol.Name}}.{{ $method.Name }} is treated as strict in Go!
+{{- end }}
 {{- end }}
 func (p *{{ $.ProxyName }}) {{ if $method.IsEvent -}}
 		{{ $method.EventExpectName }}
@@ -71,13 +77,6 @@ func (p *{{ $.ProxyName }}) {{ if $method.IsEvent -}}
 	return err_
 	{{- end }}
 }
-{{- else }}
-  {{- if $method.IsEvent }}
-	// NOTE: flexible event {{ $protocol.Name}}.{{ $method.Name }} is not implemented in Go.
-  {{- else }}
-    // NOTE: flexible method {{ $protocol.Name}}.{{ $method.Name }} is not implemented in Go.
-  {{- end }}
-{{- end }}
 {{- end }}
 
 {{ range $comment := .DocComments }}
@@ -85,11 +84,13 @@ func (p *{{ $.ProxyName }}) {{ if $method.IsEvent -}}
 {{- end }}
 type {{ $protocol.Name }} interface {
 {{- range $method := $protocol.Methods }}
-	{{- if $method.IsStrict }}
 	{{- range $comment := $method.DocComments }}
 	//{{ $comment }}
 	{{- end }}
 	{{- if $method.HasRequest }}
+	{{- if not $method.IsStrict }}
+	// WARNING: method is marked flexible in protocol, but treated as strict by these bindings!
+	{{- end }}
 	{{- if $method.Request }}
 	{{ $method.Name }}(ctx_ _bindings.Context, {{ $method.Request.NamesAndTypes }})
 	{{- else }}
@@ -99,7 +100,6 @@ type {{ $protocol.Name }} interface {
 	{{- if $method.Response }} ({{ $method.Response.Types }}, error)
 	{{- else }} error{{ end -}}
 	{{- else }} error{{ end }}
-	{{- end }}
 	{{- end }}
 {{- end }}
 }
@@ -132,7 +132,6 @@ type {{ $protocol.StubName }} struct {
 func (s_ *{{ $protocol.StubName }}) Dispatch(args_ _bindings.DispatchArgs) (_bindings.Message, bool, error) {
 	switch args_.Ordinal {
 	{{- range $method := $protocol.Methods }}
-	{{- if $method.IsStrict }}
 	{{- if not $method.IsEvent }}
 	case {{ $method.OrdinalName }}:
 		{{- if $method.HasRequest }}
@@ -165,14 +164,12 @@ func (s_ *{{ $protocol.StubName }}) Dispatch(args_ _bindings.DispatchArgs) (_bin
 		{{- end }}
 	{{- end }}
 	{{- end }}
-	{{- end }}
 	}
 	return nil, false, _bindings.ErrUnknownOrdinal
 }
 
 type {{ $protocol.EventProxyName }} _bindings.{{ $protocol.ProxyType }}
 {{ range $method := $protocol.Methods }}
-{{- if $method.IsStrict }}
 {{- if $method.IsEvent }}
 func (p *{{ $protocol.EventProxyName }}) {{ $method.Name }}(
 	{{- if $method.Response -}}
@@ -189,7 +186,6 @@ func (p *{{ $protocol.EventProxyName }}) {{ $method.Name }}(
 	{{- end }}
 	return ((*_bindings.{{ $protocol.ProxyType }})(p)).Send({{ $method.OrdinalName }}, event_)
 }
-{{- end }}
 {{- end }}
 {{- end }}
 
