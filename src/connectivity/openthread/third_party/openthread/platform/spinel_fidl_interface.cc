@@ -51,7 +51,6 @@ void SpinelFidlInterface::WriteToRxFrameBuffer(std::vector<uint8_t> vec) {
     // Frame too large. Assert here for easier debugging
     otPlatLog(OT_LOG_LEVEL_CRIT, OT_LOG_REGION_PLATFORM,
               "spinel-fidl: rx buffer full, requesting %u bytes", vec.size());
-    OT_ASSERT(0);
   }
 }
 

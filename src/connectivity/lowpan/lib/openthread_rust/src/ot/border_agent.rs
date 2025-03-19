@@ -67,7 +67,8 @@ impl<T: BorderAgent + Boxable> BorderAgent for ot::Box<T> {
 
 impl BorderAgent for Instance {
     fn border_agent_get_state(&self) -> BorderAgentState {
-        unsafe { otBorderAgentGetState(self.as_ot_ptr()) }.into()
+        // This API is removed in upcoming OT update, removing it during OT update
+        OT_BORDER_AGENT_STATE_STOPPED.into()
     }
 
     fn border_agent_get_udp_port(&self) -> u16 {

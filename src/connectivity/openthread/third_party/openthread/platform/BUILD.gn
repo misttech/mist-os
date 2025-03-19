@@ -11,6 +11,7 @@ source_set("platform") {
     "entropy.cc",
     "infra_if.cc",
     "infra_if.h",
+    "logger.h",
     "logging.cc",
     "main.cc",
     "memory.cc",
@@ -21,8 +22,11 @@ source_set("platform") {
     "radio_url.cc",
     "radio_url.h",
     "settings.cc",
+    "spinel_driver_getter.h",
     "spinel_fidl_interface.cc",
     "spinel_fidl_interface.h",
+    "spinel_manager.cc",
+    "spinel_manager.h",
     "system.cc",
     "thread_config_manager.cc",
     "url.cc",
@@ -50,13 +54,13 @@ source_set("platform") {
 
   # Conditionally compile OpenThread platform code based on the commit used.
   if (openthread_upstream_version ==
-      "2fe077037dc5e290f92e0a239a8b50eefff23c5c") {
-    defines = [ "OPENTHREAD_231010=1" ]
+      "93f311376434605e03c796a7543e3f0289fd3acf") {
+    defines = [ "OPENTHREAD_240425=1" ]
   }
 
   if (openthread_upstream_version ==
-      "49c59ec519cc8b49dd58978d1bc80b7ae7ba88d0") {
-    defines = [ "OPENTHREAD_240214=1" ]
+      "33a1f095691bd9e5a8743011d8ef03eca363a251") {
+    defines = [ "OPENTHREAD_250225=1" ]
   }
 
   deps = [ "//third_party/openthread:lib-ot-core" ]

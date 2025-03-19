@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2016, The OpenThread Authors.
+ *  Copyright (c) 2024, The OpenThread Authors.
  *  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
@@ -28,44 +28,26 @@
 
 /**
  * @file
- * @brief
- *   This file includes the platform-specific initializers.
+ *   This file is used to expose the API to the external posix app so that the
+ *   app can access to the posix spinel driver.
  */
 
-#include <openthread/tasklet.h>
-
-#include "alarm.h"
-#include "misc.h"
-#include "openthread-system.h"
-
 #ifdef OPENTHREAD_250225
-#include "spinel_manager.h"
+#ifndef POSIX_PLATFORM_SPINEL_DRIVER_GETTER_HPP_
+#define POSIX_PLATFORM_SPINEL_DRIVER_GETTER_HPP_
+
+#include <spinel/spinel_driver.hpp>
+
+namespace ot {
+namespace Posix {
+
+/**
+ * Returns the static instance of the SpinelDriver.
+ */
+extern Spinel::SpinelDriver &GetSpinelDriver(void);
+
+}  // namespace Posix
+}  // namespace ot
+
+#endif  // POSIX_PLATFORM_SPINEL_DRIVER_GETTER_HPP_
 #endif  // OPENTHREAD_250225
-
-void platformSimInit(void);
-extern "C" void platformRadioInit(const char *aUrl);
-
-extern "C" void platformRadioDeinit();
-void platformRandomInit(void);
-void platformAlarmInit(uint32_t a_speed_up_factor);
-
-const char *radio_url_string =
-    "spinel+vendor+spi:///dev/class/ot-radio/000?baudrate=115200&no-reset&enable-coex";
-
-void otSysInit(otPlatformConfig *a_platform_config) {
-#ifdef OPENTHREAD_250225
-  platformSpinelManagerInit(radio_url_string);
-#endif  // OPENTHREAD_250225
-  platformRadioInit(radio_url_string);
-  platformRandomInit();
-}
-
-void otSysDeinit(void) {
-#if OPENTHREAD_POSIX_VIRTUAL_TIME
-  virtualTimeDeinit();
-#endif
-  platformRadioDeinit();
-#if OPENTHREAD_CONFIG_PLATFORM_NETIF_ENABLE
-  platformNetifDeinit();
-#endif
-}
