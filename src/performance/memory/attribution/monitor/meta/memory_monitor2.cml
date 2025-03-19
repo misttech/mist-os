@@ -26,6 +26,9 @@
                 // VMO usage of Fuchsia processes, and memory utilization statistics for each VMO.
                 "fuchsia.kernel.RootJobForInspect",
 
+                // Provides access to memory stall (thrashing) information.
+                "fuchsia.kernel.StallResource",
+
                 // Provides access to whole-system memory statistics information.
                 "fuchsia.kernel.Stats",
 

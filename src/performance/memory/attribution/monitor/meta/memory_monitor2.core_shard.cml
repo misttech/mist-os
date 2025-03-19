@@ -20,6 +20,7 @@
             protocol: [
                 "fuchsia.component.Introspector.root",
                 "fuchsia.kernel.RootJobForInspect",
+                "fuchsia.kernel.StallResource",
                 "fuchsia.kernel.Stats",
                 "fuchsia.memory.attribution.Provider",
             ],

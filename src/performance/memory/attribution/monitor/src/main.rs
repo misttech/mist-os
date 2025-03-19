@@ -17,6 +17,7 @@ use resources::Job;
 use snapshot::AttributionSnapshot;
 use std::sync::Arc;
 use traces::CATEGORY_MEMORY_CAPTURE;
+use zx::MonotonicDuration;
 
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_kernel as fkernel,
@@ -83,10 +84,18 @@ async fn main() -> Result<(), Error> {
 
     let attribution_data_provider = AttributionDataProviderImpl::new(attribution_client, root_job);
 
+    let stall_provider = stalls::StallProvider::new(
+        MonotonicDuration::from_minutes(5),
+        Arc::new(connect_to_protocol::<fkernel::StallResourceMarker>()?.get().await?),
+    )?;
+
     // Serves Fuchsia component inspection protocol
     // https://fuchsia.dev/fuchsia-src/development/diagnostics/inspect
-    let _inspect_nodes_service =
-        inspect_nodes::start_service(attribution_data_provider.clone(), kernel_stats.clone())?;
+    let _inspect_nodes_service = inspect_nodes::start_service(
+        attribution_data_provider.clone(),
+        kernel_stats.clone(),
+        stall_provider,
+    )?;
 
     service_fs
         .for_each_concurrent(None, |stream| async {
