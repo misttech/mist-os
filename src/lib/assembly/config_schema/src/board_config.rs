@@ -100,11 +100,6 @@ pub struct BoardInformation {
     #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub tee_trusted_app_guids: Vec<uuid::Uuid>,
-
-    /// Release version that this board config corresponds to.
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub release_version: Option<String>,
 }
 
 /// This struct defines board-provided data for the 'fuchsia.hwinfo.Board' fidl

@@ -4,7 +4,6 @@
 
 import("//build/bazel/bazel_inputs.gni")
 import("//build/compiled_action.gni")
-import("//build/info/info.gni")
 
 # Creates the assembly Board configuration file, and it's main Hardware Support
 # Bundle, which respectively provide information about the board and components
@@ -211,11 +210,6 @@ template("board_configuration") {
               get_label_info(invoker.devicetree, "target_out_dir") + "/" +
                   get_label_info(invoker.devicetree, "name") + ".dtb",
               root_build_dir)
-    }
-
-    release_version = "unversioned"
-    if (defined(build_info_version) && build_info_version != "") {
-      release_version = build_info_version
     }
   }
 

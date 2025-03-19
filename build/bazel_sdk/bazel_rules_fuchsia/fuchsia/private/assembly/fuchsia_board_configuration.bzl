@@ -35,10 +35,6 @@ def _fuchsia_board_configuration_impl(ctx):
     board_config["name"] = ctx.attr.board_name
     board_config["provided_features"] = ctx.attr.provided_features
 
-    board_config["release_version"] = "unversioned"
-    if ctx.attr.release_version:
-        board_config["release_version"] = ctx.attr.release_version
-
     kernel = json.decode(ctx.attr.kernel)
     check_type(kernel, "dict")
     if kernel != {}:
@@ -165,12 +161,6 @@ _fuchsia_board_configuration = rule(
         "board_name": attr.string(
             doc = "Name of this board.",
             mandatory = True,
-        ),
-        "release_version": attr.string(
-            doc = "Release version of this board.",
-            # TODO: https://fxbug.dev/397489730 - Make this a mandatory field
-            # once these changes have rolled into all downstream repositories.
-            default = "",
         ),
         "hardware_info": attr.string(
             doc = "Data provided via the 'fuchsia.hwinfo.Board' protocol.",
