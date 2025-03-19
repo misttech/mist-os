@@ -209,8 +209,14 @@ fn koid_of(c: &UtcClock) -> u64 {
 #[fuchsia::main(logging_tags=["time", "timekeeper"])]
 async fn main() -> Result<()> {
     fuchsia_trace_provider::trace_provider_create_with_fdio();
-    let config: Arc<Config> =
-        Arc::new(timekeeper_config::Config::take_from_startup_handle().into());
+    // The root inspect node in the inspect hierarchy.
+    let inspector_root = diagnostics::INSPECTOR.root();
+
+    let structured_config_node = inspector_root.create_child("structured_config");
+    let structured_config = timekeeper_config::Config::take_from_startup_handle();
+    structured_config.record_inspect(&structured_config_node);
+
+    let config: Arc<Config> = Arc::new(structured_config.into());
 
     // If we don't get this, timekeeper probably didn't even start.
     debug!("starting timekeeper: config: {:?}", &config);
@@ -244,9 +250,6 @@ async fn main() -> Result<()> {
         time_source: new_time_source(config.get_monitor_uses_pull(), &details),
         clock: Arc::new(create_monitor_clock(&primary_track.clock)),
     });
-
-    // The root inspect node in the inspect hierarchy.
-    let inspector_root = diagnostics::INSPECTOR.root();
 
     info!("initializing diagnostics and serving inspect on servicefs");
     let cobalt_experiment = COBALT_EXPERIMENT;
