@@ -189,8 +189,36 @@ impl Statistic for ArithmeticMean<f32> {
     fn aggregation(&self) -> Option<Self::Aggregation> {
         // This is lossy and lossiness correlates to the magnitude of `n`. See details of
         // `u64 as f32` casts.
-        let aggregation = (self.n > 0).then(|| self.sum / (self.n as f32));
-        aggregation
+        (self.n > 0).then(|| self.sum / (self.n as f32))
+    }
+}
+
+impl Sampler<i64> for ArithmeticMean<i64> {
+    type Error = OverflowError;
+
+    fn fold(&mut self, sample: i64) -> Result<(), Self::Error> {
+        // TODO(https://fxbug.dev/351848566): On overflow, either saturate `self.n` or leave both
+        //                                    `self.sum` and `self.n` unchanged (here and in
+        //                                    `Sampler::fold` and `Fill::fill` implementations; see
+        //                                    below).
+        self.sum = self.sum.checked_add(sample).ok_or(OverflowError)?;
+        self.increment(1)
+    }
+}
+
+impl Statistic for ArithmeticMean<i64> {
+    type Semantic = Gauge;
+    type Sample = i64;
+    type Aggregation = f32;
+
+    fn reset(&mut self) {
+        *self = Default::default();
+    }
+
+    fn aggregation(&self) -> Option<Self::Aggregation> {
+        // This is lossy and lossiness correlates to the magnitude of `n`. See details of
+        // `i64 as f32` casts.
+        (self.n > 0).then(|| self.sum as f32 / (self.n as f32))
     }
 }
 
@@ -743,6 +771,45 @@ mod tests {
     fn arithmetic_mean_count_overflow() {
         let mut mean = ArithmeticMean::<f32> { sum: 1.0, n: u64::MAX };
         let result = mean.fold(1.0);
+        assert_eq!(result, Err(OverflowError));
+    }
+
+    #[test]
+    fn arithmetic_mean_i64_aggregation() {
+        let mut mean = ArithmeticMean::<i64>::default();
+        mean.fold(1).unwrap();
+        mean.fold(1).unwrap();
+        mean.fold(1).unwrap();
+        let aggregation = mean.aggregation().unwrap();
+        assert!(aggregation > 0.99 && aggregation < 1.01); // ~ 1.0
+
+        let mut mean = ArithmeticMean::<i64>::default();
+        mean.fold(0).unwrap();
+        mean.fold(1).unwrap();
+        mean.fold(2).unwrap();
+        let aggregation = mean.aggregation().unwrap();
+        assert!(aggregation > 0.99 && aggregation < 1.01); // ~ 1.0
+    }
+
+    #[test]
+    fn arithmetic_mean_i64_aggregation_fill() {
+        let mut mean = ArithmeticMean::<i64>::default();
+        mean.fill(1, NonZeroUsize::new(1000).unwrap()).unwrap();
+        let aggregation = mean.aggregation().unwrap();
+        assert!(aggregation > 0.99 && aggregation < 1.01); // ~ 1.0
+    }
+
+    #[test]
+    fn arithmetic_mean_i64_sum_overflow() {
+        let mut mean = ArithmeticMean::<i64> { sum: i64::MAX, n: 1 };
+        let result = mean.fold(1);
+        assert_eq!(result, Err(OverflowError));
+    }
+
+    #[test]
+    fn arithmetic_mean_i64_count_overflow() {
+        let mut mean = ArithmeticMean::<i64> { sum: 1, n: u64::MAX };
+        let result = mean.fold(1);
         assert_eq!(result, Err(OverflowError));
     }
 
