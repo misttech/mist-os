@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{DecodedRequest, DeviceInfo, IntoSessionManager, Operation, SessionHelper};
+use super::{DecodedRequest, DeviceInfo, IntoSessionManager, OffsetMap, Operation, SessionHelper};
 use anyhow::Error;
 use block_protocol::{BlockFifoRequest, BlockFifoResponse, WriteOptions};
 use fuchsia_async::{self as fasync, FifoReadable as _};
@@ -21,6 +21,31 @@ use {fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume a
 pub(crate) const FIFO_MAX_REQUESTS: usize = 64;
 
 pub trait Interface: Send + Sync + Unpin + 'static {
+    /// Runs `stream` to completion.
+    ///
+    /// Implementors can override this method if they want to create a passthrough session instead
+    /// (and can use `[PassthroughSession]` below to do so).  See
+    /// fuchsia.hardware.block.Block/OpenSessionWithOffsetMap.
+    ///
+    /// If the implementor uses a `[PassthroughSession]`, the following Interface methods
+    /// will not be called, and can be stubbed out:
+    ///   - on_attach_vmo
+    ///   - on_detach_vmo
+    ///   - read
+    ///   - write
+    ///   - flush
+    ///   - trim
+    fn open_session(
+        &self,
+        session_manager: Arc<SessionManager<Self>>,
+        stream: fblock::SessionRequestStream,
+        offset_map: Option<OffsetMap>,
+        block_size: u32,
+    ) -> impl Future<Output = Result<(), Error>> + Send {
+        // By default, serve the session rather than forwarding/proxying it.
+        session_manager.serve_session(stream, offset_map, block_size)
+    }
+
     /// Called whenever a VMO is attached, prior to the VMO's usage in any other methods.  Whilst
     /// the VMO is attached, `vmo` will keep the same address so it is safe to use the pointer
     /// value (as, say, a key into a HashMap).
@@ -104,18 +129,100 @@ pub trait Interface: Send + Sync + Unpin + 'static {
     }
 }
 
-pub struct SessionManager<I> {
+/// A helper object to run a passthrough (proxy) session.
+pub struct PassthroughSession(fblock::SessionProxy);
+
+impl PassthroughSession {
+    pub fn new(proxy: fblock::SessionProxy) -> Self {
+        Self(proxy)
+    }
+
+    async fn handle_request(&self, request: fblock::SessionRequest) -> Result<(), Error> {
+        match request {
+            fblock::SessionRequest::GetFifo { responder } => {
+                responder.send(self.0.get_fifo().await?)?;
+            }
+            fblock::SessionRequest::AttachVmo { vmo, responder } => {
+                responder.send(self.0.attach_vmo(vmo).await?.as_ref().map_err(|s| *s))?;
+            }
+            fblock::SessionRequest::Close { responder } => {
+                responder.send(self.0.close().await?)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Runs `stream` until completion.
+    pub async fn serve(&self, mut stream: fblock::SessionRequestStream) -> Result<(), Error> {
+        while let Some(Ok(request)) = stream.next().await {
+            if let Err(error) = self.handle_request(request).await {
+                log::warn!(error:?; "FIDL error");
+            }
+        }
+        Ok(())
+    }
+}
+
+pub struct SessionManager<I: ?Sized> {
     interface: Arc<I>,
 }
 
-impl<I: Interface> SessionManager<I> {
+impl<I: Interface + ?Sized> SessionManager<I> {
     pub fn new(interface: Arc<I>) -> Self {
         Self { interface }
+    }
+
+    /// Runs `stream` until completion.
+    pub async fn serve_session(
+        self: Arc<Self>,
+        stream: fblock::SessionRequestStream,
+        offset_map: Option<OffsetMap>,
+        block_size: u32,
+    ) -> Result<(), Error> {
+        let (helper, fifo) = SessionHelper::new(self.clone(), offset_map, block_size)?;
+        let helper = Arc::new(helper);
+        let interface = self.interface.clone();
+
+        let mut stream = stream.fuse();
+
+        let scope = fasync::Scope::new();
+        let helper_clone = helper.clone();
+        let mut fifo_task = scope
+            .spawn(async move {
+                if let Err(status) = run_fifo(fifo, interface, helper).await {
+                    if status != zx::Status::PEER_CLOSED {
+                        log::error!(status:?; "FIFO error");
+                    }
+                }
+            })
+            .fuse();
+
+        // Make sure we detach VMOs when we go out of scope.
+        scopeguard::defer! {
+            for (_, vmo) in helper_clone.take_vmos() {
+                self.interface.on_detach_vmo(&vmo);
+            }
+        }
+
+        loop {
+            futures::select! {
+                maybe_req = stream.next() => {
+                    if let Some(req) = maybe_req {
+                        helper_clone.handle_request(req?).await?;
+                    } else {
+                        break;
+                    }
+                }
+                _ = fifo_task => break,
+            }
+        }
+
+        Ok(())
     }
 }
 
 // A task loop for receiving and responding to FIFO requests.
-async fn run_fifo<I: Interface>(
+async fn run_fifo<I: Interface + ?Sized>(
     fifo: zx::Fifo<BlockFifoRequest, BlockFifoResponse>,
     interface: Arc<I>,
     helper: Arc<SessionHelper<SessionManager<I>>>,
@@ -192,7 +299,7 @@ async fn run_fifo<I: Interface>(
     }
 }
 
-impl<I: Interface> super::SessionManager for SessionManager<I> {
+impl<I: Interface + ?Sized> super::SessionManager for SessionManager<I> {
     async fn on_attach_vmo(self: Arc<Self>, vmo: &Arc<zx::Vmo>) -> Result<(), zx::Status> {
         self.interface.on_attach_vmo(vmo).await
     }
@@ -200,47 +307,10 @@ impl<I: Interface> super::SessionManager for SessionManager<I> {
     async fn open_session(
         self: Arc<Self>,
         stream: fblock::SessionRequestStream,
+        offset_map: Option<OffsetMap>,
         block_size: u32,
     ) -> Result<(), Error> {
-        let (helper, fifo) = SessionHelper::new(self.clone(), block_size)?;
-        let helper = Arc::new(helper);
-        let interface = self.interface.clone();
-
-        let mut stream = stream.fuse();
-
-        let scope = fasync::Scope::new();
-        let helper_clone = helper.clone();
-        let mut fifo_task = scope
-            .spawn(async move {
-                if let Err(status) = run_fifo(fifo, interface, helper).await {
-                    if status != zx::Status::PEER_CLOSED {
-                        log::error!(status:?; "FIFO error");
-                    }
-                }
-            })
-            .fuse();
-
-        // Make sure we detach VMOs when we go out of scope.
-        scopeguard::defer! {
-            for (_, vmo) in helper_clone.take_vmos() {
-                self.interface.on_detach_vmo(&vmo);
-            }
-        }
-
-        loop {
-            futures::select! {
-                maybe_req = stream.next() => {
-                    if let Some(req) = maybe_req {
-                        helper_clone.handle_request(req?).await?;
-                    } else {
-                        break;
-                    }
-                }
-                _ = fifo_task => break,
-            }
-        }
-
-        Ok(())
+        self.interface.clone().open_session(self, stream, offset_map, block_size).await
     }
 
     async fn get_info(&self) -> Result<Cow<'_, DeviceInfo>, zx::Status> {
@@ -278,7 +348,7 @@ impl<I: Interface> IntoSessionManager for Arc<I> {
 }
 
 /// Processes a fifo request.
-async fn process_fifo_request<I: Interface>(
+async fn process_fifo_request<I: Interface + ?Sized>(
     interface: Arc<I>,
     r: DecodedRequest,
 ) -> Result<(), zx::Status> {

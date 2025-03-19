@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{IntoSessionManager, Operation, RequestId, RequestTracking, SessionHelper};
+use super::{IntoSessionManager, OffsetMap, Operation, RequestId, RequestTracking, SessionHelper};
 use anyhow::Error;
 use block_protocol::{BlockFifoRequest, BlockFifoResponse};
 use fidl::endpoints::RequestStream;
@@ -56,9 +56,10 @@ impl super::SessionManager for SessionManager {
     async fn open_session(
         self: Arc<Self>,
         mut stream: fblock::SessionRequestStream,
+        offset_map: Option<OffsetMap>,
         block_size: u32,
     ) -> Result<(), Error> {
-        let (helper, fifo) = SessionHelper::new(self.clone(), block_size)?;
+        let (helper, fifo) = SessionHelper::new(self.clone(), offset_map, block_size)?;
         let (abort_handle, registration) = AbortHandle::new_pair();
         let session = Arc::new(Session {
             manager: self.clone(),

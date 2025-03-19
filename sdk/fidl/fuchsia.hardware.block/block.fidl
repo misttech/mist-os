@@ -75,6 +75,35 @@ type BlockInfo = struct {
     };
 };
 
+/// Describes a re-mapping of a block range.  See OffsetMap.
+/// Note that all fields are in *blocks*, not bytes.
+@available(added=HEAD)
+type BlockOffsetMapping = struct {
+    source_block_offset uint64;
+    target_block_offset uint64;
+    length uint64;
+};
+
+@available(added=HEAD)
+const MAPPINGS_BATCH_SIZE uint8 = 64;
+
+/// See Block/OpenSessionWithOffsetMap.
+@available(added=HEAD)
+closed protocol OffsetMap {
+    /// Looks up mappings which contain `[source_block_offset, source_block_offset + length)`.
+    /// The returned mappings will always overlap with a prefix of the requested range, but might
+    /// not contain the entire range (for example if there are many discontiguous extents).  The
+    /// caller can simply repeat the call to query for the remaining suffix of the range.
+    ///
+    /// These mappings are guaranteed to be stable in the lifetime of the OffsetMap connection.
+    strict Query(struct {
+        source_block_offset uint64;
+        length uint64;
+    }) -> (struct {
+        mappings vector<BlockOffsetMapping>:MAPPINGS_BATCH_SIZE;
+    }) error zx.Status;
+};
+
 /// Defines access to a device which is accessible in block-granularity chunks
 /// for reading and writing.
 closed protocol Block {
@@ -96,5 +125,30 @@ closed protocol Block {
     /// Opens a new FIFO-based session on the block device.
     strict OpenSession(resource struct {
         session server_end:Session;
+    });
+
+    /// Opens a new FIFO-based session on the block device, providing an offset lookup map which
+    /// transparently translates device offsets in block FIFO requests.
+    ///
+    /// `initial_mappings` is a static set of mappings which the server can immediately use.  If
+    /// `offset_map` is not provided, this must be non-empty, and requests that fall outside of the
+    /// mapped range will fail.
+    ///
+    /// If `offset_map` is provided, whenever the server receives a request with a dev_offset that
+    /// falls outside of the known range, it will consult `offset_map` to attempt to resolve the
+    /// offset.  Because these offset mappings must be stable for the duration of the session, the
+    /// server may cache any mappings.
+    ///
+    /// This interface is intended to be used internally between nested Block implementations, in
+    /// order to provide passthrough I/O.  For example, a fixed partition map (e.g. GPT) will serve
+    /// a Block protocol for each partition, and will respond to OpenSession requests by calling
+    /// OpenSessionWithOffsetMap on the underlying block device, establishing itself as the source
+    /// for translating client block offsets (relative to the partition start) to absolute offsets.
+    /// The client can then communicate directly with the underlying block device, and the partition
+    /// offsets can be transparently applied to requests.
+    strict OpenSessionWithOffsetMap(resource struct {
+        session server_end:Session;
+        offset_map client_end:<OffsetMap, optional>;
+        initial_mappings vector<BlockOffsetMapping>:<MAPPINGS_BATCH_SIZE, optional>;
     });
 };

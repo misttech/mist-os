@@ -670,6 +670,13 @@ impl RemoteBlockClient {
             remote.get_info().await.map_err(fidl_to_status)?.map_err(zx::Status::from_raw)?;
         let (session, server) = fidl::endpoints::create_proxy();
         let () = remote.open_session(server).map_err(fidl_to_status)?;
+        Self::from_session(info, session).await
+    }
+
+    pub async fn from_session(
+        info: block::BlockInfo,
+        session: block::SessionProxy,
+    ) -> Result<Self, zx::Status> {
         let fifo =
             session.get_fifo().await.map_err(fidl_to_status)?.map_err(zx::Status::from_raw)?;
         let fifo = fasync::Fifo::from_fifo(fifo);

@@ -85,6 +85,8 @@ class BlockDevice : public BlockDeviceType,
   void GetInfo(GetInfoCompleter::Sync& completer) override;
   void GetStats(GetStatsRequestView request, GetStatsCompleter::Sync& completer) override;
   void OpenSession(OpenSessionRequestView request, OpenSessionCompleter::Sync& completer) override;
+  void OpenSessionWithOffsetMap(OpenSessionWithOffsetMapRequestView request,
+                                OpenSessionWithOffsetMapCompleter::Sync& completer) override;
 
   void GetTypeGuid(GetTypeGuidCompleter::Sync& completer) override;
   void GetInstanceGuid(GetInstanceGuidCompleter::Sync& completer) override;
@@ -99,6 +101,11 @@ class BlockDevice : public BlockDeviceType,
 
  private:
   zx_status_t DoIo(zx::vmo& vmo, size_t buf_len, zx_off_t off, zx_off_t vmo_off, bool write);
+
+  void CreateSession(
+      fidl::ServerEnd<fuchsia_hardware_block::Session> session,
+      fidl::ClientEnd<fuchsia_hardware_block::OffsetMap> offset_map = {},
+      std::span<const fuchsia_hardware_block::wire::BlockOffsetMapping> initial_mappings = {});
 
   // Completion callback that expects StatsCookie as |cookie| and calls upper
   // layer completion cookie.

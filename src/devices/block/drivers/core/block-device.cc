@@ -172,9 +172,22 @@ void BlockDevice::GetStats(GetStatsRequestView request, GetStatsCompleter::Sync&
 
 void BlockDevice::OpenSession(OpenSessionRequestView request,
                               OpenSessionCompleter::Sync& completer) {
-  zx::result server = Server::Create(&self_protocol_);
+  CreateSession(std::move(request->session));
+}
+
+void BlockDevice::OpenSessionWithOffsetMap(OpenSessionWithOffsetMapRequestView request,
+                                           OpenSessionWithOffsetMapCompleter::Sync& completer) {
+  CreateSession(std::move(request->session), std::move(request->offset_map),
+                std::span(request->initial_mappings.cbegin(), request->initial_mappings.cend()));
+}
+
+void BlockDevice::CreateSession(
+    fidl::ServerEnd<fuchsia_hardware_block::Session> session,
+    fidl::ClientEnd<fuchsia_hardware_block::OffsetMap> offset_map,
+    std::span<const fuchsia_hardware_block::wire::BlockOffsetMapping> initial_mappings) {
+  zx::result server = Server::Create(&self_protocol_, std::move(offset_map), initial_mappings);
   if (server.is_error()) {
-    request->session.Close(server.error_value());
+    session.Close(server.error_value());
     return;
   }
 
@@ -188,7 +201,7 @@ void BlockDevice::OpenSession(OpenSessionRequestView request,
             return 0;
           },
           server.value().get(), "block_server") != thrd_success) {
-    request->session.Close(ZX_ERR_NO_MEMORY);
+    session.Close(ZX_ERR_NO_MEMORY);
     return;
   }
 
@@ -216,7 +229,7 @@ void BlockDevice::OpenSession(OpenSessionRequestView request,
   }
 
   fidl::BindServer(
-      fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(request->session),
+      fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(session),
       std::move(server.value()),
       [thread](Server* server, fidl::UnbindInfo, fidl::ServerEnd<fuchsia_hardware_block::Session>) {
         server->Close();

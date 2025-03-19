@@ -2,7 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use crate::gpt::GptPartition;
+use anyhow::Error;
 use block_client::{VmoId, WriteOptions};
+use block_server::async_interface::{PassthroughSession, SessionManager};
+use block_server::OffsetMap;
+use fidl_fuchsia_hardware_block as fblock;
 
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -17,6 +21,24 @@ pub struct PartitionBackend {
 }
 
 impl block_server::async_interface::Interface for PartitionBackend {
+    async fn open_session(
+        &self,
+        session_manager: Arc<SessionManager<Self>>,
+        stream: fblock::SessionRequestStream,
+        offset_map: Option<OffsetMap>,
+        block_size: u32,
+    ) -> Result<(), Error> {
+        if offset_map.is_some() {
+            // For now, we don't support double-passthrough.  We could as needed for nested GPT.
+            // If we support this, we can remove I/O and vmoid management from this struct.
+            return session_manager.serve_session(stream, offset_map, block_size).await;
+        }
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fblock::SessionMarker>();
+        self.partition.open_passthrough_session(server_end);
+        let passthrough = PassthroughSession::new(proxy);
+        passthrough.serve(stream).await
+    }
+
     async fn on_attach_vmo(&self, vmo: &zx::Vmo) -> Result<(), zx::Status> {
         let key = std::ptr::from_ref(vmo) as usize;
         let vmoid = self.partition.attach_vmo(vmo).await?;

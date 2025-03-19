@@ -19,7 +19,6 @@
 
 #include <algorithm>
 #include <limits>
-#include <new>
 #include <optional>
 #include <utility>
 
@@ -27,6 +26,7 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 #include <fbl/ref_ptr.h>
+#include <safemath/checked_math.h>
 
 #include "message-group.h"
 #include "src/devices/lib/block/block.h"
@@ -56,6 +56,37 @@ block_command_t OpcodeAndFlagsToCommand(block_fifo_command_t command) {
 }
 
 }  // namespace
+
+OffsetMap::OffsetMap(fuchsia_hardware_block::wire::BlockOffsetMapping mapping)
+    : mapping_(mapping) {}
+
+zx::result<std::unique_ptr<OffsetMap>> OffsetMap::Create(
+    fuchsia_hardware_block::wire::BlockOffsetMapping initial_mapping) {
+  if (initial_mapping.length == 0) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+  auto source_end = safemath::CheckAdd(initial_mapping.source_block_offset, initial_mapping.length);
+  auto target_end = safemath::CheckAdd(initial_mapping.target_block_offset, initial_mapping.length);
+  if (!source_end.IsValid() || !target_end.IsValid()) {
+    return zx::error(ZX_ERR_OUT_OF_RANGE);
+  }
+  auto map = std::unique_ptr<OffsetMap>(new OffsetMap(initial_mapping));
+  return zx::ok(std::move(map));
+}
+
+bool OffsetMap::AdjustRequest(block_fifo_request_t& request) const {
+  if (request.length == 0) {
+    return false;
+  }
+  auto end = safemath::CheckAdd(request.dev_offset, request.length);
+  if (mapping_.source_block_offset > request.dev_offset || !end.IsValid() ||
+      end.ValueOrDie() > mapping_.source_block_offset + mapping_.length) {
+    return false;
+  }
+  uint64_t delta = request.dev_offset - mapping_.source_block_offset;
+  request.dev_offset = mapping_.target_block_offset + delta;
+  return true;
+}
 
 void Server::Enqueue(std::unique_ptr<Message> message) {
   {
@@ -184,9 +215,33 @@ void Server::TxnEnd() {
   }
 }
 
-zx::result<std::unique_ptr<Server>> Server::Create(ddk::BlockProtocolClient* bp) {
+zx::result<std::unique_ptr<Server>> Server::Create(
+    ddk::BlockProtocolClient* bp, fidl::ClientEnd<fuchsia_hardware_block::OffsetMap> offset_map,
+    std::span<const fuchsia_hardware_block::wire::BlockOffsetMapping> initial_mappings) {
+  if (offset_map.is_valid()) {
+    // TODO(https://fxbug.dev/402515764): Support dynamically querying offsets for FVM as needed.
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  std::unique_ptr<OffsetMap> map;
+  if (!initial_mappings.empty()) {
+    if (initial_mappings.size() != 1) {
+      // TODO(https://fxbug.dev/402515764): support multiple mappings for FVM as needed.
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
+    }
+    zx::result result = OffsetMap::Create(initial_mappings.front());
+    if (result.is_error()) {
+      return result.take_error();
+    }
+    map = *std::move(result);
+  }
+
+  block_info_t info;
+  size_t block_op_size;
+  bp->Query(&info, &block_op_size);
+
   fbl::AllocChecker ac;
-  std::unique_ptr<Server> bs(new (&ac) Server(bp));
+  std::unique_ptr<Server> bs(new (&ac) Server(bp, info, block_op_size, std::move(map)));
   if (!ac.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
@@ -199,8 +254,6 @@ zx::result<std::unique_ptr<Server>> Server::Create(ddk::BlockProtocolClient* bp)
   for (size_t i = 0; i < std::size(bs->groups_); i++) {
     bs->groups_[i] = std::make_unique<MessageGroup>(*bs, static_cast<groupid_t>(i));
   }
-
-  bp->Query(&bs->info_, &bs->block_op_size_);
 
   // TODO(https://fxbug.dev/42106444): Allocate BlockMsg arena based on block_op_size_.
 
@@ -251,10 +304,13 @@ zx_status_t Server::ProcessReadWriteRequest(block_fifo_request_t* request) {
   }
 
   if (!request->length) {
-    zxlogf(WARNING,
-           "ProcessReadWriteRequest: Invalid request range [%" PRIu64 ",%" PRIu64 "), failing",
-           request->dev_offset, request->dev_offset + request->length);
     return ZX_ERR_INVALID_ARGS;
+  }
+  if (offset_map_ && !offset_map_->AdjustRequest(*request)) {
+    zxlogf(WARNING,
+           "ProcessReadWriteRequest: Invalid request range %" PRIu32 "@%" PRIu64 ", failing",
+           request->length, request->dev_offset);
+    return ZX_ERR_OUT_OF_RANGE;
   }
 
   // Hack to ensure that the vmo is valid.
@@ -434,9 +490,12 @@ zx_status_t Server::ProcessFlushRequest(block_fifo_request_t* request) {
 
 zx_status_t Server::ProcessTrimRequest(block_fifo_request_t* request) {
   if (!request->length) {
-    zxlogf(WARNING, "ProcessTrimRequest: Invalid request range [%" PRIu64 ",%" PRIu64 "), failing",
-           request->dev_offset, request->dev_offset + request->length);
     return ZX_ERR_INVALID_ARGS;
+  }
+  if (offset_map_ && !offset_map_->AdjustRequest(*request)) {
+    zxlogf(WARNING, "ProcessTrimRequest: Invalid request range %" PRIu32 "@%" PRIu64 ", failing",
+           request->length, request->dev_offset);
+    return ZX_ERR_OUT_OF_RANGE;
   }
 
   std::unique_ptr<Message> msg;
@@ -541,11 +600,14 @@ void Server::Close(CloseCompleter::Sync& completer) {
   completer.Close(ZX_OK);
 }
 
-Server::Server(ddk::BlockProtocolClient* bp)
-    : bp_(bp), block_op_size_(0), pending_count_(0), last_id_(BLOCK_VMOID_INVALID + 1) {
-  size_t block_op_size;
-  bp->Query(&info_, &block_op_size);
-}
+Server::Server(ddk::BlockProtocolClient* bp, block_info_t info, size_t block_op_size,
+               std::unique_ptr<OffsetMap> offset_map)
+    : info_(info),
+      offset_map_(std::move(offset_map)),
+      bp_(bp),
+      block_op_size_(block_op_size),
+      pending_count_(0),
+      last_id_(BLOCK_VMOID_INVALID + 1) {}
 
 Server::~Server() { Close(); }
 
