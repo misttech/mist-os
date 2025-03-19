@@ -17,6 +17,7 @@ use std::collections::{HashMap, HashSet};
 use std::ffi::CStr;
 use std::fmt::{self, Debug};
 use std::hash::Hash;
+use std::ops;
 use uuid::Uuid;
 
 use crate::credentials::*;
@@ -1195,7 +1196,27 @@ impl Broker {
     }
 }
 
-pub type LeaseID = String;
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
+pub struct LeaseID(String);
+
+impl LeaseID {
+    fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl fmt::Display for LeaseID {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl ops::Deref for LeaseID {
+    type Target = str;
+    fn deref(&self) -> &str {
+        self.as_str()
+    }
+}
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
 pub struct Lease {
@@ -1215,11 +1236,11 @@ impl Lease {
         level: IndexedPowerLevel,
         underlying_element_level: IndexedPowerLevel,
     ) -> Self {
-        let uuid = LeaseID::from(Uuid::new_v4().as_simple().to_string());
+        let uuid = Uuid::new_v4().as_simple().to_string();
         let id =
             if ID_DEBUG_MODE { format!("{synthetic_element_id}@{level}:{uuid:.6}") } else { uuid };
         Lease {
-            id: id,
+            id: LeaseID(id),
             synthetic_element_id: synthetic_element_id.clone(),
             underlying_element_id: underlying_element_id.clone(),
             level: level.clone(),
@@ -1228,7 +1249,21 @@ impl Lease {
     }
 }
 
-type ClaimID = String;
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
+pub struct ClaimID(String);
+
+impl fmt::Display for ClaimID {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl ops::Deref for ClaimID {
+    type Target = str;
+    fn deref(&self) -> &str {
+        self.0.as_str()
+    }
+}
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
 struct Claim {
@@ -1245,11 +1280,11 @@ impl fmt::Display for Claim {
 
 impl Claim {
     fn new(dependency: Dependency, lease_id: &LeaseID) -> Self {
-        let mut id = ClaimID::from(Uuid::new_v4().as_simple().to_string());
+        let mut id = Uuid::new_v4().as_simple().to_string();
         if ID_DEBUG_MODE {
             id = format!("{id:.6}");
         }
-        Claim { id, dependency, lease_id: lease_id.clone() }
+        Claim { id: ClaimID(id), dependency, lease_id: lease_id.clone() }
     }
 
     fn dependent(&self) -> &ElementLevel {
@@ -1783,7 +1818,7 @@ impl Inspectable for &ElementID {
 impl Inspectable for &LeaseID {
     type Value = LeaseStatus;
     fn track_inspect_with(&self, value: Self::Value, parent: &INode) -> Box<dyn IType> {
-        Box::new(parent.create_string(*self, format!("{:?}", value)))
+        Box::new(parent.create_string(self.as_str(), format!("{:?}", value)))
     }
 }
 
@@ -2081,7 +2116,7 @@ mod tests {
                     level: IndexedPowerLevel::from_same_level_and_index(requires_element_level),
                 },
             },
-            &LeaseID::new(),
+            &LeaseID(String::new()),
         )
     }
 
@@ -2095,7 +2130,7 @@ mod tests {
         lookup.add(claim_a_1_b_1.clone());
         lookup.add(claim_a_2_b_2.clone());
 
-        lookup.mark_to_deactivate(&claim_a_2_b_2.id);
+        lookup.mark_to_deactivate(&claim_a_2_b_2.lease_id);
 
         assert_eq!(lookup.remove(&claim_a_1_b_1.id), Some(claim_a_1_b_1.clone()));
         assert_eq!(lookup.remove(&claim_a_2_b_2.id), Some(claim_a_2_b_2.clone()));
@@ -2946,7 +2981,7 @@ mod tests {
         assert_data_tree!(inspect, root: {
             test: {
                 leases: {
-                    lease.id.clone() => "Satisfied",
+                    lease.id.to_string() => "Satisfied",
                 },
                 topology: {
                     "fuchsia.inspect.synthetic.Graph": contains {},
@@ -3868,8 +3903,8 @@ mod tests {
         assert_data_tree!(inspect, root: {
             test: {
                 leases: {
-                    lease_b.id.clone() => "Satisfied",
-                    lease_c.id.clone() => "Satisfied",
+                    lease_b.id.to_string() => "Satisfied",
+                    lease_c.id.to_string() => "Satisfied",
                 },
                 topology: {
                     "fuchsia.inspect.synthetic.Graph": contains {},
