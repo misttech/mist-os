@@ -121,7 +121,7 @@ source_set("netif_files") {
 
 # LWIPNOAPPSFILES: All LWIP files without apps
 zx_library("lwip") {
-  configs += [ ":include_dirs" ]
+  public_configs = [ ":include_dirs" ]
 
   deps = [
     ":api_files",
@@ -131,7 +131,13 @@ zx_library("lwip") {
     ":netif_files",
   ]
 
-  deps += [ "//zircon/kernel/lib/init" ]
+  deps += [
+    "//zircon/kernel/lib/console",
+    "//zircon/kernel/lib/init",
+  ]
 
-  sources = [ "sys_arch.cc" ]
+  sources = [
+    "debugcommands.cc",
+    "sys_arch.cc",
+  ]
 }
