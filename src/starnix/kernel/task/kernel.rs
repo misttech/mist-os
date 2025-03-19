@@ -17,8 +17,8 @@ use crate::mm::{FutexTable, MappingSummary, SharedFutexKey};
 use crate::power::SuspendResumeManagerHandle;
 use crate::security;
 use crate::task::{
-    AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, Cgroups, CurrentTask,
-    HrTimerManager, HrTimerManagerHandle, IpTables, KernelStats, KernelThreads, NetstackDevices,
+    AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, HrTimerManager,
+    HrTimerManagerHandle, IpTables, KernelCgroups, KernelStats, KernelThreads, NetstackDevices,
     PidTable, PsiProvider, SchedulerManager, StopState, Syslog, ThreadGroup, UtsNamespace,
     UtsNamespaceHandle,
 };
@@ -318,7 +318,7 @@ pub struct Kernel {
     pub root_cgroup_ebpf_programs: CgroupEbpfProgramSet,
 
     /// Cgroups of the kernel.
-    pub cgroups: Cgroups,
+    pub cgroups: KernelCgroups,
 }
 
 /// An implementation of [`InterfacesHandler`].
@@ -446,7 +446,7 @@ impl Kernel {
             shutting_down: AtomicBool::new(false),
             container_control_handle: Mutex::new(None),
             root_cgroup_ebpf_programs: Default::default(),
-            cgroups: Cgroups::new(kernel.clone()),
+            cgroups: KernelCgroups::new(kernel.clone()),
         });
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle

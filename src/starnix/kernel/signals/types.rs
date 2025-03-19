@@ -22,6 +22,7 @@ use std::sync::Arc;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 /// Internal signal that cannot be masked, blocked or ignored.
+#[derive(Debug)]
 pub enum KernelSignal {
     Freeze(Waiter),
 }

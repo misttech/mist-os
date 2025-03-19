@@ -53,6 +53,7 @@ use starnix_uapi::{
     ROBUST_LIST_LIMIT, SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER,
     SECCOMP_FILTER_FLAG_TSYNC, SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SI_KERNEL,
 };
+use std::collections::VecDeque;
 use std::ffi::CString;
 use std::fmt;
 use std::marker::PhantomData;
@@ -1526,6 +1527,7 @@ impl CurrentTask {
                 Arc::clone(&kernel.default_abstract_vsock_namespace),
                 Some(SIGCHLD),
                 Default::default(),
+                Default::default(),
                 None,
                 Default::default(),
                 kernel.root_uts_ns.clone(),
@@ -1594,6 +1596,7 @@ impl CurrentTask {
             Arc::clone(&system_task.abstract_socket_namespace),
             Arc::clone(&system_task.abstract_vsock_namespace),
             None,
+            Default::default(),
             Default::default(),
             None,
             scheduler_policy,
@@ -1673,6 +1676,7 @@ impl CurrentTask {
         let clone_sighand = flags & (CLONE_SIGHAND as u64) != 0;
         let clone_vfork = flags & (CLONE_VFORK as u64) != 0;
         let clone_newuts = flags & (CLONE_NEWUTS as u64) != 0;
+        let clone_into_cgroup = flags & CLONE_INTO_CGROUP != 0;
 
         if clone_ptrace {
             track_stub!(TODO("https://fxbug.dev/322874630"), "CLONE_PTRACE");
@@ -1680,6 +1684,10 @@ impl CurrentTask {
 
         if clone_sysvsem {
             track_stub!(TODO("https://fxbug.dev/322875185"), "CLONE_SYSVSEM");
+        }
+
+        if clone_into_cgroup {
+            track_stub!(TODO("https://fxbug.dev/403612570"), "CLONE_INTO_CGROUP");
         }
 
         if clone_sighand && !clone_vm {
@@ -1727,6 +1735,17 @@ impl CurrentTask {
         let files = if clone_files { self.files.clone() } else { self.files.fork() };
 
         let kernel = self.kernel();
+
+        // Lock the cgroup process hierarchy so that the parent process cannot move to a different
+        // cgroup while a new task or thread_group is created. This may be unnecessary if
+        // CLONE_INTO_CGROUP is implemented and passed in.
+        let mut cgroup2_pid_table = kernel.cgroups.lock_cgroup2_pid_table();
+        // Create a `KernelSignal::Freeze` to put onto the new task, if the cgroup is frozen.
+        let child_kernel_signals = cgroup2_pid_table
+            .maybe_create_freeze_signal(self.get_pid())
+            .into_iter()
+            .collect::<VecDeque<_>>();
+
         let mut pids = kernel.pids.write();
 
         let pid;
@@ -1821,7 +1840,7 @@ impl CurrentTask {
 
                 task_info.thread_group.write().is_sharing = is_sharing;
 
-                kernel.cgroups.cgroup2.inherit_cgroup(
+                cgroup2_pid_table.inherit_cgroup(
                     self.get_pid(),
                     pid,
                     &OwnedRef::temp(&task_info.thread_group),
@@ -1847,6 +1866,7 @@ impl CurrentTask {
             self.abstract_vsock_namespace.clone(),
             child_exit_signal,
             child_signal_mask,
+            child_kernel_signals,
             vfork_event,
             scheduler_policy,
             uts_ns,

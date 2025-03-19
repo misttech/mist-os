@@ -638,6 +638,11 @@ impl TaskMutableState {
     pub fn is_frozen(&self) -> bool {
         matches!(self.run_state(), RunState::Frozen(_))
     }
+
+    #[cfg(test)]
+    pub fn kernel_signals_for_test(&self) -> &VecDeque<KernelSignal> {
+        &self.kernel_signals
+    }
 }
 
 #[apply(state_implementation!)]
@@ -1136,6 +1141,7 @@ impl Task {
         abstract_vsock_namespace: Arc<AbstractVsockSocketNamespace>,
         exit_signal: Option<Signal>,
         signal_mask: SigSet,
+        kernel_signals: VecDeque<KernelSignal>,
         vfork_event: Option<Arc<zx::Event>>,
         scheduler_policy: SchedulerPolicy,
         uts_ns: UtsNamespaceHandle,
@@ -1162,7 +1168,7 @@ impl Task {
             mutable_state: RwLock::new(TaskMutableState {
                 clear_child_tid: UserRef::default(),
                 signals: SignalState::with_mask(signal_mask),
-                kernel_signals: Default::default(),
+                kernel_signals,
                 exit_status: None,
                 scheduler_policy,
                 uts_ns,
