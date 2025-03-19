@@ -10,9 +10,7 @@ use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker as _, Proxy as _};
 use fidl_fuchsia_device::{ControllerMarker, ControllerProxy, ControllerSynchronousProxy};
 use fidl_fuchsia_hardware_ramdisk::{Guid, RamdiskControllerMarker};
 use fs_management::filesystem::{BlockConnector, DirBasedBlockConnector};
-use fuchsia_component::client::{
-    connect_to_named_protocol_at_dir_root, connect_to_protocol_at_dir_svc, Service,
-};
+use fuchsia_component::client::{connect_to_named_protocol_at_dir_root, Service};
 use {
     fidl_fuchsia_hardware_block as fhardware_block, fidl_fuchsia_hardware_block_volume as fvolume,
     fidl_fuchsia_hardware_ramdisk as framdisk, fidl_fuchsia_io as fio,
@@ -279,32 +277,9 @@ impl RamdiskClient {
 
     /// Get an open channel to the underlying ramdevice.
     pub fn open(&self) -> Result<fidl::endpoints::ClientEnd<fhardware_block::BlockMarker>, Error> {
-        match self {
-            Self::V1 { .. } => {
-                // At this point, we have already waited on the block path to appear so we can
-                // directly open a connection to the ramdevice.
-
-                // TODO(https://fxbug.dev/42063787): In order to allow multiplexing to be removed,
-                // use connect_to_device_fidl to connect to the BlockProxy instead of
-                // connect_to_.._dir_root.  Requires downstream work.
-                let block_dir = self.as_dir().ok_or_else(|| anyhow!("directory is invalid"))?;
-                let block_proxy = connect_to_named_protocol_at_dir_root::<
-                    fhardware_block::BlockMarker,
-                >(block_dir, ".")?;
-                let block_client_end = ClientEnd::<fhardware_block::BlockMarker>::new(
-                    block_proxy.into_channel().unwrap().into(),
-                );
-                Ok(block_client_end)
-            }
-            Self::V2 { outgoing, .. } => {
-                let block_proxy =
-                    connect_to_protocol_at_dir_svc::<fvolume::VolumeMarker>(outgoing)?;
-                let block_client_end = ClientEnd::<fhardware_block::BlockMarker>::new(
-                    block_proxy.into_channel().unwrap().into(),
-                );
-                Ok(block_client_end)
-            }
-        }
+        let (client, server_end) = fidl::endpoints::create_endpoints();
+        self.connect(server_end)?;
+        Ok(client)
     }
 
     /// Gets a connector for the Block protocol of the ramdisk.
@@ -448,10 +423,11 @@ impl RamdiskClient {
 }
 
 impl BlockConnector for RamdiskClient {
-    fn connect_volume(
+    fn connect_channel_to_volume(
         &self,
-    ) -> Result<ClientEnd<fidl_fuchsia_hardware_block_volume::VolumeMarker>, Error> {
-        self.open().map(|block| block.into_channel().into())
+        server_end: fidl::endpoints::ServerEnd<fidl_fuchsia_hardware_block_volume::VolumeMarker>,
+    ) -> Result<(), Error> {
+        self.connect(server_end.into_channel().into())
     }
 }
 

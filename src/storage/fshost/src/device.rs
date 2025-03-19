@@ -583,7 +583,7 @@ impl Device for RamdiskDevice {
     }
 
     fn block_connector(&self) -> Result<Box<dyn BlockConnector>, Error> {
-        Ok(Box::new(RamdiskDeviceBlockConnector { ramdisk: self.ramdisk.clone() }))
+        Ok(Box::new(self.ramdisk.clone()))
     }
 
     fn block_proxy(&self) -> Result<BlockProxy, Error> {
@@ -603,18 +603,6 @@ impl Device for RamdiskDevice {
     }
 
     fn set_fshost_ramdisk(&mut self, _v: bool) {}
-}
-
-struct RamdiskDeviceBlockConnector {
-    ramdisk: Arc<RamdiskClient>,
-}
-
-impl BlockConnector for RamdiskDeviceBlockConnector {
-    fn connect_volume(
-        &self,
-    ) -> Result<ClientEnd<fidl_fuchsia_hardware_block_volume::VolumeMarker>, Error> {
-        Ok(ClientEnd::new(self.ramdisk.open()?.into_channel()))
-    }
 }
 
 /// RegisteredDevices keeps track of significant devices so that they can be found later as

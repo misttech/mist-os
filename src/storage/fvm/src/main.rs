@@ -874,13 +874,15 @@ impl MountedVolume {
 }
 
 impl BlockConnector for MountedVolume {
-    fn connect_volume(&self) -> Result<ClientEnd<fvolume::VolumeMarker>, Error> {
-        let (client, stream) = fidl::endpoints::create_request_stream();
+    fn connect_channel_to_volume(
+        &self,
+        server_end: ServerEnd<fvolume::VolumeMarker>,
+    ) -> Result<(), Error> {
         let this = self.clone();
         self.scope.spawn(async move {
-            let _ = this.block_server.handle_requests(stream).await;
+            let _ = this.block_server.handle_requests(server_end.into_stream()).await;
         });
-        Ok(client)
+        Ok(())
     }
 }
 

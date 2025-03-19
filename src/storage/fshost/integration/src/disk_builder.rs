@@ -373,7 +373,7 @@ impl DiskBuilder {
             Box::new(DirBasedBlockConnector::new(dir, String::from("part-000/volume")))
         } else {
             // Format the volume manager onto the disk directly.
-            Box::new(move || Ok(server.volume_proxy().into_client_end().unwrap()))
+            Box::new(move |server_end| Ok(server.connect(server_end)))
         };
 
         if self.volumes_spec.fxfs_blob {

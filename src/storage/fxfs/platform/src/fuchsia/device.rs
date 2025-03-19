@@ -506,8 +506,10 @@ mod tests {
     // TODO(https://fxbug.dev/397501864): Migrate this to the new Open method, and convert this to
     // fs_management::filesystem::DirBasedBlockConnector
     impl fs_management::filesystem::BlockConnector for BlockConnector {
-        fn connect_volume(&self) -> Result<ClientEnd<VolumeMarker>, anyhow::Error> {
-            let (client, server) = fidl::endpoints::create_endpoints::<VolumeMarker>();
+        fn connect_channel_to_volume(
+            &self,
+            server_end: ServerEnd<VolumeMarker>,
+        ) -> Result<(), anyhow::Error> {
             self.0
                 .deprecated_open(
                     fio::OpenFlags::RIGHT_READABLE
@@ -515,10 +517,10 @@ mod tests {
                         | fio::OpenFlags::BLOCK_DEVICE,
                     fio::ModeType::empty(),
                     self.1,
-                    server.into_channel().into(),
+                    server_end.into_channel().into(),
                 )
                 .expect("open failed");
-            Ok(client)
+            Ok(())
         }
     }
 
@@ -527,17 +529,19 @@ mod tests {
     // TODO(https://fxbug.dev/397501864): Migrate this to the new Open method, and convert this to
     // fs_management::filesystem::DirBasedBlockConnector
     impl fs_management::filesystem::BlockConnector for ReadonlyBlockConnector {
-        fn connect_volume(&self) -> Result<ClientEnd<VolumeMarker>, anyhow::Error> {
-            let (client, server) = fidl::endpoints::create_endpoints::<VolumeMarker>();
+        fn connect_channel_to_volume(
+            &self,
+            server_end: ServerEnd<VolumeMarker>,
+        ) -> Result<(), anyhow::Error> {
             self.0
                 .deprecated_open(
                     fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::BLOCK_DEVICE,
                     fio::ModeType::empty(),
                     self.1,
-                    server.into_channel().into(),
+                    server_end.into_channel().into(),
                 )
                 .expect("open failed");
-            Ok(client)
+            Ok(())
         }
     }
 

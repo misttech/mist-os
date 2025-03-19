@@ -7,7 +7,7 @@
 use crate::error::{QueryError, ShutdownError};
 use crate::{ComponentType, FSConfig, Options};
 use anyhow::{anyhow, bail, ensure, Context, Error};
-use fidl::endpoints::{create_endpoints, create_proxy, ClientEnd, Proxy as _, ServerEnd};
+use fidl::endpoints::{create_endpoints, create_proxy, ClientEnd, ServerEnd};
 use fidl_fuchsia_component::{self as fcomponent, RealmMarker};
 use fidl_fuchsia_fs::AdminMarker;
 use fidl_fuchsia_fs_startup::{CheckOptions, CreateOptions, MountOptions, StartupMarker};
@@ -24,7 +24,12 @@ use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio};
 
 /// An abstract connector for things that speak fuchsia.hardware.block.Block and similar protocols.
 pub trait BlockConnector: Send + Sync {
-    fn connect_volume(&self) -> Result<ClientEnd<VolumeMarker>, Error>;
+    fn connect_channel_to_volume(&self, server_end: ServerEnd<VolumeMarker>) -> Result<(), Error>;
+    fn connect_volume(&self) -> Result<ClientEnd<VolumeMarker>, Error> {
+        let (client, server) = fidl::endpoints::create_endpoints();
+        self.connect_channel_to_volume(server)?;
+        Ok(client)
+    }
     fn connect_partition(
         &self,
     ) -> Result<ClientEnd<fidl_fuchsia_hardware_block_partition::PartitionMarker>, Error> {
@@ -50,27 +55,28 @@ impl DirBasedBlockConnector {
 }
 
 impl BlockConnector for DirBasedBlockConnector {
-    fn connect_volume(&self) -> Result<ClientEnd<VolumeMarker>, Error> {
-        fuchsia_component::client::connect_to_named_protocol_at_dir_root::<VolumeMarker>(
-            &self.0, &self.1,
-        )
-        .map(|p| p.into_client_end().unwrap())
+    fn connect_channel_to_volume(&self, server_end: ServerEnd<VolumeMarker>) -> Result<(), Error> {
+        self.0.open(
+            self.path(),
+            fio::Flags::PROTOCOL_SERVICE,
+            &fio::Options::default(),
+            server_end.into_channel(),
+        )?;
+        Ok(())
     }
 }
 
 impl BlockConnector for fidl_fuchsia_device::ControllerProxy {
-    fn connect_volume(&self) -> Result<ClientEnd<VolumeMarker>, Error> {
-        let (client, server) = fidl::endpoints::create_endpoints();
-        let () = self.connect_to_device_fidl(server.into_channel())?;
-        Ok(client)
+    fn connect_channel_to_volume(&self, server_end: ServerEnd<VolumeMarker>) -> Result<(), Error> {
+        let () = self.connect_to_device_fidl(server_end.into_channel())?;
+        Ok(())
     }
 }
 
 impl BlockConnector for fidl_fuchsia_storage_partitions::PartitionServiceProxy {
-    fn connect_volume(&self) -> Result<ClientEnd<VolumeMarker>, Error> {
-        let (client, server) = fidl::endpoints::create_endpoints();
-        self.connect_channel_to_volume(server)?;
-        Ok(client)
+    fn connect_channel_to_volume(&self, server_end: ServerEnd<VolumeMarker>) -> Result<(), Error> {
+        self.connect_channel_to_volume(server_end)?;
+        Ok(())
     }
 }
 
@@ -78,17 +84,17 @@ impl BlockConnector for fidl_fuchsia_storage_partitions::PartitionServiceProxy {
 // that would conflict with a downstream crate that implements AsRef for a concrete BlockConnector
 // defined here already.
 impl<T: BlockConnector> BlockConnector for Arc<T> {
-    fn connect_volume(&self) -> Result<ClientEnd<VolumeMarker>, Error> {
-        self.as_ref().connect_volume()
+    fn connect_channel_to_volume(&self, server_end: ServerEnd<VolumeMarker>) -> Result<(), Error> {
+        self.as_ref().connect_channel_to_volume(server_end)
     }
 }
 
 impl<F> BlockConnector for F
 where
-    F: Fn() -> Result<ClientEnd<VolumeMarker>, Error> + Send + Sync,
+    F: Fn(ServerEnd<VolumeMarker>) -> Result<(), Error> + Send + Sync,
 {
-    fn connect_volume(&self) -> Result<ClientEnd<VolumeMarker>, Error> {
-        self()
+    fn connect_channel_to_volume(&self, server_end: ServerEnd<VolumeMarker>) -> Result<(), Error> {
+        self(server_end)
     }
 }
 
