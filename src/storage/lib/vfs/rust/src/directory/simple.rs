@@ -132,12 +132,10 @@ impl Simple {
                     // Creating an entry is not supported.
                     return Err(Status::NOT_SUPPORTED);
                 }
-                return object_request.spawn_connection(
-                    scope,
-                    self,
-                    protocols,
-                    ImmutableConnection::create,
-                );
+                object_request
+                    .take()
+                    .create_connection_sync::<ImmutableConnection<_>, _>(scope, self, protocols);
+                return Ok(());
             }
         };
 

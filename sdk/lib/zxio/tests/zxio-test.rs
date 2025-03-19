@@ -231,12 +231,9 @@ async fn test_read_link_error() {
                 if !path.is_empty() {
                     return Err(Status::NOT_DIR);
                 }
-                scope.spawn(vfs::symlink::Connection::create(
-                    scope.clone(),
-                    self,
-                    &flags,
-                    object_request,
-                )?);
+                object_request
+                    .take()
+                    .create_connection_sync::<vfs::symlink::Connection<_>, _>(scope, self, flags);
                 Ok(())
             });
         }
@@ -251,12 +248,9 @@ async fn test_read_link_error() {
             if !path.is_empty() {
                 return Err(Status::NOT_DIR);
             }
-            scope.spawn(vfs::symlink::Connection::create(
-                scope.clone(),
-                self,
-                &flags,
-                object_request,
-            )?);
+            object_request
+                .take()
+                .create_connection_sync::<vfs::symlink::Connection<_>, _>(scope, self, flags);
             Ok(())
         }
     }
@@ -548,7 +542,8 @@ impl FileLike for AllocateFile {
         options: FileOptions,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), Status> {
-        FidlIoConnection::spawn(scope, self, options, object_request)
+        FidlIoConnection::create_sync(scope, self, options, object_request.take());
+        Ok(())
     }
 }
 

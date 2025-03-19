@@ -42,7 +42,7 @@ use vfs::directory::simple::Simple;
 use vfs::directory::traversal_position::TraversalPosition;
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
-use vfs::{ObjectRequestRef, ToObjectRequest};
+use vfs::{ObjectRequestRef, ProtocolsExt, ToObjectRequest};
 use zx::Status;
 
 /// A flat directory containing content-addressable blobs (names are their hashes).
@@ -316,6 +316,26 @@ impl BlobDirectory {
             };
         }
     }
+
+    async fn open_impl(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        path: Path,
+        flags: impl ProtocolsExt,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), Status> {
+        if path.is_empty() {
+            object_request
+                .create_connection::<MutableConnection<_>, _>(
+                    scope,
+                    OpenedNode::new(self).take(),
+                    flags,
+                )
+                .await
+        } else {
+            Err(Status::NOT_SUPPORTED)
+        }
+    }
 }
 
 impl FxNode for BlobDirectory {
@@ -395,18 +415,9 @@ impl VfsDirectory for BlobDirectory {
         path: Path,
         server_end: ServerEnd<NodeMarker>,
     ) {
-        flags.to_object_request(server_end).handle(move |object_request| {
-            if path.is_empty() {
-                object_request.spawn_connection(
-                    scope,
-                    OpenedNode::new(self).take(),
-                    flags,
-                    MutableConnection::create,
-                )
-            } else {
-                Err(Status::NOT_SUPPORTED)
-            }
-        });
+        scope.clone().spawn(flags.to_object_request(server_end).handle_async(
+            async move |object_request| self.open_impl(scope, path, flags, object_request).await,
+        ));
     }
 
     fn open3(
@@ -416,19 +427,20 @@ impl VfsDirectory for BlobDirectory {
         flags: fio::Flags,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), Status> {
-        object_request.take().handle(|object_request| {
-            if path.is_empty() {
-                object_request.spawn_connection(
-                    scope,
-                    OpenedNode::new(self).take(),
-                    flags,
-                    MutableConnection::create,
-                )
-            } else {
-                Err(Status::NOT_SUPPORTED)
-            }
-        });
+        scope.clone().spawn(object_request.take().handle_async(async move |object_request| {
+            self.open_impl(scope, path, flags, object_request).await
+        }));
         Ok(())
+    }
+
+    async fn open3_async(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        path: Path,
+        flags: fio::Flags,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), Status> {
+        self.open_impl(scope, path, flags, object_request).await
     }
 
     async fn read_dirents<'a>(

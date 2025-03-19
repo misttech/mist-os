@@ -220,7 +220,7 @@ impl<'a> OpenRequest<'a> {
                 if !path.is_empty() {
                     return Err(Status::NOT_DIR);
                 }
-                symlink::serve(service, scope, &flags, object_request)
+                symlink::serve(service, scope, flags, object_request)
             }
             OpenRequest {
                 scope,
@@ -231,7 +231,7 @@ impl<'a> OpenRequest<'a> {
                 if !path.is_empty() {
                     return Err(Status::NOT_DIR);
                 }
-                symlink::serve(service, scope, &flags, object_request)
+                symlink::serve(service, scope, flags, object_request)
             }
         }
     }

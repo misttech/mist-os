@@ -402,19 +402,16 @@ impl BootfsSvc {
             let flags = fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_EXECUTABLE
                 | fio::OpenFlags::DIRECTORY;
-            fasync::LocalExecutor::new().run_singlethreaded(
+            fasync::LocalExecutor::new().run_singlethreaded(async move {
+                let scope = ExecutionScope::new();
                 flags
                     .to_object_request(directory_server_end)
-                    .handle(|object_request| {
-                        ImmutableConnection::create(
-                            ExecutionScope::new(),
-                            vfs,
-                            flags,
-                            object_request,
-                        )
+                    .handle_async(async |object_request| {
+                        ImmutableConnection::create(scope.clone(), vfs, flags, object_request).await
                     })
-                    .unwrap(),
-            );
+                    .await;
+                scope.wait().await;
+            });
         });
 
         let ns = fdio::Namespace::installed().map_err(BootfsError::Namespace)?;

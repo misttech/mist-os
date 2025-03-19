@@ -79,7 +79,10 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Me
                     return Err(zx::Status::NOT_SUPPORTED);
                 }
 
-                object_request.spawn_connection(scope, self, flags, ImmutableConnection::create)
+                object_request
+                    .take()
+                    .create_connection_sync::<ImmutableConnection<_>, _>(scope, self, flags);
+                Ok(())
             });
             return;
         }
@@ -139,13 +142,11 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Me
                     return Err(zx::Status::NOT_SUPPORTED);
                 }
             }
-            // `ImmutableConnection::create` checks that only directory flags are specified.
-            return object_request.spawn_connection(
-                scope,
-                self,
-                flags,
-                ImmutableConnection::create,
-            );
+            // `ImmutableConnection` checks that only directory flags are specified.
+            object_request
+                .take()
+                .create_connection_sync::<ImmutableConnection<_>, _>(scope, self, flags);
+            return Ok(());
         }
 
         // <path as vfs::path::Path>::as_str() is an object relative path expression [1], except

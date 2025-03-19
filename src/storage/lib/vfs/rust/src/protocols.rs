@@ -12,7 +12,7 @@ use fidl_fuchsia_io as fio;
 use zx_status::Status;
 
 /// Extends fio::Flags and fio::OpenFlags
-pub trait ProtocolsExt: ToFileOptions + ToNodeOptions + Sync + 'static {
+pub trait ProtocolsExt: ToFileOptions + ToNodeOptions + Send + Sync + 'static {
     /// True if the directory protocol is allowed.
     fn is_dir_allowed(&self) -> bool;
 
@@ -356,7 +356,7 @@ impl ProtocolsExt for fio::Flags {
     }
 }
 
-pub trait ToFileOptions {
+pub trait ToFileOptions: Send + 'static {
     fn to_file_options(&self) -> Result<FileOptions, Status>;
 }
 
@@ -457,7 +457,7 @@ impl ToFileOptions for FileOptions {
     }
 }
 
-pub trait ToNodeOptions {
+pub trait ToNodeOptions: Send + 'static {
     fn to_node_options(&self, dirent_type: fio::DirentType) -> Result<NodeOptions, Status>;
 }
 

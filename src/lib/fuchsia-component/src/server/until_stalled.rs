@@ -151,28 +151,26 @@ impl OutgoingConnector {
         let scope = self.scope.clone();
         let dir = self.dir.clone();
         let flags = self.flags;
-        object_request.spawn(&scope.clone(), move |object_request_ref| {
-            async move {
-                ImmutableConnection::create_transform_stream(
-                    scope,
-                    dir,
-                    flags,
-                    object_request_ref,
-                    move |stream| {
-                        StallableRequestStream::new(
-                            stream,
-                            debounce_interval,
-                            // This function will be called with the server endpoint when
-                            // the directory request stream is stalled for `debounce_interval`
-                            move |maybe_channel: Option<zx::Channel>| {
-                                _ = unbound_sender.send(maybe_channel);
-                            },
-                        )
-                    },
-                )
-            }
-            .boxed()
-        });
+        scope.clone().spawn(object_request.handle_async(async move |object_request| {
+            ImmutableConnection::create_transform_stream(
+                scope,
+                dir,
+                flags,
+                object_request,
+                move |stream| {
+                    StallableRequestStream::new(
+                        stream,
+                        debounce_interval,
+                        // This function will be called with the server endpoint when
+                        // the directory request stream is stalled for `debounce_interval`
+                        move |maybe_channel: Option<zx::Channel>| {
+                            _ = unbound_sender.send(maybe_channel);
+                        },
+                    )
+                },
+            )
+            .await
+        }));
         Box::pin(
             unbound_receiver
                 .map(|result| match result {

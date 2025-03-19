@@ -14,10 +14,9 @@ use std::fmt::Debug;
 use std::io::{Read, Seek, Write};
 use std::pin::Pin;
 use std::sync::{Arc, RwLock};
+use vfs::attributes;
 use vfs::directory::entry::EntryInfo;
-use vfs::execution_scope::ExecutionScope;
-use vfs::file::{FidlIoConnection, File as VfsFile, FileIo as VfsFileIo, FileOptions, SyncMode};
-use vfs::{attributes, ObjectRequestRef};
+use vfs::file::{File as VfsFile, FileIo as VfsFileIo, FileOptions, SyncMode};
 use zx::{self as zx, Status};
 
 fn extend(file: &mut File<'_>, mut current: u64, target: u64) -> Result<(), Status> {
@@ -135,15 +134,6 @@ impl FatFile {
         }
         self.filesystem.mark_dirty();
         Ok((total_written as u64, file_offset))
-    }
-
-    pub(crate) fn create_connection(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        object_request: ObjectRequestRef<'_>,
-    ) -> Result<(), zx::Status> {
-        object_request.spawn_connection(scope, self, flags, FidlIoConnection::create)
     }
 }
 

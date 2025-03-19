@@ -1054,9 +1054,9 @@ mod tests {
             _path: Path,
             server_end: ServerEnd<fio::NodeMarker>,
         ) {
-            flags.to_object_request(server_end).handle(|object_request| {
-                object_request.spawn_connection(scope, self, flags, ImmutableConnection::create)
-            });
+            flags
+                .to_object_request(server_end)
+                .create_connection_sync::<ImmutableConnection<_>, _>(scope, self, flags);
         }
 
         fn open3(
@@ -1066,9 +1066,9 @@ mod tests {
             flags: fio::Flags,
             object_request: ObjectRequestRef<'_>,
         ) -> Result<(), zx::Status> {
-            object_request.take().handle(|object_request| {
-                object_request.spawn_connection(scope, self, flags, ImmutableConnection::create)
-            });
+            object_request
+                .take()
+                .create_connection_sync::<ImmutableConnection<_>, _>(scope, self, flags);
             Ok(())
         }
 

@@ -13,6 +13,7 @@ use crate::directory::entry_container::MutableDirectory;
 use crate::execution_scope::ExecutionScope;
 use crate::name::validate_name;
 use crate::node::OpenNode;
+use crate::object_request::ConnectionCreator;
 use crate::path::Path;
 use crate::request_handler::{RequestHandler, RequestListener};
 use crate::token_registry::{TokenInterface, TokenRegistry, Tokenizable};
@@ -22,7 +23,6 @@ use anyhow::Error;
 use fidl::endpoints::ServerEnd;
 use fidl::Handle;
 use fidl_fuchsia_io as fio;
-use std::future::Future;
 use std::ops::ControlFlow;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -34,25 +34,28 @@ pub struct MutableConnection<DirectoryType: MutableDirectory> {
 }
 
 impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
-    pub fn create(
+    /// Creates a new connection to serve the mutable directory. The directory will be served from a
+    /// new async `Task`, not from the current `Task`. Errors in constructing the connection are not
+    /// guaranteed to be returned, they may be sent directly to the client end of the connection.
+    /// This method should be called from within an `ObjectRequest` handler to ensure that errors
+    /// are sent to the client end of the connection.
+    pub async fn create(
         scope: ExecutionScope,
         directory: Arc<DirectoryType>,
         protocols: impl ProtocolsExt,
         object_request: ObjectRequestRef<'_>,
-    ) -> Result<impl Future<Output = ()>, Status> {
+    ) -> Result<(), Status> {
         // Ensure we close the directory if we fail to prepare the connection.
         let directory = OpenNode::new(directory);
 
         let connection = MutableConnection {
-            base: BaseConnection::new(scope, directory, protocols.to_directory_options()?),
+            base: BaseConnection::new(scope.clone(), directory, protocols.to_directory_options()?),
         };
 
-        let object_request = object_request.take();
-        Ok(async move {
-            if let Ok(requests) = object_request.into_request_stream(&connection.base).await {
-                RequestListener::new(requests, Tokenizable::new(connection)).await;
-            }
-        })
+        if let Ok(requests) = object_request.take().into_request_stream(&connection.base).await {
+            scope.spawn(RequestListener::new(requests, Tokenizable::new(connection)));
+        }
+        Ok(())
     }
 
     async fn handle_request(
@@ -266,6 +269,19 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
 
     async fn handle_remove_extended_attribute(&self, name: Vec<u8>) -> Result<(), Status> {
         self.base.directory.remove_extended_attribute(name).await
+    }
+}
+
+impl<DirectoryType: MutableDirectory> ConnectionCreator<DirectoryType>
+    for MutableConnection<DirectoryType>
+{
+    async fn create<'a>(
+        scope: ExecutionScope,
+        node: Arc<DirectoryType>,
+        protocols: impl ProtocolsExt,
+        object_request: ObjectRequestRef<'a>,
+    ) -> Result<(), Status> {
+        Self::create(scope, node, protocols, object_request).await
     }
 }
 
@@ -486,14 +502,11 @@ mod tests {
             let dir = MockDirectory::new(*cur_id, self.clone());
             *cur_id += 1;
             let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-            flags.to_object_request(server_end).handle(|object_request| {
-                object_request.spawn_connection(
-                    self.scope.clone(),
-                    dir.clone(),
-                    flags,
-                    MutableConnection::create,
-                )
-            });
+            flags.to_object_request(server_end).create_connection_sync::<MutableConnection<_>, _>(
+                self.scope.clone(),
+                dir.clone(),
+                flags,
+            );
             (dir, proxy)
         }
     }

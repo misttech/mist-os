@@ -9,12 +9,12 @@ use crate::directory::connection::{BaseConnection, ConnectionState};
 use crate::directory::entry_container::Directory;
 use crate::execution_scope::ExecutionScope;
 use crate::node::OpenNode;
+use crate::object_request::ConnectionCreator;
 use crate::request_handler::{RequestHandler, RequestListener};
 use crate::{ObjectRequestRef, ProtocolsExt};
 
 use fidl_fuchsia_io as fio;
 use fio::DirectoryRequest;
-use std::future::Future;
 use std::ops::ControlFlow;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -25,12 +25,17 @@ pub struct ImmutableConnection<DirectoryType: Directory> {
 }
 
 impl<DirectoryType: Directory> ImmutableConnection<DirectoryType> {
-    pub fn create(
+    /// Creates a new connection to serve the directory. The directory will be served from a new
+    /// async `Task`, not from the current `Task`. Errors in constructing the connection are not
+    /// guaranteed to be returned, they may be sent directly to the client end of the connection.
+    /// This method should be called from within an `ObjectRequest` handler to ensure that errors
+    /// are sent to the client end of the connection.
+    pub async fn create(
         scope: ExecutionScope,
         directory: Arc<DirectoryType>,
         protocols: impl ProtocolsExt,
         object_request: ObjectRequestRef<'_>,
-    ) -> Result<impl Future<Output = ()>, Status> {
+    ) -> Result<(), Status> {
         Self::create_transform_stream(
             scope,
             directory,
@@ -38,40 +43,39 @@ impl<DirectoryType: Directory> ImmutableConnection<DirectoryType> {
             object_request,
             std::convert::identity,
         )
+        .await
     }
 
     /// TODO(https://fxbug.dev/326626515): this is an experimental method to run a FIDL
     /// directory connection until stalled, with the purpose to cleanly stop a component.
     /// We'll expect to revisit how this works to generalize to all connections later.
     /// Try not to use this function for other purposes.
-    pub fn create_transform_stream<Transform, RS>(
+    pub async fn create_transform_stream<Transform, RS>(
         scope: ExecutionScope,
         directory: Arc<DirectoryType>,
         protocols: impl ProtocolsExt,
         object_request: ObjectRequestRef<'_>,
         transform: Transform,
-    ) -> Result<impl Future<Output = ()>, Status>
+    ) -> Result<(), Status>
     where
         Transform: FnOnce(fio::DirectoryRequestStream) -> RS,
-        RS: futures::stream::Stream<Item = Result<DirectoryRequest, fidl::Error>>,
+        RS: futures::stream::Stream<Item = Result<DirectoryRequest, fidl::Error>> + Send + 'static,
     {
         // Ensure we close the directory if we fail to create the connection.
         let directory = OpenNode::new(directory);
 
         let connection = ImmutableConnection {
-            base: BaseConnection::new(scope, directory, protocols.to_directory_options()?),
+            base: BaseConnection::new(scope.clone(), directory, protocols.to_directory_options()?),
         };
 
         // If we fail to send the task to the executor, it is probably shut down or is in the
         // process of shutting down (this is the only error state currently).  So there is nothing
         // for us to do - the connection will be closed automatically when the connection object is
         // dropped.
-        let object_request = object_request.take();
-        Ok(async move {
-            if let Ok(requests) = object_request.into_request_stream(&connection.base).await {
-                RequestListener::new(transform(requests), connection).await;
-            }
-        })
+        if let Ok(requests) = object_request.take().into_request_stream(&connection.base).await {
+            scope.spawn(RequestListener::new(transform(requests), connection));
+        }
+        Ok(())
     }
 }
 
@@ -88,5 +92,18 @@ impl<DirectoryType: Directory> RequestHandler for ImmutableConnection<DirectoryT
             },
             Err(_) => ControlFlow::Break(()),
         }
+    }
+}
+
+impl<DirectoryType: Directory> ConnectionCreator<DirectoryType>
+    for ImmutableConnection<DirectoryType>
+{
+    async fn create<'a>(
+        scope: ExecutionScope,
+        node: Arc<DirectoryType>,
+        protocols: impl ProtocolsExt,
+        object_request: ObjectRequestRef<'a>,
+    ) -> Result<(), Status> {
+        Self::create(scope, node, protocols, object_request).await
     }
 }

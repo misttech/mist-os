@@ -14,7 +14,6 @@ use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
 use fuchsia_sync::Mutex;
 use futures::future::BoxFuture;
-use futures::FutureExt;
 use fxfs::errors::FxfsError;
 use fxfs::filesystem::SyncOptions;
 use fxfs::log::*;
@@ -735,10 +734,15 @@ impl MutableDirectory for FxDirectory {
                     .commit_with_callback(|_| {
                         let node = Arc::new(FxSymlink::new(self.volume().clone(), object_id));
                         p.commit(&(node.clone() as Arc<dyn FxNode>));
-                        let scope = self.volume().scope();
-                        scope.spawn(
-                            symlink::Connection::new(scope.clone(), node)
-                                .run(fio::PERM_READABLE.to_object_request(connection)),
+                        let scope = self.volume().scope().clone();
+                        let flags = fio::Flags::PROTOCOL_SYMLINK | fio::PERM_READABLE;
+                        // fio::Flags::FLAG_SEND_REPRESENTATION isn't specified so connection
+                        // creation is synchronous.
+                        symlink::Connection::create_sync(
+                            scope,
+                            node,
+                            flags,
+                            flags.to_object_request(connection),
                         );
                     })
                     .await
@@ -851,17 +855,16 @@ impl VfsDirectory for FxDirectory {
         // Ignore the provided scope which might be for the parent pseudo filesystem and use the
         // volume's scope instead.
         let scope = self.volume().scope().clone();
-        flags.to_object_request(server_end).spawn(&scope.clone(), move |object_request| {
-            Box::pin(async move {
+        scope.clone().spawn(flags.to_object_request(server_end).handle_async(
+            async move |object_request| {
                 let node =
                     self.lookup(&flags, path, object_request).await.map_err(map_to_status)?;
                 if node.is::<FxDirectory>() {
-                    object_request.create_connection(
-                        scope,
-                        node.downcast::<FxDirectory>().unwrap_or_else(|_| unreachable!()).take(),
-                        flags,
-                        MutableConnection::create,
-                    )
+                    let directory =
+                        node.downcast::<FxDirectory>().unwrap_or_else(|_| unreachable!()).take();
+                    object_request
+                        .create_connection::<MutableConnection<_>, _>(scope, directory, flags)
+                        .await
                 } else if node.is::<FxFile>() {
                     let node = node.downcast::<FxFile>().unwrap_or_else(|_| unreachable!());
                     // TODO(https://fxbug.dev/397501864): Support opening block devices with the new
@@ -878,36 +881,46 @@ impl VfsDirectory for FxDirectory {
                             );
                             return Err(zx::Status::ACCESS_DENIED);
                         }
-                        let mut server = BlockServer::new(
+                        let server = BlockServer::new(
                             node,
                             /*read_only=*/ !flags.contains(fio::OpenFlags::RIGHT_WRITABLE),
                             object_request.take().into_channel(),
                         );
-                        Ok(async move {
-                            let _ = server.run().await;
-                        }
-                        .boxed())
+                        scope.spawn(server.run());
+                        Ok(())
                     } else {
                         FxFile::create_connection_async(node, scope, flags, object_request).await
                     }
                 } else if node.is::<FxSymlink>() {
                     let node = node.downcast::<FxSymlink>().unwrap_or_else(|_| unreachable!());
-                    object_request.create_connection(
-                        scope.clone(),
-                        node.take(),
-                        flags,
-                        |scope, symlink, protocols, object_request| {
-                            symlink::Connection::create(scope, symlink, &protocols, object_request)
-                        },
-                    )
+                    object_request
+                        .create_connection::<symlink::Connection<_>, _>(
+                            scope.clone(),
+                            node.take(),
+                            flags,
+                        )
+                        .await
                 } else {
                     unreachable!();
                 }
-            })
-        });
+            },
+        ));
     }
 
     fn open3(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        path: Path,
+        flags: fio::Flags,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), zx::Status> {
+        self.volume().scope().clone().spawn(object_request.take().handle_async(
+            async move |object_request| self.open3_async(scope, path, flags, object_request).await,
+        ));
+        Ok(())
+    }
+
+    async fn open3_async(
         self: Arc<Self>,
         _scope: ExecutionScope,
         path: Path,
@@ -917,36 +930,28 @@ impl VfsDirectory for FxDirectory {
         // Ignore the provided scope which might be for the parent pseudo filesystem and use the
         // volume's scope instead.
         let scope = self.volume().scope().clone();
-        object_request.take().spawn(&scope.clone(), move |object_request| {
-            Box::pin(async move {
-                let node =
-                    self.lookup(&flags, path, object_request).await.map_err(map_to_status)?;
-                if node.is::<FxDirectory>() {
-                    object_request.create_connection(
-                        scope,
-                        node.downcast::<FxDirectory>().unwrap_or_else(|_| unreachable!()).take(),
-                        flags,
-                        MutableConnection::create,
-                    )
-                } else if node.is::<FxFile>() {
-                    let node = node.downcast::<FxFile>().unwrap_or_else(|_| unreachable!());
-                    FxFile::create_connection_async(node, scope, flags, object_request).await
-                } else if node.is::<FxSymlink>() {
-                    let node = node.downcast::<FxSymlink>().unwrap_or_else(|_| unreachable!());
-                    object_request.create_connection(
-                        scope.clone(),
-                        node.take(),
-                        flags,
-                        |scope, symlink, flags, object_request| {
-                            symlink::Connection::create(scope, symlink, &flags, object_request)
-                        },
-                    )
-                } else {
-                    unreachable!();
-                }
-            })
-        });
-        Ok(())
+        let node = self.lookup(&flags, path, object_request).await.map_err(map_to_status)?;
+        if node.is::<FxDirectory>() {
+            let directory =
+                node.downcast::<FxDirectory>().unwrap_or_else(|_| unreachable!()).take();
+            object_request
+                .create_connection::<MutableConnection<_>, _>(scope, directory, flags)
+                .await
+        } else if node.is::<FxFile>() {
+            let file = node.downcast::<FxFile>().unwrap_or_else(|_| unreachable!());
+            FxFile::create_connection_async(file, scope, flags, object_request).await
+        } else if node.is::<FxSymlink>() {
+            let symlink = node.downcast::<FxSymlink>().unwrap_or_else(|_| unreachable!());
+            object_request
+                .create_connection::<symlink::Connection<_>, _>(
+                    scope.clone(),
+                    symlink.take(),
+                    flags,
+                )
+                .await
+        } else {
+            unreachable!();
+        }
     }
 
     async fn read_dirents<'a>(

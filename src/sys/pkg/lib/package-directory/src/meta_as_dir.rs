@@ -82,7 +82,10 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Me
                 // VFS handles Clone by calling Open with a path of ".", a mode of 0, and mostly
                 // unmodified flags and that combination of arguments would normally result in the
                 // file being used.
-                object_request.spawn_connection(scope, self, flags, ImmutableConnection::create)
+                object_request
+                    .take()
+                    .create_connection_sync::<ImmutableConnection<_>, _>(scope, self, flags);
+                Ok(())
             });
             return;
         }
@@ -146,13 +149,11 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Me
             // Clone by calling Open with a path of ".", a mode of 0, and mostly unmodified flags
             // and that combination of arguments would normally result in the file being used.
             //
-            // `ImmutableConnection::create` will check flags contain only directory-allowed flags.
-            return object_request.spawn_connection(
-                scope,
-                self,
-                flags,
-                ImmutableConnection::create,
-            );
+            // `ImmutableConnection` will check flags contain only directory-allowed flags.
+            object_request
+                .take()
+                .create_connection_sync::<ImmutableConnection<_>, _>(scope, self, flags);
+            return Ok(());
         }
 
         // <path as vfs::path::Path>::as_str() is an object relative path expression [1], except

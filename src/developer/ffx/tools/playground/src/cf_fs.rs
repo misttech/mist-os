@@ -264,9 +264,9 @@ impl CFDirectory {
                     inner.cache = CacheState::NeedsRefresh(Some(got));
                 }
             }
-            object_request.take().handle(|request| {
-                request.spawn_connection(scope, self, protocols, ImmutableConnection::create)
-            });
+            object_request
+                .take()
+                .create_connection_sync::<ImmutableConnection<_>, _>(scope, self, protocols);
             return;
         };
 

@@ -12,7 +12,6 @@ use crate::fuchsia::pager::{
 use crate::fuchsia::volume::{info_to_filesystem_info, FxVolume};
 use anyhow::Error;
 use fidl_fuchsia_io as fio;
-use futures::future::BoxFuture;
 use fxfs::filesystem::{SyncOptions, MAX_FILE_SIZE};
 use fxfs::future_with_guard::FutureWithGuard;
 use fxfs::log::*;
@@ -226,7 +225,7 @@ impl FxFile {
         scope: ExecutionScope,
         flags: impl ProtocolsExt,
         object_request: ObjectRequestRef<'_>,
-    ) -> Result<BoxFuture<'static, ()>, zx::Status> {
+    ) -> Result<(), zx::Status> {
         if let Some(rights) = flags.rights() {
             if rights.intersects(fio::Operations::READ_BYTES | fio::Operations::WRITE_BYTES) {
                 if let Some(fut) = this.handle.pre_fetch_keys() {
@@ -245,7 +244,9 @@ impl FxFile {
                 }
             }
         }
-        object_request.create_connection(scope, this.take(), flags, StreamIoConnection::create)
+        object_request
+            .create_connection::<StreamIoConnection<_>, _>(scope, this.take(), flags)
+            .await
     }
 
     /// Marks the file to be purged when the open count drops to zero.

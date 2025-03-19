@@ -100,6 +100,21 @@ pub trait Directory: Node {
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), Status>;
 
+    /// Same as `open3` but the implementation is async. This may be more efficient if the directory
+    /// needs to do async work to open the connection.
+    fn open3_async(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        path: Path,
+        flags: fio::Flags,
+        object_request: ObjectRequestRef<'_>,
+    ) -> impl Future<Output = Result<(), Status>> + Send
+    where
+        Self: Sized,
+    {
+        ready(self.open3(scope, path, flags, object_request))
+    }
+
     /// Reads directory entries starting from `pos` by adding them to `sink`.
     /// Once finished, should return a sealed sink.
     // The lifetimes here are because of https://github.com/rust-lang/rust/issues/63033.

@@ -1647,7 +1647,8 @@ impl FileLike for MockWritableFile {
         options: FileOptions,
         object_request: crate::ObjectRequestRef<'_>,
     ) -> Result<(), Status> {
-        FidlIoConnection::spawn(scope, self, options, object_request)
+        FidlIoConnection::create_sync(scope, self, options, object_request.take());
+        Ok(())
     }
 }
 

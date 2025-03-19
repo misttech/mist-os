@@ -11,7 +11,7 @@ use crate::common::{
 use crate::execution_scope::ExecutionScope;
 use crate::name::parse_name;
 use crate::node::Node;
-use crate::object_request::Representation;
+use crate::object_request::{run_synchronous_future_or_spawn, ConnectionCreator, Representation};
 use crate::request_handler::{RequestHandler, RequestListener};
 use crate::{ObjectRequest, ObjectRequestRef, ProtocolsExt, ToObjectRequest};
 use fidl::endpoints::{ControlHandle as _, Responder, ServerEnd};
@@ -61,28 +61,39 @@ pub struct Connection<T> {
 pub struct SymlinkOptions;
 
 impl<T: Symlink> Connection<T> {
-    /// Returns a new connection object.
-    pub fn new(scope: ExecutionScope, symlink: Arc<T>) -> Self {
-        Self { scope, symlink }
-    }
-
-    /// Upon success, returns a future that will process requests for the connection.
-    pub fn create(
+    /// Creates a new connection to serve the symlink. The symlink will be served from a new async
+    /// `Task`, not from the current `Task`. Errors in constructing the connection are not
+    /// guaranteed to be returned, they may be sent directly to the client end of the connection.
+    /// This method should be called from within an `ObjectRequest` handler to ensure that errors
+    /// are sent to the client end of the connection.
+    pub async fn create(
         scope: ExecutionScope,
         symlink: Arc<T>,
-        protocols: &impl ProtocolsExt,
+        protocols: impl ProtocolsExt,
         object_request: ObjectRequestRef<'_>,
-    ) -> Result<impl Future<Output = ()>, Status> {
+    ) -> Result<(), Status> {
         let _options = protocols.to_symlink_options()?;
-        Ok(Connection::new(scope, symlink).run(object_request.take()))
+        let connection = Self { scope: scope.clone(), symlink };
+        if let Ok(requests) = object_request.take().into_request_stream(&connection).await {
+            scope.spawn(RequestListener::new(requests, connection));
+        }
+        Ok(())
     }
 
-    /// Process requests until either `shutdown` is notified, the connection is closed, or an error
-    /// with the connection is encountered.
-    pub async fn run(self, object_request: ObjectRequest) {
-        if let Ok(requests) = object_request.into_request_stream(&self).await {
-            RequestListener::new(requests, self).await;
-        }
+    /// Similar to `create` but optimized for symlinks whose implementation is synchronous and
+    /// creating the connection is being done from a non-async context.
+    pub fn create_sync(
+        scope: ExecutionScope,
+        symlink: Arc<T>,
+        options: impl ProtocolsExt,
+        object_request: ObjectRequest,
+    ) {
+        run_synchronous_future_or_spawn(
+            &scope.clone(),
+            Box::pin(object_request.handle_async(async |object_request| {
+                Self::create(scope, symlink, options, object_request).await
+            })),
+        )
     }
 
     // Returns true if the connection should terminate.
@@ -90,19 +101,19 @@ impl<T: Symlink> Connection<T> {
         match req {
             #[cfg(fuchsia_api_level_at_least = "26")]
             fio::SymlinkRequest::DeprecatedClone { flags, object, control_handle: _ } => {
-                self.handle_deprecated_clone(flags, object);
+                self.handle_deprecated_clone(flags, object).await;
             }
             #[cfg(not(fuchsia_api_level_at_least = "26"))]
             fio::SymlinkRequest::Clone { flags, object, control_handle: _ } => {
-                self.handle_deprecated_clone(flags, object);
+                self.handle_deprecated_clone(flags, object).await;
             }
             #[cfg(fuchsia_api_level_at_least = "26")]
             fio::SymlinkRequest::Clone { request, control_handle: _ } => {
-                self.handle_clone(ServerEnd::new(request.into_channel()));
+                self.handle_clone(ServerEnd::new(request.into_channel())).await;
             }
             #[cfg(not(fuchsia_api_level_at_least = "26"))]
             fio::SymlinkRequest::Clone2 { request, control_handle: _ } => {
-                self.handle_clone(ServerEnd::new(request.into_channel()));
+                self.handle_clone(ServerEnd::new(request.into_channel())).await;
             }
             fio::SymlinkRequest::Close { responder } => {
                 responder.send(Ok(()))?;
@@ -214,7 +225,7 @@ impl<T: Symlink> Connection<T> {
         Ok(false)
     }
 
-    fn handle_deprecated_clone(
+    async fn handle_deprecated_clone(
         &mut self,
         flags: fio::OpenFlags,
         server_end: ServerEnd<fio::NodeMarker>,
@@ -230,28 +241,22 @@ impl<T: Symlink> Connection<T> {
                 return;
             }
         };
-        flags.to_object_request(server_end).handle(|object_request| {
-            self.scope.spawn(Self::create(
-                self.scope.clone(),
-                self.symlink.clone(),
-                &flags,
-                object_request,
-            )?);
-            Ok(())
-        });
+        flags
+            .to_object_request(server_end)
+            .handle_async(async |object_request| {
+                Self::create(self.scope.clone(), self.symlink.clone(), flags, object_request).await
+            })
+            .await;
     }
 
-    fn handle_clone(&mut self, server_end: ServerEnd<fio::SymlinkMarker>) {
+    async fn handle_clone(&mut self, server_end: ServerEnd<fio::SymlinkMarker>) {
         let flags = fio::Flags::PROTOCOL_SYMLINK | fio::Flags::PERM_GET_ATTRIBUTES;
-        flags.to_object_request(server_end).handle(|object_request| {
-            self.scope.spawn(Self::create(
-                self.scope.clone(),
-                self.symlink.clone(),
-                &flags,
-                object_request,
-            )?);
-            Ok(())
-        });
+        flags
+            .to_object_request(server_end)
+            .handle_async(async |object_request| {
+                Self::create(self.scope.clone(), self.symlink.clone(), flags, object_request).await
+            })
+            .await;
     }
 
     async fn handle_link_into(
@@ -354,20 +359,30 @@ impl<T: Symlink> Representation for Connection<T> {
     }
 }
 
-/// Helper to open a service or node as required.
+impl<T: Symlink> ConnectionCreator<T> for Connection<T> {
+    async fn create<'a>(
+        scope: ExecutionScope,
+        node: Arc<T>,
+        protocols: impl ProtocolsExt,
+        object_request: ObjectRequestRef<'a>,
+    ) -> Result<(), Status> {
+        Self::create(scope, node, protocols, object_request).await
+    }
+}
+
+/// Helper to open a symlink or node as required.
 pub fn serve(
     link: Arc<impl Symlink>,
     scope: ExecutionScope,
-    protocols: &impl ProtocolsExt,
+    protocols: impl ProtocolsExt,
     object_request: ObjectRequestRef<'_>,
 ) -> Result<(), Status> {
     if protocols.is_node() {
         let options = protocols.to_node_options(link.entry_info().type_())?;
         link.open_as_node(scope, options, object_request)
     } else {
-        Connection::create(scope.clone(), link, protocols, object_request).map(|x| {
-            scope.spawn(x);
-        })
+        Connection::create_sync(scope, link, protocols, object_request.take());
+        Ok(())
     }
 }
 
@@ -453,15 +468,23 @@ mod tests {
         }
     }
 
+    async fn serve_test_symlink() -> fio::SymlinkProxy {
+        let (client_end, server_end) = create_proxy::<fio::SymlinkMarker>();
+        let flags = fio::PERM_READABLE | fio::Flags::PROTOCOL_SYMLINK;
+
+        Connection::create_sync(
+            ExecutionScope::new(),
+            Arc::new(TestSymlink::new()),
+            flags,
+            flags.to_object_request(server_end),
+        );
+
+        client_end
+    }
+
     #[fuchsia::test]
     async fn test_read_target() {
-        let scope = ExecutionScope::new();
-        let (client_end, server_end) = create_proxy::<fio::SymlinkMarker>();
-
-        scope.spawn(
-            Connection::new(scope.clone(), Arc::new(TestSymlink::new()))
-                .run(fio::OpenFlags::RIGHT_READABLE.to_object_request(server_end)),
-        );
+        let client_end = serve_test_symlink().await;
 
         assert_eq!(
             client_end.describe().await.expect("fidl failed").target.expect("missing target"),
@@ -476,16 +499,12 @@ mod tests {
         let check = |mut flags: fio::OpenFlags| {
             let (client_end, server_end) = create_proxy::<fio::SymlinkMarker>();
             flags |= fio::OpenFlags::DESCRIBE;
-            flags.to_object_request(server_end).handle(|object_request| {
-                object_request.spawn_connection(
-                    scope.clone(),
-                    Arc::new(TestSymlink::new()),
-                    flags,
-                    |scope, symlink, protocols, object_request| {
-                        Connection::create(scope, symlink, &protocols, object_request)
-                    },
-                )
-            });
+            flags.to_object_request(server_end).create_connection_sync::<Connection<_>, _>(
+                scope.clone(),
+                Arc::new(TestSymlink::new()),
+                flags,
+            );
+
             async move {
                 Status::from_raw(
                     client_end
@@ -524,13 +543,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_get_attr() {
-        let scope = ExecutionScope::new();
-        let (client_end, server_end) = create_proxy::<fio::SymlinkMarker>();
-
-        scope.spawn(
-            Connection::new(scope.clone(), Arc::new(TestSymlink::new()))
-                .run(fio::OpenFlags::RIGHT_READABLE.to_object_request(server_end)),
-        );
+        let client_end = serve_test_symlink().await;
 
         assert_matches!(
             client_end.get_attr().await.expect("fidl failed"),
@@ -552,12 +565,8 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_clone() {
-        let scope = ExecutionScope::new();
-        let (client_end, server_end) = create_proxy::<fio::SymlinkMarker>();
-        scope.spawn(
-            Connection::new(scope.clone(), Arc::new(TestSymlink::new()))
-                .run(fio::Flags::PERM_GET_ATTRIBUTES.to_object_request(server_end)),
-        );
+        let client_end = serve_test_symlink().await;
+
         let orig_attrs = client_end
             .get_attributes(fio::NodeAttributesQuery::all())
             .await
@@ -576,13 +585,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_describe() {
-        let scope = ExecutionScope::new();
-        let (client_end, server_end) = create_proxy::<fio::SymlinkMarker>();
-
-        scope.spawn(
-            Connection::new(scope.clone(), Arc::new(TestSymlink::new()))
-                .run(fio::OpenFlags::RIGHT_READABLE.to_object_request(server_end)),
-        );
+        let client_end = serve_test_symlink().await;
 
         assert_matches!(
             client_end.describe().await.expect("fidl failed"),
@@ -595,13 +598,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_xattrs() {
-        let scope = ExecutionScope::new();
-        let (client_end, server_end) = create_proxy::<fio::SymlinkMarker>();
-
-        scope.spawn(
-            Connection::new(scope.clone(), Arc::new(TestSymlink::new()))
-                .run(fio::OpenFlags::RIGHT_READABLE.to_object_request(server_end)),
-        );
+        let client_end = serve_test_symlink().await;
 
         client_end
             .set_extended_attribute(

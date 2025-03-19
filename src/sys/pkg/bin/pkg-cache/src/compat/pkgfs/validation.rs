@@ -111,7 +111,10 @@ impl vfs::directory::entry_container::Directory for Validation {
                     return Err(zx::Status::NOT_SUPPORTED);
                 }
 
-                object_request.spawn_connection(scope, self, flags, ImmutableConnection::create)
+                object_request
+                    .take()
+                    .create_connection_sync::<ImmutableConnection<_>, _>(scope, self, flags);
+                Ok(())
             });
             return;
         }
@@ -154,13 +157,11 @@ impl vfs::directory::entry_container::Directory for Validation {
                 }
             }
 
-            // `ImmutableConnection::create` checks that only directory flags are specified.
-            return object_request.spawn_connection(
-                scope,
-                self,
-                flags,
-                ImmutableConnection::create,
-            );
+            // `ImmutableConnection` checks that only directory flags are specified.
+            object_request
+                .take()
+                .create_connection_sync::<ImmutableConnection<_>, _>(scope, self, flags);
+            return Ok(());
         }
 
         if path.as_ref() == "missing" {

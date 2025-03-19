@@ -509,22 +509,22 @@ fn open_blob_with_reader<P: ProtocolsExt + Send>(
     protocols: P,
     object_request: ObjectRequest,
 ) {
-    object_request.spawn(&scope.clone(), move |object_request| {
-        Box::pin(async move {
-            let get_vmo_result = reader.get_vmo(&blob_hash.into()).await.map_err(|fidl_error| {
-                if let fidl::Error::ClientChannelClosed { status, .. } = fidl_error {
-                    error!("Blob reader channel closed: {:?}", status);
-                    status
-                } else {
-                    error!("Transport error on get_vmo: {:?}", fidl_error);
-                    zx::Status::INTERNAL
-                }
-            })?;
-            let vmo = get_vmo_result.map_err(zx::Status::from_raw)?;
-            let vmo_blob = vmo_blob::VmoBlob::new(vmo);
-            object_request.create_connection(scope, vmo_blob, protocols, StreamIoConnection::create)
-        })
-    });
+    scope.clone().spawn(object_request.handle_async(async move |object_request| {
+        let get_vmo_result = reader.get_vmo(&blob_hash.into()).await.map_err(|fidl_error| {
+            if let fidl::Error::ClientChannelClosed { status, .. } = fidl_error {
+                error!("Blob reader channel closed: {:?}", status);
+                status
+            } else {
+                error!("Transport error on get_vmo: {:?}", fidl_error);
+                zx::Status::INTERNAL
+            }
+        })?;
+        let vmo = get_vmo_result.map_err(zx::Status::from_raw)?;
+        let vmo_blob = vmo_blob::VmoBlob::new(vmo);
+        object_request
+            .create_connection::<StreamIoConnection<_>, _>(scope, vmo_blob, protocols)
+            .await
+    }));
 }
 
 #[derive(thiserror::Error, Debug)]

@@ -26,6 +26,7 @@ use starnix_uapi::{errno, error, ino_t, off_t};
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Weak};
 use vfs::directory::entry_container::Directory;
+use vfs::directory::mutable::connection::MutableConnection;
 use vfs::directory::{self};
 use vfs::{
     attributes, execution_scope, file, path, ObjectRequestRef, ProtocolsExt, ToObjectRequest,
@@ -302,12 +303,10 @@ impl StarnixNodeConnection {
                     &current_task,
                     &flags,
                 )?;
-                return object_request.spawn_connection(
-                    scope,
-                    dir,
-                    flags,
-                    directory::mutable::connection::MutableConnection::create,
-                );
+                object_request
+                    .take()
+                    .create_connection_sync::<MutableConnection<_>, _>(scope, dir, flags);
+                return Ok(());
             }
 
             // Open a path under the current directory.
@@ -357,7 +356,10 @@ impl StarnixNodeConnection {
         }
         let file =
             self.reopen(kernel.kthreads.unlocked_for_async().deref_mut(), &current_task, &flags)?;
-        object_request.spawn_connection(scope, file, flags, file::RawIoConnection::create)
+        object_request
+            .take()
+            .create_connection_sync::<file::RawIoConnection<_>, _>(scope, file, flags);
+        Ok(())
     }
 
     fn get_attributes(

@@ -9,10 +9,10 @@ use crate::directory::entry::GetEntryInfo;
 use crate::directory::entry_container::MutableDirectory;
 use crate::execution_scope::ExecutionScope;
 use crate::name::Name;
-use crate::object_request::Representation;
+use crate::object_request::{run_synchronous_future_or_spawn, ConnectionCreator, Representation};
 use crate::protocols::ToNodeOptions;
 use crate::request_handler::{RequestHandler, RequestListener};
-use crate::{node, ObjectRequestRef, ToObjectRequest};
+use crate::{ObjectRequest, ObjectRequestRef, ToObjectRequest};
 use anyhow::Error;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
@@ -94,7 +94,7 @@ pub trait Node: GetEntryInfo + IntoAny + Send + Sync + 'static {
         Self: Sized,
     {
         self.will_open_as_node()?;
-        scope.spawn(node::Connection::create(scope.clone(), self, options, object_request)?);
+        Connection::create_sync(scope, self, options, object_request.take());
         Ok(())
     }
 }
@@ -123,21 +123,40 @@ enum ConnectionState {
 }
 
 impl<N: Node> Connection<N> {
-    pub fn create(
+    /// Creates a new connection to serve the node. The node will be served from a new async `Task`,
+    /// not from the current `Task`. Errors in constructing the connection are not guaranteed to be
+    /// returned, they may be sent directly to the client end of the connection. This method should
+    /// be called from within an `ObjectRequest` handler to ensure that errors are sent to the
+    /// client end of the connection.
+    pub async fn create(
         scope: ExecutionScope,
         node: Arc<N>,
         options: impl ToNodeOptions,
         object_request: ObjectRequestRef<'_>,
-    ) -> Result<impl Future<Output = ()>, Status> {
+    ) -> Result<(), Status> {
         let node = OpenNode::new(node);
         let options = options.to_node_options(node.entry_info().type_())?;
-        let object_request = object_request.take();
-        Ok(async move {
-            let connection = Connection { scope: scope.clone(), node, options };
-            if let Ok(requests) = object_request.into_request_stream(&connection).await {
-                RequestListener::new(requests, connection).await
-            }
-        })
+        let connection = Connection { scope: scope.clone(), node, options };
+        if let Ok(requests) = object_request.take().into_request_stream(&connection).await {
+            scope.spawn(RequestListener::new(requests, connection));
+        }
+        Ok(())
+    }
+
+    /// Similar to `create` but optimized for nodes whose implementation is synchronous and creating
+    /// the connection is being done from a non-async context.
+    pub fn create_sync(
+        scope: ExecutionScope,
+        node: Arc<N>,
+        options: impl ToNodeOptions,
+        object_request: ObjectRequest,
+    ) {
+        run_synchronous_future_or_spawn(
+            &scope.clone(),
+            Box::pin(object_request.handle_async(async |object_request| {
+                Self::create(scope, node, options, object_request).await
+            })),
+        )
     }
 
     /// Handle a [`NodeRequest`].
@@ -145,11 +164,11 @@ impl<N: Node> Connection<N> {
         match req {
             #[cfg(fuchsia_api_level_at_least = "26")]
             fio::NodeRequest::DeprecatedClone { flags, object, control_handle: _ } => {
-                self.handle_clone_deprecated(flags, object);
+                self.handle_clone_deprecated(flags, object).await;
             }
             #[cfg(not(fuchsia_api_level_at_least = "26"))]
             fio::NodeRequest::Clone { flags, object, control_handle: _ } => {
-                self.handle_clone_deprecated(flags, object);
+                self.handle_clone_deprecated(flags, object).await;
             }
             #[cfg(fuchsia_api_level_at_least = "26")]
             fio::NodeRequest::Clone { request, control_handle: _ } => {
@@ -241,29 +260,31 @@ impl<N: Node> Connection<N> {
         Ok(ConnectionState::Alive)
     }
 
-    fn handle_clone_deprecated(
+    async fn handle_clone_deprecated(
         &mut self,
         flags: fio::OpenFlags,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
-        flags.to_object_request(server_end).handle(|object_request| {
-            let options = inherit_rights_for_clone(fio::OpenFlags::NODE_REFERENCE, flags)?
-                .to_node_options(self.node.entry_info().type_())?;
+        flags
+            .to_object_request(server_end)
+            .handle_async(async |object_request| {
+                let options = inherit_rights_for_clone(fio::OpenFlags::NODE_REFERENCE, flags)?
+                    .to_node_options(self.node.entry_info().type_())?;
 
-            self.node.will_clone();
+                self.node.will_clone();
 
-            let connection =
-                Self { scope: self.scope.clone(), node: OpenNode::new(self.node.clone()), options };
+                let connection = Self {
+                    scope: self.scope.clone(),
+                    node: OpenNode::new(self.node.clone()),
+                    options,
+                };
 
-            object_request.take().spawn(&self.scope, |object_request| {
-                Box::pin(async move {
-                    let requests = object_request.take().into_request_stream(&connection).await?;
-                    Ok(async move { RequestListener::new(requests, connection).await })
-                })
-            });
+                let requests = object_request.take().into_request_stream(&connection).await?;
+                self.scope.spawn(RequestListener::new(requests, connection));
 
-            Ok(())
-        });
+                Ok(())
+            })
+            .await;
     }
 
     fn handle_clone(&mut self, server_end: ServerEnd<fio::NodeMarker>) {
@@ -328,6 +349,17 @@ impl<N: Node> Representation for Connection<N> {
 
     async fn node_info(&self) -> Result<fio::NodeInfoDeprecated, Status> {
         Ok(fio::NodeInfoDeprecated::Service(fio::Service))
+    }
+}
+
+impl<N: Node> ConnectionCreator<N> for Connection<N> {
+    async fn create<'a>(
+        scope: ExecutionScope,
+        node: Arc<N>,
+        protocols: impl crate::ProtocolsExt,
+        object_request: ObjectRequestRef<'a>,
+    ) -> Result<(), Status> {
+        Self::create(scope, node, protocols, object_request).await
     }
 }
 

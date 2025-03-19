@@ -383,14 +383,9 @@ mod tests {
             _path: vfs::path::Path,
             server_end: fidl::endpoints::ServerEnd<fio::NodeMarker>,
         ) {
-            flags.to_object_request(server_end).handle(|object_request| {
-                object_request.spawn_connection(
-                    scope,
-                    self.clone(),
-                    flags,
-                    ImmutableConnection::create,
-                )
-            });
+            flags
+                .to_object_request(server_end)
+                .create_connection_sync::<ImmutableConnection<_>, _>(scope, self.clone(), flags);
         }
 
         fn open3(

@@ -894,13 +894,17 @@ impl Directory for FatDirectory {
                     let () = entry
                         .open_ref(&self.filesystem.lock().unwrap())
                         .expect("entry should already be open");
-                    object_request.spawn_connection(scope, entry, flags, MutableConnection::create)
+                    object_request
+                        .take()
+                        .create_connection_sync::<MutableConnection<_>, _>(scope, entry, flags);
+                    Ok(())
                 }
                 FatNode::File(entry) => {
-                    let () = entry
-                        .open_ref(&self.filesystem.lock().unwrap())
-                        .expect("entry should already be open");
-                    entry.create_connection(scope, flags, object_request)
+                    let () = entry.open_ref(&self.filesystem.lock().unwrap())?;
+                    object_request
+                        .take()
+                        .create_connection_sync::<FidlIoConnection<_>, _>(scope, entry, flags);
+                    Ok(())
                 }
             }
         });
@@ -918,11 +922,17 @@ impl Directory for FatDirectory {
         match self.lookup_with_open3_flags(flags, path, &mut closer)? {
             FatNode::Dir(entry) => {
                 let () = entry.open_ref(&self.filesystem.lock().unwrap())?;
-                object_request.spawn_connection(scope, entry, flags, MutableConnection::create)
+                object_request
+                    .take()
+                    .create_connection_sync::<MutableConnection<_>, _>(scope, entry, flags);
+                Ok(())
             }
             FatNode::File(entry) => {
                 let () = entry.open_ref(&self.filesystem.lock().unwrap())?;
-                object_request.spawn_connection(scope, entry, flags, FidlIoConnection::create)
+                object_request
+                    .take()
+                    .create_connection_sync::<FidlIoConnection<_>, _>(scope, entry, flags);
+                Ok(())
             }
         }
     }

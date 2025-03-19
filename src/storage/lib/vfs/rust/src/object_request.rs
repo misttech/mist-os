@@ -8,7 +8,7 @@ use crate::ProtocolsExt;
 use fidl::endpoints::{ControlHandle, ProtocolMarker, RequestStream, ServerEnd};
 use fidl::epitaph::ChannelEpitaphExt;
 use fidl::{AsHandleRef, HandleBased};
-use futures::future::BoxFuture;
+use futures::FutureExt;
 use std::future::Future;
 use std::sync::Arc;
 use zx_status::Status;
@@ -172,50 +172,14 @@ impl ObjectRequest {
         }
     }
 
-    /// Spawn a task for the object request.  The callback returns a future that can return a
-    /// Status which will be handled appropriately.  If the future succeeds it should return
-    /// another future that is responsible for the long term servicing of the object request.  This
-    /// is done to avoid paying the stack cost of the object request for the lifetime of the
-    /// connection.
-    ///
-    /// For example:
-    ///
-    ///   object_request.spawn(
-    ///       scope,
-    ///       move |object_request| Box::pin(async move {
-    ///           // Perform checks on the new connection
-    ///           if !valid(...) {
-    ///               return Err(Status::INVALID_ARGS);
-    ///           }
-    ///           // Upon success, return a future that handles the connection.
-    ///           let requests = object_request.take().into_request_stream();
-    ///           Ok(async {
-    ///                  while let request = requests.next().await {
-    ///                      ...
-    ///                  }
-    ///              })
-    ///       }));
-    ///
-    pub fn spawn<F, Fut>(self, scope: &ExecutionScope, f: F)
-    where
-        for<'a> F:
-            FnOnce(ObjectRequestRef<'a>) -> BoxFuture<'a, Result<Fut, Status>> + Send + 'static,
-        Fut: Future<Output = ()> + Send,
-    {
-        scope.spawn(async {
-            // This avoids paying the stack cost for ObjectRequest for the lifetime of the task.
-            let fut = {
-                let mut this = self;
-                match f(&mut this).await {
-                    Err(s) => {
-                        this.shutdown(s);
-                        return;
-                    }
-                    Ok(fut) => fut,
-                }
-            };
-            fut.await
-        });
+    /// Calls `f` and sends an error on the object request channel upon failure.
+    pub async fn handle_async(
+        mut self,
+        f: impl AsyncFnOnce(&mut ObjectRequest) -> Result<(), Status>,
+    ) {
+        if let Err(s) = f(&mut self).await {
+            self.shutdown(s);
+        }
     }
 
     /// Waits until the request has a request waiting in its channel.  Returns immediately if this
@@ -249,39 +213,67 @@ impl ObjectRequest {
         }
     }
 
-    /// Returns a future that will run the connection. `f` is a callback that returns a future
-    /// that will run the connection but it will not be called if the connection is supposed
-    /// to be a node connection.
-    pub fn create_connection<N: Node, F: Future<Output = ()> + Send + 'static, P: ProtocolsExt>(
+    /// Constructs a new connection to `node` and spawns an async `Task` that will handle requests
+    /// on the connection. `f` is a callback that constructs the connection but it will not be
+    /// called if the connection is supposed to be a node connection. This should be called from
+    /// within a [`ObjectRequest::handle_async`] callback.
+    pub async fn create_connection<C, N>(
         &mut self,
         scope: ExecutionScope,
         node: Arc<N>,
-        protocols: P,
-        f: impl FnOnce(ExecutionScope, Arc<N>, P, &mut Self) -> Result<F, Status>,
-    ) -> Result<BoxFuture<'static, ()>, Status> {
+        protocols: impl ProtocolsExt,
+    ) -> Result<(), Status>
+    where
+        C: ConnectionCreator<N>,
+        N: Node,
+    {
         assert!(!self.object_request.is_invalid_handle());
         if protocols.is_node() {
-            Ok(Box::pin(node::Connection::create(scope, node, protocols, self)?))
+            node::Connection::create(scope, node, protocols, self).await
         } else {
-            Ok(Box::pin(f(scope, node, protocols, self)?))
+            C::create(scope, node, protocols, self).await
         }
     }
 
-    /// Spawns a new connection for this request. `f` is similar to `create_connection` above.
-    pub fn spawn_connection<N: Node, F: Future<Output = ()> + Send + 'static, P: ProtocolsExt>(
-        &mut self,
+    /// Constructs a new connection to `node` and spawns an async `Task` that will handle requests
+    /// on the connection. `f` is a callback that constructs the connection but it will not be
+    /// called if the connection is supposed to be a node connection. This should be called from
+    /// within a [`ObjectRequest::handle`] callback.
+    ///
+    /// This method synchronously calls async code and may require spawning an extra Task if the
+    /// async code does something asynchronous. `create_connection` should be preferred if the
+    /// caller is already in an async context.
+    pub fn create_connection_sync<C, N>(
+        self,
         scope: ExecutionScope,
         node: Arc<N>,
-        protocols: P,
-        f: impl FnOnce(ExecutionScope, Arc<N>, P, &mut Self) -> Result<F, Status>,
-    ) -> Result<(), Status> {
+        protocols: impl ProtocolsExt,
+    ) where
+        C: ConnectionCreator<N>,
+        N: Node,
+    {
         assert!(!self.object_request.is_invalid_handle());
         if protocols.is_node() {
-            scope.spawn(node::Connection::create(scope.clone(), node, protocols, self)?);
+            self.create_connection_sync_or_spawn::<node::Connection<N>, N>(scope, node, protocols);
         } else {
-            scope.spawn(f(scope.clone(), node, protocols, self)?);
+            self.create_connection_sync_or_spawn::<C, N>(scope, node, protocols);
         }
-        Ok(())
+    }
+
+    fn create_connection_sync_or_spawn<C, N>(
+        self,
+        scope: ExecutionScope,
+        node: Arc<N>,
+        protocols: impl ProtocolsExt,
+    ) where
+        C: ConnectionCreator<N>,
+        N: Node,
+    {
+        let scope2 = scope.clone();
+        let fut = Box::pin(self.handle_async(async |object_request| {
+            C::create(scope2, node, protocols, object_request).await
+        }));
+        run_synchronous_future_or_spawn(&scope, fut);
     }
 }
 
@@ -347,4 +339,55 @@ fn send_on_open(
     control_handle
         .send_on_open_(Status::OK.into_raw(), Some(node_info))
         .map_err(|_| Status::PEER_CLOSED)
+}
+
+/// Trait for constructing connections to nodes.
+pub trait ConnectionCreator<T: Node> {
+    /// Creates a new connection to `node` and spawns a new `Task` to run the connection.
+    fn create<'a>(
+        scope: ExecutionScope,
+        node: Arc<T>,
+        protocols: impl ProtocolsExt,
+        object_request: ObjectRequestRef<'a>,
+    ) -> impl Future<Output = Result<(), Status>> + Send + 'a;
+}
+
+/// Synchronously polls `future` with the expectation that it won't return Pending. If the future
+/// does return Pending then this function will spawn a Task to run the future.
+pub(crate) fn run_synchronous_future_or_spawn(
+    scope: &ExecutionScope,
+    mut future: impl Future<Output = ()> + Send + Unpin + 'static,
+) {
+    let noop_waker = std::task::Waker::noop();
+    let mut cx = std::task::Context::from_waker(&noop_waker);
+
+    match future.poll_unpin(&mut cx) {
+        std::task::Poll::Pending => {
+            scope.spawn(future);
+        }
+        std::task::Poll::Ready(()) => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::future::ready;
+
+    use crate::execution_scope::yield_to_executor;
+
+    use super::*;
+
+    #[fuchsia::test]
+    async fn test_run_synchronous_future_or_spawn_with_sync_future() {
+        let scope = ExecutionScope::new();
+        run_synchronous_future_or_spawn(&scope, ready(()));
+        scope.wait().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_run_synchronous_future_or_spawn_with_async_future() {
+        let scope = ExecutionScope::new();
+        run_synchronous_future_or_spawn(&scope, Box::pin(yield_to_executor()));
+        scope.wait().await;
+    }
 }

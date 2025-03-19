@@ -433,12 +433,18 @@ impl BlockServer {
         Ok(())
     }
 
-    pub async fn run(&mut self) -> Result<(), Error> {
+    pub async fn run(mut self) {
         let server = ServerEnd::<VolumeMarker>::new(self.server_channel.take().unwrap());
 
         // Create a fifo pair
         let (server_fifo, client_fifo) =
-            zx::Fifo::<BlockFifoRequest, BlockFifoResponse>::create(16)?;
+            match zx::Fifo::<BlockFifoRequest, BlockFifoResponse>::create(16) {
+                Ok(endpoints) => endpoints,
+                Err(e) => {
+                    log::error!("Failed to create fifo for block requests: {:?}", e);
+                    return;
+                }
+            };
         self.maybe_server_fifo = Mutex::new(Some(client_fifo));
 
         // Handling requests from fifo
@@ -469,8 +475,7 @@ impl BlockServer {
             Ok(())
         };
 
-        try_join!(fifo_future, channel_future)?;
-        Ok(())
+        let _ = try_join!(fifo_future, channel_future);
     }
 }
 
