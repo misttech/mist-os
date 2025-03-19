@@ -139,7 +139,7 @@ inline void TraceMessage(const MessagePacket& msg, const ChannelDispatcher* chan
   //    associated correctly.
 
   uint64_t ts;
-  const auto get_timestamp = [&ts] { return ts = ktrace_timestamp(); };
+  const auto get_timestamp = [&ts] { return ts = KTrace::Timestamp(); };
 
   KTRACE_DURATION_BEGIN_TIMESTAMP("kernel:ipc", "ChannelMessage", get_timestamp(),
                                   ("ordinal", msg.fidl_header().ordinal));

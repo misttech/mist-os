@@ -186,7 +186,7 @@ zx_status_t KTraceState::Start(uint32_t groups, StartMode mode) {
   DiagsPrintf(INFO, "Trace category states:\n");
   for (const fxt::InternedCategory& category : fxt::InternedCategory::Iterate()) {
     DiagsPrintf(INFO, "  %-20s : 0x%03x : %s\n", category.string(), (1u << category.index()),
-                ktrace_category_enabled(category) ? "enabled" : "disabled");
+                KTrace::CategoryEnabled(category) ? "enabled" : "disabled");
   }
 
   return ZX_OK;

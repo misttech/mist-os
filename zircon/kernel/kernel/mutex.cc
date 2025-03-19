@@ -73,7 +73,7 @@ template <KernelMutexTracingLevel Level>
 class KTracer<Level, ktl::enable_if_t<(Level == KernelMutexTracingLevel::Contested) ||
                                       (Level == KernelMutexTracingLevel::All)>> {
  public:
-  KTracer() : ts_(ktrace_timestamp()) {}
+  KTracer() : ts_(KTrace::Timestamp()) {}
 
   void KernelMutexUncontestedAcquire(const void* mutex_id) {
     if constexpr (Level == KernelMutexTracingLevel::All) {
@@ -98,7 +98,7 @@ class KTracer<Level, ktl::enable_if_t<(Level == KernelMutexTracingLevel::Contest
  private:
   void KernelMutexTrace(const fxt::InternedString& event_name, const void* mutex_id,
                         const Thread* t, uint32_t waiter_count) {
-    if (ktrace_category_enabled("kernel:sched"_category)) {
+    if (KTrace::CategoryEnabled("kernel:sched"_category)) {
       auto tid_type = fxt::StringRef{(t == nullptr                  ? "none"_intern
                                       : t->user_thread() == nullptr ? "kernel_mode"_intern
                                                                     : "user_mode"_intern)};
@@ -116,7 +116,7 @@ class KTracer<Level, ktl::enable_if_t<(Level == KernelMutexTracingLevel::Contest
     }
   }
 
-  const uint64_t ts_;
+  const zx_instant_boot_ticks_t ts_;
 };
 }  // namespace
 

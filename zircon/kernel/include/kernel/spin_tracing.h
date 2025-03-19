@@ -21,17 +21,17 @@ template <>
 class SpinTracingTimestamp<false> {
  public:
   constexpr SpinTracingTimestamp() = default;
-  constexpr uint64_t value() const { return 0; }
+  constexpr zx_instant_boot_ticks_t value() const { return 0; }
 };
 
 template <>
 class SpinTracingTimestamp<true> {
  public:
   SpinTracingTimestamp() = default;
-  uint64_t value() const { return value_; }
+  zx_instant_boot_ticks_t value() const { return value_; }
 
  private:
-  const uint64_t value_{ktrace_timestamp()};
+  const zx_instant_boot_ticks_t value_{KTrace::Timestamp()};
 };
 
 template <bool TraceInstrumented = false>
@@ -61,7 +61,7 @@ class Tracer<true> {
           elid.lock_type() == LockType::kSpinlock ? "Spinlock"_intern : "Mutex"_intern;
       const bool blocked_after = (finish_type == FinishType::kBlocked);
 
-      FXT_EVENT_COMMON(true, ktrace_category_enabled, KTrace::EmitComplete, "kernel:sched",
+      FXT_EVENT_COMMON(true, KTrace::CategoryEnabled, KTrace::EmitComplete, "kernel:sched",
                        "lock_spin"_intern, start_, end_time.value(), TraceContext::Thread,
                        ("lock_id", lock_id),
                        ("lock_class", fxt::StringRef<fxt::RefType::kId>{class_name}),
@@ -73,7 +73,7 @@ class Tracer<true> {
       // the native FXT format.  Currently, it depends on conversion to JSON
       // before processing, which strips the string table from the data
       // (embedding it directly into the JSON instead).
-      FXT_EVENT_COMMON(true, ktrace_category_enabled, KTrace::EmitComplete, "kernel:sched",
+      FXT_EVENT_COMMON(true, KTrace::CategoryEnabled, KTrace::EmitComplete, "kernel:sched",
                        "lock_spin"_intern, start_, end_time.value(), TraceContext::Thread,
                        ("lock_class", fxt::StringRef<fxt::RefType::kId>{class_name}),
                        ("elid", elid.FinishedValue(finish_type)));
@@ -81,7 +81,7 @@ class Tracer<true> {
   }
 
  private:
-  uint64_t start_ = ktrace_timestamp();
+  uint64_t start_ = KTrace::Timestamp();
 };
 
 }  // namespace spin_tracing
