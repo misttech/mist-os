@@ -40,10 +40,7 @@ rustc_library("cgroupfs") {
     "//src/starnix/lib/starnix_uapi",
   ]
 
-  test_deps = [
-    "//src/graphics/lib/magma/src/libmagma",
-    "//src/lib/fuchsia",
-  ]
+  test_deps = [ "//src/lib/fuchsia" ]
 }
 
 fuchsia_unittest_package("starnix-cgroupfs-tests") {

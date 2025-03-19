@@ -50,7 +50,6 @@ rustc_binary("starnix_kernel_bin") {
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_rust",
     "//sdk/fidl/fuchsia.starnix.container:fuchsia.starnix.container_rust",
     "//sdk/rust/zx",
-    "//src/graphics/lib/magma/src/libmagma",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",
@@ -69,8 +68,10 @@ rustc_binary("starnix_kernel_bin") {
 
   sources = [ "main.rs" ]
 
-  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
-  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+  configs += [
+    "//build/config/rust/lints:clippy_warn_all",
+    "//src/starnix/config:starnix_clippy_lints",
+  ]
 
   disable_rustdoc = false
 
@@ -367,7 +368,6 @@ rustc_library("starnix_core") {
     "//src/connectivity/lib/net-types",
     "//src/connectivity/network/netlink",
     "//src/connectivity/wlan/wlanix:fuchsia.wlan.wlanix_rust",
-    "//src/graphics/lib/magma/src/libmagma",
     "//src/lib/async-utils",
     "//src/lib/debug/rust",
     "//src/lib/dense-map",
@@ -493,6 +493,9 @@ rustc_library("starnix_core") {
   ]
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 
+  # Allows binaries that depend on this library to link.
+  public_configs = [ "//build/config/fuchsia:static_cpp_standard_library" ]
+
   # Linking the lib tests requires a lot of memory.
   # Notes: if (is_asan || target_cpu == "riscv64"), linking is known to
   # OOM on n2-standard-2.
@@ -543,7 +546,6 @@ rustc_library("starnix_kernel_runner") {
     "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_rust",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
     "//sdk/rust/zx",
-    "//src/graphics/lib/magma/src/libmagma",
     "//src/lib/diagnostics/inspect/contrib/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",

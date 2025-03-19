@@ -38,7 +38,6 @@ rustc_library("loop") {
 
   test_deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//src/graphics/lib/magma/src/libmagma",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-fs",

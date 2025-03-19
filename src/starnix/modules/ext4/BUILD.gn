@@ -42,10 +42,7 @@ rustc_library("ext4") {
     "//third_party/rust_crates:scopeguard",
   ]
 
-  test_deps = [
-    "//src/graphics/lib/magma/src/libmagma",
-    "//src/lib/fuchsia",
-  ]
+  test_deps = [ "//src/lib/fuchsia" ]
 }
 
 fuchsia_unittest_package("starnix-ext4-tests") {
