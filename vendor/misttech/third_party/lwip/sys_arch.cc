@@ -12,17 +12,31 @@
 #include <kernel/spinlock.h>
 #include <kernel/thread.h>
 #include <lk/init.h>
-#include <lwip/sys.h>
-#include <lwip/tcpip.h>
 
-#define LOCAL_TRACE 2
+#include "lwip/debug.h"
+#include "lwip/opt.h"
+#include "lwip/sys.h"
+#include "lwip/tcpip.h"
+
+#define LOCAL_TRACE 0
 
 struct sys_sem {
-  Semaphore sem;
+ public:
+  sys_sem(int64_t initial_count) : sem_(initial_count) {}
+
+  zx_status_t Wait(zx_duration_mono_t timeout) {
+    return timeout == 0 ? sem_.Wait(Deadline::infinite())
+                        : sem_.Wait(Deadline::after_mono(timeout));
+  }
+
+  void Post() { sem_.Post(); }
+
+ private:
+  Semaphore sem_;
 };
 
 struct sys_mutex {
-  Mutex mutex;
+  DECLARE_MUTEX(sys_mutex) mutex;
 };
 
 #define SYS_MBOX_SIZE 16
@@ -32,7 +46,7 @@ struct sys_mbox {
 
   Semaphore empty;
   Semaphore full;
-  Mutex lock;
+  DECLARE_MUTEX(sys_mbox) lock;
 
   int head;
   int tail;
@@ -42,10 +56,14 @@ struct sys_mbox {
 
 /*-----------------------------------------------------------------------------------*/
 /* Time */
-u32_t sys_now(void) { return static_cast<u32_t>(current_mono_time()); }
+
+u32_t sys_now(void) { return (u32_t)(current_mono_time() / ZX_MSEC(1)); }
+
+// u32_t sys_jiffies(void) { return static_cast<u32_t>(current_boot_time()); }
 
 /*-----------------------------------------------------------------------------------*/
 /* Init */
+
 void sys_init(void) {}
 
 /*-----------------------------------------------------------------------------------*/
@@ -101,12 +119,15 @@ err_t sys_mutex_new(struct sys_mutex **mutex) {
   return ERR_OK;
 }
 
-void sys_mutex_lock(struct sys_mutex **mutex) TA_ACQ((*mutex)->mutex) { (*mutex)->mutex.Acquire(); }
-void sys_mutex_unlock(struct sys_mutex **mutex) TA_REL((*mutex)->mutex) {
-  (*mutex)->mutex.Release();
+void sys_mutex_lock(struct sys_mutex **mutex) TA_ACQ((*mutex)->mutex) {
+  (*mutex)->mutex.lock().Acquire();
 }
 
-void sys_mutex_free(struct sys_mutex **mutex) { delete *mutex; }
+void sys_mutex_unlock(struct sys_mutex **mutex) TA_REL((*mutex)->mutex) {
+  (*mutex)->mutex.lock().Release();
+}
+
+void sys_mutex_free(struct sys_mutex **mutex) TA_EXCL((*mutex)->mutex) { delete *mutex; }
 
 /*-----------------------------------------------------------------------------------*/
 /* Critical section */
@@ -114,16 +135,18 @@ void sys_mutex_free(struct sys_mutex **mutex) { delete *mutex; }
 #if SYS_LIGHTWEIGHT_PROT
 
 namespace {
-SpinLock gArchLock;
+DECLARE_SINGLETON_SPINLOCK(ArchLock);
 }
 
-sys_prot_t sys_arch_protect(void) TA_ACQ(gArchLock) {
+sys_prot_t sys_arch_protect(void) TA_ACQ(ArchLock::Get()) {
   interrupt_saved_state_t irqstate;
-  gArchLock.AcquireIrqSave(irqstate);
+  ArchLock::Get()->lock().AcquireIrqSave(irqstate);
   return irqstate;
 }
 
-void sys_arch_unprotect(sys_prot_t pval) TA_REL(gArchLock) { gArchLock.ReleaseIrqRestore(pval); }
+void sys_arch_unprotect(sys_prot_t pval) TA_REL(ArchLock::Get()) {
+  ArchLock::Get()->lock().ReleaseIrqRestore(pval);
+}
 
 #endif /* SYS_LIGHTWEIGHT_PROT */
 
@@ -131,6 +154,7 @@ void sys_arch_unprotect(sys_prot_t pval) TA_REL(gArchLock) { gArchLock.ReleaseIr
 /* Mailbox */
 
 err_t sys_mbox_new(struct sys_mbox **mb, int size) {
+  LTRACE_ENTRY;
   struct sys_mbox *mbox;
   LWIP_UNUSED_ARG(size);
 
@@ -143,66 +167,88 @@ err_t sys_mbox_new(struct sys_mbox **mb, int size) {
   mbox->head = 0;
   mbox->tail = 0;
 
+  SYS_STATS_INC_USED(mbox);
+
+  *mb = mbox;
   return ERR_OK;
 }
 
-void sys_mbox_free(struct sys_mbox **mb) { delete *mb; }
+void sys_mbox_free(struct sys_mbox **mb) {
+  if ((mb != nullptr) && (*mb != nullptr)) {
+    struct sys_mbox *mbox = *mb;
+    SYS_STATS_DEC(mbox.used);
+    /*  LWIP_DEBUGF("sys_mbox_free: mbox 0x%lx\n", mbox); */
+    delete mbox;
+  }
+}
 
 int sys_mbox_valid(struct sys_mbox **mb) {
   return (mb != nullptr) && (*mb != nullptr) && (*mb)->magic.Valid();
 }
 
 void sys_mbox_post(struct sys_mbox **mb, void *msg) {
+  LTRACE_ENTRY;
   struct sys_mbox *mbox;
   LWIP_ASSERT("invalid mbox", (mb != nullptr) && (*mb != nullptr) && (*mb)->magic.Valid());
   mbox = *mb;
 
   mbox->empty.Wait(Deadline::infinite());
-  mbox->lock.Acquire();
 
-  mbox->queue[mbox->head] = msg;
-  mbox->head = (mbox->head + 1) % SYS_MBOX_SIZE;
-
-  mbox->lock.Release();
+  LWIP_DEBUGF(SYS_DEBUG, ("sys_mbox_post: mbox %p msg %p\n", (void *)mbox, (void *)msg));
+  {
+    Guard<Mutex> guard{&mbox->lock};
+    mbox->queue[mbox->head] = msg;
+    mbox->head = (mbox->head + 1) % SYS_MBOX_SIZE;
+  }
   mbox->full.Post();
   LTRACE_EXIT;
 }
 
 err_t sys_mbox_trypost(struct sys_mbox **mb, void *msg) {
+  LTRACE_ENTRY;
   struct sys_mbox *mbox;
   LWIP_ASSERT("invalid mbox", (mb != nullptr) && (*mb != nullptr) && (*mb)->magic.Valid());
   mbox = *mb;
 
-  if (unlikely(mbox->empty.count() <= 0)) {
-    return ERR_TIMEOUT;
+  zx_status_t res = mbox->empty.Wait(Deadline::after_mono(ZX_USEC(1)));
+  if (res == ZX_ERR_TIMED_OUT) {
+    return ERR_MEM;
   }
 
-  mbox->lock.Acquire();
+  {
+    Guard<Mutex> guard{&mbox->lock};
 
-  mbox->queue[mbox->head] = msg;
-  mbox->head = (mbox->head + 1) % SYS_MBOX_SIZE;
-
-  mbox->lock.Release();
+    mbox->queue[mbox->head] = msg;
+    mbox->head = (mbox->head + 1) % SYS_MBOX_SIZE;
+  }
   mbox->full.Post();
-
   return ERR_OK;
 }
 
 u32_t sys_arch_mbox_tryfetch(struct sys_mbox **mb, void **msg) {
+  LTRACE_ENTRY;
   struct sys_mbox *mbox;
   LWIP_ASSERT("invalid mbox", (mb != nullptr) && (*mb != nullptr) && (*mb)->magic.Valid());
   mbox = *mb;
 
-  if (unlikely(mbox->full.count() <= 0)) {
+  zx_status_t res = mbox->full.Wait(Deadline::after_mono(ZX_USEC(1)));
+  if (res == ZX_ERR_TIMED_OUT) {
     return SYS_MBOX_EMPTY;
   }
 
-  mbox->lock.Acquire();
+  if (mbox->head == mbox->tail) {
+    return SYS_MBOX_EMPTY;
+  }
 
-  *msg = mbox->queue[mbox->tail];
-  mbox->tail = (mbox->tail + 1) % SYS_MBOX_SIZE;
+  {
+    Guard<Mutex> guard{&mbox->lock};
 
-  mbox->lock.Release();
+    if (msg != nullptr) {
+      LWIP_DEBUGF(SYS_DEBUG, ("sys_mbox_tryfetch: mbox %p msg %p\n", (void *)mbox, *msg));
+      *msg = mbox->queue[mbox->tail];
+    }
+    mbox->tail = (mbox->tail + 1) % SYS_MBOX_SIZE;
+  }
   mbox->empty.Post();
 
   return 0;
@@ -213,37 +259,70 @@ u32_t sys_arch_mbox_fetch(struct sys_mbox **mb, void **msg, u32_t timeout) {
   LWIP_ASSERT("invalid mbox", (mb != nullptr) && (*mb != nullptr) && (*mb)->magic.Valid());
   mbox = *mb;
 
-  zx_status_t res;
-  zx_instant_mono_t start = current_mono_time();
-
-  res = mbox->full.Wait(timeout ? Deadline::after_mono(ZX_MSEC(timeout)) : Deadline::infinite());
-  if (res == ZX_ERR_TIMED_OUT) {
-    return SYS_ARCH_TIMEOUT;  // timeout ? SYS_ARCH_TIMEOUT : 0;
+  u32_t start = sys_now();
+  zx_status_t res =
+      mbox->full.Wait(timeout ? Deadline::after_mono(ZX_MSEC(timeout)) : Deadline::infinite());
+  if (res != ZX_OK) {
+    return SYS_ARCH_TIMEOUT;
   }
 
-  mbox->lock.Acquire();
+  {
+    Guard<Mutex> guard{&mbox->lock};
 
-  *msg = mbox->queue[mbox->tail];
-  mbox->tail = (mbox->tail + 1) % SYS_MBOX_SIZE;
-
-  mbox->lock.Release();
+    if (msg != nullptr) {
+      LWIP_DEBUGF(SYS_DEBUG, ("sys_mbox_fetch: mbox %p msg %p\n", (void *)mbox, *msg));
+      *msg = mbox->queue[mbox->tail];
+    }
+    mbox->tail = (mbox->tail + 1) % SYS_MBOX_SIZE;
+  }
   mbox->empty.Post();
 
-  return static_cast<u32_t>(current_mono_time() - start);
+  return sys_now() - start;
 }
 
 /*-----------------------------------------------------------------------------------*/
 /* Semaphore */
 
-static void tcpip_init_done(void *arg) { dprintf(INFO, "TPC/IP init done\n"); }
+err_t sys_sem_new(struct sys_sem **sem, u8_t count) {
+  LWIP_UNUSED_ARG(count);
+
+  fbl::AllocChecker ac;
+  *sem = new (&ac) sys_sem(count);
+  if (!ac.check()) {
+    return ERR_MEM;
+  }
+  return ERR_OK;
+}
+
+void sys_sem_free(struct sys_sem **sem) { delete *sem; }
+
+void sys_sem_signal(struct sys_sem **s) {
+  struct sys_sem *sem;
+  LWIP_ASSERT("invalid sem", (s != nullptr) && (*s != nullptr));
+  sem = *s;
+  sem->Post();
+}
+
+u32_t sys_arch_sem_wait(struct sys_sem **s, u32_t timeout) {
+  LTRACE_ENTRY;
+  struct sys_sem *sem;
+  LWIP_ASSERT("invalid sem", (s != nullptr) && (*s != nullptr));
+  sem = *s;
+
+  u32_t start = sys_now();
+  zx_status_t res = sem->Wait(timeout);
+  if (res == ZX_ERR_TIMED_OUT) {
+    return SYS_ARCH_TIMEOUT;
+  }
+
+  return sys_now() - start;
+}
+
+namespace {
+void tcpip_init_done(void *arg) { dprintf(INFO, "TPC/IP init done\n"); }
+}  // namespace
 
 /* run lwip init as soon as threads are running */
-void lwip_init_hook(uint level) { tcpip_init(&tcpip_init_done, nullptr); }
+void lwip_init_hook(uint level) { tcpip_init(tcpip_init_done, nullptr); }
 
-/* completely un-threadsafe implementation of errno */
-/* TODO: pull from kernel TLS or some other thread local storage */
-static int _errno;
-
-int *__geterrno(void) { return &_errno; }
-
-LK_INIT_HOOK(lwip, &lwip_init_hook, LK_INIT_LEVEL_USER - 1)
+LK_INIT_HOOK(lwip, &lwip_init_hook, LK_INIT_LEVEL_PLATFORM)

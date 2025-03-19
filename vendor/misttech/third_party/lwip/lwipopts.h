@@ -7,8 +7,6 @@
 
 #include <errno.h>
 
-#include <arch/defines.h>
-
 // clang-format off
 
 /* An OS is present */
@@ -54,6 +52,7 @@
 #define LWIP_DONT_PROVIDE_BYTEORDER_FUNCTIONS 1
 
 /* Debug mode */
+//#define LWIP_DEBUG
 #ifdef LWIP_DEBUG
 #define ETHARP_DEBUG      LWIP_DBG_OFF
 #define NETIF_DEBUG       LWIP_DBG_OFF
