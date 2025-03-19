@@ -50,7 +50,7 @@ SECTIONS {
    * by the linker.
    */
   .interp : { *(.interp) }
-  .dynamic : { *(.dynamic) }
+  .dynamic : ONLY_IF_RO { *(.dynamic) }
   .hash : { *(.hash) }
   .gnu.hash : { *(.gnu.hash) }
   .dynsym : { *(.dynsym) }
@@ -140,6 +140,8 @@ SECTIONS {
    * to be writable until after dynamic relocation.  In the kernel, these
    * things all just form another read-only segment.
    */
+
+  .dynamic : ONLY_IF_RW { *(.dynamic) }
 
   .init_array : {
     PROVIDE_HIDDEN(__init_array_start = .);
