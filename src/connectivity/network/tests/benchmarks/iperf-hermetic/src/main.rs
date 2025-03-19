@@ -6,6 +6,7 @@ use std::fmt::Display;
 
 use fidl::endpoints::ProtocolMarker as _;
 use fidl_fuchsia_netemul as fnetemul;
+use fuchsia_async::TimeoutExt as _;
 use futures::FutureExt as _;
 use net_types::ip::Ipv4;
 use netstack_testing_common::realms::{
@@ -84,6 +85,9 @@ async fn watch_for_exit(
     component_moniker: &str,
 ) -> component_events::events::ExitStatus {
     let event = wait_for_component_stopped(&realm, component_moniker, None)
+        .on_timeout(std::time::Duration::from_secs(60), || {
+            panic!("timed out waiting for component stopped event: {component_moniker}");
+        })
         .await
         .expect("observe stopped event");
     let component_events::events::StoppedPayload { status, .. } =
@@ -247,10 +251,14 @@ async fn bench<N: Netstack, I: TestIpExt>(
     let mut clients = futures::future::join_all((0..flows).map(|i| async move {
         loop {
             realm_ref.start_child_component(&client_moniker(i)).await.expect("start client");
-            if watch_for_exit(realm_ref, &client_moniker(i)).await
-                == component_events::events::ExitStatus::Clean
-            {
+            log::info!("started client {i}");
+
+            let status = watch_for_exit(realm_ref, &client_moniker(i)).await;
+            if status == component_events::events::ExitStatus::Clean {
+                log::info!("client {i} exited cleanly");
                 return;
+            } else {
+                log::info!("client {i} crashed: {status:?}; retrying");
             }
         }
     }))
