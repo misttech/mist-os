@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Context};
 use fuchsia_component::client::connect_to_protocol_sync;
+use fuchsia_inspect::ArrayProperty;
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use starnix_logging::log_warn;
 use starnix_sync::{Mutex, MutexGuard};
@@ -252,7 +253,17 @@ impl SuspendResumeManager {
                     fuchsia_trace::Scope::Process
                 );
             }
-            _ => {
+            e => {
+                let wake_lock_names: Option<Vec<String>> = match e {
+                    Ok(Err(frunner::SuspendError::WakeLocksExist)) => {
+                        let mut names = vec![];
+                        for wl in &self.active_wake_locks() {
+                            names.push(wl.clone());
+                        }
+                        Some(names)
+                    }
+                    _ => None,
+                };
                 let wake_time = zx::BootInstant::get();
                 self.update_suspend_stats(|suspend_stats| {
                     suspend_stats.fail_count += 1;
@@ -260,6 +271,13 @@ impl SuspendResumeManager {
                 });
                 self.lock().inspect_node.add_entry(|node| {
                     node.record_int(fobs::SUSPEND_FAILED_AT, wake_time.into_nanos());
+                    if let Some(names) = wake_lock_names {
+                        let names_array =
+                            node.create_string_array(fobs::ACTIVE_WAKE_LOCK_NAMES, names.len());
+                        for (i, name) in names.iter().enumerate() {
+                            names_array.set(i, name);
+                        }
+                    }
                 });
                 fuchsia_trace::instant!(
                     c"power",
