@@ -60,7 +60,7 @@ pub enum MlmeRequest {
     SetCtrlPort(fidl_mlme::SetControlledPortRequest),
     Start(fidl_mlme::StartRequest),
     Stop(fidl_mlme::StopRequest),
-    GetIfaceCounterStats(responder::Responder<fidl_mlme::GetIfaceCounterStatsResponse>),
+    GetIfaceStats(responder::Responder<fidl_mlme::GetIfaceStatsResponse>),
     GetIfaceHistogramStats(responder::Responder<fidl_mlme::GetIfaceHistogramStatsResponse>),
     ListMinstrelPeers(responder::Responder<fidl_mlme::MinstrelListResponse>),
     GetMinstrelStats(
@@ -95,7 +95,7 @@ impl MlmeRequest {
             Self::SetCtrlPort(_) => "SetCtrlPort",
             Self::Start(_) => "Start",
             Self::Stop(_) => "Stop",
-            Self::GetIfaceCounterStats(_) => "GetIfaceCounterStats",
+            Self::GetIfaceStats(_) => "GetIfaceStats",
             Self::GetIfaceHistogramStats(_) => "GetIfaceHistogramStats",
             Self::ListMinstrelPeers(_) => "ListMinstrelPeers",
             Self::GetMinstrelStats(_, _) => "GetMinstrelStats",

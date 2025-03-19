@@ -488,7 +488,7 @@ pub enum TimeoutSource {
     ApStart,
     ApStop,
     ApStatus,
-    GetCounterStats,
+    GetIfaceStats,
     GetHistogramStats,
 }
 
@@ -589,7 +589,7 @@ struct ConnectedState {
     /// Time when the user manually initiates connecting to another network via the
     /// Policy ClientController::Connect FIDL call.
     new_connect_start_time: Option<fasync::MonotonicInstant>,
-    prev_connection_counters: Option<fidl_fuchsia_wlan_stats::ConnectionCounters>,
+    prev_connection_stats: Option<fidl_fuchsia_wlan_stats::ConnectionStats>,
     multiple_bss_candidates: bool,
     ap_state: client::types::ApState,
     network_is_likely_hidden: bool,
@@ -1021,17 +1021,17 @@ impl Telemetry {
                 self.stats_logger.log_stat(StatOp::AddConnectedDuration(duration)).await;
                 if let Some(proxy) = &state.telemetry_proxy {
                     match proxy
-                        .get_counter_stats()
+                        .get_iface_stats()
                         .on_timeout(GET_IFACE_STATS_TIMEOUT, || {
-                            warn!("Timed out waiting for counter stats");
+                            warn!("Timed out waiting for iface stats");
 
                             if let Err(e) =
                                 self.defect_sender.try_send(Defect::Iface(IfaceFailure::Timeout {
                                     iface_id: state.iface_id,
-                                    source: TimeoutSource::GetCounterStats,
+                                    source: TimeoutSource::GetIfaceStats,
                                 }))
                             {
-                                warn!("Failed to report counter stats timeout: {:?}", e)
+                                warn!("Failed to report iface stats timeout: {:?}", e)
                             }
 
                             Ok(Err(zx::Status::TIMED_OUT.into_raw()))
@@ -1040,22 +1040,19 @@ impl Telemetry {
                     {
                         Ok(Ok(stats)) => {
                             *state.num_consecutive_get_counter_stats_failures.get_mut() = 0;
-                            if let (
-                                Some(prev_connection_counters),
-                                Some(current_connection_counters),
-                            ) = (
-                                state.prev_connection_counters.as_ref(),
-                                stats.connection_counters.as_ref(),
+                            if let (Some(prev_connection_stats), Some(current_connection_stats)) = (
+                                state.prev_connection_stats.as_ref(),
+                                stats.connection_stats.as_ref(),
                             ) {
-                                diff_and_log_connection_counters(
+                                diff_and_log_connection_stats(
                                     &mut self.stats_logger,
-                                    prev_connection_counters,
-                                    current_connection_counters,
+                                    prev_connection_stats,
+                                    current_connection_stats,
                                     duration,
                                 )
                                 .await;
                             }
-                            state.prev_connection_counters = stats.connection_counters;
+                            state.prev_connection_stats = stats.connection_stats;
                         }
                         error => {
                             info!("Failed to get interface stats: {:?}", error);
@@ -1071,7 +1068,7 @@ impl Telemetry {
                                         .unwrap(),
                                 )
                                 .await;
-                            let _ = state.prev_connection_counters.take();
+                            let _ = state.prev_connection_stats.take();
                         }
                     }
                 }
@@ -1261,7 +1258,7 @@ impl Telemetry {
                     self.connection_state = ConnectionState::Connected(ConnectedState {
                         iface_id,
                         new_connect_start_time: None,
-                        prev_connection_counters: None,
+                        prev_connection_stats: None,
                         multiple_bss_candidates,
                         ap_state,
                         network_is_likely_hidden,
@@ -1270,6 +1267,8 @@ impl Telemetry {
                         // indicator for whether driver is still responsive, set it to the
                         // connection start time for now.
                         last_signal_report: now,
+                        // TODO(https://fxbug.dev/404889275): Consider renaming the Inspect
+                        // property name to no longer to refer to "counter"
                         num_consecutive_get_counter_stats_failures: InspectableU64::new(
                             0,
                             &self.inspect_node,
@@ -1309,7 +1308,7 @@ impl Telemetry {
                             self.connection_state = ConnectionState::Connected(ConnectedState {
                                 iface_id,
                                 new_connect_start_time: None,
-                                prev_connection_counters: None,
+                                prev_connection_stats: None,
                                 multiple_bss_candidates: state.multiple_bss_candidates,
                                 ap_state,
                                 network_is_likely_hidden: state.network_is_likely_hidden,
@@ -1318,6 +1317,8 @@ impl Telemetry {
                                 // indicator for whether driver is still responsive, set it to the
                                 // connection start time for now.
                                 last_signal_report: now,
+                                // TODO(https://fxbug.dev/404889275): Consider renaming the Inspect
+                                // property name to no longer to refer to "counter"
                                 num_consecutive_get_counter_stats_failures: InspectableU64::new(
                                     0,
                                     &self.inspect_node,
@@ -1728,10 +1729,10 @@ const VERY_HIGH_PACKET_DROP_RATE_THRESHOLD: f64 = 0.05;
 
 const DEVICE_LOW_CONNECTION_SUCCESS_RATE_THRESHOLD: f64 = 0.1;
 
-async fn diff_and_log_connection_counters(
+async fn diff_and_log_connection_stats(
     stats_logger: &mut StatsLogger,
-    prev: &fidl_fuchsia_wlan_stats::ConnectionCounters,
-    current: &fidl_fuchsia_wlan_stats::ConnectionCounters,
+    prev: &fidl_fuchsia_wlan_stats::ConnectionStats,
+    current: &fidl_fuchsia_wlan_stats::ConnectionStats,
     duration: zx::MonotonicDuration,
 ) {
     diff_and_log_rx_counters(stats_logger, prev, current, duration).await;
@@ -1740,8 +1741,8 @@ async fn diff_and_log_connection_counters(
 
 async fn diff_and_log_rx_counters(
     stats_logger: &mut StatsLogger,
-    prev: &fidl_fuchsia_wlan_stats::ConnectionCounters,
-    current: &fidl_fuchsia_wlan_stats::ConnectionCounters,
+    prev: &fidl_fuchsia_wlan_stats::ConnectionStats,
+    current: &fidl_fuchsia_wlan_stats::ConnectionStats,
     duration: zx::MonotonicDuration,
 ) {
     let (current_rx_unicast_total, prev_rx_unicast_total) =
@@ -1779,8 +1780,8 @@ async fn diff_and_log_rx_counters(
 
 async fn diff_and_log_tx_counters(
     stats_logger: &mut StatsLogger,
-    prev: &fidl_fuchsia_wlan_stats::ConnectionCounters,
-    current: &fidl_fuchsia_wlan_stats::ConnectionCounters,
+    prev: &fidl_fuchsia_wlan_stats::ConnectionStats,
+    current: &fidl_fuchsia_wlan_stats::ConnectionStats,
     duration: zx::MonotonicDuration,
 ) {
     let (current_tx_total, prev_tx_total) = match (current.tx_total, prev.tx_total) {
@@ -3379,6 +3380,8 @@ impl StatsLogger {
         self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
             self.cobalt_1dot1_proxy,
             log_integer,
+            // TODO(https://fxbug.dev/404889275): Consider renaming the Cobalt
+            // metric name to no longer to refer to "counter"
             metrics::CONSECUTIVE_COUNTER_STATS_FAILURES_METRIC_ID,
             count,
             &[]
@@ -4175,7 +4178,9 @@ impl StatsLogger {
             TimeoutSource::ApStatus => {
                 metrics::SmeOperationTimeoutMetricDimensionStalledOperation::ApStatus_
             }
-            TimeoutSource::GetCounterStats => {
+            TimeoutSource::GetIfaceStats => {
+                // TODO(https://fxbug.dev/404889275): Consider renaming the Cobalt
+                // dimension name to no longer to refer to "counter"
                 metrics::SmeOperationTimeoutMetricDimensionStalledOperation::GetCounterStats_
             }
             TimeoutSource::GetHistogramStats => {
@@ -4678,7 +4683,7 @@ mod tests {
 
             // The rest of the fields don't matter for this test case.
             new_connect_start_time: None,
-            prev_connection_counters: None,
+            prev_connection_stats: None,
             multiple_bss_candidates: false,
             network_is_likely_hidden: false,
             last_signal_report: fasync::MonotonicInstant::now(),
@@ -4708,15 +4713,15 @@ mod tests {
             defect_receiver.try_next(),
             Ok(Some(Defect::Iface(IfaceFailure::Timeout {
                 iface_id: 0,
-                source: TimeoutSource::GetCounterStats,
+                source: TimeoutSource::GetIfaceStats,
             })))
         );
     }
 
     #[fuchsia::test]
-    fn test_logging_num_consecutive_get_counter_stats_failures() {
+    fn test_logging_num_consecutive_get_iface_stats_failures() {
         let (mut test_helper, mut test_fut) = setup_test();
-        test_helper.set_counter_stats_resp(Box::new(|| Err(zx::sys::ZX_ERR_TIMED_OUT)));
+        test_helper.set_iface_stats_resp(Box::new(|| Err(zx::sys::ZX_ERR_TIMED_OUT)));
         test_helper.send_connected_event(random_bss_description!(Wpa2));
 
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
@@ -5585,13 +5590,13 @@ mod tests {
     #[fuchsia::test]
     fn test_tx_high_packet_drop_duration_counters() {
         let (mut test_helper, mut test_fut) = setup_test();
-        test_helper.set_counter_stats_resp(Box::new(|| {
+        test_helper.set_iface_stats_resp(Box::new(|| {
             let seed = fasync::MonotonicInstant::now().into_nanos() as u64;
-            Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                connection_counters: Some(fidl_fuchsia_wlan_stats::ConnectionCounters {
+            Ok(fidl_fuchsia_wlan_stats::IfaceStats {
+                connection_stats: Some(fidl_fuchsia_wlan_stats::ConnectionStats {
                     tx_total: Some(10 * seed),
                     tx_drop: Some(3 * seed),
-                    ..fake_connection_counters(seed)
+                    ..fake_connection_stats(seed)
                 }),
                 ..Default::default()
             })
@@ -5627,13 +5632,13 @@ mod tests {
     #[fuchsia::test]
     fn test_rx_high_packet_drop_duration_counters() {
         let (mut test_helper, mut test_fut) = setup_test();
-        test_helper.set_counter_stats_resp(Box::new(|| {
+        test_helper.set_iface_stats_resp(Box::new(|| {
             let seed = fasync::MonotonicInstant::now().into_nanos() as u64;
-            Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                connection_counters: Some(fidl_fuchsia_wlan_stats::ConnectionCounters {
+            Ok(fidl_fuchsia_wlan_stats::IfaceStats {
+                connection_stats: Some(fidl_fuchsia_wlan_stats::ConnectionStats {
                     rx_unicast_total: Some(10 * seed),
                     rx_unicast_drop: Some(3 * seed),
-                    ..fake_connection_counters(seed)
+                    ..fake_connection_stats(seed)
                 }),
                 ..Default::default()
             })
@@ -5669,16 +5674,16 @@ mod tests {
     #[fuchsia::test]
     fn test_rx_tx_high_but_not_very_high_packet_drop_duration_counters() {
         let (mut test_helper, mut test_fut) = setup_test();
-        test_helper.set_counter_stats_resp(Box::new(|| {
+        test_helper.set_iface_stats_resp(Box::new(|| {
             let seed = fasync::MonotonicInstant::now().into_nanos() as u64;
-            Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                connection_counters: Some(fidl_fuchsia_wlan_stats::ConnectionCounters {
+            Ok(fidl_fuchsia_wlan_stats::IfaceStats {
+                connection_stats: Some(fidl_fuchsia_wlan_stats::ConnectionStats {
                     // 3% drop rate would be high, but not very high
                     rx_unicast_total: Some(100 * seed),
                     rx_unicast_drop: Some(3 * seed),
                     tx_total: Some(100 * seed),
                     tx_drop: Some(3 * seed),
-                    ..fake_connection_counters(seed)
+                    ..fake_connection_stats(seed)
                 }),
                 ..Default::default()
             })
@@ -5715,17 +5720,17 @@ mod tests {
     #[fuchsia::test]
     fn test_rx_tx_packet_time_series() {
         let (mut test_helper, mut test_fut) = setup_test();
-        test_helper.set_counter_stats_resp(Box::new(|| {
+        test_helper.set_iface_stats_resp(Box::new(|| {
             let seed = (fasync::MonotonicInstant::now()
                 - fasync::MonotonicInstant::from_nanos(0i64))
             .into_seconds() as u64;
-            Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                connection_counters: Some(fidl_fuchsia_wlan_stats::ConnectionCounters {
+            Ok(fidl_fuchsia_wlan_stats::IfaceStats {
+                connection_stats: Some(fidl_fuchsia_wlan_stats::ConnectionStats {
                     rx_unicast_total: Some(100 * seed),
                     rx_unicast_drop: Some(3 * seed),
                     tx_total: Some(10 * seed),
                     tx_drop: Some(2 * seed),
-                    ..fake_connection_counters(seed)
+                    ..fake_connection_stats(seed)
                 }),
                 ..Default::default()
             })
@@ -5760,12 +5765,12 @@ mod tests {
     #[fuchsia::test]
     fn test_no_rx_duration_counters() {
         let (mut test_helper, mut test_fut) = setup_test();
-        test_helper.set_counter_stats_resp(Box::new(|| {
+        test_helper.set_iface_stats_resp(Box::new(|| {
             let seed = fasync::MonotonicInstant::now().into_nanos() as u64;
-            Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                connection_counters: Some(fidl_fuchsia_wlan_stats::ConnectionCounters {
+            Ok(fidl_fuchsia_wlan_stats::IfaceStats {
+                connection_stats: Some(fidl_fuchsia_wlan_stats::ConnectionStats {
                     rx_unicast_total: Some(10),
-                    ..fake_connection_counters(seed)
+                    ..fake_connection_stats(seed)
                 }),
                 ..Default::default()
             })
@@ -5801,12 +5806,12 @@ mod tests {
     #[fuchsia::test]
     fn test_no_rx_duration_time_series() {
         let (mut test_helper, mut test_fut) = setup_test();
-        test_helper.set_counter_stats_resp(Box::new(|| {
+        test_helper.set_iface_stats_resp(Box::new(|| {
             let seed = fasync::MonotonicInstant::now().into_nanos() as u64;
-            Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                connection_counters: Some(fidl_fuchsia_wlan_stats::ConnectionCounters {
+            Ok(fidl_fuchsia_wlan_stats::IfaceStats {
+                connection_stats: Some(fidl_fuchsia_wlan_stats::ConnectionStats {
                     rx_unicast_total: Some(10),
-                    ..fake_connection_counters(seed)
+                    ..fake_connection_stats(seed)
                 }),
                 ..Default::default()
             })
@@ -5825,7 +5830,7 @@ mod tests {
     #[fuchsia::test]
     fn test_get_iface_stats_fail() {
         let (mut test_helper, mut test_fut) = setup_test();
-        test_helper.set_counter_stats_resp(Box::new(|| Err(zx::sys::ZX_ERR_NOT_SUPPORTED)));
+        test_helper.set_iface_stats_resp(Box::new(|| Err(zx::sys::ZX_ERR_NOT_SUPPORTED)));
 
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
@@ -6077,10 +6082,10 @@ mod tests {
     #[fuchsia::test]
     fn test_log_daily_rx_tx_ratio_cobalt_metrics() {
         let (mut test_helper, mut test_fut) = setup_test();
-        test_helper.set_counter_stats_resp(Box::new(|| {
+        test_helper.set_iface_stats_resp(Box::new(|| {
             let seed = fasync::MonotonicInstant::now().into_nanos() as u64 / 1_000_000_000;
-            Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                connection_counters: Some(fidl_fuchsia_wlan_stats::ConnectionCounters {
+            Ok(fidl_fuchsia_wlan_stats::IfaceStats {
+                connection_stats: Some(fidl_fuchsia_wlan_stats::ConnectionStats {
                     tx_total: Some(10 * seed),
                     // TX drop rate stops increasing at 1 hour + TELEMETRY_QUERY_INTERVAL mark.
                     // Because the first TELEMETRY_QUERY_INTERVAL doesn't count when
@@ -6104,7 +6109,7 @@ mod tests {
                                 .into_seconds() as u64,
                         ),
                     ),
-                    ..fake_connection_counters(seed)
+                    ..fake_connection_stats(seed)
                 }),
                 ..Default::default()
             })
@@ -6285,10 +6290,10 @@ mod tests {
     #[fuchsia::test]
     fn test_log_hourly_fleetwide_rx_tx_cobalt_metrics() {
         let (mut test_helper, mut test_fut) = setup_test();
-        test_helper.set_counter_stats_resp(Box::new(|| {
+        test_helper.set_iface_stats_resp(Box::new(|| {
             let seed = fasync::MonotonicInstant::now().into_nanos() as u64 / 1_000_000_000;
-            Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                connection_counters: Some(fidl_fuchsia_wlan_stats::ConnectionCounters {
+            Ok(fidl_fuchsia_wlan_stats::IfaceStats {
+                connection_stats: Some(fidl_fuchsia_wlan_stats::ConnectionStats {
                     tx_total: Some(10 * seed),
                     // TX drop rate stops increasing at 10 min + TELEMETRY_QUERY_INTERVAL mark.
                     // Because the first TELEMETRY_QUERY_INTERVAL doesn't count when
@@ -6315,7 +6320,7 @@ mod tests {
                                 .into_seconds() as u64,
                         ),
                     ),
-                    ..fake_connection_counters(seed)
+                    ..fake_connection_stats(seed)
                 }),
                 ..Default::default()
             })
@@ -9856,9 +9861,9 @@ mod tests {
         "log AP status timeout"
     )]
     #[test_case(
-        TimeoutSource::GetCounterStats,
+        TimeoutSource::GetIfaceStats,
         metrics::SmeOperationTimeoutMetricDimensionStalledOperation::GetCounterStats_ ;
-        "log counter stats timeout"
+        "log iface stats timeout"
     )]
     #[test_case(
         TimeoutSource::GetHistogramStats,
@@ -9898,8 +9903,8 @@ mod tests {
         telemetry_svc_stream: Option<fidl_fuchsia_wlan_sme::TelemetryRequestStream>,
         cobalt_1dot1_stream: fidl_fuchsia_metrics::MetricEventLoggerRequestStream,
         persistence_stream: mpsc::Receiver<String>,
-        counter_stats_resp:
-            Option<Box<dyn Fn() -> fidl_fuchsia_wlan_sme::TelemetryGetCounterStatsResult>>,
+        iface_stats_resp:
+            Option<Box<dyn Fn() -> fidl_fuchsia_wlan_sme::TelemetryGetIfaceStatsResult>>,
         /// As requests to Cobalt are responded to via `self.drain_cobalt_events()`,
         /// their payloads are drained to this HashMap
         cobalt_events: Vec<MetricEvent>,
@@ -9969,7 +9974,7 @@ mod tests {
                         respond_iface_counter_stats_req(
                             &mut self.exec,
                             telemetry_svc_stream,
-                            &self.counter_stats_resp,
+                            &self.iface_stats_resp,
                         );
                     }
                 }
@@ -9982,13 +9987,11 @@ mod tests {
             }
         }
 
-        fn set_counter_stats_resp(
+        fn set_iface_stats_resp(
             &mut self,
-            counter_stats_resp: Box<
-                dyn Fn() -> fidl_fuchsia_wlan_sme::TelemetryGetCounterStatsResult,
-            >,
+            iface_stats_resp: Box<dyn Fn() -> fidl_fuchsia_wlan_sme::TelemetryGetIfaceStatsResult>,
         ) {
-            let _ = self.counter_stats_resp.replace(counter_stats_resp);
+            let _ = self.iface_stats_resp.replace(iface_stats_resp);
         }
 
         /// Advance executor by some duration until the next time `test_fut` handles periodic
@@ -10071,8 +10074,8 @@ mod tests {
     fn respond_iface_counter_stats_req(
         executor: &mut fasync::TestExecutor,
         telemetry_svc_stream: &mut fidl_fuchsia_wlan_sme::TelemetryRequestStream,
-        counter_stats_resp: &Option<
-            Box<dyn Fn() -> fidl_fuchsia_wlan_sme::TelemetryGetCounterStatsResult>,
+        iface_stats_resp: &Option<
+            Box<dyn Fn() -> fidl_fuchsia_wlan_sme::TelemetryGetIfaceStatsResult>,
         >,
     ) {
         let telemetry_svc_req_fut = telemetry_svc_stream.try_next();
@@ -10081,20 +10084,20 @@ mod tests {
             executor.run_until_stalled(&mut telemetry_svc_req_fut)
         {
             match request {
-                fidl_fuchsia_wlan_sme::TelemetryRequest::GetCounterStats { responder } => {
-                    let resp = match &counter_stats_resp {
+                fidl_fuchsia_wlan_sme::TelemetryRequest::GetIfaceStats { responder } => {
+                    let resp = match &iface_stats_resp {
                         Some(get_resp) => get_resp(),
                         None => {
                             let seed = fasync::MonotonicInstant::now().into_nanos() as u64;
-                            Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                                connection_counters: Some(fake_connection_counters(seed)),
+                            Ok(fidl_fuchsia_wlan_stats::IfaceStats {
+                                connection_stats: Some(fake_connection_stats(seed)),
                                 ..Default::default()
                             })
                         }
                     };
                     responder
                         .send(resp.as_ref().map_err(|e| *e))
-                        .expect("expect sending GetCounterStats response to succeed");
+                        .expect("expect sending GetIfaceStats response to succeed");
                 }
                 _ => {
                     panic!("unexpected request: {:?}", request);
@@ -10260,7 +10263,7 @@ mod tests {
             telemetry_svc_stream: None,
             cobalt_1dot1_stream,
             persistence_stream,
-            counter_stats_resp: None,
+            iface_stats_resp: None,
             cobalt_events: vec![],
             _defect_receiver,
             exec,
@@ -10268,8 +10271,8 @@ mod tests {
         (test_helper, test_fut)
     }
 
-    fn fake_connection_counters(nth_req: u64) -> fidl_fuchsia_wlan_stats::ConnectionCounters {
-        fidl_fuchsia_wlan_stats::ConnectionCounters {
+    fn fake_connection_stats(nth_req: u64) -> fidl_fuchsia_wlan_stats::ConnectionStats {
+        fidl_fuchsia_wlan_stats::ConnectionStats {
             connection_id: Some(1),
             rx_unicast_total: Some(nth_req),
             rx_unicast_drop: Some(0),

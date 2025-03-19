@@ -571,19 +571,20 @@ mod tests {
     }
 
     #[test]
-    fn generic_sme_get_counter_stats_for_client() {
+    fn generic_sme_get_iface_stats_for_client() {
         let (mut helper, mut serve_fut) =
             start_generic_sme_test(fidl_common::WlanMacRole::Client).unwrap();
         let telemetry_proxy = get_telemetry_proxy(&mut helper, &mut serve_fut);
 
         // Forward request to MLME.
-        let mut counter_fut = telemetry_proxy.get_counter_stats();
+        let mut counter_fut = telemetry_proxy.get_iface_stats();
         assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Mock response from MLME. Use a fake error code to make the response easily verifiable.
         let counter_req = assert_variant!(helper.exec.run_until_stalled(&mut helper.mlme_req_stream.next()), Poll::Ready(Some(req)) => req);
-        let counter_responder = assert_variant!(counter_req, crate::MlmeRequest::GetIfaceCounterStats(responder) => responder);
-        counter_responder.respond(fidl_mlme::GetIfaceCounterStatsResponse::ErrorStatus(1337));
+        let counter_responder =
+            assert_variant!(counter_req, crate::MlmeRequest::GetIfaceStats(responder) => responder);
+        counter_responder.respond(fidl_mlme::GetIfaceStatsResponse::ErrorStatus(1337));
 
         // Verify that the response made it to us without alteration.
         assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);

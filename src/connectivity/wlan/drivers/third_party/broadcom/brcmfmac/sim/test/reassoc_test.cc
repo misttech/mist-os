@@ -39,8 +39,7 @@ class ReassocTest : public SimTest {
   // Schedule a future roam request.
   void ScheduleRoam(const simulation::FakeAp& ap, zx::duration when);
 
-  void GetIfaceCounterStats(fuchsia_wlan_stats::wire::IfaceCounterStats* out_stats,
-                            zx::duration when);
+  void GetIfaceStats(fuchsia_wlan_stats::wire::IfaceStats* out_stats, zx::duration when);
 
  protected:
   // This is the interface we will use for our single client interface
@@ -66,11 +65,11 @@ void ReassocTest::ScheduleRoam(const simulation::FakeAp& ap, zx::duration when) 
                              when, nullptr);
 }
 
-void ReassocTest::GetIfaceCounterStats(fuchsia_wlan_stats::wire::IfaceCounterStats* out_stats,
-                                       zx::duration when) {
+void ReassocTest::GetIfaceStats(fuchsia_wlan_stats::wire::IfaceStats* out_stats,
+                                zx::duration when) {
   env_->ScheduleNotification(
       [this, out_stats] {
-        auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->GetIfaceCounterStats();
+        auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->GetIfaceStats();
         EXPECT_TRUE(result.ok());
         if (!result->is_error()) {
           *out_stats = result->value()->stats;
@@ -234,7 +233,7 @@ TEST_F(ReassocTest, DisconnectOnRoamSuccessWhenDriverCannotSyncChannel) {
   EXPECT_EQ(0U, ap_0.GetNumAssociatedClient());
 }
 
-// Verify that on successful roam, the connection ID returned by GetIfaceCounterStats is updated.
+// Verify that on successful roam, the connection ID returned by GetIfaceStats is updated.
 TEST_F(ReassocTest, RoamSucceedsUpdatesConnectionId) {
   Init();
 
@@ -246,26 +245,26 @@ TEST_F(ReassocTest, RoamSucceedsUpdatesConnectionId) {
   aps_.push_back(&ap_1);
 
   client_ifc_.AssociateWith(ap_0, zx::sec(1));
-  fuchsia_wlan_stats::wire::IfaceCounterStats stats_1 = {};
-  GetIfaceCounterStats(&stats_1, zx::sec(2));
+  fuchsia_wlan_stats::wire::IfaceStats stats_1 = {};
+  GetIfaceStats(&stats_1, zx::sec(2));
 
   common::MacAddr client_mac;
   client_ifc_.GetMacAddr(&client_mac);
 
   ScheduleRoam(ap_1, zx::sec(3));
-  fuchsia_wlan_stats::wire::IfaceCounterStats stats_2 = {};
-  GetIfaceCounterStats(&stats_2, zx::sec(4));
+  fuchsia_wlan_stats::wire::IfaceStats stats_2 = {};
+  GetIfaceStats(&stats_2, zx::sec(4));
   env_->Run(kTestDuration);
 
-  ASSERT_TRUE(stats_1.has_connection_counters());
-  auto connection_counters_1 = stats_1.connection_counters();
-  ASSERT_TRUE(connection_counters_1.has_connection_id());
-  EXPECT_EQ(connection_counters_1.connection_id(), 1);
+  ASSERT_TRUE(stats_1.has_connection_stats());
+  auto connection_stats_1 = stats_1.connection_stats();
+  ASSERT_TRUE(connection_stats_1.has_connection_id());
+  EXPECT_EQ(connection_stats_1.connection_id(), 1);
 
-  ASSERT_TRUE(stats_2.has_connection_counters());
-  auto connection_counters_2 = stats_2.connection_counters();
-  ASSERT_TRUE(connection_counters_2.has_connection_id());
-  EXPECT_EQ(connection_counters_2.connection_id(), 2);
+  ASSERT_TRUE(stats_2.has_connection_stats());
+  auto connection_stats_2 = stats_2.connection_stats();
+  ASSERT_TRUE(connection_stats_2.has_connection_id());
+  EXPECT_EQ(connection_stats_2.connection_id(), 2);
 }
 
 }  // namespace wlan::brcmfmac

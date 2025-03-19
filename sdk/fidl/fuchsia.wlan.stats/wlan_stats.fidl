@@ -138,14 +138,14 @@ type UnnamedGauge = struct {
     value int64;
 };
 
-type IfaceCounterStats = table {
-    /// Counters related to the current connection. May not be set if the client is not connected.
-    1: connection_counters ConnectionCounters;
+type IfaceStats = table {
+    /// Stats related to the current connection. May not be set if the client is not connected.
+    1: connection_stats ConnectionStats;
     2: driver_specific_counters vector<UnnamedCounter>:MAX_DRIVER_SPECIFIC_COUNTERS;
     3: driver_specific_gauges vector<UnnamedGauge>:MAX_DRIVER_SPECIFIC_GAUGES;
 };
 
-type ConnectionCounters = table {
+type ConnectionStats = table {
     /// ID of the current connection. Used by WLAN telemetry to determine whether
     /// the current counters and the previous counters belong to the same connection.
     /// If the counters belong to two different connections, telemetry will not diff

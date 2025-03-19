@@ -356,8 +356,8 @@ closed protocol Telemetry {
     strict QueryTelemetrySupport() -> (struct {
         resp fuchsia.wlan.stats.TelemetrySupport;
     }) error zx.Status;
-    strict GetCounterStats() -> (struct {
-        stats fuchsia.wlan.stats.IfaceCounterStats;
+    strict GetIfaceStats() -> (struct {
+        stats fuchsia.wlan.stats.IfaceStats;
     }) error zx.Status;
     strict GetHistogramStats() -> (struct {
         stats fuchsia.wlan.stats.IfaceHistogramStats;

@@ -853,9 +853,9 @@ impl ClientSme {
         receiver
     }
 
-    pub fn counter_stats(&mut self) -> oneshot::Receiver<fidl_mlme::GetIfaceCounterStatsResponse> {
+    pub fn iface_stats(&mut self) -> oneshot::Receiver<fidl_mlme::GetIfaceStatsResponse> {
         let (responder, receiver) = Responder::new();
-        self.context.mlme_sink.send(MlmeRequest::GetIfaceCounterStats(responder));
+        self.context.mlme_sink.send(MlmeRequest::GetIfaceStats(responder));
         receiver
     }
 

@@ -176,10 +176,10 @@ impl TestHelper {
         self.exec.run_until_stalled(test_fut)
     }
 
-    pub fn run_and_respond_iface_counter_stats_req<T>(
+    pub fn run_and_respond_iface_stats_req<T>(
         &mut self,
         test_fut: &mut (impl Future<Output = T> + Unpin),
-        counter_stats_resp: Result<&fidl_fuchsia_wlan_stats::IfaceCounterStats, i32>,
+        iface_stats_resp: Result<&fidl_fuchsia_wlan_stats::IfaceStats, i32>,
     ) -> Poll<T> {
         let result = self.exec.run_until_stalled(test_fut);
         let telemetry_svc_stream = match &mut self.telemetry_svc_stream {
@@ -196,10 +196,10 @@ impl TestHelper {
         };
 
         match request {
-            fidl_fuchsia_wlan_sme::TelemetryRequest::GetCounterStats { responder } => {
+            fidl_fuchsia_wlan_sme::TelemetryRequest::GetIfaceStats { responder } => {
                 responder
-                    .send(counter_stats_resp)
-                    .expect("expect sending GetCounterStats response to succeed");
+                    .send(iface_stats_resp)
+                    .expect("expect sending GetIfaceStats response to succeed");
             }
             _ => {
                 panic!("unexpected request: {:?}", request);

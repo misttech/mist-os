@@ -642,8 +642,8 @@ closed protocol MLME {
         resp fuchsia.wlan.stats.TelemetrySupport;
     }) error zx.Status;
 
-    strict GetIfaceCounterStats() -> (struct {
-        resp GetIfaceCounterStatsResponse;
+    strict GetIfaceStats() -> (struct {
+        resp GetIfaceStatsResponse;
     });
     strict GetIfaceHistogramStats() -> (struct {
         resp GetIfaceHistogramStatsResponse;

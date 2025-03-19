@@ -177,9 +177,7 @@ impl<D: DeviceOps> MlmeMainLoop<D> {
             QueryTelemetrySupport(responder) => {
                 responder.respond(self.device.query_telemetry_support()?)
             }
-            GetIfaceCounterStats(responder) => {
-                responder.respond(self.device.get_iface_counter_stats()?)
-            }
+            GetIfaceStats(responder) => responder.respond(self.device.get_iface_stats()?),
             GetIfaceHistogramStats(responder) => {
                 responder.respond(self.device.get_iface_histogram_stats()?)
             }
@@ -868,10 +866,10 @@ mod handle_mlme_request_tests {
     }
 
     #[test]
-    fn test_get_iface_counter_stats() {
+    fn test_get_iface_stats() {
         let mut h = TestHelper::set_up();
-        let mocked_stats = fidl_stats::IfaceCounterStats {
-            connection_counters: Some(fidl_stats::ConnectionCounters {
+        let mocked_stats = fidl_stats::IfaceStats {
+            connection_stats: Some(fidl_stats::ConnectionStats {
                 connection_id: Some(1),
                 rx_unicast_drop: Some(11),
                 rx_unicast_total: Some(22),
@@ -885,21 +883,20 @@ mod handle_mlme_request_tests {
         h.fake_device
             .lock()
             .unwrap()
-            .get_iface_counter_stats_mock
-            .replace(fidl_mlme::GetIfaceCounterStatsResponse::Stats(mocked_stats));
+            .get_iface_stats_mock
+            .replace(fidl_mlme::GetIfaceStatsResponse::Stats(mocked_stats));
         let (stats_responder, mut stats_receiver) = wlan_sme::responder::Responder::new();
-        let fidl_req = wlan_sme::MlmeRequest::GetIfaceCounterStats(stats_responder);
+        let fidl_req = wlan_sme::MlmeRequest::GetIfaceStats(stats_responder);
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::GetIfaceCounterStats)));
+        assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::GetIfaceStats)));
         let stats = assert_variant!(stats_receiver.try_recv(), Ok(Some(stats)) => stats);
-        let stats =
-            assert_variant!(stats, fidl_mlme::GetIfaceCounterStatsResponse::Stats(stats) => stats);
+        let stats = assert_variant!(stats, fidl_mlme::GetIfaceStatsResponse::Stats(stats) => stats);
         assert_eq!(
             stats,
-            fidl_stats::IfaceCounterStats {
-                connection_counters: Some(fidl_stats::ConnectionCounters {
+            fidl_stats::IfaceStats {
+                connection_stats: Some(fidl_stats::ConnectionStats {
                     connection_id: Some(1),
                     rx_unicast_drop: Some(11),
                     rx_unicast_total: Some(22),

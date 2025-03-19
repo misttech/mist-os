@@ -5314,14 +5314,14 @@ zx_status_t brcmf_get_histograms_report(brcmf_if* ifp, histograms_report_t* out_
 
 }  // namespace
 
-zx_status_t brcmf_if_get_iface_counter_stats(net_device* ndev,
-                                             fuchsia_wlan_stats::wire::IfaceCounterStats* out_stats,
-                                             fidl::AnyArena& arena) {
+zx_status_t brcmf_if_get_iface_stats(net_device* ndev,
+                                     fuchsia_wlan_stats::wire::IfaceStats* out_stats,
+                                     fidl::AnyArena& arena) {
   struct brcmf_cfg80211_info* cfg = ndev_to_if(ndev)->drvr->config;
 
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
   if (!ndev->if_proto.is_valid()) {
-    BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping get iface counter stats");
+    BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping get iface stats");
     return ZX_ERR_INTERNAL;
   }
 
@@ -5332,7 +5332,7 @@ zx_status_t brcmf_if_get_iface_counter_stats(net_device* ndev,
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  auto stats_builder = fuchsia_wlan_stats::wire::IfaceCounterStats::Builder(arena);
+  auto stats_builder = fuchsia_wlan_stats::wire::IfaceStats::Builder(arena);
   std::vector<fuchsia_wlan_stats::wire::UnnamedCounter> sdio_counters =
       brcmf_bus_get_counters(cfg->pub->bus_if);
   stats_builder.driver_specific_counters(sdio_counters);
@@ -5355,8 +5355,8 @@ zx_status_t brcmf_if_get_iface_counter_stats(net_device* ndev,
   BRCMF_DBG(DATA, "Cntrs: rxgood:%d rxbad:%d txgood:%d txbad:%d rxocast:%d", pktcnt.rx_good_pkt,
             pktcnt.rx_bad_pkt, pktcnt.tx_good_pkt, pktcnt.tx_bad_pkt, pktcnt.rx_ocast_good_pkt);
 
-  auto connection_counters_builder =
-      fuchsia_wlan_stats::wire::ConnectionCounters::Builder(arena)
+  auto connection_stats_builder =
+      fuchsia_wlan_stats::wire::ConnectionStats::Builder(arena)
           .connection_id(ifp->connection_id)
           .rx_unicast_total(pktcnt.rx_good_pkt + pktcnt.rx_bad_pkt + ndev->stats.rx_errors)
           .rx_unicast_drop(pktcnt.rx_bad_pkt + ndev->stats.rx_errors)
@@ -5445,8 +5445,8 @@ zx_status_t brcmf_if_get_iface_counter_stats(net_device* ndev,
     driver_counters.push_back(CounterConfigs::FW_RX_DECRYPT_FAILURES.unnamed(counters->rxundec));
   }
 
-  connection_counters_builder.driver_specific_counters(fidl::VectorView(arena, driver_counters));
-  *out_stats = stats_builder.connection_counters(connection_counters_builder.Build()).Build();
+  connection_stats_builder.driver_specific_counters(fidl::VectorView(arena, driver_counters));
+  *out_stats = stats_builder.connection_stats(connection_stats_builder.Build()).Build();
   return ZX_OK;
 }
 

@@ -114,9 +114,9 @@ impl<S: InspectSender> ClientIfaceCountersLogger<S> {
             IfaceState::Created { telemetry_proxy, .. } => {
                 if let Some(telemetry_proxy) = &telemetry_proxy {
                     match telemetry_proxy
-                        .get_counter_stats()
+                        .get_iface_stats()
                         .on_timeout(GET_IFACE_STATS_TIMEOUT, || {
-                            warn!("Timed out waiting for counter stats");
+                            warn!("Timed out waiting for iface stats");
                             Ok(Err(zx::Status::TIMED_OUT.into_raw()))
                         })
                         .await
@@ -127,7 +127,7 @@ impl<S: InspectSender> ClientIfaceCountersLogger<S> {
                                 let time_series = Arc::clone(&self.driver_counters_time_series);
                                 log_driver_specific_counters(&counters[..], time_series).await;
                             }
-                            log_connection_counters(
+                            log_connection_stats(
                                 &stats,
                                 &self.time_series_stats,
                                 Arc::clone(&self.driver_counters_time_series),
@@ -148,19 +148,19 @@ impl<S: InspectSender> ClientIfaceCountersLogger<S> {
     }
 }
 
-async fn log_connection_counters(
-    stats: &fidl_stats::IfaceCounterStats,
+async fn log_connection_stats(
+    stats: &fidl_stats::IfaceStats,
     time_series_stats: &IfaceCountersTimeSeries,
     driver_counters_time_series: Arc<Mutex<HashMap<u16, InspectedTimeMatrix<u64>>>>,
 ) {
-    let connection_counters = match &stats.connection_counters {
+    let connection_stats = match &stats.connection_stats {
         Some(counters) => counters,
         None => return,
     };
 
     // `connection_id` field is not used yet, but we check it anyway to
     // enforce that it must be there for us to log driver counters.
-    match &connection_counters.connection_id {
+    match &connection_stats.connection_id {
         Some(_connection_id) => (),
         _ => {
             warn!("connection_id is not present, no connection counters will be logged");
@@ -168,26 +168,26 @@ async fn log_connection_counters(
         }
     }
 
-    if let fidl_stats::ConnectionCounters {
+    if let fidl_stats::ConnectionStats {
         rx_unicast_total: Some(rx_unicast_total),
         rx_unicast_drop: Some(rx_unicast_drop),
         ..
-    } = connection_counters
+    } = connection_stats
     {
         time_series_stats.log_rx_unicast_total(*rx_unicast_total);
         time_series_stats.log_rx_unicast_drop(*rx_unicast_drop);
     }
 
-    if let fidl_stats::ConnectionCounters {
+    if let fidl_stats::ConnectionStats {
         tx_total: Some(tx_total), tx_drop: Some(tx_drop), ..
-    } = connection_counters
+    } = connection_stats
     {
         time_series_stats.log_tx_total(*tx_total);
         time_series_stats.log_tx_drop(*tx_drop);
     }
 
     // Connection-level driver-specific counters
-    if let Some(counters) = &connection_counters.driver_specific_counters {
+    if let Some(counters) = &connection_stats.driver_specific_counters {
         log_driver_specific_counters(&counters[..], driver_counters_time_series).await;
     }
 }
@@ -313,7 +313,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_handle_periodic_telemetry_connection_counters() {
+    fn test_handle_periodic_telemetry_connection_stats() {
         let mut test_helper = setup_test();
         let driver_mock_matrix_client = MockTimeMatrixClient::new();
         let logger = ClientIfaceCountersLogger::new(
@@ -327,8 +327,8 @@ mod tests {
 
         let is_connected = true;
         let mut test_fut = pin!(logger.handle_periodic_telemetry(is_connected));
-        let counter_stats = fidl_stats::IfaceCounterStats {
-            connection_counters: Some(fidl_stats::ConnectionCounters {
+        let iface_stats = fidl_stats::IfaceStats {
+            connection_stats: Some(fidl_stats::ConnectionStats {
                 connection_id: Some(1),
                 rx_unicast_total: Some(100),
                 rx_unicast_drop: Some(5),
@@ -340,7 +340,7 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            test_helper.run_and_respond_iface_counter_stats_req(&mut test_fut, Ok(&counter_stats)),
+            test_helper.run_and_respond_iface_stats_req(&mut test_fut, Ok(&iface_stats)),
             Poll::Ready(())
         );
 
@@ -410,9 +410,9 @@ mod tests {
 
         let is_connected = true;
         let mut test_fut = pin!(logger.handle_periodic_telemetry(is_connected));
-        let counter_stats = fidl_stats::IfaceCounterStats {
+        let iface_stats = fidl_stats::IfaceStats {
             driver_specific_counters: Some(vec![fidl_stats::UnnamedCounter { id: 1, count: 50 }]),
-            connection_counters: Some(fidl_stats::ConnectionCounters {
+            connection_stats: Some(fidl_stats::ConnectionStats {
                 connection_id: Some(1),
                 driver_specific_counters: Some(vec![
                     fidl_stats::UnnamedCounter { id: 2, count: 100 },
@@ -425,7 +425,7 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            test_helper.run_and_respond_iface_counter_stats_req(&mut test_fut, Ok(&counter_stats)),
+            test_helper.run_and_respond_iface_stats_req(&mut test_fut, Ok(&iface_stats)),
             Poll::Ready(())
         );
 

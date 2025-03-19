@@ -40,7 +40,7 @@ pub trait DeviceOps {
         req: fidl_fullmac::WlanFullmacImplSetKeysRequest,
     ) -> anyhow::Result<fidl_fullmac::WlanFullmacSetKeysResp>;
     fn eapol_tx(&self, req: fidl_fullmac::WlanFullmacImplEapolTxRequest) -> anyhow::Result<()>;
-    fn get_iface_counter_stats(&self) -> anyhow::Result<fidl_mlme::GetIfaceCounterStatsResponse>;
+    fn get_iface_stats(&self) -> anyhow::Result<fidl_mlme::GetIfaceStatsResponse>;
     fn get_iface_histogram_stats(
         &self,
     ) -> anyhow::Result<fidl_mlme::GetIfaceHistogramStatsResponse>;
@@ -195,14 +195,14 @@ impl DeviceOps for FullmacDevice {
             .eapol_tx(&req, zx::MonotonicInstant::INFINITE)
             .context("FIDL error on EapolTx")
     }
-    fn get_iface_counter_stats(&self) -> anyhow::Result<fidl_mlme::GetIfaceCounterStatsResponse> {
+    fn get_iface_stats(&self) -> anyhow::Result<fidl_mlme::GetIfaceStatsResponse> {
         match self
             .fullmac_impl_sync_proxy
-            .get_iface_counter_stats(zx::MonotonicInstant::INFINITE)
-            .context("FIDL error on GetIfaceCounterStats")?
+            .get_iface_stats(zx::MonotonicInstant::INFINITE)
+            .context("FIDL error on GetIfaceStats")?
         {
-            Ok(stats) => Ok(fidl_mlme::GetIfaceCounterStatsResponse::Stats(stats)),
-            Err(e) => Ok(fidl_mlme::GetIfaceCounterStatsResponse::ErrorStatus(e)),
+            Ok(stats) => Ok(fidl_mlme::GetIfaceStatsResponse::Stats(stats)),
+            Err(e) => Ok(fidl_mlme::GetIfaceStatsResponse::ErrorStatus(e)),
         }
     }
     fn get_iface_histogram_stats(
@@ -268,7 +268,7 @@ pub mod test_utils {
         SetKeys { req: fidl_fullmac::WlanFullmacImplSetKeysRequest },
         EapolTx { req: fidl_fullmac::WlanFullmacImplEapolTxRequest },
         QueryTelemetrySupport,
-        GetIfaceCounterStats,
+        GetIfaceStats,
         GetIfaceHistogramStats,
         SaeHandshakeResp { resp: fidl_fullmac::WlanFullmacImplSaeHandshakeRespRequest },
         SaeFrameTx { frame: fidl_fullmac::SaeFrame },
@@ -291,7 +291,7 @@ pub mod test_utils {
         pub query_telemetry_support_mock: Option<Result<fidl_stats::TelemetrySupport, i32>>,
 
         pub set_keys_resp_mock: Option<fidl_fullmac::WlanFullmacSetKeysResp>,
-        pub get_iface_counter_stats_mock: Option<fidl_mlme::GetIfaceCounterStatsResponse>,
+        pub get_iface_stats_mock: Option<fidl_mlme::GetIfaceStatsResponse>,
         pub get_iface_histogram_stats_mock: Option<fidl_mlme::GetIfaceHistogramStatsResponse>,
 
         pub fullmac_ifc_client_end: Option<ClientEnd<fidl_fullmac::WlanFullmacImplIfcMarker>>,
@@ -361,7 +361,7 @@ pub mod test_utils {
                         ..Default::default()
                     })),
                     set_keys_resp_mock: None,
-                    get_iface_counter_stats_mock: None,
+                    get_iface_stats_mock: None,
                     get_iface_histogram_stats_mock: None,
                 })),
             };
@@ -498,12 +498,10 @@ pub mod test_utils {
             self.driver_call_sender.send(DriverCall::EapolTx { req });
             Ok(())
         }
-        fn get_iface_counter_stats(
-            &self,
-        ) -> anyhow::Result<fidl_mlme::GetIfaceCounterStatsResponse> {
-            self.driver_call_sender.send(DriverCall::GetIfaceCounterStats);
-            Ok(self.mocks.lock().unwrap().get_iface_counter_stats_mock.clone().unwrap_or(
-                fidl_mlme::GetIfaceCounterStatsResponse::ErrorStatus(zx::sys::ZX_ERR_NOT_SUPPORTED),
+        fn get_iface_stats(&self) -> anyhow::Result<fidl_mlme::GetIfaceStatsResponse> {
+            self.driver_call_sender.send(DriverCall::GetIfaceStats);
+            Ok(self.mocks.lock().unwrap().get_iface_stats_mock.clone().unwrap_or(
+                fidl_mlme::GetIfaceStatsResponse::ErrorStatus(zx::sys::ZX_ERR_NOT_SUPPORTED),
             ))
         }
         fn get_iface_histogram_stats(

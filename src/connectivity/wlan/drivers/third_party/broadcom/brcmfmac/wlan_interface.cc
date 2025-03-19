@@ -480,19 +480,19 @@ void WlanInterface::EapolTx(EapolTxRequestView request, EapolTxCompleter::Sync& 
 }
 
 // Max size of IfaceHistogramStats.
-constexpr size_t kIfaceCounterStatsBufferSize =
-    fidl::MaxSizeInChannel<fuchsia_wlan_stats::wire::IfaceCounterStats,
+constexpr size_t kIfaceStatsBufferSize =
+    fidl::MaxSizeInChannel<fuchsia_wlan_stats::wire::IfaceStats,
                            fidl::MessageDirection::kSending>();
 
-void WlanInterface::GetIfaceCounterStats(GetIfaceCounterStatsCompleter::Sync& completer) {
+void WlanInterface::GetIfaceStats(GetIfaceStatsCompleter::Sync& completer) {
   std::shared_lock<std::shared_mutex> guard(lock_);
-  fidl::Arena<kIfaceCounterStatsBufferSize> table_arena;
-  fuchsia_wlan_stats::wire::IfaceCounterStats out_stats;
+  fidl::Arena<kIfaceStatsBufferSize> table_arena;
+  fuchsia_wlan_stats::wire::IfaceStats out_stats;
   if (wdev_ == nullptr) {
     completer.ReplyError(ZX_ERR_BAD_STATE);
     return;
   }
-  zx_status_t status = brcmf_if_get_iface_counter_stats(wdev_->netdev, &out_stats, table_arena);
+  zx_status_t status = brcmf_if_get_iface_stats(wdev_->netdev, &out_stats, table_arena);
   if (status != ZX_OK) {
     completer.ReplyError(status);
   } else {

@@ -53,12 +53,6 @@ type GetPowerSaveModeResponse = struct {
 };
 
 // TODO(https://fxbug.dev/42164319): Move this to wlan_internal.fidl after https://fxbug.dev/42166364 is fixed
-type GetIfaceCounterStatsResponse = strict union {
-    1: stats fuchsia.wlan.stats.IfaceCounterStats;
-    2: error_status zx.Status;
-};
-
-// TODO(https://fxbug.dev/42164319): Move this to wlan_internal.fidl after https://fxbug.dev/42166364 is fixed
 type GetIfaceHistogramStatsResponse = strict union {
     1: stats fuchsia.wlan.stats.IfaceHistogramStats;
     2: error_status zx.Status;
