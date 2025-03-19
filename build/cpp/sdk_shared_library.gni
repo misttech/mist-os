@@ -385,6 +385,14 @@ template("sdk_shared_library") {
 
   link_lib = "${link_lib_dir}/${lib_name}"
   dist_lib = "${sdk_prebuilt_base_for_target_api_level}/dist/${lib_name}"
+  ifs_file_for_idk = ifs_golden_file
+
+  # There are not golden files for "HEAD", but the IDK needs to provide IFS
+  # files for all API levels. Therefore, use the generated file.
+  if (current_build_target_api_level == "HEAD") {
+    ifs_file_for_idk = generated_ifs_file
+  }
+
   sdk_files = sdk_header_files + [
                 {
                   source = "${shared_out_dir}/link_stub/${lib_name}"
@@ -404,7 +412,7 @@ template("sdk_shared_library") {
                   # against a stripped version of `generated_ifs_file`, so we
                   # can use the golden file here. (Ideally, we would use the
                   # stripped file - see https://fxbug.dev/383416850.)
-                  source = ifs_golden_file
+                  source = ifs_file_for_idk
                   dest = packaged_ifs_file
                 },
               ]
@@ -541,9 +549,11 @@ template("sdk_shared_library") {
     non_sdk_deps = [
       ":${metadata_target_name}",
       ":${verify_pragma_target_name}",
-      ":${verify_public_symbols_target_name}",
       shared_lib_target,
     ]
+    if (current_build_target_api_level != "HEAD") {
+      non_sdk_deps += [ ":${verify_public_symbols_target_name}" ]
+    }
     if (generate_plasa_artifacts) {
       non_sdk_deps += [ ":${_plasa_artifacts_target_name}" ]
     }

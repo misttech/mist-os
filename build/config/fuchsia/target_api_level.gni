@@ -42,10 +42,6 @@ if (current_build_target_api_level == "NEXT") {
   current_build_target_api_level_as_integer = _API_LEVEL_NEXT_AS_INTEGER
 } else if (current_build_target_api_level == "HEAD") {
   current_build_target_api_level_as_integer = _API_LEVEL_HEAD_AS_INTEGER
-
-  assert(
-      false,
-      "Targeting \"HEAD\" is not currently supported. See https://fxbug.dev/334936990.")
 } else if (current_build_target_api_level == "PLATFORM") {
   current_build_target_api_level_as_integer = _API_LEVEL_PLATFORM_AS_INTEGER
 } else {
