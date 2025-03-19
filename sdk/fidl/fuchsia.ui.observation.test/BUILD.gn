@@ -7,7 +7,7 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.ui.observation.test") {
   sdk_category = "compat_test"
   stable = true
-  sdk_area = "View System"
+  sdk_area = "UI"
 
   sources = [ "test.fidl" ]
   public_deps = [

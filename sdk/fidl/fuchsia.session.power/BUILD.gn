@@ -5,7 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.session.power") {
-  sdk_area = "Sessions"
+  sdk_area = "UI"
 
   sources = [
     "overview.fidl",

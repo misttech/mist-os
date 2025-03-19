@@ -7,7 +7,7 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.ui.input3") {
   sdk_category = "partner"
   stable = true
-  sdk_area = "HCI"
+  sdk_area = "UI"
 
   sources = [
     "events.fidl",

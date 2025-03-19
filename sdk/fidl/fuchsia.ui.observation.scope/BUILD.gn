@@ -8,7 +8,7 @@ fidl("fuchsia.ui.observation.scope") {
   # Do not increase visibility by changing `sdk_category`.
   sdk_category = "compat_test"
   stable = true
-  sdk_area = "View System"
+  sdk_area = "UI"
 
   sources = [ "registry.fidl" ]
   public_deps = [

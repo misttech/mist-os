@@ -7,7 +7,7 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.element") {
   sdk_category = "partner"
   stable = true
-  sdk_area = "Sessions"
+  sdk_area = "UI"
 
   sources = [
     "annotations.fidl",

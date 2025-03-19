@@ -8,7 +8,7 @@ fidl("fuchsia.ui.test.conformance") {
   testonly = true
   sdk_category = "compat_test"
   stable = true
-  sdk_area = "View System"
+  sdk_area = "UI"
 
   sources = [ "puppet.fidl" ]
 
