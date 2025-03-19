@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+load("@fuchsia_build_info//:args.bzl", "build_info_version")
 load(
     "@rules_fuchsia//fuchsia:assembly.bzl",
     "fuchsia_board_configuration",
@@ -36,6 +37,7 @@ fuchsia_board_configuration(
         "fuchsia::paravirtualization",
         "fuchsia::pmm_checker_auto",
     ],
+    release_version = build_info_version,
 )
 
 fuchsia_board_input_bundle(
@@ -64,4 +66,5 @@ fuchsia_board_configuration(
         "fuchsia::paravirtualization",
         "fuchsia::pmm_checker_auto",
     ],
+    release_version = build_info_version,
 )

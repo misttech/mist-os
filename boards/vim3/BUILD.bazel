@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("@fuchsia_build_info//:args.bzl", "compilation_mode")
+load("@fuchsia_build_info//:args.bzl", "build_info_version", "compilation_mode")
 load(
     "@rules_fuchsia//fuchsia:assembly.bzl",
     "fuchsia_board_configuration",
@@ -166,6 +166,7 @@ fuchsia_board_configuration(
     },
     platform = _COMMON_PLATFORM,
     provided_features = _COMMON_PROVIDED_FEATURES,
+    release_version = build_info_version,
 )
 
 fuchsia_board_configuration(
@@ -187,4 +188,5 @@ fuchsia_board_configuration(
     },
     platform = _COMMON_PLATFORM,
     provided_features = _COMMON_PROVIDED_FEATURES,
+    release_version = build_info_version,
 )
