@@ -28,7 +28,7 @@ void BindNodeSet::CompleteOngoingBind() {
   orphaned_nodes_ = std::move(new_orphaned_nodes_);
 
   for (auto& [path, node_weak] : new_multibind_nodes_) {
-    multibind_nodes_.emplace(path, node_weak);
+    multibind_nodes_[path] = node_weak;
   }
   new_multibind_nodes_ = {};
 }
@@ -43,10 +43,10 @@ void BindNodeSet::AddOrphanedNode(Node& node) {
   std::string moniker = node.MakeComponentMoniker();
   ZX_ASSERT(!MultibindContains(moniker));
   if (is_bind_ongoing_) {
-    new_orphaned_nodes_.emplace(moniker, node.weak_from_this());
+    new_orphaned_nodes_[moniker] = node.weak_from_this();
     return;
   }
-  orphaned_nodes_.emplace(moniker, node.weak_from_this());
+  orphaned_nodes_[moniker] = node.weak_from_this();
 }
 
 void BindNodeSet::RemoveOrphanedNode(std::string node_moniker) {
@@ -60,10 +60,10 @@ void BindNodeSet::RemoveOrphanedNode(std::string node_moniker) {
 void BindNodeSet::AddOrMoveMultibindNode(Node& node) {
   RemoveOrphanedNode(node.MakeComponentMoniker());
   if (is_bind_ongoing_) {
-    new_multibind_nodes_.emplace(node.MakeComponentMoniker(), node.weak_from_this());
+    new_multibind_nodes_[node.MakeComponentMoniker()] = node.weak_from_this();
     return;
   }
-  multibind_nodes_.emplace(node.MakeComponentMoniker(), node.weak_from_this());
+  multibind_nodes_[node.MakeComponentMoniker()] = node.weak_from_this();
 }
 
 bool BindNodeSet::MultibindContains(std::string node_moniker) const {

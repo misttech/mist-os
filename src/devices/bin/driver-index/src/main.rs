@@ -211,6 +211,13 @@ async fn run_driver_development_server(
                         .or_else(ignore_peer_closed)
                         .context("error responding to Disable")?;
                 }
+                DevelopmentManagerRequest::RebindCompositesWithDriver { driver_url, responder } => {
+                    let rebind_result = indexer.rebind_composites_with_driver(driver_url);
+                    responder
+                        .send(rebind_result)
+                        .or_else(ignore_peer_closed)
+                        .context("error responding to RebindCompositesWithDriver")?;
+                }
             }
             Ok(())
         })

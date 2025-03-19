@@ -141,6 +141,18 @@ open protocol Manager {
         /// Releasing this will reset the operation.
         release_fence zx.Handle:EVENTPAIR;
     }) error zx.Status;
+
+    /// Rebinds any composites and composite specs that have the given driver_url. This means the
+    /// spec is rematched with possibly another driver, or none if the only matching driver is
+    /// disabled, and any active nodes created from this spec are removed and re-bound.
+    ///
+    /// Returns the number of affected composite nodes.
+    @available(added=NEXT)
+    strict RebindCompositesWithDriver(struct {
+        driver_url fuchsia.url.Url;
+    }) -> (struct {
+        count uint32;
+    }) error zx.Status;
 };
 
 /// Interface for watching when bootup is complete, in which there are no more bind and driver start

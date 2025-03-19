@@ -283,6 +283,16 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.driver.development/Manager.RebindCompositesWithDriver",
+        "strictness": "strict",
+        "ordinal": "1683582238667972392",
+        "direction": "two_way",
+        "request": "fuchsia.driver.development/ManagerRebindCompositesWithDriverRequest",
+        "response": "fuchsia.driver.development/Manager_RebindCompositesWithDriver_Response",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.driver.development/Manager.RemoveTestNode",
         "strictness": "flexible",
         "ordinal": "1592282289633755406",
@@ -437,6 +447,16 @@
     },
     {
         "kind": "struct/member",
+        "name": "fuchsia.driver.development/ManagerRebindCompositesWithDriverRequest.driver_url",
+        "ordinal": "1",
+        "type": "string:4096"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.driver.development/ManagerRebindCompositesWithDriverRequest"
+    },
+    {
+        "kind": "struct/member",
         "name": "fuchsia.driver.development/ManagerRemoveTestNodeRequest.name",
         "ordinal": "1",
         "type": "string:1024"
@@ -470,6 +490,16 @@
     {
         "kind": "struct",
         "name": "fuchsia.driver.development/Manager_BindAllUnboundNodes_Response"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.driver.development/Manager_RebindCompositesWithDriver_Response.count",
+        "ordinal": "1",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.driver.development/Manager_RebindCompositesWithDriver_Response"
     },
     {
         "kind": "struct/member",

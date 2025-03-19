@@ -115,6 +115,9 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   void RebindComposite(std::string spec, std::optional<std::string> driver_url,
                        fit::callback<void(zx::result<>)> callback) override;
 
+  void RebindCompositesWithDriver(const std::string& url,
+                                  fit::callback<void(size_t)> complete_callback);
+
   bool IsTestShutdownDelayEnabled() const override { return enable_test_shutdown_delays_; }
   std::weak_ptr<std::mt19937> GetShutdownTestRng() const override {
     return shutdown_test_delay_rng_;

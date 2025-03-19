@@ -14,28 +14,7 @@
 
 #include "magma_vendor_queries.h"
 
-inline void RestartAndWait(std::string driver_url) {
-  auto manager = component::Connect<fuchsia_driver_development::Manager>();
-
-  fidl::WireSyncClient manager_client(*std::move(manager));
-  auto test_device = magma::TestDeviceBase(MAGMA_VENDOR_ID_MALI);
-  ASSERT_NO_FATAL_FAILURE() << "Failed to create test device";
-
-  auto restart_result = manager_client->RestartDriverHosts(
-      fidl::StringView::FromExternal(driver_url),
-      fuchsia_driver_development::wire::RestartRematchFlags::kRequested |
-          fuchsia_driver_development::wire::RestartRematchFlags::kCompositeSpec);
-
-  ASSERT_TRUE(restart_result.ok()) << restart_result.status_string();
-  EXPECT_TRUE(restart_result->is_ok()) << restart_result->error_value();
-
-  {
-    auto channel = test_device.magma_channel();
-    // Use the existing channel to wait for the device handle to close.
-    EXPECT_EQ(ZX_OK,
-              channel.handle()->wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time::infinite(), nullptr));
-  }
-
+inline void WaitForDevice() {
   // Loop until a new device with the correct specs is found.
   auto deadline_time = zx::clock::get_monotonic() + zx::sec(10);
   while (zx::clock::get_monotonic() < deadline_time) {
@@ -59,6 +38,31 @@ inline void RestartAndWait(std::string driver_url) {
     zx::nanosleep(zx::deadline_after(zx::msec(10)));
   }
   GTEST_FATAL_FAILURE_("We failed to find the GPU before the deadline");
+}
+
+inline void RestartAndWait(std::string driver_url) {
+  auto manager = component::Connect<fuchsia_driver_development::Manager>();
+
+  fidl::WireSyncClient manager_client(*std::move(manager));
+  auto test_device = magma::TestDeviceBase(MAGMA_VENDOR_ID_MALI);
+  ASSERT_NO_FATAL_FAILURE() << "Failed to create test device";
+
+  auto restart_result = manager_client->RestartDriverHosts(
+      fidl::StringView::FromExternal(driver_url),
+      fuchsia_driver_development::wire::RestartRematchFlags::kRequested |
+          fuchsia_driver_development::wire::RestartRematchFlags::kCompositeSpec);
+
+  ASSERT_TRUE(restart_result.ok()) << restart_result.status_string();
+  EXPECT_TRUE(restart_result->is_ok()) << restart_result->error_value();
+
+  {
+    auto channel = test_device.magma_channel();
+    // Use the existing channel to wait for the device handle to close.
+    EXPECT_EQ(ZX_OK,
+              channel.handle()->wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time::infinite(), nullptr));
+  }
+
+  WaitForDevice();
 }
 
 #endif  // SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_TESTS_INTEGRATION_DRIVER_REGISTRY_H_

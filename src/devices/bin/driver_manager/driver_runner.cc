@@ -269,6 +269,26 @@ void CallStartDriverOnRunner(Runner& runner, Node& node, const std::string& moni
       });
 }
 
+// Helper class to make sending out concurrent async requests and making a callback when they have
+// all finished easier.
+class AsyncSharder {
+ public:
+  AsyncSharder(size_t count, fit::callback<void()> complete_callback)
+      : remaining_(count), complete_callback_(std::move(complete_callback)) {}
+
+  ~AsyncSharder() { ZX_ASSERT_MSG(remaining_ == 0, "Sharder not complete"); }
+
+  void CompleteShard() {
+    if (--remaining_ == 0) {
+      complete_callback_();
+    }
+  }
+
+ private:
+  size_t remaining_;
+  fit::callback<void()> complete_callback_;
+};
+
 }  // namespace
 
 Collection ToCollection(const Node& node, fdf::DriverPackageType package_type) {
@@ -591,6 +611,37 @@ void DriverRunner::RebindComposite(std::string spec, std::optional<std::string> 
   composite_node_spec_manager_.Rebind(spec, driver_url, std::move(callback));
 }
 
+void DriverRunner::RebindCompositesWithDriver(const std::string& url,
+                                              fit::callback<void(size_t)> complete_callback) {
+  std::unordered_set<std::string> names;
+  PerformBFS(root_node_, [&names, url](const std::shared_ptr<driver_manager::Node>& current) {
+    if (current->type() == driver_manager::NodeType::kComposite && current->driver_url() == url) {
+      LOGF(DEBUG, "RebindCompositesWithDriver rebinding composite %s",
+           current->MakeComponentMoniker().c_str());
+      names.insert(current->name());
+      return false;
+    }
+
+    return true;
+  });
+
+  if (names.empty()) {
+    complete_callback(0);
+    return;
+  }
+
+  auto complete_wrapper = [complete_callback = std::move(complete_callback),
+                           count = names.size()]() mutable { complete_callback(count); };
+
+  std::shared_ptr<AsyncSharder> sharder =
+      std::make_shared<AsyncSharder>(names.size(), std::move(complete_wrapper));
+
+  for (const auto& name : names) {
+    RebindComposite(name, std::nullopt,
+                    [sharder](zx::result<>) mutable { sharder->CompleteShard(); });
+  }
+}
+
 void DriverRunner::DestroyDriverComponent(driver_manager::Node& node,
                                           DestroyDriverComponentCallback callback) {
   auto name = node.MakeComponentMoniker();
@@ -833,16 +884,22 @@ zx::result<uint32_t> DriverRunner::RestartNodesColocatedWithDriverUrl(
       if (current->type() == driver_manager::NodeType::kComposite) {
         // Composites need to go through a different flow that will fully remove the
         // node and empty out the composite spec management layer.
+        LOGF(DEBUG, "RestartNodesColocatedWithDriverUrl rebinding composite %s",
+             current->MakeComponentMoniker().c_str());
         RebindComposite(current->name(), std::nullopt, [](zx::result<>) {});
         return false;
       }
 
       // Non-composite nodes use the restart with rematch flow.
+      LOGF(DEBUG, "RestartNodesColocatedWithDriverUrl restarting node with rematch %s",
+           current->MakeComponentMoniker().c_str());
       current->RestartNodeWithRematch();
       return false;
     }
 
     // Not rematching, plain node restart.
+    LOGF(DEBUG, "RestartNodesColocatedWithDriverUrl restarting node %s",
+         current->MakeComponentMoniker().c_str());
     current->RestartNode();
     return false;
   });

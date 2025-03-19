@@ -135,7 +135,9 @@ DriverDevelopmentService::DriverDevelopmentService(driver_manager::DriverRunner&
 
 void DriverDevelopmentService::Publish(component::OutgoingDirectory& outgoing) {
   auto result = outgoing.AddUnmanagedProtocol<fdd::Manager>(
-      bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
+      bindings_.CreateHandler(this, dispatcher_, [](fidl::UnbindInfo info) {
+        LOGF(WARNING, "development service closed. %s", info.FormatDescription().c_str());
+      }));
   ZX_ASSERT(result.is_ok());
 }
 
@@ -385,6 +387,40 @@ void DriverDevelopmentService::RestartWithDictionary(
   driver_runner_.RestartWithDictionary(std::move(request->moniker), std::move(request->dictionary),
                                        std::move(endpoint1));
   completer.ReplySuccess(std::move(endpoint0));
+}
+
+void DriverDevelopmentService::RebindCompositesWithDriver(
+    RebindCompositesWithDriverRequestView request,
+    RebindCompositesWithDriverCompleter::Sync& completer) {
+  auto driver_index_client = component::Connect<fuchsia_driver_index::DevelopmentManager>();
+  if (driver_index_client.is_error()) {
+    LOGF(ERROR, "Failed to connect to service '%s': %s",
+         fidl::DiscoverableProtocolName<fuchsia_driver_index::DevelopmentManager>,
+         driver_index_client.status_string());
+    completer.Close(driver_index_client.status_value());
+    return;
+  }
+
+  fidl::WireSyncClient driver_index{std::move(*driver_index_client)};
+  auto index_rebind_result = driver_index->RebindCompositesWithDriver(request->driver_url);
+  if (!index_rebind_result.ok()) {
+    LOGF(ERROR, "Failed to call DriverIndex::RebindCompositesWithDriver: %s\n",
+         index_rebind_result.FormatDescription().c_str());
+    completer.ReplyError(index_rebind_result.error().status());
+    return;
+  }
+  if (index_rebind_result.value().is_error()) {
+    LOGF(ERROR, "DriverIndex::RebindCompositesWithDriver failed: %s\n",
+         zx_status_get_string(index_rebind_result.value().error_value()));
+    completer.ReplyError(index_rebind_result.value().error_value());
+    return;
+  }
+
+  driver_runner_.RebindCompositesWithDriver(
+      std::string(request->driver_url.get()),
+      [completer = completer.ToAsync()](size_t count) mutable {
+        completer.ReplySuccess(static_cast<uint32_t>(count));
+      });
 }
 
 void DriverDevelopmentService::handle_unknown_method(
