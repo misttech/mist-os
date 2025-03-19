@@ -34,3 +34,17 @@ type TwoEmptyStructsInStructInVectorInStruct = struct {
 type OptionalEmptyStructWrapper = struct {
     s box<EmptyStruct>;
 };
+
+type RecursiveEmptyStruct = struct {
+    inner box<RecursiveEmptyStruct>;
+};
+
+// Wrap with an extra layer of struct and array which should not add any more
+// out of line recursion depth.
+type RecursiveEmptyStructArrayWrapper = struct {
+    arr array<RecursiveEmptyStruct, 1>;
+};
+
+type RecursiveEmptyStructVectorWrapper = struct {
+    vec vector<RecursiveEmptyStruct>;
+};
