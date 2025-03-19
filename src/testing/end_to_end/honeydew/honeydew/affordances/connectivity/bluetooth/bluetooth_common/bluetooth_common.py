@@ -5,7 +5,7 @@
 will depend on."""
 
 import abc
-from typing import Any
+from typing import Any, Optional
 
 from honeydew.affordances.connectivity.bluetooth.utils import (
     types as bluetooth_types,
@@ -29,12 +29,14 @@ class BluetoothCommon(abc.ABC):
         self,
         input_mode: bluetooth_types.BluetoothAcceptPairing,
         output_mode: bluetooth_types.BluetoothAcceptPairing,
+        timeout_sec: Optional[int | None],
     ) -> None:
         """Sets device to accept Bluetooth pairing.
 
         Args:
             input: input mode of device.
             output: output mode of device.
+            timeout_sec: timeout duration in seconds
 
         Raises:
             BluetoothError: On failure.
@@ -45,31 +47,41 @@ class BluetoothCommon(abc.ABC):
         self,
         identifier: str,
         connection_type: bluetooth_types.BluetoothConnectionType,
+        timeout_sec: Optional[int | None],
     ) -> None:
         """Connect device to target remote device via Bluetooth.
 
         Args:
             identifier: the identifier of target remote device.
             connection_type: type of bluetooth connection.
+            timeout_sec: timeout duration in seconds
 
         Raises:
             BluetoothError: On failure.
         """
 
     @abc.abstractmethod
-    def forget_device(self, identifier: str) -> None:
+    def forget_device(
+        self, identifier: str, timeout_sec: Optional[int | None]
+    ) -> None:
         """Forget device to target remote device via Bluetooth.
 
         Args:
             identifier: the identifier of target remote device.
+            timeout_sec: timeout duration in seconds
 
         Raises:
             BluetoothError: On failure.
         """
 
     @abc.abstractmethod
-    def get_active_adapter_address(self) -> str:
+    def get_active_adapter_address(
+        self, timeout_sec: Optional[int | None]
+    ) -> str:
         """Retrieves the device's active BT adapter address.
+
+        Args:
+            timeout_sec: timeout duration in seconds
 
         Returns:
             The mac address of the active adapter.
@@ -90,8 +102,13 @@ class BluetoothCommon(abc.ABC):
         """
 
     @abc.abstractmethod
-    def get_known_remote_devices(self) -> dict[str, Any]:
+    def get_known_remote_devices(
+        self, timeout_sec: Optional[int | None] = 0
+    ) -> dict[str, Any]:
         """Retrieves all known remote devices received by device.
+
+        Args:
+            timeout_sec: timeout duration in seconds
 
         Returns:
             A dict of all known remote devices.
@@ -105,12 +122,14 @@ class BluetoothCommon(abc.ABC):
         self,
         identifier: str,
         connection_type: bluetooth_types.BluetoothConnectionType,
+        timeout_sec: Optional[int | None],
     ) -> None:
         """Pair device to target remote device via Bluetooth.
 
         Args:
             identifier: the identifier of target remote device.
             connection_type: type of bluetooth connection.
+            timeout_sec: timeout duration in seconds
 
         Raises:
             BluetoothError: On failure.
@@ -128,16 +147,23 @@ class BluetoothCommon(abc.ABC):
         """
 
     @abc.abstractmethod
-    def run_pairing_delegate(self) -> None:
-        """Run Pairing Delegate Server calls."""
+    def run_pairing_delegate(self, timeout_sec: Optional[int | None]) -> None:
+        """Run Pairing Delegate Server calls.
+
+        Args:
+            timeout_sec: timeout duration in seconds
+        """
 
     @abc.abstractmethod
-    def set_discoverable(self, discoverable: bool) -> None:
+    def set_discoverable(
+        self, discoverable: bool, timeout_sec: Optional[int | None]
+    ) -> None:
         """Sets device to be discoverable by others.
 
         Args:
             discoverable: True to be discoverable by others, False to be not
                           discoverable by others.
+            timeout_sec: timeout duration in seconds
 
         Raises:
             BluetoothError: On failure.
