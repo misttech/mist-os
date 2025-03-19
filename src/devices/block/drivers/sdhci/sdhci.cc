@@ -1220,7 +1220,7 @@ zx_status_t Sdhci::Init() {
   }};
 
   zx::result existing_metadata =
-      fdf_metadata::GetMetadataIfExists<fuchsia_hardware_sdmmc::SdmmcMetadata>(incoming());
+      fdf_metadata::GetMetadataIfExists<fuchsia_hardware_sdmmc::SdmmcMetadata>(*incoming());
   if (existing_metadata.is_error()) {
     FDF_LOG(ERROR, "Failed to get metadata: %s", existing_metadata.status_string());
     return existing_metadata.status_value();

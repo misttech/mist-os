@@ -331,7 +331,7 @@ void GpioRootDevice::Start(fdf::StartCompleter completer) {
   std::optional<fuchsia_hardware_pinimpl::Metadata> metadata;
   {
     zx::result result =
-        fdf_metadata::GetMetadataIfExists<fuchsia_hardware_pinimpl::Metadata>(incoming());
+        fdf_metadata::GetMetadataIfExists<fuchsia_hardware_pinimpl::Metadata>(*incoming());
     if (result.is_error()) {
       FDF_LOG(ERROR, "Failed to get metadata: %s", result.status_string());
       completer(result.take_error());

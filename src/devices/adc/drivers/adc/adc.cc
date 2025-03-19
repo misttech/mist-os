@@ -155,7 +155,7 @@ zx::result<std::unique_ptr<AdcDevice>> AdcDevice::Create(
 
 zx::result<> Adc::Start() {
   // Get metadata.
-  zx::result metadata = fdf_metadata::GetMetadata<fuchsia_hardware_adcimpl::Metadata>(incoming());
+  zx::result metadata = fdf_metadata::GetMetadata<fuchsia_hardware_adcimpl::Metadata>(*incoming());
   if (metadata.is_error()) {
     FDF_SLOG(ERROR, "Failed to get metadata.", KV("status", metadata.status_string()));
     return metadata.take_error();

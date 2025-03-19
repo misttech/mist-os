@@ -33,7 +33,7 @@ class RetrieverDriver final : public fdf::DriverBase,
   // fuchsia.hardware.test/Child implementation.
   void GetMetadata(GetMetadataCompleter::Sync& completer) override {
     zx::result metadata =
-        fdf_metadata::GetMetadata<fuchsia_examples_metadata::Metadata>(incoming());
+        fdf_metadata::GetMetadata<fuchsia_examples_metadata::Metadata>(*incoming());
     if (metadata.is_error()) {
       fdf::error("Failed to get metadata: {}", metadata);
       completer.Reply(fit::error(metadata.status_value()));

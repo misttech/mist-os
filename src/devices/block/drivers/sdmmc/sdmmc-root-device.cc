@@ -104,7 +104,7 @@ zx::result<fuchsia_hardware_sdmmc::SdmmcMetadata> SdmmcRootDevice::GetMetadata()
   constexpr uint32_t kMaxCommandPacking = 16;
 
   zx::result metadata =
-      fdf_metadata::GetMetadataIfExists<fuchsia_hardware_sdmmc::SdmmcMetadata>(incoming());
+      fdf_metadata::GetMetadataIfExists<fuchsia_hardware_sdmmc::SdmmcMetadata>(*incoming());
   if (metadata.is_error()) {
     FDF_LOGL(ERROR, logger(), "Failed to get metadata: %s", metadata.status_string());
     return metadata.take_error();

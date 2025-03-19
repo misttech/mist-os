@@ -292,7 +292,7 @@ class Retriever : public fdf::DriverBase {
  public:
   zx::result<> Start() override {
     zx::result<fuchsia_examples_metadata::Metadata> metadata =
-      fdf_metadata::GetMetadata<fuchsia_examples_metadata::Metadata>(incoming());
+      fdf_metadata::GetMetadata<fuchsia_examples_metadata::Metadata>(*incoming());
     ZX_ASSERT(!metadata.is_error());
 
     return zx::ok();

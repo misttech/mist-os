@@ -6,8 +6,7 @@
 
 namespace fdf_metadata {
 zx::result<fidl::ClientEnd<fuchsia_driver_metadata::Metadata>> ConnectToMetadataProtocol(
-    const std::shared_ptr<fdf::Namespace>& incoming, std::string_view service_name,
-    std::string_view instance_name) {
+    const fdf::Namespace& incoming, std::string_view service_name, std::string_view instance_name) {
   // The metadata protocol is found within the `service_name` service directory and not the
   // `fuchsia_driver_metadata::Service::Name` directory because that is where
   // `fdf_metadata::MetadataServer` is expected to serve the fuchsia.driver.metadata/Metadata'
@@ -19,7 +18,7 @@ zx::result<fidl::ClientEnd<fuchsia_driver_metadata::Metadata>> ConnectToMetadata
                   .append(fuchsia_driver_metadata::Service::Metadata::Name);
 
   zx::result result =
-      component::ConnectAt<fuchsia_driver_metadata::Metadata>(incoming->svc_dir(), path);
+      component::ConnectAt<fuchsia_driver_metadata::Metadata>(incoming.svc_dir(), path);
   if (result.is_error()) {
     FDF_SLOG(ERROR, "Failed to connect to metadata protocol.", KV("status", result.status_string()),
              KV("path", path));
