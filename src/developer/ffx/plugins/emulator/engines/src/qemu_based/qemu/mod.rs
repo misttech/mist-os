@@ -73,7 +73,9 @@ impl EmulatorEngine for QemuEngine {
         }
 
         if let Some(vsock) = &mut self.emu_config_mut().device.vsock {
-            if vsock.enabled {
+            // The default CID value of 0 indicates that selection should be
+            // left to ffx.
+            if vsock.enabled && vsock.cid == 0 {
                 vsock.cid = find_unused_vsock_cid()?;
             }
         }
