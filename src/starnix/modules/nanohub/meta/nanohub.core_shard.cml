@@ -5,7 +5,7 @@
     children: [
         {
             name: "nanohub",
-            url: "fuchsia-pkg://fuchsia.com/nanohub#meta/nanohub.cm",
+            url: "fuchsia-pkg://fuchsia.com/google_nanohub#meta/nanohub.cm",
         },
     ],
     offer: [
