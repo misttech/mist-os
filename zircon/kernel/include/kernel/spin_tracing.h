@@ -62,7 +62,7 @@ class Tracer<true> {
       const bool blocked_after = (finish_type == FinishType::kBlocked);
 
       FXT_EVENT_COMMON(true, KTrace::CategoryEnabled, KTrace::EmitComplete, "kernel:sched",
-                       "lock_spin"_intern, start_, end_time.value(), TraceContext::Thread,
+                       "lock_spin"_intern, start_, end_time.value(), KTrace::Context::Thread,
                        ("lock_id", lock_id),
                        ("lock_class", fxt::StringRef<fxt::RefType::kId>{class_name}),
                        ("lock_type", lock_type), ("blocked_after", blocked_after));
@@ -74,7 +74,7 @@ class Tracer<true> {
       // before processing, which strips the string table from the data
       // (embedding it directly into the JSON instead).
       FXT_EVENT_COMMON(true, KTrace::CategoryEnabled, KTrace::EmitComplete, "kernel:sched",
-                       "lock_spin"_intern, start_, end_time.value(), TraceContext::Thread,
+                       "lock_spin"_intern, start_, end_time.value(), KTrace::Context::Thread,
                        ("lock_class", fxt::StringRef<fxt::RefType::kId>{class_name}),
                        ("elid", elid.FinishedValue(finish_type)));
     }

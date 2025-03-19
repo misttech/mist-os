@@ -32,6 +32,7 @@
 
 // The global ktrace state.
 internal::KTraceState KTrace::state_;
+KTrace::CpuContextMap KTrace::cpu_context_map_;
 
 namespace {
 
@@ -73,24 +74,18 @@ void ktrace_report_cpu_pseudo_threads() {
   char name[32];
   for (uint i = 0; i < max_cpus; i++) {
     snprintf(name, sizeof(name), "cpu-%u", i);
-    KTRACE_KERNEL_OBJECT_ALWAYS(ktrace::CpuContextMap::GetCpuKoid(i), ZX_OBJ_TYPE_THREAD, name,
-                                ("process", kNoProcess));
+    KTRACE_KERNEL_OBJECT_ALWAYS(KTrace::GetCpuKoid(i), ZX_OBJ_TYPE_THREAD, name,
+                                ("process", KTrace::kNoProcess));
   }
 }
 
 }  // namespace
 
-namespace ktrace {
-
-zx_koid_t CpuContextMap::cpu_koid_base_{ZX_KOID_INVALID};
-
-void CpuContextMap::Init() {
+void KTrace::CpuContextMap::Init() {
   if (cpu_koid_base_ == ZX_KOID_INVALID) {
     cpu_koid_base_ = KernelObjectId::GenerateRange(arch_max_num_cpus());
   }
 }
-
-}  // namespace ktrace
 
 namespace internal {
 
@@ -650,15 +645,13 @@ static void ktrace_init(unsigned level) {
     return;
   }
 
-  // Allocate koids for each CPU.
-  ktrace::CpuContextMap::Init();
+  // Initialize the KTrace singleton.
+  KTrace::Init(bufsize, initial_grpmask);
 
   dprintf(INFO, "Trace categories: \n");
   for (const fxt::InternedCategory& category : fxt::InternedCategory::Iterate()) {
     dprintf(INFO, "  %-20s : 0x%03x\n", category.string(), (1u << category.index()));
   }
-
-  KTrace::GetInstance().Init(bufsize, initial_grpmask);
 
   if (!initial_grpmask) {
     dprintf(INFO, "ktrace: delaying buffer allocation\n");
