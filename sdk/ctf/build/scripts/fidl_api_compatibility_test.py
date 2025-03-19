@@ -150,7 +150,7 @@ def main():
         # promoting a library to an SDK category that requires compatibility
         # testing will require OWNERS approval for the new files in
         # `//sdk/history` even if the library is unstable. This is especially
-        # important for SDK categories such as "partner_internal" that do not
+        # important for SDK categories such as "prebuilt" that do not
         # affect the IDK manifest.
         err = golden_not_found_error(args.golden)
     elif args.policy == Policy.no_breaking_changes:

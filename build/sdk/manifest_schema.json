@@ -55,7 +55,8 @@
                     "enum": [
                         "internal",
                         "compat_test",
-                        "partner_internal",
+                        "host_tool",
+                        "prebuilt",
                         "partner"
                     ]
                 },

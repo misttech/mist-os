@@ -85,11 +85,11 @@ import("//build/sdk/sdk_atom.gni")
 template("sdk_source_set") {
   assert(defined(invoker.category), "Must define an SDK category")
 
-  # Only categories that are included in an IDK makes sense.
   valid_categories = [
     # "internal" is deprecated; only specific legacy cases below are allowed.
     # "compat_test" is only for ABI compatibility and thus not applicable.
-    # "partner_internal" is only for ABI compatibility and thus not applicable.
+    # "host_tool" is only for ABI compatibility and thus not applicable.
+    # "prebuilt" is only for ABI compatibility and thus not applicable.
     "partner",
   ]
 

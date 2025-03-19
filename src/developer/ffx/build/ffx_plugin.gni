@@ -140,13 +140,13 @@ template("ffx_plugin") {
         sdk_category = "partner"
       }
 
+      assert(sdk_category == "partner",
+             "Unexpected SDK category '${sdk_category}'.")
       category_marker = "//sdk/categories:marker-${sdk_category}"
-      if (sdk_category == "partner") {
-        disallowed_category_markers =
-            markers_partner_idk_prebuilts_must_not_depend_on
-      } else {
-        assert(false, "Unexpected SDK category '${sdk_category}'.")
-      }
+
+      # Host tools in the IDK can depend on up to "host_tool" regardless of category.
+      disallowed_category_markers =
+          markers_partner_idk_host_tools_must_not_depend_on
     } else {
       # The plugin is not in an IDK, so there are no restrictions.
       disallowed_category_markers = []

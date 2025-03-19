@@ -10,19 +10,23 @@ _all_idk_categories = [
 
   # The categories supported by `sdk_atom()`.
   "compat_test",
-  "partner_internal",
+  "host_tool",
+  "prebuilt",
   "partner",
 ]
 
 _categories_partner_sources_may_depend_on_directly = [ "partner" ]
 
 # Source sets may have indirect dependencies on libraries in the
-# "partner_internal" category via prebuilt libraries such as fdio.
+# "prebuilt" category via prebuilt libraries such as fdio.
 _categories_partner_sources_may_depend_on_indirectly =
-    _categories_partner_sources_may_depend_on_directly + [ "partner_internal" ]
+    _categories_partner_sources_may_depend_on_directly + [ "prebuilt" ]
 
 _categories_partner_prebuilts_may_depend_on =
-    _categories_partner_sources_may_depend_on_directly + [ "partner_internal" ]
+    _categories_partner_sources_may_depend_on_directly + [ "prebuilt" ]
+
+_categories_partner_host_tools_may_depend_on =
+    _categories_partner_prebuilts_may_depend_on + [ "host_tool" ]
 
 #
 # Marker lists.
@@ -73,5 +77,14 @@ markers_partner_idk_prebuilts_must_not_depend_on =
     all_idk_category_markers_targets
 foreach(compatible_category, _categories_partner_prebuilts_may_depend_on) {
   markers_partner_idk_prebuilts_must_not_depend_on -=
+      [ "//sdk/categories:marker-${compatible_category}" ]
+}
+
+# Markers that host tools (and host tests) in the "partner" category may not
+# depend on, directly or indirectly.
+markers_partner_idk_host_tools_must_not_depend_on =
+    all_idk_category_markers_targets
+foreach(compatible_category, _categories_partner_host_tools_may_depend_on) {
+  markers_partner_idk_host_tools_must_not_depend_on -=
       [ "//sdk/categories:marker-${compatible_category}" ]
 }

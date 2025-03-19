@@ -290,7 +290,8 @@ template("ffx_tool") {
       assert(invoker.sdk_category == "partner",
              "Unexpected SDK category '${invoker.sdk_category}'.")
 
-      assert_no_deps += markers_partner_idk_prebuilts_must_not_depend_on
+      # Host tools in the IDK can depend on SDK categories up to "host_tool".
+      assert_no_deps += markers_partner_idk_host_tools_must_not_depend_on
     }
   }
 }

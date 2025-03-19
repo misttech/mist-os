@@ -118,12 +118,16 @@ template("fidl_library") {
       # "sdk_compat_test_libs_allowlist" target, which is used to ensure
       # that the API compatibility tests actually run on these libraries.
       category_allowlist_deps = [ "//sdk/fidl:sdk_compat_test_libs_allowlist" ]
-    } else if (category == "partner_internal") {
-      # Ensures that all libraries in the "partner_internal" category are in the
-      # "sdk_partner_internal_libs_allowlist" target, which is used to ensure
+    } else if (category == "host_tool") {
+      # Ensures that all libraries in the "host_tool" category are in the
+      # "sdk_host_tool_libs_allowlist" target, which is used to ensure
       # that the API compatibility tests actually run on these libraries.
-      category_allowlist_deps =
-          [ "//sdk/fidl:sdk_partner_internal_libs_allowlist" ]
+      category_allowlist_deps = [ "//sdk/fidl:sdk_host_tool_libs_allowlist" ]
+    } else if (category == "prebuilt") {
+      # Ensures that all libraries in the "prebuilt" category are in the
+      # "sdk_prebuilt_libs_allowlist" target, which is used to ensure
+      # that the API compatibility tests actually run on these libraries.
+      category_allowlist_deps = [ "//sdk/fidl:sdk_prebuilt_libs_allowlist" ]
     } else if (category == "partner") {
       if (is_vendor_library) {
         # Vendor SDK libraries are `is_sdk_included_publishable` but not in the
@@ -138,7 +142,7 @@ template("fidl_library") {
     } else {
       assert(
           false,
-          "Unrecognized SDK category '$category'. Currently supported categories are: 'partner', 'partner_internal', and 'compat_test'. For libraries not in the IDK, do not specify `sdk_category`.")
+          "Unrecognized SDK category '$category'. Currently supported categories are: 'partner', 'prebuilt', 'host_tool', and 'compat_test'. For libraries not in the IDK, do not specify `sdk_category`.")
     }
   } else {
     category_allowlist_deps = []
@@ -297,7 +301,8 @@ template("fidl_library") {
            requires_compatibility_tests &&
            (is_sdk_included_publishable ||
                 invoker.sdk_category == "compat_test" ||
-                invoker.sdk_category == "partner_internal")) ||
+                invoker.sdk_category == "host_tool" ||
+                invoker.sdk_category == "prebuilt")) ||
           (fidlc_versioned_arg == "fuchsia" && _is_banjo_sysmem && !is_stable &&
                !requires_compatibility_tests && !is_sdk_included_publishable) ||
           (fidlc_versioned_arg == "fuchsia:HEAD" && !is_stable &&
@@ -716,9 +721,10 @@ template("fidl_library") {
       metadata = {
         # For libraries included in an IDK, add the metadata to the list used to
         # generate documentation.
-        # Historically, libraries in the  "partner_internal" SDK category have
-        # also been published, so include them as well.
-        if (is_sdk_included_publishable || category == "partner_internal") {
+        # Historically, libraries in the  "host_tool" and "prebuilt" SDK
+        # categories have also been published, so include them as well.
+        if (is_sdk_included_publishable || category == "host_tool" ||
+            category == "prebuilt") {
           sdk_fidl_json_data = [
             {
               name = library_name

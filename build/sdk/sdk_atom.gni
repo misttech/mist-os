@@ -52,10 +52,14 @@ _types_not_requiring_compatibility = [
 #   category
 #     Describes the availability of the element.
 #     Possible values, from most restrictive to least restrictive:
-#       - internal         : the atom is exposed in-tree to the Bazel SDK build via `@internal_sdk`.
-#       - compat_test      : May be used in CTF realm proxies to enable tests to configure the target.
-#       - partner_internal : The atom may be used internally by other atoms in SDKs for partners.
-#       - partner          : The atom may be included in SDKs for partners.
+#       - internal    : the atom is exposed in-tree to the Bazel SDK build via `@internal_sdk`.
+#       - compat_test : May be used to configure and run CTF tests but may not be exposed for use
+#                       in production in the SDK or used by host tools.
+#       - host_tool   : May be used by host tools (e.g., ffx) provided by the platform organization
+#                       but may not be used by production code or prebuilt binaries in the SDK.
+#       - prebuilt    : May be part of the ABI that prebuilt binaries included in the SDK use to
+#                       interact with the platform.
+#       - partner     : Included in the SDK for direct use of the API by out-of-tree developers.
 #
 #   sdk_area (optional)
 #     The API area responsible for maintaining this SDK atom. See
@@ -175,7 +179,8 @@ template("sdk_atom") {
   _allowed_categories = [
     # "internal" is deprecated; only specific legacy cases below are allowed.
     "compat_test",
-    "partner_internal",
+    "host_tool",
+    "prebuilt",
     "partner",
   ]
 

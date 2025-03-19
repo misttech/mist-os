@@ -106,7 +106,8 @@ python_library("fuchsia_controller_py") {
   # Ensure all FIDL dependencies meet the compatibility and stability
   # requirements.
   # There are currently exceptions - see https://fxbug.dev/42081073.
-  assert_no_deps = markers_partner_idk_prebuilts_must_not_depend_on
+  # Host tools in the IDK can depend on SDK categories up to "host_tool".
+  assert_no_deps = markers_partner_idk_host_tools_must_not_depend_on
 }
 
 python_library("fidl_bindings") {

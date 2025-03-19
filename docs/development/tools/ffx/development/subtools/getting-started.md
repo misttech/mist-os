@@ -237,7 +237,7 @@ to run it.
 
 It's recommended that subtools initially do not include an `sdk_category` in
 their `BUILD.gn`. These subtools without a specified category are considered
-“experimental”, and they will not be part of an SDK build. If users want to use
+"internal", and they will not be part of SDKs. If users want to use
 the binary, they will have to be given the binary directly.
 
 Subcommands, however, are handled differently.
@@ -251,8 +251,8 @@ However, there are problems with this approach, such as a lack of any verificati
 of the FIDL dependencies of the subcommand. Therefore, the mechanism for handling
 subcommands is currently being changed as of December, 2023.
 
-Similar to subtools, subcommands will be able to declare their SDK category (with
-the default being “experimental”) to determine whether the subcommands are available.
+Similar to subtools, subcommands will be able to declare their SDK category
+to determine whether the subcommands are available in SDKs.
 The subtool will be built with only the subcommands at or above the subtool’s category
 level. The FIDL dependency check will correctly verify the subcommand’s requirements.
 
@@ -271,7 +271,7 @@ the SDK and IDK:
 
 1. FIDL libraries - You are required to add any FIDL libraries you are dependent
    on to the SDK when you add a subtool to the SDK. (For details, see
-   [Promoting an API to partner_internal][promoting-an-api-to-partner-internal].)
+   [Promoting an API to `host_tool`][promoting-an-api-to-host_tool].)
 
 2. Command line arguments - In order to test for breaking changes due to command line
    option changes, the [ArgsInfo] derive macro is used to generate a JSON representation
@@ -326,6 +326,6 @@ Subtools are required to follow the
 [golden-file-test]: /src/developer/ffx/tests/cli-goldens/README.md
 [MachineWriter]: /docs/development/tools/ffx/development/subtools/writers.md
 [overnet]: /src/connectivity/overnet/
-[promoting-an-api-to-partner-internal]: /docs/contribute/sdk#promoting_an_api_to_the_partner_internal_category
+[promoting-an-api-to-host_tool]: /docs/contribute/sdk/README.md#promoting-to-host-tool
 [sdk-gn-file]: /sdk/BUILD.gn
 [rust-testing]: /docs/development/languages/rust/testing.md

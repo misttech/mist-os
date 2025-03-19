@@ -14,7 +14,7 @@ ffx_subtool_fidl_partner_unstable_allowlist = [
   "//sdk/fidl/fuchsia.wlan.stats:fuchsia.wlan.stats",
 ]
 
-# Unstable FIDL libraries that are not in "partner_internal" or greater but are
+# Unstable FIDL libraries that are not in "host_tool" or greater but are
 # temporarily allowed to be depended on by a ffx plugin/subtool.
 # TODO(https://fxbug.dev/42081073): Add these to the SDK or remove the
 # plugin/tool from the SDK and remove them below.

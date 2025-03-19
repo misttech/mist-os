@@ -40,7 +40,11 @@ idk_category_marker_template("compat_test") {
   ]
 }
 
-idk_category_marker_template("partner_internal") {
+idk_category_marker_template("host_tool") {
+  visibility = [ "//sdk/fidl/*" ]
+}
+
+idk_category_marker_template("prebuilt") {
   visibility = [ "//sdk/fidl/*" ]
 }
 
@@ -123,12 +127,17 @@ group("test_all_marker_lists") {
   testonly = true
   visibility = [ ":tests" ]
   deps = markers_partner_idk_sources_must_not_depend_on_indirectly +
-         markers_partner_idk_prebuilts_must_not_depend_on
+         markers_partner_idk_prebuilts_must_not_depend_on +
+         markers_partner_idk_host_tools_must_not_depend_on
 
   assert(markers_partner_idk_sources_must_not_depend_on_indirectly ==
          markers_partner_idk_prebuilts_must_not_depend_on)
 
-  assert(markers_partner_idk_prebuilts_must_not_depend_on == [
+  assert(markers_partner_idk_prebuilts_must_not_depend_on -
+         [ "//sdk/categories:marker-host_tool" ] ==
+         markers_partner_idk_host_tools_must_not_depend_on)
+
+  assert(markers_partner_idk_host_tools_must_not_depend_on == [
            "//sdk/categories:marker-not-in-idk",
            "//sdk/categories:marker-compat_test",
          ])
