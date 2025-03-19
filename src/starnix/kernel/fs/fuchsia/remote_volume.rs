@@ -18,6 +18,8 @@ use std::sync::Arc;
 use syncio::{zxio_node_attr_has_t, zxio_node_attributes_t, Zxio};
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
+const CRYPT_THREAD_ROLE: &str = "fuchsia.starnix.remotevol.crypt";
+
 pub struct RemoteVolume {
     remotefs: RemoteFs,
     volume_provider: StarnixVolumeProviderSynchronousProxy,
@@ -106,7 +108,7 @@ pub fn new_remote_vol(
     crypt.add_wrapping_key(wrapping_key_id, wrapping_key_bytes.to_vec(), 0)?;
     crypt.set_metadata_key(wrapping_key_id)?;
 
-    kernel.kthreads.spawner().spawn(|_, _| {
+    kernel.kthreads.spawner().spawn_with_role(CRYPT_THREAD_ROLE, |_, _| {
         let mut executor = fasync::LocalExecutor::new();
         executor.run_singlethreaded(async move {
             if let Err(e) = crypt.handle_connection(crypt_proxy.into_stream()).await {
