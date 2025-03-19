@@ -54,12 +54,13 @@ class __TA_CAPABILITY("mutex") SeqLock {
   }
 
   // Read Transactions (eg; "locking" for read)
-  ReadTransactionToken BeginReadTransaction() __TA_ACQUIRE_SHARED();
-  bool TryBeginReadTransaction(ReadTransactionToken& out_token, zx_duration_mono_t timeout = 0)
+  ReadTransactionToken BeginReadTransaction() const __TA_ACQUIRE_SHARED();
+  bool TryBeginReadTransaction(ReadTransactionToken& out_token,
+                               zx_duration_mono_t timeout = 0) const __TA_TRY_ACQUIRE_SHARED(true);
+  bool TryBeginReadTransactionDeadline(ReadTransactionToken& out_token,
+                                       zx_instant_mono_t deadline) const
       __TA_TRY_ACQUIRE_SHARED(true);
-  bool TryBeginReadTransactionDeadline(ReadTransactionToken& out_token, zx_instant_mono_t deadline)
-      __TA_TRY_ACQUIRE_SHARED(true);
-  bool EndReadTransaction(ReadTransactionToken token) __TA_RELEASE_SHARED();
+  bool EndReadTransaction(ReadTransactionToken token) const __TA_RELEASE_SHARED();
 
   // Exclusive locking.
   void Acquire() __TA_ACQUIRE();
