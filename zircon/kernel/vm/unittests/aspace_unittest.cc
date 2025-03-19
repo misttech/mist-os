@@ -1851,6 +1851,23 @@ static bool vm_mapping_page_fault_range_test() {
     EXPECT_TRUE(original_counts == child_vmo->GetAttributedMemory());
   }
 
+  // Calling ReadUser will fault the requested range.
+  {
+    EXPECT_OK(vmo->DecommitRange(0, kAllocSize));
+    vmo->CommitRange(0, kAllocSize);
+
+    ASSERT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, 0));
+
+    size_t read_actual = 0;
+    zx_status_t status = vmo->ReadUser(mapping->user_out<char>(), 0, sizeof(char[PAGE_SIZE * 2]),
+                                       VmObjectReadWriteOptions::None, &read_actual);
+    ASSERT_EQ(status, ZX_OK);
+    ASSERT_EQ(read_actual, sizeof(char[PAGE_SIZE * 2]));
+
+    // The page fault optimisation should not have been triggered so the exact range is mapped.
+    ASSERT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, 2));
+  }
+
   END_TEST;
 }
 

@@ -1531,9 +1531,12 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
         // If a fault has actually occurred, then we will have captured fault info that we can use
         // to handle the fault.
         if (copy_result.fault_info.has_value()) {
-          guard->CallUnlocked([&info = *copy_result.fault_info, &status] {
-            status = Thread::Current::SoftFault(info.pf_va, info.pf_flags);
-          });
+          guard->CallUnlocked(
+              [&info = *copy_result.fault_info, to_fault = len - dest_offset, &status] {
+                // If status is not ZX_OK, there is no guarantee that any of the data has been
+                // copied.
+                status = Thread::Current::SoftFaultInRange(info.pf_va, info.pf_flags, to_fault);
+              });
           if (status == StatusType(ZX_OK)) {
             status = LockDroppedTag{};
           }
