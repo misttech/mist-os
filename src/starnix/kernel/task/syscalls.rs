@@ -1923,13 +1923,14 @@ pub fn sys_vhangup(
 mod arch32 {
     pub use super::{
         sys_execve as sys_arch32_execve, sys_geteuid as sys_arch32_geteuid32,
-        sys_getresgid as sys_arch32_getresgid32, sys_getresuid as sys_arch32_getresuid32,
-        sys_getrlimit as sys_arch32_ugetrlimit, sys_getuid as sys_arch32_getuid32,
-        sys_sched_getaffinity as sys_arch32_sched_getaffinity,
+        sys_getppid as sys_arch32_getppid, sys_getresgid as sys_arch32_getresgid32,
+        sys_getresuid as sys_arch32_getresuid32, sys_getrlimit as sys_arch32_ugetrlimit,
+        sys_getuid as sys_arch32_getuid32, sys_sched_getaffinity as sys_arch32_sched_getaffinity,
         sys_sched_setaffinity as sys_arch32_sched_setaffinity,
         sys_setgroups as sys_arch32_setgroups32, sys_setpriority as sys_arch32_setpriority,
         sys_setresgid as sys_arch32_setresgid32, sys_setresuid as sys_arch32_setresuid32,
-        sys_setrlimit as sys_arch32_setrlimit, sys_syslog as sys_arch32_syslog,
+        sys_setrlimit as sys_arch32_setrlimit, sys_setsid as sys_arch32_setsid,
+        sys_syslog as sys_arch32_syslog,
     };
 }
 

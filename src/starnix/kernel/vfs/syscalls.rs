@@ -3456,13 +3456,14 @@ mod arch32 {
     }
 
     pub use super::{
-        sys_epoll_create1 as sys_arch32_epoll_create1, sys_epoll_ctl as sys_arch32_epoll_ctl,
-        sys_fchmod as sys_arch32_fchmod, sys_fchown as sys_arch32_fchown32,
-        sys_fchown as sys_arch32_fchown, sys_fstatat64 as sys_arch32_fstatat64,
-        sys_ftruncate as sys_arch32_ftruncate, sys_mknodat as sys_arch32_mknodat,
-        sys_preadv as sys_arch32_preadv, sys_readv as sys_arch32_readv,
-        sys_renameat2 as sys_arch32_renameat2, sys_splice as sys_arch32_splice,
-        sys_tee as sys_arch32_tee, sys_timerfd_create as sys_arch32_timerfd_create,
+        sys_dup3 as sys_arch32_dup3, sys_epoll_create1 as sys_arch32_epoll_create1,
+        sys_epoll_ctl as sys_arch32_epoll_ctl, sys_fchmod as sys_arch32_fchmod,
+        sys_fchown as sys_arch32_fchown32, sys_fchown as sys_arch32_fchown,
+        sys_fstatat64 as sys_arch32_fstatat64, sys_ftruncate as sys_arch32_ftruncate,
+        sys_mknodat as sys_arch32_mknodat, sys_preadv as sys_arch32_preadv,
+        sys_readv as sys_arch32_readv, sys_renameat2 as sys_arch32_renameat2,
+        sys_splice as sys_arch32_splice, sys_tee as sys_arch32_tee,
+        sys_timerfd_create as sys_arch32_timerfd_create,
         sys_timerfd_settime as sys_arch32_timerfd_settime, sys_truncate as sys_arch32_truncate,
         sys_vmsplice as sys_arch32_vmsplice,
     };
