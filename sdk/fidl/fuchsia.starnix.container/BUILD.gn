@@ -5,7 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.starnix.container") {
-  sdk_category = "partner_internal"
+  sdk_category = "host_tool"
   sdk_area = "Unknown"
   stable = true
   sources = [ "controller.fidl" ]

@@ -5,9 +5,9 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.vulkan.loader") {
-  sdk_category = "partner_internal"
+  sdk_category = "prebuilt"
   stable = true
-  sdk_area = "Unknown"
+  sdk_area = "Graphics"
 
   sources = [ "loader.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]

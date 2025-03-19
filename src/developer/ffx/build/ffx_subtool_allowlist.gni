@@ -29,7 +29,7 @@ ffx_subtool_fidl_allowlist = [
   "//zircon/vdso:zx",
 
   # ffx driver
-  # "//sdk/fidl/fuchsia.device:fuchsia.device" is in "partner_internal", but
+  # "//sdk/fidl/fuchsia.device:fuchsia.device" is in "prebuilt", but
   # most APIs in it are unstable.
   "//sdk/fidl/fuchsia.driver.playground:fuchsia.driver.playground",
 

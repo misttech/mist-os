@@ -275,7 +275,16 @@ group("sdk_partner_libs_allowlist") {
 #   git rm sdk/history/*/<library_name>.api_summary.json
 _prebuilt_fidl_libraries_targets_list = [
   # keep-sorted: begin
-  # TODO(https://fxbug.dev/397525399): Migrate libraries from host_tool to here.
+  "//sdk/fidl/fuchsia.device:fuchsia.device",
+  "//sdk/fidl/fuchsia.fs:fuchsia.fs",
+  "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty",
+  "//sdk/fidl/fuchsia.net.name:fuchsia.net.name",
+  "//sdk/fidl/fuchsia.posix:fuchsia.posix",
+  "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket",
+  "//sdk/fidl/fuchsia.posix.socket.packet:fuchsia.posix.socket.packet",
+  "//sdk/fidl/fuchsia.posix.socket.raw:fuchsia.posix.socket.raw",
+  "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader",
+
   # keep-sorted: end
 ]
 
@@ -316,24 +325,15 @@ _host_tool_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.debugger:fuchsia.debugger",
   "//sdk/fidl/fuchsia.developer.ffxdaemonlifecycle:fuchsia.developer.ffxdaemonlifecycle",
   "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol",
-  "//sdk/fidl/fuchsia.device:fuchsia.device",
   "//sdk/fidl/fuchsia.diagnostics.host:fuchsia.diagnostics.host",
-  "//sdk/fidl/fuchsia.fs:fuchsia.fs",
-  "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty",
   "//sdk/fidl/fuchsia.memory.debug:fuchsia.memory.debug",
   "//sdk/fidl/fuchsia.memory.heapdump.client:fuchsia.memory.heapdump.client",
   "//sdk/fidl/fuchsia.memory.inspection:fuchsia.memory.inspection",
-  "//sdk/fidl/fuchsia.net.name:fuchsia.net.name",
   "//sdk/fidl/fuchsia.overnet.protocol:fuchsia.overnet.protocol",
-  "//sdk/fidl/fuchsia.posix:fuchsia.posix",
-  "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket",
-  "//sdk/fidl/fuchsia.posix.socket.packet:fuchsia.posix.socket.packet",
-  "//sdk/fidl/fuchsia.posix.socket.raw:fuchsia.posix.socket.raw",
   "//sdk/fidl/fuchsia.power.metrics:fuchsia.power.metrics",
   "//sdk/fidl/fuchsia.starnix.container:fuchsia.starnix.container",
   "//sdk/fidl/fuchsia.sys2:fuchsia.sys2",
   "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager",
-  "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader",
 
   # keep-sorted: end
 ]

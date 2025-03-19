@@ -169,14 +169,6 @@ template("fidl") {
              invoker.sdk_category == "partner",
          "`stable` must be true unless the category is 'partner'.")
 
-  # Adapt to the new categories until all instances of "partner_internal" are
-  # converted.
-  # TODO(https://fxbug.dev/397525399): Remove after converting all instances.
-  if (defined(invoker.sdk_category) &&
-      invoker.sdk_category == "partner_internal") {
-    invoker.sdk_category = "host_tool"
-  }
-
   # Define values that will be used to generate other variables here so that
   # such use does not count as having used the member of `common_parameters.
   _fidl_target_name = target_name
