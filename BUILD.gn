@@ -22,40 +22,15 @@ import("//build/toolchain/zircon/clang.gni")
 import("//build/zbi/zbi.gni")
 
 declare_args() {
-  ## NOTE:  The "legacy_*" versions of these args are part of multi-month
-  #         transition to using product assembly and separate the definition of
-  #         the platform from the definition of the product.
-  #
-  #         These args replace the use of the non-"legacy_" prefixed arg
-  #         throughout the product definition files (//products/**/*.gni).
-  #
-  #  NOTE:  These "legacy_*" args will go away when the long-term transition to
-  #         product assembly is complete, and they should not be relied upon
-  #         within developer's own args.gn files or BUILD.gn files.
-
-  # If you add package labels to this variable, the packages will be included in
-  # the 'base' package set, which represents the set of packages that are part
-  # of an OTA. These packages are updated as an atomic unit during an OTA
-  # process and are immutable and are a superset of the TCB (Trusted Computing
-  # Base) for a product. These packages are never evicted by the system.
+  # These remain only to allow for a soft-transition with developer's
+  # local args.gn files.
   base_package_labels = []
-  legacy_base_package_labels = []
-
-  # If you add package labels to this variable, the packages will be included
-  # in the 'cache' package set, which represents an additional set of software
-  # that is made available on disk immediately after paving and in factory
-  # flows. These packages are updated with an OTA, and can also be updated
-  # ephemerally. This cache of software can be evicted by the system if storage
-  # pressure arises or other policies indicate.
   cache_package_labels = []
-  legacy_cache_package_labels = []
 
   # If you add package labels to this variable, the packages will be included
   # in the 'universe' package set, which represents all software that is
   # produced that is to be published to a package repository or to the SDK by
-  # the build. The build system ensures that the universe package set includes
-  # the base and cache package sets, which means you do not need to redundantly
-  # include those labels in this variable.
+  # the build.
   universe_package_labels = []
 
   # If you add package labels to this variable, the packages will be included in
@@ -163,7 +138,7 @@ if (base_package_labels != [] || cache_package_labels != []) {
   print()
   print(
       "WARNING:  The 'base_package_labels' and 'cache_package_labels' GN build arguments")
-  print("          have been deprecated and will some become non-functional.")
+  print("          are being removed and can no longer be used.")
   print()
   print(
       "  To add tests, use '--with-test' or the 'developer_test_labels' GN arg.")
@@ -173,6 +148,7 @@ if (base_package_labels != [] || cache_package_labels != []) {
   print(
       "  https://fuchsia.dev/fuchsia-src/development/build/assembly_developer_overrides#add-package")
   print()
+  assert(false)
 }
 
 ###
@@ -1118,16 +1094,8 @@ generated_file("tests_from_metadata") {
     # Pull in tests from the developer
     "//:developer_specified_tests",
 
-    # While these should be redundant with the above, they way in which they are
-    # redundant (included via the main assembly) is quite opaque, and so they
-    # are listed here for developers to be able to see (and to ensure that all
-    # developer-chosen tests are in the build api, catching any failures to
-    # include those tests in the assembly.
-    #
     # This is deprecated, and the above type-specific groups should be used
     # instead.
-    ":developer_base_packages",
-    ":developer_cache_packages",
     ":developer_universe_packages",
   ]
 }
@@ -1172,16 +1140,8 @@ build_api_module("test_components") {
     # Pull in tests from the developer
     "//:developer_specified_tests",
 
-    # While these should be redundant with the above, they way in which they are
-    # redundant (included via the main assembly) is quite opaque, and so they
-    # are listed here for developers to be able to see (and to ensure that all
-    # developer-chosen tests are in the build api, catching any failures to
-    # include those tests in the assembly.
-    #
     # This is deprecated, and the above type-specific groups should be used
     # instead.
-    ":developer_base_packages",
-    ":developer_cache_packages",
     ":developer_universe_packages",
   ]
 }
@@ -1983,38 +1943,6 @@ group("build_only") {
 # For any target in this file, but only in this file.
 #
 
-# Base packages added by the developer, using `fx set` or `fx args`
-group("developer_base_packages") {
-  testonly = base_cache_packages_testonly
-  visibility = [
-    ":test_components",
-    ":tests_from_metadata",
-    "//build/images/*",
-  ]
-
-  public_deps = base_package_labels
-
-  # the buildbot host tests should only be added via `--with-host`, to the
-  # `host_labels` GN arg.
-  assert_no_deps = [ "//bundles/buildbot/host/*" ]
-}
-
-# Cache packages added by the developer, using `fx set --with <foo>` or
-# `fx args`
-group("developer_cache_packages") {
-  testonly = base_cache_packages_testonly
-  visibility = [
-    ":test_components",
-    ":tests_from_metadata",
-    "//build/images/*",
-  ]
-  public_deps = cache_package_labels
-
-  # the buildbot host tests should only be added via `--with-host`, to the
-  # `host_labels` GN arg.
-  assert_no_deps = [ "//bundles/buildbot/host/*" ]
-}
-
 # Universe packages added by the developer, using `fx set` or `fx args`
 group("developer_universe_packages") {
   testonly = fuchsia_zbi_testonly
@@ -2037,34 +1965,6 @@ group("developer_universe_packages") {
   metadata = {
     test_type_validation_barrier = []
   }
-}
-
-##
-# "Legacy Product Definition" package groups.  These are only manipulated by
-# product definitions, not changed by developer options like
-# `fx set --with <foo>` or `fx args`
-#
-
-# Product+Board base packages
-group("legacy_base_packages") {
-  testonly = base_cache_packages_testonly
-  visibility = [
-    "//build/assembly/*",
-    "//build/images/*",
-  ]
-  public_deps = legacy_base_package_labels
-  assert_no_deps = [ "//build/validate:shell_command_tag" ]
-}
-
-# Product+Board cache packages
-group("legacy_cache_packages") {
-  testonly = base_cache_packages_testonly
-  visibility = [
-    "//build/assembly/*",
-    "//build/images/*",
-  ]
-  public_deps = legacy_cache_package_labels
-  assert_no_deps = [ "//build/validate:shell_command_tag" ]
 }
 
 ###

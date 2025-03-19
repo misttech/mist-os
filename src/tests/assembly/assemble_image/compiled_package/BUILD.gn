@@ -4,7 +4,6 @@
 
 import("//build/python/python_host_test.gni")
 import("//build/testing/host_test.gni")
-import("//src/sys/core/build/core.gni")
 import("//src/tests/assembly/assemble_image/test_assembly_config.gni")
 
 # The test_assembly_config() template needs to do some things on the

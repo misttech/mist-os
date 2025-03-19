@@ -46,10 +46,6 @@ load(
     _fuchsia_gen_android_starnix_container = "fuchsia_gen_android_starnix_container",
 )
 load(
-    "//fuchsia/private/assembly:fuchsia_legacy_bundle.bzl",
-    _fuchsia_legacy_bundle = "fuchsia_legacy_bundle",
-)
-load(
     "//fuchsia/private/assembly:fuchsia_package_directory.bzl",
     _fuchsia_package_directory = "fuchsia_package_directory",
 )
@@ -137,7 +133,6 @@ load(
 # Rules
 fuchsia_prebuilt_assembly_developer_overrides = _fuchsia_prebuilt_assembly_developer_overrides
 fuchsia_assembly_developer_overrides_list = _fuchsia_assembly_developer_overrides_list
-fuchsia_legacy_bundle = _fuchsia_legacy_bundle
 fuchsia_gen_android_starnix_container = _fuchsia_gen_android_starnix_container
 fuchsia_platform_artifacts = _fuchsia_platform_artifacts
 fuchsia_prebuilt_package = _fuchsia_prebuilt_package

@@ -5,8 +5,8 @@
 import("//build/assembly/assembled_system.gni")
 import("//build/assembly/board_configuration.gni")
 import("//build/assembly/product_assembly_configuration.gni")
+import("//build/testing/host_test_data.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")
-import("//src/sys/core/build/core.gni")
 
 # Wraps assembled_system to allow adding internal network-conformance test stubs.
 #

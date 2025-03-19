@@ -19,10 +19,7 @@ if (current_cpu == "x64") {
     bazel_product_image_target = ":image.x64"
     bazel_recovery_image_target = "//products/zedboot:x64"
     bazel_elf_sizes_target = ":elf_sizes.x64"
-    bazel_inputs_from_gn = [
-      "//build/images/flash:esp.bazel_input",
-      "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
-    ]
+    bazel_inputs_from_gn = [ "//build/images/flash:esp.bazel_input" ]
     if (board_configuration_label != false) {
       bazel_inputs_from_gn += [
         # Add the board configuration as a dependency via the GN arg, as vendor-
@@ -46,7 +43,6 @@ if (current_cpu == "arm64") {
     bazel_inputs_from_gn = [
       "//boards/arm64:arm64.bazel_input",
       "//build/images/flash:esp.bazel_input",
-      "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
     ]
   }
 
@@ -58,10 +54,7 @@ if (current_cpu == "arm64") {
     bazel_product_image_target = ":image.vim3"
     bazel_recovery_image_target = "//products/zedboot:vim3"
     bazel_elf_sizes_target = ":elf_sizes.vim3"
-    bazel_inputs_from_gn = [
-      "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
-      "//boards/vim3:bazel_inputs",
-    ]
+    bazel_inputs_from_gn = [ "//boards/vim3:bazel_inputs" ]
   }
 
   bazel_product_bundle("product_bundle.emac") {
@@ -71,10 +64,8 @@ if (current_cpu == "arm64") {
     bazel_product_bundle_target = ":product_bundle.emac"
     bazel_product_image_target = ":image.emac"
     bazel_elf_sizes_target = ":elf_sizes.emac"
-    bazel_inputs_from_gn = [
-      "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
-      "//src/devices/board/drivers/vim3-devicetree:vim3-dtb",
-    ]
+    bazel_inputs_from_gn =
+        [ "//src/devices/board/drivers/vim3-devicetree:vim3-dtb" ]
   }
 }
 
@@ -87,10 +78,7 @@ if (current_cpu == "riscv64") {
     bazel_product_image_target = ":image.riscv64"
     bazel_recovery_image_target = "//products/zedboot:riscv64"
     bazel_elf_sizes_target = ":elf_sizes.riscv64"
-    bazel_inputs_from_gn = [
-      "//boards/riscv64:riscv64.bazel_input",
-      "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
-    ]
+    bazel_inputs_from_gn = [ "//boards/riscv64:riscv64.bazel_input" ]
   }
 }
 

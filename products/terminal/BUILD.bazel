@@ -168,7 +168,6 @@ fuchsia_product_configuration(
 fuchsia_product(
     name = "image.x64",
     board_config = "//boards:x64",
-    legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_config",
 )
@@ -198,7 +197,6 @@ fuchsia_product_bundle(
 fuchsia_product(
     name = "image_with_netstack2.x64",
     board_config = "//boards:x64",
-    legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_config_with_netstack2",
 )
@@ -228,7 +226,6 @@ fuchsia_product_bundle(
 fuchsia_product(
     name = "image.x64_reduced_perf_variation",
     board_config = "//boards:x64_reduced_perf_variation",
-    legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_config",
 )
@@ -258,7 +255,6 @@ fuchsia_product_bundle(
 fuchsia_product(
     name = "image_with_netstack2.x64_reduced_perf_variation",
     board_config = "//boards:x64_reduced_perf_variation",
-    legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_config_with_netstack2",
 )
@@ -288,7 +284,6 @@ fuchsia_product_bundle(
 fuchsia_product(
     name = "image.arm64",
     board_config = "//boards:arm64",
-    legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_config",
 )
@@ -318,7 +313,6 @@ fuchsia_product_bundle(
 fuchsia_product(
     name = "image_with_netstack2.arm64",
     board_config = "//boards:arm64",
-    legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_config_with_netstack2",
 )
@@ -348,7 +342,6 @@ fuchsia_product_bundle(
 fuchsia_product(
     name = "image.qemu-arm64",
     board_config = "//boards:qemu-arm64",
-    legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_config",
 )
@@ -378,7 +371,6 @@ fuchsia_product_bundle(
 fuchsia_product(
     name = "image_with_netstack2.qemu-arm64",
     board_config = "//boards:qemu-arm64",
-    legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_config_with_netstack2",
 )
@@ -408,7 +400,6 @@ fuchsia_product_bundle(
 fuchsia_product(
     name = "image.vim3",
     board_config = "//boards:vim3",
-    legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_config",
 )
@@ -438,7 +429,6 @@ fuchsia_product_bundle(
 fuchsia_product(
     name = "image_with_netstack2.vim3",
     board_config = "//boards:vim3",
-    legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_config_with_netstack2",
 )
@@ -486,7 +476,6 @@ fuchsia_product_configuration(
 fuchsia_product(
     name = "image.vim3_reduced_perf_variation",
     board_config = "//boards:vim3_reduced_perf_variation",
-    legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_config_reduced_perf_variation",
 )
@@ -541,7 +530,6 @@ fuchsia_product_configuration(
 fuchsia_product(
     name = "image_with_netstack2.vim3_reduced_perf_variation",
     board_config = "//boards:vim3_reduced_perf_variation",
-    legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_config_with_netstack2_reduced_perf_variation",
 )

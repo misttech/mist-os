@@ -21,7 +21,6 @@ if (is_fuchsia) {
   import("//build/bazel/assembly/bazel_product_bundle.gni")
   import("//build/images/paths.gni")
   import("//build/product.gni")
-  import("//src/sys/core/build/core.gni")
 
   product_assembly_configuration("product_assembly_config") {
     testonly = true

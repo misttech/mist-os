@@ -2,27 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("@rules_fuchsia//fuchsia:assembly.bzl", "fuchsia_legacy_bundle", "fuchsia_platform_artifacts")
+load("@rules_fuchsia//fuchsia:assembly.bzl", "fuchsia_platform_artifacts")
 
 package(default_visibility = ["//visibility:public"])
-
-fuchsia_legacy_bundle(
-    name = "legacy_fuchsia",
-    applicable_licenses = ["@gn_targets//:all_licenses_spdx_json"],
-    files = "@gn_targets//build/images/fuchsia:fuchsia.bazel_legacy_aib",
-)
-
-fuchsia_legacy_bundle(
-    name = "legacy_bringup",
-    applicable_licenses = ["@gn_targets//:all_licenses_spdx_json"],
-    files = "@gn_targets//build/images/bringup:bringup.bazel_legacy_aib",
-)
-
-fuchsia_legacy_bundle(
-    name = "legacy_zedboot",
-    applicable_licenses = ["@gn_targets//:all_licenses_spdx_json"],
-    files = "@gn_targets//build/images/zedboot:zedboot.bazel_legacy_aib",
-)
 
 alias(
     name = "platform_bringup",

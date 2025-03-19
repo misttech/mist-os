@@ -55,7 +55,6 @@ assert(fuchsia_product_assembly_config_label != false,
 
 bringup_base = {
   testonly = true
-  include_legacy_bundle = true
   output_dir = root_build_dir
   generate_vbmeta = use_vbmeta
 
@@ -71,8 +70,6 @@ bringup_base = {
   product_assembly_config_label = fuchsia_product_assembly_config_label
   board_config_label = board_configuration_label
   use_bringup_platform_bundles_only = true
-
-  bootfs_labels = [ "//:developer_base_packages" ]
 }
 
 assembled_system("bringup_assembly") {

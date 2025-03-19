@@ -14,16 +14,7 @@ import("//build/python/python_action.gni")
 import("//build/sdk/product_bundle.gni")
 import("//build/security.gni")
 import("//build/testing/host_test_data.gni")
-import("//src/sys/core/build/core.gni")
 import("//zircon/kernel/phys/qemu.gni")
-
-declare_args() {
-  # Create the package and archive for the legacy assembly input bundle.  This
-  # can be a time-consuming operation, which due to limits in GN and groups,
-  # ends up being a blocking step in the build, so only enable this if we know
-  # that we want the legacy AIB packaged and archived for a given product:
-  create_legacy_aib_archive = false
-}
 
 if (is_host) {
   host_test_data("fuchsia_zbi_for_host_tests") {
@@ -67,7 +58,6 @@ if (is_fuchsia) {
         ":fuchsia_assembly",
         ":product_bundle",
         ":update",
-        ":validate_universe_config_data_entries_empty",
       ]
     }
 
@@ -82,64 +72,44 @@ if (is_fuchsia) {
     }
   }
 
-  assembled_system("fuchsia_assembly") {
-    testonly = fuchsia_zbi_testonly
-    include_legacy_bundle = true
-    legacy_bundle_must_be_empty = true
-
-    generate_fvm = !fxfs_blob
-    generate_fxfs = fxfs_blob
-    generate_fvm_fastboot = !fxfs_blob && assembly_generate_fvm_fastboot
-    generate_fvm_nand = !fxfs_blob && assembly_generate_fvm_nand
-    generate_vbmeta = use_vbmeta
-
-    board_config_label = board_configuration_label
-
-    base_packages = [
-      "//:developer_base_packages",
-      "//:legacy_base_packages",
-    ]
-
-    cache_packages = [
-      "//:developer_cache_packages",
-      "//:legacy_cache_packages",
-    ]
-
-    if (generate_fvm) {
-      assembly_include_account_in_fvm = include_account_in_fvm
-    }
-
-    # zbi arguments
-    if (custom_signing_script != "") {
-      inputs = custom_signing_script_inputs
-      deps = [ "//build/images/custom_signing:deps" ]
-      generate_signed_zbi = true
-    } else if (use_vboot) {
-      inputs = vboot_action.inputs
-      generate_signed_zbi = true
-    }
-
-    if (fuchsia_product_assembly_config_label != false) {
-      product_assembly_config_label = fuchsia_product_assembly_config_label
-    }
-
-    output_dir = root_build_dir
-    image_name = "fuchsia"
-
-    # Bazel assembly should not depend on any targets from GN assembly other
-    # than the legacy AIB.
-    legacy_bundle_only = use_bazel_images_only
-
-    create_legacy_aib_package = create_legacy_aib_archive
-    create_legacy_aib_archive = create_legacy_aib_archive
-
-    image_metadata_overrides = legacy_fuchsia_image_metadata_overrides
-    include_assembly_inputs = true
-  }
-
   # Bazel assembly builds a product bundle, so we don't need to build product
   # bundle and update packages in GN.
   if (!use_bazel_images_only) {
+    assembled_system("fuchsia_assembly") {
+      testonly = fuchsia_zbi_testonly
+
+      generate_fvm = !fxfs_blob
+      generate_fxfs = fxfs_blob
+      generate_fvm_fastboot = !fxfs_blob && assembly_generate_fvm_fastboot
+      generate_fvm_nand = !fxfs_blob && assembly_generate_fvm_nand
+      generate_vbmeta = use_vbmeta
+
+      board_config_label = board_configuration_label
+
+      if (generate_fvm) {
+        assembly_include_account_in_fvm = include_account_in_fvm
+      }
+
+      # zbi arguments
+      if (custom_signing_script != "") {
+        inputs = custom_signing_script_inputs
+        deps = [ "//build/images/custom_signing:deps" ]
+        generate_signed_zbi = true
+      } else if (use_vboot) {
+        inputs = vboot_action.inputs
+        generate_signed_zbi = true
+      }
+
+      if (fuchsia_product_assembly_config_label != false) {
+        product_assembly_config_label = fuchsia_product_assembly_config_label
+      }
+
+      output_dir = root_build_dir
+      image_name = "fuchsia"
+
+      image_metadata_overrides = legacy_fuchsia_image_metadata_overrides
+    }
+
     files = {
       platform_aib_dir = get_label_info("//bundles/assembly", "target_out_dir")
 
@@ -280,43 +250,5 @@ if (is_fuchsia) {
         delivery_blob_type = delivery_blob_type
       }
     }
-  }
-
-  group("assembly_inputs") {
-    testonly = fuchsia_zbi_testonly
-    public_deps = [ ":fuchsia.legacy_input_bundle_assembly_inputs.json" ]
-  }
-
-  generated_file("universe_config_data_entries") {
-    testonly = fuchsia_zbi_testonly
-    deps = [ "//:developer_universe_packages" ]
-    data_keys = [ "config_package_entries" ]
-    walk_keys = [ "config_package_barrier" ]
-    output_conversion = "json"
-    outputs = [ "${target_out_dir}/universe_config_data_entries.json" ]
-  }
-
-  python_action("validate_universe_config_data_entries_empty") {
-    testonly = fuchsia_zbi_testonly
-    binary_label = "//build/assembly/scripts:validate_config_data_is_empty"
-    args = [
-      "--package-set",
-      "universe",
-      "--metadata-walk-results",
-      rebase_path("${target_out_dir}/universe_config_data_entries.json",
-                  root_build_dir),
-      "--package-allowlist",
-      rebase_path("//build/assembly/universe_config_data.allowlist.json",
-                  root_build_dir),
-      "--output",
-      rebase_path("${target_out_dir}/universe_config_data_entries_empty.txt",
-                  root_build_dir),
-    ]
-    inputs = [
-      "${target_out_dir}/universe_config_data_entries.json",
-      "//build/assembly/universe_config_data.allowlist.json",
-    ]
-    deps = [ ":universe_config_data_entries" ]
-    outputs = [ "${target_out_dir}/universe_config_data_entries_empty.txt" ]
   }
 }

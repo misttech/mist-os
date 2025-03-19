@@ -566,13 +566,3 @@ group("core_realm_shards_allowlist") {
   visibility +=
       [ "//src/security/lib/scrutiny/tests/structured_config:core_shard" ]
 }
-
-group("legacy_bundle_allowlist") {
-  visibility = []
-
-  visibility += [
-    # Owned closely by the assembly team.
-    "//build/images/bringup:*",
-    "//build/images/fuchsia:*",
-  ]
-}

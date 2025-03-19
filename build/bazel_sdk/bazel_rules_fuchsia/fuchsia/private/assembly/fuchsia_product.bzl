@@ -11,7 +11,6 @@ load(
     "FuchsiaAssemblyDeveloperOverridesInfo",
     "FuchsiaAssemblyDeveloperOverridesListInfo",
     "FuchsiaBoardConfigInfo",
-    "FuchsiaLegacyBundleInfo",
     "FuchsiaPlatformArtifactsInfo",
     "FuchsiaProductAssemblyInfo",
     "FuchsiaProductConfigInfo",
@@ -98,14 +97,6 @@ def _fuchsia_product_assembly_impl(ctx):
         ctx.attr.package_validation,
     ]
 
-    if ctx.attr.legacy_bundle:
-        legacy_bundle = ctx.attr.legacy_bundle[FuchsiaLegacyBundleInfo]
-        ffx_invocation.extend(["--legacy-bundle", legacy_bundle.root])
-        ffx_inputs += legacy_bundle.files
-
-    if ctx.attr.legacy_bundle_must_be_empty:
-        ffx_invocation.append("--legacy-bundle-must-be-empty")
-
     # Add developer overrides manifest and inputs if necessary.
     overrides_maps = ctx.attr._developer_overrides_list[FuchsiaAssemblyDeveloperOverridesListInfo].maps
     for (pattern_string, overrides_label) in overrides_maps.items():
@@ -187,14 +178,6 @@ _fuchsia_product_assembly = rule(
             doc = "Board configuration used to assemble this product.",
             providers = [FuchsiaBoardConfigInfo],
             mandatory = True,
-        ),
-        "legacy_bundle": attr.label(
-            doc = "Legacy AIB for this product.",
-            providers = [FuchsiaLegacyBundleInfo],
-        ),
-        "legacy_bundle_must_be_empty": attr.bool(
-            doc = "The Legacy AIB has been included, but must be empty.",
-            default = False,
         ),
         "platform_artifacts": attr.label(
             doc = "Platform artifacts to use for this product.",
@@ -294,8 +277,6 @@ def fuchsia_product(
         board_config,
         product_config,
         platform_artifacts = None,
-        legacy_bundle = None,
-        legacy_bundle_must_be_empty = False,
         package_validation = None,
         **kwargs):
     _fuchsia_product_assembly(
@@ -303,8 +284,6 @@ def fuchsia_product(
         board_config = board_config,
         product_config = product_config,
         platform_artifacts = platform_artifacts,
-        legacy_bundle = legacy_bundle,
-        legacy_bundle_must_be_empty = legacy_bundle_must_be_empty,
         package_validation = package_validation,
     )
 
