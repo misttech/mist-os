@@ -117,6 +117,30 @@ TEST_F(DriverRunnerDeathTest, AllowlistCausesBindToFail) {
   ASSERT_DEATH(TryBind(banned_controller_, test_loop()), "Undeclared DEVFS_USAGE detected");
 }
 
+void TryRebind(fidl::WireClient<fuchsia_device::Controller>& controller, async::TestLoop& loop) {
+  auto controller_endpoints = fidl::Endpoints<fuchsia_device::Controller>::Create();
+  controller->Rebind(fidl::StringView::FromExternal(second_driver_url))
+      .Then([](fidl::WireUnownedResult<fuchsia_device::Controller::Rebind>& reply) {
+        ASSERT_EQ(reply.status(), ZX_OK);
+      });
+
+  ASSERT_TRUE(loop.RunUntilIdle());
+}
+
+TEST_F(DriverRunnerDeathTest, AllowlistCausesRebindToFail) {
+  PrepareRealmForDriverComponentStart("dev.node-1", second_driver_url);
+  driver_index().set_match_callback([](auto args) -> zx::result<FakeDriverIndex::MatchResult> {
+    EXPECT_EQ(args.driver_url_suffix().get(), second_driver_url);
+    return zx::ok(FakeDriverIndex::MatchResult{
+        .url = second_driver_url,
+    });
+  });
+
+  TryRebind(allowed_controller_, test_loop());
+
+  ASSERT_DEATH(TryRebind(banned_controller_, test_loop()), "Undeclared DEVFS_USAGE detected");
+}
+
 void TryScheduleUnbind(fidl::WireClient<fuchsia_device::Controller>& controller,
                        async::TestLoop& loop) {
   auto controller_endpoints = fidl::Endpoints<fuchsia_device::Controller>::Create();

@@ -54,7 +54,16 @@ const std::unordered_map<std::string, std::unordered_set<std::string_view>> kCon
          "driver_runner_test",                                                // driver-runner-test
          "test",  // power-manager-integration-test
      }},
-    {"Rebind", {kAllowAllUses}},
+    {"Rebind",
+     {
+         "",                    // amlogic_decoder_integration_tests
+         "block",               // ramdisk-tests
+         "driver_runner_test",  // driver-runner-test
+         "nand",                // nandpart-broker-test
+         "intel-gpu-core",      // virtio_magma_unittests
+         "No_class_name_but_driver_url_is_fuchsia-boot:///dtr#meta/ddk-lifecycle-test.cm",  // ddk-lifecycle-test
+         "platform-dev",  // msd-vsi-vip-integration-tests
+     }},
     {"UnbindChildren",
      {
          "block",               // fshost_integration_tests_fxfs_no_fxblob.cm
