@@ -4,6 +4,8 @@
 @available(added=HEAD)
 library fuchsia.hardware.spmi;
 
+using fuchsia.power.system;
+
 /// Maximum length of the SPMI device name.
 const MAX_SPMI_NAME_LEN uint32 = 64;
 
@@ -88,11 +90,27 @@ open protocol Device {
     /// Returns `INVALID_ARGS` if `address` or `size` are invalid, or `BAD_STATE` if another call
     /// is pending for this register range. Returns `CANCELED` if
     /// `CancelWatchControllerWriteCommands()` was called for this register range.
-    flexible WatchControllerWriteCommands(struct {
+    ///
+    /// If this method is meant to keep the system awake (prevents suspension) while watch is setup,
+    /// use the passed-in `setup_wake_lease` `LeaseToken`. Then, when the watch is triggered this
+    /// method will return a second `wake_lease` `LeaseToken` to prevent suspension.
+    ///
+    /// These keep alive wake lease tokens are provided by the Power Framework's System Activity
+    /// Governor. A driver supporting keep alive must be able to get `wake_lease` from System
+    /// Activity Governor.
+    ///
+    /// When `wake_lease` is closed, then the created wake lease keeping the system from suspending
+    /// at the time of watch triggering is dropped. Hence, to guarantee that the system is not
+    /// suspended by the Power Framework a client must either keep this `wake_lease` for as long as
+    /// the system needs to stay awake, or a client must get its own wake lease from the Power
+    /// Framework before it drops `wake_lease` to prevent suspension.
+    flexible WatchControllerWriteCommands(resource struct {
         address uint8;
         size uint16;
-    }) -> (struct {
+        setup_wake_lease fuchsia.power.system.LeaseToken:optional;
+    }) -> (resource struct {
         writes vector<Register8>:MAX_CONTROLLER_WRITE_COMMANDS;
+        wake_lease fuchsia.power.system.LeaseToken:optional;
     }) error DriverError;
 
     /// Cancels an pending call to `WatchControllerWriteCommands`. `address` and `size` must
