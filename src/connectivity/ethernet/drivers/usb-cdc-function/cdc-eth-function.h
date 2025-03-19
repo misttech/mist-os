@@ -35,7 +35,9 @@ namespace usb_cdc_function {
 #define BULK_MAX_PACKET 512  // FIXME(voydanoff) USB 3.0 support
 #define INTR_MAX_PACKET sizeof(usb_cdc_speed_change_notification_t)
 
-#define ETH_MTU 1500
+// Total Ethernet MTU is 1514 bytes. 1500 bytes for IP and 14 bytes for Ethernet
+// header.
+#define ETH_MTU 1514
 
 class UsbCdc;
 using UsbCdcType = ddk::Device<UsbCdc, ddk::Initializable, ddk::Unbindable>;
