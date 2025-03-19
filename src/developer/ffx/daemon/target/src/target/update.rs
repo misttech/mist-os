@@ -412,6 +412,7 @@ mod tests {
             status: compat_info::CompatibilityState::Error,
             platform_abi: 0,
             message: "Error message here".into(),
+            overnet_id: None,
         };
 
         target.apply_update(

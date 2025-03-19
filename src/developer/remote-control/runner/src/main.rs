@@ -118,14 +118,16 @@ fn print_prelude_info(
     message: String,
     status: CompatibilityState,
     platform_abi: AbiRevision,
+    overnet_id: u64,
 ) -> Result<()> {
     let ssh_connection = std::env::var("SSH_CONNECTION")?;
     let info = ConnectionInfo {
-        ssh_connection: ssh_connection,
+        ssh_connection,
         compatibility: CompatibilityInfo {
             status,
             platform_abi: platform_abi.as_u64(),
-            message: message,
+            message,
+            overnet_id: Some(overnet_id),
         },
     };
 
@@ -160,6 +162,15 @@ async fn main() -> Result<()> {
     let args: Args = argh::from_env();
     // Perform the compatibility checking between the caller (the ffx daemon or
     // a standalone ffx command) and the platform (this program).
+    let rcs_proxy = connect_to_protocol::<ConnectorMarker>()?;
+    let (local_socket, remote_socket) = fidl::Socket::create_stream();
+
+    let overnet_id = if args.circuit {
+        rcs_proxy.establish_circuit(args.id.unwrap_or(0), remote_socket).await?
+    } else {
+        return Err(anyhow::format_err!("Legacy overnet is no longer supported."));
+    };
+
     if let Some(abi) = args.abi_revision {
         let host_overnet_revision = AbiRevision::from_u64(abi);
         let platform_abi = HISTORY.get_misleading_version_for_ffx().abi_revision;
@@ -177,21 +188,12 @@ async fn main() -> Result<()> {
                 warning
             }
         };
-        print_prelude_info(message, status, platform_abi)?;
+        print_prelude_info(message, status, platform_abi, overnet_id)?;
     } else {
         // This is the legacy caller that does not support compatibility checking. Do not write anything
         // to stdout.
         // messages to stderr will cause the pipe to close as well.
         log::warn!("--abi-revision not present. Compatibility checks are disabled.");
-    }
-
-    let rcs_proxy = connect_to_protocol::<ConnectorMarker>()?;
-    let (local_socket, remote_socket) = fidl::Socket::create_stream();
-
-    if args.circuit {
-        rcs_proxy.establish_circuit(args.id.unwrap_or(0), remote_socket).await?;
-    } else {
-        return Err(anyhow::format_err!("Legacy overnet is no longer supported."));
     }
 
     let local_socket = fidl::AsyncSocket::from_socket(local_socket);
@@ -277,7 +279,7 @@ mod test {
                 runner_stream.try_next().await
             {
                 last_id.replace(id);
-                responder.send().unwrap();
+                responder.send(0u64).unwrap();
             }
         })
         .detach();

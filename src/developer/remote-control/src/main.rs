@@ -28,8 +28,11 @@ async fn exec_server(config: &Config) -> Result<(), Error> {
     let connector = {
         let router = Arc::clone(&router);
         move |request, weak_self| match request {
-            ConnectionRequest::Overnet(socket) => {
+            ConnectionRequest::Overnet(socket, nodeid_sender) => {
                 let router = Arc::clone(&router);
+                if let Err(e) = nodeid_sender.send(router.node_id().0) {
+                    error!("Error sending node id: {e:?}");
+                }
                 fasync::Task::spawn(async move {
                     let socket = fidl::AsyncSocket::from_socket(socket);
                     let (mut rx, mut tx) = socket.split();

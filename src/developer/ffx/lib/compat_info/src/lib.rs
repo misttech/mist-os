@@ -82,6 +82,7 @@ pub struct CompatibilityInfo {
     #[serde(deserialize_with = "parse_string_or_u64")]
     pub platform_abi: u64,
     pub message: String,
+    pub overnet_id: Option<u64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
@@ -95,6 +96,7 @@ impl From<fidl_fuchsia_developer_remotecontrol::CompatibilityInfo> for Compatibi
             status: value.state.into(),
             platform_abi: value.platform_abi,
             message: value.message,
+            overnet_id: None,
         }
     }
 }

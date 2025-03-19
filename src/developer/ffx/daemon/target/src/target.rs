@@ -1226,6 +1226,7 @@ impl Target {
                             status: CompatibilityState::Error,
                             platform_abi: 0,
                             message: format!("Host connection failed: {e}"),
+                            overnet_id: None,
                         });
                         if let Some(target) = weak_target.upgrade() {
                             target.set_compatibility_status(&compatibility_status);
