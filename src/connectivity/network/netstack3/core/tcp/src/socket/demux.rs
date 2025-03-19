@@ -646,7 +646,7 @@ where
         }
     }
     let (reply, passive_open, data_acked, newly_closed) = state.on_segment::<_, BC>(
-        conn_id,
+        &conn_id.either(),
         &TcpCountersRefs::from_ctx(core_ctx),
         incoming,
         bindings_ctx.now(),
@@ -981,7 +981,7 @@ where
         // NB: This is a bit of a lie, we're passing the listener ID to process
         // the first segment because we don't have an ID allocated yet. This is
         // okay because the state machine ID is only for debugging purposes.
-        listener_id,
+        &listener_id.either(),
         &TcpCountersRefs::from_ctx(core_ctx),
         incoming,
         bindings_ctx.now(),

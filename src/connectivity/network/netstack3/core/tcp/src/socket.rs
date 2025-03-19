@@ -1874,13 +1874,9 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> TcpSocket
         let Self(inner) = self;
         inner.trace_id()
     }
-}
 
-impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> StateMachineDebugId
-    for TcpSocketId<I, D, BT>
-{
-    fn trace_id(&self) -> TraceResourceId<'_> {
-        self.trace_id()
+    pub(crate) fn either(&self) -> EitherTcpSocketId<'_, D, BT> {
+        I::map_ip_in(self, EitherTcpSocketId::V4, EitherTcpSocketId::V6)
     }
 }
 
@@ -1942,6 +1938,31 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         let Self(rc) = self;
         OrderedLockRef::new(&*rc)
+    }
+}
+
+/// A borrow of either an IPv4 or IPv6 TCP socket.
+///
+/// This type is used to implement [`StateMachineDebugId`] in a way that doesn't
+/// taint the state machine with IP-specific types, avoiding code generation
+/// duplication.
+#[derive(Derivative)]
+#[derivative(Debug(bound = ""))]
+pub(crate) enum EitherTcpSocketId<'a, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> {
+    #[derivative(Debug = "transparent")]
+    V4(&'a TcpSocketId<Ipv4, D, BT>),
+    #[derivative(Debug = "transparent")]
+    V6(&'a TcpSocketId<Ipv6, D, BT>),
+}
+
+impl<D: WeakDeviceIdentifier, BT: TcpBindingsTypes> StateMachineDebugId
+    for EitherTcpSocketId<'_, D, BT>
+{
+    fn trace_id(&self) -> TraceResourceId<'_> {
+        match self {
+            Self::V4(v4) => v4.trace_id(),
+            Self::V6(v6) => v6.trace_id(),
+        }
     }
 }
 
@@ -4717,7 +4738,7 @@ where
 {
     let newly_closed = loop {
         match conn.state.poll_send(
-            conn_id,
+            &conn_id.either(),
             &TcpCountersRefs::from_ctx(core_ctx),
             u32::MAX,
             bindings_ctx.now(),
