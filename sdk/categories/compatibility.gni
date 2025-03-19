@@ -14,10 +14,15 @@ _all_idk_categories = [
   "partner",
 ]
 
-_categories_partner_sources_may_depend_on = [ "partner" ]
+_categories_partner_sources_may_depend_on_directly = [ "partner" ]
+
+# Source sets may have indirect dependencies on libraries in the
+# "partner_internal" category via prebuilt libraries such as fdio.
+_categories_partner_sources_may_depend_on_indirectly =
+    _categories_partner_sources_may_depend_on_directly + [ "partner_internal" ]
 
 _categories_partner_prebuilts_may_depend_on =
-    _categories_partner_sources_may_depend_on + [ "partner_internal" ]
+    _categories_partner_sources_may_depend_on_directly + [ "partner_internal" ]
 
 #
 # Marker lists.
@@ -32,28 +37,38 @@ foreach(category, _all_idk_categories) {
 # Incompatible marker lists.
 #
 # The following are lists of IDK category markers for categories that are
-# *incompatible* with the named IDK category. Add the list corresponding to a
-# target's SDK category to its `assert_no_deps` to ensure that no item in the
-# target's dependency tree has a dependency on a marker for an incompatible
-# category. In other words, to ensure that the target does not have a dependency
-# on a target in one of the incompatible IDK categories.
+# *incompatible* with the named atom type and IDK category. That means that
+# atoms of that type in that category may have any direct or indirect
+# dependencies on atoms in categories in that list.
 #
-# Note: `assert_no_deps` entries appear to apply to all toolchains unless one
-# is explicitly specified in the entry. This is important because the markers
-# may be applied on any toolchain. Thus, it is critical that no toolchain be
+# Add the list corresponding to a target's atom type and IDK category to its
+# `assert_no_deps` to ensure that no item in the target's dependency tree has a
+# dependency on a marker for an incompatible category. In other words, to ensure
+# that the target does not have a dependency on a target in one of the
+# incompatible IDK categories.
+#
+# Note: `assert_no_deps` entries appear to apply to all toolchains unless one is
+# explicitly specified in the entry. This is important because the markers may
+# be applied on any toolchain. Thus, it is critical that no toolchain be
 # specified in these lists.
 #
 # For each category:
 # 1. Initialize marker incompatibility lists to all markers.
 # 2. Remove the compatible markers from the list.
 
-markers_partner_idk_sources_must_not_depend_on =
+# Markers that source sets in the "partner" category may not depend on, even
+# indirectly. Prevention of disallowed direct dependencies for "patner" source
+# sets must be enforced by category violation detection in the IDK build.
+markers_partner_idk_sources_must_not_depend_on_indirectly =
     all_idk_category_markers_targets
-foreach(compatible_category, _categories_partner_sources_may_depend_on) {
-  markers_partner_idk_sources_must_not_depend_on -=
+foreach(compatible_category,
+        _categories_partner_sources_may_depend_on_indirectly) {
+  markers_partner_idk_sources_must_not_depend_on_indirectly -=
       [ "//sdk/categories:marker-${compatible_category}" ]
 }
 
+# Markers that prebuilts in the "partner" category may not depend on, directly
+# or indirectly.
 markers_partner_idk_prebuilts_must_not_depend_on =
     all_idk_category_markers_targets
 foreach(compatible_category, _categories_partner_prebuilts_may_depend_on) {

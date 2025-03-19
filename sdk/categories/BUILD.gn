@@ -122,18 +122,16 @@ group("test_all_markers") {
 group("test_all_marker_lists") {
   testonly = true
   visibility = [ ":tests" ]
-  deps = markers_partner_idk_sources_must_not_depend_on +
+  deps = markers_partner_idk_sources_must_not_depend_on_indirectly +
          markers_partner_idk_prebuilts_must_not_depend_on
 
-  assert(markers_partner_idk_sources_must_not_depend_on -
-         [ "//sdk/categories:marker-partner_internal" ] ==
+  assert(markers_partner_idk_sources_must_not_depend_on_indirectly ==
          markers_partner_idk_prebuilts_must_not_depend_on)
 
   assert(markers_partner_idk_prebuilts_must_not_depend_on == [
-               "//sdk/categories:marker-not-in-idk",
-               "//sdk/categories:marker-compat_test",
-             ],
-         "${markers_partner_idk_prebuilts_must_not_depend_on}")
+           "//sdk/categories:marker-not-in-idk",
+           "//sdk/categories:marker-compat_test",
+         ])
 }
 
 group("tests") {
