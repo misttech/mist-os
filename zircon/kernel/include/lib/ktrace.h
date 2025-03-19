@@ -670,6 +670,10 @@ inline fxt::ThreadRef<fxt::RefType::kInline> ThreadRefFromContext(TraceContext c
   }
 }
 
+// Bring the fxt literal operators into the global scope.
+using fxt::operator""_category;
+using fxt::operator""_intern;
+
 class KTrace {
  public:
   static internal::KTraceState& GetInstance() { return state_; }
@@ -699,6 +703,19 @@ class KTrace {
 
   static bool CategoryEnabled(const fxt::InternedCategory& category) {
     return GetInstance().IsCategoryEnabled(category);
+  }
+
+  // Generates an instant event record that contains the given arguments if the kernel:probe
+  // category is enabled.
+  static void Probe(TraceContext context, const fxt::InternedString& label, uint64_t a,
+                    uint64_t b) {
+    if (CategoryEnabled("kernel:probe"_category)) {
+      const fxt::StringRef name_ref = fxt::StringRef{label};
+      fxt::WriteInstantEventRecord(
+          &GetInstance(), KTrace::Timestamp(), ThreadRefFromContext(context),
+          fxt::StringRef{"kernel:probe"_category.label()}, name_ref,
+          fxt::Argument{"arg0"_intern, a}, fxt::Argument{"arg1"_intern, b});
+    }
   }
 
   // The Emit* functions provide an API by which the ktrace macros above can write a trace record
@@ -823,37 +840,6 @@ class KTrace {
  private:
   static internal::KTraceState state_;
 };
-
-// Argument type that specifies whether a trace function is enabled or disabled.
-template <bool enabled>
-struct TraceEnabled {};
-
-// Type that specifies whether tracing is enabled or disabled for the local
-// compilation unit.
-template <bool enabled>
-constexpr auto LocalTrace = TraceEnabled<enabled>{};
-
-// Constants that specify unconditional enabled or disabled tracing.
-constexpr auto TraceAlways = TraceEnabled<true>{};
-constexpr auto TraceNever = TraceEnabled<false>{};
-
-// Bring the fxt literal operators into the global scope.
-using fxt::operator""_category;
-using fxt::operator""_intern;
-
-template <bool enabled>
-inline void ktrace_probe(TraceEnabled<enabled>, TraceContext context,
-                         const fxt::InternedString& label, uint64_t a, uint64_t b) {
-  if constexpr (enabled) {
-    if (KTrace::CategoryEnabled("kernel:probe"_category)) {
-      const fxt::StringRef name_ref = fxt::StringRef{label};
-      fxt::WriteInstantEventRecord(
-          &KTrace::GetInstance(), KTrace::Timestamp(), ThreadRefFromContext(context),
-          fxt::StringRef{"kernel:probe"_category.label()}, name_ref,
-          fxt::Argument{"arg0"_intern, a}, fxt::Argument{"arg1"_intern, b});
-    }
-  }
-}
 
 void ktrace_report_live_threads();
 void ktrace_report_live_processes();

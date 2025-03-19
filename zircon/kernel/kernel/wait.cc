@@ -54,8 +54,8 @@ inline void MarkInWaitQueue(const Thread& t) TA_ASSERT_SHARED(t.get_lock()) {}
 
 static inline void WqTraceDepth(const WaitQueueCollection* collection, uint32_t depth) {
   if constexpr (WAIT_QUEUE_DEPTH_TRACING_ENABLED) {
-    ktrace_probe(TraceEnabled<true>{}, TraceContext::Cpu, "wq_depth"_intern,
-                 reinterpret_cast<uint64_t>(collection), static_cast<uint64_t>(depth));
+    KTrace::Probe(TraceContext::Cpu, "wq_depth"_intern, reinterpret_cast<uint64_t>(collection),
+                  static_cast<uint64_t>(depth));
   }
 }
 
