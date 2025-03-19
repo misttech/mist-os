@@ -102,6 +102,21 @@ impl KernelThreads {
         self.spawner().spawn(f)
     }
 
+    /// Spawn a thread in the main starnix process to run the given function with `role` applied if
+    /// possible.
+    ///
+    /// Use this function to work in the background that involves blocking. Prefer `spawn_future`
+    /// for non-blocking work that does not need a thread profile applied.
+    ///
+    /// There is some minor IPC overhead to applying thread roles, this method should not be used
+    /// for extremely short-lived tasks.
+    pub fn spawn_with_role<F>(&self, role: &'static str, f: F)
+    where
+        F: FnOnce(&mut Locked<'_, Unlocked>, &CurrentTask) + Send + 'static,
+    {
+        self.spawner().spawn_with_role(role, f)
+    }
+
     /// The dynamic thread spawner used to spawn threads.
     ///
     /// To spawn a thread in this thread pool, use `spawn()`.

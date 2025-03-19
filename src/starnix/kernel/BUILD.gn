@@ -361,6 +361,7 @@ rustc_library("starnix_core") {
     "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_rust",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
     "//sdk/fidl/fuchsia.unknown:fuchsia.unknown_rust",
+    "//sdk/lib/scheduler/rust",
     "//sdk/rust/zx",
     "//sdk/rust/zx-status",
     "//src/connectivity/lib/net-types",

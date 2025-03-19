@@ -43,6 +43,8 @@ use {
     zx,
 };
 
+const EXECUTOR_THREAD_ROLE: &str = "fuchsia.starnix.remote_binder.executor";
+
 // The name used to track the duration of a remote binder ioctl.
 const NAME_REMOTE_BINDER_IOCTL: &'static CStr = c"remote_binder_ioctl";
 const NAME_REMOTE_BINDER_IOCTL_SEND_WORK: &'static CStr = c"remote_binder_ioctl_send_work";
@@ -1004,40 +1006,50 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
             })
             .map_err(|_| errno!(EINVAL))?;
         let handle = self.clone();
-        current_task.kernel().kthreads.spawn_future(async move {
-            // Retrieve the Kernel and a `DropWaiter` for the thread_group, taking care not
-            // to keep a strong reference to the thread_group itself.
-            let kernel_and_drop_waiter = handle
-                .state
-                .lock()
-                .thread_group
-                .upgrade()
-                .map(|tg| (tg.kernel.clone(), tg.drop_notifier.waiter()));
-            let Some((kernel, drop_waiter)) = kernel_and_drop_waiter else {
-                return;
-            };
-            // Start the 3 servers.
-            let dev_binder_future = handle.clone().serve_dev_binder(dev_binder_server_end.into());
-            let lutex_controller_future =
-                Self::serve_lutex_controller(kernel.clone(), lutex_controller_server_end.into());
-            let power_controller_future = Self::serve_container_power_controller(
-                power_controller_server_end.into(),
-                power_controller_event,
-                kernel,
-                &service_name,
-            );
-            // Wait until both are done, or the task exits.
-            let (binder_result, lutex_controller_result, power_controller_result) = futures::join!(
-                future_or_task_end(&drop_waiter, dev_binder_future),
-                future_or_task_end(&drop_waiter, lutex_controller_future),
-                future_or_task_end(&drop_waiter, power_controller_future)
-            );
-            let result = binder_result.and(lutex_controller_result).and(power_controller_result);
-            if let Err(e) = &result {
-                log_error!("Error when servicing the DevBinder protocol: {e:#}");
-            }
-            handle.lock().exit(result.map_err(|_| errno!(ENOENT)));
-        });
+        current_task.kernel().kthreads.spawn_with_role(
+            EXECUTOR_THREAD_ROLE,
+            move |_locked, _current_task| {
+                let mut exec = fuchsia_async::LocalExecutor::new();
+
+                // Retrieve the Kernel and a `DropWaiter` for the thread_group, taking care not
+                // to keep a strong reference to the thread_group itself.
+                let kernel_and_drop_waiter = handle
+                    .state
+                    .lock()
+                    .thread_group
+                    .upgrade()
+                    .map(|tg| (tg.kernel.clone(), tg.drop_notifier.waiter()));
+                let Some((kernel, drop_waiter)) = kernel_and_drop_waiter else {
+                    return;
+                };
+
+                exec.run_singlethreaded(async move {
+                    // Start the 3 servers.
+                    let binder_fut = handle.clone().serve_dev_binder(dev_binder_server_end.into());
+                    let lutex_fut = Self::serve_lutex_controller(
+                        kernel.clone(),
+                        lutex_controller_server_end.into(),
+                    );
+                    let power_fut = Self::serve_container_power_controller(
+                        power_controller_server_end.into(),
+                        power_controller_event,
+                        kernel,
+                        &service_name,
+                    );
+                    // Wait until all are done, or the task exits.
+                    let (binder_res, lutex_res, power_res) = futures::join!(
+                        future_or_task_end(&drop_waiter, binder_fut),
+                        future_or_task_end(&drop_waiter, lutex_fut),
+                        future_or_task_end(&drop_waiter, power_fut),
+                    );
+                    let result = binder_res.and(lutex_res).and(power_res);
+                    if let Err(e) = &result {
+                        log_error!("Error when servicing the DevBinder protocol: {e:#}");
+                    }
+                    handle.lock().exit(result.map_err(|_| errno!(ENOENT)));
+                });
+            },
+        );
 
         error!(EAGAIN)
     }
