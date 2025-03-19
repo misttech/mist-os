@@ -640,8 +640,9 @@ static void ktrace_init(unsigned level) {
   // fxt::InternedString::RegisterStrings() is called at the beginning of a trace session.
   // TODO(eieio): Replace this with id allocator allocations when IOB-based tracing is implemented.
   fxt::InternedString::SetRegisterCallback([](const fxt::InternedString& interned_string) {
-    fxt_string_record(interned_string.id(), interned_string.string(),
-                      strnlen(interned_string.string(), fxt::InternedString::kMaxStringLength));
+    fxt::WriteStringRecord(
+        &KTRACE_STATE, interned_string.id(), interned_string.string(),
+        strnlen(interned_string.string(), fxt::InternedString::kMaxStringLength));
   });
 
   if (!bufsize) {
