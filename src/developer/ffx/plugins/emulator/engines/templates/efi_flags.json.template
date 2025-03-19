@@ -77,9 +77,9 @@
     {{#if (eq device.cpu.architecture "arm64")}}
          "-machine",
         {{#if (eq host.architecture "arm64")}}
-            "virt-2.12,gic-version=host",
+            "virt-9.2,gic-version=host,highmem-ecam=off",
         {{else}}
-            "virt-2.12,virtualization=true", "-cpu", "max",
+            "virt-9.2,virtualization=true,highmem-ecam=off", "-cpu", "max",
         {{/if}}
     {{/if}}
     {{#if (eq device.cpu.architecture "x64")}}
