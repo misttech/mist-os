@@ -675,7 +675,7 @@ depend on your Fuchsia build directory, which defaults to
 ```sh
 FUCHSIA_BUILD_DIR="$FUCHSIA_DIR/out/default" # Change depending on build dir.
 export FIDL_IR_PATH="$FUCHSIA_BUILD_DIR/fidling/gen/ir_root"
-__PYTHONPATH="$FUCHSIA_BUILD_DIR/host_x64:$FUCHSIA_DIR/src/developer/ffx/lib/fuchsia-controller/python"
+__PYTHONPATH="$FUCHSIA_BUILD_DIR/host_x64:$FUCHSIA_DIR/src/developer/ffx/lib/fuchsia-controller/python:$FUCHSIA_BUILD_DIR/host_x64/gen/src/developer/ffx/lib/fuchsia-controller/cpp"
 if [ ! -z PYTHONPATH ]; then
     __PYTHONPATH="$PYTHONPATH:$__PYTHONPATH"
 fi

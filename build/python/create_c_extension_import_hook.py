@@ -39,18 +39,28 @@ def main():
 
     shlib = os.path.basename(args.shlib)
     shlib_dir = os.path.dirname(args.shlib)
+    # This file includes both `shlib` and the system search path `sys.path` so
+    # that scripts not invoked in the root build dir can include the library.
     with open(main_file, "w", encoding="utf-8") as main_file_out:
         main_file_out.write(
             f"""
+# DO NOT EDIT.
+#
+# This file was generated from //build/python/create_c_extension_import_hook.py
+# which is invoked as part of the `python_c_extension` target defined in
+# //build/python/python_c_extension.gni
 from importlib.abc import Loader
 import importlib.util
 import importlib.machinery
+import sys
 
 def _init() -> object:
     finder = importlib.machinery.PathFinder()
-    spec = finder.find_spec('{shlib}', path=['{shlib_dir}'])
+    search_path = ['{shlib_dir}'] + sys.path
+    spec = finder.find_spec('{shlib}', path=search_path)
     if spec is None:
-        raise Exception('Couldn\\'t load library "{shlib}.so" from {shlib_dir}"')
+        raise Exception(
+            'Couldn\\'t find library "{shlib}.so" anywhere in path: {{search_path}}')
     mod = importlib.util.module_from_spec(spec)
     assert isinstance(spec.loader, Loader)
     spec.loader.exec_module(mod)

@@ -50,7 +50,7 @@ python -m pip install --editable ".[test,guidelines]"
 
 echo "Configuring environment for Honeydew..."
 OLD_PYTHONPATH=$PYTHONPATH
-PYTHONPATH=$FUCHSIA_DIR/$BUILD_DIR/host_x64:$FUCHSIA_DIR/src/developer/ffx/lib/fuchsia-controller/python:$FUCHSIA_DIR/src/lib/diagnostics/python:$PYTHONPATH
+PYTHONPATH=$FUCHSIA_DIR/$BUILD_DIR/host_x64:$FUCHSIA_DIR/src/developer/ffx/lib/fuchsia-controller/python:$FUCHSIA_DIR/src/lib/diagnostics/python:$FUCHSIA_DIR/$BUILD_DIR/host_x64/gen/src/developer/ffx/lib/fuchsia-controller/cpp:$PYTHONPATH
 export HONEYDEW_FASTBOOT_OVERRIDE=$FASTBOOT_PATH
 
 python -c "import honeydew"
