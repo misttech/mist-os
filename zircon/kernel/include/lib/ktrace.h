@@ -585,15 +585,14 @@
 //
 
 // Writes a context switch record for the given threads.
-#define KTRACE_CONTEXT_SWITCH(category, cpu, outgoing_state, outgoing_thread_ref,         \
-                              incoming_thread_ref, ...)                                   \
-  do {                                                                                    \
-    if (unlikely(KTrace::CategoryEnabled(FXT_INTERN_CATEGORY(category)))) {               \
-      fxt::WriteContextSwitchRecord(&KTrace::GetInstance(), KTrace::Timestamp(),          \
-                                    static_cast<uint16_t>(cpu), outgoing_state,           \
-                                    outgoing_thread_ref, incoming_thread_ref,             \
-                                    FXT_MAP_LIST_ARGS(FXT_MAKE_ARGUMENT, ##__VA_ARGS__)); \
-    }                                                                                     \
+#define KTRACE_CONTEXT_SWITCH(category, cpu, outgoing_state, outgoing_thread_ref, \
+                              incoming_thread_ref, ...)                           \
+  do {                                                                            \
+    if (unlikely(KTrace::CategoryEnabled(FXT_INTERN_CATEGORY(category)))) {       \
+      KTrace::EmitContextSwitch(                                                  \
+          cpu, outgoing_state, outgoing_thread_ref, incoming_thread_ref,          \
+          ktl::make_tuple(FXT_MAP_LIST_ARGS(FXT_MAKE_ARGUMENT, ##__VA_ARGS__)));  \
+    }                                                                             \
   } while (false)
 
 //
@@ -601,13 +600,12 @@
 //
 
 // Writes a thread wakeup record for the given thread.
-#define KTRACE_THREAD_WAKEUP(category, cpu, thread_ref, ...)                             \
-  do {                                                                                   \
-    if (unlikely(KTrace::CategoryEnabled(FXT_INTERN_CATEGORY(category)))) {              \
-      fxt::WriteThreadWakeupRecord(&KTrace::GetInstance(), KTrace::Timestamp(),          \
-                                   static_cast<uint16_t>(cpu), thread_ref,               \
-                                   FXT_MAP_LIST_ARGS(FXT_MAKE_ARGUMENT, ##__VA_ARGS__)); \
-    }                                                                                    \
+#define KTRACE_THREAD_WAKEUP(category, cpu, thread_ref, ...)                                      \
+  do {                                                                                            \
+    if (unlikely(KTrace::CategoryEnabled(FXT_INTERN_CATEGORY(category)))) {                       \
+      KTrace::EmitThreadWakeup(                                                                   \
+          cpu, thread_ref, ktl::make_tuple(FXT_MAP_LIST_ARGS(FXT_MAKE_ARGUMENT, ##__VA_ARGS__))); \
+    }                                                                                             \
   } while (false)
 
 //
@@ -799,6 +797,34 @@ class KTrace {
           fxt::WriteFlowEndEventRecord(&GetInstance(), timestamp, ThreadRefFromContext(context),
                                        fxt::StringRef{category.label()}, label, flow_id,
                                        unpacked_args...);
+        },
+        args);
+  }
+
+  // The EmitThreadWakeup and EmitContextSwitch functions have slightly different signatures from
+  // the other Emit functions because they do not utilize the FXT_* macros to invoke them.
+  template <typename... Ts>
+  static void EmitThreadWakeup(const cpu_num_t cpu,
+                               fxt::ThreadRef<fxt::RefType::kInline> thread_ref,
+                               const ktl::tuple<Ts...>& args) {
+    ktl::apply(
+        [&](const Ts&... unpacked_args) {
+          fxt::WriteThreadWakeupRecord(&GetInstance(), Timestamp(), static_cast<uint16_t>(cpu),
+                                       thread_ref, unpacked_args...);
+        },
+        args);
+  }
+
+  template <typename... Ts>
+  static void EmitContextSwitch(const cpu_num_t cpu, zx_thread_state_t outgoing_thread_state,
+                                const fxt::ThreadRef<fxt::RefType::kInline>& outgoing_thread,
+                                const fxt::ThreadRef<fxt::RefType::kInline>& incoming_thread,
+                                const ktl::tuple<Ts...>& args) {
+    ktl::apply(
+        [&](const Ts&... unpacked_args) {
+          fxt::WriteContextSwitchRecord(&GetInstance(), Timestamp(), static_cast<uint16_t>(cpu),
+                                        outgoing_thread_state, outgoing_thread, incoming_thread,
+                                        unpacked_args...);
         },
         args);
   }
