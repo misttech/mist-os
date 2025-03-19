@@ -98,7 +98,6 @@ TEST_F(DevicetreeSerialNumberItemTest, SerialNumberBootargs) {
   for (auto [header, payload] : image) {
     if (header->type == ZBI_TYPE_SERIAL_NUMBER) {
       std::string_view serial = {reinterpret_cast<const char*>(payload.data()), payload.size()};
-      std::cout << serial << std::endl;
       EXPECT_STREQ(serial, "foo-bar-baz");
       present = true;
     }
