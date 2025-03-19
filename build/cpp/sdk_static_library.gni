@@ -302,11 +302,17 @@ template("sdk_static_library") {
   }
 
   # Add binaries.
+  #
+  # Use the binary from the shared library toolchain to allow the static
+  # libraries shipped in the IDK to be linked into shared libraries See
+  # https://fxbug.dev/404169865.
+  static_lib_target = ":${main_target_name}(${shlib_toolchain})"
+  static_out_dir = get_label_info(static_lib_target, "target_out_dir")
   lib_name = "lib${output_name}.a"
 
   # If output_name already starts with `lib`, GN won't prepend lib to it.
   #
-  # E.g. the following target/ouput name yileds the corresponding lib file:
+  # E.g. the following target/output name yields the corresponding lib file:
   #  ngunwind -> libngunwind.a
   #  libngunwind -> libngunwind.a
   #
@@ -319,7 +325,7 @@ template("sdk_static_library") {
   link_lib = "${sdk_prebuilt_base_for_target_api_level}/lib/${lib_name}"
   sdk_files = sdk_header_files + [
                 {
-                  source = "${target_out_dir}/${lib_name}"
+                  source = "${static_out_dir}/${lib_name}"
                   dest = link_lib
                 },
               ]
@@ -382,13 +388,13 @@ template("sdk_static_library") {
       ]
     }
 
-    deps = sdk_deps + [ ":${main_target_name}" ]
+    deps = sdk_deps + [ static_lib_target ]
   }
 
   # Exempt internal libraries from pragma verification.
   should_verify_pragma = !is_internal
   if (should_verify_pragma) {
-    verify_pragma_target_name = "${target_name}_sdk_pragma"
+    verify_pragma_target_name = "${main_target_name}_sdk_pragma"
     verify_pragma_once(verify_pragma_target_name) {
       headers = all_headers
     }
@@ -430,8 +436,8 @@ template("sdk_static_library") {
     deps = sdk_deps
 
     non_sdk_deps = [
-      ":${main_target_name}",
       ":${metadata_target_name}",
+      static_lib_target,
     ]
     if (should_verify_pragma) {
       non_sdk_deps += [ ":${verify_pragma_target_name}" ]
@@ -451,7 +457,7 @@ template("sdk_static_library") {
   verify_runtime_deps_target = "${target_name}_verify_runtime_deps"
 
   sdk_verify_runtime_deps(verify_runtime_deps_target) {
-    atom_target = ":$main_target_name"
+    atom_target = static_lib_target
     manifest_file = sdk_manifest_file
     manifest_target = ":$manifest_target_name"
   }
