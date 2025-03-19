@@ -91,17 +91,6 @@ pub(crate) fn hash_hashes(hashes: &[Hash], level: usize, offset: usize) -> Hash 
     Hash::from(hasher.finish().bytes())
 }
 
-/// Initializes the crypto library used for hashing. This is only necessary if using `hash_block`
-/// directly.
-pub fn crypto_library_init() {
-    unsafe { CRYPTO_library_init() }
-}
-
-extern "C" {
-    #[allow(dead_code)]
-    fn CRYPTO_library_init();
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

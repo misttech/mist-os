@@ -19,7 +19,6 @@
 // See note in //zircon/kernel/lib/crypto/boringssl/BUILD.gn
 #define BORINGSSL_NO_CXX
 #include <openssl/cipher.h>
-#include <openssl/crypto.h>
 
 #include "src/security/lib/fcrypto/bytes.h"
 #include "src/security/lib/fcrypto/cipher.h"
@@ -31,10 +30,7 @@ namespace crypto {
 
 // The previously opaque crypto implementation context.  Guaranteed to clean up on destruction.
 struct Cipher::Context {
-  Context() {
-    CRYPTO_library_init();
-    EVP_CIPHER_CTX_init(&impl);
-  }
+  Context() { EVP_CIPHER_CTX_init(&impl); }
 
   ~Context() { EVP_CIPHER_CTX_cleanup(&impl); }
 

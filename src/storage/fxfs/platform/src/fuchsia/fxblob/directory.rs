@@ -106,7 +106,6 @@ impl RootDir for BlobDirectory {
 
 impl BlobDirectory {
     fn new(directory: FxDirectory) -> Self {
-        fuchsia_merkle::crypto_library_init();
         Self { directory: Arc::new(directory) }
     }
 

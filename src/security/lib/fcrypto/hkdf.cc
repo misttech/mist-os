@@ -14,7 +14,6 @@
 
 // See note in //zircon/kernel/lib/crypto/boringssl/BUILD.gn
 #define BORINGSSL_NO_CXX
-#include <openssl/crypto.h>
 #include <openssl/digest.h>
 #include <openssl/hkdf.h>
 
@@ -31,7 +30,7 @@ const uint16_t kAllFlags = HKDF::ALLOW_WEAK_KEY;
 }
 // Public methods
 
-HKDF::HKDF() : digest_(digest::kUninitialized) { CRYPTO_library_init(); }
+HKDF::HKDF() : digest_(digest::kUninitialized) {}
 HKDF::~HKDF() {}
 
 zx_status_t HKDF::Init(digest::Algorithm digest, const Secret& key, const Bytes& salt,

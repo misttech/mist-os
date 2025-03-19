@@ -5,7 +5,7 @@
 use std::cmp::min;
 
 use crate::tree::MerkleTree;
-use crate::util::{crypto_library_init, hash_block, hash_hashes, HASHES_PER_BLOCK};
+use crate::util::{hash_block, hash_hashes, HASHES_PER_BLOCK};
 use crate::{Hash, BLOCK_SIZE};
 
 /// A `MerkleTreeBuilder` generates a [`MerkleTree`] from one or more write calls.
@@ -35,7 +35,6 @@ pub struct MerkleTreeBuilder {
 
 impl Default for MerkleTreeBuilder {
     fn default() -> Self {
-        crypto_library_init();
         Self { levels: vec![Vec::new()], block: Vec::with_capacity(BLOCK_SIZE) }
     }
 }
