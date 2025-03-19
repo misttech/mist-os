@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/bazel_action.gni")
 import("//build/bazel/bazel_build_action.gni")
 import("//build/bazel/bazel_fuchsia_sdk.gni")
 import("//build/bazel/bazel_inputs.gni")
@@ -31,14 +32,34 @@ bazel_input_directory("bazel_in_tree_idk.bazel_input") {
   output_directory = "$root_build_dir/sdk/exported/bazel_in_tree_idk"
 }
 
-# Generate the in-tree @fuchsia_sdk by performing a silent query
-# on @fuchsia_sdk//:BUILD.bazel. This will trigger the repository rule.
-bazel_build_action("in_tree_fuchsia_sdk") {
+# Generate a symlink to the @fuchsia_sdk//:BUILD.bazel file to ensure
+# that repository is rebuilt by Bazel when it is missing (e.g. just
+# after an `fx gen` call).
+#
+# Note that this uses a symlink chain: the Ninja output is a symlink
+# to a Bazel genrule() target that creates a symlink to the final
+# file. See https://fxbug.dev/404799660 for context.
+#
+#    Ninja
+#       obj/build/bazel/bazel_sdk/in_tree_fuchsia_sdk.stamp
+#               |
+#            symlink
+#               |
+#    Bazel      v
+#       BAZEL_BIN/build/bazel/bazel_sdk/fuchsia_sdk.stamp
+#               |
+#            symlink
+#               |
+#               v
+#       BAZEL_EXECROOT/external/fuchsia_sdk/BUILD.bazel
+#
+bazel_action("in_tree_fuchsia_sdk") {
   deps = [ ":bazel_in_tree_idk.bazel_input" ]
-  bazel_target = ":in_tree_fuchsia_sdk"
-  copy_outputs = [
+  command = "build"
+  bazel_targets = [ ":in_tree_fuchsia_sdk" ]
+  final_symlink_outputs = [
     {
-      bazel = "{{BAZEL_TARGET_OUT_DIR}}/stamp"
+      bazel = "{{BAZEL_TARGET_OUT_DIR}}/fuchsia_sdk.stamp"
       ninja = "$target_name.stamp"
     },
   ]
