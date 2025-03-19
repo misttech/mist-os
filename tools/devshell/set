@@ -51,8 +51,8 @@
 ##                         enable ALL supporting fuzzers.  Use --variant for
 ##                         individual fuzzers, e.g. "--variant asan-fuzzer/foo".
 ##   --rbe-mode            Use a preset RBE configuration.
-##                         Valid options: auto, off, cloudtop, legacy_default,
-##                         remote_cache_only, low_bandwidth.
+##                         Valid options: auto, off, workstation, cloudtop,
+##                         legacy_default, remote_cache_only, low_bandwidth.
 ##                         'auto' chooses one of the other options for you.
 ##                         See also build/toolchain/rbe_modes.gni for details.
 ##                         Default: auto

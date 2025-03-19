@@ -355,6 +355,18 @@ func rbeIsSupported() bool {
 	return (runtime.GOOS == "linux") && (runtime.GOARCH == "amd64")
 }
 
+// rbeHostType returns the type of host that this appears to be, defaulting to
+// "workstation".
+func rbeHostType() string {
+	cmd := exec.Command("vendor/google/scripts/devshell/detect-build-host-class")
+	out, err := cmd.Output()
+	if err != nil {
+		return "workstation"
+	} else {
+		return strings.Split(string(out), "\n")[0]
+	}
+}
+
 func constructStaticSpec(checkoutDir string, args *setArgs, canUseRbe bool) (*fintpb.Static, error) {
 	productPath, err := findGNIFile(checkoutDir, "products", args.product)
 	if err != nil {
@@ -429,7 +441,7 @@ func applyRbeSettings(static *fintpb.Static, args *setArgs, canUseRbe bool) (*fi
 	rbeMode := args.rbeMode
 	if rbeMode == "auto" {
 		if rbeSupported && canUseRbe {
-			rbeMode = "cloudtop"
+			rbeMode = rbeHostType()
 		} else {
 			rbeMode = "off"
 		}
