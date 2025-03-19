@@ -144,11 +144,11 @@ zx_status_t sys_ktrace_read(zx_handle_t handle, user_out_ptr<void> _data, uint32
     return status;
   }
 
-  ssize_t result = ktrace_read_user(_data, offset, len);
-  if (result < 0)
-    return static_cast<zx_status_t>(result);
+  zx::result<size_t> result = KTrace::ReadUser(_data, offset, len);
+  if (result.is_error())
+    return result.status_value();
 
-  return _actual.copy_to_user(static_cast<size_t>(result));
+  return _actual.copy_to_user(result.value());
 }
 
 // zx_status_t zx_ktrace_control
@@ -171,10 +171,10 @@ zx_status_t sys_ktrace_control(zx_handle_t handle, uint32_t action, uint32_t opt
       if (_ptr.reinterpret<char>().copy_array_from_user(name, sizeof(name) - 1) != ZX_OK)
         return ZX_ERR_INVALID_ARGS;
       name[sizeof(name) - 1] = 0;
-      return ktrace_control(action, options, name);
+      return KTrace::Control(action, options, name);
     }
     default:
-      return ktrace_control(action, options, nullptr);
+      return KTrace::Control(action, options, nullptr);
   }
 }
 

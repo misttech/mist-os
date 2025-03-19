@@ -674,6 +674,26 @@ class KTrace {
  public:
   static internal::KTraceState& GetInstance() { return state_; }
 
+  // Control is responsible for probing, starting, stopping, or rewinding the ktrace buffer.
+  //
+  // The meaning of the options changes based on the action. If the action is to start tracing,
+  // then the options field functions as the group mask. The ptr argument is only used when
+  // probing.
+  static zx_status_t Control(uint32_t action, uint32_t options, void* ptr);
+
+  // ReadUser reads len bytes from the ktrace buffer starting at offset off into the given user
+  // buffer.
+  //
+  // On success, this function returns the number of bytes that were read into the buffer.
+  // On failure, a zx_status_t error code is returned.
+  static zx::result<size_t> ReadUser(user_out_ptr<void> ptr, uint32_t off, size_t len) {
+    const ssize_t ret = GetInstance().ReadUser(ptr, off, len);
+    if (ret < 0) {
+      return zx::error(static_cast<zx_status_t>(ret));
+    }
+    return zx::ok(ret);
+  }
+
   // The Emit* functions provide an API by which the ktrace macros above can write a trace record
   // to the ktrace buffer.
   template <fxt::RefType name_type, typename... Ts>
@@ -833,12 +853,6 @@ inline void ktrace_probe(TraceEnabled<enabled>, TraceContext context,
     }
   }
 }
-
-inline ssize_t ktrace_read_user(user_out_ptr<void> ptr, uint32_t off, size_t len) {
-  return KTrace::GetInstance().ReadUser(ptr, off, len);
-}
-
-zx_status_t ktrace_control(uint32_t action, uint32_t options, void* ptr);
 
 void ktrace_report_live_threads();
 void ktrace_report_live_processes();

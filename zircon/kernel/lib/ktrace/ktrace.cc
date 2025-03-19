@@ -594,21 +594,21 @@ uint64_t* KTraceState::ReserveRaw(uint32_t num_words) {
 
 }  // namespace internal
 
-zx_status_t ktrace_control(uint32_t action, uint32_t options, void* ptr) {
+zx_status_t KTrace::Control(uint32_t action, uint32_t options, void* ptr) {
   using StartMode = ::internal::KTraceState::StartMode;
   switch (action) {
     case KTRACE_ACTION_START:
     case KTRACE_ACTION_START_CIRCULAR: {
       const StartMode start_mode =
           (action == KTRACE_ACTION_START) ? StartMode::Saturate : StartMode::Circular;
-      return KTrace::GetInstance().Start(options ? options : KTRACE_GRP_ALL, start_mode);
+      return GetInstance().Start(options ? options : KTRACE_GRP_ALL, start_mode);
     }
 
     case KTRACE_ACTION_STOP:
-      return KTrace::GetInstance().Stop();
+      return GetInstance().Stop();
 
     case KTRACE_ACTION_REWIND:
-      return KTrace::GetInstance().Rewind();
+      return GetInstance().Rewind();
 
     case KTRACE_ACTION_NEW_PROBE:
       return ZX_ERR_NOT_SUPPORTED;
