@@ -114,7 +114,6 @@ _SDK_TEMPLATES = {
     "cc_prebuilt_library": "//fuchsia/workspace/sdk_templates:cc_prebuilt_library.BUILD.template",
     "cc_prebuilt_library_linklib": "//fuchsia/workspace/sdk_templates:cc_prebuilt_library_linklib_sub.BUILD.template",
     "cc_prebuilt_library_distlib": "//fuchsia/workspace/sdk_templates:cc_prebuilt_library_distlib_sub.BUILD.template",
-    "cc_prebuilt_library_distlib_unstripped": "//fuchsia/workspace/sdk_templates:cc_prebuilt_library_distlib_sub_unstripped.BUILD.template",
     "companion_host_tool": "//fuchsia/workspace/sdk_templates:companion_host_tool.BUILD.template",
     "component_manifest": "//fuchsia/workspace/sdk_templates:component_manifest.BUILD.template",
     "component_manifest_collection": "//fuchsia/workspace/sdk_templates:component_manifest_collection.BUILD.template",
@@ -950,6 +949,8 @@ def _generate_cc_prebuilt_library_build_rules(
     ctx = runtime.ctx
     lib_base_path = meta["root"] + "/"
 
+    meta_sdk_root = meta["_meta_sdk_root"]
+
     deps = _find_dep_paths(
         meta["deps"],
         "pkg/",
@@ -969,7 +970,7 @@ def _generate_cc_prebuilt_library_build_rules(
     files = meta["headers"]
     if "ifs" in meta:
         files.append(lib_base_path + meta["ifs"])
-    process_context.files_to_copy[meta["_meta_sdk_root"]].extend(files)
+    process_context.files_to_copy[meta_sdk_root].extend(files)
 
     prebuilt_select = {}
     dist_select = {}
@@ -1010,42 +1011,31 @@ def _generate_cc_prebuilt_library_build_rules(
                     "{{library_type}}": meta["format"],
                 },
             )
-            process_context.files_to_copy[meta["_meta_sdk_root"]].append(linklib)
+            process_context.files_to_copy[meta_sdk_root].append(linklib)
 
             if "dist" in meta["binaries"][arch]:
                 has_distlibs = True
                 dist_lib = meta["binaries"][arch]["dist"]
-                process_context.files_to_copy[meta["_meta_sdk_root"]].append(
+                process_context.files_to_copy[meta_sdk_root].append(
                     dist_lib,
                 )
 
                 debug_lib = meta["binaries"][arch].get("debug", dist_lib)
-                if debug_lib.startswith(".build-id/"):
-                    _merge_template(
-                        ctx,
-                        per_arch_build_file,
-                        _sdk_template_path(runtime, "cc_prebuilt_library_distlib"),
-                        {
-                            "{{dist_lib}}": _final_bazel_path(dist_lib),
-                            "{{dist_path}}": meta["binaries"][arch]["dist_path"],
-                        },
-                    )
-                else:
-                    _merge_template(
-                        ctx,
-                        per_arch_build_file,
-                        _sdk_template_path(
-                            runtime,
-                            "cc_prebuilt_library_distlib_unstripped",
-                        ),
-                        {
-                            "{{stripped_file}}": _final_bazel_path(dist_lib),
-                            "{{unstripped_file}}": _final_bazel_path(debug_lib),
-                            "{{dist_path}}": meta["binaries"][arch]["dist_path"],
-                        },
-                    )
-                    if debug_lib != dist_lib:
-                        process_context.files_to_copy[meta["_meta_sdk_root"]].append(debug_lib)
+                _merge_template(
+                    ctx,
+                    per_arch_build_file,
+                    _sdk_template_path(
+                        runtime,
+                        "cc_prebuilt_library_distlib",
+                    ),
+                    {
+                        "{{stripped_file}}": _final_bazel_path(dist_lib),
+                        "{{unstripped_file}}": _final_bazel_path(debug_lib),
+                        "{{dist_path}}": meta["binaries"][arch]["dist_path"],
+                    },
+                )
+                if debug_lib != dist_lib:
+                    process_context.files_to_copy[meta_sdk_root].append(debug_lib)
 
     # Process "variants".
 
@@ -1099,43 +1089,32 @@ def _generate_cc_prebuilt_library_build_rules(
                 "{{library_type}}": meta["format"],
             },
         )
-        process_context.files_to_copy[meta["_meta_sdk_root"]].append(
+        process_context.files_to_copy[meta_sdk_root].append(
             variant.link_lib,
         )
 
         if variant.has_dist_lib:
             dist_lib = variant.dist_lib
-            process_context.files_to_copy[meta["_meta_sdk_root"]].append(
+            process_context.files_to_copy[meta_sdk_root].append(
                 dist_lib,
             )
 
             debug_lib = variant.debug if variant.has_debug else dist_lib
-            if debug_lib.startswith(".build-id/"):
-                _merge_template(
-                    ctx,
-                    per_arch_x_api_build_file,
-                    _sdk_template_path(runtime, "cc_prebuilt_library_distlib"),
-                    {
-                        "{{dist_lib}}": _final_bazel_path(dist_lib),
-                        "{{dist_path}}": variant.dist_lib_dest,
-                    },
-                )
-            else:
-                _merge_template(
-                    ctx,
-                    per_arch_x_api_build_file,
-                    _sdk_template_path(
-                        runtime,
-                        "cc_prebuilt_library_distlib_unstripped",
-                    ),
-                    {
-                        "{{stripped_file}}": _final_bazel_path(dist_lib),
-                        "{{unstripped_file}}": _final_bazel_path(debug_lib),
-                        "{{dist_path}}": variant.dist_lib_dest,
-                    },
-                )
-                if debug_lib != dist_lib:
-                    process_context.files_to_copy[meta["_meta_sdk_root"]].append(debug_lib)
+            _merge_template(
+                ctx,
+                per_arch_x_api_build_file,
+                _sdk_template_path(
+                    runtime,
+                    "cc_prebuilt_library_distlib",
+                ),
+                {
+                    "{{stripped_file}}": _final_bazel_path(dist_lib),
+                    "{{unstripped_file}}": _final_bazel_path(debug_lib),
+                    "{{dist_path}}": variant.dist_lib_dest,
+                },
+            )
+            if debug_lib != dist_lib:
+                process_context.files_to_copy[meta_sdk_root].append(debug_lib)
 
     # Apply the results.
 

@@ -385,6 +385,8 @@ template("sdk_shared_library") {
 
   link_lib = "${link_lib_dir}/${lib_name}"
   dist_lib = "${sdk_prebuilt_base_for_target_api_level}/dist/${lib_name}"
+  debug_lib = "${sdk_prebuilt_base_for_target_api_level}/debug/${lib_name}"
+
   ifs_file_for_idk = ifs_golden_file
 
   # There are not golden files for "HEAD", but the IDK needs to provide IFS
@@ -401,6 +403,10 @@ template("sdk_shared_library") {
                 {
                   source = "${shared_out_dir}/${lib_name}"
                   dest = dist_lib
+                },
+                {
+                  source = "${shared_out_dir}/lib.unstripped/${lib_name}"
+                  dest = debug_lib
                 },
                 {
                   # `generated_ifs_file` contains text, including undefined
@@ -438,23 +444,14 @@ template("sdk_shared_library") {
   }
 
   metadata_file = "${target_gen_dir}/${metadata_target_name}.sdk_meta.json"
-  debug_mapping_file = "${target_gen_dir}/${metadata_target_name}.mappings.txt"
-  debug_lib_file = "${shared_out_dir}/lib.unstripped/${lib_name}"
 
   action(metadata_target_name) {
     forward_variables_from(invoker, [ "testonly" ])
     script = "//build/cpp/gen_sdk_prebuilt_meta_file.py"
 
-    inputs = sdk_metas + [
-               debug_lib_file,
-               "//build/cpp/binaries.py",
-               "//build/images/elfinfo.py",
-             ]
+    inputs = sdk_metas
 
-    outputs = [
-      debug_mapping_file,
-      metadata_file,
-    ]
+    outputs = [ metadata_file ]
 
     args = [
       "--out",
@@ -475,10 +472,8 @@ template("sdk_shared_library") {
       link_lib,
       "--lib-dist",
       dist_lib,
-      "--lib-debug-file",
-      rebase_path(debug_lib_file, root_build_dir),
-      "--debug-mapping",
-      rebase_path(debug_mapping_file, root_build_dir),
+      "--lib-debug",
+      debug_lib,
     ]
     args += [ "--deps" ] + rebase_path(sdk_metas, root_build_dir)
     args += [ "--headers" ] + sdk_metadata_headers
@@ -541,8 +536,6 @@ template("sdk_shared_library") {
     }
 
     files = sdk_files
-
-    file_list = debug_mapping_file
 
     deps = sdk_deps
 
