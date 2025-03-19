@@ -19,6 +19,7 @@
 
 #include <kernel/thread.h>
 #include <ktl/atomic.h>
+#include <ktl/tuple.h>
 
 //
 // # Kernel tracing instrumentation and state management interfaces
@@ -703,110 +704,6 @@ inline ssize_t ktrace_read_user(user_out_ptr<void> ptr, uint32_t off, size_t len
   return KTRACE_STATE.ReadUser(ptr, off, len);
 }
 
-template <fxt::RefType name_type, fxt::ArgumentType... arg_types, fxt::RefType... arg_name_types,
-          fxt::RefType... arg_val_types>
-inline void fxt_kernel_object(
-    zx_koid_t koid, zx_obj_type_t obj_type, const fxt::StringRef<name_type>& name_arg,
-    const fxt::Argument<arg_types, arg_name_types, arg_val_types>&... args) {
-  fxt::WriteKernelObjectRecord(&KTRACE_STATE, fxt::Koid(koid), obj_type, name_arg, args...);
-}
-
-template <fxt::RefType outgoing_type, fxt::RefType incoming_type>
-inline void fxt_context_switch(uint64_t timestamp, uint8_t cpu_num,
-                               zx_thread_state_t outgoing_thread_state,
-                               const fxt::ThreadRef<outgoing_type>& outgoing_thread,
-                               const fxt::ThreadRef<incoming_type>& incoming_thread,
-                               uint8_t outgoing_priority, uint8_t incoming_priority) {
-  fxt::WriteContextSwitchRecord(&KTRACE_STATE, timestamp, cpu_num, outgoing_thread_state,
-                                outgoing_thread, incoming_thread, outgoing_priority,
-                                incoming_priority);
-}
-
-inline void fxt_string_record(uint16_t index, const char* string, size_t string_length) {
-  fxt::WriteStringRecord(&KTRACE_STATE, index, string, string_length);
-}
-
-template <fxt::RefType thread_type, fxt::RefType name_type, fxt::ArgumentType... arg_types,
-          fxt::RefType... arg_name_types, fxt::RefType... arg_val_types>
-inline void fxt_instant(const fxt::InternedCategory& category, uint64_t timestamp,
-                        const fxt::ThreadRef<thread_type>& thread_ref,
-                        const fxt::StringRef<name_type>& name_ref,
-                        const fxt::Argument<arg_types, arg_name_types, arg_val_types>&... args) {
-  fxt::WriteInstantEventRecord(&KTRACE_STATE, timestamp, thread_ref,
-                               fxt::StringRef{category.label()}, name_ref, args...);
-}
-
-template <fxt::RefType thread_type, fxt::RefType name_type, fxt::ArgumentType... arg_types,
-          fxt::RefType... arg_name_types, fxt::RefType... arg_val_types>
-inline void fxt_duration_begin(
-    const fxt::InternedCategory& category, uint64_t timestamp,
-    const fxt::ThreadRef<thread_type>& thread_ref, const fxt::StringRef<name_type>& name_ref,
-    const fxt::Argument<arg_types, arg_name_types, arg_val_types>&... args) {
-  fxt::WriteDurationBeginEventRecord(&KTRACE_STATE, timestamp, thread_ref,
-                                     fxt::StringRef{category.label()}, name_ref, args...);
-}
-
-template <fxt::RefType thread_type, fxt::RefType name_type, fxt::ArgumentType... arg_types,
-          fxt::RefType... arg_name_types, fxt::RefType... arg_val_types>
-inline void fxt_duration_end(
-    const fxt::InternedCategory& category, uint64_t timestamp,
-    const fxt::ThreadRef<thread_type>& thread_ref, const fxt::StringRef<name_type>& name_ref,
-    const fxt::Argument<arg_types, arg_name_types, arg_val_types>&... args) {
-  fxt::WriteDurationEndEventRecord(&KTRACE_STATE, timestamp, thread_ref,
-                                   fxt::StringRef{category.label()}, name_ref, args...);
-}
-
-template <fxt::RefType thread_type, fxt::RefType name_type, fxt::ArgumentType... arg_types,
-          fxt::RefType... arg_name_types, fxt::RefType... arg_val_types>
-inline void fxt_duration_complete(
-    const fxt::InternedCategory& category, uint64_t start_time,
-    const fxt::ThreadRef<thread_type>& thread_ref, const fxt::StringRef<name_type>& name_ref,
-    uint64_t end_time, const fxt::Argument<arg_types, arg_name_types, arg_val_types>&... args) {
-  fxt::WriteDurationCompleteEventRecord(&KTRACE_STATE, start_time, thread_ref,
-                                        fxt::StringRef{category.label()}, name_ref, end_time,
-                                        args...);
-}
-
-template <fxt::RefType thread_type, fxt::RefType name_type, fxt::ArgumentType... arg_types,
-          fxt::RefType... arg_name_types, fxt::RefType... arg_val_types>
-inline void fxt_counter(const fxt::InternedCategory& category, uint64_t timestamp,
-                        const fxt::ThreadRef<thread_type>& thread_ref,
-                        const fxt::StringRef<name_type>& name_ref, uint64_t counter_id,
-                        const fxt::Argument<arg_types, arg_name_types, arg_val_types>&... args) {
-  fxt::WriteCounterEventRecord(&KTRACE_STATE, timestamp, thread_ref,
-                               fxt::StringRef{category.label()}, name_ref, counter_id, args...);
-}
-
-template <fxt::RefType thread_type, fxt::RefType name_type, fxt::ArgumentType... arg_types,
-          fxt::RefType... arg_name_types, fxt::RefType... arg_val_types>
-inline void fxt_flow_begin(const fxt::InternedCategory& category, uint64_t timestamp,
-                           const fxt::ThreadRef<thread_type>& thread_ref,
-                           const fxt::StringRef<name_type>& name_ref, uint64_t flow_id,
-                           const fxt::Argument<arg_types, arg_name_types, arg_val_types>&... args) {
-  fxt::WriteFlowBeginEventRecord(&KTRACE_STATE, timestamp, thread_ref,
-                                 fxt::StringRef{category.label()}, name_ref, flow_id, args...);
-}
-
-template <fxt::RefType thread_type, fxt::RefType name_type, fxt::ArgumentType... arg_types,
-          fxt::RefType... arg_name_types, fxt::RefType... arg_val_types>
-inline void fxt_flow_step(const fxt::InternedCategory& category, uint64_t timestamp,
-                          const fxt::ThreadRef<thread_type>& thread_ref,
-                          const fxt::StringRef<name_type>& name_ref, uint64_t flow_id,
-                          const fxt::Argument<arg_types, arg_name_types, arg_val_types>&... args) {
-  fxt::WriteFlowStepEventRecord(&KTRACE_STATE, timestamp, thread_ref,
-                                fxt::StringRef{category.label()}, name_ref, flow_id, args...);
-}
-
-template <fxt::RefType thread_type, fxt::RefType name_type, fxt::ArgumentType... arg_types,
-          fxt::RefType... arg_name_types, fxt::RefType... arg_val_types>
-inline void fxt_flow_end(const fxt::InternedCategory& category, uint64_t timestamp,
-                         const fxt::ThreadRef<thread_type>& thread_ref,
-                         const fxt::StringRef<name_type>& name_ref, uint64_t flow_id,
-                         const fxt::Argument<arg_types, arg_name_types, arg_val_types>&... args) {
-  fxt::WriteFlowEndEventRecord(&KTRACE_STATE, timestamp, thread_ref,
-                               fxt::StringRef{category.label()}, name_ref, flow_id, args...);
-}
-
 zx_status_t ktrace_control(uint32_t action, uint32_t options, void* ptr);
 
 void ktrace_report_live_threads();
@@ -821,113 +718,117 @@ using fxt::Scope;
 // Sentinel type for unused arguments.
 struct Unused {};
 
-template <size_t... Is, typename... Ts, typename... Params>
-inline void EmitKernelObject(std::index_sequence<Is...>, const std::tuple<Ts...>& args,
-                             Params&&... params) {
-  fxt_kernel_object(ktl::forward<Params>(params)..., std::get<Is>(args)...);
-}
-template <size_t... Is, typename... Ts, typename... Params>
-inline void EmitComplete(std::index_sequence<Is...>, const std::tuple<Ts...>& args,
-                         Params&&... params) {
-  fxt_duration_complete(ktl::forward<Params>(params)..., std::get<Is>(args)...);
-}
-template <size_t... Is, typename... Ts, typename... Params>
-inline void EmitInstant(std::index_sequence<Is...>, const std::tuple<Ts...>& args,
-                        Params&&... params) {
-  fxt_instant(ktl::forward<Params>(params)..., std::get<Is>(args)...);
-}
-template <size_t... Is, typename... Ts, typename... Params>
-inline void EmitDurationBegin(std::index_sequence<Is...>, const std::tuple<Ts...>& args,
-                              Params&&... params) {
-  fxt_duration_begin(ktl::forward<Params>(params)..., std::get<Is>(args)...);
-}
-template <size_t... Is, typename... Ts, typename... Params>
-inline void EmitDurationEnd(std::index_sequence<Is...>, const std::tuple<Ts...>& args,
-                            Params&&... params) {
-  fxt_duration_end(ktl::forward<Params>(params)..., std::get<Is>(args)...);
-}
-template <size_t... Is, typename... Ts, typename... Params>
-inline void EmitCounter(std::index_sequence<Is...>, const std::tuple<Ts...>& args,
-                        Params&&... params) {
-  fxt_counter(ktl::forward<Params>(params)..., std::get<Is>(args)...);
-}
-template <size_t... Is, typename... Ts, typename... Params>
-inline void EmitFlowBegin(std::index_sequence<Is...>, const std::tuple<Ts...>& args,
-                          Params&&... params) {
-  fxt_flow_begin(ktl::forward<Params>(params)..., std::get<Is>(args)...);
-}
-template <size_t... Is, typename... Ts, typename... Params>
-inline void EmitFlowStep(std::index_sequence<Is...>, const std::tuple<Ts...>& args,
-                         Params&&... params) {
-  fxt_flow_step(ktl::forward<Params>(params)..., std::get<Is>(args)...);
-}
-template <size_t... Is, typename... Ts, typename... Params>
-inline void EmitFlowEnd(std::index_sequence<Is...>, const std::tuple<Ts...>& args,
-                        Params&&... params) {
-  fxt_flow_end(ktl::forward<Params>(params)..., std::get<Is>(args)...);
-}
-
 template <fxt::RefType name_type, typename... Ts>
 inline void EmitKernelObject(zx_koid_t koid, zx_obj_type_t obj_type,
-                             const fxt::StringRef<name_type>& name, const std::tuple<Ts...>& args) {
-  EmitKernelObject(std::index_sequence_for<Ts...>{}, args, koid, obj_type, name);
+                             const fxt::StringRef<name_type>& name, const ktl::tuple<Ts...>& args) {
+  ktl::apply(
+      [&](const Ts&... unpacked_args) {
+        fxt::WriteKernelObjectRecord(&KTRACE_STATE, fxt::Koid(koid), obj_type, name,
+                                     unpacked_args...);
+      },
+      args);
 }
 
 template <fxt::RefType name_type, typename... Ts>
 inline void EmitComplete(const fxt::InternedCategory& category,
                          const fxt::StringRef<name_type>& label, uint64_t start_time,
-                         uint64_t end_time, TraceContext context, const std::tuple<Ts...>& args) {
-  EmitComplete(std::index_sequence_for<Ts...>{}, args, category, start_time,
-               ThreadRefFromContext(context), label, end_time);
+                         uint64_t end_time, TraceContext context, const ktl::tuple<Ts...>& args) {
+  ktl::apply(
+      [&](const Ts&... unpacked_args) {
+        fxt::WriteDurationCompleteEventRecord(
+            &KTRACE_STATE, start_time, ThreadRefFromContext(context),
+            fxt::StringRef{category.label()}, label, end_time, unpacked_args...);
+      },
+      args);
 }
+
 template <fxt::RefType name_type, typename... Ts>
 inline void EmitInstant(const fxt::InternedCategory& category,
                         const fxt::StringRef<name_type>& label, uint64_t timestamp,
-                        TraceContext context, Unused, const std::tuple<Ts...>& args) {
-  EmitInstant(std::index_sequence_for<Ts...>{}, args, category, timestamp,
-              ThreadRefFromContext(context), label);
+                        TraceContext context, Unused, const ktl::tuple<Ts...>& args) {
+  ktl::apply(
+      [&](const Ts&... unpacked_args) {
+        fxt::WriteInstantEventRecord(&KTRACE_STATE, timestamp, ThreadRefFromContext(context),
+                                     fxt::StringRef{category.label()}, label, unpacked_args...);
+      },
+      args);
 }
+
 template <fxt::RefType name_type, typename... Ts>
 inline void EmitDurationBegin(const fxt::InternedCategory& category,
                               const fxt::StringRef<name_type>& label, uint64_t timestamp,
-                              TraceContext context, Unused, const std::tuple<Ts...>& args) {
-  EmitDurationBegin(std::index_sequence_for<Ts...>{}, args, category, timestamp,
-                    ThreadRefFromContext(context), label);
+                              TraceContext context, Unused, const ktl::tuple<Ts...>& args) {
+  ktl::apply(
+      [&](const Ts&... unpacked_args) {
+        fxt::WriteDurationBeginEventRecord(&KTRACE_STATE, timestamp, ThreadRefFromContext(context),
+                                           fxt::StringRef{category.label()}, label,
+                                           unpacked_args...);
+      },
+      args);
 }
+
 template <fxt::RefType name_type, typename... Ts>
 inline void EmitDurationEnd(const fxt::InternedCategory& category,
                             const fxt::StringRef<name_type>& label, uint64_t timestamp,
-                            TraceContext context, Unused, const std::tuple<Ts...> args) {
-  EmitDurationEnd(std::index_sequence_for<Ts...>{}, args, category, timestamp,
-                  ThreadRefFromContext(context), label);
+                            TraceContext context, Unused, const ktl::tuple<Ts...> args) {
+  ktl::apply(
+      [&](const Ts&... unpacked_args) {
+        fxt::WriteDurationEndEventRecord(&KTRACE_STATE, timestamp, ThreadRefFromContext(context),
+                                         fxt::StringRef{category.label()}, label, unpacked_args...);
+      },
+      args);
 }
+
 template <fxt::RefType name_type, typename... Ts>
 inline void EmitCounter(const fxt::InternedCategory& category,
                         const fxt::StringRef<name_type>& label, uint64_t timestamp,
-                        TraceContext context, uint64_t counter_id, const std::tuple<Ts...>& args) {
-  EmitCounter(std::index_sequence_for<Ts...>{}, args, category, timestamp,
-              ThreadRefFromContext(context), label, counter_id);
+                        TraceContext context, uint64_t counter_id, const ktl::tuple<Ts...>& args) {
+  ktl::apply(
+      [&](const Ts&... unpacked_args) {
+        fxt::WriteCounterEventRecord(&KTRACE_STATE, timestamp, ThreadRefFromContext(context),
+                                     fxt::StringRef{category.label()}, label, counter_id,
+                                     unpacked_args...);
+      },
+      args);
 }
+
 template <fxt::RefType name_type, typename... Ts>
 inline void EmitFlowBegin(const fxt::InternedCategory& category,
                           const fxt::StringRef<name_type>& label, uint64_t timestamp,
-                          TraceContext context, uint64_t flow_id, const std::tuple<Ts...>& args) {
-  EmitFlowBegin(std::index_sequence_for<Ts...>{}, args, category, timestamp,
-                ThreadRefFromContext(context), label, flow_id);
+                          TraceContext context, uint64_t flow_id, const ktl::tuple<Ts...>& args) {
+  ktl::apply(
+      [&](const Ts&... unpacked_args) {
+        fxt::WriteFlowBeginEventRecord(&KTRACE_STATE, timestamp, ThreadRefFromContext(context),
+                                       fxt::StringRef{category.label()}, label, flow_id,
+                                       unpacked_args...);
+      },
+      args);
 }
+
 template <fxt::RefType name_type, typename... Ts>
 inline void EmitFlowStep(const fxt::InternedCategory& category,
                          const fxt::StringRef<name_type>& label, uint64_t timestamp,
-                         TraceContext context, uint64_t flow_id, const std::tuple<Ts...>& args) {
-  EmitFlowStep(std::index_sequence_for<Ts...>{}, args, category, timestamp,
-               ThreadRefFromContext(context), label, flow_id);
+                         TraceContext context, uint64_t flow_id, const ktl::tuple<Ts...>& args) {
+  ktl::apply(
+      [&](const Ts&... unpacked_args) {
+        fxt::WriteFlowStepEventRecord(&KTRACE_STATE, timestamp, ThreadRefFromContext(context),
+                                      fxt::StringRef{category.label()}, label, flow_id,
+                                      unpacked_args...);
+      },
+      args);
 }
+
 template <fxt::RefType name_type, typename... Ts>
 inline void EmitFlowEnd(const fxt::InternedCategory& category,
                         const fxt::StringRef<name_type>& label, uint64_t timestamp,
-                        TraceContext context, uint64_t flow_id, const std::tuple<Ts...>& args) {
-  EmitFlowEnd(std::index_sequence_for<Ts...>{}, args, category, timestamp,
-              ThreadRefFromContext(context), label, flow_id);
+                        TraceContext context, uint64_t flow_id, const ktl::tuple<Ts...>& args) {
+  ktl::apply(
+      [&](const Ts&... unpacked_args) {
+        fxt::WriteFlowEndEventRecord(&KTRACE_STATE, timestamp, ThreadRefFromContext(context),
+                                     fxt::StringRef{category.label()}, label, flow_id,
+                                     unpacked_args...);
+      },
+      args);
 }
 
 }  // namespace ktrace
