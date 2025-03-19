@@ -128,10 +128,10 @@ impl NamespaceBuilder {
                         serve_directory(
                             entry,
                             &self.namespace_scope,
-                            fio::OpenFlags::DIRECTORY
-                                | fio::OpenFlags::RIGHT_READABLE
-                                | fio::OpenFlags::POSIX_EXECUTABLE
-                                | fio::OpenFlags::POSIX_WRITABLE,
+                            fio::Flags::PROTOCOL_DIRECTORY
+                                | fio::PERM_READABLE
+                                | fio::Flags::PERM_INHERIT_WRITE
+                                | fio::Flags::PERM_INHERIT_EXECUTE,
                         )
                         .map_err(|err| BuildNamespaceError::Serve { path: path.clone(), err })?,
                     )

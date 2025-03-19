@@ -620,7 +620,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (dir, receiver) = mock_dir();
         let scope = ExecutionScope::new();
-        let dir_proxy = serve_directory(dir, &scope, fio::OpenFlags::DIRECTORY).unwrap();
+        let dir_proxy = serve_directory(dir, &scope, fio::PERM_READABLE).unwrap();
 
         let mut processargs = ProcessArgs::new();
         let dict = Dict::new();

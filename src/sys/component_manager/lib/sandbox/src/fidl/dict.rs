@@ -1084,8 +1084,7 @@ mod tests {
         let scope = ExecutionScope::new();
         let remote = dict.try_into_directory_entry(scope.clone()).unwrap();
 
-        let dir_client_end =
-            serve_directory(remote.clone(), &scope, fio::OpenFlags::DIRECTORY).unwrap();
+        let dir_client_end = serve_directory(remote.clone(), &scope, fio::PERM_READABLE).unwrap();
 
         assert_eq!(mock_dir.0.get(), 0);
         let (client_end, server_end) = Channel::create();
@@ -1110,8 +1109,7 @@ mod tests {
             .try_into_directory_entry(scope.clone())
             .expect("convert dict into Open capability");
 
-        let dir_client_end =
-            serve_directory(remote.clone(), &scope, fio::OpenFlags::DIRECTORY).unwrap();
+        let dir_client_end = serve_directory(remote.clone(), &scope, fio::PERM_READABLE).unwrap();
 
         // List the outer directory and verify the contents.
         let dir = dir_client_end.into_proxy();
@@ -1138,9 +1136,8 @@ mod tests {
         let dict = Dict::new();
         let scope = ExecutionScope::new();
         let remote = dict.clone().try_into_directory_entry(scope.clone()).unwrap();
-        let dir_proxy = serve_directory(remote.clone(), &scope, fio::OpenFlags::DIRECTORY)
-            .unwrap()
-            .into_proxy();
+        let dir_proxy =
+            serve_directory(remote.clone(), &scope, fio::PERM_READABLE).unwrap().into_proxy();
         let mut watcher = fuchsia_fs::directory::Watcher::new(&dir_proxy)
             .await
             .expect("failed to create watcher");
@@ -1217,9 +1214,8 @@ mod tests {
 
         let scope = ExecutionScope::new();
         let remote = dict.clone().try_into_directory_entry(scope.clone()).unwrap();
-        let dir_proxy = serve_directory(remote.clone(), &scope, fio::OpenFlags::DIRECTORY)
-            .unwrap()
-            .into_proxy();
+        let dir_proxy =
+            serve_directory(remote.clone(), &scope, fio::PERM_READABLE).unwrap().into_proxy();
         let mut watcher = fuchsia_fs::directory::Watcher::new(&dir_proxy)
             .await
             .expect("failed to create watcher");

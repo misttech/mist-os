@@ -299,9 +299,11 @@ impl<'a> OpenRequest<'a> {
                 {
                     let object_request = object_request.take();
                     scope.clone().spawn(async move {
-                        object_request.handle(|object_request| {
-                            remote.open3(scope, path, flags, object_request)
-                        });
+                        if object_request.wait_till_ready().await {
+                            object_request.handle(|object_request| {
+                                remote.open3(scope, path, flags, object_request)
+                            });
+                        }
                     });
                     Ok(())
                 } else {
@@ -398,7 +400,7 @@ impl<T: DirectoryEntry + ?Sized> DirectoryEntry for SubNode<T> {
 pub fn serve_directory(
     dir: Arc<impl DirectoryEntry + ?Sized>,
     scope: &ExecutionScope,
-    flags: fio::OpenFlags,
+    flags: fio::Flags,
 ) -> Result<ClientEnd<fio::DirectoryMarker>, Status> {
     assert_eq!(dir.entry_info().type_(), fio::DirentType::Directory);
     let (client, server) = create_endpoints::<fio::DirectoryMarker>();
