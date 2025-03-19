@@ -9,6 +9,7 @@
 #include <lib/async/default.h>
 #include <lib/fidl/cpp/hlcpp_conversion.h>
 #include <lib/fit/function.h>
+#include <lib/scheduler/role.h>
 #include <lib/trace/event.h>
 
 #include <utility>
@@ -109,6 +110,12 @@ scheduling::SessionId FlatlandManager::CreateFlatland(
                           this->alive_sessions_--;
                         });
       });
+  async::PostTask(instance->loop->dispatcher(), []() {
+    zx_status_t status = fuchsia_scheduler::SetRoleForThisThread("fuchsia.graphics.flatland");
+    if (status != ZX_OK) {
+      FX_LOGS(WARNING) << "Failed to apply profile to flatland thread: " << status;
+    }
+  });
   instance->impl = NewFlatland(
       instance->loop, std::move(request), id,
       std::bind(&FlatlandManager::DestroyInstanceFunction, this, id), flatland_presenter_,
