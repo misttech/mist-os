@@ -626,8 +626,6 @@ using fxt::operator""_intern;
 
 class KTrace {
  public:
-  static internal::KTraceState& GetInstance() { return state_; }
-
   // Sentinel type for unused arguments.
   struct Unused {};
 
@@ -638,12 +636,9 @@ class KTrace {
     // TODO(eieio): Support process?
   };
 
-  // Initializes the internal KTraceState as well as the CPU context map needed to support
-  // tracing. It is an error to perform any other operations before invoking Init.
-  static void Init(uint32_t target_bufsize, uint32_t initial_groups) {
-    cpu_context_map_.Init();
-    state_.Init(target_bufsize, initial_groups);
-  }
+  // Initializes all of the internal state needed to support kernel tracing.
+  // This is a no-op if tracing has been disabled.
+  static void InitHook(unsigned);
 
   // Control is responsible for probing, starting, stopping, or rewinding the ktrace buffer.
   //
@@ -848,7 +843,11 @@ class KTrace {
     }
 
     // Initializes the CPU KOID base value.
-    void Init();
+    void Init() {
+      if (cpu_koid_base_ == ZX_KOID_INVALID) {
+        cpu_koid_base_ = KernelObjectId::GenerateRange(arch_max_num_cpus());
+      }
+    }
 
    private:
     // Returns a ThreadRef for the given CPU.
@@ -871,6 +870,18 @@ class KTrace {
         return {kNoProcess, fxt::Koid{0}};
     }
   }
+
+  static internal::KTraceState& GetInstance() { return state_; }
+
+  // Set this class up as a singleton by:
+  // * Making the constructor and destructor private
+  // * Preventing copies and moves
+  constexpr KTrace() = default;
+  ~KTrace() = default;
+  KTrace(const KTrace&) = delete;
+  KTrace& operator=(const KTrace&) = delete;
+  KTrace(KTrace&&) = delete;
+  KTrace& operator=(KTrace&&) = delete;
 
   static internal::KTraceState state_;
   static CpuContextMap cpu_context_map_;

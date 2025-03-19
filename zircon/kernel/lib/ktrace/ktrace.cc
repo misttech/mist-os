@@ -30,10 +30,6 @@
 
 #include <ktl/enforce.h>
 
-// The global ktrace state.
-internal::KTraceState KTrace::state_;
-KTrace::CpuContextMap KTrace::cpu_context_map_;
-
 namespace {
 
 using fxt::operator""_category;
@@ -68,7 +64,6 @@ void SetupCategoryBits() {
   }
 }
 
-// TODO(https://fxbug.dev/42064084)
 void ktrace_report_cpu_pseudo_threads() {
   const uint max_cpus = arch_max_num_cpus();
   char name[32];
@@ -80,12 +75,6 @@ void ktrace_report_cpu_pseudo_threads() {
 }
 
 }  // namespace
-
-void KTrace::CpuContextMap::Init() {
-  if (cpu_koid_base_ == ZX_KOID_INVALID) {
-    cpu_koid_base_ = KernelObjectId::GenerateRange(arch_max_num_cpus());
-  }
-}
 
 namespace internal {
 
@@ -589,6 +578,10 @@ uint64_t* KTraceState::ReserveRaw(uint32_t num_words) {
 
 }  // namespace internal
 
+// The global ktrace state.
+internal::KTraceState KTrace::state_;
+KTrace::CpuContextMap KTrace::cpu_context_map_;
+
 zx_status_t KTrace::Control(uint32_t action, uint32_t options, void* ptr) {
   using StartMode = ::internal::KTraceState::StartMode;
   switch (action) {
@@ -614,7 +607,7 @@ zx_status_t KTrace::Control(uint32_t action, uint32_t options, void* ptr) {
   return ZX_OK;
 }
 
-static void ktrace_init(unsigned level) {
+void KTrace::InitHook(unsigned) {
   // There's no utility in setting up the singleton ktrace instance if there are
   // no syscalls to access it. See zircon/kernel/syscalls/debug.cc for the
   // corresponding syscalls. Note that because the internal KTraceState grpmask starts at 0
@@ -627,26 +620,14 @@ static void ktrace_init(unsigned level) {
   dprintf(INFO, "ktrace_init: syscalls_enabled=%d bufsize=%u grpmask=%x\n", syscalls_enabled,
           bufsize, initial_grpmask);
 
-  // Coerce the category ids to match the pre-defined bit mapptings of aged ktrace interface.
-  // TODO(eieio): Remove this when kernel migrates to IOB-based tracing with extensible categories.
-  SetupCategoryBits();
-
-  // Set the callback to emit fxt string records for the set of interned strings when
-  // fxt::InternedString::RegisterStrings() is called at the beginning of a trace session.
-  // TODO(eieio): Replace this with id allocator allocations when IOB-based tracing is implemented.
-  fxt::InternedString::SetRegisterCallback([](const fxt::InternedString& interned_string) {
-    fxt::WriteStringRecord(
-        &KTrace::GetInstance(), interned_string.id(), interned_string.string(),
-        strnlen(interned_string.string(), fxt::InternedString::kMaxStringLength));
-  });
-
   if (!bufsize) {
     dprintf(INFO, "ktrace: disabled\n");
     return;
   }
 
-  // Initialize the KTrace singleton.
-  KTrace::Init(bufsize, initial_grpmask);
+  // Coerce the category ids to match the pre-defined bit mappings of aged ktrace interface.
+  // TODO(eieio): Remove this when kernel migrates to IOB-based tracing with extensible categories.
+  SetupCategoryBits();
 
   dprintf(INFO, "Trace categories: \n");
   for (const fxt::InternedCategory& category : fxt::InternedCategory::Iterate()) {
@@ -656,7 +637,20 @@ static void ktrace_init(unsigned level) {
   if (!initial_grpmask) {
     dprintf(INFO, "ktrace: delaying buffer allocation\n");
   }
+
+  // Set the callback to emit fxt string records for the set of interned strings when
+  // fxt::InternedString::RegisterStrings() is called at the beginning of a trace session.
+  // TODO(eieio): Replace this with id allocator allocations when IOB-based tracing is implemented.
+  fxt::InternedString::SetRegisterCallback([](const fxt::InternedString& interned_string) {
+    fxt::WriteStringRecord(
+        &GetInstance(), interned_string.id(), interned_string.string(),
+        strnlen(interned_string.string(), fxt::InternedString::kMaxStringLength));
+  });
+
+  // Initialize the singleton data structures.
+  cpu_context_map_.Init();
+  state_.Init(bufsize, initial_grpmask);
 }
 
 // Finish initialization before starting userspace (i.e. before debug syscalls can occur).
-LK_INIT_HOOK(ktrace, ktrace_init, LK_INIT_LEVEL_USER - 1)
+LK_INIT_HOOK(ktrace, KTrace::InitHook, LK_INIT_LEVEL_USER - 1)
