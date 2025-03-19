@@ -664,7 +664,7 @@ void BlockDevice::WorkerThread() {
 
 void BlockDevice::WatchdogThread() {
   for (;;) {
-    watchdog_signal_.Wait(Deadline::after_mono(kWatchdogInterval.to_secs()));
+    watchdog_signal_.Wait(Deadline::after_mono(kWatchdogInterval.get()));
     if (watchdog_shutdown_.load()) {
       return;
     }
