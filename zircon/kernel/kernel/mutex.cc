@@ -110,7 +110,7 @@ class KTracer<Level, ktl::enable_if_t<(Level == KernelMutexTracingLevel::Contest
       fxt::Argument tid_type_arg{"tid_type"_intern, tid_type};
       fxt::Argument wait_count_arg{"waiter_count"_intern, waiter_count};
 
-      ktrace::EmitComplete(
+      KTrace::EmitComplete(
           "kernel::sched"_category, fxt::StringRef{event_name}, ts_, ts_ + 50, TraceContext::Thread,
           ktl::make_tuple(mutex_id_arg, tid_name_arg, tid_type_arg, wait_count_arg));
     }

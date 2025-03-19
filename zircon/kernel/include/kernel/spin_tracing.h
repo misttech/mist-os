@@ -61,7 +61,7 @@ class Tracer<true> {
           elid.lock_type() == LockType::kSpinlock ? "Spinlock"_intern : "Mutex"_intern;
       const bool blocked_after = (finish_type == FinishType::kBlocked);
 
-      FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitComplete, "kernel:sched",
+      FXT_EVENT_COMMON(true, ktrace_category_enabled, KTrace::EmitComplete, "kernel:sched",
                        "lock_spin"_intern, start_, end_time.value(), TraceContext::Thread,
                        ("lock_id", lock_id),
                        ("lock_class", fxt::StringRef<fxt::RefType::kId>{class_name}),
@@ -73,7 +73,7 @@ class Tracer<true> {
       // the native FXT format.  Currently, it depends on conversion to JSON
       // before processing, which strips the string table from the data
       // (embedding it directly into the JSON instead).
-      FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitComplete, "kernel:sched",
+      FXT_EVENT_COMMON(true, ktrace_category_enabled, KTrace::EmitComplete, "kernel:sched",
                        "lock_spin"_intern, start_, end_time.value(), TraceContext::Thread,
                        ("lock_class", fxt::StringRef<fxt::RefType::kId>{class_name}),
                        ("elid", elid.FinishedValue(finish_type)));

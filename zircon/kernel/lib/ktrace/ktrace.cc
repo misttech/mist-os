@@ -31,7 +31,7 @@
 #include <ktl/enforce.h>
 
 // The global ktrace state.
-internal::KTraceState KTRACE_STATE;
+internal::KTraceState KTrace::state_;
 
 namespace {
 
@@ -601,14 +601,14 @@ zx_status_t ktrace_control(uint32_t action, uint32_t options, void* ptr) {
     case KTRACE_ACTION_START_CIRCULAR: {
       const StartMode start_mode =
           (action == KTRACE_ACTION_START) ? StartMode::Saturate : StartMode::Circular;
-      return KTRACE_STATE.Start(options ? options : KTRACE_GRP_ALL, start_mode);
+      return KTrace::GetInstance().Start(options ? options : KTRACE_GRP_ALL, start_mode);
     }
 
     case KTRACE_ACTION_STOP:
-      return KTRACE_STATE.Stop();
+      return KTrace::GetInstance().Stop();
 
     case KTRACE_ACTION_REWIND:
-      return KTRACE_STATE.Rewind();
+      return KTrace::GetInstance().Rewind();
 
     case KTRACE_ACTION_NEW_PROBE:
       return ZX_ERR_NOT_SUPPORTED;
@@ -622,7 +622,7 @@ zx_status_t ktrace_control(uint32_t action, uint32_t options, void* ptr) {
 static void ktrace_init(unsigned level) {
   // There's no utility in setting up the singleton ktrace instance if there are
   // no syscalls to access it. See zircon/kernel/syscalls/debug.cc for the
-  // corresponding syscalls. Note that because KTRACE_STATE grpmask starts at 0
+  // corresponding syscalls. Note that because the internal KTraceState grpmask starts at 0
   // and will not be changed, the other functions in this file need not check
   // for enabled-ness manually.
   const bool syscalls_enabled = gBootOptions->enable_debugging_syscalls;
@@ -641,7 +641,7 @@ static void ktrace_init(unsigned level) {
   // TODO(eieio): Replace this with id allocator allocations when IOB-based tracing is implemented.
   fxt::InternedString::SetRegisterCallback([](const fxt::InternedString& interned_string) {
     fxt::WriteStringRecord(
-        &KTRACE_STATE, interned_string.id(), interned_string.string(),
+        &KTrace::GetInstance(), interned_string.id(), interned_string.string(),
         strnlen(interned_string.string(), fxt::InternedString::kMaxStringLength));
   });
 
@@ -658,7 +658,7 @@ static void ktrace_init(unsigned level) {
     dprintf(INFO, "  %-20s : 0x%03x\n", category.string(), (1u << category.index()));
   }
 
-  KTRACE_STATE.Init(bufsize, initial_grpmask);
+  KTrace::GetInstance().Init(bufsize, initial_grpmask);
 
   if (!initial_grpmask) {
     dprintf(INFO, "ktrace: delaying buffer allocation\n");

@@ -85,7 +85,7 @@
 // - ...: List of parenthesized argument tuples.
 //
 #define KTRACE_KERNEL_OBJECT(category, koid, obj_type, name, ...)                            \
-  FXT_KERNEL_OBJECT(true, ktrace_category_enabled, ktrace::EmitKernelObject, category, koid, \
+  FXT_KERNEL_OBJECT(true, ktrace_category_enabled, KTrace::EmitKernelObject, category, koid, \
                     obj_type, name, ##__VA_ARGS__)
 
 // Writes a kernel object record unconditionally. Useful for generating the initial set of object
@@ -98,7 +98,7 @@
 // - ...: List of parenthesized argument tuples.
 //
 #define KTRACE_KERNEL_OBJECT_ALWAYS(koid, obj_type, name, ...) \
-  FXT_KERNEL_OBJECT_ALWAYS(true, ktrace::EmitKernelObject, koid, obj_type, name, ##__VA_ARGS__)
+  FXT_KERNEL_OBJECT_ALWAYS(true, KTrace::EmitKernelObject, koid, obj_type, name, ##__VA_ARGS__)
 
 //
 // ## SCOPE
@@ -152,41 +152,41 @@
 // - ...: List of parenthesized argument tuples.
 //
 #define KTRACE_BEGIN_SCOPE(category, label, ...)                                               \
-  FXT_BEGIN_SCOPE(true, true, ktrace_category_enabled, ktrace_timestamp, ktrace::EmitComplete, \
+  FXT_BEGIN_SCOPE(true, true, ktrace_category_enabled, ktrace_timestamp, KTrace::EmitComplete, \
                   category, FXT_INTERN_STRING(label), TraceContext::Thread, ##__VA_ARGS__)
 
 // Similar to KTRACE_BEGIN_SCOPE, but associates the event with the current CPU instead of the
 // current thread.
 #define KTRACE_CPU_BEGIN_SCOPE(category, label, ...)                                           \
-  FXT_BEGIN_SCOPE(true, true, ktrace_category_enabled, ktrace_timestamp, ktrace::EmitComplete, \
+  FXT_BEGIN_SCOPE(true, true, ktrace_category_enabled, ktrace_timestamp, KTrace::EmitComplete, \
                   category, FXT_INTERN_STRING(label), TraceContext::Cpu, ##__VA_ARGS__)
 
 // Similar to KTRACE_BEGIN_SCOPE, but checks the given runtime_condition, in addition to the given
 // category, to determine whether to emit the event.
 #define KTRACE_BEGIN_SCOPE_COND(runtime_condition, category, label, ...)                          \
   FXT_BEGIN_SCOPE(true, runtime_condition, ktrace_category_enabled, ktrace_timestamp,             \
-                  ktrace::EmitComplete, category, FXT_INTERN_STRING(label), TraceContext::Thread, \
+                  KTrace::EmitComplete, category, FXT_INTERN_STRING(label), TraceContext::Thread, \
                   ##__VA_ARGS__)
 
 // Similar to KTRACE_BEGIN_SCOPE_COND, but associates the event with the current CPU instead of the
 // current thread.
 #define KTRACE_CPU_BEGIN_SCOPE_COND(runtime_condition, category, label, ...)                   \
   FXT_BEGIN_SCOPE(true, runtime_condition, ktrace_category_enabled, ktrace_timestamp,          \
-                  ktrace::EmitComplete, category, FXT_INTERN_STRING(label), TraceContext::Cpu, \
+                  KTrace::EmitComplete, category, FXT_INTERN_STRING(label), TraceContext::Cpu, \
                   ##__VA_ARGS__)
 
 // Similar to KTRACE_BEGIN_SCOPE, but checks the given constexpr_condition to determine whether the
 // event is enabled at compile time.
 #define KTRACE_BEGIN_SCOPE_ENABLE(constexpr_enabled, category, label, ...)                        \
   FXT_BEGIN_SCOPE(constexpr_enabled, true, ktrace_category_enabled, ktrace_timestamp,             \
-                  ktrace::EmitComplete, category, FXT_INTERN_STRING(label), TraceContext::Thread, \
+                  KTrace::EmitComplete, category, FXT_INTERN_STRING(label), TraceContext::Thread, \
                   ##__VA_ARGS__)
 
 // Similar to KTRACE_BEGIN_SCOPE_ENABLE, but associates the event with the current CPU instead of
 // the current thread.
 #define KTRACE_CPU_BEGIN_SCOPE_ENABLE(constexpr_enabled, category, label, ...)                 \
   FXT_BEGIN_SCOPE(constexpr_enabled, true, ktrace_category_enabled, ktrace_timestamp,          \
-                  ktrace::EmitComplete, category, FXT_INTERN_STRING(label), TraceContext::Cpu, \
+                  KTrace::EmitComplete, category, FXT_INTERN_STRING(label), TraceContext::Cpu, \
                   ##__VA_ARGS__)
 
 // Similar to KTRACE_BEGIN_SCOPE, but checks the given constexpr_condition to determine whether the
@@ -194,7 +194,7 @@
 // given category, to determine whether to emit the event.
 #define KTRACE_BEGIN_SCOPE_ENABLE_COND(constexpr_enabled, runtime_enabled, category, label, ...)  \
   FXT_BEGIN_SCOPE(constexpr_enabled, runtime_enabled, ktrace_category_enabled, ktrace_timestamp,  \
-                  ktrace::EmitComplete, category, FXT_INTERN_STRING(label), TraceContext::Thread, \
+                  KTrace::EmitComplete, category, FXT_INTERN_STRING(label), TraceContext::Thread, \
                   ##__VA_ARGS__)
 
 // Similar to KTRACE_BEGIN_SCOPE_ENABLE_COND, but associates the event with the current CPU instead
@@ -202,7 +202,7 @@
 #define KTRACE_CPU_BEGIN_SCOPE_ENABLE_COND(constexpr_enabled, runtime_enabled, category, label,  \
                                            ...)                                                  \
   FXT_BEGIN_SCOPE(constexpr_enabled, runtime_enabled, ktrace_category_enabled, ktrace_timestamp, \
-                  ktrace::EmitComplete, category, FXT_INTERN_STRING(label), TraceContext::Cpu,   \
+                  KTrace::EmitComplete, category, FXT_INTERN_STRING(label), TraceContext::Cpu,   \
                   ##__VA_ARGS__)
 
 // Creates a delegate to capture the given arguments at the end of an active scope. The returned
@@ -244,28 +244,28 @@
 // - ...: List of parenthesized argument tuples.
 //
 #define KTRACE_INSTANT(category, label, ...)                                           \
-  FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitInstant, category,       \
+  FXT_EVENT_COMMON(true, ktrace_category_enabled, KTrace::EmitInstant, category,       \
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Thread, \
                    ktrace::Unused{}, ##__VA_ARGS__)
 
 // Similar to KTRACE_INSTANT, but associates the event with the current CPU instead of the current
 // thread.
 #define KTRACE_CPU_INSTANT(category, label, ...)                                    \
-  FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitInstant, category,    \
+  FXT_EVENT_COMMON(true, ktrace_category_enabled, KTrace::EmitInstant, category,    \
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Cpu, \
                    ktrace::Unused{}, ##__VA_ARGS__)
 
 // Similar to KTRACE_INSTANT, but checks the given constexpr_condition to determine whether the
 // event is enabled at compile time.
 #define KTRACE_INSTANT_ENABLE(constexpr_enabled, category, label, ...)                        \
-  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, ktrace::EmitInstant, category, \
+  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, KTrace::EmitInstant, category, \
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Thread,        \
                    ktrace::Unused{}, ##__VA_ARGS__)
 
 // Similar to KTRACE_INSTANT_ENABLE, but associates the event with the current CPU instead of the
 // current thread.
 #define KTRACE_CPU_INSTANT_ENABLE(constexpr_enabled, category, label, ...)                    \
-  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, ktrace::EmitInstant, category, \
+  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, KTrace::EmitInstant, category, \
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Cpu,           \
                    ktrace::Unused{}, ##__VA_ARGS__)
 
@@ -282,40 +282,40 @@
 // - ...: List of parenthesized argument tuples.
 //
 #define KTRACE_DURATION_BEGIN(category, label, ...)                                    \
-  FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitDurationBegin, category, \
+  FXT_EVENT_COMMON(true, ktrace_category_enabled, KTrace::EmitDurationBegin, category, \
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Thread, \
                    ktrace::Unused{}, ##__VA_ARGS__)
 
 // Similar to KTRACE_DURATION_BEGIN, but associates the event with the current CPU instead of the
 // current thread.
 #define KTRACE_CPU_DURATION_BEGIN(category, label, ...)                                \
-  FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitDurationBegin, category, \
+  FXT_EVENT_COMMON(true, ktrace_category_enabled, KTrace::EmitDurationBegin, category, \
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Cpu,    \
                    ktrace::Unused{}, ##__VA_ARGS__)
 
 // Similar to KTRACE_DURATION_BEGIN, but checks the given constexpr_condition to determine whether
 // the event is enabled at compile time.
 #define KTRACE_DURATION_BEGIN_ENABLE(constexpr_enabled, category, label, ...)                    \
-  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, ktrace::EmitDurationBegin,        \
+  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, KTrace::EmitDurationBegin,        \
                    category, FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Thread, \
                    ktrace::Unused{}, ##__VA_ARGS__)
 
 // Similar to KTRACE_DURATION_BEGIN_ENABLE, but associates the event with the current CPU instead of
 // the current thread.
 #define KTRACE_CPU_DURATION_BEGIN_ENABLE(constexpr_enabled, category, label, ...)             \
-  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, ktrace::EmitDurationBegin,     \
+  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, KTrace::EmitDurationBegin,     \
                    category, FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Cpu, \
                    ktrace::Unused{}, ##__VA_ARGS__)
 
 // Similar to KTRACE_DURATION_BEGIN, but accepts a value convertible to fxt::StringRef for the
 // label. Useful to tracing durations where the label comes from a table (e.g. syscall, vmm).
 #define KTRACE_DURATION_BEGIN_LABEL_REF(category, label_ref, ...)                                 \
-  FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitDurationBegin, category, label_ref, \
+  FXT_EVENT_COMMON(true, ktrace_category_enabled, KTrace::EmitDurationBegin, category, label_ref, \
                    ktrace_timestamp(), TraceContext::Thread, ktrace::Unused{}, ##__VA_ARGS__)
 
 // Similar to KTRACE_DURATION_BEGIN, but accepts an expression to use for the event timestamp.
 #define KTRACE_DURATION_BEGIN_TIMESTAMP(category, label, timestamp, ...)                        \
-  FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitDurationBegin, category,          \
+  FXT_EVENT_COMMON(true, ktrace_category_enabled, KTrace::EmitDurationBegin, category,          \
                    FXT_INTERN_STRING(label), timestamp, TraceContext::Thread, ktrace::Unused{}, \
                    ##__VA_ARGS__)
 
@@ -332,40 +332,40 @@
 // - ...: List of parenthesized argument tuples.
 //
 #define KTRACE_DURATION_END(category, label, ...)                                      \
-  FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitDurationEnd, category,   \
+  FXT_EVENT_COMMON(true, ktrace_category_enabled, KTrace::EmitDurationEnd, category,   \
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Thread, \
                    ktrace::Unused{}, ##__VA_ARGS__)
 
 // Similar to KTRACE_DURATION_END, but associates the event with the current CPU instead of the
 // current thread.
 #define KTRACE_CPU_DURATION_END(category, label, ...)                                \
-  FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitDurationEnd, category, \
+  FXT_EVENT_COMMON(true, ktrace_category_enabled, KTrace::EmitDurationEnd, category, \
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Cpu,  \
                    ktrace::Unused{}, ##__VA_ARGS__)
 
 // Similar to KTRACE_DURATION_END, but checks the given constexpr_condition to determine whether the
 // event is enabled at compile time.
 #define KTRACE_DURATION_END_ENABLE(constexpr_enabled, category, label, ...)                       \
-  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, ktrace::EmitDurationEnd, category, \
+  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, KTrace::EmitDurationEnd, category, \
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Thread,            \
                    ktrace::Unused{}, ##__VA_ARGS__)
 
 // Similar to KTRACE_DURATION_END_ENABLE, but associates the event with the current CPU instead of
 // the current thread.
 #define KTRACE_CPU_DURATION_END_ENABLE(constexpr_enabled, category, label, ...)                   \
-  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, ktrace::EmitDurationEnd, category, \
+  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, KTrace::EmitDurationEnd, category, \
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Cpu,               \
                    ktrace::Unused{}, ##__VA_ARGS__)
 
 // Similar to KTRACE_DURATION_END, but accepts a value convertible to fxt::StringRef for the label.
 // Useful to tracing durations where the label comes from a table (e.g. syscall, vmm).
 #define KTRACE_DURATION_END_LABEL_REF(category, label, ...)                                 \
-  FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitDurationEnd, category, label, \
+  FXT_EVENT_COMMON(true, ktrace_category_enabled, KTrace::EmitDurationEnd, category, label, \
                    ktrace_timestamp(), TraceContext::Thread, ktrace::Unused{}, ##__VA_ARGS__)
 
 // Similar to KTRACE_DURATION_END, but accepts an expression to use for the event timestamp.
 #define KTRACE_DURATION_END_TIMESTAMP(category, label, timestamp, ...)                          \
-  FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitDurationEnd, category,            \
+  FXT_EVENT_COMMON(true, ktrace_category_enabled, KTrace::EmitDurationEnd, category,            \
                    FXT_INTERN_STRING(label), timestamp, TraceContext::Thread, ktrace::Unused{}, \
                    ##__VA_ARGS__)
 
@@ -383,28 +383,28 @@
 // - ...: List of parenthesized argument tuples.
 //
 #define KTRACE_COMPLETE(category, label, start_timestamp, ...)                    \
-  FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitComplete, category, \
+  FXT_EVENT_COMMON(true, ktrace_category_enabled, KTrace::EmitComplete, category, \
                    FXT_INTERN_STRING(label), start_timestamp, ktrace_timestamp(), \
                    TraceContext::Thread, ##__VA_ARGS__)
 
 // Similar to KTRACE_COMPLETE, but associates the event with the current CPU instead of the current
 // thread.
 #define KTRACE_CPU_COMPLETE(category, label, start_timestamp, ...)                \
-  FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitComplete, category, \
+  FXT_EVENT_COMMON(true, ktrace_category_enabled, KTrace::EmitComplete, category, \
                    FXT_INTERN_STRING(label), start_timestamp, ktrace_timestamp(), \
                    TraceContext::Cpu, ##__VA_ARGS__)
 
 // Similar to KTRACE_COMPLETE, but checks the given constexpr_condition to determine whether the
 // event is enabled at compile time.
 #define KTRACE_COMPLETE_ENABLE(constexpr_enabled, category, label, start_timestamp, ...)       \
-  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, ktrace::EmitComplete, category, \
+  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, KTrace::EmitComplete, category, \
                    FXT_INTERN_STRING(label), start_timestamp, ktrace_timestamp(),              \
                    TraceContext::Thread, ##__VA_ARGS__)
 
 // Similar to KTRACE_COMPLETE_ENABLE, but associates the event with the current CPU instead of the
 // current thread.
 #define KTRACE_CPU_COMPLETE_ENABLE(constexpr_enabled, category, label, start_timestamp, ...)   \
-  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, ktrace::EmitComplete, category, \
+  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, KTrace::EmitComplete, category, \
                    FXT_INTERN_STRING(label), start_timestamp, ktrace_timestamp(),              \
                    TraceContext::Cpu, ##__VA_ARGS__)
 
@@ -423,28 +423,28 @@
 // - ...: List of parenthesized argument tuples.
 //
 #define KTRACE_COUNTER(category, label, counter_id, ...)                                           \
-  FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitCounter, category,                   \
+  FXT_EVENT_COMMON(true, ktrace_category_enabled, KTrace::EmitCounter, category,                   \
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Thread, counter_id, \
                    ##__VA_ARGS__)
 
 // Similar to KTRACE_COUNTER, but associates the event with the current CPU instead of the current
 // thread.
 #define KTRACE_CPU_COUNTER(category, label, counter_id, ...)                                    \
-  FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitCounter, category,                \
+  FXT_EVENT_COMMON(true, ktrace_category_enabled, KTrace::EmitCounter, category,                \
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Cpu, counter_id, \
                    ##__VA_ARGS__)
 
 // Similar to KTRACE_COUNTER, but checks the given constexpr_condition to determine whether the
 // event is enabled at compile time.
 #define KTRACE_COUNTER_ENABLE(constexpr_enabled, category, label, counter_id, ...)                 \
-  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, ktrace::EmitCounter, category,      \
+  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, KTrace::EmitCounter, category,      \
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Thread, counter_id, \
                    ##__VA_ARGS__)
 
 // Similar to KTRACE_COUNTER_ENABLE, but associates the event with the current CPU instead of the
 // current thread.
 #define KTRACE_CPU_COUNTER_ENABLE(constexpr_enabled, category, label, counter_id, ...)          \
-  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, ktrace::EmitCounter, category,   \
+  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, KTrace::EmitCounter, category,   \
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Cpu, counter_id, \
                    ##__VA_ARGS__)
 
@@ -461,34 +461,34 @@
 // - ...: List of parenthesized argument tuples.
 //
 #define KTRACE_FLOW_BEGIN(category, label, flow_id, ...)                                        \
-  FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitFlowBegin, category,              \
+  FXT_EVENT_COMMON(true, ktrace_category_enabled, KTrace::EmitFlowBegin, category,              \
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Thread, flow_id, \
                    ##__VA_ARGS__)
 
 // Similar to KTRACE_FLOW_BEGIN, but associates the event with the current CPU instead of the
 // current thread.
 #define KTRACE_CPU_FLOW_BEGIN(category, label, flow_id, ...)                                 \
-  FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitFlowBegin, category,           \
+  FXT_EVENT_COMMON(true, ktrace_category_enabled, KTrace::EmitFlowBegin, category,           \
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Cpu, flow_id, \
                    ##__VA_ARGS__)
 
 // Similar to KTRACE_FLOW_BEGIN, but checks the given constexpr_condition to determine whether the
 // event is enabled at compile time.
 #define KTRACE_FLOW_BEGIN_ENABLE(constexpr_enabled, category, label, flow_id, ...)              \
-  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, ktrace::EmitFlowBegin, category, \
+  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, KTrace::EmitFlowBegin, category, \
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Thread, flow_id, \
                    ##__VA_ARGS__)
 
 // Similar to KTRACE_FLOW_BEGIN_ENABLE, but associates the event with the current CPU instead of the
 // current thread.
 #define KTRACE_CPU_FLOW_BEGIN_ENABLE(constexpr_enabled, category, label, flow_id, ...)          \
-  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, ktrace::EmitFlowBegin, category, \
+  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, KTrace::EmitFlowBegin, category, \
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Cpu, flow_id,    \
                    ##__VA_ARGS__)
 
 // Similar to KTRACE_FLOW_BEGIN, but accepts an expression to use for the event timestamp.
 #define KTRACE_FLOW_BEGIN_TIMESTAMP(category, label, timestamp, flow_id, ...)          \
-  FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitFlowBegin, category,     \
+  FXT_EVENT_COMMON(true, ktrace_category_enabled, KTrace::EmitFlowBegin, category,     \
                    FXT_INTERN_STRING(label), timestamp, TraceContext::Thread, flow_id, \
                    ##__VA_ARGS__)
 
@@ -505,34 +505,34 @@
 // - ...: List of parenthesized argument tuples.
 //
 #define KTRACE_FLOW_STEP(category, label, flow_id, ...)                                         \
-  FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitFlowStep, category,               \
+  FXT_EVENT_COMMON(true, ktrace_category_enabled, KTrace::EmitFlowStep, category,               \
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Thread, flow_id, \
                    ##__VA_ARGS__)
 
 // Similar to KTRACE_FLOW_STEP, but associates the event with the current CPU instead of the current
 // thread.
 #define KTRACE_CPU_FLOW_STEP(category, label, flow_id, ...)                                  \
-  FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitFlowStep, category,            \
+  FXT_EVENT_COMMON(true, ktrace_category_enabled, KTrace::EmitFlowStep, category,            \
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Cpu, flow_id, \
                    ##__VA_ARGS__)
 
 // Similar to KTRACE_FLOW_STEP, but checks the given constexpr_condition to determine whether the
 // event is enabled at compile time.
 #define KTRACE_FLOW_STEP_ENABLE(constexpr_enabled, category, label, flow_id, ...)               \
-  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, ktrace::EmitFlowStep, category,  \
+  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, KTrace::EmitFlowStep, category,  \
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Thread, flow_id, \
                    ##__VA_ARGS__)
 
 // Similar to KTRACE_FLOW_STEP_ENABLE, but associates the event with the current CPU instead of the
 // current thread.
 #define KTRACE_CPU_FLOW_STEP_ENABLE(constexpr_enabled, category, label, flow_id, ...)          \
-  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, ktrace::EmitFlowStep, category, \
+  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, KTrace::EmitFlowStep, category, \
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Cpu, flow_id,   \
                    ##__VA_ARGS__)
 
 // Similar to KTRACE_FLOW_STEP, but accepts an expression to use for the event timestamp.
 #define KTRACE_FLOW_STEP_TIMESTAMP(category, label, timestamp, flow_id, ...)           \
-  FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitFlowStep, category,      \
+  FXT_EVENT_COMMON(true, ktrace_category_enabled, KTrace::EmitFlowStep, category,      \
                    FXT_INTERN_STRING(label), timestamp, TraceContext::Thread, flow_id, \
                    ##__VA_ARGS__)
 
@@ -549,34 +549,34 @@
 // - ...: List of parenthesized argument tuples.
 //
 #define KTRACE_FLOW_END(category, label, flow_id, ...)                                          \
-  FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitFlowEnd, category,                \
+  FXT_EVENT_COMMON(true, ktrace_category_enabled, KTrace::EmitFlowEnd, category,                \
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Thread, flow_id, \
                    ##__VA_ARGS__)
 
 // Similar to KTRACE_FLOW_END, but associates the event with the current CPU instead of the current
 // thread.
 #define KTRACE_CPU_FLOW_END(category, label, flow_id, ...)                                   \
-  FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitFlowEnd, category,             \
+  FXT_EVENT_COMMON(true, ktrace_category_enabled, KTrace::EmitFlowEnd, category,             \
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Cpu, flow_id, \
                    ##__VA_ARGS__)
 
 // Similar to KTRACE_FLOW_END, but checks the given constexpr_condition to determine whether the
 // event is enabled at compile time.
 #define KTRACE_FLOW_END_ENABLE(constexpr_enabled, category, label, flow_id, ...)                \
-  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, ktrace::EmitFlowEnd, category,   \
+  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, KTrace::EmitFlowEnd, category,   \
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Thread, flow_id, \
                    ##__VA_ARGS__)
 
 // Similar to KTRACE_FLOW_END_ENABLE, but associates the event with the current CPU instead of the
 // current thread.
 #define KTRACE_CPU_FLOW_END_ENABLE(constexpr_enabled, category, label, flow_id, ...)          \
-  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, ktrace::EmitFlowEnd, category, \
+  FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, KTrace::EmitFlowEnd, category, \
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Cpu, flow_id,  \
                    ##__VA_ARGS__)
 
 // Similar to KTRACE_FLOW_END, but accepts an expression to use for the event timestamp.
 #define KTRACE_FLOW_END_TIMESTAMP(category, label, timestamp, flow_id, ...)            \
-  FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitFlowEnd, category,       \
+  FXT_EVENT_COMMON(true, ktrace_category_enabled, KTrace::EmitFlowEnd, category,       \
                    FXT_INTERN_STRING(label), timestamp, TraceContext::Thread, flow_id, \
                    ##__VA_ARGS__)
 
@@ -585,14 +585,15 @@
 //
 
 // Writes a context switch record for the given threads.
-#define KTRACE_CONTEXT_SWITCH(category, cpu, outgoing_state, outgoing_thread_ref,                  \
-                              incoming_thread_ref, ...)                                            \
-  do {                                                                                             \
-    if (unlikely(ktrace_category_enabled(FXT_INTERN_CATEGORY(category)))) {                        \
-      fxt::WriteContextSwitchRecord(&KTRACE_STATE, ktrace_timestamp(), static_cast<uint16_t>(cpu), \
-                                    outgoing_state, outgoing_thread_ref, incoming_thread_ref,      \
-                                    FXT_MAP_LIST_ARGS(FXT_MAKE_ARGUMENT, ##__VA_ARGS__));          \
-    }                                                                                              \
+#define KTRACE_CONTEXT_SWITCH(category, cpu, outgoing_state, outgoing_thread_ref,         \
+                              incoming_thread_ref, ...)                                   \
+  do {                                                                                    \
+    if (unlikely(ktrace_category_enabled(FXT_INTERN_CATEGORY(category)))) {               \
+      fxt::WriteContextSwitchRecord(&KTrace::GetInstance(), ktrace_timestamp(),           \
+                                    static_cast<uint16_t>(cpu), outgoing_state,           \
+                                    outgoing_thread_ref, incoming_thread_ref,             \
+                                    FXT_MAP_LIST_ARGS(FXT_MAKE_ARGUMENT, ##__VA_ARGS__)); \
+    }                                                                                     \
   } while (false)
 
 //
@@ -600,24 +601,30 @@
 //
 
 // Writes a thread wakeup record for the given thread.
-#define KTRACE_THREAD_WAKEUP(category, cpu, thread_ref, ...)                                      \
-  do {                                                                                            \
-    if (unlikely(ktrace_category_enabled(FXT_INTERN_CATEGORY(category)))) {                       \
-      fxt::WriteThreadWakeupRecord(&KTRACE_STATE, ktrace_timestamp(), static_cast<uint16_t>(cpu), \
-                                   thread_ref,                                                    \
-                                   FXT_MAP_LIST_ARGS(FXT_MAKE_ARGUMENT, ##__VA_ARGS__));          \
-    }                                                                                             \
+#define KTRACE_THREAD_WAKEUP(category, cpu, thread_ref, ...)                             \
+  do {                                                                                   \
+    if (unlikely(ktrace_category_enabled(FXT_INTERN_CATEGORY(category)))) {              \
+      fxt::WriteThreadWakeupRecord(&KTrace::GetInstance(), ktrace_timestamp(),           \
+                                   static_cast<uint16_t>(cpu), thread_ref,               \
+                                   FXT_MAP_LIST_ARGS(FXT_MAKE_ARGUMENT, ##__VA_ARGS__)); \
+    }                                                                                    \
   } while (false)
 
 //
 // # Kernel tracing state and low level API
 //
 
-extern internal::KTraceState KTRACE_STATE;
 constexpr fxt::Koid kNoProcess{0u};
 
 // TODO(https://fxbug.dev/42069955): Move ktrace interfaces into ktrace namespace.
 namespace ktrace {
+
+using fxt::Koid;
+using fxt::Pointer;
+using fxt::Scope;
+
+// Sentinel type for unused arguments.
+struct Unused {};
 
 // Maintains the mapping from CPU numbers to pre-allocated KOIDs.
 class CpuContextMap {
@@ -663,6 +670,133 @@ inline fxt::ThreadRef<fxt::RefType::kInline> ThreadRefFromContext(TraceContext c
   }
 }
 
+class KTrace {
+ public:
+  static internal::KTraceState& GetInstance() { return state_; }
+
+  // The Emit* functions provide an API by which the ktrace macros above can write a trace record
+  // to the ktrace buffer.
+  template <fxt::RefType name_type, typename... Ts>
+  static void EmitKernelObject(zx_koid_t koid, zx_obj_type_t obj_type,
+                               const fxt::StringRef<name_type>& name,
+                               const ktl::tuple<Ts...>& args) {
+    ktl::apply(
+        [&](const Ts&... unpacked_args) {
+          fxt::WriteKernelObjectRecord(&GetInstance(), fxt::Koid(koid), obj_type, name,
+                                       unpacked_args...);
+        },
+        args);
+  }
+
+  template <fxt::RefType name_type, typename... Ts>
+  static void EmitComplete(const fxt::InternedCategory& category,
+                           const fxt::StringRef<name_type>& label, uint64_t start_time,
+                           uint64_t end_time, TraceContext context, const ktl::tuple<Ts...>& args) {
+    ktl::apply(
+        [&](const Ts&... unpacked_args) {
+          fxt::WriteDurationCompleteEventRecord(
+              &GetInstance(), start_time, ThreadRefFromContext(context),
+              fxt::StringRef{category.label()}, label, end_time, unpacked_args...);
+        },
+        args);
+  }
+
+  template <fxt::RefType name_type, typename... Ts>
+  static void EmitInstant(const fxt::InternedCategory& category,
+                          const fxt::StringRef<name_type>& label, uint64_t timestamp,
+                          TraceContext context, ktrace::Unused, const ktl::tuple<Ts...>& args) {
+    ktl::apply(
+        [&](const Ts&... unpacked_args) {
+          fxt::WriteInstantEventRecord(&GetInstance(), timestamp, ThreadRefFromContext(context),
+                                       fxt::StringRef{category.label()}, label, unpacked_args...);
+        },
+        args);
+  }
+
+  template <fxt::RefType name_type, typename... Ts>
+  static void EmitDurationBegin(const fxt::InternedCategory& category,
+                                const fxt::StringRef<name_type>& label, uint64_t timestamp,
+                                TraceContext context, ktrace::Unused,
+                                const ktl::tuple<Ts...>& args) {
+    ktl::apply(
+        [&](const Ts&... unpacked_args) {
+          fxt::WriteDurationBeginEventRecord(
+              &GetInstance(), timestamp, ThreadRefFromContext(context),
+              fxt::StringRef{category.label()}, label, unpacked_args...);
+        },
+        args);
+  }
+
+  template <fxt::RefType name_type, typename... Ts>
+  static void EmitDurationEnd(const fxt::InternedCategory& category,
+                              const fxt::StringRef<name_type>& label, uint64_t timestamp,
+                              TraceContext context, ktrace::Unused, const ktl::tuple<Ts...> args) {
+    ktl::apply(
+        [&](const Ts&... unpacked_args) {
+          fxt::WriteDurationEndEventRecord(&GetInstance(), timestamp, ThreadRefFromContext(context),
+                                           fxt::StringRef{category.label()}, label,
+                                           unpacked_args...);
+        },
+        args);
+  }
+
+  template <fxt::RefType name_type, typename... Ts>
+  static void EmitCounter(const fxt::InternedCategory& category,
+                          const fxt::StringRef<name_type>& label, uint64_t timestamp,
+                          TraceContext context, uint64_t counter_id,
+                          const ktl::tuple<Ts...>& args) {
+    ktl::apply(
+        [&](const Ts&... unpacked_args) {
+          fxt::WriteCounterEventRecord(&GetInstance(), timestamp, ThreadRefFromContext(context),
+                                       fxt::StringRef{category.label()}, label, counter_id,
+                                       unpacked_args...);
+        },
+        args);
+  }
+
+  template <fxt::RefType name_type, typename... Ts>
+  static void EmitFlowBegin(const fxt::InternedCategory& category,
+                            const fxt::StringRef<name_type>& label, uint64_t timestamp,
+                            TraceContext context, uint64_t flow_id, const ktl::tuple<Ts...>& args) {
+    ktl::apply(
+        [&](const Ts&... unpacked_args) {
+          fxt::WriteFlowBeginEventRecord(&GetInstance(), timestamp, ThreadRefFromContext(context),
+                                         fxt::StringRef{category.label()}, label, flow_id,
+                                         unpacked_args...);
+        },
+        args);
+  }
+
+  template <fxt::RefType name_type, typename... Ts>
+  static void EmitFlowStep(const fxt::InternedCategory& category,
+                           const fxt::StringRef<name_type>& label, uint64_t timestamp,
+                           TraceContext context, uint64_t flow_id, const ktl::tuple<Ts...>& args) {
+    ktl::apply(
+        [&](const Ts&... unpacked_args) {
+          fxt::WriteFlowStepEventRecord(&GetInstance(), timestamp, ThreadRefFromContext(context),
+                                        fxt::StringRef{category.label()}, label, flow_id,
+                                        unpacked_args...);
+        },
+        args);
+  }
+
+  template <fxt::RefType name_type, typename... Ts>
+  static void EmitFlowEnd(const fxt::InternedCategory& category,
+                          const fxt::StringRef<name_type>& label, uint64_t timestamp,
+                          TraceContext context, uint64_t flow_id, const ktl::tuple<Ts...>& args) {
+    ktl::apply(
+        [&](const Ts&... unpacked_args) {
+          fxt::WriteFlowEndEventRecord(&GetInstance(), timestamp, ThreadRefFromContext(context),
+                                       fxt::StringRef{category.label()}, label, flow_id,
+                                       unpacked_args...);
+        },
+        args);
+  }
+
+ private:
+  static internal::KTraceState state_;
+};
+
 // Argument type that specifies whether a trace function is enabled or disabled.
 template <bool enabled>
 struct TraceEnabled {};
@@ -683,7 +817,7 @@ using fxt::operator""_category;
 using fxt::operator""_intern;
 
 inline bool ktrace_category_enabled(const fxt::InternedCategory& category) {
-  return KTRACE_STATE.IsCategoryEnabled(category);
+  return KTrace::GetInstance().IsCategoryEnabled(category);
 }
 
 template <bool enabled>
@@ -693,7 +827,7 @@ inline void ktrace_probe(TraceEnabled<enabled>, TraceContext context,
     if (ktrace_category_enabled("kernel:probe"_category)) {
       const fxt::StringRef name_ref = fxt::StringRef{label};
       fxt::WriteInstantEventRecord(
-          &KTRACE_STATE, current_boot_ticks(), ThreadRefFromContext(context),
+          &KTrace::GetInstance(), current_boot_ticks(), ThreadRefFromContext(context),
           fxt::StringRef{"kernel:probe"_category.label()}, name_ref,
           fxt::Argument{"arg0"_intern, a}, fxt::Argument{"arg1"_intern, b});
     }
@@ -701,136 +835,12 @@ inline void ktrace_probe(TraceEnabled<enabled>, TraceContext context,
 }
 
 inline ssize_t ktrace_read_user(user_out_ptr<void> ptr, uint32_t off, size_t len) {
-  return KTRACE_STATE.ReadUser(ptr, off, len);
+  return KTrace::GetInstance().ReadUser(ptr, off, len);
 }
 
 zx_status_t ktrace_control(uint32_t action, uint32_t options, void* ptr);
 
 void ktrace_report_live_threads();
 void ktrace_report_live_processes();
-
-namespace ktrace {
-
-using fxt::Koid;
-using fxt::Pointer;
-using fxt::Scope;
-
-// Sentinel type for unused arguments.
-struct Unused {};
-
-template <fxt::RefType name_type, typename... Ts>
-inline void EmitKernelObject(zx_koid_t koid, zx_obj_type_t obj_type,
-                             const fxt::StringRef<name_type>& name, const ktl::tuple<Ts...>& args) {
-  ktl::apply(
-      [&](const Ts&... unpacked_args) {
-        fxt::WriteKernelObjectRecord(&KTRACE_STATE, fxt::Koid(koid), obj_type, name,
-                                     unpacked_args...);
-      },
-      args);
-}
-
-template <fxt::RefType name_type, typename... Ts>
-inline void EmitComplete(const fxt::InternedCategory& category,
-                         const fxt::StringRef<name_type>& label, uint64_t start_time,
-                         uint64_t end_time, TraceContext context, const ktl::tuple<Ts...>& args) {
-  ktl::apply(
-      [&](const Ts&... unpacked_args) {
-        fxt::WriteDurationCompleteEventRecord(
-            &KTRACE_STATE, start_time, ThreadRefFromContext(context),
-            fxt::StringRef{category.label()}, label, end_time, unpacked_args...);
-      },
-      args);
-}
-
-template <fxt::RefType name_type, typename... Ts>
-inline void EmitInstant(const fxt::InternedCategory& category,
-                        const fxt::StringRef<name_type>& label, uint64_t timestamp,
-                        TraceContext context, Unused, const ktl::tuple<Ts...>& args) {
-  ktl::apply(
-      [&](const Ts&... unpacked_args) {
-        fxt::WriteInstantEventRecord(&KTRACE_STATE, timestamp, ThreadRefFromContext(context),
-                                     fxt::StringRef{category.label()}, label, unpacked_args...);
-      },
-      args);
-}
-
-template <fxt::RefType name_type, typename... Ts>
-inline void EmitDurationBegin(const fxt::InternedCategory& category,
-                              const fxt::StringRef<name_type>& label, uint64_t timestamp,
-                              TraceContext context, Unused, const ktl::tuple<Ts...>& args) {
-  ktl::apply(
-      [&](const Ts&... unpacked_args) {
-        fxt::WriteDurationBeginEventRecord(&KTRACE_STATE, timestamp, ThreadRefFromContext(context),
-                                           fxt::StringRef{category.label()}, label,
-                                           unpacked_args...);
-      },
-      args);
-}
-
-template <fxt::RefType name_type, typename... Ts>
-inline void EmitDurationEnd(const fxt::InternedCategory& category,
-                            const fxt::StringRef<name_type>& label, uint64_t timestamp,
-                            TraceContext context, Unused, const ktl::tuple<Ts...> args) {
-  ktl::apply(
-      [&](const Ts&... unpacked_args) {
-        fxt::WriteDurationEndEventRecord(&KTRACE_STATE, timestamp, ThreadRefFromContext(context),
-                                         fxt::StringRef{category.label()}, label, unpacked_args...);
-      },
-      args);
-}
-
-template <fxt::RefType name_type, typename... Ts>
-inline void EmitCounter(const fxt::InternedCategory& category,
-                        const fxt::StringRef<name_type>& label, uint64_t timestamp,
-                        TraceContext context, uint64_t counter_id, const ktl::tuple<Ts...>& args) {
-  ktl::apply(
-      [&](const Ts&... unpacked_args) {
-        fxt::WriteCounterEventRecord(&KTRACE_STATE, timestamp, ThreadRefFromContext(context),
-                                     fxt::StringRef{category.label()}, label, counter_id,
-                                     unpacked_args...);
-      },
-      args);
-}
-
-template <fxt::RefType name_type, typename... Ts>
-inline void EmitFlowBegin(const fxt::InternedCategory& category,
-                          const fxt::StringRef<name_type>& label, uint64_t timestamp,
-                          TraceContext context, uint64_t flow_id, const ktl::tuple<Ts...>& args) {
-  ktl::apply(
-      [&](const Ts&... unpacked_args) {
-        fxt::WriteFlowBeginEventRecord(&KTRACE_STATE, timestamp, ThreadRefFromContext(context),
-                                       fxt::StringRef{category.label()}, label, flow_id,
-                                       unpacked_args...);
-      },
-      args);
-}
-
-template <fxt::RefType name_type, typename... Ts>
-inline void EmitFlowStep(const fxt::InternedCategory& category,
-                         const fxt::StringRef<name_type>& label, uint64_t timestamp,
-                         TraceContext context, uint64_t flow_id, const ktl::tuple<Ts...>& args) {
-  ktl::apply(
-      [&](const Ts&... unpacked_args) {
-        fxt::WriteFlowStepEventRecord(&KTRACE_STATE, timestamp, ThreadRefFromContext(context),
-                                      fxt::StringRef{category.label()}, label, flow_id,
-                                      unpacked_args...);
-      },
-      args);
-}
-
-template <fxt::RefType name_type, typename... Ts>
-inline void EmitFlowEnd(const fxt::InternedCategory& category,
-                        const fxt::StringRef<name_type>& label, uint64_t timestamp,
-                        TraceContext context, uint64_t flow_id, const ktl::tuple<Ts...>& args) {
-  ktl::apply(
-      [&](const Ts&... unpacked_args) {
-        fxt::WriteFlowEndEventRecord(&KTRACE_STATE, timestamp, ThreadRefFromContext(context),
-                                     fxt::StringRef{category.label()}, label, flow_id,
-                                     unpacked_args...);
-      },
-      args);
-}
-
-}  // namespace ktrace
 
 #endif  // ZIRCON_KERNEL_INCLUDE_LIB_KTRACE_H_
