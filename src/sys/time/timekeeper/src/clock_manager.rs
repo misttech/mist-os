@@ -10,6 +10,7 @@ use crate::estimator::Estimator;
 use crate::rtc::Rtc;
 use crate::time_source_manager::{KernelBootTimeProvider, TimeSourceManager};
 use crate::{Config, UtcTransform};
+use anyhow::{anyhow, Result};
 use chrono::prelude::*;
 use fuchsia_runtime::{UtcClock, UtcClockUpdate, UtcDuration, UtcInstant};
 use futures::channel::mpsc;
@@ -280,6 +281,75 @@ impl Debug for Slew {
     }
 }
 
+/// Decides whether a user-supplied clock adjustment should be applied or not.
+///
+/// ```ignore
+/// ---|<------->|<----------->|----> time
+///    ^         ^             ^
+///    |         |             ` actual_utc + max_window_width_future
+///    |         `-------------- actual_utc
+///    `------------------------ actual_utc - max_window_width_past
+/// ```
+struct UserClockAdjust {
+    /// The maximum deviation of the proposed UTC adjustment from actual, if
+    /// the deviation is in the past.
+    max_window_width_past: UtcDuration,
+    /// The maximum deviation of the proposed UTC adjustment from actual, if
+    /// the deviation is in the future.
+    max_window_width_future: UtcDuration,
+}
+
+impl UserClockAdjust {
+    /// Computes an updated UTC adjustment transform based on the provided
+    /// reference `actual_transform` and a new proposed reference point formed
+    /// by `proposed_boot` and `proposed_utc`.
+    ///
+    /// Args:
+    /// - `actual_transform`: the affine transform computed as the best estimate
+    ///   from an externally synchronized source.
+    /// - `proposed_boot`: the boot timeline coordinate of the proposed reference
+    ///   point to adjust to.
+    /// - `proposed_utc`: the proposed instant on the UTC timeline that corresponds to
+    /// `proposed_boot`
+    ///
+    /// Returns:
+    /// - A pair of:
+    ///   - Adjusted [UtcTransform] based on the proposed coordinates.
+    ///   - The applied delta to actual UTC estimate.
+    /// - Or: error in the case the proposal is rejected.
+    #[allow(dead_code)]
+    pub fn try_adjust(
+        &self,
+        actual_transform: &UtcTransform,
+        proposed_boot: zx::BootInstant,
+        proposed_utc: UtcInstant,
+    ) -> Result<(UtcTransform, UtcDuration)> {
+        let actual_utc_at_proposed_boot = actual_transform.synthetic(proposed_boot);
+        assert!(self.max_window_width_past >= UtcDuration::ZERO);
+        let min_allowed_utc = actual_utc_at_proposed_boot - self.max_window_width_past;
+        assert!(self.max_window_width_future >= UtcDuration::ZERO);
+        let max_allowed_utc = actual_utc_at_proposed_boot + self.max_window_width_future;
+
+        if min_allowed_utc <= proposed_utc && proposed_utc <= max_allowed_utc {
+            let mut proposed_transform = actual_transform.clone();
+            proposed_transform.reference_offset = proposed_boot;
+            proposed_transform.synthetic_offset = proposed_utc;
+
+            let mut new_transform = actual_transform.clone();
+            let allowed_delta = proposed_transform.difference(&actual_transform, proposed_boot);
+
+            // The corrected transform translates the synthetic offset by the computed
+            // allowed delta.
+            new_transform.synthetic_offset += allowed_delta;
+            Ok((new_transform, allowed_delta))
+        } else {
+            // The user-supplied adjustment is rejected. Starnix calls that bottom out
+            // in this code branch should probably return `EINVAL`.
+            Err(anyhow!("adjustment out of bounds"))
+        }
+    }
+}
+
 /// Generates and applies all updates needed to maintain a userspace clock object (and optionally
 /// also a real time clock) with accurate UTC time. New time samples are received from a
 /// `TimeSourceManager` and a UTC estimate is produced based on these samples by an `Estimator`.
@@ -396,6 +466,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
         } else {
             zx::MonotonicDuration::from_millis(10)
         };
+
         loop {
             debug!("clock_manager: waiting for command");
             select! {
@@ -675,6 +746,7 @@ mod tests {
     use crate::rtc::FakeRtc;
     use crate::time_source::{Event as TimeSourceEvent, FakePushTimeSource, Sample};
     use crate::{make_test_config, make_test_config_with_delay};
+    use assert_matches::assert_matches;
     use fidl_fuchsia_time_external::{self as ftexternal, Status};
     use fuchsia_async as fasync;
     use futures::Future;
@@ -1559,5 +1631,84 @@ mod tests {
             Event::UpdateClock { track: *TEST_TRACK, reason: ClockUpdateReason::IncreaseError },
             Event::UpdateClock { track: *TEST_TRACK, reason: ClockUpdateReason::IncreaseError },
         ]);
+    }
+
+    #[fuchsia::test]
+    fn adjust_decisions() {
+        let adjust_decision = UserClockAdjust {
+            max_window_width_past: UtcDuration::from_seconds(100),
+            max_window_width_future: UtcDuration::from_seconds(200),
+        };
+
+        let actual_transform = UtcTransform {
+            reference_offset: zx::BootInstant::ZERO + zx::BootDuration::from_seconds(300),
+            synthetic_offset: UtcInstant::ZERO + UtcDuration::from_seconds(300),
+            ..Default::default()
+        };
+
+        // This adjustment does not change the actual. It is permitted.
+        assert_matches!(
+            adjust_decision.try_adjust(
+                &actual_transform,
+                zx::BootInstant::ZERO + zx::BootDuration::from_seconds(300),
+                UtcInstant::ZERO + UtcDuration::from_seconds(300)
+            ),
+            Ok((new_transform, delta))
+            if delta == UtcDuration::from_seconds(0) && new_transform == UtcTransform {
+                reference_offset: zx::BootInstant::ZERO + zx::BootDuration::from_seconds(300),
+                synthetic_offset: UtcInstant::ZERO + UtcDuration::from_seconds(300),
+                    ..Default::default()
+            }
+        );
+
+        // Adjusting +200s is permitted by max_window_width_future.
+        assert_matches!(
+            adjust_decision.try_adjust(
+                &actual_transform,
+                zx::BootInstant::ZERO + zx::BootDuration::from_seconds(300),
+                UtcInstant::ZERO + UtcDuration::from_seconds(500)
+            ),
+            Ok((new_transform, delta))
+            if delta == UtcDuration::from_seconds(200) && new_transform == UtcTransform {
+                reference_offset: zx::BootInstant::ZERO + zx::BootDuration::from_seconds(300),
+                synthetic_offset: UtcInstant::ZERO + UtcDuration::from_seconds(500),
+                    ..Default::default()
+            }
+        );
+
+        // Adjusting +201s is not permitted.
+        assert_matches!(
+            adjust_decision.try_adjust(
+                &actual_transform,
+                zx::BootInstant::ZERO + zx::BootDuration::from_seconds(300),
+                UtcInstant::ZERO + UtcDuration::from_seconds(501)
+            ),
+            Err(_)
+        );
+
+        // Adjusting -100s is permitted by max_window_width_past.
+        assert_matches!(
+            adjust_decision.try_adjust(
+                &actual_transform,
+                zx::BootInstant::ZERO + zx::BootDuration::from_seconds(300),
+                UtcInstant::ZERO + UtcDuration::from_seconds(200)
+            ),
+            Ok((new_transform, delta))
+            if delta == UtcDuration::from_seconds(-100) && new_transform == UtcTransform {
+                reference_offset: zx::BootInstant::ZERO + zx::BootDuration::from_seconds(300),
+                synthetic_offset: UtcInstant::ZERO + UtcDuration::from_seconds(200),
+                    ..Default::default()
+            }
+        );
+
+        // Adjusting -101s is not permitted.
+        assert_matches!(
+            adjust_decision.try_adjust(
+                &actual_transform,
+                zx::BootInstant::ZERO + zx::BootDuration::from_seconds(300),
+                UtcInstant::ZERO + UtcDuration::from_seconds(199)
+            ),
+            Err(_)
+        );
     }
 }
