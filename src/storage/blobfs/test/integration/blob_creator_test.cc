@@ -9,6 +9,7 @@
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
+#include <unistd.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
@@ -39,12 +40,12 @@ struct DeliveryBlobInfo {
   fbl::Array<uint8_t> delivery_blob;
 };
 
-DeliveryBlobInfo GenerateBlob(uint64_t size) {
+DeliveryBlobInfo GenerateBlob(uint64_t size, bool compress) {
   auto buf = std::make_unique<uint8_t[]>(size);
   memset(buf.get(), 0xAB, size);
   // Don't compress the blob. The BlobCreator protocol doesn't need to test writing compressed blobs
   // and compressing blobs makes it harder to reason about the size of payloads.
-  auto delivery_blob = GenerateDeliveryBlobType1(std::span(buf.get(), size), /*compress=*/false);
+  auto delivery_blob = GenerateDeliveryBlobType1(std::span(buf.get(), size), compress);
   ZX_ASSERT(delivery_blob.is_ok());
   auto digest = CalculateDeliveryBlobDigest(*delivery_blob);
   ZX_ASSERT(digest.is_ok());
@@ -53,6 +54,10 @@ DeliveryBlobInfo GenerateBlob(uint64_t size) {
       .delivery_blob = std::move(*delivery_blob),
   };
 }
+
+DeliveryBlobInfo GenerateCompressedBlob(uint64_t size) { return GenerateBlob(size, true); }
+
+DeliveryBlobInfo GenerateUncompressedBlob(uint64_t size) { return GenerateBlob(size, false); }
 
 class BlobReaderWrapper {
  public:
@@ -97,6 +102,30 @@ class BlobWriterWrapper {
     return zx::ok(std::move((*result)->vmo));
   }
 
+  zx::result<> WriteBlob(const DeliveryBlobInfo& blob) const {
+    uint64_t payload_size = blob.delivery_blob.size();
+
+    auto vmo = GetVmo(payload_size);
+    if (vmo.is_error()) {
+      return vmo.take_error();
+    }
+
+    uint64_t bytes_written = 0;
+    while (bytes_written < payload_size) {
+      uint64_t bytes_to_write = std::min(kRingBufferSize, payload_size - bytes_written);
+      if (zx_status_t status =
+              vmo->write(blob.delivery_blob.get() + bytes_written, 0, bytes_to_write);
+          status != ZX_OK) {
+        return zx::error(status);
+      }
+      if (zx::result result = BytesReady(bytes_to_write); result.is_error()) {
+        return result.take_error();
+      }
+      bytes_written += bytes_to_write;
+    }
+    return zx::ok();
+  }
+
  private:
   fidl::WireSyncClient<fuchsia_fxfs::BlobWriter> writer_;
 };
@@ -113,32 +142,12 @@ class BlobCreatorWrapper {
   }
 
   zx::result<> CreateAndWriteBlob(const DeliveryBlobInfo& blob) const {
-    uint64_t payload_size = blob.delivery_blob.size();
-
     auto writer = Create(blob.digest);
     if (writer.is_error()) {
       return writer.take_error();
     }
 
-    auto vmo = writer->GetVmo(payload_size);
-    if (vmo.is_error()) {
-      return vmo.take_error();
-    }
-
-    uint64_t bytes_written = 0;
-    while (bytes_written < payload_size) {
-      uint64_t bytes_to_write = std::min(kRingBufferSize, payload_size - bytes_written);
-      if (zx_status_t status =
-              vmo->write(blob.delivery_blob.get() + bytes_written, 0, bytes_to_write);
-          status != ZX_OK) {
-        return zx::error(status);
-      }
-      if (zx::result result = writer->BytesReady(bytes_to_write); result.is_error()) {
-        return result.take_error();
-      }
-      bytes_written += bytes_to_write;
-    }
-    return zx::ok();
+    return writer->WriteBlob(blob);
   }
 
  private:
@@ -178,6 +187,15 @@ class BlobCreatorTest : public BlobfsTest {
 
   const BlobReaderWrapper& reader() const { return *reader_; }
   const BlobCreatorWrapper& creator() const { return *creator_; }
+  void Barrier() const {
+    // This is just a barrier to reduce the risk of a race. There is no way for the caller to wait
+    // and guarantee that the channel close has gotten to the port on the server. So we send some
+    // other message that will be handled by the server to ensure that we do some kind of waiting on
+    // it. Since that server is single-threaded it is unlikely that the close has not made it back
+    // to start handling before it gets the next message after this one.
+    auto info = fs().GetFsInfo();
+    ASSERT_OK(info.status_value());
+  }
 
  private:
   std::unique_ptr<BlobReaderWrapper> reader_;
@@ -197,28 +215,186 @@ uint64_t GetVmoContentSize(const zx::vmo& vmo) {
 }
 
 TEST_F(BlobCreatorTest, CreateNewBlobSucceeds) {
-  auto blob = GenerateBlob(10);
+  auto blob = GenerateUncompressedBlob(10);
   EXPECT_OK(creator().CreateAndWriteBlob(blob).status_value());
 }
 
 TEST_F(BlobCreatorTest, CreateExistingBlobFails) {
-  auto blob = GenerateBlob(10);
+  auto blob = GenerateUncompressedBlob(10);
   EXPECT_OK(creator().CreateAndWriteBlob(blob).status_value());
 
   auto writer = creator().Create(blob.digest);
   EXPECT_STATUS(writer.status_value(), ZX_ERR_ALREADY_EXISTS);
 }
 
-TEST_F(BlobCreatorTest, CreateWithAllowExistingIsNotSupported) {
-  auto blob = GenerateBlob(10);
+TEST_F(BlobCreatorTest, TwoWritesToOneDigestFails) {
+  auto blob = GenerateUncompressedBlob(10);
+  auto writer = creator().Create(blob.digest);
+  ASSERT_OK(writer.status_value());
+
+  // Can't start two writers for the same digest at once.
+  EXPECT_STATUS(creator().CreateExisting(blob.digest).status_value(), ZX_ERR_ALREADY_EXISTS);
+
+  ASSERT_OK(writer->WriteBlob(blob).status_value());
+
+  // Open the blob under the old version.
+  auto vmo = reader().GetVmo(blob.digest);
+  EXPECT_OK(vmo.status_value());
+
+  // Other write completed. This can be replaced now. Note that the other connection isn't even
+  // closed yet, but the blob has become readable.
+  auto writer2 = creator().CreateExisting(blob.digest);
+  EXPECT_OK(writer2.status_value());
+
+  // Can't overwrite while the other overwrite is in progress.
+  EXPECT_STATUS(creator().CreateExisting(blob.digest).status_value(), ZX_ERR_ALREADY_EXISTS);
+  ASSERT_OK(writer2->WriteBlob(blob).status_value());
+
+  // Try to read with the new info.
+  char a;
+  EXPECT_OK(vmo->read(&a, 0, 1));
+}
+
+TEST_F(BlobCreatorTest, AbandonOverwriteAllowsRestart) {
+  auto blob = GenerateUncompressedBlob(10);
+  ASSERT_OK(creator().CreateAndWriteBlob(blob).status_value());
+
+  {
+    auto writer = creator().CreateExisting(blob.digest);
+    EXPECT_OK(writer.status_value());
+
+    // Can't overwrite while the other overwrite is in progress.
+    EXPECT_STATUS(creator().CreateExisting(blob.digest).status_value(), ZX_ERR_ALREADY_EXISTS);
+  }
+
+  Barrier();
+
+  // First writer went away, so now we can try again.
   auto writer = creator().CreateExisting(blob.digest);
-  EXPECT_STATUS(writer.status_value(), ZX_ERR_INTERNAL);
+  EXPECT_OK(writer.status_value());
+  EXPECT_OK(writer->WriteBlob(blob).status_value());
+}
+
+TEST_F(BlobCreatorTest, FailOverwriteForUnlinked) {
+  auto blob = GenerateUncompressedBlob(10);
+  ASSERT_OK(creator().CreateAndWriteBlob(blob).status_value());
+  auto fd = fs().GetRootFd();
+  {
+    // Grab the vmo to survive unlink.
+    auto vmo = reader().GetVmo(blob.digest);
+    EXPECT_OK(vmo.status_value());
+
+    // Unlink.
+    ASSERT_EQ(unlinkat(fd.get(), blob.digest.ToString().c_str(), 0), 0);
+
+    EXPECT_STATUS(creator().CreateExisting(blob.digest).status_value(), ZX_ERR_ALREADY_EXISTS);
+  }
+}
+
+TEST_F(BlobCreatorTest, UnlinkPreventedByOverwrite) {
+  uint64_t old_used_bytes;
+  {
+    auto info = fs().GetFsInfo();
+    ASSERT_OK(info.status_value());
+    old_used_bytes = info->used_bytes;
+  }
+
+  auto blob = GenerateUncompressedBlob(10);
+  ASSERT_OK(creator().CreateAndWriteBlob(blob).status_value());
+
+  // Should have grown.
+  {
+    auto info = fs().GetFsInfo();
+    ASSERT_OK(info.status_value());
+    ASSERT_GT(info->used_bytes, old_used_bytes);
+  }
+
+  auto fd = fs().GetRootFd();
+  {
+    // Start overwrite.
+    auto writer = creator().CreateExisting(blob.digest);
+    EXPECT_OK(writer.status_value());
+
+    // Unlink.
+    ASSERT_EQ(unlinkat(fd.get(), blob.digest.ToString().c_str(), 0), 0);
+
+    // Finish overwrite. This will let the purge complete.
+    ASSERT_OK(writer.status_value());
+  }
+
+  Barrier();
+
+  // Should be back where we started.
+  {
+    auto info = fs().GetFsInfo();
+    ASSERT_OK(info.status_value());
+    ASSERT_EQ(info->used_bytes, old_used_bytes);
+  }
+}
+
+TEST_F(BlobCreatorTest, UnlinkDuringOverwrite) {
+  uint64_t old_used_bytes;
+  {
+    auto info = fs().GetFsInfo();
+    ASSERT_OK(info.status_value());
+    old_used_bytes = info->used_bytes;
+  }
+
+  auto blob = GenerateUncompressedBlob(10);
+  ASSERT_OK(creator().CreateAndWriteBlob(blob).status_value());
+
+  // Should have grown.
+  {
+    auto info = fs().GetFsInfo();
+    ASSERT_OK(info.status_value());
+    ASSERT_GT(info->used_bytes, old_used_bytes);
+  }
+
+  auto fd = fs().GetRootFd();
+  {
+    auto vmo = reader().GetVmo(blob.digest);
+    EXPECT_OK(vmo.status_value());
+
+    // Start overwrite.
+    auto writer = creator().CreateExisting(blob.digest);
+    EXPECT_OK(writer.status_value());
+
+    // Unlink.
+    ASSERT_EQ(unlinkat(fd.get(), blob.digest.ToString().c_str(), 0), 0);
+
+    // Finish overwrite.
+    ASSERT_OK(writer.status_value());
+
+    // Try to read with the new info.
+    char a;
+    EXPECT_OK(vmo->read(&a, 0, 1));
+  }
+
+  Barrier();
+
+  // Should be back where we started.
+  {
+    auto info = fs().GetFsInfo();
+    ASSERT_OK(info.status_value());
+    ASSERT_EQ(info->used_bytes, old_used_bytes);
+  }
+}
+
+TEST_F(BlobCreatorTest, AllowExistingNullBlob) {
+  auto blob = GenerateUncompressedBlob(0);
+  EXPECT_OK(creator().CreateAndWriteBlob(blob).status_value());
+
+  auto writer = creator().CreateExisting(blob.digest);
+  EXPECT_OK(writer.status_value());
+  EXPECT_OK(writer->WriteBlob(blob).status_value());
+
+  EXPECT_OK(reader().GetVmo(blob.digest).status_value());
 }
 
 using BlobWriterTest = BlobCreatorTest;
 
 TEST_F(BlobWriterTest, ValidateRingBufferSize) {
-  auto blob = GenerateBlob(10);
+  auto blob = GenerateUncompressedBlob(10);
   auto writer = creator().Create(blob.digest);
   ASSERT_OK(writer.status_value());
   auto vmo = writer->GetVmo(blob.delivery_blob.size());
@@ -227,7 +403,7 @@ TEST_F(BlobWriterTest, ValidateRingBufferSize) {
 }
 
 TEST_F(BlobWriterTest, MultipleGetVmoCallsFail) {
-  auto blob = GenerateBlob(10);
+  auto blob = GenerateUncompressedBlob(10);
   auto writer = creator().Create(blob.digest);
   ASSERT_OK(writer.status_value());
   auto writer_vmo = writer->GetVmo(blob.delivery_blob.size());
@@ -239,7 +415,7 @@ TEST_F(BlobWriterTest, MultipleGetVmoCallsFail) {
 TEST_F(BlobWriterTest, GetVmoWithTooSmallOfPayloadFails) {
   // BlobWriter only accepts delivery blobs and GetVmo should validate that the payload is at least
   // the size of the delivery blob header.
-  auto blob = GenerateBlob(10);
+  auto blob = GenerateUncompressedBlob(10);
   auto writer = creator().Create(blob.digest);
   ASSERT_OK(writer.status_value());
   auto writer_vmo = writer->GetVmo(MetadataType1::kHeader.header_length - 1);
@@ -247,14 +423,14 @@ TEST_F(BlobWriterTest, GetVmoWithTooSmallOfPayloadFails) {
 }
 
 TEST_F(BlobWriterTest, BytesReadyBeforeGetVmoFails) {
-  auto blob = GenerateBlob(10);
+  auto blob = GenerateUncompressedBlob(10);
   auto writer = creator().Create(blob.digest);
   ASSERT_OK(writer.status_value());
   ASSERT_STATUS(writer->BytesReady(5).status_value(), ZX_ERR_BAD_STATE);
 }
 
 TEST_F(BlobWriterTest, WritingMoreThanTheRingBufferFails) {
-  auto blob = GenerateBlob(10);
+  auto blob = GenerateUncompressedBlob(10);
   auto writer = creator().Create(blob.digest);
   ASSERT_OK(writer.status_value());
   auto writer_vmo = writer->GetVmo(blob.delivery_blob.size());
@@ -263,7 +439,7 @@ TEST_F(BlobWriterTest, WritingMoreThanTheRingBufferFails) {
 }
 
 TEST_F(BlobWriterTest, WritingMoreBytesThanExpectedFails) {
-  auto blob = GenerateBlob(10);
+  auto blob = GenerateUncompressedBlob(10);
   auto writer = creator().Create(blob.digest);
   ASSERT_OK(writer.status_value());
   auto vmo = writer->GetVmo(blob.delivery_blob.size());
@@ -275,7 +451,7 @@ TEST_F(BlobWriterTest, WritingMoreBytesThanExpectedFails) {
 }
 
 TEST_F(BlobWriterTest, WrittenBlobIsReadable) {
-  auto blob = GenerateBlob(10);
+  auto blob = GenerateUncompressedBlob(10);
   ASSERT_OK(creator().CreateAndWriteBlob(blob).status_value());
 
   auto reader_vmo = reader().GetVmo(blob.digest);
@@ -283,7 +459,7 @@ TEST_F(BlobWriterTest, WrittenBlobIsReadable) {
 }
 
 TEST_F(BlobWriterTest, ZeroBytesReadyIsValid) {
-  auto blob = GenerateBlob(10);
+  auto blob = GenerateUncompressedBlob(10);
   auto writer = creator().Create(blob.digest);
   ASSERT_OK(writer.status_value());
   auto writer_vmo = writer->GetVmo(blob.delivery_blob.size());
@@ -303,7 +479,7 @@ TEST_F(BlobWriterTest, ZeroBytesReadyIsValid) {
 }
 
 TEST_F(BlobWriterTest, MultipleWrites) {
-  auto blob = GenerateBlob(10);
+  auto blob = GenerateUncompressedBlob(10);
   auto writer = creator().Create(blob.digest);
   ASSERT_OK(writer.status_value());
   auto writer_vmo = writer->GetVmo(blob.delivery_blob.size());
@@ -321,7 +497,7 @@ TEST_F(BlobWriterTest, MultipleWrites) {
 }
 
 TEST_F(BlobWriterTest, BytesReadyAfterBlobWrittenFails) {
-  auto blob = GenerateBlob(10);
+  auto blob = GenerateUncompressedBlob(10);
   auto writer = creator().Create(blob.digest);
   ASSERT_OK(writer.status_value());
   auto writer_vmo = writer->GetVmo(blob.delivery_blob.size());
@@ -339,7 +515,7 @@ TEST_F(BlobWriterTest, BytesReadyAfterBlobWrittenFails) {
 }
 
 TEST_F(BlobWriterTest, WriteNullBlob) {
-  auto blob = GenerateBlob(0);
+  auto blob = GenerateUncompressedBlob(0);
   ASSERT_OK(creator().CreateAndWriteBlob(blob).status_value());
 
   auto reader_vmo = reader().GetVmo(blob.digest);
@@ -348,7 +524,7 @@ TEST_F(BlobWriterTest, WriteNullBlob) {
 }
 
 TEST_F(BlobWriterTest, BytesReadySpanningEndOfVmo) {
-  auto blob = GenerateBlob(kRingBufferSize + 50);
+  auto blob = GenerateUncompressedBlob(kRingBufferSize + 50);
   auto writer = creator().Create(blob.digest);
   ASSERT_OK(writer.status_value());
   auto writer_vmo = writer->GetVmo(blob.delivery_blob.size());
@@ -375,7 +551,7 @@ TEST_F(BlobWriterTest, BytesReadySpanningEndOfVmo) {
 }
 
 TEST_F(BlobWriterTest, CorruptBlobFails) {
-  auto blob = GenerateBlob(10);
+  auto blob = GenerateUncompressedBlob(10);
   auto writer = creator().Create(blob.digest);
   ASSERT_OK(writer.status_value());
   auto writer_vmo = writer->GetVmo(blob.delivery_blob.size());
@@ -389,7 +565,7 @@ TEST_F(BlobWriterTest, CorruptBlobFails) {
 }
 
 TEST_F(BlobWriterTest, CorruptDeliveryBlobHeaderFails) {
-  auto blob = GenerateBlob(10);
+  auto blob = GenerateUncompressedBlob(10);
   auto writer = creator().Create(blob.digest);
   ASSERT_OK(writer.status_value());
   auto writer_vmo = writer->GetVmo(blob.delivery_blob.size());
@@ -402,16 +578,120 @@ TEST_F(BlobWriterTest, CorruptDeliveryBlobHeaderFails) {
                 ZX_ERR_IO_DATA_INTEGRITY);
 }
 
+TEST_F(BlobWriterTest, CreateWithAllowExistingDeletesOld) {
+  constexpr uint64_t kBlobSize = 9000;  // Big enough for compression to make a difference.
+  auto blob = GenerateUncompressedBlob(kBlobSize);
+  ASSERT_STATUS(reader().GetVmo(blob.digest).status_value(), ZX_ERR_NOT_FOUND);
+
+  {
+    // Doing CreateExisting despite the blob not being there. Succeeds normally.
+    auto writer = creator().CreateExisting(blob.digest);
+    EXPECT_OK(writer.status_value());
+    ASSERT_OK(writer->WriteBlob(blob).status_value());
+  }
+
+  // Get the current space usage.
+  uint64_t old_used_bytes;
+  {
+    auto info = fs().GetFsInfo();
+    ASSERT_OK(info.status_value());
+    old_used_bytes = info->used_bytes;
+    EXPECT_NE(old_used_bytes, 0ul);
+  }
+
+  auto compressed_blob = GenerateCompressedBlob(kBlobSize);
+  {
+    auto writer = creator().CreateExisting(blob.digest);
+    EXPECT_OK(writer.status_value());
+    EXPECT_OK(writer->WriteBlob(compressed_blob).status_value());
+  }
+
+  // Check that it can be verified.
+  auto vmo = reader().GetVmo(blob.digest);
+  EXPECT_OK(vmo.status_value());
+  char a;
+  EXPECT_OK(vmo->read(&a, 0, 1));
+
+  // Check that space usage has been recovered by replacing with a compressed blob.
+  // In part to verify that the old blob has actually been deleted.
+  auto info = fs().GetFsInfo();
+  ASSERT_OK(info.status_value());
+  EXPECT_LT(info->used_bytes, old_used_bytes);
+}
+
+TEST_F(BlobWriterTest, FailedWriteMarksBlobCorruptRecoversOnRemount) {
+  auto blob = GenerateUncompressedBlob(10);
+  EXPECT_OK(creator().CreateAndWriteBlob(blob).status_value());
+  auto fd = fs().GetRootFd();
+  // Sync to ensure that the data makes it disk.
+  ASSERT_EQ(fsync(fd.get()), 0);
+
+  {
+    auto vmo = reader().GetVmo(blob.digest);
+    ASSERT_OK(vmo.status_value());
+
+    auto writer = creator().CreateExisting(blob.digest);
+
+    // Sleep the disk during the write to generate a failure.
+    ASSERT_OK(fs().GetRamDisk()->SleepAfter(0).status_value());
+    EXPECT_TRUE(writer->WriteBlob(blob).is_error());
+    ASSERT_OK(fs().GetRamDisk()->Wake().status_value());
+
+    // The original blob is partially deleted. It cannot respond.
+    char a;
+    EXPECT_STATUS(vmo->read(&a, 0, 1), ZX_ERR_BAD_STATE);
+  }
+
+  // Remount to revert changes to the ondisk version.
+  ASSERT_OK(fs().Unmount().status_value());
+  ASSERT_OK(fs().Mount().status_value());
+
+  auto reader_chan = component::ConnectAt<fuchsia_fxfs::BlobReader>(fs().ServiceDirectory());
+  ASSERT_OK(reader_chan.status_value());
+  auto reader = std::make_unique<BlobReaderWrapper>(
+      fidl::WireSyncClient<fuchsia_fxfs::BlobReader>(std::move(*reader_chan)));
+  auto vmo = reader->GetVmo(blob.digest);
+  ASSERT_OK(vmo.status_value());
+
+  // Now reading works.
+  char a;
+  EXPECT_OK(vmo->read(&a, 0, 1));
+}
+
+TEST_F(BlobWriterTest, FailedOverwriteWithBadData) {
+  auto blob = GenerateUncompressedBlob(10);
+  EXPECT_OK(creator().CreateAndWriteBlob(blob).status_value());
+
+  auto writer = creator().CreateExisting(blob.digest);
+  ASSERT_OK(writer.status_value());
+
+  auto vmo = writer->GetVmo(blob.delivery_blob.size());
+  ASSERT_OK(vmo.status_value());
+
+  uint64_t payload_size = blob.delivery_blob.size() - 1;
+  uint64_t bytes_written = 0;
+  while (bytes_written < payload_size) {
+    uint64_t bytes_to_write = std::min(kRingBufferSize, payload_size - bytes_written);
+    ASSERT_OK(vmo->write(blob.delivery_blob.get() + bytes_written, 0, bytes_to_write));
+    ASSERT_OK(writer->BytesReady(bytes_to_write).status_value());
+    bytes_written += bytes_to_write;
+  }
+  // Write a bad byte at the end of the delivery blob.
+  uint8_t bad_byte = blob.delivery_blob.data()[payload_size - 1] ^ 0xFF;
+  ASSERT_OK(vmo->write(&bad_byte, 0, 1));
+  EXPECT_STATUS(writer->BytesReady(1).status_value(), ZX_ERR_IO_DATA_INTEGRITY);
+}
+
 using BlobReaderTest = BlobCreatorTest;
 
 TEST_F(BlobReaderTest, GetVmoForMissingBlobFails) {
-  auto blob = GenerateBlob(10);
+  auto blob = GenerateUncompressedBlob(10);
   auto vmo = reader().GetVmo(blob.digest);
   EXPECT_STATUS(vmo.status_value(), ZX_ERR_NOT_FOUND);
 }
 
 TEST_F(BlobReaderTest, GetVmoForPartiallyWrittenBlobFails) {
-  auto blob = GenerateBlob(10);
+  auto blob = GenerateUncompressedBlob(10);
   auto writer = creator().Create(blob.digest);
   ASSERT_OK(writer.status_value());
   auto writer_vmo = writer->GetVmo(blob.delivery_blob.size());

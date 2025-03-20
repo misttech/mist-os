@@ -54,6 +54,8 @@ class Blob::Writer {
   Writer(const Writer&) = delete;
   Writer& operator=(const Writer&) = delete;
 
+  ~Writer();
+
   // Prepare `blob` and this writer to accept `data_size` bytes of data. If this is a null blob,
   // `WriteNullBlob()` should be called instead. `blob` should be the same object this writer was
   // created using.
@@ -89,6 +91,9 @@ class Blob::Writer {
 
   // Amount of data written into this writer so far.
   uint64_t total_written() const { return total_written_; }
+
+  // Save a reference to a blob being overwritten.
+  void SetBlobToOverwrite(fbl::RefPtr<Blob> to_overwrite);
 
  private:
   // Initialize `blob_layout_` and Merkle tree buffers, if required, using specified `blob_size`
@@ -260,6 +265,10 @@ class Blob::Writer {
   // Buffer to store decompressed data in when we will not save any space persisting compressed data
   // to disk (i.e. the decompressed size is smaller than one block). Must be block aligned.
   fbl::Array<uint8_t> decompressed_data_;
+
+  // The blob that should be overwritten. When this object is destroyed it should go to this Blob
+  // to mark that it is no longer being overwritten, either due to successful overwrite, or failure.
+  std::optional<fbl::RefPtr<Blob>> to_overwrite_ = std::nullopt;
 };
 
 }  // namespace blobfs

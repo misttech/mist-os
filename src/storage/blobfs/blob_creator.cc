@@ -171,14 +171,31 @@ void BlobCreator::Create(fuchsia_fxfs::wire::BlobCreatorCreateRequest* request,
 
 zx::result<fidl::ClientEnd<fuchsia_fxfs::BlobWriter>> BlobCreator::CreateImpl(const Digest& digest,
                                                                               bool allow_existing) {
+  std::optional<fbl::RefPtr<Blob>> to_overwrite;
   if (allow_existing) {
-    // TODO(https://fxbug.dev/350020539): Add support for allow_existing.
-    return zx::error(ZX_ERR_NOT_SUPPORTED);
+    // Check the cache if a previous version is here. If so, save a ref to it to replace it. To keep
+    // the number of states low, only allow this if the existing version is readable, and there is
+    // not another overwrite already in-flight. Also blocks if the blob is already marked deleted
+    // and has not yet been purged. It would be confusing to allow overwrite to start after a purge
+    // has been queued, but will later purge both versions.
+    fbl::RefPtr<CacheNode> found;
+    if (zx_status_t status = blobfs_.GetCache().Lookup(digest, &found); status == ZX_OK) {
+      auto blob = fbl::RefPtr<Blob>::Downcast(std::move(found));
+      if (!blob->IsReadable() || blob->SetOverwriting() != ZX_OK || blob->DeletionQueued()) {
+        return zx::error(ZX_ERR_ALREADY_EXISTS);
+      }
+      to_overwrite = std::move(blob);
+    }
   }
 
   fbl::RefPtr new_blob = fbl::AdoptRef(new Blob(blobfs_, digest, true));
-  if (zx_status_t status = blobfs_.GetCache().Add(new_blob); status != ZX_OK) {
-    return zx::error(status);
+  if (to_overwrite.has_value()) {
+    // Don't put it in the cache if it is not the canonical version yet.
+    new_blob->SetBlobToOverwrite(std::move(to_overwrite.value()));
+  } else {
+    if (zx_status_t status = blobfs_.GetCache().Add(new_blob); status != ZX_OK) {
+      return zx::error(status);
+    }
   }
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_fxfs::BlobWriter>();
