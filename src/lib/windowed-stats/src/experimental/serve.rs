@@ -33,7 +33,7 @@ pub fn serve_time_matrix_inspection(
 ) -> (TimeMatrixClient, impl Future<Output = Result<(), anyhow::Error>>) {
     /// The buffer capacity of the MPSC channel through which time matrices are sent from clients
     /// to the server future.
-    const TIME_MATRIX_SENDER_BUFFER_SIZE: usize = 10;
+    const TIME_MATRIX_SENDER_BUFFER_SIZE: usize = 250;
 
     /// The duration between interpolating data in inspected time matrices.
     const INTERPOLATION_PERIOD: zx::MonotonicDuration = zx::MonotonicDuration::from_minutes(5);
