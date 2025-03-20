@@ -79,7 +79,6 @@ go_library("targets") {
     "//tools/net/mdns",
     "//tools/net/netutil",
     "//tools/net/sshutil",
-    "//tools/qemu",
     "//tools/testing/testrunner:constants",
   ]
 }

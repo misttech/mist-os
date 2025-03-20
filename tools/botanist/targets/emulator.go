@@ -22,7 +22,6 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 	"go.fuchsia.dev/fuchsia/tools/net/sshutil"
-	"go.fuchsia.dev/fuchsia/tools/qemu"
 
 	"github.com/creack/pty"
 )
@@ -51,10 +50,10 @@ const (
 )
 
 // qemuTargetMapping maps the Fuchsia target name to the name recognized by QEMU.
-var qemuTargetMapping = map[Target]qemu.Target{
-	TargetX64:     qemu.TargetEnum.X86_64,
-	TargetARM64:   qemu.TargetEnum.AArch64,
-	TargetRISCV64: qemu.TargetEnum.RiscV64,
+var qemuTargetMapping = map[Target]Target{
+	TargetX64:     "x86_64",
+	TargetARM64:   "aarch64",
+	TargetRISCV64: "riscv64",
 }
 
 // EmulatorConfig gives the common configuration for supported emulators.
