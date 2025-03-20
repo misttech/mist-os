@@ -827,7 +827,7 @@ pub fn execute_syscall(
             None
         }
         Err(errno) => {
-            log_trace!("!-> {:?}", errno);
+            log_trace!("!-> {}", errno);
             if errno.is_restartable() {
                 current_task.thread_state.restart_code = Some(errno.code);
             }
