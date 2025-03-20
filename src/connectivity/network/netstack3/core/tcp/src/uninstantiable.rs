@@ -6,9 +6,8 @@
 
 use explicit::UnreachableExt as _;
 
-use netstack3_base::{CounterContext, Uninstantiable, UninstantiableWrapper, WeakDeviceIdentifier};
+use netstack3_base::{Uninstantiable, UninstantiableWrapper, WeakDeviceIdentifier};
 
-use crate::internal::counters::TcpCounters;
 use crate::internal::socket::{
     AsThisStack, DemuxState, DualStackBaseIpExt, DualStackDemuxIdConverter, DualStackIpExt,
     TcpBindingsTypes, TcpDemuxContext, TcpDualStackContext, TcpSocketId,
@@ -51,8 +50,6 @@ impl<
         BT: TcpBindingsTypes,
         P: TcpDualStackContext<I::OtherVersion, D, BT>,
     > TcpDualStackContext<I, D, BT> for UninstantiableWrapper<P>
-where
-    for<'a> P::DualStackIpTransportCtx<'a>: CounterContext<TcpCounters<I>>,
 {
     type DualStackIpTransportCtx<'a> = P::DualStackIpTransportCtx<'a>;
     fn other_demux_id_converter(&self) -> impl DualStackDemuxIdConverter<I> {

@@ -50,14 +50,14 @@ use netstack3_base::socket::{
 use netstack3_base::socketmap::{IterShadows as _, SocketMap};
 use netstack3_base::sync::RwLock;
 use netstack3_base::{
-    AnyDevice, BidirectionalConverter as _, ContextPair, Control, CoreTimerContext, CounterContext,
+    AnyDevice, BidirectionalConverter as _, ContextPair, Control, CoreTimerContext, Counter,
     CtxPair, DeferredResourceRemovalContext, DeviceIdContext, EitherDeviceId, ExistsError,
     HandleableTimer, IcmpErrorCode, Inspector, InspectorDeviceExt, InspectorExt,
     InstantBindingsTypes, IpDeviceAddr, IpExt, LocalAddressError, Mark, MarkDomain, Mss,
     OwnedOrRefsBidirectionalConverter, PortAllocImpl, ReferenceNotifiersExt as _,
-    RemoveResourceResult, RngContext, Segment, SeqNum, StrongDeviceIdentifier as _,
-    TimerBindingsTypes, TimerContext, TxMetadataBindingsTypes, WeakDeviceIdentifier,
-    ZonedAddressError,
+    RemoveResourceResult, ResourceCounterContext as _, RngContext, Segment, SeqNum,
+    StrongDeviceIdentifier as _, TimerBindingsTypes, TimerContext, TxMetadataBindingsTypes,
+    WeakDeviceIdentifier, ZonedAddressError,
 };
 use netstack3_filter::Tuple;
 use netstack3_ip::socket::{
@@ -73,7 +73,9 @@ use crate::internal::base::{
     BufferSizes, BuffersRefMut, ConnectionError, SocketOptions, TcpIpSockOptions,
 };
 use crate::internal::buffer::{Buffer, IntoBuffers, ReceiveBuffer, SendBuffer};
-use crate::internal::counters::{TcpCounters, TcpCountersRefs};
+use crate::internal::counters::{
+    CombinedTcpCounters, TcpCounterContext, TcpCountersRefs, TcpCountersWithSocket,
+};
 use crate::internal::socket::accept_queue::{AcceptQueue, ListenerNotifier};
 use crate::internal::socket::demux::tcp_serialize_segment;
 use crate::internal::socket::isn::IsnGenerator;
@@ -503,11 +505,7 @@ pub trait TcpDemuxContext<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBin
     /// The inner IP transport context.
     type IpTransportCtx<'a>: TransportIpContext<I, BT, DeviceId = D::Strong, WeakDeviceId = D>
         + DeviceIpSocketHandler<I, BT>
-        + TcpCoreTimerContext<I, D, BT>
-        + CounterContext<TcpCounters<I>>
-        // NB: We need to be able to access counters for the `OtherVersion` to
-        // attribute IPv4 packets on dual stack sockets to the IPv6 counters.
-        + CounterContext<TcpCounters<I::OtherVersion>>;
+        + TcpCoreTimerContext<I, D, BT>;
 
     /// Calls `f` with non-mutable access to the demux state.
     fn with_demux<O, F: FnOnce(&DemuxState<I, D, BT>) -> O>(&mut self, cb: F) -> O;
@@ -640,21 +638,23 @@ where
 
 /// Core context for TCP.
 pub trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
-    TcpDemuxContext<I, Self::WeakDeviceId, BC> + IpSocketHandler<I, BC>
+    TcpDemuxContext<I, Self::WeakDeviceId, BC>
+    + IpSocketHandler<I, BC>
+    + TcpCounterContext<I, Self::WeakDeviceId, BC>
 {
     /// The core context for the current version of the IP protocol. This is
     /// used to be version agnostic when the operation is on the current stack.
     type ThisStackIpTransportAndDemuxCtx<'a>: TransportIpContext<I, BC, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
         + DeviceIpSocketHandler<I, BC>
         + TcpDemuxContext<I, Self::WeakDeviceId, BC>
-        + CounterContext<TcpCounters<I>>;
+        + TcpCounterContext<I, Self::WeakDeviceId, BC>;
 
     /// The core context that will give access to this version of the IP layer.
     type SingleStackIpTransportAndDemuxCtx<'a>: TransportIpContext<I, BC, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
         + DeviceIpSocketHandler<I, BC>
         + TcpDemuxContext<I, Self::WeakDeviceId, BC>
         + AsThisStack<Self::ThisStackIpTransportAndDemuxCtx<'a>>
-        + CounterContext<TcpCounters<I>>;
+        + TcpCounterContext<I, Self::WeakDeviceId, BC>;
 
     /// A collection of type assertions that must be true in the single stack
     /// version, associated types and concrete types must unify and we can
@@ -674,8 +674,8 @@ pub trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
         + TcpDemuxContext<I::OtherVersion, Self::WeakDeviceId, BC>
         + TcpDualStackContext<I, Self::WeakDeviceId, BC>
         + AsThisStack<Self::ThisStackIpTransportAndDemuxCtx<'a>>
-        + CounterContext<TcpCounters<I>>
-        + CounterContext<TcpCounters<I::OtherVersion>>;
+        + TcpCounterContext<I, Self::WeakDeviceId, BC>
+        + TcpCounterContext<I::OtherVersion, Self::WeakDeviceId, BC>;
 
     /// A collection of type assertions that must be true in the dual stack
     /// version, associated types and concrete types must unify and we can
@@ -826,8 +826,7 @@ pub trait TcpDualStackContext<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: Tc
         + TcpCoreTimerContext<I, D, BT>
         + TransportIpContext<I::OtherVersion, BT, DeviceId = D::Strong, WeakDeviceId = D>
         + DeviceIpSocketHandler<I::OtherVersion, BT>
-        + TcpCoreTimerContext<I::OtherVersion, D, BT>
-        + CounterContext<TcpCounters<I>>;
+        + TcpCoreTimerContext<I::OtherVersion, D, BT>;
 
     /// Gets a converter to get the demux socket ID for the other stack.
     fn other_demux_id_converter(&self) -> impl DualStackDemuxIdConverter<I>;
@@ -1489,7 +1488,6 @@ pub struct Unbound<D, Extra> {
     socket_extra: Takeable<Extra>,
 }
 
-type ReferenceState<I, D, BT> = RwLock<TcpSocketState<I, D, BT>>;
 type PrimaryRc<I, D, BT> = netstack3_base::sync::PrimaryRc<ReferenceState<I, D, BT>>;
 type StrongRc<I, D, BT> = netstack3_base::sync::StrongRc<ReferenceState<I, D, BT>>;
 type WeakRc<I, D, BT> = netstack3_base::sync::WeakRc<ReferenceState<I, D, BT>>;
@@ -1555,7 +1553,7 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> Drop
         // held.
         let Self(map) = self;
         for TcpSocketId(rc) in map.keys() {
-            let guard = rc.read();
+            let guard = rc.locked_state.read();
             let accept_queue = match &(*guard).socket_state {
                 TcpSocketStateInner::Bound(BoundSocketState::Listener((
                     MaybeListener::Listener(Listener { accept_queue, .. }),
@@ -1606,7 +1604,15 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>
     }
 }
 
-/// The state held by a TCP socket.
+/// The state held by a [`TcpSocketId`].
+#[derive(Derivative)]
+#[derivative(Debug(bound = "D: Debug"))]
+pub struct ReferenceState<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> {
+    locked_state: RwLock<TcpSocketState<I, D, BT>>,
+    counters: TcpCountersWithSocket<I>,
+}
+
+/// The locked state held by a TCP socket.
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"))]
 pub struct TcpSocketState<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> {
@@ -1751,15 +1757,16 @@ impl<
     /// Updates this connection's state to reflect the error.
     ///
     /// The connection's soft error, if previously unoccupied, holds the error.
-    fn on_icmp_error<CC: CounterContext<TcpCounters<SockI>>>(
+    fn on_icmp_error<CC: TcpCounterContext<SockI, D, BT>>(
         &mut self,
         core_ctx: &mut CC,
+        id: &TcpSocketId<SockI, D, BT>,
         seq: SeqNum,
         error: IcmpErrorCode,
     ) -> NewlyClosed {
         let Connection { soft_error, state, .. } = self;
         let (new_soft_error, newly_closed) =
-            state.on_icmp_error(&TcpCountersRefs::from_ctx(core_ctx), error, seq);
+            state.on_icmp_error(&TcpCountersRefs::from_ctx(core_ctx, id), error, seq);
         *soft_error = soft_error.or(new_soft_error);
         newly_closed
     }
@@ -1849,10 +1856,13 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> Clone
 
 impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> TcpSocketId<I, D, BT> {
     pub(crate) fn new(socket_state: TcpSocketStateInner<I, D, BT>) -> (Self, PrimaryRc<I, D, BT>) {
-        let primary = PrimaryRc::new(RwLock::new(TcpSocketState {
-            socket_state,
-            ip_options: Default::default(),
-        }));
+        let primary = PrimaryRc::new(ReferenceState {
+            locked_state: RwLock::new(TcpSocketState {
+                socket_state,
+                ip_options: Default::default(),
+            }),
+            counters: Default::default(),
+        });
         let socket = Self(PrimaryRc::clone_strong(&primary));
         (socket, primary)
     }
@@ -1864,10 +1874,22 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> TcpSocket
     ) -> (Self, PrimaryRc<I, D, BT>) {
         let primary = PrimaryRc::new_cyclic(move |weak| {
             let socket_state = init(WeakTcpSocketId(weak));
-            RwLock::new(TcpSocketState { socket_state, ip_options: Default::default() })
+            ReferenceState {
+                locked_state: RwLock::new(TcpSocketState {
+                    socket_state,
+                    ip_options: Default::default(),
+                }),
+                counters: Default::default(),
+            }
         });
         let socket = Self(PrimaryRc::clone_strong(&primary));
         (socket, primary)
+    }
+
+    /// Obtains the counters tracked for this TCP socket.
+    pub fn counters(&self) -> &TcpCountersWithSocket<I> {
+        let Self(rc) = self;
+        &rc.counters
     }
 
     pub(crate) fn trace_id(&self) -> TraceResourceId<'_> {
@@ -1937,7 +1959,7 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>
     type Lock = RwLock<TcpSocketState<I, D, BT>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         let Self(rc) = self;
-        OrderedLockRef::new(&*rc)
+        OrderedLockRef::new(&rc.locked_state)
     }
 }
 
@@ -2192,7 +2214,7 @@ impl<I, C> TcpApi<I, C>
 where
     I: DualStackIpExt,
     C: ContextPair,
-    C::CoreContext: TcpContext<I, C::BindingsContext> + CounterContext<TcpCounters<I>>,
+    C::CoreContext: TcpContext<I, C::BindingsContext>,
     C::BindingsContext: TcpBindingsContext,
 {
     fn core_ctx(&mut self) -> &mut C::CoreContext {
@@ -2454,7 +2476,7 @@ where
         });
         match &result {
             Err(BindError::LocalAddressError(LocalAddressError::FailedToAllocateLocalPort)) => {
-                core_ctx.counters().failed_port_reservations.increment();
+                core_ctx.increment_both(id, |c| &c.failed_port_reservations);
             }
             Err(_) | Ok(_) => {}
         }
@@ -2827,13 +2849,14 @@ where
         match &result {
             Ok(()) => {}
             Err(err) => {
-                core_ctx.counters().failed_connection_attempts.increment();
+                core_ctx.increment_both(id, |counters| &counters.failed_connection_attempts);
                 match err {
                     ConnectError::NoRoute => {
-                        core_ctx.counters().active_open_no_route_errors.increment()
+                        core_ctx
+                            .increment_both(id, |counters| &counters.active_open_no_route_errors);
                     }
                     ConnectError::NoPort => {
-                        core_ctx.counters().failed_port_reservations.increment()
+                        core_ctx.increment_both(id, |counters| &counters.failed_port_reservations);
                     }
                     _ => {}
                 }
@@ -2996,14 +3019,14 @@ where
                             BC: TcpBindingsContext,
                             CC: TransportIpContext<WireI, BC>
                                 + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>
-                                + CounterContext<TcpCounters<SockI>>,
+                                + TcpCounterContext<SockI, CC::WeakDeviceId, BC>,
                         {
                             // Ignore the result - errors are handled below after calling `close`.
                             let _: Result<(), CloseError> = conn.state.shutdown_recv();
 
                             conn.defunct = true;
                             let newly_closed = match conn.state.close(
-                                &TcpCountersRefs::from_ctx(core_ctx),
+                                &TcpCountersRefs::from_ctx(core_ctx, id),
                                 CloseReason::Close { now: bindings_ctx.now() },
                                 &conn.socket_options,
                             ) {
@@ -3141,7 +3164,7 @@ where
                             BC: TcpBindingsContext,
                             CC: TransportIpContext<WireI, BC>
                                 + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>
-                                + CounterContext<TcpCounters<SockI>>,
+                                + TcpCounterContext<SockI, CC::WeakDeviceId, BC>,
                         {
                             let (shutdown_send, shutdown_receive) = shutdown_type.to_send_receive();
                             if shutdown_receive {
@@ -3157,7 +3180,7 @@ where
                             }
 
                             match conn.state.close(
-                                &TcpCountersRefs::from_ctx(core_ctx),
+                                &TcpCountersRefs::from_ctx(core_ctx, id),
                                 CloseReason::Shutdown,
                                 &conn.socket_options,
                             ) {
@@ -3740,7 +3763,7 @@ where
                     BC: TcpBindingsContext,
                     CC: TransportIpContext<WireI, BC>
                         + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>
-                        + CounterContext<TcpCounters<SockI>>,
+                        + TcpCounterContext<SockI, CC::WeakDeviceId, BC>,
                 {
                     let time_wait = matches!(conn.state, State::TimeWait(_));
                     let newly_closed = do_send_inner(id, conn, addr, timer, core_ctx, bindings_ctx);
@@ -4116,7 +4139,7 @@ where
             ) = match core_ctx {
                 MaybeDualStack::NotDualStack((core_ctx, converter)) => {
                     let (conn, addr) = converter.convert(conn_and_addr);
-                    let newly_closed = conn.on_icmp_error(core_ctx, seq, error);
+                    let newly_closed = conn.on_icmp_error(core_ctx, &id, seq, error);
                     (
                         newly_closed,
                         &mut conn.accept_queue,
@@ -4133,7 +4156,7 @@ where
                 MaybeDualStack::DualStack((core_ctx, converter)) => {
                     match converter.convert(conn_and_addr) {
                         EitherStack::ThisStack((conn, addr)) => {
-                            let newly_closed = conn.on_icmp_error(core_ctx, seq, error);
+                            let newly_closed = conn.on_icmp_error(core_ctx, &id, seq, error);
                             (
                                 newly_closed,
                                 &mut conn.accept_queue,
@@ -4148,7 +4171,7 @@ where
                             )
                         }
                         EitherStack::OtherStack((conn, addr)) => {
-                            let newly_closed = conn.on_icmp_error(core_ctx, seq, error);
+                            let newly_closed = conn.on_icmp_error(core_ctx, &id, seq, error);
                             let demux_id = core_ctx.into_other_demux_socket_id(id.clone());
                             (
                                 newly_closed,
@@ -4220,8 +4243,7 @@ where
         seq: SeqNum,
         error: IcmpErrorCode,
     ) where
-        C::CoreContext: TcpContext<I::OtherVersion, C::BindingsContext>
-            + CounterContext<TcpCounters<I::OtherVersion>>,
+        C::CoreContext: TcpContext<I::OtherVersion, C::BindingsContext>,
         C::BindingsContext: TcpBindingsContext,
     {
         let (core_ctx, bindings_ctx) = self.contexts();
@@ -4460,6 +4482,12 @@ where
                         node.record_display("State", state);
                     }
                 }
+                node.record_child("Counters", |node| {
+                    node.delegate_inspectable(&CombinedTcpCounters {
+                        with_socket: socket_id.counters(),
+                        without_socket: None,
+                    })
+                })
             });
         })
     }
@@ -4659,11 +4687,12 @@ fn close_pending_socket<WireI, SockI, DC, BC>(
     DC: TransportIpContext<WireI, BC>
         + DeviceIpSocketHandler<WireI, BC>
         + TcpDemuxContext<WireI, DC::WeakDeviceId, BC>
-        + CounterContext<TcpCounters<SockI>>,
+        + TcpCounterContext<SockI, DC::WeakDeviceId, BC>,
     BC: TcpBindingsContext,
 {
     debug!("aborting pending socket {sock_id:?}");
-    let (maybe_reset, newly_closed) = conn.state.abort(&TcpCountersRefs::from_ctx(core_ctx));
+    let (maybe_reset, newly_closed) =
+        conn.state.abort(&TcpCountersRefs::from_ctx(core_ctx, sock_id));
     handle_newly_closed(core_ctx, bindings_ctx, newly_closed, demux_id, conn_addr, timer);
     if let Some(reset) = maybe_reset {
         let ConnAddr { ip, device: _ } = conn_addr;
@@ -4693,7 +4722,7 @@ fn do_send_inner_and_then_handle_newly_closed<SockI, WireI, CC, BC>(
     WireI: DualStackIpExt,
     BC: TcpBindingsContext,
     CC: TransportIpContext<WireI, BC>
-        + CounterContext<TcpCounters<SockI>>
+        + TcpCounterContext<SockI, CC::WeakDeviceId, BC>
         + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>,
 {
     let newly_closed = do_send_inner(conn_id, conn, addr, timer, core_ctx, bindings_ctx);
@@ -4734,12 +4763,12 @@ where
     SockI: DualStackIpExt,
     WireI: DualStackIpExt,
     BC: TcpBindingsContext,
-    CC: TransportIpContext<WireI, BC> + CounterContext<TcpCounters<SockI>>,
+    CC: TransportIpContext<WireI, BC> + TcpCounterContext<SockI, CC::WeakDeviceId, BC>,
 {
     let newly_closed = loop {
         match conn.state.poll_send(
             &conn_id.either(),
-            &TcpCountersRefs::from_ctx(core_ctx),
+            &TcpCountersRefs::from_ctx(core_ctx, conn_id),
             u32::MAX,
             bindings_ctx.now(),
             &conn.socket_options,
@@ -5165,7 +5194,7 @@ where
     BC: TcpBindingsContext,
     CC: TransportIpContext<WireI, BC>
         + DeviceIpSocketHandler<WireI, BC>
-        + CounterContext<TcpCounters<SockI>>,
+        + TcpCounterContext<SockI, CC::WeakDeviceId, BC>,
     Demux: DemuxStateAccessor<WireI, CC, BC>,
 {
     let (local_ip, bound_device, local_port) = match listener_addr {
@@ -5295,7 +5324,7 @@ where
             },
             conn_addr,
         );
-        core_ctx.counters().active_connection_openings.increment();
+        core_ctx.increment_both(sock_id, |counters| &counters.active_connection_openings);
         TcpSocketStateInner::Bound(BoundSocketState::Connected { conn, sharing, timer })
     })())
 }
@@ -5395,10 +5424,7 @@ impl<A: IpAddress, D: Clone> From<ConnAddr<ConnIpAddr<A, NonZeroU16, NonZeroU16>
 impl<CC, BC> HandleableTimer<CC, BC> for TcpTimerId<CC::WeakDeviceId, BC>
 where
     BC: TcpBindingsContext,
-    CC: TcpContext<Ipv4, BC>
-        + TcpContext<Ipv6, BC>
-        + CounterContext<TcpCounters<Ipv4>>
-        + CounterContext<TcpCounters<Ipv6>>,
+    CC: TcpContext<Ipv4, BC> + TcpContext<Ipv6, BC>,
 {
     fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, _: BC::UniqueTimerId) {
         let ctx_pair = CtxPair { core_ctx, bindings_ctx };
@@ -5430,7 +5456,7 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
 ) where
     WireI: IpExt,
     SockI: IpExt + DualStackIpExt,
-    CC: CounterContext<TcpCounters<SockI>>
+    CC: TcpCounterContext<SockI, D, BC>
         + IpSocketHandler<WireI, BC, DeviceId = D::Strong, WeakDeviceId = D>,
     BC: TcpBindingsTypes,
     D: WeakDeviceIdentifier,
@@ -5465,21 +5491,42 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
     };
     match result {
         Ok(()) => {
-            core_ctx.counters().segments_sent.increment();
-            match control {
-                None => {}
-                Some(Control::RST) => core_ctx.counters().resets_sent.increment(),
-                Some(Control::SYN) => core_ctx.counters().syns_sent.increment(),
-                Some(Control::FIN) => core_ctx.counters().fins_sent.increment(),
+            increment_optional_tcp_counter(core_ctx, socket_id, |counters| &counters.segments_sent);
+            if let Some(control) = control {
+                increment_optional_tcp_counter(core_ctx, socket_id, |counters| match control {
+                    Control::RST => &counters.resets_sent,
+                    Control::SYN => &counters.syns_sent,
+                    Control::FIN => &counters.fins_sent,
+                })
             }
         }
         Err(err) => {
-            core_ctx.counters().segment_send_errors.increment();
+            increment_optional_tcp_counter(core_ctx, socket_id, |counters| {
+                &counters.segment_send_errors
+            });
             match socket_id {
                 Some(socket_id) => debug!("{:?}: failed to send segment: {:?}", socket_id, err),
                 None => debug!("TCP: failed to send segment: {:?}", err),
             }
         }
+    }
+}
+
+// Increments the stack-wide counters, and optionally, the per-resouce counters.
+fn increment_optional_tcp_counter<I, CC, BT, D, F>(
+    core_ctx: &CC,
+    socket_id: Option<&TcpSocketId<I, D, BT>>,
+    cb: F,
+) where
+    I: DualStackIpExt,
+    CC: TcpCounterContext<I, D, BT>,
+    D: WeakDeviceIdentifier,
+    BT: TcpBindingsTypes,
+    F: Fn(&TcpCountersWithSocket<I>) -> &Counter,
+{
+    match socket_id {
+        Some(id) => core_ctx.increment_both(id, cb),
+        None => cb(core_ctx.counters()).increment(),
     }
 }
 
@@ -5507,9 +5554,9 @@ mod tests {
         WithFakeTimerContext,
     };
     use netstack3_base::{
-        ContextProvider, IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode, Instant as _, InstantContext,
-        LinkDevice, Mms, ReferenceNotifiers, StrongDeviceIdentifier, Uninstantiable,
-        UninstantiableWrapper,
+        ContextProvider, CounterContext, IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode, Instant as _,
+        InstantContext, LinkDevice, Mms, ReferenceNotifiers, ResourceCounterContext,
+        StrongDeviceIdentifier, Uninstantiable, UninstantiableWrapper,
     };
     use netstack3_filter::{TransportPacketSerializer, Tuple};
     use netstack3_ip::device::IpDeviceStateIpExt;
@@ -5536,6 +5583,10 @@ mod tests {
         ClientBuffers, ProvidedBuffers, RingBuffer, TestSendBuffer, WriteBackClientBuffers,
     };
     use crate::internal::buffer::BufferLimits;
+    use crate::internal::counters::testutil::{
+        CounterExpectations, CounterExpectationsWithoutSocket,
+    };
+    use crate::internal::counters::TcpCountersWithoutSocket;
     use crate::internal::state::{TimeWait, MSL};
 
     trait TcpTestIpExt: DualStackIpExt + TestIpExt + IpDeviceStateIpExt + DualStackIpExt {
@@ -5578,7 +5629,8 @@ mod tests {
         // Always destroy all sockets last so the strong references in the demux
         // are gone.
         all_sockets: TcpSocketSet<I, D::Weak, BT>,
-        counters: TcpCounters<I>,
+        counters_with_socket: TcpCountersWithSocket<I>,
+        counters_without_socket: TcpCountersWithoutSocket<I>,
     }
 
     impl<I, D, BT> Default for FakeTcpState<I, D, BT>
@@ -5593,7 +5645,8 @@ mod tests {
                 isn_generator: Default::default(),
                 all_sockets: Default::default(),
                 demux: Rc::new(RefCell::new(DemuxState { socketmap: Default::default() })),
-                counters: Default::default(),
+                counters_with_socket: Default::default(),
+                counters_without_socket: Default::default(),
             }
         }
     }
@@ -6166,11 +6219,39 @@ mod tests {
         }
     }
 
-    impl<I: Ip, D: FakeStrongDeviceId, BT: TcpTestBindingsTypes<D>> CounterContext<TcpCounters<I>>
+    impl<I: Ip, D: FakeStrongDeviceId, BT: TcpTestBindingsTypes<D>>
+        CounterContext<TcpCountersWithSocket<I>> for TcpCoreCtx<D, BT>
+    {
+        fn counters(&self) -> &TcpCountersWithSocket<I> {
+            I::map_ip(
+                (),
+                |()| &self.tcp.v4.counters_with_socket,
+                |()| &self.tcp.v6.counters_with_socket,
+            )
+        }
+    }
+
+    impl<I: Ip, D: FakeStrongDeviceId, BT: TcpTestBindingsTypes<D>>
+        CounterContext<TcpCountersWithoutSocket<I>> for TcpCoreCtx<D, BT>
+    {
+        fn counters(&self) -> &TcpCountersWithoutSocket<I> {
+            I::map_ip(
+                (),
+                |()| &self.tcp.v4.counters_without_socket,
+                |()| &self.tcp.v6.counters_without_socket,
+            )
+        }
+    }
+
+    impl<I: DualStackIpExt, D: FakeStrongDeviceId, BT: TcpTestBindingsTypes<D>>
+        ResourceCounterContext<TcpSocketId<I, FakeWeakDeviceId<D>, BT>, TcpCountersWithSocket<I>>
         for TcpCoreCtx<D, BT>
     {
-        fn counters(&self) -> &TcpCounters<I> {
-            I::map_ip((), |()| &self.tcp.v4.counters, |()| &self.tcp.v6.counters)
+        fn per_resource_counters<'a>(
+            &'a self,
+            resource: &'a TcpSocketId<I, FakeWeakDeviceId<D>, BT>,
+        ) -> &'a TcpCountersWithSocket<I> {
+            resource.counters()
         }
     }
 
@@ -6290,12 +6371,12 @@ mod tests {
     impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> TcpSocketId<I, D, BT> {
         fn get(&self) -> impl Deref<Target = TcpSocketState<I, D, BT>> + '_ {
             let Self(rc) = self;
-            rc.read()
+            rc.locked_state.read()
         }
 
         fn get_mut(&self) -> impl DerefMut<Target = TcpSocketState<I, D, BT>> + '_ {
             let Self(rc) = self;
-            rc.write()
+            rc.locked_state.write()
         }
     }
 
@@ -6603,35 +6684,24 @@ mod tests {
         let (mut net, _client, _client_snd_end, _accepted) =
             bind_listen_connect_accept_inner::<I>(listen_addr, bind_config, 0, 0.0);
 
-        struct ExpectedCounters {
-            tx: u64,
-            rx: u64,
-            passive_open: u64,
-            active_open: u64,
-        }
         let mut assert_counters =
-            |context_name: &'static str, ExpectedCounters { tx, rx, passive_open, active_open }| {
+            |context_name: &'static str,
+             expected: CounterExpectations,
+             expected_without_socket: CounterExpectationsWithoutSocket| {
                 net.with_context(context_name, |ctx| {
-                    let c: &TcpCounters<I> = ctx.core_ctx.counters();
-                    assert_eq!(c.segment_send_errors.get(), 0, "{}", context_name);
-                    assert_eq!(c.segments_sent.get(), tx, "{}", context_name);
-                    assert_eq!(c.invalid_segments_received.get(), 0, "{}", context_name);
-                    assert_eq!(c.valid_segments_received.get(), rx, "{}", context_name);
-                    assert_eq!(c.received_segments_dispatched.get(), rx, "{}", context_name);
-                    assert_eq!(c.active_connection_openings.get(), active_open, "{}", context_name);
+                    let counters =
+                        CounterContext::<TcpCountersWithSocket<I>>::counters(&ctx.core_ctx);
+                    let counters_without_socket =
+                        CounterContext::<TcpCountersWithoutSocket<I>>::counters(&ctx.core_ctx);
+                    assert_eq!(expected, counters.as_ref().into(), "{context_name}");
                     assert_eq!(
-                        c.passive_connection_openings.get(),
-                        passive_open,
-                        "{}",
-                        context_name
+                        expected_without_socket,
+                        counters_without_socket.as_ref().into(),
+                        "{context_name}"
                     );
-                    assert_eq!(c.failed_connection_attempts.get(), 0, "{}", context_name);
-                    // Each side of the connection sends and receives a,
-                    // SYN, regardless of it initiated the connection.
-                    assert_eq!(c.syns_sent.get(), 1);
-                    assert_eq!(c.syns_received.get(), 1);
                 })
             };
+
         // Communication done by `bind_listen_connect_accept_inner`:
         //   LOCAL -> REMOTE: SYN to initiate the connection.
         //   LOCAL <- REMOTE: ACK the connection.
@@ -6640,8 +6710,30 @@ mod tests {
         //   LOCAL <- REMOTE: ACK "hello".
         //   LOCAL <- REMOTE: Send "hello".
         //   LOCAL -> REMOTE: ACK "hello".
-        assert_counters(LOCAL, ExpectedCounters { tx: 4, rx: 3, passive_open: 0, active_open: 1 });
-        assert_counters(REMOTE, ExpectedCounters { tx: 3, rx: 4, passive_open: 1, active_open: 0 });
+        assert_counters(
+            LOCAL,
+            CounterExpectations {
+                segments_sent: 4,
+                received_segments_dispatched: 3,
+                active_connection_openings: 1,
+                syns_sent: 1,
+                syns_received: 1,
+                ..Default::default()
+            },
+            CounterExpectationsWithoutSocket { valid_segments_received: 3, ..Default::default() },
+        );
+        assert_counters(
+            REMOTE,
+            CounterExpectations {
+                segments_sent: 3,
+                received_segments_dispatched: 4,
+                passive_connection_openings: 1,
+                syns_sent: 1,
+                syns_received: 1,
+                ..Default::default()
+            },
+            CounterExpectationsWithoutSocket { valid_segments_received: 4, ..Default::default() },
+        );
     }
 
     #[ip_test(I)]
@@ -8065,10 +8157,8 @@ mod tests {
     fn deliver_icmp_error<
         I: TcpTestIpExt + IcmpIpExt,
         CC: TcpContext<I, BC, DeviceId = FakeDeviceId>
-            + TcpContext<I::OtherVersion, BC, DeviceId = FakeDeviceId>
-            + CounterContext<TcpCounters<I>>
-            + CounterContext<TcpCounters<I::OtherVersion>>,
-        BC: TcpBindingsContext + TcpBindingsContext,
+            + TcpContext<I::OtherVersion, BC, DeviceId = FakeDeviceId>,
+        BC: TcpBindingsContext,
     >(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
@@ -8279,7 +8369,7 @@ mod tests {
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<I, TcpBindingsCtx<FakeDeviceId>>
             + TcpContext<I::OtherVersion, TcpBindingsCtx<FakeDeviceId>>
-            + CounterContext<TcpCounters<I>>,
+            + CounterContext<TcpCountersWithSocket<I>>,
     {
         let mut net = new_test_net::<I>();
 

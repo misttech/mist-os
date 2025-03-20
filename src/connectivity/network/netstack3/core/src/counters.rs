@@ -18,7 +18,7 @@ use netstack3_ip::multicast_forwarding::MulticastForwardingCounters;
 use netstack3_ip::nud::{NudCounters, NudCountersInner};
 use netstack3_ip::raw::RawIpSocketCounters;
 use netstack3_ip::{FragmentationCounters, IpCounters, IpLayerIpExt};
-use netstack3_tcp::TcpCounters;
+use netstack3_tcp::{CombinedTcpCounters, TcpCountersWithSocket, TcpCountersWithoutSocket};
 use netstack3_udp::{UdpCounters, UdpCountersInner};
 
 /// An API struct for accessing all stack counters.
@@ -41,8 +41,10 @@ where
         + CounterContext<RawIpSocketCounters<Ipv6>>
         + CounterContext<UdpCounters<Ipv4>>
         + CounterContext<UdpCounters<Ipv6>>
-        + CounterContext<TcpCounters<Ipv4>>
-        + CounterContext<TcpCounters<Ipv6>>
+        + CounterContext<TcpCountersWithSocket<Ipv4>>
+        + CounterContext<TcpCountersWithSocket<Ipv6>>
+        + CounterContext<TcpCountersWithoutSocket<Ipv4>>
+        + CounterContext<TcpCountersWithoutSocket<Ipv6>>
         + CounterContext<IcmpRxCounters<Ipv4>>
         + CounterContext<IcmpRxCounters<Ipv6>>
         + CounterContext<IcmpTxCounters<Ipv4>>
@@ -162,14 +164,24 @@ where
         });
         inspector.record_child("TCP", |inspector| {
             inspector.record_child("V4", |inspector| {
-                inspector.delegate_inspectable(
-                    CounterContext::<TcpCounters<Ipv4>>::counters(self.core_ctx()).as_ref(),
-                );
+                let ctx = self.core_ctx();
+                let with_socket = CounterContext::<TcpCountersWithSocket<Ipv4>>::counters(ctx);
+                let without_socket =
+                    CounterContext::<TcpCountersWithoutSocket<Ipv4>>::counters(ctx);
+                inspector.delegate_inspectable(&CombinedTcpCounters {
+                    with_socket,
+                    without_socket: Some(without_socket),
+                });
             });
             inspector.record_child("V6", |inspector| {
-                inspector.delegate_inspectable(
-                    CounterContext::<TcpCounters<Ipv6>>::counters(self.core_ctx()).as_ref(),
-                );
+                let ctx = self.core_ctx();
+                let with_socket = CounterContext::<TcpCountersWithSocket<Ipv6>>::counters(ctx);
+                let without_socket =
+                    CounterContext::<TcpCountersWithoutSocket<Ipv6>>::counters(ctx);
+                inspector.delegate_inspectable(&CombinedTcpCounters {
+                    with_socket,
+                    without_socket: Some(without_socket),
+                });
             });
         });
     }

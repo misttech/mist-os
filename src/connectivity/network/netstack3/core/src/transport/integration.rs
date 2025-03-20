@@ -7,13 +7,15 @@ use lock_order::relation::LockBefore;
 use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6};
 use netstack3_base::socket::MaybeDualStack;
 use netstack3_base::{
-    CoreTimerContext, CounterContext, Uninstantiable, UninstantiableWrapper, WeakDeviceIdentifier,
+    CoreTimerContext, CounterContext, ResourceCounterContext, Uninstantiable,
+    UninstantiableWrapper, WeakDeviceIdentifier,
 };
 use netstack3_datagram as datagram;
 use netstack3_device::WeakDeviceId;
 use netstack3_tcp::{
-    self as tcp, IsnGenerator, TcpContext, TcpCounters, TcpDemuxContext, TcpDualStackContext,
-    TcpSocketId, TcpSocketSet, TcpSocketState, WeakTcpSocketId,
+    self as tcp, IsnGenerator, TcpContext, TcpCountersWithSocket, TcpCountersWithoutSocket,
+    TcpDemuxContext, TcpDualStackContext, TcpSocketId, TcpSocketSet, TcpSocketState,
+    WeakTcpSocketId,
 };
 use netstack3_udp::{self as udp, UdpCounters, UdpSocketId, UdpSocketSet, UdpSocketState};
 
@@ -581,9 +583,35 @@ impl<I: datagram::IpExt, BT: BindingsTypes>
     }
 }
 
-impl<BC: BindingsContext, I: Ip, L> CounterContext<TcpCounters<I>> for CoreCtx<'_, BC, L> {
-    fn counters(&self) -> &TcpCounters<I> {
-        self.unlocked_access::<crate::lock_ordering::UnlockedState>().transport.tcp_counters::<I>()
+impl<BC: BindingsContext, I: Ip, L> CounterContext<TcpCountersWithSocket<I>>
+    for CoreCtx<'_, BC, L>
+{
+    fn counters(&self) -> &TcpCountersWithSocket<I> {
+        self.unlocked_access::<crate::lock_ordering::UnlockedState>()
+            .transport
+            .tcp_counters_with_socket::<I>()
+    }
+}
+
+impl<BC: BindingsContext, I: Ip, L> CounterContext<TcpCountersWithoutSocket<I>>
+    for CoreCtx<'_, BC, L>
+{
+    fn counters(&self) -> &TcpCountersWithoutSocket<I> {
+        self.unlocked_access::<crate::lock_ordering::UnlockedState>()
+            .transport
+            .tcp_counters_without_socket::<I>()
+    }
+}
+
+impl<BC: BindingsContext, I: netstack3_tcp::DualStackIpExt, L>
+    ResourceCounterContext<TcpSocketId<I, WeakDeviceId<BC>, BC>, TcpCountersWithSocket<I>>
+    for CoreCtx<'_, BC, L>
+{
+    fn per_resource_counters<'a>(
+        &'a self,
+        resource: &'a TcpSocketId<I, WeakDeviceId<BC>, BC>,
+    ) -> &'a TcpCountersWithSocket<I> {
+        resource.counters()
     }
 }
 

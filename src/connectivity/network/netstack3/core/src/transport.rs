@@ -63,7 +63,9 @@ use netstack3_base::{CoreTxMetadataContext, HandleableTimer, TimerHandler};
 use netstack3_datagram as datagram;
 use netstack3_device::WeakDeviceId;
 use netstack3_icmp_echo::{IcmpSocketTxMetadata, IcmpSockets};
-use netstack3_tcp::{self as tcp, TcpCounters, TcpState, TcpTimerId};
+use netstack3_tcp::{
+    self as tcp, TcpCountersWithSocket, TcpCountersWithoutSocket, TcpState, TcpTimerId,
+};
 use netstack3_udp::{UdpCounters, UdpSocketTxMetadata, UdpState, UdpStateBuilder};
 
 use crate::{BindingsContext, BindingsTypes, CoreCtx, IpExt};
@@ -126,8 +128,16 @@ impl<BT: BindingsTypes> TransportLayerState<BT> {
         I::map_ip((), |()| &self.udpv4.counters, |()| &self.udpv6.counters)
     }
 
-    pub(crate) fn tcp_counters<I: Ip>(&self) -> &TcpCounters<I> {
-        I::map_ip((), |()| &self.tcpv4.counters, |()| &self.tcpv6.counters)
+    pub(crate) fn tcp_counters_with_socket<I: Ip>(&self) -> &TcpCountersWithSocket<I> {
+        I::map_ip((), |()| &self.tcpv4.counters_with_socket, |()| &self.tcpv6.counters_with_socket)
+    }
+
+    pub(crate) fn tcp_counters_without_socket<I: Ip>(&self) -> &TcpCountersWithoutSocket<I> {
+        I::map_ip(
+            (),
+            |()| &self.tcpv4.counters_without_socket,
+            |()| &self.tcpv6.counters_without_socket,
+        )
     }
 }
 

@@ -3455,7 +3455,7 @@ mod test {
     use crate::internal::buffer::testutil::RingBuffer;
     use crate::internal::buffer::Buffer;
     use crate::internal::counters::testutil::CounterExpectations;
-    use crate::internal::counters::TcpCountersInner;
+    use crate::internal::counters::TcpCountersWithSocketInner;
 
     const ISS_1: SeqNum = SeqNum::new(100);
     const ISS_2: SeqNum = SeqNum::new(300);
@@ -3684,21 +3684,22 @@ mod test {
 
     #[derive(Default)]
     struct FakeTcpCounters {
-        stack_wide: TcpCountersInner,
-        // TODO(https://fxbug.dev/42081990): Add per-socket counters.
+        stack_wide: TcpCountersWithSocketInner,
+        per_socket: TcpCountersWithSocketInner,
     }
 
     impl FakeTcpCounters {
-        fn refs(&self) -> TcpCountersRefs<'_> {
-            let Self { stack_wide } = self;
-            TcpCountersRefs { stack_wide }
+        fn refs<'a>(&'a self) -> TcpCountersRefs<'a> {
+            let Self { stack_wide, per_socket } = self;
+            TcpCountersRefs { stack_wide, per_socket }
         }
     }
 
     impl CounterExpectations {
         #[track_caller]
-        fn assert_counters(&self, FakeTcpCounters { stack_wide }: &FakeTcpCounters) {
+        fn assert_counters(&self, FakeTcpCounters { stack_wide, per_socket }: &FakeTcpCounters) {
             assert_eq!(self, &CounterExpectations::from(stack_wide), "stack-wide counter mismatch");
+            assert_eq!(self, &CounterExpectations::from(per_socket), "per-socket counter mismatch");
         }
     }
 

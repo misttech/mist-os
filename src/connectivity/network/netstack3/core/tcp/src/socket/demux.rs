@@ -37,7 +37,9 @@ use packet_formats::tcp::{
 };
 
 use crate::internal::base::{BufferSizes, ConnectionError, SocketOptions, TcpIpSockOptions};
-use crate::internal::counters::{TcpCounters, TcpCountersRefs};
+use crate::internal::counters::{
+    TcpCounterContext, TcpCountersRefs, TcpCountersWithSocket, TcpCountersWithoutSocket,
+};
 use crate::internal::socket::isn::IsnGenerator;
 use crate::internal::socket::{
     self, AsThisStack as _, BoundSocketState, Connection, DemuxState, DeviceIpSocketHandler,
@@ -73,10 +75,7 @@ where
             ActiveOpen = <BC as TcpBindingsTypes>::ListenerNotifierOrProvidedBuffers,
             PassiveOpen = <BC as TcpBindingsTypes>::ReturnedBuffers,
         >,
-    CC: TcpContext<I, BC>
-        + TcpContext<I::OtherVersion, BC>
-        + CounterContext<TcpCounters<I>>
-        + CounterContext<TcpCounters<I::OtherVersion>>,
+    CC: TcpContext<I, BC> + TcpContext<I::OtherVersion, BC>,
 {
     fn receive_icmp_error(
         core_ctx: &mut CC,
@@ -127,7 +126,7 @@ where
         }
 
         if broadcast.is_some() {
-            CounterContext::<TcpCounters<I>>::counters(core_ctx)
+            CounterContext::<TcpCountersWithoutSocket<I>>::counters(core_ctx)
                 .invalid_ip_addrs_received
                 .increment();
             debug!("tcp: dropping broadcast TCP packet");
@@ -136,7 +135,7 @@ where
 
         let remote_ip = match SpecifiedAddr::new(remote_ip.into()) {
             None => {
-                CounterContext::<TcpCounters<I>>::counters(core_ctx)
+                CounterContext::<TcpCountersWithoutSocket<I>>::counters(core_ctx)
                     .invalid_ip_addrs_received
                     .increment();
                 debug!("tcp: source address unspecified, dropping the packet");
@@ -147,7 +146,7 @@ where
         let remote_ip: SocketIpAddr<_> = match remote_ip.try_into() {
             Ok(remote_ip) => remote_ip,
             Err(AddrIsMappedError {}) => {
-                CounterContext::<TcpCounters<I>>::counters(core_ctx)
+                CounterContext::<TcpCountersWithoutSocket<I>>::counters(core_ctx)
                     .invalid_ip_addrs_received
                     .increment();
                 debug!("tcp: source address is mapped (ipv4-mapped-ipv6), dropping the packet");
@@ -157,7 +156,7 @@ where
         let local_ip: SocketIpAddr<_> = match local_ip.try_into() {
             Ok(local_ip) => local_ip,
             Err(AddrIsMappedError {}) => {
-                CounterContext::<TcpCounters<I>>::counters(core_ctx)
+                CounterContext::<TcpCountersWithoutSocket<I>>::counters(core_ctx)
                     .invalid_ip_addrs_received
                     .increment();
                 debug!("tcp: local address is mapped (ipv4-mapped-ipv6), dropping the packet");
@@ -169,13 +168,13 @@ where
         {
             Ok(packet) => packet,
             Err(err) => {
-                CounterContext::<TcpCounters<I>>::counters(core_ctx)
+                CounterContext::<TcpCountersWithoutSocket<I>>::counters(core_ctx)
                     .invalid_segments_received
                     .increment();
                 debug!("tcp: failed parsing incoming packet {:?}", err);
                 match err {
                     ParseError::Checksum => {
-                        CounterContext::<TcpCounters<I>>::counters(core_ctx)
+                        CounterContext::<TcpCountersWithoutSocket<I>>::counters(core_ctx)
                             .checksum_errors
                             .increment();
                     }
@@ -189,7 +188,7 @@ where
         let incoming = match Segment::try_from(packet) {
             Ok(segment) => segment,
             Err(err) => {
-                CounterContext::<TcpCounters<I>>::counters(core_ctx)
+                CounterContext::<TcpCountersWithoutSocket<I>>::counters(core_ctx)
                     .invalid_segments_received
                     .increment();
                 debug!("tcp: malformed segment {:?}", err);
@@ -199,18 +198,21 @@ where
         let conn_addr =
             ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) };
 
-        CounterContext::<TcpCounters<I>>::counters(core_ctx).valid_segments_received.increment();
+        CounterContext::<TcpCountersWithoutSocket<I>>::counters(core_ctx)
+            .valid_segments_received
+            .increment();
+        // TODO(https://fxbug.dev/42081990): Track these counters per socket.
         match incoming.header.control {
             None => {}
-            Some(Control::RST) => {
-                CounterContext::<TcpCounters<I>>::counters(core_ctx).resets_received.increment()
-            }
-            Some(Control::SYN) => {
-                CounterContext::<TcpCounters<I>>::counters(core_ctx).syns_received.increment()
-            }
-            Some(Control::FIN) => {
-                CounterContext::<TcpCounters<I>>::counters(core_ctx).fins_received.increment()
-            }
+            Some(Control::RST) => CounterContext::<TcpCountersWithSocket<I>>::counters(core_ctx)
+                .resets_received
+                .increment(),
+            Some(Control::SYN) => CounterContext::<TcpCountersWithSocket<I>>::counters(core_ctx)
+                .syns_received
+                .increment(),
+            Some(Control::FIN) => CounterContext::<TcpCountersWithSocket<I>>::counters(core_ctx)
+                .fins_received
+                .increment(),
         }
         handle_incoming_packet::<I, _, _>(
             core_ctx,
@@ -240,10 +242,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
             ActiveOpen = <BC as TcpBindingsTypes>::ListenerNotifierOrProvidedBuffers,
             PassiveOpen = <BC as TcpBindingsTypes>::ReturnedBuffers,
         >,
-    CC: TcpContext<WireI, BC>
-        + TcpContext<WireI::OtherVersion, BC>
-        + CounterContext<TcpCounters<WireI>>
-        + CounterContext<TcpCounters<WireI::OtherVersion>>,
+    CC: TcpContext<WireI, BC> + TcpContext<WireI::OtherVersion, BC>,
 {
     trace_duration!(c"tcp::handle_incoming_packet");
     let mut tw_reuse = None;
@@ -406,7 +405,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
     };
 
     if !found_socket {
-        CounterContext::<TcpCounters<WireI>>::counters(core_ctx)
+        CounterContext::<TcpCountersWithoutSocket<WireI>>::counters(core_ctx)
             .received_segments_no_dispatch
             .increment();
 
@@ -429,7 +428,8 @@ fn handle_incoming_packet<WireI, BC, CC>(
             );
         }
     } else {
-        CounterContext::<TcpCounters<WireI>>::counters(core_ctx)
+        // TODO(https://fxbug.dev/42081990): Track per socket.
+        CounterContext::<TcpCountersWithSocket<WireI>>::counters(core_ctx)
             .received_segments_dispatched
             .increment();
     }
@@ -509,7 +509,7 @@ where
             ActiveOpen = <BC as TcpBindingsTypes>::ListenerNotifierOrProvidedBuffers,
             PassiveOpen = <BC as TcpBindingsTypes>::ReturnedBuffers,
         >,
-    CC: TcpContext<SockI, BC> + CounterContext<TcpCounters<SockI>>,
+    CC: TcpContext<SockI, BC>,
 {
     core_ctx.with_socket_mut_transport_demux(conn_id, |core_ctx, socket_state| {
         let TcpSocketState { socket_state, ip_options: _ } = socket_state;
@@ -615,7 +615,7 @@ where
     DC: TransportIpContext<WireI, BC, DeviceId = CC::DeviceId, WeakDeviceId = CC::WeakDeviceId>
         + DeviceIpSocketHandler<SockI, BC>
         + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>
-        + CounterContext<TcpCounters<SockI>>,
+        + TcpCounterContext<SockI, CC::WeakDeviceId, BC>,
 {
     let Connection {
         accept_queue,
@@ -647,7 +647,7 @@ where
     }
     let (reply, passive_open, data_acked, newly_closed) = state.on_segment::<_, BC>(
         &conn_id.either(),
-        &TcpCountersRefs::from_ctx(core_ctx),
+        &TcpCountersRefs::from_ctx(core_ctx, conn_id),
         incoming,
         bindings_ctx.now(),
         socket_options,
@@ -763,10 +763,7 @@ fn try_handle_listener_incoming_disposition<SockI, WireI, CC, BC, Addr>(
 where
     SockI: DualStackIpExt,
     WireI: DualStackIpExt,
-    CC: TcpContext<SockI, BC>
-        + TcpContext<WireI, BC>
-        + TcpContext<WireI::OtherVersion, BC>
-        + CounterContext<TcpCounters<SockI>>,
+    CC: TcpContext<SockI, BC> + TcpContext<WireI, BC> + TcpContext<WireI::OtherVersion, BC>,
     BC: TcpBindingsContext,
 {
     match disposition {
@@ -837,7 +834,10 @@ where
             if let Some(to_destroy) = to_destroy {
                 socket::destroy_socket(core_ctx, bindings_ctx, to_destroy);
             }
-            core_ctx.counters().passive_connection_openings.increment();
+            // TODO(https://fxbug.dev/42081990): Track per socket.
+            CounterContext::<TcpCountersWithSocket<SockI>>::counters(core_ctx)
+                .passive_connection_openings
+                .increment();
             true
         }
     }
@@ -882,7 +882,7 @@ where
     DC: TransportIpContext<WireI, BC, DeviceId = CC::DeviceId, WeakDeviceId = CC::WeakDeviceId>
         + DeviceIpSocketHandler<WireI, BC>
         + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>
-        + CounterContext<TcpCounters<SockI>>,
+        + TcpCounterContext<SockI, CC::WeakDeviceId, BC>,
 {
     let (maybe_listener, sharing, listener_addr) = assert_matches!(
         socket_state,
@@ -905,8 +905,8 @@ where
     // reuse the connection in TIME-WAIT, this is because we need to store the
     // reused connection in the accept queue so we have to respect its limit.
     if accept_queue.len() == backlog.get() {
-        core_ctx.counters().listener_queue_overflow.increment();
-        core_ctx.counters().failed_connection_attempts.increment();
+        core_ctx.increment_both(listener_id, |counters| &counters.listener_queue_overflow);
+        core_ctx.increment_both(listener_id, |counters| &counters.failed_connection_attempts);
         debug!("incoming SYN dropped because of the full backlog of the listener");
         return ListenerIncomingSegmentDisposition::FoundSocket;
     }
@@ -934,8 +934,8 @@ where
     ) {
         Ok(ip_sock) => ip_sock,
         err @ Err(IpSockCreationError::Route(_)) => {
-            core_ctx.counters().passive_open_no_route_errors.increment();
-            core_ctx.counters().failed_connection_attempts.increment();
+            core_ctx.increment_both(listener_id, |counters| &counters.passive_open_no_route_errors);
+            core_ctx.increment_both(listener_id, |counters| &counters.failed_connection_attempts);
             debug!("cannot construct an ip socket to the SYN originator: {:?}, ignoring", err);
             return ListenerIncomingSegmentDisposition::NoMatchingSocket;
         }
@@ -953,7 +953,7 @@ where
             // there isn't much we can do here since sending a RST back is
             // impossible, we just need to silent drop the segment.
             error!("Cannot find a device with large enough MTU for the connection");
-            core_ctx.counters().failed_connection_attempts.increment();
+            core_ctx.increment_both(listener_id, |counters| &counters.failed_connection_attempts);
             match err {
                 MmsError::NoDevice(_) | MmsError::MTUTooSmall(_) => {
                     return ListenerIncomingSegmentDisposition::FoundSocket;
@@ -982,7 +982,7 @@ where
         // the first segment because we don't have an ID allocated yet. This is
         // okay because the state machine ID is only for debugging purposes.
         &listener_id.either(),
-        &TcpCountersRefs::from_ctx(core_ctx),
+        &TcpCountersRefs::from_ctx(core_ctx, listener_id),
         incoming,
         bindings_ctx.now(),
         &SocketOptions::default(),
@@ -1087,7 +1087,8 @@ where
             None => {
                 // We didn't create a new connection, short circuit early and
                 // don't send out the pending segment.
-                core_ctx.counters().failed_connection_attempts.increment();
+                core_ctx
+                    .increment_both(listener_id, |counters| &counters.failed_connection_attempts);
                 return ListenerIncomingSegmentDisposition::ConflictingConnection;
             }
         }

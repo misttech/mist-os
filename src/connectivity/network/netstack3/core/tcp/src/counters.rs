@@ -5,24 +5,43 @@
 //! Facilities for tracking the counts of various TCP events.
 
 use net_types::ip::{Ip, IpMarked};
-use netstack3_base::{Counter, CounterContext, Inspectable, Inspector, InspectorExt as _};
+use netstack3_base::{
+    Counter, CounterContext, Inspectable, Inspector, InspectorExt as _, ResourceCounterContext,
+    WeakDeviceIdentifier,
+};
 
-/// TCP Counters.
-///
-/// Accrued for the entire stack, rather than on a per connection basis.
-///
-/// Note that for dual stack sockets, all events will be attributed to the IPv6
-/// counters.
-pub type TcpCounters<I> = IpMarked<I, TcpCountersInner>;
+use crate::internal::socket::{DualStackIpExt, TcpBindingsTypes, TcpSocketId};
 
-/// The IP agnostic version of [`TcpCounters`].
+/// A marker trait to simplify bounds for TCP counters.
+pub trait TcpCounterContext<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>:
+    ResourceCounterContext<TcpSocketId<I, D, BT>, TcpCountersWithSocket<I>>
+    + CounterContext<TcpCountersWithoutSocket<I>>
+{
+}
+
+impl<I, D, BT, CC> TcpCounterContext<I, D, BT> for CC
+where
+    I: DualStackIpExt,
+    D: WeakDeviceIdentifier,
+    BT: TcpBindingsTypes,
+    CC: ResourceCounterContext<TcpSocketId<I, D, BT>, TcpCountersWithSocket<I>>
+        + CounterContext<TcpCountersWithoutSocket<I>>,
+{
+}
+
+/// Counters for TCP events that cannot be attributed to an individual socket.
+///
+/// These counters are tracked stack wide.
+///
+/// Note on dual stack sockets: These counters are tracked for `WireI`.
+pub type TcpCountersWithoutSocket<I> = IpMarked<I, TcpCountersWithoutSocketInner>;
+
+/// The IP agnostic version of [`TcpCountersWithoutSocket`].
 ///
 /// The counter type `C` is generic to facilitate testing.
-#[derive(Default)]
-#[cfg_attr(test, derive(Debug, PartialEq))]
-// TODO(https://fxbug.dev/42052878): Add counters for SYN cookies.
-// TODO(https://fxbug.dev/42078221): Add counters for SACK.
-pub struct TcpCountersInner<C = Counter> {
+#[derive(Default, Debug)]
+#[cfg_attr(test, derive(PartialEq))]
+pub struct TcpCountersWithoutSocketInner<C = Counter> {
     /// Count of received IP packets that were dropped because they had
     /// unexpected IP addresses (either src or dst).
     pub invalid_ip_addrs_received: C,
@@ -31,12 +50,35 @@ pub struct TcpCountersInner<C = Counter> {
     pub invalid_segments_received: C,
     /// Count of received TCP segments that were valid.
     pub valid_segments_received: C,
-    /// Count of received TCP segments that were successfully dispatched to a
-    /// socket.
-    pub received_segments_dispatched: C,
     /// Count of received TCP segments that were not associated with any
     /// existing sockets.
     pub received_segments_no_dispatch: C,
+    /// Count of received segments whose checksums were invalid.
+    pub checksum_errors: C,
+}
+
+/// Counters for TCP events that can be attributed to an individual socket.
+///
+/// These counters are tracked stack wide and per socket.
+///
+/// Note on dual stack sockets: These counters are tracked for `SockI`.
+// TODO(https://fxbug.dev/396127493): For some of these events, it would be
+// better to track them for `WireI` (e.g. `received_segments_dispatched`,
+// `segments_sent`, etc.). Doing so may require splitting up the struct and/or
+// reworking the `ResourceCounterContext` trait.
+pub type TcpCountersWithSocket<I> = IpMarked<I, TcpCountersWithSocketInner<Counter>>;
+
+/// The IP agnostic version of [`TcpCountersWithSocket`].
+///
+/// The counter type `C` is generic to facilitate testing.
+// TODO(https://fxbug.dev/42052878): Add counters for SYN cookies.
+// TODO(https://fxbug.dev/42078221): Add counters for SACK.
+#[derive(Default, Debug)]
+#[cfg_attr(test, derive(PartialEq))]
+pub struct TcpCountersWithSocketInner<C = Counter> {
+    /// Count of received TCP segments that were successfully dispatched to a
+    /// socket.
+    pub received_segments_dispatched: C,
     /// Count of received TCP segments that were dropped because the listener
     /// queue was full.
     pub listener_queue_overflow: C,
@@ -59,8 +101,6 @@ pub struct TcpCountersInner<C = Counter> {
     pub failed_connection_attempts: C,
     /// Count of port reservation attempts that failed.
     pub failed_port_reservations: C,
-    /// Count of received segments whose checksums were invalid.
-    pub checksum_errors: C,
     /// Count of received segments with the RST flag set.
     pub resets_received: C,
     /// Count of sent segments with the RST flag set.
@@ -93,14 +133,23 @@ pub struct TcpCountersInner<C = Counter> {
     pub established_timedout: C,
 }
 
-impl Inspectable for TcpCountersInner {
-    fn record<I: Inspector>(&self, inspector: &mut I) {
-        let TcpCountersInner {
-            invalid_ip_addrs_received,
-            invalid_segments_received,
-            valid_segments_received,
+/// A union of the TCP Counters with and without a socket.
+pub struct CombinedTcpCounters<'a, I: Ip> {
+    /// The TCP Counters that can be associated with a socket.
+    pub with_socket: &'a TcpCountersWithSocket<I>,
+    /// The TCP Counters that cannot be associated with a socket.
+    ///
+    /// This field is optional so that the same [`Inspectable`] implementation
+    /// can be used for both the stack-wide counters, and the per-socket
+    /// counters.
+    pub without_socket: Option<&'a TcpCountersWithoutSocket<I>>,
+}
+
+impl<I: Ip> Inspectable for CombinedTcpCounters<'_, I> {
+    fn record<II: Inspector>(&self, inspector: &mut II) {
+        let CombinedTcpCounters { with_socket, without_socket } = self;
+        let TcpCountersWithSocketInner {
             received_segments_dispatched,
-            received_segments_no_dispatch,
             listener_queue_overflow,
             segment_send_errors,
             segments_sent,
@@ -110,7 +159,6 @@ impl Inspectable for TcpCountersInner {
             active_connection_openings,
             failed_connection_attempts,
             failed_port_reservations,
-            checksum_errors,
             resets_received,
             resets_sent,
             syns_received,
@@ -125,21 +173,64 @@ impl Inspectable for TcpCountersInner {
             established_closed,
             established_resets,
             established_timedout,
-        } = self;
+        } = with_socket.as_ref();
+
+        // Note: Organize the "without socket" counters into helper structs to
+        // make the optionality more ergonomic to handle.
+        struct WithoutSocketRx<'a> {
+            valid_segments_received: &'a Counter,
+        }
+        struct WithoutSocketRxError<'a> {
+            invalid_ip_addrs_received: &'a Counter,
+            invalid_segments_received: &'a Counter,
+            received_segments_no_dispatch: &'a Counter,
+            checksum_errors: &'a Counter,
+        }
+        let (without_socket_rx, without_socket_rx_error) = match without_socket.map(AsRef::as_ref) {
+            None => (None, None),
+            Some(TcpCountersWithoutSocketInner {
+                invalid_ip_addrs_received,
+                invalid_segments_received,
+                valid_segments_received,
+                received_segments_no_dispatch,
+                checksum_errors,
+            }) => (
+                Some(WithoutSocketRx { valid_segments_received }),
+                Some(WithoutSocketRxError {
+                    invalid_ip_addrs_received,
+                    invalid_segments_received,
+                    received_segments_no_dispatch,
+                    checksum_errors,
+                }),
+            ),
+        };
+
         inspector.record_child("Rx", |inspector| {
-            inspector.record_counter("ValidSegmentsReceived", valid_segments_received);
+            if let Some(WithoutSocketRx { valid_segments_received }) = without_socket_rx {
+                inspector.record_counter("ValidSegmentsReceived", valid_segments_received);
+            }
             inspector.record_counter("ReceivedSegmentsDispatched", received_segments_dispatched);
             inspector.record_counter("ResetsReceived", resets_received);
             inspector.record_counter("SynsReceived", syns_received);
             inspector.record_counter("FinsReceived", fins_received);
             inspector.record_child("Errors", |inspector| {
-                inspector.record_counter("InvalidIpAddrsReceived", invalid_ip_addrs_received);
-                inspector.record_counter("InvalidSegmentsReceived", invalid_segments_received);
-                inspector
-                    .record_counter("ReceivedSegmentsNoDispatch", received_segments_no_dispatch);
                 inspector.record_counter("ListenerQueueOverflow", listener_queue_overflow);
                 inspector.record_counter("PassiveOpenNoRouteErrors", passive_open_no_route_errors);
-                inspector.record_counter("ChecksumErrors", checksum_errors);
+                if let Some(WithoutSocketRxError {
+                    invalid_ip_addrs_received,
+                    invalid_segments_received,
+                    received_segments_no_dispatch,
+                    checksum_errors,
+                }) = without_socket_rx_error
+                {
+                    inspector.record_counter("InvalidIpAddrsReceived", invalid_ip_addrs_received);
+                    inspector.record_counter("InvalidSegmentsReceived", invalid_segments_received);
+                    inspector.record_counter(
+                        "ReceivedSegmentsNoDispatch",
+                        received_segments_no_dispatch,
+                    );
+                    inspector.record_counter("ChecksumErrors", checksum_errors);
+                }
             })
         });
         inspector.record_child("Tx", |inspector| {
@@ -176,18 +267,25 @@ impl Inspectable for TcpCountersInner {
 /// machine, which does not operate on a core context so that it can remain
 /// IP agnostic (and thus avoid duplicate code generation).
 pub(crate) struct TcpCountersRefs<'a> {
-    pub(crate) stack_wide: &'a TcpCountersInner,
-    // TODO(https://fxbug.dev/42081990): Add per-socket counters.
+    pub(crate) stack_wide: &'a TcpCountersWithSocketInner,
+    pub(crate) per_socket: &'a TcpCountersWithSocketInner,
 }
 
 impl<'a> TcpCountersRefs<'a> {
-    pub(crate) fn from_ctx<I: Ip, CC: CounterContext<TcpCounters<I>>>(ctx: &'a CC) -> Self {
-        TcpCountersRefs { stack_wide: ctx.counters() }
+    pub(crate) fn from_ctx<I: Ip, R, CC: ResourceCounterContext<R, TcpCountersWithSocket<I>>>(
+        ctx: &'a CC,
+        resource: &'a R,
+    ) -> Self {
+        TcpCountersRefs {
+            stack_wide: ctx.counters(),
+            per_socket: ctx.per_resource_counters(resource),
+        }
     }
 
-    pub(crate) fn increment<F: Fn(&TcpCountersInner) -> &Counter>(&self, cb: F) {
-        let Self { stack_wide } = self;
+    pub(crate) fn increment<F: Fn(&TcpCountersWithSocketInner<Counter>) -> &Counter>(&self, cb: F) {
+        let Self { stack_wide, per_socket } = self;
         cb(stack_wide).increment();
+        cb(per_socket).increment();
     }
 }
 
@@ -195,16 +293,12 @@ impl<'a> TcpCountersRefs<'a> {
 pub(crate) mod testutil {
     use super::*;
 
-    pub(crate) type CounterExpectations = TcpCountersInner<u64>;
+    pub(crate) type CounterExpectations = TcpCountersWithSocketInner<u64>;
 
-    impl From<&TcpCountersInner> for CounterExpectations {
-        fn from(counters: &TcpCountersInner) -> CounterExpectations {
-            let TcpCountersInner {
-                invalid_ip_addrs_received,
-                invalid_segments_received,
-                valid_segments_received,
+    impl From<&TcpCountersWithSocketInner> for CounterExpectations {
+        fn from(counters: &TcpCountersWithSocketInner) -> CounterExpectations {
+            let TcpCountersWithSocketInner {
                 received_segments_dispatched,
-                received_segments_no_dispatch,
                 listener_queue_overflow,
                 segment_send_errors,
                 segments_sent,
@@ -214,7 +308,6 @@ pub(crate) mod testutil {
                 active_connection_openings,
                 failed_connection_attempts,
                 failed_port_reservations,
-                checksum_errors,
                 resets_received,
                 resets_sent,
                 syns_received,
@@ -230,12 +323,8 @@ pub(crate) mod testutil {
                 established_resets,
                 established_timedout,
             } = counters;
-            TcpCountersInner {
-                invalid_ip_addrs_received: invalid_ip_addrs_received.get(),
-                invalid_segments_received: invalid_segments_received.get(),
-                valid_segments_received: valid_segments_received.get(),
+            TcpCountersWithSocketInner {
                 received_segments_dispatched: received_segments_dispatched.get(),
-                received_segments_no_dispatch: received_segments_no_dispatch.get(),
                 listener_queue_overflow: listener_queue_overflow.get(),
                 segment_send_errors: segment_send_errors.get(),
                 segments_sent: segments_sent.get(),
@@ -245,7 +334,6 @@ pub(crate) mod testutil {
                 active_connection_openings: active_connection_openings.get(),
                 failed_connection_attempts: failed_connection_attempts.get(),
                 failed_port_reservations: failed_port_reservations.get(),
-                checksum_errors: checksum_errors.get(),
                 resets_received: resets_received.get(),
                 resets_sent: resets_sent.get(),
                 syns_received: syns_received.get(),
@@ -260,6 +348,27 @@ pub(crate) mod testutil {
                 established_closed: established_closed.get(),
                 established_resets: established_resets.get(),
                 established_timedout: established_timedout.get(),
+            }
+        }
+    }
+
+    pub(crate) type CounterExpectationsWithoutSocket = TcpCountersWithoutSocketInner<u64>;
+
+    impl From<&TcpCountersWithoutSocketInner> for CounterExpectationsWithoutSocket {
+        fn from(counters: &TcpCountersWithoutSocketInner) -> CounterExpectationsWithoutSocket {
+            let TcpCountersWithoutSocketInner {
+                invalid_ip_addrs_received,
+                invalid_segments_received,
+                valid_segments_received,
+                received_segments_no_dispatch,
+                checksum_errors,
+            } = counters;
+            TcpCountersWithoutSocketInner {
+                invalid_ip_addrs_received: invalid_ip_addrs_received.get(),
+                invalid_segments_received: invalid_segments_received.get(),
+                valid_segments_received: valid_segments_received.get(),
+                received_segments_no_dispatch: received_segments_no_dispatch.get(),
+                checksum_errors: checksum_errors.get(),
             }
         }
     }

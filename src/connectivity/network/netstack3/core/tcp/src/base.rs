@@ -23,7 +23,7 @@ use packet_formats::utils::NonZeroDuration;
 use rand::Rng;
 
 use crate::internal::buffer::BufferLimits;
-use crate::internal::counters::TcpCounters;
+use crate::internal::counters::{TcpCountersWithSocket, TcpCountersWithoutSocket};
 use crate::internal::socket::isn::IsnGenerator;
 use crate::internal::socket::{DualStackIpExt, Sockets, TcpBindingsTypes};
 use crate::internal::state::DEFAULT_MAX_SYN_RETRIES;
@@ -161,8 +161,10 @@ pub struct TcpState<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsT
     pub isn_generator: IsnGenerator<BT::Instant>,
     /// TCP sockets state.
     pub sockets: Sockets<I, D, BT>,
-    /// TCP counters.
-    pub counters: TcpCounters<I>,
+    /// TCP counters that cannot be attributed to a specific socket.
+    pub counters_without_socket: TcpCountersWithoutSocket<I>,
+    /// TCP counters that can be attributed to a specific socket.
+    pub counters_with_socket: TcpCountersWithSocket<I>,
 }
 
 impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> TcpState<I, D, BT> {
@@ -171,7 +173,8 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> TcpState<
         Self {
             isn_generator: IsnGenerator::new(now, rng),
             sockets: Sockets::new(),
-            counters: Default::default(),
+            counters_without_socket: Default::default(),
+            counters_with_socket: Default::default(),
         }
     }
 }
