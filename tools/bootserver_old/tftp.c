@@ -204,7 +204,7 @@ int transport_recv(void* data, size_t len, bool block, void* cookie) {
     memcpy(&state->target_addr, &connection_addr, sizeof(state->target_addr));
     state->connected = true;
   }
-  return recv_result;
+  return (int)recv_result;
 }
 
 int transport_timeout_set(uint32_t timeout_ms, void* cookie) {
@@ -213,7 +213,7 @@ int transport_timeout_set(uint32_t timeout_ms, void* cookie) {
     state->previous_timeout_ms = timeout_ms;
     struct timeval tv;
     tv.tv_sec = timeout_ms / 1000;
-    tv.tv_usec = 1000 * (timeout_ms - 1000 * tv.tv_sec);
+    tv.tv_usec = (suseconds_t)(1000 * (timeout_ms - 1000 * tv.tv_sec));
     return setsockopt(state->socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
   }
   return 0;

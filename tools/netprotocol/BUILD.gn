@@ -7,10 +7,6 @@ import("//build/host.gni")
 source_set("common") {
   sources = [ "netprotocol.c" ]
   public_deps = [ "//src/bringup/lib/netboot" ]
-  configs += [
-    # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-    "//build/config:Wno-conversion",
-  ]
 }
 
 executable("netruncmd") {
@@ -23,10 +19,6 @@ executable("netcp") {
   deps = [
     ":common",
     "//zircon/system/ulib/tftp",
-  ]
-  configs += [
-    # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-    "//build/config:Wno-conversion",
   ]
 }
 

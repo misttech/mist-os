@@ -116,7 +116,7 @@ void update_status(size_t bytes_so_far) {
   }
 
   if (is_redirected) {
-    int percent_sent = (bytes_so_far * 100 / (total_file_size));
+    int percent_sent = (int)(bytes_so_far * 100 / (total_file_size));
     if (percent_sent - progress_reported >= 5) {
       fprintf(stderr, "\t%d%%...", percent_sent);
       progress_reported = percent_sent;
@@ -572,11 +572,13 @@ int main(int argc, char** argv) {
       }
       errno = 0;
       static uint16_t block_size;
-      block_size = strtoll(argv[1], NULL, 10);
-      if (errno != 0 || block_size <= 0) {
+      char* endptr;
+      unsigned long long temp_block_size = strtoull(argv[1], &endptr, 10);
+      if (errno != 0 || *endptr != '\0' || temp_block_size == 0 || temp_block_size > UINT16_MAX) {
         fprintf(stderr, "invalid arg for -b: %s\n", argv[1]);
         return -1;
       }
+      block_size = (uint16_t)temp_block_size;
       tftp_block_size = &block_size;
     } else if (!strcmp(argv[1], "-w")) {
       argc--;
@@ -587,11 +589,13 @@ int main(int argc, char** argv) {
       }
       errno = 0;
       static uint16_t window_size;
-      window_size = strtoll(argv[1], NULL, 10);
-      if (errno != 0 || window_size <= 0) {
+      char* endptr;
+      unsigned long long temp_window_size = strtoull(argv[1], &endptr, 10);
+      if (errno != 0 || *endptr != '\0' || temp_window_size == 0 || temp_window_size > UINT16_MAX) {
         fprintf(stderr, "invalid arg for -w: %s\n", argv[1]);
         return -1;
       }
+      window_size = (uint16_t)temp_window_size;
       tftp_window_size = &window_size;
     } else if (!strcmp(argv[1], "-i")) {
       argc--;

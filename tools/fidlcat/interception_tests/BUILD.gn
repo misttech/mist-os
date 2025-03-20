@@ -66,8 +66,5 @@ if (is_host) {
       "//tools/fidlcat/lib:session_proto",
       "//zircon/system/public",
     ]
-
-    # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-    configs += [ "//build/config:Wno-conversion" ]
   }
 }
