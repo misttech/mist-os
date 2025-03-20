@@ -136,7 +136,7 @@ pub struct FsNode {
     /// The pipe located at this node, if any.
     ///
     /// Used if, and only if, the node has a mode of FileMode::IFIFO.
-    pub fifo: Option<PipeHandle>,
+    fifo: Option<PipeHandle>,
 
     /// The UNIX domain socket bound to this node, if any.
     bound_socket: OnceLock<SocketHandle>,
@@ -169,7 +169,7 @@ pub struct FsNode {
     /// Tracks lock state for this file.
     pub write_guard_state: Mutex<FileWriteGuardState>,
 
-    /// Cached Fsverity state associated with this node.
+    /// Cached FsVerity state associated with this node.
     pub fsverity: Mutex<FsVerityState>,
 
     /// Inotify watchers on this node. See inotify(7).
@@ -1422,7 +1422,7 @@ impl FsNode {
                     DeviceMode::Block,
                 )
             }
-            FileMode::IFIFO => Pipe::open(locked, current_task, self.fifo.as_ref().unwrap(), flags),
+            FileMode::IFIFO => Pipe::open(locked, current_task, self.fifo().unwrap(), flags),
             // UNIX domain sockets can't be opened.
             FileMode::IFSOCK => error!(ENXIO),
             _ => self.create_file_ops(locked, current_task, flags),
@@ -2028,6 +2028,10 @@ impl FsNode {
             security::check_task_capable(current_task, CAP_FOWNER)?;
         }
         Ok(())
+    }
+
+    pub fn fifo(&self) -> Option<&PipeHandle> {
+        self.fifo.as_ref()
     }
 
     /// Returns the UNIX domain socket bound to this node, if any.
