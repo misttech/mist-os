@@ -41,6 +41,31 @@ TEST(ElfldltlSonameTests, Basic) {
   EXPECT_EQ(other, name);
   EXPECT_EQ(other.hash(), kOtherHash);
 
+  // Test str() and size() methods.
+  EXPECT_EQ(name.str().size(), kOther.size());
+  EXPECT_EQ(name.size(), kOther.size());
+
+  // Test copy() when truncating.
+  std::array<char, 3> short_buffer;
+  size_t n = name.copy(short_buffer.data(), short_buffer.size(), 1);
+  EXPECT_EQ(n, short_buffer.size());
+  EXPECT_EQ(std::string_view(short_buffer.data(), n), name.str().substr(1, n));
+
+  // Test copy() when not truncating.
+  std::array<char, 10> long_buffer;
+  ASSERT_GT(long_buffer.size(), name.str().size());
+  n = name.copy(long_buffer.data(), long_buffer.size());
+  EXPECT_EQ(n, name.str().size() + 1);
+  EXPECT_EQ(long_buffer[name.str().size()], '\0');
+  EXPECT_STREQ(long_buffer.data(), name.c_str());
+
+  // Test using copy_size().
+  std::vector<char> buffer(name.copy_size());
+  n = name.copy(buffer.data(), buffer.size());
+  EXPECT_EQ(n, name.str().size() + 1);
+  EXPECT_EQ(buffer[name.str().size()], '\0');
+  EXPECT_STREQ(buffer.data(), name.c_str());
+
   elfldltl::Soname a{"a"}, b{"b"};
   EXPECT_LT(a, b);
   EXPECT_LE(a, b);

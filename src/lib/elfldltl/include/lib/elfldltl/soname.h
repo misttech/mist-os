@@ -55,6 +55,24 @@ class Soname {
     return name_.get();
   }
 
+  // This is slightly different from str().copy() because it also includes the
+  // '\0' terminator in the count of chars to be copied.  Hence it can return
+  // up to size() + 1, not only up to size() like std::string_view::copy.
+  template <typename Ptr = AbiPtr<const char, Elf, AbiTraits>, typename = decltype(Ptr{}.get())>
+  constexpr size_t copy(char* dest, size_t count, size_t pos = 0) const {
+    assert(name_.get()[size_] == '\0');
+    size_t n = str().copy(dest, count, pos);
+    if (n < count) {
+      dest[n++] = '\0';
+    }
+    return n;
+  }
+
+  // This returns the size of a buffer sufficient for copy() not to truncate.
+  constexpr size_t copy_size() const { return size_ + 1; }
+
+  constexpr uint32_t size() const { return size_; }
+
   constexpr uint32_t hash() const { return hash_; }
 
   template <typename Ptr = AbiPtr<const char, Elf, AbiTraits>, typename = decltype(Ptr{}.get())>
