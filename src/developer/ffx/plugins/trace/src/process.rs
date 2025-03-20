@@ -9,7 +9,7 @@ use ffx_trace::SymbolizationMap;
 use fxt::{
     Arg, ArgValue, RawArg, RawArgValue, RawEventRecord, SessionParser, StringRef, TraceRecord,
 };
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 use termion::{color, style};
 
@@ -50,6 +50,13 @@ impl<R: std::io::Read> Iterator for TraceIterator<R> {
     }
 }
 
+/// Change a raw serialized flow event (begin or end) into a flow step and return the raw bytes.
+fn flow_event_into_flow_step(bytes: &[u8], flow_id: u64) -> Result<Vec<u8>> {
+    let (_, mut parsed) = fxt::RawEventRecord::parse(bytes)?;
+    parsed.set_flow_step_payload(flow_id);
+    parsed.serialize().map_err(|e| anyhow!(e))
+}
+
 /// Parse a trace session and call a function for each trace record that is an event record.
 /// The function takes the parsed event record and the raw bytes and returns raw bytes.
 /// This allows the function to examine the event record and modify it if needed.
@@ -83,7 +90,7 @@ pub fn process_trace_file(
 ) -> Result<Vec<String>> {
     let mut warning_list = Vec::new();
 
-    let symbolizer = if symbolize { Some(Symbolizer::new(&context)) } else { None };
+    let mut symbolizer = if symbolize { Some(Symbolizer::new(&context)) } else { None };
     let mut category_counter = if let Some(input_categories) = category_check {
         Some(CategoryCounter::new(input_categories))
     } else {
@@ -95,7 +102,7 @@ pub fn process_trace_file(
 
     // Process all of the event records.
     let mut modified = false;
-    let trace: Vec<u8> = process_event_records(trace, |event_record, parsed_bytes| {
+    let mut trace: Vec<u8> = process_event_records(trace, |event_record, parsed_bytes| {
         // This closure runs over every event record.
 
         // Count the event categories.
@@ -104,7 +111,7 @@ pub fn process_trace_file(
         }
 
         // Symbolize FIDL IPC traces.
-        if let Some(symbolizer) = &symbolizer {
+        if let Some(symbolizer) = &mut symbolizer {
             symbolizer.symbolize_event_record(&event_record, parsed_bytes, &mut modified)
         } else {
             parsed_bytes
@@ -132,6 +139,48 @@ pub fn process_trace_file(
         }
     }
 
+    // Fix-up two-way method traces so that the round-trips are a single flow.
+    // For channel_call the kernel takes care of this, for async IPC we do it now.
+    if let Some(symbolizer) = symbolizer {
+        // We can ignore any flows that have steps because the kernel's already taken care of it.
+        let mut flow_state: BTreeMap<u64, Option<CallState>> = BTreeMap::from_iter(
+            symbolizer.flow_has_steps.iter().filter_map(|(flow_id, has_steps)| {
+                if *has_steps {
+                    None
+                } else {
+                    Some((*flow_id, None))
+                }
+            }),
+        );
+
+        // If there are flows to fix up then run through the trace again:
+        if !flow_state.is_empty() {
+            trace = process_event_records(trace, |event_record, mut parsed_bytes| {
+                // If this is a flow event...
+                if let Some((flow_id, flow_stage)) = event_flow_info(&event_record) {
+                    // If this is a flow event for a flow we care about...
+                    if let Some(call_state) = flow_state.get_mut(&flow_id) {
+                        // Flows with steps should have been excluded above...
+                        assert_ne!(flow_stage, FlowStage::Step,);
+
+                        let call_state = call_state.get_or_insert_with(||
+                            // Guess the initial state...
+                            if flow_stage == FlowStage::Begin { CallState::WriteRequest } else { CallState::ReadResponse }
+                        );
+
+                        if matches!(call_state, CallState::ReadRequest | CallState::WriteResponse) {
+                            // These should turn into FlowStep records.
+                            parsed_bytes = flow_event_into_flow_step(&parsed_bytes, flow_id)
+                                .expect("modifying flow event");
+                        }
+                        *call_state = call_state.next();
+                    }
+                }
+                parsed_bytes
+            })?;
+        }
+    }
+
     // Write the trace if there's a different output path specified or if the processing actually modified the trace.
     if trace_file.as_ref() != outfile.as_ref() || modified {
         std::fs::write(outfile, trace)?;
@@ -139,26 +188,84 @@ pub fn process_trace_file(
     Ok(warning_list)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CallState {
+    WriteRequest,
+    ReadRequest,
+    WriteResponse,
+    ReadResponse,
+}
+impl CallState {
+    fn next(&self) -> Self {
+        use CallState::*;
+        match self {
+            WriteRequest => ReadRequest,
+            ReadRequest => WriteResponse,
+            WriteResponse => ReadResponse,
+            ReadResponse => WriteRequest,
+        }
+    }
+}
+
+/// Determine if this flow id is for a message with a txid.
+/// See: //zircon/kernel/object/channel_dispatcher.cc
+fn is_two_way_message(flow_id: u64) -> bool {
+    (flow_id >> 31) & 1 == 1
+}
+
+#[derive(PartialEq, Debug, Eq)]
+enum FlowStage {
+    Begin,
+    Step,
+    End,
+}
+
+/// Extract the flow id and stage from an event record, if it holds a flow event.
+fn event_flow_info(event_record: &fxt::EventRecord) -> Option<(u64, FlowStage)> {
+    use FlowStage::*;
+    match event_record.payload {
+        fxt::EventPayload::FlowBegin { id } => Some((id, Begin)),
+        fxt::EventPayload::FlowStep { id } => Some((id, Step)),
+        fxt::EventPayload::FlowEnd { id } => Some((id, End)),
+        _ => None,
+    }
+}
+
 /// Implements FIDL method symbolization for IPC traces.
 pub struct Symbolizer {
     ordinals: SymbolizationMap,
+    flow_has_steps: BTreeMap<u64, bool>,
 }
 
 impl Symbolizer {
     pub fn new(context: &EnvironmentContext) -> Self {
         let ordinals = SymbolizationMap::from_context(context).unwrap_or_default();
-        Self { ordinals }
+        Self { ordinals, flow_has_steps: BTreeMap::new() }
     }
 
     /// Apply FIDL method name symbolization to an event record.
     /// If the record was modified then set the modified reference.
     fn symbolize_event_record(
-        &self,
+        &mut self,
         event_record: &fxt::EventRecord,
         parsed_bytes: Vec<u8>,
         modified: &mut bool,
     ) -> Vec<u8> {
         if event_record.category.as_str() == "kernel:ipc" {
+            // Count how many times we've seen flow begin, step and end for two-way messages.
+            if let Some((flow_id, flow_stage)) = event_flow_info(&event_record) {
+                if is_two_way_message(flow_id) {
+                    // If we see a flow message make sure that we have an entry for its flow id.
+                    let flow_has_steps = self.flow_has_steps.entry(flow_id).or_default();
+
+                    // If it's a FlowStep message record that.
+                    if flow_stage == FlowStage::Step {
+                        *flow_has_steps = true;
+                    }
+                }
+            }
+
+            // Attach method names to DurationBegin events with ordinals.
             for arg in &event_record.args {
                 match arg {
                     Arg { name, value: ArgValue::Unsigned64(ord) }
