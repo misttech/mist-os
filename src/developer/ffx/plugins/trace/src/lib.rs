@@ -6,6 +6,7 @@ use anyhow::{anyhow, Result};
 use errors::ffx_bail;
 use ffx_config::EnvironmentContext;
 use ffx_target::get_target_specifier;
+use ffx_trace::SymbolizationMap;
 use ffx_trace_args::{TraceCommand, TraceSubCommand};
 use ffx_writer::{MachineWriter, ToolIO as _};
 use fho::{deferred, FfxMain, FfxTool};
@@ -282,53 +283,10 @@ impl TraceProcessor {
     }
 }
 
-fn generate_symbolization_map(ir_files: Vec<String>) -> (HashMap<u64, String>, Vec<String>) {
-    let mut ord_fn_map = HashMap::new();
-    let mut warnings = vec![];
-    // Scan through the list of ir files and look for the provided ordinal in the json contents.
-    for ir_file in ir_files {
-        let json_string = match std::fs::read_to_string(ir_file.clone()) {
-            Ok(content) => content,
-            Err(e) => {
-                warnings.push(format!("WARNING: Failed to read {ir_file}. Reason: {e}"));
-                continue;
-            }
-        };
-        let fidl_json: serde_json::Value = match serde_json::from_str(&json_string) {
-            Ok(serialized_json) => serialized_json,
-            Err(_) => {
-                warnings.push(format!("WARNING: Failed to parse json in IR file {ir_file}"));
-                continue;
-            }
-        };
-        let Some(protocols) = fidl_json["protocol_declarations"].as_array() else {
-            continue;
-        };
-        for protocol in protocols {
-            // Protocol should have a name, but it is missing for some reason.
-            let protocol_name = protocol["name"].as_str().unwrap_or("-");
-            let Some(methods) = protocol["methods"].as_array() else {
-                continue;
-            };
-            for method in methods {
-                let Some(method_ordinal) = method["ordinal"].as_u64() else {
-                    continue;
-                };
-                let method_name = method["name"].as_str().unwrap_or("-");
-                ord_fn_map.insert(method_ordinal, format!("{protocol_name}.{method_name}"));
-            }
-        }
-    }
-    (ord_fn_map, warnings)
-}
-
-fn symbolize_ordinal(ordinal: u64, ir_files: Vec<String>, mut writer: Writer) -> Result<()> {
-    let (fidl_ordinal_map, warnings) = generate_symbolization_map(ir_files);
-    for warning in warnings {
-        writer.line(warning)?;
-    }
-    if fidl_ordinal_map.contains_key(&ordinal) {
-        writer.line(format!("{} -> {}", ordinal, fidl_ordinal_map[&ordinal]))?;
+fn symbolize_ordinal(ordinal: u64, ordinals: &SymbolizationMap, mut writer: Writer) -> Result<()> {
+    if let Some(name) = ordinals.get(ordinal) {
+        // If the ordinal is present in the symbolization map print the name associated with it.
+        writer.line(format!("{} -> {}", ordinal, name))?;
     } else {
         writer.line(format!(
             "Unable to symbolize ordinal {}. This could be because either:",
@@ -386,17 +344,15 @@ pub fn symbolize_fidl_call<'a>(bytes: &[u8], ordinal: u64, method: &'a str) -> R
 
 struct Symbolizer {
     output_file: LineWriter<File>,
-    ord_map: HashMap<u64, String>,
+    ordinals: SymbolizationMap,
 }
 
 impl Symbolizer {
     fn new(outfile: &str, context: &EnvironmentContext) -> Self {
         let file = std::fs::File::create(outfile).unwrap();
-        let output_file = LineWriter::new(file);
-        let (ord_map, _) =
-            generate_symbolization_map(ffx_trace::ir_files_list(context).unwrap_or_default());
-
-        Self { output_file: output_file, ord_map: ord_map }
+        let output_file: LineWriter<File> = LineWriter::new(file);
+        let ordinals = SymbolizationMap::from_context(context).unwrap_or_default();
+        Self { output_file: output_file, ordinals }
     }
 
     fn symbolize_and_write_record(
@@ -413,11 +369,14 @@ impl Symbolizer {
                     match arg {
                         Arg { name, value: ArgValue::Unsigned64(ord) }
                             if name.as_str() == ORDINAL_ARG_NAME
-                                && self.ord_map.contains_key(&ord) =>
+                                && self.ordinals.contains_key(ord) =>
                         {
-                            parsed_bytes =
-                                symbolize_fidl_call(&parsed_bytes, ord, self.ord_map[&ord].as_str())
-                                    .unwrap_or(parsed_bytes)
+                            parsed_bytes = symbolize_fidl_call(
+                                &parsed_bytes,
+                                ord,
+                                self.ordinals.get(ord).unwrap(),
+                            )
+                            .unwrap_or(parsed_bytes)
                         }
                         _ => continue,
                     }
@@ -637,17 +596,18 @@ pub async fn trace(
                 processor.run()?;
                 writer.line(format!("Symbolized traces written to {outfile}"))?;
             } else if let Some(ordinal) = opts.ordinal {
-                let mut all_ir_files = opts.ir_path.clone();
-                let build_ir_files = match ffx_trace::ir_files_list(&context) {
-                    None => {
-                        writer.line("Unable to read list of FIDL IR files from $FUCHSIA_BUILD_DIR/all_fidl_json.txt.")?;
-                        writer.line("Only input IR files will be searched.")?;
-                        vec![]
+                let mut ordinals = match SymbolizationMap::from_context(&context) {
+                    Ok(ordinals) => ordinals,
+                    Err(err) => {
+                        writer.line(format!("Unable to load FIDL symbolization map: {}", err))?;
+                        SymbolizationMap::default()
                     }
-                    Some(ir_files) => ir_files,
                 };
-                all_ir_files.extend(build_ir_files);
-                symbolize_ordinal(ordinal, all_ir_files, writer)?;
+                for ir_file in opts.ir_path {
+                    ordinals.add_ir_file(ir_file)?;
+                }
+
+                symbolize_ordinal(ordinal, &ordinals, writer)?;
             } else {
                 ffx_bail!("Either ordinal or trace file must be provided to symbolize");
             }
@@ -1128,6 +1088,7 @@ mod tests {
                         {
                             "ordinal": 12345678,
                             "name": "fake_method_name",
+                            "is_composed": false,
                         },
                     ],
                 },
