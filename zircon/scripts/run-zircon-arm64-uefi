@@ -13,7 +13,7 @@ DISK=$DIR/../../out/default/obj/build/images/disk.raw
 
 ${QEMU} \
   -cpu max -smp 1 -m 512 \
-  -machine virt-2.12 \
+  -machine virt-9.2,highmem-ecam=off \
   -nographic \
   -bios ${UEFI} \
   -drive file=${DISK},format=raw,id=mydisk,if=none \

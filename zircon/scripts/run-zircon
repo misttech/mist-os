@@ -508,7 +508,8 @@ case $ARCH in
         # Ask for a specific virt machine version.
         # TODO(https://fxbug.dev/42131826) add support for high PCIe aperture
         # Can switch to plain 'virt' once this is fixed.
-        MACHINEARG="virt-2.12"
+        # The highmem-ecam argument functions as a workaround until then.
+        MACHINEARG="virt-9.2,highmem-ecam=off"
         # append a gic version to the machine specifier
         if [[ $GIC != 0 ]]; then
             MACHINEARG+=",gic-version=${GIC}"
