@@ -91,7 +91,7 @@ pub struct RawEventRecord<'a> {
     process: ProcessRef,
     thread: ThreadRef,
     category: StringRef<'a>,
-    name: StringRef<'a>,
+    pub name: StringRef<'a>,
     pub args: Vec<RawArg<'a>>,
     payload: EventPayload<Ticks>,
 }

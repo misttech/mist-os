@@ -316,6 +316,7 @@ impl Symbolizer {
 fn symbolize_fidl_call<'a>(bytes: &[u8], ordinal: u64, method: &'a str) -> Vec<u8> {
     let (_, mut raw_event_record) =
         RawEventRecord::parse(bytes).expect("Unable to parse event record");
+    raw_event_record.name = StringRef::Inline(method);
     let mut new_args = vec![];
     for arg in &raw_event_record.args {
         if let &RawArgValue::Unsigned64(arg_value) = &arg.value {
