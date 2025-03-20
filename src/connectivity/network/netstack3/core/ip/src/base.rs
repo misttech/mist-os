@@ -33,15 +33,16 @@ use netstack3_base::{
     AnyDevice, BroadcastIpExt, CoreTimerContext, Counter, CounterContext, DeviceIdContext,
     DeviceIdentifier as _, DeviceWithName, ErrorAndSerializer, EventContext, FrameDestination,
     HandleableTimer, Inspectable, Inspector, InspectorExt as _, InstantContext, IpAddressId,
-    IpDeviceAddr, IpDeviceAddressIdContext, IpExt, Marks, Matcher as _, NestedIntoCoreTimerCtx,
-    NotFoundError, RngContext, SendFrameErrorReason, StrongDeviceIdentifier, TimerBindingsTypes,
-    TimerContext, TimerHandler, TxMetadataBindingsTypes, WeakIpAddressId, WrapBroadcastMarker,
+    IpDeviceAddr, IpDeviceAddressIdContext, IpExt, MarkDomain, Marks, Matcher as _,
+    NestedIntoCoreTimerCtx, NotFoundError, RngContext, SendFrameErrorReason,
+    StrongDeviceIdentifier, TimerBindingsTypes, TimerContext, TimerHandler,
+    TxMetadataBindingsTypes, WeakIpAddressId, WrapBroadcastMarker,
 };
 use netstack3_filter::{
     self as filter, ConnectionDirection, ConntrackConnection, FilterBindingsContext,
     FilterBindingsTypes, FilterHandler as _, FilterIpContext, FilterIpExt, FilterIpMetadata,
-    FilterTimerId, ForwardedPacket, IngressVerdict, IpPacket, TransportPacketSerializer, Tuple,
-    WeakConnectionError, WeakConntrackConnection,
+    FilterMarkMetadata, FilterTimerId, ForwardedPacket, IngressVerdict, IpPacket, MarkAction,
+    TransportPacketSerializer, Tuple, WeakConnectionError, WeakConntrackConnection,
 };
 use packet::{
     Buf, BufferAlloc, BufferMut, GrowBuffer, PacketConstraints, ParseBufferMut, ParseMetadata,
@@ -341,6 +342,14 @@ impl<I: packet_formats::ip::IpExt, A, BT: FilterBindingsTypes + TxMetadataBindin
         direction: ConnectionDirection,
     ) -> Option<ConntrackConnection<I, A, BT>> {
         self.conntrack_connection_and_direction.replace((conn, direction)).map(|(conn, _dir)| conn)
+    }
+}
+
+impl<I: packet_formats::ip::IpExt, A, BT: FilterBindingsTypes + TxMetadataBindingsTypes>
+    FilterMarkMetadata for IpLayerPacketMetadata<I, A, BT>
+{
+    fn apply_mark_action(&mut self, domain: MarkDomain, action: MarkAction) {
+        action.apply(self.marks.get_mut(domain))
     }
 }
 

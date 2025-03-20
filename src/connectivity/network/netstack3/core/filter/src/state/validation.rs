@@ -125,7 +125,7 @@ impl<I: IpExt, DeviceClass: Clone + Debug> ValidRoutines<I, DeviceClass> {
         validate_hook(
             &ingress,
             &[UnavailableMatcher::OutInterface],
-            &[UnavailableAction::Masquerade],
+            &[UnavailableAction::Masquerade, UnavailableAction::Mark],
         )?;
         validate_hook(
             &local_ingress,
@@ -134,17 +134,26 @@ impl<I: IpExt, DeviceClass: Clone + Debug> ValidRoutines<I, DeviceClass> {
                 UnavailableAction::TransparentProxy,
                 UnavailableAction::Redirect,
                 UnavailableAction::Masquerade,
+                UnavailableAction::Mark,
             ],
         )?;
         validate_hook(
             &egress,
             &[UnavailableMatcher::InInterface],
-            &[UnavailableAction::TransparentProxy, UnavailableAction::Redirect],
+            &[
+                UnavailableAction::TransparentProxy,
+                UnavailableAction::Redirect,
+                UnavailableAction::Mark,
+            ],
         )?;
         validate_hook(
             &local_egress,
             &[UnavailableMatcher::InInterface],
-            &[UnavailableAction::TransparentProxy, UnavailableAction::Masquerade],
+            &[
+                UnavailableAction::TransparentProxy,
+                UnavailableAction::Masquerade,
+                UnavailableAction::Mark,
+            ],
         )?;
 
         let mut index = UninstalledRoutineIndex::default();
@@ -182,6 +191,7 @@ enum UnavailableAction {
     TransparentProxy,
     Redirect,
     Masquerade,
+    Mark,
 }
 
 impl UnavailableAction {
@@ -193,7 +203,8 @@ impl UnavailableAction {
         match (self, action) {
             (UnavailableAction::TransparentProxy, Action::TransparentProxy(_))
             | (UnavailableAction::Redirect, Action::Redirect { .. })
-            | (UnavailableAction::Masquerade, Action::Masquerade { .. }) => {
+            | (UnavailableAction::Masquerade, Action::Masquerade { .. })
+            | (UnavailableAction::Mark, Action::Mark { .. }) => {
                 Err(ValidationError::RuleWithInvalidAction(rule.clone()))
             }
             _ => Ok(()),
@@ -254,7 +265,7 @@ fn validate_routine<I: IpExt, DeviceClass, RuleInfo: Clone>(
         };
 
         match action {
-            Action::Accept | Action::Drop | Action::Return => {}
+            Action::Accept | Action::Drop | Action::Return | Action::Mark { .. } => {}
             Action::TransparentProxy(_) => {
                 // TransparentProxy is only valid in a rule that matches on
                 // either TCP or UDP.
@@ -431,6 +442,7 @@ impl<I: IpExt, DeviceClass: Clone + Debug, RuleInfo: Clone> Action<I, DeviceClas
             Self::TransparentProxy(proxy) => Action::TransparentProxy(proxy),
             Self::Redirect { dst_port } => Action::Redirect { dst_port },
             Self::Masquerade { src_port } => Action::Masquerade { src_port },
+            Self::Mark { domain, action } => Action::Mark { domain, action },
             Self::Jump(target) => {
                 let converted = index.get_or_insert_with(target.clone(), |index| {
                     // Recursively strip debug info from the target routine.

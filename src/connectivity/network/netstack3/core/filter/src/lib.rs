@@ -9,6 +9,7 @@
 
 extern crate fakealloc as alloc;
 
+mod actions;
 mod api;
 mod conntrack;
 mod context;
@@ -22,6 +23,7 @@ use logic::nat::NatConfig;
 /// A connection as tracked by conntrack.
 pub type ConntrackConnection<I, A, BT> = conntrack::Connection<I, NatConfig<I, A>, BT>;
 
+pub use actions::MarkAction;
 pub use api::FilterApi;
 pub use conntrack::{
     ConnectionDirection, Table, TransportProtocol, Tuple,
@@ -43,8 +45,8 @@ pub use packets::{
 };
 pub use state::validation::{ValidRoutines, ValidationError};
 pub use state::{
-    Action, FilterIpMetadata, Hook, IpRoutines, NatRoutines, Routine, Routines, Rule, State,
-    TransparentProxy, UninstalledRoutine,
+    Action, FilterIpMetadata, FilterMarkMetadata, Hook, IpRoutines, NatRoutines, Routine, Routines,
+    Rule, State, TransparentProxy, UninstalledRoutine,
 };
 
 /// Testing-related utilities for use by other crates.

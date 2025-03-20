@@ -11,6 +11,7 @@ rustc_library_with_features("netstack3-filter") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
   check_cfgs = [ "test" ]
   sources = [
+    "src/actions.rs",
     "src/api.rs",
     "src/conntrack.rs",
     "src/conntrack/tcp.rs",
