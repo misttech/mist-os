@@ -45,6 +45,58 @@ enum DriveStrength {
   DRV_4000UA,
 };
 
+template <typename FidlType>
+fpromise::promise<void, zx_status_t> InitMetadataServer(
+    fdf_metadata::MetadataServer<FidlType>& metadata_server,
+    fidl::WireClient<fuchsia_hardware_platform_device::Device>& pdev,
+    fdf::OutgoingDirectory& outgoing) {
+  fpromise::bridge<void, zx_status_t> bridge;
+
+  pdev->GetMetadata(FidlType::kSerializableName)
+      .Then([&metadata_server, &outgoing,
+             completer = std::move(bridge.completer)](auto& persisted_metadata) mutable {
+        if (zx::result result =
+                metadata_server.Serve(outgoing, fdf::Dispatcher::GetCurrent()->async_dispatcher());
+            result.is_error()) {
+          FDF_LOG(ERROR, "Failed to serve metadata server: %s", result.status_string());
+          return completer.complete_error(result.status_value());
+          return;
+        }
+
+        if (!persisted_metadata.ok()) {
+          FDF_LOG(ERROR, "Failed to send GetMetadata request: %s",
+                  persisted_metadata.status_string());
+          return completer.complete_error(persisted_metadata.status());
+        }
+        if (persisted_metadata->is_error()) {
+          if (persisted_metadata->error_value() == ZX_ERR_NOT_FOUND) {
+            FDF_LOG(DEBUG, "Not forwarding metadata: Metadata not found");
+            return completer.complete_ok();
+          }
+          FDF_LOG(ERROR, "Failed to get metadata: %s",
+                  zx_status_get_string(persisted_metadata->error_value()));
+          return completer.complete_error(persisted_metadata->error_value());
+        }
+
+        fit::result metadata =
+            fidl::Unpersist<FidlType>(persisted_metadata.value()->metadata.get());
+        if (metadata.is_error()) {
+          FDF_LOG(ERROR, "Failed to unpersist metadata: %s",
+                  zx_status_get_string(metadata.error_value().status()));
+          return completer.complete_error(metadata.error_value().status());
+        }
+
+        if (zx::result result = metadata_server.SetMetadata(metadata.value()); result.is_error()) {
+          FDF_LOG(ERROR, "Failed to set metadata for metadata server: %s", result.status_string());
+          return completer.complete_error(result.status_value());
+        }
+
+        completer.complete_ok();
+      });
+
+  return bridge.consumer.promise_or(fpromise::error(ZX_ERR_INTERNAL));
+}
+
 }  // namespace
 
 namespace gpio {
@@ -56,52 +108,6 @@ enum {
   MMIO_GPIO_INTERRUPTS = 2,
   MMIO_COUNT,
 };
-
-fpromise::promise<void, zx_status_t> AmlGpioDriver::InitMetadataServer() {
-  fpromise::bridge<void, zx_status_t> bridge;
-
-  pdev_->GetMetadata(fuchsia_hardware_pinimpl::Metadata::kSerializableName)
-      .Then([this, completer = std::move(bridge.completer)](auto& encoded_metadata) mutable {
-        if (zx::result result = metadata_server_.Serve(*outgoing(), dispatcher());
-            result.is_error()) {
-          FDF_LOG(ERROR, "Failed to serve metadata server: %s", result.status_string());
-          return completer.complete_error(result.status_value());
-          return;
-        }
-
-        if (!encoded_metadata.ok()) {
-          FDF_LOG(ERROR, "Failed to send GetMetadata request: %s",
-                  encoded_metadata.status_string());
-          return completer.complete_error(encoded_metadata.status());
-        }
-        if (encoded_metadata->is_error()) {
-          if (encoded_metadata->error_value() == ZX_ERR_NOT_FOUND) {
-            FDF_LOG(DEBUG, "Not forwarding metadata: Metadata not found");
-            return completer.complete_ok();
-          }
-          FDF_LOG(ERROR, "Failed to get metadata: %s",
-                  zx_status_get_string(encoded_metadata->error_value()));
-          return completer.complete_error(encoded_metadata->error_value());
-        }
-
-        fit::result metadata = fidl::Unpersist<fuchsia_hardware_pinimpl::Metadata>(
-            encoded_metadata.value()->metadata.get());
-        if (metadata.is_error()) {
-          FDF_LOG(ERROR, "Failed to unpersist metadata: %s",
-                  zx_status_get_string(metadata.error_value().status()));
-          return completer.complete_error(metadata.error_value().status());
-        }
-
-        if (zx::result result = metadata_server_.SetMetadata(metadata.value()); result.is_error()) {
-          FDF_LOG(ERROR, "Failed to set metadata for metadata server: %s", result.status_string());
-          return completer.complete_error(result.status_value());
-        }
-
-        completer.complete_ok();
-      });
-
-  return bridge.consumer.promise_or(fpromise::error(ZX_ERR_INTERNAL));
-}
 
 fpromise::promise<void, zx_status_t> AmlGpioDriver::InitCompatServer() {
   fpromise::bridge<void, zx_status_t> bridge;
@@ -117,6 +123,8 @@ fpromise::promise<void, zx_status_t> AmlGpioDriver::InitCompatServer() {
 
         completer.complete_ok();
       },
+      // TODO(b/395140408): Don't forward DEVICE_METADATA_SCHEDULER_ROLE_NAME once no longer
+      // retrieved.
       compat::ForwardMetadata::Some({DEVICE_METADATA_SCHEDULER_ROLE_NAME}));
 
   return bridge.consumer.promise_or(fpromise::error(ZX_ERR_INTERNAL));
@@ -136,11 +144,15 @@ void AmlGpioDriver::Start(fdf::StartCompleter completer) {
   }
 
   auto task =
-      fpromise::join_promises(InitCompatServer(), InitResources(), InitMetadataServer())
+      fpromise::join_promises(
+          InitCompatServer(), InitResources(),
+          InitMetadataServer(pin_metadata_server_, pdev_, *outgoing()),
+          InitMetadataServer(scheduler_role_name_metadata_server_, pdev_, *outgoing()))
           .then([this, completer = std::move(completer)](
                     fpromise::result<std::tuple<
                         fpromise::result<void, zx_status_t>, fpromise::result<void, zx_status_t>,
-                        fpromise::result<void, zx_status_t>>>& results) mutable {
+                        fpromise::result<void, zx_status_t>, fpromise::result<void, zx_status_t>>>&
+                        results) mutable {
             if (results.is_error()) {
               FDF_LOG(ERROR, "One of the promises abandoned its completer");
               return completer(zx::error(ZX_ERR_INTERNAL));
@@ -167,7 +179,16 @@ void AmlGpioDriver::Start(fdf::StartCompleter completer) {
             {
               fpromise::result result = std::get<2>(results.value());
               if (result.is_error()) {
-                FDF_LOG(ERROR, "Failed to initialize metadata server: %s",
+                FDF_LOG(ERROR, "Failed to initialize pin metadata server: %s",
+                        zx_status_get_string(result.error()));
+                return completer(zx::error(result.error()));
+              }
+            }
+
+            {
+              fpromise::result result = std::get<3>(results.value());
+              if (result.is_error()) {
+                FDF_LOG(ERROR, "Failed to initialize scheduler role name metadata server: %s",
                         zx_status_get_string(result.error()));
                 return completer(zx::error(result.error()));
               }
@@ -387,7 +408,8 @@ void AmlGpioDriver::AddNode(fdf::StartCompleter completer) {
   std::vector offers = compat_server_.CreateOffers2(arena);
   offers.push_back(
       fdf::MakeOffer2<fuchsia_hardware_pinimpl::Service>(arena, component::kDefaultInstance));
-  offers.push_back(metadata_server_.MakeOffer(arena));
+  offers.push_back(pin_metadata_server_.MakeOffer(arena));
+  offers.push_back(scheduler_role_name_metadata_server_.MakeOffer(arena));
 
   const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                         .name(arena, name())
