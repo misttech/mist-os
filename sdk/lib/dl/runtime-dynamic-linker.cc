@@ -128,7 +128,7 @@ std::unique_ptr<RuntimeDynamicLinker> RuntimeDynamicLinker::Create(const ld::abi
     }
     size_t max_static_tls_modid = abi.static_tls_modules.size();
     dynamic_linker->max_static_tls_modid_ = max_static_tls_modid;
-    dynamic_linker->next_tls_modid_ = max_static_tls_modid + 1;
+    dynamic_linker->max_tls_modid_ = max_static_tls_modid;
   }
 
   return result(std::move(dynamic_linker));

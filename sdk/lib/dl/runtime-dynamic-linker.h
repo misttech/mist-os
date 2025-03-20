@@ -113,22 +113,28 @@ class RuntimeDynamicLinker {
 
     // A Module for `file` does not yet exist; create a new LinkingSession
     // to perform the loading and linking of the file and all its dependencies.
-    LinkingSession<Loader> linking_session{modules_, max_static_tls_modid_};
+    LinkingSession<Loader> linking_session{modules_, max_static_tls_modid_, max_tls_modid_};
 
     if (!linking_session.Link(diag, name, std::forward<RetrieveFile>(retrieve_file))) {
       return diag.take_error();
     }
 
     // Commit the linking session and its mapped modules.
-    auto pending_modules = std::move(linking_session).Commit();
+    LinkingResult result = std::move(linking_session).Commit();
+
+    // The max_tls_modid from the LinkingResult should be an updated counter
+    // of any new TLS modules that were loaded.
+    assert(result.max_tls_modid >= max_tls_modid_);
+    assert(result.max_tls_modid >= max_static_tls_modid_);
+    max_tls_modid_ = result.max_tls_modid;
 
     // Obtain a reference to the root module for the dlopen-ed file to return
     // back to the caller.
-    RuntimeModule& root_module = pending_modules.front();
+    RuntimeModule& root_module = result.loaded_modules.front();
 
     // After successful loading and relocation, append the new permanent modules
     // created by the linking session to the dynamic linker's module list.
-    AddNewModules(std::move(pending_modules));
+    AddNewModules(std::move(result.loaded_modules));
 
     // If RTLD_GLOBAL was passed, make the module and all of its dependencies
     // global. This is done after modules from the linking session have been
@@ -157,7 +163,8 @@ class RuntimeDynamicLinker {
   size_t DynamicTlsCount() const {
     // TODO(https://fxbug.dev/342480690): Hard-code for the test that loads one
     // module with a PT_TLS segment.  The proper bookkeeping for this is not
-    // yet in place.
+    // yet in place. Uncomment this when libdl's new TlsDescResolver is wired in.
+    // return max_tls_modid_ - max_static_tls_modid_;
     return 1;
   }
 
@@ -200,10 +207,11 @@ class RuntimeDynamicLinker {
   // during relocation.
   size_type max_static_tls_modid_ = 0;
 
-  // The next TLS modid is the modid that will be assigned to a TLS module when
-  // it is loaded. This gets set to max_static_tls_modid_ + 1 when startup TLS
-  // modules are loaded and gets incremented when a new TLS module is dlopen-ed.
-  size_type next_tls_modid_ = 0;
+  // The maximum TLS modid assigned to a module in modules_. This value
+  // describes the number of static and dynamic TLS modules that are currently
+  // loaded. This gets set to max_static_tls_modid_ when startup TLS modules are
+  // loaded and gets incremented when a new dynamic TLS module is dlopen-ed.
+  size_type max_tls_modid_ = 0;
 
   // This is incremented every time a module is loaded into the system. This
   // number only ever increases and includes startup modules.

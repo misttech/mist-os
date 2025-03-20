@@ -20,6 +20,18 @@
 
 namespace dl {
 
+using size_type = Elf::size_type;
+
+// This is the result returned by a successful LinkingSession once it has been
+// committed (see LinkingSession::Commit).
+struct LinkingResult {
+  // The list of modules loaded by the LinkingSession.
+  ModuleList loaded_modules;
+  // The updated max TLS modid: this value is incremented for every new module
+  // that is loaded and defines a TLS variable. The
+  size_type max_tls_modid;
+};
+
 // A LinkingSession encapsulates the decoding, loading, relocation and creation
 // of RuntimeModules from a single dlopen call. A LinkingSession instance only
 // lives as long as the dlopen call, and a successful LinkingSession will
@@ -27,17 +39,20 @@ namespace dl {
 template <class Loader>
 class LinkingSession {
  public:
-  using size_type = Elf::size_type;
-
   // Not copyable, not movable.
   LinkingSession(const LinkingSession&) = delete;
   LinkingSession(LinkingSession&&) = delete;
 
+  // TODO(https://fxbug.dev/342480690): Have the LinkingSession take a reference
+  // to the RuntimeDynamicLinker instead of separate fields.
   // A LinkingSession is provided a reference to the dynamic linker's list of
   // already loaded modules to refer to during the linking procedure, and the
   // max static TLS module id from the passive ABI to use for TLS resolution.
-  explicit LinkingSession(const ModuleList& loaded_modules, size_type max_static_tls_modid)
-      : loaded_modules_(loaded_modules), tls_desc_resolver_(max_static_tls_modid) {}
+  explicit LinkingSession(const ModuleList& loaded_modules, size_type max_static_tls_modid,
+                          size_type max_tls_modid)
+      : loaded_modules_(loaded_modules),
+        tls_desc_resolver_(max_static_tls_modid),
+        max_tls_modid_(max_tls_modid) {}
 
   ~LinkingSession() = default;
 
@@ -55,8 +70,11 @@ class LinkingSession {
   // The caller calls Commit() to finalize the LinkingSession after it has
   // loaded and linked all the modules needed for a single dlopen call. This
   // will transfer ownership of the RuntimeModules created during this session
-  // to the caller.
-  ModuleList Commit() && { return std::move(runtime_modules_); }
+  // and provide an updated max_tls_modid in the LinkingResult returned back to
+  // the caller.
+  LinkingResult Commit() && {
+    return {.loaded_modules = std::move(runtime_modules_), .max_tls_modid = max_tls_modid_};
+  }
 
  private:
   // Forward declaration; see definition below.
@@ -120,7 +138,7 @@ class LinkingSession {
         return fit::error(true);
       }
 
-      if (auto dep_names = module.Load(diag, *std::move(file))) {
+      if (auto dep_names = module.Load(diag, *std::move(file), max_tls_modid_)) {
         // Create and enqueue a module for each dependency, skipping
         // dependencies that have already been enqueued. The module that was
         // loaded will also store a reference to the dependency's RuntimeModule
@@ -256,6 +274,13 @@ class LinkingSession {
   // TODO(https://fxbug.dev/342480690): Support Dynamic TLS.
   // The resolver used for TLSDESC relocations.
   const TlsDescResolver tls_desc_resolver_;
+
+  // This is the max TLS modid value provided by the dynamic linker when this
+  // LinkingSession was created. This value gets incremented and assigned to
+  // each new TLS module that is loaded as a part of this LinkingSession. The
+  // updated max_tls_modid_ is returned back to the dynamic linker in the
+  // LinkingResult from the LinkingSession::Commit.
+  size_type max_tls_modid_;
 };
 
 // SessionModule is the temporary data structure created to load a file and
@@ -292,7 +317,7 @@ class LinkingSession<Loader>::SessionModule
   // the the ABI module. A vector of Soname objects of the module's DT_NEEDEDs
   // are returned to the caller.
   template <class File>
-  std::optional<Vector<Soname>> Load(Diagnostics& diag, File&& file) {
+  std::optional<Vector<Soname>> Load(Diagnostics& diag, File&& file, size_type& max_tls_modid) {
     // Read the file header and program headers into stack buffers and map in
     // the image.  This fills in load_info() as well as the module vaddr bounds
     // and phdrs fields.
@@ -302,11 +327,12 @@ class LinkingSession<Loader>::SessionModule
       return {};
     }
 
+    // TODO(https://fxbug.dev/342480690) Use the passed in max_tls_modid when
+    // libldl's new TlsDescResolver is wired in.
+    size_t tmp_max_tls_modid = 0;
     Vector<size_type> needed_offsets;
-    // TODO(https://fxbug.dev/331421403): TLS is not supported yet.
-    size_type max_tls_modid = 0;
     if (!decoded().DecodeFromMemory(  //
-            diag, loader.memory(), loader.page_size(), *headers, max_tls_modid,
+            diag, loader.memory(), loader.page_size(), *headers, tmp_max_tls_modid,
             elfldltl::DynamicRelocationInfoObserver(decoded().reloc_info()),
             elfldltl::DynamicInitObserver(decoded().module().init),
             elfldltl::DynamicFiniObserver(decoded().module().fini),
