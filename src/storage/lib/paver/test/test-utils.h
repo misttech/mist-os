@@ -8,12 +8,15 @@
 #include <fidl/fuchsia.boot/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
 #include <fidl/fuchsia.sysinfo/cpp/wire.h>
+#include <lib/arch/zbi.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fzl/vmo-mapper.h>
+#include <lib/zbi-format/zbi.h>
 
 #include <memory>
 
+#include <fbl/array.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/unique_fd.h>
 #include <ramdevice-client-test/ramnandctl.h>
@@ -231,5 +234,19 @@ class FakeBootArgs : public fidl::WireServer<fuchsia_boot::Arguments> {
   bool astro_sysconfig_abr_wear_leveling_ = false;
   std::unordered_map<std::string, std::string> string_args_;
 };
+
+// Allocates a valid-looking ZBI header, and give it some basic defaults.
+//
+// This is useful when attempting to pave a Kernel asset, in order to pass the
+// verification checks.
+//
+// If "span" is non-null, it will be initialized with a span covering
+// the allocated data.
+//
+// If "result_header" is non-null, it will point to the beginning of the
+// uint8_t. It must not outlive the returned fbl::Array object.
+fbl::Array<uint8_t> CreateZbiHeader(paver::Arch arch, size_t payload_size,
+                                    arch::ZbiKernelImage** result_header,
+                                    std::span<uint8_t>* span = nullptr);
 
 #endif  // SRC_STORAGE_LIB_PAVER_TEST_TEST_UTILS_H_

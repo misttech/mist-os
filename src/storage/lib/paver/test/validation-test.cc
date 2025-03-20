@@ -8,60 +8,16 @@
 #include <lib/zbi-format/zbi.h>
 #include <zircon/errors.h>
 
-#include <memory>
 #include <span>
-#include <vector>
 
-#include <fbl/array.h>
 #include <zxtest/zxtest.h>
 
 #include "src/storage/lib/paver/device-partitioner.h"
 #include "src/storage/lib/paver/test/test-utils.h"
 
 namespace paver {
+
 namespace {
-
-// Allocate header and data following it, and give it some basic defaults.
-//
-// If "span" is non-null, it will be initialized with a span covering
-// the allocated data.
-//
-// If "result_header" is non-null, it will point to the beginning of the
-// uint8_t. It must not outlive the returned fbl::Array object.
-fbl::Array<uint8_t> CreateZbiHeader(Arch arch, size_t payload_size,
-                                    arch::ZbiKernelImage** result_header,
-                                    std::span<uint8_t>* span = nullptr) {
-  // Allocate raw memory.
-  const size_t data_size = sizeof(arch::ZbiKernelImage) + payload_size;
-  auto data = fbl::Array<uint8_t>(new uint8_t[data_size], data_size);
-  memset(data.get(), 0xee, data_size);
-
-  // Set up header for outer ZBI header.
-  auto header = reinterpret_cast<arch::ZbiKernelImage*>(data.get());
-  header->hdr_file.type = ZBI_TYPE_CONTAINER;
-  header->hdr_file.extra = ZBI_CONTAINER_MAGIC;
-  header->hdr_file.magic = ZBI_ITEM_MAGIC;
-  header->hdr_file.flags = ZBI_FLAGS_VERSION;
-  header->hdr_file.crc32 = ZBI_ITEM_NO_CRC32;
-  header->hdr_file.length =
-      static_cast<uint32_t>(sizeof(zbi_header_t) + sizeof(zbi_kernel_t) + payload_size);
-
-  // Set up header for inner ZBI header.
-  header->hdr_kernel.type = (arch == Arch::kX64) ? ZBI_TYPE_KERNEL_X64 : ZBI_TYPE_KERNEL_ARM64;
-  header->hdr_kernel.magic = ZBI_ITEM_MAGIC;
-  header->hdr_kernel.flags = ZBI_FLAGS_VERSION;
-  header->hdr_kernel.crc32 = ZBI_ITEM_NO_CRC32;
-  header->hdr_kernel.length = static_cast<uint32_t>(sizeof(zbi_kernel_t) + payload_size);
-
-  if (span != nullptr) {
-    *span = std::span<uint8_t>(data.get(), data_size);
-  }
-  if (result_header != nullptr) {
-    *result_header = reinterpret_cast<arch::ZbiKernelImage*>(data.get());
-  }
-
-  return data;
-}
 
 TEST(IsValidKernelZbi, EmptyData) {
   ASSERT_FALSE(IsValidKernelZbi(Arch::kX64, std::span<uint8_t>()));

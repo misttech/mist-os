@@ -242,8 +242,6 @@ class PaverServiceTest : public PaverTest {
     fidl::BindServer(loop_.dispatcher(), std::move(server), paver_.get());
   }
 
-  static void CreatePayload(size_t num_pages, fuchsia_mem::wire::Buffer* out);
-
   static constexpr size_t kKilobyte = 1 << 10;
 
   static void ValidateWritten(const fuchsia_mem::wire::Buffer& buf, size_t num_pages) {
@@ -273,14 +271,68 @@ PaverServiceTest::~PaverServiceTest() {
   paver_.reset();
 }
 
-void PaverServiceTest::CreatePayload(size_t num_pages, fuchsia_mem::wire::Buffer* out) {
+// Creates a `Buffer` with payload of `data` repeating for `num_pages` pages.
+void CreateBuffer(size_t num_pages, fuchsia_mem::wire::Buffer* out, uint8_t data = 0x4a) {
   zx::vmo vmo;
   fzl::VmoMapper mapper;
   const size_t size = kPageSize * num_pages;
   ASSERT_OK(mapper.CreateAndMap(size, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, nullptr, &vmo));
-  memset(mapper.start(), 0x4a, mapper.size());
+  memset(mapper.start(), data, mapper.size());
   out->vmo = std::move(vmo);
   out->size = size;
+}
+
+// Creates a `Buffer` with the given data as the payload.
+void CreateBuffer(std::span<const uint8_t> data, fuchsia_mem::wire::Buffer* out) {
+  zx::vmo vmo;
+  fzl::VmoMapper mapper;
+  ASSERT_OK(mapper.CreateAndMap(data.size(), ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, nullptr, &vmo));
+  memcpy(mapper.start(), data.data(), data.size());
+  *out = {.vmo = std::move(vmo), .size = data.size()};
+}
+
+// Verifies that `buffer` contains exactly `data`.
+void VerifyBufferContents(const fuchsia_mem::wire::Buffer& buffer, std::span<const uint8_t> data) {
+  ASSERT_EQ(buffer.size, data.size());
+  fzl::VmoMapper mapper;
+  ASSERT_OK(mapper.Map(buffer.vmo, 0, buffer.size, ZX_VM_PERM_READ));
+  ASSERT_BYTES_EQ(mapper.start(), data.data(), buffer.size);
+}
+
+// Common logic to test writing an asset to disk and reading it back.
+//
+// Args:
+// * `block_device`: the block device object providing the disk.
+// * `data_sink`: the paver data sink to make FIDL calls on.
+// * `configuration`: configuration to write.
+// * `asset`: asset type to write.
+// * `partition_start_block`: the disk block number that we expect this data to start at.
+void TestReadWriteAsset(BlockDevice& block_device,
+                        fidl::WireSyncClient<fuchsia_paver::DynamicDataSink> data_sink,
+                        fuchsia_paver::wire::Configuration configuration,
+                        fuchsia_paver::wire::Asset asset, size_t partition_start_block) {
+  // WriteAsset(Kernel) requires something that looks like a kernel.
+  fbl::Array<uint8_t> data = CreateZbiHeader(paver::GetCurrentArch(), 1000, nullptr);
+
+  // Use WriteAsset() FIDL to write a payload to disk.
+  fuchsia_mem::wire::Buffer buffer;
+  ASSERT_NO_FATAL_FAILURE(CreateBuffer(data, &buffer));
+  auto write_result = data_sink->WriteAsset(configuration, asset, std::move(buffer));
+  ASSERT_OK(write_result.status());
+  ASSERT_OK(write_result.value().status);
+
+  // Reset the buffer then read from disk directly to make sure the bytes were written correctly.
+  // Block devices can only read full pages, so we need to round up here.
+  ASSERT_NO_FATAL_FAILURE(CreateBuffer(fbl::round_up(data.size(), kBlockSize), &buffer, 0x00));
+  ASSERT_NO_FATAL_FAILURE(block_device.Read(buffer.vmo, buffer.size, partition_start_block, 0));
+  // Only verify up to the data we actually wrote.
+  buffer.size = data.size();
+  ASSERT_NO_FATAL_FAILURE(VerifyBufferContents(buffer, data));
+
+  // Use ReadAsset() FIDL to make sure we get the expected data back.
+  auto read_result = data_sink->ReadAsset(configuration, asset);
+  ASSERT_OK(read_result.status());
+  ASSERT_NO_FATAL_FAILURE(VerifyBufferContents(read_result->value()->asset, data));
 }
 
 class PaverServiceSkipBlockTest : public PaverServiceTest {
@@ -1348,7 +1400,7 @@ TEST_F(PaverServiceSkipBlockTest, WriteAssetKernelConfigA) {
   ASSERT_NO_FATAL_FAILURE(StartFixture());
 
   fuchsia_mem::wire::Buffer payload;
-  CreatePayload(static_cast<size_t>(2) * kPagesPerBlock, &payload);
+  CreateBuffer(static_cast<size_t>(2) * kPagesPerBlock, &payload);
 
   ASSERT_NO_FATAL_FAILURE(FindDataSink());
   auto result = data_sink_->WriteAsset(fuchsia_paver::wire::Configuration::kA,
@@ -1363,7 +1415,7 @@ TEST_F(PaverServiceSkipBlockTest, WriteAssetKernelConfigB) {
   ASSERT_NO_FATAL_FAILURE(StartFixture());
 
   fuchsia_mem::wire::Buffer payload;
-  CreatePayload(static_cast<size_t>(2) * kPagesPerBlock, &payload);
+  CreateBuffer(static_cast<size_t>(2) * kPagesPerBlock, &payload);
 
   ASSERT_NO_FATAL_FAILURE(FindDataSink());
   auto result = data_sink_->WriteAsset(fuchsia_paver::wire::Configuration::kB,
@@ -1379,7 +1431,7 @@ TEST_F(PaverServiceSkipBlockTest, WriteAssetKernelConfigRecovery) {
   ASSERT_NO_FATAL_FAILURE(StartFixture());
 
   fuchsia_mem::wire::Buffer payload;
-  CreatePayload(static_cast<size_t>(2) * kPagesPerBlock, &payload);
+  CreateBuffer(static_cast<size_t>(2) * kPagesPerBlock, &payload);
 
   ASSERT_NO_FATAL_FAILURE(FindDataSink());
   auto result = data_sink_->WriteAsset(fuchsia_paver::wire::Configuration::kRecovery,
@@ -1394,7 +1446,7 @@ TEST_F(PaverServiceSkipBlockTest, WriteAssetVbMetaConfigA) {
   ASSERT_NO_FATAL_FAILURE(StartFixture());
 
   fuchsia_mem::wire::Buffer payload;
-  CreatePayload(32, &payload);
+  CreateBuffer(32, &payload);
 
   ASSERT_NO_FATAL_FAILURE(FindDataSink());
   auto result =
@@ -1414,7 +1466,7 @@ TEST_F(PaverServiceSkipBlockTest, WriteAssetVbMetaConfigB) {
   ASSERT_NO_FATAL_FAILURE(StartFixture());
 
   fuchsia_mem::wire::Buffer payload;
-  CreatePayload(32, &payload);
+  CreateBuffer(32, &payload);
 
   ASSERT_NO_FATAL_FAILURE(FindDataSink());
   auto result =
@@ -1434,7 +1486,7 @@ TEST_F(PaverServiceSkipBlockTest, WriteAssetVbMetaConfigRecovery) {
   ASSERT_NO_FATAL_FAILURE(StartFixture());
 
   fuchsia_mem::wire::Buffer payload;
-  CreatePayload(32, &payload);
+  CreateBuffer(32, &payload);
 
   ASSERT_NO_FATAL_FAILURE(FindDataSink());
   auto result =
@@ -1609,7 +1661,7 @@ TEST_F(PaverServiceSkipBlockTest, WriteAssetBuffered) {
 
   for (auto config : configs) {
     fuchsia_mem::wire::Buffer payload;
-    CreatePayload(32, &payload);
+    CreateBuffer(32, &payload);
     auto result = data_sink_->WriteAsset(config, fuchsia_paver::wire::Asset::kVerifiedBootMetadata,
                                          std::move(payload));
     ASSERT_OK(result.status());
@@ -1627,7 +1679,7 @@ TEST_F(PaverServiceSkipBlockTest, WriteAssetTwice) {
   ASSERT_NO_FATAL_FAILURE(StartFixture());
 
   fuchsia_mem::wire::Buffer payload;
-  CreatePayload(static_cast<size_t>(2) * kPagesPerBlock, &payload);
+  CreateBuffer(static_cast<size_t>(2) * kPagesPerBlock, &payload);
 
   ASSERT_NO_FATAL_FAILURE(FindDataSink());
   {
@@ -1635,7 +1687,7 @@ TEST_F(PaverServiceSkipBlockTest, WriteAssetTwice) {
                                          fuchsia_paver::wire::Asset::kKernel, std::move(payload));
     ASSERT_OK(result.status());
     ASSERT_OK(result.value().status);
-    CreatePayload(static_cast<size_t>(2) * kPagesPerBlock, &payload);
+    CreateBuffer(static_cast<size_t>(2) * kPagesPerBlock, &payload);
     ValidateWritten(8, 2);
     ValidateUnwritten(10, 4);
   }
@@ -1704,7 +1756,7 @@ TEST_F(PaverServiceSkipBlockTest, WriteFirmwareConfigASupported) {
 
   ASSERT_NO_FATAL_FAILURE(FindDataSink());
   fuchsia_mem::wire::Buffer payload;
-  CreatePayload(static_cast<size_t>(4) * kPagesPerBlock, &payload);
+  CreateBuffer(static_cast<size_t>(4) * kPagesPerBlock, &payload);
   auto result = data_sink_->WriteFirmware(fuchsia_paver::wire::Configuration::kA,
                                           fidl::StringView::FromExternal(kFirmwareTypeBootloader),
                                           std::move(payload));
@@ -1720,7 +1772,7 @@ TEST_F(PaverServiceSkipBlockTest, WriteFirmwareUnsupportedConfigBFallBackToA) {
 
   ASSERT_NO_FATAL_FAILURE(FindDataSink());
   fuchsia_mem::wire::Buffer payload;
-  CreatePayload(static_cast<size_t>(4) * kPagesPerBlock, &payload);
+  CreateBuffer(static_cast<size_t>(4) * kPagesPerBlock, &payload);
   auto result = data_sink_->WriteFirmware(fuchsia_paver::wire::Configuration::kB,
                                           fidl::StringView::FromExternal(kFirmwareTypeBootloader),
                                           std::move(payload));
@@ -1736,7 +1788,7 @@ TEST_F(PaverServiceSkipBlockTest, WriteFirmwareUnsupportedConfigR) {
 
   ASSERT_NO_FATAL_FAILURE(FindDataSink());
   fuchsia_mem::wire::Buffer payload;
-  CreatePayload(static_cast<size_t>(4) * kPagesPerBlock, &payload);
+  CreateBuffer(static_cast<size_t>(4) * kPagesPerBlock, &payload);
   auto result = data_sink_->WriteFirmware(fuchsia_paver::wire::Configuration::kRecovery,
                                           fidl::StringView::FromExternal(kFirmwareTypeBootloader),
                                           std::move(payload));
@@ -1756,7 +1808,7 @@ TEST_F(PaverServiceSkipBlockTest, WriteFirmwareBl2ConfigASupported) {
 
   WriteDataBytes(kBl2StartByte, kBl2SkipLength, 0xC6);
   fuchsia_mem::wire::Buffer payload;
-  CreatePayload(kBl2ImagePages, &payload);
+  CreateBuffer(kBl2ImagePages, &payload);
   auto result = data_sink_->WriteFirmware(fuchsia_paver::wire::Configuration::kA,
                                           fidl::StringView::FromExternal(kFirmwareTypeBl2),
                                           std::move(payload));
@@ -1775,7 +1827,7 @@ TEST_F(PaverServiceSkipBlockTest, WriteFirmwareBl2UnsupportedConfigBFallBackToA)
 
   ASSERT_NO_FATAL_FAILURE(FindDataSink());
   fuchsia_mem::wire::Buffer payload;
-  CreatePayload(kBl2ImagePages, &payload);
+  CreateBuffer(kBl2ImagePages, &payload);
   auto result = data_sink_->WriteFirmware(fuchsia_paver::wire::Configuration::kB,
                                           fidl::StringView::FromExternal(kFirmwareTypeBl2),
                                           std::move(payload));
@@ -1794,7 +1846,7 @@ TEST_F(PaverServiceSkipBlockTest, WriteFirmwareBl2UnsupportedConfigR) {
 
   ASSERT_NO_FATAL_FAILURE(FindDataSink());
   fuchsia_mem::wire::Buffer payload;
-  CreatePayload(kBl2ImagePages, &payload);
+  CreateBuffer(kBl2ImagePages, &payload);
   auto result = data_sink_->WriteFirmware(fuchsia_paver::wire::Configuration::kRecovery,
                                           fidl::StringView::FromExternal(kFirmwareTypeBl2),
                                           std::move(payload));
@@ -1815,7 +1867,7 @@ TEST_F(PaverServiceSkipBlockTest, WriteFirmwareUnsupportedType) {
   ASSERT_NO_FATAL_FAILURE(FindDataSink());
   for (auto config : kAllConfigs) {
     fuchsia_mem::wire::Buffer payload;
-    CreatePayload(static_cast<size_t>(4) * kPagesPerBlock, &payload);
+    CreateBuffer(static_cast<size_t>(4) * kPagesPerBlock, &payload);
     auto result = data_sink_->WriteFirmware(
         config, fidl::StringView::FromExternal(kFirmwareTypeUnsupported), std::move(payload));
     ASSERT_OK(result.status());
@@ -1842,7 +1894,7 @@ TEST_F(PaverServiceSkipBlockWithNoBootloaderTest, WriteFirmwareError) {
 
   ASSERT_NO_FATAL_FAILURE(FindDataSink());
   fuchsia_mem::wire::Buffer payload;
-  CreatePayload(static_cast<size_t>(4) * kPagesPerBlock, &payload);
+  CreateBuffer(static_cast<size_t>(4) * kPagesPerBlock, &payload);
   auto result = data_sink_->WriteFirmware(fuchsia_paver::wire::Configuration::kA,
                                           fidl::StringView::FromExternal(kFirmwareTypeBootloader),
                                           std::move(payload));
@@ -1966,7 +2018,7 @@ TEST_F(PaverServiceSkipBlockTest, WriteBootloader) {
   ASSERT_NO_FATAL_FAILURE(StartFixture());
 
   fuchsia_mem::wire::Buffer payload;
-  CreatePayload(static_cast<size_t>(4) * kPagesPerBlock, &payload);
+  CreateBuffer(static_cast<size_t>(4) * kPagesPerBlock, &payload);
 
   ASSERT_NO_FATAL_FAILURE(FindDataSink());
   auto result =
@@ -1983,7 +2035,7 @@ TEST_F(PaverServiceSkipBlockTest, WriteBootloaderNotAligned) {
   ASSERT_NO_FATAL_FAILURE(StartFixture());
 
   fuchsia_mem::wire::Buffer payload;
-  CreatePayload(static_cast<size_t>(4) * kPagesPerBlock - 1, &payload);
+  CreateBuffer(static_cast<size_t>(4) * kPagesPerBlock - 1, &payload);
 
   WriteData(4 * kPagesPerBlock, static_cast<size_t>(4) * kPagesPerBlock - 1, 0x4a);
   WriteData(8 * kPagesPerBlock - 1, 1, 0xff);
@@ -2012,7 +2064,7 @@ void PaverServiceSkipBlockTest::TestSysconfigWriteBufferedClient(uint32_t offset
 
   {
     fuchsia_mem::wire::Buffer payload;
-    CreatePayload(sysconfig_pages, &payload);
+    CreateBuffer(sysconfig_pages, &payload);
     auto result = sysconfig_->Write(std::move(payload));
     ASSERT_OK(result.status());
     ASSERT_OK(result.value().status);
@@ -2101,8 +2153,7 @@ TEST_F(PaverServiceSkipBlockTest, SysconfigWipeWithBufferredClientLayoutUpdated)
   ASSERT_NO_FATAL_FAILURE(TestSysconfigWipeBufferedClient(2, 5 * 2));
 }
 
-#if defined(__x86_64__)
-class PaverServiceBlockTest : public PaverServiceTest {
+class PaverServiceUefiTest : public PaverServiceTest {
  protected:
   IsolatedDevmgr::Args DevmgrArgs() override {
     IsolatedDevmgr::Args args;
@@ -2110,12 +2161,102 @@ class PaverServiceBlockTest : public PaverServiceTest {
     return args;
   }
 
+  // Installs a UEFI-compatible GPT to `devmgr_` using the given `scheme`.
+  //
+  // Partition start blocks and sizes are given in the constants below.
+  //
+  // Returns nullptr and logs a test failure on error.
+  std::unique_ptr<BlockDevice> InstallUefiGpt(paver::PartitionScheme scheme);
+
+  // Tests writing then reading back a single asset.
+  //
+  // Args:
+  // `scheme`: GPT partition scheme to test against.
+  // `configuration`: which configuration to write.
+  // `asset`: asset type to write.
+  // `block_start`: disk block where the data is expected to be written.
+  void AssetTest(paver::PartitionScheme scheme, fuchsia_paver::wire::Configuration configuration,
+                 fuchsia_paver::wire::Asset asset, size_t block_start);
+
   static constexpr uint8_t kEmptyType[GPT_GUID_LEN] = GUID_EMPTY_VALUE;
   static constexpr size_t kEfiBlockStart = 0x20400;
   static constexpr size_t kEfiBlockSize = 0x10000;
+  static constexpr size_t kZirconABlockStart = kEfiBlockStart + kEfiBlockSize;
+  static constexpr size_t kZirconABlockSize = 0x10000;
+  static constexpr size_t kZirconBBlockStart = kZirconABlockStart + kZirconABlockSize;
+  static constexpr size_t kZirconBBlockSize = 0x10000;
+  static constexpr size_t kZirconRBlockStart = kZirconBBlockStart + kZirconBBlockSize;
+  static constexpr size_t kZirconRBlockSize = 0x10000;
+  static constexpr size_t kVbmetaABlockStart = kZirconRBlockStart + kZirconRBlockSize;
+  static constexpr size_t kVbmetaABlockSize = 0x10000;
+  static constexpr size_t kVbmetaBBlockStart = kVbmetaABlockStart + kVbmetaABlockSize;
+  static constexpr size_t kVbmetaBBlockSize = 0x10000;
+  static constexpr size_t kVbmetaRBlockStart = kVbmetaBBlockStart + kVbmetaBBlockSize;
+  static constexpr size_t kVbmetaRBlockSize = 0x10000;
+  static constexpr size_t kFvmBlockStart = kVbmetaRBlockStart + kVbmetaRBlockSize;
+  static constexpr size_t kFvmBlockSize = 0x10000;
 };
 
-TEST_F(PaverServiceBlockTest, InitializePartitionTables) {
+std::unique_ptr<BlockDevice> PaverServiceUefiTest::InstallUefiGpt(paver::PartitionScheme scheme) {
+  std::unique_ptr<BlockDevice> gpt_dev;
+  constexpr uint64_t block_count = (64LU << 30) / kBlockSize;  // 64 GiB disk.
+  bool legacy = (scheme == paver::PartitionScheme::kLegacy);
+  BlockDevice::CreateWithGpt(
+      devmgr_.devfs_root(), block_count, kBlockSize,
+      {
+          {.name = legacy ? "efi-system" : GUID_EFI_NAME,
+           .type = GUID_EFI_VALUE,  // Same for both schemes.
+           .start = kEfiBlockStart,
+           .length = kEfiBlockSize},
+          {.name = legacy ? GUID_ZIRCON_A_NAME : GPT_ZIRCON_A_NAME,
+           .type = legacy ? uuid::Uuid(GUID_ZIRCON_A_VALUE) : uuid::Uuid(GPT_ZIRCON_ABR_TYPE_GUID),
+           .start = kZirconABlockStart,
+           .length = kZirconABlockSize},
+          {.name = legacy ? GUID_ZIRCON_B_NAME : GPT_ZIRCON_B_NAME,
+           .type = legacy ? uuid::Uuid(GUID_ZIRCON_B_VALUE) : uuid::Uuid(GPT_ZIRCON_ABR_TYPE_GUID),
+           .start = kZirconBBlockStart,
+           .length = kZirconBBlockSize},
+          {.name = legacy ? GUID_ZIRCON_R_NAME : GPT_ZIRCON_R_NAME,
+           .type = legacy ? uuid::Uuid(GUID_ZIRCON_R_VALUE) : uuid::Uuid(GPT_ZIRCON_ABR_TYPE_GUID),
+           .start = kZirconRBlockStart,
+           .length = kZirconRBlockSize},
+          {.name = legacy ? GUID_VBMETA_A_NAME : GPT_VBMETA_A_NAME,
+           .type = legacy ? uuid::Uuid(GUID_VBMETA_A_VALUE) : uuid::Uuid(GPT_VBMETA_ABR_TYPE_GUID),
+           .start = kVbmetaABlockStart,
+           .length = kVbmetaABlockSize},
+          {.name = legacy ? GUID_VBMETA_B_NAME : GPT_VBMETA_B_NAME,
+           .type = legacy ? uuid::Uuid(GUID_VBMETA_B_VALUE) : uuid::Uuid(GPT_VBMETA_ABR_TYPE_GUID),
+           .start = kVbmetaBBlockStart,
+           .length = kVbmetaBBlockSize},
+          {.name = legacy ? GUID_VBMETA_R_NAME : GPT_VBMETA_R_NAME,
+           .type = legacy ? uuid::Uuid(GUID_VBMETA_R_VALUE) : uuid::Uuid(GPT_VBMETA_ABR_TYPE_GUID),
+           .start = kVbmetaRBlockStart,
+           .length = kVbmetaRBlockSize},
+          {.name = legacy ? GUID_FVM_NAME : GPT_FVM_NAME,
+           .type = legacy ? uuid::Uuid(GUID_FVM_VALUE) : uuid::Uuid(GPT_FVM_TYPE_GUID),
+           .start = kFvmBlockStart,
+           .length = kFvmBlockSize},
+      },
+      &gpt_dev);
+
+  return gpt_dev;
+}
+
+void PaverServiceUefiTest::AssetTest(paver::PartitionScheme scheme,
+                                     fuchsia_paver::wire::Configuration configuration,
+                                     fuchsia_paver::wire::Asset asset, size_t block_start) {
+  std::unique_ptr<BlockDevice> gpt_dev = InstallUefiGpt(scheme);
+  ASSERT_NOT_NULL(gpt_dev.get());
+
+  auto [client, server] = fidl::Endpoints<fuchsia_paver::DynamicDataSink>::Create();
+  ASSERT_OK(client_->FindPartitionTableManager(std::move(server)));
+  fidl::WireSyncClient data_sink{std::move(client)};
+
+  ASSERT_NO_FATAL_FAILURE(
+      TestReadWriteAsset(*gpt_dev, std::move(data_sink), configuration, asset, block_start));
+}
+
+TEST_F(PaverServiceUefiTest, InitializePartitionTables) {
   std::unique_ptr<BlockDevice> gpt_dev;
   // 64GiB disk.
   constexpr uint64_t block_count = (64LU << 30) / kBlockSize;
@@ -2132,7 +2273,7 @@ TEST_F(PaverServiceBlockTest, InitializePartitionTables) {
   ASSERT_OK(result.value().status);
 }
 
-TEST_F(PaverServiceBlockTest, InitializePartitionTablesMultipleDevicesOneGpt) {
+TEST_F(PaverServiceUefiTest, InitializePartitionTablesMultipleDevicesOneGpt) {
   std::unique_ptr<BlockDevice> gpt_dev1, gpt_dev2;
   // 64GiB disk.
   constexpr uint64_t block_count = (64LU << 30) / kBlockSize;
@@ -2151,7 +2292,36 @@ TEST_F(PaverServiceBlockTest, InitializePartitionTablesMultipleDevicesOneGpt) {
   ASSERT_OK(result.value().status);
 }
 
-#endif
+// Test a variety of asset read/write using both new and legacy partition schemes.
+TEST_F(PaverServiceUefiTest, AssetZirconANew) {
+  AssetTest(paver::PartitionScheme::kNew, fuchsia_paver::wire::Configuration::kA,
+            fuchsia_paver::wire::Asset::kKernel, kZirconABlockStart);
+}
+
+TEST_F(PaverServiceUefiTest, AssetZirconBLegacy) {
+  AssetTest(paver::PartitionScheme::kLegacy, fuchsia_paver::wire::Configuration::kB,
+            fuchsia_paver::wire::Asset::kKernel, kZirconBBlockStart);
+}
+
+TEST_F(PaverServiceUefiTest, AssetZirconRNew) {
+  AssetTest(paver::PartitionScheme::kNew, fuchsia_paver::wire::Configuration::kRecovery,
+            fuchsia_paver::wire::Asset::kKernel, kZirconRBlockStart);
+}
+
+TEST_F(PaverServiceUefiTest, AssetVbmetaALegacy) {
+  AssetTest(paver::PartitionScheme::kLegacy, fuchsia_paver::wire::Configuration::kA,
+            fuchsia_paver::wire::Asset::kVerifiedBootMetadata, kVbmetaABlockStart);
+}
+
+TEST_F(PaverServiceUefiTest, AssetVbmetaBNew) {
+  AssetTest(paver::PartitionScheme::kNew, fuchsia_paver::wire::Configuration::kB,
+            fuchsia_paver::wire::Asset::kVerifiedBootMetadata, kVbmetaBBlockStart);
+}
+
+TEST_F(PaverServiceUefiTest, AssetVbmetaRLegacy) {
+  AssetTest(paver::PartitionScheme::kLegacy, fuchsia_paver::wire::Configuration::kRecovery,
+            fuchsia_paver::wire::Asset::kVerifiedBootMetadata, kVbmetaRBlockStart);
+}
 
 class PaverServiceGptDeviceTest : public PaverServiceTest {
  protected:

@@ -18,6 +18,7 @@ source_set("test-utils") {
     "//src/storage/lib/paver",
     "//src/storage/lib/ramdevice_client/cpp:ramdevice-client-test",
     "//src/storage/lib/vfs/cpp",
+    "//zircon/kernel/lib/arch",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zxtest",
   ]
