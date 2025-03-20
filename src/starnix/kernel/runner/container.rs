@@ -220,7 +220,7 @@ pub struct ContainerProgram {
 
 /// Specifies a role override for a class of tasks whose process and thread names match provided
 /// patterns.
-#[derive(Debug, Default, Deserialize)]
+#[derive(Default, Deserialize)]
 struct RealtimeSchedulerMapping {
     /// The role name to use for tasks matching the provided patterns.
     role: String,
@@ -228,6 +228,12 @@ struct RealtimeSchedulerMapping {
     process: String,
     /// A regular expression that will be matched against the thread's command.
     thread: String,
+}
+
+impl std::fmt::Debug for RealtimeSchedulerMapping {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "process `{}` thread `{}` role `{}`", self.process, self.thread, self.role)
+    }
 }
 
 fn default_uid() -> runner::serde::StoreAsString<u32> {
