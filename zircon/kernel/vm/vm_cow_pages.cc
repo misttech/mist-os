@@ -6036,40 +6036,41 @@ void VmCowPages::RangeChangeUpdateCowChildren(VmCowRange range, RangeChangeOp op
   RangeChangeUpdateCowChildrenLocked(range, op);
 }
 
-void VmCowPages::ReclaimPageForEviction(vm_page_t* page, uint64_t offset) {
-  canary_.Assert();
-
-  Guard<VmoLockType> guard{lock()};
-
-  // Check this page is still a part of this VMO.
-  const VmPageOrMarker* page_or_marker = page_list_.Lookup(offset);
-  if (!page_or_marker || !page_or_marker->IsPage() || page_or_marker->Page() != page) {
-    return;
+template <typename T>
+bool VmCowPages::CanReclaimPageLocked(vm_page_t* page, T actual) {
+  // Check this page is still a part of this VMO. After this any failures should mark the page as
+  // accessed to prevent the page from remaining a reclamation candidate.
+  if (!actual || !actual->IsPage() || actual->Page() != page) {
+    return false;
   }
-
-  // We shouldn't have been asked to evict a pinned page.
-  ASSERT(page->object.pin_count == 0);
-
-  // Ignore any hints, we were asked directly to evict.
-  ReclaimPageForEvictionLocked(page, offset, EvictionHintAction::Ignore);
+  // Pinned pages could be in use by DMA so we cannot safely reclaim them.
+  if (page->object.pin_count != 0) {
+    pmm_page_queues()->MarkAccessed(page);
+    return false;
+  }
+  if (high_priority_count_ != 0) {
+    // Not allowed to reclaim. To avoid this page remaining in a reclamation list we simulate an
+    // access.
+    pmm_page_queues()->MarkAccessed(page);
+    return false;
+  }
+  return true;
 }
 
-VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEvictionLocked(vm_page_t* page, uint64_t offset,
-                                                                   EvictionHintAction hint_action) {
+VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEviction(vm_page_t* page, uint64_t offset,
+                                                             EvictionHintAction hint_action) {
+  canary_.Assert();
   // Without a page source to bring the page back in we cannot even think about eviction.
   if (!can_evict()) {
     return ReclaimCounts{};
   }
 
-  // We can assume this page is in the VMO.
-#if (DEBUG_ASSERT_IMPLEMENTED)
-  {
-    const VmPageOrMarker* page_or_marker = page_list_.Lookup(offset);
-    DEBUG_ASSERT(page_or_marker);
-    DEBUG_ASSERT(page_or_marker->IsPage());
-    DEBUG_ASSERT(page_or_marker->Page() == page);
+  Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+
+  const VmPageOrMarker* page_or_marker = page_list_.Lookup(offset);
+  if (!CanReclaimPageLocked(page, page_or_marker)) {
+    return ReclaimCounts{};
   }
-#endif
 
   DEBUG_ASSERT(is_page_dirty_tracked(page));
 
@@ -6119,13 +6120,10 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEvictionLocked(vm_page_t* pa
   };
 }
 
-VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompressionLocked(
-    vm_page_t* page, uint64_t offset, VmCompressor* compressor,
-    Guard<VmoLockType>::Adoptable adopt) {
+VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompression(vm_page_t* page, uint64_t offset,
+                                                                VmCompressor* compressor) {
   DEBUG_ASSERT(compressor);
   DEBUG_ASSERT(!page_source_);
-  ASSERT(page->object.pin_count == 0);
-  DEBUG_ASSERT(!page->is_loaned());
   DEBUG_ASSERT(!discardable_tracker_);
   DEBUG_ASSERT(can_decommit_zero_pages());
 
@@ -6133,23 +6131,23 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompressionLocked(
   bool reclaimed = false;
 
   {
-    Guard<VmoLockType> guard{AdoptLock, lock(), ktl::move(adopt)};
-    if (paged_ref_) {
-      if ((paged_backlink_locked(this)->GetMappingCachePolicyLocked() & ZX_CACHE_POLICY_MASK) !=
-          ZX_CACHE_POLICY_CACHED) {
-        // Cannot compress uncached mappings. To avoid this page remaining in the reclamation list
-        // we simulate an access.
-        pmm_page_queues()->MarkAccessed(page);
-        return ReclaimCounts{};
-      }
+    Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+    // Not allowed to reclaim if uncached.
+    if ((paged_ref_ && (paged_backlink_locked(this)->GetMappingCachePolicyLocked() &
+                        ZX_CACHE_POLICY_MASK) != ZX_CACHE_POLICY_CACHED)) {
+      // To avoid this page remaining in the reclamation list we simulate an access.
+      pmm_page_queues()->MarkAccessed(page);
+      return ReclaimCounts{};
     }
 
     // Use a sub-scope as the page_or_marker will become invalid as we will drop the lock later.
     {
       VmPageOrMarkerRef page_or_marker = page_list_.LookupMutable(offset);
-      DEBUG_ASSERT(page_or_marker);
-      DEBUG_ASSERT(page_or_marker->IsPage());
-      DEBUG_ASSERT(page_or_marker->Page() == page);
+      if (!CanReclaimPageLocked(page, page_or_marker)) {
+        return ReclaimCounts{};
+      }
+
+      DEBUG_ASSERT(!page->is_loaned());
 
       // Perform the unmap of the page on our mappings while we hold the lock. This removes all
       // possible writable mappings, although our children could still have read-only mappings.
@@ -6271,49 +6269,40 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPage(vm_page_t* page, uint64_t offs
                                                   VmCompressor* compressor) {
   canary_.Assert();
 
-  Guard<VmoLockType> guard{lock()};
-  // Check this page is still a part of this VMO.
-  const VmPageOrMarker* page_or_marker = page_list_.Lookup(offset);
-  if (!page_or_marker || !page_or_marker->IsPage() || page_or_marker->Page() != page) {
-    return ReclaimCounts{};
-  }
-
-  // Pinned pages could be in use by DMA so we cannot safely reclaim them.
-  if (page->object.pin_count != 0) {
-    return ReclaimCounts{};
-  }
-
-  if (high_priority_count_ != 0) {
-    // Not allowed to reclaim. To avoid this page remaining in a reclamation list we simulate an
-    // access.
-    pmm_page_queues()->MarkAccessed(page);
-    return ReclaimCounts{};
-  }
-
   // See if we can reclaim by eviction.
   if (can_evict()) {
-    return ReclaimPageForEvictionLocked(page, offset, hint_action);
-  } else if (compressor && !page_source_ && !discardable_tracker_) {
-    return ReclaimPageForCompressionLocked(page, offset, compressor, guard.take());
-  } else if (discardable_tracker_) {
+    return ReclaimPageForEviction(page, offset, hint_action);
+  }
+  if (compressor && !page_source_ && !discardable_tracker_) {
+    return ReclaimPageForCompression(page, offset, compressor);
+  }
+  if (discardable_tracker_) {
     // On any errors touch the page so we stop trying to reclaim it. In particular for discardable
     // reclamation attempts, if the page we are passing is not the first page in the discardable
     // VMO then the discard will fail, so touching it will stop us from continuously trying to
     // trigger a discard with it.
-    auto result = ReclaimDiscardableLocked(page, offset);
-    if (result.is_error()) {
-      pmm_page_queues()->MarkAccessed(page);
-      vm_vmo_discardable_failed_reclaim.Add(1);
-      return ReclaimCounts{};
+    auto result = ReclaimDiscardable(page, offset);
+    if (result.is_ok()) {
+      return ReclaimCounts{.discarded = *result};
     }
-    return ReclaimCounts{.discarded = *result};
+    vm_vmo_discardable_failed_reclaim.Add(1);
+    return ReclaimCounts{};
   }
-  // No other reclamation strategies, so to avoid this page remaining in a reclamation list we
-  // simulate an access. Do not want to place it in the ReclaimFailed queue since our failure was
-  // not based on page contents.
-  pmm_page_queues()->MarkAccessed(page);
+
   // Keep a count as having no reclamation strategy is probably a sign of miss-configuration.
   vm_vmo_no_reclamation_strategy.Add(1);
+
+  // Either no other strategies, or reclamation failed, so to avoid this page remaining in a
+  // reclamation list we simulate an access. Do not want to place it in the ReclaimFailed queue
+  // since our failure was not based on page contents.
+  // Before touching it double check this page is page of this VMO, as otherwise we cannot safely
+  // know its state to call MarkAccessed.
+  Guard<VmoLockType> guard{lock()};
+  const VmPageOrMarker* page_or_marker = page_list_.Lookup(offset);
+  if (!page_or_marker || !page_or_marker->IsPage() || page_or_marker->Page() != page) {
+    return ReclaimCounts{};
+  }
+  pmm_page_queues()->MarkAccessed(page);
   return ReclaimCounts{};
 }
 
@@ -7015,8 +7004,16 @@ zx::result<uint64_t> VmCowPages::DiscardPagesLocked() {
   return result;
 }
 
-zx::result<uint64_t> VmCowPages::ReclaimDiscardableLocked(vm_page_t* page, uint64_t offset) {
+zx::result<uint64_t> VmCowPages::ReclaimDiscardable(vm_page_t* page, uint64_t offset) {
   DEBUG_ASSERT(discardable_tracker_);
+
+  Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+
+  const VmPageOrMarker* page_or_marker = page_list_.Lookup(offset);
+  if (!CanReclaimPageLocked(page, page_or_marker)) {
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+
   // Check if this is the first page.
   bool first = false;
   page_list_.ForEveryPage([&first, &offset, &page](auto* p, uint64_t off) {

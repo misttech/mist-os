@@ -619,6 +619,13 @@ class VmCowPages final : public VmHierarchyBase,
   ReclaimCounts ReclaimPage(vm_page_t* page, uint64_t offset, EvictionHintAction hint_action,
                             VmCompressor* compressor);
 
+  // Helper for reclamation functions to perform common checks for whether or not reclamation should
+  // proceed. It takes two parameters, one being the original requested page and the other being
+  // the result of a page list Lookup or LookupMutable, allowing it to check if the page is still
+  // up to date and owned by this VMO.
+  template <typename T>
+  bool CanReclaimPageLocked(vm_page_t* page, T actual) TA_REQ(lock());
+
   // If any pages in the specified range are loaned pages, replaces them with non-loaned pages
   // (which requires providing a |page_request|). The specified range should be fully committed
   // before calling this function. If a gap or a marker is encountered, or a loaned page cannot be
@@ -810,7 +817,9 @@ class VmCowPages final : public VmHierarchyBase,
   // Eviction wrapper, unlike ReclaimPage this wrapper can assume it just needs to evict, and has no
   // requirements on updating any reclamation lists. Exposed for the physical page provider to
   // reclaim loaned pages.
-  void ReclaimPageForEviction(vm_page_t* page, uint64_t offset);
+  // Is also used as an internal helper by ReclaimPage.
+  VmCowPages::ReclaimCounts ReclaimPageForEviction(vm_page_t* page, uint64_t offset,
+                                                   EvictionHintAction hint_action);
 
   // Potentially transitions from Alive->Dead if the cow pages is unreachable (i.e. has no
   // paged_ref_ and no children). Used by the VmObjectPaged when it unlinks the paged_ref_, but
@@ -1519,25 +1528,15 @@ class VmCowPages final : public VmHierarchyBase,
   void CopyPageContentsForReplacementLocked(vm_page_t* dst_page, vm_page_t* src_page)
       TA_REQ(lock());
 
-  // Internal helper for performing reclamation via eviction on pager backed VMOs.
-  // Assumes that the page is owned by this VMO at the specified offset.
-  ReclaimCounts ReclaimPageForEvictionLocked(vm_page_t* page, uint64_t offset,
-                                             EvictionHintAction hint_action) TA_REQ(lock());
-
   // Internal helper for performing reclamation via compression on an anonymous VMO. Assumes that
-  // the page is owned by this VMO at the specified offset.
-  // Assumes that the provided |compressor| is not-null.
-  //
-  // Takes ownership of the lock and releases it before returning.
-  ReclaimCounts ReclaimPageForCompressionLocked(vm_page_t* page, uint64_t offset,
-                                                VmCompressor* compressor,
-                                                Guard<VmoLockType>::Adoptable adopt);
+  // the provided |compressor| is not-null.
+  ReclaimCounts ReclaimPageForCompression(vm_page_t* page, uint64_t offset,
+                                          VmCompressor* compressor);
 
-  // Internal helper for performing reclamation against a discardable VMO. Assumes that the page is
-  // owned by this VMO at the specified offset. If any discarding happens the number of pages is
-  // returned. The passed in |page| must be the first page in the discardable VMO to trigger a
-  // discard, otherwise it will fail.
-  zx::result<uint64_t> ReclaimDiscardableLocked(vm_page_t* page, uint64_t offset) TA_REQ(lock());
+  // Internal helper for performing reclamation against a discardable VMO. If any discarding happens
+  // the number of pages is returned. The passed in |page| must be the first page in the discardable
+  // VMO to trigger a discard, otherwise it will fail.
+  zx::result<uint64_t> ReclaimDiscardable(vm_page_t* page, uint64_t offset);
 
   // Internal helper for discarding a VMO. Will discard if VMO is unlocked returning the count.
   zx::result<uint64_t> DiscardPagesLocked() TA_REQ(lock());

@@ -265,7 +265,8 @@ void PhysicalPageProvider::UnloanRange(uint64_t range_offset, uint64_t length, l
             }
           }
           if (needs_evict) {
-            cow_container->ReclaimPageForEviction(page, vmo_backlink.offset);
+            cow_container->ReclaimPageForEviction(page, vmo_backlink.offset,
+                                                  VmCowPages::EvictionHintAction::Ignore);
             // Either we succeeded eviction, or another thread raced and did it first. If another
             // thread did it first then it would have done so under the VMO lock, which we have
             // since acquired, and so we know the page is either on the way (in a
