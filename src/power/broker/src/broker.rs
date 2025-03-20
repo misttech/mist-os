@@ -3185,7 +3185,7 @@ mod tests {
         broker_status.assert_matches(&broker);
 
         // Raise P's level to ON.
-        // GP's required level should become ON.
+        // C's required level should become ON.
         broker.update_current_level(&parent, ON);
         broker_status.required_level.update(&child, ON);
         broker_status.assert_matches(&broker);
@@ -3966,8 +3966,10 @@ mod tests {
         }}}});
 
         // Drop Lease on B.
-        // B's required level should be OFF because the lease was dropped.
         // A's required level should remain ON until B is OFF.
+        // B's required level should become OFF because the lease was dropped.
+        // C's required level should become OFF because its passive claims are no
+        // longer supported by an active lease.
         // Lease C should now be pending and contingent.
         broker.drop_lease(&lease_b.id).expect("drop_lease failed");
         broker_status.required_level.update(&element_b, OFF);
@@ -3978,13 +3980,13 @@ mod tests {
 
         // Update B's current level to OFF.
         // A's required level should remain ON, until C is OFF.
-        // C's required level should remain ON, to preserve ordering.
+        // C's required level should remain OFF.
         broker.update_current_level(&element_b, OFF);
         broker_status.assert_matches(&broker);
 
         // Drop Lease on C.
-        // C's required level should be OFF because the lease was dropped.
         // A's required level should remain ON until C is OFF.
+        // C's required level should remain OFF.
         broker.drop_lease(&lease_c.id).expect("drop_lease failed");
         broker_status.lease.remove(&lease_c.id);
         broker_status.assert_matches(&broker);
@@ -4327,7 +4329,8 @@ mod tests {
         // Drop Lease on B.
         // A's required level should remain ON.
         // B's required level should become OFF because it is no longer leased.
-        // C's required level should remain OFF as its passive claims are not covered by an active lease.
+        // C's required level should become OFF because its passive claims are no
+        // longer supported by an active lease.
         // Lease C is now pending and contingent.
         broker.drop_lease(&lease_b.id).expect("drop_lease failed");
         broker_status.required_level.update(&element_b, OFF);
