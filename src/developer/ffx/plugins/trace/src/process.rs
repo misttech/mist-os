@@ -128,7 +128,14 @@ pub fn process_trace_file(
 
         // Symbolize FIDL IPC traces.
         if let Some(symbolizer) = &mut symbolizer {
-            symbolizer.symbolize_event_record(&event_record, parsed_bytes, &mut modified)
+            if let Some(symbolized_bytes) =
+                symbolizer.symbolize_event_record(&event_record, &parsed_bytes)
+            {
+                modified = true;
+                symbolized_bytes
+            } else {
+                parsed_bytes
+            }
         } else {
             parsed_bytes
         }
@@ -276,9 +283,8 @@ impl Symbolizer {
     fn symbolize_event_record(
         &mut self,
         event_record: &fxt::EventRecord,
-        parsed_bytes: Vec<u8>,
-        modified: &mut bool,
-    ) -> Vec<u8> {
+        parsed_bytes: &[u8],
+    ) -> Option<Vec<u8>> {
         if event_record.category.as_str() == "kernel:ipc" {
             // Count how many times we've seen flow begin, step and end for two-way messages.
             if let Some((flow_id, flow_stage)) = event_flow_info(&event_record) {
@@ -299,17 +305,15 @@ impl Symbolizer {
             {
                 let ord = *ord;
                 if let Some(method_name) = self.ordinals.get(ord) {
-                    *modified = true;
-                    return symbolize_fidl_call(&parsed_bytes, ord, method_name)
-                        .unwrap_or(parsed_bytes);
+                    return Some(symbolize_fidl_call(&parsed_bytes, ord, method_name));
                 }
             }
         }
-        parsed_bytes
+        None
     }
 }
 
-fn symbolize_fidl_call<'a>(bytes: &[u8], ordinal: u64, method: &'a str) -> Result<Vec<u8>> {
+fn symbolize_fidl_call<'a>(bytes: &[u8], ordinal: u64, method: &'a str) -> Vec<u8> {
     let (_, mut raw_event_record) =
         RawEventRecord::parse(bytes).expect("Unable to parse event record");
     let mut new_args = vec![];
@@ -327,7 +331,7 @@ fn symbolize_fidl_call<'a>(bytes: &[u8], ordinal: u64, method: &'a str) -> Resul
     }
 
     raw_event_record.args = new_args;
-    raw_event_record.serialize().map_err(|e| anyhow!(e))
+    raw_event_record.serialize().expect("Unable to serialize raw event record")
 }
 
 pub struct CategoryCounter {
