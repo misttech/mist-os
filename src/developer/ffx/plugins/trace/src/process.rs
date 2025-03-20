@@ -6,9 +6,7 @@ use anyhow::{anyhow, Result};
 use errors::ffx_bail;
 use ffx_config::EnvironmentContext;
 use ffx_trace::SymbolizationMap;
-use fxt::{
-    Arg, ArgValue, RawArg, RawArgValue, RawEventRecord, SessionParser, StringRef, TraceRecord,
-};
+use fxt::{ArgValue, RawArg, RawArgValue, RawEventRecord, SessionParser, StringRef, TraceRecord};
 use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 use termion::{color, style};
@@ -249,6 +247,19 @@ fn event_flow_info(event_record: &fxt::EventRecord) -> Option<(u64, FlowStage)> 
     }
 }
 
+/// Look for a named argument to an event record.
+fn event_record_arg_value<'a>(
+    event_record: &'a fxt::EventRecord,
+    arg_name: &str,
+) -> Option<&'a ArgValue> {
+    for arg in &event_record.args {
+        if arg.name == arg_name {
+            return Some(&arg.value);
+        }
+    }
+    None
+}
+
 /// Implements FIDL method symbolization for IPC traces.
 pub struct Symbolizer {
     ordinals: SymbolizationMap,
@@ -283,21 +294,14 @@ impl Symbolizer {
             }
 
             // Attach method names to DurationBegin events with ordinals.
-            for arg in &event_record.args {
-                match arg {
-                    Arg { name, value: ArgValue::Unsigned64(ord) }
-                        if name.as_str() == ORDINAL_ARG_NAME
-                            && self.ordinals.contains_key(*ord) =>
-                    {
-                        *modified = true;
-                        return symbolize_fidl_call(
-                            &parsed_bytes,
-                            *ord,
-                            self.ordinals.get(*ord).unwrap(),
-                        )
+            if let Some(ArgValue::Unsigned64(ord)) =
+                event_record_arg_value(&event_record, ORDINAL_ARG_NAME)
+            {
+                let ord = *ord;
+                if let Some(method_name) = self.ordinals.get(ord) {
+                    *modified = true;
+                    return symbolize_fidl_call(&parsed_bytes, ord, method_name)
                         .unwrap_or(parsed_bytes);
-                    }
-                    _ => continue,
                 }
             }
         }
