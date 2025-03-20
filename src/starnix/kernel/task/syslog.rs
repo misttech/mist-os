@@ -12,6 +12,7 @@ use serde::Deserialize;
 use starnix_sync::{Locked, Mutex, Unlocked};
 use starnix_uapi::auth::{CAP_SYSLOG, CAP_SYS_ADMIN};
 use starnix_uapi::errors::{errno, Errno, EAGAIN};
+use starnix_uapi::syslog::SyslogAction;
 use starnix_uapi::vfs::FdEvents;
 use std::cmp;
 use std::collections::VecDeque;
@@ -26,6 +27,12 @@ pub struct Syslog {
     syscall_subscription: OnceLock<Mutex<LogSubscription>>,
 }
 
+pub enum SyslogAccess {
+    DevKmsg,
+    ProcKmsg,
+    Syscall(SyslogAction),
+}
+
 impl Syslog {
     pub fn init(&self, system_task: &CurrentTask) -> Result<(), anyhow::Error> {
         let subscription = LogSubscription::snapshot_then_subscribe(system_task)?;
@@ -33,18 +40,24 @@ impl Syslog {
         Ok(())
     }
 
-    pub fn access(&self, current_task: &CurrentTask) -> Result<GrantedSyslog<'_>, Errno> {
-        Self::validate_access(current_task)?;
+    pub fn access(
+        &self,
+        current_task: &CurrentTask,
+        access: SyslogAccess,
+    ) -> Result<GrantedSyslog<'_>, Errno> {
+        Self::validate_access(current_task, access)?;
         let syscall_subscription = self.subscription()?;
         Ok(GrantedSyslog { syscall_subscription })
     }
 
     /// Validates that syslog access is unrestricted, or that the `current_task` has the relevant
     /// capability, or global admin capability.
-    pub fn validate_access(current_task: &CurrentTask) -> Result<(), Errno> {
-        if !current_task.kernel().restrict_dmesg.load(Ordering::Relaxed) {
-            // TODO(b/316630310): Should unrestricted access only apply to specific operations, e.g.
-            // READ_ALL and SIZE_BUFFER, when /proc/sys/kernel/dmesg_restrict` is 0?
+    pub fn validate_access(current_task: &CurrentTask, access: SyslogAccess) -> Result<(), Errno> {
+        // According to syslog(2) man, ReadAll (3) and SizeBuffer (10) are allowed unprivileged
+        // access only if restrict_dmsg is 0;
+        if matches!(access, SyslogAccess::Syscall(SyslogAction::ReadAll | SyslogAction::SizeBuffer))
+            && !current_task.kernel().restrict_dmesg.load(Ordering::Relaxed)
+        {
             return Ok(());
         }
         if security::is_task_capable_noaudit(current_task, CAP_SYS_ADMIN) {

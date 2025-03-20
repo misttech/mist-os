@@ -10,7 +10,9 @@ use crate::mm::{
     MemoryAccessorExt, ProtectionFlags,
 };
 use crate::task::syslog::{self, KmsgLevel};
-use crate::task::{CurrentTask, EventHandler, LogSubscription, Syslog, WaitCanceler, Waiter};
+use crate::task::{
+    CurrentTask, EventHandler, LogSubscription, Syslog, SyslogAccess, WaitCanceler, Waiter,
+};
 use crate::vfs::buffers::{InputBuffer, InputBufferExt as _, OutputBuffer};
 use crate::vfs::{
     fileops_impl_noop_sync, fileops_impl_seekless, Anon, FileHandle, FileObject, FileOps,
@@ -259,7 +261,7 @@ pub fn open_kmsg(
     _node: &FsNode,
     flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
-    Syslog::validate_access(current_task)?;
+    Syslog::validate_access(current_task, SyslogAccess::DevKmsg)?;
     let subscription = if flags.can_read() {
         Some(Mutex::new(Syslog::snapshot_then_subscribe(&current_task)?))
     } else {

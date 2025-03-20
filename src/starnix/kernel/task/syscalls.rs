@@ -8,7 +8,8 @@ use crate::security;
 use crate::task::{
     max_priority_for_sched_policy, min_priority_for_sched_policy, ptrace_attach, ptrace_dispatch,
     ptrace_traceme, CurrentTask, ExitStatus, PtraceAllowedPtracers, PtraceAttachType,
-    PtraceOptions, SchedulerPolicy, SeccompAction, SeccompStateValue, Task, PR_SET_PTRACER_ANY,
+    PtraceOptions, SchedulerPolicy, SeccompAction, SeccompStateValue, SyslogAccess, Task,
+    PR_SET_PTRACER_ANY,
 };
 use crate::vfs::{
     FdNumber, FileHandle, MountNamespaceFile, PidFdFileObject, UserBuffersOutputBuffer,
@@ -1862,7 +1863,8 @@ pub fn sys_syslog(
     length: i32,
 ) -> Result<i32, Errno> {
     let action = SyslogAction::try_from(action_type)?;
-    let syslog = current_task.kernel().syslog.access(&current_task)?;
+    let syslog =
+        current_task.kernel().syslog.access(&current_task, SyslogAccess::Syscall(action))?;
     match action {
         SyslogAction::Read => {
             if address.is_null() || length < 0 {

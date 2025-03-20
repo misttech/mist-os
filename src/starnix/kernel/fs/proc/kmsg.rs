@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::task::{CurrentTask, EventHandler, WaitCanceler, Waiter};
+use crate::task::{CurrentTask, EventHandler, SyslogAccess, WaitCanceler, Waiter};
 use crate::vfs::{
     fileops_impl_noop_sync, fileops_impl_seekless, FileObject, FileOps, FileSystemHandle,
     FsNodeHandle, FsNodeInfo, InputBuffer, OutputBuffer, SimpleFileNode,
@@ -36,7 +36,8 @@ impl FileOps for KmsgFile {
         events: FdEvents,
         handler: EventHandler,
     ) -> Option<WaitCanceler> {
-        let syslog = current_task.kernel().syslog.access(current_task).ok()?;
+        let syslog =
+            current_task.kernel().syslog.access(current_task, SyslogAccess::ProcKmsg).ok()?;
         Some(syslog.wait(waiter, events, handler))
     }
 
@@ -46,7 +47,7 @@ impl FileOps for KmsgFile {
         _file: &FileObject,
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
-        let syslog = current_task.kernel().syslog.access(current_task)?;
+        let syslog = current_task.kernel().syslog.access(current_task, SyslogAccess::ProcKmsg)?;
         let mut events = FdEvents::empty();
         if syslog.size_unread()? > 0 {
             events |= FdEvents::POLLIN;
@@ -62,7 +63,7 @@ impl FileOps for KmsgFile {
         _offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        let syslog = current_task.kernel().syslog.access(current_task)?;
+        let syslog = current_task.kernel().syslog.access(current_task, SyslogAccess::ProcKmsg)?;
         file.blocking_op(locked, current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, |_| {
             let bytes_written = syslog.read(data)?;
             Ok(bytes_written as usize)
