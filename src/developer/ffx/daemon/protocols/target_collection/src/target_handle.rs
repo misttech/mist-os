@@ -98,14 +98,14 @@ impl TargetHandleInner {
                     .ok_or(ffx::TargetError::AddressNotFound);
 
                 if result.is_ok() {
-                    self.target.maybe_reconnect();
+                    self.target.maybe_reconnect(None);
                 }
 
                 responder.send(result).map_err(Into::into)
             }
             ffx::TargetRequest::ClearPreferredSshAddress { responder } => {
                 self.target.clear_preferred_ssh_address();
-                self.target.maybe_reconnect();
+                self.target.maybe_reconnect(None);
                 responder.send().map_err(Into::into)
             }
             ffx::TargetRequest::OpenRemoteControl { remote_control, responder } => {

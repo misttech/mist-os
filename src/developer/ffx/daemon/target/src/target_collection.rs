@@ -650,7 +650,7 @@ impl TargetCollection {
             tracing::warn!("Network address changed for {to_update:?}");
             if to_update.is_connected() {
                 to_update.disconnect();
-                to_update.maybe_reconnect();
+                to_update.maybe_reconnect(None);
                 *to_update.ssh_host_address.borrow_mut() = None;
             }
         } else {
@@ -1897,6 +1897,7 @@ mod tests {
             task: Task::local(future::pending()),
             overnet_node: local_node,
             ssh_addr: None,
+            remote_overnet_id: None,
         });
 
         let collection = TargetCollection::new();

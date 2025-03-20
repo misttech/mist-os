@@ -22,6 +22,7 @@ use fidl_fuchsia_developer_ffx::TargetState;
 use fidl_fuchsia_developer_remotecontrol::{IdentifyHostResponse, RemoteControlProxy};
 use fidl_fuchsia_net::{IpAddress, Ipv4Address, Ipv6Address};
 use fuchsia_async::Task;
+use futures::channel;
 use netext::IsLocalAddr;
 use rand::random;
 use rcs::{knock_rcs, RcsConnection};
@@ -242,6 +243,7 @@ pub(crate) struct HostPipeState {
     pub task: Task<()>,
     pub overnet_node: Arc<overnet_core::Router>,
     pub(crate) ssh_addr: Option<SocketAddr>,
+    pub(crate) remote_overnet_id: Option<u64>,
 }
 
 pub struct Target {
@@ -1131,12 +1133,16 @@ impl Target {
 
     /// Drops the existing connection (if any) and re-initializes the
     /// `HostPipe`.
-    pub fn maybe_reconnect(self: &Rc<Self>) {
+    pub fn maybe_reconnect(
+        self: &Rc<Self>,
+        roid_sender: Option<channel::oneshot::Sender<Option<u64>>>,
+    ) {
         if self.host_pipe.borrow().is_some() {
-            let HostPipeState { task, overnet_node, ssh_addr: _ } = self.host_pipe.take().unwrap();
+            let HostPipeState { task, overnet_node, ssh_addr: _, remote_overnet_id: _ } =
+                self.host_pipe.take().unwrap();
             drop(task);
             tracing::debug!("Reconnecting host_pipe for {}@{}", self.nodename_str(), self.id());
-            self.run_host_pipe(&overnet_node);
+            self.run_host_pipe_with_id_sender(&overnet_node, roid_sender);
         }
     }
 
@@ -1144,14 +1150,28 @@ impl Target {
         self.preferred_ssh_address.borrow_mut().take();
     }
 
-    #[tracing::instrument]
     pub fn run_host_pipe(self: &Rc<Self>, overnet_node: &Arc<overnet_core::Router>) {
+        self.run_host_pipe_with_id_sender(overnet_node, None)
+    }
+
+    #[tracing::instrument]
+    pub fn run_host_pipe_with_id_sender(
+        self: &Rc<Self>,
+        overnet_node: &Arc<overnet_core::Router>,
+        roid_sender: Option<channel::oneshot::Sender<Option<u64>>>,
+    ) {
         if !self.is_enabled() {
+            if let Some(sender) = roid_sender {
+                let _ = sender.send(None);
+            }
             tracing::error!("Cannot run host pipe for device not in use");
             return;
         }
 
-        if self.host_pipe.borrow().is_some() {
+        if let Some(ref hp) = *self.host_pipe.borrow() {
+            if let Some(sender) = roid_sender {
+                let _ = sender.send(hp.remote_overnet_id);
+            }
             // tracing::debug!("Host pipe is already set for {}@{}.", self.nodename_str(), self.id());
             return;
         }
@@ -1201,8 +1221,16 @@ impl Target {
                         if let Some(target) = weak_target.upgrade() {
                             target.set_compatibility_status(&compatibility_status);
 
+                            // TODO(slgrady) Is there a race-condition here? What if we _don't_ get the target.host_pipe?
+                            // Then we will never set the ssh_addr, etc?
                             if let Some(host_pipe) = target.host_pipe.borrow_mut().as_mut() {
                                 host_pipe.ssh_addr = Some(hp.get_address());
+                                if let Some(compat) = compatibility_status {
+                                    host_pipe.remote_overnet_id = compat.overnet_id;
+                                }
+                                if let Some(sender) = roid_sender {
+                                    let _ = sender.send(host_pipe.remote_overnet_id);
+                                }
                             }
                         }
 
@@ -1241,6 +1269,7 @@ impl Target {
             }),
             overnet_node,
             ssh_addr: None,
+            remote_overnet_id: None,
         });
     }
 
@@ -1564,7 +1593,6 @@ mod test {
     use fidl_fuchsia_net::Subnet;
     use fidl_fuchsia_overnet_protocol::NodeId;
     use fuchsia_async::Timer;
-    use futures::channel;
     use futures::prelude::*;
     use std::borrow::Borrow;
     use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
@@ -2341,6 +2369,7 @@ mod test {
             task: Task::local(future::pending()),
             overnet_node: local_node,
             ssh_addr: None,
+            remote_overnet_id: None,
         });
 
         target.disconnect();
