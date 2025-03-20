@@ -31,7 +31,8 @@ use fidl::endpoints::ClientEnd;
 use fuchsia_inspect_contrib::profile_duration;
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{
-    log_error, log_trace, log_warn, trace_duration, track_stub, with_zx_name, CATEGORY_STARNIX,
+    log_error, log_trace, log_warn, trace_duration, trace_instant_flow_begin,
+    trace_instant_flow_end, track_stub, with_zx_name, CATEGORY_STARNIX,
 };
 use starnix_sync::{
     DeviceOpen, FileOpsCore, InterruptibleEvent, LockBefore, Locked, Mutex, MutexGuard,
@@ -91,7 +92,10 @@ use std::sync::Arc;
 use zerocopy::{FromBytes, Immutable, IntoBytes};
 use {fidl_fuchsia_posix as fposix, fidl_fuchsia_starnix_binder as fbinder};
 
-// The name used to track the duration of a local binder ioctl.
+/// The trace category used for binder command tracing.
+const TRACE_CATEGORY: &'static CStr = c"starnix:binder";
+
+/// The name used to track the duration of a local binder ioctl.
 const NAME_BINDER_IOCTL: &'static CStr = c"binder_ioctl";
 
 /// Allows for sequential reading of a task's userspace memory.
@@ -409,7 +413,7 @@ struct BinderProcessState {
 
 #[derive(Default, Debug)]
 struct CommandQueueWithWaitQueue {
-    commands: VecDeque<Command>,
+    commands: VecDeque<(Command, CommandTraceGuard)>,
     waiters: WaitQueue,
 }
 
@@ -419,11 +423,13 @@ impl CommandQueueWithWaitQueue {
     }
 
     fn pop_front(&mut self) -> Option<Command> {
-        self.commands.pop_front()
+        // Dropping the guard will terminate the trace flow.
+        self.commands.pop_front().map(|(command, _guard)| command)
     }
 
     fn push_back(&mut self, command: Command) {
-        self.commands.push_back(command);
+        let guard = command.begin_trace_flow();
+        self.commands.push_back((command, guard));
         self.waiters.notify_fd_events(FdEvents::POLLIN);
     }
 
@@ -1069,7 +1075,7 @@ impl Releasable for BinderProcess {
 
         // Notify all callers that had transactions scheduled for this process that the recipient is
         // dead.
-        for command in self.command_queue.into_inner().commands {
+        for (command, _trace_guard) in self.command_queue.into_inner().commands {
             if let Command::Transaction { sender, .. } = command {
                 if let Some(sender_thread) = sender.thread.upgrade() {
                     sender_thread
@@ -1836,7 +1842,7 @@ impl Releasable for BinderThreadState {
         log_trace!("Dropping BinderThreadState id={}", self.tid);
         // If there are any transactions queued, we need to tell the caller that this thread is now
         // dead.
-        for command in self.command_queue.commands {
+        for (command, _trace_guard) in self.command_queue.commands {
             if let Command::Transaction { sender, .. } = command {
                 if let Some(sender_thread) = sender.thread.upgrade() {
                     sender_thread
@@ -1968,6 +1974,28 @@ enum Command {
 }
 
 impl Command {
+    /// Initiates a trace flow for the command and returns a guard that will terminate the flow
+    /// when dropped
+    fn begin_trace_flow(&self) -> CommandTraceGuard {
+        CommandTraceGuard::begin(match self {
+            Command::AcquireRef(_) => c"AcquireRef",
+            Command::ReleaseRef(_) => c"ReleaseRef",
+            Command::IncRef(_) => c"IncRef",
+            Command::DecRef(_) => c"DecRef",
+            Command::Error(_) => c"Error",
+            Command::OnewayTransaction(_) => c"OnewayTransaction",
+            Command::Transaction { .. } => c"Transaction",
+            Command::Reply(_) => c"Reply",
+            Command::TransactionComplete => c"TransactionComplete",
+            Command::OnewayTransactionComplete => c"OnewayTransactionComplete",
+            Command::FailedReply => c"FailedReply",
+            Command::DeadReply { .. } => c"DeadReply",
+            Command::DeadBinder(_) => c"DeadBinder",
+            Command::ClearDeathNotificationDone(_) => c"ClearDeathNotificationDone",
+            Command::SpawnLooper => c"SpawnLooper",
+        })
+    }
+
     /// Returns the command's BR_* code for serialization.
     fn driver_return_code(&self) -> binder_driver_return_protocol {
         match self {
@@ -2109,6 +2137,35 @@ impl Command {
                     &DeadBinderData { command: self.driver_return_code(), cookie: *cookie },
                 )
             }
+        }
+    }
+}
+
+#[derive(Debug)]
+struct CommandTraceGuard(Option<CommandTraceGuardInner>);
+
+#[derive(Debug)]
+struct CommandTraceGuardInner {
+    id: fuchsia_trace::Id,
+    kind: &'static CStr,
+}
+
+impl CommandTraceGuard {
+    fn begin(kind: &'static CStr) -> Self {
+        if starnix_logging::regular_trace_category_enabled(TRACE_CATEGORY) {
+            let id = fuchsia_trace::Id::random();
+            trace_instant_flow_begin!(TRACE_CATEGORY, kind, c"BinderFlow", id);
+            Self(Some(CommandTraceGuardInner { id, kind }))
+        } else {
+            Self(None)
+        }
+    }
+}
+
+impl Drop for CommandTraceGuard {
+    fn drop(&mut self) {
+        if let Some(CommandTraceGuardInner { id, kind }) = self.0.take() {
+            trace_instant_flow_end!(TRACE_CATEGORY, kind, c"BinderFlow", id);
         }
     }
 }
@@ -5341,7 +5398,7 @@ pub mod tests {
 
             assert_matches!(
                 &proc.proc.command_queue.lock().commands.front(),
-                Some(Command::ReleaseRef(LOCAL_BINDER_OBJECT))
+                Some((Command::ReleaseRef(LOCAL_BINDER_OBJECT), _))
             );
         });
     }
@@ -5883,7 +5940,7 @@ pub mod tests {
             // that sent the transaction).
             assert_matches!(
                 &sender.thread.lock().command_queue.commands.front(),
-                Some(Command::AcquireRef(BINDER_OBJECT))
+                Some((Command::AcquireRef(BINDER_OBJECT), _))
             );
             transaction_state.release(());
         });
@@ -6623,7 +6680,6 @@ pub mod tests {
                 .proc
                 .command_queue
                 .lock()
-                .commands
                 .pop_front()
                 .expect("the transaction should be queued on the process")
             {
@@ -7307,7 +7363,7 @@ pub mod tests {
             // The client process should have a notification waiting.
             assert_matches!(
                 receiver.proc.command_queue.lock().commands.front(),
-                Some(Command::DeadBinder(DEATH_NOTIFICATION_COOKIE))
+                Some((Command::DeadBinder(DEATH_NOTIFICATION_COOKIE), _))
             );
         });
     }
@@ -7352,7 +7408,7 @@ pub mod tests {
             // transaction. Since there is only one thread, check the process command queue.
             assert_matches!(
                 receiver.proc.command_queue.lock().commands.front(),
-                Some(Command::DeadBinder(DEATH_NOTIFICATION_COOKIE))
+                Some((Command::DeadBinder(DEATH_NOTIFICATION_COOKIE), _))
             );
         });
     }
@@ -7399,7 +7455,7 @@ pub mod tests {
             {
                 let mut queue = client.proc.command_queue.lock();
                 assert_eq!(queue.commands.len(), 1);
-                assert!(matches!(queue.commands[0], Command::ClearDeathNotificationDone(_)));
+                assert_matches!(queue.commands[0], (Command::ClearDeathNotificationDone(_), _));
 
                 // Clear the command queue.
                 queue.commands.clear();
@@ -7615,7 +7671,7 @@ pub mod tests {
             // that sent the transaction).
             assert_matches!(
                 sender.thread.lock().command_queue.commands.front(),
-                Some(Command::AcquireRef(BINDER_OBJECT))
+                Some((Command::AcquireRef(BINDER_OBJECT), _))
             );
             sender.thread.lock().command_queue.commands.pop_front().unwrap();
 
@@ -7626,7 +7682,7 @@ pub mod tests {
             // Verify that a strong release command is sent to the sender process.
             assert_matches!(
                 &sender.proc.command_queue.lock().commands.front(),
-                Some(Command::ReleaseRef(BINDER_OBJECT))
+                Some((Command::ReleaseRef(BINDER_OBJECT), _))
             );
         });
     }
@@ -7700,10 +7756,13 @@ pub mod tests {
             // The thread is ineligible to take the command (not sleeping) so check the process queue.
             assert_matches!(
                 receiver.proc.command_queue.lock().commands.front(),
-                Some(Command::OnewayTransaction(TransactionData {
-                    code: FIRST_TRANSACTION_CODE,
-                    ..
-                }))
+                Some((
+                    Command::OnewayTransaction(TransactionData {
+                        code: FIRST_TRANSACTION_CODE,
+                        ..
+                    }),
+                    _
+                ))
             );
 
             // The object should not have the transaction queued on it, as it was immediately scheduled.
@@ -7742,7 +7801,6 @@ pub mod tests {
                 .proc
                 .command_queue
                 .lock()
-                .commands
                 .pop_front()
                 .expect("the first oneway transaction should be queued on the process")
             {
@@ -7772,7 +7830,6 @@ pub mod tests {
                 .proc
                 .command_queue
                 .lock()
-                .commands
                 .pop_front()
                 .expect("the second oneway transaction should be queued on the process")
             {
@@ -7851,10 +7908,13 @@ pub mod tests {
             // the process queue.
             assert_matches!(
                 receiver.proc.command_queue.lock().commands.pop_front(),
-                Some(Command::OnewayTransaction(TransactionData {
-                    code: ONEWAY_TRANSACTION_CODE,
-                    ..
-                }))
+                Some((
+                    Command::OnewayTransaction(TransactionData {
+                        code: ONEWAY_TRANSACTION_CODE,
+                        ..
+                    }),
+                    _
+                ))
             );
 
             // The object should also have the second transaction queued on it.
@@ -7897,10 +7957,13 @@ pub mod tests {
             // The process queue should now have the synchronous transaction queued.
             assert_matches!(
                 receiver.proc.command_queue.lock().commands.pop_front(),
-                Some(Command::Transaction {
-                    data: TransactionData { code: SYNC_TRANSACTION_CODE, .. },
-                    ..
-                })
+                Some((
+                    Command::Transaction {
+                        data: TransactionData { code: SYNC_TRANSACTION_CODE, .. },
+                        ..
+                    },
+                    _
+                ))
             );
         });
     }
@@ -7950,7 +8013,7 @@ pub mod tests {
             // Check that the receiving process has a transaction scheduled.
             assert_matches!(
                 receiver.proc.command_queue.lock().commands.front(),
-                Some(Command::Transaction { .. })
+                Some((Command::Transaction { .. }, _))
             );
 
             // Drop the receiving process.
@@ -7959,7 +8022,7 @@ pub mod tests {
             // Check that there is a dead reply command for the sending thread.
             assert_matches!(
                 sender.thread.lock().command_queue.commands.front(),
-                Some(Command::DeadReply { pop_transaction: true })
+                Some((Command::DeadReply { pop_transaction: true }, _))
             );
             assert_matches!(sender.thread.lock().transactions.pop(), Some(TransactionRole::Sender));
         });
@@ -8010,7 +8073,7 @@ pub mod tests {
             // Check that the receiving process has a transaction scheduled.
             assert_matches!(
                 receiver.proc.command_queue.lock().commands.front(),
-                Some(Command::Transaction { .. })
+                Some((Command::Transaction { .. }, _))
             );
 
             // Drop the receiving process.
@@ -8019,7 +8082,7 @@ pub mod tests {
             // Check that there is a dead reply command for the sending thread.
             assert_matches!(
                 sender.thread.lock().command_queue.commands.front(),
-                Some(Command::DeadReply { pop_transaction: true })
+                Some((Command::DeadReply { pop_transaction: true }, _))
             );
             assert_matches!(sender.thread.lock().transactions.pop(), Some(TransactionRole::Sender));
         });
@@ -8079,7 +8142,7 @@ pub mod tests {
             // Check that the receiving process has a transaction scheduled.
             assert_matches!(
                 receiver.proc.command_queue.lock().commands.front(),
-                Some(Command::Transaction { .. })
+                Some((Command::Transaction { .. }, _))
             );
 
             // Have the thread dequeue the command.
@@ -8104,7 +8167,7 @@ pub mod tests {
             // Check that there is a dead reply command for the sending thread.
             assert_matches!(
                 sender.thread.lock().command_queue.commands.front(),
-                Some(Command::DeadReply { pop_transaction: true })
+                Some((Command::DeadReply { pop_transaction: true }, _))
             );
             assert_matches!(sender.thread.lock().transactions.pop(), Some(TransactionRole::Sender));
         });
@@ -8164,7 +8227,7 @@ pub mod tests {
             // Check that the receiving process has a transaction scheduled.
             assert_matches!(
                 receiver.proc.command_queue.lock().commands.front(),
-                Some(Command::Transaction { .. })
+                Some((Command::Transaction { .. }, _))
             );
 
             // Have the thread dequeue the command.
