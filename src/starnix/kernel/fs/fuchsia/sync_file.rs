@@ -15,7 +15,7 @@ use crate::vfs::{
 use fidl::HandleBased;
 
 use starnix_lifecycle::AtomicUsizeCounter;
-use starnix_logging::{impossible_error, log_warn};
+use starnix_logging::{impossible_error, log_warn, trace_duration};
 use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::errors::Errno;
@@ -143,6 +143,7 @@ impl FileOps for SyncFile {
 
         match ioctl_number {
             SYNC_IOC_MERGE => {
+                trace_duration!(c"starnix", c"SyncFileMerge");
                 let user_ref = UserRef::new(user_addr);
                 let mut merge_data: sync_merge_data = current_task.read_object(user_ref)?;
                 let file2 = current_task.files.get(FdNumber::from_raw(merge_data.fd2))?;
@@ -230,6 +231,7 @@ impl FileOps for SyncFile {
                 Ok(SUCCESS)
             }
             SYNC_IOC_FILE_INFO => {
+                trace_duration!(c"starnix", c"SyncFileInfo");
                 let user_ref = UserRef::new(user_addr);
                 let mut info: sync_file_info = current_task.read_object(user_ref)?;
 
