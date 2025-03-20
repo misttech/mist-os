@@ -25,7 +25,7 @@ use starnix_core::vfs::{
     FdNumber, FdTable, FileSystemOptions, FsString, LookupContext, NamespaceNode, WhatToMount,
 };
 use starnix_core::{security, signals};
-use starnix_logging::{log_error, log_info, log_warn};
+use starnix_logging::{log_debug, log_error, log_info, log_warn};
 use starnix_sync::{FileOpsCore, LockBefore, Locked, Mutex};
 use starnix_types::ownership::WeakRef;
 use starnix_uapi::auth::{Capabilities, Credentials};
@@ -141,7 +141,7 @@ pub async fn start_component(
     let mut program: ComponentProgram =
         runner::serde::deserialize_program(program).context("parsing program block")?;
     program.resolve_templates(&component_path, &pkg_path);
-    log_info!("start_component: {}\n{:#?}", url, program);
+    log_debug!("start_component: {}\n{:#?}", url, program);
 
     let ns_mount_options = system_task.kernel().features.default_ns_mount_options.as_ref();
     let mut maybe_pkg = None;
