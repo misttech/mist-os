@@ -961,7 +961,7 @@ where
             }
         }
     };
-    let Some(device_mss) = Mss::from_mms::<WireI>(device_mms) else {
+    let Some(device_mss) = Mss::from_mms(device_mms) else {
         return ListenerIncomingSegmentDisposition::FoundSocket;
     };
 
