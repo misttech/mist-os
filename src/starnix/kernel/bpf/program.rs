@@ -14,9 +14,11 @@ use ebpf::{
 };
 use ebpf_api::{get_common_helpers, AttachType, EbpfApiError, Map, PinnedMap, ProgramType};
 use starnix_logging::{log_error, log_warn, track_stub};
+use starnix_uapi::auth::{CAP_BPF, CAP_SYS_ADMIN};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{bpf_attr__bindgen_ty_4, bpf_insn, errno, error};
 use std::collections::HashMap;
+use std::sync::atomic::Ordering;
 
 #[derive(Clone, Debug)]
 pub struct ProgramInfo {
@@ -67,6 +69,7 @@ impl Program {
         logger: &mut dyn OutputBuffer,
         mut code: Vec<bpf_insn>,
     ) -> Result<Program, Errno> {
+        Self::check_load_access(current_task, &info)?;
         let maps = link_maps_fds(current_task, &mut code)?;
         let maps_schema = maps.iter().map(|m| m.schema).collect();
         let mut logger = BufferVeriferLogger::new(logger);
@@ -97,6 +100,18 @@ impl Program {
             .map_err(map_ebpf_error)?;
 
         Ok(program)
+    }
+
+    fn check_load_access(current_task: &CurrentTask, info: &ProgramInfo) -> Result<(), Errno> {
+        if matches!(info.program_type, ProgramType::CgroupSkb | ProgramType::SocketFilter)
+            && current_task.kernel().disable_unprivileged_bpf.load(Ordering::Relaxed) == 0
+        {
+            return Ok(());
+        }
+        if security::is_task_capable_noaudit(current_task, CAP_SYS_ADMIN) {
+            return Ok(());
+        }
+        security::check_task_capable(current_task, CAP_BPF)
     }
 }
 

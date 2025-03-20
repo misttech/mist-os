@@ -309,6 +309,12 @@ pub struct Kernel {
     /// access to /dev/kmsg requires privileged capabilities.
     pub restrict_dmesg: AtomicBool,
 
+    /// Determines whether unprivileged BPF is permitted, or can be re-enabled.
+    ///   0 - Unprivileged BPF is permitted.
+    ///   1 - Unprivileged BPF is not permitted, and cannot be enabled.
+    ///   2 - Unprivileged BPF is not permitted, but can be enabled by a privileged task.
+    pub disable_unprivileged_bpf: AtomicU8,
+
     /// Control handle to the running container's ComponentController.
     pub container_control_handle: Mutex<Option<ComponentControllerControlHandle>>,
 
@@ -431,6 +437,7 @@ impl Kernel {
             system_limits: SystemLimits::default(),
             ptrace_scope: AtomicU8::new(0),
             restrict_dmesg: AtomicBool::new(true),
+            disable_unprivileged_bpf: AtomicU8::new(0), // Enable unprivileged BPF by default.
             build_version: OnceCell::new(),
             stats: Arc::new(KernelStats::default()),
             psi_provider: PsiProvider::default(),

@@ -17,10 +17,10 @@ use starnix_sync::Mutex;
 use starnix_uapi::auth::{
     Capabilities, FsCred, CAP_LAST_CAP, CAP_NET_ADMIN, CAP_SYS_ADMIN, CAP_SYS_RESOURCE,
 };
-use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::version::{KERNEL_RELEASE, KERNEL_VERSION};
+use starnix_uapi::{errno, error};
 use std::borrow::Cow;
 use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 use uuid::Uuid;
@@ -284,10 +284,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
         dir.entry(
             current_task,
             "unprivileged_bpf_disabled",
-            StubSysctl::new_node(
-                "/proc/sys/kernel/unprivileged_bpf_disabled",
-                bug_ref!("https://fxbug.dev/322874504"),
-            ),
+            UnprivilegedBpfDisabled::new_node(),
             mode,
         );
         dir.entry(current_task, "dmesg_restrict", DmesgRestrict::new_node(), mode);
@@ -363,7 +360,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
                 BytesFile::new_node(b"256".to_vec()),
                 mode!(IFREG, 0o444),
             );
-            dir.entry(current_task, "actions_logged", SeccompActionsLogged::new_node(), mode);
         });
         dir.entry(current_task, "tainted", KernelTaintedFile::new_node(), mode);
         dir.subdir(current_task, "seccomp", 0o555, |dir| {
@@ -563,7 +559,7 @@ impl BytesFileOps for VerityRequireSignaturesFile {
         let state_str = std::str::from_utf8(&data).map_err(|_| errno!(EINVAL))?;
         let clean_state_str = state_str.split('\n').next().unwrap_or("");
         if clean_state_str != "0" {
-            return Err(errno!(EINVAL));
+            return error!(EINVAL);
         }
         Ok(())
     }
@@ -1184,6 +1180,31 @@ impl BytesFileOps for DmesgRestrict {
     }
     fn read(&self, current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
         Ok(format!("{}\n", current_task.kernel().restrict_dmesg.load(Ordering::Relaxed) as u32)
+            .into_bytes()
+            .into())
+    }
+}
+
+struct UnprivilegedBpfDisabled {}
+
+impl UnprivilegedBpfDisabled {
+    fn new_node() -> impl FsNodeOps {
+        BytesFile::new_node(Self {})
+    }
+}
+
+impl BytesFileOps for UnprivilegedBpfDisabled {
+    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+        security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
+        if current_task.kernel().disable_unprivileged_bpf.load(Ordering::Relaxed) == 2 {
+            return error!(EACCES);
+        }
+        let setting = parse_unsigned_file::<u8>(&data)?;
+        current_task.kernel().disable_unprivileged_bpf.store(setting, Ordering::Relaxed);
+        Ok(())
+    }
+    fn read(&self, current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        Ok(format!("{}\n", current_task.kernel().disable_unprivileged_bpf.load(Ordering::Relaxed))
             .into_bytes()
             .into())
     }

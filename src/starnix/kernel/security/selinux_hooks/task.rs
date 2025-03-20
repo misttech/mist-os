@@ -381,6 +381,7 @@ fn permission_from_capability(capabilities: starnix_uapi::auth::Capabilities) ->
     // TODO: https://fxbug.dev/297313673 - CapClass::CapUserns will play a role here if-and-after
     // user namespaces are implemented in Starnix.
     match capabilities {
+        // Mappings of capabilities to SELinux "cap" class permissions.
         starnix_uapi::auth::CAP_AUDIT_CONTROL => {
             CommonCapPermission::AuditControl.for_class(CapClass::Capability)
         }
@@ -469,12 +470,15 @@ fn permission_from_capability(capabilities: starnix_uapi::auth::Capabilities) ->
         starnix_uapi::auth::CAP_SYS_TTY_CONFIG => {
             CommonCapPermission::SysTtyConfig.for_class(CapClass::Capability)
         }
+
+        // Mappings of capabilities to SELinux "cap2" class permissions.
         starnix_uapi::auth::CAP_AUDIT_READ => {
             CommonCap2Permission::AuditRead.for_class(Cap2Class::Capability2)
         }
         starnix_uapi::auth::CAP_BLOCK_SUSPEND => {
             CommonCap2Permission::BlockSuspend.for_class(Cap2Class::Capability2)
         }
+        starnix_uapi::auth::CAP_BPF => CommonCap2Permission::Bpf.for_class(Cap2Class::Capability2),
         starnix_uapi::auth::CAP_MAC_ADMIN => {
             CommonCap2Permission::MacAdmin.for_class(Cap2Class::Capability2)
         }
@@ -487,6 +491,7 @@ fn permission_from_capability(capabilities: starnix_uapi::auth::Capabilities) ->
         starnix_uapi::auth::CAP_WAKE_ALARM => {
             CommonCap2Permission::WakeAlarm.for_class(Cap2Class::Capability2)
         }
+
         _ => {
             panic!("Unrecognized capabilities \"{:?}\" passed to check_capable!", capabilities)
         }

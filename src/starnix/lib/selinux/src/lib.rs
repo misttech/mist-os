@@ -705,6 +705,7 @@ common_permission_enum! {
 
         AuditRead("audit_read"),
         BlockSuspend("block_suspend"),
+        Bpf("bpf"),
         MacAdmin("mac_admin"),
         MacOverride("mac_override"),
         Syslog("syslog"),
