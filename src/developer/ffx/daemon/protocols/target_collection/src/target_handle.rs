@@ -6,11 +6,12 @@ use crate::reboot;
 use anyhow::{anyhow, Context as _, Result};
 use ffx_daemon_events::TargetEvent;
 use ffx_daemon_target::target::Target;
+use ffx_daemon_target::target_collection::TargetCollection;
 use ffx_ssh::ssh::SshError;
 use ffx_stream_util::TryStreamUtilExt;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_developer_ffx::{self as ffx};
-use futures::TryStreamExt;
+use futures::{channel, TryStreamExt};
 use protocols::Context;
 use std::cell::RefCell;
 use std::future::Future;
@@ -29,10 +30,15 @@ impl TargetHandle {
         target: Rc<Target>,
         cx: Context,
         handle: ServerEnd<ffx::TargetMarker>,
+        target_collection: Rc<TargetCollection>,
     ) -> Result<Pin<Box<dyn Future<Output = ()>>>> {
         let reboot_controller = reboot::RebootController::new(target.clone(), cx.overnet_node()?);
         let keep_alive = target.keep_alive();
-        let inner = TargetHandleInner { target, reboot_controller };
+        let inner = TargetHandleInner {
+            target: RefCell::new(target),
+            target_collection,
+            reboot_controller,
+        };
         let stream = handle.into_stream();
         let fut = Box::pin(async move {
             let _ = stream
@@ -46,7 +52,8 @@ impl TargetHandle {
 }
 
 struct TargetHandleInner {
-    target: Rc<Target>,
+    target: RefCell<Rc<Target>>,
+    target_collection: Rc<TargetCollection>,
     reboot_controller: reboot::RebootController,
 }
 
@@ -56,17 +63,17 @@ impl TargetHandleInner {
         tracing::debug!("handling request {req:?}");
         match req {
             ffx::TargetRequest::GetSshLogs { responder } => {
-                let logs = self.target.host_pipe_log_buffer().lines();
+                let logs = self.target.borrow().host_pipe_log_buffer().lines();
                 responder.send(&logs.join("\n")).map_err(Into::into)
             }
             ffx::TargetRequest::GetSshAddress { responder } => {
                 // Product state and manual state are the two states where an
                 // address is guaranteed. If the target is not in that state,
                 // then wait for its state to change.
-                let connection_state = self.target.get_connection_state();
+                let connection_state = self.target.borrow().get_connection_state();
                 if !connection_state.is_product() && !connection_state.is_manual() {
-                    self.target
-                        .events
+                    let events = self.target.borrow().events.clone();
+                    events
                         .wait_for(None, |e| {
                             if let TargetEvent::ConnectionStateChanged(_, state) = e {
                                 // It's not clear if it is possible to change
@@ -84,7 +91,7 @@ impl TargetHandleInner {
                 // SSH address is written to the target.
                 let poll_duration = Duration::from_millis(15);
                 loop {
-                    if let Some(addr) = self.target.ssh_address_info() {
+                    if let Some(addr) = self.target.borrow().ssh_address_info() {
                         return responder.send(&addr).map_err(Into::into);
                     }
                     fuchsia_async::Timer::new(poll_duration).await;
@@ -93,24 +100,33 @@ impl TargetHandleInner {
             ffx::TargetRequest::SetPreferredSshAddress { ip, responder } => {
                 let result = self
                     .target
+                    .borrow()
                     .set_preferred_ssh_address(ip.into())
                     .then_some(())
                     .ok_or(ffx::TargetError::AddressNotFound);
 
                 if result.is_ok() {
-                    self.target.maybe_reconnect(None);
+                    self.target.borrow().maybe_reconnect(None);
                 }
 
                 responder.send(result).map_err(Into::into)
             }
             ffx::TargetRequest::ClearPreferredSshAddress { responder } => {
-                self.target.clear_preferred_ssh_address();
-                self.target.maybe_reconnect(None);
+                self.target.borrow().clear_preferred_ssh_address();
+                self.target.borrow().maybe_reconnect(None);
                 responder.send().map_err(Into::into)
             }
             ffx::TargetRequest::OpenRemoteControl { remote_control, responder } => {
-                self.target.run_host_pipe(&cx.overnet_node()?);
-                let rcs = wait_for_rcs(&self.target, &cx).await?;
+                let (roid_sender, roid_receiver) = channel::oneshot::channel();
+                self.target
+                    .borrow()
+                    .run_host_pipe_with_sender(&cx.overnet_node()?, Some(roid_sender));
+                let remote_overnet_id = roid_receiver.await?;
+                if let Some(roid) = remote_overnet_id {
+                    // If we already have a connection to this overnet node, further requests can do that the one instead.
+                    self.maybe_redirect_target(roid);
+                }
+                let rcs = wait_for_rcs(&self.target.borrow(), &cx).await?;
                 match rcs {
                     Ok(mut c) => {
                         // TODO(awdavies): Return this as a specific error to
@@ -120,7 +136,7 @@ impl TargetHandleInner {
                     }
                     Err(e) => {
                         // close connection on error so the next call re-establishes the Overnet connection
-                        self.target.disconnect();
+                        self.target.borrow().disconnect();
                         responder.send(Err(e)).context("sending error response").map_err(Into::into)
                     }
                 }
@@ -129,12 +145,29 @@ impl TargetHandleInner {
                 self.reboot_controller.reboot(state, responder).await
             }
             ffx::TargetRequest::Identity { responder } => {
-                let target_info = ffx::TargetInfo::from(&*self.target);
+                let target_info = ffx::TargetInfo::from(&**self.target.borrow());
                 responder.send(&target_info).map_err(Into::into)
             }
             ffx::TargetRequest::Disconnect { responder } => {
-                self.target.disconnect();
+                self.target.borrow().disconnect();
                 responder.send().map_err(Into::into)
+            }
+        }
+    }
+
+    fn maybe_redirect_target(&self, remote_overnet_id: u64) {
+        if let Some(prev_target) = self.target_collection.find_overnet_id(remote_overnet_id) {
+            // We don't want to remove ourselves
+            if prev_target.id() != self.target.borrow().id() {
+                {
+                    let my_target = self.target.borrow();
+                    tracing::info!("connection to {:?} reached same target as {:?}. Redirecting further requests", my_target.addrs(), prev_target.addrs());
+                    prev_target.extend_addrs_from_other(my_target.clone());
+                    self.target_collection.remove_target_from_list(my_target.id());
+                }
+                // Wait until now to borrow_mut, since
+                // extend_addrs_from_other() will also need a borrow
+                *self.target.borrow_mut() = prev_target;
             }
         }
     }
@@ -281,7 +314,8 @@ mod tests {
         );
         target.update_connection_state(|_| TargetConnectionState::Mdns(std::time::Instant::now()));
         let (proxy, server) = fidl::endpoints::create_proxy::<ffx::TargetMarker>();
-        let _handle = Task::local(TargetHandle::new(target, cx, server).unwrap());
+        let tc = Rc::new(TargetCollection::new());
+        let _handle = Task::local(TargetHandle::new(target, cx, server, tc.clone()).unwrap());
         let result = proxy.get_ssh_address().await.unwrap();
         if let ffx::TargetAddrInfo::IpPort(ffx::TargetIpPort {
             ip: fidl_fuchsia_net::IpAddress::Ipv6(fidl_fuchsia_net::Ipv6Address { addr }),
@@ -423,7 +457,8 @@ mod tests {
         target.apply_update(update.build());
 
         let (target_proxy, server) = fidl::endpoints::create_proxy::<ffx::TargetMarker>();
-        let _handle = Task::local(TargetHandle::new(target, cx, server).unwrap());
+        let tc = Rc::new(TargetCollection::new());
+        let _handle = Task::local(TargetHandle::new(target, cx, server, tc.clone()).unwrap());
         let (rcs, rcs_server) = fidl::endpoints::create_proxy::<fidl_rcs::RemoteControlMarker>();
         let res = target_proxy.open_remote_control(rcs_server).await.unwrap();
         assert!(res.is_ok());

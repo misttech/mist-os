@@ -282,12 +282,16 @@ impl TargetCollection {
         self.targets.borrow().len() == 0
     }
 
+    pub fn remove_target_from_list(&self, tid: u64) {
+        let target = self.targets.borrow_mut().remove(&tid);
+        if let Some(target) = target {
+            target.disable();
+        }
+    }
+
     pub fn remove_target(&self, target_id: String) -> bool {
         if let Ok(Some(t)) = self.query_any_single_target(&target_id.clone().into(), |_| true) {
-            let target = self.targets.borrow_mut().remove(&t.id());
-            if let Some(target) = target {
-                target.disable();
-            }
+            self.remove_target_from_list(t.id());
             tracing::debug!("TargetCollection: removed target {}", target_id);
             true
         } else {
@@ -1046,6 +1050,25 @@ impl TargetCollection {
         tracing::debug!("Matched {target:?}");
         Ok(DiscoveredTarget(target))
     }
+
+    pub fn find_overnet_id(&self, overnet_id: u64) -> Option<Rc<Target>> {
+        let targets = self.targets.borrow();
+        let mut with_id_iter = targets.iter().filter_map(|(_, t)| {
+            if t.is_enabled() && t.overnet_node_id() == Some(overnet_id) {
+                Some(t)
+            } else {
+                None
+            }
+        });
+        if let Some(id) = with_id_iter.next() {
+            if let Some(_) = with_id_iter.next() {
+                tracing::warn!("Found multiple targets with the same overnet id: {overnet_id}!");
+            }
+            Some(id.clone())
+        } else {
+            None
+        }
+    }
 }
 
 /// A filter to select targets to update. Unlike `TargetInfoQuery`, this cannot be parsed from a string.
@@ -1109,8 +1132,10 @@ mod tests {
     use chrono::TimeZone;
     use ffx_daemon_events::TargetConnectionState;
     use ffx_target::Description;
+    use fidl_fuchsia_overnet_protocol;
     use fuchsia_async::Task;
     use futures::prelude::*;
+    use rcs::RcsConnection;
     use std::collections::BTreeSet;
     use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV6};
     use std::pin::Pin;
@@ -1897,7 +1922,7 @@ mod tests {
             task: Task::local(future::pending()),
             overnet_node: local_node,
             ssh_addr: None,
-            remote_overnet_id: None,
+            remote_overnet_id: target::RemoteOvernetIdState::Pending(vec![]),
         });
 
         let collection = TargetCollection::new();
@@ -2154,5 +2179,20 @@ mod tests {
         );
         let tq = TargetInfoQuery::from("fe80::dead:beef:beef:beef");
         assert!(tq.match_description(&Description { addresses: vec![addr], ..Default::default() }))
+    }
+
+    #[fuchsia::test]
+    async fn test_find_overnet_id() {
+        let tc = TargetCollection::new();
+        let target = Target::new();
+        let node = overnet_core::Router::new(None).unwrap();
+        let rcs = RcsConnection::new(node, &mut fidl_fuchsia_overnet_protocol::NodeId { id: 1234 })
+            .expect("couldn't make RcsConnection");
+        target.set_state(TargetConnectionState::Rcs(rcs));
+        target.enable();
+        let tid = target.id();
+        tc.targets.borrow_mut().insert(1, target);
+        let t = tc.find_overnet_id(1234).expect("Couldn't find overnet id 1234");
+        assert_eq!(t.id(), tid);
     }
 }

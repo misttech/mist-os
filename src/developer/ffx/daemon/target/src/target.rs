@@ -239,11 +239,29 @@ impl EventSynthesizer<TargetEvent> for TargetEventSynthesizer {
     }
 }
 
+pub(crate) enum RemoteOvernetIdState {
+    Pending(Vec<channel::oneshot::Sender<Option<u64>>>),
+    Ready(Option<u64>),
+}
 pub(crate) struct HostPipeState {
     pub task: Task<()>,
     pub overnet_node: Arc<overnet_core::Router>,
     pub(crate) ssh_addr: Option<SocketAddr>,
-    pub(crate) remote_overnet_id: Option<u64>,
+    pub(crate) remote_overnet_id: RemoteOvernetIdState,
+}
+
+impl HostPipeState {
+    fn flush_waiters(&mut self) {
+        if let RemoteOvernetIdState::Pending(waiters) =
+            std::mem::replace(&mut self.remote_overnet_id, RemoteOvernetIdState::Ready(None))
+        {
+            for sender in waiters.into_iter() {
+                let _ = sender.send(None);
+            }
+        } else {
+            unreachable!()
+        }
+    }
 }
 
 pub struct Target {
@@ -1067,6 +1085,15 @@ impl Target {
         self.addrs.borrow_mut().replace(t);
     }
 
+    // Copy the addresses from other into ours -- used when we learn that target A
+    // is actually the same as target B, just at a different address.
+    pub fn extend_addrs_from_other(&self, other: Rc<Self>) {
+        let mut addrs = self.addrs.borrow_mut();
+        for addr in other.addrs.borrow().iter() {
+            addrs.insert(addr.clone());
+        }
+    }
+
     pub(crate) fn addrs_extend<T>(&self, new_addrs: T)
     where
         T: IntoIterator<Item = TargetAddrEntry>,
@@ -1138,11 +1165,10 @@ impl Target {
         roid_sender: Option<channel::oneshot::Sender<Option<u64>>>,
     ) {
         if self.host_pipe.borrow().is_some() {
-            let HostPipeState { task, overnet_node, ssh_addr: _, remote_overnet_id: _ } =
-                self.host_pipe.take().unwrap();
+            let HostPipeState { task, overnet_node, .. } = self.host_pipe.take().unwrap();
             drop(task);
             tracing::debug!("Reconnecting host_pipe for {}@{}", self.nodename_str(), self.id());
-            self.run_host_pipe_with_id_sender(&overnet_node, roid_sender);
+            self.run_host_pipe_with_sender(&overnet_node, roid_sender);
         }
     }
 
@@ -1151,11 +1177,11 @@ impl Target {
     }
 
     pub fn run_host_pipe(self: &Rc<Self>, overnet_node: &Arc<overnet_core::Router>) {
-        self.run_host_pipe_with_id_sender(overnet_node, None)
+        self.run_host_pipe_with_sender(overnet_node, None)
     }
 
     #[tracing::instrument]
-    pub fn run_host_pipe_with_id_sender(
+    pub fn run_host_pipe_with_sender(
         self: &Rc<Self>,
         overnet_node: &Arc<overnet_core::Router>,
         roid_sender: Option<channel::oneshot::Sender<Option<u64>>>,
@@ -1168,9 +1194,19 @@ impl Target {
             return;
         }
 
-        if let Some(ref hp) = *self.host_pipe.borrow() {
+        if let Some(ref mut hp) = *self.host_pipe.borrow_mut() {
+            // The host-pipe already exists
             if let Some(sender) = roid_sender {
-                let _ = sender.send(hp.remote_overnet_id);
+                // The caller is waiting for a response
+                match &mut hp.remote_overnet_id {
+                    RemoteOvernetIdState::Pending(ref mut waiters) => waiters.push(sender),
+                    RemoteOvernetIdState::Ready(roid) => {
+                        tracing::debug!(
+                        "Got request for host pipe overnet id for an already-running host-pipe -- sending back {roid:?}",
+                    );
+                        let _ = sender.send(*roid);
+                    }
+                }
             }
             // tracing::debug!("Host pipe is already set for {}@{}.", self.nodename_str(), self.id());
             return;
@@ -1180,6 +1216,8 @@ impl Target {
         let target_name_str = format!("{}@{}", self.nodename_str(), self.id());
         let node = Arc::clone(overnet_node);
         let overnet_node = Arc::clone(overnet_node);
+        let roid_waiters =
+            if let Some(roid_sender) = roid_sender { vec![roid_sender] } else { vec![] };
         self.host_pipe.borrow_mut().replace(HostPipeState {
             task: Task::local(async move {
                 // The purpose of a host pipe is to ultimately get us connected to RCS and let us transition
@@ -1190,11 +1228,15 @@ impl Target {
                 {
                     let Some(target) = weak_target.upgrade() else {
                         // weird that self is already gone, but ¯\_(ツ)_/¯
+                        // Unfortunately that means we have no access to its remote-overnet-id waiters :-(
                         return;
                     };
                     let state = target.state.borrow().clone();
                     if let TargetConnectionState::Rcs(rcs) = state {
                         if knock_rcs(&rcs.proxy).await.is_ok() {
+                            if let Some(host_pipe) = target.host_pipe.borrow_mut().as_mut() {
+                                host_pipe.flush_waiters();
+                            }
                             return;
                         }
                     }
@@ -1225,12 +1267,14 @@ impl Target {
                             // Then we will never set the ssh_addr, etc?
                             if let Some(host_pipe) = target.host_pipe.borrow_mut().as_mut() {
                                 host_pipe.ssh_addr = Some(hp.get_address());
-                                if let Some(compat) = compatibility_status {
-                                    host_pipe.remote_overnet_id = compat.overnet_id;
-                                }
-                                if let Some(sender) = roid_sender {
-                                    let _ = sender.send(host_pipe.remote_overnet_id);
-                                }
+                                let overnet_id = compatibility_status.and_then(|compat| compat.overnet_id);
+                                tracing::debug!("Got host pipe overnet id {:?} -- sending to waiters", overnet_id);
+                                // We only go through this path once
+                                if let RemoteOvernetIdState::Pending(waiters) = std::mem::replace(&mut host_pipe.remote_overnet_id, RemoteOvernetIdState::Ready(overnet_id)) {
+                                    for sender in waiters.into_iter() {
+                                        let _ = sender.send(overnet_id);
+                                    }
+                                } else { unreachable!() }
                             }
                         }
 
@@ -1258,6 +1302,9 @@ impl Target {
                         });
                         if let Some(target) = weak_target.upgrade() {
                             target.set_compatibility_status(&compatibility_status);
+                            if let Some(host_pipe) = target.host_pipe.borrow_mut().as_mut() {
+                                host_pipe.flush_waiters();
+                            }
                         }
                     }
                 }
@@ -1269,7 +1316,7 @@ impl Target {
             }),
             overnet_node,
             ssh_addr: None,
-            remote_overnet_id: None,
+            remote_overnet_id: RemoteOvernetIdState::Pending(roid_waiters),
         });
     }
 
@@ -2369,7 +2416,7 @@ mod test {
             task: Task::local(future::pending()),
             overnet_node: local_node,
             ssh_addr: None,
-            remote_overnet_id: None,
+            remote_overnet_id: RemoteOvernetIdState::Ready(None),
         });
 
         target.disconnect();
@@ -2460,6 +2507,24 @@ mod test {
 
             assert_eq!(target.infer_fastboot_interface(), Some(FastbootInterface::Udp));
         }
+    }
+
+    #[fuchsia::test]
+    async fn test_query_overnet_id() {
+        let local_node = overnet_core::Router::new(None).unwrap();
+        let target = Target::new();
+        target.set_state(TargetConnectionState::Mdns(Instant::now()));
+        target.host_pipe.borrow_mut().replace(HostPipeState {
+            task: Task::local(future::pending()),
+            overnet_node: local_node.clone(),
+            ssh_addr: None,
+            remote_overnet_id: RemoteOvernetIdState::Ready(Some(123)),
+        });
+        let (snd, rcv) = channel::oneshot::channel::<Option<u64>>();
+        target.enable();
+        target.run_host_pipe_with_sender(&local_node, Some(snd));
+        let roid = rcv.await.expect("roid receiver failed");
+        assert_eq!(roid, Some(123));
     }
 
     mod enabled {

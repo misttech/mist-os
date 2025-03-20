@@ -412,8 +412,12 @@ impl FidlProtocol for TargetCollectionProtocol {
                 };
 
                 tracing::trace!("Found target: {target:?}");
-
-                self.tasks.spawn(TargetHandle::new(target, cx.clone(), target_handle)?);
+                self.tasks.spawn(TargetHandle::new(
+                    target,
+                    cx.clone(),
+                    target_handle,
+                    target_collection.clone(),
+                )?);
                 responder.send(Ok(())).map_err(Into::into)
             }
             ffx::TargetCollectionRequest::AddTarget {
