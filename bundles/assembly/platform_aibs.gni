@@ -338,6 +338,7 @@ _userdebug_aib_names = bootstrap_userdebug_platform_aib_names + [
                          # Needed by both eng and userdebug products, but contains things disallowed in
                          # user.
                          "adb_support",
+                         "bluetooth_hfp_hf",
                          "core_realm_development_access",
                          "core_realm_development_access_rcs_no_usb",
                          "core_realm_development_access_rcs_usb",
@@ -465,11 +466,20 @@ required_userdebug_aib_names = required_user_aib_names + [
 experimental_aib_names = [
   "adb_support",
   "bootstrap_realm_vsock_development_access",
+
+  # Bluetooth
+  # Bluetooth phone calling as the Hands Free role. Currently in development.
+  "bluetooth_hfp_hf",
+
   "nanohub_support",
   "paravirtualization_support_bootstrap",
   "power_framework_broker",
   "power_framework_sag",
   "power_framework_development_support",
+
+  "session_manager_enable_pkg_cache",
+
+  "sensors_framework_eng",
 
   # Timekeeper
   # Gives timekeeper some mutable persistent storage. This is optionally
@@ -481,9 +491,6 @@ experimental_aib_names = [
   "timekeeper_wake_alarms",
 
   "trusted_execution_environment",
-  "session_manager_enable_pkg_cache",
-
-  "sensors_framework_eng",
 ]
 
 # Ensure that we do not list any experimental AIBs as required

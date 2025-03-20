@@ -113,7 +113,39 @@ pub enum HfpCodecId {
     Lc3Swb,
 }
 
-/// Configuration options for Bluetooth hands free (bt-hfp).
+/// HFP Hands Free Features
+/// See HFP v1.9 Table 6.4 for the list of features and Table 3.2 for a description of the features.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(default)]
+pub struct HandsFreeEnabledConfig {
+    /// Enable echo canceling and/or noise reduction functionality.
+    pub echo_canceling_and_noise_reduction: bool,
+    /// Enable management of of several concurrent calls.
+    pub three_way_calling: bool,
+    /// Enable call identification for incoming calls.
+    pub calling_line_identification: bool,
+    /// Enable hands-free control of a device's functions through voice commands.
+    pub voice_recognition: bool,
+    /// Enable the remote volume control feature.
+    pub remote_volume_control: bool,
+    /// Enable enhanced hands-free call controls including integration with voice assistants.
+    pub enhanced_voice_recognition: bool,
+    /// Enable the voice-to-text feature.
+    pub voice_recognition_text: bool,
+}
+
+/// Configuration options for Bluetooth hands free calling (Hands Free role).
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(untagged)]
+pub enum HandsFreeConfig {
+    #[default]
+    #[serde(rename = "disabled")]
+    Disabled,
+    /// Enable hands free calling hands free (`bt-hfp-hands-free`).
+    Enabled(HandsFreeEnabledConfig),
+}
+
+/// Configuration options for Bluetooth hands free calling (Audio Gateway role).
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default)]
 pub struct HfpConfig {
@@ -131,6 +163,10 @@ pub struct HfpConfig {
     ///  - eSCO S4
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub audio_gateway: Vec<HfpAudioGatewayFeature>,
+
+    /// Specifies the configuration for `bt-hfp-hands-free`.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub hands_free: HandsFreeConfig,
 
     /// The set of codecs that are enabled to use.
     /// If MSBC is enabled, Wide Band Speech will be enabled
@@ -298,7 +334,16 @@ mod tests {
                         "reject_incoming_call",
                         "enhanced_call_control",
                         "enhanced_voice_recognition_status",
-                        "voice_recognition_text"],
+                        "voice_recognition_text" ],
+                    "hands_free": {
+                        "echo_canceling_and_noise_reduction": true,
+                        "three_way_calling": true,
+                        "calling_line_identification": true,
+                        "voice_recognition": true,
+                        "remote_volume_control": true,
+                        "enhanced_voice_recognition": true,
+                        "voice_recognition_text": true,
+                    },
                     "codecs_supported": ["cvsd", "msbc", "lc3swb"],
                     "controller_encodes": ["cvsd", "msbc", "lc3swb"],
                 },
@@ -333,6 +378,15 @@ mod tests {
                     HfpAudioGatewayFeature::EnhancedVoiceRecognitionStatus,
                     HfpAudioGatewayFeature::VoiceRecognitionText,
                 ],
+                hands_free: HandsFreeConfig::Enabled(HandsFreeEnabledConfig {
+                    echo_canceling_and_noise_reduction: true,
+                    three_way_calling: true,
+                    calling_line_identification: true,
+                    voice_recognition: true,
+                    remote_volume_control: true,
+                    enhanced_voice_recognition: true,
+                    voice_recognition_text: true,
+                }),
                 codecs_supported: vec![HfpCodecId::Cvsd, HfpCodecId::Msbc, HfpCodecId::Lc3Swb],
                 controller_encodes: vec![HfpCodecId::Cvsd, HfpCodecId::Msbc, HfpCodecId::Lc3Swb],
             },

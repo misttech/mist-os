@@ -2366,7 +2366,7 @@ assembly_input_bundle("bluetooth_device_id") {
   ]
 }
 
-# Bluetooth profile support: HFP - AG
+# Bluetooth profile support: HFP - Audio Gateway
 #
 # feature_set_levels: minimal
 # build-types: all
@@ -2382,6 +2382,29 @@ assembly_input_bundle("bluetooth_hfp_ag") {
         {
           component_name = "core"
           shards = [ "//src/connectivity/bluetooth/profiles/bt-hfp-audio-gateway/meta/bt-hfp-audio-gateway.core_shard.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
+# Bluetooth profile support: HFP - Hands Free
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: minimal
+# valid build-types: eng, userdebug
+#
+assembly_input_bundle("bluetooth_hfp_hf") {
+  flexible_packages = [
+    "//src/connectivity/bluetooth/profiles/bt-hfp-hands-free:without-config",
+  ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/connectivity/bluetooth/profiles/bt-hfp-hands-free/meta/bt-hfp-hands-free.core_shard.cml" ]
         },
       ]
     },

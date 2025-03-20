@@ -7,7 +7,7 @@ use anyhow::format_err;
 use crate::subsystems::prelude::*;
 use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_config::bluetooth_config::{
-    BluetoothConfig, HfpAudioGatewayFeature, HfpCodecId, Snoop,
+    BluetoothConfig, HandsFreeConfig, HfpAudioGatewayFeature, HfpCodecId, Snoop,
 };
 use assembly_config_schema::platform_config::media_config::{AudioConfig, PlatformMediaConfig};
 
@@ -79,6 +79,14 @@ impl DefineSubsystemConfiguration<(&BluetoothConfig, &PlatformMediaConfig)>
                     profiles.did.service_description.clone().unwrap_or(String::new()),
                 )?;
         }
+
+        // TODO(https://fxbug.dev/362573469): Bail if the features don't make sense
+        // (VoiceRecognitionText without EnhancedVoiceRecognitionStatus, for example)
+        let hfp_supported_codecs = if profiles.hfp.codecs_supported.is_empty() {
+            vec![HfpCodecId::Cvsd, HfpCodecId::Msbc, HfpCodecId::Lc3Swb]
+        } else {
+            profiles.hfp.codecs_supported.clone()
+        };
         if profiles.hfp.enabled {
             builder.platform_bundle("bluetooth_hfp_ag");
 
@@ -86,14 +94,6 @@ impl DefineSubsystemConfiguration<(&BluetoothConfig, &PlatformMediaConfig)>
                 vec![HfpCodecId::Cvsd, HfpCodecId::Msbc]
             } else {
                 profiles.hfp.controller_encodes.clone()
-            };
-
-            // TODO(https://fxbug.dev/362573469): Bail if the features don't make sense
-            // (VoiceRecognitionText without EnhancedVoiceRecognitionStatus, for example)
-            let supported_codecs = if profiles.hfp.codecs_supported.is_empty() {
-                vec![HfpCodecId::Cvsd, HfpCodecId::Msbc, HfpCodecId::Lc3Swb]
-            } else {
-                profiles.hfp.codecs_supported.clone()
             };
 
             let offload_type = match media_config.audio {
@@ -165,8 +165,26 @@ impl DefineSubsystemConfiguration<(&BluetoothConfig, &PlatformMediaConfig)>
                 )?
                 .field("controller_encoding_cvsd", controller_encodes.contains(&HfpCodecId::Cvsd))?
                 .field("controller_encoding_msbc", controller_encodes.contains(&HfpCodecId::Msbc))?
-                .field("wide_band_speech", supported_codecs.contains(&HfpCodecId::Msbc))?
+                .field("wide_band_speech", hfp_supported_codecs.contains(&HfpCodecId::Msbc))?
                 .field("offload_type", offload_type)?;
+        }
+        if let HandsFreeConfig::Enabled(hfp_hf_features) = &profiles.hfp.hands_free {
+            builder.platform_bundle("bluetooth_hfp_hf");
+
+            let mut hfp_hf_config =
+                builder.package("bt-hfp-hands-free").component("meta/bt-hfp-hands-free.cm")?;
+            hfp_hf_config
+                .field("ec_or_nr", hfp_hf_features.echo_canceling_and_noise_reduction)?
+                .field("call_waiting_or_three_way_calling", hfp_hf_features.three_way_calling)?
+                .field("cli_presentation_capability", hfp_hf_features.calling_line_identification)?
+                .field("voice_recognition_activation", hfp_hf_features.voice_recognition)?
+                .field("remote_volume_control", hfp_hf_features.remote_volume_control)?
+                .field("wide_band_speech", hfp_supported_codecs.contains(&HfpCodecId::Msbc))?
+                .field("enhanced_voice_recognition", hfp_hf_features.enhanced_voice_recognition)?
+                .field(
+                    "enhanced_voice_recognition_with_text",
+                    hfp_hf_features.voice_recognition_text,
+                )?;
         }
         if profiles.map.mce_enabled {
             builder.platform_bundle("bluetooth_map_mce");
