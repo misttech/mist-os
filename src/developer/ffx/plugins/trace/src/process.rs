@@ -90,7 +90,25 @@ pub fn process_trace_file(
 ) -> Result<Vec<String>> {
     let mut warning_list = Vec::new();
 
-    let mut symbolizer = if symbolize { Some(Symbolizer::new(&context)) } else { None };
+    let mut symbolizer = if symbolize {
+        let symbolization_map = match SymbolizationMap::from_context(context) {
+            Ok(symbolization_map) => symbolization_map,
+            Err(err) => {
+                // Fall back to an empty symbolization map, but warn the user.
+                warning_list.push(format!(
+                    "{}WARNING: FIDL ordinals not loaded: {:?}{}",
+                    color::Fg(color::Yellow),
+                    err,
+                    style::Reset
+                ));
+                SymbolizationMap::default()
+            }
+        };
+
+        Some(Symbolizer::new(symbolization_map))
+    } else {
+        None
+    };
     let mut category_counter = if let Some(input_categories) = category_check {
         Some(CategoryCounter::new(input_categories))
     } else {
@@ -238,8 +256,7 @@ pub struct Symbolizer {
 }
 
 impl Symbolizer {
-    pub fn new(context: &EnvironmentContext) -> Self {
-        let ordinals = SymbolizationMap::from_context(context).unwrap_or_default();
+    pub fn new(ordinals: SymbolizationMap) -> Self {
         Self { ordinals, flow_has_steps: BTreeMap::new() }
     }
 
