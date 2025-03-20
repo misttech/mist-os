@@ -77,7 +77,7 @@ impl ConnectionError {
                 Icmpv4DestUnreachableCode::DestPortUnreachable => {
                     Some(ConnectionError::PortUnreachable)
                 }
-                // TODO(https://fxbug.dev/42052672): update PMTU/MSS.
+                // TODO(https://fxbug.dev/404628798): update PMTU/MSS.
                 Icmpv4DestUnreachableCode::FragmentationRequired => None,
                 Icmpv4DestUnreachableCode::SourceRouteFailed => {
                     Some(ConnectionError::SourceRouteFailed)
@@ -146,7 +146,7 @@ impl ConnectionError {
             IcmpErrorCode::V6(Icmpv6ErrorCode::TimeExceeded(_)) => {
                 Some(ConnectionError::HostUnreachable)
             }
-            // TODO(https://fxbug.dev/42052672): update PMTU/MSS.
+            // TODO(https://fxbug.dev/404628798): update PMTU/MSS.
             IcmpErrorCode::V6(Icmpv6ErrorCode::PacketTooBig) => None,
         }
     }
