@@ -27,7 +27,6 @@ use net_declare::{
     fidl_ip_v4, fidl_ip_v6, fidl_mac, fidl_socket_addr, fidl_subnet, net_addr_subnet, net_ip_v4,
     net_ip_v6, net_subnet_v4, net_subnet_v6, std_ip, std_ip_v4, std_socket_addr,
 };
-use net_types::ethernet::Mac;
 use net_types::ip::{
     AddrSubnetEither, Ip, IpAddress as _, IpInvariant, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
 };
@@ -46,14 +45,12 @@ use netstack_testing_common::{
     ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
 use netstack_testing_macros::netstack_test;
-use packet::{InnerPacketBuilder as _, ParsablePacket as _, Serializer as _};
-use packet_formats::arp::{ArpOp, ArpPacketBuilder};
+use packet::{ParsablePacket as _, Serializer as _};
 use packet_formats::ethernet::{
     EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck,
     ETHERNET_MIN_BODY_LEN_NO_TAG,
 };
 use packet_formats::icmp::ndp::options::{NdpOptionBuilder, PrefixInformation};
-use packet_formats::icmp::ndp::NeighborAdvertisement;
 use packet_formats::icmp::{
     IcmpDestUnreachable, IcmpEchoRequest, IcmpMessage, IcmpPacketBuilder, IcmpTimeExceeded,
     IcmpZeroCode, Icmpv4DestUnreachableCode, Icmpv4Packet, Icmpv4ParameterProblem,
@@ -3695,67 +3692,27 @@ async fn tcp_connect_icmp_error<N: Netstack, I: TestIpExt, M: IcmpMessage<I> + D
         .add_address_and_subnet_route(I::CLIENT_SUBNET)
         .await
         .expect("configure address");
-    client_interface.apply_nud_flake_workaround().await.expect("nud flake workaround");
+    client
+        .add_neighbor_entry(client_interface.id(), I::SERVER_SUBNET.addr, SERVER_MAC)
+        .await
+        .expect("add_neighbor_entry");
 
-    let server_mac = Mac::new(SERVER_MAC.octets);
     let fake_ep_loop = async move {
         fake_ep
             .frame_stream()
             .map(|r| r.expect("failed to read frame"))
-            .for_each(|(frame, _dropped)| async move {
-                let mut frame = &frame[..];
-                let eth = packet_formats::ethernet::EthernetFrame::parse(
-                    &mut frame,
-                    packet_formats::ethernet::EthernetFrameLengthCheck::NoCheck,
-                )
-                .expect("error parsing ethernet frame");
+            .for_each(|(frame, dropped)| async move {
+                assert_eq!(dropped, 0);
 
-                let mut frame_body = eth.body();
-                let ip = match I::Packet::parse(&mut frame_body, ()) {
-                    Ok(ip) if ip.proto() == IpProto::Tcp.into() => ip,
-                    _ => {
-                        let confirmation = I::map_ip_in(
-                            (I::CLIENT_ADDR, I::SERVER_ADDR),
-                            |(client_addr, server_addr)| {
-                                ArpPacketBuilder::<_, Ipv4Addr>::new(
-                                    ArpOp::Response,
-                                    server_mac,
-                                    server_addr,
-                                    eth.src_mac(),
-                                    client_addr,
-                                )
-                                .into_serializer()
-                                .encapsulate(EthernetFrameBuilder::new(
-                                    server_mac,
-                                    eth.src_mac(),
-                                    EtherType::Arp,
-                                    ETHERNET_MIN_BODY_LEN_NO_TAG,
-                                ))
-                                .serialize_vec_outer()
-                                .expect("serialize ARP response")
-                                .unwrap_b()
-                            },
-                            |(client_addr, server_addr)| {
-                                ndp::create_message(
-                                    server_mac,
-                                    eth.src_mac(),
-                                    server_addr,
-                                    client_addr,
-                                    NeighborAdvertisement::new(false, true, false, server_addr),
-                                    &[NdpOptionBuilder::TargetLinkLayerAddress(&SERVER_MAC.octets)],
-                                )
-                                .expect("serialize NDP message")
-                            },
-                        );
-                        fake_ep
-                            .write(confirmation.as_ref())
-                            .await
-                            .expect("failed to write ARP response");
-                        return;
-                    }
+                let eth = EthernetFrame::parse(&mut &frame[..], EthernetFrameLengthCheck::NoCheck)
+                    .expect("valid ethernet frame");
+                let Ok(ip) = I::Packet::parse(&mut eth.body(), ()) else {
+                    return;
                 };
-                let mut body = eth.body().to_vec();
-                let icmp_error = packet::Buf::new(&mut body, ..)
+                if ip.proto() != IpProto::Tcp.into() {
+                    return;
+                }
+                let icmp_error = packet::Buf::new(&mut eth.body().to_vec(), ..)
                     .encapsulate(IcmpPacketBuilder::<I, _>::new(
                         ip.dst_ip(),
                         ip.src_ip(),
@@ -3771,7 +3728,7 @@ async fn tcp_connect_icmp_error<N: Netstack, I: TestIpExt, M: IcmpMessage<I> + D
                     .encapsulate(EthernetFrameBuilder::new(
                         eth.dst_mac(),
                         eth.src_mac(),
-                        I::map_ip_in((), |()| EtherType::Ipv4, |()| EtherType::Ipv6),
+                        EtherType::from_ip_version(I::VERSION),
                         ETHERNET_MIN_BODY_LEN_NO_TAG,
                     ))
                     .serialize_vec_outer()
@@ -3950,13 +3907,13 @@ async fn tcp_established_icmp_error<N: Netstack, I: TestIpExt, M: IcmpMessage<I>
         .add_address_and_subnet_route(I::CLIENT_SUBNET)
         .await
         .expect("configure address");
-    client_interface.apply_nud_flake_workaround().await.expect("nud flake workaround");
-
-    let server_mac = Mac::new(SERVER_MAC.octets);
+    client
+        .add_neighbor_entry(client_interface.id(), I::SERVER_SUBNET.addr, SERVER_MAC)
+        .await
+        .expect("add_neighbor_entry");
 
     // Filter frames observed on the fake endpoint to just those containing a TCP
-    // segment in an IP packet, responding to other frames with neighbor
-    // confirmations to allow neighbor resolution to succeed.
+    // segment in an IP packet.
     let fake_ep = &fake_ep;
     let mut frames = fake_ep.frame_stream().filter_map(|result| {
         Box::pin(async {
@@ -3965,52 +3922,10 @@ async fn tcp_established_icmp_error<N: Netstack, I: TestIpExt, M: IcmpMessage<I>
 
             let eth = EthernetFrame::parse(&mut &frame[..], EthernetFrameLengthCheck::NoCheck)
                 .expect("valid ethernet frame");
-            let ip = match I::Packet::parse(&mut eth.body(), ()) {
-                Ok(ip) if ip.proto() == IpProto::Tcp.into() => ip,
-                _ => {
-                    let confirmation = I::map_ip_in(
-                        (I::CLIENT_ADDR, I::SERVER_ADDR),
-                        |(client_addr, server_addr)| {
-                            ArpPacketBuilder::<_, Ipv4Addr>::new(
-                                ArpOp::Response,
-                                server_mac,
-                                server_addr,
-                                eth.src_mac(),
-                                client_addr,
-                            )
-                            .into_serializer()
-                            .encapsulate(EthernetFrameBuilder::new(
-                                server_mac,
-                                eth.src_mac(),
-                                EtherType::Arp,
-                                ETHERNET_MIN_BODY_LEN_NO_TAG,
-                            ))
-                            .serialize_vec_outer()
-                            .expect("serialize ARP response")
-                            .unwrap_b()
-                        },
-                        |(client_addr, server_addr)| {
-                            ndp::create_message(
-                                server_mac,
-                                eth.src_mac(),
-                                server_addr,
-                                client_addr,
-                                NeighborAdvertisement::new(false, true, false, server_addr),
-                                &[NdpOptionBuilder::TargetLinkLayerAddress(&SERVER_MAC.octets)],
-                            )
-                            .expect("serialize NDP message")
-                        },
-                    );
-                    fake_ep
-                        .write(confirmation.as_ref())
-                        .await
-                        .expect("failed to write ARP response");
-                    return None;
-                }
-            };
+            let ip = I::Packet::parse(&mut eth.body(), ()).ok()?;
             let tcp =
                 TcpSegment::parse(&mut ip.body(), TcpParseArgs::new(ip.src_ip(), ip.dst_ip()))
-                    .expect("valid TCP segment");
+                    .ok()?;
 
             Some((
                 eth.builder(),
@@ -4029,7 +3944,7 @@ async fn tcp_established_icmp_error<N: Netstack, I: TestIpExt, M: IcmpMessage<I>
         let ethernet_builder = EthernetFrameBuilder::new(
             eth.dst_mac(),
             eth.src_mac(),
-            I::map_ip_in((), |()| EtherType::Ipv4, |()| EtherType::Ipv6),
+            EtherType::from_ip_version(I::VERSION),
             ETHERNET_MIN_BODY_LEN_NO_TAG,
         );
         let mut syn_ack = TcpSegmentBuilder::new(
@@ -4060,13 +3975,9 @@ async fn tcp_established_icmp_error<N: Netstack, I: TestIpExt, M: IcmpMessage<I>
         // Now that the connection is established, respond to the next packet with an
         // ICMP error to cause a soft error on the connection.
         let (_eth, ip, tcp) = frames.next().await.unwrap();
-        let mut body = packet::Buf::new([], ..)
+        let icmp_error = packet::Buf::new([], ..)
             .encapsulate(tcp)
             .encapsulate(ip.clone())
-            .serialize_vec_outer()
-            .expect("serialize IP packet")
-            .unwrap_b();
-        let icmp_error = packet::Buf::new(&mut body, ..)
             .encapsulate(IcmpPacketBuilder::<I, _>::new(ip.dst_ip(), ip.src_ip(), code, message))
             .encapsulate(I::PacketBuilder::new(
                 ip.dst_ip(),
