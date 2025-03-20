@@ -226,8 +226,10 @@ if (_print_warnings) {
           [
             "cxx_enable",
             "cxx_download_objects",
+            "cxx_exec_strategy",
             "link_enable",
             "link_download_unstripped_binaries",
+            "link_exec_strategy",
             "rust_enable",
             "rust_download_rlibs",
             "rust_download_unstripped_binaries",
@@ -266,6 +268,9 @@ rbe_settings = {
   if (defined(rbe_settings_overrides["cxx_minimalist_wrapper"])) {
     cxx_minimalist_wrapper = rbe_settings_overrides["cxx_minimalist_wrapper"]
   }
+  if (defined(rbe_settings_overrides["cxx_exec_strategy"])) {
+    cxx_exec_strategy = rbe_settings_overrides["cxx_exec_strategy"]
+  }
 
   # link overrides
   if (defined(rbe_settings_overrides["link_enable"])) {
@@ -274,6 +279,9 @@ rbe_settings = {
   if (defined(rbe_settings_overrides["link_download_unstripped_binaries"])) {
     link_download_unstripped_binaries =
         rbe_settings_overrides["link_download_unstripped_binaries"]
+  }
+  if (defined(rbe_settings_overrides["link_exec_strategy"])) {
+    link_exec_strategy = rbe_settings_overrides["link_exec_strategy"]
   }
 
   # rust overrides
