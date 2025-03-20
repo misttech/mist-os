@@ -2326,7 +2326,7 @@ mod tests {
         let received_key = &m.fake_device_state.lock().keys[0];
         assert_eq!(received_key.key, Some(sent_key.key));
         assert_eq!(received_key.key_idx, Some(sent_key.key_id as u8));
-        assert_eq!(received_key.key_type, Some(fidl_common::WlanKeyType::Pairwise));
+        assert_eq!(received_key.key_type, Some(fidl_ieee80211::KeyType::Pairwise));
     }
 
     #[fuchsia::test(allow_stalls = false)]

@@ -27,23 +27,23 @@ class SetKeysTest : public SimTest {
 
 wlan_fullmac_wire::WlanFullmacImplSetKeysRequest FakeSetKeysRequest(
     const uint8_t keys[][wlan_ieee80211::kMaxKeyLen], size_t n, fidl::AnyArena& arena) {
-  fidl::VectorView<fuchsia_wlan_common::wire::WlanKeyConfig> key_list(arena, n);
+  fidl::VectorView<fuchsia_wlan_ieee80211::wire::SetKeyDescriptor> key_descriptors(arena, n);
 
   for (size_t i = 0; i < n; i++) {
-    key_list[i] =
-        fuchsia_wlan_common::wire::WlanKeyConfig::Builder(arena)
+    key_descriptors[i] =
+        fuchsia_wlan_ieee80211::wire::SetKeyDescriptor::Builder(arena)
             .key(fidl::VectorView<uint8_t>::FromExternal(
                 const_cast<uint8_t*>(keys[i]), strlen(reinterpret_cast<const char*>(keys[i]))))
-            .key_idx(static_cast<uint8_t>(i))
-            .key_type(fuchsia_wlan_common::wire::WlanKeyType::kPairwise)
+            .key_id(static_cast<uint8_t>(i))
+            .key_type(fuchsia_wlan_ieee80211::wire::KeyType::kPairwise)
             .cipher_type(wlan_ieee80211::CipherSuiteType::kCcmp128)
             .cipher_oui(kIeeeOui)
             .rsc({})
             .peer_addr({})
-            .protection({})
             .Build();
   }
-  auto builder = wlan_fullmac_wire::WlanFullmacImplSetKeysRequest::Builder(arena).keylist(key_list);
+  auto builder = wlan_fullmac_wire::WlanFullmacImplSetKeysRequest::Builder(arena).key_descriptors(
+      key_descriptors);
   return builder.Build();
 }
 
@@ -81,33 +81,34 @@ TEST_F(SetKeysTest, SetGroupKey) {
   const uint8_t ucast_key[wlan_ieee80211::kMaxKeyLen] = "My Key";
   const size_t ucast_keylen = strlen(reinterpret_cast<const char*>(ucast_key));
 
-  fidl::VectorView<fuchsia_wlan_common::wire::WlanKeyConfig> key_list(client_ifc_.test_arena_, 2);
-  key_list[0] = fuchsia_wlan_common::wire::WlanKeyConfig::Builder(client_ifc_.test_arena_)
-                    .key(fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(group_key),
-                                                                 group_keylen))
-                    .key_idx(static_cast<uint8_t>(0))
-                    .key_type(fuchsia_wlan_common::wire::WlanKeyType::kGroup)
-                    .cipher_type(wlan_ieee80211::CipherSuiteType::kCcmp128)
-                    .cipher_oui(kIeeeOui)
-                    .rsc({})
-                    .peer_addr({0xff, 0xff, 0xff, 0xff, 0xff, 0xff})
-                    .protection({})
-                    .Build();
+  fidl::VectorView<fuchsia_wlan_ieee80211::wire::SetKeyDescriptor> key_descriptors(
+      client_ifc_.test_arena_, 2);
+  key_descriptors[0] =
+      fuchsia_wlan_ieee80211::wire::SetKeyDescriptor::Builder(client_ifc_.test_arena_)
+          .key(fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(group_key),
+                                                       group_keylen))
+          .key_id(static_cast<uint8_t>(0))
+          .key_type(fuchsia_wlan_ieee80211::wire::KeyType::kGroup)
+          .cipher_type(wlan_ieee80211::CipherSuiteType::kCcmp128)
+          .cipher_oui(kIeeeOui)
+          .rsc({})
+          .peer_addr({0xff, 0xff, 0xff, 0xff, 0xff, 0xff})
+          .Build();
 
-  key_list[1] = fuchsia_wlan_common::wire::WlanKeyConfig::Builder(client_ifc_.test_arena_)
-                    .key(fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(ucast_key),
-                                                                 ucast_keylen))
-                    .key_idx(static_cast<uint8_t>(1))
-                    .key_type(fuchsia_wlan_common::wire::WlanKeyType::kPairwise)
-                    .cipher_type(wlan_ieee80211::CipherSuiteType::kCcmp128)
-                    .cipher_oui(kIeeeOui)
-                    .rsc({})
-                    .peer_addr({0xde, 0xad, 0xbe, 0xef, 0xab, 0xcd})
-                    .protection({})
-                    .Build();
+  key_descriptors[1] =
+      fuchsia_wlan_ieee80211::wire::SetKeyDescriptor::Builder(client_ifc_.test_arena_)
+          .key(fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(ucast_key),
+                                                       ucast_keylen))
+          .key_id(static_cast<uint8_t>(1))
+          .key_type(fuchsia_wlan_ieee80211::wire::KeyType::kPairwise)
+          .cipher_type(wlan_ieee80211::CipherSuiteType::kCcmp128)
+          .cipher_oui(kIeeeOui)
+          .rsc({})
+          .peer_addr({0xde, 0xad, 0xbe, 0xef, 0xab, 0xcd})
+          .Build();
 
   auto builder = wlan_fullmac_wire::WlanFullmacImplSetKeysRequest::Builder(client_ifc_.test_arena_)
-                     .keylist(key_list);
+                     .key_descriptors(key_descriptors);
 
   auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->SetKeys(builder.Build());
   EXPECT_OK(result);
@@ -137,21 +138,22 @@ TEST_F(SetKeysTest, CustomOuiNotSupported) {
 
   fidl::Array<uint8_t, 3> kCustomOui = {1, 2, 3};
 
-  fidl::VectorView<fuchsia_wlan_common::wire::WlanKeyConfig> key_list(client_ifc_.test_arena_, 1);
-  key_list[0] = fuchsia_wlan_common::wire::WlanKeyConfig::Builder(client_ifc_.test_arena_)
-                    .key(fidl::VectorView<uint8_t>::FromExternal(
-                        const_cast<uint8_t*>(key), strlen(reinterpret_cast<const char*>(key))))
-                    .key_idx(static_cast<uint8_t>(0))
-                    .key_type(fuchsia_wlan_common::wire::WlanKeyType::kPairwise)
-                    .cipher_type(wlan_ieee80211::CipherSuiteType::kCcmp128)
-                    .cipher_oui(kCustomOui)
-                    .rsc({})
-                    .peer_addr({0xde, 0xad, 0xbe, 0xef, 0xab, 0xcd})
-                    .protection({})
-                    .Build();
+  fidl::VectorView<fuchsia_wlan_ieee80211::wire::SetKeyDescriptor> key_descriptors(
+      client_ifc_.test_arena_, 1);
+  key_descriptors[0] =
+      fuchsia_wlan_ieee80211::wire::SetKeyDescriptor::Builder(client_ifc_.test_arena_)
+          .key(fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(key),
+                                                       strlen(reinterpret_cast<const char*>(key))))
+          .key_id(static_cast<uint8_t>(0))
+          .key_type(fuchsia_wlan_ieee80211::wire::KeyType::kPairwise)
+          .cipher_type(wlan_ieee80211::CipherSuiteType::kCcmp128)
+          .cipher_oui(kCustomOui)
+          .rsc({})
+          .peer_addr({0xde, 0xad, 0xbe, 0xef, 0xab, 0xcd})
+          .Build();
 
   auto builder = wlan_fullmac_wire::WlanFullmacImplSetKeysRequest::Builder(client_ifc_.test_arena_)
-                     .keylist(key_list);
+                     .key_descriptors(key_descriptors);
 
   auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->SetKeys(builder.Build());
   EXPECT_OK(result);
@@ -172,19 +174,20 @@ TEST_F(SetKeysTest, OptionalOuiSupported) {
   const uint8_t key[wlan_ieee80211::kMaxKeyLen] = "My Key";
   const size_t keylen = strlen(reinterpret_cast<const char*>(key));
 
-  fidl::VectorView<fuchsia_wlan_common::wire::WlanKeyConfig> key_list(client_ifc_.test_arena_, 1);
-  key_list[0] = fuchsia_wlan_common::wire::WlanKeyConfig::Builder(client_ifc_.test_arena_)
-                    .key(fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(key), keylen))
-                    .key_idx(static_cast<uint8_t>(0))
-                    .key_type(fuchsia_wlan_common::wire::WlanKeyType::kPairwise)
-                    .cipher_type(wlan_ieee80211::CipherSuiteType::kCcmp128)
-                    .rsc({})
-                    .peer_addr({0xde, 0xad, 0xbe, 0xef, 0xab, 0xcd})
-                    .protection({})
-                    .Build();
+  fidl::VectorView<fuchsia_wlan_ieee80211::wire::SetKeyDescriptor> key_descriptors(
+      client_ifc_.test_arena_, 1);
+  key_descriptors[0] =
+      fuchsia_wlan_ieee80211::wire::SetKeyDescriptor::Builder(client_ifc_.test_arena_)
+          .key(fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(key), keylen))
+          .key_id(static_cast<uint8_t>(0))
+          .key_type(fuchsia_wlan_ieee80211::wire::KeyType::kPairwise)
+          .cipher_type(wlan_ieee80211::CipherSuiteType::kCcmp128)
+          .rsc({})
+          .peer_addr({0xde, 0xad, 0xbe, 0xef, 0xab, 0xcd})
+          .Build();
 
   auto builder = wlan_fullmac_wire::WlanFullmacImplSetKeysRequest::Builder(client_ifc_.test_arena_)
-                     .keylist(key_list);
+                     .key_descriptors(key_descriptors);
 
   auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->SetKeys(builder.Build());
   EXPECT_OK(result);
@@ -208,20 +211,21 @@ TEST_F(SetKeysTest, MsftOuiSupported) {
   const uint8_t key[wlan_ieee80211::kMaxKeyLen] = "My Key";
   const size_t keylen = strlen(reinterpret_cast<const char*>(key));
 
-  fidl::VectorView<fuchsia_wlan_common::wire::WlanKeyConfig> key_list(client_ifc_.test_arena_, 1);
-  key_list[0] = fuchsia_wlan_common::wire::WlanKeyConfig::Builder(client_ifc_.test_arena_)
-                    .key(fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(key), keylen))
-                    .key_idx(static_cast<uint8_t>(0))
-                    .key_type(fuchsia_wlan_common::wire::WlanKeyType::kPairwise)
-                    .cipher_type(wlan_ieee80211::CipherSuiteType::kCcmp128)
-                    .cipher_oui(kMsftOui)
-                    .rsc({})
-                    .peer_addr({0xde, 0xad, 0xbe, 0xef, 0xab, 0xcd})
-                    .protection({})
-                    .Build();
+  fidl::VectorView<fuchsia_wlan_ieee80211::wire::SetKeyDescriptor> key_descriptors(
+      client_ifc_.test_arena_, 1);
+  key_descriptors[0] =
+      fuchsia_wlan_ieee80211::wire::SetKeyDescriptor::Builder(client_ifc_.test_arena_)
+          .key(fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(key), keylen))
+          .key_id(static_cast<uint8_t>(0))
+          .key_type(fuchsia_wlan_ieee80211::wire::KeyType::kPairwise)
+          .cipher_type(wlan_ieee80211::CipherSuiteType::kCcmp128)
+          .cipher_oui(kMsftOui)
+          .rsc({})
+          .peer_addr({0xde, 0xad, 0xbe, 0xef, 0xab, 0xcd})
+          .Build();
 
   auto builder = wlan_fullmac_wire::WlanFullmacImplSetKeysRequest::Builder(client_ifc_.test_arena_)
-                     .keylist(key_list);
+                     .key_descriptors(key_descriptors);
 
   auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->SetKeys(builder.Build());
   EXPECT_OK(result);

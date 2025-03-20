@@ -1505,7 +1505,7 @@ mod tests {
                 protection: Some(fidl_softmac::WlanProtection::None),
                 cipher_oui: Some([3, 4, 5]),
                 cipher_type: Some(6),
-                key_type: Some(fidl_common::WlanKeyType::Pairwise),
+                key_type: Some(fidl_ieee80211::KeyType::Pairwise),
                 peer_addr: Some([8; 6]),
                 key_idx: Some(9),
                 key: Some(vec![11; 32]),

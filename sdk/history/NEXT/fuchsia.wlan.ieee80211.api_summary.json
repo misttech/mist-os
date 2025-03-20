@@ -153,6 +153,32 @@
         "name": "fuchsia.wlan.ieee80211/HtOperation"
     },
     {
+        "kind": "enum/member",
+        "name": "fuchsia.wlan.ieee80211/KeyType.GROUP",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.wlan.ieee80211/KeyType.IGTK",
+        "value": "3"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.wlan.ieee80211/KeyType.PAIRWISE",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.wlan.ieee80211/KeyType.PEER",
+        "value": "4"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.wlan.ieee80211/KeyType",
+        "strictness": "flexible",
+        "type": "uint8"
+    },
+    {
         "kind": "const",
         "name": "fuchsia.wlan.ieee80211/MAC_ADDR_LEN",
         "type": "uint8",
@@ -555,6 +581,52 @@
         "name": "fuchsia.wlan.ieee80211/SSID_LIST_MAX",
         "type": "uint8",
         "value": "84"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.ieee80211/SetKeyDescriptor.cipher_oui",
+        "ordinal": "6",
+        "type": "array<uint8,3>"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.ieee80211/SetKeyDescriptor.cipher_type",
+        "ordinal": "7",
+        "type": "fuchsia.wlan.ieee80211/CipherSuiteType"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.ieee80211/SetKeyDescriptor.key",
+        "ordinal": "1",
+        "type": "vector<uint8>:32"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.ieee80211/SetKeyDescriptor.key_id",
+        "ordinal": "2",
+        "type": "uint16"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.ieee80211/SetKeyDescriptor.key_type",
+        "ordinal": "3",
+        "type": "fuchsia.wlan.ieee80211/KeyType"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.ieee80211/SetKeyDescriptor.peer_addr",
+        "ordinal": "4",
+        "type": "array<uint8,6>"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.ieee80211/SetKeyDescriptor.rsc",
+        "ordinal": "5",
+        "type": "uint64"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.wlan.ieee80211/SetKeyDescriptor"
     },
     {
         "kind": "enum/member",

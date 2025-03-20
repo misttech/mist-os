@@ -502,14 +502,14 @@ mod handle_mlme_request_tests {
             assert_eq!(req.auth_type, Some(fidl_fullmac::WlanAuthType::OpenSystem));
             assert_eq!(req.sae_password, Some(vec![2u8, 3, 4]));
 
-            let wep_key = req.wep_key.clone().unwrap();
-            assert_eq!(wep_key.key, Some(vec![5u8, 6]));
-            assert_eq!(wep_key.key_idx, Some(7));
-            assert_eq!(wep_key.key_type, Some(fidl_common::WlanKeyType::Group));
-            assert_eq!(wep_key.peer_addr, Some([8u8; 6]));
-            assert_eq!(wep_key.rsc, Some(9));
-            assert_eq!(wep_key.cipher_oui, Some([10u8; 3]));
-            assert_eq!(wep_key.cipher_type, fidl_ieee80211::CipherSuiteType::from_primitive(11));
+            let wep_key_desc = req.wep_key_desc.clone().unwrap();
+            assert_eq!(wep_key_desc.key, Some(vec![5u8, 6]));
+            assert_eq!(wep_key_desc.key_id, Some(7));
+            assert_eq!(wep_key_desc.key_type, Some(fidl_ieee80211::KeyType::Group));
+            assert_eq!(wep_key_desc.peer_addr, Some([8u8; 6]));
+            assert_eq!(wep_key_desc.rsc, Some(9));
+            assert_eq!(wep_key_desc.cipher_oui, Some([10u8; 3]));
+            assert_eq!(wep_key_desc.cipher_type, fidl_ieee80211::CipherSuiteType::from_primitive(11));
 
             assert_eq!(req.security_ie, Some(vec![12u8, 13]));
         });
@@ -686,15 +686,15 @@ mod handle_mlme_request_tests {
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::SetKeys { req })) => req);
-        assert_eq!(driver_req.keylist.as_ref().unwrap().len(), 1 as usize);
-        let keylist = driver_req.keylist.as_ref().unwrap();
-        assert_eq!(keylist[0].key_idx, Some(7));
-        assert_eq!(keylist[0].key_type, Some(fidl_common::WlanKeyType::Group));
-        assert_eq!(keylist[0].peer_addr, Some([8u8; 6]));
-        assert_eq!(keylist[0].rsc, Some(9));
-        assert_eq!(keylist[0].cipher_oui, Some([10u8; 3]));
+        assert_eq!(driver_req.key_descriptors.as_ref().unwrap().len(), 1 as usize);
+        let key_descriptors = driver_req.key_descriptors.as_ref().unwrap();
+        assert_eq!(key_descriptors[0].key_id, Some(7));
+        assert_eq!(key_descriptors[0].key_type, Some(fidl_ieee80211::KeyType::Group));
+        assert_eq!(key_descriptors[0].peer_addr, Some([8u8; 6]));
+        assert_eq!(key_descriptors[0].rsc, Some(9));
+        assert_eq!(key_descriptors[0].cipher_oui, Some([10u8; 3]));
         assert_eq!(
-            keylist[0].cipher_type,
+            key_descriptors[0].cipher_type,
             Some(fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(11))
         );
 
@@ -731,10 +731,10 @@ mod handle_mlme_request_tests {
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::SetKeys { req })) => req);
-        assert_eq!(driver_req.keylist.as_ref().unwrap().len(), NUM_KEYS as usize);
-        let keylist = driver_req.keylist.unwrap();
+        assert_eq!(driver_req.key_descriptors.as_ref().unwrap().len(), NUM_KEYS as usize);
+        let key_descriptors = driver_req.key_descriptors.unwrap();
         for i in 0..NUM_KEYS {
-            assert_eq!(keylist[i].key_idx, Some(i as u8));
+            assert_eq!(key_descriptors[i].key_id, Some(i as u16));
         }
 
         let conf = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(fidl_mlme::MlmeEvent::SetKeysConf { conf })) => conf);

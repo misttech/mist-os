@@ -178,7 +178,7 @@ class AuthTest : public SimTest {
   void Rx(std::shared_ptr<const simulation::SimFrame> frame,
           std::shared_ptr<const simulation::WlanRxInfo> info) override;
 
-  static fuchsia_wlan_common_wire::WlanKeyConfig CreateKeyConfig(
+  static fuchsia_wlan_ieee80211::wire::SetKeyDescriptor CreateKeyConfig(
       const uint8_t key[WLAN_MAX_KEY_LEN], const size_t key_count,
       const wlan_ieee80211::CipherSuiteType cipher_suite, fidl::AnyArena& arena);
 };
@@ -224,17 +224,16 @@ void AuthTest::SecErrorInject() {
   });
 }
 
-fuchsia_wlan_common_wire::WlanKeyConfig AuthTest::CreateKeyConfig(
+fuchsia_wlan_ieee80211::wire::SetKeyDescriptor AuthTest::CreateKeyConfig(
     const uint8_t key[WLAN_MAX_KEY_LEN], const size_t key_count,
     const wlan_ieee80211::CipherSuiteType cipher_suite, fidl::AnyArena& arena) {
   fidl::Array<uint8_t, ETH_ALEN> bssid;
   memcpy(bssid.data(), kDefaultBssid.byte, ETH_ALEN);
-  return fuchsia_wlan_common_wire::WlanKeyConfig::Builder(arena)
-      .protection(fuchsia_wlan_common::WlanProtection::kRxTx)
+  return fuchsia_wlan_ieee80211::wire::SetKeyDescriptor::Builder(arena)
       .cipher_type(cipher_suite)
-      .key_type(fuchsia_wlan_common_wire::WlanKeyType::kPairwise)
+      .key_type(fuchsia_wlan_ieee80211::wire::KeyType::kPairwise)
       .peer_addr(bssid)
-      .key_idx(kDefaultKeyIndex)
+      .key_id(kDefaultKeyIndex)
       .key(fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(key), key_count))
       .rsc(0)
       .Build();
@@ -252,9 +251,9 @@ void AuthTest::StartConnect() {
   // Fill out the auth_type arg
   switch (sec_type_) {
     case SEC_TYPE_WEP_SHARED104: {
-      builder.wep_key(CreateKeyConfig(&test_key13[0], kWEP104KeyLen,
-                                      wlan_ieee80211::CipherSuiteType::kWep104,
-                                      client_ifc_.test_arena_));
+      builder.wep_key_desc(CreateKeyConfig(&test_key13[0], kWEP104KeyLen,
+                                           wlan_ieee80211::CipherSuiteType::kWep104,
+                                           client_ifc_.test_arena_));
       builder.auth_type(wlan_fullmac_wire::WlanAuthType::kSharedKey);
       break;
     }
@@ -265,15 +264,15 @@ void AuthTest::StartConnect() {
                           client_ifc_.test_arena_);
 
       ASSERT_TRUE(wep_key.has_key() && wep_key.has_cipher_type());
-      builder.wep_key(wep_key);
+      builder.wep_key_desc(wep_key);
       builder.auth_type(wlan_fullmac_wire::WlanAuthType::kSharedKey);
       break;
     }
 
     case SEC_TYPE_WEP_OPEN: {
-      builder.wep_key(CreateKeyConfig(&test_key5[0], kWEP40KeyLen,
-                                      wlan_ieee80211::CipherSuiteType::kWep40,
-                                      client_ifc_.test_arena_));
+      builder.wep_key_desc(CreateKeyConfig(&test_key5[0], kWEP40KeyLen,
+                                           wlan_ieee80211::CipherSuiteType::kWep40,
+                                           client_ifc_.test_arena_));
       builder.auth_type(wlan_fullmac_wire::WlanAuthType::kOpenSystem);
       break;
     }

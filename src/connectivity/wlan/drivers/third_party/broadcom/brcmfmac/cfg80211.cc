@@ -2845,12 +2845,12 @@ static zx_status_t brcmf_cfg80211_del_key(struct net_device* ndev, uint8_t key_i
   return err;
 }
 
-static zx_status_t brcmf_cfg80211_add_key(struct net_device* ndev,
-                                          const fuchsia_wlan_common::wire::WlanKeyConfig* req) {
-  if (!(req->has_key() && req->has_key_idx() && req->has_peer_addr() && req->has_cipher_type())) {
+static zx_status_t brcmf_cfg80211_add_key(
+    struct net_device* ndev, const fuchsia_wlan_ieee80211::wire::SetKeyDescriptor* req) {
+  if (!(req->has_key() && req->has_key_id() && req->has_peer_addr() && req->has_cipher_type())) {
     BRCMF_ERR(
-        "Key config missing required fields: has_key %u has_key_idx %u has_peer_addr %u has_cipher_type %u",
-        req->has_key(), req->has_key_idx(), req->has_peer_addr(), req->has_cipher_type());
+        "Key config missing required fields: has_key %u has_key_id %u has_peer_addr %u has_cipher_type %u",
+        req->has_key(), req->has_key_id(), req->has_peer_addr(), req->has_cipher_type());
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -2876,7 +2876,7 @@ static zx_status_t brcmf_cfg80211_add_key(struct net_device* ndev,
   int32_t wsec;
   zx_status_t err;
   bool ext_key;
-  uint8_t key_idx = req->key_idx();
+  uint8_t key_idx = req->key_id();
   const uint8_t* mac_addr = req->peer_addr().data();
 
   BRCMF_DBG(TRACE, "Enter");
@@ -4067,8 +4067,9 @@ void brcmf_if_connect_req(net_device* ndev,
     goto fail;
   }
 
-  if (req->has_wep_key() && req->wep_key().has_key() && req->wep_key().key().count() > 0) {
-    auto add_key_result = brcmf_cfg80211_add_key(ndev, &req->wep_key());
+  if (req->has_wep_key_desc() && req->wep_key_desc().has_key() &&
+      req->wep_key_desc().key().count() > 0) {
+    auto add_key_result = brcmf_cfg80211_add_key(ndev, &req->wep_key_desc());
     if (add_key_result != ZX_OK) {
       BRCMF_DBG(WLANIF, "Connect request from SME exited: unable to set WEP key");
       status_code = fuchsia_wlan_ieee80211_wire::StatusCode::kJoinFailure;
@@ -4430,13 +4431,14 @@ done:
 
 std::vector<zx_status_t> brcmf_if_set_keys_req(
     net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacImplSetKeysRequest* req) {
-  BRCMF_IFDBG(WLANIF, ndev, "Set keys request from SME. num_keys: %zu", req->keylist().count());
+  BRCMF_IFDBG(WLANIF, ndev, "Set keys request from SME. num_keys: %zu",
+              req->key_descriptors().count());
   zx_status_t result;
 
   std::vector<zx_status_t> statuslist;
-  statuslist.reserve(req->keylist().count());
-  for (size_t i = 0; i < req->keylist().count(); i++) {
-    result = brcmf_cfg80211_add_key(ndev, &req->keylist().data()[i]);
+  statuslist.reserve(req->key_descriptors().count());
+  for (size_t i = 0; i < req->key_descriptors().count(); i++) {
+    result = brcmf_cfg80211_add_key(ndev, &req->key_descriptors().data()[i]);
     if (result != ZX_OK) {
       BRCMF_WARN("Error setting key %zu: %s.", i, zx_status_get_string(result));
     }
