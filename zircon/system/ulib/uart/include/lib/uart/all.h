@@ -242,18 +242,6 @@ class KernelDriver {
     internal::Visit(VariantVisitor<T>{std::forward<T>(f)}, variant_, std::forward<Args>(args)...);
   }
 
-  // Extract the hardware configuration and state.  The return type is const
-  // just to make clear that this never returns a mutable reference like normal
-  // accessors do, it always copies.
-  const uart_type uart() const {
-    uart_type driver;
-    Visit([&driver](auto&& active) {
-      const auto& uart = active.uart();
-      driver.template emplace<std::decay_t<decltype(uart)>>(uart);
-    });
-    return driver;
-  }
-
   // Takes ownership of the underlying hardware management and state. This object will be left
   // in an invalid state, and should be reinitialized before interacting with it.
   uart_type TakeUart() && {

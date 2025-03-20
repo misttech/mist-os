@@ -502,10 +502,6 @@ class KernelDriver {
     }
   }
 
-  // Access underlying hardware driver object.
-  const auto& uart() const { return uart_; }
-  auto& uart() { return uart_; }
-
   template <typename LockPolicy = DefaultLockPolicy, MmioDriver = UartDriver>
   constexpr MmioRange mmio_range() const {
     Guard<LockPolicy> lock(&lock_, SOURCE_TAG);
