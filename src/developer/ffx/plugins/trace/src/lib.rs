@@ -399,9 +399,9 @@ pub async fn trace(
         TraceSubCommand::Symbolize(opts) => {
             if let Some(trace_file) = opts.fxt {
                 let outfile = opts.outfile.unwrap_or_else(|| trace_file.clone());
-                let mut processor = TraceProcessor::new(trace_file)?;
-                processor.with_symbolizer(&outfile, &context);
-                processor.run()?;
+                for warning in process_trace_file(trace_file, &outfile, true, None, &context)? {
+                    writer.line(warning)?;
+                }
                 writer.line(format!("Symbolized traces written to {outfile}"))?;
             } else if let Some(ordinal) = opts.ordinal {
                 let mut ordinals = match SymbolizationMap::from_context(&context) {
@@ -512,21 +512,15 @@ async fn stop_tracing(
             let skip_symbolization =
                 skip_symbolization || !expanded_categories.contains(&"kernel:ipc".to_string());
             if !no_verify_trace || !skip_symbolization {
-                let mut processor = TraceProcessor::new(output_file.clone())?;
-
-                if !no_verify_trace {
-                    processor.with_category_check(categories);
-                }
-
-                if !skip_symbolization {
-                    processor.with_symbolizer(&output_file, context);
-                }
-
-                let warnings = processor.run()?;
-                if !warnings.is_empty() {
-                    for warning in warnings {
-                        writer.line(format!("{}", warning))?;
-                    }
+                let warnings = process_trace_file(
+                    &output_file,
+                    &output_file,
+                    !skip_symbolization,
+                    if no_verify_trace { None } else { Some(categories) },
+                    context,
+                )?;
+                for warning in warnings {
+                    writer.line(format!("{}", warning))?;
                 }
             }
 
