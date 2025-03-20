@@ -38,7 +38,7 @@ impl From<u32> for UncheckedSignal {
 }
 
 /// The `Signal` struct represents a valid signal.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Signal {
     number: u32,
 }
@@ -119,6 +119,12 @@ impl TryFrom<UncheckedSignal> for Signal {
         } else {
             error!(EINVAL)
         }
+    }
+}
+
+impl fmt::Debug for Signal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self}")
     }
 }
 
