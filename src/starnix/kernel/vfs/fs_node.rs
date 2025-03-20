@@ -126,10 +126,6 @@ pub struct FsNode {
     /// specific behaviors for this FsNode.
     ops: Box<dyn FsNodeOps>,
 
-    /// The current kernel.
-    // TODO(https://fxbug.dev/42080557): This is a temporary measure to access a task on drop.
-    kernel: Weak<Kernel>,
-
     /// The FileSystem that owns this FsNode's tree.
     fs: Weak<FileSystem>,
 
@@ -1229,7 +1225,6 @@ impl FsNode {
         {
             let result = Self {
                 weak_handle: Default::default(),
-                kernel,
                 ops,
                 fs,
                 node_id,
@@ -1275,7 +1270,6 @@ impl FsNode {
     pub fn set_fs(&mut self, fs: &FileSystemHandle) {
         debug_assert!(self.fs.ptr_eq(&Weak::new()));
         self.fs = Arc::downgrade(fs);
-        self.kernel = fs.kernel.clone();
     }
 
     pub fn ops(&self) -> &dyn FsNodeOps {
