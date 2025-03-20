@@ -185,11 +185,4 @@ fuchsia_test_package("font_provider_integration_tests") {
   test_specs = {
     environments = basic_envs
   }
-
-  # This package depends on things that define config_data entries, but they are
-  # not used by this package.  The font collections should be able to disable
-  # the definition of config_data() entries as well as the resource() entries.
-  metadata = {
-    config_package_barrier = []
-  }
 }

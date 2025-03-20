@@ -68,10 +68,7 @@ fuchsia_component_manifest("persistence-manifest") {
 
 fuchsia_component("diagnostics-persistence-component") {
   cm_label = ":persistence-manifest"
-  deps = [
-    "//src/diagnostics/config/persistence",
-    "//src/diagnostics/launcher:bin",
-  ]
+  deps = [ "//src/diagnostics/launcher:bin" ]
 }
 
 fuchsia_package("diagnostics-persistence") {

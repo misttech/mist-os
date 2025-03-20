@@ -556,13 +556,3 @@ group("config_data_template_allowlist") {
     "//zircon/kernel/lib/userabi/userboot/tests:*",
   ]
 }
-
-# All entries in this group MUST specify where the targets in question are used,
-# as justification for their existence.
-group("core_realm_shards_allowlist") {
-  visibility = []
-
-  # Used by in-tree tests
-  visibility +=
-      [ "//src/security/lib/scrutiny/tests/structured_config:core_shard" ]
-}

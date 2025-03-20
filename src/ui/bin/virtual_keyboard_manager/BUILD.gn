@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/config.gni")
 
 fuchsia_component("virtual_keyboard_component") {
   component_name = "virtual_keyboard_manager"

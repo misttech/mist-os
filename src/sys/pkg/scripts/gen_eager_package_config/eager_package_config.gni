@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/compiled_action.gni")
-import("//build/config.gni")
+import("//build/components.gni")
 
 # eager_package_config produces config-data for omaha-client and pkg-resolver to
 # to support eager package updates.
@@ -97,9 +97,7 @@ template("eager_package_config") {
   pkg_resolver_config_path =
       "$target_gen_dir/$target_name/pkg_resolver/eager_package_config.json"
 
-  eager_package_config_script_label =
-      "${target_name}_eager_package_config_script"
-  compiled_action(eager_package_config_script_label) {
+  compiled_action(target_name) {
     tool = "//src/sys/pkg/scripts/gen_eager_package_config"
     inputs = invoker.sources + [ invoker.key_config ]
     if (defined(invoker.inputs)) {
@@ -117,36 +115,5 @@ template("eager_package_config") {
              "--key-config-file",
              rebase_path(invoker.key_config, root_build_dir),
            ] + input_paths
-  }
-
-  omaha_client_config_label = "${target_name}_omaha_client_config"
-  config_data(omaha_client_config_label) {
-    for_pkg = "omaha-client"
-    outputs = [ "eager_package_config.json" ]
-    sources = [ omaha_client_config_path ]
-    deps = [ ":$eager_package_config_script_label" ]
-  }
-
-  pkg_resolver_config_label = "${target_name}_pkg_resolver_config"
-  config_data(pkg_resolver_config_label) {
-    for_pkg = "pkg-resolver"
-    outputs = [ "eager_package_config.json" ]
-    sources = [ pkg_resolver_config_path ]
-    deps = [ ":$eager_package_config_script_label" ]
-  }
-
-  group(target_name) {
-    forward_variables_from(invoker,
-                           [
-                             "deps",
-                             "data_deps",
-                           ])
-    if (!defined(data_deps)) {
-      data_deps = []
-    }
-    data_deps += [
-      ":$omaha_client_config_label",
-      ":$pkg_resolver_config_label",
-    ]
   }
 }

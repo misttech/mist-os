@@ -146,14 +146,6 @@ fuchsia_component("font_provider_hermetic_for_test") {
     ":font_provider",
     "//src/fonts/collections:downstream-test-fonts-collection",
   ]
-
-  # This component depends on font collections that define config_data entries,
-  # but they are not used by this package.  The font collections should be able
-  # to disable the definition of config_data() entries as well as the resource()
-  # entries.
-  metadata = {
-    config_package_barrier = []
-  }
 }
 
 # A hermetic fonts provider which includes the fonts resources useful for

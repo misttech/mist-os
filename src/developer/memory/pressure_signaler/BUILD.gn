@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/config.gni")
 
 _common_deps = [
   "//sdk/lib/async-loop:async-loop-cpp",

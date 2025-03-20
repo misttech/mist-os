@@ -7,7 +7,6 @@ import("//build/images/args.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/testing/environments.gni")
 import("//src/sys/pkg/bin/grand-swd-binary/gsb.gni")
-import("pkg_resolver_config.gni")
 
 # `pkg-resolver` is conceptually a binary, but it built as a lib here so it can be
 # aggregated into //src/sys/pkg/bin/grand-swd-binary to save disk space.
@@ -181,16 +180,6 @@ fuchsia_test_package("unit-tests-package") {
     "//src/sys/pkg/tests/pkg-resolver:empty-repo",
   ]
   test_components = [ ":unit-tests-root" ]
-}
-
-pkg_resolver_config("enable_dynamic_configuration") {
-  enable_dynamic_configuration = true
-  deps = [ "//build/validate:non_production_tag" ]
-}
-
-resolver_persisted_repos_config("persisted_repos_dir") {
-  persisted_repos_dir = "repos"
-  deps = [ "//build/validate:non_production_tag" ]
 }
 
 fuchsia_structured_config_rust_lib("config_lib") {

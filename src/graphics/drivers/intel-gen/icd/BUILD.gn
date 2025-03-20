@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/components/fuchsia_package_with_single_component.gni")
-import("//build/config.gni")
 import("//src/graphics/lib/magma/gnbuild/magma.gni")
 
 assert(current_cpu == "x64", "Mesa Intel Vulkan driver requires x64 build")

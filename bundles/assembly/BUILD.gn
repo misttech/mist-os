@@ -3272,7 +3272,7 @@ assembly_input_bundle("omaha_client_empty_eager_config") {
   config_data = [
     {
       package_name = "omaha-client"
-      label = "//src/sys/pkg/bin/omaha-client:empty_eager_package_config_eager_package_config_script"
+      label = "//src/sys/pkg/bin/omaha-client:empty_eager_package_config"
       files = [
         {
           source = "$root_build_dir/gen/src/sys/pkg/bin/omaha-client/empty_eager_package_config/omaha_client/eager_package_config.json"
@@ -3282,7 +3282,7 @@ assembly_input_bundle("omaha_client_empty_eager_config") {
     },
     {
       package_name = "pkg-resolver"
-      label = "//src/sys/pkg/bin/omaha-client:empty_eager_package_config_eager_package_config_script"
+      label = "//src/sys/pkg/bin/omaha-client:empty_eager_package_config"
       files = [
         {
           source = "$root_build_dir/gen/src/sys/pkg/bin/omaha-client/empty_eager_package_config/pkg_resolver/eager_package_config.json"

@@ -2,8 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/config.gni")
-
 # Provides the IANA time zone database files to the given package.
 #
 # The files will be made available in the namespace of the target component(s)

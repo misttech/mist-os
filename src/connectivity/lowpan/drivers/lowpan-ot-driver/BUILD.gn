@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/config.gni")
 import("//build/rust/rustc_binary.gni")
 
 rustc_binary("bin") {
@@ -125,12 +124,6 @@ fuchsia_unittest_package("lowpan-ot-driver-test") {
       },
     ]
   }
-}
-
-config_data("config-default") {
-  for_pkg = "lowpan-ot-driver"
-  sources = [ "config/device_config.json" ]
-  outputs = [ "device_config.json" ]
 }
 
 group("tests") {

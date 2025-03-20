@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/config.gni")
 
 source_set("ui_test_manager") {
   testonly = true

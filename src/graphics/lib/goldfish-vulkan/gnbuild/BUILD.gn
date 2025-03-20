@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/config.gni")
 import("//build/dist/packaged_shared_library.gni")
 
 assert(target_cpu == "x64", "goldfish is only for x64")
@@ -18,9 +17,6 @@ declare_args() {
 # bringup driver there doesn't make sense anyway.
 group("goldfish-vulkan") {
   public_deps = [ ":goldfish" ]
-}
-group("goldfish-vulkan-config") {
-  public_deps = [ ":goldfish-config" ]
 }
 
 icd_name = "libvulkan_goldfish"
@@ -65,11 +61,4 @@ fuchsia_package_with_single_component("goldfish") {
     ":vulkan_metadata",
   ]
   manifest = "meta/vulkan.cml"
-}
-
-config_data("goldfish-config") {
-  sources = [ rebase_path(manifest_filename) ]
-
-  for_pkg = "vulkan-icd"
-  outputs = [ "icd.d/{{source_file_part}}" ]
 }

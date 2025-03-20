@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/config.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_test.gni")
 import("//src/power/cpu-manager/node_config/node_config.gni")

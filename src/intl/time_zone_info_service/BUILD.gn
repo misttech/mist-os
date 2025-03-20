@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/config.gni")
 import("//build/icu/icu_executable.gni")
 import("//build/icu/icu_fuchsia_component.gni")
 import("//build/icu/icu_fuchsia_package.gni")

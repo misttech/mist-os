@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/config.gni")
 import(
     "//src/lib/testing/expectation/fuchsia_test_component_with_expectations.gni")
 import(

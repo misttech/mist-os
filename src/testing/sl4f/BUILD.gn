@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/config.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
 
@@ -324,10 +323,6 @@ fuchsia_component("audio_recording_comp") {
   component_name = "audio_recording"
   manifest = "audio_recording/meta/audio_recording.cml"
   deps = [ "audio_recording:bin" ]
-}
-
-# Soon to be removed.
-group("sl4f_core_shard") {
 }
 
 fuchsia_package("sl4f") {
