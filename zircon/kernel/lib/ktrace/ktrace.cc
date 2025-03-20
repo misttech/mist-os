@@ -62,6 +62,13 @@ void SetupCategoryBits() {
               entry.category.string(), (1u << entry.category.index()));
     }
   }
+  // If debug assertions are enabled, validate that all interned categories have been initialized.
+  if constexpr (DEBUG_ASSERT_IMPLEMENTED) {
+    for (const fxt::InternedCategory& category : fxt::InternedCategory::Iterate()) {
+      DEBUG_ASSERT_MSG(category.index() != fxt::InternedCategory::kInvalidIndex,
+                       "Interned category %s was not initialized\n", category.string());
+    }
+  }
 }
 
 void ktrace_report_cpu_pseudo_threads() {
