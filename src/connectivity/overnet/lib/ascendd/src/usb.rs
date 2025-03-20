@@ -13,7 +13,7 @@ use overnet_core::Router;
 use std::pin::pin;
 use std::sync::Weak;
 use usb_rs::{BulkInEndpoint, BulkOutEndpoint};
-use usb_vsock::{Header, Packet, PacketMut, PacketStream, PacketType};
+use usb_vsock::{Header, Packet, PacketMut, PacketType, VsockPacketIterator};
 
 static OVERNET_MAGIC: &[u8; 16] = b"OVERNET USB\xff\x00\xff\x00\xff";
 const MAGIC_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
@@ -112,7 +112,7 @@ async fn wait_for_magic(
         };
         let buf = &buf[..size];
 
-        let mut packets = PacketStream::new(&buf);
+        let mut packets = VsockPacketIterator::new(&buf);
         while let Some(packet) = packets.next() {
             let Ok(packet) = packet else {
                 tracing::warn!(device = debug_path, "Packet failed to parse, ignoring.");
@@ -250,7 +250,7 @@ async fn run_usb_link(
                 continue;
             }
 
-            let mut packets = PacketStream::new(&data[..size]);
+            let mut packets = VsockPacketIterator::new(&data[..size]);
             while let Some(packet) = packets.next() {
                 let Ok(packet) = packet else {
                     tracing::warn!(

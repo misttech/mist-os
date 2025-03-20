@@ -2,13 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::cmp::min;
 use std::future::Future;
 use std::iter::FusedIterator;
-use std::task::Poll;
+use std::ops::DerefMut;
+use std::pin::Pin;
+use std::sync::{Mutex, MutexGuard};
+use std::task::{Context, Poll};
 
-use futures::future::FusedFuture;
 use futures::task::AtomicWaker;
 use zerocopy::{little_endian, Immutable, IntoBytes, KnownLayout, TryFromBytes, Unaligned};
+
+use crate::Address;
 
 /// The serializable enumeration of packet types that can be used over a usb vsock link. These
 /// roughly correspond to the state machine described by the `fuchsia.hardware.vsock` fidl library.
@@ -37,13 +42,17 @@ pub enum PacketType {
     Sync = b'S',
     /// Connect to a cid:port pair from a cid:port pair on the other side. The payload must be empty.
     Connect = b'C',
+    /// Notify the other end that this connection should be closed. The other end should respond
+    /// with an [`PacketType::Reset`] when the connection has been closed on the other end. The
+    /// payload must be empty.
+    Finish = b'F',
     /// Terminate or refuse a connection on a particular cid:port pair set. There must have been a
     /// previous [`PacketType::Connect`] request for this, and after this that particular set of
     /// pairs must be considered disconnected and no more [`PacketType::Data`] packets may be sent
     /// for it unless a new connection is initiated. The payload must be empty.
     Reset = b'R',
     /// Accepts a connection previously requested with [`PacketType::Connect`] on the given cid:port
-    /// pair set. The payload may contain an initial data packet for the connection.
+    /// pair set. The payload must be empty.
     Accept = b'A',
     /// A data packet for a particular cid:port pair set previously established with a [`PacketType::Connect`]
     /// and [`PacketType::Accept`] message. If all of the cid and port fields of the packet are
@@ -93,8 +102,8 @@ pub struct Header {
     /// port fields are also zero, in which case it is a control stream packet. Must be zero for any
     /// other packet type.
     pub host_port: little_endian::U32,
-    /// The length of the packet payload. This must be zero for any packet type other than Sync,
-    /// Accept, or Data.
+    /// The length of the packet payload. This must be zero for any packet type other than Sync or
+    /// Data.
     pub payload_len: little_endian::U32,
 }
 
@@ -126,6 +135,14 @@ impl Header {
     /// [`Self::payload_len`].
     pub fn packet_size(&self) -> usize {
         Packet::size_with_payload(self.payload_len.get() as usize)
+    }
+
+    /// Sets the address fields of this packet header based on the normalized address in `addr`.
+    pub fn set_address(&mut self, addr: &Address) {
+        self.device_cid.set(addr.device_cid);
+        self.host_cid.set(addr.host_cid);
+        self.device_port.set(addr.device_port);
+        self.host_port.set(addr.host_port);
     }
 }
 
@@ -230,11 +247,11 @@ impl<'a> PacketMut<'a> {
 }
 
 /// Reads a sequence of vsock packets from a given usb packet buffer
-pub struct PacketStream<'a> {
+pub struct VsockPacketIterator<'a> {
     buf: Option<&'a [u8]>,
 }
 
-impl<'a> PacketStream<'a> {
+impl<'a> VsockPacketIterator<'a> {
     /// Creates a new [`PacketStream`] from the contents of `buf`. The returned stream will
     /// iterate over individual vsock packets.
     pub fn new(buf: &'a [u8]) -> Self {
@@ -242,8 +259,8 @@ impl<'a> PacketStream<'a> {
     }
 }
 
-impl<'a> FusedIterator for PacketStream<'a> {}
-impl<'a> Iterator for PacketStream<'a> {
+impl<'a> FusedIterator for VsockPacketIterator<'a> {}
+impl<'a> Iterator for VsockPacketIterator<'a> {
     type Item = Result<Packet<'a>, std::io::Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -268,7 +285,7 @@ impl<'a> Iterator for PacketStream<'a> {
 
 /// Builds an aggregate usb packet out of vsock packets and gives readiness
 /// notifications when there is room to add another packet or data available to send.
-pub struct PacketBuilder<B> {
+pub struct UsbPacketBuilder<B> {
     buffer: B,
     offset: usize,
     space_waker: AtomicWaker,
@@ -279,7 +296,7 @@ pub struct PacketBuilder<B> {
 #[derive(Debug, Copy, Clone)]
 pub struct PacketTooBigError;
 
-impl<B> PacketBuilder<B> {
+impl<B> UsbPacketBuilder<B> {
     /// Creates a new builder from `buffer`, which is a type that can be used as a mutable slice
     /// with space available for storing vsock packets. The `readable_notify` will have a message
     /// sent to it whenever a usb packet could be transmitted.
@@ -289,38 +306,20 @@ impl<B> PacketBuilder<B> {
         let packet_waker = AtomicWaker::default();
         Self { buffer, offset, space_waker, packet_waker }
     }
+
+    /// Returns true if the packet has data in it
+    pub fn has_data(&self) -> bool {
+        self.offset > 0
+    }
 }
 
-impl<B> PacketBuilder<B>
+impl<B> UsbPacketBuilder<B>
 where
     B: std::ops::DerefMut<Target = [u8]>,
 {
     /// Gets the space currently available for another packet in the buffer
     pub fn available(&self) -> usize {
         self.buffer.len() - self.offset
-    }
-
-    /// Waits for there to be room to write a vsock packet of at least `sizeof(Header)+bytes`
-    /// in the buffer. Use [`Self::write_vsock_packet`] to write the packet when
-    /// space becomes available.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the buffer this was built with isn't big enough to hold the packet
-    /// even if it were empty.
-    pub fn wait_for_space(&self, bytes: usize) -> SpaceAvailableFuture<'_, B> {
-        let needed_space = Packet::size_with_payload(bytes);
-        if needed_space <= self.buffer.len() {
-            SpaceAvailableFuture { needed_space, builder: self }
-        } else {
-            panic!("Buffer too small for packet even when empty");
-        }
-    }
-
-    /// Waits for a usb packet to be available in the buffer. Use [`Self::take_usb_packet`]
-    /// to get the packet when this returns.
-    pub fn wait_for_usb_packet(&self) -> UsbPacketFuture<'_, B> {
-        UsbPacketFuture { builder: self }
     }
 
     /// Writes the given packet into the buffer. The packet and header must be able to fit
@@ -351,71 +350,132 @@ where
     }
 }
 
-/// The future implementation for [`PacketBuilder::wait_for_usb_packet`]
-pub struct UsbPacketFuture<'a, B> {
-    builder: &'a PacketBuilder<B>,
+pub(crate) struct UsbPacketFiller<B> {
+    current_out_packet: Mutex<Option<UsbPacketBuilder<B>>>,
+    out_packet_waker: AtomicWaker,
+    filled_packet_waker: AtomicWaker,
 }
-impl<'a, B> Unpin for UsbPacketFuture<'a, B> {}
 
-impl<'a, B> Future for UsbPacketFuture<'a, B> {
-    type Output = ();
+impl<B> Default for UsbPacketFiller<B> {
+    fn default() -> Self {
+        let current_out_packet = Mutex::default();
+        let out_packet_waker = AtomicWaker::default();
+        let filled_packet_waker = AtomicWaker::default();
+        Self { current_out_packet, out_packet_waker, filled_packet_waker }
+    }
+}
 
-    fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
-        if self.builder.offset == 0 {
-            self.builder.packet_waker.register(cx.waker());
+impl<B: DerefMut<Target = [u8]> + Unpin> UsbPacketFiller<B> {
+    fn wait_for_fillable(&self, min_packet_size: usize) -> WaitForFillable<'_, B> {
+        WaitForFillable { filler: &self, min_packet_size }
+    }
+
+    pub async fn write_vsock_packet(&self, packet: &Packet<'_>) -> Result<(), PacketTooBigError> {
+        let mut builder = self.wait_for_fillable(packet.size()).await;
+        builder.as_mut().unwrap().write_vsock_packet(packet)?;
+        self.filled_packet_waker.wake();
+        Ok(())
+    }
+
+    pub async fn write_vsock_data(&self, address: &Address, payload: &[u8]) -> usize {
+        let header = &mut Header::new(PacketType::Data);
+        header.set_address(&address);
+        let mut builder = self.wait_for_fillable(1).await;
+        let builder = builder.as_mut().unwrap();
+        let writing = min(payload.len(), builder.available() - Header::SIZE);
+        header.payload_len.set(writing as u32);
+        builder.write_vsock_packet(&Packet { header, payload: &payload[..writing] }).unwrap();
+        self.filled_packet_waker.wake();
+        writing
+    }
+
+    pub async fn write_vsock_data_all(&self, address: &Address, payload: &[u8]) {
+        let mut written = 0;
+        while written < payload.len() {
+            written += self.write_vsock_data(address, &payload[written..]).await;
+        }
+    }
+
+    /// Provides a packet builder for the state machine to write packets to. Returns a future that
+    /// will be fulfilled when there is data available to send on the packet.
+    ///
+    /// # Panics
+    ///
+    /// Panics if called while another [`Self::fill_usb_packet`] future is pending.
+    pub fn fill_usb_packet(&self, builder: UsbPacketBuilder<B>) -> FillUsbPacket<'_, B> {
+        FillUsbPacket(&self, Some(builder))
+    }
+}
+
+pub(crate) struct FillUsbPacket<'a, B>(&'a UsbPacketFiller<B>, Option<UsbPacketBuilder<B>>);
+
+impl<'a, B: Unpin> Future for FillUsbPacket<'a, B> {
+    type Output = UsbPacketBuilder<B>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        // if we're holding a `PacketBuilder` we haven't been waited on yet. Otherwise we want
+        // to return ready when there's a packet and it's got data in it.
+        if let Some(builder) = self.1.take() {
+            // if the packet we were handed for some reason already has data in it, hand it back
+            if builder.has_data() {
+                return Poll::Ready(builder);
+            }
+
+            let mut current_out_packet = self.0.current_out_packet.lock().unwrap();
+            assert!(current_out_packet.is_none(), "Can't fill more than one packet at a time");
+            current_out_packet.replace(builder);
+            self.0.out_packet_waker.wake();
+            self.0.filled_packet_waker.register(cx.waker());
             Poll::Pending
         } else {
-            self.builder.packet_waker.take();
-            Poll::Ready(())
+            let mut current_out_packet = self.0.current_out_packet.lock().unwrap();
+            let Some(builder) = current_out_packet.take() else {
+                panic!("Packet builder was somehow removed from connection prematurely");
+            };
+
+            if builder.has_data() {
+                self.0.filled_packet_waker.wake();
+                Poll::Ready(builder)
+            } else {
+                // if there hasn't been any data placed in the packet, put the builder back and
+                // return Pending.
+                current_out_packet.replace(builder);
+                Poll::Pending
+            }
         }
     }
 }
 
-impl<'a, B> FusedFuture for UsbPacketFuture<'a, B> {
-    /// This future is always pollable as long as the underlying builder is still valid.
-    fn is_terminated(&self) -> bool {
-        false
-    }
+pub(crate) struct WaitForFillable<'a, B> {
+    filler: &'a UsbPacketFiller<B>,
+    min_packet_size: usize,
 }
 
-/// The future implementation for [`PacketBuilder::wait_for_space`]
-pub struct SpaceAvailableFuture<'a, B> {
-    needed_space: usize,
-    builder: &'a PacketBuilder<B>,
-}
-impl<'a, B> Unpin for SpaceAvailableFuture<'a, B> {}
+impl<'a, B: DerefMut<Target = [u8]> + Unpin> Future for WaitForFillable<'a, B> {
+    type Output = MutexGuard<'a, Option<UsbPacketBuilder<B>>>;
 
-impl<'a, B> Future for SpaceAvailableFuture<'a, B>
-where
-    B: std::ops::DerefMut<Target = [u8]>,
-{
-    type Output = Result<(), PacketTooBigError>;
-
-    fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
-        if self.builder.available() < self.needed_space {
-            self.builder.space_waker.register(cx.waker());
-            Poll::Pending
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let current_out_packet = self.filler.current_out_packet.lock().unwrap();
+        let Some(builder) = &*current_out_packet else {
+            self.filler.out_packet_waker.register(cx.waker());
+            return Poll::Pending;
+        };
+        if builder.available() >= self.min_packet_size {
+            Poll::Ready(current_out_packet)
         } else {
-            self.builder.space_waker.take();
-            Poll::Ready(Ok(()))
+            self.filler.out_packet_waker.register(cx.waker());
+            Poll::Pending
         }
-    }
-}
-
-impl<'a, B> FusedFuture for SpaceAvailableFuture<'a, B>
-where
-    B: std::ops::DerefMut<Target = [u8]>,
-{
-    /// This future is always pollable as long as the underlying builder is still valid.
-    fn is_terminated(&self) -> bool {
-        false
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use super::*;
-    use futures::{poll, select};
+    use fuchsia_async::Task;
+    use futures::poll;
 
     async fn assert_pending<F: Future>(fut: F) {
         let fut = std::pin::pin!(fut);
@@ -439,28 +499,26 @@ mod tests {
             },
         };
         let buffer = vec![0; packet.size()];
-        let mut builder = PacketBuilder::new(buffer);
-        // we should not be ready to pull a usb packet off yet
-        assert_pending(builder.wait_for_usb_packet()).await;
+        let builder = UsbPacketBuilder::new(buffer);
+        let filler = UsbPacketFiller::default();
+        let mut filled_fut = filler.fill_usb_packet(builder);
+        println!("we should not be ready to pull a usb packet off yet");
+        assert_pending(&mut filled_fut).await;
 
-        builder.wait_for_space(payload.len()).await.unwrap();
-        builder.write_vsock_packet(&packet).unwrap();
+        println!("we should be able to write a packet though ({} bytes)", packet.size());
+        filler.write_vsock_packet(&packet).await.unwrap();
 
-        // we shouldn't have any space for another packet now
-        assert_pending(builder.wait_for_space(1)).await;
+        println!("we shouldn't have any space for another packet now");
+        assert_pending(filler.wait_for_fillable(1)).await;
 
-        // but we should have a new usb packet available
-        builder.wait_for_usb_packet().await;
+        println!("but we should have a new usb packet available");
+        let mut builder = filled_fut.await;
         let buffer = builder.take_usb_packet().unwrap();
 
-        // the packet we get back out should be the same one we put in
+        println!("the packet we get back out should be the same one we put in");
         let (read_packet, remain) = Packet::parse_next(buffer).unwrap();
         assert_eq!(packet, read_packet);
         assert!(remain.is_empty());
-
-        // and now there shouldn't be a waiting usb packet but there should be room for a new one
-        assert_pending(builder.wait_for_usb_packet()).await;
-        builder.wait_for_space(1).await.unwrap();
     }
 
     #[fuchsia::test]
@@ -478,32 +536,86 @@ mod tests {
             (header, payload)
         }
         const BUFFER_SIZE: usize = 256;
-        let mut builder = PacketBuilder::new(vec![0; BUFFER_SIZE]);
-        let mut packet_num = 0;
+        let mut builder = UsbPacketBuilder::new(vec![0; BUFFER_SIZE]);
+        let filler = Arc::new(UsbPacketFiller::default());
+
+        let send_filler = filler.clone();
+        let send_task = Task::spawn(async move {
+            for packet_num in 0..1024 {
+                let next_packet = make_numbered_packet(packet_num);
+                let next_packet =
+                    Packet { header: &next_packet.0, payload: next_packet.1.as_ref() };
+                send_filler.write_vsock_packet(&next_packet).await.unwrap();
+            }
+        });
+
         let mut read_packet_num = 0;
         while read_packet_num < 1024 {
-            let next_packet = make_numbered_packet(packet_num);
-            let next_packet = Packet { header: &next_packet.0, payload: next_packet.1.as_ref() };
-            select! {
-                res = builder.wait_for_space(next_packet.size()) => {
-                    res.expect("all packets should fit in buffer");
-                    builder.write_vsock_packet(&next_packet).unwrap();
-                    packet_num += 1;
-                },
-                _ = builder.wait_for_usb_packet() => {
-                    let buffer = builder.take_usb_packet().unwrap();
-                    let mut num_packets = 0;
-                    for packet in PacketStream::new(&buffer) {
-                        let packet_compare = make_numbered_packet(read_packet_num);
-                        let packet_compare = Packet { header: &packet_compare.0, payload: &packet_compare.1.as_ref() };
-                        assert_eq!(packet.unwrap(), packet_compare);
-                        read_packet_num += 1;
-                        num_packets += 1;
-                    }
-                    println!("Read {num_packets} vsock packets from usb packet buffer, had {count} bytes left", count = BUFFER_SIZE - buffer.len());
-                }
+            builder = filler.fill_usb_packet(builder).await;
+            let buffer = builder.take_usb_packet().unwrap();
+            let mut num_packets = 0;
+            for packet in VsockPacketIterator::new(&buffer) {
+                let packet_compare = make_numbered_packet(read_packet_num);
+                let packet_compare =
+                    Packet { header: &packet_compare.0, payload: &packet_compare.1.as_ref() };
+                assert_eq!(packet.unwrap(), packet_compare);
+                read_packet_num += 1;
+                num_packets += 1;
             }
+            println!(
+                "Read {num_packets} vsock packets from usb packet buffer, had {count} bytes left",
+                count = BUFFER_SIZE - buffer.len()
+            );
         }
-        assert_eq!(packet_num, read_packet_num);
+        send_task.await;
+        assert_eq!(1024, read_packet_num);
+    }
+
+    #[fuchsia::test]
+    async fn packet_fillable_futures() {
+        let filler = UsbPacketFiller::default();
+
+        for _ in 0..10 {
+            println!("register an interest in filling a usb packet");
+            let mut fillable_fut = filler.wait_for_fillable(1);
+            println!("make sure we have nothing to fill");
+            assert!(poll!(&mut fillable_fut).is_pending());
+
+            println!("register a packet for filling");
+            let mut filled_fut = filler.fill_usb_packet(UsbPacketBuilder::new(vec![0; 1024]));
+            println!("make sure we've registered the buffer");
+            assert!(poll!(&mut filled_fut).is_pending());
+
+            println!("now put some things in the packet");
+            let header = &mut Header::new(PacketType::Data);
+            header.payload_len.set(99);
+            let Poll::Ready(mut builder) = poll!(fillable_fut) else {
+                panic!("should have been ready to fill a packet")
+            };
+            builder
+                .as_mut()
+                .unwrap()
+                .write_vsock_packet(&Packet { header, payload: &[b'a'; 99] })
+                .unwrap();
+            drop(builder);
+            let Poll::Ready(mut builder) = poll!(filler.wait_for_fillable(1)) else {
+                panic!("should have been ready to fill a packet(2)")
+            };
+            builder
+                .as_mut()
+                .unwrap()
+                .write_vsock_packet(&Packet { header, payload: &[b'a'; 99] })
+                .unwrap();
+            drop(builder);
+
+            println!("but if we ask for too much space we'll get pending");
+            assert!(poll!(filler.wait_for_fillable(1024 - (99 * 2) + 1)).is_pending());
+
+            println!("and now resolve the filled future and get our data back");
+            let mut filled = filled_fut.await;
+            let packets =
+                Vec::from_iter(VsockPacketIterator::new(filled.take_usb_packet().unwrap()));
+            assert_eq!(packets.len(), 2);
+        }
     }
 }

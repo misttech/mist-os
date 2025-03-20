@@ -15,7 +15,7 @@ use futures::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, StreamExt, Try
 use log::{debug, error, info, trace, warn};
 use std::io::Error;
 use std::pin::pin;
-use usb_vsock::{Header, Packet, PacketMut, PacketStream, PacketType};
+use usb_vsock::{Header, Packet, PacketMut, PacketType, VsockPacketIterator};
 use zx::{SocketOpts, Status};
 
 static MTU: usize = 1024;
@@ -163,12 +163,12 @@ impl<P: SocketCallback> UsbConnection<P> {
 async fn read_packet_stream<'a>(
     reader: &mut (impl AsyncRead + Unpin),
     mut buffer: &'a mut [u8],
-) -> Result<Option<PacketStream<'a>>, std::io::Error> {
+) -> Result<Option<VsockPacketIterator<'a>>, std::io::Error> {
     let size = reader.read(&mut buffer).await?;
     if size == 0 {
         return Ok(None);
     }
-    Ok(Some(PacketStream::new(&buffer[0..size])))
+    Ok(Some(VsockPacketIterator::new(&buffer[0..size])))
 }
 
 /// Reads from `reader` in `MTU`-sized chunks and then writes them out to `writer`, ensuring that
