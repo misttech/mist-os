@@ -37,6 +37,7 @@ use starnix_uapi::auth::{
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::{Errno, EACCES, ENOTSUP};
 use starnix_uapi::file_mode::{mode, Access, AccessCheck, FileMode};
+use starnix_uapi::inotify_mask::InotifyMask;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
@@ -173,7 +174,7 @@ pub struct FsNode {
     pub fsverity: Mutex<FsVerityState>,
 
     /// Inotify watchers on this node. See inotify(7).
-    pub watchers: inotify::InotifyWatchers,
+    watchers: inotify::InotifyWatchers,
 
     /// The security state associated with this node. Must always be acquired last
     /// relative to other `FsNode` locks.
@@ -2614,6 +2615,26 @@ impl FsNode {
             "file"
         };
         format!("{}:[{}]", class, self.node_id).into()
+    }
+
+    /// Returns the set of watchers for this node.
+    ///
+    /// Only call this function if you require this node to actually store a list of watchers. If
+    /// you just wish to notify any watchers that might exist, please use `notify` instead.
+    pub fn ensure_watchers(&self) -> &inotify::InotifyWatchers {
+        &self.watchers
+    }
+
+    /// Notify the watchers of the given event.
+    pub fn notify(
+        &self,
+        event_mask: InotifyMask,
+        cookie: u32,
+        name: &FsStr,
+        mode: FileMode,
+        is_dead: bool,
+    ) {
+        self.watchers.notify(event_mask, cookie, name, mode, is_dead);
     }
 }
 
