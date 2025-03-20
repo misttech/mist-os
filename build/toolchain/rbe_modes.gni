@@ -113,10 +113,8 @@ _default_rbe_settings = {
   cloudtop = {
     forward_variables_from(_all_modes_defaults, "*")
     cxx_enable = true
-    cxx_exec_strategy = "local"
 
     link_enable = true
-    link_exec_strategy = "local"
 
     rust_enable = true
     rust_exec_strategy = "local"
