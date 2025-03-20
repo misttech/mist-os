@@ -36,12 +36,6 @@ message Static {
   // Extra targets to pass to Ninja.
   repeated string ninja_targets = 5;
 
-  // Fuchsia packages to build and include in the base set.
-  repeated string base_packages = 6;
-
-  // Fuchsia packages to build and include in the cache set.
-  repeated string cache_packages = 7;
-
   // Fuchsia packages to build and include in the universe set.
   repeated string universe_packages = 8;
 

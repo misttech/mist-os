@@ -315,8 +315,6 @@ func genArgs(
 	}
 
 	for varName, values := range map[string][]string{
-		"base_package_labels":     staticSpec.BasePackages,
-		"cache_package_labels":    staticSpec.CachePackages,
 		"universe_package_labels": staticSpec.UniversePackages,
 	} {
 		targetLists[varName] = values
