@@ -25,6 +25,7 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.power.observability:fuchsia.power.observability_rust",
     "//sdk/fidl/fuchsia.power.suspend:fuchsia.power.suspend_rust",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
+    "//sdk/lib/scheduler/rust",
     "//sdk/rust/zx",
     "//src/lib/async-utils",
     "//src/lib/diagnostics/inspect/contrib/rust",
