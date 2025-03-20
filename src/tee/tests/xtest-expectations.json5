@@ -90,14 +90,5 @@
                 "regression6012",
             ],
         },
-        {
-            // TODO(https://fxbug.dev/404591264): Skip all tests until we roll
-            // in configuration files that reflect the updated schema for TA
-            // configs.
-            type: "skip",
-            matchers: [
-                "regression*",
-            ]
-        },
     ],
 }

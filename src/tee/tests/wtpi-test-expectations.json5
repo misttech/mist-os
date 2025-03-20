@@ -108,18 +108,5 @@
                 "CryptoTest.DeriveDeviceKeyIntoHandleFailsForBadInput",
             ],
         },
-        {
-            // TODO(https://fxbug.dev/404591264): Skip all tests until we roll
-            // in configuration files that reflect the updated schema for TA
-            // configs.
-            type: "skip",
-            matchers: [ "*" ],
-        },
-        {
-            // TODO(https://fxbug.dev/404591264): Add a matcher that doesn't actually match anything
-            // to avoid the expectations matcher's overly helpful check for skip "*" final matchers.
-            type: "skip",
-            matchers: [ "nothing" ],
-        }
     ],
 }
