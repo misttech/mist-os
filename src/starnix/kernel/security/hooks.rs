@@ -361,18 +361,9 @@ pub fn fs_node_init_on_create(
 /// hook rather than `fs_node_init_on_create()` above.
 pub fn fs_node_init_anon(current_task: &CurrentTask, new_node: &FsNode, node_type: &str) {
     track_hook_duration!(c"security.hooks.fs_node_init_anon");
-    if_selinux_else(
-        current_task,
-        |security_server| {
-            selinux_hooks::fs_node::fs_node_init_anon(
-                security_server,
-                current_task,
-                new_node,
-                node_type,
-            )
-        },
-        || (),
-    )
+    if let Some(state) = current_task.kernel().security_state.state.as_ref() {
+        selinux_hooks::fs_node::fs_node_init_anon(&state.server, current_task, new_node, node_type)
+    }
 }
 
 /// Validate that `current_task` has permission to create a regular file in the `parent` directory,

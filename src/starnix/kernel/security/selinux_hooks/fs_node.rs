@@ -431,15 +431,23 @@ pub(in crate::security) fn fs_node_init_anon(
     new_node: &FsNode,
     node_type: &str,
 ) {
-    let task_sid = current_task.security_state.lock().current_sid;
     let fs_node_class = FileClass::AnonFsNode.into();
-    let sid = security_server
-        .as_permission_check()
-        .compute_new_fs_node_sid(task_sid, task_sid, fs_node_class, node_type.into())
-        .expect("Compute label for anon_inode");
+
+    // TODO: https://fxbug.dev/ - Fold this into the `fs_node_init_with_dentry*()` logic?
+    let maybe_label = security_server.has_policy().then(|| {
+        let task_sid = current_task.security_state.lock().current_sid;
+        let sid = security_server
+            .as_permission_check()
+            .compute_new_fs_node_sid(task_sid, task_sid, fs_node_class, node_type.into())
+            .expect("Compute label for anon_inode");
+        FsNodeLabel::SecurityId { sid }
+    });
+
     let mut state = new_node.security_state.lock();
     state.class = fs_node_class;
-    state.label = FsNodeLabel::SecurityId { sid };
+    if let Some(label) = maybe_label {
+        state.label = label;
+    }
 }
 
 /// Helper used by filesystem node creation checks to validate that `current_task` has necessary
