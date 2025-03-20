@@ -11,6 +11,30 @@ async fn main() {
     // Track all the starting child components.
     let event_stream = EventStream::open().await.unwrap();
 
+    let realm_proxy =
+        fuchsia_component::client::connect_to_protocol::<fidl_fuchsia_component::RealmMarker>()
+            .unwrap();
+    let mut execution_controllers = vec![];
+    for child in ["child_a", "child_b", "child_c"] {
+        let (controller_proxy, server_end) =
+            fidl::endpoints::create_proxy::<fidl_fuchsia_component::ControllerMarker>();
+        realm_proxy
+            .open_controller(
+                &fidl_fuchsia_component_decl::ChildRef {
+                    name: child.to_string(),
+                    collection: None,
+                },
+                server_end,
+            )
+            .await
+            .unwrap()
+            .unwrap();
+        let (execution_controller_proxy, server_end) =
+            fidl::endpoints::create_proxy::<fidl_fuchsia_component::ExecutionControllerMarker>();
+        controller_proxy.start(Default::default(), server_end).await.unwrap().unwrap();
+        execution_controllers.push(execution_controller_proxy);
+    }
+
     EventSequence::new()
         .has_subset(
             vec![

@@ -43,12 +43,6 @@ fuchsia_component("echo_realm") {
   manifest = "components/scoped/meta/echo_realm.cml"
 }
 
-fuchsia_component("echo_client") {
-  testonly = true
-  deps = [ "components:echo_client_for_events_bin" ]
-  manifest = "components/scoped/meta/echo_client.cml"
-}
-
 fuchsia_component("echo_server") {
   testonly = true
   deps = [ "components:echo_server_for_events_bin" ]
@@ -102,7 +96,6 @@ fuchsia_unittest_package("events_integration_test") {
     ":async_reporter",
     ":capability_requested_child",
     ":capability_requested_root",
-    ":echo_client",
     ":echo_realm",
     ":echo_reporter",
     ":echo_server",

@@ -10,9 +10,12 @@ rustc_binary("echo_reporter_bin") {
   source_root = "scoped/echo_reporter.rs"
   testonly = true
   deps = [
+    "//examples/components/routing/fidl:echo_rust",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
     "//src/sys/lib/component-events",
+    "//third_party/rust_crates:anyhow",
   ]
 
   sources = [ "scoped/echo_reporter.rs" ]
@@ -24,7 +27,11 @@ rustc_binary("nested_reporter_bin") {
   source_root = "nested/reporter.rs"
   testonly = true
   deps = [
+    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
+    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
     "//src/sys/lib/component-events",
   ]
 
@@ -43,21 +50,6 @@ rustc_binary("async_reporter_bin") {
   ]
 
   sources = [ "async/reporter.rs" ]
-}
-
-rustc_binary("echo_client_for_events_bin") {
-  name = "scoped_echo_client"
-  edition = "2021"
-  source_root = "scoped/echo_client.rs"
-  testonly = true
-  deps = [
-    "//examples/components/routing/fidl:echo_rust",
-    "//src/lib/fuchsia",
-    "//src/lib/fuchsia-component",
-    "//third_party/rust_crates:anyhow",
-  ]
-
-  sources = [ "scoped/echo_client.rs" ]
 }
 
 rustc_binary("echo_server_for_events_bin") {
