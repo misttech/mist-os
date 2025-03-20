@@ -134,14 +134,6 @@ pub struct FsNode {
     /// this node.
     pub node_id: ino_t,
 
-    /// The pipe located at this node, if any.
-    ///
-    /// Used if, and only if, the node has a mode of FileMode::IFIFO.
-    fifo: Option<PipeHandle>,
-
-    /// The UNIX domain socket bound to this node, if any.
-    bound_socket: OnceLock<SocketHandle>,
-
     /// A RwLock to synchronize append operations for this node.
     ///
     /// FileObjects writing with O_APPEND should grab a write() lock on this
@@ -153,6 +145,30 @@ pub struct FsNode {
     ///
     /// This data is used to populate the uapi::stat structure.
     info: RwLock<FsNodeInfo>,
+
+    /// Data associated with an FsNode that is rarely needed.
+    rare_data: OnceLock<Box<FsNodeRareData>>,
+
+    /// Tracks lock state for this file.
+    pub write_guard_state: Mutex<FileWriteGuardState>,
+
+    /// Cached FsVerity state associated with this node.
+    pub fsverity: Mutex<FsVerityState>,
+
+    /// The security state associated with this node. Must always be acquired last
+    /// relative to other `FsNode` locks.
+    pub security_state: security::FsNodeState,
+}
+
+#[derive(Default)]
+struct FsNodeRareData {
+    /// The pipe located at this node, if any.
+    ///
+    /// Used if, and only if, the node has a mode of FileMode::IFIFO.
+    fifo: Option<PipeHandle>,
+
+    /// The UNIX domain socket bound to this node, if any.
+    bound_socket: OnceLock<SocketHandle>,
 
     /// Information about the locking information on this node.
     ///
@@ -167,18 +183,8 @@ pub struct FsNode {
     /// Only set for nodes created with `O_TMPFILE`.
     link_behavior: OnceLock<FsNodeLinkBehavior>,
 
-    /// Tracks lock state for this file.
-    pub write_guard_state: Mutex<FileWriteGuardState>,
-
-    /// Cached FsVerity state associated with this node.
-    pub fsverity: Mutex<FsVerityState>,
-
     /// Inotify watchers on this node. See inotify(7).
     watchers: inotify::InotifyWatchers,
-
-    /// The security state associated with this node. Must always be acquired last
-    /// relative to other `FsNode` locks.
-    pub security_state: security::FsNodeState,
 }
 
 pub type FsNodeHandle = Arc<FsNodeReleaser>;
@@ -286,6 +292,12 @@ impl FsNodeInfo {
     }
 }
 
+impl FsNodeRareData {
+    fn new(fifo: PipeHandle) -> Self {
+        Self { fifo: Some(fifo), ..Default::default() }
+    }
+}
+
 #[derive(Default)]
 struct FlockInfo {
     /// Whether the node is currently locked. The meaning of the different values are:
@@ -367,7 +379,7 @@ impl FileObject {
             return error!(EBADF);
         }
         loop {
-            let mut flock_info = self.name.entry.node.flock_info.lock();
+            let mut flock_info = self.name.entry.node.ensure_rare_data().flock_info.lock();
             if operation.is_unlock() {
                 flock_info.retain(|fh| !std::ptr::eq(fh, self));
                 return Ok(());
@@ -1207,7 +1219,9 @@ impl FsNode {
             info
         };
 
-        let fifo = if info.mode.is_fifo() {
+        let rare_data = OnceLock::new();
+
+        if info.mode.is_fifo() {
             let current_task = current_task
                 .expect("expected that a CurrentTask would be available when creating a fifo");
             let mut default_pipe_capacity = (*PAGE_SIZE * 16) as usize;
@@ -1217,10 +1231,10 @@ impl FsNode {
                 default_pipe_capacity = std::cmp::min(default_pipe_capacity, max_size);
             }
 
-            Some(Pipe::new(default_pipe_capacity))
-        } else {
-            None
-        };
+            let fifo = Pipe::new(default_pipe_capacity);
+            assert!(rare_data.set(Box::new(FsNodeRareData::new(fifo))).is_ok());
+        }
+
         // The linter will fail in non test mode as it will not see the lock check.
         #[allow(clippy::let_and_return)]
         {
@@ -1229,16 +1243,11 @@ impl FsNode {
                 ops,
                 fs,
                 node_id,
-                fifo,
-                bound_socket: Default::default(),
                 info: RwLock::new(info),
                 append_lock: Default::default(),
-                flock_info: Default::default(),
-                record_locks: Default::default(),
-                link_behavior: Default::default(),
+                rare_data,
                 write_guard_state: Default::default(),
                 fsverity: Mutex::new(FsVerityState::None),
-                watchers: Default::default(),
                 security_state: Default::default(),
             };
             #[cfg(any(test, debug_assertions))]
@@ -1246,11 +1255,10 @@ impl FsNode {
                 let mut locked = unsafe { Unlocked::new() };
                 let _l1 = result.append_lock.read_for_lock_ordering(&mut locked);
                 let _l2 = result.info.read();
-                let _l3 = result.flock_info.lock();
-                let _l4 = result.write_guard_state.lock();
-                let _l5 = result.fsverity.lock();
+                let _l3 = result.write_guard_state.lock();
+                let _l4 = result.fsverity.lock();
                 // TODO(https://fxbug.dev/367585803): Add lock levels to SELinux implementation.
-                let _l6 = result.security_state.lock();
+                let _l5 = result.security_state.lock();
             }
             result
         }
@@ -1308,8 +1316,8 @@ impl FsNode {
     }
 
     pub fn on_file_closed(&self, file: &FileObject) {
-        {
-            let mut flock_info = self.flock_info.lock();
+        if let Some(rare_data) = self.rare_data.get() {
+            let mut flock_info = rare_data.flock_info.lock();
             // This function will drop the flock from `file` because the `WeakFileHandle` for
             // `file` will no longer upgrade to an `FileHandle`.
             flock_info.retain(|_| true);
@@ -1325,12 +1333,14 @@ impl FsNode {
         cmd: RecordLockCommand,
         flock: uapi::flock,
     ) -> Result<Option<uapi::flock>, Errno> {
-        self.record_locks.lock(locked, current_task, file, cmd, flock)
+        self.ensure_rare_data().record_locks.lock(locked, current_task, file, cmd, flock)
     }
 
     /// Release all record locks acquired by the given owner.
     pub fn record_lock_release(&self, owner: RecordLockOwner) {
-        self.record_locks.release_locks(owner);
+        if let Some(rare_data) = self.rare_data.get() {
+            rare_data.record_locks.release_locks(owner);
+        }
     }
 
     pub fn create_dir_entry_ops(&self) -> Box<dyn DirEntryOps> {
@@ -1603,7 +1613,9 @@ impl FsNode {
         self.update_metadata_for_child(current_task, &mut mode, &mut owner);
         let node = self.ops().create_tmpfile(self, current_task, mode, owner)?;
         self.init_new_node_security_on_create(locked, current_task, &node, "".into())?;
-        node.link_behavior.set(link_behavior).unwrap();
+        if link_behavior == FsNodeLinkBehavior::Disallowed {
+            node.ensure_rare_data().link_behavior.set(link_behavior).unwrap();
+        }
         Ok(node)
     }
 
@@ -1645,8 +1657,10 @@ impl FsNode {
             return error!(EPERM);
         }
 
-        if matches!(child.link_behavior.get(), Some(FsNodeLinkBehavior::Disallowed)) {
-            return error!(ENOENT);
+        if let Some(child_rare_data) = child.rare_data.get() {
+            if matches!(child_rare_data.link_behavior.get(), Some(FsNodeLinkBehavior::Disallowed)) {
+                return error!(ENOENT);
+            }
         }
 
         // Check that `current_task` has permission to create the hard link.
@@ -2032,19 +2046,27 @@ impl FsNode {
     }
 
     pub fn fifo(&self) -> Option<&PipeHandle> {
-        self.fifo.as_ref()
+        if let Some(rare_data) = self.rare_data.get() {
+            rare_data.fifo.as_ref()
+        } else {
+            None
+        }
     }
 
     /// Returns the UNIX domain socket bound to this node, if any.
     pub fn bound_socket(&self) -> Option<&SocketHandle> {
-        self.bound_socket.get()
+        if let Some(rare_data) = self.rare_data.get() {
+            rare_data.bound_socket.get()
+        } else {
+            None
+        }
     }
 
     /// Register the provided socket as the UNIX domain socket bound to this node.
     ///
     /// It is a fatal error to call this method again if it has already been called on this node.
     pub fn set_bound_socket(&self, socket: SocketHandle) {
-        assert!(self.bound_socket.set(socket).is_ok());
+        assert!(self.ensure_rare_data().bound_socket.set(socket).is_ok());
     }
 
     pub fn update_attributes<L, F>(
@@ -2617,12 +2639,16 @@ impl FsNode {
         format!("{}:[{}]", class, self.node_id).into()
     }
 
+    fn ensure_rare_data(&self) -> &FsNodeRareData {
+        self.rare_data.get_or_init(|| Box::new(FsNodeRareData::default()))
+    }
+
     /// Returns the set of watchers for this node.
     ///
     /// Only call this function if you require this node to actually store a list of watchers. If
     /// you just wish to notify any watchers that might exist, please use `notify` instead.
     pub fn ensure_watchers(&self) -> &inotify::InotifyWatchers {
-        &self.watchers
+        &self.ensure_rare_data().watchers
     }
 
     /// Notify the watchers of the given event.
@@ -2634,7 +2660,9 @@ impl FsNode {
         mode: FileMode,
         is_dead: bool,
     ) {
-        self.watchers.notify(event_mask, cookie, name, mode, is_dead);
+        if let Some(rare_data) = self.rare_data.get() {
+            rare_data.watchers.notify(event_mask, cookie, name, mode, is_dead);
+        }
     }
 }
 
