@@ -4,6 +4,7 @@
 
 use crate::error::MonikerError;
 use crate::moniker::Moniker;
+use cm_rust::{FidlIntoNative, NativeIntoFidl};
 use core::cmp::Ord;
 use std::fmt;
 
@@ -83,6 +84,18 @@ impl fmt::Display for ExtendedMoniker {
 impl From<Moniker> for ExtendedMoniker {
     fn from(m: Moniker) -> Self {
         Self::ComponentInstance(m)
+    }
+}
+
+impl FidlIntoNative<ExtendedMoniker> for String {
+    fn fidl_into_native(self) -> ExtendedMoniker {
+        self.parse().unwrap()
+    }
+}
+
+impl NativeIntoFidl<String> for ExtendedMoniker {
+    fn native_into_fidl(self) -> String {
+        self.to_string()
     }
 }
 
