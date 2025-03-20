@@ -5,7 +5,6 @@
 use async_utils::hanging_get::client::HangingGetStream;
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_input_interaction::{NotifierMarker, NotifierProxy, State};
-use fidl_fuchsia_input_interaction_observation::AggregatorMarker;
 use fidl_fuchsia_input_report::{ConsumerControlButton, KeyboardInputReport};
 use fidl_fuchsia_logger::LogSinkMarker;
 use fidl_fuchsia_math::Vec_;
@@ -73,7 +72,6 @@ async fn assemble_realm(suspend_enabled: bool) -> RealmInstance {
     builder
         .add_route(
             Route::new()
-                .capability(Capability::protocol::<AggregatorMarker>())
                 .capability(Capability::protocol::<NotifierMarker>())
                 .capability(Capability::protocol::<InputRegistryMarker>())
                 .from(Ref::child(TEST_UI_STACK))

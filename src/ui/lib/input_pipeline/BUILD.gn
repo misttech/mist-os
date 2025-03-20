@@ -29,7 +29,6 @@ icu_rustc_library("input_pipeline") {
     "//sdk/fidl/fuchsia.input:fuchsia.input_rust",
     "//sdk/fidl/fuchsia.input.injection:fuchsia.input.injection_rust",
     "//sdk/fidl/fuchsia.input.interaction:fuchsia.input.interaction_rust",
-    "//sdk/fidl/fuchsia.input.interaction.observation:fuchsia.input.interaction.observation_rust",
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.lightsensor:fuchsia.lightsensor_rust",

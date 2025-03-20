@@ -73,9 +73,5 @@
             protocol: [ "fuchsia.ui.policy.DeviceListenerRegistry" ],
             from: "#scene_manager",
         },
-        {
-            protocol: [ "fuchsia.input.interaction.observation.Aggregator" ],
-            from: "#scene_manager",
-        },
     ],
 }

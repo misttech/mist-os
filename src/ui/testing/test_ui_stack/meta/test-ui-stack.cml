@@ -33,7 +33,6 @@
                 "fuchsia.accessibility.semantics.SemanticsManager",
                 "fuchsia.element.GraphicalPresenter",
                 "fuchsia.input.interaction.Notifier",
-                "fuchsia.input.interaction.observation.Aggregator",
                 "fuchsia.input.virtualkeyboard.ControllerCreator",
                 "fuchsia.input.virtualkeyboard.Manager",
                 "fuchsia.ui.composition.Allocator",
@@ -156,7 +155,6 @@
                 // GFX; support is still needed for Flatland.
                 "fuchsia.element.GraphicalPresenter",
                 "fuchsia.input.interaction.Notifier",
-                "fuchsia.input.interaction.observation.Aggregator",
                 "fuchsia.input.virtualkeyboard.ControllerCreator",
                 "fuchsia.input.virtualkeyboard.Manager",
                 "fuchsia.ui.composition.Allocator",
