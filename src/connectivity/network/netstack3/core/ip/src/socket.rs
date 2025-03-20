@@ -14,7 +14,7 @@ use net_types::{MulticastAddress, ScopeableAddress, SpecifiedAddr};
 use netstack3_base::socket::{SocketIpAddr, SocketIpAddrExt as _};
 use netstack3_base::{
     AnyDevice, CounterContext, DeviceIdContext, DeviceIdentifier, EitherDeviceId, InstantContext,
-    IpDeviceAddr, IpExt, Mms, SendFrameErrorReason, StrongDeviceIdentifier,
+    IpDeviceAddr, IpExt, Marks, Mms, SendFrameErrorReason, StrongDeviceIdentifier,
     TxMetadataBindingsTypes, WeakDeviceIdentifier,
 };
 use netstack3_filter::{
@@ -32,7 +32,7 @@ use crate::internal::base::{
     SendIpPacketMeta,
 };
 use crate::internal::device::state::IpDeviceStateIpExt;
-use crate::internal::routing::rules::{Marks, RuleInput};
+use crate::internal::routing::rules::RuleInput;
 use crate::internal::routing::PacketOrigin;
 use crate::internal::types::{InternalForwarding, ResolvedRoute, RoutableIpAddr};
 use crate::{HopLimits, NextHop};

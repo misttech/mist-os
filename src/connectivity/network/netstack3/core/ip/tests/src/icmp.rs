@@ -25,14 +25,14 @@ use packet_formats::testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame;
 use packet_formats::udp::UdpPacketBuilder;
 
 use netstack3_base::testutil::{set_logger_for_test, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6};
-use netstack3_base::FrameDestination;
+use netstack3_base::{FrameDestination, Marks};
 use netstack3_core::device::DeviceId;
 use netstack3_core::ip::MarkDomain;
 use netstack3_core::testutil::{Ctx, CtxPairExt as _, FakeBindingsCtx, FakeCtxBuilder};
 use netstack3_core::{IpExt, StackStateBuilder};
 use netstack3_ip::icmp::Icmpv4StateBuilder;
 use netstack3_ip::{
-    AddableEntry, AddableMetric, MarkMatcher, MarkMatchers, Marks, RawMetric, Rule, RuleAction,
+    AddableEntry, AddableMetric, MarkMatcher, MarkMatchers, RawMetric, Rule, RuleAction,
     RuleMatcher,
 };
 use test_case::test_case;

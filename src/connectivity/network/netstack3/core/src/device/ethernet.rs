@@ -14,7 +14,7 @@ use net_types::ethernet::Mac;
 use net_types::ip::{Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
 use net_types::{SpecifiedAddr, UnicastAddr, Witness};
 use netstack3_base::socket::SocketIpAddr;
-use netstack3_base::{CoreTimerContext, CounterContext, DeviceIdContext, SendFrameError};
+use netstack3_base::{CoreTimerContext, CounterContext, DeviceIdContext, Marks, SendFrameError};
 use netstack3_device::ethernet::{
     self, DynamicEthernetDeviceState, EthernetDeviceId, EthernetIpLinkDeviceDynamicStateContext,
     EthernetIpLinkDeviceStaticStateContext, EthernetLinkDevice, EthernetTimerId,
@@ -35,7 +35,7 @@ use netstack3_ip::nud::{
     DelegateNudContext, NudConfigContext, NudContext, NudIcmpContext, NudSenderContext, NudState,
     NudUserConfig, UseDelegateNudContext,
 };
-use netstack3_ip::{IpDeviceEgressStateContext, Marks};
+use netstack3_ip::IpDeviceEgressStateContext;
 use packet::{Buf, BufferMut, InnerPacketBuilder as _, Serializer};
 use packet_formats::ethernet::EtherType;
 use packet_formats::icmp::ndp::options::NdpOptionBuilder;

@@ -22,7 +22,7 @@ use netstack3_base::sync::Mutex;
 use netstack3_base::{
     AnyDevice, Counter, CounterContext, DeviceIdContext, EitherDeviceId, FrameDestination,
     IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode, InstantBindingsTypes, InstantContext,
-    IpDeviceAddr, IpExt, RngContext, TokenBucket, TxMetadataBindingsTypes,
+    IpDeviceAddr, IpExt, Marks, RngContext, TokenBucket, TxMetadataBindingsTypes,
 };
 use netstack3_filter::{self as filter, TransportPacketSerializer};
 use packet::{
@@ -58,7 +58,6 @@ use crate::internal::device::{
 };
 use crate::internal::local_delivery::{IpHeaderInfo, LocalDeliveryPacketInfo, ReceiveIpPacketMeta};
 use crate::internal::path_mtu::PmtuHandler;
-use crate::internal::routing::rules::Marks;
 use crate::internal::socket::{
     DelegatedRouteResolutionOptions, DelegatedSendOptions, IpSocketHandler, OptionDelegationMarker,
     RouteResolutionOptions, SendOptions,

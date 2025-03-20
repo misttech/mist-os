@@ -5674,7 +5674,7 @@ mod tests {
         tcp: FakeDualStackTcpState<D, BT>,
         ip_socket_ctx: InnerCoreCtx<D>,
         // Marks to attach for incoming packets.
-        recv_packet_marks: netstack3_ip::Marks,
+        recv_packet_marks: netstack3_base::Marks,
     }
 
     impl<D: FakeStrongDeviceId, BT: TcpBindingsTypes> ContextProvider for TcpCoreCtx<D, BT> {
@@ -8939,7 +8939,7 @@ mod tests {
     {
         // We want the accepted socket to be marked 101 for MARK_1 and 102 for MARK_2.
         let expected_marks = [(MarkDomain::Mark1, 101), (MarkDomain::Mark2, 102)];
-        let marks = netstack3_ip::Marks::new(expected_marks);
+        let marks = netstack3_base::Marks::new(expected_marks);
         let mut net = new_test_net::<I>();
 
         for c in [LOCAL, REMOTE] {

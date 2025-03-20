@@ -69,6 +69,8 @@ rustc_library_with_features("netstack3-base") {
     "//third_party/rust_crates:log",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:smallvec",
+    "//third_party/rust_crates:strum",
+    "//third_party/rust_crates:strum_macros",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:zerocopy",
   ]

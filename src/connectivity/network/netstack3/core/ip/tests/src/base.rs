@@ -41,7 +41,7 @@ use netstack3_base::testutil::{
     new_rng, set_logger_for_test, FakeInstant, TestAddrs, TestDualStackIpExt, TestIpExt,
     TEST_ADDRS_V4, TEST_ADDRS_V6,
 };
-use netstack3_base::{FrameDestination, InstantContext as _, IpDeviceAddr};
+use netstack3_base::{FrameDestination, InstantContext as _, IpDeviceAddr, Marks};
 use netstack3_core::device::{
     DeviceId, EthernetCreationProperties, EthernetLinkDevice, RecvEthernetFrameMeta,
 };
@@ -68,8 +68,8 @@ use netstack3_ip::socket::IpSocketContext;
 use netstack3_ip::{
     self as ip, AddableEntryEither, AddableMetric, AddressStatus, Destination, DropReason,
     FragmentTimerId, InternalForwarding, IpDeviceIngressStateContext, IpLayerTimerId,
-    Ipv4PresentAddressStatus, Ipv6PresentAddressStatus, Marks, NextHop, RawMetric,
-    ReceivePacketAction, ResolveRouteError, ResolvedRoute, RoutableIpAddr,
+    Ipv4PresentAddressStatus, Ipv6PresentAddressStatus, NextHop, RawMetric, ReceivePacketAction,
+    ResolveRouteError, ResolvedRoute, RoutableIpAddr,
 };
 
 // Some helper functions

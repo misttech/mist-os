@@ -9,7 +9,9 @@ use core::fmt::Debug;
 use core::ops::Deref as _;
 
 use net_types::ip::Ip;
-use netstack3_base::{DeviceNameMatcher, DeviceWithName, Mark, MarkDomain, Matcher, SubnetMatcher};
+use netstack3_base::{
+    DeviceNameMatcher, DeviceWithName, Mark, MarkDomain, MarkStorage, Marks, Matcher, SubnetMatcher,
+};
 
 use crate::internal::routing::PacketOrigin;
 use crate::RoutingTableId;
@@ -139,69 +141,9 @@ impl Matcher<Mark> for MarkMatcher {
     }
 }
 
-const MARK_DOMAINS: usize = 2;
-
-/// The 2 marks socket can use to route traffic.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Marks([Mark; MARK_DOMAINS]);
-
-impl Marks {
-    /// Unmarked marks.
-    pub const UNMARKED: Self = Marks([Mark(None), Mark(None)]);
-}
-
-impl Default for Marks {
-    fn default() -> Marks {
-        Self::UNMARKED
-    }
-}
-
-fn get_mark_with_domain<T>(storage: &[T; MARK_DOMAINS], domain: MarkDomain) -> &T {
-    match domain {
-        MarkDomain::Mark1 => &storage[0],
-        MarkDomain::Mark2 => &storage[1],
-    }
-}
-
-fn get_mark_with_domain_mut<T>(storage: &mut [T; MARK_DOMAINS], domain: MarkDomain) -> &mut T {
-    match domain {
-        MarkDomain::Mark1 => &mut storage[0],
-        MarkDomain::Mark2 => &mut storage[1],
-    }
-}
-
-impl Marks {
-    /// Creates [`Marks`]s from an iterator of `(MarkDomain, u32)`.
-    ///
-    /// An unspecified domain will remain unmarked.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the same domain is specified more than once.
-    pub fn new(iter: impl IntoIterator<Item = (MarkDomain, u32)>) -> Self {
-        let mut marks = Self::default();
-        for (domain, mark) in iter.into_iter() {
-            assert_eq!(core::mem::replace(marks.get_mut(domain), Mark(Some(mark))), Mark(None));
-        }
-        marks
-    }
-
-    /// Gets an immutable reference to the mark at the given domain.
-    pub fn get(&self, domain: MarkDomain) -> &Mark {
-        let Self(marks) = self;
-        get_mark_with_domain(marks, domain)
-    }
-
-    /// Gets a mutable reference to the mark at the given domain.
-    pub fn get_mut(&mut self, domain: MarkDomain) -> &mut Mark {
-        let Self(marks) = self;
-        get_mark_with_domain_mut(marks, domain)
-    }
-}
-
 /// The 2 mark matchers a rule can specify. All non-none markers must match.
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
-pub struct MarkMatchers([Option<MarkMatcher>; MARK_DOMAINS]);
+pub struct MarkMatchers(MarkStorage<Option<MarkMatcher>>);
 
 impl MarkMatchers {
     /// Creates [`MarkMatcher`]s from an iterator of `(MarkDomain, MarkMatcher)`.
@@ -211,31 +153,21 @@ impl MarkMatchers {
     /// # Panics
     ///
     /// Panics if the same domain is specified more than once.
-    pub fn new(iter: impl IntoIterator<Item = (MarkDomain, MarkMatcher)>) -> Self {
-        let mut mark_matchers = [None; MARK_DOMAINS];
-        for (domain, matcher) in iter.into_iter() {
-            assert_eq!(
-                core::mem::replace(
-                    get_mark_with_domain_mut(&mut mark_matchers, domain),
-                    Some(matcher)
-                ),
-                None
-            );
-        }
-        MarkMatchers(mark_matchers)
+    pub fn new(matchers: impl IntoIterator<Item = (MarkDomain, MarkMatcher)>) -> Self {
+        MarkMatchers(MarkStorage::new(matchers))
     }
 
     /// Returns an iterator over the mark matchers of all domains.
-    pub fn iter(&self) -> impl Iterator<Item = (MarkDomain, Option<MarkMatcher>)> {
-        let Self(matchers) = self;
-        [(MarkDomain::Mark1, matchers[0]), (MarkDomain::Mark2, matchers[1])].into_iter()
+    pub fn iter(&self) -> impl Iterator<Item = (MarkDomain, &Option<MarkMatcher>)> {
+        let Self(storage) = self;
+        storage.iter()
     }
 }
 
 impl Matcher<Marks> for MarkMatchers {
-    fn matches(&self, Marks(actual): &Marks) -> bool {
+    fn matches(&self, actual: &Marks) -> bool {
         let Self(matchers) = self;
-        matchers.iter().zip(actual.iter()).all(|(matcher, actual)| matcher.matches(actual))
+        matchers.zip_with(actual).all(|(_domain, matcher, actual)| matcher.matches(actual))
     }
 }
 
@@ -470,20 +402,35 @@ mod test {
     }
 
     #[test_case(
-        MarkMatchers([Some(MarkMatcher::Unmarked), Some(MarkMatcher::Unmarked)]),
-        Marks([Mark(None), Mark(None)]) => true
+        MarkMatchers::new(
+            [(MarkDomain::Mark1, MarkMatcher::Unmarked),
+            (MarkDomain::Mark2, MarkMatcher::Unmarked)]
+        ),
+        Marks::new([]) => true
     )]
     #[test_case(
-        MarkMatchers([Some(MarkMatcher::Unmarked), Some(MarkMatcher::Unmarked)]),
-        Marks([Mark(Some(1)), Mark(None)]) => false
+        MarkMatchers::new(
+            [(MarkDomain::Mark1, MarkMatcher::Unmarked),
+            (MarkDomain::Mark2, MarkMatcher::Unmarked)]
+        ),
+        Marks::new([(MarkDomain::Mark1, 1)]) => false
     )]
     #[test_case(
-        MarkMatchers([Some(MarkMatcher::Unmarked), Some(MarkMatcher::Unmarked)]),
-        Marks([Mark(None), Mark(Some(1))]) => false
+        MarkMatchers::new(
+            [(MarkDomain::Mark1, MarkMatcher::Unmarked),
+            (MarkDomain::Mark2, MarkMatcher::Unmarked)]
+        ),
+        Marks::new([(MarkDomain::Mark2, 1)]) => false
     )]
     #[test_case(
-        MarkMatchers([Some(MarkMatcher::Unmarked), Some(MarkMatcher::Unmarked)]),
-        Marks([Mark(Some(1)), Mark(Some(1))]) => false
+        MarkMatchers::new(
+            [(MarkDomain::Mark1, MarkMatcher::Unmarked),
+            (MarkDomain::Mark2, MarkMatcher::Unmarked)]
+        ),
+        Marks::new([
+            (MarkDomain::Mark1, 1),
+            (MarkDomain::Mark2, 1),
+        ]) => false
     )]
     fn mark_matchers(matchers: MarkMatchers, marks: Marks) -> bool {
         matchers.matches(&marks)

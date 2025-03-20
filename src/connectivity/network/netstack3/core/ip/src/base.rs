@@ -33,7 +33,7 @@ use netstack3_base::{
     AnyDevice, BroadcastIpExt, CoreTimerContext, Counter, CounterContext, DeviceIdContext,
     DeviceIdentifier as _, DeviceWithName, ErrorAndSerializer, EventContext, FrameDestination,
     HandleableTimer, Inspectable, Inspector, InspectorExt as _, InstantContext, IpAddressId,
-    IpDeviceAddr, IpDeviceAddressIdContext, IpExt, Matcher as _, NestedIntoCoreTimerCtx,
+    IpDeviceAddr, IpDeviceAddressIdContext, IpExt, Marks, Matcher as _, NestedIntoCoreTimerCtx,
     NotFoundError, RngContext, SendFrameErrorReason, StrongDeviceIdentifier, TimerBindingsTypes,
     TimerContext, TimerHandler, TxMetadataBindingsTypes, WeakIpAddressId, WrapBroadcastMarker,
 };
@@ -95,7 +95,7 @@ use crate::internal::reassembly::{
     FragmentBindingsTypes, FragmentHandler, FragmentProcessingState, FragmentTimerId,
     FragmentablePacket, IpPacketFragmentCache,
 };
-use crate::internal::routing::rules::{Marks, Rule, RuleAction, RuleInput, RulesTable};
+use crate::internal::routing::rules::{Rule, RuleAction, RuleInput, RulesTable};
 use crate::internal::routing::{
     IpRoutingDeviceContext, NonLocalSrcAddrPolicy, PacketOrigin, RoutingTable,
 };

@@ -18,13 +18,13 @@ use netstack3_base::socket::{
 };
 use netstack3_base::{
     BidirectionalConverter as _, Control, CounterContext, CtxPair, EitherDeviceId, IpDeviceAddr,
-    Mss, NotFoundError, Payload, Segment, SegmentHeader, SeqNum, StrongDeviceIdentifier as _,
-    WeakDeviceIdentifier,
+    Marks, Mss, NotFoundError, Payload, Segment, SegmentHeader, SeqNum,
+    StrongDeviceIdentifier as _, WeakDeviceIdentifier,
 };
 use netstack3_filter::TransportPacketSerializer;
 use netstack3_ip::socket::{IpSockCreationError, MmsError};
 use netstack3_ip::{
-    IpHeaderInfo, IpTransportContext, LocalDeliveryPacketInfo, Marks, ReceiveIpPacketMeta,
+    IpHeaderInfo, IpTransportContext, LocalDeliveryPacketInfo, ReceiveIpPacketMeta,
     TransportIpContext, TransportReceiveError,
 };
 use netstack3_trace::trace_duration;

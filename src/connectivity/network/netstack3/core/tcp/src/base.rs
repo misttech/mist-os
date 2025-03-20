@@ -10,11 +10,10 @@ use core::time::Duration;
 use net_types::ip::{GenericOverIp, Ip, Mtu};
 use net_types::SpecifiedAddr;
 use netstack3_base::{
-    IcmpErrorCode, Icmpv4ErrorCode, Icmpv6ErrorCode, IpExt, UnscaledWindowSize,
+    IcmpErrorCode, Icmpv4ErrorCode, Icmpv6ErrorCode, IpExt, Marks, UnscaledWindowSize,
     WeakDeviceIdentifier, WindowSize,
 };
 use netstack3_ip::socket::{RouteResolutionOptions, SendOptions};
-use netstack3_ip::Marks;
 use packet_formats::icmp::{
     Icmpv4DestUnreachableCode, Icmpv4TimeExceededCode, Icmpv6DestUnreachableCode,
 };

@@ -33,7 +33,7 @@ use netstack3_base::testutil::{
 };
 use netstack3_base::{
     AddressResolutionFailed, CtxPair, DeferredResourceRemovalContext, EventContext,
-    FrameDestination, InstantBindingsTypes, InstantContext, IpDeviceAddr, LinkDevice,
+    FrameDestination, InstantBindingsTypes, InstantContext, IpDeviceAddr, LinkDevice, Marks,
     NotFoundError, ReferenceNotifiers, RemoveResourceResult, RngContext, TimerBindingsTypes,
     TimerContext, TimerHandler, TxMetadataBindingsTypes, WorkQueueReport,
 };
@@ -60,8 +60,8 @@ use netstack3_ip::nud::{self, LinkResolutionContext, LinkResolutionNotifier};
 use netstack3_ip::raw::{RawIpSocketId, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes};
 use netstack3_ip::{
     self as ip, AddRouteError, AddableEntryEither, AddableMetric, DeviceIpLayerMetadata,
-    IpLayerEvent, IpLayerTimerId, Marks, RawMetric, ResolveRouteError, ResolvedRoute,
-    RoutableIpAddr, RouterAdvertisementEvent,
+    IpLayerEvent, IpLayerTimerId, RawMetric, ResolveRouteError, ResolvedRoute, RoutableIpAddr,
+    RouterAdvertisementEvent,
 };
 use netstack3_tcp::testutil::{ClientBuffers, ProvidedBuffers, RingBuffer, TestSendBuffer};
 use netstack3_tcp::{BufferSizes, TcpBindingsTypes};
