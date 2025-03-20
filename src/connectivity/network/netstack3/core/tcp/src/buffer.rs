@@ -8,7 +8,7 @@
 
 use netstack3_base::{Payload, SackBlock, SackBlocks, SeqNum};
 
-use alloc::vec::Vec;
+use alloc::collections::VecDeque;
 use arrayvec::ArrayVec;
 use core::fmt::Debug;
 use core::ops::Range;
@@ -125,13 +125,13 @@ pub(super) struct Assembler {
     // Holds all the sequence number ranges which we have already received.
     // These ranges are sorted and should have a gap of at least 1 byte
     // between any consecutive two. These ranges should only be after `nxt`.
-    outstanding: Vec<OutstandingBlock>,
+    outstanding: VecDeque<OutstandingBlock>,
 }
 
 impl Assembler {
     /// Creates a new assembler.
     pub(super) fn new(nxt: SeqNum) -> Self {
-        Self { outstanding: Vec::new(), generation: 0, nxt }
+        Self { outstanding: VecDeque::new(), generation: 0, nxt }
     }
 
     /// Returns the next sequence number expected to be received.
@@ -166,7 +166,7 @@ impl Assembler {
 
         let Self { outstanding, nxt, generation: _ } = self;
         if outstanding[0].range.start == *nxt {
-            let advanced = outstanding.remove(0);
+            let advanced = outstanding.pop_front().unwrap();
             *nxt = advanced.range.end;
             // The following unwrap is safe because it is invalid to have
             // have a range where `end` is before `start`.
@@ -191,25 +191,39 @@ impl Assembler {
         *generation = *generation + 1;
 
         if outstanding.is_empty() {
-            outstanding
-                .push(OutstandingBlock { range: Range { start, end }, generation: *generation });
+            outstanding.push_back(OutstandingBlock {
+                range: Range { start, end },
+                generation: *generation,
+            });
             return;
         }
 
         // Search for the first segment whose `start` is greater.
-        let first_after = {
-            let mut cur = 0;
-            while cur < outstanding.len() {
-                if start.before(outstanding[cur].range.start) {
-                    break;
-                }
-                cur += 1;
+        let first_after = match outstanding.binary_search_by(|block| {
+            if block.range.start == start {
+                return core::cmp::Ordering::Equal;
             }
-            cur
+            if block.range.start.before(start) {
+                core::cmp::Ordering::Less
+            } else {
+                core::cmp::Ordering::Greater
+            }
+        }) {
+            Ok(r) => {
+                // We found the exact same start point, so the first segment
+                // whose start is greater must be the next one.
+                r + 1
+            }
+            Err(e) => {
+                // When binary search doesn't find the exact place it returns
+                // the index where this block should be in, which should be the
+                // next greater range.
+                e
+            }
         };
 
         let mut merge_right = 0;
-        for block in &outstanding[first_after..outstanding.len()] {
+        for block in outstanding.range(first_after..outstanding.len()) {
             if end.before(block.range.start) {
                 break;
             }
@@ -221,7 +235,7 @@ impl Assembler {
         }
 
         let mut merge_left = 0;
-        for block in (&outstanding[0..first_after]).iter().rev() {
+        for block in outstanding.range(0..first_after).rev() {
             if start.after(block.range.end) {
                 break;
             }
@@ -332,6 +346,7 @@ pub(crate) mod testutil {
 
     use alloc::sync::Arc;
     use alloc::vec;
+    use alloc::vec::Vec;
     use core::cmp;
 
     use either::Either;
@@ -762,6 +777,7 @@ pub(crate) mod testutil {
 
 #[cfg(test)]
 mod test {
+    use alloc::vec::Vec;
     use alloc::{format, vec};
 
     use netstack3_base::{FragmentedPayload, WindowSize};
@@ -810,8 +826,8 @@ mod test {
                     );
                 }
             }
-            prop_assert_eq!(assembler.outstanding.first().unwrap().range.start, min_seq);
-            prop_assert_eq!(assembler.outstanding.last().unwrap().range.end, max_seq);
+            prop_assert_eq!(assembler.outstanding.front().unwrap().range.start, min_seq);
+            prop_assert_eq!(assembler.outstanding.back().unwrap().range.end, max_seq);
         }
 
         #[test]
@@ -916,22 +932,28 @@ mod test {
     }
 
     #[test_case([Range { start: 0, end: 0 }]
-        => Assembler { outstanding: vec![], nxt: SeqNum::new(0), generation: 0 })]
+        => Assembler { outstanding: VecDeque::new(), nxt: SeqNum::new(0), generation: 0 })]
     #[test_case([Range { start: 0, end: 10 }]
-        => Assembler { outstanding: vec![], nxt: SeqNum::new(10), generation: 1 })]
+        => Assembler { outstanding: VecDeque::new(), nxt: SeqNum::new(10), generation: 1 })]
     #[test_case([Range{ start: 10, end: 15 }, Range { start: 5, end: 10 }]
         => Assembler {
-            outstanding: vec![
+            outstanding: [
                 OutstandingBlock{ range: Range { start: SeqNum::new(5), end: SeqNum::new(15) }, generation: 2 },
-            ],
+            ].into_iter().collect(),
             nxt: SeqNum::new(0),
             generation: 2,
         })
     ]
     #[test_case([Range{ start: 10, end: 15 }, Range { start: 0, end: 5 }, Range { start: 5, end: 10 }]
-        => Assembler { outstanding: vec![], nxt: SeqNum::new(15), generation: 3 })]
+        => Assembler { outstanding: VecDeque::new(), nxt: SeqNum::new(15), generation: 3 })]
     #[test_case([Range{ start: 10, end: 15 }, Range { start: 5, end: 10 }, Range { start: 0, end: 5 }]
-        => Assembler { outstanding: vec![], nxt: SeqNum::new(15), generation: 3 })]
+        => Assembler { outstanding: VecDeque::new(), nxt: SeqNum::new(15), generation: 3 })]
+    #[test_case([Range{ start: 10, end: 15 }, Range { start: 10, end: 15 }, Range { start: 11, end: 12 }]
+        => Assembler {
+             outstanding: [
+                OutstandingBlock{ range: Range { start: SeqNum::new(10), end: SeqNum::new(15) }, generation: 3 }
+            ].into_iter().collect(),
+            nxt: SeqNum::new(0), generation: 3 })]
     fn assembler_examples(ops: impl IntoIterator<Item = Range<u32>>) -> Assembler {
         let mut assembler = Assembler::new(SeqNum::new(0));
         for Range { start, end } in ops.into_iter() {
