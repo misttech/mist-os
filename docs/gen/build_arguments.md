@@ -43,7 +43,7 @@ the //:default target
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:140
+From //BUILD.gn:115
 
 ### all_cpu_kernel_boot_tests
 
@@ -136,7 +136,7 @@ The result will be built and uploaded to CIPD by infra.
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:132
+From //BUILD.gn:107
 
 ### assembly_generate_fvm_fastboot
 
@@ -167,7 +167,7 @@ The result will be built and uploaded to CIPD by infra.
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:136
+From //BUILD.gn:111
 
 ### authorized_ssh_keys_label
 
@@ -223,11 +223,8 @@ From //build/images/vbmeta.gni:20
 
 ### base_package_labels
 
-If you add package labels to this variable, the packages will be included in
-the 'base' package set, which represents the set of packages that are part
-of an OTA. These packages are updated as an atomic unit during an OTA
-process and are immutable and are a superset of the TCB (Trusted Computing
-Base) for a product. These packages are never evicted by the system.
+These remain only to allow for a soft-transition with developer's
+local args.gn files.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
@@ -235,7 +232,7 @@ From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:41
+From //BUILD.gn:27
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -243,7 +240,7 @@ From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:41
+From //BUILD.gn:27
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -251,7 +248,7 @@ From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:41
+From //BUILD.gn:27
 
 ### basic_env_names
 
@@ -722,7 +719,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8719968479350022241"`
+**Current value for `target_cpu = "arm64"`:** `"8719923173080697281"`
 
 From //out/not-default/args.gn:10
 
@@ -730,7 +727,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8719968479350022241"`
+**Current value for `target_cpu = "riscv64"`:** `"8719923173080697281"`
 
 From //out/not-default/args.gn:10
 
@@ -738,7 +735,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8719968479350022241"`
+**Current value for `target_cpu = "x64"`:** `"8719923173080697281"`
 
 From //out/not-default/args.gn:10
 
@@ -761,7 +758,7 @@ From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:148
+From //BUILD.gn:123
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -769,7 +766,7 @@ From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:148
+From //BUILD.gn:123
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -777,7 +774,7 @@ From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:148
+From //BUILD.gn:123
 
 ### build_should_trace_actions
 
@@ -826,20 +823,13 @@ From //build/config/fuchsia/versioning.gni:11
 
 ### cache_package_labels
 
-If you add package labels to this variable, the packages will be included
-in the 'cache' package set, which represents an additional set of software
-that is made available on disk immediately after paving and in factory
-flows. These packages are updated with an OTA, and can also be updated
-ephemerally. This cache of software can be evicted by the system if storage
-pressure arises or other policies indicate.
-
 **Current value for `target_cpu = "arm64"`:** `[]`
 
 From //out/not-default/args.gn:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:50
+From //BUILD.gn:28
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -847,7 +837,7 @@ From //out/not-default/args.gn:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:50
+From //BUILD.gn:28
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -855,7 +845,7 @@ From //out/not-default/args.gn:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:50
+From //BUILD.gn:28
 
 ### camera_debug
 
@@ -1071,7 +1061,7 @@ This should never be set as a build argument.
 }
   aarch64_unknown_linux_gnu = {
   libclang_rt_profile_a = "lib/clang/21/lib/aarch64-unknown-linux-gnu/libclang_rt.profile.a"
-  libunwind_so = "../../../../out/not-default/libunwind.so"
+  libunwind_so = ""
   resource_dir = "lib/clang/21"
   variants = {
   asan = {
@@ -1146,7 +1136,7 @@ This should never be set as a build argument.
 }
   lsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.lsan.so"
 }
   static = {
   clang_rt = "lib/clang/21/lib/armv7-unknown-linux-gnueabihf/libclang_rt.lsan.a"
@@ -2069,17 +2059,6 @@ From //third_party/crashpad/src/util/net/tls.gni:19
 
 From //third_party/crashpad/src/util/net/tls.gni:30
 
-### create_legacy_aib_archive
-
-Create the package and archive for the legacy assembly input bundle.  This
-can be a time-consuming operation, which due to limits in GN and groups,
-ends up being a blocking step in the build, so only enable this if we know
-that we want the legacy AIB packaged and archived for a given product:
-
-**Current value (from the default):** `false`
-
-From //build/images/fuchsia/BUILD.gn:25
-
 ### ctf_api_level
 
 **Current value (from the default):** `"NEXT"`
@@ -2325,7 +2304,7 @@ From //out/not-default/args.gn:27
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:111
+From //BUILD.gn:86
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -2333,7 +2312,7 @@ From //out/not-default/args.gn:27
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:111
+From //BUILD.gn:86
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -2341,7 +2320,7 @@ From //out/not-default/args.gn:27
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:111
+From //BUILD.gn:86
 
 ### disable_boot_tests
 
@@ -2384,7 +2363,7 @@ As these cannot be part of the legacy AIB for a product, there is no
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:71
+From //BUILD.gn:46
 
 ### dont_profile_source_files
 
@@ -2414,7 +2393,7 @@ From //out/not-default/args.gn:23
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:100
+From //BUILD.gn:75
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -2422,7 +2401,7 @@ From //out/not-default/args.gn:23
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:100
+From //BUILD.gn:75
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -2430,7 +2409,7 @@ From //out/not-default/args.gn:23
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:100
+From //BUILD.gn:75
 
 ### emu_window_size_height
 
@@ -2823,7 +2802,7 @@ packages instead of explicitly adding the labels of the
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:85
+From //BUILD.gn:60
 
 ### extra_bazel_assembly_targets
 
@@ -3131,7 +3110,7 @@ From //out/not-default/args.gn:21
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:92
+From //BUILD.gn:67
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -3139,7 +3118,7 @@ From //out/not-default/args.gn:21
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:92
+From //BUILD.gn:67
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -3147,7 +3126,7 @@ From //out/not-default/args.gn:21
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:92
+From //BUILD.gn:67
 
 ### host_byteorder
 
@@ -3173,7 +3152,7 @@ From //out/not-default/args.gn:11
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:118
+From //BUILD.gn:93
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -3181,7 +3160,7 @@ From //out/not-default/args.gn:11
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:118
+From //BUILD.gn:93
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -3189,7 +3168,7 @@ From //out/not-default/args.gn:11
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:118
+From //BUILD.gn:93
 
 ### host_os
 
@@ -3208,7 +3187,7 @@ From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:106
+From //BUILD.gn:81
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -3216,7 +3195,7 @@ From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:106
+From //BUILD.gn:81
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -3224,7 +3203,7 @@ From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:106
+From //BUILD.gn:81
 
 ### host_tools_base_path_override
 
@@ -3835,18 +3814,6 @@ Each element of the list is one variant, which is a scope defining:
 ```
 
 From //build/config/BUILDCONFIG.gn:1688
-
-### legacy_base_package_labels
-
-**Current value (from the default):** `[]`
-
-From //BUILD.gn:42
-
-### legacy_cache_package_labels
-
-**Current value (from the default):** `[]`
-
-From //BUILD.gn:51
 
 ### link_rbe_check
 
@@ -4696,7 +4663,7 @@ From //build/config/BUILDCONFIG.gn:34
 Overrides the set of API levels for which this build will provide build-time
 support in the IDK/SDK. The default (`false`) set is all `supported` and
 `in development` non-special API levels in //sdk/version_history.json.
-Other valid values are a list containing a subset of the default set.If
+Other valid values are a list containing a subset of the default set. If
 empty, only targets for which the IDK contains artifacts built at "PLATFORM"
 will be built.
 
@@ -5008,7 +4975,7 @@ Labels for product bundles to assemble in addition to the main product bundle.
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:151
+From //BUILD.gn:126
 
 ### product_bundle_test_groups
 
@@ -5100,6 +5067,10 @@ The overall mode for RBE to be operating in.  The valid values are:
  * 'cloudtop' => An RBE configuration that's optimized for running on a
                  cloudtop. Suitable for high-bandwidth connections to
                  remote services and downloading remote outputs.
+ * 'workstation' => An RBE configuration that's optimized for running on a
+                 large workstation. Suitable for machines with a large
+                 number of fast cores and a high bandwidth connection to
+                 remote services.
  * 'infra' => The RBE configuration recommended for CI/CQ bots.
               Also uses high-bandwidth.
  * 'remote_cache_only' => Use RBE only as a remote-cache: on cache-miss,
@@ -5110,7 +5081,7 @@ The overall mode for RBE to be operating in.  The valid values are:
 
 **Current value (from the default):** `"off"`
 
-From //build/toolchain/rbe_modes.gni:36
+From //build/toolchain/rbe_modes.gni:40
 
 ### rbe_settings_overrides
 
@@ -5119,7 +5090,7 @@ variables whose default values are set by the chosen RBE mode (above).
 
 **Current value (from the default):** `{ }`
 
-From //build/toolchain/rbe_modes.gni:40
+From //build/toolchain/rbe_modes.gni:44
 
 ### recovery_board_configuration_label
 
@@ -5507,7 +5478,7 @@ extension mechanism for IDK bits outside of the main repository.
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:128
+From //BUILD.gn:103
 
 ### sdk_cross_compile_host_tools
 
@@ -6108,7 +6079,7 @@ afterwards.
 
 **Current value (from the default):** `""`
 
-From //BUILD.gn:124
+From //BUILD.gn:99
 
 ### test_package_labels
 
@@ -6121,7 +6092,7 @@ From //out/not-default/args.gn:22
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:96
+From //BUILD.gn:71
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -6129,7 +6100,7 @@ From //out/not-default/args.gn:22
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:96
+From //BUILD.gn:71
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -6137,7 +6108,7 @@ From //out/not-default/args.gn:22
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:96
+From //BUILD.gn:71
 
 ### testonly_in_containers
 
@@ -6251,9 +6222,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:49
 If you add package labels to this variable, the packages will be included
 in the 'universe' package set, which represents all software that is
 produced that is to be published to a package repository or to the SDK by
-the build. The build system ensures that the universe package set includes
-the base and cache package sets, which means you do not need to redundantly
-include those labels in this variable.
+the build.
 
 **Current value for `target_cpu = "arm64"`:** `["//bundles/kitchen_sink"]`
 
@@ -6261,7 +6230,7 @@ From //out/not-default/args.gn:17
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:59
+From //BUILD.gn:34
 
 **Current value for `target_cpu = "riscv64"`:** `["//bundles/buildbot/minimal"]`
 
@@ -6269,7 +6238,7 @@ From //out/not-default/args.gn:17
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:59
+From //BUILD.gn:34
 
 **Current value for `target_cpu = "x64"`:** `["//bundles/kitchen_sink"]`
 
@@ -6277,7 +6246,7 @@ From //out/not-default/args.gn:17
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:59
+From //BUILD.gn:34
 
 ### update_goldens
 
