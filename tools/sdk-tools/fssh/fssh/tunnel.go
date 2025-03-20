@@ -1,7 +1,7 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-package main
+package fssh
 
 import (
 	"bufio"
@@ -38,7 +38,7 @@ type sdkProvider interface {
 	ResolveTargetAddress(deviceIP string, deviceName string) (sdkcommon.DeviceConfig, error)
 }
 
-type tunnelCmd struct {
+type TunnelCmd struct {
 	remoteHost     string
 	deviceIP       string
 	dataPath       string
@@ -51,20 +51,20 @@ type tunnelCmd struct {
 	logLevel       logger.LogLevel
 }
 
-func (*tunnelCmd) Name() string { return "tunnel" }
+func (*TunnelCmd) Name() string { return "tunnel" }
 
-func (*tunnelCmd) Synopsis() string {
+func (*TunnelCmd) Synopsis() string {
 	return "Create a tunnel between a local Fuchsia device and a remote host."
 }
 
-func (*tunnelCmd) Usage() string {
+func (*TunnelCmd) Usage() string {
 	return fmt.Sprintf(`fssh tunnel [-%s remote-host -%s device-ip -%s -device-name -%s path-to-ssh-config -%s=NNNN,NNNN -s]:
 Creates tunnel between the specified remote host and local Fuchsia device. Either the %s or %s flag must be set. If both are set the %s flag will take precedence.
 Options:
 `, remoteHostFlag, deviceIPFlag, deviceNameFlag, sshConfigFlag, tunnelPortsFlag, deviceIPFlag, deviceNameFlag, deviceIPFlag)
 }
 
-func (c *tunnelCmd) SetFlags(f *flag.FlagSet) {
+func (c *TunnelCmd) SetFlags(f *flag.FlagSet) {
 	c.logLevel = logger.InfoLevel // Default that may be overridden.
 	f.Var(&c.logLevel, logLevelFlag, "Output verbosity, can be fatal, error, warning, info, debug or trace.")
 	f.StringVar(&c.remoteHost, remoteHostFlag, "", "The remote host where development is taking place. If this flag is missing the most recent value from a previous call to this command will be used if applicable.")
@@ -79,7 +79,7 @@ If using the default SSH config, the following ports which are already in use wi
 	f.BoolVar(&c.verbose, verboseFlag, false, "Add debugging to the SSH config.")
 }
 
-func (c *tunnelCmd) Execute(ctx context.Context, f *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
+func (c *TunnelCmd) Execute(ctx context.Context, f *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
 	if c.verbose {
 		c.logLevel = logger.DebugLevel
 	}
@@ -193,7 +193,7 @@ func pipeStderrToFatalLog(ctx context.Context, cmd *exec.Cmd, verbose bool) erro
 
 // listenForInterrupt starts a separate goroutine to listen for the user to
 // press Ctrl+C.
-func (c *tunnelCmd) listenForInterrupt(ctx context.Context, cmd *exec.Cmd, cleanupSSHConfig bool) {
+func (c *TunnelCmd) listenForInterrupt(ctx context.Context, cmd *exec.Cmd, cleanupSSHConfig bool) {
 	channel := make(chan os.Signal)
 	signal.Notify(channel, os.Interrupt, syscall.SIGTERM)
 	go func() {
@@ -209,7 +209,7 @@ func (c *tunnelCmd) listenForInterrupt(ctx context.Context, cmd *exec.Cmd, clean
 }
 
 // parseFlags parses flags from the user and sets default values.
-func (c *tunnelCmd) parseFlags(ctx context.Context, sdk sdkProvider) ([]byte, error) {
+func (c *TunnelCmd) parseFlags(ctx context.Context, sdk sdkProvider) ([]byte, error) {
 	deviceConfig, err := sdk.ResolveTargetAddress(c.deviceIP, c.deviceName)
 	if err != nil {
 		return []byte{}, err

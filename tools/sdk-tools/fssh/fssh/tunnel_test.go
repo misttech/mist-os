@@ -1,7 +1,7 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-package main
+package fssh
 
 import (
 	"context"
@@ -49,7 +49,7 @@ func TestCommandLineParseFlags(t *testing.T) {
 		fakeFoundIPAddr,
 	}
 	flagSet := flag.NewFlagSet("test-flag-set", flag.PanicOnError)
-	cmd := &tunnelCmd{}
+	cmd := &TunnelCmd{}
 	cmd.SetFlags(flagSet)
 	flagSet.Parse(flags)
 	if len(cmd.tunnelPorts) != len(expectedPorts) {
@@ -71,7 +71,7 @@ func TestParseFlags(t *testing.T) {
 	}
 	defer os.Remove(fakeSSHConfigPath)
 	var tests = []struct {
-		tunnelCmd              *tunnelCmd
+		TunnelCmd              *TunnelCmd
 		expectedRemoteHost     string
 		expectedDeviceIP       string
 		expectedDeviceName     string
@@ -80,7 +80,7 @@ func TestParseFlags(t *testing.T) {
 		sdk                    testSDKProperties
 	}{
 		{
-			tunnelCmd: &tunnelCmd{
+			TunnelCmd: &TunnelCmd{
 				remoteHost:     "fake.remote.host",
 				deviceIP:       "",
 				deviceName:     fakeFoundName,
@@ -103,7 +103,7 @@ func TestParseFlags(t *testing.T) {
 			},
 		},
 		{
-			tunnelCmd: &tunnelCmd{
+			TunnelCmd: &TunnelCmd{
 				remoteHost:     "fake.remote.host",
 				deviceIP:       fakeFoundIPAddr,
 				deviceName:     "",
@@ -125,7 +125,7 @@ func TestParseFlags(t *testing.T) {
 			},
 		},
 		{
-			tunnelCmd: &tunnelCmd{
+			TunnelCmd: &TunnelCmd{
 				remoteHost:     "fake.remote.host",
 				deviceIP:       fakeFoundIPAddr,
 				deviceName:     fakeFoundName,
@@ -147,7 +147,7 @@ func TestParseFlags(t *testing.T) {
 			},
 		},
 		{
-			tunnelCmd: &tunnelCmd{
+			TunnelCmd: &TunnelCmd{
 				remoteHost:     "fake.remote.host",
 				deviceIP:       fakeFoundIPAddr,
 				deviceName:     fakeFoundName,
@@ -169,7 +169,7 @@ func TestParseFlags(t *testing.T) {
 			},
 		},
 		{
-			tunnelCmd: &tunnelCmd{
+			TunnelCmd: &TunnelCmd{
 				remoteHost:     "fake.remote.host",
 				deviceIP:       fakeFoundIPAddr,
 				deviceName:     fakeFoundName,
@@ -191,7 +191,7 @@ func TestParseFlags(t *testing.T) {
 			},
 		},
 		{
-			tunnelCmd: &tunnelCmd{
+			TunnelCmd: &TunnelCmd{
 				remoteHost:     "fake.remote.host",
 				deviceIP:       "",
 				deviceName:     "",
@@ -214,7 +214,7 @@ func TestParseFlags(t *testing.T) {
 			},
 		},
 		{
-			tunnelCmd: &tunnelCmd{
+			TunnelCmd: &TunnelCmd{
 				remoteHost:     "fake.remote.host",
 				deviceIP:       "",
 				deviceName:     "",
@@ -236,30 +236,30 @@ func TestParseFlags(t *testing.T) {
 	}
 	for _, test := range tests {
 		ctx := context.Background()
-		if _, err := test.tunnelCmd.parseFlags(ctx, test.sdk); err != nil {
+		if _, err := test.TunnelCmd.parseFlags(ctx, test.sdk); err != nil {
 			t.Errorf("error calling parseFlags: %s", err)
 		}
-		if test.expectedRemoteHost != test.tunnelCmd.remoteHost {
-			t.Errorf("got remote host %s, want %s", test.tunnelCmd.remoteHost, test.expectedRemoteHost)
+		if test.expectedRemoteHost != test.TunnelCmd.remoteHost {
+			t.Errorf("got remote host %s, want %s", test.TunnelCmd.remoteHost, test.expectedRemoteHost)
 		}
-		if test.expectedDeviceIP != test.tunnelCmd.deviceIP {
-			t.Errorf("got device IP %s, want %s", test.tunnelCmd.deviceIP, test.expectedDeviceIP)
+		if test.expectedDeviceIP != test.TunnelCmd.deviceIP {
+			t.Errorf("got device IP %s, want %s", test.TunnelCmd.deviceIP, test.expectedDeviceIP)
 		}
-		if test.expectedDeviceName != test.tunnelCmd.deviceName {
-			t.Errorf("got device name %s, want %s", test.tunnelCmd.deviceName, test.expectedDeviceName)
+		if test.expectedDeviceName != test.TunnelCmd.deviceName {
+			t.Errorf("got device name %s, want %s", test.TunnelCmd.deviceName, test.expectedDeviceName)
 		}
-		if test.expectedSSHConfig != "" && test.expectedSSHConfig != test.tunnelCmd.sshConfig {
-			t.Errorf("got SSH config path %s, want %s", test.tunnelCmd.sshConfig, test.expectedSSHConfig)
+		if test.expectedSSHConfig != "" && test.expectedSSHConfig != test.TunnelCmd.sshConfig {
+			t.Errorf("got SSH config path %s, want %s", test.TunnelCmd.sshConfig, test.expectedSSHConfig)
 		}
-		if test.expectedPrintSSHConfig != test.tunnelCmd.printSSHConfig {
-			t.Errorf("got print SSH config boolean %t, want %t", test.tunnelCmd.printSSHConfig, test.expectedPrintSSHConfig)
+		if test.expectedPrintSSHConfig != test.TunnelCmd.printSSHConfig {
+			t.Errorf("got print SSH config boolean %t, want %t", test.TunnelCmd.printSSHConfig, test.expectedPrintSSHConfig)
 		}
 	}
 }
 
 func TestRemoteHostCache(t *testing.T) {
 	fakeHomePath := t.TempDir()
-	tunnelCmdNoRemote := &tunnelCmd{
+	TunnelCmdNoRemote := &TunnelCmd{
 		remoteHost:     "",
 		deviceIP:       "",
 		deviceName:     fakeFoundName,
@@ -279,12 +279,12 @@ func TestRemoteHostCache(t *testing.T) {
 		},
 	}
 
-	_, err := tunnelCmdNoRemote.parseFlags(ctx, sdk)
+	_, err := TunnelCmdNoRemote.parseFlags(ctx, sdk)
 	if err.Error() != expectedErrMsg {
 		t.Fatalf("parseFlags() got error %s, expected %s", err, expectedErrMsg)
 	}
 
-	tunnelCmdWithRemote := &tunnelCmd{
+	TunnelCmdWithRemote := &TunnelCmd{
 		remoteHost:     "fake.remote.host",
 		deviceIP:       "",
 		deviceName:     fakeFoundName,
@@ -294,17 +294,17 @@ func TestRemoteHostCache(t *testing.T) {
 		tunnelPorts:    intSlice([]int{}),
 	}
 
-	_, err = tunnelCmdWithRemote.parseFlags(ctx, sdk)
+	_, err = TunnelCmdWithRemote.parseFlags(ctx, sdk)
 	if err != nil {
 		t.Fatalf("error calling parseFlags: %s", err)
 	}
 
-	_, err = tunnelCmdNoRemote.parseFlags(ctx, sdk)
+	_, err = TunnelCmdNoRemote.parseFlags(ctx, sdk)
 	if err != nil {
 		t.Fatalf("expected cached remote-host to be used when calling parseFlags but got error: %s", err)
 	}
 
-	tunnelCmdWithDifferentRemote := &tunnelCmd{
+	TunnelCmdWithDifferentRemote := &TunnelCmd{
 		remoteHost:     "different.remote.host",
 		deviceIP:       "",
 		deviceName:     fakeFoundName,
@@ -314,7 +314,7 @@ func TestRemoteHostCache(t *testing.T) {
 		tunnelPorts:    intSlice([]int{}),
 	}
 
-	contents, err := tunnelCmdWithDifferentRemote.parseFlags(ctx, sdk)
+	contents, err := TunnelCmdWithDifferentRemote.parseFlags(ctx, sdk)
 	if err != nil {
 		t.Fatalf("error calling parseFlags: %s", err)
 	}
@@ -329,12 +329,12 @@ func TestRemoteHostCache(t *testing.T) {
 func TestNegativeParseFlags(t *testing.T) {
 	fakeHomePath := t.TempDir()
 	var tests = []struct {
-		tunnelCmd      *tunnelCmd
+		TunnelCmd      *TunnelCmd
 		sdk            testSDKProperties
 		expectedErrMsg string
 	}{
 		{
-			tunnelCmd: &tunnelCmd{
+			TunnelCmd: &TunnelCmd{
 				remoteHost:     "",
 				deviceIP:       "",
 				deviceName:     "",
@@ -347,7 +347,7 @@ func TestNegativeParseFlags(t *testing.T) {
 			expectedErrMsg: "No remote host provided. Please add the '-remote-host' flag",
 		},
 		{
-			tunnelCmd: &tunnelCmd{
+			TunnelCmd: &TunnelCmd{
 				remoteHost:     "fake.remote.host",
 				deviceIP:       "",
 				deviceName:     fakeNotFoundName,
@@ -367,7 +367,7 @@ func TestNegativeParseFlags(t *testing.T) {
 			expectedErrMsg: "no devices found",
 		},
 		{
-			tunnelCmd: &tunnelCmd{
+			TunnelCmd: &TunnelCmd{
 				remoteHost:     "fake.remote.host",
 				deviceIP:       fakeFoundIPAddr,
 				deviceName:     fakeFoundName,
@@ -386,7 +386,7 @@ func TestNegativeParseFlags(t *testing.T) {
 			expectedErrMsg: "Could not generate default SSH config: Cannot create SSH config with protected ports: 80",
 		},
 		{
-			tunnelCmd: &tunnelCmd{
+			TunnelCmd: &TunnelCmd{
 				remoteHost:     "fake.remote.host",
 				deviceIP:       fakeFoundIPAddr,
 				deviceName:     fakeFoundName,
@@ -407,7 +407,7 @@ func TestNegativeParseFlags(t *testing.T) {
 	}
 	for _, test := range tests {
 		ctx := context.Background()
-		_, err := test.tunnelCmd.parseFlags(ctx, test.sdk)
+		_, err := test.TunnelCmd.parseFlags(ctx, test.sdk)
 		if err == nil {
 			t.Errorf("no error calling parseFlags but expected error: %s", test.expectedErrMsg)
 		} else if err.Error() != test.expectedErrMsg {

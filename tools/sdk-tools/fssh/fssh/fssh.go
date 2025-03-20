@@ -1,7 +1,7 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-package main
+package fssh
 
 import (
 	"context"
@@ -38,7 +38,7 @@ const (
 	logFlags = log.Ltime
 )
 
-type fsshCmd struct {
+type Cmd struct {
 	// Target related options.
 	privateKey string
 	deviceName string
@@ -50,13 +50,13 @@ type fsshCmd struct {
 	verbose  bool
 }
 
-func (*fsshCmd) Name() string { return "fssh" }
+func (*Cmd) Name() string { return "fssh" }
 
-func (*fsshCmd) Synopsis() string {
+func (*Cmd) Synopsis() string {
 	return "Creates an SSH connection with a device and executes a command."
 }
 
-func (*fsshCmd) Usage() string {
+func (*Cmd) Usage() string {
 	return fmt.Sprintf(`fssh [-%s device-name -%s device-ip -%s private-key -%s sshconfig -%s data-path -%s -%s log-level] [ssh_command]
 
 Subcommands:
@@ -67,7 +67,7 @@ Options:
 `, deviceNameFlag, deviceIPFlag, privateKeyFlag, sshConfigFlag, dataPathFlag, verboseFlag, logLevelFlag)
 }
 
-func (c *fsshCmd) SetFlags(f *flag.FlagSet) {
+func (c *Cmd) SetFlags(f *flag.FlagSet) {
 	c.logLevel = logger.InfoLevel // Default that may be overridden.
 	f.StringVar(&c.privateKey, privateKeyFlag, "", "Uses additional private key when using ssh to access the device.")
 	f.StringVar(&c.deviceName, deviceNameFlag, "", `Serves packages to a device with the given device hostname. Cannot be used with --device-ip."
@@ -80,7 +80,7 @@ If neither --device-name nor --device-ip are specified, the device-name configur
 	f.BoolVar(&c.verbose, verboseFlag, false, "Runs ssh in verbose mode.")
 }
 
-func (c *fsshCmd) Execute(ctx context.Context, f *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
+func (c *Cmd) Execute(ctx context.Context, f *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
 	// Write all logs to stderr. Other tools parse the output of fssh which will break if logs
 	// are written to stdout.
 	log := logger.NewLogger(c.logLevel, color.NewColor(color.ColorAuto), os.Stderr, os.Stderr, "fssh ")

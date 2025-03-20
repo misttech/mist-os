@@ -6,8 +6,12 @@ import("//build/go/go_binary.gni")
 import("//build/go/go_library.gni")
 import("//build/go/go_test.gni")
 
-go_library("main") {
-  source_dir = "cmd"
+go_library("lib") {
+  sources = [
+    "fssh/fssh.go",
+    "fssh/synckeys.go",
+    "fssh/tunnel.go",
+  ]
   deps = [
     ":synckeys",
     ":tunnel",
@@ -16,23 +20,21 @@ go_library("main") {
     "//tools/lib/logger",
     "//tools/sdk-tools/sdkcommon",
   ]
+}
+
+go_test("fssh-test") {
+  library = ":lib"
   sources = [
-    "fssh.go",
-    "fssh_test.go",
-    "main.go",
-    "synckeys.go",
-    "tunnel.go",
-    "tunnel_test.go",
+    "fssh/fssh_test.go",
+    "fssh/tunnel_test.go",
   ]
 }
 
 go_binary("fssh") {
-  library = ":main"
+  sources = [ "cmd/main.go" ]
+  deps = [ ":lib" ]
 }
 
-go_test("fssh-test") {
-  library = ":main"
-}
 install_host_tools("fssh-host") {
   deps = [
     ":fssh",

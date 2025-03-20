@@ -1,7 +1,7 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-package main
+package fssh
 
 import (
 	"context"
@@ -44,7 +44,7 @@ func TestMain(t *testing.T) {
 	}()
 
 	tests := []struct {
-		cmd                    *fsshCmd
+		cmd                    *Cmd
 		name                   string
 		args                   []string
 		deviceConfiguration    string
@@ -59,7 +59,7 @@ func TestMain(t *testing.T) {
 		expectedStatus         subcommands.ExitStatus
 	}{
 		{
-			cmd:                    &fsshCmd{},
+			cmd:                    &Cmd{},
 			name:                   "No configured device but 1 device is discoverable",
 			args:                   []string{"-data-path", dataDir},
 			expectedIPAddress:      "::1f",
@@ -71,7 +71,7 @@ func TestMain(t *testing.T) {
 			ffxTargetGetSSHAddress: `[::1f]:22`,
 		},
 		{
-			cmd:                &fsshCmd{},
+			cmd:                &Cmd{},
 			name:               "Multiple discoverable devices and passing --device-name",
 			args:               []string{"-data-path", dataDir, "-level", "debug", "--device-name", "test-device"},
 			expectedIPAddress:  "::1f",
@@ -84,7 +84,7 @@ func TestMain(t *testing.T) {
 			ffxTargetGetSSHAddress: `[::1f]:22`,
 		},
 		{
-			cmd:  &fsshCmd{},
+			cmd:  &Cmd{},
 			name: "ffx has a default device",
 			args: []string{"-data-path", dataDir, "echo", "hello"},
 			deviceConfiguration: `{
@@ -108,7 +108,7 @@ func TestMain(t *testing.T) {
 			expectedPrivateKey: "",
 		},
 		{
-			cmd:  &fsshCmd{},
+			cmd:  &Cmd{},
 			name: "ffx non-default device with --device-name",
 			args: []string{"-data-path", dataDir, "-device-name", "random-device", "-private-key", filepath.Join(dataDir, "pkey")},
 			deviceConfiguration: `{
