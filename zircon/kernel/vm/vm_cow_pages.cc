@@ -632,7 +632,7 @@ fbl::RefPtr<VmCowPages> VmCowPages::MaybeDeadTransition() {
         LockedPtr parent2(parent_.get(), VmLockAcquireMode::Reentrant);
         // We have continuously held our lock, so we know that parent_ is unchanged for us, but
         // check if this is still our sibling or not by recalculating and comparing.
-        sibling_iter = ++parent.locked().children_list_.make_iterator(*this);
+        sibling_iter = ++parent2.locked().children_list_.make_iterator(*this);
         if (!sibling_iter.IsValid() || sibling.get() != &*sibling_iter) {
           // We raced and this sibling has gone away. For simplicity we just try again from the top.
           continue;
