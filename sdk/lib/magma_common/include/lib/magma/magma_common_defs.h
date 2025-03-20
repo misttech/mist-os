@@ -26,7 +26,7 @@ extern "C" {
 
 // LINT.IfChange(version)
 // This version should be incremented whenever the Magma API changes.
-#define MAGMA_API_VERSION 7
+#define MAGMA_API_VERSION 8
 // LINT.ThenChange(magma_common_defs.h)
 
 // LINT.IfChange
@@ -123,6 +123,10 @@ typedef uint32_t magma_format_t;
 #define MAGMA_FORMAT_L8 ((magma_format_t)112)
 #define MAGMA_FORMAT_R8 ((magma_format_t)113)
 #define MAGMA_FORMAT_R8G8 ((magma_format_t)114)
+#define MAGMA_FORMAT_A2R10G10B10 ((magma_format_t)115)
+#define MAGMA_FORMAT_A2B10G10R10 ((magma_format_t)116)
+#define MAGMA_FORMAT_P010 ((magma_format_t)117)
+#define MAGMA_FORMAT_R8G8B8 ((magma_format_t)118)
 
 typedef uint64_t magma_format_modifier_t;
 // These must match the corresponding fuchsia.images2.PixelFormatModifier or
