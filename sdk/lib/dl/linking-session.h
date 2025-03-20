@@ -272,11 +272,6 @@ class LinkingSession<Loader>::SessionModule
   using LoadInfo = elfldltl::LoadInfo<Elf, elfldltl::StaticVector<ld::kMaxSegments>::Container>;
   using TlsDescGot = Elf::TlsDescGot<>;
 
-  // This is the observer used to collect DT_NEEDED offsets from the dynamic phdr.
-  static const constexpr std::string_view kNeededError{"DT_NEEDED offsets"};
-  using NeededObserver = elfldltl::DynamicValueCollectionObserver<  //
-      Elf, elfldltl::ElfDynTag::kNeeded, Vector<size_type>, kNeededError>;
-
   // The SessionModule::Create(...) takes a reference to the Module for the
   // file, setting information on it during the loading, decoding, and
   // relocation process.
@@ -314,8 +309,8 @@ class LinkingSession<Loader>::SessionModule
             diag, loader.memory(), loader.page_size(), *headers, max_tls_modid,
             elfldltl::DynamicRelocationInfoObserver(decoded().reloc_info()),
             elfldltl::DynamicInitObserver(decoded().module().init),
-            elfldltl::DynamicFiniObserver(decoded().module().fini), NeededObserver(needed_offsets)))
-        [[unlikely]] {
+            elfldltl::DynamicFiniObserver(decoded().module().fini),
+            decoded().MakeNeededObserver(needed_offsets))) [[unlikely]] {
       return {};
     }
 
@@ -324,25 +319,8 @@ class LinkingSession<Loader>::SessionModule
     // will be used to apply relro protections later.
     relro_ = decoded().CommitLoader(std::move(loader));
 
-    // TODO(https://fxbug.dev/366279579): The code that parses the names from
-    // the symbol table be shared with <lib/ld/remote-decoded-module.h>.
-    Vector<Soname> dep_names;
-    if (dep_names.reserve(diag, kNeededError, needed_offsets.size())) [[likely]] {
-      for (size_type offset : needed_offsets) {
-        std::string_view name = this->symbol_info().string(offset);
-        if (name.empty()) [[unlikely]] {
-          diag.FormatError("DT_NEEDED has DT_STRTAB offset ", offset, " with DT_STRSZ ",
-                           this->symbol_info().strtab().size());
-          return {};
-        }
-        if (!dep_names.push_back(diag, kNeededError, Soname{name})) [[unlikely]] {
-          return {};
-        }
-      }
-      return std::move(dep_names);
-    }
-
-    return {};
+    // Return the parsed Sonames from the DT_NEEDED offsets.
+    return decoded().template ReifyNeeded<Vector>(diag, needed_offsets);
   }
 
   // Perform relative and symbolic relocations, resolving symbols from the
