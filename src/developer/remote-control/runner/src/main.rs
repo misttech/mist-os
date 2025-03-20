@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use argh::FromArgs;
-use compat_info::{CompatibilityInfo, CompatibilityState, ConnectionInfo};
+use compat_info::{CompatibilityState, ConnectionInfo};
 use fidl_fuchsia_developer_remotecontrol_connector::ConnectorMarker;
 use fuchsia_component::client::connect_to_protocol;
 use futures::future::{poll_fn, select};
@@ -123,7 +123,7 @@ fn print_prelude_info(
     let ssh_connection = std::env::var("SSH_CONNECTION")?;
     let info = ConnectionInfo {
         ssh_connection,
-        compatibility: CompatibilityInfo {
+        connect_info: compat_info::DeviceConnectionInfo {
             status,
             platform_abi: platform_abi.as_u64(),
             message,

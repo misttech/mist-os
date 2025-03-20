@@ -75,28 +75,28 @@ impl From<version_history::AbiRevisionError> for CompatibilityState {
         }
     }
 }
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct CompatibilityInfo {
     pub status: CompatibilityState,
-    // This could be serialized as a string in some cases, so handle that case
-    #[serde(deserialize_with = "parse_string_or_u64")]
     pub platform_abi: u64,
     pub message: String,
-    pub overnet_id: Option<u64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct ConnectionInfo {
     pub ssh_connection: String,
-    pub compatibility: CompatibilityInfo,
+    // Use the old "compatibility" name for backwards-compatibility
+    #[serde(rename = "compatibility")]
+    pub connect_info: DeviceConnectionInfo,
 }
+
 impl From<fidl_fuchsia_developer_remotecontrol::CompatibilityInfo> for CompatibilityInfo {
     fn from(value: fidl_fuchsia_developer_remotecontrol::CompatibilityInfo) -> Self {
         CompatibilityInfo {
             status: value.state.into(),
             platform_abi: value.platform_abi,
             message: value.message,
-            overnet_id: None,
         }
     }
 }
@@ -109,6 +109,22 @@ impl Into<fidl_fuchsia_developer_remotecontrol::CompatibilityInfo> for Compatibi
         }
     }
 }
+
+// This struct defines the protocol used by the ssh host-pipe. Most of the fields
+// get placed in the CompatibilityInfo object stored in the Target, but the
+// overnet_id gets kept in the HostPipeChild.
+// We put the overnet_id in here because this allows backwards-compatibility
+// with devices that don't provide the overnet_id.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct DeviceConnectionInfo {
+    pub status: CompatibilityState,
+    // This could be serialized as a string in some cases, so handle that case
+    #[serde(deserialize_with = "parse_string_or_u64")]
+    pub platform_abi: u64,
+    pub message: String,
+    pub overnet_id: Option<u64>,
+}
+
 fn parse_string_or_u64<'de, D>(deserializer: D) -> Result<u64, D::Error>
 where
     D: Deserializer<'de>,
@@ -123,5 +139,15 @@ where
     match StringNum::deserialize(deserializer)? {
         StringNum::String(s) => s.parse::<u64>().map_err(serde::de::Error::custom),
         StringNum::Num(n) => Ok(n),
+    }
+}
+
+impl Into<CompatibilityInfo> for DeviceConnectionInfo {
+    fn into(self) -> CompatibilityInfo {
+        CompatibilityInfo {
+            status: self.status,
+            platform_abi: self.platform_abi,
+            message: self.message,
+        }
     }
 }

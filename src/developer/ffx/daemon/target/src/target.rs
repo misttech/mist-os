@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::overnet::host_pipe::{spawn, LogBuffer};
+use crate::overnet::host_pipe::{
+    spawn, HostPipeChildBuilder, HostPipeChildDefaultBuilder, LogBuffer,
+};
 use crate::{FASTBOOT_MAX_AGE, MDNS_MAX_AGE, ZEDBOOT_MAX_AGE};
 use addr::TargetAddr;
 use anyhow::{anyhow, bail, Context, Result};
@@ -1166,6 +1168,10 @@ impl Target {
     ) {
         if self.host_pipe.borrow().is_some() {
             let HostPipeState { task, overnet_node, .. } = self.host_pipe.take().unwrap();
+            // Anyone already waiting on an overnet-id will get an error
+            // response as we drop the senders. (This is the correct behavior
+            // -- we don't want to return Ok(None), that would imply that the
+            // connection _did_ get made, but didn't provide an id.)
             drop(task);
             tracing::debug!("Reconnecting host_pipe for {}@{}", self.nodename_str(), self.id());
             self.run_host_pipe_with_sender(&overnet_node, roid_sender);
@@ -1180,12 +1186,35 @@ impl Target {
         self.run_host_pipe_with_sender(overnet_node, None)
     }
 
-    #[tracing::instrument]
     pub fn run_host_pipe_with_sender(
         self: &Rc<Self>,
         overnet_node: &Arc<overnet_core::Router>,
         roid_sender: Option<channel::oneshot::Sender<Option<u64>>>,
     ) {
+        let host_pipe_child_builder = HostPipeChildDefaultBuilder { ssh_path: String::from("ssh") };
+        self.run_host_pipe_with(overnet_node, roid_sender, host_pipe_child_builder)
+    }
+
+    // This function allows the caller to receive the remote-overnet-id of the target.
+    // The r-o-id can be used to determine whether this host-pipe is connecting to the
+    // same target as one we've already connected to, which is important when using
+    // Overnet, because Overnet (due to its mesh-network topology) will not inform the
+    // daemon of a "new peer" since it will consider the peer to be the same.
+    // That being said, not all callers need the r-o-id, and not all targets will have
+    // one (in particular, older targets will have have implemented this in their protocol).
+    // If the caller asks for it, the host-pipe code _must_ return it, so every code path
+    // will eventually send the resulting roid (even if it is None) back to the caller.
+    //
+    // This function can also take a HostPipeChildBuilder, for test purposes
+    #[tracing::instrument(skip(host_pipe_child_builder))]
+    pub fn run_host_pipe_with<T>(
+        self: &Rc<Self>,
+        overnet_node: &Arc<overnet_core::Router>,
+        roid_sender: Option<channel::oneshot::Sender<Option<u64>>>,
+        host_pipe_child_builder: T,
+    ) where
+        T: HostPipeChildBuilder + Clone + 'static,
+    {
         if !self.is_enabled() {
             if let Some(sender) = roid_sender {
                 let _ = sender.send(None);
@@ -1218,102 +1247,118 @@ impl Target {
         let overnet_node = Arc::clone(overnet_node);
         let roid_waiters =
             if let Some(roid_sender) = roid_sender { vec![roid_sender] } else { vec![] };
-        self.host_pipe.borrow_mut().replace(HostPipeState {
-            task: Task::local(async move {
-                // The purpose of a host pipe is to ultimately get us connected to RCS and let us transition
-                // to the RCS connected state. If we're already in that state, and the RCS connection is
-                // active, we don't need a host pipe. This will start happening more as we introduce USB
-                // links, where the first thing we hear about a target is its appearance as an Overnet peer,
-                // and thus we have an RCS connection from inception.
-                {
-                    let Some(target) = weak_target.upgrade() else {
-                        // weird that self is already gone, but ¯\_(ツ)_/¯
-                        // Unfortunately that means we have no access to its remote-overnet-id waiters :-(
+        let task = async move {
+            // The purpose of a host pipe is to ultimately get us connected to RCS and let us transition
+            // to the RCS connected state. If we're already in that state, and the RCS connection is
+            // active, we don't need a host pipe. This will start happening more as we introduce USB
+            // links, where the first thing we hear about a target is its appearance as an Overnet peer,
+            // and thus we have an RCS connection from inception.
+            {
+                let Some(target) = weak_target.upgrade() else {
+                    // weird that self is already gone, but ¯\_(ツ)_/¯
+                    // Unfortunately that means we have no access to its remote-overnet-id waiters :-(
+                    return;
+                };
+                let state = target.state.borrow().clone();
+                if let TargetConnectionState::Rcs(rcs) = state {
+                    if knock_rcs(&rcs.proxy).await.is_ok() {
+                        if let Some(host_pipe) = target.host_pipe.borrow_mut().as_mut() {
+                            host_pipe.flush_waiters();
+                        }
                         return;
+                    }
+                }
+            }
+
+            let watchdogs: bool = ffx_config::get("watchdogs.host_pipe.enabled").unwrap_or(false);
+
+            let ssh_timeout: u16 = ffx_config::get(CONFIG_HOST_PIPE_SSH_TIMEOUT).unwrap_or(50);
+            let nr = spawn(
+                weak_target.clone(),
+                watchdogs,
+                ssh_timeout,
+                std::sync::Arc::clone(&node),
+                host_pipe_child_builder,
+            )
+            .await;
+
+            match nr {
+                Ok(mut hp) => {
+                    tracing::debug!("host pipe spawn returned OK for {target_name_str}");
+                    eprintln!("host pipe spawn returned OK for {target_name_str}");
+                    let compatibility_status = hp.get_compatibility_status();
+
+                    if let Some(target) = weak_target.upgrade() {
+                        target.set_compatibility_status(&compatibility_status);
+
+                        // If there's no host-pipe, it's because the target
+                        // has dropped the task containing our host-pipe,
+                        // so it's fine to not follow through and set target
+                        // information that come from this connection.
+                        // Clients waiting for the overnet_id will have
+                        // gotten an error when the host-pipe was dropped.
+                        if let Some(host_pipe) = target.host_pipe.borrow_mut().as_mut() {
+                            host_pipe.ssh_addr = Some(hp.get_address());
+                            let overnet_id = hp.overnet_id();
+                            tracing::debug!(
+                                "Got host pipe overnet id {:?} -- sending to waiters",
+                                overnet_id
+                            );
+                            if let RemoteOvernetIdState::Pending(waiters) = std::mem::replace(
+                                &mut host_pipe.remote_overnet_id,
+                                RemoteOvernetIdState::Ready(overnet_id),
+                            ) {
+                                for sender in waiters.into_iter() {
+                                    let _ = sender.send(overnet_id);
+                                }
+                            } else {
+                                // We only go through this path once, so the state will always be Pending above.
+                                unreachable!()
+                            }
+                        }
+                    }
+
+                    // wait for the host pipe to exit.
+                    let _r = match hp.wait(&node).await {
+                        Ok(r) => {
+                            // This was an info. Moved to debug as this is not informational or
+                            // actionable to end users.
+                            tracing::debug!("HostPipeConnection returned: {:?}", r);
+                        }
+                        Err(r) => {
+                            tracing::warn!(
+                                "The host pipe connection to ['{target_name_str}'] returned: {:?}",
+                                r
+                            );
+                        }
                     };
-                    let state = target.state.borrow().clone();
-                    if let TargetConnectionState::Rcs(rcs) = state {
-                        if knock_rcs(&rcs.proxy).await.is_ok() {
-                            if let Some(host_pipe) = target.host_pipe.borrow_mut().as_mut() {
-                                host_pipe.flush_waiters();
-                            }
-                            return;
+                }
+                Err(e) => {
+                    // Change this to a debug message (from warn). We will get any error from
+                    // SSH client in the logs so this is redundant.
+                    tracing::debug!("Host pipe spawn {:?}", e);
+                    eprintln!("Host pipe spawn {:?}", e);
+                    let compatibility_status = Some(CompatibilityInfo {
+                        status: CompatibilityState::Error,
+                        platform_abi: 0,
+                        message: format!("Host connection failed: {e}"),
+                    });
+                    if let Some(target) = weak_target.upgrade() {
+                        target.set_compatibility_status(&compatibility_status);
+                        if let Some(host_pipe) = target.host_pipe.borrow_mut().as_mut() {
+                            host_pipe.flush_waiters();
                         }
                     }
                 }
+            }
 
-                let watchdogs: bool =
-                    ffx_config::get("watchdogs.host_pipe.enabled").unwrap_or(false);
-
-                let ssh_timeout: u16 =
-                    ffx_config::get(CONFIG_HOST_PIPE_SSH_TIMEOUT).unwrap_or(50);
-                let nr = spawn(
-                    weak_target.clone(),
-                    watchdogs,
-                    ssh_timeout,
-                    std::sync::Arc::clone(&node),
-                )
-                .await;
-
-                match nr {
-                    Ok(mut hp) => {
-                        tracing::debug!("host pipe spawn returned OK for {target_name_str}");
-                        let compatibility_status = hp.get_compatibility_status();
-
-                        if let Some(target) = weak_target.upgrade() {
-                            target.set_compatibility_status(&compatibility_status);
-
-                            // TODO(slgrady) Is there a race-condition here? What if we _don't_ get the target.host_pipe?
-                            // Then we will never set the ssh_addr, etc?
-                            if let Some(host_pipe) = target.host_pipe.borrow_mut().as_mut() {
-                                host_pipe.ssh_addr = Some(hp.get_address());
-                                let overnet_id = compatibility_status.and_then(|compat| compat.overnet_id);
-                                tracing::debug!("Got host pipe overnet id {:?} -- sending to waiters", overnet_id);
-                                // We only go through this path once
-                                if let RemoteOvernetIdState::Pending(waiters) = std::mem::replace(&mut host_pipe.remote_overnet_id, RemoteOvernetIdState::Ready(overnet_id)) {
-                                    for sender in waiters.into_iter() {
-                                        let _ = sender.send(overnet_id);
-                                    }
-                                } else { unreachable!() }
-                            }
-                        }
-
-                        // wait for the host pipe to exit.
-                        let _r = match hp.wait(&node).await {
-                            Ok(r) => {
-                                // This was an info. Moved to debug as this is not informational or
-                                // actionable to end users.
-                                tracing::debug!("HostPipeConnection returned: {:?}", r);
-                            }
-                            Err(r) => {
-                                tracing::warn!("The host pipe connection to ['{target_name_str}'] returned: {:?}", r);
-                            }
-                        };
-                    }
-                    Err(e) => {
-                        // Change this to a debug message (from warn). We will get any error from
-                        // SSH client in the logs so this is redundant.
-                        tracing::debug!("Host pipe spawn {:?}", e);
-                        let compatibility_status = Some(CompatibilityInfo {
-                            status: CompatibilityState::Error,
-                            platform_abi: 0,
-                            message: format!("Host connection failed: {e}"),
-                            overnet_id: None,
-                        });
-                        if let Some(target) = weak_target.upgrade() {
-                            target.set_compatibility_status(&compatibility_status);
-                            if let Some(host_pipe) = target.host_pipe.borrow_mut().as_mut() {
-                                host_pipe.flush_waiters();
-                            }
-                        }
-                    }
-                }
-
-                weak_target.upgrade().and_then(|target| {
-                    tracing::debug!("Exiting run_host_pipe for {target_name_str}");
-                    target.host_pipe.borrow_mut().take()
-                });
-            }),
+            weak_target.upgrade().and_then(|target| {
+                tracing::debug!("Exiting run_host_pipe for {target_name_str}");
+                target.host_pipe.borrow_mut().take()
+            });
+        };
+        self.host_pipe.borrow_mut().replace(HostPipeState {
+            task: Task::local(task),
             overnet_node,
             ssh_addr: None,
             remote_overnet_id: RemoteOvernetIdState::Pending(roid_waiters),
@@ -1632,6 +1677,8 @@ impl Drop for KeepAliveHandle {
 
 #[cfg(test)]
 mod test {
+    use crate::overnet::host_pipe::HostPipeChild;
+
     use super::*;
     use assert_matches::assert_matches;
     use chrono::TimeZone;
@@ -1643,6 +1690,9 @@ mod test {
     use futures::prelude::*;
     use std::borrow::Borrow;
     use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
+    use std::process::Stdio;
+    use std::str::FromStr;
+    use std::sync;
 
     const DEFAULT_PRODUCT_CONFIG: &str = "core";
     const DEFAULT_BOARD_CONFIG: &str = "x64";
@@ -2509,22 +2559,76 @@ mod test {
         }
     }
 
+    #[derive(Clone)]
+    struct FakeHostPipeChildBuilder {
+        overnet_id: Option<u64>,
+    }
+
+    #[async_trait(?Send)]
+    impl crate::overnet::host_pipe::HostPipeChildBuilder for FakeHostPipeChildBuilder {
+        async fn new(
+            &self,
+            _addr: SocketAddr,
+            _id: u64,
+            _stderr_buf: Rc<LogBuffer>,
+            _event_queue: events::Queue<TargetEvent>,
+            _watchdogs: bool,
+            _ssh_timeout: u16,
+            _node: sync::Arc<overnet_core::Router>,
+        ) -> Result<(Option<HostAddr>, HostPipeChild), ffx_ssh::parse::PipeError> {
+            Ok((
+                Some(HostAddr("127.0.0.1".to_string())),
+                HostPipeChild::fake_new(
+                    tokio::process::Command::new("echo")
+                        .arg("foo")
+                        .stdout(Stdio::piped())
+                        .stdin(Stdio::piped()),
+                    self.overnet_id,
+                ),
+            ))
+        }
+
+        fn ssh_path(&self) -> &str {
+            todo!()
+        }
+    }
+
     #[fuchsia::test]
-    async fn test_query_overnet_id() {
+    async fn test_query_new_overnet_id() {
         let local_node = overnet_core::Router::new(None).unwrap();
-        let target = Target::new();
+        let target = crate::target::Target::new_with_addrs(
+            Some("foo"),
+            [TargetAddr::from_str("192.168.1.1:22").unwrap()].into(),
+        );
+        target.set_state(TargetConnectionState::Mdns(Instant::now()));
+        let (snd, rcv) = channel::oneshot::channel::<Option<u64>>();
+        target.enable();
+        let overnet_id = Some(123);
+        target.run_host_pipe_with(&local_node, Some(snd), FakeHostPipeChildBuilder { overnet_id });
+        let roid = rcv.await.expect("roid receiver failed");
+        assert_eq!(roid, overnet_id);
+    }
+
+    #[fuchsia::test]
+    async fn test_query_existing_overnet_id() {
+        let local_node = overnet_core::Router::new(None).unwrap();
+        let target = crate::target::Target::new_with_addrs(
+            Some("foo"),
+            [TargetAddr::from_str("192.168.1.1:22").unwrap()].into(),
+        );
+        let overnet_id = Some(123);
         target.set_state(TargetConnectionState::Mdns(Instant::now()));
         target.host_pipe.borrow_mut().replace(HostPipeState {
             task: Task::local(future::pending()),
             overnet_node: local_node.clone(),
             ssh_addr: None,
-            remote_overnet_id: RemoteOvernetIdState::Ready(Some(123)),
+            remote_overnet_id: RemoteOvernetIdState::Ready(overnet_id),
         });
         let (snd, rcv) = channel::oneshot::channel::<Option<u64>>();
         target.enable();
         target.run_host_pipe_with_sender(&local_node, Some(snd));
         let roid = rcv.await.expect("roid receiver failed");
-        assert_eq!(roid, Some(123));
+        assert_eq!(roid, overnet_id);
     }
 
     mod enabled {

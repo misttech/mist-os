@@ -73,7 +73,7 @@ impl SshConnector {
             BUFFER_SIZE,
             cmd.stderr.take().expect("process should have stderr"),
         );
-        let (addr, compat) =
+        let (addr, device_connection_info) =
             // This function returns a PipeError on error, which necessitates terminating the SSH
             // command. This error must be converted into an `SshError` in order to be presentable
             // to the user.
@@ -104,7 +104,7 @@ impl SshConnector {
             output: Box::new(stdout),
             input: Box::new(stdin),
             errors: errors_receiver,
-            compat,
+            compat: device_connection_info.map(|dci| dci.into()),
             main_task,
             ssh_host_address: Some(addr),
         })

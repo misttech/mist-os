@@ -22,12 +22,12 @@ use nix::sys::wait::waitpid;
 use nix::unistd::Pid;
 use std::cell::RefCell;
 use std::collections::VecDeque;
-use std::io;
 use std::net::SocketAddr;
 use std::process::Stdio;
 use std::rc::{Rc, Weak};
 use std::sync::Arc;
 use std::time::Duration;
+use std::{io, sync};
 use tokio::io::{copy_buf, BufReader};
 use tokio::process::Child;
 
@@ -66,7 +66,6 @@ impl LogBuffer {
 
 #[async_trait(?Send)]
 pub(crate) trait HostPipeChildBuilder {
-    type NodeType: Clone;
     async fn new(
         &self,
         addr: SocketAddr,
@@ -75,7 +74,7 @@ pub(crate) trait HostPipeChildBuilder {
         event_queue: events::Queue<TargetEvent>,
         watchdogs: bool,
         ssh_timeout: u16,
-        node: Self::NodeType,
+        node: sync::Arc<overnet_core::Router>,
     ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError>
     where
         Self: Sized;
@@ -83,14 +82,13 @@ pub(crate) trait HostPipeChildBuilder {
     fn ssh_path(&self) -> &str;
 }
 
-#[derive(Copy, Clone)]
-pub(crate) struct HostPipeChildDefaultBuilder<'a> {
-    pub(crate) ssh_path: &'a str,
+#[derive(Clone)]
+pub(crate) struct HostPipeChildDefaultBuilder {
+    pub(crate) ssh_path: String,
 }
 
 #[async_trait(?Send)]
-impl HostPipeChildBuilder for HostPipeChildDefaultBuilder<'_> {
-    type NodeType = Arc<overnet_core::Router>;
+impl HostPipeChildBuilder for HostPipeChildDefaultBuilder {
     async fn new(
         &self,
         addr: SocketAddr,
@@ -120,7 +118,7 @@ impl HostPipeChildBuilder for HostPipeChildDefaultBuilder<'_> {
     }
 
     fn ssh_path(&self) -> &str {
-        self.ssh_path
+        &self.ssh_path
     }
 }
 
@@ -129,6 +127,7 @@ pub(crate) struct HostPipeChild {
     inner: Child,
     task: Option<Task<()>>,
     pub(crate) compatibility_status: Option<CompatibilityInfo>,
+    overnet_id: Option<u64>,
     address: SocketAddr,
 }
 
@@ -321,7 +320,7 @@ impl HostPipeChild {
 
         tracing::debug!("Awaiting client address from ssh connection");
         let ssh_timeout = Duration::from_secs(ssh_timeout as u64);
-        let (ssh_host_address, compatibility_status) =
+        let (ssh_host_address, device_connection_info) =
             match parse_ssh_output(&mut stdout, &mut stderr, verbose_ssh, &ctx)
                 .on_timeout(ssh_timeout, || {
                     Err(PipeError::ConnectionFailed(format!(
@@ -405,6 +404,7 @@ impl HostPipeChild {
         };
 
         tracing::debug!("Establishing host-pipe process to target");
+        let overnet_id = device_connection_info.as_ref().and_then(|dci| dci.overnet_id);
         Ok((
             Some(ssh_host_address),
             HostPipeChild {
@@ -412,7 +412,8 @@ impl HostPipeChild {
                 task: Some(Task::local(async move {
                     futures::join!(copy_in, copy_out, log_stderr);
                 })),
-                compatibility_status,
+                compatibility_status: device_connection_info.map(|dci| dci.into()),
+                overnet_id,
                 address: addr,
             },
         ))
@@ -453,7 +454,7 @@ impl Drop for HostPipeChild {
 #[derive(Debug)]
 pub(crate) struct HostPipeConnection<T>
 where
-    T: HostPipeChildBuilder + Copy,
+    T: HostPipeChildBuilder,
 {
     target: Rc<Target>,
     inner: Arc<HostPipeChild>,
@@ -465,7 +466,7 @@ where
 
 impl<T> Drop for HostPipeConnection<T>
 where
-    T: HostPipeChildBuilder + Copy,
+    T: HostPipeChildBuilder,
 {
     fn drop(&mut self) {
         let pid = Pid::from_raw(self.inner.inner.id().unwrap() as i32);
@@ -482,14 +483,18 @@ where
     }
 }
 
-pub(crate) async fn spawn<'a>(
+#[tracing::instrument(skip(host_pipe_child_builder))]
+pub(crate) async fn spawn<T>(
     target: Weak<Target>,
     watchdogs: bool,
     ssh_timeout: u16,
     node: Arc<overnet_core::Router>,
-) -> Result<HostPipeConnection<HostPipeChildDefaultBuilder<'a>>, anyhow::Error> {
-    let host_pipe_child_builder = HostPipeChildDefaultBuilder { ssh_path: "ssh" };
-    HostPipeConnection::<HostPipeChildDefaultBuilder<'_>>::spawn_with_builder(
+    host_pipe_child_builder: T,
+) -> Result<HostPipeConnection<T>, anyhow::Error>
+where
+    T: HostPipeChildBuilder + Clone,
+{
+    HostPipeConnection::<T>::spawn_with_builder(
         target,
         host_pipe_child_builder,
         ssh_timeout,
@@ -503,14 +508,14 @@ pub(crate) async fn spawn<'a>(
 
 impl<T> HostPipeConnection<T>
 where
-    T: HostPipeChildBuilder + Copy,
+    T: HostPipeChildBuilder + Clone,
 {
     async fn start_child_pipe(
         target: &Weak<Target>,
         builder: T,
         ssh_timeout: u16,
         watchdogs: bool,
-        node: T::NodeType,
+        node: Arc<overnet_core::Router>,
     ) -> Result<Arc<HostPipeChild>, PipeError> {
         let target = target.upgrade().ok_or(PipeError::TargetGone)?;
         let target_nodename: String = target.nodename_str();
@@ -554,11 +559,16 @@ where
         ssh_timeout: u16,
         relaunch_command_delay: Duration,
         watchdogs: bool,
-        node: T::NodeType,
+        node: Arc<overnet_core::Router>,
     ) -> Result<Self, PipeError> {
-        let hpc =
-            Self::start_child_pipe(&target, host_pipe_child_builder, ssh_timeout, watchdogs, node)
-                .await?;
+        let hpc = Self::start_child_pipe(
+            &target,
+            host_pipe_child_builder.clone(),
+            ssh_timeout,
+            watchdogs,
+            node,
+        )
+        .await?;
         let target = target.upgrade().ok_or(PipeError::TargetGone)?;
 
         Ok(Self {
@@ -571,7 +581,7 @@ where
         })
     }
 
-    pub async fn wait(&mut self, node: &T::NodeType) -> Result<(), anyhow::Error> {
+    pub async fn wait(&mut self, node: &Arc<overnet_core::Router>) -> Result<(), anyhow::Error> {
         loop {
             // Waits on the running the command. If it exits successfully (disconnect
             // due to peer dropping) then will set the target to disconnected
@@ -609,7 +619,7 @@ where
 
             let hpc = Self::start_child_pipe(
                 &Rc::downgrade(&self.target),
-                self.host_pipe_child_builder,
+                self.host_pipe_child_builder.clone(),
                 self.ssh_timeout,
                 self.watchdogs,
                 node.clone(),
@@ -625,6 +635,10 @@ where
 
     pub fn get_address(&self) -> SocketAddr {
         self.inner.address
+    }
+
+    pub fn overnet_id(&self) -> Option<u64> {
+        self.inner.overnet_id
     }
 }
 
@@ -647,12 +661,13 @@ mod test {
         /// Implements some fake join handles that wait on a join command before
         /// closing. The reader and writer handles don't do anything other than
         /// spin until they receive a message to stop.
-        pub fn fake_new(child: &mut Command) -> Self {
+        pub fn fake_new(child: &mut Command, overnet_id: Option<u64>) -> Self {
             Self {
                 inner: child.spawn().unwrap(),
                 task: Some(Task::local(async {})),
                 compatibility_status: None,
                 address: SocketAddr::new(Ipv4Addr::new(192, 0, 2, 0).into(), 2345),
+                overnet_id,
             }
         }
     }
@@ -663,6 +678,7 @@ mod test {
         InternalFailure,
         SshFailure,
         DefaultBuilder,
+        WithOvernetId,
     }
 
     #[derive(Copy, Clone, Debug)]
@@ -673,7 +689,6 @@ mod test {
 
     #[async_trait(?Send)]
     impl HostPipeChildBuilder for FakeHostPipeChildBuilder<'_> {
-        type NodeType = ();
         async fn new(
             &self,
             addr: SocketAddr,
@@ -682,7 +697,7 @@ mod test {
             event_queue: events::Queue<TargetEvent>,
             watchdogs: bool,
             ssh_timeout: u16,
-            _node: (),
+            _node: sync::Arc<overnet_core::Router>,
         ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError> {
             match self.operation_type {
                 ChildOperationType::Normal => {
@@ -695,7 +710,8 @@ mod test {
                     start_child_ssh_failure(addr, id, stderr_buf, event_queue).await
                 }
                 ChildOperationType::DefaultBuilder => {
-                    let builder = HostPipeChildDefaultBuilder { ssh_path: self.ssh_path };
+                    let builder =
+                        HostPipeChildDefaultBuilder { ssh_path: String::from(self.ssh_path) };
                     builder
                         .new(
                             addr,
@@ -707,6 +723,9 @@ mod test {
                             overnet_core::Router::new(None).unwrap(),
                         )
                         .await
+                }
+                ChildOperationType::WithOvernetId => {
+                    start_child_with_overnet_id(addr, id, stderr_buf, event_queue).await
                 }
             }
         }
@@ -729,6 +748,29 @@ mod test {
                     .arg("127.0.0.1 44315 192.168.1.1 22")
                     .stdout(Stdio::piped())
                     .stdin(Stdio::piped()),
+                None,
+            ),
+        ))
+    }
+
+    async fn start_child_with_overnet_id(
+        _addr: SocketAddr,
+        _id: u64,
+        _buf: Rc<LogBuffer>,
+        _events: events::Queue<TargetEvent>,
+    ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError> {
+        Ok((
+            Some(HostAddr("127.0.0.1".to_string())),
+            HostPipeChild::fake_new(
+                // Note: the overnet_id does not come from the output of "echo"
+                // -- that merely has to be parsable by parse_ssh_output().
+                // The key here is that the overnet_id field is _set_ in the
+                // HostPipeChild struct
+                tokio::process::Command::new("echo")
+                    .arg("{\"ssh_connection\":\"10.0.2.2 34502 10.0.2.15 22\",\"compatibility\":{\"status\":\"supported\",\"platform_abi\":12345,\"message\":\"foo\"}}\n")
+                    .stdout(Stdio::piped())
+                    .stdin(Stdio::piped()),
+                Some(1234),
             ),
         ))
     }
@@ -756,6 +798,7 @@ mod test {
                     .arg("127.0.0.1 44315 192.168.1.1 22")
                     .stdout(Stdio::piped())
                     .stdin(Stdio::piped()),
+                None,
             ),
         ))
     }
@@ -766,6 +809,7 @@ mod test {
             Some("flooooooooberdoober"),
             [TargetAddr::from_str("192.168.1.1:22").unwrap()].into(),
         );
+        let node = overnet_core::Router::new(None).unwrap();
         let res = HostPipeConnection::<FakeHostPipeChildBuilder<'_>>::spawn_with_builder(
             Rc::downgrade(&target),
             FakeHostPipeChildBuilder {
@@ -775,7 +819,7 @@ mod test {
             30,
             Duration::default(),
             false,
-            (),
+            node,
         )
         .await;
         assert_matches!(res, Ok(_));
@@ -789,6 +833,7 @@ mod test {
             Some("flooooooooberdoober"),
             [TargetAddr::from_str("192.168.1.1:22").unwrap()].into(),
         );
+        let node = overnet_core::Router::new(None).unwrap();
         let res = HostPipeConnection::<FakeHostPipeChildBuilder<'_>>::spawn_with_builder(
             Rc::downgrade(&target),
             FakeHostPipeChildBuilder {
@@ -798,7 +843,7 @@ mod test {
             30,
             Duration::default(),
             false,
-            (),
+            node,
         )
         .await;
         assert!(res.is_err());
@@ -823,6 +868,7 @@ mod test {
         // This is here to allow for the above task to get polled so that the `wait_for` can be
         // placed on at the appropriate time (before the failure occurs in the function below).
         futures_lite::future::yield_now().await;
+        let node = overnet_core::Router::new(None).unwrap();
         let res = HostPipeConnection::<FakeHostPipeChildBuilder<'_>>::spawn_with_builder(
             Rc::downgrade(&target),
             FakeHostPipeChildBuilder {
@@ -832,7 +878,7 @@ mod test {
             30,
             Duration::default(),
             false,
-            (),
+            node,
         )
         .await;
         assert_matches!(res, Ok(_));
@@ -897,6 +943,7 @@ mod test {
             Some("test_target"),
             [TargetAddr::from_str("192.168.1.1:22").unwrap()].into(),
         );
+        let node = overnet_core::Router::new(None).unwrap();
         let _res = HostPipeConnection::<FakeHostPipeChildBuilder<'_>>::spawn_with_builder(
             Rc::downgrade(&target),
             FakeHostPipeChildBuilder {
@@ -906,7 +953,7 @@ mod test {
             30,
             Duration::default(),
             false,
-            (),
+            node,
         )
         .await
         .expect_err("host connection");
@@ -929,6 +976,7 @@ mod test {
             [TargetAddr::from_str("192.168.1.1:22").unwrap()].into(),
         );
         let ssh_path_str: String = ssh_path.to_string_lossy().to_string();
+        let node = overnet_core::Router::new(None).unwrap();
         let _res = HostPipeConnection::<FakeHostPipeChildBuilder<'_>>::spawn_with_builder(
             Rc::downgrade(&target),
             FakeHostPipeChildBuilder {
@@ -938,7 +986,7 @@ mod test {
             30,
             Duration::default(),
             false,
-            (),
+            node,
         )
         .await
         .expect("host connection");
@@ -961,6 +1009,7 @@ mod test {
             [TargetAddr::from_str("192.168.1.1:22").unwrap()].into(),
         );
         let ssh_path_str: String = ssh_path.to_string_lossy().to_string();
+        let node = overnet_core::Router::new(None).unwrap();
         let _res = HostPipeConnection::<FakeHostPipeChildBuilder<'_>>::spawn_with_builder(
             Rc::downgrade(&target),
             FakeHostPipeChildBuilder {
@@ -970,7 +1019,7 @@ mod test {
             30,
             Duration::default(),
             false,
-            (),
+            node,
         )
         .await
         .expect("host connection");
@@ -994,5 +1043,29 @@ mod test {
         );
         // Kind of a hack, but there's no non-debug method that returns a string corresponding to the command.
         assert!(format!("{cmd:?}").contains("ServerAliveCountMax=30"));
+    }
+
+    #[fuchsia::test]
+    async fn test_host_pipe_with_overnet_id() {
+        let target = crate::target::Target::new_with_addrs(
+            Some("overnetid"),
+            [TargetAddr::from_str("10.0.2.2:22").unwrap()].into(),
+        );
+        // Test that the overnet_id is available via the Child builder
+        let node = overnet_core::Router::new(None).unwrap();
+        let hpc = HostPipeConnection::<FakeHostPipeChildBuilder<'_>>::spawn_with_builder(
+            Rc::downgrade(&target),
+            FakeHostPipeChildBuilder {
+                operation_type: ChildOperationType::WithOvernetId,
+                ssh_path: "ssh",
+            },
+            30,
+            Duration::default(),
+            false,
+            node,
+        )
+        .await
+        .unwrap();
+        assert_eq!(hpc.overnet_id(), Some(1234));
     }
 }
