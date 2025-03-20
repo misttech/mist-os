@@ -342,7 +342,7 @@ impl TrelInstance {
                         counters.update_rx_bytes(len.try_into().unwrap());
                         counters.update_rx_packets(1);
                     }
-                    instance.plat_trel_handle_received(&buffer[..len])
+                    instance.plat_trel_handle_received(&buffer[..len], &sockaddr)
                 }
                 Poll::Ready(Err(err)) => {
                     warn!(tag = "trel"; "Error receiving packet: {:?}", err);
@@ -524,6 +524,15 @@ unsafe extern "C" fn otPlatTrelGetCounters(
     } else {
         std::ptr::null()
     }
+}
+
+#[no_mangle]
+unsafe extern "C" fn otPlatTrelNotifyPeerSocketAddressDifference(
+    _instance: *mut otsys::otInstance,
+    peer_sock_addr: &ot::SockAddr,
+    rx_sock_addr: &ot::SockAddr,
+) {
+    info!(tag = "trel"; "otPlatTrelNotifyPeerSocketAddressDifference: Not Implemented. peer_sock_addr {}, rx_sock_addr {}", peer_sock_addr, rx_sock_addr);
 }
 
 #[no_mangle]

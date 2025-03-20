@@ -1881,14 +1881,4 @@ void otSysSetRcpRestorationEnabled(bool aEnabled) {
 }
 #endif
 
-// This will be removed after the OT update in the following CL.
-// The implementation will be done in lowpan.
-extern "C" void otPlatTrelNotifyPeerSocketAddressDifference(otInstance *aInstance,
-                                                            const otSockAddr *aPeerSockAddr,
-                                                            const otSockAddr *aRxSockAddr) {
-  OT_UNUSED_VARIABLE(aInstance);
-  OT_UNUSED_VARIABLE(aPeerSockAddr);
-  OT_UNUSED_VARIABLE(aRxSockAddr);
-}
-
 #endif  // OPENTHREAD_250225

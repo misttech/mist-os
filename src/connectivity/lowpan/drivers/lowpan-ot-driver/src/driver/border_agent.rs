@@ -46,7 +46,7 @@ where
 
     let mut border_agent_state = BorderAgentState::HIGH_AVAILABILITY;
 
-    if ot_instance.border_agent_get_state() != ot::BorderAgentState::Stopped {
+    if ot_instance.border_agent_is_active() == true {
         border_agent_state |= BorderAgentState::CONNECTION_MODE_PSKC;
     }
 
@@ -248,7 +248,7 @@ impl<OT: ot::InstanceInterface, NI, BI> OtDriver<OT, NI, BI> {
             let driver_state = self.driver_state.lock();
             let ot_instance = &driver_state.ot_instance;
             txt.extend(calc_meshcop_service_txt(ot_instance, &vendor, &product));
-            let port = if ot_instance.border_agent_get_state() != ot::BorderAgentState::Stopped {
+            let port = if ot_instance.border_agent_is_active() == true {
                 ot_instance.border_agent_get_udp_port()
             } else {
                 // The following comment is from the original ot-br-posix implementation:

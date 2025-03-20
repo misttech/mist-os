@@ -23,6 +23,10 @@ extern "C" {
         instance: *mut otsys::otInstance,
         context: *const OtSysMainloopContext,
     );
+    pub fn platformSpinelManagerProcess(
+        instance: *mut otsys::otInstance,
+        context: *const OtSysMainloopContext,
+    );
     pub fn platformInfraIfInit(infra_if_idx: ot::NetifIndex) -> i32;
     pub fn platformInfraIfOnReceiveIcmp6Msg(instance: *mut otsys::otInstance);
 }
