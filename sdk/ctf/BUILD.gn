@@ -68,6 +68,7 @@ group("ctf") {
     ":manifests",
     ":summarize_ctf_fidl_methods($default_toolchain)",
     ":tests",
+    "//src/testing/fidl_coverage:fidl_coverage_py_bin",
   ]
 }
 
