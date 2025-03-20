@@ -890,10 +890,27 @@ fn negate_pid(pid: pid_t) -> Result<pid_t, Errno> {
 // Syscalls for arch32 usage
 #[cfg(feature = "arch32")]
 mod arch32 {
+    use crate::task::CurrentTask;
+    use crate::vfs::FdNumber;
+    use starnix_sync::{Locked, Unlocked};
+    use starnix_uapi::errors::Errno;
+    use starnix_uapi::signals::SigSet;
+    use starnix_uapi::user_address::UserRef;
+
+    pub fn sys_arch32_signalfd(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        fd: FdNumber,
+        mask_addr: UserRef<SigSet>,
+        mask_size: usize,
+    ) -> Result<FdNumber, Errno> {
+        super::sys_signalfd4(locked, current_task, fd, mask_addr, mask_size, 0)
+    }
+
     pub use super::{
         sys_rt_sigaction as sys_arch32_rt_sigaction,
         sys_rt_sigtimedwait as sys_arch32_rt_sigtimedwait,
-        sys_sigaltstack as sys_arch32_sigaltstack,
+        sys_sigaltstack as sys_arch32_sigaltstack, sys_signalfd4 as sys_arch32_signalfd4,
     };
 }
 
